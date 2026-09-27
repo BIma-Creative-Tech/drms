@@ -74,3 +74,8 @@ export const S2A_ADMIN_VIEWS = {
 export const S3E_ADMIN_VIEWS = {
   notifications: { Component: '@/admin/views/Notifikasi#NotificationsView', path: '/notifikasi' as const, exact: true, meta: { title: 'Notifikasi' } },
 }
+
+/** ADR 0017: "Keamanan akun" — optional self-service 2FA of the caller's own account (avatar menu). */
+export const ACCOUNT_ADMIN_VIEWS = {
+  accountSecurity: { Component: '@/admin/views/KeamananAkun#KeamananAkunView', path: '/keamanan-akun' as const, exact: true, meta: { title: 'Keamanan akun' } },
+}

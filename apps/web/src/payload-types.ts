@@ -1590,7 +1590,9 @@ export interface AuditLog {
     | 'access_denied'
     | 'approval_skipped'
     | 'retention_purge'
-    | 'import';
+    | 'import'
+    | '2fa_enabled'
+    | '2fa_disabled';
   field?: string | null;
   lineNo?: number | null;
   oldValue?:

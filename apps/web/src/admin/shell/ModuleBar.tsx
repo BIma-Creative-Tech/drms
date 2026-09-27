@@ -17,7 +17,8 @@ import type { NavUser } from './modules-server'
  * Odoo-style top bar (client). Left: launcher button (⊞ → /admin) + current module. Middle: the
  * module menu — an unlabelled section = plain links, a labelled section with several items = ▾
  * dropdown; the active entry carries an animated pill (motion layoutId). Right: bell (server node)
- * + avatar menu (profile & signature, light/dark theme, logout = the existing LogoutButton form).
+ * + avatar menu (profile & signature, account security / 2FA, light/dark theme, logout = the existing
+ * LogoutButton form).
  * Compact mode (≤ 768px OR the menu does not fit): ☰ opens a sheet with the whole module menu —
  * no horizontal scroll at 390px. Keyboard: ←/→/Home/End between top-level entries, ↓/Enter/Space
  * opens a dropdown, ↑/↓ inside, Esc closes and returns focus, visible focus rings (custom.scss),
@@ -219,6 +220,10 @@ function AvatarMenu({ user, logout, open, setOpen }: { user: NavUser; logout: Re
             <Link href={profileHref(user)} className="pk-bar__menu-link" data-pk-nav-link="profile" onClick={() => close(false)}>
               <Icon name="userEdit" size={18} />
               <span className="pk-bar__label">Profil &amp; tanda tangan</span>
+            </Link>
+            <Link href="/admin/keamanan-akun" className="pk-bar__menu-link" data-pk-nav-link="account-security" onClick={() => close(false)}>
+              <Icon name="shieldLock" size={18} />
+              <span className="pk-bar__label">Keamanan akun</span>
             </Link>
             <button type="button" className="pk-bar__menu-link" onClick={() => setTheme(next)} data-pk-theme-toggle={next}>
               <Icon name={theme === 'dark' ? 'sun' : 'moon'} size={18} />

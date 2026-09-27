@@ -8,6 +8,7 @@ import { isRole } from '@/access/roles'
 import { oidcTxCookieName, readCookie, serializeCookie, sessionCookieName } from '@/auth/cookies'
 import { getWebOidcConfig, openTx } from '@/auth/oidc'
 import { auditLoginFailed, createWebSession } from '@/auth/sessions'
+import { handleAccountActionCallback } from '@/auth/two-factor'
 import { getEnv } from '@/lib/env'
 
 export const dynamic = 'force-dynamic'
@@ -16,6 +17,9 @@ const fail = (status: number, msg: string) =>
   new Response(msg, { status, headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' } })
 
 export async function GET(request: NextRequest): Promise<Response> {
+  // ADR 0017: return leg of a self-service 2FA action (own cookie + state) — no new session.
+  const accountAction = await handleAccountActionCallback(request)
+  if (accountAction) return accountAction
   const env = getEnv()
   const payload = await getPayload({ config })
   const txCookie = readCookie(request.headers.get('cookie'), oidcTxCookieName(env.AUTH_COOKIE_INSECURE))

@@ -71,6 +71,10 @@ export function installFakeKeycloak(): { calls: KcCall[]; users: Map<string, { e
       rec('executeActionsEmail', id, actions)
       throw new Error('SMTP not configured') // mirrors the realm today (runbook): must be non-fatal
     },
+    async listUserCredentials(id) {
+      rec('listUserCredentials', id)
+      return []
+    },
   }
   setKeycloakAdmin(fake)
   return { calls, users }

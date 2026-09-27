@@ -55,6 +55,10 @@ export const AUDIT_ACTIONS = [
   'retention_purge',
   // S3b / E11: go-live data import (one row per changed master + one summary row per run).
   'import',
+  // ADR 0017: optional self-service 2FA — a user turned TOTP on/off for their own account
+  // (Keycloak application-initiated action, outcome verified through the Admin API).
+  '2fa_enabled',
+  '2fa_disabled',
 ] as const
 export type AuditAction = (typeof AUDIT_ACTIONS)[number]
 
