@@ -10,6 +10,7 @@ import '../../../shared/widgets/module_tile.dart';
 import '../../addendum/presentation/addendum_providers.dart';
 import '../../app_config/application/app_config_providers.dart';
 import '../../app_config/domain/app_config.dart';
+import '../../app_config/presentation/release_notes.dart';
 import '../../approvals/application/inbox_providers.dart';
 import '../../auth/application/auth_controller.dart';
 import '../../auth/domain/user_profile.dart';
@@ -32,7 +33,8 @@ class HomeScreen extends ConsumerWidget {
     final profile = ref.watch(currentProfileProvider);
     if (profile == null) return const SizedBox.shrink();
     final gate = ref.watch(versionGateProvider);
-    final latest = ref.watch(appConfigProvider).value?.latestAppVersion;
+    final appConfig = ref.watch(appConfigProvider).value;
+    final latest = appConfig?.latestAppVersion;
     final kind = profile.homeKind;
     final attendanceOn = ref.watch(appConfigProvider).value?.syncAttendance ?? false;
     final openProgress = profile.canReadProgress ? (ref.watch(openProgressDraftsProvider).value?.length ?? 0) : 0;
@@ -152,8 +154,14 @@ class HomeScreen extends ConsumerWidget {
                   textColor: Theme.of(context).colorScheme.onErrorContainer,
                 ),
               ),
-            if (gate == VersionGate.updateAvailable && latest != null)
-              Padding(padding: const EdgeInsets.only(top: 8), child: Text(t.updateAvailable(latest))),
+            if (gate == VersionGate.updateAvailable && appConfig != null && latest != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 12),
+                child: _UpdateBanner(
+                  title: t.updateAvailable(latest),
+                  onTap: () => showUpdateAvailableSheet(context, appConfig),
+                ),
+              ),
             const SizedBox(height: 20),
             // Launcher tiles first so every role reaches its menu without scrolling (user decision 2026-09-27).
             if (kpis != null) _SectionTitle(t.homeActionsTitle),
@@ -169,6 +177,35 @@ class HomeScreen extends ConsumerWidget {
             ],
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// "Versi baru tersedia" on home (primary tint, like the role pill) → sheet with release notes + link.
+class _UpdateBanner extends StatelessWidget {
+  const _UpdateBanner({required this.title, required this.onTap});
+  final String title;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return Card(
+      key: const Key('update-available-banner'),
+      margin: EdgeInsets.zero,
+      color: Color.alphaBlend(
+        scheme.primary.withValues(alpha: theme.brightness == Brightness.dark ? 0.18 : 0.08),
+        scheme.surfaceContainerLow,
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: ListTile(
+        onTap: onTap,
+        leading: Icon(Icons.system_update, color: scheme.primary),
+        title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
+        subtitle: Text(AppLocalizations.of(context).updateAvailableTap),
+        trailing: const Icon(Icons.chevron_right),
       ),
     );
   }

@@ -86,6 +86,9 @@ Future<void> _shot(
   bool signedIn = true,
   String? showKey,
   List<Override> overrides = const [],
+  AuthController Function()? authController,
+  Future<void> Function(WidgetTester tester)? act,
+  AppConfig appConfig = const AppConfig(syncAttendance: true),
 }) async {
   // flutter_test paints shadows as solid black outlines unless this is off.
   debugDisableShadows = false;
@@ -118,8 +121,8 @@ Future<void> _shot(
         deviceIdentityProvider.overrideWithValue(testDevice()),
         databaseProvider.overrideWithValue(db),
         connectivityProvider.overrideWith(() => FakeConnectivity(true)),
-        authControllerProvider.overrideWith(() => FakeAuth(auth)),
-        appConfigProvider.overrideWith((ref) async => const AppConfig(syncAttendance: true)),
+        authControllerProvider.overrideWith(authController ?? () => FakeAuth(auth)),
+        appConfigProvider.overrideWith((ref) async => appConfig),
         integrityReportProvider.overrideWith((ref) async => null),
         notificationsProvider.overrideWith((ref) async => const NotificationPage([], 3, null)),
         outboxCountsProvider.overrideWith((ref) => Stream.value(const OutboxCounts())),
@@ -224,6 +227,31 @@ void main() {
     ('profile', {Role.staff}, '/profile', true, null),
     ('login', {Role.staff}, '/login', false, null),
   ];
+  // Release notes (web 0.4.2 `releaseNotes`): home banner, its sheet, and the blocking update screen.
+  const notes = [
+    'Bisa masuk dengan kode Authenticator: ketuk "Pakai kode Authenticator" di layar masuk, lalu isi 6 angka dari aplikasi Authenticator di HP Anda.',
+    'Pesan salah masuk lebih jelas: email/username, kata sandi, atau kode Authenticator salah.',
+    'Akun tanpa kode Authenticator masuk seperti biasa, tidak ada yang berubah.',
+  ];
+  const url = 'https://drms-kas.bimacreative.tech/unduh/proyekkas.apk';
+  final updateShots = <String, (AppConfig, Future<void> Function(WidgetTester)?)>{
+    'update-banner': (const AppConfig(latestAppVersion: '0.2.1', appDownloadUrl: url, releaseNotes: notes), null),
+    'update-sheet': (
+      const AppConfig(latestAppVersion: '0.2.1', appDownloadUrl: url, releaseNotes: notes),
+      (tester) => tester.tap(find.byKey(const Key('update-available-banner'))),
+    ),
+    'update-required': (
+      const AppConfig(minAppVersion: '0.2.0', latestAppVersion: '0.2.1', appDownloadUrl: url, releaseNotes: notes),
+      null,
+    ),
+  };
+  for (final MapEntry(key: name, value: (cfg, act)) in updateShots.entries) {
+    for (final b in Brightness.values) {
+      testWidgets('$name ${b.name}', (tester) async {
+        await _shot(tester, name: name, brightness: b, roles: {Role.staff}, appConfig: cfg, act: act);
+      });
+    }
+  }
   for (final (name, roles, location, signedIn, showKey) in shots) {
     for (final b in Brightness.values) {
       testWidgets('$name ${b.name}', (tester) async {

@@ -145,6 +145,18 @@ class AppLocalizationsId extends AppLocalizations {
   }
 
   @override
+  String get updateAvailableTap => 'Ketuk untuk melihat yang baru dan cara memperbarui.';
+
+  @override
+  String get updateHowTo =>
+      'Pasang APK versi baru di atas aplikasi ini, tanpa menghapusnya. Data dan login tetap tersimpan.';
+
+  @override
+  String releaseNotesTitle(String version) {
+    return 'Yang baru di versi $version';
+  }
+
+  @override
   String get navHome => 'Beranda';
 
   @override

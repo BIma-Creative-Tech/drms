@@ -10,6 +10,7 @@ class AppConfig {
     this.syncExpenseDrafts = true,
     this.syncAttendance = false,
     this.syncProgressReports = false,
+    this.releaseNotes = const [],
   });
   final String? minAppVersion;
   final String? latestAppVersion;
@@ -26,6 +27,27 @@ class AppConfig {
   /// false (or an older server without the flag) reports are sent online only (POST /progress-reports).
   final bool syncProgressReports;
 
+  /// "Yang baru di versi [latestAppVersion]" — plain-text bullets (server ≥ web 0.4.2, only when the APK
+  /// published on /unduh is the latest version). Empty = nothing to show (older server, no notes).
+  final List<String> releaseNotes;
+
+  /// Server limits (apps/web src/lib/app-release.ts); applied again here so a bad payload cannot flood the UI.
+  static const releaseNotesMaxItems = 15;
+  static const releaseNoteMaxChars = 300;
+
+  static List<String> _notes(Object? raw) {
+    if (raw is! List) return const [];
+    final out = <String>[];
+    for (final n in raw) {
+      if (n is! String) continue;
+      final s = n.replaceAll(RegExp(r'\s+'), ' ').trim();
+      if (s.isEmpty) continue;
+      out.add(s.length > releaseNoteMaxChars ? '${s.substring(0, releaseNoteMaxChars - 1)}…' : s);
+      if (out.length == releaseNotesMaxItems) break;
+    }
+    return List.unmodifiable(out);
+  }
+
   factory AppConfig.fromJson(Map<String, dynamic> j) {
     String? s(String k) => j[k] is String && (j[k] as String).isNotEmpty ? j[k] as String : null;
     final features = j['features'] is Map<String, dynamic> ? j['features'] as Map<String, dynamic> : const {};
@@ -40,6 +62,7 @@ class AppConfig {
       syncExpenseDrafts: features['syncExpenseDrafts'] != false,
       syncAttendance: features['syncAttendance'] == true,
       syncProgressReports: features['syncProgressReports'] == true,
+      releaseNotes: _notes(j['releaseNotes']),
     );
   }
 }

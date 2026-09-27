@@ -337,6 +337,24 @@ abstract class AppLocalizations {
   /// **'Versi baru tersedia ({version}).'**
   String updateAvailable(String version);
 
+  /// No description provided for @updateAvailableTap.
+  ///
+  /// In id, this message translates to:
+  /// **'Ketuk untuk melihat yang baru dan cara memperbarui.'**
+  String get updateAvailableTap;
+
+  /// No description provided for @updateHowTo.
+  ///
+  /// In id, this message translates to:
+  /// **'Pasang APK versi baru di atas aplikasi ini, tanpa menghapusnya. Data dan login tetap tersimpan.'**
+  String get updateHowTo;
+
+  /// No description provided for @releaseNotesTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Yang baru di versi {version}'**
+  String releaseNotesTitle(String version);
+
   /// No description provided for @navHome.
   ///
   /// In id, this message translates to:

@@ -49,6 +49,23 @@ void main() {
       );
       expect(AppConfig.fromJson({'minAppVersion': '', 'latestAppVersion': 3}).minAppVersion, isNull);
     });
+
+    test('releaseNotes: optional, tolerant (non-strings/blank dropped, whitespace folded, ≤ 15 × ≤ 300)', () {
+      expect(AppConfig.fromJson({'latestVersion': '0.2.1'}).releaseNotes, isEmpty);
+      expect(AppConfig.fromJson({'releaseNotes': 'teks'}).releaseNotes, isEmpty);
+      expect(AppConfig.fromJson({'releaseNotes': null}).releaseNotes, isEmpty);
+      expect(
+        AppConfig.fromJson({
+          'releaseNotes': ['  Masuk dengan\nkode Authenticator. ', 3, '', '   ', null, 'Mode gelap.'],
+        }).releaseNotes,
+        ['Masuk dengan kode Authenticator.', 'Mode gelap.'],
+      );
+      final many = AppConfig.fromJson({'releaseNotes': List.generate(20, (i) => 'x' * (i == 0 ? 400 : 5))})
+          .releaseNotes;
+      expect(many, hasLength(15));
+      expect(many.first, hasLength(300));
+      expect(many.first.endsWith('…'), isTrue);
+    });
   });
 
   test('jwt claims (unverified, only for sub/exp)', () {
