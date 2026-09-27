@@ -195,7 +195,7 @@ function upload(s, kind, bin, name, metric) {
   for (let attempt = 0; attempt < 4; attempt++) {
     const res = http.post(`${BASE}/api/v1/media/${kind}`, { file: http.file(bin, name, 'image/jpeg') }, { headers: hdr(s, false), tags: { name: metric } })
     let code = null
-    if (res.status === 503) { try { code = res.json('code') } catch (_) { code = null } }
+    if (res.status === 503) { try { code = res.json('code') } catch { code = null } }
     if (res.status === 503 && code === 'UPLOAD_BUSY' && attempt < 3) {
       uploadBusy.add(1, { kind })
       T.upload_busy_503.add(res.timings.duration)
