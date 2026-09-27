@@ -21,6 +21,19 @@ export const APK_FILENAME_RE = /^proyekkas-[0-9]+\.[0-9]+\.[0-9]+-arm64\.apk$/
 const VERSION_RE = /^[0-9]+\.[0-9]+\.[0-9]+$/
 const CERT_RE = /^([0-9A-F]{2}:){31}[0-9A-F]{2}$/
 
+/** Release notes limits — the same numbers are enforced by scripts/publish-apk.mjs (`--notes`). */
+export const NOTES_MAX_ITEMS = 15
+export const NOTE_MAX_CHARS = 300
+const CONTROL_RE = /[\u0000-\u001f\u007f-\u009f]/
+
+/** One release-note bullet: plain text (rendered as text, never HTML), single line, 1…300 chars. */
+export const releaseNoteSchema = z
+  .string()
+  .min(1)
+  .max(NOTE_MAX_CHARS)
+  .refine((s) => s.trim() === s, 'no leading/trailing whitespace')
+  .refine((s) => !CONTROL_RE.test(s), 'no control characters')
+
 export const releaseManifestSchema = z
   .object({
     version: z.string().regex(VERSION_RE, 'x.y.z'),
@@ -31,6 +44,11 @@ export const releaseManifestSchema = z
     /** Byte size written by the publish script; the download refuses a file whose size differs (partial copy). */
     size: z.number().int().positive(),
     publishedAt: z.iso.datetime({ offset: true }),
+    /**
+     * "Yang baru di versi …" — user-facing Indonesian bullets from docs/release-notes/apk/<version>.md
+     * (`publish-apk.mjs --notes`). Optional: manifests written before the field existed stay valid.
+     */
+    notes: z.array(releaseNoteSchema).min(1).max(NOTES_MAX_ITEMS).optional(),
   })
   .strict()
   .refine((m) => m.file === `proyekkas-${m.version}-arm64.apk`, { path: ['file'], message: 'must match version' })
@@ -90,6 +108,16 @@ export async function readLatestRelease(media: string = mediaDir()): Promise<App
   } catch {
     return null
   }
+}
+
+/**
+ * Release notes of `version` when it is the currently published (downloadable) release, else null — the
+ * app-config endpoint only attaches notes that belong to the version it announces as latest.
+ */
+export async function releaseNotesFor(version: string | null, media: string = mediaDir()): Promise<string[] | null> {
+  if (!version) return null
+  const rel = await readLatestRelease(media)
+  return rel && rel.manifest.version === version && rel.manifest.notes?.length ? rel.manifest.notes : null
 }
 
 /** Stable, human-facing download name: `ProyekKas-0.2.0.apk`. */

@@ -1,4 +1,7 @@
 import { randomUUID } from 'node:crypto'
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
 
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 
@@ -6,6 +9,8 @@ import { resetAppConfigCache } from '@/api/v1/endpoints/app'
 import { resetMinVersionCache } from '@/api/v1/http'
 import { resetEnvCache } from '@/lib/env'
 import { resetRateLimits } from '@/lib/rate-limit'
+
+import { publishApk } from '../../scripts/publish-apk.mjs'
 
 import { accessToken, auditRows, getTestPayload, http, installLocalJwks, registerDevice, sqlAs, type TestUser, updateCompany } from './helpers'
 import { api, draftBody, makeWorld, uploadMedia, type FlowUser, type World } from './flow-world'
@@ -394,6 +399,35 @@ describe('GET /api/v1/app/config (public version gate)', () => {
       await p.updateGlobal({ slug: 'company-settings', data: { minAppVersion: null, latestAppVersion: null, appDownloadUrl: null }, overrideAccess: true /* SYSTEM-WRITE: fixture */ })
       resetAppConfigCache()
       resetMinVersionCache()
+    }
+  })
+
+  it('releaseNotes of latestVersion from the /unduh manifest; omitted for another version or without notes', async () => {
+    const p = await getTestPayload()
+    const media = mkdtempSync(path.join(os.tmpdir(), 'pk-appcfg-media-'))
+    const prevMedia = process.env.MEDIA_DIR
+    const apk = path.join(media, 'in.apk')
+    writeFileSync(apk, Buffer.concat([Buffer.from([0x50, 0x4b, 0x03, 0x04]), Buffer.from('apk')]))
+    const notesMd = path.join(media, 'notes.md')
+    writeFileSync(notesMd, '# ProyekKas 1.4.1\n\n- Bisa masuk dengan kode Authenticator.\n- Pesan salah login lebih jelas.\n')
+    const cert = 'E3:09:A8:92:AE:7F:EB:C2:62:98:EA:4E:60:3F:6A:38:50:86:E5:AA:FF:47:9B:4F:A9:1D:70:18:01:17:02:53'
+    process.env.MEDIA_DIR = media
+    try {
+      await publishApk({ apk, version: '1.4.1', cert, mediaDir: media, notes: notesMd })
+      await p.updateGlobal({ slug: 'company-settings', data: { latestAppVersion: '1.4.1' }, overrideAccess: true /* SYSTEM-WRITE: fixture */ })
+      resetAppConfigCache()
+      const r = await http('GET', '/api/v1/app/config?version=1.4.0')
+      expect(r.status).toBe(200)
+      expect((r.body as { releaseNotes?: string[] }).releaseNotes).toEqual(['Bisa masuk dengan kode Authenticator.', 'Pesan salah login lebih jelas.'])
+
+      await p.updateGlobal({ slug: 'company-settings', data: { latestAppVersion: '1.5.0' }, overrideAccess: true /* SYSTEM-WRITE: fixture */ })
+      resetAppConfigCache()
+      expect((await http('GET', '/api/v1/app/config')).body).not.toHaveProperty('releaseNotes')
+    } finally {
+      process.env.MEDIA_DIR = prevMedia
+      await p.updateGlobal({ slug: 'company-settings', data: { latestAppVersion: null }, overrideAccess: true /* SYSTEM-WRITE: fixture */ })
+      resetAppConfigCache()
+      rmSync(media, { recursive: true, force: true })
     }
   })
 

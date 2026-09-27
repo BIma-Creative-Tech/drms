@@ -136,6 +136,10 @@
 
 .pk-pub__steps { margin: 0 0 1rem; padding-left: 1.25rem; }
 .pk-pub__steps li { margin-bottom: 0.5rem; }
+.pk-pub__notes { margin: 0; padding-left: 1.25rem; }
+.pk-pub__notes li { margin-bottom: 0.375rem; overflow-wrap: anywhere; }
+.pk-pub__notes li:last-child { margin-bottom: 0; }
+.pk-pub__notes li::marker { color: var(--primary); }
 .pk-pub__hint { margin: 0; color: var(--muted-fg); font-size: 0.9375rem; }
 
 .pk-pub__verify summary { margin: 0; cursor: pointer; }

@@ -3755,6 +3755,13 @@ export const openapiDocument = {
             ],
             "description": "APK download page (side-load); null = not published yet (\"hubungi admin\")."
           },
+          "releaseNotes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Plain-text \"Yang baru di versi …\" bullets (Indonesian, ≤ 15 × ≤ 300 chars) of latestVersion, from the /unduh release manifest; omitted when the published APK is not latestVersion or has no notes."
+          },
           "updateRequired": {
             "type": [
               "boolean",

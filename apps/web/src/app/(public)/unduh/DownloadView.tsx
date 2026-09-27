@@ -62,6 +62,20 @@ export function DownloadView({ release }: { release: { manifest: ReleaseManifest
             </a>
           </section>
 
+          {release.manifest.notes?.length ? (
+            <section className="pk-pub__card" aria-labelledby="pk-pub-baru">
+              <h2 id="pk-pub-baru" className="pk-pub__h2">
+                Yang baru di versi {release.manifest.version}
+              </h2>
+              {/* Plain text from the manifest (React escapes it) — never rendered as HTML/markdown. */}
+              <ul className="pk-pub__notes">
+                {release.manifest.notes.map((note, i) => (
+                  <li key={i}>{note}</li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
+
           <section className="pk-pub__card" aria-labelledby="pk-pub-pasang">
             <h2 id="pk-pub-pasang" className="pk-pub__h2">
               Cara memasang

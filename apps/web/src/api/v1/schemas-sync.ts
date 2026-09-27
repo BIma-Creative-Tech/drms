@@ -355,6 +355,13 @@ export const AppConfig = z
     minSupportedVersion: z.string().nullable().meta({ description: 'Below this every authenticated call answers 426.' }),
     latestVersion: z.string().nullable(),
     downloadUrl: z.string().nullable().meta({ description: 'APK download page (side-load); null = not published yet ("hubungi admin").' }),
+    releaseNotes: z
+      .array(z.string())
+      .optional()
+      .meta({
+        description:
+          'Plain-text "Yang baru di versi …" bullets (Indonesian, ≤ 15 × ≤ 300 chars) of latestVersion, from the /unduh release manifest; omitted when the published APK is not latestVersion or has no notes.',
+      }),
     updateRequired: z.boolean().nullable().meta({ description: 'Only with ?version=.' }),
     updateAvailable: z.boolean().nullable().meta({ description: 'Only with ?version=.' }),
     timezone: z.string().meta({ description: 'Company display timezone (IANA).' }),

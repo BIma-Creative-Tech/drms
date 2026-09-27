@@ -1,5 +1,6 @@
 import type { PayloadRequest } from 'payload'
 
+import { releaseNotesFor } from '@/lib/app-release'
 import { getEnv } from '@/lib/env'
 import { settingsOf } from '@/domain/companies'
 import { DEFAULT_TZ } from '@/lib/time'
@@ -16,6 +17,8 @@ type GateSettings = {
   syncExpenseDraftsEnabled: boolean
   syncAttendanceEnabled: boolean
   syncProgressReportsEnabled: boolean
+  /** Notes of the published APK (media volume `app-release/latest.json`) when it IS latestAppVersion. */
+  releaseNotes: string[] | null
 }
 
 let cache: { value: GateSettings; at: number } | undefined
@@ -24,20 +27,22 @@ export function resetAppConfigCache(): void {
   cache = undefined
 }
 
-/** Public endpoint → settings cached 60 s in-process (no DB read per anonymous request). */
+/** Public endpoint → settings (+ release notes from the manifest) cached 60 s in-process (no DB/disk read per anonymous request). */
 async function gateSettings(req: PayloadRequest): Promise<GateSettings> {
   if (cache && Date.now() - cache.at < 60_000) return cache.value
   // App gate = app-wide global; TZ + feature flags are per PT (ADR 0016 §1). Public → no PT known:
   // company #1. MC3: per-PT flags in /me `companies[]` (the APK then decides per selected PT).
   const s = await settingsOf(req.payload, null, req)
+  const latestAppVersion = s.latestAppVersion || null
   const value: GateSettings = {
     minAppVersion: s.minAppVersion || null,
-    latestAppVersion: s.latestAppVersion || null,
+    latestAppVersion,
     appDownloadUrl: s.appDownloadUrl || null,
     timezone: s.timezone || DEFAULT_TZ,
     syncExpenseDraftsEnabled: s.syncExpenseDraftsEnabled !== false,
     syncAttendanceEnabled: s.syncAttendanceEnabled === true,
     syncProgressReportsEnabled: s.syncProgressReportsEnabled !== false,
+    releaseNotes: await releaseNotesFor(latestAppVersion),
   }
   cache = { value, at: Date.now() }
   return value
@@ -47,7 +52,8 @@ async function gateSettings(req: PayloadRequest): Promise<GateSettings> {
  * GET /api/v1/app/config — APK version gate + client configuration (ADR 0010 decision 13).
  * PUBLIC: the APK must learn that it is too old BEFORE login, and old versions get 426 on every
  * authenticated call. Returns only non-sensitive values (versions, download URL, company TZ,
- * feature flags, sync limits). Values: company-settings (admin/owner editable) + env (package).
+ * feature flags, sync limits, release notes of the latest APK). Values: company-settings (admin/owner
+ * editable) + env (package) + the /unduh release manifest (notes only when its version = latestVersion).
  */
 export const appConfigEndpoint = v1({
   path: '/app/config',
@@ -62,6 +68,7 @@ export const appConfigEndpoint = v1({
       minSupportedVersion: s.minAppVersion,
       latestVersion: s.latestAppVersion,
       downloadUrl: s.appDownloadUrl,
+      ...(s.releaseNotes ? { releaseNotes: s.releaseNotes } : {}),
       updateRequired: v ? (s.minAppVersion ? compareVersions(v, s.minAppVersion) < 0 : false) : null,
       updateAvailable: v ? (s.latestAppVersion ? compareVersions(v, s.latestAppVersion) < 0 : false) : null,
       timezone: s.timezone,

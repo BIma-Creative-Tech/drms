@@ -15,9 +15,10 @@ import {
   readLatestRelease,
   releaseFilePath,
   releaseManifestSchema,
+  releaseNotesFor,
 } from '@/lib/app-release'
 
-import { publishApk } from '../../scripts/publish-apk.mjs'
+import { parseNotesMarkdown, publishApk } from '../../scripts/publish-apk.mjs'
 
 /** Public APK download: manifest validation, /unduh/proyekkas.apk handler, publish script, page markup. */
 const CERT = 'E3:09:A8:92:AE:7F:EB:C2:62:98:EA:4E:60:3F:6A:38:50:86:E5:AA:FF:47:9B:4F:A9:1D:70:18:01:17:02:53'
@@ -66,6 +67,14 @@ describe('release manifest schema', () => {
     ['unknown key', { extra: 1 }],
   ])('rejects %s', (_n, over) => {
     expect(releaseManifestSchema.safeParse({ ...valid, ...over }).success).toBe(false)
+  })
+
+  it('notes: optional plain-text bullets, 1…15 × 1…300 chars, no control characters', () => {
+    expect(releaseManifestSchema.safeParse({ ...valid, notes: ['Tampilan baru.', 'Mode gelap.'] }).success).toBe(true)
+    expect(releaseManifestSchema.safeParse({ ...valid, notes: Array(15).fill('x'.repeat(300)) }).success).toBe(true)
+    for (const notes of [[], Array(16).fill('x'), ['x'.repeat(301)], [''], [' spasi'], ['baris\nkedua'], ['tab\t'], [1], 'teks']) {
+      expect(releaseManifestSchema.safeParse({ ...valid, notes }).success, JSON.stringify(notes)).toBe(false)
+    }
   })
 
   it('parseManifest returns null on invalid JSON', () => {
@@ -171,6 +180,69 @@ describe('scripts/publish-apk.mjs', () => {
   })
 })
 
+describe('release notes (publish-apk --notes → manifest → app config)', () => {
+  const NOTES_MD = [
+    '# ProyekKas 0.2.1',
+    '',
+    '- Bisa masuk dengan **kode Authenticator**.',
+    '* Pesan salah login lebih jelas,',
+    '  termasuk bila kode salah.',
+    '- Lihat [halaman unduh](https://drms-kas.example.test/unduh) dan `Profil`.',
+    '',
+  ].join('\n')
+  const notesFile = (text: string) => {
+    const p = path.join(tmpIn, 'notes.md')
+    writeFileSync(p, text)
+    return p
+  }
+
+  it('parses bullets, continuation lines, title and inline markdown into plain text', () => {
+    expect(parseNotesMarkdown(NOTES_MD)).toEqual([
+      'Bisa masuk dengan kode Authenticator.',
+      'Pesan salah login lebih jelas, termasuk bila kode salah.',
+      'Lihat halaman unduh dan Profil.',
+    ])
+    expect(parseNotesMarkdown('\uFEFF- a\r\n- b\r\n')).toEqual(['a', 'b'])
+  })
+
+  it.each([
+    ['no bullet', '# Judul saja\n'],
+    ['prose line', '- a\nParagraf biasa\n'],
+    ['too many bullets', Array.from({ length: 16 }, (_, i) => `- ${i}`).join('\n')],
+    ['too long bullet', `- ${'x'.repeat(301)}`],
+    ['control char', '- a\u0007b'],
+  ])('refuses %s', (_n, md) => {
+    expect(() => parseNotesMarkdown(md)).toThrow(/--notes/)
+  })
+
+  it('stores notes in latest.json (schema-valid); without --notes the key is absent', async () => {
+    const { manifest } = await publishApk({ apk: inputApk(), version: '0.2.1', cert: CERT, mediaDir: media, notes: notesFile(NOTES_MD) })
+    const onDisk = JSON.parse(readFileSync(path.join(media, 'app-release', 'latest.json'), 'utf8'))
+    expect(onDisk.notes).toEqual(manifest.notes)
+    expect(onDisk.notes).toHaveLength(3)
+    expect(releaseManifestSchema.safeParse(onDisk).success).toBe(true)
+
+    const again = await publishApk({ apk: inputApk(), version: '0.2.1', cert: CERT, mediaDir: media })
+    expect('notes' in again.manifest).toBe(false)
+  })
+
+  it('a bad notes file fails before anything is copied or written', async () => {
+    await expect(publishApk({ apk: inputApk(), version: '0.2.1', cert: CERT, mediaDir: media, notes: notesFile('tanpa bullet') })).rejects.toThrow(/--notes/)
+    await expect(publishApk({ apk: inputApk(), version: '0.2.1', cert: CERT, mediaDir: media, notes: path.join(tmpIn, 'nope.md') })).rejects.toThrow(/notes file not found/)
+    expect(readdirSync(media)).toEqual([])
+  })
+
+  it('releaseNotesFor: notes only when the published release is that version and has notes', async () => {
+    expect(await releaseNotesFor('0.2.1', media)).toBeNull()
+    await publishApk({ apk: inputApk(), version: '0.2.1', cert: CERT, mediaDir: media, notes: notesFile(NOTES_MD) })
+    expect(await releaseNotesFor('0.2.1', media)).toHaveLength(3)
+    expect(await releaseNotesFor('0.2.2', media)).toBeNull()
+    expect(await releaseNotesFor(null, media)).toBeNull()
+    await publishApk({ apk: inputApk(), version: '0.2.1', cert: CERT, mediaDir: media })
+    expect(await releaseNotesFor('0.2.1', media)).toBeNull()
+  })
+})
+
 describe('/unduh page markup', () => {
   it('shows version, size, date, button, hashes, steps and the employees-only note', () => {
     const html = renderToStaticMarkup(React.createElement(DownloadView, { release: { manifest: { ...valid, size: 24_600_000 }, size: 24_600_000 } }))
@@ -184,6 +256,18 @@ describe('/unduh page markup', () => {
     expect(html).toContain('Izinkan dari sumber ini')
     expect(html).toContain('Hanya untuk karyawan PT DRMS')
     expect(html).not.toContain('<script')
+  })
+
+  it('"Yang baru di versi" lists the notes as escaped text; no section without notes', () => {
+    const notes = ['Tampilan baru selaras web.', '<script>alert(1)</script> & <b>tebal</b>']
+    const html = renderToStaticMarkup(React.createElement(DownloadView, { release: { manifest: { ...valid, notes }, size: 10 } }))
+    expect(html).toContain('Yang baru di versi 0.2.0')
+    expect(html).toContain('<li>Tampilan baru selaras web.</li>')
+    expect(html).toContain('&lt;script&gt;alert(1)&lt;/script&gt; &amp; &lt;b&gt;tebal&lt;/b&gt;')
+    expect(html).not.toContain('<script')
+    expect(html).not.toContain('<b>')
+    const plain = renderToStaticMarkup(React.createElement(DownloadView, { release: { manifest: valid, size: 10 } }))
+    expect(plain).not.toContain('Yang baru')
   })
 
   it('without a release: no button, a clear message', () => {
