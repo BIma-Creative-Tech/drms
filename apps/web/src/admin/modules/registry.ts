@@ -106,10 +106,10 @@ export const MODULES: readonly ModuleDef[] = [
         items: [
           { view: '/progress', label: 'Progress project', roles: OFFICE_PM, navKey: 'progress' },
           { view: '/progress/laporan', label: 'Laporan progress', roles: OFFICE_PM, navKey: 'laporan-progress' },
-          { collection: 'progress-reports' },
+          { collection: 'progress-reports', label: 'Data laporan progress' },
         ],
       },
-      { label: 'Addendum', items: [{ view: '/addendum', label: 'Addendum RAB', roles: OFFICE_PM, navKey: 'addendum' }, { collection: 'budget-addenda' }] },
+      { label: 'Addendum', items: [{ view: '/addendum', label: 'Addendum RAB', roles: OFFICE_PM, navKey: 'addendum' }, { collection: 'budget-addenda', label: 'Data addendum' }] },
     ],
   },
   {
@@ -216,9 +216,9 @@ export const MODULES: readonly ModuleDef[] = [
       {
         items: [
           { view: '/audit-log', label: 'Audit Log', roles: OFFICE_ADMIN, navKey: 'audit-log' },
-          { collection: 'audit-logs' },
+          { collection: 'audit-logs', label: 'Data audit log' },
           { view: '/notifikasi', label: 'Notifikasi saya', navKey: 'notifikasi-saya' },
-          { collection: 'notifications' },
+          { collection: 'notifications', label: 'Data notifikasi' },
         ],
       },
     ],

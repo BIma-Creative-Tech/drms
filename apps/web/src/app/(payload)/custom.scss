@@ -426,6 +426,11 @@ $pk-modules: dashboard, persetujuan, proyek, keuangan, absensi, laporan, penggun
     width: 100%;
   }
 
+  // Launcher (/admin): no (empty) breadcrumb row above the greeting.
+  .template-default__wrap:has(.pk-launcher) > .app-header {
+    display: none;
+  }
+
   // Payload's sticky rows sit below the bar instead of under it.
   .doc-controls,
   .edit-many__document-actions,
@@ -447,7 +452,7 @@ $pk-modules: dashboard, persetujuan, proyek, keuangan, absensi, laporan, penggun
     background-color: color-mix(in oklab, var(--pk-card) 82%, transparent);
     backdrop-filter: blur(16px) saturate(160%);
     color: var(--pk-fg);
-    font-size: 0.9rem;
+    font-size: 14px; // px: Payload's root font-size is 13px, rem would shrink the bar
   }
 
   .pk-bar__start,
@@ -511,7 +516,7 @@ $pk-modules: dashboard, persetujuan, proyek, keuangan, absensi, laporan, penggun
     background: linear-gradient(135deg, var(--pk-light-primary), var(--pk-mod-proyek-from));
     color: #FFFFFF;
     font-family: var(--pk-font-heading);
-    font-size: 0.8rem;
+    font-size: 13px;
     font-weight: 700;
     letter-spacing: 0.02em;
 
@@ -552,7 +557,7 @@ $pk-modules: dashboard, persetujuan, proyek, keuangan, absensi, laporan, penggun
     border-radius: 12px;
     color: var(--pk-fg);
     font-family: var(--pk-font-heading);
-    font-size: 1.02rem;
+    font-size: 17px;
     font-weight: 700;
     letter-spacing: -0.01em;
     text-decoration: none;
@@ -570,7 +575,7 @@ $pk-modules: dashboard, persetujuan, proyek, keuangan, absensi, laporan, penggun
 
   .pk-bar__brand-sub {
     color: var(--pk-muted-fg);
-    font-size: 0.72rem;
+    font-size: 11px;
     font-weight: 600;
     letter-spacing: 0.16em;
   }
@@ -720,7 +725,7 @@ $pk-modules: dashboard, persetujuan, proyek, keuangan, absensi, laporan, penggun
 
     span {
       color: var(--pk-muted-fg);
-      font-size: 0.8rem;
+      font-size: 13px;
     }
   }
 
@@ -818,7 +823,7 @@ $pk-modules: dashboard, persetujuan, proyek, keuangan, absensi, laporan, penggun
   .pk-sheet__label {
     padding: 6px 10px 4px;
     color: var(--pk-muted-fg);
-    font-size: 0.75rem;
+    font-size: 12px;
     font-weight: 700;
     letter-spacing: 0.08em;
     text-transform: uppercase;
@@ -843,12 +848,12 @@ $pk-modules: dashboard, persetujuan, proyek, keuangan, absensi, laporan, penggun
   .pk-launcher__hello {
     margin: 0;
     color: var(--pk-muted-fg);
-    font-size: 1rem;
+    font-size: 16px;
   }
 
   .pk-launcher__name {
     margin: 2px 0 10px;
-    font-size: clamp(1.6rem, 3.4vw, 2.3rem);
+    font-size: clamp(26px, 3.4vw, 36px);
     line-height: 1.15;
   }
 
@@ -860,6 +865,7 @@ $pk-modules: dashboard, persetujuan, proyek, keuangan, absensi, laporan, penggun
     justify-content: center;
     margin: 0;
     color: var(--pk-muted-fg);
+    font-size: 15px;
   }
 
   .pk-launcher__role-pill {
@@ -867,7 +873,7 @@ $pk-modules: dashboard, persetujuan, proyek, keuangan, absensi, laporan, penggun
     border-radius: 999px;
     background: color-mix(in oklab, var(--pk-primary) 12%, var(--pk-card));
     color: var(--pk-primary);
-    font-size: 0.8rem;
+    font-size: 13px;
     font-weight: 700;
   }
 
@@ -946,14 +952,14 @@ $pk-modules: dashboard, persetujuan, proyek, keuangan, absensi, laporan, penggun
 
   .pk-tile__label {
     font-family: var(--pk-font-heading);
-    font-size: 0.95rem;
+    font-size: 15px;
     font-weight: 600;
     line-height: 1.2;
   }
 
   .pk-tile__hint {
     color: var(--pk-muted-fg);
-    font-size: 0.78rem;
+    font-size: 12px;
     line-height: 1.3;
   }
 
@@ -963,7 +969,7 @@ $pk-modules: dashboard, persetujuan, proyek, keuangan, absensi, laporan, penggun
     }
 
     .pk-tile__label {
-      font-size: 0.82rem;
+      font-size: 13px;
     }
   }
 
