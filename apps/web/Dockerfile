@@ -62,6 +62,8 @@ RUN addgroup -S -g 1001 nextjs \
 COPY --from=build --chown=root:root /app/apps/web/.next/standalone ./
 COPY --from=build --chown=root:root /app/apps/web/.next/static ./apps/web/.next/static
 COPY --from=build --chown=root:root /app/apps/web/dist ./apps/web/dist
+# APK publish helper for /unduh (node built-ins only; runbook docs/proyekkas/runbooks/rilis-apk.md).
+COPY --from=build --chown=root:root /app/apps/web/scripts/publish-apk.mjs ./apps/web/scripts/publish-apk.mjs
 RUN mkdir -p /app/apps/web/.next/cache /data/media \
  && chown nextjs:nextjs /app/apps/web/.next/cache /data/media
 USER 1001:1001

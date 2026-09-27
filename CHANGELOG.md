@@ -120,6 +120,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   - Tests: web unit + integration (Keycloak mocked), `tests/kc/two-factor.kc.test.ts` against a real throwaway
     Keycloak 26.7.4 (`test-env/kc-setup.sh` gains a TEST-ONLY `proyekkas-web` client + user); mobile unit + widget.
   - Docs: ADR 0017; revisions in ADR 0012, `plans/fase1-golive.md` G1-3, ASVS checklist 4.3.1 / G-01 (decided).
+- **Public APK download on the DRMS server** (`apps/web`, branch `feat/apk-download-page`; user decision 2026-09-27
+  "host on the DRMS server"): `GET /unduh` — a public page in Indonesian (web-starter tokens/fonts, light/dark, 390 px,
+  server component, `noindex`): version, size, publish date (WITA), big **Unduh APK** button, install/update steps,
+  SHA-256 of the file and of the signing certificate, "Hanya untuk karyawan PT DRMS". `GET|HEAD /unduh/proyekkas.apk`
+  — stable URL for Pengaturan → "URL unduh APK": streams the current release with
+  `application/vnd.android.package-archive`, `attachment; filename="ProyekKas-<version>.apk"`, `Content-Length`,
+  `Cache-Control: no-cache` + `ETag` (= SHA-256, 304 on match), `nosniff`, `X-Robots-Tag`; 404 with an Indonesian
+  message while nothing is published. No login; the `/admin` gate and CSP nonce proxy are unchanged (own root layout
+  in route group `(public)`, no Payload, no client components).
+  - Files live in the existing media volume under `${MEDIA_DIR}/app-release/` with a manifest `latest.json`
+    validated strictly by zod (`src/lib/app-release.ts`: fixed file-name pattern, path kept inside the directory,
+    size must match → a partial copy is never served).
+  - `apps/web/scripts/publish-apk.mjs` (Node built-ins only, shipped in the runner image): copies an APK, computes
+    SHA-256, writes `latest.json` atomically, keeps the current + 2 previous versions; refuses a different file under
+    an already published version. Runbook `docs/proyekkas/runbooks/rilis-apk.md` (one-shot `docker run --rm` with the
+    running web image + media volume; no running container is touched).
+  - Tests: `tests/unit/apk-download.test.ts` (manifest schema incl. traversal, route 404/200/HEAD/304, publish
+    retention, page markup). No new dependency.
 
 ### Changed
 - **`company-settings` global = app-wide only** (APK gate, device image targets, offline max age, selfie batch

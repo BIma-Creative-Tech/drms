@@ -53,6 +53,9 @@ const nextConfig: NextConfig = {
           { key: 'Cross-Origin-Opener-Policy', value: 'same-origin' },
         ],
       },
+      // Public APK download page + file (src/app/(public)/unduh): for DRMS employees only, never indexed.
+      // `:path*` also matches `/unduh` itself.
+      { source: '/unduh/:path*', headers: [{ key: 'X-Robots-Tag', value: 'noindex, nofollow' }] },
     ]
   },
 }

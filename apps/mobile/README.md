@@ -200,3 +200,7 @@ One-time setup (custodian 1 = client, custodian 2 = vendor; do it together, offl
    (ADR 0011, E8), in the Firebase Android app. The CI summary of every release shows the same value.
 5. Release: bump `version:` in `pubspec.yaml`, merge to `main`, push the tag `mobile-vX.Y.Z`, download
    the artifact, `apksigner verify --print-certs` locally if desired, distribute the `arm64-v8a` APK.
+6. Publish it on the DRMS server download page (infra Lead): `publish-apk.mjs` into the prod media volume →
+   `https://drms-kas.bimacreative.tech/unduh` / stable file URL `…/unduh/proyekkas.apk`, verify with `curl -I`, then
+   Pengaturan → **Versi APK terbaru** = X.Y.Z (and once: **URL unduh APK** = the stable file URL, so the app's update
+   screen links there). Steps: `docs/proyekkas/runbooks/rilis-apk.md`.
