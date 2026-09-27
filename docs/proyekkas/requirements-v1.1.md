@@ -3,6 +3,9 @@
 Klien: PT Double Rezki Makmur Sejahtera (DRMS) · Tanggal: 23 September 2026 · Status: **draf untuk review klien**
 Penyusun: Business & System Analyst (Fase 0, dokumen saja)
 
+> **Lihat juga v1.2 (2026-09-27, multi-PT):** `requirements-v1.2.md` menambah dan mengubah sebagian isi dokumen ini
+> (peran per PT, master per PT/bersama, konsolidasi, penomoran & tutup buku per PT). Isi di bawah tidak diubah.
+
 Sumber:
 - `reference/proyekkas-kebutuhan-pengembangan.md` (v1.0, 23 Sep 2026)
 - `reference/prompt-lead-proyekkas.md` bagian "Temuan tambahan dari form asli klien" butir 1–10

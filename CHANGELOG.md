@@ -6,6 +6,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-09-27
+
+### Added
+- **MC0 — multi-company analysis (docs only, branch `docs/mc0-multi-company`; user decision 2026-09-27):** several PTs
+  of the client group in one ProyekKas, one login per person, per-PT role matrix, full consolidation, mutations always
+  within one PT, before go-live.
+  - ADR 0016 `docs/proyekkas/adr/0016-multi-company.md` (proposed; design approved by the user): `companies` master
+    (identity + operational settings; `company-settings` keeps app-wide values), `company-memberships` as the source of
+    per-PT roles (Keycloak keeps identity + realm role `pk-user`), `company_id NOT NULL` + composite uniques + per-PT
+    numbering counters and period lock + cross-PT DB triggers, access context = selected PTs ∩ memberships
+    (`X-Company-Ids`, cookie), per-PT reports/jobs/APK; alternatives (deployment per PT, Keycloak Organizations, RLS),
+    security model, staging backfill to company #1 DRMS.
+  - Dated "Revisi 2026-09-27 (ADR 0016)" sections in ADR 0003, 0005, 0007, 0009, 0010, 0013.
+  - `requirements-v1.2.md` (delta on v1.1: shared vs per-PT data, per-PT role matrix, consolidation rules per screen,
+    letterheads, numbering examples, US-MC-01…19); client questions Q-51…Q-61 (`open-questions-client.md` §L);
+    phase **MC** (MC0–MC4, 60–88 pd, go-live ≈ 4–6 weeks later) and risk #8 in `phase-plan.md`; traceability rows;
+    wireframes `docs/proyekkas/mc/wireframes.md`; code change inventory `docs/proyekkas/mc/impact-inventory.md`.
+
 ### Changed
 - **Admin breadcrumbs** (`apps/web`): Payload's AppHeader row under the module bar (a lone graphics-Icon "D" home
   crumb, and an empty row on pages without crumbs) is replaced by a slim **breadcrumb line** under the bar

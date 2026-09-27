@@ -1,6 +1,6 @@
 # ADR 0010 — Android app: Flutter stack, offline queue & sync contract
 
-- **Status:** accepted (user, GATE F0 2026-09-23) 
+- **Status:** accepted (user, GATE F0 2026-09-23); multi-company revision proposed 2026-09-27 (ADR 0016, section "Revisi 2026-09-27")
 - **Date:** 2026-09-23
 - **Author:** Analyst (mobile & integration), Phase 0
 - **Related:** `docs/proyekkas/f0-brief.md` §2–§3; requirements v1.1 (US-01, US-02, US-03, US-07, US-10, US-26,
@@ -624,3 +624,26 @@ update. A bad APK is rolled back by distributing the previous signed APK with a 
 
 None for the platform `CLAUDE.md`. Adds agent definition `.claude/agents/flutter-developer.md` in the ProyekKas
 repo (not the infra repo).
+
+## Revisi 2026-09-27 (ADR 0016)
+
+*Status of this revision: proposed with ADR 0016 (multi-company); takes effect with MC3.*
+
+- **PT switcher:** the APK shows the PT selection (one PT or "Semua PT") in the app bar/profile; lists and the
+  approval inbox follow the selection; **creating** a draft, progress report or attendance always happens in **one**
+  PT (asked when "Semua PT" is selected; attendance takes the PT of the chosen project/cost center).
+- **`GET /api/v1/me`** returns `companies[]` = `{ id, name, shortCode, roles, capabilities, employee, settings }`
+  (per-PT operational settings: geofence radius, receipt tolerance/age, sync flags) plus app-wide `settings`
+  (`minAppVersion`, `offlineMaxAgeDays`, `imageTargets`). Capabilities are computed per PT (today one object,
+  `apps/web/src/api/v1/endpoints/me.ts:38-45`; APK fallback `user_profile.dart:52-55`).
+- **Request header `X-Company-Ids`** on every `/api/v1` call (selection); always intersected with memberships
+  server-side (ADR 0016 §5).
+- **drift schema v3** (today v2, `apps/mobile/lib/core/db/app_database.dart:177`): `companyId` (int) on
+  `LocalDrafts`, `LocalProgressReports`, `Outbox`; `onUpgrade` from 2 → 3 adds the columns (nullable) and fills them
+  with the user's only membership after the next `/me` (staging only). Master caches (`KvEntries`, today key per `sub`,
+  `features/masters/data/masters_repository.dart:23,31`) are keyed per `sub` **and** PT.
+- **Sync contract:** the sync engine sends one `POST /api/v1/sync/batch` **per PT** with `X-Company-Ids` = that PT
+  and only that PT's outbox items; the server derives the company of every item from its references
+  (project / cost center / employee / existing draft) and rejects a mismatch with item status `rejected`,
+  code `COMPANY_MISMATCH`; `sync_receipts` stay per user. Idempotency and ordering rules are unchanged.
+- One APK and one Firebase project for all PTs (Q-58); push payloads carry the PT short code for display.

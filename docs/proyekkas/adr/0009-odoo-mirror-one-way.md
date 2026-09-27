@@ -1,6 +1,6 @@
 # ADR 0009 — One-way mirror ProyekKas → Odoo 19 (JSON-2 API, outbox pattern)
 
-- **Status:** accepted (user, GATE F0 2026-09-23) 
+- **Status:** accepted (user, GATE F0 2026-09-23); multi-company revision proposed 2026-09-27 (ADR 0016, section "Revisi 2026-09-27")
 - **Date:** 2026-09-23
 - **Author:** Analyst (mobile & integration), Phase 0
 - **Related:** `docs/proyekkas/f0-brief.md` §2 decision 2, §3 "Odoo mirror"; `/opt/infra/CLAUDE.md` §0, §3.2, §3.6;
@@ -252,3 +252,23 @@ can be truncated after export.
 
 None for the platform `CLAUDE.md`. Suggested addition to the future ProyekKas project docs: "ProyekKas databases
 must not be owned by the Odoo Postgres role."
+
+## Revisi 2026-09-27 (ADR 0016)
+
+*Status of this revision: paper only (F7 is after go-live); nothing is built now.*
+
+- **Company mapping:** each ProyekKas PT (`companies`) maps to one **`res.company`** in the single client DB
+  (`drms_prod` / `drms_staging`, §7 unchanged — still one Odoo DB for the client). XMLID
+  `__import__.pk_companies_<uuid_hex>` like every other mirrored row (§2).
+- **Per-PT records** (employees, partners from clients/vendors, projects/analytic accounts, cost centers, vehicles,
+  expense lines, attendances, journals of cash accounts) are sent with the Odoo `company_id` of their PT; shared
+  masters (`banks`, `uoms`) are sent **without** company (shared in Odoo). A person with two employee rows (ADR 0016
+  D1) becomes two `hr.employee` records (one per company) linked to the same partner/user only if the client wants
+  Odoo users (UNVERIFIED: Odoo 19 multi-company rules for `hr.employee`/`hr.expense` — verify in F7 on
+  `drms_staging`).
+- **Technical user** `svc_proyekkas_mirror` needs access to all mirrored companies (`company_ids`); still no
+  `base.group_system`.
+- **Accounting mirroring** stays deferred (§6) and, when enabled, is per company (COA per PT, Q-53).
+- **Mapping table:** add row `companies` → `res.company` (name, `shortCode` → XMLID only, logo → `logo`,
+  address/phone → partner of the company); `company-memberships` → not mirrored (identity/authorisation is ProyekKas +
+  Keycloak).

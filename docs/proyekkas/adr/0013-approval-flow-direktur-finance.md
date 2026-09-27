@@ -1,6 +1,6 @@
 # ADR 0013 — Approval flow: "Diketahui" by the Direktur (an approval), then Finance; PM monitors only
 
-- **Status:** accepted (GATE 1 fase1-golive, user 2026-09-26)
+- **Status:** accepted (GATE 1 fase1-golive, user 2026-09-26); multi-company revision proposed 2026-09-27 (ADR 0016, section "Revisi 2026-09-27")
 - **Date:** 2026-09-25
 - **Author:** Analyst (Fase 1 go-live plan, branch `docs/plan-fase1-golive`)
 - **Supersedes (when accepted):** the Q-07 default (PM / cost-center manager fills "Diketahui") and, for new
@@ -168,3 +168,32 @@ requests submitted under ADR 0013 keep their snapshot. Code guards (PM refusal) 
 - Not changed (follow-ups): PM dashboard tile "Menunggu \"Diketahui\" saya" (now 0 for new requests; relabel in E3/E12);
   "Owner" in developer-facing OpenAPI summaries and the cash re-open message (`domain/cash/ledger.ts`, left to the E2
   track to avoid conflicts).
+
+## Revisi 2026-09-27 (ADR 0016)
+
+*Status of this revision: proposed with ADR 0016 (multi-company); takes effect with MC2. The flow (Direktur →
+Finance, PM monitors) is unchanged; only **who** counts as a holder changes.*
+
+- **Approval rules per PT:** `approval-rules.company` NOT NULL; `loadActiveRules` (`domain/expense/snapshot.ts:80-113`)
+  loads only the rules of the document's PT. The rule hook refuses a named `acknowledgeUser`/`approverUser` without an
+  **active membership in that PT holding `pk-owner`/`pk-finance`** (today: the user's global roles,
+  `snapshot.ts:47-49`).
+- **Position holders per PT:** `activeUsersWithRole(req, role, companyId)` (today company-blind,
+  `snapshot.ts:116-128`) joins `company_memberships`; the same for `usersWithRole` in `domain/notifications.ts:82-93`
+  and `domain/addendum/service.ts:232-243` and `roleHolders` in `domain/reminders/service.ts:60-63`.
+- **Decision 5 (G1-2 skip rule)** is evaluated **per PT**: "the only Direktur" means the only active `pk-owner`
+  member **of the document's PT**. Example: Rina is Direktur in DRMS and Finance in CS1 (fictional); a CS1 request she
+  creates skips nothing in DRMS terms — only CS1 holders are counted.
+- **Service guard:** `actorContext` (`domain/expense/common.ts:146-160`) uses the caller's roles **in the document's
+  PT** and the caller's employee in that PT (`isRequester`); `matchesStep`/`matchesAcknowledger`
+  (`domain/expense/rules.ts:220-236`) therefore compare against PT roles. A Finance of PT A gets 403 + `access_denied`
+  on a PT B request.
+- **Q-07/Q-08 delegation (F2e, Owner else Admin):** new snapshots never delegate (`snapshot.ts:68` calls
+  `buildSnapshot` without a delegation); for legacy snapshots the check `caller.roles.includes(...)`
+  (`rules.ts:232`) uses the document PT's roles. No further change.
+- **DB guard G1:** `pk_approvals_before_insert` and `pk_request_involves` join `users.employee_id`
+  (`migrations/20260923_133050_f2a_security.ts:158`, `migrations/20260924_020344_f2e_security.ts:28`,
+  `migrations/20260926_114555_e5_budget_addenda.ts:103`); rewritten to join `company_memberships.employee_id` for the
+  actor (any of the actor's memberships), so a requester can still never decide.
+- **Notifications:** `expense.pending_ack` → active `pk-owner` members of the PT minus requester/creator;
+  `expense.pending_approval` → active `pk-finance` members of the PT; texts carry the PT short code.

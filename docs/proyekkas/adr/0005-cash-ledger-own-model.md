@@ -1,6 +1,6 @@
 # ADR 0005 — Cash & bank: own append-only ledger (not Odoo `account`), Odoo-mappable
 
-- **Status:** accepted (user, GATE F0 2026-09-23); implementation recorded after F2a and F2b (see Revision history)
+- **Status:** accepted (user, GATE F0 2026-09-23); implementation recorded after F2a and F2b (see Revision history); multi-company revision proposed 2026-09-27 (ADR 0016, section "Revisi 2026-09-27")
 - **Date:** 2026-09-23
 - **Author:** Analyst/Architect — Phase 0
 - **Related:** requirements v1.0 §4 (Kas & bank), §7 T3/T5–T8, §8, §9 ("Tutup buku bulanan");
@@ -178,6 +178,27 @@ permanent; changes only by additive migrations. Moving the system of record to O
 
 None.
 
+## Revisi 2026-09-27 (ADR 0016)
+
+*Status of this revision: proposed with ADR 0016 (multi-company); takes effect with MC1.*
+
+- **§1 / §2:** the ledger is **per PT**: `cash_entries.company_id NOT NULL` (copied from the cash account on insert,
+  immutable); `cash-accounts`, `expense-categories` (incl. `coaCode`), `cash-in-sources` are per-PT masters; a DB
+  trigger rejects an entry whose account, category, source, project, cost center, vehicle, request or transfer
+  belongs to another PT. Entry numbers are unique per `(company_id, entry_no)` (KM/KK patterns carry no company
+  token; see ADR 0007 revision).
+- **§6 Period closing per PT:** `period_closings.company_id`, unique closed row per `(company_id, period)`
+  (today `period_closings_one_closed (period)`, `migrations/20260923_133050_f2a_security.ts:332`); the lock function
+  becomes `pk_cash_lock_date(company_id int)` (today company-wide, same file L61-64) and every guard passes the row's
+  company (`pk_transfers_guard`, `pk_cash_entries_guard`, the S3b opening guards
+  `pk_cash_entries_opening_guard`/`pk_cash_accounts_opening_lock`). Closing / re-opening is done per PT by a Finance
+  (close) / Direktur (re-open) **of that PT**; API `POST /api/v1/period-closings` and
+  `/period-closings/:period/reopen` (`api/v1/endpoints/cash.ts:163,174`) take a `company` parameter. The
+  `LOCK TABLE period_closings` in `domain/cash/ledger.ts:273,297` stays (serialises closings of all PTs; acceptable).
+- **§7 Balances** are computed per account (unchanged) and aggregated per PT; a consolidated balance is the sum of
+  per-PT balances (IDR only), always shown with its per-PT breakdown.
+- Transfers between PTs (inter-company loans) are **out of scope**: record a manual KK in PT A and a manual KM in PT B.
+
 ## Revision history
 
 - **2026-09-23 (F0 gate):** accepted by user.
@@ -199,3 +220,4 @@ None.
   rationale) + `openingBalanceDate`; lock after the first close on/after the opening month (hook + DB trigger);
   no cash entry before the opening date; cut-over closes the month before go-live. Verified against branch
   `feat/s3b-e11-data-import`. Status stays accepted.
+- **2026-09-27 (ADR 0016, multi-company):** section "Revisi 2026-09-27 (ADR 0016)" added (proposed; takes effect with phase MC). Status stays accepted.
