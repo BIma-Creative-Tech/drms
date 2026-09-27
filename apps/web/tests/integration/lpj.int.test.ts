@@ -3,7 +3,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { autoCloseReimburse } from '@/domain/expense/auto-close'
 import { addDays } from '@/domain/expense/types'
 
-import { auditRows, getTestPayload, sqlAs, sqlError } from './helpers'
+import { auditRows, companySettingsDoc, getTestPayload, sqlAs, sqlError, updateCompany } from './helpers'
 import { api, draftBody, makeWorld, png, upload, type FlowUser, type World } from './flow-world'
 
 /**
@@ -311,7 +311,7 @@ describe('notifications API', () => {
 describe('Reimburse auto-close job (architecture §5.2, setting reimburseAutoCloseDays)', () => {
   it('closes "Ditransfer" reimburse requests N days after the transfer; idempotent; audit source job', async () => {
     const p = await getTestPayload()
-    const before = await p.findGlobal({ slug: 'company-settings', overrideAccess: true /* SYSTEM-READ: test */ })
+    const before = (await companySettingsDoc()) as { reimburseAutoCloseDays?: number | null }
     // reimburse → approved → receipts verified → transferred yesterday
     const c = await api('POST', E, w.users.staffA, draftBody(w, { type: 'reimburse', lines: [{ description: 'Makan', total: 150_000, categoryId: w.cat.ksm }] }))
     const id = c.body.id as number
@@ -327,12 +327,12 @@ describe('Reimburse auto-close job (architecture §5.2, setting reimburseAutoClo
     const t = await api('POST', `${E}/${id}/transfer`, w.users.finance, { cashAccountId: w.cashAccount, bankRef: 'RB-1', proofMediaId: await proof(), transferDate: addDays(today, -1) })
     expect(t.status, JSON.stringify(t.body)).toBe(201)
 
-    await p.updateGlobal({ slug: 'company-settings', data: { reimburseAutoCloseDays: 2 }, overrideAccess: true /* SYSTEM-WRITE: test */ })
+    await updateCompany({ reimburseAutoCloseDays: 2 })
     expect(await autoCloseReimburse(p)).not.toContain(id) // 1 day < 2 days
-    await p.updateGlobal({ slug: 'company-settings', data: { reimburseAutoCloseDays: 1 }, overrideAccess: true /* SYSTEM-WRITE: test */ })
+    await updateCompany({ reimburseAutoCloseDays: 1 })
     expect(await autoCloseReimburse(p)).toContain(id)
     expect(await autoCloseReimburse(p)).not.toContain(id) // idempotent
-    await p.updateGlobal({ slug: 'company-settings', data: { reimburseAutoCloseDays: before.reimburseAutoCloseDays ?? 30 }, overrideAccess: true /* SYSTEM-WRITE: test */ })
+    await updateCompany({ reimburseAutoCloseDays: before.reimburseAutoCloseDays ?? 30 })
     const rows = (await auditRows('expense_request', id)).filter((r) => r.action === 'status_change' && r.new_value?.v === 'completed')
     expect(rows).toEqual([expect.objectContaining({ source: 'job', user_id: null, reason: expect.stringContaining('otomatis selesai 1 hari') })])
   })

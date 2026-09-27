@@ -224,6 +224,9 @@
   **isolation test suite** (every per-PT collection + every `/api/v1` route with ids, 404 across PTs).
   **Gate:** isolation suite green; existing suites green on a two-PT fixture; migration up/down on a staging copy
   with row counts and balances equal before/after (US-MC-19).
+  > **Status 2026-09-28 (branch `feat/mc1-foundation`, in progress):** progress log `mc/mc1-progress.md`.
+  > MC1-1 done (companies, memberships, app-wide global, `groupAdmin`, login via `pk-user` with legacy transition,
+  > backfill migration verified on a develop-head copy).
 - **MC2 — Domain, reports, admin UI:** approval holders/notifications/queues per PT (ADR 0013 revision), jobs per PT,
   `ReportScope` per company + company predicates in all raw SQL, consolidated dashboards/reports/exports with PT
   breakdown + totals, letterheads per PT / group, admin: company master, role matrix, employee ↔ PT mapping, PT

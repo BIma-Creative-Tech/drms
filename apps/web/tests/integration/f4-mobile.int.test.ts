@@ -7,7 +7,7 @@ import { resetMinVersionCache } from '@/api/v1/http'
 import { resetEnvCache } from '@/lib/env'
 import { resetRateLimits } from '@/lib/rate-limit'
 
-import { accessToken, auditRows, getTestPayload, http, installLocalJwks, registerDevice, sqlAs, type TestUser } from './helpers'
+import { accessToken, auditRows, getTestPayload, http, installLocalJwks, registerDevice, sqlAs, type TestUser, updateCompany } from './helpers'
 import { api, draftBody, makeWorld, uploadMedia, type FlowUser, type World } from './flow-world'
 
 /**
@@ -328,13 +328,12 @@ describe('POST /api/v1/sync/batch — expense request drafts (ADR 0010)', () => 
     const own = await sync(staffA, [item('attendance.check_in', { project_id: w.project, lat: -2.2, lng: 113.9, is_mocked: false, selfie_media_id: 1 })])
     expect(own.body.results[0]).toMatchObject({ status: 'rejected', errors: [expect.objectContaining({ code: 'FEATURE_DISABLED' })] })
 
-    const p = await getTestPayload()
-    await p.updateGlobal({ slug: 'company-settings', data: { syncExpenseDraftsEnabled: false }, overrideAccess: true /* SYSTEM-WRITE: fixture */ })
+    await updateCompany({ syncExpenseDraftsEnabled: false })
     try {
       const off = await sync(staffA, [item('expense_request.draft_upsert', reimbursePayload())])
       expect(off.body.results[0]).toMatchObject({ status: 'rejected', errors: [expect.objectContaining({ code: 'FEATURE_DISABLED' })] })
     } finally {
-      await p.updateGlobal({ slug: 'company-settings', data: { syncExpenseDraftsEnabled: true }, overrideAccess: true /* SYSTEM-WRITE: fixture */ })
+      await updateCompany({ syncExpenseDraftsEnabled: true })
     }
   })
 
@@ -398,8 +397,9 @@ describe('GET /api/v1/app/config (public version gate)', () => {
     }
   })
 
-  it('admin/owner can edit the gate fields; an http download URL is refused', async () => {
-    const r = await api('POST', '/api/globals/company-settings', w.users.owner, { appDownloadUrl: 'http://insecure.test/app.apk' })
+  it('the group admin can edit the gate fields (ADR 0016 §1); an http download URL is refused; a PT Direktur cannot', async () => {
+    expect((await api('POST', '/api/globals/company-settings', w.users.owner, { latestAppVersion: '1.0.1' })).status).toBe(403)
+    const r = await api('POST', '/api/globals/company-settings', w.users.admin, { appDownloadUrl: 'http://insecure.test/app.apk' })
     expect(r.status).toBe(400)
     const ok = await api('POST', '/api/globals/company-settings', w.users.admin, { latestAppVersion: '1.0.1' })
     expect(ok.status, JSON.stringify(ok.body)).toBe(200)

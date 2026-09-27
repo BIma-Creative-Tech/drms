@@ -299,8 +299,8 @@ export function ScheduleAssign({ employeeId, employee, current, options, disable
   )
 }
 
-/** company-settings.defaultWorkSchedule (POST /api/globals/company-settings; Admin/Owner). */
-export function DefaultSchedule({ current, options, disabled }: { current: number | null; options: Option[]; disabled?: boolean }) {
+/** companies.defaultWorkSchedule of the PT (PATCH /api/companies/:id; Admin/Owner of that PT, ADR 0016 §1). */
+export function DefaultSchedule({ current, companyId, options, disabled }: { current: number | null; companyId: number; options: Option[]; disabled?: boolean }) {
   const [value, setValue] = useState(current ? String(current) : '')
   const { busy, msg, run } = useSave()
   const uid = useId()
@@ -309,7 +309,7 @@ export function DefaultSchedule({ current, options, disabled }: { current: numbe
       className="pk-inline"
       onSubmit={(e) => {
         e.preventDefault()
-        void run('POST', '/api/globals/company-settings?depth=0', { defaultWorkSchedule: value ? Number(value) : null }, 'Jadwal default tersimpan.')
+        void run('PATCH', `/api/companies/${companyId}?depth=0`, { defaultWorkSchedule: value ? Number(value) : null }, 'Jadwal default tersimpan.')
       }}
       data-pk-form="default-schedule"
     >

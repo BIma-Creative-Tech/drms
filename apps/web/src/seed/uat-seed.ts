@@ -2,6 +2,7 @@ import type { CollectionSlug, Payload, PayloadRequest, Where } from 'payload'
 import { z } from 'zod'
 
 import { relId, type Role } from '@/access/roles'
+import { firstActiveCompanyId } from '@/domain/companies'
 import { withSystemTransaction } from '@/lib/system-tx'
 
 /**
@@ -12,7 +13,8 @@ import { withSystemTransaction } from '@/lib/system-tx'
  * (one Staff, one PM, up to two Finance and two Direktur = `pk-owner`, ADR 0013)
  * (created by infra); nothing is written to Keycloak (context `skipKeycloakSync`). Every step is
  * idempotent (natural keys) and never overwrites data it did not create, except:
- * - an existing user (same keycloakSub) gets its missing UAT role added and, when unlinked, the UAT employee;
+ * - an existing user (same keycloakSub) gets its missing UAT role added to its company #1 membership and,
+ *   when unlinked, the UAT employee (ADR 0016: roles + employee link live in `company-memberships`);
  * - cost center OPS-PB gets manager = PM user ONLY when it has no manager yet.
  * All writes: Local API as the system actor (audit source=system), one transaction per step.
  */
@@ -119,6 +121,7 @@ export async function seedUat(payload: Payload, users: UatUser[]): Promise<UatRe
     bank: (await findOne(req, 'banks', { code: { equals: UAT_FIXTURE.bankCode } }))?.id,
     costCenter: await findOne(req, 'cost-centers', { code: { equals: UAT_FIXTURE.costCenterCode } }),
   }))
+  const companyId = await firstActiveCompanyId(payload)
   if (pre.bank === undefined || !pre.costCenter) {
     throw new Error(`base seed missing: bank ${UAT_FIXTURE.bankCode} and cost center ${UAT_FIXTURE.costCenterCode} are required (run src/seed/index.ts first)`)
   }
@@ -139,26 +142,40 @@ export async function seedUat(payload: Payload, users: UatUser[]): Promise<UatRe
       } else tally('employees', 'skipped')
       if (nth === 1) empIds.set(u.role, emp)
 
+      // ADR 0016 §2: role + employee link = membership of company #1 (DRMS).
+      const membership = async (userId: number) => findOne(req, 'company-memberships', { and: [{ user: { equals: userId } }, { company: { equals: companyId } }] })
+      const empTaken = async (userId?: number) => {
+        const m = await findOne(req, 'company-memberships', { employee: { equals: emp } })
+        return !!m && relId(m.user) !== userId
+      }
       const bySub = await findOne(req, 'users', { keycloakSub: { equals: u.keycloakSub } })
       if (!bySub) {
         const byEmail = await findOne(req, 'users', { email: { equals: u.email } })
         if (byEmail) throw new Error(`users: ${u.role} email already belongs to another account (different keycloakSub) — fix manually`)
-        if (await findOne(req, 'users', { employee: { equals: emp } })) throw new Error(`employees: ${code} is already linked to another user — fix manually`)
-        const created = await create(req, 'users', { email: u.email, name: u.name, keycloakSub: u.keycloakSub, roles: [u.role], employee: emp, active: true })
+        if (await empTaken()) throw new Error(`employees: ${code} is already linked to another user — fix manually`)
+        const created = await create(req, 'users', { email: u.email, name: u.name, keycloakSub: u.keycloakSub, active: true })
+        await create(req, 'company-memberships', { user: created, company: companyId, roles: [u.role], employee: emp, active: true })
         if (nth === 1) userIds.set(u.role, created)
         tally('users', 'created')
         return
       }
       if (nth === 1) userIds.set(u.role, bySub.id)
-      const roles = Array.isArray(bySub.roles) ? (bySub.roles as string[]) : []
+      const m = await membership(bySub.id)
+      if (!m) {
+        if (await empTaken(bySub.id)) throw new Error(`employees: ${code} is already linked to another user — fix manually`)
+        await create(req, 'company-memberships', { user: bySub.id, company: companyId, roles: [u.role], employee: emp, active: true })
+        tally('users', 'linked')
+        return
+      }
+      const roles = Array.isArray(m.roles) ? (m.roles as string[]) : []
       const patch: Record<string, unknown> = {}
       if (!roles.includes(u.role)) patch.roles = [...roles, u.role]
-      if (relId(bySub.employee) === undefined) {
-        if (await findOne(req, 'users', { employee: { equals: emp } })) throw new Error(`employees: ${code} is already linked to another user — fix manually`)
+      if (relId(m.employee) === undefined) {
+        if (await empTaken(bySub.id)) throw new Error(`employees: ${code} is already linked to another user — fix manually`)
         patch.employee = emp
       }
       if (Object.keys(patch).length > 0) {
-        await update(req, 'users', bySub.id, patch)
+        await update(req, 'company-memberships', m.id, patch)
         tally('users', 'linked')
       } else tally('users', 'skipped')
     })

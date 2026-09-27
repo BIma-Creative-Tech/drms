@@ -247,16 +247,16 @@ describe('F2c profile signature (self-service)', () => {
     expect(r.status, JSON.stringify(r.body)).toBe(200)
     expect(r.body.doc.signature?.id ?? r.body.doc.signature).toBe(id)
     // the admin form re-sends the unchanged read-only fields → still allowed
-    const full = await api('PATCH', `/api/users/${w.users.staffB.id}`, w.users.staffB, { email: w.users.staffB.email, roles: ['pk-staff'], employee: w.emp.b, active: true, signature: id })
+    const full = await api('PATCH', `/api/users/${w.users.staffB.id}`, w.users.staffB, { email: w.users.staffB.email, active: true, groupAdmin: false, signature: id })
     expect(full.status, JSON.stringify(full.body)).toBe(200)
   })
 
-  it('someone else\'s profile → 403; someone else\'s image on own profile → 403; own roles → 403', async () => {
+  it('someone else\'s profile → 403; someone else\'s image on own profile → 403; own groupAdmin → 403', async () => {
     const mine = await sig(w.users.staffB)
     expect((await api('PATCH', `/api/users/${w.users.staffA.id}`, w.users.staffB, { signature: mine })).status).toBe(403)
     const foreign = await sig(w.users.staffA)
     expect((await api('PATCH', `/api/users/${w.users.staffB.id}`, w.users.staffB, { signature: foreign })).status).toBe(403)
-    expect((await api('PATCH', `/api/users/${w.users.staffB.id}`, w.users.staffB, { roles: ['pk-admin'] })).status).toBe(403)
+    expect((await api('PATCH', `/api/users/${w.users.staffB.id}`, w.users.staffB, { groupAdmin: true })).status).toBe(403)
     expect((await api('PATCH', `/api/users/${w.users.staffB.id}`, w.users.staffB, { email: 'x@evil.test' })).status).toBe(403)
   })
 

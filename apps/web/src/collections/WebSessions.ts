@@ -1,6 +1,6 @@
 import type { CollectionConfig } from 'payload'
 
-import { denyAll, hasRole } from '@/access/roles'
+import { denyAll, hasRoleAny } from '@/access/roles'
 import { byRole } from '@/access/policies'
 
 /**
@@ -14,7 +14,7 @@ export const WebSessions: CollectionConfig = {
   admin: {
     group: 'Pengguna & Akses',
     defaultColumns: ['user', 'createdAt', 'expiresAt', 'revokedAt', 'revokeReason', 'ip'],
-    hidden: ({ user }) => !hasRole({ user } as never, 'pk-admin'),
+    hidden: ({ user }) => !hasRoleAny({ user } as never, 'pk-admin'),
   },
   access: { read: byRole({ 'pk-admin': true }), create: denyAll, update: denyAll, delete: denyAll },
   lockDocuments: false,

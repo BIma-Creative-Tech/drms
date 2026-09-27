@@ -5,7 +5,7 @@ import { allocateDocNo } from '@/domain/numbering-db'
 import { DEFAULT_SEQUENCES, parseBusinessDate } from '@/domain/numbering'
 import { withSystemTransaction } from '@/lib/system-tx'
 
-import { getTestPayload, sqlAs } from './helpers'
+import { getTestPayload, sqlAs, updateCompany } from './helpers'
 
 /**
  * ADR 0007 §5 on the REQUEST transaction handle (getRequestTx = adapter.sessions[await
@@ -14,7 +14,7 @@ import { getTestPayload, sqlAs } from './helpers'
  */
 beforeAll(async () => {
   const p = await getTestPayload()
-  await p.updateGlobal({ slug: 'company-settings', data: { shortCode: 'DRMS' }, overrideAccess: true /* SYSTEM-WRITE: fixture */ })
+  await updateCompany({ shortCode: 'DRMS' })
   for (const s of DEFAULT_SEQUENCES) {
     // other suites share the DB (one reset per run) → only create what is missing, force ADR defaults
     const found = await p.find({ collection: 'document-sequences', where: { docType: { equals: s.docType } }, overrideAccess: true /* SYSTEM-READ */ })

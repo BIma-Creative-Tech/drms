@@ -4,7 +4,7 @@ import type { AdminViewServerProps, PayloadRequest } from 'payload'
 import Link from 'next/link'
 import React from 'react'
 
-import { hasRole, relId } from '@/access/roles'
+import { hasRoleAny, relId } from '@/access/roles'
 import { CorrectionDialog, DefaultSchedule, GeofenceForm, HolidayAdd, ScheduleAssign, SelfieButton, type Option } from '@/admin/components/absensi/AttendanceActions'
 import { KAS_STYLE } from '@/admin/components/kas/style'
 import type { DayRecap, LocationDay, LocationRef, RecapSummary, TeamTodayRow } from '@/domain/attendance/aggregate'
@@ -21,6 +21,7 @@ import { formatServerTime } from '@/pdf/format'
 import { ChartHover } from './ChartHover'
 import { F3Root } from './f3-ui'
 import { Bento, Card, DashHead, DataTable, EmptyState, HBarList, KpiRow, KpiTile, StatusPill, TableView, VIZ_STYLE } from './viz'
+import { settings as companySettings } from '@/domain/companies'
 
 /**
  * E6 web (plan fase1-golive E6, S2; US-09/13/14/15, Q-30/33/40): admin views of the attendance
@@ -987,6 +988,7 @@ function TeamGrid({ d, grid, sp }: { d: RekapData; grid: NonNullable<RekapData['
 type JadwalData = {
   schedules: Array<{ id: number; name: string; start: string; end: string; tol: number; days: number[]; active: boolean; used: number }>
   defaultId: number | null
+  companyId: number
   employees: Array<{ id: number; code: string; name: string; scheduleId: number | null }>
   holidays: Array<{ id: number; date: string; name: string }>
   costCenters: Array<{ id: number; code: string; name: string; lat: number | null; lng: number | null; radiusM: number | null; active: boolean }>
@@ -1010,8 +1012,8 @@ export async function AbsensiJadwal(props: AdminViewServerProps) {
       </Frame>
     )
   }
-  const canWrite = hasRole(req, 'pk-admin', 'pk-owner') // collection update access: Admin + Owner (Direktur)
-  const canCreate = hasRole(req, 'pk-admin') // create: Admin only
+  const canWrite = hasRoleAny(req, 'pk-admin', 'pk-owner') // collection update access: Admin + Owner (Direktur)
+  const canCreate = hasRoleAny(req, 'pk-admin') // create: Admin only
   let d: JadwalData
   try {
     d = await withReqTransaction(req, async (): Promise<JadwalData> => {
@@ -1022,7 +1024,8 @@ export async function AbsensiJadwal(props: AdminViewServerProps) {
       const emps = await p.find({ collection: 'employees', where: { active: { equals: true } }, limit: 500, depth: 0, sort: 'name', select: { code: true, name: true, workSchedule: true }, user: req.user, overrideAccess: false, req })
       const hol = await p.find({ collection: 'holidays', where: { and: [{ date: { greater_than_equal: `${year}-01-01` } }, { date: { less_than_equal: `${year}-12-31` } }] }, limit: 400, depth: 0, sort: 'date', user: req.user, overrideAccess: false, req })
       const cc = await p.find({ collection: 'cost-centers', limit: 300, depth: 0, sort: 'code', user: req.user, overrideAccess: false, req })
-      const s = (await p.findGlobal({ slug: 'company-settings', depth: 0, overrideAccess: true /* SYSTEM-READ: default schedule / radius */, req })) as { defaultWorkSchedule?: unknown; defaultGeofenceRadiusM?: number | null }
+      // MC2: PT switcher — MC1 shows the settings of the context PT (only / first PT)
+      const s = await companySettings(req)
       const employees = emps.docs.map((e) => {
         const x = e as unknown as { id: number; code: string; name: string; workSchedule?: unknown }
         return { id: x.id, code: x.code, name: x.name, scheduleId: relId(x.workSchedule) ?? null }
@@ -1040,6 +1043,7 @@ export async function AbsensiJadwal(props: AdminViewServerProps) {
           return { id: x.id, name: x.name, start: x.startTime, end: x.endTime, tol: x.lateToleranceMin ?? 15, days: keys.map((k, i) => ((x.workDays?.[k] ?? k !== 'sun') ? i + 1 : 0)).filter((v) => v > 0), active: x.active !== false, used: used.get(x.id) ?? 0 }
         }),
         defaultId,
+        companyId: s.companyId,
         employees,
         holidays: hol.docs.map((h) => ({ id: h.id as number, date: (h as { date: string }).date, name: (h as { name: string }).name })),
         costCenters: cc.docs.map((c) => {
@@ -1086,7 +1090,7 @@ export async function AbsensiJadwal(props: AdminViewServerProps) {
 
         <Card id="jadwal" title="Jadwal kerja" sub="Hari kerja, jam masuk/pulang dan toleransi" span={7} i={4} action={canCreate ? { href: '/admin/collections/work-schedules/create', label: 'Jadwal baru' } : undefined}>
           <div id="jadwal-default" style={{ marginBottom: 14 }}>
-            <DefaultSchedule current={d.defaultId} options={opts} disabled={!canWrite} />
+            <DefaultSchedule current={d.defaultId} companyId={d.companyId} options={opts} disabled={!canWrite} />
           </div>
           <DataTable
             id="work-schedules"

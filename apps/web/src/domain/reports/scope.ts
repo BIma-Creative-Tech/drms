@@ -1,7 +1,7 @@
 import { sql } from '@payloadcms/db-postgres'
 import type { PayloadRequest } from 'payload'
 
-import { hasRole, userId } from '@/access/roles'
+import { hasRoleAny, userId } from '@/access/roles'
 import { resolveScope } from '@/access/scope'
 
 /** drizzle SQL fragment (the type is not re-exported by @payloadcms/db-postgres 3.90.1). */
@@ -24,8 +24,8 @@ export type ReportScope =
 
 /** Office scope of the caller: Finance/Owner → all, else PM → team, else none. */
 export async function officeScope(req: PayloadRequest): Promise<ReportScope> {
-  if (hasRole(req, 'pk-finance', 'pk-owner')) return { kind: 'all' }
-  if (hasRole(req, 'pk-pm')) {
+  if (hasRoleAny(req, 'pk-finance', 'pk-owner')) return { kind: 'all' }
+  if (hasRoleAny(req, 'pk-pm')) {
     const s = await resolveScope(req)
     return { kind: 'team', projects: s.teamProjects, costCenters: s.teamCostCenters }
   }
@@ -37,7 +37,7 @@ export async function officeScope(req: PayloadRequest): Promise<ReportScope> {
  * → all, PM → team. Admin sees attendance only — never the finance reports (officeScope → none).
  */
 export async function attendanceOfficeScope(req: PayloadRequest): Promise<ReportScope> {
-  if (hasRole(req, 'pk-admin')) return { kind: 'all' }
+  if (hasRoleAny(req, 'pk-admin')) return { kind: 'all' }
   return officeScope(req)
 }
 

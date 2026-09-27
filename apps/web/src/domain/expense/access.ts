@@ -1,6 +1,6 @@
 import type { Access, PayloadRequest, Where } from 'payload'
 
-import { hasRole, relId, userId } from '@/access/roles'
+import { hasRoleAny, relId, userId } from '@/access/roles'
 import { anyOf, byRole, type Rule } from '@/access/policies'
 import { inIds } from '@/access/scope'
 import { writeAuditDetached } from '@/audit/writer'
@@ -83,7 +83,7 @@ export async function visibleRequestIds(req: PayloadRequest): Promise<number[]> 
 export function byVisibleRequest(field = 'request'): Access {
   return async ({ req }) => {
     if (!req.user) return false
-    if (hasRole(req, 'pk-finance', 'pk-owner', 'pk-admin')) return true
+    if (hasRoleAny(req, 'pk-finance', 'pk-owner', 'pk-admin')) return true
     return inIds(field, await visibleRequestIds(req))
   }
 }

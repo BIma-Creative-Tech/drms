@@ -14,7 +14,7 @@ import { buildSample } from '@/import/template'
 import { withSystemTransaction } from '@/lib/system-tx'
 
 import { api, makeFlowUser, type FlowUser } from './flow-world'
-import { auditRows, getTestPayload, sqlAs, sqlError } from './helpers'
+import { auditRows, getTestPayload, sqlAs, sqlError, updateCompany } from './helpers'
 
 /**
  * E11 go-live import against the throwaway DB. Test files share one DB (reset once per run), so the
@@ -53,7 +53,7 @@ const importAudits = () => count("SELECT count(*) AS n FROM audit_logs WHERE act
 
 beforeAll(async () => {
   const p = await getTestPayload()
-  await p.updateGlobal({ slug: 'company-settings', data: { shortCode: 'DRMS' }, overrideAccess: true /* SYSTEM-WRITE: fixture */ })
+  await updateCompany({ shortCode: 'DRMS' })
   for (const s of DEFAULT_SEQUENCES) {
     const found = await p.find({ collection: 'document-sequences', where: { docType: { equals: s.docType } }, overrideAccess: true /* SYSTEM-READ */ })
     if (found.docs[0]) await p.update({ collection: 'document-sequences', id: found.docs[0].id, data: { ...s, active: true, changeReason: 'test fixture' }, overrideAccess: true /* SYSTEM-WRITE: fixture */ })
@@ -125,9 +125,10 @@ describe('E11 go-live import (dry-run → commit → idempotent re-run)', () => 
       banks: 1,
       clients: 1,
     })
-    const candra = (await sqlAs('app', "SELECT id, keycloak_sub, employee_id FROM users WHERE email = 'candra@drms-contoh.test'")).rows[0]
+    const candra = (await sqlAs('app', "SELECT u.id, u.keycloak_sub, m.employee_id FROM users u LEFT JOIN company_memberships m ON m.user_id = u.id WHERE u.email = 'candra@drms-contoh.test'")).rows[0]
     expect(candra.keycloak_sub).toBe(subs.get('candra.contoh'))
-    const roles = (await sqlAs('app', 'SELECT value::text AS value FROM users_roles WHERE parent_id = $1', [candra.id])).rows.map((x) => x.value).sort()
+    // ADR 0016: roles + employee = membership of the PT
+    const roles = (await sqlAs('app', 'SELECT r.value::text AS value FROM company_memberships m JOIN company_memberships_roles r ON r.parent_id = m.id WHERE m.user_id = $1', [candra.id])).rows.map((x) => x.value).sort()
     expect(roles).toEqual(['pk-pm', 'pk-staff'])
     const prj = (await sqlAs('app', "SELECT pm_id, budget::bigint AS budget, lat, radius_m, status, start_date FROM projects WHERE code = 'CTH-PRJ-01'")).rows[0]
     expect(prj).toMatchObject({ pm_id: candra.id, budget: '250000000', status: 'berjalan' })

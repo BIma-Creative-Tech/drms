@@ -1,6 +1,6 @@
 import type { PayloadRequest, Where } from 'payload'
 
-import { hasRole, userId } from '@/access/roles'
+import { hasRoleAny, userId } from '@/access/roles'
 import { resolveScope } from '@/access/scope'
 
 /**
@@ -11,14 +11,14 @@ import { resolveScope } from '@/access/scope'
 
 /** May the caller CREATE a report for `projectId`? Direktur: any project; PM: team projects. */
 export async function canReportOn(req: PayloadRequest, projectId: number): Promise<boolean> {
-  if (hasRole(req, 'pk-owner')) return true
-  if (!hasRole(req, 'pk-pm')) return false
+  if (hasRoleAny(req, 'pk-owner')) return true
+  if (!hasRoleAny(req, 'pk-pm')) return false
   return (await resolveScope(req)).teamProjects.includes(projectId)
 }
 
 /** Roles that may create reports at all (capability for the APK / web). */
 export function mayCreateReports(req: PayloadRequest): boolean {
-  return hasRole(req, 'pk-owner', 'pk-pm')
+  return hasRoleAny(req, 'pk-owner', 'pk-pm')
 }
 
 const CTX_IDS = 'pkVisibleProgressReportIds'

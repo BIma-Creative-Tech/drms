@@ -5,6 +5,7 @@ import { formatRupiah } from '@/lib/money'
 
 import type { ApprovalSnapshot } from './expense/rules'
 import { REQUEST_TYPE_LABELS, statusLabel, type RequestStatus, type RequestType } from './expense/types'
+import { contextCompanyId, membersWithRole, settings, usersOfEmployees } from '@/domain/companies'
 
 /**
  * In-app notifications on T1/T5 status transitions (requirements v1.1 US-05 "push … di setiap
@@ -77,19 +78,12 @@ type Doc = {
   createdBy?: unknown
   currentLevel?: number | null
   approvalSnapshot?: ApprovalSnapshot | null
+  company?: unknown
 }
 
-async function usersWithRole(req: PayloadRequest, role: Role): Promise<number[]> {
-  const res = await req.payload.find({
-    collection: 'users',
-    where: { and: [{ roles: { in: [role] } }, { active: { equals: true } }] },
-    depth: 0,
-    pagination: false,
-    select: { email: true },
-    overrideAccess: true, // SYSTEM-READ: notification recipients by role
-    req,
-  })
-  return res.docs.map((d) => d.id as number)
+/** Holders of `role` in the document's PT (ADR 0016 §5: recipients per PT). */
+async function usersWithRole(req: PayloadRequest, role: Role, doc: Doc): Promise<number[]> {
+  return membersWithRole(req, role, relId(doc.company) ?? (await contextCompanyId(req)))
 }
 
 /** "Diajukan Oleh" employees' active user accounts + "Dibuat Oleh". */
@@ -98,18 +92,8 @@ async function people(req: PayloadRequest, doc: Doc): Promise<number[]> {
   const out = new Set<number>()
   const creator = relId(doc.createdBy)
   if (creator !== undefined) out.add(creator)
-  if (empIds.length > 0) {
-    const res = await req.payload.find({
-      collection: 'users',
-      where: { and: [{ employee: { in: empIds } }, { active: { equals: true } }] },
-      depth: 0,
-      pagination: false,
-      select: { email: true },
-      overrideAccess: true, // SYSTEM-READ: requester accounts (Q-28: employees without account get nothing)
-      req,
-    })
-    for (const u of res.docs) out.add(u.id as number)
-  }
+  // Q-28: employees without account get nothing.
+  for (const u of await usersOfEmployees(req, empIds, { activeOnly: true })) out.add(u)
   return [...out]
 }
 
@@ -119,11 +103,11 @@ async function stepUsers(req: PayloadRequest, doc: Doc, kind: 'ack' | 'approval'
   let ids: number[] = []
   if (kind === 'ack') {
     if (snap.acknowledgerUserId !== null) ids = [snap.acknowledgerUserId]
-    else if (snap.acknowledgeBy === 'role' && snap.acknowledgeRole) ids = await usersWithRole(req, snap.acknowledgeRole)
+    else if (snap.acknowledgeBy === 'role' && snap.acknowledgeRole) ids = await usersWithRole(req, snap.acknowledgeRole, doc)
   } else {
     const step = snap.steps.find((s) => s.level === (doc.currentLevel ?? 1))
     if (step?.approverUserId) ids = [step.approverUserId]
-    else if (step?.approverRole) ids = await usersWithRole(req, step.approverRole)
+    else if (step?.approverRole) ids = await usersWithRole(req, step.approverRole, doc)
   }
   // G1: requesters/creator can never decide → never asked to.
   const excluded = new Set(await people(req, doc))
@@ -218,11 +202,8 @@ export function pushEnabled(): boolean {
 type NotifySettings = { requesterStatus: boolean; approvalEmail: boolean }
 
 /** S3e toggles (company-settings): requester in-app events default ON, approval email default OFF. */
-export async function notifySettings(req: PayloadRequest): Promise<NotifySettings> {
-  const s = (await req.payload.findGlobal({ slug: 'company-settings', depth: 0, overrideAccess: true /* SYSTEM-READ: notification toggles */, req })) as {
-    notifyRequesterStatusEnabled?: boolean | null
-    approvalEmailEnabled?: boolean | null
-  }
+export async function notifySettings(req: PayloadRequest, companyId?: number | null): Promise<NotifySettings> {
+  const s = await settings(req, companyId)
   return { requesterStatus: s.notifyRequesterStatusEnabled !== false, approvalEmail: s.approvalEmailEnabled === true }
 }
 
@@ -246,7 +227,7 @@ export function approvalEmail(doc: Doc, event: NotifyEvent, appUrl: string | und
 export async function notifyTransition(req: PayloadRequest, prev: { status: RequestStatus; currentLevel?: number | null } | null, doc: Doc): Promise<number> {
   const all = eventsFor(prev, doc)
   if (all.length === 0) return 0
-  const settings = await notifySettings(req)
+  const settings = await notifySettings(req, relId(doc.company))
   return deliver(req, doc, settings.requesterStatus ? all : all.filter((e) => !REQUESTER_STATUS_EVENTS.has(e.event)), settings)
 }
 
@@ -255,7 +236,7 @@ export async function notifyTransition(req: PayloadRequest, prev: { status: Requ
  * colleagues) informs those requesters' accounts. The creator (= actor) is never notified.
  */
 export async function notifyCreated(req: PayloadRequest, doc: Doc): Promise<number> {
-  const settings = await notifySettings(req)
+  const settings = await notifySettings(req, relId(doc.company))
   if (!settings.requesterStatus) return 0
   return deliver(req, doc, [{ event: 'expense.created_on_behalf', to: 'people' }], settings)
 }
@@ -269,7 +250,7 @@ async function deliver(req: PayloadRequest, doc: Doc, events: Array<{ event: Not
   for (const e of events) {
     let to: number[] = []
     if (e.to === 'people') to = await people(req, doc)
-    else if (e.to === 'finance') to = finance ??= await usersWithRole(req, 'pk-finance')
+    else if (e.to === 'finance') to = finance ??= await usersWithRole(req, 'pk-finance', doc)
     else to = await stepUsers(req, doc, e.to)
     const t = await template(req, e.event)
     for (const uid of to) {

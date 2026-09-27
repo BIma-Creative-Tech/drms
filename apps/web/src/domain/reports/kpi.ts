@@ -735,7 +735,8 @@ export async function ownRequests(req: PayloadRequest, scope: ReportScope, opts:
 /** Admin home: onboarding gaps (approval prerequisites, F2). */
 export async function masterGaps(req: PayloadRequest) {
   const [u, p, c] = await inSequence(
-    () => rows(req, sql`SELECT count(*)::int AS n FROM users u WHERE coalesce(u.active, true) AND (u.employee_id IS NULL OR NOT EXISTS (SELECT 1 FROM users_roles r WHERE r.parent_id = u.id))`),
+    // ADR 0016: complete = at least one active membership with an employee AND a role. MC2: per PT.
+    () => rows(req, sql`SELECT count(*)::int AS n FROM users u WHERE coalesce(u.active, true) AND NOT EXISTS (SELECT 1 FROM company_memberships m WHERE m.user_id = u.id AND coalesce(m.active, true) AND m.employee_id IS NOT NULL AND EXISTS (SELECT 1 FROM company_memberships_roles r WHERE r.parent_id = m.id))`),
     () => rows(req, sql`SELECT count(*)::int AS n FROM projects p WHERE p.pm_id IS NULL AND p.status <> 'arsip'`),
     () => rows(req, sql`SELECT count(*)::int AS n FROM cost_centers cc WHERE cc.manager_id IS NULL AND coalesce(cc.active, true)`),
   )

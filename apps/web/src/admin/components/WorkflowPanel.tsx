@@ -1,7 +1,7 @@
 import type { UIFieldServerProps } from 'payload'
 import React from 'react'
 
-import { relId } from '@/access/roles'
+import { ownEmployees, relId } from '@/access/roles'
 import { displayName, loadVisible } from '@/domain/expense/common'
 import { detail } from '@/domain/expense/dto'
 import { isDecisionSnapshot, SKIPPED_LABEL } from '@/domain/expense/decision'
@@ -241,10 +241,11 @@ export async function WorkflowPanel(props: UIFieldServerProps) {
   )
 }
 
-function isOwn(d: Detail, user: { id?: unknown; employee?: unknown }): boolean {
+function isOwn(d: Detail, user: { id?: unknown }): boolean {
   if (d.createdById === user.id) return true
-  const emp = relId(user.employee)
-  return emp !== undefined && d.requesters.some((r) => r?.id === emp)
+  // ADR 0016: one employee per PT membership — any of them counts (each belongs to one PT).
+  const emps = ownEmployees({ user } as never)
+  return d.requesters.some((r) => r?.id !== undefined && emps.includes(r.id))
 }
 
 const POSITION_LABELS: Record<string, string> = { diajukan: 'Diajukan Oleh', dibuat: 'Dibuat Oleh', diketahui: 'Diketahui Oleh', approval: 'Approval' }

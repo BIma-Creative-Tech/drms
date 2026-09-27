@@ -21,6 +21,7 @@ import { sql } from '@payloadcms/db-postgres'
 import type { CollectionSlug, Payload, PayloadRequest, Where } from 'payload'
 
 import { writeAudit } from '@/audit/writer'
+import { firstActiveCompanyId, settings as companySettings } from '@/domain/companies'
 import { periodEnd } from '@/domain/cash/periods'
 import { DEFAULT_SEQUENCES, formatDocNo, parseBusinessDate, periodKey, type ResetPolicy } from '@/domain/numbering'
 import { CTX_STAGE_EDITOR, projectStages, recalcProjectProgress } from '@/domain/progress/recalc'
@@ -105,13 +106,19 @@ export async function loadDbKeys(payload: Payload): Promise<DbKeys> {
     depth: 0,
     pagination: false,
     limit: 0,
-    select: { email: true, keycloakSub: true, employee: true } as never,
+    select: { email: true, keycloakSub: true } as never,
     overrideAccess: true, // SYSTEM-READ: import reference check
   })
+  const employeeOf = await (async () => {
+    const m = await payload.find({ collection: 'company-memberships', depth: 0, pagination: false, limit: 0, overrideAccess: true /* SYSTEM-READ: import reference check */ })
+    const out = new Map<number, number>()
+    for (const r of m.docs as unknown as Array<{ user: number; employee?: number | null }>) if (typeof r.employee === 'number' && !out.has(r.user)) out.set(r.user, r.employee)
+    return out
+  })()
   const usersByEmail = new Map<string, { id: number; sub: string | null; employee: number | null }>()
   const usersBySub = new Map<string, { id: number; email: string }>()
-  for (const u of users.docs as unknown as Array<{ id: number; email: string; keycloakSub?: string | null; employee?: number | null }>) {
-    usersByEmail.set(u.email.toLowerCase(), { id: u.id, sub: u.keycloakSub ?? null, employee: u.employee ?? null })
+  for (const u of users.docs as unknown as Array<{ id: number; email: string; keycloakSub?: string | null }>) {
+    usersByEmail.set(u.email.toLowerCase(), { id: u.id, sub: u.keycloakSub ?? null, employee: employeeOf.get(u.id) ?? null })
     if (u.keycloakSub) usersBySub.set(u.keycloakSub.toLowerCase(), { id: u.id, email: u.email })
   }
   return {
@@ -282,7 +289,7 @@ const MASTERS: Array<{ key: SheetKey; rows: (d: ImportData) => number; run: Mast
           continue
         }
         const r = await atRow(rep.sheet, u._row, async () => {
-          const data: Record<string, unknown> = { name: u.name, roles: u.roles, employee: await x.idOf('employees', 'code', u.employeeCode), phone: u.phone, active: u.active }
+          const data: Record<string, unknown> = { name: u.name, phone: u.phone, active: u.active }
           const where: Where = plan.sub ? { keycloakSub: { equals: plan.sub } } : { email: { equals: plan.email } }
           const existing = await x.findOne('users', where)
           const wasActive = existing ? existing.active !== false : null
@@ -293,6 +300,14 @@ const MASTERS: Array<{ key: SheetKey; rows: (d: ImportData) => number; run: Mast
           if (!existing || !isPlaceholderEmail(email) || isPlaceholderEmail(String(existing.email ?? ''))) data.email = email
           const res = await x.upsert('users', where, data, { createOnly: { keycloakSub: plan.sub }, context: { skipKeycloakSync: true } })
           x.cache.set(`users:email:${plan.email}`, res.id)
+          // ADR 0016 §2: roles + employee link = membership of the PT. MC2-5: `kode_pt` per row
+          // (sheet AksesPT); MC1 = the only / first active PT.
+          const company = await firstActiveCompanyId(x.req.payload, x.req)
+          await x.upsert(
+            'company-memberships',
+            { and: [{ user: { equals: res.id } }, { company: { equals: company } }] },
+            { user: res.id, company, roles: u.roles, employee: await x.idOf('employees', 'code', u.employeeCode), active: u.active },
+          )
           return res
         })
         tally(rep, r.action)
@@ -524,7 +539,8 @@ async function runCutover(x: Exec, rep: MasterReport, issues: Issue[], reason: s
   } else if (before !== null && before > s.pbStartAt) {
     issues.push({ level: 'warning', sheet, message: `Nomor PB sudah berjalan: nomor berikutnya ${before} (> ${s.pbStartAt}); counter tidak diubah (nomor tidak pernah mundur).` })
   }
-  const settings = (await req.payload.findGlobal({ slug: 'company-settings', depth: 0, overrideAccess: true /* SYSTEM-READ: company code */, req })) as { shortCode?: string | null }
+  // MC2-5: per-PT cut-over (`kode_pt`); MC1 = the only / first active PT.
+  const settings = await companySettings(req)
   const firstPbNumber = formatDocNo(
     { pattern: String(cfg.pattern), padding: Number(cfg.padding ?? 0), docCode: (cfg.docCode as string) ?? undefined },
     Math.max(after ?? s.pbStartAt, s.pbStartAt),

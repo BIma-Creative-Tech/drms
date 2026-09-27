@@ -9,6 +9,7 @@ import { DEFAULT_TZ } from '@/lib/time'
 import { withReqTransaction } from '@/lib/system-tx'
 
 import { Empty, TableScroll, table, td, th } from './shared'
+import { settings as companySettings } from '@/domain/companies'
 
 const ACTION_LABELS: Record<string, string> = {
   create: 'dibuat',
@@ -70,8 +71,7 @@ export async function RiwayatView(props: DocumentViewServerProps) {
       return visible ? { rows: await historyRows(req, [{ docType, ids: [String(id)] }]), denied: false } : { rows: [], denied: true }
     })
   }
-  const settings = await req.payload.findGlobal({ slug: 'company-settings', depth: 0, overrideAccess: true /* SYSTEM-READ: timezone */, req })
-  const tz = settings.timezone || process.env.TZ || DEFAULT_TZ
+  const tz = (await companySettings(req)).timezone || process.env.TZ || DEFAULT_TZ
   return (
     <Gutter>
       <h2 style={{ margin: '16px 0' }}>Riwayat</h2>

@@ -2,7 +2,7 @@ import type { AdminViewServerProps, PayloadRequest } from 'payload'
 import Link from 'next/link'
 import React from 'react'
 
-import { hasRole } from '@/access/roles'
+import { hasRoleAny } from '@/access/roles'
 import { AddendumForm } from '@/admin/components/addendum/AddendumForm'
 import { ConfirmAction } from '@/admin/components/addendum/ConfirmAction'
 import { ReasonAction } from '@/admin/components/kas/ReasonAction'
@@ -46,7 +46,7 @@ function Denied({ props, title }: { props: AdminViewServerProps; title: string }
 
 export async function AddendumList(props: AdminViewServerProps) {
   const req = props.initPageResult.req
-  if (!hasRole(req, ...READERS)) return <Denied props={props} title="Addendum RAB" />
+  if (!hasRoleAny(req, ...READERS)) return <Denied props={props} title="Addendum RAB" />
   const sp = (props.searchParams ?? {}) as Record<string, string | undefined>
   const status = ADDENDUM_STATUSES.includes(sp.status as AddendumStatus) ? (sp.status as AddendumStatus) : undefined
   const project = sp.project && /^\d{1,10}$/.test(sp.project) ? Number(sp.project) : undefined
@@ -199,7 +199,7 @@ export async function AddendumList(props: AdminViewServerProps) {
 
 export async function AddendumNew(props: AdminViewServerProps) {
   const req = props.initPageResult.req
-  const projects = hasRole(req, 'pk-pm') ? await withReqTransaction(req, () => addendumProjectOptions(req)) : []
+  const projects = hasRoleAny(req, 'pk-pm') ? await withReqTransaction(req, () => addendumProjectOptions(req)) : []
   if (projects.length === 0) {
     return (
       <Frame props={props} name="addendum-baru">
@@ -255,7 +255,7 @@ const DECISION: Record<string, { tone: PillTone; label: string }> = {
 
 export async function AddendumDetail(props: AdminViewServerProps) {
   const req = props.initPageResult.req
-  if (!hasRole(req, ...READERS)) return <Denied props={props} title="Addendum RAB" />
+  if (!hasRoleAny(req, ...READERS)) return <Denied props={props} title="Addendum RAB" />
   const seg = ((props.params as { segments?: string[] } | undefined)?.segments ?? [])[2] ?? ''
   const id = /^\d{1,10}$/.test(seg) ? Number(seg) : 0
   const d = await withReqTransaction(req, async () => {

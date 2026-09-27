@@ -8,6 +8,7 @@ import { reportContext, rows } from './kpi'
 import type { FilterField, Option, ReportDef, Table } from './registry'
 import { firstDay, lastDay, PERIOD_RE, periodLabel } from './rules'
 import { attendanceOfficeScope, costCenterScopeSql, idList, projectScopeSql, type ReportScope } from './scope'
+import { settings } from '@/domain/companies'
 
 /**
  * E6 / M13 "Laporan absensi" (requirements v1.1 §5 M13, plan fase1-golive E6): per employee and
@@ -45,7 +46,8 @@ export type EmployeeMonth = { id: number; code: string; name: string; days: DayR
 /** Per-employee recap of a month in the scope (shared by the report and its reconciliation test). */
 export async function attendanceMonth(req: PayloadRequest, scope: AttScope, month: string, employeeId?: number): Promise<EmployeeMonth[]> {
   const ctx = await reportContext(req)
-  const s = (await req.payload.findGlobal({ slug: 'company-settings', depth: 0, overrideAccess: true /* SYSTEM-READ: default schedule */, req })) as { defaultWorkSchedule?: unknown }
+  // MC2: default schedule of each employee's PT (ADR 0016 §6).
+  const s = await settings(req)
   const defaultId = typeof s.defaultWorkSchedule === 'number' ? s.defaultWorkSchedule : null
   const from = firstDay(month)
   const to = lastDay(month)

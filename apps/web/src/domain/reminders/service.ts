@@ -12,6 +12,7 @@ import { DEFAULT_TZ } from '@/lib/time'
 import { getRequestTx } from '@/lib/tx'
 
 import { companyClock, crossedThresholds, DEFAULT_TEXTS, fill, REMINDER_EVENTS, reminderSettingsOf, runDecision, type ReminderRule, type ReminderSettings } from './rules'
+import { settingsOf } from '@/domain/companies'
 
 /**
  * E7 — daily scheduled reminders (M12, US-11; plan fase1-golive §E7). Job `dailyReminders` fires
@@ -57,8 +58,15 @@ async function activeOnly(req: PayloadRequest, userIds: Iterable<number>): Promi
   return r.map((x) => Number(x.id))
 }
 
+// MC2: role holders of the SUBJECT's PT only (ADR 0016 §5/§7) — today: holders in any PT (leaks
+// reminders across PTs once a 2nd PT exists).
 async function roleHolders(req: PayloadRequest, role: string): Promise<number[]> {
-  const r = await q<{ id: number }>(req, sql`SELECT DISTINCT u.id FROM users u JOIN users_roles ur ON ur.parent_id = u.id WHERE ur.value::text = ${role} AND coalesce(u.active, true) ORDER BY u.id`)
+  const r = await q<{ id: number }>(
+    req,
+    sql`SELECT DISTINCT u.id FROM users u JOIN company_memberships m ON m.user_id = u.id AND coalesce(m.active, true)
+          JOIN company_memberships_roles mr ON mr.parent_id = m.id
+         WHERE mr.value::text = ${role} AND coalesce(u.active, true) ORDER BY u.id`,
+  )
   return r.map((x) => Number(x.id))
 }
 
@@ -68,7 +76,7 @@ async function requestPeople(req: PayloadRequest, requestId: number): Promise<nu
     req,
     sql`SELECT er.created_by_id AS id FROM expense_requests er WHERE er.id = ${requestId} AND er.created_by_id IS NOT NULL
         UNION
-        SELECT u.id FROM expense_requests_rels rr JOIN users u ON u.employee_id = rr.employees_id
+        SELECT m.user_id FROM expense_requests_rels rr JOIN company_memberships m ON m.employee_id = rr.employees_id
          WHERE rr.parent_id = ${requestId} AND rr.path = 'requesters'`,
   )
   return r.map((x) => Number(x.id))
@@ -249,7 +257,8 @@ async function budgetThreshold(run: Run) {
 // ---------------------------------------------------------------- run
 
 export async function reminderSettings(payload: Payload, req?: PayloadRequest): Promise<ReminderSettings> {
-  const s = (await payload.findGlobal({ slug: 'company-settings', depth: 0, overrideAccess: true /* SYSTEM-READ: reminder settings (job) */, req })) as unknown as Record<string, unknown>
+  // MC2: one run per active PT with that PT's settings (ADR 0016 §7); MC1 = company #1.
+  const s = (await settingsOf(payload, null, req)) as unknown as Record<string, unknown>
   return reminderSettingsOf(s, process.env.TZ || DEFAULT_TZ)
 }
 

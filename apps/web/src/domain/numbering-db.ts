@@ -2,6 +2,7 @@ import { sql } from '@payloadcms/db-postgres'
 import { APIError, type PayloadRequest } from 'payload'
 
 import { writeAudit } from '@/audit/writer'
+import { settings } from '@/domain/companies'
 import { DEFAULT_TZ, localDateInTz, type LocalDate } from '@/lib/time'
 import { getRequestTx } from '@/lib/tx'
 
@@ -34,13 +35,7 @@ export async function loadSequence(req: PayloadRequest, docType: string): Promis
 }
 
 async function companyCode(req: PayloadRequest): Promise<string> {
-  const settings = await req.payload.findGlobal({
-    slug: 'company-settings',
-    depth: 0,
-    overrideAccess: true, // SYSTEM-READ: company short code for {COMPANY}
-    req,
-  })
-  return settings.shortCode || 'DRMS'
+  return (await settings(req)).shortCode || 'DRMS'
 }
 
 /**

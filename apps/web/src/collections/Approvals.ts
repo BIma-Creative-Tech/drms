@@ -1,6 +1,6 @@
 import type { Access, CollectionConfig, Where } from 'payload'
 
-import { denyAll, hasRole } from '@/access/roles'
+import { denyAll, hasRoleAny } from '@/access/roles'
 import { visibleAddendumIds } from '@/domain/addendum/access'
 import { byVisibleRequest, denyDeleteLogged } from '@/domain/expense/access'
 import { inIds } from '@/access/scope'
@@ -21,7 +21,7 @@ const ro = { readOnly: true }
 const readAccess: Access = async (args) => {
   const { req } = args
   if (!req.user) return false
-  if (hasRole(req, 'pk-finance', 'pk-owner', 'pk-admin')) return true
+  if (hasRoleAny(req, 'pk-finance', 'pk-owner', 'pk-admin')) return true
   const byRequest = await byVisibleRequest('request')(args)
   const byAddendum = inIds('addendum', await visibleAddendumIds(req))
   const or = [byRequest, byAddendum].filter((w): w is Where => typeof w === 'object' && w !== null)

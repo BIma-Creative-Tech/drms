@@ -2,7 +2,7 @@ import { sql } from '@payloadcms/db-postgres'
 import { APIError, ValidationError, type PayloadRequest } from 'payload'
 import type { z } from 'zod'
 
-import { hasRole, relId, userId } from '@/access/roles'
+import { hasRoleAny, relId, userId } from '@/access/roles'
 import {
   SyncAttendancePayload,
   SyncDraftDeletePayload,
@@ -418,7 +418,7 @@ async function applyAttendance(c: ItemCtx, verdict: TimeVerdict, receivedAt: Dat
     const ob = p as SyncOnBehalf
     // US-14: "diabsenkan oleh PM" — requirements §4 "Absensi": PM C (atas nama tim). Not an approval
     // (ADR 0013 covers expense decisions only), so the PM keeps this right.
-    if (!hasRole(req, 'pk-pm')) reject('FORBIDDEN', 'Hanya PM yang dapat mengabsenkan anggota tim.')
+    if (!hasRoleAny(req, 'pk-pm')) reject('FORBIDDEN', 'Hanya PM yang dapat mengabsenkan anggota tim.')
     if (own !== undefined && own === ob.employee_id) reject('FORBIDDEN', 'Absensi Anda sendiri dicatat lewat absen masuk/pulang biasa.', 'payload.employee_id')
     const emp = (await req.payload.findByID({ collection: 'employees', id: ob.employee_id, depth: 0, overrideAccess: true /* SYSTEM-READ: target employee of on-behalf */, req, disableErrors: true })) as { active?: boolean | null } | null
     if (!emp) reject('NOT_FOUND', 'Karyawan tidak ditemukan.', 'payload.employee_id')

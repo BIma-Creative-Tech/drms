@@ -1,4 +1,5 @@
 import { relId, userRoles } from '@/access/roles'
+import { settings } from '@/domain/companies'
 
 import { json, v1 } from '../http'
 
@@ -30,7 +31,8 @@ export const meEndpoint = v1({
             req,
             disableErrors: true,
           })
-    const s = await req.payload.findGlobal({ slug: 'company-settings', depth: 0, overrideAccess: false, req })
+    // MC3: `companies[]` with per-PT roles/settings (ADR 0016 §8); MC1 = settings of the context PT.
+    const s = await settings(req)
     return json({
       id: u.id,
       email: u.email,

@@ -175,7 +175,7 @@ export const MODULES: readonly ModuleDef[] = [
     label: 'Pengguna & Akses',
     icon: 'users',
     hint: 'User, karyawan, perangkat',
-    sections: [{ items: [{ collection: 'users' }, { collection: 'employees' }, { collection: 'employee-bank-accounts' }, { collection: 'devices' }, { collection: 'web-sessions' }] }],
+    sections: [{ items: [{ collection: 'users' }, { collection: 'company-memberships' }, { collection: 'employees' }, { collection: 'employee-bank-accounts' }, { collection: 'devices' }, { collection: 'web-sessions' }] }],
   },
   {
     id: 'master',
@@ -208,7 +208,7 @@ export const MODULES: readonly ModuleDef[] = [
     label: 'Pengaturan',
     icon: 'settings',
     hint: 'Perusahaan & aturan',
-    sections: [{ items: [{ global: 'company-settings' }, { collection: 'approval-rules' }, { collection: 'notification-templates' }, { collection: 'document-sequences' }] }],
+    sections: [{ items: [{ collection: 'companies' }, { global: 'company-settings' }, { collection: 'approval-rules' }, { collection: 'notification-templates' }, { collection: 'document-sequences' }] }],
   },
   {
     id: 'sistem',

@@ -1,6 +1,6 @@
 import type { CollectionConfig } from 'payload'
 
-import { anyRole, denyAll, hasRole, relId } from '@/access/roles'
+import { anyRole, denyAll, hasRoleAny, relId } from '@/access/roles'
 import { byRole, rolesAllowed } from '@/access/policies'
 import { reasonOnDeactivate, withAudit } from '@/audit/hooks'
 import { activeField, codeField, odooRefField, uuidField } from '@/fields/common'
@@ -33,7 +33,7 @@ export const Employees: CollectionConfig = withAudit(
         maxLength: 32,
         access: {
           read: ({ req, doc }) =>
-            hasRole(req, 'pk-admin', 'pk-owner', 'pk-finance', 'pk-pm') ||
+            hasRoleAny(req, 'pk-admin', 'pk-owner', 'pk-finance', 'pk-pm') ||
             (relId((req.user as { employee?: unknown } | null)?.employee) ?? -1) === (doc as { id?: unknown } | undefined)?.id,
         },
       },

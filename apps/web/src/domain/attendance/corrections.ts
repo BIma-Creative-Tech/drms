@@ -1,7 +1,7 @@
 import { sql } from '@payloadcms/db-postgres'
 import { APIError, type PayloadRequest } from 'payload'
 
-import { hasRole, relId, userId } from '@/access/roles'
+import { hasRoleAny, relId, userId } from '@/access/roles'
 import { resolveScope } from '@/access/scope'
 import { writeAudit, writeAuditDetached } from '@/audit/writer'
 import { settings } from '@/domain/expense/common'
@@ -76,12 +76,12 @@ export async function correctAttendance(req: PayloadRequest, attendanceId: numbe
   const ownEmployee = relId((req.user as { employee?: unknown } | null)?.employee)
   const isOwn = relId(att.user) === uid || (ownEmployee !== undefined && relId(att.employee) === ownEmployee)
   if (isOwn) await deny(req, attendanceId, 'Tidak dapat mengoreksi absensi Anda sendiri.')
-  if (!hasRole(req, 'pk-admin')) {
-    const scope = hasRole(req, 'pk-pm') ? await resolveScope(req) : null
+  if (!hasRoleAny(req, 'pk-admin')) {
+    const scope = hasRoleAny(req, 'pk-pm') ? await resolveScope(req) : null
     const inTeam = !!scope && ((project !== undefined && scope.teamProjects.includes(project)) || (costCenter !== undefined && scope.teamCostCenters.includes(costCenter)))
     if (!inTeam) {
       // Readable (office roles) → 403 + audit; not readable at all (other team, staff) → 404, no existence leak.
-      if (hasRole(req, 'pk-owner', 'pk-finance')) await deny(req, attendanceId, 'Koreksi absensi hanya oleh PM tim atau Admin.')
+      if (hasRoleAny(req, 'pk-owner', 'pk-finance')) await deny(req, attendanceId, 'Koreksi absensi hanya oleh PM tim atau Admin.')
       throw new APIError('Absensi tidak ditemukan.', 404, null, true)
     }
   }

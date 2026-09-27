@@ -68,6 +68,8 @@ export interface Config {
   blocks: {};
   collections: {
     users: User;
+    companies: Company;
+    'company-memberships': CompanyMembership;
     employees: Employee;
     'employee-bank-accounts': EmployeeBankAccount;
     banks: Bank;
@@ -122,6 +124,8 @@ export interface Config {
   collectionsJoins: {};
   collectionsSelect: {
     users: UsersSelect<false> | UsersSelect<true>;
+    companies: CompaniesSelect<false> | CompaniesSelect<true>;
+    'company-memberships': CompanyMembershipsSelect<false> | CompanyMembershipsSelect<true>;
     employees: EmployeesSelect<false> | EmployeesSelect<true>;
     'employee-bank-accounts': EmployeeBankAccountsSelect<false> | EmployeeBankAccountsSelect<true>;
     banks: BanksSelect<false> | BanksSelect<true>;
@@ -231,11 +235,6 @@ export interface User {
   id: number;
   email: string;
   name?: string | null;
-  /**
-   * Disinkronkan ke realm role Keycloak.
-   */
-  roles?: ('pk-staff' | 'pk-pm' | 'pk-finance' | 'pk-owner' | 'pk-admin')[] | null;
-  employee?: (number | null) | Employee;
   phone?: string | null;
   /**
    * PNG tanda tangan Anda (latar putih/transparan). Dipakai otomatis saat mengirim/menyetujui pengajuan (US-43). Klik "Buat Baru" untuk mengunggah, lalu Simpan.
@@ -247,6 +246,10 @@ export interface User {
   keycloakSub?: string | null;
   active?: boolean | null;
   /**
+   * Mengelola daftar PT, setting aplikasi dan akses PT semua pengguna.
+   */
+  groupAdmin?: boolean | null;
+  /**
    * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
    */
   changeReason?: string | null;
@@ -256,21 +259,126 @@ export interface User {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "employees".
+ * via the `definition` "media-signatures".
  */
-export interface Employee {
+export interface MediaSignature {
   id: number;
-  code: string;
-  name: string;
-  nickname?: string | null;
-  position?: string | null;
-  phone?: string | null;
-  workSchedule?: (number | null) | WorkSchedule;
-  faceRefPhoto?: (number | null) | MediaSelfy;
+  uploadedBy?: (number | null) | User;
+  receivedAt?: string | null;
+  ownerDocType?: string | null;
+  ownerDocId?: string | null;
+  sha256Original?: string | null;
+  originalWidth?: number | null;
+  originalHeight?: number | null;
+  originalSize?: number | null;
+  capturedAt?: string | null;
   /**
-   * Referensi Odoo (diisi saat mirror, ADR 0009).
+   * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
    */
-  odooEmployeeRef?: string | null;
+  changeReason?: string | null;
+  updatedAt: string;
+  createdAt: string;
+  url?: string | null;
+  thumbnailURL?: string | null;
+  filename?: string | null;
+  mimeType?: string | null;
+  filesize?: number | null;
+  width?: number | null;
+  height?: number | null;
+  focalX?: number | null;
+  focalY?: number | null;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "companies".
+ */
+export interface Company {
+  id: number;
+  name: string;
+  /**
+   * Token {COMPANY} di nomor dokumen. Tidak dapat diubah setelah ada dokumen bernomor.
+   */
+  shortCode: string;
+  legalName?: string | null;
+  logo?: (number | null) | MediaCompany;
+  pdfHeader?: string | null;
+  address?: string | null;
+  phone?: string | null;
+  /**
+   * MC1: harus sama dengan zona waktu server (ADR 0016 §9).
+   */
+  timezone: string;
+  /**
+   * Dipakai untuk absensi bila project/pusat biaya punya titik lokasi tetapi radiusnya kosong.
+   */
+  defaultGeofenceRadiusM: number;
+  lateReportDays: number;
+  budgetWarnPct: number;
+  budgetOverPct: number;
+  progressWarnGapPct: number;
+  progressBadGapPct: number;
+  receiptRoundingTolerance: number;
+  receiptMaxAgeDays: number;
+  reimburseAutoCloseDays: number;
+  /**
+   * Uang muka tanpa LPJ lebih lama dari ini tampil sebagai "LPJ terlambat" di dashboard/laporan.
+   */
+  lpjDueDays: number;
+  /**
+   * Nonaktif → item offline ditolak FEATURE_DISABLED (ADR 0010 rollback).
+   */
+  syncExpenseDraftsEnabled?: boolean | null;
+  /**
+   * Absen masuk/pulang sendiri di project/pusat biaya yang ditugaskan (geofence, selfie, lokasi palsu ditolak) dan "diabsenkan PM". Nonaktif → item absensi ditolak FEATURE_DISABLED. Nyalakan di prod setelah checklist go-live.
+   */
+  syncAttendanceEnabled?: boolean | null;
+  /**
+   * Dipakai untuk karyawan tanpa jadwal sendiri. Kosong = keterlambatan tidak dihitung.
+   */
+  defaultWorkSchedule?: (number | null) | WorkSchedule;
+  /**
+   * Selfie lebih tua dari ini dihapus dari penyimpanan saat penghapusan otomatis aktif (data absensi tetap). Default 12 bulan; menunggu keputusan klien (Q-33).
+   */
+  selfieRetentionMonths: number;
+  /**
+   * Nonaktif = job hanya menghitung (dry run). Aktif = file selfie dihapus permanen setiap malam (02:30), tercatat di audit log.
+   */
+  selfieRetentionDeleteEnabled?: boolean | null;
+  /**
+   * E4: laporan progress harian + foto dari APK. Nonaktif → item laporan ditolak FEATURE_DISABLED (rollback).
+   */
+  syncProgressReportsEnabled?: boolean | null;
+  /**
+   * Nonaktif = job pengingat tidak mengirim apa pun (rollback).
+   */
+  remindersEnabled?: boolean | null;
+  reminderHour: number;
+  /**
+   * Selain notifikasi in-app. Batas SMTP 30 email/jam per mailbox — aktifkan setelah alamat email pengguna benar.
+   */
+  reminderEmailEnabled?: boolean | null;
+  /**
+   * Batas hari = "Batas hari laporan progress terlambat".
+   */
+  reminderLateProgressEnabled?: boolean | null;
+  /**
+   * Batas hari = "Batas LPJ uang muka".
+   */
+  reminderLpjOverdueEnabled?: boolean | null;
+  reminderRevisionEnabled?: boolean | null;
+  reminderRevisionDays: number;
+  /**
+   * Ambang = "Ambang anggaran kuning" dan "merah" di atas; sekali per ambang per project.
+   */
+  reminderBudgetEnabled?: boolean | null;
+  /**
+   * Pemohon lain dan pembuat diberi tahu; pelaku aksi tidak diberi tahu tentang aksinya sendiri.
+   */
+  notifyRequesterStatusEnabled?: boolean | null;
+  /**
+   * Selain notifikasi in-app. Isi email tanpa nominal/nama pemohon. Batas SMTP 30 email/jam per mailbox.
+   */
+  approvalEmailEnabled?: boolean | null;
   active?: boolean | null;
   uuid?: string | null;
   /**
@@ -279,6 +387,37 @@ export interface Employee {
   changeReason?: string | null;
   updatedAt: string;
   createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "media-company".
+ */
+export interface MediaCompany {
+  id: number;
+  uploadedBy?: (number | null) | User;
+  receivedAt?: string | null;
+  ownerDocType?: string | null;
+  ownerDocId?: string | null;
+  sha256Original?: string | null;
+  originalWidth?: number | null;
+  originalHeight?: number | null;
+  originalSize?: number | null;
+  capturedAt?: string | null;
+  /**
+   * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
+   */
+  changeReason?: string | null;
+  updatedAt: string;
+  createdAt: string;
+  url?: string | null;
+  thumbnailURL?: string | null;
+  filename?: string | null;
+  mimeType?: string | null;
+  filesize?: number | null;
+  width?: number | null;
+  height?: number | null;
+  focalX?: number | null;
+  focalY?: number | null;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -309,6 +448,50 @@ export interface WorkSchedule {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "company-memberships".
+ */
+export interface CompanyMembership {
+  id: number;
+  user: number | User;
+  company: number | Company;
+  employee?: (number | null) | Employee;
+  roles?: ('pk-staff' | 'pk-pm' | 'pk-finance' | 'pk-owner' | 'pk-admin')[] | null;
+  active?: boolean | null;
+  /**
+   * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
+   */
+  changeReason?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "employees".
+ */
+export interface Employee {
+  id: number;
+  code: string;
+  name: string;
+  nickname?: string | null;
+  position?: string | null;
+  phone?: string | null;
+  workSchedule?: (number | null) | WorkSchedule;
+  faceRefPhoto?: (number | null) | MediaSelfy;
+  /**
+   * Referensi Odoo (diisi saat mirror, ADR 0009).
+   */
+  odooEmployeeRef?: string | null;
+  active?: boolean | null;
+  uuid?: string | null;
+  /**
+   * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
+   */
+  changeReason?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "media-selfies".
  */
 export interface MediaSelfy {
@@ -323,37 +506,6 @@ export interface MediaSelfy {
   originalSize?: number | null;
   capturedAt?: string | null;
   removedAt?: string | null;
-  /**
-   * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
-   */
-  changeReason?: string | null;
-  updatedAt: string;
-  createdAt: string;
-  url?: string | null;
-  thumbnailURL?: string | null;
-  filename?: string | null;
-  mimeType?: string | null;
-  filesize?: number | null;
-  width?: number | null;
-  height?: number | null;
-  focalX?: number | null;
-  focalY?: number | null;
-}
-/**
- * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "media-signatures".
- */
-export interface MediaSignature {
-  id: number;
-  uploadedBy?: (number | null) | User;
-  receivedAt?: string | null;
-  ownerDocType?: string | null;
-  ownerDocId?: string | null;
-  sha256Original?: string | null;
-  originalWidth?: number | null;
-  originalHeight?: number | null;
-  originalSize?: number | null;
-  capturedAt?: string | null;
   /**
    * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
    */
@@ -1667,37 +1819,6 @@ export interface MediaProgressPhoto {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "media-company".
- */
-export interface MediaCompany {
-  id: number;
-  uploadedBy?: (number | null) | User;
-  receivedAt?: string | null;
-  ownerDocType?: string | null;
-  ownerDocId?: string | null;
-  sha256Original?: string | null;
-  originalWidth?: number | null;
-  originalHeight?: number | null;
-  originalSize?: number | null;
-  capturedAt?: string | null;
-  /**
-   * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
-   */
-  changeReason?: string | null;
-  updatedAt: string;
-  createdAt: string;
-  url?: string | null;
-  thumbnailURL?: string | null;
-  filename?: string | null;
-  mimeType?: string | null;
-  filesize?: number | null;
-  width?: number | null;
-  height?: number | null;
-  focalX?: number | null;
-  focalY?: number | null;
-}
-/**
- * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "payload-kv".
  */
 export interface PayloadKv {
@@ -1826,6 +1947,14 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'users';
         value: number | User;
+      } | null)
+    | ({
+        relationTo: 'companies';
+        value: number | Company;
+      } | null)
+    | ({
+        relationTo: 'company-memberships';
+        value: number | CompanyMembership;
       } | null)
     | ({
         relationTo: 'employees';
@@ -2036,11 +2165,69 @@ export interface PayloadMigration {
 export interface UsersSelect<T extends boolean = true> {
   email?: T;
   name?: T;
-  roles?: T;
-  employee?: T;
   phone?: T;
   signature?: T;
   keycloakSub?: T;
+  active?: T;
+  groupAdmin?: T;
+  changeReason?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "companies_select".
+ */
+export interface CompaniesSelect<T extends boolean = true> {
+  name?: T;
+  shortCode?: T;
+  legalName?: T;
+  logo?: T;
+  pdfHeader?: T;
+  address?: T;
+  phone?: T;
+  timezone?: T;
+  defaultGeofenceRadiusM?: T;
+  lateReportDays?: T;
+  budgetWarnPct?: T;
+  budgetOverPct?: T;
+  progressWarnGapPct?: T;
+  progressBadGapPct?: T;
+  receiptRoundingTolerance?: T;
+  receiptMaxAgeDays?: T;
+  reimburseAutoCloseDays?: T;
+  lpjDueDays?: T;
+  syncExpenseDraftsEnabled?: T;
+  syncAttendanceEnabled?: T;
+  defaultWorkSchedule?: T;
+  selfieRetentionMonths?: T;
+  selfieRetentionDeleteEnabled?: T;
+  syncProgressReportsEnabled?: T;
+  remindersEnabled?: T;
+  reminderHour?: T;
+  reminderEmailEnabled?: T;
+  reminderLateProgressEnabled?: T;
+  reminderLpjOverdueEnabled?: T;
+  reminderRevisionEnabled?: T;
+  reminderRevisionDays?: T;
+  reminderBudgetEnabled?: T;
+  notifyRequesterStatusEnabled?: T;
+  approvalEmailEnabled?: T;
+  active?: T;
+  uuid?: T;
+  changeReason?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "company-memberships_select".
+ */
+export interface CompanyMembershipsSelect<T extends boolean = true> {
+  user?: T;
+  company?: T;
+  employee?: T;
+  roles?: T;
   active?: T;
   changeReason?: T;
   updatedAt?: T;
@@ -3224,94 +3411,16 @@ export interface PayloadMigrationsSelect<T extends boolean = true> {
  */
 export interface CompanySetting {
   id: number;
-  name: string;
-  shortCode: string;
-  logo?: (number | null) | MediaCompany;
-  pdfHeader?: string | null;
-  address?: string | null;
-  phone?: string | null;
-  /**
-   * Proses server memakai env TZ (cron, tanggal bisnis); ubah keduanya bersamaan.
-   */
-  timezone: string;
-  /**
-   * Dipakai untuk absensi bila project/pusat biaya punya titik lokasi tetapi radiusnya kosong.
-   */
-  defaultGeofenceRadiusM: number;
-  lateReportDays: number;
-  budgetWarnPct: number;
-  budgetOverPct: number;
-  progressWarnGapPct: number;
-  progressBadGapPct: number;
-  receiptRoundingTolerance: number;
-  receiptMaxAgeDays: number;
-  reimburseAutoCloseDays: number;
-  /**
-   * Uang muka tanpa LPJ lebih lama dari ini tampil sebagai "LPJ terlambat" di dashboard/laporan.
-   */
-  lpjDueDays: number;
+  groupName?: string | null;
+  groupLogo?: (number | null) | MediaCompany;
+  groupPdfHeader?: string | null;
   minAppVersion?: string | null;
   latestAppVersion?: string | null;
   /**
    * https://… (APK side-load). Kosong = aplikasi menampilkan "hubungi admin".
    */
   appDownloadUrl?: string | null;
-  /**
-   * Nonaktif → item offline ditolak FEATURE_DISABLED (ADR 0010 rollback).
-   */
-  syncExpenseDraftsEnabled?: boolean | null;
-  /**
-   * Absen masuk/pulang sendiri di project/pusat biaya yang ditugaskan (geofence, selfie, lokasi palsu ditolak) dan "diabsenkan PM". Nonaktif → item absensi ditolak FEATURE_DISABLED. Nyalakan di prod setelah checklist go-live.
-   */
-  syncAttendanceEnabled?: boolean | null;
-  /**
-   * Dipakai untuk karyawan tanpa jadwal sendiri. Kosong = keterlambatan tidak dihitung.
-   */
-  defaultWorkSchedule?: (number | null) | WorkSchedule;
-  /**
-   * Selfie lebih tua dari ini dihapus dari penyimpanan saat penghapusan otomatis aktif (data absensi tetap). Default 12 bulan; menunggu keputusan klien (Q-33).
-   */
-  selfieRetentionMonths: number;
-  /**
-   * Nonaktif = job hanya menghitung (dry run). Aktif = file selfie dihapus permanen setiap malam (02:30), tercatat di audit log.
-   */
-  selfieRetentionDeleteEnabled?: boolean | null;
   selfieRetentionBatch: number;
-  /**
-   * E4: laporan progress harian + foto dari APK. Nonaktif → item laporan ditolak FEATURE_DISABLED (rollback).
-   */
-  syncProgressReportsEnabled?: boolean | null;
-  /**
-   * Nonaktif = job pengingat tidak mengirim apa pun (rollback).
-   */
-  remindersEnabled?: boolean | null;
-  reminderHour: number;
-  /**
-   * Selain notifikasi in-app. Batas SMTP 30 email/jam per mailbox — aktifkan setelah alamat email pengguna benar.
-   */
-  reminderEmailEnabled?: boolean | null;
-  /**
-   * Batas hari = "Batas hari laporan progress terlambat".
-   */
-  reminderLateProgressEnabled?: boolean | null;
-  /**
-   * Batas hari = "Batas LPJ uang muka".
-   */
-  reminderLpjOverdueEnabled?: boolean | null;
-  reminderRevisionEnabled?: boolean | null;
-  reminderRevisionDays: number;
-  /**
-   * Ambang = "Ambang anggaran kuning" dan "merah" di atas; sekali per ambang per project.
-   */
-  reminderBudgetEnabled?: boolean | null;
-  /**
-   * Pemohon lain dan pembuat diberi tahu; pelaku aksi tidak diberi tahu tentang aksinya sendiri.
-   */
-  notifyRequesterStatusEnabled?: boolean | null;
-  /**
-   * Selain notifikasi in-app. Isi email tanpa nominal/nama pemohon. Batas SMTP 30 email/jam per mailbox.
-   */
-  approvalEmailEnabled?: boolean | null;
   offlineMaxAgeDays: number;
   imageTargets: {
     receiptsMaxPx: number;
@@ -3350,43 +3459,13 @@ export interface PayloadJobsStat {
  * via the `definition` "company-settings_select".
  */
 export interface CompanySettingsSelect<T extends boolean = true> {
-  name?: T;
-  shortCode?: T;
-  logo?: T;
-  pdfHeader?: T;
-  address?: T;
-  phone?: T;
-  timezone?: T;
-  defaultGeofenceRadiusM?: T;
-  lateReportDays?: T;
-  budgetWarnPct?: T;
-  budgetOverPct?: T;
-  progressWarnGapPct?: T;
-  progressBadGapPct?: T;
-  receiptRoundingTolerance?: T;
-  receiptMaxAgeDays?: T;
-  reimburseAutoCloseDays?: T;
-  lpjDueDays?: T;
+  groupName?: T;
+  groupLogo?: T;
+  groupPdfHeader?: T;
   minAppVersion?: T;
   latestAppVersion?: T;
   appDownloadUrl?: T;
-  syncExpenseDraftsEnabled?: T;
-  syncAttendanceEnabled?: T;
-  defaultWorkSchedule?: T;
-  selfieRetentionMonths?: T;
-  selfieRetentionDeleteEnabled?: T;
   selfieRetentionBatch?: T;
-  syncProgressReportsEnabled?: T;
-  remindersEnabled?: T;
-  reminderHour?: T;
-  reminderEmailEnabled?: T;
-  reminderLateProgressEnabled?: T;
-  reminderLpjOverdueEnabled?: T;
-  reminderRevisionEnabled?: T;
-  reminderRevisionDays?: T;
-  reminderBudgetEnabled?: T;
-  notifyRequesterStatusEnabled?: T;
-  approvalEmailEnabled?: T;
   offlineMaxAgeDays?: T;
   imageTargets?:
     | T

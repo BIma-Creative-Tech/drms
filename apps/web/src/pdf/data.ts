@@ -4,6 +4,7 @@ import type { CollectionSlug, PayloadRequest } from 'payload'
 
 import { relId } from '@/access/roles'
 import { approvalsOf, settings, type ApprovalRow, type RequestDoc } from '@/domain/expense/common'
+import { displayNames } from '@/domain/companies'
 import { SKIPPED_LABEL } from '@/domain/expense/decision'
 import { displayUnitPrice } from '@/domain/expense/lines'
 import { receiptsOf } from '@/domain/expense/receipts'
@@ -54,7 +55,8 @@ export async function buildPdfData(req: PayloadRequest, requestId: number, opts:
     createdBy?: { id: number; name?: string; employee?: { name?: string } | number | null } | number
     lines?: Array<{ id: string; description?: string; qty?: number | null; unitPrice?: number | null; total?: number | null; notes?: string | null; uom?: { name?: string; code?: string } | number | null }>
   }
-  const s = await settings(req)
+  // ADR 0016 §6: letterhead + {COMPANY} of the document's PT
+  const s = await settings(req, relId((doc as { company?: unknown }).company))
   const tz = s.timezone || process.env.TZ || DEFAULT_TZ
   const companyCode = s.shortCode || 'DRMS'
   const companyName = s.name || 'PT Double Rezki Makmur Sejahtera'
@@ -70,7 +72,8 @@ export async function buildPdfData(req: PayloadRequest, requestId: number, opts:
   const diketahui = rows.find((r) => r.position === 'diketahui' && (r.decision === 'acknowledged' || r.decision === 'rejected'))
   const approvals = rows.filter((r) => r.position === 'approval' && (r.decision === 'approved' || r.decision === 'rejected')).sort((a, b) => a.level - b.level)
   const creator = typeof doc.createdBy === 'object' ? doc.createdBy : null
-  const creatorName = (creator?.employee && typeof creator.employee === 'object' ? creator.employee.name : undefined) || creator?.name || dibuat?.actorName || ''
+  // ADR 0016: the creator's employee = membership link (MC2: of the document's PT)
+  const creatorName = (creator ? (await displayNames(req, [creator.id], { emailFallback: false })).get(creator.id)?.replace(/^user#\d+$/, '') : undefined) || dibuat?.actorName || ''
   const skipped = doc.approvalSnapshot?.skipped ?? []
   const skippedAck = skipped.some((x) => x.position === 'diketahui')
   const skippedApproval = skipped.some((x) => x.position === 'approval') && (doc.approvalSnapshot?.steps.length ?? 0) === 0

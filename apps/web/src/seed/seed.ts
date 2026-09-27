@@ -55,17 +55,30 @@ export async function seed(payload: Payload, data: SeedData = DEFAULT_SEED_DATA)
     )
   }
 
-  // Company settings (global) + placeholder logo (shapes only: no fonts in the alpine image)
+  // Company #1 (ADR 0016 §1; created by migration *_mc1_companies on existing DBs) + placeholder logo
+  // (shapes only: no fonts in the alpine image). Existing values are never overwritten.
+  let companyId = 0
   await withSystemTransaction(
     payload,
     null,
     async (req) => {
-      const s = await payload.findGlobal({ slug: 'company-settings', depth: 0, overrideAccess: true /* SYSTEM-READ: seed */, req })
+      const found = await payload.find({ collection: 'companies', where: { shortCode: { equals: COMPANY.shortCode } }, limit: 1, depth: 0, pagination: false, overrideAccess: true /* SYSTEM-READ: seed */, req })
+      let c = found.docs[0] as { id: number; name?: string | null; timezone?: string | null; logo?: unknown } | undefined
+      if (!c) {
+        c = (await payload.create({
+          collection: 'companies',
+          data: { name: COMPANY.name, shortCode: COMPANY.shortCode, timezone: COMPANY.timezone, active: true } as never,
+          depth: 0,
+          overrideAccess: true, // SYSTEM-WRITE: seed
+          req,
+        })) as unknown as { id: number }
+        tally('companies', true)
+      } else tally('companies', false)
+      companyId = c.id
       const patch: Record<string, unknown> = {}
-      if (!s.shortCode) patch.shortCode = COMPANY.shortCode
-      if (!s.name) patch.name = COMPANY.name
-      if (!s.timezone) patch.timezone = COMPANY.timezone
-      if (!s.logo) {
+      if (!c.name) patch.name = COMPANY.name
+      if (!c.timezone) patch.timezone = COMPANY.timezone
+      if (!c.logo) {
         const png = await sharp(
           Buffer.from(
             `<svg xmlns="http://www.w3.org/2000/svg" width="600" height="200"><rect width="600" height="200" fill="#ffffff"/><rect x="8" y="8" width="584" height="184" fill="none" stroke="#1f3a5f" stroke-width="8"/><rect x="60" y="60" width="80" height="80" fill="#1f3a5f"/><rect x="170" y="85" width="370" height="30" fill="#9fb3c8"/></svg>`,
@@ -85,15 +98,8 @@ export async function seed(payload: Payload, data: SeedData = DEFAULT_SEED_DATA)
         tally('media-company', true)
       } else tally('media-company', false)
       if (Object.keys(patch).length > 0) {
-        await payload.updateGlobal({
-          slug: 'company-settings',
-          data: patch as never,
-          depth: 0,
-          overrideAccess: true, // SYSTEM-WRITE: seed
-          req,
-        })
+        await payload.update({ collection: 'companies', id: c.id, data: patch as never, depth: 0, overrideAccess: true /* SYSTEM-WRITE: seed */, req })
       }
-      tally('company-settings', Object.keys(patch).length > 0)
     },
     { auditSource: 'system' },
   )
@@ -161,12 +167,20 @@ export async function seed(payload: Payload, data: SeedData = DEFAULT_SEED_DATA)
       async (req) => {
         const found = await payload.find({ collection: 'users', where: { keycloakSub: { equals: sub } }, limit: 1, depth: 0, overrideAccess: true /* SYSTEM-READ: seed */, req })
         if (found.docs[0]) return tally('users', false)
-        await payload.create({
+        // ADR 0016 §2: bootstrap admin = group admin + Admin membership of company #1.
+        const u = await payload.create({
           collection: 'users',
-          data: { email, keycloakSub: sub, roles: ['pk-admin'], active: true },
+          data: { email, keycloakSub: sub, active: true, groupAdmin: true },
           depth: 0,
           overrideAccess: true, // SYSTEM-WRITE: bootstrap admin (Keycloak user created by infra)
           context: { skipKeycloakSync: true },
+          req,
+        })
+        await payload.create({
+          collection: 'company-memberships',
+          data: { user: u.id, company: companyId, roles: ['pk-admin'], active: true },
+          depth: 0,
+          overrideAccess: true, // SYSTEM-WRITE: bootstrap admin membership
           req,
         })
         tally('users', true)

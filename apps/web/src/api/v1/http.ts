@@ -1,7 +1,7 @@
 import { addDataAndFileToRequest, APIError, ValidationError, type Endpoint, type PayloadRequest } from 'payload'
 import type { z } from 'zod'
 
-import { hasRole, type Role } from '@/access/roles'
+import { hasRoleAny, type Role } from '@/access/roles'
 import { AUTH_FAILURE_KEY } from '@/auth/strategies'
 import { claimKey, IDEMPOTENCY_KEY_RE, requestHash, storeResponse } from '@/lib/idempotency'
 import { requestMeta } from '@/lib/request-meta'
@@ -122,7 +122,7 @@ export function v1<B extends z.ZodType | undefined = undefined>(opts: V1Options<
             }
             return problem(401, 'Unauthorized')
           }
-          if (opts.roles && !hasRole(req, ...opts.roles)) return problem(403, 'Forbidden')
+          if (opts.roles && !hasRoleAny(req, ...opts.roles)) return problem(403, 'Forbidden')
           const meta = requestMeta(req)
           if (meta.source === 'apk') {
             const min = await minAppVersion(req)

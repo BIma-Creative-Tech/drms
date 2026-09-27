@@ -558,7 +558,7 @@ describe('K-12 kelengkapan nota/LPJ', () => {
   })
 
   it('lpjDueDays is a company setting (default 7)', async () => {
-    const r = await sqlAs('app', 'SELECT lpj_due_days::int AS d FROM company_settings')
+    const r = await sqlAs('app', 'SELECT lpj_due_days::int AS d FROM companies')
     expect(r.rows.every((x) => x.d === 7) || r.rows.length === 0).toBe(true)
   })
 })

@@ -1,6 +1,6 @@
 import type { CollectionSlug, PayloadRequest } from 'payload'
 
-import { hasRole, relId, userId } from '@/access/roles'
+import { hasRoleAny, relId, userId } from '@/access/roles'
 import { resolveScope } from '@/access/scope'
 
 import { actorContext, fail, ids, loadRaw, loadVisible, requireAction, type RequestDoc } from './common'
@@ -88,7 +88,7 @@ export async function validateContent(
   opts: { forSubmit: boolean; creatorId: number },
 ): Promise<void> {
   const errors: Array<{ path: string; message: string }> = []
-  const office = hasRole(req, ...OFFICE)
+  const office = hasRoleAny(req, ...OFFICE)
 
   if (c.projectId && c.costCenterId) errors.push({ path: 'projectId', message: 'Pilih project ATAU pusat biaya, tidak keduanya (US-53).' })
   if (opts.forSubmit && !c.projectId && !c.costCenterId) errors.push({ path: 'projectId', message: 'Project atau pusat biaya wajib diisi (US-53).' })
@@ -117,7 +117,7 @@ export async function validateContent(
   if (opts.forSubmit && uniq.length === 0) errors.push({ path: 'requesterIds', message: 'Minimal 1 pemohon (Diajukan Oleh).' })
   const activeEmp = await activeIds(req, 'employees', uniq)
   uniq.filter((e) => !activeEmp.has(e)).forEach((e) => errors.push({ path: 'requesterIds', message: `Karyawan #${e} tidak ditemukan atau nonaktif.` }))
-  if (!hasRole(req, 'pk-admin', 'pk-finance')) {
+  if (!hasRoleAny(req, 'pk-admin', 'pk-finance')) {
     const creatorEmp = relId((req.user as { employee?: unknown } | null)?.employee)
     if (userId(req) === opts.creatorId && (creatorEmp === undefined || (uniq.length > 0 && !uniq.includes(creatorEmp)))) {
       fail(403, 'Hanya Admin/Finance yang boleh membuat pengajuan atas nama orang lain (Q-09).')

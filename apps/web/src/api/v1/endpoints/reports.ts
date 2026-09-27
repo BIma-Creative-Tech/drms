@@ -1,6 +1,6 @@
 import type { PayloadRequest } from 'payload'
 
-import { hasRole } from '@/access/roles'
+import { hasRoleAny } from '@/access/roles'
 import { adminDashboard, financeDashboard, ownerDashboard, pmDashboard, staffDashboard } from '@/domain/reports/dashboards'
 import { csvStream, downloadHeaders, ExportRefused, pdfBuffer, prepareExport, xlsxBuffer } from '@/domain/reports/export'
 import { reportByCode, type Format, type ReportDef } from '@/domain/reports/registry'
@@ -41,7 +41,7 @@ export const meDashboardEndpoint = dashboard('me', undefined, (req) => staffDash
 export async function resolveReport(req: PayloadRequest, code: string | undefined): Promise<{ def: ReportDef; scope: ReportScope }> {
   const def = code ? reportByCode(code) : undefined
   if (!def) throw new HttpError(404, 'Not Found')
-  if (!hasRole(req, ...def.roles)) throw new HttpError(403, 'Forbidden', { detail: 'Laporan ini tidak tersedia untuk peran Anda.' })
+  if (!hasRoleAny(req, ...def.roles)) throw new HttpError(403, 'Forbidden', { detail: 'Laporan ini tidak tersedia untuk peran Anda.' })
   const scope: ReportScope = def.code === 'audit-log' ? { kind: 'all' } : def.scope ? await def.scope(req) : await officeScope(req)
   if (scope.kind === 'none') throw new HttpError(403, 'Forbidden')
   return { def, scope }

@@ -1,7 +1,7 @@
 import { sql } from '@payloadcms/db-postgres'
 import type { PayloadRequest } from 'payload'
 
-import { hasRole, relId, userId } from '@/access/roles'
+import { hasRoleAny, relId, userId } from '@/access/roles'
 import { writeAudit } from '@/audit/writer'
 import { fail, today } from '@/domain/expense/common'
 import { claimMedia } from '@/domain/expense/receipts'
@@ -291,7 +291,7 @@ export async function closePeriod(req: PayloadRequest, period: string, note?: st
 
 /** Re-open (Owner only = "Direktur" label, G1-1; reason required; ADR 0005 §6): only the LATEST closed period. */
 export async function reopenPeriod(req: PayloadRequest, period: string, reason: string) {
-  if (!hasRole(req, 'pk-owner')) fail(403, 'Hanya Direktur yang dapat membuka kembali periode.')
+  if (!hasRoleAny(req, 'pk-owner')) fail(403, 'Hanya Direktur yang dapat membuka kembali periode.')
   if (!isPeriod(period)) fail(400, 'Periode harus YYYY-MM.')
   const tx = await getRequestTx(req)
   await tx.execute(sql`LOCK TABLE period_closings IN SHARE ROW EXCLUSIVE MODE`)

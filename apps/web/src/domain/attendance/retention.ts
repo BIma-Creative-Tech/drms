@@ -9,6 +9,7 @@ import { withSystemTransaction } from '@/lib/system-tx'
 import { getRequestTx } from '@/lib/tx'
 
 import { retentionCutoff } from './schedule'
+import { settingsOf } from '@/domain/companies'
 
 /**
  * E6 — selfie retention (Q-33, UU No. 27/2022 PDP; plan fase1-golive E6 "selfie > retensi terhapus
@@ -31,11 +32,8 @@ export type RetentionPlan = { months: number; cutoff: string; candidates: number
 export type RetentionSettings = { months: number; deleteEnabled: boolean; batch: number }
 
 export async function retentionSettings(payload: Payload, req?: PayloadRequest): Promise<RetentionSettings> {
-  const s = (await payload.findGlobal({ slug: 'company-settings', depth: 0, overrideAccess: true /* SYSTEM-READ: retention settings (job) */, req })) as {
-    selfieRetentionMonths?: number | null
-    selfieRetentionDeleteEnabled?: boolean | null
-    selfieRetentionBatch?: number | null
-  }
+  // MC2: months/enabled per PT in the job loop (ADR 0016 §7); MC1 = company #1; batch is app-wide.
+  const s = await settingsOf(payload, null, req)
   const months = typeof s.selfieRetentionMonths === 'number' && s.selfieRetentionMonths >= 1 ? s.selfieRetentionMonths : 12
   const batch = typeof s.selfieRetentionBatch === 'number' && s.selfieRetentionBatch >= 1 ? Math.min(2000, Math.floor(s.selfieRetentionBatch)) : 200
   return { months, deleteEnabled: s.selfieRetentionDeleteEnabled === true, batch }

@@ -6,7 +6,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { resetAppConfigCache } from '@/api/v1/endpoints/app'
 import { resetRateLimits } from '@/lib/rate-limit'
 
-import { accessToken, auditRows, getTestPayload, http, installLocalJwks, registerDevice, sqlAs, sqlError, type TestUser } from './helpers'
+import { accessToken, auditRows, getTestPayload, http, installLocalJwks, registerDevice, sqlAs, sqlError, type TestUser, updateCompany } from './helpers'
 import { api, makeWorld, type FlowUser, type World } from './flow-world'
 
 /**
@@ -64,8 +64,7 @@ async function sync(m: Mobile, items: Array<Record<string, unknown>>) {
 }
 
 async function setAttendance(enabled: boolean) {
-  const p = await getTestPayload()
-  await p.updateGlobal({ slug: 'company-settings', data: { syncAttendanceEnabled: enabled }, overrideAccess: true /* SYSTEM-WRITE: fixture */ })
+  await updateCompany({ syncAttendanceEnabled: enabled })
   resetAppConfigCache()
 }
 

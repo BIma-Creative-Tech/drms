@@ -1,6 +1,6 @@
 import type { PayloadRequest } from 'payload'
 
-import { hasRole } from '@/access/roles'
+import { hasRoleAny } from '@/access/roles'
 import { resolveScope } from '@/access/scope'
 
 import { ProgressError } from './reports'
@@ -50,8 +50,8 @@ async function templateStages(req: PayloadRequest, templateId: number): Promise<
 
 export async function saveStageSet(req: PayloadRequest, projectId: number, body: StageSetBody) {
   const project = await requireVisibleProject(req, projectId)
-  const owner = hasRole(req, 'pk-owner')
-  if (!owner && !(hasRole(req, 'pk-pm') && (await resolveScope(req)).teamProjects.includes(projectId))) {
+  const owner = hasRoleAny(req, 'pk-owner')
+  if (!owner && !(hasRoleAny(req, 'pk-pm') && (await resolveScope(req)).teamProjects.includes(projectId))) {
     fail(403, 'FORBIDDEN', 'Tahapan hanya dapat diubah oleh Direktur atau PM project ini.')
   }
   if (project.status === 'arsip') fail(409, 'STATE_CONFLICT', 'Project sudah diarsipkan.')

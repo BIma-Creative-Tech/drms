@@ -2,7 +2,7 @@ import type { AdminViewServerProps, PayloadRequest } from 'payload'
 import Link from 'next/link'
 import React from 'react'
 
-import { hasRole, ROLE_LABELS } from '@/access/roles'
+import { hasRoleAny, ROLE_LABELS } from '@/access/roles'
 import { writeAudit } from '@/audit/writer'
 import { PDF_MAX_ROWS } from '@/domain/reports/export'
 import { reportContext } from '@/domain/reports/kpi'
@@ -34,7 +34,7 @@ const FORMAT_LABEL = { csv: 'CSV', xlsx: 'Excel (.xlsx)', pdf: 'PDF' } as const
 
 export async function ReportsIndex(props: AdminViewServerProps) {
   const req = props.initPageResult.req
-  const list = REPORTS.filter((r) => hasRole(req, ...r.roles))
+  const list = REPORTS.filter((r) => hasRoleAny(req, ...r.roles))
   return (
     <Shell props={props} title="Laporan">
       <F3Root name="laporan">
@@ -69,7 +69,7 @@ export async function ReportsIndex(props: AdminViewServerProps) {
             </table>
           </div>
         )}
-        {hasRole(req, ...AUDIT_REPORT.roles) ? (
+        {hasRoleAny(req, ...AUDIT_REPORT.roles) ? (
           <p>
             <Link href="/admin/audit-log">Audit Log →</Link>
           </p>
@@ -85,7 +85,7 @@ export async function ReportView(props: AdminViewServerProps) {
   const code = segments[1] ?? ''
   const def = reportByCode(code)
   if (!def || def.code === 'audit-log') return <Shell props={props} title="Laporan tidak ditemukan"><p><Link href="/admin/laporan">← Daftar laporan</Link></p></Shell>
-  if (!hasRole(req, ...def.roles)) return <Denied props={props} def={def} />
+  if (!hasRoleAny(req, ...def.roles)) return <Denied props={props} def={def} />
   const scope = def.scope ? await def.scope(req) : await officeScope(req)
   if (scope.kind === 'none') return <Denied props={props} def={def} />
   return <ReportPage props={props} def={def} scope={scope} base={`/admin/laporan/${def.code}`} />
@@ -93,7 +93,7 @@ export async function ReportView(props: AdminViewServerProps) {
 
 export async function AuditLogView(props: AdminViewServerProps) {
   const req = props.initPageResult.req
-  if (!hasRole(req, ...AUDIT_REPORT.roles)) return <Denied props={props} def={AUDIT_REPORT} />
+  if (!hasRoleAny(req, ...AUDIT_REPORT.roles)) return <Denied props={props} def={AUDIT_REPORT} />
   const sp = toSearchParams(props.searchParams)
   // K-16: opening the global audit log is itself recorded (new row, never a change).
   await withReqTransaction(req, () =>

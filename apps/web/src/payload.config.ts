@@ -20,6 +20,8 @@ import { BudgetLines } from './collections/BudgetLines'
 import { CashAccounts } from './collections/CashAccounts'
 import { CashEntries } from './collections/CashEntries'
 import { CashInSources } from './collections/CashInSources'
+import { Companies } from './collections/Companies'
+import { CompanyMemberships } from './collections/CompanyMemberships'
 import { Clients } from './collections/Clients'
 import { CostCenters } from './collections/CostCenters'
 import { Devices } from './collections/Devices'
@@ -136,7 +138,7 @@ export default buildConfig({
   },
   // F2c: staff-only users see only their requests, receipts, notifications and profile.
   // E9 B-1 (G-21): non-object REST bodies (form/text, JSON arrays) → 400 before any hook runs.
-  collections: withBodyGuard(withStaffPanelVisibility([Users, ...MASTER_COLLECTIONS, ...FLOW_COLLECTIONS, Attendances, AttendanceCorrections, ProgressReports, BudgetAddenda, Notifications, Devices, WebSessions, AuditLogs, ...MEDIA_COLLECTIONS])),
+  collections: withBodyGuard(withStaffPanelVisibility([Users, Companies, CompanyMemberships, ...MASTER_COLLECTIONS, ...FLOW_COLLECTIONS, Attendances, AttendanceCorrections, ProgressReports, BudgetAddenda, Notifications, Devices, WebSessions, AuditLogs, ...MEDIA_COLLECTIONS])),
   globals: withGlobalBodyGuard(withStaffHiddenGlobals([CompanySettings])),
   // Admin UI in Bahasa Indonesia (ADR 0001 §5; @payloadcms/translations/languages/id @3.90.1).
   i18n: { supportedLanguages: { id }, fallbackLanguage: 'id' },

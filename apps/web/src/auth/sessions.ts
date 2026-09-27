@@ -9,7 +9,7 @@ import { hashSessionId, newSessionId, readCookie, sessionCookieName } from './co
 
 export const SESSION_MAX_AGE_S = 10 * 60 * 60 // = Keycloak SSO max lifespan (ADR 0003 §1)
 
-type UserDoc = { id: number; roles?: unknown }
+type UserDoc = { id: number }
 
 export async function createWebSession(
   payload: Payload,
@@ -49,7 +49,7 @@ export async function createWebSession(
 export async function auditLoginFailed(
   payload: Payload,
   headers: Headers,
-  info: { reason: 'oidc_callback_error' | 'unknown_or_inactive_user'; userId?: number; keycloakSub?: string },
+  info: { reason: 'oidc_callback_error' | 'unknown_or_inactive_user' | 'no_login_role'; userId?: number; keycloakSub?: string },
 ): Promise<void> {
   const ip = headers.get('x-real-ip') ?? headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown'
   if (!takeToken(`login_failed:${ip}`, 30, 60_000)) return
@@ -64,7 +64,12 @@ export async function auditLoginFailed(
             docType: 'web_session',
             field: 'oidc_callback',
             newValue: info.keycloakSub ? { keycloakSub: info.keycloakSub } : undefined,
-            reason: info.reason === 'unknown_or_inactive_user' ? 'Akun belum terdaftar atau tidak aktif di ProyekKas' : 'Callback OIDC gagal (state/nonce/PKCE/penukaran kode)',
+            reason:
+              info.reason === 'unknown_or_inactive_user'
+                ? 'Akun belum terdaftar atau tidak aktif di ProyekKas'
+                : info.reason === 'no_login_role'
+                  ? 'Token Keycloak tanpa realm role pk-user'
+                  : 'Callback OIDC gagal (state/nonce/PKCE/penukaran kode)',
           },
         ],
         info.userId !== undefined ? { id: info.userId } : null,

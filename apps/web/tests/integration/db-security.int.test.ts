@@ -57,6 +57,7 @@ describe('grants (least privilege)', () => {
     )
     expect(r.rows.map((x) => x.table_name)).toEqual([
       'approval_rules_steps',
+      'company_memberships_roles', // MC1: per-PT roles (hasMany rewritten on update)
       'expense_categories_rels',
       // F2a: Payload rewrites these children on every parent update; locked content is protected
       // by the deferred freeze check (content_hash), not by withholding DELETE.
@@ -72,7 +73,6 @@ describe('grants (least privilege)', () => {
       'payload_preferences_rels',
       'stage_templates_items',
       'sync_receipts', // F4: purge of expired sync results (30 days, ADR 0010)
-      'users_roles',
     ])
   })
 

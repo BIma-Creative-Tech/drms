@@ -3,6 +3,7 @@ import { APIError, type PayloadRequest } from 'payload'
 
 import { relId, userId, userRoles } from '@/access/roles'
 import { writeAuditDetached } from '@/audit/writer'
+import { displayNames, settings } from '@/domain/companies'
 import { DEFAULT_TZ, localDateInTz } from '@/lib/time'
 import { getRequestTx } from '@/lib/tx'
 
@@ -89,16 +90,15 @@ export type ApprovalRow = {
 
 export const ids = (v: unknown[] | null | undefined): number[] => (v ?? []).map((x) => relId(x)).filter((x): x is number => x !== undefined)
 
-/** Today's business date in the company timezone. */
-export async function today(req: PayloadRequest): Promise<string> {
-  const s = await settings(req)
+/** Today's business date in the company timezone (of `companyId`, default: context PT). */
+export async function today(req: PayloadRequest, companyId?: number | null): Promise<string> {
+  const s = await settings(req, companyId)
   const d = localDateInTz(new Date(), s.timezone || process.env.TZ || DEFAULT_TZ)
   return `${d.year}-${String(d.month).padStart(2, '0')}-${String(d.day).padStart(2, '0')}`
 }
 
-export async function settings(req: PayloadRequest) {
-  return req.payload.findGlobal({ slug: 'company-settings', depth: 0, overrideAccess: true /* SYSTEM-READ: company settings */, req })
-}
+/** App-wide + per-PT settings (ADR 0016 §1) — re-exported for the many F2 callers. */
+export { settings }
 
 /** Row lock on the request (serialises concurrent actions on the same document). */
 export async function lockRequest(req: PayloadRequest, id: number): Promise<void> {
@@ -311,7 +311,5 @@ export async function resolveSignature(req: PayloadRequest, signerId: number, ca
 }
 
 export async function displayName(req: PayloadRequest, uid: number): Promise<string> {
-  const u = await req.payload.findByID({ collection: 'users', id: uid, depth: 1, overrideAccess: true /* SYSTEM-READ: display name */, req }).catch(() => null)
-  const emp = u?.employee && typeof u.employee === 'object' ? (u.employee as { name?: string }).name : undefined
-  return emp || u?.name || u?.email || `user#${uid}`
+  return (await displayNames(req, [uid])).get(uid) ?? `user#${uid}`
 }

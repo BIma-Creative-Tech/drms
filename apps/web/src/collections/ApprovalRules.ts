@@ -1,6 +1,7 @@
 import { APIError, type CollectionConfig, type Option } from 'payload'
 
-import { ROLES, ROLE_LABELS, denyAll, relId, rolesOf, type Role } from '@/access/roles'
+import { ROLES, ROLE_LABELS, denyAll, relId, type Role } from '@/access/roles'
+import { contextCompanyId, rolesOfUsersIn } from '@/domain/companies'
 import { byRole, rolesAllowed } from '@/access/policies'
 import { reasonOnAnyUpdate, withAudit } from '@/audit/hooks'
 import { isDecisionRole, ruleDecisionError } from '@/domain/expense/decision'
@@ -59,18 +60,11 @@ export const ApprovalRules: CollectionConfig = withAudit(
             steps,
           }
           const named = [rule.acknowledgeUser, ...steps.map((s) => s.approverUser)].filter((x): x is number => typeof x === 'number')
+          // ADR 0016 §5: roles of the named users IN THE RULE's PT (memberships).
           const roles = new Map<number, Role[]>()
           if (named.length > 0) {
-            const users = await req.payload.find({
-              collection: 'users',
-              where: { id: { in: named } },
-              depth: 0,
-              pagination: false,
-              select: { roles: true },
-              overrideAccess: true, // SYSTEM-READ: roles of users named in a rule (ADR 0013 validation)
-              req,
-            })
-            for (const u of users.docs) roles.set(u.id as number, rolesOf(u))
+            const company = relId(data.company ?? originalDoc?.company) ?? (await contextCompanyId(req))
+            for (const [id, v] of await rolesOfUsersIn(req, named, company)) roles.set(id, v.roles)
           }
           const decisionErr = ruleDecisionError(rule, (id) => roles.get(id))
           if (decisionErr) throw new APIError(decisionErr, 400, null, true)

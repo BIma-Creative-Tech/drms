@@ -1,6 +1,6 @@
 import { APIError, type CollectionBeforeChangeHook, type CollectionConfig } from 'payload'
 
-import { denyAll, hasRole, relId } from '@/access/roles'
+import { denyAll, hasRoleAny, relId } from '@/access/roles'
 import { anyOf, byRole, rolesAllowed, teamCostCenters, teamProjects } from '@/access/policies'
 import { resolveScope } from '@/access/scope'
 import { reasonOnChange, withAudit } from '@/audit/hooks'
@@ -22,7 +22,7 @@ const guard: CollectionBeforeChangeHook = async ({ data, originalDoc, operation,
   if (start !== undefined && end !== undefined && end < start) {
     throw new APIError('Tanggal selesai tidak boleh sebelum tanggal mulai.', 400, null, true)
   }
-  if (req.user && !hasRole(req, 'pk-admin', 'pk-owner') && hasRole(req, 'pk-pm')) {
+  if (req.user && !hasRoleAny(req, 'pk-admin', 'pk-owner') && hasRoleAny(req, 'pk-pm')) {
     const scope = await resolveScope(req)
     const inTeam =
       (project !== undefined && scope.teamProjects.includes(project)) ||

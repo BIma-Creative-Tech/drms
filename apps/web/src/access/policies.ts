@@ -1,6 +1,6 @@
 import type { Access, AccessArgs, FieldAccess, PayloadRequest, Where } from 'payload'
 
-import { hasRole, userRoles, type Role } from './roles'
+import { hasRoleAny, userRoles, type Role } from './roles'
 import { inIds, resolveScope, type Scope } from './scope'
 
 /**
@@ -31,12 +31,12 @@ export function byRole(rules: Partial<Record<Role, Rule>>): Access {
 
 /** Boolean-only variant (create access cannot use `Where`). */
 export function rolesAllowed(...roles: Role[]): Access {
-  return ({ req }) => hasRole(req, ...roles)
+  return ({ req }) => hasRoleAny(req, ...roles)
 }
 
 /** Field-level access (boolean only). */
 export function fieldRoles(...roles: Role[]): FieldAccess {
-  return ({ req }) => hasRole(req, ...roles)
+  return ({ req }) => hasRoleAny(req, ...roles)
 }
 
 export const fieldNever: FieldAccess = () => false
