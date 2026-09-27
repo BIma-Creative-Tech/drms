@@ -10936,7 +10936,7 @@ export const openapiDocument = {
     },
     "/media/{kind}": {
       "post": {
-        "summary": "Upload a file (multipart field \"file\"); server resizes images (receipts ≤ 2000 px, original discarded)",
+        "summary": "Upload a file (multipart field \"file\"); server resizes images (receipts ≤ 1600 px, original discarded); image resizing is queued — queue full → 503 + Retry-After (code UPLOAD_BUSY), retry later",
         "security": [
           {
             "bearer": []
@@ -11066,6 +11066,16 @@ export const openapiDocument = {
             }
           },
           "429": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
             "description": "Problem",
             "content": {
               "application/problem+json": {

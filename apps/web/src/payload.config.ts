@@ -55,6 +55,8 @@ import { smtpEmailAdapter } from './email/adapter'
 import { getEnv, parseSmtpEnv, readSecret } from './lib/env'
 import { loggerOptions } from './lib/logger'
 import { MAX_UPLOAD_BYTES } from './collections/media/factory'
+import { withBodyGuard, withGlobalBodyGuard } from './lib/body-guard'
+import { gateSharp, setImageQueueLogger } from './lib/image-queue'
 
 const dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -62,8 +64,13 @@ const dirname = path.dirname(fileURLToPath(import.meta.url))
 // adapter is built with the config); otherwise Payload's console adapter (dev/tests/migrate).
 const smtp = parseSmtpEnv(process.env)
 
-// ADR 0004: one sharp instance (the one passed to buildConfig), concurrency 1 (RAM budget).
+// ADR 0004: one sharp instance (the one passed to buildConfig), concurrency 1 (RAM budget): one
+// libvips thread per pipeline. E9 P-1: no libvips operation cache (every upload is a new image, the
+// cache only holds RAM), and every pipeline runs through the bounded image queue (lib/image-queue:
+// max IMAGE_RESIZE_CONCURRENCY jobs, the v1 upload endpoint queues whole uploads → 503 when full).
 sharp.concurrency(1)
+sharp.cache(false)
+const queuedSharp = gateSharp(sharp)
 
 export const MASTER_COLLECTIONS = [
   Employees,
@@ -124,8 +131,9 @@ export default buildConfig({
     meta: { titleSuffix: ' — ProyekKas DRMS' },
   },
   // F2c: staff-only users see only their requests, receipts, notifications and profile.
-  collections: withStaffPanelVisibility([Users, ...MASTER_COLLECTIONS, ...FLOW_COLLECTIONS, Attendances, AttendanceCorrections, ProgressReports, BudgetAddenda, Notifications, Devices, WebSessions, AuditLogs, ...MEDIA_COLLECTIONS]),
-  globals: withStaffHiddenGlobals([CompanySettings]),
+  // E9 B-1 (G-21): non-object REST bodies (form/text, JSON arrays) → 400 before any hook runs.
+  collections: withBodyGuard(withStaffPanelVisibility([Users, ...MASTER_COLLECTIONS, ...FLOW_COLLECTIONS, Attendances, AttendanceCorrections, ProgressReports, BudgetAddenda, Notifications, Devices, WebSessions, AuditLogs, ...MEDIA_COLLECTIONS])),
+  globals: withGlobalBodyGuard(withStaffHiddenGlobals([CompanySettings])),
   // Admin UI in Bahasa Indonesia (ADR 0001 §5; @payloadcms/translations/languages/id @3.90.1).
   i18n: { supportedLanguages: { id }, fallbackLanguage: 'id' },
   graphQL: { disable: true },
@@ -145,7 +153,7 @@ export default buildConfig({
     push: false,
     migrationDir: path.resolve(dirname, 'migrations'),
   }),
-  sharp,
+  sharp: queuedSharp,
   // ADR 0004 §2: ≤ 8 MiB per file, 5 files, request ≤ 10 MiB (Traefik buffering-pk/AppSec 10 MiB).
   upload: { limits: { fileSize: MAX_UPLOAD_BYTES, files: 5, fields: 30 }, requestSizeLimit: 10 * 1024 * 1024 },
   endpoints: v1Endpoints,
@@ -162,6 +170,7 @@ export default buildConfig({
   typescript: { outputFile: path.resolve(dirname, 'payload-types.ts') },
   onInit: async (payload) => {
     if (process.env.PK_SKIP_ENV_CHECK !== 'true') getEnv() // fail fast on invalid env
+    setImageQueueLogger(payload.logger)
     payload.logger.info({ msg: 'payload initialised', pid: process.pid, tz: Intl.DateTimeFormat().resolvedOptions().timeZone })
   },
 })

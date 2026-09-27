@@ -11,6 +11,9 @@
  * Keycloak is NOT called (out of scope, infra Lead): users are created only when a `--kc-map`
  * links their username to an existing Keycloak account (`skipKeycloakSync`); the others are
  * reported as "pending" and exported for the Lead (keycloakUsers).
+ * E9 B-2: for the same reason a user (de)activated by the import is NOT disabled/enabled in Keycloak
+ * and its Keycloak sessions are NOT ended (the device revocation cascade skips Keycloak too): such
+ * users are listed once in `keycloakFollowUp` for the operator (runbook: disable + logout via kc_*).
  */
 import { createHash, randomUUID } from 'node:crypto'
 
@@ -45,6 +48,13 @@ export type CutoverReport = {
 
 export type KeycloakUserRow = { username: string; email: string; firstName: string; enabled: boolean; realmRoles: string[]; employeeCode: string }
 
+/**
+ * E9 B-2: Keycloak step the operator must do by hand (realm drms) because the import never calls
+ * Keycloak — `disable_logout`: user deactivated here → disable the account + log out all sessions;
+ * `enable`: user re-activated here → enable the account again.
+ */
+export type KeycloakFollowUpRow = { username: string; email: string; keycloakSub: string | null; action: 'disable_logout' | 'enable' }
+
 export type ImportReport = {
   mode: Mode
   runId: string
@@ -59,6 +69,8 @@ export type ImportReport = {
   cutover: CutoverReport | null
   /** Users to create in Keycloak realm `drms` (no passwords). */
   keycloakUsers: KeycloakUserRow[]
+  /** Users (de)activated by this run whose Keycloak account/sessions the operator must update (E9 B-2). */
+  keycloakFollowUp: KeycloakFollowUpRow[]
 }
 
 export type ImportInput = { bytes: Uint8Array; fileName: string; mode: Mode; kcMap?: ReadonlyMap<string, string>; operator?: string; now?: Date }
@@ -132,6 +144,7 @@ export const dateValue = (d: string | null) => (d ? `${d}T12:00:00.000Z` : null)
 
 class Exec {
   readonly cache = new Map<string, number>()
+  readonly kcFollowUp: KeycloakFollowUpRow[] = []
   constructor(
     readonly req: PayloadRequest,
     readonly data: ImportData,
@@ -272,6 +285,9 @@ const MASTERS: Array<{ key: SheetKey; rows: (d: ImportData) => number; run: Mast
           const data: Record<string, unknown> = { name: u.name, roles: u.roles, employee: await x.idOf('employees', 'code', u.employeeCode), phone: u.phone, active: u.active }
           const where: Where = plan.sub ? { keycloakSub: { equals: plan.sub } } : { email: { equals: plan.email } }
           const existing = await x.findOne('users', where)
+          const wasActive = existing ? existing.active !== false : null
+          if (wasActive !== false && !u.active) x.kcFollowUp.push({ username: u.username, email: plan.email, keycloakSub: (existing?.keycloakSub as string | null | undefined) ?? plan.sub, action: 'disable_logout' })
+          if (wasActive === false && u.active) x.kcFollowUp.push({ username: u.username, email: plan.email, keycloakSub: (existing?.keycloakSub as string | null | undefined) ?? plan.sub, action: 'enable' })
           // never replace a real email by the placeholder of an email-less row
           const email = effectiveEmail(u)
           if (!existing || !isPlaceholderEmail(email) || isPlaceholderEmail(String(existing.email ?? ''))) data.email = email
@@ -550,12 +566,13 @@ function keycloakUsers(data: ImportData, users: Map<string, UserPlan>): Keycloak
     .map((u) => ({ username: u.username, email: u.email ?? '', firstName: u.name, enabled: u.active, realmRoles: u.roles, employeeCode: u.employeeCode ?? '' }))
 }
 
-type PassResult = { masters: MasterReport[]; cutover: CutoverReport | null; issues: Issue[] }
+type PassResult = { masters: MasterReport[]; cutover: CutoverReport | null; issues: Issue[]; kcFollowUp: KeycloakFollowUpRow[] }
 
 async function executePass(payload: Payload, data: ImportData, users: Map<string, UserPlan>, opts: { dryRun: boolean; reason: string; runId: string; fileName: string; sha256: string }): Promise<PassResult> {
   const context = { auditSource: 'system', auditReason: opts.reason }
   const masters: MasterReport[] = []
   const issues: Issue[] = []
+  const kcFollowUp: KeycloakFollowUpRow[] = []
   let cutover: CutoverReport | null = null
   const steps: Array<{ key: SheetKey | 'cutover'; sheet: string; rows: number; run: (x: Exec, rep: MasterReport) => Promise<void> }> = [
     ...MASTERS.filter((m) => data.present.includes(m.key)).map((m) => ({ key: m.key, sheet: SHEET_BY_KEY[m.key].name, rows: m.rows(data), run: (x: Exec, rep: MasterReport) => m.run(x, rep, issues) })),
@@ -599,6 +616,7 @@ async function executePass(payload: Payload, data: ImportData, users: Map<string
             await st.run(x, rep)
             masters.push(rep)
           }
+          kcFollowUp.push(...x.kcFollowUp)
           throw new DryRunRollback()
         },
         context,
@@ -606,13 +624,14 @@ async function executePass(payload: Payload, data: ImportData, users: Map<string
     } catch (e) {
       if (!(e instanceof DryRunRollback)) throw e
     }
-    return { masters, cutover, issues }
+    return { masters, cutover, issues, kcFollowUp }
   }
   // commit: one transaction per master, in dependency order (a later failure keeps earlier masters;
   // re-running the fixed file is idempotent)
   const cache = new Map<string, number>()
   for (const st of steps) {
     const rep: MasterReport = { key: st.key, sheet: st.sheet, rows: st.rows, created: 0, updated: 0, unchanged: 0, skipped: 0 }
+    let stepFollowUp: KeycloakFollowUpRow[] = []
     await withSystemTransaction(
       payload,
       null,
@@ -626,12 +645,15 @@ async function executePass(payload: Payload, data: ImportData, users: Map<string
           await summary(req)
         }
         for (const [k, v] of x.cache) cache.set(k, v)
+        stepFollowUp = x.kcFollowUp
       },
       context,
     )
+    // only what was committed (a failed master rolls back its (de)activations too)
+    kcFollowUp.push(...stepFollowUp)
     if (st.key !== 'cutover') masters.push(rep)
   }
-  return { masters, cutover, issues }
+  return { masters, cutover, issues, kcFollowUp }
 }
 
 export async function runImport(payload: Payload, input: ImportInput): Promise<ImportReport> {
@@ -639,7 +661,7 @@ export async function runImport(payload: Payload, input: ImportInput): Promise<I
   const sha256 = createHash('sha256').update(input.bytes).digest('hex')
   const runId = randomUUID()
   const reason = `Impor data go-live ${input.fileName} (sha256 ${sha256.slice(0, 12)})${input.operator ? ` oleh ${input.operator}` : ''}`.slice(0, 1000)
-  const report: ImportReport = { mode: input.mode, runId, file: input.fileName, sha256, startedAt, finishedAt: startedAt, ok: false, committed: false, issues: [], masters: [], cutover: null, keycloakUsers: [] }
+  const report: ImportReport = { mode: input.mode, runId, file: input.fileName, sha256, startedAt, finishedAt: startedAt, ok: false, committed: false, issues: [], masters: [], cutover: null, keycloakUsers: [], keycloakFollowUp: [] }
   const done = () => {
     report.finishedAt = new Date().toISOString()
     report.ok = !hasErrors(report.issues)
@@ -667,6 +689,7 @@ export async function runImport(payload: Payload, input: ImportInput): Promise<I
     report.masters = check.masters
     report.cutover = check.cutover
     report.issues.push(...check.issues)
+    report.keycloakFollowUp = check.kcFollowUp
   } catch (e) {
     if (!(e instanceof RowError)) throw e
     report.issues.push({ level: 'error', sheet: e.sheet, row: e.row, message: e.message })
@@ -679,6 +702,7 @@ export async function runImport(payload: Payload, input: ImportInput): Promise<I
     const real = await executePass(payload, data, resolved.users, { ...passOpts, dryRun: false })
     report.masters = real.masters
     report.cutover = real.cutover
+    report.keycloakFollowUp = real.kcFollowUp
     report.committed = true
   } catch (e) {
     if (!(e instanceof RowError)) throw e

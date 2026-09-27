@@ -148,6 +148,58 @@ Langkah:
 - [ ] Audit log: filter aksi `import` → satu baris per master yang berubah + satu ringkasan (`selesai`).
 - [ ] Commit kedua dengan file yang sama (opsional, sebagai bukti) → semua `baru 0, ubah 0` (AC E11).
 - [ ] Login uji satu pengguna per peran (web + APK).
+- [ ] Bila laporan memuat blok **`PERINGATAN KEYCLOAK`**: jalankan §3.5 (wajib sebelum serah terima).
+
+### 3.5 Langkah Keycloak setelah impor menonaktifkan / mengaktifkan pengguna (E9 B-2, ASVS G-22)
+
+Alat impor **tidak pernah memanggil Keycloak** (container `…-seed` sengaja tanpa env OIDC/KC admin). Saat baris
+Pengguna berubah `aktif = Tidak`, impor mencabut **perangkat dan sesi web ProyekKas** (audit `device_revoke` dengan
+nilai `keycloak_skipped`, `session_revoked`), tetapi **akun Keycloak tetap aktif dan sesi SSO / offline token APK tetap
+hidup** sampai langkah ini dijalankan. Laporan impor merangkumnya dalam **satu** blok (bukan satu log per perangkat):
+
+```
+PERINGATAN KEYCLOAK (realm drms) — impor TIDAK mengubah Keycloak; perangkat & sesi web ProyekKas sudah dicabut, tetapi akun & sesi Keycloak belum:
+  35 pengguna dinonaktifkan → WAJIB disable + logout di Keycloak (runbook import-data-golive §Langkah Keycloak): lt-field-01, …
+```
+
+dan (dengan `--out`) menulis `impor-commit-<stamp>-keycloak-tindak-lanjut.csv` (`username,email,keycloakId,action`;
+`action` = `disable_logout` atau `enable`; tanpa secret). Pada dry-run blok yang sama berbunyi "akan dinonaktifkan" —
+jangan jalankan langkah ini sebelum commit.
+
+Jalankan di host (root), dengan lib infra `kc_*` (client `automation`, Admin REST hanya via `:8443`, token tidak pernah
+dicetak; **jangan** `bash -x`). Realm prod `drms`; staging `drms-staging`.
+
+```bash
+set -euo pipefail
+source /opt/infra/scripts/lib/odoo-pools.sh     # prasyarat lib: die, INFRA_DIR
+source /opt/infra/scripts/lib/keycloak-admin.sh
+kc_init drms                                    # staging: kc_init drms-staging
+CSV=/srv/drms-import/out/impor-commit-<stamp>-keycloak-tindak-lanjut.csv
+tail -n +2 "$CSV" | while IFS=, read -r username email kcid action; do
+  if [[ -z "$kcid" ]]; then   # id kosong → cari dari username
+    kcid="$(kc_get "/users?username=$(kc_urlencode "$username")&exact=true" | kc_json 'd[0]["id"] if d else ""')"
+  fi
+  [[ "$kcid" =~ ^[0-9a-f-]{36}$ ]] || { echo "LEWATI $username: id Keycloak tidak ditemukan"; continue; }
+  case "$action" in
+    disable_logout)
+      kc_send PUT  "/users/$kcid" '{"enabled":false}' 204          # akun nonaktif → login & refresh ditolak
+      kc_send POST "/users/$kcid/logout" "" 204                    # akhiri semua sesi SSO
+      kc_send DELETE "/users/$kcid/consents/proyekkas-mobile" "" 204 404   # cabut offline token APK
+      echo "OK disable+logout $username" ;;
+    enable)
+      kc_send PUT "/users/$kcid" '{"enabled":true}' 204
+      echo "OK enable $username" ;;
+  esac
+done
+```
+
+Verifikasi (sampel 1–2 pengguna): `kc_get "/users/<id>" | kc_json 'd["enabled"]'` → `False`,
+`kc_get "/users/<id>/sessions" | kc_json 'len(d)'` → `0`; login uji akun itu → `invalid_grant "Account disabled"`.
+Catat jumlah akun yang diproses di catatan cut-over. Tanpa akses `kc_*`: lakukan hal yang sama di Admin Console realm
+(Users → user → **Enabled** off → tab **Sessions** → **Sign out**; tab **Consents** → cabut `proyekkas-mobile`).
+
+Penonaktifan lewat **web admin** (bukan impor) tidak butuh langkah ini: hook pengguna menonaktifkan akun Keycloak dan
+mengakhiri sesinya sendiri (runbook `cabut-perangkat.md` §B).
 
 ## 4. Cut-over (yang dilakukan alat impor)
 
@@ -168,7 +220,8 @@ Langkah:
 - Tahapan: sheet Tahapan = set lengkap per project; tahapan lama yang tidak ada di file **dinonaktifkan** (peringatan).
 - Pengguna: peran di ProyekKas adalah cermin; sumber kebenaran tetap realm role Keycloak (disinkronkan saat login,
   ADR 0003). Ubah peran di Keycloak juga. `aktif = Tidak` menonaktifkan pengguna di ProyekKas (login ditolak, sesi &
-  perangkat dicabut) tetapi alat impor **tidak** menyentuh Keycloak — nonaktifkan juga akunnya di Keycloak.
+  perangkat dicabut) tetapi alat impor **tidak** menyentuh Keycloak — laporan impor mendaftar pengguna itu dalam blok
+  `PERINGATAN KEYCLOAK`; nonaktifkan + logout akunnya di Keycloak dengan §3.5.
 
 ## 6. Kunci saldo awal (keputusan S3b)
 

@@ -24,7 +24,10 @@ const statusGuard: CollectionBeforeChangeHook = ({ data, originalDoc, operation,
 
 const revokeEffects: CollectionAfterChangeHook = async ({ doc, previousDoc, operation, req }) => {
   if (operation !== 'update' || previousDoc?.status !== 'active' || doc.status === 'active') return doc
-  const kc = await endKeycloakDeviceSession(req, doc.keycloakSid)
+  // E9 B-2: system tooling that does not talk to Keycloak (go-live import, seed — `skipKeycloakSync`)
+  // records the revocation only; the import reports the users whose Keycloak account/sessions the
+  // operator must disable + log out (runbook import-data-golive), instead of one warning per device.
+  const kc = req.context?.skipKeycloakSync === true ? 'keycloak_skipped' : await endKeycloakDeviceSession(req, doc.keycloakSid)
   await writeAudit(req, [
     {
       action: 'device_revoke',

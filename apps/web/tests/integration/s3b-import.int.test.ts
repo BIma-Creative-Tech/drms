@@ -1,11 +1,12 @@
 import { randomUUID } from 'node:crypto'
 
 import type { PayloadRequest } from 'payload'
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 
 import { postEntry } from '@/domain/cash/ledger'
 import { DEFAULT_SEQUENCES, parseBusinessDate } from '@/domain/numbering'
 import { allocateDocNo } from '@/domain/numbering-db'
+import { formatReport } from '@/import/report'
 import { parseKcMap } from '@/import/resolve'
 import { runImport, type ImportReport } from '@/import/run'
 import { SAMPLE } from '@/import/sample'
@@ -13,7 +14,7 @@ import { buildSample } from '@/import/template'
 import { withSystemTransaction } from '@/lib/system-tx'
 
 import { api, makeFlowUser, type FlowUser } from './flow-world'
-import { getTestPayload, sqlAs, sqlError } from './helpers'
+import { auditRows, getTestPayload, sqlAs, sqlError } from './helpers'
 
 /**
  * E11 go-live import against the throwaway DB. Test files share one DB (reset once per run), so the
@@ -211,6 +212,47 @@ describe('E11 go-live import (dry-run → commit → idempotent re-run)', () => 
     const dewi = (await sqlAs('app', "SELECT email, keycloak_sub FROM users WHERE keycloak_sub = $1", [all.get('dewi.fiktif')])).rows[0]
     expect(dewi.email).toBe('dewi.fiktif@pengguna.drms.invalid')
     expect(Object.fromEntries(r.masters.map((m) => [m.sheet, m.created])).Pengguna).toBe(1)
+  })
+
+  it('E9 B-2 (G-22): deactivation by import revokes devices without calling Keycloak and reports ONE Keycloak follow-up', async () => {
+    const p = await getTestPayload()
+    const candra = (await sqlAs('app', "SELECT id FROM users WHERE email = 'candra@drms-contoh.test'")).rows[0]
+    const device = await p.create({
+      collection: 'devices',
+      data: { deviceId: randomUUID(), user: candra.id, platform: 'android', model: 'Uji B-2', appVersion: '1.0.0', keycloakSid: randomUUID(), status: 'active' } as never,
+      depth: 0,
+      overrideAccess: true, // SYSTEM-WRITE: fixture (registration endpoint not needed here)
+    })
+    const withCandra = (aktif: 'Ya' | 'Tidak') =>
+      buildSample({ settings, rows: { pengguna: (SAMPLE.rows.pengguna ?? []).map((u) => (u.username === 'candra.contoh' ? { ...u, aktif } : u)) } })
+    const warn = vi.spyOn(p.logger, 'warn')
+    try {
+      const dry = await run('dry-run', withCandra('Tidak'))
+      expect(dry.ok, JSON.stringify(dry.issues)).toBe(true)
+      expect(dry.keycloakFollowUp).toEqual([{ username: 'candra.contoh', email: 'candra@drms-contoh.test', keycloakSub: subs.get('candra.contoh'), action: 'disable_logout' }])
+      expect((await sqlAs('app', 'SELECT status FROM devices WHERE id = $1', [device.id])).rows[0].status).toBe('active')
+
+      const r = await run('commit', withCandra('Tidak'))
+      expect(r.ok, JSON.stringify(r.issues)).toBe(true)
+      expect(r.keycloakFollowUp.map((x) => [x.username, x.action])).toEqual([['candra.contoh', 'disable_logout']])
+      expect((await sqlAs('app', 'SELECT status, revoke_reason FROM devices WHERE id = $1', [device.id])).rows[0]).toEqual({ status: 'revoked', revoke_reason: 'user_deactivated' })
+      const revoke = (await auditRows('device', device.id)).find((a) => a.action === 'device_revoke')
+      expect(revoke?.new_value).toEqual({ v: 'keycloak_skipped' })
+      // no per-device "keycloak device session delete failed" noise, one summary block instead
+      expect(warn.mock.calls.filter((c) => JSON.stringify(c).includes('keycloak device session delete failed'))).toEqual([])
+      const text = formatReport(r)
+      expect(text.match(/PERINGATAN KEYCLOAK/g)).toHaveLength(1)
+      expect(text).toContain('1 pengguna dinonaktifkan → WAJIB disable + logout di Keycloak (runbook import-data-golive §Langkah Keycloak): candra.contoh')
+
+      // re-activation is reported as well (enable in Keycloak)
+      const back = await run('commit', withCandra('Ya'))
+      expect(back.keycloakFollowUp.map((x) => [x.username, x.action])).toEqual([['candra.contoh', 'enable']])
+      expect((await sqlAs('app', 'SELECT active FROM users WHERE id = $1', [candra.id])).rows[0].active).toBe(true)
+      // unchanged state → nothing to follow up
+      expect((await run('dry-run', withCandra('Ya'))).keycloakFollowUp).toEqual([])
+    } finally {
+      warn.mockRestore()
+    }
   })
 
   it('kcadm CSV mapping file is accepted as-is', () => {

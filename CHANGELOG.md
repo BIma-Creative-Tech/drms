@@ -7,6 +7,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ## [Unreleased]
 
 ### Added
+- **E9 follow-ups — upload resize queue, B-1, B-2** (`apps/web`, branch `fix/e9-upload-resize-queue`; QA report
+  `docs/proyekkas/qa/s3-e9-qa-report.md` §7, user decision 2026-09-27):
+  - P-1: process-wide FIFO image queue (`src/lib/image-queue.ts`): at most `IMAGE_RESIZE_CONCURRENCY` (default 2)
+    sharp jobs at once, `IMAGE_RESIZE_MAX_QUEUE` (default 20) waiting, 30 s max wait; `POST /api/v1/media/{kind}`
+    queues the whole upload (DB transaction opened only after the slot is granted) and answers 503 + `Retry-After: 5`
+    (`code: UPLOAD_BUSY`) when full; generic REST uploads are gated per sharp pipeline and refused (503) while the
+    queue is saturated. `sharp.cache(false)`, `sharp.concurrency(1)` kept. Outputs unchanged. Queue wait logged at
+    debug (`image queue slot`). AC E9: uploads p95 < 5 s, everything else < 2 s.
+  - B-1 (ASVS G-21): generic REST create/update with a non-object body (form/text, multipart without `_payload`, JSON
+    array/null) → 400 with a clear message instead of a 500 from the collection hooks (`src/lib/body-guard.ts`, first
+    `beforeOperation` hook of every collection and the `company-settings` global).
+  - B-2 (ASVS G-22): the E11 import no longer tries Keycloak per revoked device (audit `keycloak_skipped`); the report
+    prints ONE `PERINGATAN KEYCLOAK` block listing users to disable + log out (or re-enable) and the CLI writes
+    `…-keycloak-tindak-lanjut.csv`; Keycloak step (`kc_*`, realm drms) added to the import and cabut-perangkat runbooks.
 - **S3 track E — Fase 1 UAT gap fixes** (`apps/web`, branch `feat/s3e-uat-gap-fixes`; S-ids of
   `docs/proyekkas/uat/fase1/README.md`):
   - S-01 PM home: "Pengajuan tim menunggu keputusan" (Direktur / Finance) instead of the empty "Diketahui saya" card;

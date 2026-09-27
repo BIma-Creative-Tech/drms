@@ -19,12 +19,14 @@
 | AC E9 | Hasil | Status |
 |---|---|---|
 | Tidak ada temuan HIGH/CRITICAL terbuka | ZAP baseline pasif tanpa login (26/9, 2 run) **dan terautentikasi** (27/9, 1 akun lapangan + 1 akun Direktur, 142 / 837 URL): **0 FAIL, 0 High/Critical**. Medium hanya CSP `style-src 'unsafe-inline'` (diterima) dan "Absence of Anti-CSRF Tokens" (false positive, §7.4). Bug baru B-1 (500 pada body non-JSON, Low). | **PASS** |
-| Load test p95 < 2 s pada aksi utama (Q-34: 30 lapangan + 5 kantor, termasuk unggah foto/selfie) | Run terautentikasi 27/9 (§7.3, campuran opsi b): check-in 1,02 s, dashboard 0,81 s, inbox approval 1,88 s, laporan 0,81 s → lulus; **unggah nota 3,18 s, laporan progress 2,71 s, draft pengajuan 2,60 s, unggah foto progress 2,20 s, unggah selfie 2,11 s → lewat target**. Error 0%, 0× 429, 0× WAF. Penyebab: CPU web dibatasi 0,75 vCPU — 38% periode CFS ter-*throttle* (§7.3.3). | **FAIL** (jalur unggah/resize) — perlu keputusan kapasitas (P-1) |
+| Load test (Q-34: 30 lapangan + 5 kantor, termasuk unggah foto/selfie): **unggahan p95 < 5 s** (latar belakang, keputusan user 2026-09-27), **aksi lain p95 < 2 s** | Run terautentikasi 27/9 (§7.3, campuran opsi b, SEBELUM antrean resize): unggah nota 3,18 s, foto progress 2,20 s, selfie 2,11 s → **di bawah target unggah 5 s**; check-in 1,02 s, dashboard 0,81 s, inbox approval 1,88 s, laporan 0,81 s → lulus; **laporan progress 2,71 s dan draft pengajuan (`/sync/batch`) 2,60 s → lewat target 2 s** (ikut antre CPU di event loop yang sama). Error 0%, 0× 429, 0× WAF. Penyebab: CPU web 0,75 vCPU — 38% periode CFS ter-*throttle* (§7.3.3). | **FAIL → uji ulang** setelah deploy antrean resize (P-1, branch `fix/e9-upload-resize-queue`) |
 | RAM puncak web/worker < 80% limit | Run terautentikasi dengan resize sharp: web **189,5 / 384 MiB (49,3%)**, worker **70,1 / 192 MiB (36,5%)**; di bawah ambang flag 307 MiB. | **PASS** |
 | Restore drill `pk_drms_restoretest` (DB + media) < 4 jam, jumlah baris & checksum media cocok | RTO terukur **6,1 s** (DB 5,1 s + media 0,7 s + verifikasi 0,3 s); **68 tabel / 2 078 baris cocok**, **58 sequence cocok**, **46 file media sha256 + owner/mode cocok**. DB uji & direktori sementara dihapus. | **PASS** |
 
-**Keputusan yang dibutuhkan (Lead/user)** — P-1 (§7.3.3): naikkan `cpus` web staging/prod (mis. 0,75 → 1,5) atau batasi/ pindahkan
-resize sharp, lalu ulangi load test terautentikasi. Bagian §1–§6 = run 26/9 (tanpa login); §7 = run terautentikasi 27/9.
+**Keputusan user 2026-09-27 (P-1, §7.3.3):** resize gambar **diantre** di proses web (maks 2 job sharp bersamaan,
+`IMAGE_RESIZE_CONCURRENCY`; antrean penuh → 503 + `Retry-After`, APK mencoba ulang di latar belakang), `cpus` web tetap;
+target AC menjadi **unggahan p95 < 5 s**, **aksi lain p95 < 2 s**. Ulangi load test terautentikasi setelah deploy.
+Bagian §1–§6 = run 26/9 (tanpa login); §7 = run terautentikasi 27/9.
 
 ## 1. ZAP baseline (pasif)
 
@@ -336,7 +338,7 @@ draft lump sum — `Satuan wajib bila jumlah diisi`).
 — semuanya `ALREADY_CHECKED_IN/OUT` (aturan bisnis 1× masuk + 1× pulang per hari; diharapkan dari iterasi berulang).
 Laporan progress tercipta 20 (0× 409).
 
-| Aksi | n | p50 (ms) | p95 (ms) | maks (ms) | Target p95 < 2 s |
+| Aksi | n | p50 (ms) | p95 (ms) | maks (ms) | Target p95 < 2 s (saat uji) |
 |---|---:|---:|---:|---:|---|
 | token (password grant / refresh) | 70 | 66 | 151–191 | 291 | ✓ |
 | `/me` | 398 | 30 | 621 | 3 349 | ✓ |
@@ -355,6 +357,10 @@ Laporan progress tercipta 20 (0× 409).
 | tahapan project | 20 | 34 | 552 | 756 | ✓ |
 | unggah foto progress 1600 px | 43 | 611 | **2 195** | 3 357 | ✗ |
 | laporan progress (`POST /progress-reports`) | 20 | 451 | **2 708** | 3 802 | ✗ |
+
+> **Target baru (keputusan user 2026-09-27):** unggahan (selfie, nota, foto progress) p95 < 5 s → ketiga baris unggah di
+> atas memenuhi; aksi lain p95 < 2 s → draft Reimburse (`/sync/batch`) 2 600 ms dan laporan progress 2 708 ms **tetap ✗**
+> sampai uji ulang dengan antrean resize (§7.3.3).
 
 #### 7.3.3 Sumber daya & penyebab
 
@@ -375,6 +381,11 @@ Laporan progress tercipta 20 (0× 409).
   host masih punya headroom CPU tetapi load1 5,7 perlu dipantau), (b) batasi konkurensi sharp (`sharp.concurrency(1)`,
   antre) atau pindahkan resize ke worker (ADR 0002 §6 (b)), (c) terima target lebih longgar untuk unggahan (mis. p95 < 4 s,
   karena APK mengunggah di latar belakang/antrean offline). Ulangi load test setelah keputusan.
+- **Keputusan user 2026-09-27:** (b) + (c) — antrean resize di proses web (`apps/web/src/lib/image-queue.ts`: semafor FIFO
+  seproses, maks `IMAGE_RESIZE_CONCURRENCY` = 2 job, antrean maks `IMAGE_RESIZE_MAX_QUEUE` = 20 → 503 + `Retry-After: 5`,
+  tunggu maks 30 s; `sharp.concurrency(1)`, cache libvips mati; output resize/format/EXIF tidak berubah) dan target
+  **unggahan p95 < 5 s**, **aksi lain p95 < 2 s** (AC `plans/fase1-golive.md` §E9 diperbarui). Uji ulang `MODE=auth`
+  setelah deploy; bila laporan progress / `/sync/batch` masih > 2 s, coba `IMAGE_RESIZE_CONCURRENCY=1`.
 
 ### 7.4 ZAP baseline terautentikasi
 
@@ -425,9 +436,9 @@ decision untuk IP uji selama seluruh sesi.
 
 | ID | Severity | Pemilik | Ringkas |
 |---|---|---|---|
-| P-1 | **Medium (AC gagal)** | user/Lead + nextjs/infra | p95 unggah + resize 2,1–3,2 s pada Q-34; CPU web 0,75 vCPU ter-throttle 38% |
-| B-1 | Low | nextjs | REST generik Payload: body non-JSON → 500 (TypeError di hook), seharusnya 400 |
-| B-2 | Low | nextjs + Lead (runbook) | Nonaktif lewat impor E11 tidak mencabut sesi Keycloak (env OIDC tidak ada di service seed) |
+| P-1 | **Medium (AC gagal)** | user/Lead + nextjs/infra | p95 unggah + resize 2,1–3,2 s pada Q-34; CPU web 0,75 vCPU ter-throttle 38%. **Keputusan 27/9:** antre resize + target unggah < 5 s / lain < 2 s; diimplementasi di `fix/e9-upload-resize-queue`, **uji ulang tertunda** |
+| B-1 | Low | nextjs | REST generik Payload: body non-JSON → 500 (TypeError di hook), seharusnya 400 — **diperbaiki** (`lib/body-guard.ts`, 400 + pesan) |
+| B-2 | Low | nextjs + Lead (runbook) | Nonaktif lewat impor E11 tidak mencabut sesi Keycloak (env OIDC tidak ada di service seed) — **laporan impor merangkum 1 peringatan + CSV; langkah `kc_*` di runbook** |
 | D-1 | Info (deviasi) | infra | Penanda `loadtest=e9` di grup, bukan atribut user (unmanaged attribute nonaktif) |
 | D-2 | Info (deviasi) | — | Project uji beban `PRJ-LT-E9` menggantikan `PRJ-UJI-01` yang tidak ada di staging |
 | Z-6…Z-10 | Info | — | §7.4 |

@@ -132,6 +132,13 @@ export const envSchema = z
     /** Only for plain-http throwaway environments. Refused when APP_URL is https. */
     AUTH_COOKIE_INSECURE: bool,
     MEDIA_DIR: z.string().startsWith('/').default('/data/media'),
+    /**
+     * E9 P-1 (lib/image-queue.ts): image uploads re-encoded by sharp at once in this process; more
+     * wait in a FIFO queue. With web cpus 0.75, 1–2 keeps the other requests p95 < 2 s.
+     */
+    IMAGE_RESIZE_CONCURRENCY: z.coerce.number().int().min(1).max(8).default(2),
+    /** E9 P-1: uploads allowed to WAIT for a slot; one more → 503 + Retry-After (APK retries). */
+    IMAGE_RESIZE_MAX_QUEUE: z.coerce.number().int().min(0).max(500).default(20),
     LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
     /** Android application id of the APK (ADR 0010 decision 1 proposal; client to confirm the domain). */
     ANDROID_APP_PACKAGE: z
