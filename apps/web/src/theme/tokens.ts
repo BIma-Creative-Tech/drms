@@ -19,6 +19,11 @@ export type SemanticTokens = {
   cardForeground: string
   primary: string
   primaryHover: string
+  /**
+   * Low-emphasis primary tint (decorative, never text): the resting dot of the admin loader
+   * (src/admin/loading) in light mode. Light = blue-200, dark = blue-800.
+   */
+  primarySoft: string
   primaryForeground: string
   accent: string
   accentHover: string
@@ -46,6 +51,7 @@ export const semantic: { light: SemanticTokens; dark: SemanticTokens } = {
     cardForeground: '#1E293B',
     primary: '#2563EB',
     primaryHover: '#1D4ED8',
+    primarySoft: '#BFDBFE',
     primaryForeground: '#FFFFFF',
     accent: '#EA580C',
     accentHover: '#F97316',
@@ -70,6 +76,7 @@ export const semantic: { light: SemanticTokens; dark: SemanticTokens } = {
     cardForeground: '#E2E8F0',
     primary: '#60A5FA',
     primaryHover: '#93C5FD',
+    primarySoft: '#1E40AF',
     primaryForeground: '#0B1120',
     accent: '#FB923C',
     accentHover: '#FDBA74',
@@ -148,6 +155,17 @@ export const moduleGradients: Record<string, { light: [string, string]; dark: [s
   sistem: { light: ['#0F766E', '#134E4A'], dark: ['#115E59', '#042F2E'] },
 }
 
+/**
+ * Admin loading dots (src/admin/loading, Uiverse.io "thin-lionfish-5" pulse): each dot pulses from
+ * `rest` to `peak` and back. Light = pale primary → primary; dark = primary → primaryHover (brighter
+ * on the dark background). The glow ring is `peak` faded with color-mix in the SCSS. The peak (the
+ * state that must be perceivable) keeps ≥ 3:1 against background and card (tests/unit/theme.test.ts).
+ */
+export const loaderDots: Record<'light' | 'dark', { rest: keyof SemanticTokens; peak: keyof SemanticTokens }> = {
+  light: { rest: 'primarySoft', peak: 'primary' },
+  dark: { rest: 'primary', peak: 'primaryHover' },
+}
+
 /** Base radius (web-starter brand.radius); Payload's s/m/l are derived like web-starter sm/md/lg. */
 export const radius = '0.875rem'
 
@@ -171,6 +189,10 @@ export function themeCssVariables(): Record<string, string> {
       vars[`--pk-${mode}-mod-${id}-from`] = g[mode][0]
       vars[`--pk-${mode}-mod-${id}-to`] = g[mode][1]
     }
+  }
+  for (const mode of ['light', 'dark'] as const) {
+    vars[`--pk-${mode}-loader-rest`] = semantic[mode][loaderDots[mode].rest]
+    vars[`--pk-${mode}-loader-peak`] = semantic[mode][loaderDots[mode].peak]
   }
   vars['--pk-radius'] = radius
   return vars

@@ -1,0 +1,158 @@
+// Admin loader overlay + pulsing dots (src/admin/loading/LoadingProvider.tsx, LoadingDots.tsx).
+//
+// The dot pulse is adapted from Uiverse.io "thin-lionfish-5" by adamgiebl
+// https://github.com/uiverse-io/galaxy/blob/main/loaders/adamgiebl_thin-lionfish-5.html
+// Changes: BEM class names; colours from the DRMS brand tokens (src/theme/tokens.ts `loaderDots`:
+// light pale primary → primary, dark primary → primaryHover; glow = peak faded with color-mix)
+// instead of #b3d4fc/#6793fb; even animation delays for dots 4–5; prefers-reduced-motion variant.
+//
+// MIT License
+//
+// Copyright (c) 2023 Uiverse.io
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
+// associated documentation files (the "Software"), to deal in the Software without restriction,
+// including without limitation the rights to use, copy, modify, merge, publish, distribute,
+// sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in all copies or
+// substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT
+// NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+// NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+// DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT
+// OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+@layer payload {
+  // Theme follows Payload's html[data-theme] (the avatar-menu toggle / cookie; Payload itself falls
+  // back to prefers-color-scheme when no choice is stored), like every other --pk-* token.
+  :root {
+    --pk-loader-rest: var(--pk-light-loader-rest);
+    --pk-loader-peak: var(--pk-light-loader-peak);
+  }
+
+  html[data-theme='dark'] {
+    --pk-loader-rest: var(--pk-dark-loader-rest);
+    --pk-loader-peak: var(--pk-dark-loader-peak);
+  }
+
+  .pk-loading {
+    position: fixed;
+    inset: var(--pk-bar-h, 0) 0 0 0;
+    z-index: 24; // navigation: under the module bar (25) so the shell stays visible
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: color-mix(in oklab, var(--pk-bg) 55%, transparent);
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition:
+      opacity 0.15s ease,
+      visibility 0s linear 0.15s;
+  }
+
+  .pk-loading[data-visible] {
+    opacity: 1;
+    visibility: visible;
+    transition:
+      opacity 0.15s ease,
+      visibility 0s;
+  }
+
+  // Create / update / delete: whole page (drawers and modals too, Payload --z-status 40), clicks
+  // absorbed so a form cannot be submitted twice. Payload popups (60) and toasts stay above.
+  .pk-loading[data-mode='save'] {
+    inset: 0;
+    z-index: calc(var(--z-status, 40) + 2);
+  }
+
+  .pk-loading[data-mode='save'][data-visible] {
+    pointer-events: auto;
+    cursor: progress;
+  }
+
+  .pk-loading__status {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .pk-dots {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .pk-dots__dot {
+    width: 20px;
+    height: 20px;
+    margin-right: 10px;
+    border-radius: 10px;
+    background-color: var(--pk-loader-rest);
+  }
+
+  .pk-dots__dot:last-child {
+    margin-right: 0;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .pk-dots__dot {
+      animation: pk-dots-pulse 1.5s infinite ease-in-out;
+    }
+
+    .pk-dots__dot:nth-child(1) {
+      animation-delay: -0.3s;
+    }
+
+    .pk-dots__dot:nth-child(2) {
+      animation-delay: -0.1s;
+    }
+
+    .pk-dots__dot:nth-child(3) {
+      animation-delay: 0.1s;
+    }
+
+    .pk-dots__dot:nth-child(4) {
+      animation-delay: 0.3s;
+    }
+
+    .pk-dots__dot:nth-child(5) {
+      animation-delay: 0.5s;
+    }
+  }
+
+  // Reduced motion: no scale / glow / pulse — a static row fading into the peak colour.
+  @media (prefers-reduced-motion: reduce) {
+    .pk-dots__dot {
+      animation: none;
+      background-color: var(--pk-loader-peak);
+    }
+
+    @for $i from 1 through 5 {
+      .pk-dots__dot:nth-child(#{$i}) {
+        opacity: 0.2 + $i * 0.16;
+      }
+    }
+  }
+
+  @keyframes pk-dots-pulse {
+    0%,
+    100% {
+      transform: scale(0.8);
+      background-color: var(--pk-loader-rest);
+      box-shadow: 0 0 0 0 color-mix(in oklab, var(--pk-loader-peak) 45%, transparent);
+    }
+
+    50% {
+      transform: scale(1.2);
+      background-color: var(--pk-loader-peak);
+      box-shadow: 0 0 0 10px color-mix(in oklab, var(--pk-loader-peak) 0%, transparent);
+    }
+  }
+}

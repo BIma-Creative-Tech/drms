@@ -53,3 +53,44 @@ in our own product is explicitly allowed by Iconsax; if a strict OSI-only readin
   while it renders no view actions; breadcrumbs are a line under the bar rendered by `ModuleBar` from Payload's
   `useStepNav()` (home crumb = current module, `src/admin/shell/crumbs.ts`). If a future view adds `viewActions`,
   the AppHeader row reappears automatically (CSS `:has(.app-header__actions > *)`).
+
+## Addendum 2026-09-27 — admin loader (third-party CSS: Uiverse.io "thin-lionfish-5")
+
+**Decision.** The web admin shows a five-dot pulse loader on every module navigation and during every
+create / update / delete (branch `feat/admin-loading-dots`, `apps/web/src/admin/loading/`). Not the APK.
+
+**Third-party code (provenance + licence).**
+
+| Item | Source | Licence | Where |
+|---|---|---|---|
+| Dot pulse CSS + 5-dot markup, "thin-lionfish-5" by adamgiebl | Uiverse.io, `github.com/uiverse-io/galaxy` `loaders/adamgiebl_thin-lionfish-5.html` | MIT, Copyright (c) 2023 Uiverse.io | adapted in `src/admin/loading/_loading-dots.scss` (full MIT notice in the file header) and `LoadingDots.tsx` (header comment) |
+
+No package is installed (copied snippet, ≈ 30 lines of CSS). Changes: BEM class names; colours from the brand
+tokens instead of `#b3d4fc`/`#6793fb` (`src/theme/tokens.ts` `loaderDots`: light `primarySoft` #BFDBFE → `primary`
+#2563EB, dark `primary` #60A5FA → `primaryHover` #93C5FD, glow = peak faded with `color-mix`, new token
+`primarySoft` in both themes, peak ≥ 3:1 on background/card tested); even delays for dots 4–5; reduced-motion
+variant (static dots, no scale/glow).
+
+**Mechanism** (one provider, no call site changed): `admin.components.providers` →
+`src/admin/loading/LoadingProvider.tsx` (inside Payload's RootProvider on every admin page, login included).
+- Navigation = capture-phase click on a same-origin `<a>` to another admin URL (next/link, Payload Link, plain
+  anchors), submit of a GET filter form to an admin URL, or Payload's `useRouteTransition().isTransitioning`
+  (router.push after Save/Duplicate/Delete). Ends when `usePathname()`/`useSearchParams()` change. No
+  `loading.tsx`: the admin page renders Payload's template incl. the module bar, a Suspense fallback would blank
+  the shell. The navigation overlay sits under the module bar and lets clicks through.
+- Mutations = `window.fetch` wrapped once (`mutation-tracker.ts`), counting in-flight same-origin
+  POST/PUT/PATCH/DELETE to `/api/` — Payload's Form, delete, bulk delete/publish/edit, duplicate, reorder all use
+  fetch (verified in @payloadcms/ui 3.90.1); custom views' `/api/v1` calls too. The save overlay covers the whole
+  page (drawers too, `--z-status + 2`) and absorbs pointer events (no double submit).
+- **Not counted:** GET/HEAD/OPTIONS; `X-Payload-HTTP-Method-Override: GET` (relationship/upload searches);
+  cross-origin; everything outside `/api/` (Next server actions / Payload server functions such as form-state,
+  RSC refreshes); `?autosave=true`; `/api/payload-preferences`; `/api/payload-locked-documents`;
+  `/api/<slug>/access` permission probes; `/api/<slug>/{login,logout,refresh-token,forgot-password,
+  reset-password,first-register,unlock,verify}`; `/api/v1/notifications/<id>/read` (background read-mark on open).
+- Timing: shown after 180 ms (no flash), at least 300 ms, force-hidden after 15 s; a request pending > 15 s stops
+  counting; a navigation without a route change is dropped after 15 s. `role="status"` `aria-live="polite"`
+  text "Memuat…" / "Menyimpan…", focus never moved; theme follows `html[data-theme]` (Payload toggle).
+- CSP unchanged: styles come from the SCSS bundle (`custom.scss` `@use`s the partial), no inline `<style>`.
+
+**Risk.** Relies on Payload using `fetch` for mutations and on `useRouteTransition` (public `@payloadcms/ui`
+export); re-verify on Payload upgrades. Payload's bulk-upload drawer has its own overlay; ours shows on top.
