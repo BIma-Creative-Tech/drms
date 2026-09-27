@@ -1,6 +1,6 @@
 # ADR 0003 — Authentication & identity: Keycloak realm `drms`, OIDC for web and APK
 
-- **Status:** accepted (user, GATE F0 2026-09-23); revised 2026-09-23 after the F1 spike (user-approved) and the F1 foundation / staging deploy; F2c panel access recorded 2026-09-24 (see Revision history)
+- **Status:** accepted (user, GATE F0 2026-09-23); revised 2026-09-23 after the F1 spike (user-approved) and the F1 foundation / staging deploy; F2c panel access recorded 2026-09-24 (see Revision history); multi-company revision proposed 2026-09-27 (ADR 0016, section "Revisi 2026-09-27")
 - **Date:** 2026-09-23
 - **Author:** Analyst/Architect — Phase 0
 - **Related:** brief §2 #3; `/opt/infra/CLAUDE.md` §3.2 (login), §3.6; `/opt/infra/identity/keycloak/*`
@@ -277,6 +277,30 @@ different auth design requires only `users` collection auth config + routes. No 
 1. §3.2 "Login" paragraph: add "Client apps outside Odoo (e.g. ProyekKas/Payload) use a dedicated realm per
    client (`<slug>`, `<slug>-staging`) and custom OIDC strategies — see ProyekKas ADR 0003".
 
+## Revisi 2026-09-27 (ADR 0016)
+
+*Status of this revision: proposed with ADR 0016 (multi-company); takes effect with MC1. The sections above stay as
+the record of the single-company design.*
+
+- **§2 Roles — source of truth changes.** Per-PT roles live in the ProyekKas table `company_memberships`
+  (`user`, `company`, `employee`, `roles[]`, `active`); Keycloak keeps identity, credentials, sessions and **one**
+  realm role **`pk-user`** (= may log in to ProyekKas). The five `pk-*` realm roles are no longer written:
+  `users-sync` stops `applyRoles` (`apps/web/src/domain/users-sync.ts:50-56,86,113`) and assigns only `pk-user` on
+  create; the web login callback stops the `role_sync` mirror write (`app/(auth)/auth/callback/route.ts:52-61`) and
+  refuses a token without `pk-user` (403 + `login_failed`). The paragraph "Authorization decisions use token roles ∩
+  `users.active`" is replaced by: **effective roles = active memberships of the active user, per PT (DB only)**.
+- **§4 APK bearer:** the rule "effective roles = token realm roles ∩ roles stored in ProyekKas"
+  (`auth/strategies.ts:118-123,139-142`) is replaced by "token carries `pk-user` + user active + device active;
+  roles from memberships". A new request header **`X-Company-Ids`** narrows the PT selection; it is always
+  intersected with the memberships, and a foreign id is a 403 (ADR 0016 §5).
+- **§3 Web:** the PT selection is a server-set `HttpOnly` cookie `__Host-pk-companies` (switcher in the module bar);
+  it never widens access. `users.roles` and the unique `users.employee` are removed; the employee of a user is per PT
+  (`company_memberships.employee`). New DB-only flag `users.groupAdmin` for company master and app-wide settings.
+- **Infra (infra-engineer, coordinated):** create realm role `pk-user` in `drms` and `drms-staging`, assign it to all
+  ProyekKas users, then remove the `pk-*` mappings (after the MC1 release is live on staging). No client/mapper
+  change; the service account rights (`manage-users` + `view-users`) are unchanged.
+- **Alternatives (added):** Keycloak Organizations / group-per-PT roles — rejected, see ADR 0016 "Alternatives".
+
 ## Revision history
 
 - **2026-09-23 (F0 gate):** accepted by user.
@@ -306,3 +330,4 @@ different auth design requires only `users` collection auth config + routes. No 
   Authorization Code + PKCE (`browser`) until the F6 decision. Status stays accepted.
 - **2026-09-26 (E9, S3 track A):** §7 decision recorded — Keycloak event log = source of truth for failed logins;
   ProyekKas writes `login_failed` only for logins refused on its side. Status stays accepted.
+- **2026-09-27 (ADR 0016, multi-company):** section "Revisi 2026-09-27 (ADR 0016)" added (proposed; takes effect with phase MC). Status stays accepted.

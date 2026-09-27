@@ -1,6 +1,6 @@
 # ADR 0007 — Document numbering (configurable per document type, client format by default)
 
-- **Status:** accepted (user, GATE F0 2026-09-23); revised 2026-09-23 after the F1 spike (user-approved) the F1 foundation and F2a (see Revision history)
+- **Status:** accepted (user, GATE F0 2026-09-23); revised 2026-09-23 after the F1 spike (user-approved) the F1 foundation and F2a (see Revision history); multi-company revision proposed 2026-09-27 (ADR 0016, section "Revisi 2026-09-27")
 - **Date:** 2026-09-23
 - **Author:** Analyst/Architect — Phase 0
 - **Related:** requirements v1.0 §1 finding #8, §6 (company settings "format penomoran"), §7 (T1 `PG/YYMM/####`,
@@ -130,6 +130,26 @@ never rewritten.
 
 None.
 
+## Revisi 2026-09-27 (ADR 0016)
+
+*Status of this revision: proposed with ADR 0016 (multi-company); takes effect with MC1.*
+
+- **§1 Sequences per PT:** `document-sequences.company` NOT NULL, unique `(company_id, doc_type)` (today `docType`
+  unique, `collections/DocumentSequences.ts:28-36`). A new PT gets the seven default sequences of
+  `domain/numbering.ts:97-105` with its own `startAt` (Q-54).
+- **Counters:** `document_sequence_counters` PK `(company_id, doc_type, period_key)` (today `(doc_type, period_key)`,
+  `migrations/20260923_103219_security.ts:100-105`); the monotonic/no-delete triggers stay. `allocateDocNo` requires
+  the document's company.
+- **§2 Token `{COMPANY}`** = `shortCode` of the **document's** PT (today the global `company-settings.shortCode`,
+  `domain/numbering-db.ts:36-44`). Examples on the same day (27-09-2026):
+  `229/PB-DRMS/27/IX/2026` (DRMS continues the paper series) and `1/PB-CS1/27/IX/2026` (fictional "PT Contoh Satu",
+  `shortCode` CS1, new series).
+- **Uniqueness:** patterns without `{COMPANY}` (`TRF/{YY}{MM}/{seq}`, LPJ, KM, KK, LP, ADD) repeat across PTs, e.g.
+  `TRF/2609/0001` exists in DRMS and CS1 → `doc_no`/`entry_no` unique per `(company_id, …)`; consolidated lists always
+  show the PT column. Whether the other document types should carry the company code (e.g. `TRF-CS1/2609/0001`) is
+  Q-54 — configuration only.
+- The S3b go-live cut-over (`import/run.ts`, `nomor_pb_mulai`) becomes per PT (workbook column `kode_pt`).
+
 ## Revision history
 
 - **2026-09-23 (F0 gate):** accepted by user.
@@ -148,3 +168,4 @@ None.
   `expense_request.startAt` = the workbook's `nomor_pb_mulai` (default 229); an existing counter below it is raised
   (upward only, audited `update` field `nextValue` with the import reason), a counter already beyond it is left
   unchanged (warning). Runbook `runbooks/import-data-golive.md`. Status stays accepted.
+- **2026-09-27 (ADR 0016, multi-company):** section "Revisi 2026-09-27 (ADR 0016)" added (proposed; takes effect with phase MC). Status stays accepted.

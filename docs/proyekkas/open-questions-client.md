@@ -1,6 +1,6 @@
 # ProyekKas — Pertanyaan Terbuka untuk Klien (DRMS)
 
-Tanggal: 23 September 2026 (diperbarui 25 September 2026: keputusan user untuk go-live, lihat `plans/fase1-golive.md` §1 dan ADR 0013) · Terkait: `requirements-v1.1.md` (nomor `Q-xx` dirujuk dari sana)
+Tanggal: 23 September 2026 (diperbarui 25 September 2026: keputusan user untuk go-live, lihat `plans/fase1-golive.md` §1 dan ADR 0013; diperbarui 27 September 2026: multi-PT, bagian L, ADR 0016) · Terkait: `requirements-v1.1.md` (nomor `Q-xx` dirujuk dari sana)
 
 Cara membaca:
 - **Usulan default** = yang akan dipakai tim bila klien tidak menjawab sebelum fase yang diblokir dimulai. Semua default bisa diubah di setting kecuali disebut lain.
@@ -115,3 +115,25 @@ Cara membaca:
 | Q-49 | Addendum RAB (T12): cukup disetujui Direktur, atau Direktur lalu Finance seperti pengajuan biaya? | Menentukan aturan approval `budget_addendum`. | Direktur saja; Finance menerima notifikasi. | Tidak memblokir |
 | Q-50 | Bolehkah Finance yang meng-approve sebuah pengajuan juga yang mencatat transfernya? | Pemisahan tugas vs ukuran tim. | Boleh (tercatat di audit, ada peringatan di layar); bila ada ≥ 2 Finance bisa diwajibkan berbeda. | Tidak memblokir |
 
+
+## L. Multi-perusahaan / multi-PT (ADR 0016, ditambahkan 2026-09-27)
+
+Keputusan user 2026-09-27: beberapa PT dikelola dalam satu aplikasi; satu akun bisa punya peran berbeda per PT;
+1 data karyawan = 1 PT; bank, satuan dan hari libur dipakai bersama; semua master lain per PT; laporan dan kotak
+persetujuan bisa gabungan. Jawaban di bawah dibutuhkan untuk data awal tiap PT, **bukan** untuk desain (model data
+tidak bergantung pada jawaban). Blok **MC1** = fondasi web, **MC2** = domain/laporan/admin, **MC3** = APK, **Go-live**
+= impor data. Contoh PT fiktif: "PT Contoh Satu" (kode `CS1`). Rincian: `requirements-v1.2.md`.
+
+| No | Pertanyaan | Kenapa penting | Usulan default | Blok |
+|---|---|---|---|---|
+| Q-51 | Mohon **daftar PT** dalam grup yang akan memakai ProyekKas: nama legal, nama tampilan, **kode singkat** (2–16 huruf/angka, dipakai di nomor dokumen, mis. `PB-DRMS`), alamat, telepon, **logo** resolusi tinggi dan contoh **kop surat** per PT. PT mana yang mulai dipakai saat go-live? | Kode singkat masuk ke nomor dokumen dan tidak bisa diubah setelah ada dokumen; kop/logo dipakai di PDF per PT. | DRMS = PT #1 (data sekarang). PT lain ditambahkan oleh Admin grup sebelum impor go-live; logo/kop sementara = nama PT saja (seperti Q-32). | MC1 / Go-live |
+| Q-52 | Apakah **Direktur dan Finance** yang sama bertindak di beberapa PT? Mohon daftar per PT: siapa Direktur, siapa Finance, siapa Admin, siapa PM. | Menentukan matriks peran per PT dan apakah alur Direktur → Finance (ADR 0013) punya cukup orang berbeda di setiap PT (satu-satunya Direktur yang juga pemohon → posisinya dilewati). | Peran diisi per PT oleh Admin; minimal 1 Direktur dan 1 Finance aktif di setiap PT (sama dengan Q-47). | MC2 / Go-live |
+| Q-53 | Apakah **kategori pengeluaran / COA** berbeda per PT, atau semua PT memakai daftar yang sama? | Kategori per PT (keputusan user); bila isinya sama, cukup disalin dari DRMS. Berpengaruh ke laporan gabungan per kategori dan mirror Odoo. | Per PT, diisi dengan salinan daftar DRMS saat PT dibuat; laporan gabungan menampilkan kategori per PT. | Go-live |
+| Q-54 | **Penomoran per PT:** mulai dari nomor berapa pengajuan (PB) di tiap PT (apakah ada seri kertas yang dilanjutkan)? Apakah transfer, LPJ, kas masuk/keluar, laporan progress dan addendum juga perlu kode PT di nomornya (mis. `TRF-CS1/2609/0001`)? | Nomor unik per PT; tanpa kode PT nomor seperti `TRF/2609/0001` bisa sama di dua PT (dibedakan kolom PT). | PB: DRMS lanjut 229 (Q-17), PT lain mulai 1, format `{seq}/PB-{kode PT}/{DD}/{MM_ROMAN}/{YYYY}`. Dokumen lain: format v1.1 tanpa kode PT. | MC1 / Go-live |
+| Q-55 | Apakah ada **karyawan yang benar-benar bekerja di 2 PT** (absen, mengajukan biaya, atau punya rekening di kedua PT)? Berapa orang? | Orang seperti itu punya 2 data karyawan (1 per PT) dan 1 akun; absensi dan rekening dicatat per PT. | Didukung; bila tidak ada kasus nyata, cukup satu data karyawan di PT utamanya. | Go-live |
+| Q-56 | Untuk **laporan gabungan** beberapa PT: nama grup dan kop/logo apa yang dipakai? | Laporan PDF gabungan butuh kop yang bukan milik salah satu PT. | Nama grup "Grup DRMS" [usulan], logo DRMS; bila tidak ada, judul "Laporan gabungan: DRMS, CS1, …". | MC2 |
+| Q-57 | Apakah **aturan approval** sama untuk semua PT (Direktur lalu Finance untuk semua nominal), atau ada PT dengan ambang/urutan berbeda? | Aturan approval dibuat per PT. | Semua PT memakai salinan aturan DRMS (ADR 0013); ambang nominal tetap terbuka (Q-31). | MC2 |
+| Q-58 | Apakah semua PT memakai **satu aplikasi HP** dan **satu proyek Firebase** (notifikasi) yang sama? | Satu APK = satu login untuk semua PT; Firebase per PT tidak perlu. | Ya (asumsi tim): satu APK, satu Firebase (akun sesuai Q-44), notifikasi diberi kode PT. | MC3 |
+| Q-59 | Apakah **semua PT beroperasi di zona waktu WITA** (`Asia/Makassar`)? | Jadwal pengingat, tanggal dokumen dan batas tutup buku memakai zona waktu server; zona berbeda per PT butuh pekerjaan tambahan. | Semua PT WITA; zona waktu lain di luar cakupan rilis ini. | MC1 |
+| Q-60 | Siapa **Admin grup** (boleh membuat PT baru, mengubah setting aplikasi dan master bersama bank/satuan/libur)? | Admin satu PT tidak boleh mengatur PT lain; perlu pemilik tugas lintas PT. | Admin DRMS saat ini menjadi Admin grup; bisa lebih dari satu orang. | MC1 |
+| Q-61 | Apakah ada **kendaraan, akun kas/bank, project, vendor atau klien yang dipakai bersama** oleh beberapa PT? | Semua master itu per PT (keputusan user); pemakaian bersama berarti data dicatat dua kali atau biaya dicatat di satu PT saja. Plat kendaraan diusulkan unik di seluruh grup. | Tidak ada pemakaian bersama: satu kendaraan/akun/project milik satu PT; vendor/klien yang sama didaftarkan di tiap PT yang memakainya. | MC1 / Go-live |

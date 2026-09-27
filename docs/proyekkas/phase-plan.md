@@ -1,6 +1,6 @@
 # ProyekKas — Phase plan F0–F7
 
-- **Status:** accepted (user, GATE F0 2026-09-23); F1 status updated 2026-09-23 (spike gate passed; foundation on staging); F2 status updated 2026-09-24 (F2a–F2e done and deployed to staging `e9c07ab`; UAT run 4 56/59 PASS; **F2 ready for gate**) · **Date:** 2026-09-23 · **Author:** Analyst/Architect (Phase 0)
+- **Status:** accepted (user, GATE F0 2026-09-23); phase **MC (multi-company)** added 2026-09-27 before go-live (ADR 0016, proposed — MC0 gate); F1 status updated 2026-09-23 (spike gate passed; foundation on staging); F2 status updated 2026-09-24 (F2a–F2e done and deployed to staging `e9c07ab`; UAT run 4 56/59 PASS; **F2 ready for gate**) · **Date:** 2026-09-23 · **Author:** Analyst/Architect (Phase 0)
 - **Basis:** `architecture.md`, ADR 0001–0008 (this folder), ADR 0009–0011 (other agent), requirements v1.0
   (+ v1.1 in parallel), `/opt/infra/CLAUDE.md` §1 (workflow: stop and report at the end of every phase, wait
   for user approval), §5 (Definition of Done).
@@ -205,6 +205,67 @@
 - **Acceptance gate:** US-01, 02, 09–16, 18, 29–31 criteria pass; geofence rejects outside radius and
   mock location; progress % only changes via reports (audit shows before→after).
 
+### MC — Multi-company (several PTs in one deployment) — BEFORE go-live
+
+> **Added 2026-09-27 (Analyst, ADR 0016; design approved by the user 2026-09-27).** New requirement: several PTs of the
+> client group in one ProyekKas, one login per person, per-PT role matrix, full consolidation of lists/inbox/
+> dashboards/reports, mutations always within one PT. Runs **before** the Fase 1 sprint S4 (client UAT, prod import,
+> cut-over, `v1.0.0`; `plans/fase1-golive.md` §5) because prod has no data yet. Requirements `requirements-v1.2.md`
+> (US-MC-01…19), client questions Q-51…Q-61, wireframes `mc/wireframes.md`, code inventory `mc/impact-inventory.md`.
+
+- **MC0 — Analysis gate:** ADR 0016 + revisions of ADR 0003/0005/0007/0009/0010/0013, requirements v1.2, open
+  questions §L, wireframes, impact inventory, traceability rows (this branch `docs/mc0-multi-company`).
+  **Gate:** user accepts ADR 0016 (incl. Analyst additions `groupAdmin`, global vehicle plate, TZ = process TZ);
+  client answers to Q-51/Q-52/Q-54/Q-59/Q-60 are wanted before MC1 seeds, not before MC1 code.
+- **MC1 — Web foundation:** `companies`, `company-memberships`, `company_id` on every per-PT table, backfill of staging
+  to company #1 DRMS, composite uniques, per-PT numbering counters and `pk_cash_lock_date(company_id)`, cross-PT
+  triggers, access context (cookie/header ∩ memberships, `hasRole(req, role, companyId)`, per-PT `byRole`,
+  per-PT `resolveScope`), Keycloak `pk-user` (realm role via infra) + removal of role sync and of token ∩ DB,
+  **isolation test suite** (every per-PT collection + every `/api/v1` route with ids, 404 across PTs).
+  **Gate:** isolation suite green; existing suites green on a two-PT fixture; migration up/down on a staging copy
+  with row counts and balances equal before/after (US-MC-19).
+- **MC2 — Domain, reports, admin UI:** approval holders/notifications/queues per PT (ADR 0013 revision), jobs per PT,
+  `ReportScope` per company + company predicates in all raw SQL, consolidated dashboards/reports/exports with PT
+  breakdown + totals, letterheads per PT / group, admin: company master, role matrix, employee ↔ PT mapping, PT
+  switcher in the module bar, `PT` column + filter in list views, import workbook with `kode_pt`.
+  **Gate:** KPI reconciliation per PT and Σ PT = total (extends `f3-kpi-reconciliation`); US-MC-06…13, 15, 16, 18
+  pass; browser check of switcher/matrix/consolidated screens at 1440 px and 390 px.
+- **MC3 — API + APK:** `X-Company-Ids`, `/me` `companies[]`, OpenAPI regenerated (`packages/api-contract`), APK PT
+  switcher, per-PT capabilities, drift schema v3 (`companyId` on drafts/outbox/progress), per-PT master caches, sync per
+  PT (`COMPANY_MISMATCH`). **Gate:** Flutter unit/widget tests + mock-backend flow with two PTs; phone test on staging
+  (create in CS1, approve in DRMS, offline draft in each PT synced to its own PT).
+- **MC4 — QA + staging UAT:** security review (IDOR, header spoofing, raw SQL, SYSTEM-READ inventory), ZAP rerun, load
+  test with 3 PTs (E9 targets), restore drill unchanged, staging UAT with a fictional second PT (`CS1`), user guides
+  (Admin: PT + role matrix; all roles: PT switcher), runbook import updated, CHANGELOG/version.
+  **Gate:** 0 HIGH/CRITICAL; UAT MC scripts pass; user approves → Fase 1 S4 continues.
+- **Dependencies:** develop `74cf7f2` (Fase 1 S0–S3 merged); infra-engineer for the `pk-user` realm role
+  (`drms`, `drms-staging`); client answers §L for seeds/import (not for code).
+- **Agents / estimate (ESTIMATE, pd):**
+
+  | Work package | Agent | pd | Sub-phase |
+  |---|---|---|---|
+  | Analysis, ADRs, requirements, wireframes, inventory, gate follow-up | analyst | 3–5 | MC0 |
+  | Data model + migration/backfill (collections, `company_id`, composite uniques, counters, lock date, cross-PT triggers) | nextjs-developer | 7–10 | MC1 |
+  | Access layer (context, `hasRole`/`byRole`/`resolveScope` per PT, SYSTEM-READ review, create/update company checks) | nextjs-developer | 7–10 | MC1 |
+  | Auth / Keycloak (`pk-user`, callback + bearer strategy, users-sync) | nextjs-developer + infra-engineer | 2–3 | MC1 |
+  | Domain (approval holders, notifications, queues, numbering/closing callers, jobs per PT, attendance/progress/addendum) | nextjs-developer | 6–9 | MC2 |
+  | Reports/KPI + consolidation + exports/PDF letterheads | nextjs-developer | 8–12 | MC2 |
+  | Admin UI (company master, role matrix, employee ↔ PT, PT switcher, PT columns/filters, import workbook) | nextjs-developer | 7–10 | MC2 |
+  | API + OpenAPI (`X-Company-Ids`, `/me`, sync, period-closing params) | nextjs-developer | 2–3 | MC3 |
+  | Mobile (switcher, capabilities per PT, drift v3, caches, sync per PT, tests) | flutter-developer | 8–12 | MC3 |
+  | QA-security (isolation suite MC1 3–4, domain/report tests MC2 2–3, APK/API MC3 1–2, review + UAT MC4 2) | qa-security | 8–11 | MC1–MC4 |
+  | Deploy (staging migration, Keycloak role rollout) + docs (guides, runbooks, CHANGELOG) | infra-engineer + docs-versioning | 2–3 | MC4 |
+
+  → nextjs-developer 37–54 · flutter-developer 8–12 · qa-security 8–11 · analyst 3–5 · infra/auth + deploy/docs 4–6
+  (auth/Keycloak 2–3 shared with nextjs, deploy+docs 2–3) → **60–88 pd**
+  (per sub-phase: MC0 3–5 · MC1 19–27 · MC2 23–34 · MC3 11–17 · MC4 4–5).
+- **Calendar / go-live shift:** with two web tracks (data+access, then domain/reports and admin UI), one APK track
+  (starts once `/me` and the header are fixed in MC1) and QA in parallel, **≈ 4–6 calendar weeks** (ESTIMATE) are
+  added before Fase 1 S4 → go-live moves by the same amount (plus client latency on §L answers for the import).
+- **Acceptance gate (MC overall):** US-MC-01…19 criteria pass; isolation suite in CI; no cross-PT row possible at DB
+  level (trigger tests); per-PT numbering concurrency test (2 PTs × 50 parallel); consolidated numbers reconcile;
+  APK two-PT phone test; user approval.
+
 ### F6 — Hardening & release
 - **Scope:** security review (OWASP ASVS L1 basics), ZAP baseline on staging, load test (≈ 30 concurrent
   field users + 5 office users, ESTIMATE target) with RAM re-measurement, backup + restore drill (DB +
@@ -250,11 +311,14 @@
 | F3 | 20–28 |
 | F4 | 42–60 |
 | F5 | 30–42 |
+| **MC** (multi-company, added 2026-09-27, before go-live) | **60–88** |
 | F6 | 18–28 |
 | F7 | 20–29 |
-| **Total** | **197–282** |
+| **Total** | **257–370** (was 197–282 before MC) |
 
 Parallelism: F3 (web) and F4 (APK) can overlap once F2's API is frozen; F5 backend can start during F4.
+MC: the APK track (MC3) can start once the MC1 access contract (`X-Company-Ids`, `/me` `companies[]`) is fixed; MC2
+reports and admin UI run in parallel on two web tracks after the MC1 data model is merged.
 
 ## Task dependency graph (for parallel delegation)
 
@@ -273,6 +337,16 @@ Parallelism: F3 (web) and F4 (APK) can overlap once F2's API is frozen; F5 backe
 | T-F4-apk | flutter-developer | F2 API freeze, ADR 0010/0011 | `apps/mobile/**` |
 | T-F4-sync-api | nextjs-developer | ADR 0010 | `apps/web/src/api/v1/sync/**` |
 | T-F5-* | nextjs + flutter | F4 base | both apps |
+| T-MC1-model | nextjs-developer | MC0 gate | `apps/web/src/{collections,globals,migrations,domain/numbering*,seed}/**` |
+| T-MC1-access | nextjs-developer | T-MC1-model | `apps/web/src/{access,auth}/**`, `app/(auth)/**`, `domain/users-sync.ts` |
+| T-MC1-kc | infra-engineer | MC0 gate | `/opt/infra/identity/keycloak/realm-export/drms*.json` (realm role `pk-user`) |
+| T-MC1-qa | qa-security | T-MC1-access | `apps/web/tests/integration/mc-*.int.test.ts`, `.semgrep/proyekkas.yml` |
+| T-MC2-domain | nextjs-developer | T-MC1-access | `apps/web/src/{domain,jobs}/**` |
+| T-MC2-reports | nextjs-developer | T-MC1-access | `apps/web/src/{domain/reports,pdf}/**`, `admin/views/{Dashboard,Reports}.tsx` |
+| T-MC2-admin | nextjs-developer | T-MC1-model | `apps/web/src/admin/**`, `apps/web/src/import/**` |
+| T-MC3-api | nextjs-developer | T-MC1-access | `apps/web/src/api/v1/**`, `packages/api-contract/**` |
+| T-MC3-apk | flutter-developer | T-MC3-api (contract) | `apps/mobile/**` |
+| T-MC4-qa-uat | qa-security + docs-versioning | T-MC2-*, T-MC3-* | `docs/proyekkas/{qa,uat,guides,runbooks}/**`, `CHANGELOG.md` |
 | T-F7-mirror | nextjs + odoo-developer | F6, ADR 0009 | `apps/web/src/jobs/odoo/**`, odoo addon repo (if any) |
 
 ## Top risks (overall)
@@ -286,6 +360,7 @@ Parallelism: F3 (web) and F4 (APK) can overlap once F2's API is frozen; F5 backe
 | 5 | **Shared-infra changes** (Keycloak realm + token rate limit, Traefik middlewares, pg_hba, backup script, `infra-deploy`) can collide with the platform session or other clients | M / M | changes as separate infra tasks with their own review, staging first, coordination note to infra session; ProyekKas never edits `/opt/infra` directly | infra-engineer |
 | 6 | Payload 4 major (canary exists) shortens 3.x support | L–M / M | pin 3.90.1, monthly minors via staging; evaluate 4.x only after GA + guide (new ADR) | nextjs-dev |
 | 7 | Excel export library lacks a maintained MIT/Apache option on npm | M / L | CSV baseline; fresh evaluation in F3 | nextjs-dev |
+| 8 | **Multi-company isolation (ADR 0016)**: a missed company predicate (233 raw `sql` fragments, 199 `overrideAccess: true` SYSTEM-READs) or a role check against the wrong PT leaks or changes another PT's data; migration/backfill errors on staging; go-live shifts ≈ 4–6 weeks | M / H | DB `company_id NOT NULL` + cross-PT triggers + composite uniques; isolation test suite per collection/route in CI; Semgrep rule for raw SQL without company helper; SYSTEM-READ inventory reviewed by qa-security (MC4); migration rehearsed on a staging copy with row-count/balance reconciliation; done before go-live (no prod data) | nextjs-dev + qa-security |
 
 ## Items requiring user/Lead decision before F1
 1. ~~DB rename~~ — **accepted by user 2026-09-23:** `pk_drms` / `pk_drms_stg`.
