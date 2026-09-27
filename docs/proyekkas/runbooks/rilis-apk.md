@@ -12,7 +12,13 @@
 - File disimpan di **volume media** yang sudah ada (`drms_pk_media_prod` / `drms_pk_media_stg`, ikut backup harian
   `MEDIA_VOLUMES`), direktori `/data/media/app-release/`:
   `proyekkas-<versi>-arm64.apk` + manifest `latest.json` (`version`, `file`, `sha256`, `certSha256`, `size`,
-  `publishedAt`). Direktori ini bukan koleksi Payload → tidak disajikan jalur lain.
+  `publishedAt`, opsional `notes`). Direktori ini bukan koleksi Payload → tidak disajikan jalur lain.
+- **Deskripsi rilis** (`notes`): butir-butir dari `docs/release-notes/apk/<versi>.md` (bahasa Indonesia untuk
+  karyawan lapangan), dikirim ke skrip dengan `--notes`. Tampil di `/unduh` sebagai "Yang baru di versi <versi>" dan
+  di APK (banner "Versi baru tersedia" di Beranda → lembar rincian, serta layar "Perbarui aplikasi") lewat
+  `GET /api/v1/app/config` → `releaseNotes` — **hanya** bila versi di `latest.json` sama dengan Pengaturan →
+  **Versi APK terbaru**. Teks polos saja (maks. 15 butir × 300 karakter); file yang tidak valid ditolak sebelum
+  apa pun disalin.
 - Halaman dan file **publik, tanpa login** (proxy/admin gate hanya berlaku untuk `/admin`), `noindex`. Tidak ada
   unggah lewat admin UI — penerbitan hanya lewat skrip di bawah (butuh akses root VPS).
 - Skrip `apps/web/scripts/publish-apk.mjs` (ada di image web, hanya modul bawaan Node): menyalin APK, menghitung
@@ -50,9 +56,17 @@ gh run download "$RUN_ID" -R bctech-adm/drms -n proyekkas-prod-release-apk -D "$
 # Artefak berisi app/outputs/flutter-apk/app-*-prod-release.apk (+ simbol obfuscation) → ambil arm64 saja:
 mv "$(find "$D/artefak" -name app-arm64-v8a-prod-release.apk)" "$D"/ && rm -rf "$D/artefak"
 ls -l "$D"/app-arm64-v8a-prod-release.apk
+# Deskripsi rilis versi yang sama, dari tag (bukan dari branch lain):
+gh api "repos/bctech-adm/drms/contents/docs/release-notes/apk/$V.md?ref=mobile-v$V" \
+  -H 'Accept: application/vnd.github.raw' > "$D/notes.md"
+cat "$D/notes.md"
 # Direktori/file harus terbaca oleh uid 1001 (container):
-chmod 755 "$D"; chmod 644 "$D"/app-arm64-v8a-prod-release.apk
+chmod 755 "$D"; chmod 644 "$D"/app-arm64-v8a-prod-release.apk "$D/notes.md"
 ```
+
+Catatan: token *Actions: read* saja tidak cukup untuk `gh api …/contents` (butuh *Contents: read*). Alternatif:
+salin isi `docs/release-notes/apk/<V>.md` dari checkout repo, atau dari teks GitHub Release tag `mobile-v<V>`
+(bagian di atas garis `---`), ke `"$D/notes.md"`.
 
 Opsional (ada Android build-tools): `apksigner verify --print-certs "$D"/app-arm64-v8a-prod-release.apk`
 → SHA-256 sertifikat harus sama dengan di atas.
@@ -69,8 +83,11 @@ VOL=drms_pk_media_prod                                            # staging: drm
 docker run --rm --user 1001:1001 --read-only --network none --cap-drop ALL \
   --security-opt no-new-privileges:true --memory 128m \
   -v "$VOL":/data/media -v "$D":/in:ro --entrypoint node "$IMG" \
-  apps/web/scripts/publish-apk.mjs --apk /in/app-arm64-v8a-prod-release.apk --version "$V" --cert "$CERT"
+  apps/web/scripts/publish-apk.mjs --apk /in/app-arm64-v8a-prod-release.apk --version "$V" --cert "$CERT" \
+  --notes /in/notes.md
 ```
+
+Tanpa `--notes` rilis tetap terbit, hanya tanpa bagian "Yang baru di versi …" (di `/unduh` maupun di APK).
 
 Keluaran: JSON manifest (catat `sha256`) + daftar file lama yang dihapus. Kode keluar ≠ 0 = tidak ada yang berubah
 pada `latest.json` (pesan menjelaskan sebabnya).
@@ -84,7 +101,10 @@ curl -sI https://drms-kas.bimacreative.tech/unduh/proyekkas.apk
 curl -s https://drms-kas.bimacreative.tech/unduh/proyekkas.apk | sha256sum     # = sha256 dari langkah 2
 ```
 
-Buka `https://drms-kas.bimacreative.tech/unduh` di HP: versi, ukuran, tanggal, tombol **Unduh APK**.
+Buka `https://drms-kas.bimacreative.tech/unduh` di HP: versi, ukuran, tanggal, tombol **Unduh APK**, dan kartu
+**Yang baru di versi <V>** berisi butir-butir deskripsi rilis. Setelah langkah 5 (Versi APK terbaru = `<V>`):
+`curl -s https://drms-kas.bimacreative.tech/api/v1/app/config | grep -o '"releaseNotes":[^]]*]'` menampilkan butir
+yang sama (cache server ≤ 60 detik).
 
 ### 4. Bersihkan
 
@@ -109,6 +129,8 @@ rm -rf "$D"
     apps/web/scripts/publish-apk.mjs --apk /data/media/app-release/proyekkas-<V_LAMA>-arm64.apk \
     --version <V_LAMA> --cert "$CERT"
   ```
+  (Deskripsi rilis versi lama ikut hanya bila `--notes` diberikan lagi — pasang `-v <dir>:/in:ro` dengan file
+  `docs/release-notes/apk/<V_LAMA>.md` dan tambahkan `--notes /in/notes.md`.)
   Catatan: Android **tidak** memasang versi lebih rendah di atas versi lebih tinggi (harus hapus aplikasi = data
   lokal/antrian offline hilang). Untuk HP yang sudah memasang versi baru, perbaikan = rilis versi lebih tinggi.
 - Menyembunyikan unduhan sama sekali: hapus `latest.json` (file APK tetap) → `/unduh` menampilkan "APK belum
@@ -119,3 +141,4 @@ rm -rf "$D"
 | Tanggal | Perubahan |
 |---|---|
 | 2026-09-27 | Versi awal (halaman `/unduh` + skrip `publish-apk.mjs`). |
+| 2026-09-28 | Deskripsi rilis: `--notes` dari `docs/release-notes/apk/<V>.md` → `/unduh` + `releaseNotes` untuk APK. |

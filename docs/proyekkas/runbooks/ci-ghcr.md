@@ -61,6 +61,8 @@ rollback). Tidak ada tag bergerak (`latest`, `X.Y`) — deploy selalu dengan dig
 
 Rilis prod: merge `release/*` → `main`, `git tag -a vX.Y.Z` di `main`, `git push origin vX.Y.Z` → tunggu run `ci`
 tag itu hijau → ambil dua baris `PK_*_IMAGE` dari job summary.
+Tag yang sama memicu workflow `release-notes` → GitHub Release `vX.Y.Z` berisi bagian `## [X.Y.Z]` dari
+`CHANGELOG.md` (gagal bila bagian itu tidak ada — tulis CHANGELOG sebelum men-tag). Image tidak terpengaruh.
 
 ## 4. Visibilitas image (harus privat) — **aksi user**
 

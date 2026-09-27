@@ -138,6 +138,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
     running web image + media volume; no running container is touched).
   - Tests: `tests/unit/apk-download.test.ts` (manifest schema incl. traversal, route 404/200/HEAD/304, publish
     retention, page markup). No new dependency.
+- **Release notes per version ("deskripsi rilis") in three places** (web + APK 0.2.1; user decision 2026-09-28):
+  - Source of truth for the APK: `docs/release-notes/apk/<X.Y.Z>.md` — short Indonesian bullets for field employees
+    (0.2.0 and 0.2.1 written; format rules in `docs/release-notes/README.md`). Must exist before the tag is pushed.
+  - **`/unduh`**: `scripts/publish-apk.mjs --notes <file.md>` stores the bullets as plain text `notes: string[]` in
+    `latest.json` (markdown bullets, continuation lines, title/blank lines ignored, inline markup reduced to text;
+    1–15 bullets × ≤ 300 chars, no control characters; a bad file fails before anything is copied). The zod manifest
+    schema accepts the optional field (older manifests stay valid); the page shows "Yang baru di versi X" as escaped
+    text. Retention unchanged. Runbook `rilis-apk.md` passes `--notes /in/notes.md`.
+  - **In the APK**: `GET /api/v1/app/config` gains optional `releaseNotes: string[]` — the manifest notes when the
+    published APK's version equals "Versi APK terbaru" (else omitted; cached with the settings for 60 s). OpenAPI
+    regenerated. APK: tolerant parsing (`AppConfig.releaseNotes`, ≤ 15 × ≤ 300), the home line "Versi baru tersedia"
+    became a tappable banner → sheet with "Yang baru di versi X", install hint and the download link (copy button as
+    before); the blocking "Perbarui aplikasi" screen shows the same list and scrolls when long. New ARB strings only.
+  - **GitHub Releases**: `mobile.yml` job `release-prod` fails before building when the notes file for the tag version
+    is missing, and after the APKs are verified creates/updates the Release of `mobile-vX.Y.Z` (body = notes file +
+    certificate SHA-256 + CHANGELOG link; assets = the three ABI APKs + `SHA256SUMS.txt`; job-level
+    `contents: write`, workflow default stays read). New workflow `release-notes.yml`: tag `vX.Y.Z` → Release with the
+    `## [X.Y.Z]` section of this file (fails when the section is missing).
+  - Tests: `tests/unit/apk-download.test.ts` (schema limits, markdown parsing, publish with/without notes,
+    `releaseNotesFor`, page escaping), `tests/integration/f4-mobile.int.test.ts` (app config `releaseNotes`),
+    APK `test/unit/misc_test.dart` + `test/widget/release_notes_test.dart`. No new dependency.
 
 ### Changed
 - **`company-settings` global = app-wide only** (APK gate, device image targets, offline max age, selfie batch
