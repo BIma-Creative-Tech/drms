@@ -1,6 +1,6 @@
 import { strFromU8, unzipSync } from 'fflate'
 import { handleEndpoints, type PayloadRequest } from 'payload'
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 
 import { addDays, BUDGET_COMMITTED } from '@/domain/expense/types'
 import { AUDIT_REPORT, reportByCode, type ReportDef } from '@/domain/reports/registry'
@@ -205,11 +205,13 @@ function weighted<T>(xs: readonly T[], ws: number[]): T {
   return xs[xs.length - 1]!
 }
 
+const currentToday = () => asUser(w.users.finance, async (req) => (await import('@/domain/expense/common')).today(req))
+
 const t0 = Date.now()
 beforeAll(async () => {
   w = await makeWorld('FK') // tag letters only: it becomes part of a vehicle plate
   const p = await getTestPayload()
-  today = (await asUser(w.users.finance, async (req) => (await import('@/domain/expense/common')).today(req)))
+  today = await currentToday()
   month = today.slice(0, 7)
   closedMonth = addMonths(month, -3)
   cash2 = await sysCreate('cash-accounts', { name: 'F3 Kas Kecil', kind: 'cash', openingBalance: 5_000_000 })
@@ -296,6 +298,14 @@ afterAll(async () => {
 const asFinance = <T,>(fn: (req: PayloadRequest) => Promise<T>) => asUser(w.users.finance, fn)
 const n = (v: unknown) => Number(v ?? 0)
 const COMMITTED = BUDGET_COMMITTED.map((s) => `'${s}'`).join(',') // constant list, not user input
+
+// The suite runs ~10 min: when it crosses midnight (company TZ) the code's "today" moves on while
+// the value captured in beforeAll does not (CI failure 2026-09-27 23:57 WITA: K-01/K-02/K-11/K-12
+// off by one day). Re-read it before every test so expectations use the same date as the code.
+beforeEach(async () => {
+  today = await currentToday()
+  month = today.slice(0, 7)
+})
 
 describe('generated data set', () => {
   it('covers ≥ 500 requests, every status, voids, LPJ refund/shortfall and a closed period', async () => {
