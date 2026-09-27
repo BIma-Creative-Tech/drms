@@ -48,7 +48,11 @@ for (const n of [
   'token', 'me', 'masters', 'upload_selfie', 'checkin', 'upload_photo', 'progress_report',
   'expense_draft', 'expense_list', 'dashboard', 'approvals_inbox', 'report', 'transfer_queue',
   'upload_receipt', 'device_register', 'stages', 'projects_progress', 'dashboard_me',
+  // E9 P-1: end-to-end unggahan termasuk tunggu Retry-After setelah 503 UPLOAD_BUSY (antrean resize penuh).
+  'upload_selfie_e2e', 'upload_receipt_e2e', 'upload_photo_e2e', 'upload_busy_503',
 ]) T[n] = new Trend(`act_${n}`, true)
+const uploadBusy = new Counter('upload_busy_503')
+const uploadGaveUp = new Counter('upload_gave_up')
 // Hasil bisnis item /sync/batch dan laporan progress (HTTP 200 tetapi item bisa `rejected`).
 const syncApplied = new Counter('sync_applied')
 const syncRejected = new Counter('sync_rejected')
@@ -72,13 +76,13 @@ export const options = {
     office: { executor: 'ramping-vus', exec: MODE === 'auth' ? 'officeAuth' : 'officeAnon', startVUs: 0, stages: stages(OFFICE_VUS), gracefulRampDown: '20s' },
   }).filter(([k]) => !__ENV.ONLY || __ENV.ONLY === k)),
   thresholds: {
-    // AC E9: p95 < 2 s pada aksi utama (ESTIMASI target).
+    // AC E9 (keputusan user 2026-09-27): unggahan foto p95 < 5 s, aksi lain p95 < 2 s.
     act_checkin: ['p(95)<2000'],
     act_progress_report: ['p(95)<2000'],
-    act_upload_photo: ['p(95)<2000'],
-    act_upload_selfie: ['p(95)<2000'],
+    act_upload_photo: ['p(95)<5000'],
+    act_upload_selfie: ['p(95)<5000'],
     act_expense_draft: ['p(95)<2000'],
-    act_upload_receipt: ['p(95)<2000'],
+    act_upload_receipt: ['p(95)<5000'],
     act_dashboard: ['p(95)<2000'],
     act_approvals_inbox: ['p(95)<2000'],
     act_admin_login_page: ['p(95)<2000'],
@@ -183,9 +187,27 @@ function ensure(pool) {
   return session
 }
 
+// 503 + Retry-After (code UPLOAD_BUSY) = antrean resize server penuh (E9 P-1): tunggu Retry-After lalu ulangi
+// (maks. 3 kali). act_<metric> = latensi request yang DITERIMA; act_<metric>_e2e = total termasuk tunggu;
+// percobaan 503 dihitung terpisah (upload_busy_503), bukan error.
 function upload(s, kind, bin, name, metric) {
-  const res = http.post(`${BASE}/api/v1/media/${kind}`, { file: http.file(bin, name, 'image/jpeg') }, { headers: hdr(s, false), tags: { name: metric } })
-  return rec(metric, res, [201]) ? res.json('id') : null
+  const t0 = Date.now()
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const res = http.post(`${BASE}/api/v1/media/${kind}`, { file: http.file(bin, name, 'image/jpeg') }, { headers: hdr(s, false), tags: { name: metric } })
+    let code = null
+    if (res.status === 503) { try { code = res.json('code') } catch (_) { code = null } }
+    if (res.status === 503 && code === 'UPLOAD_BUSY' && attempt < 3) {
+      uploadBusy.add(1, { kind })
+      T.upload_busy_503.add(res.timings.duration)
+      sleep(Number(res.headers['Retry-After'] || 5))
+      continue
+    }
+    if (res.status === 503 && code === 'UPLOAD_BUSY') uploadGaveUp.add(1, { kind })
+    const ok = rec(metric, res, [201])
+    if (ok) T[`${metric}_e2e`].add(Date.now() - t0)
+    return ok ? res.json('id') : null
+  }
+  return null
 }
 
 function clock() {
@@ -291,7 +313,7 @@ export function handleSummary(data) {
 function textSummary(data) {
   const lines = [`MODE=${MODE} BASE=${BASE}`]
   for (const [k, m] of Object.entries(data.metrics)) {
-    if (!k.startsWith('act_') && !['http_req_duration', 'http_reqs', 'http_req_failed', 'http_429', 'http_403_waf', 'iterations', 'sync_applied', 'sync_rejected', 'sync_other', 'progress_created'].includes(k)) continue
+    if (!k.startsWith('act_') && !['http_req_duration', 'http_reqs', 'http_req_failed', 'http_429', 'http_403_waf', 'iterations', 'sync_applied', 'sync_rejected', 'sync_other', 'progress_created', 'upload_busy_503', 'upload_gave_up'].includes(k)) continue
     const v = m.values
     if (m.type === 'trend') { if (v.count) lines.push(`${k.padEnd(24)} n=${v.count} p50=${v.med.toFixed(0)}ms p95=${v['p(95)'].toFixed(0)}ms max=${v.max.toFixed(0)}ms`) }
     else lines.push(`${k.padEnd(24)} ${JSON.stringify(v)}`)

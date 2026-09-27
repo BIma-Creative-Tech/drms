@@ -1,7 +1,7 @@
 # ProyekKas — Laporan QA E9 (Sprint S3): ZAP baseline, load test, restore drill
 
 > **Pembaruan 2026-09-27:** load test & ZAP **terautentikasi** dengan akun uji beban `lt-*` — lihat §7 (menggantikan
-> blocker BLK-1 di §2.1/§2.5).
+> blocker BLK-1 di §2.1/§2.5). **Uji ulang 2026-09-27 siang** pada build `dc80237` (antrean resize, B-1, B-2) — §7.7.
 
 - **Tanggal:** 2026-09-26, 23:08–23:30 WIB · **Penguji:** agen QA (Claude) atas permintaan Lead ProyekKas
 - **Target:** staging `https://drms-kas.staging.bimacreative.tech` (Traefik v3 + CrowdSec bouncer/AppSec, Keycloak realm
@@ -19,8 +19,8 @@
 | AC E9 | Hasil | Status |
 |---|---|---|
 | Tidak ada temuan HIGH/CRITICAL terbuka | ZAP baseline pasif tanpa login (26/9, 2 run) **dan terautentikasi** (27/9, 1 akun lapangan + 1 akun Direktur, 142 / 837 URL): **0 FAIL, 0 High/Critical**. Medium hanya CSP `style-src 'unsafe-inline'` (diterima) dan "Absence of Anti-CSRF Tokens" (false positive, §7.4). Bug baru B-1 (500 pada body non-JSON, Low). | **PASS** |
-| Load test (Q-34: 30 lapangan + 5 kantor, termasuk unggah foto/selfie): **unggahan p95 < 5 s** (latar belakang, keputusan user 2026-09-27), **aksi lain p95 < 2 s** | Run terautentikasi 27/9 (§7.3, campuran opsi b, SEBELUM antrean resize): unggah nota 3,18 s, foto progress 2,20 s, selfie 2,11 s → **di bawah target unggah 5 s**; check-in 1,02 s, dashboard 0,81 s, inbox approval 1,88 s, laporan 0,81 s → lulus; **laporan progress 2,71 s dan draft pengajuan (`/sync/batch`) 2,60 s → lewat target 2 s** (ikut antre CPU di event loop yang sama). Error 0%, 0× 429, 0× WAF. Penyebab: CPU web 0,75 vCPU — 38% periode CFS ter-*throttle* (§7.3.3). | **FAIL → uji ulang** setelah deploy antrean resize (P-1, branch `fix/e9-upload-resize-queue`) |
-| RAM puncak web/worker < 80% limit | Run terautentikasi dengan resize sharp: web **189,5 / 384 MiB (49,3%)**, worker **70,1 / 192 MiB (36,5%)**; di bawah ambang flag 307 MiB. | **PASS** |
+| Load test (Q-34: 30 lapangan + 5 kantor, termasuk unggah foto/selfie): **unggahan p95 < 5 s** (latar belakang, keputusan user 2026-09-27), **aksi lain p95 < 2 s** | **Uji ulang 27/9 pada `dc80237` (§7.7):** unggah selfie 1,43 s, nota 2,84 s, foto progress 2,04 s → lulus (< 5 s); laporan progress **1,67 s** (sebelumnya 2,71 s) dan semua aksi baca < 1 s → lulus; **draft Reimburse (`/sync/batch`) 2,66 s → masih > 2 s**. 0× 503 `UPLOAD_BUSY`, error 0%, 0× 429. Run pertama (sebelum antrean) di §7.3. | **FAIL tipis** — 1 aksi (draft Reimburse sync) di atas 2 s; uji `IMAGE_RESIZE_CONCURRENCY=1` belum bisa tanpa ubah compose staging (P-1b) |
+| RAM puncak web/worker < 80% limit | Run 1 (tanpa antrean): web **189,5 / 384 MiB (49,3%)**, worker 70,1 / 192 MiB (36,5%). Uji ulang `dc80237`: web **150,5 MiB (39,2%)**, worker **61,4 MiB (32,0%)**; di bawah ambang flag 307 MiB. | **PASS** |
 | Restore drill `pk_drms_restoretest` (DB + media) < 4 jam, jumlah baris & checksum media cocok | RTO terukur **6,1 s** (DB 5,1 s + media 0,7 s + verifikasi 0,3 s); **68 tabel / 2 078 baris cocok**, **58 sequence cocok**, **46 file media sha256 + owner/mode cocok**. DB uji & direktori sementara dihapus. | **PASS** |
 
 **Keputusan user 2026-09-27 (P-1, §7.3.3):** resize gambar **diantre** di proses web (maks 2 job sharp bersamaan,
@@ -436,11 +436,97 @@ decision untuk IP uji selama seluruh sesi.
 
 | ID | Severity | Pemilik | Ringkas |
 |---|---|---|---|
-| P-1 | **Medium (AC gagal)** | user/Lead + nextjs/infra | p95 unggah + resize 2,1–3,2 s pada Q-34; CPU web 0,75 vCPU ter-throttle 38%. **Keputusan 27/9:** antre resize + target unggah < 5 s / lain < 2 s; diimplementasi di `fix/e9-upload-resize-queue`, **uji ulang tertunda** |
-| B-1 | Low | nextjs | REST generik Payload: body non-JSON → 500 (TypeError di hook), seharusnya 400 — **diperbaiki** (`lib/body-guard.ts`, 400 + pesan) |
-| B-2 | Low | nextjs + Lead (runbook) | Nonaktif lewat impor E11 tidak mencabut sesi Keycloak (env OIDC tidak ada di service seed) — **laporan impor merangkum 1 peringatan + CSV; langkah `kc_*` di runbook** |
+| P-1 | **Medium (AC gagal)** | user/Lead + nextjs/infra | p95 unggah + resize 2,1–3,2 s pada Q-34; CPU web 0,75 vCPU ter-throttle. **Keputusan 27/9:** antre resize + target unggah < 5 s / lain < 2 s — **uji ulang `dc80237` (§7.7): unggahan & laporan progress lulus; tersisa P-1b** |
+| P-1b | **Low/Medium (AC gagal tipis)** | Lead/infra + user | `/sync/batch` draft Reimburse p95 2,66 s (> 2 s) karena CPU web jenuh saat 2 job sharp berjalan (65% periode aktif ter-throttle). Opsi: `IMAGE_RESIZE_CONCURRENCY=1` (perlu entri env di compose staging/prod), naikkan `cpus` web, atau terima 2 s → 3 s untuk sync batch (APK kirim di latar belakang) |
+| B-1 | Low | nextjs | REST generik Payload: body non-JSON → 500 (TypeError di hook), seharusnya 400 — **diperbaiki** (`lib/body-guard.ts`, 400 + pesan); **terverifikasi di staging `dc80237`** (POST form ke `/api/clients`, `/api/projects`, `/api/globals/company-settings` → 400, 0 log error) |
+| B-2 | Low | nextjs + Lead (runbook) | Nonaktif lewat impor E11 tidak mencabut sesi Keycloak (env OIDC tidak ada di service seed) — **laporan impor merangkum 1 peringatan + CSV; langkah `kc_*` di runbook**; **terverifikasi `dc80237`**: impor nonaktif/aktif → 1 blok `PERINGATAN KEYCLOAK` + CSV tindak lanjut, 0 log `device session delete failed` |
 | D-1 | Info (deviasi) | infra | Penanda `loadtest=e9` di grup, bukan atribut user (unmanaged attribute nonaktif) |
 | D-2 | Info (deviasi) | — | Project uji beban `PRJ-LT-E9` menggantikan `PRJ-UJI-01` yang tidak ada di staging |
 | Z-6…Z-10 | Info | — | §7.4 |
 
 BLK-1 **ditutup**. Tidak ada HIGH/CRITICAL.
+
+### 7.7 Uji ulang 2026-09-27 siang — build `dc80237` (antrean resize P-1, B-1, B-2)
+
+- **Build:** staging `ghcr.io/bctech-adm/proyekkas-web:0.2.1-stg-dc80237` (web/worker start 02:48Z, `RestartCount=0`,
+  tanpa OOM); limit tetap web 384 MiB / 0,75 vCPU, worker 192 MiB / 0,25 vCPU. `IMAGE_RESIZE_CONCURRENCY` /
+  `IMAGE_RESIZE_MAX_QUEUE` tidak diset di compose → default **2 / 20**.
+- **Akun:** 35 akun `lt-*` diaktifkan lagi di Keycloak `drms-staging` (`kc_*`, `enabled=true`) dan di ProyekKas lewat
+  impor E11 (`lt-e9-import.xlsx`, dry-run → commit, operator "QA E9 load test rerun"; Karyawan/Pengguna 35 diubah,
+  sisanya sama). Setelah uji: impor `lt-e9-deactivate.xlsx` (dry-run → commit, "QA E9 load test rerun (nonaktif)"),
+  lalu Keycloak `enabled=false` + `logout` untuk 35 akun (runbook §3.5; login uji → `Account disabled`). Grup
+  `loadtest-e9` tetap. 5 akun lama tidak berubah.
+- **Skrip k6:** campuran opsi (b) yang sama, durasi & pengaman sama (monitor 5 s, abort otomatis bila probe prod gagal/
+  > 2 s 3× berturut-turut atau load1 > 6). Tambahan: unggahan yang mendapat **503 `UPLOAD_BUSY`** menunggu
+  `Retry-After` lalu diulang (maks. 3×); percobaan 503 dihitung terpisah (`upload_busy_503`, bukan error);
+  `act_upload_*` = latensi request yang diterima, `act_upload_*_e2e` = termasuk tunggu. Ambang: unggahan p95 < 5 s,
+  lainnya < 2 s. Smoke 1+5 VU (±1 menit) sebelum run utama.
+- **Catatan data:** uji ulang di hari WITA yang sama → **semua 174 check-in/out ditolak `ALREADY_CHECKED_IN/OUT`**
+  (jalur tolak aturan bisnis, lebih ringan dari penyimpanan absensi); unggah selfie + resize tetap penuh.
+
+#### 7.7.1 Hasil (09:53:15–10:03:15 WIB, tidak di-abort)
+
+2 191 request, **error HTTP 0%**, **0× 429**, 0× WAF, **0× 503 `UPLOAD_BUSY`** (antrean 20 tidak pernah penuh; tidak ada
+unggahan yang menyerah). Sync: 446 `applied` (223 draft + 223 batal), 174 `rejected` (absensi, lihat atas).
+Laporan progress tercipta 24.
+
+| Aksi | n | p50 (ms) | p95 (ms) | maks (ms) | Target | Run 1 p95 (sebelum antrean) |
+|---|---:|---:|---:|---:|---|---:|
+| unggah selfie 720 px | 174 | 307 | 1 430 | 5 646 | < 5 s ✓ | 2 110 |
+| unggah nota 1600 px | 223 | 974 | 2 839 | 6 064 | < 5 s ✓ | 3 184 |
+| unggah foto progress 1600 px | 46 | 738 | 2 037 | 2 842 | < 5 s ✓ | 2 195 |
+| (e2e unggahan, termasuk tunggu 503) | — | = di atas | = di atas | — | — | — |
+| check-in/out (`/sync/batch`, ditolak) | 174 | 89 | 462 | 2 462 | < 2 s ✓ | 1 015 |
+| **draft Reimburse + batal (`/sync/batch`)** | 223 | 688 | **2 661** | 5 271 | < 2 s **✗** | 2 600 |
+| laporan progress (`POST /progress-reports`) | 24 | 398 | **1 667** | 2 784 | < 2 s ✓ | 2 708 |
+| `/me` | 397 | 27 | 297 | 1 302 | ✓ | 621 |
+| `/masters` | 145 | 110 | 686 | 5 923 | ✓ | 832 |
+| daftar pengajuan | 223 | 50 | 732 | 1 955 | ✓ | 695 |
+| `/dashboard/me` | 223 | 60 | 577 | 1 358 | ✓ | 443 |
+| dashboard kantor | 65 | 102 | 452 | 2 953 | ✓ | 807 |
+| `/approvals/inbox` | 52 | 59 | 534 | 1 160 | ✓ | 1 880 |
+| `/transfer-queue` | 28 | 26 | 929 | 2 221 | ✓ | 139 |
+| laporan (`/reports/{code}`) | 28 | 52 | 451 | 2 137 | ✓ | 809 |
+| `/projects/progress` | 37 | 66 | 539 | 1 458 | ✓ | 230 |
+| tahapan project | 24 | 32 | 262 | 486 | ✓ | 552 |
+| token | 70 | 48–52 | 251–330 | 831 | ✓ | 151–191 |
+
+#### 7.7.2 Sumber daya
+
+| Container | Awal | Puncak RAM | % limit | CPU p50 / p95 / maks (% 1 core) |
+|---|---:|---:|---:|---|
+| `drms-pk-stg` (web, 384 MiB, cpus 0,75) | 95,4 MiB | **150,5 MiB** | **39,2%** | 38 / 81 / 91 |
+| `drms-pk-stg-worker` (192 MiB) | 58,0 MiB | **61,4 MiB** | **32,0%** | 0 / 4 / 9 |
+| `postgres` | 233,7 MiB | 275,6 MiB | 13,5% | 7 / 22 / 35 |
+| traefik / crowdsec / keycloak | — | 101 / 172 / 562 MiB | ≤ 45% | ≤ 22 (p95) |
+
+- **Throttling CPU web (delta `cpu.stat` selama run, 10 menit):** `usage_usec` +242,0 s (rata-rata 0,40 core),
+  `nr_periods` +4 178 periode aktif, `nr_throttled` **+2 737 (65,5%)**, `throttled_usec` **+303,8 s**. (Angka run 1
+  "38%" adalah kumulatif sejak container start 26/9 termasuk jam idle → tidak sebanding; throttled time run 1
+  kumulatif 455,7 s.) CPU web tetap jenuh pada 0,75 vCPU saat 2 job sharp berjalan; antrean membatasi RAM dan
+  latensi unggah, tetapi request lain (sync batch) ikut menunggu CPU.
+- Host load1 maks **3,0** (run 1: 5,7); probe prod 168 sampel semua 200/307, p50 50 ms, p95 78 ms, maks 392 ms → tanpa
+  degradasi. Log app selama run: 0 baris `error`. CrowdSec: 0 alert/decision dari IP uji.
+
+#### 7.7.3 Langkah 3 — `IMAGE_RESIZE_CONCURRENCY=1`: tidak dijalankan
+
+Draft Reimburse sync masih > 2 s, tetapi variabel tidak ada di daftar `environment:` compose staging
+(`/opt/infra/staging/drms-proyekkas/docker-compose.yml`) dan env container tidak bisa diubah tanpa mengedit file itu
+(dilarang untuk QA). Jalur draft sync sendiri tidak memproses gambar (hanya tautan nota + SQL deteksi duplikat,
+`domain/expense/receipts.ts`) → latensinya murni antre CPU. **Butuh:** infra Lead menambah
+`IMAGE_RESIZE_CONCURRENCY: ${IMAGE_RESIZE_CONCURRENCY:-2}` di compose staging (lalu `.env` = 1 dan `up -d`), atau
+keputusan target sync batch (P-1b).
+
+#### 7.7.4 Temuan tambahan uji ulang
+
+| ID | Severity | Pemilik | Ringkas |
+|---|---|---|---|
+| F-1 | Info | flutter | APK tidak membaca `Retry-After`/`UPLOAD_BUSY`: 503 unggahan → item `deferred` dengan backoff eksponensial 5 s × 2ⁿ (±20%) (`sync_engine.dart`, `backoffFor`). Kompatibel dengan `Retry-After: 5`; 503 ikut menambah hitungan percobaan menuju "Gagal dikirim". |
+| F-2 | Info | nextjs | Blok `PERINGATAN KEYCLOAK` selalu menulis "realm drms" dan "perangkat & sesi web ProyekKas sudah dicabut" — juga saat staging (`drms-staging`) dan saat baris **diaktifkan** kembali. Kosmetik. |
+
+#### 7.7.5 Data uji kumulatif di staging (fiktif, akun nonaktif)
+
+`PRJ-LT-E9` (progress 3,78%; tahapan 5,25 / 4,5 / 2,75%), 31 penugasan, 60 absensi, 53 laporan progress, 445 draft
+Reimburse `cancelled`, 85 perangkat `revoked`, 357 selfie (8,2 MB), 446 foto nota (104,5 MB), 110 foto progress (21,9 MB);
+volume media staging **138 MB**; baris audit terkait. File impor/laporan: `/srv/drms-import-e9/out/`.
+
