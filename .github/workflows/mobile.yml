@@ -12,9 +12,10 @@
 #                                      (that key's SHA-256 must be in the server's ANDROID_APP_CERT_SHA256)
 # Every APK is statically scanned for secrets before upload (tool/apk_secret_scan.sh: unpack incl. string
 # dumps of dex / Dart AOT, forbidden files, deny-list, gitleaks + trivy with the ci.yml image pins).
-#   proyekkas-prod-release-apk         job release-prod (E3-c): only on push to main or a tag mobile-vX.Y.Z,
-#                                      after approval of the GitHub environment `android-release-prod`
-#                                      (required reviewers); signed with the production key from that
+#   proyekkas-prod-release-apk         job release-prod (E3-c): ONLY on a tag mobile-vX.Y.Z (pushing the tag
+#                                      is the deliberate release step; the private repo on the GitHub Free
+#                                      plan has no required reviewers, decision 2026-09-27) in the GitHub
+#                                      environment `android-release-prod`; signed with the production key from that
 #                                      environment's secrets ANDROID_KEYSTORE_* (two custodians, ADR 0010
 #                                      decision 13). The certificate SHA-256 is printed to the log and the
 #                                      job summary (Firebase / App Links). apps/mobile/README.md
@@ -180,13 +181,13 @@ jobs:
   release-prod:
     name: release APKs (prod, production key)
     needs: verify
-    if: >-
-      github.event_name == 'push' &&
-      (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/mobile-v'))
+    # Tag pushes only: a merge to main never builds a production APK (release gate, decision 2026-09-27).
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/mobile-v')
     runs-on: ubuntu-24.04
     timeout-minutes: 45
-    # Required reviewers are configured on this environment (GitHub → Settings → Environments); the
-    # production keystore secrets exist ONLY as secrets of this environment.
+    # The production keystore secrets exist ONLY as secrets of this environment (deployment tags
+    # restricted to mobile-v*). Required reviewers need a paid plan for private repos; add them there
+    # if the organisation upgrades.
     environment: android-release-prod
     env:
       HAS_PROD_KEY: ${{ secrets.ANDROID_KEYSTORE_B64 != '' }}
@@ -197,8 +198,7 @@ jobs:
         run: |
           echo "::error::Secret ANDROID_KEYSTORE_B64 is not set on environment android-release-prod (see apps/mobile/README.md 'Production signing key')."
           exit 1
-      - name: Tag matches pubspec version (tags only)
-        if: startsWith(github.ref, 'refs/tags/mobile-v')
+      - name: Tag matches pubspec version
         run: |
           want="${GITHUB_REF_NAME#mobile-v}"
           have="$(sed -n 's/^version: \([0-9][0-9.]*\)+.*/\1/p' pubspec.yaml)"

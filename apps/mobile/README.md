@@ -158,9 +158,9 @@ a separate key with two custodians (ADR 0010 decision 13). Gradle reads signing 
 
 ## Production signing key (E3-c) — custodian steps
 
-The CI job `release-prod` (`.github/workflows/mobile.yml`) builds the **prod** flavor only on a push to `main` or
-a tag `mobile-vX.Y.Z` (must equal `version:` in `pubspec.yaml`), waits for approval of the GitHub environment
-`android-release-prod`, signs with the production key, verifies every APK with `apksigner verify --print-certs`,
+The CI job `release-prod` (`.github/workflows/mobile.yml`) builds the **prod** flavor **only when a tag
+`mobile-vX.Y.Z` is pushed** (must equal `version:` in `pubspec.yaml`; a merge to `main` alone never builds prod),
+runs in the GitHub environment `android-release-prod`, signs with the production key, verifies every APK with `apksigner verify --print-certs`,
 prints the certificate SHA-256 (log + job summary), runs the APK secret scan and uploads
 `proyekkas-prod-release-apk` (APKs + obfuscation symbols, 90 days). Nobody but the custodians ever holds the key
 file; CI decodes it to `$RUNNER_TEMP` and deletes it in an `always()` step.
@@ -178,12 +178,17 @@ One-time setup (custodian 1 = client, custodian 2 = vendor; do it together, offl
    An app signed with this key can only ever be updated with the same key — losing it means users must
    uninstall and reinstall. Keep **two offline backups** (e.g. two encrypted USB drives, one per custodian).
 2. GitHub → repository **Settings → Environments → New environment** `android-release-prod`:
-   **Required reviewers** = both custodians (or at least one who did not start the release);
-   **Deployment branches and tags** = `main` and tag pattern `mobile-v*`.
+   **Deployment branches and tags** = *Selected* with only the tag pattern `mobile-v*` (a `main` branch rule is no
+   longer needed). **Required reviewers** (both custodians) only exist for private repos on a paid plan — the repo
+   is private on GitHub Free (2026-09-27), so the release gate is the deliberate tag push; add reviewers if the
+   organisation upgrades.
+   Key generated on Windows: `keytool` ships with a JDK (`winget install EclipseAdoptium.Temurin.21.JDK`, new
+   PowerShell); base64 with
+   `[Convert]::ToBase64String([IO.File]::ReadAllBytes("$PWD\proyekkas-prod.jks")) | Set-Content -NoNewline kunci.b64`.
 3. In that environment (not as repository secrets) add: `ANDROID_KEYSTORE_B64` (`base64 -w0 proyekkas-prod.jks`),
    `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_PASSWORD` (same as the store password for PKCS12),
    `ANDROID_KEY_ALIAS` (`proyekkas-prod`). Then delete the base64 text from the clipboard/shell history.
 4. Record the SHA-256 in the prod server env `ANDROID_APP_CERT_SHA256` (App Links) and, when push is enabled
    (ADR 0011, E8), in the Firebase Android app. The CI summary of every release shows the same value.
-5. Release: bump `version:` in `pubspec.yaml`, merge to `main`, tag `mobile-vX.Y.Z`, approve the job, download
+5. Release: bump `version:` in `pubspec.yaml`, merge to `main`, push the tag `mobile-vX.Y.Z`, download
    the artifact, `apksigner verify --print-certs` locally if desired, distribute the `arm64-v8a` APK.
