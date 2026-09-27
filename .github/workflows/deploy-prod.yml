@@ -1,0 +1,139 @@
+# ProyekKas PROD deploy (E10) — manual, approval-gated. INERT until the user/infra Lead enable it:
+#   1. infra: `infra-deploy` v2 on the VPS (accepts `--set PK_WEB_IMAGE=… --set PK_MIGRATE_IMAGE=…` from a per-stack
+#      allowlist with value regexes, keeps .env.prev, pre-deploy pg_dump, waits for healthy, auto-rollback) — infra
+#      runbook docs/runbooks/proyekkas-drms-prod.md §11. Until then prod is deployed manually by the Lead.
+#   2. GitHub (repo bctech-adm/drms → Settings → Environments): environment `infra-deploy` with required reviewers,
+#      "Prevent self-review", deployment branches/tags rule = tags `v*.*.*` only; environment secrets
+#      DEPLOY_SSH_KEY (ed25519 private key; public half in ~deploy/.ssh/authorized_keys with
+#      `restrict,command="sudo /usr/local/sbin/infra-deploy …"`) and DEPLOY_KNOWN_HOSTS (`ssh-keyscan -p 2221` output,
+#      verified out of band); environment variables DEPLOY_HOST, DEPLOY_PORT (2221), DEPLOY_USER (deploy).
+#   3. Repository variable PROD_DEPLOY_ENABLED=true (the kill switch; anything else → the deploy job is skipped).
+# Runbook: docs/proyekkas/runbooks/ci-ghcr.md §6.
+#
+# Run: Actions → deploy-prod → Run workflow, from the tag vX.Y.Z ("Use workflow from" = the tag). The images must already
+# exist in GHCR (ci.yml job `image` of that tag). Digests are resolved here and the VPS receives ref@digest only.
+name: deploy-prod
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version X.Y.Z (git tag vX.Y.Z; images ghcr.io/bctech-adm/proyekkas-{web,migrate}:X.Y.Z)"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-prod
+  cancel-in-progress: false
+
+env:
+  WEB_IMAGE: ghcr.io/bctech-adm/proyekkas-web
+  MIGRATE_IMAGE: ghcr.io/bctech-adm/proyekkas-migrate
+  STACK: web/clients/drms-proyekkas
+  HEALTH_URL: https://drms-kas.bimacreative.tech/api/v1/health
+
+jobs:
+  resolve:
+    name: resolve release → image@digest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      packages: read
+    outputs:
+      web: ${{ steps.digest.outputs.web }}
+      migrate: ${{ steps.digest.outputs.migrate }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - name: Version = tag on main = ref of this run
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::version must be X.Y.Z"; exit 1; }
+          [[ "$GITHUB_REF" == "refs/tags/v$VERSION" ]] \
+            || { echo "::error::run this workflow from tag v$VERSION (current ref $GITHUB_REF)"; exit 1; }
+          git fetch --no-tags origin main
+          git merge-base --is-ancestor "$GITHUB_SHA" origin/main || { echo "::error::v$VERSION is not on main"; exit 1; }
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - name: Resolve digests (image must carry this commit as revision)
+        id: digest
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          for pair in "web=$WEB_IMAGE" "migrate=$MIGRATE_IMAGE"; do
+            key="${pair%%=*}"; img="${pair#*=}:$VERSION"
+            digest="$(docker buildx imagetools inspect "$img" --format '{{json .Manifest}}' | jq -r .digest)"
+            rev="$(docker buildx imagetools inspect "$img" --format '{{json .Image}}' \
+              | jq -r '(if has("config") then .config else (.[] | select(.os == "linux")).config end).Labels["org.opencontainers.image.revision"]')"
+            [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]] || { echo "::error::no digest for $img"; exit 1; }
+            [[ "$rev" == "$GITHUB_SHA" ]] || { echo "::error::$img revision $rev != $GITHUB_SHA"; exit 1; }
+            echo "$key=$img@$digest" >> "$GITHUB_OUTPUT"
+            echo "$key → $img@$digest" | tee -a "$GITHUB_STEP_SUMMARY"
+          done
+      - name: Deploy switch
+        if: vars.PROD_DEPLOY_ENABLED != 'true'
+        run: |
+          echo "::notice::PROD_DEPLOY_ENABLED is not 'true' → deploy job skipped. Deploy manually (runbook ci-ghcr.md §6) with the refs above."
+
+  deploy:
+    name: deploy prod (environment infra-deploy — approval)
+    needs: resolve
+    if: vars.PROD_DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    environment:
+      name: infra-deploy
+      url: https://drms-kas.bimacreative.tech
+    steps:
+      - name: Preconditions (secrets and variables exist)
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+          DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
+          DEPLOY_PORT: ${{ vars.DEPLOY_PORT }}
+          DEPLOY_USER: ${{ vars.DEPLOY_USER }}
+        run: |
+          missing=""
+          for v in DEPLOY_SSH_KEY DEPLOY_KNOWN_HOSTS DEPLOY_HOST DEPLOY_PORT DEPLOY_USER; do
+            [[ -n "${!v}" ]] || missing+=" $v"
+          done
+          [[ -z "$missing" ]] || { echo "::error::environment infra-deploy lacks:$missing"; exit 1; }
+      - name: infra-deploy (VPS; pre-deploy dump, pull, up -d, wait healthy, auto-rollback on failure)
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+          DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
+          DEPLOY_PORT: ${{ vars.DEPLOY_PORT }}
+          DEPLOY_USER: ${{ vars.DEPLOY_USER }}
+          WEB_REF: ${{ needs.resolve.outputs.web }}
+          MIGRATE_REF: ${{ needs.resolve.outputs.migrate }}
+        run: |
+          set -euo pipefail
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/id_deploy && chmod 600 ~/.ssh/id_deploy
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          trap 'rm -f ~/.ssh/id_deploy' EXIT
+          ssh -i ~/.ssh/id_deploy -p "$DEPLOY_PORT" -o BatchMode=yes -o StrictHostKeyChecking=yes \
+            "$DEPLOY_USER@$DEPLOY_HOST" \
+            sudo /usr/local/sbin/infra-deploy "$STACK" \
+              --set "PK_WEB_IMAGE=$WEB_REF" --set "PK_MIGRATE_IMAGE=$MIGRATE_REF"
+      - name: Smoke (public health = 200)
+        run: |
+          for _ in $(seq 1 12); do
+            code="$(curl -s -o /dev/null -w '%{http_code}' "$HEALTH_URL" || true)"
+            [[ "$code" == 200 ]] && { echo "health 200"; exit 0; }
+            sleep 10
+          done
+          echo "::error::$HEALTH_URL not 200 after 120 s (last $code) — see runbook ci-ghcr.md §7 (rollback)"; exit 1

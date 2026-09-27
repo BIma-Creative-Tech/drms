@@ -16,7 +16,7 @@ const ACTION_LABELS: Record<string, string> = {
   status_change: 'status',
   void: 'void',
   sign: 'tanda tangan',
-  acknowledge: 'diketahui',
+  acknowledge: 'disetujui Direktur (Diketahui)', // ADR 0013 (pre-E1 rows: PM "Diketahui")
   approve: 'disetujui',
   reject: 'ditolak',
   verify: 'diverifikasi',
@@ -29,6 +29,7 @@ const ACTION_LABELS: Record<string, string> = {
   delete_attempt: 'percobaan hapus',
   acknowledge_delegated: 'Diketahui dilimpahkan',
   access_denied: 'aksi ditolak (hak akses)',
+  approval_skipped: 'posisi dilewati (tidak berlaku — pemohon)',
 }
 
 const DOC_LABELS: Record<string, string> = { expense_request: 'Pengajuan', receipt: 'Nota', transfer: 'Transfer', settlement: 'LPJ', cash_entry: 'Kas' }

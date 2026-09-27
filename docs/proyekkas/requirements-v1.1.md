@@ -36,6 +36,7 @@ Penanda:
 | 12 | Target resize foto dijadikan kebutuhan non-fungsional (sisi perangkat dan server). | 9 | [Keputusan user 2026-09-23] |
 | 13 | Matriks peran, user story (US-36…US-59), audit log, dan NFR diperbarui. US-03, US-04, US-05, US-07, US-17, US-19, US-20, US-26, US-32, US-34 diubah. | 4, 5, 8, 9 | campuran |
 | 14 | Temuan konflik v1.0 vs form klien dicatat sebagai pertanyaan terbuka, tidak diputuskan diam-diam. | 1.3, `open-questions-client.md` | Analyst |
+| 15 | [Keputusan user 2026-09-25/26, ADR 0013, Epik E1] Peran Owner **ditampilkan "Direktur"** (peran Keycloak tetap `pk-owner`). "Diketahui Oleh" = **persetujuan Direktur**, lalu **Approval Finance**, untuk semua nominal; **PM hanya memantau** (tidak ada hak memutuskan). Posisi yang satu-satunya pemegangnya adalah pemohon/pembuat dilewati dan dicatat; tanpa keputusan independen pengajuan ditolak (409). Revisi nota Reimburse dengan total berubah kembali ke "Menunggu Diketahui (Direktur)". | 4, 5 (US-17, US-26, US-30, US-42), 7 (T2) | [Keputusan user 2026-09-25] |
 
 ---
 
@@ -214,12 +215,14 @@ Tambahan kebutuhan yang diturunkan (butir 1–10 prompt Lead), semua [Tambahan d
 Kode: **C** buat, **R** lihat, **U** ubah, **X** batal/void, **A** approve, **K** diketahui (acknowledge), **V** verifikasi, **P** cetak.
 Cakupan: *own* = milik sendiri (pemohon atau pembuat), *team* = project/pusat biaya yang dipegang, *assigned* = project tempat ditugaskan, *all* = semua.
 
-| Modul | Staff | PM | Finance | Owner | Admin |
+Kolom "Direktur" = peran `pk-owner` (label "Direktur" sejak E1, ADR 0013 — tidak ada peran Keycloak baru).
+
+| Modul | Staff | PM | Finance | Direktur | Admin |
 |---|---|---|---|---|---|
 | Pengajuan dana | C, R/U/X *own* (selama belum ada keputusan approval) | R *team*, C *own* | R *all* | R *all* | R *all*; **C atas nama pemohon** [Tambahan dari form klien] (usulan, Q-09) |
 | Baris item & nota pengajuan [Tambahan dari form klien] | C/U *own* (sebelum diajukan; Reimburse: saat revisi nota) | R *team* | R, **V** *all* | R *all* | C/U untuk pengajuan yang dia buat (sebelum diajukan) |
-| Diketahui Oleh [Tambahan dari form klien] | – | **K** *team* (usulan, Q-07) | – | K *all* (bila ditetapkan) | – |
-| Persetujuan (Approval) | – | – (opsional A level-1) | – | **A** *all* | – |
+| Diketahui Oleh [Tambahan dari form klien] [Diubah ADR 0013] | – | – (memantau saja) | – | **K = A** *all* (persetujuan Direktur) | – |
+| Persetujuan (Approval) [Diubah ADR 0013] | – | – | **A** *all* | – (sudah memutuskan di "Diketahui") | – |
 | Flag validasi nota [Tambahan dari form klien] | R *own* | R *team* | R, tandai "sudah diperiksa" *all* | R *all* | R *all* |
 | Transfer | R *own* | R *team* | C/R/U *all* | R *all* | – |
 | Nota & LPJ | C/U *own* | R *team* | R, **V** *all* | R *all* | – |
@@ -240,7 +243,10 @@ Cakupan: *own* = milik sendiri (pemohon atau pembuat), *team* = project/pusat bi
 | Audit log | R dokumen *own* | R dokumen *team* | R *all* | R *all* | R *all* |
 
 **Aturan tambahan:**
-- Pemohon tidak boleh meng-approve pengajuannya sendiri. [Diubah v1.1] "Pemohon" = **setiap** orang di "Diajukan Oleh" **dan** "Dibuat Oleh". Apakah larangan ini juga berlaku untuk posisi "Diketahui Oleh" → Q-08 (form contoh menunjukkan kemungkinan Budi = pemohon = yang mengetahui).
+- Pemohon tidak boleh meng-approve pengajuannya sendiri. [Diubah v1.1] "Pemohon" = **setiap** orang di "Diajukan Oleh" **dan** "Dibuat Oleh". Larangan ini juga berlaku untuk posisi "Diketahui Oleh" (Q-08, diterapkan; server + DB).
+- [ADR 0013, keputusan user 2026-09-25] **Alur keputusan:** "Diketahui" = persetujuan **Direktur** (tombol "Setujui"), lalu **Approval Finance** level 1 — untuk semua nominal (ambang Q-31 belum ada; bisa ditambah lewat aturan approval). Hanya Direktur/Finance yang boleh memberi keputusan: aturan approval menolak PM/Staff/Admin sebagai pemutus, pengisi "PM project / penanggung jawab" tidak dipakai lagi, dan persetujuan Direktur tidak boleh opsional. PM/Staff/Admin yang mencoba acknowledge/approve/reject → 403 + audit `access_denied`.
+- [ADR 0013, G1-2] Bila **satu-satunya** Direktur (atau Finance) aktif adalah pemohon/pembuat, posisinya **dilewati** (audit `approval_skipped`, PDF "(tidak berlaku — pemohon)"); minimal satu keputusan independen wajib ada, bila tidak → pengajuan tidak dapat diajukan (409). Bila ada Direktur/Finance lain, merekalah yang memutuskan.
+- Pengajuan yang sudah diajukan sebelum perubahan alur tetap selesai dengan aturan (snapshot) lama (US-34).
 - Finance tidak boleh mengubah nominal atau baris item yang sudah disetujui. Koreksi = kembalikan ke pemohon (revisi) dan, bila grand total berubah, approval diulang [Usulan].
 - Satu orang tidak boleh mengisi dua posisi tanda tangan yang berbeda pada pengajuan yang sama, kecuali "Diajukan Oleh" + "Dibuat Oleh" (staff membuat pengajuannya sendiri) [Usulan, Q-08].
 - Semua aksi dicatat di audit log.
@@ -276,7 +282,7 @@ Kriteria penerimaan ditulis agar bisa diuji (unit/API/e2e/manual). "Server menol
 | US-14 | Sebagai PM, saya ingin mengabsenkan anggota yang tidak punya HP. | Tercatat sebagai "diabsenkan oleh PM" beserta nama PM. (Keberadaan staff tanpa HP: Q-29.) |
 | US-15 | Sebagai PM, saya ingin mengoreksi jam absensi. | Alasan wajib. Nilai lama dan baru tersimpan di log. |
 | US-16 | Sebagai PM, saya ingin mengelola anggota dan penugasan tim ke project. | Tambah, nonaktifkan, pindah project, dengan periode penugasan. |
-| US-17 | [Diubah v1.1] Sebagai PM, saya ingin memantau pengajuan tim tanpa bisa meng-approve. | Hanya lihat, terbatas pada project/pusat biaya yang dipegang. Bila PM ditetapkan sebagai "Diketahui Oleh" (Q-07), PM hanya bisa memberi status "Diketahui" (US-42), bukan Approval. Server menolak approve oleh PM. |
+| US-17 | [Diubah v1.1] [Diubah ADR 0013] Sebagai PM, saya ingin memantau pengajuan tim tanpa bisa meng-approve. | Hanya lihat, terbatas pada project/pusat biaya yang dipegang (daftar tim, dashboard, laporan). PM **tidak** memberi "Diketahui" maupun Approval: server menolak acknowledge/approve/reject oleh PM (403, tercatat `access_denied`); PM tidak menerima notifikasi persetujuan dan tidak punya kotak masuk Persetujuan. |
 | US-18 | Sebagai PM, saya ingin mengajukan addendum RAB. | Nominal tambahan dan alasan wajib, lalu masuk ke approval owner. |
 
 ### Finance
@@ -291,15 +297,15 @@ Kriteria penerimaan ditulis agar bisa diuji (unit/API/e2e/manual). "Server menol
 | US-24 | Sebagai finance, saya ingin membatalkan transaksi kas yang salah input. | Void/jurnal balik dengan alasan. Transaksi asli tetap terlihat. |
 | US-25 | Sebagai finance, saya ingin rekap per kategori, project, pusat biaya, periode, dan export Excel. | Filter tanggal, project/pusat biaya, jenis. Saldo per akun kas. Kategori dihitung dari **baris item** [Tambahan dari form klien]. |
 
-### Owner
+### Direktur (peran `pk-owner`, dulu "Owner")
 
 | ID | User story | Kriteria penerimaan |
 |---|---|---|
-| US-26 | [Diubah v1.1] Sebagai owner, saya ingin menyetujui atau menolak pengajuan dari HP. | Tampil jenis, baris item, nota (Reimburse), flag validasi, posisi tanda tangan yang sudah terisi, dan dampak anggaran (% sekarang → % bila disetujui, merah bila > 85%; untuk pusat biaya tanpa anggaran: tampil "tanpa anggaran", Q-24). Alasan wajib saat menolak. Tanda tangan terekam (US-43). |
+| US-26 | [Diubah v1.1] [Diubah ADR 0013] Sebagai Direktur (langkah "Diketahui") atau Finance (langkah Approval), saya ingin menyetujui atau menolak pengajuan dari HP. | Tampil jenis, baris item, nota (Reimburse), flag validasi, posisi tanda tangan yang sudah terisi, dan dampak anggaran (% sekarang → % bila disetujui, merah bila > 85%; untuk pusat biaya tanpa anggaran: tampil "tanpa anggaran", Q-24). Alasan wajib saat menolak. Tanda tangan terekam (US-43). |
 | US-27 | Sebagai owner, saya ingin melihat saldo kas, anggaran terpakai, kelengkapan nota/LPJ, dan pengajuan yang menunggu. | 4 kartu dashboard dengan data real-time (tata letak: prototipe tidak tersedia). |
 | US-28 | Sebagai owner, saya ingin grafik kas masuk vs keluar per bulan. | Periode bisa dipilih. |
 | US-29 | Sebagai owner, saya ingin membuat, mengedit, dan mengarsipkan project beserta tahapannya. | Total bobot wajib 100%. Project dengan transaksi tidak bisa dihapus. |
-| US-30 | Sebagai owner, saya ingin meng-approve addendum RAB. | Anggaran bertambah dan riwayat tersimpan. |
+| US-30 | [Diubah ADR 0013] Sebagai Direktur, saya ingin meng-approve addendum RAB. | Anggaran bertambah dan riwayat tersimpan. Memakai mesin approval yang sama (`docType: budget_addendum`); usulan: Direktur menyetujui, Finance diberi tahu (ADR 0013 O-3, diputuskan di Epik E5). |
 | US-31 | Sebagai owner, saya ingin membaca semua laporan progress beserta fotonya. | Terbaru di atas. Filter per project. |
 
 ### Admin & umum
@@ -321,7 +327,7 @@ Kriteria penerimaan ditulis agar bisa diuji (unit/API/e2e/manual). "Server menol
 | US-39 | [Tambahan dari form klien] Sebagai finance, saya ingin memverifikasi nota reimburse sebelum transfer. | Reimburse "Disetujui" → Finance verifikasi per nota (valid/ditolak dengan alasan). Semua flag terbuka harus ditandai "sudah diperiksa" (dengan catatan opsional) sebelum status "Nota Terverifikasi (Antri Transfer)". Bila ada nota ditolak → status "Revisi Nota", pemohon memperbaiki; bila grand total berubah, pengajuan kembali ke "Menunggu Approval" [Usulan]. Urutan verifikasi vs approval: Q-12. |
 | US-40 | [Tambahan dari form klien] Sebagai pembuat pengajuan, saya ingin mencantumkan lebih dari satu pemohon di "Diajukan Oleh". | Minimal 1 pemohon, semuanya karyawan aktif (master `employees`). Urutan nama tersimpan dan tampil di PDF seperti "Budi, Doni". Setiap pemohon mendapat akses R *own* ke pengajuan. Tak satu pun pemohon bisa memberi Approval (server menolak). |
 | US-41 | [Tambahan dari form klien] Sebagai admin, saya ingin membuat pengajuan atas nama pemohon ("Dibuat Oleh"). | "Dibuat Oleh" diisi otomatis oleh server dengan user yang login (tidak bisa diisi manual). Bila pembuat ≠ pemohon, pemohon utama dinotifikasi. Peran yang boleh membuat atas nama: Q-09 (usulan default: Admin dan Finance). |
-| US-42 | [Tambahan dari form klien] Sebagai pihak "Diketahui Oleh", saya ingin menandai pengajuan sudah diketahui. | Hanya user yang ditetapkan aturan approval (usulan: PM project / penanggung jawab pusat biaya, Q-07) yang bisa. Aksi "Diketahui" merekam nama, waktu server, tanda tangan. Bila langkah ini wajib, status tidak bisa ke "Menunggu Approval" sebelum diketahui (server menolak). Menolak di posisi ini wajib alasan [Usulan]. |
+| US-42 | [Tambahan dari form klien] [Diubah ADR 0013] Sebagai Direktur (pihak "Diketahui Oleh"), saya ingin menyetujui pengajuan pada langkah "Diketahui". | "Diketahui" adalah **persetujuan Direktur** (peran `pk-owner`, label "Direktur"; Q-07 dijawab user 2026-09-25): semua Direktur aktif yang bukan pemohon/pembuat menerima notifikasi, salah satu cukup. Aksi merekam nama, waktu server, tanda tangan, dampak anggaran dan flag terbuka. Status tidak bisa ke "Menunggu Approval" (Finance) sebelum disetujui Direktur (server menolak). Menolak wajib alasan. |
 | US-43 | [Tambahan dari form klien] Sebagai penanda tangan, saya ingin tanda tangan digital saya terekam di pengajuan. | Dua cara (pilihan klien, Q-15): (a) gambar tanda tangan tersimpan di profil, (b) gambar di layar HP saat aksi. Tersimpan: gambar (PNG, §9), user, posisi, waktu server, perangkat. Gambar tanda tangan pada dokumen yang sudah ditandatangani tidak berubah bila profil diganti kemudian (salinan/snapshot). |
 | US-44 | [Tambahan dari form klien] Sebagai pembuat pengajuan, saya ingin memilih rekening tujuan dari rekening milik salah satu pemohon. | Dropdown hanya berisi rekening aktif (master `employee-bank-accounts`) milik karyawan di "Diajukan Oleh"; server menolak rekening milik orang lain (pengecualian: Q-11). Default = rekening default pemohon pertama. Info bank, atas nama, nomor tersimpan sebagai snapshot di pengajuan (uji: Mandiri · Doni Pratama · 1234567890123). |
 | US-45 | [Tambahan dari form klien] Sebagai admin, saya ingin mengatur format penomoran per jenis dokumen. | Token minimal: nomor urut, kode dokumen, kode perusahaan, hari, bulan (angka dan romawi), tahun (2 & 4 digit). Default pengajuan: `{seq}/PB-DRMS/{DD}/{MM_ROMAN}/{YYYY}` → uji: seq 228, tanggal 20-09-2026 menghasilkan `228/PB-DRMS/20/IX/2026`. Periode reset counter bisa diatur (tidak/tahunan/bulanan; default: Q-17). Nomor diambil saat pertama kali diajukan (bukan saat draft), unik, tanpa lompat pada transaksi yang gagal [Usulan]; uji konkurensi 50 pengajuan paralel → 50 nomor unik berurutan. Nomor awal bisa diset (untuk melanjutkan nomor manual klien, Q-17). |
@@ -446,8 +452,8 @@ Prompt Lead menyebut alur `Draft → Menunggu Approval → Disetujui → Ditrans
 |---|---|---|---|
 | Diajukan Oleh (1..n) | Setiap pemohon | Saat diajukan (cara tanda tangan pemohon yang tidak membuat sendiri: Q-10) | – (konfirmasi) |
 | Dibuat Oleh | User pembuat | Saat diajukan | – |
-| Diketahui Oleh | Sesuai aturan (usulan PM / penanggung jawab pusat biaya) | Setelah diajukan | Diketahui / Ditolak |
-| Approval (level 1..n) | Sesuai aturan (default Owner) | Setelah Diketahui (bila ada) | Disetujui / Ditolak |
+| Diketahui Oleh | Direktur (`pk-owner`, ADR 0013; dulu usulan PM — tidak berlaku lagi) | Setelah diajukan | Disetujui (Diketahui) / Ditolak |
+| Approval (level 1..n) | Sesuai aturan (default Finance, ADR 0013) | Setelah Diketahui | Disetujui / Ditolak |
 
 - **Field:** posisi, level, user, nama tampil, keputusan, alasan, waktu server, gambar tanda tangan (snapshot) + sumber (profil/layar), perangkat, % anggaran sebelum dan sesudah, jumlah flag terbuka saat keputusan.
 

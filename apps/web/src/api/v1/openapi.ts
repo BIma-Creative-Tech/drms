@@ -1,8 +1,13 @@
 import { OpenAPIRegistry, OpenApiGeneratorV31 } from '@asteasolutions/zod-to-openapi'
 import { z } from 'zod'
 
+import { registerAddendumPaths } from './openapi-addendum'
+import { registerAttendancePaths } from './openapi-attendance'
 import { Device, DeviceRegister, DeviceRevoke, Health, Masters, MastersQuery, Me, Problem, Ready, TestEmailQueued } from './schemas'
 import * as F from './schemas-flow'
+import * as P from './schemas-progress'
+import * as R from './schemas-reports'
+import * as S from './schemas-sync'
 
 /**
  * Builds the /api/v1 OpenAPI 3.1 document from the zod schemas (architecture §6.4). Pure module
@@ -180,9 +185,9 @@ export function buildOpenApiDocument(version: string) {
   post('/expense-requests/{id}/withdraw', 'Withdraw to Draft before any decision (reason)', F.ReasonBody, ['id'], detailOk())
   post('/expense-requests/{id}/cancel', 'Cancel (reason)', F.ReasonBody, ['id'], detailOk())
   post('/expense-requests/{id}/resubmit', 'Clone a rejected request into a new Draft (US-06)', F.EmptyBody, ['id'], res(201, 'New draft', F.ExpenseRequestDetail, [401, 403, 404, 409, 422, 426, 429]))
-  post('/expense-requests/{id}/acknowledge', '"Diketahui Oleh" (US-42)', F.SignBody, ['id'], detailOk())
-  post('/expense-requests/{id}/approve', 'Approve the current level (G1/G2; budget % before → after)', F.SignBody, ['id'], detailOk())
-  post('/expense-requests/{id}/reject', 'Reject (reason)', F.RejectBody, ['id'], detailOk())
+  post('/expense-requests/{id}/acknowledge', '"Diketahui Oleh" = Direktur approval (US-42, ADR 0013); PM/Staff/Admin → 403 (audited)', F.SignBody, ['id'], detailOk())
+  post('/expense-requests/{id}/approve', 'Approve the current level — Finance by default (G1/G2, ADR 0013; budget % before → after); PM/Staff/Admin → 403 (audited)', F.SignBody, ['id'], detailOk())
+  post('/expense-requests/{id}/reject', 'Reject (reason) at "Diketahui" (Direktur) or an approval level (Finance); PM/Staff/Admin → 403 (audited)', F.RejectBody, ['id'], detailOk())
   post('/expense-requests/{id}/complete', 'Reimburse: Ditransfer → Selesai', F.EmptyBody, ['id'], detailOk())
   post('/expense-requests/{id}/receipts', 'Add a receipt to a line (image from POST /media/receipts)', F.ReceiptCreate, ['id'], res(201, 'Request with receipts and flags', F.ExpenseRequestDetail, [400, 401, 403, 404, 409, 422, 426, 429]))
   registry.registerPath({
@@ -211,19 +216,19 @@ export function buildOpenApiDocument(version: string) {
   registry.registerPath({
     method: 'post',
     path: '/media/{kind}',
-    summary: 'Upload a file (multipart field "file"); server resizes images (receipts ≤ 2000 px, original discarded)',
+    summary: 'Upload a file (multipart field "file"); server resizes images (receipts ≤ 1600 px, original discarded); image resizing is queued — queue full → 503 + Retry-After (code UPLOAD_BUSY), retry later',
     security,
     request: {
       headers: deviceHeader,
       params: z.object({ kind: F.MediaKindEnum }),
       body: { content: { 'multipart/form-data': { schema: z.object({ file: z.string().meta({ format: 'binary' }) }) } } },
     },
-    responses: res(201, 'Uploaded', F.MediaUploaded, [400, 401, 403, 404, 413, 426, 429]),
+    responses: res(201, 'Uploaded', F.MediaUploaded, [400, 401, 403, 404, 413, 426, 429, 503]),
   })
   registry.registerPath({
     method: 'get',
     path: '/cash-entries',
-    summary: 'Finance/Owner/Admin: cash ledger (KM/KK, reversals)',
+    summary: 'Finance/Direktur (pk-owner)/Admin: cash ledger (KM/KK, reversals)',
     security,
     request: { query: F.CashListQuery },
     responses: res(200, 'Page', F.CashEntryList, [400, 401, 403]),
@@ -241,14 +246,14 @@ export function buildOpenApiDocument(version: string) {
     path: '/cash-entries/{id}',
     summary: 'Finance: edit descriptive fields of a manual entry in an open period (reason)',
     security,
-    request: { params: idParams('id'), body: jsonBody(F.CashEntryUpdate) },
+    request: { headers: idem, params: idParams('id'), body: jsonBody(F.CashEntryUpdate) },
     responses: res(200, 'Updated', F.CashEntry, [400, 401, 403, 404, 409, 429]),
   })
   post('/cash-entries/{id}/void', 'Finance: void = reversal entry + original void (T8, reason)', F.ReasonBody, ['id'], res(200, 'Voided', F.VoidResult, [400, 401, 403, 404, 409, 422, 429]))
   registry.registerPath({
     method: 'get',
     path: '/cash-accounts/balances',
-    summary: 'Finance/Owner: balance per cash account (opening + in − out)',
+    summary: 'Finance/Direktur (pk-owner): balance per cash account (opening + in − out)',
     security,
     request: { query: z.object({ asOf: z.string().optional() }) },
     responses: res(200, 'Balances', F.Balances, [401, 403]),
@@ -260,11 +265,11 @@ export function buildOpenApiDocument(version: string) {
     security,
     responses: res(200, 'Periods', F.PeriodClosingList, [401, 403]),
   })
-  post('/period-closings', 'Finance/Owner: close a past month (DB rejects postings dated ≤ lock date)', F.PeriodCloseBody, [], res(201, 'Closed', F.PeriodClosing, [400, 401, 403, 409, 422, 429]))
+  post('/period-closings', 'Finance/Direktur (pk-owner): close a past month (DB rejects postings dated ≤ lock date)', F.PeriodCloseBody, [], res(201, 'Closed', F.PeriodClosing, [400, 401, 403, 409, 422, 429]))
   registry.registerPath({
     method: 'post',
     path: '/period-closings/{period}/reopen',
-    summary: 'Owner: re-open the latest closed period (reason)',
+    summary: 'Direktur (role pk-owner): re-open the latest closed period (reason)',
     security,
     request: { headers: idem, params: z.object({ period: z.string().regex(/^\d{4}-\d{2}$/) }), body: jsonBody(F.ReasonBody) },
     responses: res(200, 'Re-opened', F.PeriodClosing, [400, 401, 403, 409, 422, 429]),
@@ -281,6 +286,13 @@ export function buildOpenApiDocument(version: string) {
     F.SettleBody,
     ['id'],
     res(200, 'Settled', F.SettleResult, [400, 401, 403, 404, 409, 422, 426, 429]),
+  )
+  post(
+    '/expense-requests/{id}/settle/reverse',
+    'E9 Finance: reverse a settlement — void the refund KM / shortfall transfer (+ KK reversal) → LPJ "Terverifikasi" again (reason; closed period → 409)',
+    F.ReasonBody,
+    ['id'],
+    res(200, 'Reversed', F.SettleReverseResult, [400, 401, 403, 404, 409, 422, 426, 429]),
   )
   registry.registerPath({
     method: 'get',
@@ -336,18 +348,165 @@ export function buildOpenApiDocument(version: string) {
   registry.registerPath({
     method: 'get',
     path: '/media/{collection}/{id}/file',
-    summary: 'Download a stored file the caller may read (owner-document scope; else 404); private, no-store',
+    summary:
+      'Download a stored file the caller may read (owner-document scope; else 404); private, no-store. E9: alternatively a SIGNED URL from GET …/signed-url (query exp, uid, sig; no bearer/cookie needed) — expired/invalid → 403 (code URL_EXPIRED / URL_INVALID), valid signature but the user may not read the file → 403 (code FORBIDDEN)',
+    security: [...security, {}],
+    request: {
+      headers: deviceHeader,
+      params: z.object({ collection: F.FileCollectionEnum, id: z.string().regex(/^\d+$/) }),
+      query: z.object({
+        variant: z.enum(['thumb']).optional(),
+        exp: z.string().regex(/^\d+$/).optional().meta({ description: 'Signed URL: expiry (unix seconds)' }),
+        uid: z.string().regex(/^\d+$/).optional().meta({ description: 'Signed URL: user the URL was minted for' }),
+        sig: z.string().optional().meta({ description: 'Signed URL: base64url HMAC-SHA256 (ADR 0004 §4)' }),
+      }),
+    },
+    responses: {
+      200: { description: 'File bytes (image/jpeg, image/png, image/webp thumb, application/pdf)', content: { 'application/octet-stream': { schema: z.string().meta({ format: 'binary' }) } } },
+      ...problemResponses(400, 401, 403, 404, 426, 429),
+    },
+  })
+  registry.registerPath({
+    method: 'get',
+    path: '/media/{collection}/{id}/signed-url',
+    summary: 'E9 (ADR 0004 §4): mint a signed, 5-minute URL of the file endpoint for the caller (same visibility as the download; else 404). The URL is relative to the API origin',
     security,
     request: {
       headers: deviceHeader,
       params: z.object({ collection: F.FileCollectionEnum, id: z.string().regex(/^\d+$/) }),
       query: z.object({ variant: z.enum(['thumb']).optional() }),
     },
+    responses: res(200, 'Signed URL', F.SignedMediaUrl, [400, 401, 404, 426, 429]),
+  })
+
+  // ---- F4: APK backend (ADR 0010) ----
+  registry.registerPath({
+    method: 'get',
+    path: '/app/config',
+    summary: 'PUBLIC app gate: min/latest APK version, download URL, company timezone, feature flags, sync limits (call before login and on start)',
+    request: { query: S.AppConfigQuery },
+    responses: res(200, 'Config (Cache-Control: public, max-age=60)', S.AppConfig, [400]),
+  })
+  registry.registerPath({
+    method: 'post',
+    path: '/sync/batch',
+    summary:
+      'APK offline queue replay (bearer + registered device = device_id). Items in order, one transaction each; always 200 with one result per item (applied | duplicate | rejected | conflict | deferred | unsupported). Rate limit 12/min.',
+    description:
+      'Item types: expense_request.draft_upsert (payload SyncDraftUpsertPayload), expense_request.draft_delete (payload SyncDraftDeletePayload), attendance.check_in / attendance.check_out (payload SyncAttendancePayload: project_id OR cost_center_id; selfie first with POST /media/selfies; company-settings.syncAttendanceEnabled, else rejected FEATURE_DISABLED; rejection codes MOCK_LOCATION, OUTSIDE_GEOFENCE, NOT_ASSIGNED, NO_GEOFENCE, ALREADY_CHECKED_IN, NO_CHECK_IN, ALREADY_CHECKED_OUT, MEDIA_MISSING, FORBIDDEN), attendance.on_behalf (payload SyncOnBehalfPayload, US-14: PM only, team location, not own, reason required; GPS + photo from the PM phone); progress_report.draft_upsert (payload SyncProgressReportPayload; photos first with POST /media/progress-photos, ≤ 5; new report = PM of a team project or Direktur; edit = reporter within 24 h with base_rev + reason, else conflict/NOT_EDITABLE with server_report; company-settings.syncProgressReportsEnabled, else FEATURE_DISABLED; codes WEIGHTS_INCOMPLETE, PROGRESS_DECREASED, PHOTO_LIMIT, MEDIA_IN_USE, MEDIA_MISSING, FORBIDDEN). Receipt images are uploaded first with POST /media/receipts and referenced by media_id. Replaying a client_uuid returns the stored result as duplicate. Edits of an existing draft need base_rev = server rev, else conflict + server_copy (server wins).',
+    security: [{ [bearer.name]: [] }],
+    request: {
+      headers: z.object({
+        'X-Device-Id': z.uuid().meta({ description: 'Registered install id; must equal body.device_id.' }),
+        'X-App-Version': z.string().optional().meta({ description: 'APK version; below company minimum → 426.' }),
+        'Idempotency-Key': z.uuid().optional().meta({ description: 'Optional (= batch_id); items are idempotent by client_uuid.' }),
+      }),
+      body: jsonBody(S.SyncBatch),
+    },
+    responses: res(200, 'Per-item results', S.SyncBatchResponse, [400, 401, 403, 413, 426, 429]),
+  })
+
+  // ---- E4: project stages (G11), progress reports (T11, US-10/US-31), K-09 (US-12) ----
+  registry.registerPath({
+    method: 'get',
+    path: '/projects/progress',
+    summary: 'K-09 progress fisik vs anggaran per project (Finance/Direktur all, PM team): K-08 % vs Σ(weight × stage %), selisih + colour',
+    security,
+    request: { headers: deviceHeader, query: P.ProjectProgressQuery },
+    responses: res(200, 'Projects', P.ProjectProgressList, [400, 401, 403, 426, 429]),
+  })
+  registry.registerPath({
+    method: 'get',
+    path: '/projects/{id}/stages',
+    summary: 'Stage set of a readable project: weights, stage %, active total and project progress',
+    security,
+    request: { headers: deviceHeader, params: idParams('id') },
+    responses: res(200, 'Stages', P.StageSet, [401, 404, 426]),
+  })
+  registry.registerPath({
+    method: 'put',
+    path: '/projects/{id}/stages',
+    summary: 'Stage editor: save the whole active set (total weight = 100 %, G11); Direktur any project (add/deactivate), PM team projects (rename/reorder/re-weight); reason for weight changes (G7)',
+    security,
+    request: { headers: idem, params: idParams('id'), body: jsonBody(P.StageSetBody) },
+    responses: res(200, 'Saved set', P.StageSet, [400, 401, 403, 404, 409, 422, 426, 429]),
+  })
+  registry.registerPath({
+    method: 'get',
+    path: '/progress-reports',
+    summary: 'Progress reports in the caller scope (PM team, Direktur/Finance all), newest first (US-31), filter project/stage/date, cursor paging',
+    security,
+    request: { headers: deviceHeader, query: P.ProgressReportListQuery },
+    responses: res(200, 'Page', P.ProgressReportList, [400, 401, 426]),
+  })
+  registry.registerPath({
+    method: 'post',
+    path: '/progress-reports',
+    summary: 'Create a progress report (US-10): PM of the project or Direktur; photos from POST /media/progress-photos (≤ 5); stage % before → after and project progress in the same transaction. Replayed clientUuid → 200',
+    description: 'Problem `code`: FORBIDDEN (not PM of the project / Staff), WEIGHTS_INCOMPLETE (active stage weights ≠ 100 %), PROGRESS_DECREASED, PHOTO_LIMIT, MEDIA_MISSING, MEDIA_IN_USE, VALIDATION, STATE_CONFLICT (archived project / inactive stage).',
+    security,
+    request: { headers: idem, body: jsonBody(P.ProgressReportCreate) },
     responses: {
-      200: { description: 'File bytes (image/jpeg, image/png, image/webp thumb, application/pdf)', content: { 'application/octet-stream': { schema: z.string().meta({ format: 'binary' }) } } },
-      ...problemResponses(400, 401, 404, 426, 429),
+      ...res(201, 'Created', P.ProgressReport, [400, 401, 403, 404, 409, 422, 426, 429]),
+      200: { description: 'Existing report for this clientUuid', content: { 'application/json': { schema: P.ProgressReport } } },
     },
   })
+  registry.registerPath({
+    method: 'get',
+    path: '/progress-reports/{id}',
+    summary: 'Report detail with photos (file URLs under /media/progress-photos/{id}/file)',
+    security,
+    request: { headers: deviceHeader, params: idParams('id') },
+    responses: res(200, 'Report', P.ProgressReport, [401, 404, 426]),
+  })
+  registry.registerPath({
+    method: 'patch',
+    path: '/progress-reports/{id}',
+    summary: 'Edit within 24 h by the reporter (reason required): work/issues, add photos (total ≤ 5), correct pctAfter on the latest report of the stage',
+    security,
+    request: { headers: idem, params: idParams('id'), body: jsonBody(P.ProgressReportUpdate) },
+    responses: res(200, 'Report after the edit', P.ProgressReport, [400, 401, 403, 404, 409, 422, 426, 429]),
+  })
+
+  // ---- F3 dashboards & reports (docs/proyekkas/f3) ----------------------------------------------
+  const dash = (name: string, summary: string, schema: z.ZodType) =>
+    registry.registerPath({ method: 'get', path: `/dashboard/${name}`, summary, security, request: { headers: deviceHeader }, responses: res(200, 'Dashboard', schema, [401, 403, 426, 429]) })
+  dash('owner', 'Owner home: cash (K-01, K-02b), budgets (K-07/K-08), completeness (K-12), approvals (K-10), cost centers (K-15), transfer queue (K-11)', R.OwnerDashboard)
+  dash('finance', 'Finance home: work queues (K-11, K-12c/d/e), balances per account (K-01), advances without LPJ (K-12a/b), cash flow (K-02a)', R.FinanceDashboard)
+  dash('pm', 'PM home (team scope): waiting for my "Diketahui", team month (K-13), LPJ (K-12a/b), project budgets (K-08), cost centers (K-15); attendance/progress = F5', R.PmDashboard)
+  dash('admin', 'Admin home: master-data gaps and latest audit rows', R.AdminDashboard)
+  dash('me', 'Own requests: "Perlu tindakan saya" and latest (any role)', R.StaffDashboard)
+  registry.registerPath({
+    method: 'get',
+    path: '/reports/{code}',
+    summary: 'One report page as JSON (same filters/scope as /admin/laporan/{code}); audit-log: Owner/Admin/Finance',
+    security,
+    request: { headers: deviceHeader, params: z.object({ code: R.ReportCode }), query: R.ReportQuery },
+    responses: res(200, 'Report', R.ReportResponse, [400, 401, 403, 404, 426, 429]),
+  })
+  registry.registerPath({
+    method: 'get',
+    path: '/reports/{code}/{format}',
+    summary: 'Download (CSV streamed UTF-8 BOM ";"; XLSX ≤ 10 000 rows; PDF ≤ 500 rows for rekap-kas, pengeluaran-kategori, anggaran-project). Audited `export`; 10/min per user',
+    security,
+    request: { headers: deviceHeader, params: z.object({ code: R.ReportCode, format: R.ReportFormat }), query: R.ReportQuery },
+    responses: {
+      200: {
+        description: 'File (Content-Disposition: attachment)',
+        content: {
+          'text/csv': { schema: z.string() },
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': { schema: z.string().meta({ format: 'binary' }) },
+          'application/pdf': { schema: z.string().meta({ format: 'binary' }) },
+        },
+      },
+      ...problemResponses(400, 401, 403, 404, 413, 426, 429, 503),
+    },
+  })
+
+  // ---- E6 attendance (US-09/13/15, Q-33) -------------------------------------------------------
+  registerAttendancePaths(registry, { security, deviceHeader, idem, res, problemResponses })
+  // ---- E5 addendum RAB (T12, US-18/US-30) ------------------------------------------------------
+  registerAddendumPaths(registry, { security, deviceHeader, idem, res })
 
   return new OpenApiGeneratorV31(registry.definitions).generateDocument({
     openapi: '3.1.0',

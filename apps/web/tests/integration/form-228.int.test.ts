@@ -51,8 +51,9 @@ beforeAll(async () => {
   await seed(p)
   for (const c of ['EMP-001', 'EMP-002', 'EMP-003', 'EMP-004', 'EMP-005']) emp[c] = await idOf('employees', 'code', c)
   citra = await makeFlowUser(['pk-admin'], 'citra', emp['EMP-003']!, { signature: false })
-  budiH = await makeFlowUser(['pk-pm'], 'budi-hartono', emp['EMP-004']!, { signature: false })
-  sari = await makeFlowUser(['pk-owner'], 'sari', emp['EMP-005']!, { signature: false })
+  // ADR 0013 (E1): "Diketahui Oleh" = Direktur (pk-owner) approval, "Approval" = Finance.
+  budiH = await makeFlowUser(['pk-owner'], 'budi-hartono', emp['EMP-004']!, { signature: false })
+  sari = await makeFlowUser(['pk-finance'], 'sari', emp['EMP-005']!, { signature: false })
   // Signature-like PNGs (fictional strokes) so the sample PDF shows the four signed positions.
   for (const [i, u] of [citra, budiH, sari].entries()) {
     const sig = await uploadMedia('media-signatures', u, await signatureImage(i + 3))
@@ -60,9 +61,7 @@ beforeAll(async () => {
   }
   finance = await makeFlowUser(['pk-finance'], 'finance-228', null)
   m.cc = await idOf('cost-centers', 'code', FORM_228.costCenterCode)
-  // Q-07 default: "Diketahui Oleh" = the cost center's manager (Budi Hartono on the form).
-  await p.update({ collection: 'cost-centers', id: m.cc, data: { manager: budiH.id }, overrideAccess: true /* SYSTEM-WRITE: fixture */ })
-  // The seeded default rule (Q-31 Owner-only, Q-07 Diketahui required) scoped to OPS-PB so that
+  // The seeded default rule (ADR 0013: Diketahui = Direktur, then Finance, every amount) scoped to OPS-PB so that
   // generic rules created by other test files sharing the DB cannot win the tie.
   const def = (await p.find({ collection: 'approval-rules', where: { name: { equals: DEFAULT_APPROVAL_RULES[0].name } }, limit: 1, depth: 0, overrideAccess: true /* SYSTEM-READ: fixture */ })).docs[0]!
   await p.create({
@@ -107,11 +106,11 @@ describe('form 228/PB-DRMS/20/IX/2026 (F2 acceptance fixture)', () => {
 
   it('receipts are attached per line (Reimburse: required before submit, US-38)', async () => {
     for (const rc of FORM_228.receipts) {
-      // Synthetic FICTIONAL receipt photo (bitmap text), 2400 px wide → resized to ≤ 2000 px.
+      // Synthetic FICTIONAL receipt photo (bitmap text), 2400 px wide → resized to ≤ 1600 px (S3e).
       const photo = await receiptImage([rc.vendorName.slice(0, 22), `NO ${rc.receiptNo}`, `TGL ${rc.receiptDate}${rc.receiptTime ? ` ${rc.receiptTime}` : ''}`, `TOTAL RP ${formatAmount(rc.amount)}`, 'TERIMA KASIH'], { width: 2400, px: 14 })
       const img = await upload('/api/v1/media/receipts', citra, photo, 'image/jpeg')
       expect(img.status).toBe(201)
-      expect(Math.max(img.body.width, img.body.height)).toBeLessThanOrEqual(2000) // resized, original discarded
+      expect(Math.max(img.body.width, img.body.height)).toBeLessThanOrEqual(1600) // resized, original discarded
       const r = await api('POST', `/api/v1/expense-requests/${requestId}/receipts`, citra, {
         lineId: lineIds[rc.line],
         receiptNo: rc.receiptNo,
@@ -142,7 +141,7 @@ describe('form 228/PB-DRMS/20/IX/2026 (F2 acceptance fixture)', () => {
       docNo: '228/PB-DRMS/20/IX/2026',
       grandTotal: 1_447_500,
       bank: { bankName: 'Bank Mandiri', accountNo: '1234567890123', accountHolder: 'Doni Pratama' },
-      approvalRule: { acknowledge: 'required', acknowledgerUserId: budiH.id },
+      approvalRule: { acknowledge: 'required', acknowledgeBy: 'role', acknowledgeRole: 'pk-owner', acknowledgerUserId: null, steps: [{ level: 1, approverRole: 'pk-finance' }] },
     })
     const signed = r.body.approvals.map((a: { position: string; decision: string; onBehalf: boolean; employeeId: number | null }) => [a.position, a.decision, a.onBehalf, a.employeeId])
     expect(signed).toEqual(
@@ -166,7 +165,7 @@ describe('form 228/PB-DRMS/20/IX/2026 (F2 acceptance fixture)', () => {
     expect(r.body.openWarningFlags).toBe(3)
   })
 
-  it('Diketahui (Budi Hartono) → Approval (Sari, Owner): cost center has no budget (Q-24), open flags recorded', async () => {
+  it('Diketahui (Budi Hartono, Direktur) → Approval (Sari, Finance): cost center has no budget (Q-24), open flags recorded', async () => {
     expect((await api('POST', `/api/v1/expense-requests/${requestId}/approve`, sari, {})).status).toBe(409) // Diketahui first
     const ack = await api('POST', `/api/v1/expense-requests/${requestId}/acknowledge`, budiH, {})
     expect(ack.status, JSON.stringify(ack.body)).toBe(200)
@@ -175,7 +174,9 @@ describe('form 228/PB-DRMS/20/IX/2026 (F2 acceptance fixture)', () => {
     expect(ok.status, JSON.stringify(ok.body)).toBe(200)
     expect(ok.body).toMatchObject({ status: 'approved', approvedAmount: 1_447_500, budget: { basis: 'none', pctBefore: null } })
     const appr = ok.body.approvals.find((a: { position: string }) => a.position === 'approval')
-    expect(appr).toMatchObject({ actorId: sari.id, decision: 'approved', openFlags: 3, budgetPctBefore: null })
+    // S3e (S-05): open flags of both levels (3 warnings + 1 info), as shown in the inbox
+    expect(appr).toMatchObject({ actorId: sari.id, decision: 'approved', openFlags: 4, budgetPctBefore: null })
+    expect(ok.body.approvals.find((a: { position: string }) => a.position === 'diketahui')).toMatchObject({ actorId: budiH.id, decision: 'acknowledged' })
   })
 
   it('Finance verifies receipts + reviews warnings → "Nota Terverifikasi", transfers Rp 1.447.500 (KK posted), requester closes', async () => {

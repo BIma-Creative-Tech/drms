@@ -1,0 +1,71 @@
+### headers /admin/login
+cache-control: private, no-cache, no-store, max-age=0, must-revalidate
+content-type: text/html; charset=utf-8
+cross-origin-opener-policy: same-origin
+permissions-policy: camera=(), microphone=(), geolocation=(), payment=(), usb=()
+referrer-policy: strict-origin-when-cross-origin
+strict-transport-security: max-age=604800
+x-content-type-options: nosniff
+x-frame-options: DENY
+x-request-id: 913f551f-8cbd-4e3a-8a7e-d82b2d9d0fd3
+### headers /api/v1/me (401)
+HTTP/2 401 
+access-control-allow-headers: Origin, X-Requested-With, Content-Type, Accept, Authorization, Content-Encoding, x-apollo-tracing, X-Payload-HTTP-Method-Override
+access-control-allow-methods: PUT, PATCH, POST, GET, DELETE, OPTIONS
+cache-control: no-store
+content-type: application/problem+json
+strict-transport-security: max-age=604800
+{"type":"about:blank","title":"Unauthorized","status":401}
+### REST generic /api/users (unauth)
+HTTP/2 403 
+content-type: application/json
+{"errors":[{"message":"Anda tidak diizinkan melakukan tindakan ini."}]}
+
+### REST generic /api/users/me
+HTTP/2 200 
+content-type: application/json
+{"user":null,"message":"Akun"}
+
+### REST error /api/users/abc
+{"errors":[{"message":"Anda tidak diizinkan melakukan tindakan ini."}]}
+### api/v1 404
+{"message":"Route not found \"/api/v1/does-not-exist\""} 404
+### TRACE /
+403
+### TRACK /
+403
+### PUT /
+403
+### DELETE /
+403
+### OPTIONS /
+400
+### PROPFIND /
+403
+### OPTIONS CORS preflight /api/v1/me Origin evil
+HTTP/2 200 
+access-control-allow-headers: Origin, X-Requested-With, Content-Type, Accept, Authorization, Content-Encoding, x-apollo-tracing, X-Payload-HTTP-Method-Override
+access-control-allow-methods: PUT, PATCH, POST, GET, DELETE, OPTIONS
+### GET CORS /api/users/me Origin evil
+HTTP/2 200 
+access-control-allow-headers: Origin, X-Requested-With, Content-Type, Accept, Authorization, Content-Encoding, x-apollo-tracing, X-Payload-HTTP-Method-Override
+access-control-allow-methods: PUT, PATCH, POST, GET, DELETE, OPTIONS
+### /.git/HEAD 403
+### /.env 403
+### /.git/config 403
+### /_next/ 308
+### /api/v1/../../etc/passwd 404
+### /server.js 404
+### /package.json 403
+### /media/ 308
+### /data/media/ 308
+### HPP /api/v1/app/config?version=1.0.0&version=0.0.1
+{"type":"about:blank","title":"Bad Request","status":400,"detail":"version harus x.y.z."}
+### TLS
+tls1: 000000
+tls1.1: curl: option --tls1.1: is unknown
+curl: try 'curl --help' or 'curl --manual' for more information
+tls1.2: curl: option --tls1.2: is unknown
+curl: try 'curl --help' or 'curl --manual' for more information
+tls1.3: curl: option --tls1.3: is unknown
+curl: try 'curl --help' or 'curl --manual' for more information

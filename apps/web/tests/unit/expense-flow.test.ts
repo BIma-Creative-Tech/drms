@@ -35,7 +35,7 @@ describe('state machines (architecture §5.1 Uang Muka / §5.2 Reimburse, G6)', 
     expect(targets('reimburse', 'transferred', 'transfer_void')).toEqual(['receipts_verified'])
     expect(targets('reimburse', 'transferred', 'complete')).toEqual(['completed'])
     expect(targets('reimburse', 'approved', 'receipt_reject')).toEqual(['receipt_revision'])
-    expect(targets('reimburse', 'receipt_revision', 'receipts_resubmit').sort()).toEqual(['approved', 'pending_approval'])
+    expect(targets('reimburse', 'receipt_revision', 'receipts_resubmit').sort()).toEqual(['approved', 'pending_ack', 'pending_approval']) // E1: re-approval back to Diketahui (Direktur)
   })
 
   it('terminal states allow nothing; invalid transitions throw', () => {

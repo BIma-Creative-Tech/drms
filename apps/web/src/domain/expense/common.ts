@@ -6,7 +6,8 @@ import { writeAuditDetached } from '@/audit/writer'
 import { DEFAULT_TZ, localDateInTz } from '@/lib/time'
 import { getRequestTx } from '@/lib/tx'
 
-import { allowedActions, FINANCE_SELF_GUARDED, targets, type Action, type ActorContext } from './state'
+import { allowedActions, FINANCE_SELF_GUARDED, mayPerform, targets, type Action, type ActorContext } from './state'
+import { lacksDecisionRole } from './decision'
 import { matchesAcknowledger, matchesStep, type ApprovalSnapshot } from './rules'
 import { BUDGET_COMMITTED, type RequestStatus, type RequestType } from './types'
 
@@ -58,6 +59,8 @@ export type RequestDoc = {
   cancelReason?: string | null
   rejectReason?: string | null
   clientUuid?: string | null
+  /** F4: content revision of an editable request (sync `rev` / `base_rev`). */
+  syncRev?: number | null
   source?: string | null
   attachments?: unknown[] | null
   createdAt?: string
@@ -162,11 +165,17 @@ export async function actorContext(req: PayloadRequest, doc: RequestDoc): Promis
       !!snap && !acknowledged && (doc.status === 'pending_ack' || (doc.status === 'pending_approval' && snap.acknowledge === 'optional')) && matchesAcknowledger(snap, caller),
     matchesCurrentStep: doc.status === 'pending_approval' && matchesStep(step, caller),
     alreadyDecided: decisions.some((r) => relId(r.actor) === uid && (r.position === 'diketahui' || r.position === 'approval')),
+    lacksDecisionRole: lacksDecisionRole(snap, roles),
   }
 }
 
-/** 409 when the status does not allow the action, 403 when the caller may not perform it. */
+/**
+ * 403 when the caller may not perform the action on this document at all (role/ownership — checked
+ * FIRST, E9 / UAT 5.2), 409 when the status does not allow it, else 403 for the remaining
+ * status-dependent turn rules (not the caller's step / already decided).
+ */
 export function requireAction(ctx: ActorContext, action: Action): void {
+  if (!mayPerform(ctx, action)) fail(403, 'Anda tidak berhak melakukan aksi ini pada pengajuan ini.')
   const nonTransition = ['edit', 'add_receipt', 'receipt_verify', 'review_flag', 'resubmit'].includes(action)
   if (!nonTransition && targets(ctx.type, ctx.status, action).length === 0) {
     fail(409, `Aksi tidak dapat dilakukan pada status pengajuan saat ini (${ctx.status}).`)
@@ -184,12 +193,29 @@ export function requireAction(ctx: ActorContext, action: Action): void {
 const G1_DECISIONS: ReadonlySet<Action> = new Set<Action>(['acknowledge', 'approve', 'reject'])
 
 /**
- * `requireAction` + audit of SELF-INVOLVEMENT denials (F2e): a requester/creator attempting a
+ * `requireAction` + audit of decision-role denials (E1, ADR 0013: caller is neither Direktur nor
+ * Finance on a Direktur → Finance request) and of SELF-INVOLVEMENT denials (F2e): a requester/creator attempting a
  * decision (G1) or a Finance user attempting a receipt/flag/LPJ verification on a request it
  * requested or created (FINANCE_SELF_GUARDED) → 403 and an `access_denied` audit row written in its
  * own transaction (the failing operation rolls back, the attempt stays recorded).
  */
 export async function requireActionAudited(req: PayloadRequest, ctx: ActorContext, action: Action, doc: Pick<RequestDoc, 'id' | 'docNo'>): Promise<void> {
+  if (G1_DECISIONS.has(action) && ctx.lacksDecisionRole) {
+    // ADR 0013 (E1): PM / Staff / Admin never decide on a Direktur → Finance request — refused whatever
+    // the status, and the attempt is recorded (defence in depth behind the UI and the rule hook).
+    await writeAuditDetached(req, [
+      {
+        action: 'access_denied',
+        docType: 'expense_request',
+        docId: String(doc.id),
+        docNo: doc.docNo ?? undefined,
+        field: action,
+        newValue: { action, status: ctx.status, roles: ctx.roles },
+        reason: 'hanya Direktur/Finance yang memberi keputusan (ADR 0013; PM hanya memantau)',
+      },
+    ])
+    fail(403, 'Hanya Direktur atau Finance yang dapat menyetujui atau menolak pengajuan (ADR 0013). PM hanya memantau.')
+  }
   try {
     requireAction(ctx, action)
   } catch (err) {
@@ -245,10 +271,16 @@ export async function projectCommitted(req: PayloadRequest, projectId: number, e
   return Number(r.rows[0]?.s ?? 0)
 }
 
-export async function openWarningFlags(req: PayloadRequest, requestId: number): Promise<number> {
+/**
+ * Flag count stored with a decision (`approvals.openFlags`, US-26/US-59). S3e (S-05): counts what the
+ * decider sees as open in the inbox / review panel — status "Terbuka", BOTH levels (peringatan + info).
+ * Reviewed ("Sudah diperiksa") and resolved flags are not counted. Decisions before S3e counted
+ * open warnings only.
+ */
+export async function openFlagCount(req: PayloadRequest, requestId: number): Promise<number> {
   const r = await req.payload.count({
     collection: 'receipt-flags',
-    where: { and: [{ request: { equals: requestId } }, { status: { equals: 'open' } }, { level: { equals: 'warning' } }] },
+    where: { and: [{ request: { equals: requestId } }, { status: { equals: 'open' } }] },
     overrideAccess: true, // SYSTEM-READ: flag count for decisions
     req,
   })

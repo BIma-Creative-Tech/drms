@@ -71,6 +71,7 @@ describe('grants (least privilege)', () => {
       'payload_preferences',
       'payload_preferences_rels',
       'stage_templates_items',
+      'sync_receipts', // F4: purge of expired sync results (30 days, ADR 0010)
       'users_roles',
     ])
   })

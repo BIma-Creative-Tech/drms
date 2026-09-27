@@ -37,6 +37,8 @@ export const Employees: CollectionConfig = withAudit(
             (relId((req.user as { employee?: unknown } | null)?.employee) ?? -1) === (doc as { id?: unknown } | undefined)?.id,
         },
       },
+      // E6: jadwal kerja karyawan (kosong = jadwal default di Setting perusahaan).
+      { name: 'workSchedule', type: 'relationship', relationTo: 'work-schedules', label: 'Jadwal kerja' },
       { name: 'faceRefPhoto', type: 'upload', relationTo: 'media-selfies', label: 'Foto wajah referensi' },
       odooRefField('odooEmployeeRef', 'Ref. karyawan Odoo'),
       activeField(),

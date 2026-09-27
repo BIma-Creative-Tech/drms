@@ -6,7 +6,7 @@ import { balances, closePeriod, createManualEntry, currentLockDate, editManualEn
 import { HttpError, json, v1 } from '../http'
 import { CashEntryCreate, CashEntryUpdate, CashListQuery, PeriodCloseBody, ReasonBody } from '../schemas-flow'
 
-/** US-23 / US-24 / ADR 0005 — Finance writes; Finance/Owner/Admin read (requirements §4 "Kas & bank"). */
+/** US-23 / US-24 / ADR 0005 — Finance writes; Finance/Direktur (pk-owner)/Admin read (requirements §4 "Kas & bank"). */
 const WRITE_LIMIT: [number, number] = [30, 60_000]
 
 export function cashDto(e: CashEntryDoc & { postedAt?: string | null }) {
@@ -55,6 +55,8 @@ export const listCashEndpoint = v1({
     const and: Where[] = []
     if (q.data.period) and.push({ period: { equals: q.data.period } })
     if (q.data.cashAccountId) and.push({ cashAccount: { equals: q.data.cashAccountId } })
+    if (q.data.projectId) and.push({ project: { equals: q.data.projectId } })
+    if (q.data.costCenterId) and.push({ costCenter: { equals: q.data.costCenterId } })
     if (q.data.cursor) {
       const n = Number(Buffer.from(q.data.cursor, 'base64url').toString('utf8'))
       if (!Number.isSafeInteger(n) || n <= 0) throw new HttpError(400, 'Bad Request', { detail: 'cursor tidak valid.' })
@@ -98,6 +100,7 @@ export const updateCashEndpoint = v1({
   body: CashEntryUpdate,
   rateLimit: WRITE_LIMIT,
   transactional: true,
+  idempotent: true, // E2: the web form sends Idempotency-Key (retry = replay, never a second edit)
   handler: async ({ req, body, params }) => {
     const id = idParam(params.id)
     const { reason, ...patch } = body

@@ -1,7 +1,9 @@
-import type { CollectionConfig } from 'payload'
+import type { Access, CollectionConfig, Where } from 'payload'
 
-import { denyAll } from '@/access/roles'
+import { denyAll, hasRole } from '@/access/roles'
+import { visibleAddendumIds } from '@/domain/addendum/access'
 import { byVisibleRequest, denyDeleteLogged } from '@/domain/expense/access'
+import { inIds } from '@/access/scope'
 import { APPROVAL_DECISIONS, APPROVAL_POSITIONS } from '@/domain/expense/types'
 
 const ro = { readOnly: true }
@@ -13,16 +15,30 @@ const ro = { readOnly: true }
  * DB backstops (security migration): one decision per (request, cycle, position, level); one
  * decision position per person per cycle (G1); requester/creator can never hold a decision row.
  * Written only by the domain service (create access false).
+ * E5 (T12): rows of budget addenda carry docType `budget_addendum` + `addendum` (no `request`); a DB
+ * CHECK keeps exactly one owner per docType and the G1 trigger reads the addendum's creator.
  */
+const readAccess: Access = async (args) => {
+  const { req } = args
+  if (!req.user) return false
+  if (hasRole(req, 'pk-finance', 'pk-owner', 'pk-admin')) return true
+  const byRequest = await byVisibleRequest('request')(args)
+  const byAddendum = inIds('addendum', await visibleAddendumIds(req))
+  const or = [byRequest, byAddendum].filter((w): w is Where => typeof w === 'object' && w !== null)
+  if (byRequest === true) return true
+  return or.length === 0 ? false : or.length === 1 ? or[0]! : { or }
+}
+
 export const Approvals: CollectionConfig = {
   slug: 'approvals',
   labels: { singular: 'Approval & tanda tangan', plural: 'Approval & tanda tangan' },
   admin: { group: 'Keuangan', defaultColumns: ['request', 'position', 'level', 'actorName', 'decision', 'decidedAt'] },
-  access: { read: byVisibleRequest('request'), create: denyAll, update: denyAll, delete: denyDeleteLogged('approval') },
+  access: { read: readAccess, create: denyAll, update: denyAll, delete: denyDeleteLogged('approval') },
   lockDocuments: false,
   fields: [
     { name: 'docType', type: 'select', required: true, defaultValue: 'expense_request', options: ['expense_request', 'budget_addendum'].map((v) => ({ label: v, value: v })), admin: ro },
-    { name: 'request', type: 'relationship', relationTo: 'expense-requests', label: 'Pengajuan', required: true, index: true, admin: ro },
+    { name: 'request', type: 'relationship', relationTo: 'expense-requests', label: 'Pengajuan', index: true, admin: ro },
+    { name: 'addendum', type: 'relationship', relationTo: 'budget-addenda', label: 'Addendum RAB', index: true, admin: ro },
     { name: 'cycle', type: 'number', label: 'Siklus', required: true, admin: ro },
     { name: 'position', type: 'select', label: 'Posisi', required: true, options: APPROVAL_POSITIONS.map((v) => ({ label: v, value: v })), admin: ro },
     { name: 'level', type: 'number', label: 'Level', required: true, defaultValue: 0, admin: ro },

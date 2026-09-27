@@ -75,13 +75,20 @@ export const Settlements: CollectionConfig = withAudit(
       { name: 'settledBy', type: 'relationship', relationTo: 'users', label: 'Diselesaikan oleh', admin: ro },
       { name: 'refundCashEntry', type: 'relationship', relationTo: 'cash-entries', label: 'Kas masuk pengembalian', admin: ro },
       { name: 'shortfallTransfer', type: 'relationship', relationTo: 'transfers', label: 'Transfer kekurangan', admin: ro },
+      // E9 — settlement reversal (Finance): the refund KM / shortfall transfer is voided (reversal rows
+      // stay visible in the cash book), the LPJ returns to "Terverifikasi" and the links above are
+      // cleared (the previous ids stay in the audit log). DB guard: only settled → verified, reason ≥ 3.
+      { name: 'reversalCount', type: 'number', label: 'Jumlah pembatalan penyelesaian', defaultValue: 0, admin: ro },
+      { name: 'lastReversedAt', type: 'date', label: 'Penyelesaian terakhir dibatalkan (server)', admin: { ...ro, date: { pickerAppearance: 'dayAndTime' } } },
+      { name: 'lastReversedBy', type: 'relationship', relationTo: 'users', label: 'Dibatalkan oleh', admin: ro },
+      { name: 'lastReversalReason', type: 'textarea', label: 'Alasan pembatalan penyelesaian', maxLength: 1000, admin: ro },
       uuidField(),
     ],
   },
   {
     docType: 'settlement',
     docNo: (d) => (typeof d.docNo === 'string' ? d.docNo : undefined),
-    exclude: ['submitCount'],
+    exclude: ['submitCount', 'reversalCount'],
     reasonRules: [reasonOnChange(['financeNotes'], 'Catatan revisi wajib diisi (G7).')],
     actionFor: (c) => (c.field === 'status' ? 'status_change' : undefined),
   },

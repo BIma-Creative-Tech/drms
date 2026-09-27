@@ -1,0 +1,712 @@
+/**
+ * Go-live data import (plan fase1-golive E11) — executor. Pipeline:
+ *   read .xlsx → parse (pure) → reference check against DB keys (read-only) → [stop on errors]
+ *   → VALIDATION PASS: every write executed in ONE transaction that is always rolled back
+ *     (Payload hooks, field validation and DB triggers run for real; nothing persists)
+ *   → dry-run: report the validation pass · commit: run again, one transaction PER MASTER, in order.
+ * Idempotent: every row is upserted on its natural key and only changed fields are written, so a
+ * second commit with the same file creates/updates nothing. Runs as the system actor (audit
+ * source=system) with the reason "Impor data go-live <file> (sha256 …)"; each master that changed
+ * something and the run itself are recorded as audit action `import`.
+ * Keycloak is NOT called (out of scope, infra Lead): users are created only when a `--kc-map`
+ * links their username to an existing Keycloak account (`skipKeycloakSync`); the others are
+ * reported as "pending" and exported for the Lead (keycloakUsers).
+ * E9 B-2: for the same reason a user (de)activated by the import is NOT disabled/enabled in Keycloak
+ * and its Keycloak sessions are NOT ended (the device revocation cascade skips Keycloak too): such
+ * users are listed once in `keycloakFollowUp` for the operator (runbook: disable + logout via kc_*).
+ */
+import { createHash, randomUUID } from 'node:crypto'
+
+import { sql } from '@payloadcms/db-postgres'
+import type { CollectionSlug, Payload, PayloadRequest, Where } from 'payload'
+
+import { writeAudit } from '@/audit/writer'
+import { periodEnd } from '@/domain/cash/periods'
+import { DEFAULT_SEQUENCES, formatDocNo, parseBusinessDate, periodKey, type ResetPolicy } from '@/domain/numbering'
+import { CTX_STAGE_EDITOR, projectStages, recalcProjectProgress } from '@/domain/progress/recalc'
+import { withSystemTransaction } from '@/lib/system-tx'
+import { getRequestTx } from '@/lib/tx'
+
+import { hasErrors, parseWorkbook, type ImportData, type Issue } from './parse'
+import { effectiveEmail, isPlaceholderEmail, resolveReferences, type DbKeys, type UserPlan } from './resolve'
+import { SHEET_BY_KEY, type SheetKey } from './spec'
+import { readXlsx, XlsxError } from './xlsx-io'
+
+export type Mode = 'dry-run' | 'commit'
+
+export type MasterReport = { key: SheetKey | 'cutover'; sheet: string; rows: number; created: number; updated: number; unchanged: number; skipped: number }
+
+export type CutoverReport = {
+  goLiveDate: string
+  pbStartAt: number
+  pbCounterBefore: number | null
+  pbCounterAfter: number | null
+  firstPbNumber: string | null
+  closedPeriod: string | null
+  closeNote: string
+}
+
+export type KeycloakUserRow = { username: string; email: string; firstName: string; enabled: boolean; realmRoles: string[]; employeeCode: string }
+
+/**
+ * E9 B-2: Keycloak step the operator must do by hand (realm drms) because the import never calls
+ * Keycloak — `disable_logout`: user deactivated here → disable the account + log out all sessions;
+ * `enable`: user re-activated here → enable the account again.
+ */
+export type KeycloakFollowUpRow = { username: string; email: string; keycloakSub: string | null; action: 'disable_logout' | 'enable' }
+
+export type ImportReport = {
+  mode: Mode
+  runId: string
+  file: string
+  sha256: string
+  startedAt: string
+  finishedAt: string
+  ok: boolean
+  committed: boolean
+  issues: Issue[]
+  masters: MasterReport[]
+  cutover: CutoverReport | null
+  /** Users to create in Keycloak realm `drms` (no passwords). */
+  keycloakUsers: KeycloakUserRow[]
+  /** Users (de)activated by this run whose Keycloak account/sessions the operator must update (E9 B-2). */
+  keycloakFollowUp: KeycloakFollowUpRow[]
+}
+
+export type ImportInput = { bytes: Uint8Array; fileName: string; mode: Mode; kcMap?: ReadonlyMap<string, string>; operator?: string; now?: Date }
+
+class RowError extends Error {
+  constructor(
+    readonly sheet: string,
+    readonly row: number | undefined,
+    message: string,
+  ) {
+    super(message)
+  }
+}
+class DryRunRollback extends Error {}
+
+function errorText(e: unknown): string {
+  const err = e as { message?: string; data?: { errors?: Array<{ path?: string; message?: string }> }; cause?: { message?: string } }
+  const details = (err.data?.errors ?? []).map((d) => `${d.path ? `${d.path}: ` : ''}${d.message ?? ''}`).filter(Boolean)
+  const base = err.cause?.message && !err.message?.includes(err.cause.message) ? `${err.message} (${err.cause.message})` : (err.message ?? String(e))
+  return details.length > 0 ? `${base} — ${details.join('; ')}` : base
+}
+
+// ------------------------------------------------------------------ DB keys (read-only)
+
+export async function loadDbKeys(payload: Payload): Promise<DbKeys> {
+  const codes = async (collection: CollectionSlug) => {
+    const r = await payload.find({ collection, depth: 0, pagination: false, limit: 0, select: { code: true } as never, overrideAccess: true /* SYSTEM-READ: import reference check */ })
+    return new Set((r.docs as unknown as Array<{ code: string }>).map((d) => d.code))
+  }
+  const users = await payload.find({
+    collection: 'users',
+    depth: 0,
+    pagination: false,
+    limit: 0,
+    select: { email: true, keycloakSub: true, employee: true } as never,
+    overrideAccess: true, // SYSTEM-READ: import reference check
+  })
+  const usersByEmail = new Map<string, { id: number; sub: string | null; employee: number | null }>()
+  const usersBySub = new Map<string, { id: number; email: string }>()
+  for (const u of users.docs as unknown as Array<{ id: number; email: string; keycloakSub?: string | null; employee?: number | null }>) {
+    usersByEmail.set(u.email.toLowerCase(), { id: u.id, sub: u.keycloakSub ?? null, employee: u.employee ?? null })
+    if (u.keycloakSub) usersBySub.set(u.keycloakSub.toLowerCase(), { id: u.id, email: u.email })
+  }
+  return {
+    employees: await codes('employees'),
+    banks: await codes('banks'),
+    uoms: await codes('uoms'),
+    categories: await codes('expense-categories'),
+    costCenters: await codes('cost-centers'),
+    projects: await codes('projects'),
+    usersByEmail,
+    usersBySub,
+  }
+}
+
+// ------------------------------------------------------------------ generic upsert
+
+type Action = 'created' | 'updated' | 'unchanged'
+
+function norm(v: unknown, isDate: boolean): unknown {
+  if (v === undefined || v === null || v === '') return null
+  if (isDate && typeof v === 'string') return v.slice(0, 10)
+  if (Array.isArray(v)) return v.map((x) => norm(x, false)).sort((a, b) => String(a).localeCompare(String(b)))
+  if (typeof v === 'object' && v !== null && 'id' in v) return (v as { id: unknown }).id
+  if (typeof v === 'string' && /^-?\d+(\.\d+)?$/.test(v)) return Number(v)
+  return v
+}
+
+/** ISO timestamp at 12:00 UTC: the same calendar day in every timezone of Indonesia (and ±11 h). */
+export const dateValue = (d: string | null) => (d ? `${d}T12:00:00.000Z` : null)
+
+class Exec {
+  readonly cache = new Map<string, number>()
+  readonly kcFollowUp: KeycloakFollowUpRow[] = []
+  constructor(
+    readonly req: PayloadRequest,
+    readonly data: ImportData,
+    readonly users: Map<string, UserPlan>,
+  ) {}
+
+  async findOne(collection: CollectionSlug, where: Where): Promise<Record<string, unknown> | null> {
+    const r = await this.req.payload.find({ collection, where, limit: 1, depth: 0, pagination: false, overrideAccess: true /* SYSTEM-READ: import upsert */, req: this.req })
+    return (r.docs[0] as unknown as Record<string, unknown>) ?? null
+  }
+
+  async idOf(collection: CollectionSlug, field: string, value: string | null): Promise<number | null> {
+    if (value === null) return null
+    const k = `${collection}:${field}:${value}`
+    const hit = this.cache.get(k)
+    if (hit !== undefined) return hit
+    const doc = await this.findOne(collection, { [field]: { equals: value } })
+    if (!doc) throw new Error(`${collection} "${value}" tidak ditemukan`)
+    this.cache.set(k, doc.id as number)
+    return doc.id as number
+  }
+
+  /** Username (Pengguna sheet) or email of an existing user → user id; undefined = pending (leave the field alone). */
+  async userId(ref: string | null): Promise<number | null | undefined> {
+    if (ref === null) return null
+    if (ref.includes('@')) return this.idOf('users', 'email', ref)
+    const plan = this.users.get(ref)
+    if (!plan || plan.action === 'pending') return undefined
+    return this.idOf('users', 'email', plan.email)
+  }
+
+  async upsert(
+    collection: CollectionSlug,
+    where: Where,
+    data: Record<string, unknown>,
+    opts: { createOnly?: Record<string, unknown>; dates?: string[]; cacheKey?: string; context?: Record<string, unknown> } = {},
+  ): Promise<{ action: Action; id: number }> {
+    const existing = await this.findOne(collection, where)
+    const dates = new Set(opts.dates ?? [])
+    const clean = Object.fromEntries(Object.entries(data).filter(([, v]) => v !== undefined))
+    if (opts.context) Object.assign(this.req.context, opts.context)
+    try {
+      if (!existing) {
+        const doc = await this.req.payload.create({ collection, data: { ...clean, ...(opts.createOnly ?? {}) } as never, depth: 0, overrideAccess: true /* SYSTEM-WRITE: go-live import */, req: this.req })
+        if (opts.cacheKey) this.cache.set(opts.cacheKey, doc.id as number)
+        return { action: 'created', id: doc.id as number }
+      }
+      const patch: Record<string, unknown> = {}
+      for (const [k, v] of Object.entries(clean)) {
+        if (JSON.stringify(norm(v, dates.has(k))) !== JSON.stringify(norm(existing[k], dates.has(k)))) patch[k] = v
+      }
+      if (opts.cacheKey) this.cache.set(opts.cacheKey, existing.id as number)
+      if (Object.keys(patch).length === 0) return { action: 'unchanged', id: existing.id as number }
+      await this.req.payload.update({ collection, id: existing.id as number, data: patch as never, depth: 0, overrideAccess: true /* SYSTEM-WRITE: go-live import */, req: this.req })
+      return { action: 'updated', id: existing.id as number }
+    } finally {
+      if (opts.context) for (const k of Object.keys(opts.context)) delete this.req.context[k]
+    }
+  }
+}
+
+function tally(rep: MasterReport, a: Action | 'skipped') {
+  rep[a === 'skipped' ? 'skipped' : a]++
+}
+
+async function atRow<T>(sheet: string, row: number | undefined, fn: () => Promise<T>): Promise<T> {
+  try {
+    return await fn()
+  } catch (e) {
+    if (e instanceof RowError) throw e
+    throw new RowError(sheet, row, errorText(e))
+  }
+}
+
+// ------------------------------------------------------------------ masters (dependency order)
+
+type MasterFn = (x: Exec, rep: MasterReport, issues: Issue[]) => Promise<void>
+
+const MASTERS: Array<{ key: SheetKey; rows: (d: ImportData) => number; run: MasterFn }> = [
+  {
+    key: 'bank',
+    rows: (d) => d.banks.length,
+    run: async (x, rep) => {
+      for (const b of x.data.banks) tally(rep, (await atRow(rep.sheet, b._row, () => x.upsert('banks', { code: { equals: b.code } }, { code: b.code, name: b.name }, { cacheKey: `banks:code:${b.code}` }))).action)
+    },
+  },
+  {
+    key: 'satuan',
+    rows: (d) => d.uoms.length,
+    run: async (x, rep) => {
+      for (const u of x.data.uoms) {
+        tally(rep, (await atRow(rep.sheet, u._row, () => x.upsert('uoms', { code: { equals: u.code } }, { code: u.code, name: u.name, category: u.category }, { cacheKey: `uoms:code:${u.code}` }))).action)
+      }
+    },
+  },
+  {
+    key: 'kategori',
+    rows: (d) => d.categories.length,
+    run: async (x, rep) => {
+      for (const c of x.data.categories) {
+        const r = await atRow(rep.sheet, c._row, async () => {
+          const allowed: number[] = []
+          for (const u of c.allowedUoms) allowed.push((await x.idOf('uoms', 'code', u))!)
+          return x.upsert(
+            'expense-categories',
+            { code: { equals: c.code } },
+            { code: c.code, name: c.name, coaCode: c.coaCode, defaultUom: await x.idOf('uoms', 'code', c.defaultUom), allowedUoms: allowed, requiresVehicle: c.requiresVehicle, active: c.active },
+            { cacheKey: `expense-categories:code:${c.code}` },
+          )
+        })
+        tally(rep, r.action)
+      }
+    },
+  },
+  {
+    key: 'karyawan',
+    rows: (d) => d.employees.length,
+    run: async (x, rep) => {
+      for (const e of x.data.employees) {
+        const r = await atRow(rep.sheet, e._row, () =>
+          x.upsert('employees', { code: { equals: e.code } }, { code: e.code, name: e.name, nickname: e.nickname, position: e.position, phone: e.phone, active: e.active }, { cacheKey: `employees:code:${e.code}` }),
+        )
+        tally(rep, r.action)
+      }
+    },
+  },
+  {
+    key: 'pengguna',
+    rows: (d) => d.users.length,
+    run: async (x, rep) => {
+      for (const u of x.data.users) {
+        const plan = x.users.get(u.username)!
+        if (plan.action === 'pending') {
+          tally(rep, 'skipped')
+          continue
+        }
+        const r = await atRow(rep.sheet, u._row, async () => {
+          const data: Record<string, unknown> = { name: u.name, roles: u.roles, employee: await x.idOf('employees', 'code', u.employeeCode), phone: u.phone, active: u.active }
+          const where: Where = plan.sub ? { keycloakSub: { equals: plan.sub } } : { email: { equals: plan.email } }
+          const existing = await x.findOne('users', where)
+          const wasActive = existing ? existing.active !== false : null
+          if (wasActive !== false && !u.active) x.kcFollowUp.push({ username: u.username, email: plan.email, keycloakSub: (existing?.keycloakSub as string | null | undefined) ?? plan.sub, action: 'disable_logout' })
+          if (wasActive === false && u.active) x.kcFollowUp.push({ username: u.username, email: plan.email, keycloakSub: (existing?.keycloakSub as string | null | undefined) ?? plan.sub, action: 'enable' })
+          // never replace a real email by the placeholder of an email-less row
+          const email = effectiveEmail(u)
+          if (!existing || !isPlaceholderEmail(email) || isPlaceholderEmail(String(existing.email ?? ''))) data.email = email
+          const res = await x.upsert('users', where, data, { createOnly: { keycloakSub: plan.sub }, context: { skipKeycloakSync: true } })
+          x.cache.set(`users:email:${plan.email}`, res.id)
+          return res
+        })
+        tally(rep, r.action)
+      }
+    },
+  },
+  {
+    key: 'rekening',
+    rows: (d) => d.bankAccounts.length,
+    run: async (x, rep) => {
+      for (const a of x.data.bankAccounts) {
+        const r = await atRow(rep.sheet, a._row, async () => {
+          const bank = await x.idOf('banks', 'code', a.bankCode)
+          const employee = await x.idOf('employees', 'code', a.employeeCode)
+          const where: Where = { and: [{ bank: { equals: bank } }, { accountNo: { equals: a.accountNo } }] }
+          const existing = await x.findOne('employee-bank-accounts', where)
+          if (existing && existing.employee !== employee) throw new Error(`Rekening ${a.bankCode} ${a.accountNo} sudah terdaftar untuk karyawan lain di ProyekKas.`)
+          return x.upsert(
+            'employee-bank-accounts',
+            where,
+            { employee, bank, accountNo: a.accountNo, accountHolder: a.accountHolder, isDefault: a.isDefault, active: a.active },
+            { createOnly: { verificationStatus: 'unverified' } },
+          )
+        })
+        tally(rep, r.action)
+      }
+    },
+  },
+  {
+    key: 'pusatBiaya',
+    rows: (d) => d.costCenters.length,
+    run: async (x, rep) => {
+      for (const c of x.data.costCenters) {
+        const r = await atRow(rep.sheet, c._row, async () =>
+          x.upsert(
+            'cost-centers',
+            { code: { equals: c.code } },
+            { code: c.code, name: c.name, type: c.type, manager: await x.userId(c.manager), lat: c.lat, lng: c.lng, radiusM: c.radiusM, active: c.active },
+            { cacheKey: `cost-centers:code:${c.code}` },
+          ),
+        )
+        tally(rep, r.action)
+      }
+    },
+  },
+  {
+    key: 'project',
+    rows: (d) => d.projects.length,
+    run: async (x, rep) => {
+      for (const p of x.data.projects) {
+        const r = await atRow(rep.sheet, p._row, async () => {
+          let client: number | null = null
+          if (p.client) {
+            const found = await x.findOne('clients', { name: { equals: p.client } })
+            client = found ? (found.id as number) : ((await x.req.payload.create({ collection: 'clients', data: { name: p.client, active: true }, depth: 0, overrideAccess: true /* SYSTEM-WRITE: go-live import */, req: x.req })).id as number)
+          }
+          const lines = x.data.budgetLines.filter((b) => b.projectCode === p.code)
+          const budget = p.budget ?? (lines.length > 0 ? lines.reduce((s, b) => s + b.amount, 0) : undefined)
+          return x.upsert(
+            'projects',
+            { code: { equals: p.code } },
+            {
+              code: p.code,
+              name: p.name,
+              client,
+              address: p.address,
+              pm: await x.userId(p.pm),
+              lat: p.lat,
+              lng: p.lng,
+              radiusM: p.radiusM,
+              budget,
+              startDate: dateValue(p.startDate),
+              targetDate: dateValue(p.targetDate),
+              status: p.status,
+            },
+            { dates: ['startDate', 'targetDate'], cacheKey: `projects:code:${p.code}` },
+          )
+        })
+        tally(rep, r.action)
+      }
+    },
+  },
+  {
+    key: 'tahapan',
+    rows: (d) => d.stages.length,
+    run: async (x, rep, issues) => {
+      const byProject = new Map<string, ImportData['stages']>()
+      for (const s of x.data.stages) byProject.set(s.projectCode, [...(byProject.get(s.projectCode) ?? []), s])
+      for (const [code, stages] of byProject) {
+        const first = stages[0]!._row
+        const projectId = (await atRow(rep.sheet, first, () => x.idOf('projects', 'code', code)))!
+        x.req.context[CTX_STAGE_EDITOR] = true // whole set validated (Σ = 100 %) by the parser, G11
+        try {
+          const existing = await projectStages(x.req, projectId)
+          let changed = false
+          const seen = new Set<number>()
+          for (const s of [...stages].sort((a, b) => a.sequence - b.sequence)) {
+            const cur = existing.find((e) => e.sequence === s.sequence && !seen.has(e.id))
+            const r = await atRow(rep.sheet, s._row, async () => {
+              if (!cur) {
+                const doc = await x.req.payload.create({ collection: 'project-stages', data: { project: projectId, name: s.name, weightPct: s.weightPct, sequence: s.sequence, active: true } as never, depth: 0, overrideAccess: true /* SYSTEM-WRITE: go-live import */, req: x.req })
+                seen.add(doc.id as number)
+                return 'created' as const
+              }
+              seen.add(cur.id)
+              if (cur.name === s.name && Math.round(cur.weightPct * 100) === Math.round(s.weightPct * 100) && cur.active) return 'unchanged' as const
+              await x.req.payload.update({ collection: 'project-stages', id: cur.id, data: { name: s.name, weightPct: s.weightPct, active: true } as never, depth: 0, overrideAccess: true /* SYSTEM-WRITE: go-live import */, req: x.req })
+              return 'updated' as const
+            })
+            if (r !== 'unchanged') changed = true
+            tally(rep, r)
+          }
+          for (const e of existing.filter((e) => e.active && !seen.has(e.id))) {
+            await atRow(rep.sheet, first, () => x.req.payload.update({ collection: 'project-stages', id: e.id, data: { active: false } as never, depth: 0, overrideAccess: true /* SYSTEM-WRITE: go-live import */, req: x.req }))
+            issues.push({ level: 'warning', sheet: rep.sheet, row: first, message: `Tahapan lama "${e.name}" (urutan ${e.sequence}) project ${code} tidak ada di file → dinonaktifkan.` })
+            changed = true
+          }
+          if (changed) await atRow(rep.sheet, first, () => recalcProjectProgress(x.req, projectId))
+        } finally {
+          delete x.req.context[CTX_STAGE_EDITOR]
+        }
+      }
+    },
+  },
+  {
+    key: 'rab',
+    rows: (d) => d.budgetLines.length,
+    run: async (x, rep) => {
+      for (const b of x.data.budgetLines) {
+        const r = await atRow(rep.sheet, b._row, async () => {
+          const project = await x.idOf('projects', 'code', b.projectCode)
+          const category = await x.idOf('expense-categories', 'code', b.categoryCode)
+          return x.upsert('budget-lines', { and: [{ project: { equals: project } }, { category: { equals: category } }] }, { amount: b.amount }, { createOnly: { project, category } })
+        })
+        tally(rep, r.action)
+      }
+    },
+  },
+  {
+    key: 'kendaraan',
+    rows: (d) => d.vehicles.length,
+    run: async (x, rep) => {
+      for (const v of x.data.vehicles) {
+        const r = await atRow(rep.sheet, v._row, async () =>
+          x.upsert(
+            'vehicles',
+            { plateNo: { equals: v.plateNo } },
+            { plateNo: v.plateNo, type: v.type, brandModel: v.brandModel, costCenter: await x.idOf('cost-centers', 'code', v.costCenterCode), project: await x.idOf('projects', 'code', v.projectCode), active: v.active },
+          ),
+        )
+        tally(rep, r.action)
+      }
+    },
+  },
+  {
+    key: 'penugasan',
+    rows: (d) => d.assignments.length,
+    run: async (x, rep) => {
+      for (const a of x.data.assignments) {
+        const r = await atRow(rep.sheet, a._row, async () => {
+          const employee = await x.idOf('employees', 'code', a.employeeCode)
+          const project = await x.idOf('projects', 'code', a.projectCode)
+          const costCenter = await x.idOf('cost-centers', 'code', a.costCenterCode)
+          const where: Where = { and: [{ employee: { equals: employee } }, project ? { project: { equals: project } } : { costCenter: { equals: costCenter } }] }
+          return x.upsert(
+            'team-assignments',
+            where,
+            { roleInProject: a.role, startDate: dateValue(a.startDate), endDate: dateValue(a.endDate) },
+            { createOnly: { employee, project, costCenter }, dates: ['startDate', 'endDate'] },
+          )
+        })
+        tally(rep, r.action)
+      }
+    },
+  },
+  {
+    key: 'akunKas',
+    rows: (d) => d.cashAccounts.length,
+    run: async (x, rep) => {
+      for (const a of x.data.cashAccounts) {
+        const r = await atRow(rep.sheet, a._row, async () =>
+          x.upsert('cash-accounts', { name: { equals: a.name } }, {
+            name: a.name,
+            kind: a.kind,
+            bank: await x.idOf('banks', 'code', a.bankCode),
+            accountNo: a.accountNo,
+            accountHolder: a.accountHolder,
+            openingBalance: a.openingBalance,
+            openingBalanceDate: x.data.settings!.goLiveDate,
+            odooJournalCode: a.odooJournalCode,
+            active: a.active,
+          }),
+        )
+        tally(rep, r.action)
+      }
+    },
+  },
+]
+
+// ------------------------------------------------------------------ cut-over
+
+export function previousPeriod(date: string): string {
+  const [y, m] = date.split('-').map(Number) as [number, number]
+  return m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, '0')}`
+}
+
+async function runCutover(x: Exec, rep: MasterReport, issues: Issue[], reason: string): Promise<CutoverReport> {
+  const s = x.data.settings!
+  const req = x.req
+  const tx = await getRequestTx(req)
+  const sheet = SHEET_BY_KEY.pengaturan.name
+  // (1) PB sequence: startAt (Q-17) — used when the counter row does not exist yet
+  const { startAt: _default, ...dflt } = DEFAULT_SEQUENCES.find((d) => d.docType === 'expense_request')!
+  const seq = await atRow(sheet, undefined, () =>
+    x.upsert('document-sequences', { docType: { equals: 'expense_request' } }, { startAt: s.pbStartAt, active: true }, { createOnly: { ...dflt, timezone: 'Asia/Makassar' } }),
+  )
+  tally(rep, seq.action)
+  const cfg = (await x.findOne('document-sequences', { id: { equals: seq.id } }))!
+  const key = periodKey(cfg.resetPolicy as ResetPolicy, parseBusinessDate(s.goLiveDate))
+  const cur = (await tx.execute(sql`SELECT next_value::int AS n FROM document_sequence_counters WHERE doc_type = 'expense_request' AND period_key = ${key}`)) as unknown as { rows: Array<{ n: number }> }
+  const before = cur.rows[0]?.n ?? null
+  let after = before
+  if (before !== null && before < s.pbStartAt) {
+    // only upward (DB trigger pk_counter_monotonic) — "set next value" of ADR 0007 §1, audited
+    await tx.execute(sql`UPDATE document_sequence_counters SET next_value = ${s.pbStartAt} WHERE doc_type = 'expense_request' AND period_key = ${key}`)
+    await writeAudit(req, [{ action: 'update', docType: 'document_sequence', docId: String(seq.id), field: 'nextValue', oldValue: before, newValue: s.pbStartAt, reason }])
+    after = s.pbStartAt
+    rep.updated++
+  } else if (before !== null && before > s.pbStartAt) {
+    issues.push({ level: 'warning', sheet, message: `Nomor PB sudah berjalan: nomor berikutnya ${before} (> ${s.pbStartAt}); counter tidak diubah (nomor tidak pernah mundur).` })
+  }
+  const settings = (await req.payload.findGlobal({ slug: 'company-settings', depth: 0, overrideAccess: true /* SYSTEM-READ: company code */, req })) as { shortCode?: string | null }
+  const firstPbNumber = formatDocNo(
+    { pattern: String(cfg.pattern), padding: Number(cfg.padding ?? 0), docCode: (cfg.docCode as string) ?? undefined },
+    Math.max(after ?? s.pbStartAt, s.pbStartAt),
+    parseBusinessDate(s.goLiveDate),
+    settings.shortCode || 'DRMS',
+  )
+
+  // (2) period before go-live closed (ADR 0005 §6) — the go-live month stays open
+  let closedPeriod: string | null = null
+  let closeNote = 'tidak diminta (tutup_periode_sebelum_golive = Tidak)'
+  if (s.closePrevPeriod) {
+    const period = previousPeriod(s.goLiveDate)
+    const rows = await req.payload.find({ collection: 'period-closings', where: { period: { equals: period } }, depth: 0, pagination: false, overrideAccess: true /* SYSTEM-READ: cut-over */, req })
+    const lock = (await tx.execute(sql`SELECT pk_cash_lock_date()::text AS d`)) as unknown as { rows: Array<{ d: string | null }> }
+    const lockDate = lock.rows[0]?.d ?? null
+    if (rows.docs.some((d) => (d as { status?: string }).status === 'closed')) closeNote = `periode ${period} sudah ditutup`
+    else if (rows.docs.length > 0) {
+      closeNote = `periode ${period} pernah dibuka kembali — tidak ditutup otomatis`
+      issues.push({ level: 'warning', sheet, message: `Periode ${period} berstatus dibuka kembali; tutup manual bila memang perlu.` })
+    } else if (lockDate && lockDate >= periodEnd(period)) closeNote = `sudah terkunci s/d ${lockDate}`
+    else {
+      const doc = await atRow(sheet, undefined, () =>
+        req.payload.create({ collection: 'period-closings', data: { period, status: 'closed', note: `Cut-over go-live ${s.goLiveDate} (impor data)` } as never, depth: 0, overrideAccess: true /* SYSTEM-WRITE: cut-over period close */, req }),
+      )
+      await writeAudit(req, [{ action: 'period_close', docType: 'period_closing', docId: String(doc.id), docNo: period, field: 'period', newValue: { period, lockDate: periodEnd(period) }, reason }])
+      closedPeriod = period
+      closeNote = `periode ${period} ditutup`
+      rep.created++
+    }
+  }
+  return { goLiveDate: s.goLiveDate, pbStartAt: s.pbStartAt, pbCounterBefore: before, pbCounterAfter: after, firstPbNumber, closedPeriod, closeNote }
+}
+
+// ------------------------------------------------------------------ orchestration
+
+function keycloakUsers(data: ImportData, users: Map<string, UserPlan>): KeycloakUserRow[] {
+  return data.users
+    .filter((u) => users.get(u.username)?.action === 'pending')
+    .map((u) => ({ username: u.username, email: u.email ?? '', firstName: u.name, enabled: u.active, realmRoles: u.roles, employeeCode: u.employeeCode ?? '' }))
+}
+
+type PassResult = { masters: MasterReport[]; cutover: CutoverReport | null; issues: Issue[]; kcFollowUp: KeycloakFollowUpRow[] }
+
+async function executePass(payload: Payload, data: ImportData, users: Map<string, UserPlan>, opts: { dryRun: boolean; reason: string; runId: string; fileName: string; sha256: string }): Promise<PassResult> {
+  const context = { auditSource: 'system', auditReason: opts.reason }
+  const masters: MasterReport[] = []
+  const issues: Issue[] = []
+  const kcFollowUp: KeycloakFollowUpRow[] = []
+  let cutover: CutoverReport | null = null
+  const steps: Array<{ key: SheetKey | 'cutover'; sheet: string; rows: number; run: (x: Exec, rep: MasterReport) => Promise<void> }> = [
+    ...MASTERS.filter((m) => data.present.includes(m.key)).map((m) => ({ key: m.key, sheet: SHEET_BY_KEY[m.key].name, rows: m.rows(data), run: (x: Exec, rep: MasterReport) => m.run(x, rep, issues) })),
+    {
+      key: 'cutover' as const,
+      sheet: SHEET_BY_KEY.pengaturan.name,
+      rows: 0,
+      run: async (x: Exec, rep: MasterReport) => {
+        cutover = await runCutover(x, rep, issues, opts.reason)
+      },
+    },
+  ]
+  const audit = async (req: PayloadRequest, rep: MasterReport) => {
+    if (rep.created + rep.updated === 0) return
+    await writeAudit(req, [
+      { action: 'import', docType: 'import', docId: opts.runId, docNo: opts.fileName.slice(0, 120), field: rep.sheet, newValue: { rows: rep.rows, created: rep.created, updated: rep.updated, unchanged: rep.unchanged, skipped: rep.skipped, sha256: opts.sha256 }, reason: opts.reason },
+    ])
+  }
+  const summary = async (req: PayloadRequest) =>
+    writeAudit(req, [
+      {
+        action: 'import',
+        docType: 'import',
+        docId: opts.runId,
+        docNo: opts.fileName.slice(0, 120),
+        field: 'selesai',
+        newValue: { sha256: opts.sha256, masters: masters.map((m) => ({ sheet: m.sheet, created: m.created, updated: m.updated, unchanged: m.unchanged, skipped: m.skipped })), cutover },
+        reason: opts.reason,
+      },
+    ])
+
+  if (opts.dryRun) {
+    try {
+      await withSystemTransaction(
+        payload,
+        null,
+        async (req) => {
+          const x = new Exec(req, data, users)
+          for (const st of steps) {
+            const rep: MasterReport = { key: st.key, sheet: st.sheet, rows: st.rows, created: 0, updated: 0, unchanged: 0, skipped: 0 }
+            await st.run(x, rep)
+            masters.push(rep)
+          }
+          kcFollowUp.push(...x.kcFollowUp)
+          throw new DryRunRollback()
+        },
+        context,
+      )
+    } catch (e) {
+      if (!(e instanceof DryRunRollback)) throw e
+    }
+    return { masters, cutover, issues, kcFollowUp }
+  }
+  // commit: one transaction per master, in dependency order (a later failure keeps earlier masters;
+  // re-running the fixed file is idempotent)
+  const cache = new Map<string, number>()
+  for (const st of steps) {
+    const rep: MasterReport = { key: st.key, sheet: st.sheet, rows: st.rows, created: 0, updated: 0, unchanged: 0, skipped: 0 }
+    let stepFollowUp: KeycloakFollowUpRow[] = []
+    await withSystemTransaction(
+      payload,
+      null,
+      async (req) => {
+        const x = new Exec(req, data, users)
+        for (const [k, v] of cache) x.cache.set(k, v)
+        await st.run(x, rep)
+        await audit(req, rep)
+        if (st.key === 'cutover') {
+          masters.push(rep)
+          await summary(req)
+        }
+        for (const [k, v] of x.cache) cache.set(k, v)
+        stepFollowUp = x.kcFollowUp
+      },
+      context,
+    )
+    // only what was committed (a failed master rolls back its (de)activations too)
+    kcFollowUp.push(...stepFollowUp)
+    if (st.key !== 'cutover') masters.push(rep)
+  }
+  return { masters, cutover, issues, kcFollowUp }
+}
+
+export async function runImport(payload: Payload, input: ImportInput): Promise<ImportReport> {
+  const startedAt = (input.now ?? new Date()).toISOString()
+  const sha256 = createHash('sha256').update(input.bytes).digest('hex')
+  const runId = randomUUID()
+  const reason = `Impor data go-live ${input.fileName} (sha256 ${sha256.slice(0, 12)})${input.operator ? ` oleh ${input.operator}` : ''}`.slice(0, 1000)
+  const report: ImportReport = { mode: input.mode, runId, file: input.fileName, sha256, startedAt, finishedAt: startedAt, ok: false, committed: false, issues: [], masters: [], cutover: null, keycloakUsers: [], keycloakFollowUp: [] }
+  const done = () => {
+    report.finishedAt = new Date().toISOString()
+    report.ok = !hasErrors(report.issues)
+    return report
+  }
+
+  let parsed
+  try {
+    parsed = parseWorkbook(readXlsx(input.bytes))
+  } catch (e) {
+    if (!(e instanceof XlsxError)) throw e
+    report.issues.push({ level: 'error', sheet: '(file)', message: e.message })
+    return done()
+  }
+  report.issues.push(...parsed.issues)
+  const data = parsed.data
+  const resolved = resolveReferences(data, await loadDbKeys(payload), input.kcMap ?? new Map())
+  report.issues.push(...resolved.issues)
+  report.keycloakUsers = keycloakUsers(data, resolved.users)
+  if (hasErrors(report.issues) || !data.settings) return done()
+
+  const passOpts = { reason, runId, fileName: input.fileName, sha256 }
+  try {
+    const check = await executePass(payload, data, resolved.users, { ...passOpts, dryRun: true })
+    report.masters = check.masters
+    report.cutover = check.cutover
+    report.issues.push(...check.issues)
+    report.keycloakFollowUp = check.kcFollowUp
+  } catch (e) {
+    if (!(e instanceof RowError)) throw e
+    report.issues.push({ level: 'error', sheet: e.sheet, row: e.row, message: e.message })
+    return done()
+  }
+  if (input.mode === 'dry-run') return done()
+
+  // commit: the validation pass succeeded; now for real (warnings of the pass are already reported)
+  try {
+    const real = await executePass(payload, data, resolved.users, { ...passOpts, dryRun: false })
+    report.masters = real.masters
+    report.cutover = real.cutover
+    report.keycloakFollowUp = real.kcFollowUp
+    report.committed = true
+  } catch (e) {
+    if (!(e instanceof RowError)) throw e
+    report.issues.push({ level: 'error', sheet: e.sheet, row: e.row, message: `COMMIT BERHENTI (master sebelumnya sudah tersimpan; perbaiki lalu jalankan ulang): ${e.message}` })
+  }
+  return done()
+}

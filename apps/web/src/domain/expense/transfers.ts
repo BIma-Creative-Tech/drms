@@ -1,9 +1,11 @@
+import { sql } from '@payloadcms/db-postgres'
 import type { PayloadRequest } from 'payload'
 
 import { relId, userId } from '@/access/roles'
 import { assertAccount, currentLockDate, postEntry, voidEntry } from '@/domain/cash/ledger'
 import { allocateDocNo } from '@/domain/numbering-db'
 import { parseBusinessDate } from '@/domain/numbering'
+import { getRequestTx } from '@/lib/tx'
 
 import { actorContext, fail, loadRaw, loadVisible, requireAction, today, updateRequest } from './common'
 import { claimMedia, recomputeFlags } from './receipts'
@@ -121,4 +123,23 @@ export async function voidTransfer(req: PayloadRequest, id: number, transferId: 
   const back = doc.type === 'advance' ? 'approved' : 'receipts_verified'
   const updated = await updateRequest(req, id, { status: back, transferredTotal: Math.max(0, (doc.transferredTotal ?? 0) - t.amount) }, reason)
   return { transfer, reversal: voided?.reversal ?? null, request: updated }
+}
+
+/**
+ * ADR 0013 O-2 (S3e, S-29): requests among `requestIds` whose CURRENT approval cycle the caller
+ * approved (Finance "Approval" decision). Approve and transfer by the same Finance user stay allowed
+ * (small team, audited); the transfer screen shows "Anda juga yang menyetujui" as a warning.
+ */
+export async function approvedByCaller(req: PayloadRequest, requestIds: number[]): Promise<Set<number>> {
+  const uid = userId(req)
+  const list = requestIds.filter((x) => Number.isSafeInteger(x) && x > 0)
+  if (uid === undefined || list.length === 0) return new Set()
+  const tx = await getRequestTx(req)
+  const r = (await tx.execute(sql`
+    SELECT DISTINCT a.request_id AS id FROM approvals a JOIN expense_requests er ON er.id = a.request_id
+     WHERE a.request_id IN (${sql.join(
+       list.map((i) => sql`${i}`),
+       sql`, `,
+     )}) AND a.actor_id = ${uid} AND a.decision = 'approved' AND a.cycle = er.approval_cycle`)) as unknown as { rows: Array<{ id: number }> }
+  return new Set(r.rows.map((x) => Number(x.id)))
 }

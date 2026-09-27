@@ -76,7 +76,8 @@ export const VEHICLES = [{ plateNo: 'DA 1234 XY', type: 'Hilux', costCenter: 'OP
 
 /**
  * People on the client form (Diajukan Oleh "Budi, Doni" · Dibuat Oleh "Citra" · Diketahui Oleh
- * "Budi Hartono" · Approval "sari"). Whether "Budi" and "Budi Hartono" are the same
+ * "Budi Hartono" · Approval "sari"). Under ADR 0013 the "Diketahui Oleh" person is a Direktur and
+ * the "Approval" person is Finance (roles are given to user accounts, not to these employees). Whether "Budi" and "Budi Hartono" are the same
  * person is open (Q-08) → two records as listed in phase-plan F1 item 6; Admin can merge.
  */
 export const EMPLOYEES = [
@@ -92,40 +93,67 @@ export const EMPLOYEE_BANK_ACCOUNTS = [
   { employee: 'EMP-002', bank: 'MANDIRI', accountNo: '1234567890123', accountHolder: 'Doni Pratama', isDefault: true },
 ]
 
-/** US-34 defaults (see seed.ts): Owner-only for every amount + an inactive two-level example. */
+/**
+ * US-34 defaults (see seed.ts), ADR 0013 (E1, GATE 1 G1-2): "Diketahui" = approval by the Direktur
+ * (role `pk-owner`), then Finance approves — for every amount (no threshold yet, Q-31) + an inactive
+ * example with a threshold of the same shape. Existing databases get the same content through the
+ * data migration `20260926_*_e1_approval_direktur_finance` (renamed from the pre-E1 names below).
+ */
+/** Name of the seeded default addendum rule (shared with the E5 migration). */
+export const ADDENDUM_DEFAULT_RULE_NAME = 'Default Addendum RAB — Direktur lalu Finance'
+
 export const DEFAULT_APPROVAL_RULES = [
   {
-    name: 'Default — Owner (semua nominal)',
+    name: 'Default — Direktur lalu Finance (semua nominal)',
     docType: 'expense_request',
     requestType: 'any',
     minAmount: 0,
     maxAmount: null,
     priority: 100,
     acknowledge: 'required',
-    acknowledgeBy: 'scope_manager',
+    acknowledgeBy: 'role',
+    acknowledgeRole: 'pk-owner',
     signDiajukan: 'required',
     signDibuat: 'required',
-    steps: [{ level: 1, approverRole: 'pk-owner' }],
+    steps: [{ level: 1, approverRole: 'pk-finance' }],
     active: true,
   },
   {
-    name: 'Contoh — di atas Rp 10 juta: 2 approver (Q-31, nonaktif)',
+    name: 'Contoh — di atas Rp 10 juta: Direktur lalu Finance (Q-31, nonaktif)',
     docType: 'expense_request',
     requestType: 'any',
     minAmount: 10_000_001,
     maxAmount: null,
     priority: 50,
     acknowledge: 'required',
-    acknowledgeBy: 'scope_manager',
+    acknowledgeBy: 'role',
+    acknowledgeRole: 'pk-owner',
     signDiajukan: 'required',
     signDibuat: 'required',
-    steps: [
-      { level: 1, approverRole: 'pk-owner' },
-      { level: 2, approverRole: 'pk-owner' },
-    ],
+    steps: [{ level: 1, approverRole: 'pk-finance' }],
     active: false,
   },
+  // E5 (T12, US-30): Addendum RAB through the same engine — Direktur ("Diketahui" = approval) then
+  // Finance (Sprint S2 decision on ADR 0013 O-3). Also inserted by migration e5_budget_addenda.
+  {
+    name: ADDENDUM_DEFAULT_RULE_NAME,
+    docType: 'budget_addendum',
+    requestType: 'any',
+    minAmount: 0,
+    maxAmount: null,
+    priority: 100,
+    acknowledge: 'required',
+    acknowledgeBy: 'role',
+    acknowledgeRole: 'pk-owner',
+    signDiajukan: 'none',
+    signDibuat: 'none',
+    steps: [{ level: 1, approverRole: 'pk-finance' }],
+    active: true,
+  },
 ] as const
+
+/** Names of the two seeded rules before ADR 0013 (renamed by the E1 data migration). */
+export const PRE_E1_APPROVAL_RULE_NAMES = ['Default — Owner (semua nominal)', 'Contoh — di atas Rp 10 juta: 2 approver (Q-31, nonaktif)'] as const
 
 export const DEFAULT_SEED_DATA = {
   company: COMPANY,

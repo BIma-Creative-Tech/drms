@@ -8,7 +8,7 @@ import { getRequestTx } from '@/lib/tx'
 import { actorContext, fail, ids, loadRaw, loadVisible, requireAction, requireActionAudited, settings, today, updateRequest, type RequestDoc } from './common'
 import { computeFlags, normalizeReceiptNo, normalizeVendor, type DuplicateHit, type FlagCategory, type FlagSpec } from './flags'
 import { grandTotal } from './lines'
-import { selectAndSnapshot, writeSnapshot } from './snapshot'
+import { auditSkipped, selectAndSnapshot, writeSnapshot } from './snapshot'
 import { isBusinessDate, INACTIVE_FOR_DUPLICATES } from './types'
 
 export type ReceiptInput = {
@@ -104,7 +104,7 @@ function validateReceipt(input: Partial<ReceiptInput>, forCreate: boolean) {
 }
 
 /** POST /expense-requests/{id}/receipts (US-07, US-38). */
-export async function addReceipt(req: PayloadRequest, requestId: number, input: ReceiptInput) {
+export async function addReceipt(req: PayloadRequest, requestId: number, input: ReceiptInput, opts: { clientUuid?: string } = {}) {
   const doc = await loadVisible(req, requestId, { lock: true })
   requireAction(await actorContext(req, doc), 'add_receipt')
   validateReceipt(input, true)
@@ -130,6 +130,7 @@ export async function addReceipt(req: PayloadRequest, requestId: number, input: 
       status: 'pending',
       entrySource: 'manual',
       createdBy: userId(req),
+      clientUuid: opts.clientUuid ?? null, // F4: APK offline id (sync batch)
     } as never,
     depth: 0,
     overrideAccess: true, // SYSTEM-WRITE: receipt after add_receipt guard (DB: editable window)
@@ -246,8 +247,9 @@ export async function rejectReceipt(req: PayloadRequest, requestId: number, rece
 
 /**
  * POST …/receipts-resubmit (Reimburse, "Revisi Nota" → back): every line needs an active receipt;
- * grand total unchanged → "Disetujui"; changed → re-approval ("Menunggu Approval", new cycle, rule
- * re-evaluated for the new amount) — requirements §7 T1 Reimburse branch [Usulan], Q-12 default.
+ * grand total unchanged → "Disetujui"; changed → re-approval (new cycle, rule re-evaluated for the new
+ * amount; "Menunggu Diketahui" when the rule requires the Direktur, else "Menunggu Approval") —
+ * requirements §7 T1 Reimburse branch [Usulan], Q-12 default, ADR 0013 §6.
  */
 export async function resubmitReceipts(req: PayloadRequest, requestId: number) {
   const doc = await loadVisible(req, requestId, { lock: true })
@@ -260,13 +262,17 @@ export async function resubmitReceipts(req: PayloadRequest, requestId: number) {
     updated = await updateRequest(req, requestId, { status: 'approved' })
   } else {
     const { rule, snapshot } = await selectAndSnapshot(req, raw)
+    // E1 (ADR 0013 §6): the new amount goes through the WHOLE flow again — "Diketahui" (Direktur
+    // approval) first when the new snapshot requires it, not straight to "Menunggu Approval".
+    const needsAck = snapshot.acknowledge === 'required'
     updated = await updateRequest(req, requestId, {
-      status: 'pending_approval',
+      status: needsAck ? 'pending_ack' : 'pending_approval',
       approvalRule: rule.id,
       approvalSnapshot: snapshot,
       approvalCycle: (raw.approvalCycle ?? 0) + 1,
-      currentLevel: 1,
+      currentLevel: needsAck ? 0 : 1,
     })
+    await auditSkipped(req, updated, snapshot)
   }
   await writeSnapshot(req, updated, 'receipts_resubmit')
   await recomputeFlags(req, requestId)
@@ -283,6 +289,59 @@ export async function assertEveryLineHasReceipt(req: PayloadRequest, doc: Reques
       missing.map(({ i }) => ({ path: `lines.${i}`, message: 'Belum ada nota.' })),
     )
   }
+}
+
+/**
+ * US-06 (S3e, S-26): "Ajukan ulang" copies the ACTIVE receipts (pending/valid, not rejected/removed) of
+ * the rejected request to the new draft — same photo (the media row stays owned by the old request;
+ * its readers are the same people), line mapped by position (the clone keeps the line order), status
+ * back to "belum diverifikasi". Rejected/removed receipts are not copied. Flags are recomputed for the
+ * draft; the old request is rejected, so it never counts as a duplicate (INACTIVE_FOR_DUPLICATES).
+ * Returns the number of copied receipts.
+ */
+export async function copyReceiptsForResubmit(req: PayloadRequest, fromId: number, to: RequestDoc): Promise<number> {
+  const src = await loadRaw(req, fromId)
+  const oldLines = (src.lines ?? []).map((l) => l.id)
+  const newLines = (to.lines ?? []).map((l) => l.id)
+  const receipts = await receiptsOf(req, fromId, true)
+  let copied = 0
+  for (const r of receipts) {
+    const idx = oldLines.indexOf(r.lineId)
+    const lineId = idx >= 0 ? newLines[idx] : undefined
+    if (!lineId) continue
+    const full = r as ReceiptDoc & Record<string, unknown>
+    await req.payload.create({
+      collection: 'receipts',
+      data: {
+        request: to.id,
+        lineId,
+        lineNo: idx + 1,
+        receiptNo: r.receiptNo ?? null,
+        receiptNoNorm: normalizeReceiptNo(r.receiptNo),
+        vendor: relId(full.vendor) ?? null,
+        vendorName: r.vendorName,
+        vendorNorm: normalizeVendor(r.vendorName),
+        receiptDate: r.receiptDate,
+        receiptTime: (full.receiptTime as string | null | undefined) ?? null,
+        amount: r.amount,
+        taxAmount: (full.taxAmount as number | null | undefined) ?? null,
+        image: relId(r.image),
+        imageSha256: r.imageSha256 ?? null,
+        status: 'pending',
+        entrySource: (full.entrySource as string | undefined) ?? 'manual',
+        createdBy: userId(req),
+      } as never,
+      depth: 0,
+      overrideAccess: true, // SYSTEM-WRITE: copy after the resubmit guard (DB: draft accepts receipts)
+      req,
+    })
+    copied++
+  }
+  if (copied > 0) {
+    await recomputeFlags(req, to.id)
+    await writeAudit(req, [{ action: 'create', docType: 'expense_request', docId: String(to.id), field: 'receipts', newValue: { copiedFrom: fromId, count: copied }, reason: 'ajukan ulang: nota disalin (US-06)' }])
+  }
+  return copied
 }
 
 /** US-39: all receipts valid + all open warnings reviewed → "Nota Terverifikasi (Antri Transfer)". */

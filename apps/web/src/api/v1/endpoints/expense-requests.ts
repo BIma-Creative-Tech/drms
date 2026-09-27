@@ -11,7 +11,7 @@ import { addReceipt, editReceipt, rejectReceipt, removeReceipt, resubmitReceipts
 import { allowedActions } from '@/domain/expense/state'
 import { recordTransfer, voidTransfer } from '@/domain/expense/transfers'
 import { acknowledge, approve, cancel, complete, reject, submit, withdraw } from '@/domain/expense/workflow'
-import { receiptsComplete, requestLpjRevision, settle, submitLpj, verifyLpj } from '@/domain/expense/lpj'
+import { receiptsComplete, requestLpjRevision, reverseSettlement, settle, submitLpj, verifyLpj } from '@/domain/expense/lpj'
 import { requestHistory } from '@/domain/history'
 import { approvalInbox } from '@/domain/expense/queues'
 
@@ -398,6 +398,26 @@ export const settleEndpoint = v1({
   },
 })
 
+/**
+ * POST /expense-requests/{id}/settle/reverse {reason} — E9: Finance voids the settlement's refund KM
+ * or shortfall transfer (+ KK reversal) → LPJ "Terverifikasi", request "LPJ Terverifikasi" again.
+ * Closed period → 409 (re-open first); not Finance / Finance self-involved → 403 (audited).
+ */
+export const settleReverseEndpoint = v1({
+  path: '/expense-requests/:id/settle/reverse',
+  method: 'post',
+  roles: ['pk-finance'],
+  body: ReasonBody,
+  rateLimit: ACTION_LIMIT,
+  transactional: true,
+  idempotent: true,
+  handler: async ({ req, body, params }) => {
+    const id = idParam(params)
+    const r = await reverseSettlement(req, id, body.reason)
+    return json({ request: await detail(req, id), voided: r.voided })
+  },
+})
+
 // ---------------------------------------------------------------- PDF "Pengajuan Biaya" (M16, US-46)
 
 /**
@@ -417,7 +437,7 @@ export const pdfEndpoint = v1({
     const q = PdfQuery.safeParse(Object.fromEntries(req.searchParams.entries()))
     if (!q.success) throw new HttpError(400, 'Bad Request', { detail: 'variant harus standard atau internal.' })
     const internal = q.data.variant === 'internal'
-    if (internal && !hasRole(req, 'pk-finance', 'pk-owner', 'pk-admin')) throw new HttpError(403, 'Forbidden', { detail: 'Salinan internal hanya untuk Finance/Owner/Admin.' })
+    if (internal && !hasRole(req, 'pk-finance', 'pk-owner', 'pk-admin')) throw new HttpError(403, 'Forbidden', { detail: 'Salinan internal hanya untuk Finance/Direktur/Admin.' })
     const { buildPdfData } = await import('@/pdf/data')
     const data = await withReqTransaction(req, async () => {
       const doc = await loadVisible(req, id)
@@ -485,6 +505,7 @@ export const EXPENSE_ENDPOINTS = [
   lpjRevisionEndpoint,
   lpjVerifyEndpoint,
   settleEndpoint,
+  settleReverseEndpoint,
   pdfEndpoint,
 ]
 

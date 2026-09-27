@@ -59,9 +59,16 @@ export async function LpjVerification(props: AdminViewServerProps) {
           {d.flags.length > 0 ? (
             <ul style={{ margin: '8px 0', paddingLeft: 18, fontSize: 12 }}>
               {d.flags.map((f) => (
-                <li key={f.id}>
-                  <span style={badge(f.level === 'warning' ? 'warn' : 'muted')}>{f.kindLabel}</span> baris {f.lineNo ?? '—'}: {f.message}
-                  {f.status === 'reviewed' ? ' (sudah diperiksa)' : ''}
+                <li key={f.id} data-pk-flag={f.id}>
+                  <span style={badge(f.status === 'reviewed' ? 'muted' : f.level === 'warning' ? 'warn' : 'muted')}>{f.kindLabel}</span> baris {f.lineNo ?? '—'}: {f.message}
+                  {f.status === 'reviewed' ? <em> (sudah diperiksa{f.reviewNote ? `: ${f.reviewNote}` : ''})</em> : null}
+                  {/* S3e (US-21, S-08): Finance marks the flag reviewed (audit flag_reviewed), same endpoint as the Reimburse review. */}
+                  {finance && f.status === 'open' && d.allowedActions.includes('review_flag') ? (
+                    <>
+                      {' '}
+                      <ActionButton url={`${base(d.id)}/flags/${f.id}/review`} label="Tandai flag diperiksa" prompt={{ field: 'note', message: 'Catatan pemeriksaan (opsional):' }} testId="lpj-flag-review" />
+                    </>
+                  ) : null}
                 </li>
               ))}
             </ul>
@@ -121,7 +128,7 @@ export async function LpjVerification(props: AdminViewServerProps) {
                 <ActionButton url={`${base(d.id)}/lpj/verify`} label="Verifikasi LPJ" variant="primary" confirm="Verifikasi LPJ? Total terverifikasi = jumlah nota valid." />
               ) : null}
               {d.allowedActions.includes('lpj_request_revision') ? (
-                <ActionButton url={`${base(d.id)}/lpj/request-revision`} label="Minta revisi" prompt={{ field: 'note', message: 'Catatan revisi untuk pemohon (wajib):' }} />
+                <ActionButton url={`${base(d.id)}/lpj/request-revision`} label="Minta revisi" prompt={{ field: 'note', message: 'Catatan revisi untuk pemohon (wajib, minimal 3 karakter):', minLength: 3 }} />
               ) : null}
             </div>
           ) : null}

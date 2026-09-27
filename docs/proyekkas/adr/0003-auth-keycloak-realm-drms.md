@@ -221,6 +221,18 @@ Verified in `apps/web/src/access/{roles.ts,panel-visibility.ts}`, `src/collectio
   whether we import Keycloak login-failure events into our audit log (`login_failed`) is optional
   (Keycloak event listener config **UNVERIFIED**; propose: poll `GET /admin/realms/{realm}/events` —
   endpoint existence not checked this session → UNVERIFIED).
+- **Decision E9 (2026-09-26, `login_failed`):** the **Keycloak event log is the source of truth** for failed
+  logins (wrong password, unknown user, brute-force lockout — Keycloak `LOGIN_ERROR` events). ProyekKas does **not**
+  import Keycloak events into `audit_logs`: the web never sees a password (Authorization Code + PKCE; the staging APK
+  password grant of ADR 0012 goes to Keycloak directly), polling the Admin events API would need the
+  `view-events` permission for the service account and a new sync job, and the append-only audit log would then
+  mirror an external store. Required on the Keycloak/infra side (realm `drms`/`drms-staging`, infra-engineer):
+  user events **enabled** with `LOGIN_ERROR` saved, expiration ≥ 90 days, and the Keycloak container log shipped to
+  Loki (already the platform pattern) — to be verified in E10. What ProyekKas records itself as `login_failed`
+  (`docType web_session`, `field oidc_callback`, source `web`, client IP): a login that returned from Keycloak but
+  was refused by the app — OIDC callback failure (state/nonce/PKCE/code exchange) or an account unknown/inactive in
+  ProyekKas (with the Keycloak `sub`); only with a login-transaction cookie present and throttled to 30/min per IP
+  (`src/auth/sessions.ts` `auditLoginFailed`). Tested in `tests/integration/e9-hardening.int.test.ts`.
 
 ## Alternatives
 
@@ -289,3 +301,8 @@ different auth design requires only `users` collection auth config + routes. No 
   restricted nav (collections hidden in the UI; access functions enforce data); self-service signature (own row,
   `signature` field only); requester actions in the admin call `/api/v1` with `Idempotency-Key`; admin REST
   create/edit of expense requests runs the same `validateContent` as `/api/v1` (security fix). Status stays accepted.
+- **2026-09-25 (mobile login, user decision):** staging APK deviates from §1 for `proyekkas-mobile`: in-app
+  password login (Direct Access Grant) behind `PK_LOGIN_MODE=password`, see **ADR 0012**. Prod stays on
+  Authorization Code + PKCE (`browser`) until the F6 decision. Status stays accepted.
+- **2026-09-26 (E9, S3 track A):** §7 decision recorded — Keycloak event log = source of truth for failed logins;
+  ProyekKas writes `login_failed` only for logins refused on its side. Status stays accepted.

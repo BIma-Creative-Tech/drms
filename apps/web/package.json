@@ -1,6 +1,6 @@
 {
   "name": "@proyekkas/web",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "private": true,
   "type": "module",
   "engines": {
@@ -10,12 +10,15 @@
     "dev": "next dev",
     "gen:openapi": "node scripts/gen-openapi.mjs",
     "check:openapi": "node scripts/gen-openapi.mjs --check",
+    "gen:import-template": "node scripts/gen-import-template.mjs",
+    "check:import-template": "node scripts/gen-import-template.mjs --check",
     "build": "npm run gen:openapi && next build --webpack && npm run build:worker",
     "build:worker": "node scripts/build-worker.mjs",
     "start": "next start",
     "lint": "eslint --max-warnings=0 .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
     "test:int": "vitest run -c vitest.integration.config.ts",
     "test:kc": "vitest run -c vitest.kc.config.ts",
     "payload": "payload",
@@ -41,6 +44,7 @@
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "sharp": "0.35.4",
+    "write-excel-file": "4.1.1",
     "zod": "4.6.5"
   },
   "devDependencies": {
@@ -49,9 +53,11 @@
     "@types/pg": "8.20.0",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
+    "@vitest/coverage-v8": "5.0.1",
     "esbuild": "0.28.2",
     "eslint": "9.39.5",
     "eslint-config-next": "16.3.6",
+    "fflate": "0.8.3",
     "typescript": "6.0.3",
     "vitest": "5.0.1"
   }

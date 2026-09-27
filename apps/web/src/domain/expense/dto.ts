@@ -2,7 +2,7 @@ import type { PayloadRequest } from 'payload'
 
 import { hasRole, relId } from '@/access/roles'
 
-import { actorContext, approvalsOf, projectCommitted, type RequestDoc } from './common'
+import { actorContext, approvalsOf, displayName, projectCommitted, type RequestDoc } from './common'
 import { displayUnitPrice } from './lines'
 import { budgetImpact, type ApprovalSnapshot } from './rules'
 import { allowedActions } from './state'
@@ -10,6 +10,7 @@ import { REQUEST_TYPE_LABELS, statusLabel, FLAG_LABELS, type FlagKind } from './
 import { receiptsOf } from './receipts'
 import { settlementOfRequest } from './lpj'
 import { SETTLEMENT_STATUS_LABELS } from './settlement-rules'
+import { nextActor, timeline } from './timeline'
 
 type Named = { id: number; name?: string; code?: string; email?: string; plateNo?: string; plateDisplay?: string } | null
 
@@ -94,6 +95,15 @@ export async function detail(req: PayloadRequest, id: number) {
   }
   const snap = (doc.approvalSnapshot ?? null) as ApprovalSnapshot | null
   const lpj = doc.type === 'advance' ? await settlementOfRequest(req, id) : null
+  // F4: status timeline + "Giliran" (next expected actor) — same derivation as the web WorkflowPanel.
+  const names: Record<number, string> = {}
+  const nameIds = [snap?.acknowledgerUserId, ...(snap?.steps ?? []).map((s) => s.approverUserId)].filter((x): x is number => typeof x === 'number')
+  for (const u of new Set(nameIds)) names[u] = await displayName(req, u)
+  const requesterNames = (doc.requesters ?? [])
+    .map((r) => (r && typeof r === 'object' ? String((r as { name?: string }).name ?? '') : ''))
+    .filter(Boolean)
+    .join(', ')
+  const next = nextActor({ type: doc.type, status: doc.status, currentLevel: doc.currentLevel ?? null, snapshot: snap, requesters: requesterNames, names })
 
   return {
     ...listItem({ ...flat, project: doc.project, costCenter: doc.costCenter, createdBy: doc.createdBy } as RequestDoc),
@@ -133,6 +143,10 @@ export async function detail(req: PayloadRequest, id: number) {
           acknowledgerUserId: snap.acknowledgerUserId,
           acknowledgeDelegatedTo: snap.acknowledgeDelegatedTo ?? null,
           acknowledgeDelegationReason: snap.acknowledgeDelegationReason ?? null,
+          acknowledgeBy: snap.acknowledgeBy,
+          acknowledgeRole: snap.acknowledgeRole ?? null,
+          decisionRoles: snap.decisionRoles ?? [],
+          skipped: snap.skipped ?? [],
           steps: snap.steps,
           signDiajukan: snap.signDiajukan,
           signDibuat: snap.signDibuat,
@@ -213,11 +227,15 @@ export async function detail(req: PayloadRequest, id: number) {
           settledAt: lpj.settledAt ?? null,
           refundCashEntryId: relId(lpj.refundCashEntry) ?? null,
           shortfallTransferId: relId(lpj.shortfallTransfer) ?? null,
+          reversalCount: lpj.reversalCount ?? 0,
+          lastReversedAt: lpj.lastReversedAt ?? null,
+          lastReversalReason: lpj.lastReversalReason ?? null,
         }
       : null,
     budget,
     openWarningFlags: flags.filter((f) => f.status === 'open' && f.level === 'warning').length,
-    allowedActions: allowedActions(ctx),
+    // E9: reversal only for a settled LPJ that posted a refund KM / shortfall transfer (UI hint; the service re-checks).
+    allowedActions: allowedActions(ctx).filter((a) => a !== 'settle_reverse' || (lpj?.status === 'settled' && (lpj.settlementType === 'refund' || lpj.settlementType === 'shortfall'))),
     resubmitOfId: relId(doc.resubmitOf) ?? null,
     // F2e: the previous (rejected) request by number + title ("Pengajuan ulang dari").
     resubmitOf:
@@ -229,5 +247,8 @@ export async function detail(req: PayloadRequest, id: number) {
     rejectReason: doc.rejectReason ?? null,
     clientUuid: doc.clientUuid ?? null,
     createdAt: doc.createdAt ?? null,
+    rev: typeof doc.syncRev === 'number' && doc.syncRev > 0 ? doc.syncRev : 1,
+    timeline: timeline(doc.type, doc.status, { skipAck: snap?.acknowledge === 'none' }),
+    nextActor: next,
   }
 }

@@ -1,0 +1,9 @@
+{
+  "PK_FLAVOR": "prod",
+  "PK_API_BASE_URL": "https://drms-kas.bimacreative.tech",
+  "PK_OIDC_ISSUER": "https://auth.bimacreative.tech/realms/drms",
+  "PK_OIDC_CLIENT_ID": "proyekkas-mobile",
+  "PK_OIDC_REDIRECT_URI": "https://drms-kas.bimacreative.tech/app/callback",
+  "PK_PUSH_ENABLED": "false",
+  "PK_LOGIN_MODE": "password"
+}

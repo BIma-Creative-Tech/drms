@@ -1,0 +1,8 @@
+# gitleaks config for the APK secret scan (tool/apk_secret_scan.sh): default rules + verified false
+# positives of third-party libraries compiled into the APK. Every entry names the library and the reason.
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "flutter_secure_storage 11.2.0 SharedPreferences key NAMES (base64 of 'This is the key for a secure storage AES Key'), e.g. StorageCipherImplementationGCM.SHARED_PREFERENCES_KEY — public constants, not secrets"
+regexes = ['''VGhpcyBpcyB0aGUga2V5IGZvciBhIHNlY3VyZSBzdG9yYWdlIEFFUyBLZXkK''']

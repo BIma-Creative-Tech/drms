@@ -1,29 +1,92 @@
 import { sql } from '@payloadcms/db-postgres'
 import type { PayloadRequest } from 'payload'
 
-import { relId, type Role } from '@/access/roles'
+import { relId, rolesOf, type Role } from '@/access/roles'
+import { writeAudit } from '@/audit/writer'
 import { getRequestTx } from '@/lib/tx'
 
 import { fail, ids, type RequestDoc } from './common'
 import { displayUnitPrice } from './lines'
-import { buildSnapshot, resolveAckDelegation, selectRule, type AckDelegation, type ApprovalSnapshot, type RuleInput } from './rules'
+import { DECISION_ROLES, planPositions, ruleDecisionError } from './decision'
+import { buildSnapshot, selectRule, type ApprovalSnapshot, type RuleInput } from './rules'
 
 /**
- * Rule resolution at submit / re-approval (US-34, G2) + acknowledger resolution (Q-07 default:
- * PM of the project or manager of the cost center; Q-08 default: a requester or the creator can
- * never be "Diketahui Oleh" nor approver). F2e: when that person is a requester/creator or missing,
- * "Diketahui" is delegated to an Owner / Admin (rules.ts resolveAckDelegation) instead of a 409.
+ * Rule resolution at submit / re-approval (US-34, G2) under ADR 0013 (E1): "Diketahui" = approval by
+ * the Direktur (`pk-owner`), then Finance; PM/Staff never decide. The rule must pass
+ * `ruleDecisionError` (legacy rules → 409); the positions are planned by `planPositions` (G1-2 skip
+ * rule: a position whose only holders are requester/creator is skipped and recorded; no independent
+ * decision → 409). The snapshot carries `decisionRoles` (service guard) and `skipped`. Snapshots taken
+ * before E1 (PM acknowledger, F2e delegation) keep working unchanged at decision time.
  */
 export async function selectAndSnapshot(req: PayloadRequest, doc: RequestDoc): Promise<{ rule: RuleInput; snapshot: ApprovalSnapshot }> {
+  const rules = await loadActiveRules(req, 'expense_request')
+  const projectId = relId(doc.project) ?? null
+  const costCenterId = relId(doc.costCenter) ?? null
+  const rule = selectRule(rules, {
+    type: doc.type,
+    grandTotal: doc.grandTotal ?? 0,
+    categoryIds: (doc.lines ?? []).map((l) => relId(l.category)).filter((x): x is number => x !== undefined),
+    projectId,
+    costCenterId,
+  })
+  if (!rule) fail(409, 'Tidak ada aturan approval yang berlaku untuk pengajuan ini (US-34). Hubungi Admin.')
+
+  const snapshot = await snapshotForRule(req, rule, await involvedUserIds(req, doc))
+  return { rule, snapshot }
+}
+
+/**
+ * ADR 0013 snapshot of `rule` for a document whose requester/creator accounts are `excluded` (G1):
+ * rule validity (legacy rules → 409), position plan (G1-2 skip rule), decision roles. Shared by
+ * expense requests and budget addenda (E5).
+ */
+export async function snapshotForRule(req: PayloadRequest, rule: RuleInput, excluded: ReadonlySet<number>): Promise<ApprovalSnapshot> {
+  // ADR 0013: only rules of the Direktur → Finance model may be used for NEW submissions. A rule saved
+  // before E1 (e.g. "Diketahui" by the PM) is refused here instead of being silently reinterpreted.
+  const named = [...new Set([rule.acknowledgeUser, ...rule.steps.map((s) => s.approverUser)].filter((x): x is number => typeof x === 'number'))]
+  const namedUsers = await usersById(req, named)
+  const ruleErr = ruleDecisionError(rule, (id) => namedUsers.get(id)?.roles)
+  if (ruleErr) fail(409, `Aturan approval "${rule.name}" tidak sesuai alur Direktur → Finance (ADR 0013): ${ruleErr} Hubungi Admin.`)
+
+  const holders = async (role: Role | null | undefined, user: number | null | undefined): Promise<number[]> => {
+    if (user) return namedUsers.get(user)?.active ? [user] : []
+    return role ? activeUsersWithRole(req, role) : []
+  }
+  const ackHolders =
+    rule.acknowledge === 'required'
+      ? await holders(rule.acknowledgeBy === 'role' ? rule.acknowledgeRole : null, rule.acknowledgeBy === 'user' ? rule.acknowledgeUser : null)
+      : []
+  const stepHolders: number[][] = []
+  for (const s of [...rule.steps].sort((a, b) => a.level - b.level)) stepHolders.push(await holders(s.approverUser ? null : s.approverRole, s.approverUser))
+  // G1-2: positions whose only holders are requester/creator are skipped (recorded); at least one
+  // independent decision must remain and every remaining position needs a different person — else 409.
+  const planned = planPositions({ rule, excluded, ackHolders, stepHolders })
+  if (!planned.ok) fail(409, planned.error)
+  const { plan } = planned
+  const optionalAckUser =
+    rule.acknowledge === 'optional' && rule.acknowledgeBy === 'user' && rule.acknowledgeUser && !excluded.has(rule.acknowledgeUser) ? rule.acknowledgeUser : null
+  const base = buildSnapshot(rule, plan.ackRequired ? plan.ackUserId : optionalAckUser)
+  const snapshot: ApprovalSnapshot = {
+    ...base,
+    acknowledge: rule.acknowledge === 'required' && !plan.ackRequired ? 'none' : base.acknowledge,
+    steps: plan.steps,
+    decisionRoles: [...DECISION_ROLES],
+    skipped: plan.skipped,
+  }
+  return snapshot
+}
+
+/** Active `approval-rules` of one document type, mapped to the engine shape (SYSTEM-READ). */
+export async function loadActiveRules(req: PayloadRequest, docType: 'expense_request' | 'budget_addendum'): Promise<RuleInput[]> {
   const res = await req.payload.find({
     collection: 'approval-rules',
-    where: { and: [{ active: { equals: true } }, { docType: { equals: 'expense_request' } }] },
+    where: { and: [{ active: { equals: true } }, { docType: { equals: docType } }] },
     depth: 0,
     pagination: false,
     overrideAccess: true, // SYSTEM-READ: approval rules
     req,
   })
-  const rules: RuleInput[] = (res.docs as unknown as Array<Record<string, unknown>>).map((r) => ({
+  return (res.docs as unknown as Array<Record<string, unknown>>).map((r) => ({
     id: r.id as number,
     name: r.name as string,
     active: r.active as boolean,
@@ -47,60 +110,10 @@ export async function selectAndSnapshot(req: PayloadRequest, doc: RequestDoc): P
       approverUser: relId(s.approverUser) ?? null,
     })),
   }))
-  const projectId = relId(doc.project) ?? null
-  const costCenterId = relId(doc.costCenter) ?? null
-  const rule = selectRule(rules, {
-    type: doc.type,
-    grandTotal: doc.grandTotal ?? 0,
-    categoryIds: (doc.lines ?? []).map((l) => relId(l.category)).filter((x): x is number => x !== undefined),
-    projectId,
-    costCenterId,
-  })
-  if (!rule) fail(409, 'Tidak ada aturan approval yang berlaku untuk pengajuan ini (US-34). Hubungi Admin.')
-
-  const excluded = await involvedUserIds(req, doc)
-  for (const s of rule.steps) {
-    if (s.approverUser && excluded.has(s.approverUser)) fail(409, 'Approver pada aturan approval adalah pemohon/pembuat pengajuan ini (G1). Hubungi Admin.')
-  }
-  let ackUser: number | null = null
-  let delegation: AckDelegation | null = null
-  if (rule.acknowledge !== 'none') {
-    if (rule.acknowledgeBy === 'user') ackUser = rule.acknowledgeUser ?? null
-    else if ((rule.acknowledgeBy ?? 'scope_manager') === 'scope_manager') {
-      if (projectId) {
-        const p = await req.payload.findByID({ collection: 'projects', id: projectId, depth: 0, overrideAccess: true /* SYSTEM-READ: PM (Q-07) */, req })
-        ackUser = relId(p.pm) ?? null
-      } else if (costCenterId) {
-        const c = await req.payload.findByID({ collection: 'cost-centers', id: costCenterId, depth: 0, overrideAccess: true /* SYSTEM-READ: manager (Q-07) */, req })
-        ackUser = relId(c.manager) ?? null
-      }
-    }
-    const original = ackUser
-    if (ackUser !== null && excluded.has(ackUser)) ackUser = null // Q-08: never self-acknowledge
-    if (rule.acknowledge === 'required' && rule.acknowledgeBy !== 'role' && ackUser === null) {
-      // F2e (user decision option a): delegate "Diketahui" to an Owner, else an Admin — exact rule
-      // in rules.ts resolveAckDelegation (never a requester/creator, never the person who would
-      // have to approve as well). Only when nobody qualifies does the submit stay blocked (409).
-      delegation = resolveAckDelegation({
-        excluded,
-        owners: await activeUsersWithRole(req, 'pk-owner'),
-        admins: await activeUsersWithRole(req, 'pk-admin'),
-        approverPools: await approverPools(req, rule, excluded),
-        originalUserId: original,
-      })
-      if (!delegation) {
-        fail(
-          409,
-          'Pihak "Diketahui Oleh" tidak dapat ditentukan: PM project / penanggung jawab pusat biaya belum diatur atau termasuk pemohon/pembuat, dan tidak ada Owner/Admin lain yang dapat menggantikan (bukan pemohon/pembuat dan bukan satu-satunya approver) (Q-07, Q-08, G1). Hubungi Admin.',
-        )
-      }
-    }
-  }
-  return { rule, snapshot: buildSnapshot(rule, ackUser, delegation) }
 }
 
-/** Active users holding `role` (SYSTEM-READ for the acknowledger fallback, F2e). */
-async function activeUsersWithRole(req: PayloadRequest, role: Role): Promise<number[]> {
+/** Active users holding `role` (SYSTEM-READ: decision position holders, ADR 0013). */
+export async function activeUsersWithRole(req: PayloadRequest, role: Role): Promise<number[]> {
   const res = await req.payload.find({
     collection: 'users',
     where: { and: [{ roles: { in: [role] } }, { active: { equals: true } }] },
@@ -108,20 +121,27 @@ async function activeUsersWithRole(req: PayloadRequest, role: Role): Promise<num
     pagination: false,
     select: { email: true },
     sort: 'id',
-    overrideAccess: true, // SYSTEM-READ: acknowledger fallback candidates (F2e)
+    overrideAccess: true, // SYSTEM-READ: decision position holders (ADR 0013)
     req,
   })
   return res.docs.map((d) => d.id as number)
 }
 
-/** Eligible approvers per level of `rule` (named user or active role holders), requesters/creator removed. */
-async function approverPools(req: PayloadRequest, rule: RuleInput, excluded: ReadonlySet<number>): Promise<number[][]> {
-  const pools: number[][] = []
-  for (const s of [...rule.steps].sort((a, b) => a.level - b.level)) {
-    const users = s.approverUser ? [s.approverUser] : s.approverRole ? await activeUsersWithRole(req, s.approverRole) : []
-    pools.push(users.filter((u) => !excluded.has(u)))
-  }
-  return pools
+/** Roles + active flag of users named in a rule (acknowledgeUser / approverUser). */
+export async function usersById(req: PayloadRequest, ids: number[]): Promise<Map<number, { roles: Role[]; active: boolean }>> {
+  const out = new Map<number, { roles: Role[]; active: boolean }>()
+  if (ids.length === 0) return out
+  const res = await req.payload.find({
+    collection: 'users',
+    where: { id: { in: ids } },
+    depth: 0,
+    pagination: false,
+    select: { roles: true, active: true },
+    overrideAccess: true, // SYSTEM-READ: named decision users of an approval rule (ADR 0013)
+    req,
+  })
+  for (const u of res.docs as unknown as Array<{ id: number; roles?: unknown; active?: boolean | null }>) out.set(u.id, { roles: rolesOf(u), active: u.active !== false })
+  return out
 }
 
 /** User ids of the creator and of every requester employee that has an account (G1, Q-08). */
@@ -142,6 +162,23 @@ export async function involvedUserIds(req: PayloadRequest, doc: RequestDoc): Pro
     for (const u of users.docs) out.add(u.id as number)
   }
   return out
+}
+
+/**
+ * ADR 0013 G1-2: one `approval_skipped` audit row per decision position left out at submit /
+ * re-approval (the only Direktur/Finance is requester or creator) — printed "(tidak berlaku — pemohon)".
+ */
+export async function auditSkipped(req: PayloadRequest, doc: RequestDoc, snapshot: ApprovalSnapshot): Promise<void> {
+  const rows = (snapshot.skipped ?? []).map((s) => ({
+    action: 'approval_skipped' as const,
+    docType: 'expense_request',
+    docId: String(doc.id),
+    docNo: doc.docNo ?? undefined,
+    field: s.position,
+    newValue: { level: s.level, role: s.role, userId: s.userId, cycle: doc.approvalCycle ?? 0 },
+    reason: s.reason,
+  }))
+  await writeAudit(req, rows)
 }
 
 /** Class A snapshot of the request content (ADR 0006 §2 `expense_line_snapshots`). */

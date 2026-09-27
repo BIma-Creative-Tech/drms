@@ -94,7 +94,7 @@ describe('status timeline + next actor', () => {
     const base = { type: 'advance' as const, currentLevel: null, snapshot: snap, requesters: 'Staff Uji', names }
     expect(nextActor({ ...base, status: 'draft' })?.who).toBe('Pemohon (Staff Uji)')
     expect(nextActor({ ...base, status: 'pending_ack' })?.who).toBe('PM Uji')
-    expect(nextActor({ ...base, status: 'pending_approval', currentLevel: 1 })?.who).toBe('Owner — approval level 1')
+    expect(nextActor({ ...base, status: 'pending_approval', currentLevel: 1 })?.who).toBe('Direktur — approval level 1')
     expect(nextActor({ ...base, status: 'pending_approval', currentLevel: 2 })?.who).toBe('Direktur Uji — approval level 2')
     expect(nextActor({ ...base, status: 'approved' })).toMatchObject({ who: 'Finance' })
     expect(nextActor({ ...base, status: 'lpj_revision' })?.what).toMatch(/Kirim ulang LPJ/)

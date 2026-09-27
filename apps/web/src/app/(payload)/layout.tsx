@@ -6,6 +6,9 @@ import type { ServerFunctionClient } from 'payload'
 import { handleServerFunctions, RootLayout } from '@payloadcms/next/layouts'
 import React from 'react'
 
+import { fontBody, fontHeading } from '@/theme/fonts'
+import { themeCssVariables } from '@/theme/tokens'
+
 import { importMap } from './admin/importMap.js'
 import './custom.scss'
 
@@ -22,8 +25,16 @@ const serverFunction: ServerFunctionClient = async function (args) {
   })
 }
 
+// Web-starter design system (src/theme): self-hosted next/font variables + colour tokens on <html>
+// through RootLayout's public `htmlProps` prop (@payloadcms/next 3.90.1 layouts/Root/index.d.ts).
+// Only this block differs from the generated Payload template.
+const htmlProps = {
+  className: `${fontHeading.variable} ${fontBody.variable}`,
+  style: themeCssVariables() as React.CSSProperties,
+}
+
 const Layout = ({ children }: Args) => (
-  <RootLayout config={config} importMap={importMap} serverFunction={serverFunction}>
+  <RootLayout config={config} htmlProps={htmlProps} importMap={importMap} serverFunction={serverFunction}>
     {children}
   </RootLayout>
 )

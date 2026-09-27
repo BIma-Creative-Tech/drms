@@ -59,12 +59,14 @@ export const Receipts: CollectionConfig = withAudit(
       { name: 'verifiedAt', type: 'date', label: 'Diverifikasi', admin: ro },
       { name: 'entrySource', type: 'select', label: 'Sumber isian', defaultValue: 'manual', options: [{ label: 'Manual', value: 'manual' }, { label: 'OCR', value: 'ocr' }], admin: ro },
       { name: 'createdBy', type: 'relationship', relationTo: 'users', label: 'Diunggah oleh', admin: ro },
+      // F4: APK offline id of a receipt synced with a draft (POST /api/v1/sync/batch, ADR 0010).
+      { name: 'clientUuid', type: 'text', label: 'Client UUID (APK offline)', unique: true, index: true, admin: { ...ro, hidden: true } },
       uuidField(),
     ],
   },
   {
     docType: 'receipt',
-    exclude: ['receiptNoNorm', 'vendorNorm', 'imageSha256'],
+    exclude: ['receiptNoNorm', 'vendorNorm', 'imageSha256', 'clientUuid'],
     reasonRules: [
       reasonOnChange(['rejectReason'], 'Alasan wajib diisi saat menolak nota.'),
       reasonOnChange(['removeReason'], 'Alasan wajib diisi saat menghapus nota.'),

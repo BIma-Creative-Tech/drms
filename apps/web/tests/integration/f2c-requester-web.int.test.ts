@@ -141,7 +141,7 @@ describe('F2c requester actions (panel request shapes)', () => {
   it('Batalkan: after "Diketahui" the requester can no longer cancel (403); on Draft with reason OK', async () => {
     const a = await draft()
     await api('POST', `${E}/${a.id}/submit`, w.users.staffA, {}, key())
-    expect((await api('POST', `${E}/${a.id}/acknowledge`, w.users.pm, {}, key())).status).toBe(200)
+    expect((await api('POST', `${E}/${a.id}/acknowledge`, w.users.owner, {}, key())).status).toBe(200)
     expect((await api('POST', `${E}/${a.id}/cancel`, w.users.staffA, { reason: 'Tidak jadi' }, key())).status).toBe(403)
     const b = await draft()
     const c = await api('POST', `${E}/${b.id}/cancel`, w.users.staffA, { reason: 'Tidak jadi' }, key())
@@ -153,7 +153,7 @@ describe('F2c requester actions (panel request shapes)', () => {
     const a = await draft()
     expect((await api('POST', `${E}/${a.id}/resubmit`, w.users.staffA, {}, key())).status).toBe(409)
     await api('POST', `${E}/${a.id}/submit`, w.users.staffA, {}, key())
-    expect((await api('POST', `${E}/${a.id}/reject`, w.users.pm, { reason: 'Lengkapi rincian' }, key())).status).toBe(200)
+    expect((await api('POST', `${E}/${a.id}/reject`, w.users.owner, { reason: 'Lengkapi rincian' }, key())).status).toBe(200)
     const r = await api('POST', `${E}/${a.id}/resubmit`, w.users.staffA, {}, key())
     expect(r.status, JSON.stringify(r.body)).toBe(201)
     expect(r.body).toMatchObject({ status: 'draft', resubmitOfId: a.id, docNo: null })
@@ -184,8 +184,8 @@ describe('F2c requester actions (panel request shapes)', () => {
   it('Kirim LPJ / revisi / Kirim ulang LPJ (Uang Muka): usage notes required; revision note visible to the requester', async () => {
     const a = await draft()
     await api('POST', `${E}/${a.id}/submit`, w.users.staffA, {}, key())
-    await api('POST', `${E}/${a.id}/acknowledge`, w.users.pm, {}, key())
-    await api('POST', `${E}/${a.id}/approve`, w.users.owner, {}, key())
+    await api('POST', `${E}/${a.id}/acknowledge`, w.users.owner, {}, key())
+    await api('POST', `${E}/${a.id}/approve`, w.users.finance, {}, key())
     const proof = await upload('/api/v1/media/transfer-proofs', w.users.finance, await png())
     expect((await api('POST', `${E}/${a.id}/transfer`, w.users.finance, { cashAccountId: w.cashAccount, bankRef: `FC-${a.id}`, proofMediaId: proof.body.id }, key())).status).toBe(201)
     const img = await upload('/api/v1/media/receipts', w.users.staffA, await png())

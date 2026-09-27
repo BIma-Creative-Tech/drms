@@ -9,7 +9,17 @@ const id = z.number().int().positive()
 const rupiah = z.number().int().min(0).max(1e13)
 const rupiahPos = z.number().int().min(1).max(1e13)
 const businessDate = z.string().regex(/^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/, 'YYYY-MM-DD')
-const reason = z.string().trim().min(3).max(1000)
+// S3e (S-06): specific Indonesian messages (the web shows them as-is; before: generic "Data tidak valid.").
+const reason = z
+  .string({ error: 'Alasan wajib diisi.' })
+  .trim()
+  .min(3, 'Alasan wajib diisi, minimal 3 karakter.')
+  .max(1000, 'Alasan maksimal 1000 karakter.')
+const note = z
+  .string({ error: 'Catatan wajib diisi.' })
+  .trim()
+  .min(3, 'Catatan wajib diisi, minimal 3 karakter.')
+  .max(1000, 'Catatan maksimal 1000 karakter.')
 const qty = z
   .number()
   .positive()
@@ -60,6 +70,7 @@ export const ActionEnum = z
     'lpj_request_revision',
     'lpj_verify',
     'settle',
+    'settle_reverse',
   ])
   .meta({ id: 'RequestAction' })
 
@@ -226,6 +237,12 @@ export const ExpenseRequestDetail = ExpenseRequestListItem.extend({
       acknowledgerUserId: id.nullable(),
       acknowledgeDelegatedTo: z.enum(['owner', 'admin']).nullable(),
       acknowledgeDelegationReason: z.string().nullable(),
+      acknowledgeBy: z.enum(['scope_manager', 'role', 'user']).meta({ description: 'scope_manager only on pre-E1 snapshots (PM "Diketahui").' }),
+      acknowledgeRole: z.string().nullable().meta({ description: 'ADR 0013: pk-owner (label "Direktur") when "Diketahui" is the Direktur approval.' }),
+      decisionRoles: z.array(z.string()).meta({ description: 'ADR 0013: roles that may acknowledge/approve/reject ([pk-owner, pk-finance]); empty = pre-E1 snapshot (old guards).' }),
+      skipped: z
+        .array(z.object({ position: z.enum(['diketahui', 'approval']), level: z.number().int(), role: z.string().nullable(), userId: id.nullable(), reason: z.string() }))
+        .meta({ description: 'ADR 0013 G1-2: positions skipped at submit because their only holders are requester/creator — show "(tidak berlaku — pemohon)".' }),
       steps: z.array(z.object({ level: z.number().int(), approverRole: z.string().nullable(), approverUserId: id.nullable() })),
       signDiajukan: z.enum(['required', 'optional', 'none']),
       signDibuat: z.enum(['required', 'optional', 'none']),
@@ -314,6 +331,9 @@ export const ExpenseRequestDetail = ExpenseRequestListItem.extend({
       settledAt: z.string().nullable(),
       refundCashEntryId: id.nullable(),
       shortfallTransferId: id.nullable(),
+      reversalCount: z.number().int().meta({ description: 'E9: how often the settlement was reversed (void of the refund KM / shortfall transfer).' }),
+      lastReversedAt: z.string().nullable(),
+      lastReversalReason: z.string().nullable(),
     })
     .nullable()
     .meta({ id: 'Settlement', description: 'T5 LPJ (Uang Muka only; null before "Nota Lengkap").' }),
@@ -329,6 +349,14 @@ export const ExpenseRequestDetail = ExpenseRequestListItem.extend({
   rejectReason: z.string().nullable(),
   clientUuid: z.string().nullable(),
   createdAt: z.string().nullable(),
+  rev: z.number().int().meta({ description: 'Content revision (sync `base_rev` for offline edits of a draft, ADR 0010).' }),
+  timeline: z
+    .array(z.object({ status: RequestStatusEnum, label: z.string(), state: z.enum(['done', 'current', 'todo']) }))
+    .meta({ description: 'Status path of the request type with done / current / todo marks (US-05).' }),
+  nextActor: z
+    .object({ who: z.string(), what: z.string() })
+    .nullable()
+    .meta({ description: '"Giliran": who is expected to act next and what (display text, Bahasa Indonesia); null when finished.' }),
 }).meta({ id: 'ExpenseRequestDetail' })
 
 export const LpjSubmitBody = z
@@ -336,7 +364,25 @@ export const LpjSubmitBody = z
   .strict()
   .meta({ id: 'LpjSubmitBody' })
 
-export const RevisionBody = z.object({ note: reason }).strict().meta({ id: 'LpjRevisionBody' })
+export const RevisionBody = z.object({ note }).strict().meta({ id: 'LpjRevisionBody' })
+
+export const SettleReverseResult = z
+  .object({
+    request: ExpenseRequestDetail,
+    voided: z
+      .object({
+        type: z.enum(['refund', 'shortfall']),
+        amount: rupiah,
+        refundCashEntryId: id.optional(),
+        refundCashEntryNo: z.string().optional(),
+        shortfallTransferId: id.optional(),
+        shortfallTransferNo: z.string().nullable().optional(),
+        reversalCashEntryId: id.nullable(),
+        reversalCashEntryNo: z.string().nullable(),
+      })
+      .meta({ description: 'Documents voided by the reversal (also in the audit log).' }),
+  })
+  .meta({ id: 'SettleReverseResult' })
 
 export const SettleBody = z
   .object({
@@ -371,7 +417,7 @@ export const HistoryItem = z
   .meta({ id: 'HistoryItem' })
 export const History = z.object({ items: z.array(HistoryItem) }).meta({ id: 'History' })
 
-export const MediaKindEnum = z.enum(['receipts', 'transfer-proofs', 'signatures', 'attachments']).meta({ id: 'MediaKind' })
+export const MediaKindEnum = z.enum(['receipts', 'transfer-proofs', 'signatures', 'attachments', 'selfies', 'progress-photos']).meta({ id: 'MediaKind' })
 export const MediaUploaded = z
   .object({ id, kind: MediaKindEnum, mimeType: z.string().nullable(), filesize: z.number().int().nullable(), width: z.number().int().nullable(), height: z.number().int().nullable(), sha256Original: z.string().nullable() })
   .meta({ id: 'MediaUploaded' })
@@ -437,6 +483,8 @@ export const CashListQuery = z
   .object({
     period: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/).optional(),
     cashAccountId: z.coerce.number().int().positive().optional(),
+    projectId: z.coerce.number().int().positive().optional(),
+    costCenterId: z.coerce.number().int().positive().optional(),
     limit: z.coerce.number().int().min(1).max(100).default(50),
     cursor: z.string().max(64).optional(),
   })
@@ -522,7 +570,14 @@ export const NotificationQuery = z
   .meta({ id: 'NotificationQuery' })
 export const ReadAllResult = z.object({ updated: z.number().int() }).meta({ id: 'NotificationsReadAll' })
 
-export const FileCollectionEnum = z.enum(['receipts', 'transfer-proofs', 'signatures', 'attachments', 'company']).meta({ id: 'FileCollection' })
+export const FileCollectionEnum = z.enum(['receipts', 'transfer-proofs', 'signatures', 'attachments', 'company', 'progress-photos', 'selfies']).meta({ id: 'FileCollection' })
+export const SignedMediaUrl = z
+  .object({
+    url: z.string().meta({ description: 'Relative URL: /api/v1/media/{collection}/{id}/file?…&exp=&uid=&sig=' }),
+    expiresAt: z.iso.datetime(),
+    ttlSeconds: z.number().int(),
+  })
+  .meta({ id: 'SignedMediaUrl' })
 export const PdfQuery = z.object({ variant: z.enum(['standard', 'internal']).optional().meta({ description: 'internal = with receipt validation flags (Finance/Owner/Admin).' }) }).meta({ id: 'PdfQuery' })
 
 export const ApprovalInbox = z
@@ -545,6 +600,8 @@ export const ApprovalInbox = z
         requestDate: z.string().nullable(),
         step: z.enum(['acknowledge', 'approve']),
         level: z.number().int().nullable(),
+        stepLabel: z.string().meta({ description: 'ADR 0013: "Persetujuan Direktur (Diketahui)" | "Approval level n" (legacy PM step: "Diketahui Oleh").' }),
+        decisionFlow: z.boolean().meta({ description: 'ADR 0013 Direktur → Finance request (acknowledge = the Direktur approval, button "Setujui"); false = pre-E1 snapshot.' }),
         budget: z.object({ basis: z.enum(['project', 'none']), pctBefore: z.number().nullable(), pctAfter: z.number().nullable(), overWarn: z.boolean() }),
         flags: z.object({ warning: z.number().int(), info: z.number().int() }),
       }),

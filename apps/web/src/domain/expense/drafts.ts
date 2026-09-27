@@ -5,6 +5,7 @@ import { resolveScope } from '@/access/scope'
 
 import { actorContext, fail, ids, loadRaw, loadVisible, requireAction, type RequestDoc } from './common'
 import { validateLines } from './lines'
+import { copyReceiptsForResubmit } from './receipts'
 import { isBusinessDate, type RequestType } from './types'
 
 export type LineInputApi = {
@@ -335,6 +336,9 @@ export async function resubmitAsDraft(req: PayloadRequest, id: number): Promise<
       overrideAccess: true, // SYSTEM-WRITE: resubmit reference (US-06)
       req,
     })
+    delete req.context.pkTransition
+    // S3e (US-06, S-26): receipts come along (Reimburse needs them before submit).
+    await copyReceiptsForResubmit(req, id, linked as unknown as RequestDoc)
     return linked as unknown as RequestDoc
   } finally {
     delete req.context.pkTransition

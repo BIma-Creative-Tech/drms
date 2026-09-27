@@ -439,6 +439,132 @@ Notes: grand total 1 447 500 assumes line totals are accepted as entered; if Q-0
 unit price", line 2 becomes 678 000 and grand total 1 448 500 (requirements v1.1 US-37). The request **number**
 (`228/PB-DRMS/20/IX/2026` style) is assigned only at online submit (US-45), never offline.
 
+### Implemented server side (F4 backend, branch `feat/nextjs-f4-mobile-backend`)
+
+Verified in `apps/web/src/api/v1/{schemas-sync.ts,endpoints/sync.ts,endpoints/app.ts}`,
+`src/domain/sync/{service.ts,clock.ts}`, `src/app/.well-known/assetlinks.json/route.ts`,
+`tests/integration/f4-mobile.int.test.ts`. Contract for the Dart client: `packages/api-contract/openapi.json`
+(`SyncBatch`, `SyncItem`, `SyncDraftUpsertPayload`, `SyncDraftDeletePayload`, `SyncBatchResponse`, `SyncResult`,
+`SyncDraftCopy`, `AppConfig`). Differences from / precisions of the contract above:
+- **Media:** receipt images are uploaded first with the existing `POST /api/v1/media/receipts` (server resize,
+  ADR 0004) and referenced by numeric `media_id`; `PUT /api/v1/sync/media/{client_uuid}` is **not** built.
+  Missing media → `rejected MEDIA_MISSING`, another user's upload → `rejected FORBIDDEN`; the image of a synced
+  receipt cannot change (remove + add online).
+- **Draft payload** (snake_case like the envelope, numeric server ids): `kind`, `title` (both required for a new
+  draft), `project_id` | `cost_center_id`, `needed_date`, `period_from/_to`, `notes`, `requester_ids`,
+  `bank_account_id`, `client_grand_total`, `lines[]` (`id` = server line id or `client_uuid` = becomes the server
+  line id; `receipts[]` per line with `client_uuid`, `receipt_no`, `vendor_name`, `receipt_date` YYYY-MM-DD,
+  `receipt_time` HH:MM, `amount`, `tax_amount`, `media_id`). Target draft = `request_id` (created online) or
+  `draft_client_uuid` (default: the item's own `client_uuid`). Omitted fields stay; `lines` replaces all lines;
+  receipts are upserted by `client_uuid` and never removed by sync; a line that still has a receipt cannot be
+  dropped (`VALIDATION`). Receipts only on Reimburse drafts (Uang Muka receipts come after transfer, online).
+- **`rev`:** new column `expense_requests.sync_rev` — 1 at create, +1 on every content edit of an editable
+  request (web or APK), never on transitions. Exposed as `rev` in `SyncResult`, `SyncDraftCopy` and
+  `GET /expense-requests/{id}`. Edit of an existing draft needs `base_rev` = server `rev`; missing or lower →
+  `conflict` + `server_copy` (code `STALE_REV`, nothing changes). Queued edits of a draft created offline predict
+  `base_rev` 1, 2, … in queue order (each applied edit adds exactly 1).
+- **Statuses:** `applied | duplicate (+ original_status) | rejected | conflict | deferred | unsupported`.
+  `unsupported` (addition) = item type accepted by the schema but not enabled yet (attendance.*,
+  progress_report.draft_upsert until F5): keep it queued, not an attempt, not stored. `deferred`:
+  `DEPENDENCY_PENDING` (a `depends_on` item not yet received) or `INTERNAL` (unexpected server error).
+  Error codes: `VALIDATION`, `NOT_EDITABLE`, `NOT_FOUND`, `FORBIDDEN`, `MEDIA_MISSING`, `CLIENT_UUID_CONFLICT`,
+  `FEATURE_DISABLED`, `DEPENDENCY_FAILED`, `STATE_CONFLICT`, `INTEGRITY`, `STALE_REV`.
+- **Authz:** bearer (`mobileBearer`) only, `device_id` = the verified `X-Device-Id`; the draft's creator only
+  (a readable foreign draft → `NOT_EDITABLE` without `server_copy`, an unreadable one → `NOT_FOUND`). Delete =
+  cancel with reason (default "Draft dihapus dari aplikasi"). Domain validation (G9, G10, Q-09, masters, US-37)
+  is the same code as `POST/PATCH /api/v1/expense-requests`.
+- **Idempotency / storage:** raw table `sync_receipts` (not a Payload collection; app role SELECT/INSERT/DELETE,
+  no UPDATE; 30-day retention with opportunistic purge) keeps `client_uuid`, user, device, batch, status,
+  result JSON and the comparison clock facts (`device_time`, `elapsed_ms`, `estimated_time`, `offline`,
+  `time_trust`; `received_at` = DB clock). Applied/conflict results are stored in the item's transaction,
+  rejections in a new transaction after the rollback. `Idempotency-Key` (= `batch_id`) is accepted but not needed.
+  Every stored result writes audit `sync_offline` (with `device_time`).
+- **Time:** `time_trust` = `server` for `offline=false`; `estimated` when the item's boot (`boot_id`, default
+  `clock.boot_id`) matches and `clock.last_server_time/_elapsed_ms` exist and the estimate is not in the future;
+  else `device_only`. `CLOCK_SKEW` when |device − estimate| > 5 min (or, without an estimate, device clock > 5 min
+  ahead of the server).
+- **Limits:** ≤ 50 items (400), ≤ 256 KiB body (413), 12 batches/min per user (429). Server flag
+  `company-settings.syncExpenseDraftsEnabled` (default on) → `rejected FEATURE_DISABLED` when off.
+- **App gate:** `GET /api/v1/app/config` is **public** (the APK must learn it is too old before login):
+  `minSupportedVersion` (= `company-settings.minAppVersion`, also enforced as 426), `latestVersion`,
+  `downloadUrl` (null until published), `updateRequired/updateAvailable` for `?version=x.y.z`, company
+  `timezone`, `android.packageName`, `features` (`pushEnabled: false` until FCM — ADR 0011 —, `syncExpenseDrafts`,
+  `syncAttendance: false`, `syncProgressReports: false`) and the sync limits. Admin/Owner edit the values in
+  "Setting perusahaan".
+- **App Links:** `GET /.well-known/assetlinks.json` (Next route, public, `Cache-Control: public, max-age=3600`)
+  from env `ANDROID_APP_PACKAGE` (default `id.co.drms.proyekkas`, still pending client confirmation) and
+  `ANDROID_APP_CERT_SHA256` (comma-separated `AA:BB:…` fingerprints, validated at boot). No fingerprint → `[]`
+  (verification fails closed → APK uses the private-use scheme fallback). Traefik: served by the host's
+  catch-all web router (`drms-pk-stg-web`, priority 1), no infra change.
+
+### Implemented in F4b (branch `feat/f4b-mobile-completion`, 2026-09-25) — precisions / deviations
+
+Details and evidence: `docs/proyekkas/f4/f4-gap-analysis.md`. Needs the Lead's review before merge.
+- **Decision 10, root/emulator (deviation):** no `safe_device`. It is still maintained (1.4.1, 2026-07-07, MIT,
+  140/160) but its Android part adds location permissions, `play-services-location`, appcompat/material, an AGP 7.2.2
+  `buildscript` with `kotlin-android` (build under AGP 9.1 / built-in Kotlin **UNVERIFIED**), and its mock check
+  subscribes to fused location updates. Instead a method channel `id.co.drms.proyekkas/integrity` in `MainActivity.kt`
+  reports `rooted` (su/Magisk paths, `test-keys`), `emulator` (build properties), `developerMode`, `adbEnabled`.
+  Mock location = `Position.isMocked` of the attendance GPS fix (geolocator 14.0.3).
+- **Decision 10, transport (deviation):** the flags are sent as `integrity` in `POST /api/v1/devices/register` (every
+  app start and login), not as an `X-Device-Integrity` header on every request. Stored on `devices`
+  (`integrity*`, `integrityRisk` = rooted ∨ emulator ∨ mocked fix), audited by the field diff, never blocking
+  (Q-43 proposal). The app shows a warning on the home screen when the report is risky.
+- **Remote logout (decision 3):** a valid token on a revoked/lost device now gets `401` with `code: DEVICE_REVOKED`;
+  the app ends the session on that first answer (no refresh), rotates the install id and shows an Indonesian notice.
+- **Attendance (decisions 5/7/8), F4 slice:** `attendance.check_in` / `attendance.check_out` are processed (no longer
+  `unsupported`) when `company-settings.syncAttendanceEnabled` is on (default off; else `rejected FEATURE_DISABLED`).
+  Payload `SyncAttendancePayload`: `project_id`, `lat`, `lng`, `accuracy_m`, `is_mocked`, `selfie_media_id` (uploaded
+  first with `POST /api/v1/media/selfies` — numeric id like receipts, not `selfie_media_client_uuid`), `camera_lens`.
+  Server checks: own employee, project with a geofence (`NO_GEOFENCE`), assignment on the local date
+  (`NOT_ASSIGNED`), haversine distance ≤ radius + min(accuracy, 50 m) (`OUTSIDE_GEOFENCE`), `MOCK_LOCATION`, own
+  selfie (`MEDIA_MISSING`/`FORBIDDEN`), one check-in and one check-out per employee/project/local date
+  (`ALREADY_CHECKED_IN`, `NO_CHECK_IN`, `ALREADY_CHECKED_OUT`; DB unique index as backstop). Time that counts
+  (QM-3 proposal): server time online, else the monotonic estimate, else the device clock flagged
+  `DEVICE_TIME_ONLY`. Table `attendances` is append-only (no UPDATE/DELETE for the app role, reject triggers;
+  `received_at` set by a DB trigger). Still F5: `attendance.on_behalf`, cost-center geofences (QM-1b), corrections
+  (T10), schedules/late minutes, recap.
+- **Media:** `media-selfies` now stores JPEG q75 (it was WebP, which Payload rejected against the collection's
+  `image/jpeg` mime list, so no selfie upload could succeed).
+- **Build (decision 13):** every APK is scanned for secrets in CI (`apps/mobile/tool/apk_secret_scan.sh`).
+- **Background sync (decision 12):** WorkManager still not added (foreground triggers only).
+  *Update 2026-09-26 (E3-b, branch `feat/mobile-e1-e3`):* `workmanager` 0.10.10 added — periodic task (15 min,
+  network connected) + one-off task after an unfinished foreground run; the task opens the encrypted DB and the
+  secure token store in its own isolate; one token owner per process via `IsolateNameServer` ports (see
+  `apps/mobile/README.md` "Background sync"). Workmanager's merged FOREGROUND_SERVICE* / POST_NOTIFICATIONS
+  permissions are removed (no foreground service used).
+
+### Phone test fixes (branch `fix/mobile-startup-offline-logout`, 2026-09-25) — precisions
+
+Found on a real phone with the staging APK (password login, ADR 0012): "Offline" shown on working mobile data, logout
+that never finished, slow first load. Server answers were all fast (Traefik log), so the fixes are client-side.
+- **Online state (decision 12, precision):** the server decides. Any HTTP answer from `/api/v1` — success or problem —
+  sets the app ONLINE, even when connectivity_plus reported `none` (before, a `none` could only be cleared by the next
+  OS network event, so the app stayed "Offline" while every API call succeeded). A request without an answer sets
+  OFFLINE and starts a probe of `GET /api/v1/health` (public, own dio, 5 s timeout) with backoff 3/10/20/30/60 s
+  until the server answers; a `none` from the OS is verified the same way. Tapping the red banner probes at once.
+  All connectivity_plus 7.3.1 values except `none` (mobile, wifi, vpn, other, …) count as a network. A cancelled
+  request is not reported as offline.
+- **Logout (decision 3, precision):** logout ALWAYS ends on the login screen. The network part (device revoke, then
+  the Keycloak logout) is best effort with a 5 s budget in total; afterwards the local session is cleared in every
+  case (tokens, push, new install id), each Keystore step isolated and bounded. A token refresh still in flight when
+  the session is cleared can no longer write tokens back (generation check in `TokenManager`). The button shows
+  "Sedang keluar…" and ignores a second tap.
+- **Unsent data on logout (decision 3, decision):** never deleted. Pending and failed/rejected outbox items and local
+  drafts stay in the encrypted DB, locked to the user's `sub`, and are sent after the SAME user signs in again. When
+  such items exist, the confirmation dialog says so in Bahasa Indonesia ("… data belum terkirim … TIDAK dihapus …")
+  and the button reads "Tetap keluar"; "Batal" keeps the session so the user can send them first (Antrean).
+  Rationale: deleting would silently lose expense/attendance evidence; another user on the same phone cannot see or
+  send them (queue owner = `sub`). Wiping a lost phone stays the Admin's remote revoke + the 30-day offline limit.
+- **Start-up (decision 12 / 10, precision):** before `runApp` only the install id, app version, model, DB handle and
+  date symbols are loaded, in parallel (the encrypted DB opens lazily in drift's background isolate). `/app/config`
+  no longer holds the splash (the update gate redirects when it arrives; the server enforces 426 anyway). With a
+  cached profile the home screen shows as soon as tokens + cached profile are read; `POST /devices/register` and
+  `/me` then run in the background. The integrity report and push token wait at most 2 s before registration is
+  sent without them. The integrity checks run on a background thread in `MainActivity.kt`, because in Flutter 3.47.5
+  Dart runs on the Android main thread by default (engine `Settings::merged_platform_ui_thread = kEnabled`), so
+  main-thread native work freezes the UI. Debug builds log start-up marks (`pk.startup`); release builds do not.
+
 ## Alternatives
 
 | Alternative | Rejected because |

@@ -35,8 +35,8 @@ async function transferredAdvance() {
   expect(c.status, JSON.stringify(c.body)).toBe(201)
   const id = c.body.id as number
   expect((await api('POST', `${E}/${id}/submit`, w.users.staffA, {})).status).toBe(200)
-  expect((await api('POST', `${E}/${id}/acknowledge`, w.users.pm, {})).status).toBe(200)
-  expect((await api('POST', `${E}/${id}/approve`, w.users.owner, {})).status).toBe(200)
+  expect((await api('POST', `${E}/${id}/acknowledge`, w.users.owner, {})).status).toBe(200)
+  expect((await api('POST', `${E}/${id}/approve`, w.users.finance, {})).status).toBe(200)
   const t = await api('POST', `${E}/${id}/transfer`, w.users.finance, { cashAccountId: w.cashAccount, bankRef: `TRF-${id}`, proofMediaId: await proof() })
   expect(t.status, JSON.stringify(t.body)).toBe(201)
   return { id, lineIds: c.body.lines.map((l: { id: string }) => l.id) as string[] }
@@ -229,7 +229,7 @@ describe('authz negatives and DB guards (T5)', () => {
     expect((await api('POST', `${E}/${id2}/lpj/verify`, w.users.owner, {})).status).toBe(403)
     expect((await api('POST', `${E}/${id2}/settle`, w.users.owner, { cashAccountId: w.cashAccount })).status).toBe(403) // roles: Finance only
     expect((await api('POST', `${E}/${id2}/lpj/verify`, w.users.otherPm, {})).status).toBe(404)
-    expect((await api('POST', `${E}/${id2}/lpj/submit`, w.users.finance, {})).status).toBe(409) // already submitted
+    expect((await api('POST', `${E}/${id2}/lpj/submit`, w.users.finance, {})).status).toBe(403) // E9: Finance never submits an LPJ (403 before the 409 state check)
     expect((await api('POST', `${E}/${id2}/receipts-complete`, w.users.staffB, {})).status).toBe(404) // not own, not visible
   })
 
@@ -293,11 +293,14 @@ describe('notifications API', () => {
   it('approval step: approvers are notified, requesters/creator never asked to decide (G1)', async () => {
     const c = await api('POST', E, w.users.staffA, draftBody(w))
     await api('POST', `${E}/${c.body.id}/submit`, w.users.staffA, {})
+    // ADR 0013: "Diketahui" = Direktur approval → the Direktur are asked, the PM (monitors only) is not
     const pm = await api('GET', '/api/v1/notifications?unread=true', w.users.pm)
-    expect(pm.body.items.map((x: { event: string; docId: string }) => [x.event, x.docId])).toContainEqual(['expense.pending_ack', String(c.body.id)])
-    await api('POST', `${E}/${c.body.id}/acknowledge`, w.users.pm, {})
-    for (const owner of [w.users.owner, w.users.owner2]) {
-      const n = await api('GET', '/api/v1/notifications?unread=true', owner)
+    expect(pm.body.items.map((x: { event: string; docId: string }) => [x.event, x.docId])).not.toContainEqual(['expense.pending_ack', String(c.body.id)])
+    const dir = await api('GET', '/api/v1/notifications?unread=true', w.users.owner2)
+    expect(dir.body.items.map((x: { event: string; docId: string }) => [x.event, x.docId])).toContainEqual(['expense.pending_ack', String(c.body.id)])
+    await api('POST', `${E}/${c.body.id}/acknowledge`, w.users.owner, {})
+    for (const approver of [w.users.finance, w.users.finance2]) {
+      const n = await api('GET', '/api/v1/notifications?unread=true', approver)
       expect(n.body.items.map((x: { event: string; docId: string }) => [x.event, x.docId])).toContainEqual(['expense.pending_approval', String(c.body.id)])
     }
     const own = await api('GET', '/api/v1/notifications', w.users.staffA)
@@ -314,8 +317,8 @@ describe('Reimburse auto-close job (architecture §5.2, setting reimburseAutoClo
     const id = c.body.id as number
     await addReceipt(id, c.body.lines[0].id, 150_000)
     expect((await api('POST', `${E}/${id}/submit`, w.users.staffA, {})).status).toBe(200)
-    await api('POST', `${E}/${id}/acknowledge`, w.users.pm, {})
-    await api('POST', `${E}/${id}/approve`, w.users.owner, {})
+    await api('POST', `${E}/${id}/acknowledge`, w.users.owner, {})
+    await api('POST', `${E}/${id}/approve`, w.users.finance, {})
     await verifyAll(id)
     const d = (await api('GET', `${E}/${id}`, w.users.finance)).body
     for (const f of d.flags.filter((x: { level: string; status: string }) => x.level === 'warning' && x.status === 'open')) await api('POST', `${E}/${id}/flags/${f.id}/review`, w.users.finance, {})

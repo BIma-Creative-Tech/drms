@@ -32,9 +32,15 @@ export type NotifyEvent =
   | 'expense.lpj_revision'
   | 'expense.lpj_verified'
   | 'expense.completed'
+  // S3e (US-05, US-41, S-04): requester-side events, gated by company-settings.notifyRequesterStatusEnabled
+  | 'expense.submitted'
+  | 'expense.withdrawn'
+  | 'expense.created_on_behalf'
 
 const DEFAULTS: Record<NotifyEvent, { title: string; body: string }> = {
-  'expense.pending_ack': { title: 'Menunggu Diketahui: {docNo}', body: '{type} "{title}" {amount} menunggu tanda "Diketahui" dari Anda.' },
+  // ADR 0013 §10: "Diketahui" is the Direktur's approval; recipients = active Direktur (pk-owner)
+  // holders minus requester/creator. pending_approval → active Finance holders (never the PM).
+  'expense.pending_ack': { title: 'Persetujuan Direktur: {docNo}', body: '{docNo} menunggu persetujuan Anda sebagai Direktur: {type} "{title}" {amount}.' },
   'expense.pending_approval': { title: 'Menunggu Approval: {docNo}', body: '{type} "{title}" {amount} menunggu persetujuan Anda.' },
   'expense.approved': { title: 'Disetujui: {docNo}', body: 'Pengajuan "{title}" {amount} disetujui.' },
   'expense.rejected': { title: 'Ditolak: {docNo}', body: 'Pengajuan "{title}" ditolak. Lihat alasan di detail pengajuan.' },
@@ -48,7 +54,16 @@ const DEFAULTS: Record<NotifyEvent, { title: string; body: string }> = {
   'expense.lpj_revision': { title: 'LPJ perlu revisi: {docNo}', body: 'Finance meminta revisi LPJ "{title}". Lihat catatan revisi.' },
   'expense.lpj_verified': { title: 'LPJ terverifikasi: {docNo}', body: 'LPJ "{title}" terverifikasi; menunggu penyelesaian selisih.' },
   'expense.completed': { title: 'Selesai: {docNo}', body: 'Pengajuan "{title}" selesai.' },
+  'expense.submitted': { title: 'Diajukan: {docNo}', body: '{type} "{title}" {amount} telah diajukan dan menunggu persetujuan.' },
+  'expense.withdrawn': { title: 'Ditarik ke Draft: {docNo}', body: 'Pengajuan "{title}" ditarik kembali ke Draft.' },
+  'expense.created_on_behalf': { title: 'Pengajuan atas nama Anda: {docNo}', body: 'Draft {type} "{title}" {amount} dibuat atas nama Anda. Anda tercantum sebagai pemohon (Diajukan Oleh).' },
 }
+
+/** S3e: requester-side events that company-settings.notifyRequesterStatusEnabled can switch off. */
+export const REQUESTER_STATUS_EVENTS: ReadonlySet<NotifyEvent> = new Set<NotifyEvent>(['expense.submitted', 'expense.withdrawn', 'expense.created_on_behalf'])
+
+/** S3e: events that also send an email to the deciding user when company-settings.approvalEmailEnabled. */
+export const APPROVAL_EMAIL_EVENTS: ReadonlySet<NotifyEvent> = new Set<NotifyEvent>(['expense.pending_ack', 'expense.pending_approval'])
 
 type Doc = {
   id: number
@@ -123,11 +138,13 @@ export function eventsFor(prev: { status: RequestStatus; currentLevel?: number |
     if (doc.status === 'pending_approval' && prev && prev.currentLevel !== doc.currentLevel) return [{ event: 'expense.pending_approval', to: 'approval' }]
     return []
   }
+  // S3e (US-05): submit (Draft → waiting) also informs the other requesters / the creator.
+  const submitted = prev?.status === 'draft' ? [{ event: 'expense.submitted' as const, to: 'people' as const }] : []
   switch (doc.status) {
     case 'pending_ack':
-      return [{ event: 'expense.pending_ack', to: 'ack' }]
+      return [{ event: 'expense.pending_ack', to: 'ack' }, ...submitted]
     case 'pending_approval':
-      return [{ event: 'expense.pending_approval', to: 'approval' }]
+      return [{ event: 'expense.pending_approval', to: 'approval' }, ...submitted]
     case 'approved':
       if (prev?.status === 'receipt_revision' || prev?.status === 'receipts_verified' || prev?.status === 'transferred') {
         return doc.type === 'advance' ? [{ event: 'expense.transfer_queue', to: 'finance' }] : [{ event: 'expense.receipts_to_verify', to: 'finance' }]
@@ -157,8 +174,11 @@ export function eventsFor(prev: { status: RequestStatus; currentLevel?: number |
       return [{ event: 'expense.lpj_verified', to: 'people' }]
     case 'completed':
       return [{ event: 'expense.completed', to: 'people' }]
+    case 'draft':
+      // S3e (US-05): withdraw (waiting → Draft) informs the other requesters / the creator.
+      return prev && (prev.status === 'pending_ack' || prev.status === 'pending_approval') ? [{ event: 'expense.withdrawn', to: 'people' }] : []
     default:
-      return [] // draft (withdraw), receipts_complete: nobody to inform
+      return [] // receipts_complete: nobody to inform
   }
 }
 
@@ -173,7 +193,8 @@ export function renderTemplate(tpl: string, doc: Doc): string {
   return tpl.replace(/\{(docNo|title|amount|status|type)\}/g, (_, k: string) => vars[k] ?? '')
 }
 
-async function template(req: PayloadRequest, event: NotifyEvent): Promise<{ title: string; body: string }> {
+/** Active `notification-templates` text of `event`, else `fallback` (also used by E4/E7 reminders). */
+export async function notificationTemplate(req: PayloadRequest, event: string, fallback: { title: string; body: string }): Promise<{ title: string; body: string }> {
   const res = await req.payload.find({
     collection: 'notification-templates',
     where: { and: [{ event: { equals: event } }, { active: { equals: true } }] },
@@ -183,16 +204,63 @@ async function template(req: PayloadRequest, event: NotifyEvent): Promise<{ titl
     req,
   })
   const t = res.docs[0] as { title?: string; body?: string; channel?: string } | undefined
-  return t?.title && t.body ? { title: t.title, body: t.body } : DEFAULTS[event]
+  return t?.title && t.body ? { title: t.title, body: t.body } : fallback
+}
+
+async function template(req: PayloadRequest, event: NotifyEvent): Promise<{ title: string; body: string }> {
+  return notificationTemplate(req, event, DEFAULTS[event])
 }
 
 export function pushEnabled(): boolean {
   return process.env.PUSH_FCM_ENABLED === 'true'
 }
 
-/** Creates the in-app rows of one transition. Returns the number of rows written. */
+type NotifySettings = { requesterStatus: boolean; approvalEmail: boolean }
+
+/** S3e toggles (company-settings): requester in-app events default ON, approval email default OFF. */
+export async function notifySettings(req: PayloadRequest): Promise<NotifySettings> {
+  const s = (await req.payload.findGlobal({ slug: 'company-settings', depth: 0, overrideAccess: true /* SYSTEM-READ: notification toggles */, req })) as {
+    notifyRequesterStatusEnabled?: boolean | null
+    approvalEmailEnabled?: boolean | null
+  }
+  return { requesterStatus: s.notifyRequesterStatusEnabled !== false, approvalEmail: s.approvalEmailEnabled === true }
+}
+
+/**
+ * S3e (US-26/US-41, S-04): email to a deciding user (Direktur / Finance) — same `sendEmail` job queue,
+ * SMTP rate guard and retry as the E7 reminder emails; queued in the transition's transaction (no
+ * mail for a rolled-back change). Text without amount and requester names (the mailbox leaves the
+ * company network); the link opens the Persetujuan inbox.
+ */
+export function approvalEmail(doc: Doc, event: NotifyEvent, appUrl: string | undefined): { subject: string; text: string } {
+  const no = doc.docNo ?? `#${doc.id}`
+  const step = event === 'expense.pending_ack' ? 'persetujuan Anda sebagai Direktur (Diketahui)' : 'approval Anda'
+  const base = appUrl ? `${appUrl.replace(/\/$/, '')}/admin/persetujuan` : null
+  return {
+    subject: `ProyekKas — Menunggu keputusan Anda: ${no}`.slice(0, 200),
+    text: `Pengajuan ${no} (${REQUEST_TYPE_LABELS[doc.type]}) menunggu ${step}.\n\n${base ? `Buka Persetujuan: ${base}\n\n` : ''}Email otomatis ProyekKas. Pengaturan: Setting perusahaan → Notifikasi status pengajuan.\n`,
+  }
+}
+
+/** Creates the in-app rows of one transition (+ queued approval emails). Returns the number of in-app rows written. */
 export async function notifyTransition(req: PayloadRequest, prev: { status: RequestStatus; currentLevel?: number | null } | null, doc: Doc): Promise<number> {
-  const events = eventsFor(prev, doc)
+  const all = eventsFor(prev, doc)
+  if (all.length === 0) return 0
+  const settings = await notifySettings(req)
+  return deliver(req, doc, settings.requesterStatus ? all : all.filter((e) => !REQUESTER_STATUS_EVENTS.has(e.event)), settings)
+}
+
+/**
+ * S3e (US-41): a request created on behalf of other requesters (Admin/Finance, or a creator listing
+ * colleagues) informs those requesters' accounts. The creator (= actor) is never notified.
+ */
+export async function notifyCreated(req: PayloadRequest, doc: Doc): Promise<number> {
+  const settings = await notifySettings(req)
+  if (!settings.requesterStatus) return 0
+  return deliver(req, doc, [{ event: 'expense.created_on_behalf', to: 'people' }], settings)
+}
+
+async function deliver(req: PayloadRequest, doc: Doc, events: Array<{ event: NotifyEvent; to: 'people' | 'finance' | 'ack' | 'approval' }>, settings: NotifySettings): Promise<number> {
   if (events.length === 0) return 0
   const actor = userId(req)
   let finance: number[] | null = null
@@ -207,6 +275,10 @@ export async function notifyTransition(req: PayloadRequest, prev: { status: Requ
     for (const uid of to) {
       if (uid === actor || done.has(`${e.event}:${uid}`)) continue
       done.add(`${e.event}:${uid}`)
+      if (settings.approvalEmail && APPROVAL_EMAIL_EVENTS.has(e.event)) {
+        const m = approvalEmail(doc, e.event, process.env.APP_URL)
+        await req.payload.jobs.queue({ task: 'sendEmail', input: { userId: uid, subject: m.subject, text: m.text }, req })
+      }
       await req.payload.create({
         collection: 'notifications',
         data: {
@@ -227,4 +299,21 @@ export async function notifyTransition(req: PayloadRequest, prev: { status: Requ
     }
   }
   return written
+}
+
+/** Admin page of a notification's document, or null when there is none. S3e: used by the web notification page (/admin/notifikasi). */
+export function notificationHref(docType: string | null | undefined, docId: string | null | undefined): string | null {
+  if (!docId || !/^\d{1,10}$/.test(docId)) return null
+  switch (docType) {
+    case 'expense_request':
+      return `/admin/collections/expense-requests/${docId}`
+    case 'project':
+      return `/admin/progress/project/${docId}`
+    case 'progress_report':
+      return `/admin/progress/laporan/${docId}`
+    case 'budget_addendum':
+      return `/admin/addendum/detail/${docId}`
+    default:
+      return null
+  }
 }

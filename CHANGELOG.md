@@ -6,11 +6,324 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-09-27
+
+Fase 1 go-live build (web + API; images `ghcr.io/bctech-adm/proyekkas-{web,migrate}:0.3.0`). Covers F3 dashboards,
+reports and exports, the F4 APK backend (`/api/v1/sync/batch`, devices, masters) and fase1-golive epics E1–E11:
+approval flow Direktur → Finance (ADR 0013), Finance cash UI (E2), project stages/progress + Addendum RAB (E4/E5),
+attendance + selfie retention (E6), scheduled reminders (E7), E9 hardening (signed media URLs, settlement reversal,
+coverage gate, upload resize queue), E10 GHCR images + prod compose, E11 Excel import/cut-over, and the S3 Fase 1 UAT
+gap fixes. The APK (`apps/mobile`) changes listed here ship on their own `mobile-vX.Y.Z` tags (pubspec version),
+not with this web release.
+
+### Added
+- **E9 follow-ups — upload resize queue, B-1, B-2** (`apps/web`, branch `fix/e9-upload-resize-queue`; QA report
+  `docs/proyekkas/qa/s3-e9-qa-report.md` §7, user decision 2026-09-27):
+  - P-1: process-wide FIFO image queue (`src/lib/image-queue.ts`): at most `IMAGE_RESIZE_CONCURRENCY` (default 2)
+    sharp jobs at once, `IMAGE_RESIZE_MAX_QUEUE` (default 20) waiting, 30 s max wait; `POST /api/v1/media/{kind}`
+    queues the whole upload (DB transaction opened only after the slot is granted) and answers 503 + `Retry-After: 5`
+    (`code: UPLOAD_BUSY`) when full; generic REST uploads are gated per sharp pipeline and refused (503) while the
+    queue is saturated. `sharp.cache(false)`, `sharp.concurrency(1)` kept. Outputs unchanged. Queue wait logged at
+    debug (`image queue slot`). AC E9: uploads p95 < 5 s, everything else < 2 s.
+  - B-1 (ASVS G-21): generic REST create/update with a non-object body (form/text, multipart without `_payload`, JSON
+    array/null) → 400 with a clear message instead of a 500 from the collection hooks (`src/lib/body-guard.ts`, first
+    `beforeOperation` hook of every collection and the `company-settings` global).
+  - B-2 (ASVS G-22): the E11 import no longer tries Keycloak per revoked device (audit `keycloak_skipped`); the report
+    prints ONE `PERINGATAN KEYCLOAK` block listing users to disable + log out (or re-enable) and the CLI writes
+    `…-keycloak-tindak-lanjut.csv`; Keycloak step (`kc_*`, realm drms) added to the import and cabut-perangkat runbooks.
+- **S3 track E — Fase 1 UAT gap fixes** (`apps/web`, branch `feat/s3e-uat-gap-fixes`; S-ids of
+  `docs/proyekkas/uat/fase1/README.md`):
+  - S-01 PM home: "Pengajuan tim menunggu keputusan" (Direktur / Finance) instead of the empty "Diketahui saya" card;
+    `GET /api/v1/dashboard/pm` adds `teamWaiting`.
+  - S-03 web bank account picker filtered to the requesters' active accounts; empty = first requester's default.
+  - S-04 in-app notifications on submit / withdraw / created on behalf; optional approval email to the deciding
+    Direktur/Finance (sendEmail queue); web notification bell + `/admin/notifikasi`. Settings
+    `notifyRequesterStatusEnabled` (on), `approvalEmailEnabled` (off, upgrade copies `reminderEmailEnabled`).
+  - S-05 Persetujuan + request panel show lines, receipt photos and per-line flags to deciders; `approvals.openFlags`
+    = open flags of both levels.
+  - S-06 reject/revision reason: client min length, server detail "Alasan wajib diisi, minimal 3 karakter.".
+  - S-07 Antrian Transfer badge = page count. S-08 LPJ "Tandai flag diperiksa". S-29 "Anda juga yang menyetujui".
+  - S-19 default geofence radius for points without radius (server + masters). S-23 Admin attendance report export.
+  - S-24 receipts ≤ 1600 px, logo ≤ 1024 px, 50 MP / 2 MB caps. S-26 resubmit copies receipts.
+  - Migration `20260926_141606_s3e_uat_gap_fixes` (additive, `company_settings`).
+- **S3 web A — E9 hardening F6** (`apps/web`, fase1-golive §E9; branch `feat/s3a-e9-hardening`):
+  - Signed, time-limited media URLs (ADR 0004 §4b): `GET /api/v1/media/{collection}/{id}/signed-url` mints a 5-minute
+    HMAC-SHA256 URL of the file endpoint (keys `MEDIA_URL_KEYS[_FILE]` with rotation, default derived from
+    `PAYLOAD_SECRET`); expired/invalid → 403, valid signature but the user may not read the file → 403 +
+    `access_denied`. Bearer/cookie downloads unchanged (APK compatible). Selfies are served by the media file
+    endpoint too (`selfies`), with `view_sensitive` for other people's selfies.
+  - `/admin/*` without a session cookie → real **302** to `/admin/login?redirect=…` (Next proxy) instead of the 200 shell.
+  - Settlement reversal: `POST /api/v1/expense-requests/{id}/settle/reverse {reason}` (Finance) voids the refund KM /
+    shortfall transfer + KK, LPJ back to "Terverifikasi", request "LPJ Terverifikasi", balances restored, audited;
+    closed period → 409; button "Batalkan penyelesaian LPJ" on the request detail. Migration
+    `20260926_131136_s3a_e9_hardening` (4 additive columns on `settlements`, guard update).
+  - 403 before 409 (UAT 5.2): authorization failures are answered before state conflicts (expense flow, addendum).
+  - `login_failed` audit for logins refused on the ProyekKas side (OIDC callback failure, unknown/inactive account);
+    Keycloak event log = source of truth for wrong passwords (ADR 0003 §7). Hash chain deferred (ADR 0006 §5).
+  - CI: unit-test coverage gate (`npm run test:coverage`, thresholds in `apps/web/vitest.config.ts`).
+  - Docs: ASVS L1 self-checklist `docs/proyekkas/security/asvs-l1-checklist.md`.
+- **S3 track C — E10 images on GHCR + prod compose** (branch `feat/s3c-e10-ghcr-ci`): `ci.yml` job `image` builds web +
+  migrate on GitHub runners (buildx, GHA cache), Trivy gate (fail on fixable CRITICAL, HIGH/CRITICAL reported in the job
+  summary), pushes `ghcr.io/bctech-adm/proyekkas-{web,migrate}` with OCI labels, SBOM and provenance (`develop` →
+  `sha-<sha7>` + `<ver>-stg-<sha7>`, tag `vX.Y.Z` → `X.Y.Z`, `ci/ghcr-*` → `test-<sha7>`); `deploy/prod/docker-compose.yml`
+  (identical to the infra prep except comments); inert, approval-gated `deploy-prod.yml` (environment `infra-deploy`);
+  runbook `docs/proyekkas/runbooks/ci-ghcr.md`.
+- **S3 web B — E11 data go-live: template Excel + impor idempoten + cut-over** (`apps/web`, fase1-golive §E11,
+  Q-17/19/20/22/23/36/37/40; branch `feat/s3b-e11-data-import`):
+  - Workbook `docs/proyekkas/templates/drms-impor-golive-template.xlsx` (sheet Petunjuk + Pengaturan, Bank, Satuan,
+    Kategori, Karyawan, Pengguna, Rekening, PusatBiaya, Project, Tahapan, RAB, Kendaraan, Penugasan, AkunKas; header
+    check, dropdowns, number ranges, input hints) and a FICTIONAL sample, both generated reproducibly by
+    `npm run gen:import-template` (`check:import-template` guards drift).
+  - Import CLI `payload run src/import/cli.ts -- (--dry-run|--commit) --file … [--kc-map …] [--out …]` (migrate image,
+    APP role): errors per sheet/row/column; dry-run executes every write in one transaction that is always rolled
+    back; commit = one transaction per master, upsert on natural keys (second run = no-op), audit action `import`.
+    Keycloak is not called: users without a `username → id` mapping are skipped and exported
+    (`…-keycloak-users.json/csv`, no passwords) for the infra Lead.
+  - Cut-over: opening balance + `openingBalanceDate` = go-live date, month before go-live closed, PB `startAt` from the
+    workbook (229, Q-17; counter raised upward only, audited).
+  - Opening balance lock after the first close on/after the opening month (hook 409 + DB trigger); no cash entry
+    before an account's opening date (ADR 0005 "As implemented (S3b)"). Runbook `docs/proyekkas/runbooks/import-data-golive.md`.
+  - Migration `20260926_133934_s3b_data_import` (additive: enum value `import`, `cash_accounts.opening_balance_date`,
+    CHECK + two triggers).
+- **APK S2 — laporan progress (E4) + absensi lengkap (E6)** (`apps/mobile`, branch
+  `feat/mobile-s2-progress-attendance`). Progress: offline-first reports (project/stage, % never below the stage %,
+  ≤ 5 rear-camera photos compressed on the phone, `progress_report.draft_upsert` or online POST/PATCH when
+  `syncProgressReports` is off), list/detail with photo thumbs, edit ≤ 24 h with reason, conflict screen (server vs
+  phone), K-09 "progress fisik vs anggaran" cards (PM/Direktur home + tab). Absensi: check-in/out at a project or a
+  pusat biaya with distance feedback, monthly recap calendar, "Tim hari ini", PM on-behalf (reason, front/back
+  camera, offline), corrections (online). Local DB schema v2 (`local_progress_reports`, additive). Fix: saving an
+  expense draft no longer deletes queued selfies/progress photos. E5 Addendum RAB on the APK: section in the
+  Direktur/Finance inbox, detail with RAB impact + timeline + server `allowedActions` (Setujui Direktur / Finance,
+  Tolak with reason), PM create/submit/cancel (online, Idempotency-Key).
+- **S2 web A — E4 progress web + E5 Addendum RAB** (`apps/web`, fase1-golive §E4/§E5, US-12/18/29/30/31; branch
+  `feat/s2a-progress-web-addendum`):
+  - Admin views `/admin/progress` (K-09 progress fisik vs % anggaran per project, KPI tiles, table view),
+    `/admin/progress/project/{id}` (stage bars, stage editor with live 100 % validation — Direktur add/deactivate,
+    PM rename/reorder/re-weight, reason on re-weight — timeline per stage, addenda of the project),
+    `/admin/progress/laporan` (filters project/stage/date) and `/admin/progress/laporan/{id}` (photo gallery). Beranda
+    Direktur/Finance/PM: card "Progress fisik vs anggaran" (US-12) and "Progress fisik" column; PM "Lapangan" card shows
+    the latest progress reports. Report `anggaran-project`: "Progress fisik" + K-09 status columns (was "F5").
+  - Addendum RAB (T12): collection `budget-addenda` (`ADD/YYMM/####`), `/api/v1/budget-addenda` (list, inbox, detail,
+    create/patch/submit/cancel for the PM of the team, acknowledge = Direktur, approve = Finance, reject with reason;
+    Idempotency-Key, APK-ready). Approval through `approval-rules` docType `budget_addendum` (ADR 0013 engine);
+    decisions are `approvals` rows (docType `budget_addendum`); final approval raises `projects.budget` = current RAB +
+    addition in the same transaction (audit before → after); in-app notifications. Web `/admin/addendum`,
+    `/admin/addendum/baru`, `/admin/addendum/detail/{id}`; "Persetujuan" lists addenda too. Nav: Progress project,
+    Laporan progress, Addendum RAB.
+  - Migration `20260926_114555_e5_budget_addenda` (additive: new table + guards, `approvals.addendum_id`,
+    `approvals.request_id` nullable with an owner CHECK per docType, G1 trigger for addenda, default rule
+    "Default Addendum RAB — Direktur lalu Finance").
+- **S2 web B — E6 absensi web + retensi selfie + E7 pengingat terjadwal** (`apps/web`, fase1-golive §E6/§E7, US-09/11/13/14/15,
+  M12/M13, Q-30/33/40; branch `feat/s2b-attendance-web-reminders`):
+  - Admin views `/admin/absensi` "Tim hari ini" (belum absen / hadir / selesai board, times, project/pusat biaya, late,
+    diabsenkan PM, filters date/project/cost center), `/admin/absensi/rekap` (per employee: month calendar with
+    status legend, KPI tiles, day detail, T10 correction dialog before → after with mandatory reason, correction history,
+    audited selfie viewer; without employee: team grid employees × days + totals; Staff: own recap), `/admin/absensi/jadwal`
+    (company default schedule, schedule list, employee schedule assignment, holidays per year + add, cost-center geofence
+    lat/lng/radius editor with an OpenStreetMap link — no embedded map). Nav "Absensi" (PM/Finance/Direktur/Admin),
+    "Rekap absensi saya" (Staff). Beranda PM: widget "Kehadiran tim hari ini" replaces the F5 placeholder. Laporan
+    absensi rows link to the employee recap; stale "Rekap absensi (F5)" row removed from `/admin/laporan`.
+  - Retensi selfie (Q-33): job `selfieRetention` deletes selfie FILES older than `selfieRetentionMonths` when
+    `company-settings.selfieRetentionDeleteEnabled` is on (**default OFF** = dry run), at most `selfieRetentionBatch`
+    (default 200) per night, oldest first, face reference photos never; media row kept as tombstone
+    (`media_selfies.removed_at`, immutable once set) because attendances are append-only; one `retention_purge` audit row
+    per run (counts only). Attendance rows untouched; selfie endpoint answers 404.
+  - Pengingat terjadwal (E7, M12/US-11): job `dailyReminders` (hourly tick, one run per business day at/after
+    `reminderHour`, company TZ) — laporan progress terlambat → PM + Direktur; uang muka tanpa nota/LPJ > `lpjDueDays` →
+    pemohon + Finance; revisi nota/LPJ menggantung ≥ `reminderRevisionDays` → pemohon; komitmen anggaran ≥ ambang
+    kuning/merah → Direktur + Finance + PM (once per threshold per project). Exactly one notification per recipient,
+    rule, subject and day (`reminder_deliveries`, append-only); inactive users and archived projects excluded; in-app
+    always, email via the `sendEmail` queue when `reminderEmailEnabled` (**default OFF**). Settings per rule in
+    company-settings ("Pengingat terjadwal (E7)").
+  - Migration `20260926_104606_s2b_attendance_reminders` (additive: nullable/defaulted columns, 2 new tables, enum values).
+- **E6 backend — absensi lengkap** (`apps/web`, fase1-golive §E6, US-01/02/09/13/14/15, Q-30/33/40; branch
+  `feat/e6-attendance-backend`). Web/APK screens follow in S2; `syncAttendanceEnabled` stays **off** by default.
+  - Cost-center geofence (Q-40): `cost-centers` lat/lng/radius (optional); sync check-in/out takes `project_id` XOR
+    `cost_center_id`; one check-in/out per employee/location/day (DB unique index for both).
+  - "Diabsenkan oleh PM" (US-14): sync item `attendance.on_behalf` (was `unsupported`) — PM only, team location,
+    employee assigned that day, not the PM themself, reason required, GPS + photo from the PM phone; stored with
+    `source = pm`, `recordedBy`, `onBehalfReason` (DB CHECK); employees without an account supported (`user` empty).
+  - Koreksi absensi T10 (US-15): `POST /api/v1/attendance/{id}/correct` (team PM or Admin, never own attendance,
+    reason ≥ 3, same local date, order check-in ≤ check-out, not in the future, Idempotency-Key). New append-only
+    collection `attendance-corrections` (DB triggers + no UPDATE/DELETE for the app role); the newest correction is
+    the effective time everywhere; audit `update attendanceTime` old → new with the reason; denied attempts audited.
+  - Jadwal/libur/terlambat (Q-30): `work-schedules.workDays` (Mon–Sat default), `employees.workSchedule`,
+    `company-settings.defaultWorkSchedule`; schedule snapshot on each attendance; late = minutes after start when
+    above the tolerance, early leave, work minutes, holiday/off-day attendance flagged (never late).
+  - Rekap bulanan (US-09) `GET /api/v1/attendance/me?month=`, recap of an employee `GET /api/v1/attendance/recap`
+    (PM team / Direktur / Finance / Admin), tim hari ini (US-13) `GET /api/v1/attendance/team-today`, selfie viewer
+    `GET /api/v1/attendance/{id}/selfie` (Q-33 roles, audited `view_sensitive`).
+  - Laporan absensi (M13): report `absensi` (CSV/XLSX) on `/admin/laporan` and `/api/v1/reports/absensi`.
+  - Retensi selfie (Q-33): `company-settings.selfieRetentionMonths` (default 12) + daily job `selfieRetention`
+    (**dry run**: counts candidates, never face reference photos; file deletion = S2).
+  - Masters for the APK: cost centers with lat/lng/radius, work schedules with `workDays`.
+  - Migration `20260926_091848_e6_attendance` (additive; staging-safe: no existing row rewritten).
+- **E4 backend — project stages + progress reports** (`apps/web`, fase1-golive §E4, T11, US-10/11/12/29/31; branch
+  `feat/e4-progress-backend`; web views = Sprint S2, APK screens = E4-APK):
+  - Collection `progress-reports` (`LP/YYMM/####`; project, stage, % before → after, project % before → after, pekerjaan,
+    kendala, pelapor, ≤ 5 photos in `media-progress-photos`, offline/time-trust flags). Written only by the domain
+    service; HTTP collection writes closed. Read: PM team, Direktur/Finance all (Staff/Admin none).
+  - API: `POST/GET /api/v1/progress-reports`, `GET/PATCH /api/v1/progress-reports/{id}` (edit ≤ 24 h by the reporter,
+    reason required), `GET/PUT /api/v1/projects/{id}/stages` (stage editor: whole set = 100 %, G11), `GET
+    /api/v1/projects/progress` (K-09 progress fisik vs anggaran), media kind/file collection `progress-photos`,
+    `/me` capability `progressReportCreate`, masters `projects.progressPct`, `project-stages.active`. Problem responses
+    of E4 carry a `code` (e.g. `WEIGHTS_INCOMPLETE`, `PROGRESS_DECREASED`, `PHOTO_LIMIT`). OpenAPI regenerated.
+  - Project physical progress `projects.progressPct` = Σ(weight × stage %) / 100, recalculated in the same transaction
+    as the report / stage edit, audited before → after; stage/project % cannot be written directly (403 + DB guard).
+  - Sync: `progress_report.draft_upsert` is processed (was `unsupported`): create or edit (base_rev, conflict +
+    `server_report`), idempotent by `client_uuid`; `GET /app/config` `features.syncProgressReports` from the new
+    company setting `syncProgressReportsEnabled` (default on).
+  - E7 hook points: `lateProgressProjects()` / `notifyLateProgressReport()` (no schedule).
+  - Migration `20260926_095319_e4_progress_reports` (additive: new table + 4 defaulted/nullable columns; DB guards:
+    progress_pct guard, report 24 h window, no delete, immutable identity columns, ≤ 5 photos per report).
+- **E1 APK + E3 APK parity** (`apps/mobile`, fase1-golive §E1 AC-10, §E3-b/c/d; branch `feat/mobile-e1-e3`):
+  - Approval inbox/tab from `GET /api/v1/me` `capabilities.approvalInbox` (Direktur + Finance, ADR 0013), no longer
+    `owner || pm`; PM gets a read-only **team monitor** (home KPIs from `/dashboard/pm`, "Tim" tab = `scope=team`).
+    Inbox cards show the server `stepLabel`; the Direktur's "Diketahui" is a "Setujui (Diketahui)" decision;
+    403 on a decision shows why and reloads. Timeline: "Diketahui (Direktur)", "Approval (Finance)", skipped
+    positions "(tidak berlaku — pemohon)"; pre-E1 snapshots keep the PM label. "Owner" → "Direktur" in the app.
+  - Requester parity with the web: "Tarik kembali ke Draft" / "Batalkan pengajuan" (reason ≥ 3), "Ajukan ulang"
+    (rejected → new draft), "Ubah & ajukan di HP" imports a server draft into the offline editor (server receipts
+    read-only, `draft_upsert` identifies it by `request_id`); "Riwayat" screen (`GET …/history`, web labels).
+  - Home KPI cards for Direktur/Finance (`/dashboard/owner|finance`, same data as the web Beranda) with sparklines,
+    a budget meter and a tappable monthly cash-flow chart.
+  - Background sync with WorkManager (`workmanager` 0.10.10): periodic 15 min + one-off after an unfinished run;
+    encrypted DB + token store opened in the task isolate; one token owner per process.
+  - Unknown routes show an Indonesian error page; release builds show readable text instead of a grey box
+    (salvaged from `fix/mobile-login-redirect`).
+  - CI: job `release-prod` (main / tag `mobile-vX.Y.Z`, environment `android-release-prod` approval, production key
+    from environment secrets, SHA-256 printed, `apksigner` check, secret scan). No key is created by CI.
+  - `config/prod.json` login mode = `password` (K3 / G1-3; needs Direct Access Grants in realm `drms`, E10).
+- **E2 — web Finance UI for cash** (`apps/web`, fase1-golive §E2, US-23/US-24, ADR 0005; branch
+  `feat/e2-finance-cash-ui`): admin views `/admin/kas` (buku kas with filters akun/periode/project/pusat biaya/arah/
+  status, saldo per akun tiles, void rows kept and linked to their jurnal balik), `/admin/kas/baru` (kas masuk/keluar:
+  tanggal, akun, sumber/kategori, project XOR pusat biaya, nominal, keterangan, bukti upload, kendaraan for kas keluar),
+  `/admin/kas/:id/ubah` (edit before period close, reason required), `/admin/tutup-buku` (close a past month; re-open =
+  Direktur = role `pk-owner`, G1-1). Void (cash entry) and Void transfer (Antrian Transfer + request detail) through a
+  reason dialog. All writes go to the existing `/api/v1` domain endpoints with `Idempotency-Key`; the collections keep
+  `create/update: denyAll`. Menu "Kas"/"Tutup buku" for Finance and Direktur only.
+  - API: `GET /api/v1/cash-entries` filters `projectId`/`costCenterId`; `PATCH /api/v1/cash-entries/{id}` honours
+    `Idempotency-Key`. No migration.
+- **F4b APK completion** (branch `feat/f4b-mobile-completion`; gap analysis `docs/proyekkas/f4/f4-gap-analysis.md`,
+  phone test script `docs/proyekkas/f4/f4-e2e-scenario.md`):
+  - API: a valid token on a revoked/lost device gets `401` with `code: DEVICE_REVOKED`; the APK logs out on that first
+    answer with an Indonesian message and a new install id.
+  - Device integrity flags (root, emulator, developer options, ADB; mocked GPS per attendance fix) reported in
+    `POST /api/v1/devices/register` and stored on `devices` (`integrityRisk`, `integrity*`) — recorded, never blocking
+    (Q-43 proposal); warning on the APK home screen. Migration `20260925_015425_f4b_device_integrity` (additive).
+  - APK: transfer status (amount, date, bank reference, void reason) and LPJ summary on the request detail; online
+    receipts after approval (camera/gallery, device compression), remove receipt, "Nota sudah lengkap",
+    "Kirim LPJ"/"Kirim ulang LPJ", "Kirim ulang nota", "Tandai selesai"; in-app notifications (bell + list, polling).
+  - Attendance, F4 slice: own check-in/out at an assigned project from the APK, offline-capable (GPS via geolocator
+    14.0.3, front-camera selfie, server geofence/mock/assignment/one-per-day checks, server-estimated time). Company
+    setting `syncAttendanceEnabled` (default off). New collection `attendances` (append-only), migrations
+    `20260925_023715_f4b_attendance` + `20260925_023716_f4b_attendance_security` (additive), `POST /api/v1/media/selfies`.
+  - Env `PUSH_FCM_ENABLED` in the schema (default false; `true` refused until the FCM dispatcher exists).
+  - CI: static secret scan of every built APK (`apps/mobile/tool/apk_secret_scan.sh`: gitleaks + trivy + deny-list).
+- **F3 dashboards, reports and exports** (`apps/web`; design `docs/proyekkas/f3/*`, approved by the user 2026-09-24 with
+  all defaults Q-F3-1…8): role home pages replacing the Payload dashboard (`admin.components.views.dashboard`) for
+  Owner, Finance, PM (team scope), Admin and Staff, server-rendered with inline SVG charts (no chart library,
+  `<title>` tooltips + data table), budget status always with a text label (Komitmen basis), attendance/progress as
+  "F5" placeholders; `/admin/laporan` with 7 reports (Rekap Kas, Buku Kas, Pengeluaran per Kategori, Anggaran Project,
+  Rekap Pengajuan, Kelengkapan Nota/LPJ, Biaya per Kendaraan) with plain GET filters and keyset paging; global
+  `/admin/audit-log` for Owner/Admin/Finance (read-only; opening it is audited). Every KPI follows
+  `kpi-definitions.md` (K-01…K-17) and is reconciled against its SQL rule on ≥ 500 generated requests
+  (`tests/integration/f3-kpi-reconciliation.int.test.ts`).
+- **API:** `GET /api/v1/dashboard/{owner,finance,pm,admin,me}`, `GET /api/v1/reports/{code}` (JSON, same filters/scope
+  as the web page) and `GET /api/v1/reports/{code}/{csv|xlsx|pdf}` (audited `export`, 10/min per user).
+- **Exports:** CSV always (streamed in 1 000-row keyset pages, UTF-8 BOM, `;`, CRLF, formula-injection guard, ≤ 100 000
+  rows); XLSX via `write-excel-file` 4.1.1 (MIT, lazy import, ≤ 10 000 rows → else 413, amounts `#,##0`, real dates,
+  no formula cells; env `EXPORT_XLSX_ENABLED=false` hides it / 404); PDF (A4 landscape, ≤ 500 rows) for Rekap Kas,
+  Pengeluaran per Kategori and Anggaran Project with the existing `@react-pdf/renderer`. XLSX and PDF share one
+  in-process semaphore (2 concurrent, 10 s → 503) with the F2 document PDF (`lib/heavy-gate.ts`).
+- **Company setting `lpjDueDays`** (default 7, Q-F3-1): Uang Muka without LPJ older than this since the first advance
+  transfer is "LPJ terlambat". Migration `20260924_110138_f3_reports` (one column with a constant default) — additive.
+- Nav links "Laporan" (Finance/Owner/PM) and "Audit Log" (Owner/Admin/Finance); `data-pk-*` selectors for UAT.
+
+- **F4 APK backend** (`apps/web`, ADR 0010): `POST /api/v1/sync/batch` (bearer + registered device; drafts
+  create/edit/delete + receipts per line, per-item transactions, idempotent by `client_uuid` via `sync_receipts`,
+  `rev`/`base_rev` conflicts — server wins, offline device time stored as comparison only, attendance/progress →
+  `unsupported` until F5); public `GET /api/v1/app/config` (min/latest APK version, download URL, company TZ,
+  feature flags incl. `pushEnabled:false`); `/.well-known/assetlinks.json` (env `ANDROID_APP_PACKAGE`,
+  `ANDROID_APP_CERT_SHA256`); request detail gains `rev`, `timeline` and `nextActor` ("Giliran"); device
+  registration accepts `fcmToken: null`. Migrations `20260924_025114_f4_mobile_sync` (columns
+  `expense_requests.sync_rev`, `receipts.client_uuid`, company-settings gate fields) and
+  `20260924_025115_f4_security` (table `sync_receipts`, immutable `receipts.client_uuid`) — additive.
+
+### Changed
+- **Approval flow Direktur → Finance, PM monitors only** (Epic E1, ADR 0013 accepted, GATE 1 fase1-golive 2026-09-26;
+  branch `feat/e1-approval-direktur-finance`): the role `pk-owner` is shown as **"Direktur"** (no new Keycloak role).
+  "Diketahui" is now the Direktur's **approval** (inbox "Persetujuan Direktur (Diketahui)", button "Setujui"), followed
+  by **Finance** approval, for every amount. Approval rules refuse PM/Staff/Admin deciders, the retired "PM project /
+  penanggung jawab" acknowledger and an optional Direktur (400); PM/Staff/Admin acknowledge/approve/reject → 403 +
+  `access_denied` audit; the PM keeps read access to team requests and no longer gets approval notifications or the
+  "Persetujuan" link. G1-2: a position whose only holder is the requester/creator is skipped (audit
+  `approval_skipped`, PDF "(tidak berlaku — pemohon)"); no independent decision → submit 409. Status label
+  "Menunggu Diketahui (Direktur)"; notification "… menunggu persetujuan Anda sebagai Direktur". Requests submitted
+  before the change finish on their old snapshot (PM "Diketahui", F2e delegation).
+  - Migration `20260926_022918_e1_approval_direktur_finance` (additive): audit action `approval_skipped`, new
+    `approval_rules` column defaults, the two seeded rules rewritten + renamed with audit rows. Seed and UAT seed
+    (up to two Direktur and two Finance users) follow.
+  - API (additive, for the APK): `GET /api/v1/me` → `capabilities.{approvalInbox,teamMonitor}`; request detail
+    `approvalRule.{acknowledgeBy,acknowledgeRole,decisionRoles,skipped}`; `GET /api/v1/approvals/inbox` items
+    `stepLabel`, `decisionFlow`.
+- **Admin UI retheme to the web-starter design system** (branch `feat/cms-theme-web-starter`; visual only, no
+  behaviour/data change): trust blue `#2563EB` primary, orange `#EA580C` CTA (SSO login button), slate surfaces with a
+  designed dark palette, Space Grotesk headings / DM Sans body self-hosted via `next/font` (CSP `font-src 'self'`
+  unchanged), radius 0.875rem, glass login card and header, card/table surfaces, visible 2px focus ring (also on
+  Payload's nav group toggle), reduced-motion honoured. Mechanism (Payload 3.90.1): `(payload)/custom.scss` inside
+  `@layer payload`, colour tokens on `<html>` via `RootLayout` `htmlProps`, `admin.components.graphics` Icon/Logo
+  with the ProyekKas DRMS name. Tokens in `apps/web/src/theme/tokens.ts`, WCAG contrast checked by
+  `tests/unit/theme.test.ts`; hard-coded status colours in the work views replaced by tokens (white on the old
+  orange `#ef6c00` was 2.9:1).
+- **Beranda redesigned as a data dashboard** (same branch; user feedback 2026-09-25 "terlalu text based"): per role
+  a KPI stat-tile row (compact value + exact value, delta vs previous month, 12-point mini columns, meters), charts
+  and card tables in a responsive 12-column bento grid (tablet 2 columns, phone 1). Owner: saldo kas, pengajuan
+  menunggu (Diketahui/Approval split), pencairan bulan ini, realisasi vs anggaran; arus kas bulanan (masuk vs keluar
+  columns, one axis), status pipeline, realisasi vs RAB per project (bullet rows), komposisi biaya per kategori
+  (sorted bars, top 6 + "Lainnya", no donut), tren pengajuan, saldo per akun, menunggu tindakan saya, transaksi
+  kas terbaru, project realisasi tertinggi. Finance: saldo, antrian transfer, menunggu verifikasi, kas
+  masuk/keluar bulan ini, selisih LPJ; antrian transfer teratas, uang muka belum LPJ, pencairan per bulan. PM (team
+  scope): menunggu Diketahui, pengajuan tim, LPJ tim, realisasi anggaran; bullets, pipeline, tren, komposisi.
+  Staff: perlu tindakan, diproses, bulan ini, selesai; own pipeline and monthly value. **No chart library** (kept
+  the existing server-rendered inline SVG approach; one ~70-line client component for hover/focus tooltips, text
+  via React); every chart has a table view, focusable marks with accessible names, status always icon + label,
+  skeleton via Suspense, one subtle enter animation off under `prefers-reduced-motion`. Chart colours are ramp
+  steps of `theme/tokens.ts` validated per mode with the dataviz palette validator (dark mode uses blue-450: the
+  dark primary blue-400 fails the chart lightness band). New read-only, scope-parameterised queries
+  (`requestStatusCounts`, `requestTrendMonthly`, `disbursedMonthly`, `recentCashEntries`, `transferQueueTop`);
+  the cash-ledger rows are office-scope only. `GET /api/v1/dashboard/*` responses gain an additive `viz` object
+  (owner `approvals.pendingAck/pendingApproval`, staff `month`); OpenAPI regenerated. No schema change/migration.
+  `data-pk-*` UAT selectors kept (the KPI list items of Owner/Finance/PM now sit in tiles/cards, tables in
+  "Tabel angka").
+- The F2 PDF semaphore moved to `lib/heavy-gate.ts` (shared with the F3 exports); behaviour unchanged.
+
+### Fixed
+- Reimburse receipt revision with a changed grand total now goes back to "Menunggu Diketahui (Direktur)" (new cycle)
+  instead of straight to "Menunggu Approval" (ADR 0013 §6); a role-based "Diketahui" without any active holder is
+  refused at submit (409) instead of leaving the request stuck in "Menunggu Diketahui".
+- Manual cash entry with a proof (`proofId`) always failed with 400 "Alasan wajib diisi saat mengedit transaksi kas."
+  (the proof was attached by a follow-up update that hit the edit-reason rule); the proof is now set on insert (E2).
+- APK (staging phone test, ADR 0010 "Phone test fixes"): "Offline" shown on working mobile data — a successful API
+  answer now always means online and a `GET /api/v1/health` probe recovers from failures and wrong `none` reports;
+  logout that never finished — now always returns to the login screen (network part ≤ 5 s, local clean-up always,
+  unsent data kept with a warning); slow first load — home from the cached profile at once, device registration,
+  `/me` and `/app/config` in the background, integrity checks off the Android main thread.
+- `media-selfies` stored WebP while accepting only `image/jpeg`, so every selfie upload failed with "Invalid file type";
+  selfies are now stored as JPEG q75 (F4b).
+- APK: a failed masters refresh at login (e.g. 401/5xx) no longer surfaces as an unhandled async error (F4b).
+- **Report "Anggaran Project" with a project filter** (F3 UAT): the per-category table used
+  `FULL JOIN … ON category_id IS NOT DISTINCT FROM …`, which PostgreSQL 16 rejects ("FULL JOIN is only supported with
+  merge-joinable or hash-joinable join conditions"), so the page ("Data tidak dapat dimuat…"), JSON and CSV/XLSX/PDF
+  exports failed. RAB and Komitmen per category are now merged with `UNION ALL` + `GROUP BY` (same K-07 result,
+  uncategorised lines in one "Tanpa kategori" bucket). New `tests/integration/f3-report-filters.int.test.ts`: the
+  per-category detail in all formats against the K-07 SQL rule, plus a smoke matrix of every report × every filter.
+
 ## [0.2.1] - 2026-09-24
 
 ### Fixed
-- OpenAPI documents regenerated for package version 0.2.0 (the 0.2.0 release bump missed `gen:openapi`,
-  which failed the CI drift check). No code change.
+- OpenAPI documents regenerated for the release version (the 0.2.0 bump missed `gen:openapi`, which failed the
+  CI drift check). No code change.
 
 ## [0.2.0] - 2026-09-24
 

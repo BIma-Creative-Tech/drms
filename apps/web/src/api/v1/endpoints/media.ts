@@ -5,12 +5,15 @@ import { Readable } from 'node:stream'
 import type { CollectionSlug, PayloadRequest } from 'payload'
 
 import { relId, userId } from '@/access/roles'
-import { writeAudit } from '@/audit/writer'
+import { writeAudit, writeAuditDetached } from '@/audit/writer'
 import { visibleRequestIds } from '@/domain/expense/access'
+import { getEnv } from '@/lib/env'
+import { ImageQueueFullError, withImageSlot } from '@/lib/image-queue'
 import { fileSize, mediaPath } from '@/lib/media-files'
+import { parseSignedParams, signedMediaPath, signingKeys, signMedia, verifyMedia } from '@/lib/signed-url'
 import { withReqTransaction } from '@/lib/system-tx'
 
-import { HttpError, json, v1 } from '../http'
+import { HttpError, json, problem, v1 } from '../http'
 import { FileCollectionEnum, MediaKindEnum } from '../schemas-flow'
 
 const COLLECTION: Record<string, CollectionSlug> = {
@@ -18,6 +21,10 @@ const COLLECTION: Record<string, CollectionSlug> = {
   'transfer-proofs': 'media-transfer-proofs',
   signatures: 'media-signatures',
   attachments: 'media-attachments',
+  // F4b attendance selfie (720 px, JPEG in / WebP stored, EXIF stripped — ADR 0004).
+  selfies: 'media-selfies',
+  // E4 progress photos (1600 px JPEG, EXIF/GPS stripped; ≤ 5 per report — ADR 0004, US-10).
+  'progress-photos': 'media-progress-photos',
 }
 
 /**
@@ -32,20 +39,38 @@ export const uploadMediaEndpoint = v1({
   method: 'post',
   multipart: true,
   rateLimit: [60, 60_000],
-  transactional: true,
+  // E9 P-1: the transaction is opened INSIDE the image-queue slot (below), so a queued upload does
+  // not hold a pooled DB connection while it waits.
+  transactional: false,
   handler: async ({ req, params }) => {
     const kind = MediaKindEnum.safeParse(params.kind)
     if (!kind.success) throw new HttpError(404, 'Not Found')
-    if (!req.file?.data?.length) throw new HttpError(400, 'Bad Request', { detail: 'Field "file" wajib (multipart/form-data).' })
-    const doc = (await req.payload.create({
-      collection: COLLECTION[kind.data]!,
-      data: {},
-      file: req.file,
-      depth: 0,
-      user: req.user,
-      overrideAccess: false, // collection create access decides who may upload what
-      req,
-    })) as unknown as { id: number; mimeType?: string; filesize?: number; width?: number; height?: number; sha256Original?: string }
+    const file = req.file
+    if (!file?.data?.length) throw new HttpError(400, 'Bad Request', { detail: 'Field "file" wajib (multipart/form-data).' })
+    const create = () =>
+      withReqTransaction(req, () =>
+        req.payload.create({
+          collection: COLLECTION[kind.data]!,
+          data: {},
+          file,
+          depth: 0,
+          user: req.user,
+          overrideAccess: false, // collection create access decides who may upload what
+          req,
+        }),
+      )
+    let doc: { id: number; mimeType?: string; filesize?: number; width?: number; height?: number; sha256Original?: string }
+    try {
+      // Raster images are re-encoded by sharp → one image-queue slot per upload (PDFs are stored as-is).
+      doc = (await (file.mimetype?.startsWith('image/') ? withImageSlot(create, `media:${kind.data}`) : create())) as unknown as typeof doc
+    } catch (err) {
+      if (err instanceof ImageQueueFullError) {
+        const res = problem(503, 'Service Unavailable', { code: 'UPLOAD_BUSY', detail: 'Server sedang memproses banyak foto. Unggahan akan dicoba lagi otomatis.' })
+        res.headers.set('Retry-After', String(err.retryAfterSeconds))
+        return res
+      }
+      throw err
+    }
     return json(
       {
         id: doc.id,
@@ -67,12 +92,24 @@ const FILE_COLLECTION: Record<string, CollectionSlug> = {
   signatures: 'media-signatures',
   attachments: 'media-attachments',
   company: 'media-company',
+  // E4: readable by the uploader, office roles and readers of the owning progress report.
+  'progress-photos': 'media-progress-photos',
+  // E9: attendance selfies (uploader, office roles, readers of the referencing attendance — Q-33).
+  selfies: 'media-selfies',
+}
+
+/** Collections whose reads by someone other than the uploader are audited `view_sensitive`. */
+const SENSITIVE: Partial<Record<CollectionSlug, string>> = {
+  'media-transfer-proofs': 'media_transfer_proofs',
+  'media-selfies': 'media_selfies',
 }
 
 type MediaDoc = {
   id: number
   filename?: string | null
   mimeType?: string | null
+  uploadedBy?: unknown
+  removedAt?: string | null
   sizes?: { thumb?: { filename?: string | null; mimeType?: string | null } | null } | null
 }
 
@@ -110,44 +147,119 @@ async function signatureOnVisibleRequest(req: PayloadRequest, mediaId: number): 
 }
 
 /**
+ * E9: a selfie is also readable by everyone who may read the ATTENDANCE referencing it (PM team,
+ * Q-33) — same rule as GET /attendance/{id}/selfie, evaluated with the caller's access.
+ */
+async function selfieOnVisibleAttendance(req: PayloadRequest, mediaId: number): Promise<boolean> {
+  const res = await req.payload.find({
+    collection: 'attendances',
+    where: { selfie: { equals: mediaId } },
+    depth: 0,
+    limit: 1,
+    pagination: false,
+    select: { selfie: true },
+    user: req.user,
+    overrideAccess: false, // the caller's attendance scope decides
+    req,
+  })
+  return res.docs.length > 0
+}
+
+/**
+ * The media row when the CURRENT req.user may read it (collection read access with
+ * overrideAccess:false, plus the owner-document fallbacks for signatures and selfies), else null.
+ * Shared by the file download, the signed-URL minting and the signed-URL re-check.
+ */
+async function readableMedia(req: PayloadRequest, slug: CollectionSlug, id: number): Promise<MediaDoc | null> {
+  let doc = (await req.payload.findByID({ collection: slug, id, depth: 0, user: req.user, overrideAccess: false, req }).catch(() => null)) as MediaDoc | null
+  const fallback =
+    (slug === 'media-signatures' && (() => signatureOnVisibleRequest(req, id))) || (slug === 'media-selfies' && (() => selfieOnVisibleAttendance(req, id))) || null
+  if (!doc && fallback && (await fallback())) {
+    doc = (await req.payload.findByID({ collection: slug, id, depth: 0, overrideAccess: true /* SYSTEM-READ: visibility checked above */, req }).catch(() => null)) as MediaDoc | null
+  }
+  return doc
+}
+
+function parseTarget(params: Record<string, string>, req: PayloadRequest): { kind: string; slug: CollectionSlug; id: number; variant: 'thumb' | null } {
+  const kind = FileCollectionEnum.safeParse(params.collection)
+  if (!kind.success) throw new HttpError(404, 'Not Found')
+  if (!/^\d{1,10}$/.test(params.id ?? '')) throw new HttpError(404, 'Not Found')
+  const variant = req.searchParams.get('variant')
+  if (variant !== null && variant !== 'thumb') throw new HttpError(400, 'Bad Request', { detail: 'variant hanya "thumb".' })
+  return { kind: kind.data, slug: FILE_COLLECTION[kind.data]!, id: Number(params.id), variant }
+}
+
+const nowS = () => Math.floor(Date.now() / 1000)
+const keys = () => signingKeys(getEnv())
+
+/**
+ * Signed request (…?exp&uid&sig): verifies the HMAC, the expiry and the user, then makes that user
+ * the request user so every later check (read access, audit) runs as them. Any failure → 403 (ADR
+ * 0004 §4 / E9 AC: expired → 403; valid signature but the user may not read the file → 403).
+ */
+async function authenticateSigned(req: PayloadRequest, t: { kind: string; id: number; variant: string | null }): Promise<void> {
+  const p = parseSignedParams(req.searchParams)
+  if (!p) throw new HttpError(403, 'Forbidden', { code: 'URL_INVALID', detail: 'Tautan file tidak valid.' })
+  const result = verifyMedia({ collection: t.kind, id: t.id, variant: t.variant, userId: p.uid }, p, keys(), nowS())
+  if (result === 'expired') throw new HttpError(403, 'Forbidden', { code: 'URL_EXPIRED', detail: 'Tautan file sudah kedaluwarsa. Buka ulang dari aplikasi.' })
+  if (result !== 'ok') throw new HttpError(403, 'Forbidden', { code: 'URL_INVALID', detail: 'Tautan file tidak valid.' })
+  const found = await req.payload.find({
+    collection: 'users',
+    where: { and: [{ id: { equals: p.uid } }, { active: { equals: true } }] },
+    limit: 1,
+    depth: 0,
+    pagination: false,
+    overrideAccess: true, // SYSTEM-READ: the user the URL was minted for (signature verified above)
+    req,
+  })
+  const user = found.docs[0]
+  if (!user) throw new HttpError(403, 'Forbidden', { code: 'URL_INVALID', detail: 'Tautan file tidak valid.' })
+  req.user = { ...user, collection: 'users', _strategy: 'signedUrl' } as unknown as PayloadRequest['user']
+}
+
+/**
  * GET /api/v1/media/{collection}/{id}/file[?variant=thumb] — authenticated, scoped file download
- * for the APK (ADR 0004 §4; Traefik strips bearer tokens on the Payload-proxied /api/<slug>/file
- * path). Read access = the media collection's own access (owner-document derived), else 404 (no
- * existence leak). The stored name comes from the DB and must be a server-generated one inside the
- * collection's staticDir (no path traversal). Streams the file with `private, no-store`, nosniff
- * and a fixed Content-Disposition. Transfer proofs (bank data) are audited `view_sensitive`.
+ * for the APK and the web panel (ADR 0004 §4; Traefik strips bearer tokens on the Payload-proxied
+ * /api/<slug>/file path). Read access = the media collection's own access (owner-document
+ * derived), else 404 (no existence leak). The stored name comes from the DB and must be a
+ * server-generated one inside the collection's staticDir (no path traversal). Streams the file
+ * with `private, no-store`, nosniff and a fixed Content-Disposition. Transfer proofs (bank data)
+ * and other people's selfies are audited `view_sensitive`.
+ *
+ * E9: the same URL also accepts a SIGNED query (`exp`, `uid`, `sig` from GET …/signed-url) instead
+ * of a session/bearer — expired or invalid → 403, valid but the user may no longer read the file →
+ * 403 (audited `access_denied`). Without `sig` nothing changes (APK bearer / web cookie → 401/404).
  */
 export const mediaFileEndpoint = v1({
   path: '/media/:collection/:id/file',
   method: 'get',
   rateLimit: [240, 60_000],
+  signedAccess: true,
   handler: async ({ req, params }) => {
-    const kind = FileCollectionEnum.safeParse(params.collection)
-    if (!kind.success) throw new HttpError(404, 'Not Found')
-    const slug = FILE_COLLECTION[kind.data]!
-    if (!/^\d{1,10}$/.test(params.id ?? '')) throw new HttpError(404, 'Not Found')
-    const id = Number(params.id)
-    const variant = req.searchParams.get('variant')
-    if (variant !== null && variant !== 'thumb') throw new HttpError(400, 'Bad Request', { detail: 'variant hanya "thumb".' })
+    const t = parseTarget(params, req)
+    const signed = req.searchParams.has('sig')
+    if (signed) await authenticateSigned(req, t)
 
-    let doc = (await req.payload
-      .findByID({ collection: slug, id, depth: 0, user: req.user, overrideAccess: false, req })
-      .catch(() => null)) as MediaDoc | null
-    if (!doc && slug === 'media-signatures' && (await signatureOnVisibleRequest(req, id))) {
-      doc = (await req.payload.findByID({ collection: slug, id, depth: 0, overrideAccess: true /* SYSTEM-READ: visibility checked above */, req }).catch(() => null)) as MediaDoc | null
+    const doc = await readableMedia(req, t.slug, t.id)
+    if (!doc) {
+      if (!signed) throw new HttpError(404, 'Not Found')
+      await writeAuditDetached(req, [
+        { action: 'access_denied', docType: t.slug.replace(/-/g, '_'), docId: String(t.id), field: 'signed_url', reason: 'URL bertanda tangan valid, tetapi pengguna tidak (lagi) berhak membaca file (E9, ADR 0004 §4)' },
+      ])
+      throw new HttpError(403, 'Forbidden', { code: 'FORBIDDEN', detail: 'Anda tidak berhak membuka file ini.' })
     }
-    if (!doc) throw new HttpError(404, 'Not Found')
 
-    const name = variant === 'thumb' ? doc.sizes?.thumb?.filename : doc.filename
-    const mime = (variant === 'thumb' ? doc.sizes?.thumb?.mimeType : doc.mimeType) ?? 'application/octet-stream'
-    const file = mediaPath(req.payload, slug, name)
+    const name = t.variant === 'thumb' ? doc.sizes?.thumb?.filename : doc.filename
+    const mime = (t.variant === 'thumb' ? doc.sizes?.thumb?.mimeType : doc.mimeType) ?? 'application/octet-stream'
+    const file = doc.removedAt ? null : mediaPath(req.payload, t.slug, name)
     const size = file ? await fileSize(file) : null
     if (!file || size === null) throw new HttpError(404, 'Not Found')
 
-    if (slug === 'media-transfer-proofs' && shouldAuditView(`${userId(req)}:${slug}:${id}`)) {
-      await withReqTransaction(req, () =>
-        writeAudit(req, [{ action: 'view_sensitive', docType: 'media_transfer_proofs', docId: String(id), field: variant ?? 'file' }]),
-      )
+    const uid = userId(req)
+    const sensitive = SENSITIVE[t.slug]
+    const own = relId(doc.uploadedBy) === uid
+    if (sensitive && !(t.slug === 'media-selfies' && own) && shouldAuditView(`${uid}:${t.slug}:${t.id}`)) {
+      await withReqTransaction(req, () => writeAudit(req, [{ action: 'view_sensitive', docType: sensitive, docId: String(t.id), field: t.variant ?? 'file' }]))
     }
     const ext = path.extname(file)
     const disposition = mime === 'application/pdf' ? 'attachment' : 'inline'
@@ -159,9 +271,34 @@ export const mediaFileEndpoint = v1({
         'Content-Length': String(size),
         'Cache-Control': 'private, no-store',
         'X-Content-Type-Options': 'nosniff',
-        'Content-Disposition': `${disposition}; filename="${kind.data}-${id}${variant ? '-thumb' : ''}${ext}"`,
+        'Content-Disposition': `${disposition}; filename="${t.kind}-${t.id}${t.variant ? '-thumb' : ''}${ext}"`,
         'Content-Security-Policy': "default-src 'none'; sandbox",
+        'Referrer-Policy': 'no-referrer',
       },
+    })
+  },
+})
+
+/**
+ * GET /api/v1/media/{collection}/{id}/signed-url[?variant=thumb] — E9 (ADR 0004 §4): mints a signed
+ * URL of the file endpoint for the CALLER, valid 5 minutes, for contexts that cannot send the
+ * bearer/cookie (notification deep links, WebView `<img>`, external viewer). Same visibility as
+ * the download (not readable → 404). The URL is relative to the API origin.
+ */
+export const mediaSignedUrlEndpoint = v1({
+  path: '/media/:collection/:id/signed-url',
+  method: 'get',
+  rateLimit: [240, 60_000],
+  handler: async ({ req, params }) => {
+    const t = parseTarget(params, req)
+    const doc = await readableMedia(req, t.slug, t.id)
+    if (!doc) throw new HttpError(404, 'Not Found')
+    const target = { collection: t.kind, id: t.id, variant: t.variant, userId: userId(req)! }
+    const signedParams = signMedia(target, keys(), nowS())
+    return json({
+      url: signedMediaPath(req.payload.config.routes.api, target, signedParams),
+      expiresAt: new Date(signedParams.exp * 1000).toISOString(),
+      ttlSeconds: signedParams.exp - nowS(),
     })
   },
 })

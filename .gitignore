@@ -16,3 +16,10 @@ apps/web/media/
 seed-data.*.json
 # PDF RAM measurement scratch dir (tests/integration/form-228.int.test.ts)
 apps/web/.pdf-rss-*/
+# go-live import (E11): client workbooks, reports and Keycloak user lists — never commit (personal data)
+impor-dry-run-*.json
+impor-commit-*.json
+*-keycloak-users.json
+*-keycloak-users.csv
+kc-map*.csv
+*.klien.xlsx

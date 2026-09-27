@@ -4,7 +4,8 @@ import { denyAll } from '@/access/roles'
 import { assignedProjects, byRole, fieldRoles, rolesAllowed } from '@/access/policies'
 import { inIds } from '@/access/scope'
 import { reasonOnChange, withAudit } from '@/audit/hooks'
-import { codeField, odooRefField, rupiahField, uuidField } from '@/fields/common'
+import { progressWriteGuard } from '@/domain/progress/guards'
+import { codeField, odooRefField, percentField, rupiahField, uuidField } from '@/fields/common'
 
 export const PROJECT_STATUSES = [
   { label: 'Perencanaan', value: 'perencanaan' },
@@ -20,7 +21,8 @@ const ownerOnly = fieldRoles('pk-owner')
  * Project (requirements v1.1 §4 "Project & tahapan"): Staff R assigned, PM R/U team,
  * Finance R, Owner C/R/U/archive, Admin R. No delete (US-29: archive only).
  * PM may update operational fields of team projects; code/client/PM/RAB/status are Owner-only
- * (RAB changes go through addenda, T12).
+ * (RAB changes go through addenda, T12). `progressPct` (E4) = Σ(weight × stage %) / 100, written only
+ * by the progress recalculation (domain/progress/recalc.ts; guard + DB trigger pk_progress_guard).
  */
 export const Projects: CollectionConfig = withAudit(
   {
@@ -42,6 +44,7 @@ export const Projects: CollectionConfig = withAudit(
       }),
       delete: denyAll,
     },
+    hooks: { beforeOperation: [progressWriteGuard('projects')] },
     fields: [
       { ...codeField(), access: { update: ownerOnly } },
       { name: 'name', type: 'text', label: 'Nama project', required: true, maxLength: 160 },
@@ -52,7 +55,7 @@ export const Projects: CollectionConfig = withAudit(
         fields: [
           { name: 'lat', type: 'number', label: 'Latitude', min: -90, max: 90 },
           { name: 'lng', type: 'number', label: 'Longitude', min: -180, max: 180 },
-          { name: 'radiusM', type: 'number', label: 'Radius geofence (m)', min: 10, max: 5000 },
+          { name: 'radiusM', type: 'number', label: 'Radius geofence (m)', min: 10, max: 5000, admin: { description: 'Kosong = radius default perusahaan (Setting perusahaan).' } },
         ],
       },
       { name: 'pm', type: 'relationship', relationTo: 'users', label: 'Project Manager', index: true, access: { update: ownerOnly } },
@@ -73,6 +76,12 @@ export const Projects: CollectionConfig = withAudit(
         options: [...PROJECT_STATUSES],
         index: true,
         access: { update: ownerOnly },
+      },
+      {
+        ...percentField('progressPct', 'Progress fisik (%)'),
+        defaultValue: 0,
+        access: { create: () => false, update: () => false },
+        admin: { readOnly: true, position: 'sidebar', description: 'Dihitung dari bobot × progress tahapan (hanya lewat laporan progress).' },
       },
       odooRefField('odooAnalyticRef', 'Ref. akun analitik Odoo'),
       uuidField(),

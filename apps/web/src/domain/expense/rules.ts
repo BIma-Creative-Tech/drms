@@ -5,6 +5,7 @@
  */
 import type { Role } from '@/access/roles'
 
+import type { SkippedPosition } from './decision'
 import type { RequestType } from './types'
 
 export type AckMode = 'required' | 'optional' | 'none'
@@ -33,7 +34,10 @@ export type RuleInput = {
 }
 
 export type RequestFacts = {
-  type: RequestType
+  /** E5: `budget_addendum` rules are matched for addenda (default: expense requests). */
+  docType?: 'expense_request' | 'budget_addendum'
+  /** Request type; null for addenda (only `requestType: any` rules match). */
+  type: RequestType | null
   grandTotal: number
   categoryIds: number[]
   projectId?: number | null
@@ -63,6 +67,18 @@ export type ApprovalSnapshot = {
   acknowledgeDelegateUserIds?: number[]
   /** The originally resolved person (PM / cost-center manager / rule user) that was skipped, if any. */
   acknowledgeOriginalUserId?: number | null
+  /**
+   * ADR 0013 (E1): roles that may decide (acknowledge / approve / reject) — `pk-owner` (Direktur) and
+   * `pk-finance`. Absent on snapshots taken before E1 (legacy flow, e.g. PM "Diketahui"): those keep
+   * their old guards until they are closed (US-34, AC-8).
+   */
+  decisionRoles?: Role[]
+  /**
+   * ADR 0013 G1-2: decision positions left out at submit because their only holders are requester/
+   * creator (a skipped "Diketahui" also sets `acknowledge: 'none'`; skipped approval levels are
+   * removed from `steps`, the rest renumbered 1..m). Printed "(tidak berlaku — pemohon)".
+   */
+  skipped?: SkippedPosition[]
 }
 
 export type AckDelegate = 'owner' | 'admin'
@@ -78,7 +94,7 @@ function specificity(r: RuleInput): number {
 
 export function ruleMatches(r: RuleInput, f: RequestFacts): boolean {
   if (r.active === false) return false
-  if (r.docType !== 'expense_request') return false
+  if (r.docType !== (f.docType ?? 'expense_request')) return false
   if (r.requestType !== 'any' && r.requestType !== f.type) return false
   if (f.grandTotal < r.minAmount) return false
   if (r.maxAmount !== null && r.maxAmount !== undefined && f.grandTotal > r.maxAmount) return false

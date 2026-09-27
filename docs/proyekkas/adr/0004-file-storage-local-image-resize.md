@@ -131,7 +131,9 @@ Without server/device resize (typical 3–5 MB phone photos) the same volume wou
 
 - Deterministic, small files; EXIF (incl. GPS) removed server-side — location evidence comes from explicit
   API fields instead.
-- Server CPU spikes on upload (sharp); bounded by sharp concurrency 1 and 10 MiB request cap.
+- Server CPU spikes on upload (sharp); bounded by sharp concurrency 1 and 10 MiB request cap. **E9 P-1 (2026-09-27):**
+  plus a process-wide FIFO queue (`apps/web/src/lib/image-queue.ts`, max `IMAGE_RESIZE_CONCURRENCY` = 2 jobs,
+  `IMAGE_RESIZE_MAX_QUEUE` = 20 waiting → 503 + `Retry-After`), libvips cache off; upload target p95 < 5 s (user decision).
 - Loss of the unprocessed original is irreversible for receipts (flagged to client).
 
 ## Security implications
@@ -164,7 +166,36 @@ Verified in `apps/web/src/api/v1/endpoints/media.ts`, `tests/integration/files.i
 - Headers: `Cache-Control: private, no-store`, `nosniff`, `Content-Security-Policy: default-src 'none'; sandbox`,
   `Content-Disposition` `inline` (PDF `attachment`). Transfer-proof reads audited **`view_sensitive`**
   (at most one row per user/file/10 min, in-process). Rate limit 240/min per user.
-- **Signed, time-limited URLs are still open** (not implemented; F6 backlog in `phase-plan.md`).
+- ~~Signed, time-limited URLs are still open~~ → implemented in E9, see §4b.
+
+### 4b. Signed, time-limited URLs — as implemented (E9, branch `feat/s3a-e9-hardening`)
+
+Verified in `apps/web/src/lib/signed-url.ts`, `apps/web/src/api/v1/endpoints/media.ts`,
+`tests/unit/e9-hardening.test.ts`, `tests/integration/e9-hardening.int.test.ts`:
+- **Mint:** `GET /api/v1/media/{collection}/{id}/signed-url[?variant=thumb]` (bearer or cookie, same visibility as
+  the download, else 404) → `{ url, expiresAt, ttlSeconds }`; `url` is **relative** to the API origin:
+  `/api/v1/media/{collection}/{id}/file?[variant=thumb&]exp=<unix s>&uid=<user id>&sig=<b64url>`.
+- **Scheme:** `sig = base64url(HMAC-SHA256(key, "pk-media-v1|collection|id|variant|exp|uid"))` (the §4 sketch plus a
+  version label); TTL **300 s**, an `exp` more than TTL + 60 s in the future is refused. Keys: env
+  `MEDIA_URL_KEYS` / `MEDIA_URL_KEYS_FILE` (comma separated, each ≥ 32 chars; the **first** signs, **all** verify →
+  rotation = prepend the new key, drop the old one after ≥ 5 min). Unset → one key derived from `PAYLOAD_SECRET`
+  with HKDF-SHA256 (own label; the secret itself is never the HMAC key) — so staging/prod need no new secret, and
+  rotating `PAYLOAD_SECRET` invalidates outstanding URLs (harmless at 5 min).
+- **Verify (same file endpoint):** a request with `sig` is a signed request — no session/bearer needed, and it never
+  falls back to the cookie. Incomplete/malformed/tampered → **403** `code: URL_INVALID`; expired → **403**
+  `URL_EXPIRED`; the `uid` must be an **active** user; then the normal read check runs **as that user** — no access
+  (any more) → **403** `FORBIDDEN` + audit `access_denied` (field `signed_url`). Transfer proofs / other people's
+  selfies stay audited `view_sensitive` under that user. Rate limit keyed on the claimed `uid`.
+- **Unchanged:** without `sig` the endpoint behaves as in §4a (APK bearer / web cookie; anonymous 401; not
+  readable 404 — no existence leak for normal reads). The signed path answers 403 (not 404) for "no access" because
+  the E9 acceptance criterion requires it; the caller already holds a URL minted for that file.
+- **Selfies** are now also served here (`{collection}` = `selfies`): uploader, office roles, and everyone who may
+  read an attendance that references the selfie (same rule as `GET /api/v1/attendance/{id}/selfie`); a retention
+  tombstone (`removedAt`) → 404. Every response adds `Referrer-Policy: no-referrer` (the signed query must not leak
+  through a Referer).
+- **APK impact:** none required — the APK keeps using the bearer path (`progress_api.dart`, `expense_api.dart`).
+  Optional: where a URL must be handed to a context without headers (share sheet, external viewer, WebView `<img>`,
+  notification deep link), call `…/signed-url` and prefix the base URL; refresh on 403 `URL_EXPIRED`.
 
 ## Revision history
 
@@ -176,3 +207,6 @@ Verified in `apps/web/src/api/v1/endpoints/media.ts`, `tests/integration/files.i
 - **2026-09-24 (F2b):** §4a added, verified against `develop` `59ba0a4`: file endpoint
   `GET /api/v1/media/{collection}/{id}/file[?variant=thumb]` (other users' files → 404, transfer proofs audited
   `view_sensitive`); §4 signed URLs still open (F6). Status stays accepted.
+- **2026-09-26 (E9, S3 track A):** §4b added — signed, time-limited media URLs implemented (HMAC-SHA256, TTL 5 min,
+  key rotation via `MEDIA_URL_KEYS`, re-check of the user's access, 403 for expired/invalid/no access); selfies
+  served by the media file endpoint. Status stays accepted.

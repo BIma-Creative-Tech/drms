@@ -4,12 +4,16 @@ import React from 'react'
 import { relId } from '@/access/roles'
 import { displayName, loadVisible } from '@/domain/expense/common'
 import { detail } from '@/domain/expense/dto'
+import { isDecisionSnapshot, SKIPPED_LABEL } from '@/domain/expense/decision'
 import type { ApprovalSnapshot } from '@/domain/expense/rules'
 import { nextActor, timeline } from '@/domain/expense/timeline'
 import { formatRupiah } from '@/lib/money'
 import { withSystemTransaction } from '@/lib/system-tx'
 
+import { ReasonAction } from './kas/ReasonAction'
+import { KAS_STYLE } from './kas/style'
 import { RequesterActions, type RequesterActionsProps } from './RequesterActions'
+import { ReviewDetails } from './ReviewDetails'
 
 type Detail = Awaited<ReturnType<typeof detail>>
 
@@ -22,8 +26,8 @@ const badge = (tone: 'ok' | 'warn' | 'bad'): React.CSSProperties => ({
   borderRadius: 8,
   fontSize: 11,
   fontWeight: 600,
-  color: '#fff',
-  background: tone === 'ok' ? '#2e7d32' : tone === 'warn' ? '#ef6c00' : '#c62828',
+  color: '#FFFFFF', // ≥ 4.5:1 on every --pk-tone-* (src/theme/tokens.ts)
+  background: tone === 'ok' ? 'var(--pk-tone-ok)' : tone === 'warn' ? 'var(--pk-tone-warn)' : 'var(--pk-tone-bad)',
 })
 
 /** Requester-side actions surfaced in the web panel (F2c). Office actions stay in the work views. */
@@ -104,8 +108,8 @@ export async function WorkflowPanel(props: UIFieldServerProps) {
                   borderRadius: 10,
                   fontSize: 12,
                   fontWeight: s.state === 'current' ? 700 : 400,
-                  background: s.state === 'current' ? 'var(--theme-success-500)' : s.state === 'done' ? 'var(--theme-elevation-150)' : 'transparent',
-                  color: s.state === 'current' ? '#fff' : s.state === 'todo' ? 'var(--theme-elevation-500)' : 'inherit',
+                  background: s.state === 'current' ? 'var(--pk-primary)' : s.state === 'done' ? 'var(--theme-elevation-150)' : 'transparent',
+                  color: s.state === 'current' ? 'var(--pk-on-primary)' : s.state === 'todo' ? 'var(--theme-elevation-500)' : 'inherit',
                   border: s.state === 'todo' ? '1px dashed var(--theme-elevation-300)' : '1px solid transparent',
                 }}
                 aria-current={s.state === 'current' ? 'step' : undefined}
@@ -142,14 +146,62 @@ export async function WorkflowPanel(props: UIFieldServerProps) {
             </a>
           </div>
         ) : null}
+        {d.allowedActions.includes('transfer_void') ? (
+          // E2 (US-24, T8): Finance voids a recorded transfer from the request detail (reason dialog).
+          <div style={{ marginTop: 8, display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }} data-pk-transfer-void>
+            <style>{KAS_STYLE}</style>
+            {d.transfers
+              .filter((t) => t.status === 'posted' && (t.kind === 'advance' || t.kind === 'reimburse'))
+              .map((t) => (
+                <ReasonAction
+                  key={t.id}
+                  url={`/api/v1/expense-requests/${d.id}/transfers/${t.id}/void`}
+                  label={`Void transfer ${t.docNo}`}
+                  title={`Void transfer ${t.docNo}?`}
+                  description={`KK transfer ${rp(t.amount)} dibalik dengan jurnal balik, transfer ditandai Void, dan pengajuan kembali ke ${d.type === 'advance' ? 'Disetujui (Antri Transfer)' : 'Nota Terverifikasi (Antri Transfer)'}.`}
+                  confirmLabel="Void transfer"
+                  testId={`void-transfer-${t.id}`}
+                />
+              ))}
+          </div>
+        ) : null}
+        {d.allowedActions.includes('settle_reverse') && d.settlement ? (
+          // E9: Finance reverses the LPJ settlement (void refund KM / shortfall transfer) → "LPJ Terverifikasi".
+          <div style={{ marginTop: 8, display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }} data-pk-settle-reverse>
+            <style>{KAS_STYLE}</style>
+            <ReasonAction
+              url={`/api/v1/expense-requests/${d.id}/settle/reverse`}
+              label="Batalkan penyelesaian LPJ"
+              title={`Batalkan penyelesaian LPJ ${d.settlement.docNo ?? ''}?`}
+              description={
+                d.settlement.settlementType === 'refund'
+                  ? `Kas masuk pengembalian ${rp(d.settlement.difference ?? 0)} di-void (jurnal balik), LPJ kembali ke Terverifikasi dan dapat diselesaikan ulang. Ditolak bila periode transaksinya sudah ditutup.`
+                  : `Transfer kekurangan ${rp(-(d.settlement.difference ?? 0))} di-void dan KK-nya dibalik, LPJ kembali ke Terverifikasi dan dapat diselesaikan ulang. Ditolak bila periode transaksinya sudah ditutup.`
+              }
+              confirmLabel="Batalkan penyelesaian"
+              testId="settle-reverse"
+            />
+          </div>
+        ) : null}
         {d.rejectReason ? <div style={{ marginTop: 6, color: 'var(--theme-error-500)' }}>Alasan ditolak: {d.rejectReason}</div> : null}
         {d.cancelReason ? <div style={{ marginTop: 6 }}>Alasan batal: {d.cancelReason}</div> : null}
+        {(snap?.skipped ?? []).length > 0 ? (
+          // ADR 0013 G1-2: decision positions left out because their only holders are requester/creator.
+          <div data-pk-skipped style={{ marginTop: 6 }}>
+            {(snap?.skipped ?? []).map((x) => (
+              <div key={`${x.position}-${x.level}`}>
+                {x.position === 'diketahui' ? 'Diketahui Oleh (Direktur)' : `Approval L${x.level}`}: {SKIPPED_LABEL} — {x.reason}
+              </div>
+            ))}
+          </div>
+        ) : null}
         {d.approvals.length > 0 ? (
           <ul style={{ margin: '8px 0 0', paddingLeft: 18, fontSize: 12 }}>
             {d.approvals.map((a) => (
               <li key={a.id}>
                 siklus {a.cycle} · {POSITION_LABELS[a.position] ?? a.position}
-                {a.position === 'approval' ? ` L${a.level}` : ''}: {a.actorName ?? '—'} — {DECISION_LABELS[a.decision] ?? a.decision}
+                {a.position === 'approval' ? ` L${a.level}` : ''}: {a.actorName ?? '—'} —{' '}
+                {a.decision === 'acknowledged' && a.cycle === d.approvalCycle && isDecisionSnapshot(snap) ? 'disetujui Direktur (Diketahui)' : (DECISION_LABELS[a.decision] ?? a.decision)}
                 {a.onBehalf ? ' (diwakili)' : ''}
                 {a.position === 'diketahui' && a.cycle === d.approvalCycle && snap?.acknowledgeDelegatedTo ? ' (dilimpahkan)' : ''}
                 {a.reason ? ` — ${a.reason}` : ''}
@@ -158,6 +210,12 @@ export async function WorkflowPanel(props: UIFieldServerProps) {
           </ul>
         ) : null}
       </section>
+      {!own && d.status !== 'draft' ? (
+        // S3e (US-26/US-59, S-05): deciders / Finance / PM see lines, receipts and per-line flags here too.
+        <section style={box} data-pk-section="review">
+          <ReviewDetails d={d} />
+        </section>
+      ) : null}
       {own ? (
         <RequesterActions
           id={d.id}

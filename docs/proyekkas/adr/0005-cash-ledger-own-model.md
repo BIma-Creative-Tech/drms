@@ -108,6 +108,29 @@ Verified in `apps/web/src/domain/expense/{lpj.ts,settlement-rules.ts,transfers.t
   (transfer void → 409, state machine). **Settlement reversal is not implemented** — F6 backlog
   (`phase-plan.md`).
 
+### As implemented (S3b, go-live data import E11) — opening balance
+
+Verified in `apps/web/src/collections/CashAccounts.ts`, `src/import/run.ts`,
+`migrations/20260926_133934_s3b_data_import.ts`, `tests/integration/s3b-import.int.test.ts`:
+- **Deviation from §3 (kept on purpose):** the opening balance stays the field `cash-accounts.openingBalance`
+  (balances = `opening + Σin − Σout`, §7), **not** an `opening` ledger row. Reasons: every report (K-01/K-02,
+  Rekap Kas) already reads the field; an `opening` row would need a KM number, a category/source and would appear
+  as "cash in" in the go-live month's flow, distorting K-02; the Odoo mirror (ADR 0009) can still emit one opening
+  move per account from the field + date. The `opening` value of `sourceType` stays reserved/unused.
+- **Opening date:** new field `openingBalanceDate` (`YYYY-MM-DD`, set to the go-live date by the import; NULL for
+  accounts without one). DB trigger `pk_cash_entries_opening_guard`: no cash entry dated before its account's
+  opening date (the opening balance already contains everything before go-live).
+- **Lock (decision S3b):** once a period **on or after** the month of `openingBalanceDate` is closed,
+  `openingBalance` and `openingBalanceDate` are immutable (collection hook → 409 with an Indonesian message; DB
+  trigger `pk_cash_accounts_opening_lock`, SQLSTATE 42501). Before that, Finance may correct it with a reason
+  (F2 rule). After the lock, corrections are manual KM/KK entries with a reason. Rationale: after a close the opening
+  balance is part of a reported closing balance; changing it would silently rewrite a closed period (§6). The
+  cut-over closes the month **before** go-live, which intentionally does not lock, so discrepancies found in the
+  first weeks can still be fixed until the go-live month is closed. Accounts without an opening date keep the F2
+  rule (change with reason, no lock).
+- **Cut-over by the import** (`--commit`): opening balances + date = go-live date; the month before go-live is closed
+  (`period-closings` row, audited `period_close`) unless it is already closed/locked or was re-opened.
+
 ### Odoo mapping hints (for ADR 0009, not binding here)
 
 | ProyekKas | Odoo 19 |
@@ -167,3 +190,12 @@ None.
   refund KM (`settlement_refund`, source `LPJ`) / shortfall `lpj_shortfall` transfer + KK, exact amount settles
   at verification, DB cross-checks; void of a refund KM or of a shortfall transfer → 409, settlement reversal
   not implemented (F6 backlog). Status stays accepted.
+- **2026-09-26 (E9, S3 track A):** settlement reversal implemented — `POST …/settle/reverse` (Finance, reason)
+  voids the refund KM (reversal row) or the shortfall transfer + KK and returns the LPJ to "Terverifikasi"; refused
+  (409) when the settlement transaction lies in a closed period (§6: re-open by Direktur first), so the reversal row
+  is always dated like the original. A refund KM still cannot be voided from the cash book alone (409 with a pointer
+  to the LPJ action). Architecture §5.1 updated. Status stays accepted.
+- **2026-09-26 (S3b, E11):** "As implemented (S3b)" added: opening balance stays a field (deviation from §3 with
+  rationale) + `openingBalanceDate`; lock after the first close on/after the opening month (hook + DB trigger);
+  no cash entry before the opening date; cut-over closes the month before go-live. Verified against branch
+  `feat/s3b-e11-data-import`. Status stays accepted.

@@ -70,10 +70,10 @@ describe('acknowledger fallback (option a) — exact rule', () => {
     expect(matchesAcknowledger(old, { id: PM, roles: ['pk-pm'] })).toBe(true)
   })
 
-  it('timeline: "Giliran: Owner — Diketahui (dilimpahkan)"', () => {
+  it('timeline (legacy F2e snapshot): "Giliran: Direktur — Diketahui (dilimpahkan)"', () => {
     const snap = buildSnapshot(rule, null, { to: 'owner', userIds: [OWNER_A], reason: 'x', originalUserId: PM })
     expect(nextActor({ type: 'advance', status: 'pending_ack', currentLevel: 0, snapshot: snap, requesters: 'PM', names: {} })).toEqual({
-      who: 'Owner',
+      who: 'Direktur',
       what: 'Diketahui (dilimpahkan): tandai "Diketahui" (atau tolak)',
     })
     const admin = buildSnapshot(rule, null, { to: 'admin', userIds: [ADMIN], reason: 'x', originalUserId: PM })

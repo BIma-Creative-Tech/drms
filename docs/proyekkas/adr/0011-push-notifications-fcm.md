@@ -150,3 +150,8 @@ None.
 - **2026-09-24 (F2b):** in-app `notifications` implemented (API incl. fetch by uuid, Class B in the DB);
   `pushStatus` column (`skipped` default, `pending` only with `PUSH_FCM_ENABLED=true`); the gate is not yet in
   the env schema and there is no FCM dispatcher (F4). Decisions unchanged; status stays accepted.
+- **2026-09-25 (F4b, branch `feat/f4b-mobile-completion`):** `PUSH_FCM_ENABLED` is in the env schema (default
+  false) and `true` is refused at boot until a dispatcher exists; `/api/v1/app/config` `features.pushEnabled` reads it.
+  The APK shows in-app notifications (bell + list, polling every 2 min while the home screen is open) — the fallback
+  of this ADR. No Firebase packages in the APK yet: the Firebase project (Q-44) is still missing. The checklist for
+  enabling FCM is in `docs/proyekkas/f4/f4-gap-analysis.md` §4. Decisions unchanged.

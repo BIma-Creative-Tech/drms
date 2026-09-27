@@ -1,0 +1,369 @@
+// DRMS admin theme = web-starter design system (tokens: src/theme/tokens.ts).
+//
+// Mechanism (Payload 3.90.1, verified in node_modules):
+// - (payload)/layout.tsx imports this file (generated template convention).
+// - Payload's own styles live in `@layer payload-default`; RootLayout declares
+//   `@layer payload-default, payload;` in <head> → everything below, inside `@layer payload`,
+//   wins over Payload defaults without forking Payload.
+// - Colour ramps (--color-base-*, --color-success-*, …) and the --pk-light-*/--pk-dark-* tokens are
+//   set inline on <html> from src/theme/tokens.ts; Payload's own dark-mode elevation mapping
+//   (html[data-theme='dark'] in payload-default) keeps working on top of the new ramps.
+// - A later layer wins regardless of specificity, so every variable set in :root here is set
+//   again for html[data-theme='dark'].
+// - Unlayered styles (e.g. the <style> of src/admin/views/f3-ui.tsx) still win over this file;
+//   those use the --pk-* tokens directly.
+// Only colour, typography, radius, surfaces and focus styles change — no layout/behaviour.
+
+@layer payload {
+  // ---------------------------------------------------------------------------------------------
+  // Tokens → Payload variables
+  // ---------------------------------------------------------------------------------------------
+  :root {
+    --pk-bg: var(--pk-light-background);
+    --pk-fg: var(--pk-light-foreground);
+    --pk-card: var(--pk-light-card);
+    --pk-card-fg: var(--pk-light-card-foreground);
+    --pk-primary: var(--pk-light-primary);
+    --pk-primary-hover: var(--pk-light-primary-hover);
+    --pk-on-primary: var(--pk-light-primary-foreground);
+    --pk-accent: var(--pk-light-accent);
+    --pk-accent-hover: var(--pk-light-accent-hover);
+    --pk-on-accent: var(--pk-light-accent-foreground);
+    --pk-muted-bg: var(--pk-light-muted);
+    --pk-muted-fg: var(--pk-light-muted-foreground);
+    --pk-border: var(--pk-light-border);
+    --pk-input: var(--pk-light-input);
+    --pk-ring: var(--pk-light-ring);
+    --pk-destructive: var(--pk-light-destructive);
+    --pk-tone-ok: var(--pk-light-ok);
+    --pk-tone-warn: var(--pk-light-warn);
+    --pk-tone-bad: var(--pk-light-bad);
+    --pk-tone-ok-text: var(--pk-light-ok-text);
+    --pk-tone-warn-text: var(--pk-light-warn-text);
+    --pk-tone-bad-text: var(--pk-light-bad-text);
+    --pk-shadow: 0 1px 2px rgb(15 23 42 / 0.04), 0 4px 16px -4px rgb(15 23 42 / 0.08);
+    --pk-shadow-hover: 0 2px 4px rgb(15 23 42 / 0.06), 0 12px 28px -8px rgb(37 99 235 / 0.18);
+
+    --theme-bg: var(--pk-bg);
+    --theme-text: var(--pk-fg);
+    --theme-input-bg: var(--pk-card);
+    --theme-border-color: var(--pk-border);
+    // Payload uses elevation-400 for secondary text (field descriptions, placeholders, table
+    // headers): base-400 on the light surfaces is < 4.5:1 → one step darker.
+    --theme-elevation-400: var(--color-base-500);
+
+    --font-body: var(--font-brand-body), ui-sans-serif, system-ui, -apple-system, 'Segoe UI', roboto, arial, sans-serif;
+    --pk-font-heading: var(--font-brand-heading), var(--font-brand-body), ui-sans-serif, system-ui, sans-serif;
+
+    // web-starter radius scale (sm 0.6×, md 0.8×, lg 1×) on base 0.875rem.
+    --style-radius-s: calc(var(--pk-radius) * 0.6);
+    --style-radius-m: calc(var(--pk-radius) * 0.8);
+    --style-radius-l: var(--pk-radius);
+
+    // Focus: 2px ring in the brand ring colour (≥ 3:1 against the background in both modes).
+    --accessibility-outline: 2px solid var(--pk-ring);
+    --accessibility-outline-offset: 2px;
+  }
+
+  html[data-theme='dark'] {
+    --pk-bg: var(--pk-dark-background);
+    --pk-fg: var(--pk-dark-foreground);
+    --pk-card: var(--pk-dark-card);
+    --pk-card-fg: var(--pk-dark-card-foreground);
+    --pk-primary: var(--pk-dark-primary);
+    --pk-primary-hover: var(--pk-dark-primary-hover);
+    --pk-on-primary: var(--pk-dark-primary-foreground);
+    --pk-accent: var(--pk-dark-accent);
+    --pk-accent-hover: var(--pk-dark-accent-hover);
+    --pk-on-accent: var(--pk-dark-accent-foreground);
+    --pk-muted-bg: var(--pk-dark-muted);
+    --pk-muted-fg: var(--pk-dark-muted-foreground);
+    --pk-border: var(--pk-dark-border);
+    --pk-input: var(--pk-dark-input);
+    --pk-ring: var(--pk-dark-ring);
+    --pk-destructive: var(--pk-dark-destructive);
+    --pk-tone-ok: var(--pk-dark-ok);
+    --pk-tone-warn: var(--pk-dark-warn);
+    --pk-tone-bad: var(--pk-dark-bad);
+    --pk-tone-ok-text: var(--pk-dark-ok-text);
+    --pk-tone-warn-text: var(--pk-dark-warn-text);
+    --pk-tone-bad-text: var(--pk-dark-bad-text);
+    --pk-shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 4px 16px -4px rgb(0 0 0 / 0.4);
+    --pk-shadow-hover: 0 2px 4px rgb(0 0 0 / 0.35), 0 12px 28px -8px rgb(96 165 250 / 0.22);
+
+    --theme-bg: var(--pk-bg);
+    --theme-text: var(--pk-fg);
+    --theme-input-bg: var(--pk-card);
+    --theme-border-color: var(--pk-input);
+    // Secondary text in dark mode: Payload maps elevation-400 to base-450 (4.5:1 on the card, too
+    // tight) and leaves elevation-500 unmapped (< 4.5:1) → both use base-400.
+    --theme-elevation-400: var(--color-base-400);
+    --theme-elevation-500: var(--color-base-400);
+  }
+
+  // ---------------------------------------------------------------------------------------------
+  // Typography (Space Grotesk headings, DM Sans body)
+  // ---------------------------------------------------------------------------------------------
+  body,
+  button,
+  input,
+  select,
+  textarea {
+    font-family: var(--font-body);
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  .doc-header__title,
+  .list-header__title,
+  .card__title {
+    font-family: var(--pk-font-heading);
+    letter-spacing: -0.02em;
+    text-wrap: balance;
+  }
+
+  ::selection {
+    background: var(--color-blue-200);
+    color: var(--color-base-900);
+  }
+
+  // ---------------------------------------------------------------------------------------------
+  // Focus visibility (WCAG 2.4.7) — incl. where Payload removes it (nav group toggle, step-nav home)
+  // ---------------------------------------------------------------------------------------------
+  :focus-visible,
+  .nav-group__toggle:focus-visible,
+  .step-nav__home:focus-visible {
+    outline: var(--accessibility-outline);
+    outline-offset: var(--accessibility-outline-offset);
+  }
+
+  .field-type.text:not(.has-many) input:focus,
+  .field-type.textarea textarea:focus,
+  .field-type.email input:focus,
+  .field-type.number input:focus,
+  .field-type.password input:focus,
+  .rs__control--is-focused {
+    border-color: var(--pk-ring);
+    outline: none;
+    box-shadow: 0 0 0 3px color-mix(in oklab, var(--pk-ring) 30%, transparent);
+  }
+
+  ::placeholder {
+    color: var(--theme-elevation-500);
+  }
+
+  // ---------------------------------------------------------------------------------------------
+  // Buttons: primary = trust blue, CTA (SSO login) = orange accent
+  // ---------------------------------------------------------------------------------------------
+  .btn {
+    --btn-font-weight: 600;
+    border-radius: var(--style-radius-m);
+  }
+
+  .btn--style-primary {
+    --color: var(--pk-on-primary);
+    --bg-color: var(--pk-primary);
+    --hover-bg: var(--pk-primary-hover);
+    --hover-color: var(--pk-on-primary);
+
+    &.btn--disabled {
+      --bg-color: var(--theme-elevation-150);
+      --color: var(--theme-elevation-600);
+      --hover-bg: var(--bg-color);
+      --hover-color: var(--color);
+    }
+  }
+
+  .btn--style-secondary {
+    --bg-color: var(--pk-card);
+    --btn-border: 1px solid var(--pk-input);
+    --hover-btn-border: 1px solid var(--pk-primary);
+    --hover-color: var(--pk-primary);
+  }
+
+  .btn--style-pill {
+    --bg-color: var(--pk-muted-bg);
+    --color: var(--pk-fg);
+    --hover-bg: color-mix(in oklab, var(--pk-primary) 14%, var(--pk-muted-bg));
+    --hover-color: var(--pk-fg);
+  }
+
+  // "Buat Baru" in list headers (a.list-create-new-doc__create-new-button, Payload 3.90.1) = the
+  // page's primary action.
+  .list-create-new-doc__create-new-button.btn--style-pill {
+    --bg-color: var(--pk-primary);
+    --color: var(--pk-on-primary);
+    --hover-bg: var(--pk-primary-hover);
+    --hover-color: var(--pk-on-primary);
+  }
+
+  .pk-sso .btn--style-primary {
+    --color: var(--pk-on-accent);
+    --bg-color: var(--pk-accent);
+    --hover-bg: var(--pk-accent-hover);
+    --hover-color: var(--pk-on-accent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    min-height: 48px;
+    margin: 0;
+    text-decoration: none;
+    box-shadow: 0 8px 20px -8px color-mix(in oklab, var(--pk-accent) 60%, transparent);
+  }
+
+  // ---------------------------------------------------------------------------------------------
+  // Login (minimal template): gradient backdrop + glass card
+  // ---------------------------------------------------------------------------------------------
+  .template-minimal {
+    background-color: var(--pk-bg);
+    background-image:
+      radial-gradient(60rem 30rem at 10% -10%, color-mix(in oklab, var(--pk-primary) 16%, transparent), transparent 70%),
+      radial-gradient(40rem 24rem at 110% 110%, color-mix(in oklab, var(--pk-accent) 12%, transparent), transparent 70%);
+  }
+
+  .template-minimal__wrap {
+    padding: calc(var(--base) * 1.6);
+    border: 1px solid color-mix(in oklab, var(--pk-border) 80%, transparent);
+    border-radius: calc(var(--pk-radius) * 1.4);
+    background-color: color-mix(in oklab, var(--pk-card) 78%, transparent);
+    box-shadow: var(--pk-shadow);
+    backdrop-filter: blur(14px) saturate(140%);
+  }
+
+  .login__brand {
+    margin-bottom: calc(var(--base) * 1.2);
+  }
+
+  .pk-logo {
+    display: inline-flex;
+    gap: 12px;
+    align-items: center;
+    color: var(--pk-fg);
+  }
+
+  .pk-logo__text {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.1;
+  }
+
+  .pk-logo__name {
+    font-family: var(--pk-font-heading);
+    font-size: 1.6rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+
+  .pk-logo__product {
+    color: var(--pk-muted-fg);
+    font-size: 0.85rem;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+  }
+
+  .pk-sso {
+    margin-bottom: 0;
+  }
+
+  // ---------------------------------------------------------------------------------------------
+  // Shell: nav + header (glass), surfaces (bento cards), tables
+  // ---------------------------------------------------------------------------------------------
+  .nav {
+    border-inline-end: 1px solid var(--pk-border);
+    background: var(--pk-card);
+  }
+
+  .nav__label,
+  .nav-group__toggle {
+    color: var(--pk-muted-fg);
+  }
+
+  .nav-group__toggle:hover,
+  .nav-group__toggle:focus-visible {
+    color: var(--pk-fg);
+  }
+
+  .nav__link.active,
+  .nav__link:has(.nav__link-indicator) {
+    color: var(--pk-primary);
+  }
+
+  .nav__link-indicator {
+    width: 3px;
+    background: var(--pk-primary);
+  }
+
+  .app-header__bg {
+    border-bottom: 1px solid color-mix(in oklab, var(--pk-border) 80%, transparent);
+    background-color: color-mix(in oklab, var(--pk-bg) 75%, transparent);
+    backdrop-filter: blur(14px) saturate(140%);
+  }
+
+  .card {
+    border: 1px solid var(--pk-border);
+    border-radius: var(--style-radius-l);
+    background: var(--pk-card);
+    box-shadow: var(--pk-shadow);
+  }
+
+  .card--has-onclick:hover {
+    border-color: color-mix(in oklab, var(--pk-primary) 45%, var(--pk-border));
+    background: var(--pk-card);
+    box-shadow: var(--pk-shadow-hover);
+  }
+
+  .collection-list .table,
+  .relationship-table .table {
+    border: 1px solid var(--pk-border);
+    border-radius: var(--style-radius-l);
+    background: var(--pk-card);
+    box-shadow: var(--pk-shadow);
+  }
+
+  .table thead {
+    color: var(--pk-muted-fg);
+  }
+
+  .table thead th {
+    border-bottom: 1px solid var(--pk-border);
+    font-weight: 600;
+  }
+
+  .table tbody tr:nth-child(odd) {
+    background: color-mix(in oklab, var(--pk-muted-bg) 55%, transparent);
+  }
+
+  .table tbody tr:hover {
+    background: color-mix(in oklab, var(--pk-primary) 7%, transparent);
+  }
+
+  // ---------------------------------------------------------------------------------------------
+  // Motion: short hover transitions only (compositor-friendly), none with reduced motion.
+  // ---------------------------------------------------------------------------------------------
+  @media (prefers-reduced-motion: no-preference) {
+    .card {
+      transition:
+        box-shadow 0.2s ease,
+        border-color 0.2s ease,
+        transform 0.2s ease;
+    }
+
+    .card--has-onclick:hover {
+      transform: translateY(-2px);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      scroll-behavior: auto !important;
+      transition-duration: 0.01ms !important;
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+    }
+  }
+}

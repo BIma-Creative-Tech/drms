@@ -1,7 +1,8 @@
 import type { PayloadRequest } from 'payload'
 
 import { relId, userId } from '@/access/roles'
-import { assertAccount, currentLockDate, postEntry } from '@/domain/cash/ledger'
+import { writeAudit } from '@/audit/writer'
+import { assertAccount, currentLockDate, loadEntry, postEntry, voidEntry } from '@/domain/cash/ledger'
 import { allocateDocNo } from '@/domain/numbering-db'
 import { parseBusinessDate } from '@/domain/numbering'
 
@@ -35,6 +36,9 @@ export type SettlementDoc = {
   settledAt?: string | null
   refundCashEntry?: unknown
   shortfallTransfer?: unknown
+  reversalCount?: number | null
+  lastReversedAt?: string | null
+  lastReversalReason?: string | null
 }
 
 export async function settlementOfRequest(req: PayloadRequest, requestId: number): Promise<SettlementDoc | null> {
@@ -294,4 +298,84 @@ export async function settle(req: PayloadRequest, id: number, input: SettleInput
   const settlement = await updateSettlement(req, s.id, data)
   const request = await updateRequest(req, id, { status: 'completed', transferredTotal })
   return { settlement, request, refundEntry, shortfall, type: st.type, amount: st.amount }
+}
+
+/**
+ * POST …/settle/reverse — Finance (E9, F6 backlog "settlement reversal"), "Selesai" → "LPJ
+ * Terverifikasi": undoes a settlement that posted money so it can be settled again correctly
+ * (wrong account/date/proof, refund not actually received, shortfall transfer bounced):
+ * - refund: the KM "Pengembalian LPJ" is voided (reversal row, original stays visible "Void");
+ * - shortfall: the transfer is voided and its KK reversed (same as T8 void transfer), the
+ *   request's transferred total drops by the shortfall amount;
+ * then the LPJ returns to `verified` (links cleared, reversal count/reason/actor recorded) and the
+ * request to `lpj_verified`. Reason required. Period close (ADR 0005 §6, G5): when the settlement
+ * transaction lies in a CLOSED period the reversal is refused (409) — the Direktur must re-open the
+ * period first; the reversal row is therefore always dated like the original. Audited: status
+ * changes of request/LPJ (hooks) + one `void` row on the settlement with the voided documents.
+ */
+export async function reverseSettlement(req: PayloadRequest, id: number, reason: string) {
+  const doc = await loadVisible(req, id, { lock: true })
+  await requireActionAudited(req, await actorContext(req, doc), 'settle_reverse', doc)
+  const s = await requireSettlement(req, id, ['settled'])
+  if (s.settlementType !== 'refund' && s.settlementType !== 'shortfall') {
+    fail(409, 'LPJ ini selesai tanpa selisih; tidak ada kas masuk/transfer penyelesaian yang dapat dibatalkan.')
+  }
+  const raw = await loadRaw(req, id)
+  const lock = await currentLockDate(req)
+  const closed = (date: string) =>
+    fail(409, `Periode ${date.slice(0, 7)} sudah ditutup (tutup buku s/d ${lock}). Minta Direktur membuka kembali periode sebelum membatalkan penyelesaian.`)
+  let transferredTotal = raw.transferredTotal ?? 0
+  let voided: Record<string, unknown>
+
+  if (s.settlementType === 'refund') {
+    const entryId = relId(s.refundCashEntry)
+    if (!entryId) fail(409, 'Kas masuk pengembalian LPJ tidak ditemukan pada LPJ ini.')
+    const entry = await loadEntry(req, entryId)
+    if (entry.status !== 'posted') fail(409, 'Kas masuk pengembalian LPJ sudah di-void.')
+    if (lock && entry.entryDate <= lock) closed(entry.entryDate)
+    const r = await voidEntry(req, entryId, reason, { viaSettlement: true })
+    voided = { type: 'refund', amount: entry.amount, refundCashEntryId: entryId, refundCashEntryNo: entry.entryNo, reversalCashEntryId: r.reversal.id, reversalCashEntryNo: r.reversal.entryNo }
+  } else {
+    const transferId = relId(s.shortfallTransfer)
+    if (!transferId) fail(409, 'Transfer kekurangan tidak ditemukan pada LPJ ini.')
+    const t = (await req.payload
+      .findByID({ collection: 'transfers', id: transferId, depth: 0, overrideAccess: true /* SYSTEM-READ: linked from the LPJ checked above */, req })
+      .catch(() => null)) as { id: number; docNo?: string; status: string; amount: number; transferDate: string; cashEntry?: unknown } | null
+    if (!t) fail(409, 'Transfer kekurangan tidak ditemukan pada LPJ ini.')
+    if (t.status !== 'posted') fail(409, 'Transfer kekurangan sudah dibatalkan.')
+    if (lock && t.transferDate <= lock) closed(t.transferDate)
+    const entryId = relId(t.cashEntry)
+    const r = entryId ? await voidEntry(req, entryId, reason, { viaTransfer: true }) : null
+    req.context.auditReason = reason
+    await req.payload.update({
+      collection: 'transfers',
+      id: t.id,
+      data: { status: 'void', voidReason: reason, voidedBy: userId(req), voidedAt: new Date().toISOString() } as never,
+      depth: 0,
+      overrideAccess: true, // SYSTEM-WRITE: void after guards (DB: only posted → void)
+      req,
+    })
+    transferredTotal = Math.max(0, transferredTotal - t.amount)
+    voided = { type: 'shortfall', amount: t.amount, shortfallTransferId: t.id, shortfallTransferNo: t.docNo ?? null, reversalCashEntryId: r?.reversal.id ?? null, reversalCashEntryNo: r?.reversal.entryNo ?? null }
+  }
+
+  const settlement = await updateSettlement(
+    req,
+    s.id,
+    {
+      status: 'verified',
+      settledAt: null,
+      settledBy: null,
+      refundCashEntry: null,
+      shortfallTransfer: null,
+      reversalCount: (s.reversalCount ?? 0) + 1,
+      lastReversedAt: new Date().toISOString(),
+      lastReversedBy: userId(req),
+      lastReversalReason: reason,
+    },
+    reason,
+  )
+  await writeAudit(req, [{ action: 'void', docType: 'settlement', docId: String(s.id), docNo: s.docNo ?? undefined, field: 'settlement', oldValue: voided, reason }])
+  const request = await updateRequest(req, id, { status: 'lpj_verified', transferredTotal }, reason)
+  return { settlement, request, voided }
 }

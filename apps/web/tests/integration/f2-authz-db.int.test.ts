@@ -19,8 +19,8 @@ beforeAll(async () => {
   const c = await api('POST', E, w.users.staffA, draftBody(w))
   approvedId = c.body.id
   await api('POST', `${E}/${approvedId}/submit`, w.users.staffA, {})
-  await api('POST', `${E}/${approvedId}/acknowledge`, w.users.pm, {})
-  const a = await api('POST', `${E}/${approvedId}/approve`, w.users.owner, {})
+  await api('POST', `${E}/${approvedId}/acknowledge`, w.users.owner, {})
+  const a = await api('POST', `${E}/${approvedId}/approve`, w.users.finance, {})
   expect(a.body.status).toBe('approved')
   const d = await api('POST', E, w.users.staffA, draftBody(w))
   pendingId = d.body.id
@@ -68,7 +68,7 @@ describe('read scopes (own / team / Q-23 / all)', () => {
 })
 
 describe('decisions (G1, G2, US-17)', () => {
-  it('a requester (with the Owner role) cannot approve their own request — API 403 and DB trigger', async () => {
+  it('a requester (with the Direktur role) cannot approve their own request — API 403 and DB trigger', async () => {
     const ownerEmp = await (async () => {
       const p = await getTestPayload()
       return (await p.create({ collection: 'employees', data: { code: 'AZ-OWN', name: 'AZ Owner-Pemohon' }, overrideAccess: true /* SYSTEM-WRITE: fixture */ })).id as number
@@ -77,7 +77,7 @@ describe('decisions (G1, G2, US-17)', () => {
     const c = await api('POST', E, w.users.admin, draftBody(w, { requesterIds: [w.emp.a, ownerEmp] })) // 2nd requester = an Owner
     expect(c.status, JSON.stringify(c.body)).toBe(201)
     await api('POST', `${E}/${c.body.id}/submit`, w.users.admin, {})
-    await api('POST', `${E}/${c.body.id}/acknowledge`, w.users.pm, {})
+    await api('POST', `${E}/${c.body.id}/acknowledge`, w.users.owner, {})
     expect((await api('POST', `${E}/${c.body.id}/approve`, ownerRequester, {})).status).toBe(403)
     expect((await api('POST', `${E}/${c.body.id}/reject`, ownerRequester, { reason: 'tolak sendiri' })).status).toBe(403)
     // DB backstop: even a raw insert as the app role is refused
@@ -96,11 +96,12 @@ describe('decisions (G1, G2, US-17)', () => {
     expect(err2?.message).toContain('requester/creator')
   })
 
-  it('PM (not the rule step) and Admin cannot approve; Owner of the step can', async () => {
-    await api('POST', `${E}/${pendingId}/acknowledge`, w.users.pm, {})
-    for (const u of [w.users.pm, w.users.admin, w.users.finance, w.users.staffB]) {
+  it('PM, Admin, Staff and a Direktur (not the rule step) cannot approve; Finance of the step can (ADR 0013)', async () => {
+    await api('POST', `${E}/${pendingId}/acknowledge`, w.users.owner, {})
+    for (const u of [w.users.pm, w.users.admin, w.users.owner, w.users.owner2, w.users.staffB]) {
       expect([403, 404], u.email).toContain((await api('POST', `${E}/${pendingId}/approve`, u, {})).status)
     }
+    expect((await api('POST', `${E}/${pendingId}/approve`, w.users.finance, {})).status).toBe(200)
   })
 })
 

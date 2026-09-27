@@ -14,7 +14,7 @@ import {
   ids,
   loadRaw,
   loadVisible,
-  openWarningFlags,
+  openFlagCount,
   projectCommitted,
   requireAction,
   requireActionAudited,
@@ -28,7 +28,7 @@ import {
 import { fromDocLines, validateContent } from './drafts'
 import { assertEveryLineHasReceipt, recomputeFlags } from './receipts'
 import { ACK_DELEGATE_ROLE, budgetImpact, lastLevel, type AckDelegate, type ApprovalSnapshot } from './rules'
-import { selectAndSnapshot, writeSnapshot } from './snapshot'
+import { auditSkipped, selectAndSnapshot, writeSnapshot } from './snapshot'
 import type { ApprovalDecision, ApprovalPosition } from './types'
 
 export { selectAndSnapshot, writeSnapshot }
@@ -216,6 +216,7 @@ export async function submit(req: PayloadRequest, id: number, opts: SubmitOption
       signature: diajukanSig,
     })
   }
+  await auditSkipped(req, updated, snapshot)
   if (needsAck && snapshot.acknowledgeDelegatedTo) {
     // F2e: the delegation is part of the submit's audit trail (who was skipped, to whom, why).
     await writeAudit(req, [
@@ -250,7 +251,10 @@ export async function cancel(req: PayloadRequest, id: number, reason: string): P
   return updateRequest(req, id, { status: 'cancelled', cancelReason: reason }, reason)
 }
 
-/** POST …/acknowledge — "Diketahui Oleh" (US-42, Q-07/Q-08 defaults). */
+/**
+ * POST …/acknowledge — "Diketahui Oleh" (US-42). ADR 0013: on new requests this is the Direktur's
+ * approval ("Setujui"); PM/Staff/Admin are refused and audited (`requireActionAudited`).
+ */
 export async function acknowledge(req: PayloadRequest, id: number, opts: SignOpts = {}): Promise<RequestDoc> {
   const visible = await loadVisible(req, id, { lock: true })
   await requireActionAudited(req, await actorContext(req, visible), 'acknowledge', visible)
@@ -266,10 +270,19 @@ export async function acknowledge(req: PayloadRequest, id: number, opts: SignOpt
     delegation: snap?.acknowledgeDelegatedTo ? { to: snap.acknowledgeDelegatedTo, reason: snap.acknowledgeDelegationReason ?? null } : null,
     signature: sig,
     budget: await budgetFor(req, doc),
-    openFlags: await openWarningFlags(req, id),
+    openFlags: await openFlagCount(req, id),
   })
-  if (doc.status === 'pending_ack') return updateRequest(req, id, { status: 'pending_approval', currentLevel: 1 })
-  return doc
+  if (doc.status !== 'pending_ack') return doc
+  const next = await updateRequest(req, id, { status: 'pending_approval', currentLevel: 1 })
+  if (snap && lastLevel(snap) === 0) {
+    // ADR 0013 G1-2: the only approval position was skipped (the only Finance is requester/creator) →
+    // the Direktur's decision is final. Through "Menunggu Approval" so the DB rule "approvedAmount only
+    // on pending_approval → approved" (G3) holds; nobody is notified for the empty level.
+    const approved = await updateRequest(req, id, { status: 'approved', approvedAmount: next.grandTotal ?? 0 })
+    await writeSnapshot(req, approved, 'approve')
+    return approved
+  }
+  return next
 }
 
 /**
@@ -292,7 +305,7 @@ export async function approve(req: PayloadRequest, id: number, opts: SignOpts = 
     actor: caller,
     signature: sig,
     budget: await budgetFor(req, doc),
-    openFlags: await openWarningFlags(req, id),
+    openFlags: await openFlagCount(req, id),
   })
   const snap = doc.approvalSnapshot as ApprovalSnapshot
   if (level < lastLevel(snap)) return updateRequest(req, id, { currentLevel: level + 1 })
@@ -320,7 +333,7 @@ export async function reject(req: PayloadRequest, id: number, reason: string, op
         : null,
     signature: sig,
     budget: await budgetFor(req, doc),
-    openFlags: await openWarningFlags(req, id),
+    openFlags: await openFlagCount(req, id),
   })
   return updateRequest(req, id, { status: 'rejected', rejectReason: reason }, reason)
 }

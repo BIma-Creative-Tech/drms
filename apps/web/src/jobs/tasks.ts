@@ -1,6 +1,8 @@
 import { sql } from '@payloadcms/db-postgres'
 import type { TaskConfig } from 'payload'
 
+import { purgeExpiredSelfies } from '@/domain/attendance/retention'
+import { runDailyReminders } from '@/domain/reminders/service'
 import { autoCloseReimburse } from '@/domain/expense/auto-close'
 
 /**
@@ -98,4 +100,56 @@ export const reimburseAutoCloseTask: TaskConfig<{
   },
 }
 
-export const tasks = [auditDailyAnchorTask, sendEmailTask, reimburseAutoCloseTask]
+/**
+ * E6 selfie retention (Q-33): daily 02:30 (process TZ). company-settings.selfieRetentionDeleteEnabled
+ * OFF (default) = dry run (count only); ON = deletes at most selfieRetentionBatch selfie FILES older
+ * than selfieRetentionMonths, marks the media rows removed and writes one `retention_purge` audit
+ * row per run (domain/attendance/retention.ts). Attendance rows stay. Log = counts only (no ids/PII).
+ */
+export const selfieRetentionTask: TaskConfig<{
+  input: Record<string, never>
+  output: { months: number; cutoff: string; candidates: number; deleted: number }
+}> = {
+  slug: 'selfieRetention',
+  schedule: [{ cron: '30 2 * * *', queue: 'default' }],
+  inputSchema: [],
+  outputSchema: [
+    { name: 'months', type: 'number', required: true },
+    { name: 'cutoff', type: 'text', required: true },
+    { name: 'candidates', type: 'number', required: true },
+    { name: 'deleted', type: 'number', required: true },
+  ],
+  handler: async ({ req }) => {
+    const r = await purgeExpiredSelfies(req.payload)
+    req.payload.logger.info({ msg: r.dryRun ? 'selfie retention (dry run)' : 'selfie retention', months: r.months, cutoff: r.cutoff, candidates: r.candidates, deleted: r.deleted, failed: r.failed, remaining: r.remaining })
+    return { output: { months: r.months, cutoff: r.cutoff, candidates: r.candidates, deleted: r.deleted } }
+  },
+}
+
+/**
+ * E7 daily reminders (M12, US-11): the worker queues this every hour (process TZ); the domain runs
+ * ONE pass per business day at/after company-settings.reminderHour and de-duplicates every delivery
+ * (domain/reminders/service.ts). Log = counts per rule only (no names/ids of recipients).
+ */
+export const dailyRemindersTask: TaskConfig<{
+  input: Record<string, never>
+  output: { status: string; date: string; notified: number; emails: number }
+}> = {
+  slug: 'dailyReminders',
+  schedule: [{ cron: '2 * * * *', queue: 'default' }],
+  inputSchema: [],
+  outputSchema: [
+    { name: 'status', type: 'text', required: true },
+    { name: 'date', type: 'text', required: true },
+    { name: 'notified', type: 'number', required: true },
+    { name: 'emails', type: 'number', required: true },
+  ],
+  handler: async ({ req }) => {
+    const r = await runDailyReminders(req.payload)
+    const notified = Object.values(r.rules).reduce((s, x) => s + (x?.notified ?? 0), 0)
+    if (r.status === 'run') req.payload.logger.info({ msg: 'daily reminders', date: r.date, rules: r.rules, emails: r.emails })
+    return { output: { status: r.status, date: r.date, notified, emails: r.emails } }
+  },
+}
+
+export const tasks = [auditDailyAnchorTask, sendEmailTask, reimburseAutoCloseTask, selfieRetentionTask, dailyRemindersTask]

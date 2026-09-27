@@ -1,5 +1,7 @@
 import type { CollectionSlug, PayloadRequest, Where } from 'payload'
 
+import { withEffectiveRadius } from '@/domain/attendance/calendar'
+
 import { MASTER_TYPES, MastersQuery, type MasterType } from '../schemas'
 import { HttpError, json, problem, v1 } from '../http'
 
@@ -7,16 +9,16 @@ const LIMIT = 500
 
 /** type → collection + whitelisted fields (never internal/sensitive columns like odoo refs). */
 const MAP: Record<MasterType, { collection: CollectionSlug; fields: string[] }> = {
-  projects: { collection: 'projects', fields: ['code', 'name', 'client', 'address', 'lat', 'lng', 'radiusM', 'pm', 'status', 'startDate', 'targetDate'] },
-  'project-stages': { collection: 'project-stages', fields: ['project', 'name', 'weightPct', 'sequence', 'progressPct'] },
-  'cost-centers': { collection: 'cost-centers', fields: ['code', 'name', 'type', 'manager', 'active'] },
+  projects: { collection: 'projects', fields: ['code', 'name', 'client', 'address', 'lat', 'lng', 'radiusM', 'pm', 'status', 'startDate', 'targetDate', 'progressPct'] },
+  'project-stages': { collection: 'project-stages', fields: ['project', 'name', 'weightPct', 'sequence', 'progressPct', 'active'] },
+  'cost-centers': { collection: 'cost-centers', fields: ['code', 'name', 'type', 'manager', 'lat', 'lng', 'radiusM', 'active'] },
   'expense-categories': { collection: 'expense-categories', fields: ['code', 'name', 'defaultUom', 'allowedUoms', 'requiresVehicle', 'active'] },
   uoms: { collection: 'uoms', fields: ['code', 'name', 'category', 'active'] },
   vehicles: { collection: 'vehicles', fields: ['plateNo', 'plateDisplay', 'type', 'brandModel', 'costCenter', 'project', 'active'] },
   employees: { collection: 'employees', fields: ['code', 'name', 'nickname', 'position', 'active'] },
   banks: { collection: 'banks', fields: ['code', 'name', 'active'] },
   'bank-accounts': { collection: 'employee-bank-accounts', fields: ['employee', 'bank', 'accountNo', 'accountHolder', 'isDefault', 'verificationStatus', 'active'] },
-  'work-schedules': { collection: 'work-schedules', fields: ['name', 'startTime', 'endTime', 'lateToleranceMin', 'active'] },
+  'work-schedules': { collection: 'work-schedules', fields: ['name', 'startTime', 'endTime', 'lateToleranceMin', 'workDays', 'active'] },
   holidays: { collection: 'holidays', fields: ['date', 'name'] },
   'team-assignments': { collection: 'team-assignments', fields: ['employee', 'project', 'costCenter', 'roleInProject', 'startDate', 'endDate'] },
 }
@@ -43,7 +45,12 @@ async function loadType(req: PayloadRequest, type: MasterType, since?: string) {
       overrideAccess: false, // access control of the collection applies (scope own/team/assigned/all)
       req,
     })
-    return { items: res.docs.map((d) => pick(d as unknown as Record<string, unknown>, fields)), hasMore: res.hasNextPage }
+    let items = res.docs.map((d) => pick(d as unknown as Record<string, unknown>, fields))
+    if (type === 'projects' || type === 'cost-centers') {
+      const s = (await req.payload.findGlobal({ slug: 'company-settings', depth: 0, overrideAccess: true /* SYSTEM-READ: default geofence radius */, req })) as { defaultGeofenceRadiusM?: number | null }
+      items = items.map((i) => withEffectiveRadius(i, s.defaultGeofenceRadiusM))
+    }
+    return { items, hasMore: res.hasNextPage }
   } catch (err) {
     // Access `false` (nothing in scope, e.g. staff without assignments) → Forbidden → empty list.
     if ((err as { status?: number }).status === 403) return { items: [], hasMore: false }

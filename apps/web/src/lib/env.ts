@@ -16,6 +16,7 @@ export const FILE_SECRETS = [
   'OIDC_WEB_CLIENT_SECRET',
   'KC_ADMIN_CLIENT_SECRET',
   'SMTP_PASSWORD',
+  'MEDIA_URL_KEYS',
 ] as const
 
 const postgresUrl = z.string().regex(/^postgres(ql)?:\/\/\S+$/, 'must be a postgres:// URL')
@@ -90,6 +91,20 @@ export function smtpConfigOf(env: SmtpFieldsOut & { APP_URL?: string }): SmtpCon
   }
 }
 
+/**
+ * Android App Links (ADR 0003 §1 redirect `https://<pk-host>/app/callback`, ADR 0010 decision 3):
+ * SHA-256 fingerprints of the APK signing certificate(s), comma separated, `AA:BB:…` (32 bytes).
+ * Normalised to upper case; empty = none (assetlinks.json then serves `[]`).
+ */
+const CERT_FP_RE = /^([0-9A-F]{2}:){31}[0-9A-F]{2}$/
+export function parseCertFingerprints(value: string | undefined): string[] | null {
+  const list = (value ?? '')
+    .split(',')
+    .map((v) => v.trim().toUpperCase())
+    .filter(Boolean)
+  return list.every((v) => CERT_FP_RE.test(v)) ? [...new Set(list)] : null
+}
+
 export const envSchema = z
   .object({
     NODE_ENV: z.enum(['development', 'test', 'production']).default('production'),
@@ -117,7 +132,41 @@ export const envSchema = z
     /** Only for plain-http throwaway environments. Refused when APP_URL is https. */
     AUTH_COOKIE_INSECURE: bool,
     MEDIA_DIR: z.string().startsWith('/').default('/data/media'),
+    /**
+     * E9 P-1 (lib/image-queue.ts): image uploads re-encoded by sharp at once in this process; more
+     * wait in a FIFO queue. With web cpus 0.75, 1–2 keeps the other requests p95 < 2 s.
+     */
+    IMAGE_RESIZE_CONCURRENCY: z.coerce.number().int().min(1).max(8).default(2),
+    /** E9 P-1: uploads allowed to WAIT for a slot; one more → 503 + Retry-After (APK retries). */
+    IMAGE_RESIZE_MAX_QUEUE: z.coerce.number().int().min(0).max(500).default(20),
     LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
+    /** Android application id of the APK (ADR 0010 decision 1 proposal; client to confirm the domain). */
+    ANDROID_APP_PACKAGE: z
+      .string()
+      .regex(/^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$/, 'must be an Android application id')
+      .default('id.co.drms.proyekkas'),
+    ANDROID_APP_CERT_SHA256: z
+      .string()
+      .default('')
+      .refine((v) => parseCertFingerprints(v) !== null, 'comma separated SHA-256 fingerprints AA:BB:… (32 bytes)')
+      .transform((v) => parseCertFingerprints(v) ?? []),
+    /** F3 rollback switch (export-library-decision §7): 'false' hides Excel buttons, /reports/…/xlsx → 404. */
+    EXPORT_XLSX_ENABLED: z.enum(['true', 'false']).default('true').transform((v) => v === 'true'),
+    /**
+     * FCM push (ADR 0011). Stays false: there is no Firebase project (Q-44) and no FCM dispatcher
+     * yet, so `true` is refused at boot (rows would stay push_status=pending forever). The APK reads
+     * the effective value from GET /api/v1/app/config `features.pushEnabled`.
+     */
+    PUSH_FCM_ENABLED: bool,
+    /**
+     * E9 (ADR 0004 §4): HMAC keys for signed, time-limited media URLs, comma separated, each ≥ 32
+     * chars. The FIRST key signs, every key verifies (rotation = prepend the new key, drop the old
+     * one after the 5-min TTL). Unset → a key derived from PAYLOAD_SECRET (HKDF, own label).
+     */
+    MEDIA_URL_KEYS: z
+      .string()
+      .optional()
+      .refine((v) => !v || v.split(',').every((k) => k.trim().length >= 32), 'comma separated keys, each min 32 chars'),
     ...smtpFields,
   })
   .superRefine((env, ctx) => {
@@ -134,6 +183,9 @@ export const envSchema = z
     }
     if (!/\/realms\/[^/]+$/.test(env.OIDC_ISSUER.replace(/\/$/, ''))) {
       ctx.addIssue({ code: 'custom', path: ['OIDC_ISSUER'], message: 'must look like <base>/realms/<realm>' })
+    }
+    if (env.PUSH_FCM_ENABLED) {
+      ctx.addIssue({ code: 'custom', path: ['PUSH_FCM_ENABLED'], message: 'not supported yet: no FCM dispatcher / Firebase project (ADR 0011, Q-44)' })
     }
     if (env.KC_ADMIN_BASE_URL && !env.KC_ADMIN_CLIENT_SECRET) {
       ctx.addIssue({ code: 'custom', path: ['KC_ADMIN_CLIENT_SECRET'], message: 'required when KC_ADMIN_BASE_URL is set' })

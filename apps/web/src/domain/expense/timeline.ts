@@ -6,6 +6,7 @@
  */
 import { ROLE_LABELS, type Role } from '@/access/roles'
 
+import { isDecisionSnapshot } from './decision'
 import { ACK_DELEGATE_ROLE, type ApprovalSnapshot } from './rules'
 import { statusLabel, type RequestStatus, type RequestType } from './types'
 
@@ -45,7 +46,7 @@ export function timeline(type: RequestType, status: RequestStatus, opts: { skipA
 
 export type NextActor = { who: string; what: string }
 
-type SnapshotLike = Pick<ApprovalSnapshot, 'acknowledge' | 'acknowledgeBy' | 'acknowledgerUserId' | 'acknowledgeRole' | 'steps' | 'acknowledgeDelegatedTo'>
+type SnapshotLike = Pick<ApprovalSnapshot, 'acknowledge' | 'acknowledgeBy' | 'acknowledgerUserId' | 'acknowledgeRole' | 'steps' | 'acknowledgeDelegatedTo' | 'decisionRoles'>
 
 const roleLabel = (r: Role | null | undefined) => (r ? ROLE_LABELS[r] : 'approver')
 
@@ -75,7 +76,8 @@ export function nextActor(input: {
       const who =
         user(snapshot?.acknowledgerUserId) ??
         (snapshot?.acknowledgeBy === 'role' ? roleLabel(snapshot.acknowledgeRole) : 'Manajer project / pusat biaya')
-      return { who, what: 'tandai "Diketahui" (atau tolak)' }
+      // ADR 0013: "Diketahui" is the Direktur's approval on new requests; legacy snapshots keep the old wording.
+      return { who, what: isDecisionSnapshot(snapshot) ? 'setujui (Diketahui) atau tolak' : 'tandai "Diketahui" (atau tolak)' }
     }
     case 'pending_approval': {
       const step = snapshot?.steps.find((s) => s.level === (input.currentLevel ?? 1))

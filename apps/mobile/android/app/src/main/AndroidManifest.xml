@@ -1,0 +1,105 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.CAMERA" />
+    <!--
+      Attendance (F4b, ADR 0010 decision 8): one GPS fix per check-in/out while the app is open
+      (geolocator 14.0.3 README "Permissions"). No background location, no foreground service.
+    -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-feature android:name="android.hardware.location.gps" android:required="false" />
+    <!--
+      Background sync (E3-b) uses plain WorkManager jobs (network constraint), never a foreground service
+      or expedited work, so the permissions merged in by workmanager_android 0.10.9 are removed
+      (least privilege). POST_NOTIFICATIONS returns with FCM push (ADR 0011, E8).
+    -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" tools:node="remove" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SHORT_SERVICE" tools:node="remove" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" tools:node="remove" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+
+    <!--
+      allowBackup=false + dataExtractionRules: refresh token, DB key and the encrypted offline queue never
+      leave the device (ADR 0010 decision 3; flutter_secure_storage README "Disabling Auto Backup").
+      networkSecurityConfig: TLS only, system CAs only, no pinning in v1 (ADR 0010 decision 9).
+    -->
+    <application
+        android:label="@string/app_name"
+        android:name="${applicationName}"
+        android:icon="@mipmap/ic_launcher"
+        android:allowBackup="false"
+        android:fullBackupContent="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:networkSecurityConfig="@xml/network_security_config"
+        tools:targetApi="31">
+        <!-- No android:taskAffinity="": flutter_appauth README "No Redirect to app after login". -->
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:launchMode="singleTop"
+            android:theme="@style/LaunchTheme"
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
+            android:hardwareAccelerated="true"
+            android:windowSoftInputMode="adjustResize">
+            <meta-data
+              android:name="io.flutter.embedding.android.NormalTheme"
+              android:resource="@style/NormalTheme"
+              />
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+        </activity>
+
+        <!--
+          OIDC redirect (ADR 0003/0010): claimed HTTPS App Link https://<host>/app/callback (autoVerify,
+          needs /.well-known/assetlinks.json with this package + signing-cert SHA-256), plus the
+          reverse-domain fallback scheme id.co.drms.proyekkas:/oauth2redirect (only used when the build
+          sets OIDC_REDIRECT_URI to it and Keycloak allows it). Manual intent-filter per flutter_appauth
+          README "Android setup".
+        -->
+        <!-- nosemgrep: java.android.security.exported_activity.exported_activity (AppAuth redirect receiver must be exported so the browser can return the OIDC response; it only accepts VIEW intents for https://HOST/app/callback and the app scheme, holds no privileged state, and PKCE S256 plus state protect the authorization code) -->
+        <activity
+            android:name="net.openid.appauth.RedirectUriReceiverActivity"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar"
+            android:exported="true"
+            tools:node="replace">
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https"
+                      android:host="${appLinkHost}"
+                      android:path="/app/callback" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="id.co.drms.proyekkas" />
+            </intent-filter>
+        </activity>
+
+        <meta-data
+            android:name="flutterEmbedding"
+            android:value="2" />
+    </application>
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.PROCESS_TEXT"/>
+            <data android:mimeType="text/plain"/>
+        </intent>
+        <!-- AppAuth: find a browser / Custom Tabs provider on API 30+. -->
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <category android:name="android.intent.category.BROWSABLE" />
+            <data android:scheme="https" />
+        </intent>
+        <intent>
+            <action android:name="android.support.customtabs.action.CustomTabsService" />
+        </intent>
+    </queries>
+</manifest>

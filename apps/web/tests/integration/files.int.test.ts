@@ -31,8 +31,8 @@ beforeAll(async () => {
   const c = await api('POST', E, w.users.staffA, draftBody(w))
   requestId = c.body.id
   await api('POST', `${E}/${requestId}/submit`, w.users.staffA, {})
-  await api('POST', `${E}/${requestId}/acknowledge`, w.users.pm, {})
-  await api('POST', `${E}/${requestId}/approve`, w.users.owner, {})
+  await api('POST', `${E}/${requestId}/acknowledge`, w.users.owner, {})
+  await api('POST', `${E}/${requestId}/approve`, w.users.finance, {})
   const pr = await upload('/api/v1/media/transfer-proofs', w.users.finance, await png())
   proofId = pr.body.id
   const t = await api('POST', `${E}/${requestId}/transfer`, w.users.finance, { cashAccountId: w.cashAccount, bankRef: 'FI-1', proofMediaId: proofId })

@@ -11,7 +11,32 @@ export type RegisterInput = {
   platform: 'android'
   model?: string
   appVersion?: string
-  fcmToken?: string
+  fcmToken?: string | null
+  integrity?: DeviceIntegrityInput
+}
+
+export type DeviceIntegrityInput = {
+  rooted: boolean
+  emulator: boolean
+  developerMode: boolean
+  adbEnabled: boolean
+  mockLocation?: boolean | null
+}
+
+/** Risk = signals that matter for fraud (root, emulator, mocked GPS); dev options/ADB alone do not. */
+export function integrityRisk(i: DeviceIntegrityInput): boolean {
+  return i.rooted || i.emulator || i.mockLocation === true
+}
+
+/** Stored integrity fields for a register call; nothing when the APK sent no integrity report. */
+function integrityData(input: RegisterInput, now: string) {
+  const i = input.integrity
+  if (!i) return {}
+  return {
+    integrity: { rooted: i.rooted, emulator: i.emulator, developerMode: i.developerMode, adbEnabled: i.adbEnabled, mockLocation: i.mockLocation ?? null },
+    integrityRisk: integrityRisk(i),
+    integrityCheckedAt: now,
+  }
 }
 
 type DeviceDoc = {
@@ -53,6 +78,7 @@ export async function registerDevice(req: PayloadRequest, input: RegisterInput, 
         fcmToken: input.fcmToken,
         keycloakSid: keycloakSid ?? existing.keycloakSid,
         lastSeenAt: now,
+        ...integrityData(input, now),
       },
       depth: 0,
       req,
@@ -73,6 +99,7 @@ export async function registerDevice(req: PayloadRequest, input: RegisterInput, 
       status: 'active',
       registeredAt: now,
       lastSeenAt: now,
+      ...integrityData(input, now),
     },
     depth: 0,
     req,

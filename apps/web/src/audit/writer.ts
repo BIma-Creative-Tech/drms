@@ -47,6 +47,14 @@ export const AUDIT_ACTIONS = [
   // action and the attempt is recorded in its own transaction (e.g. Finance on its own request).
   'acknowledge_delegated',
   'access_denied',
+  // E1 (ADR 0013 G1-2): a decision position was skipped at submit because its only holders are the
+  // requester/creator (e.g. the only Direktur is the requester).
+  'approval_skipped',
+  // E6 S2 (Q-33): the selfieRetention job deleted selfie files past the retention period (one
+  // summary row per run, counts only).
+  'retention_purge',
+  // S3b / E11: go-live data import (one row per changed master + one summary row per run).
+  'import',
 ] as const
 export type AuditAction = (typeof AUDIT_ACTIONS)[number]
 
@@ -62,6 +70,8 @@ export type AuditRow = {
   statusFrom?: string
   statusTo?: string
   reason?: string
+  /** Device wall clock of an offline action (comparison only; server_time stays authoritative). */
+  deviceTime?: string
 }
 
 type UserLike = { id?: unknown; roles?: unknown } | null | undefined
@@ -107,6 +117,7 @@ export async function writeAudit(req: PayloadRequest, rows: AuditRow[], user?: U
         appVersion: meta.appVersion,
         ip: meta.ip,
         deviceId: meta.deviceId,
+        deviceTime: row.deviceTime,
       },
       req,
       depth: 0,

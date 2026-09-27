@@ -1,4 +1,4 @@
-import { APIError, ValidationError, type CollectionAfterChangeHook, type Condition, type CollectionBeforeChangeHook, type CollectionConfig, type Field } from 'payload'
+import { APIError, ValidationError, type CollectionAfterChangeHook, type Condition, type CollectionBeforeChangeHook, type CollectionConfig, type Field, type FilterOptionsProps, type PayloadRequest, type Where } from 'payload'
 
 import { RIWAYAT_TAB } from '@/admin/config'
 
@@ -15,7 +15,7 @@ import { isBusinessDate, isContentEditable, REQUEST_STATUSES, STATUS_LABELS, typ
 import { rupiahField, uuidField } from '@/fields/common'
 import { requestMeta } from '@/lib/request-meta'
 import { forceDeferredChecks } from '@/lib/system-tx'
-import { notifyTransition } from '@/domain/notifications'
+import { notifyCreated, notifyTransition } from '@/domain/notifications'
 
 /**
  * T1 Pengajuan biaya (requirements v1.1 §7 T1; architecture §4.3, §5.1/§5.2).
@@ -54,6 +54,35 @@ const businessDate = (name: string, label: string, extra: Partial<Field> = {}): 
     ...extra,
   }) as Field
 
+/** Picker filter of `bankAccount` (S3e, US-44): active accounts of the requesters / the creator's employee. */
+export const bankAccountOptions = ({ data, user }: Pick<FilterOptionsProps, 'data' | 'user'>): false | Where => {
+  const reqs = ids(((data ?? {}) as { requesters?: unknown[] | null }).requesters ?? null)
+  const emp = relId((user as { employee?: unknown } | null)?.employee)
+  const owners = reqs.length > 0 ? reqs : emp !== undefined ? [emp] : []
+  if (owners.length === 0) return false
+  return { and: [{ employee: { in: owners } }, { active: { not_equals: false } }] }
+}
+
+/**
+ * S3e (US-44): default account of the first requester — its "Rekening default", else its oldest active
+ * account; none → null (the requester then picks one, submit requires it).
+ */
+export async function defaultBankAccount(req: PayloadRequest, requesterIds: number[]): Promise<number | null> {
+  const first = requesterIds[0]
+  if (first === undefined) return null
+  const res = await req.payload.find({
+    collection: 'employee-bank-accounts',
+    where: { and: [{ employee: { equals: first } }, { active: { not_equals: false } }] },
+    sort: 'id',
+    depth: 0,
+    limit: 50,
+    overrideAccess: true, // SYSTEM-READ: default account of a requester (G9 checked by validateContent)
+    req,
+  })
+  const docs = res.docs as unknown as Array<{ id: number; isDefault?: boolean | null }>
+  return (docs.find((a) => a.isDefault) ?? docs[0])?.id ?? null
+}
+
 type Doc = Record<string, unknown> & { id?: number; status?: RequestStatus; lines?: LineInput[] }
 
 const beforeChange: CollectionBeforeChangeHook = async ({ data, originalDoc, operation, req, context }) => {
@@ -70,6 +99,7 @@ const beforeChange: CollectionBeforeChangeHook = async ({ data, originalDoc, ope
       d.source = requestMeta(req).source
       d.approvalCycle = 0
       d.transferredTotal = 0
+      d.syncRev = 1
     }
     const reqs = Array.isArray(d.requesters) ? d.requesters : []
     const emp = relId((req.user as { employee?: unknown } | null)?.employee)
@@ -82,11 +112,17 @@ const beforeChange: CollectionBeforeChangeHook = async ({ data, originalDoc, ope
     if (!transition && prev.status && !isContentEditable(prev.status)) {
       throw new APIError(`Pengajuan berstatus "${STATUS_LABELS[prev.status]}" tidak dapat diubah.`, 409, null, true)
     }
+    // F4 (ADR 0010 sync contract): `syncRev` counts content edits of an editable request; the APK
+    // sends it back as `base_rev` and a stale offline edit becomes a `conflict` (server wins).
+    // Transitions never bump it (a locked row may not change outside the guard whitelist).
+    if (!transition && prev.status && isContentEditable(prev.status)) {
+      d.syncRev = (typeof prev.syncRev === 'number' ? prev.syncRev : 1) + 1
+    }
     if (!transition && prev.status === 'receipt_revision') {
       // "Revisi Nota": only line amounts/descriptions and notes may change (type, scope,
       // requesters and bank account were approved and stay).
       const changed = Object.keys(d).filter(
-        (k) => !['lines', 'notes', 'changeReason'].includes(k) && JSON.stringify(normalizeValue(d[k])) !== JSON.stringify(normalizeValue(prev[k])),
+        (k) => !['lines', 'notes', 'changeReason', 'syncRev'].includes(k) && JSON.stringify(normalizeValue(d[k])) !== JSON.stringify(normalizeValue(prev[k])),
       )
       if (changed.length > 0) throw new APIError(`Saat Revisi Nota hanya baris item yang dapat diubah (${changed.join(', ')}).`, 409, null, true)
     }
@@ -102,6 +138,16 @@ const beforeChange: CollectionBeforeChangeHook = async ({ data, originalDoc, ope
   const errors = validateLines(lines, { forSubmit: false })
   if (errors.length > 0) throw new ValidationError({ collection: 'expense-requests', errors, req })
   d.grandTotal = grandTotal(lines) // server-computed; any client value is ignored (US-03)
+
+  // S3e (US-44): the admin form leaves the account empty → default account of the first requester.
+  // Only the admin form path (the /api/v1 + APK path sends its own choice and is validated as-is).
+  if (!transition && req.user && context?.[CONTENT_VALIDATED] !== true && (operation === 'create' || isContentEditable((prev.status ?? 'draft') as RequestStatus))) {
+    const current = d.bankAccount !== undefined ? d.bankAccount : prev.bankAccount
+    if ((current === null || current === undefined || current === '') && prev.status !== 'receipt_revision') {
+      const def = await defaultBankAccount(req, ids((d.requesters !== undefined ? d.requesters : prev.requesters) as unknown[] | null))
+      if (def !== null) d.bankAccount = def
+    }
+  }
 
   // F2c: the admin create/edit form (generic REST) gets the SAME draft rules as POST/PATCH
   // /api/v1/expense-requests (G9 bank account of a requester, G10 scope, Q-09 on-behalf only by
@@ -164,6 +210,11 @@ const auditLines: CollectionAfterChangeHook = async ({ doc, previousDoc, operati
 
 /** In-app notifications on every status transition (US-05, ADR 0011 §5) — same transaction. */
 const notify: CollectionAfterChangeHook = async ({ doc, previousDoc, operation, req, context }) => {
+  // S3e (US-41): a new draft that lists other requesters informs them ("dibuat atas nama Anda").
+  if (operation === 'create') {
+    if (context?.pkTransition !== true) await notifyCreated(req, doc as never)
+    return doc
+  }
   if (operation !== 'update' || context?.pkTransition !== true || !previousDoc) return doc
   await notifyTransition(req, { status: previousDoc.status as RequestStatus, currentLevel: previousDoc.currentLevel as number | null }, doc as never)
   return doc
@@ -225,7 +276,20 @@ export const ExpenseRequests: CollectionConfig = withAudit(
       { name: 'notes', type: 'textarea', label: 'Keterangan', maxLength: 2000 },
       { name: 'requesters', type: 'relationship', relationTo: 'employees', hasMany: true, label: 'Diajukan Oleh', admin: { isSortable: true } },
       { name: 'createdBy', type: 'relationship', relationTo: 'users', label: 'Dibuat Oleh', index: true, access: system, admin: { ...ro, position: 'sidebar' } },
-      { name: 'bankAccount', type: 'relationship', relationTo: 'employee-bank-accounts', label: 'Rekening tujuan' },
+      {
+        name: 'bankAccount',
+        type: 'relationship',
+        relationTo: 'employee-bank-accounts',
+        label: 'Rekening tujuan',
+        // S3e (US-44, Q-11, S-03): the picker lists only ACTIVE accounts of the requesters ("Diajukan
+        // Oleh"; none chosen yet = the creator's own employee), like the APK. Empty on save = default
+        // account of the first requester (beforeChange). G9 is still enforced by validateContent, so
+        // the relationship's own filterOptions check is switched off (it would re-read the account with
+        // the caller's access — a Staff cannot read a co-requester's account).
+        filterOptions: bankAccountOptions,
+        validate: () => true as const,
+        admin: { description: 'Hanya rekening milik pemohon. Kosongkan untuk memakai rekening default pemohon pertama.' },
+      },
       {
         name: 'bankSnapshot',
         type: 'group',
@@ -291,6 +355,14 @@ export const ExpenseRequests: CollectionConfig = withAudit(
       },
       { name: 'cancelReason', type: 'text', label: 'Alasan batal', access: system, admin: ro },
       { name: 'rejectReason', type: 'text', label: 'Alasan ditolak', access: system, admin: ro },
+      {
+        name: 'syncRev',
+        type: 'number',
+        label: 'Revisi isi (sinkronisasi APK)',
+        defaultValue: 1,
+        access: system,
+        admin: { ...ro, hidden: true },
+      },
       { name: 'clientUuid', type: 'text', label: 'Client UUID (APK offline)', unique: true, index: true, access: { update: fieldNever }, admin: { ...ro, hidden: true } },
       {
         name: 'source',
@@ -306,7 +378,7 @@ export const ExpenseRequests: CollectionConfig = withAudit(
   {
     docType: 'expense_request',
     // lines: per-line rows (auditLines); docNo: `number_issued` row written by allocateDocNo().
-    exclude: ['lines', 'docNo', 'contentHash', 'approvalSnapshot', 'currentLevel', 'approvalCycle', 'submittedAt'],
+    exclude: ['lines', 'docNo', 'contentHash', 'approvalSnapshot', 'currentLevel', 'approvalCycle', 'submittedAt', 'syncRev'],
     docNo: (doc) => (typeof doc.docNo === 'string' ? doc.docNo : undefined),
     reasonRules: [reasonOnChange(['cancelReason'], 'Alasan wajib diisi saat membatalkan.')],
     actionFor: (c) => (c.field === 'status' ? 'status_change' : undefined),

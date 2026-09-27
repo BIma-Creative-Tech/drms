@@ -38,8 +38,13 @@ export async function postJson(url: string, body: unknown, opts: { idempotencyKe
 
 export function problemText(data: unknown, status: number): string {
   const p = (data ?? {}) as { title?: string; detail?: string; errors?: Array<{ path?: string; message?: string }> }
-  const errs = (p.errors ?? []).map((e) => `${e.path ? `${e.path}: ` : ''}${e.message ?? ''}`).join('; ')
-  return [p.detail ?? p.title ?? `HTTP ${status}`, errs].filter(Boolean).join(' — ')
+  const head = p.detail ?? p.title ?? `HTTP ${status}`
+  // S3e: messages already in `detail` (body validation) are not repeated.
+  const errs = (p.errors ?? [])
+    .filter((e) => !(e.message && head.includes(e.message)))
+    .map((e) => `${e.path ? `${e.path}: ` : ''}${e.message ?? ''}`)
+    .join('; ')
+  return [head, errs].filter(Boolean).join(' — ')
 }
 
 export function ActionButton({ url, label, body, prompt, confirm, variant = 'secondary', testId }: ActionButtonProps) {

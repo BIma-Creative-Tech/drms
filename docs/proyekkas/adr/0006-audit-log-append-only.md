@@ -233,6 +233,20 @@ Hash chain: BEFORE INSERT trigger sets `row_hash = sha256(prev_hash || canonical
 `prev_hash` from the latest row under an advisory lock — serialises audit inserts (throughput cost small
 at DRMS volume). Daily job exports the day's last hash to logs (Loki) as an external anchor.
 
+**Decision E9 (2026-09-26): not implemented for go-live (deferred, revisit after the load test).** Rationale:
+- The advisory lock is held until COMMIT, and every business transaction writes its audit rows in the same
+  transaction (§4) — so the chain serialises **all** mutating requests (approvals, sync batches, transfers) behind
+  each other, not just the audit INSERTs; with offline sync batches of up to 50 items that is a real latency and
+  lock-wait risk that the pending load test (E9, Q-34) has not measured.
+- It needs more than a trigger to be useful: a canonical row encoding stable across Payload upgrades, a
+  verification tool, a daily anchor job and a runbook for "chain broken" — none exists yet.
+- The threat it adds evidence for (a DB **superuser** disabling the triggers and rewriting history) is already
+  bounded by: `REVOKE UPDATE/DELETE/TRUNCATE` + reject triggers (§2), no superuser in the app path, daily restic
+  backups with retention (platform ADR 0006; restore drill in E9), and container/application logs in Loki.
+Cheaper follow-up (proposed, not built): a **daily digest** job in the worker — `sha256` over the previous day's
+`audit_logs` rows ordered by `id` (+ count and max id) written to the log (Loki) as an external anchor; no lock, no
+schema change, verification = recompute. Owner: nextjs + infra (Loki retention). Open question for the Lead/user.
+
 ### 6. Payload migrations vs these rules
 - Payload generates DDL migrations (`payload migrate:create`); we **append raw SQL** (roles, grants,
   triggers, CHECKs) in the same or follow-up migration files (Payload migrations are TS with `up/down`
@@ -307,3 +321,6 @@ the DB before first deploy is free; after deploy it needs dump/restore.
   `receipts_self_verify_guard` / `receipt_flags_self_review_guard` with `pk_request_involves` (SQLSTATE 42501).
   §3: audit enum values `acknowledge_delegated`, `access_denied` (down = no-op). §4: detached audit writer for
   refused attempts (`delete_attempt`, `access_denied`). Status stays accepted.
+- **2026-09-26 (E9, S3 track A):** §5 decided — hash chain **not** implemented for go-live (serialises every
+  mutating transaction; verification tooling missing; superuser risk bounded by grants, triggers, backups, Loki);
+  daily digest anchor proposed as a follow-up. Status stays accepted.

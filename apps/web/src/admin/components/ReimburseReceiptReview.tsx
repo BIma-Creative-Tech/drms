@@ -48,8 +48,8 @@ const badge = (tone: 'ok' | 'warn' | 'bad' | 'muted'): React.CSSProperties => ({
   borderRadius: 8,
   fontSize: 11,
   fontWeight: 600,
-  color: tone === 'muted' ? 'var(--theme-elevation-800)' : '#fff',
-  background: tone === 'ok' ? '#2e7d32' : tone === 'warn' ? '#ef6c00' : tone === 'bad' ? '#c62828' : 'var(--theme-elevation-150)',
+  color: tone === 'muted' ? 'var(--theme-elevation-800)' : '#FFFFFF', // ≥ 4.5:1 on every --pk-tone-* (src/theme/tokens.ts)
+  background: tone === 'ok' ? 'var(--pk-tone-ok)' : tone === 'warn' ? 'var(--pk-tone-warn)' : tone === 'bad' ? 'var(--pk-tone-bad)' : 'var(--theme-elevation-150)',
 })
 const RECEIPT_STATUS: Record<string, { text: string; tone: 'ok' | 'bad' | 'muted' }> = {
   valid: { text: 'valid', tone: 'ok' },

@@ -128,24 +128,18 @@ export async function createManualEntry(req: PayloadRequest, input: ManualInput)
   if (!input.description.trim()) fail(400, 'Keterangan wajib diisi.')
   const entryDate = input.entryDate ?? (await today(req))
   if (entryDate > (await today(req))) fail(400, 'Tanggal tidak boleh di masa depan.')
+  // E2 fix: the proof is set on INSERT. Attaching it with a follow-up update (previous code) hit
+  // the audit reason rule for edits ("Alasan wajib diisi saat mengedit transaksi kas.") → every
+  // manual entry with a proof failed with 400. The owner link is claimed right after the insert,
+  // in the same transaction (uploader/ownership errors roll the posting back).
   const doc = await postEntry(req, {
     ...input,
     entryDate,
     description: input.description.trim(),
-    proofId: null,
+    proofId: input.proofId ?? null,
     sourceType: 'manual',
   })
-  if (input.proofId) {
-    await claimMedia(req, 'media-attachments', input.proofId, doc.id, { ownerType: 'cash_entry' })
-    return (await req.payload.update({
-      collection: 'cash-entries',
-      id: doc.id,
-      data: { proof: input.proofId } as never,
-      depth: 0,
-      overrideAccess: true, // SYSTEM-WRITE: attach proof to the new manual entry
-      req,
-    })) as unknown as CashEntryDoc
-  }
+  if (input.proofId) await claimMedia(req, 'media-attachments', input.proofId, doc.id, { ownerType: 'cash_entry' })
   return doc
 }
 
@@ -206,14 +200,21 @@ export async function loadEntry(req: PayloadRequest, id: number): Promise<CashEn
  * if its period is open, else today (Odoo-like), and mark the original `void` with reason.
  * Entries created by a transfer are voided only through the transfer (keeps T1/T3 consistent).
  */
-export async function voidEntry(req: PayloadRequest, id: number, reason: string, opts: { viaTransfer?: boolean } = {}): Promise<{ original: CashEntryDoc; reversal: CashEntryDoc }> {
+export async function voidEntry(
+  req: PayloadRequest,
+  id: number,
+  reason: string,
+  opts: { viaTransfer?: boolean; viaSettlement?: boolean } = {},
+): Promise<{ original: CashEntryDoc; reversal: CashEntryDoc }> {
   const e = await loadEntry(req, id)
   if (e.status === 'void') fail(409, 'Transaksi sudah di-void.')
   if (e.sourceType === 'reversal') fail(409, 'Jurnal balik tidak dapat di-void.')
   if (e.sourceType === 'transfer' && !opts.viaTransfer) fail(409, 'Kas keluar dari transfer di-void lewat pembatalan transfer.')
   // F2b: the LPJ refund belongs to a settled request ("Selesai"); voiding it alone would leave the
-  // settlement inconsistent → not allowed (settlement reversal is a follow-up, see F2b report).
-  if (e.sourceType === 'settlement_refund') fail(409, 'Kas masuk pengembalian LPJ tidak dapat di-void terpisah dari LPJ.')
+  // settlement inconsistent → only through the settlement reversal (E9, lpj.ts reverseSettlement).
+  if (e.sourceType === 'settlement_refund' && !opts.viaSettlement) {
+    fail(409, 'Kas masuk pengembalian LPJ di-void lewat "Batalkan penyelesaian" pada LPJ, bukan dari buku kas.')
+  }
   const lock = await currentLockDate(req)
   const reversalDate = lock && e.entryDate <= lock ? await today(req) : e.entryDate
   const reversal = await postEntry(req, {
@@ -264,7 +265,7 @@ export async function balances(req: PayloadRequest, asOf?: string) {
   })
 }
 
-/** Close a month (Finance/Owner). Only past months; audited `period_close`. */
+/** Close a month (Finance/Direktur = pk-owner). Only past months; audited `period_close`. */
 export async function closePeriod(req: PayloadRequest, period: string, note?: string) {
   if (!isPeriod(period)) fail(400, 'Periode harus YYYY-MM.')
   if (period >= (await today(req)).slice(0, 7)) fail(409, 'Hanya bulan yang sudah lewat yang dapat ditutup.')
@@ -288,9 +289,9 @@ export async function closePeriod(req: PayloadRequest, period: string, note?: st
   return doc
 }
 
-/** Re-open (Owner only, reason required; ADR 0005 §6): only the LATEST closed period. */
+/** Re-open (Owner only = "Direktur" label, G1-1; reason required; ADR 0005 §6): only the LATEST closed period. */
 export async function reopenPeriod(req: PayloadRequest, period: string, reason: string) {
-  if (!hasRole(req, 'pk-owner')) fail(403, 'Hanya Owner yang dapat membuka kembali periode.')
+  if (!hasRole(req, 'pk-owner')) fail(403, 'Hanya Direktur yang dapat membuka kembali periode.')
   if (!isPeriod(period)) fail(400, 'Periode harus YYYY-MM.')
   const tx = await getRequestTx(req)
   await tx.execute(sql`LOCK TABLE period_closings IN SHARE ROW EXCLUSIVE MODE`)

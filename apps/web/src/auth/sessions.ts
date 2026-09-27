@@ -1,8 +1,9 @@
-import type { Payload, PayloadRequest } from 'payload'
+import { createLocalReq, type Payload, type PayloadRequest } from 'payload'
 
 import { writeAudit } from '@/audit/writer'
 import { getEnv } from '@/lib/env'
-import { withSystemTransaction } from '@/lib/system-tx'
+import { takeToken } from '@/lib/rate-limit'
+import { withReqTransaction, withSystemTransaction } from '@/lib/system-tx'
 
 import { hashSessionId, newSessionId, readCookie, sessionCookieName } from './cookies'
 
@@ -34,6 +35,44 @@ export async function createWebSession(
     await writeAudit(req, [{ action: 'login', docType: 'web_session', docId: String(s.id) }], user as never)
   })
   return { id, maxAge: SESSION_MAX_AGE_S }
+}
+
+/**
+ * E9 — `login_failed` on the ProyekKas side (ADR 0003 §7 revision, ADR 0006): the web never sees a
+ * password (Keycloak does; wrong passwords / lockouts are Keycloak LOGIN_ERROR events = the source
+ * of truth). What the app CAN see and records here: a login that came back from Keycloak but was
+ * refused by ProyekKas — OIDC callback failure (state/nonce/PKCE/code exchange) or an account that
+ * is unknown/inactive in ProyekKas. Only reached with a valid-looking login transaction cookie;
+ * throttled per client IP (30/min) so the anonymous callback cannot flood the append-only log.
+ * Never throws (the login is refused either way).
+ */
+export async function auditLoginFailed(
+  payload: Payload,
+  headers: Headers,
+  info: { reason: 'oidc_callback_error' | 'unknown_or_inactive_user'; userId?: number; keycloakSub?: string },
+): Promise<void> {
+  const ip = headers.get('x-real-ip') ?? headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown'
+  if (!takeToken(`login_failed:${ip}`, 30, 60_000)) return
+  try {
+    const req = await createLocalReq({ req: { headers } as never, context: { auditSource: 'web' } }, payload)
+    await withReqTransaction(req, () =>
+      writeAudit(
+        req,
+        [
+          {
+            action: 'login_failed',
+            docType: 'web_session',
+            field: 'oidc_callback',
+            newValue: info.keycloakSub ? { keycloakSub: info.keycloakSub } : undefined,
+            reason: info.reason === 'unknown_or_inactive_user' ? 'Akun belum terdaftar atau tidak aktif di ProyekKas' : 'Callback OIDC gagal (state/nonce/PKCE/penukaran kode)',
+          },
+        ],
+        info.userId !== undefined ? { id: info.userId } : null,
+      ),
+    )
+  } catch (err) {
+    payload.logger.error({ msg: 'login_failed audit write failed', err: (err as Error).message })
+  }
 }
 
 /** Revokes the session whose raw id is `raw` inside `req`'s transaction; returns its id_token hint. */

@@ -855,6 +855,7 @@ stateDiagram-v2
   settle --> SE : difference = 0
   settle --> SE : difference positive / refund T6 KM Pengembalian LPJ recorded
   settle --> SE : difference negative / shortfall T3 transfer + T7 KK
+  SE --> LV : settlement reversal by Finance (reason) [refund or shortfall, period open] / void KM or transfer + KK
   TO --> [*] : resubmit = NEW request (resubmitOf)
   SE --> [*]
   BA --> [*]
@@ -866,6 +867,16 @@ return transfer (proof optional per US-23 — client question).
 - **Exact amount auto-settles:** when `difference = 0` the `lpj_verify` transition goes straight to "Selesai"
   (LPJ `verified` → `settled` in the same call, no cash posting); `settle` is only needed for a refund or a
   shortfall (ADR 0005 "As implemented (F2b)").
+- **Settlement reversal (E9, `feat/s3a-e9-hardening`):** `POST /api/v1/expense-requests/{id}/settle/reverse {reason}`
+  (Finance, never on its own request; action `settle_reverse`): the refund KM is voided (reversal row) or the
+  shortfall transfer voided with its KK reversed (`transferredTotal` −= shortfall); LPJ `settled` → `verified`
+  (links cleared, `reversalCount`/`lastReversal*` recorded), request "Selesai" → "LPJ Terverifikasi", then `settle`
+  can run again. Transaction in a closed period → 409 (Direktur re-opens first). Exact LPJ (difference 0) → 409.
+  DB guard `pk_settlements_guard` (migration `20260926_131136_s3a_e9_hardening`).
+- **403 before 409 (E9, UAT 5.2):** the service answers an authorization failure (role/ownership, G1/G17,
+  ADR 0013 monitor-only PM) with 403 **before** looking at the status; only an authorized caller gets 409 for a
+  status that does not allow the action (`state.ts` `mayPerform`, `common.ts` `requireAction`; same order in the
+  addendum service).
 - The **`NL --> DT` arrow ("add/remove receipt before LPJ") is not implemented**: there is no transition from
   "Nota Lengkap" back to "Ditransfer".
 - **Settlement reversal is not implemented:** voiding the refund KM or the shortfall transfer of a settled LPJ
@@ -894,8 +905,9 @@ stateDiagram-v2
   Draft --> MK : submit [every line has a receipt, rule requires Diketahui] / docNo, snapshot, sign
   Draft --> MA : submit [rule without Diketahui] / docNo, snapshot, sign
   Draft --> BA : cancel (reason)
-  MK --> MA : acknowledge (Diketahui Oleh)
-  MK --> TO : reject by acknowledger (reason)
+  MK --> MA : acknowledge = Direktur approval (Diketahui Oleh, ADR 0013)
+  MK --> DS : acknowledge when the only approval level was skipped (G1-2) / via MA, approvedAmount := grandTotal
+  MK --> TO : reject by the Direktur (reason)
   MK --> Draft : withdraw [no decision] (reason)
   MA --> Draft : withdraw [no decision] (reason)
   MA --> MA : approve level n, not last
@@ -907,7 +919,8 @@ stateDiagram-v2
   DS --> RN : Finance rejects a receipt (reason)
   NV --> RN : Finance rejects a receipt (reason)
   RN --> DS : requester resubmits receipts [grandTotal unchanged]
-  RN --> MA : requester resubmits with changed amounts / re-approval
+  RN --> MK : requester resubmits with changed amounts / re-approval (new cycle, Direktur first — E1)
+  RN --> MA : same, when the new snapshot has no Diketahui (skipped / rule without it)
   NV --> DT : transfer [amount = approvedAmount] / T3 + one KK (ADR 0005)
   DT --> NV : transfer voided (T8 reversal, reason)
   DT --> SE : complete (requester or Finance)
@@ -927,27 +940,39 @@ per request, audit source `job` (`domain/expense/auto-close.ts`). `complete` sta
 implements the same submit / acknowledge / withdraw / approve / reject / cancel front part and
 `Disetujui (Antri Transfer) → Ditransfer` with void back; the receipt/LPJ part is F2b.
 
-**Acknowledger resolution and delegation (Q-07 default + F2e, user decision 2026-09-24 option a).** The seeded
-default approval rule ("Default — Owner (semua nominal)", `apps/web/src/seed/data.ts`) has
-`acknowledge: 'required'`, `acknowledgeBy: 'scope_manager'`. At submit (`domain/expense/snapshot.ts`) the
-acknowledger is resolved from the project's PM or the cost center's manager (or the rule's named user). If that
-person is a **requester or the creator** (Q-08), or is **missing**, "Diketahui" is **delegated** instead of
-refusing the submit (`rules.ts` `resolveAckDelegation`):
-1. tier 1 = every active `pk-owner` who is not a requester/creator; tier 2 = every active `pk-admin` likewise;
-2. a candidate is eligible only if every approval level can still be decided by a **different** eligible
-   person once the candidate holds "Diketahui" (`approversAssignable`, exact distinct-person matching;
-   acknowledge ≠ approve — e.g. the only Owner who must also approve is not eligible);
-3. the first tier with ≥ 1 eligible candidate wins; **any** of its eligible users may acknowledge — the set is
-   **fixed at submit** in the snapshot (`acknowledgeDelegatedTo` `owner|admin`, `acknowledgeDelegateUserIds`,
-   `acknowledgeDelegationReason`, `acknowledgeOriginalUserId`; absent on pre-F2e snapshots = not delegated).
-   At acknowledge time the caller must be in that set **and** still hold the tier's role (`matchesAcknowledger`);
-4. nobody eligible → submit still returns **409** (`Pihak "Diketahui Oleh" tidak dapat ditentukan…`).
-
-The submit writes an audit row **`acknowledge_delegated`** (old = skipped user id, new = tier, delegate ids,
-cycle; reason printed); the "Diketahui" approval row and its audit carry `delegatedTo` and the reason
-`dilimpahkan ke <role>: …`; the PDF prints the actual acknowledger followed by **"(dilimpahkan)"**
-(`pdf/data.ts`). A rule step whose named approver is a requester/creator is still a 409 (G1), checked before
-the acknowledger. Onboarding should still set PM/cost-center managers so that delegation stays the exception.
+**Decision flow Direktur → Finance (E1, ADR 0013, user decision 2026-09-25, GATE 1 G1-1/G1-2 2026-09-26).**
+The role `pk-owner` is labelled **"Direktur"** (`access/roles.ts` `ROLE_LABELS`; no new Keycloak role). The seeded
+default rule "Default — Direktur lalu Finance (semua nominal)" (`seed/data.ts`, existing databases: data migration
+`20260926_022918_e1_approval_direktur_finance`) has `acknowledge: required`, `acknowledgeBy: role`,
+`acknowledgeRole: pk-owner`, `steps: [{ level 1, pk-finance }]` for every amount. "Diketahui" is the **Direktur's
+approval** (inbox "Persetujuan Direktur (Diketahui)", button "Setujui", audit action stays `acknowledge`, Riwayat label
+"disetujui Direktur (Diketahui)"); Finance approves next. The state table is unchanged except `receipts_resubmit` may
+now go to `pending_ack`.
+- **Rule validation** (`domain/expense/decision.ts` `ruleDecisionError`, `approval-rules` hook → 400; at submit → 409
+  for rules saved before E1): decision roles only `pk-owner`/`pk-finance` (named users must hold one of them);
+  `acknowledgeBy: scope_manager` (PM / cost-center manager) is retired (kept in the enum for old rows/snapshots); an
+  `optional` Direktur "Diketahui" is refused. The admin selects only offer Direktur/Finance (`filterOptions`).
+- **Service guard** (`common.ts` `requireActionAudited`): on a snapshot with `decisionRoles` (every snapshot taken
+  since E1) acknowledge/approve/reject need `pk-owner` or `pk-finance`; PM/Staff/Admin → **403** + `access_denied`
+  audit (own transaction), whatever the status. `allowedActions` hides the actions (`ActorContext.lacksDecisionRole`).
+- **Positions at submit** (`snapshot.ts` → `decision.ts` `planPositions`, replaces the F2e delegation for new
+  requests): holders of a position = active role holders (or the named user); eligible = holders − requesters/creator.
+  No holder at all → 409. Eligible empty → the position is **skipped** (G1-2): snapshot `skipped[]` (a skipped
+  "Diketahui" sets `acknowledge: none`; skipped levels are removed and the rest renumbered), one **`approval_skipped`**
+  audit row each (reason "pemohon/pembuat adalah satu-satunya Direktur|Finance"), PDF box "(tidak berlaku — pemohon)".
+  The remaining positions must be fillable by **different** people (`distinctAssignable`, one position per person) and
+  at least one must remain — else **409**. When the only approval level was skipped, the Direktur's "Setujui" is final:
+  `acknowledge` moves the request through "Menunggu Approval" to "Disetujui" in the same transaction (the DB allows
+  `approved_amount` only on `pending_approval → approved`).
+- **Notifications:** `expense.pending_ack` → active Direktur minus requester/creator ("… menunggu persetujuan Anda
+  sebagai Direktur"); `expense.pending_approval` → active Finance minus requester/creator; the PM gets none. The
+  "Persetujuan" nav link is shown to Direktur/Finance only; `/api/v1/me` returns `capabilities.approvalInbox`.
+- **Re-approval** (Reimburse receipt revision with a changed total, `receipts.ts`): new snapshot + cycle, back to
+  "Menunggu Diketahui (Direktur)" when the new snapshot requires it.
+- **Legacy snapshots** (submitted before E1, no `decisionRoles`): finish on their old flow — PM "Diketahui", F2e
+  delegation (`acknowledgeDelegatedTo`, `matchesAcknowledger`, "(dilimpahkan)" on the PDF), Owner approval — with the
+  old guards (US-34, E1 AC-8). `resolveAckDelegation` is no longer called at submit; remove it after the last legacy
+  request is closed (F7 cleanup).
 
 **Finance receipt verification in the panel (F2d).** Reimburse requests in "Disetujui" (to verify) and
 "Revisi Nota" (waiting for the requester) are listed at the top of **Antrian Transfer**
@@ -1105,11 +1130,14 @@ POST /api/v1/attendance/check-in | /check-out | /on-behalf (PM) | POST /api/v1/a
 GET  /api/v1/attendance/today?project= | GET /api/v1/attendance/me?month=
 POST /api/v1/progress-reports (multipart ≤5 photos) | PATCH /api/v1/progress-reports/{id}
 POST /api/v1/budget-addenda | /{id}/submit | /approve | /reject
-POST /api/v1/sync/batch                               (offline queue replay — contract in ADR 0010)
+POST /api/v1/sync/batch                               (offline queue replay — contract in ADR 0010; implemented F4: drafts + receipts)
+GET  /api/v1/app/config                               (PUBLIC app gate: versions, download URL, TZ, feature flags — F4)
 GET  /api/v1/notifications | GET /api/v1/notifications/{id|uuid} | POST /api/v1/notifications/{id}/read | POST /api/v1/notifications/read-all
 GET  /api/v1/media/{collection}/{id}/file[?variant=thumb]   (as implemented F2b; signed exp/sig NOT implemented — F6)
-GET  /api/v1/dashboard/{owner|finance|pm|staff}
-GET  /api/v1/reports/{cash-recap|budget-vs-actual|attendance|requests|vehicle-costs}?format=json|xlsx|pdf
+GET  /api/v1/dashboard/{owner|finance|pm|admin|me}      (as implemented F3; me = own requests / Staff home)
+GET  /api/v1/reports/{code}[/{csv|xlsx|pdf}]           (as implemented F3; code = rekap-kas | buku-kas | pengeluaran-kategori |
+                                                        anggaran-project | rekap-pengajuan | kelengkapan | biaya-kendaraan | audit-log;
+                                                        attendance report → F5)
 POST /api/v1/auth/backchannel-logout                  (NOT USED: back-channel logout disabled, ADR 0003 §1 rev. 2026-09-23)
 GET  /api/v1/openapi.json                             (auth required outside dev)
 ```
@@ -1237,12 +1265,21 @@ The worker bundle stubs the renderer out (no batch PDF yet). Built-in Helvetica;
 stored. Layout replicates the client form; receipts on separate pages, 2 per page; internal variant shows
 validation flags. Layout approved by the user 2026-09-24; logo pending (Q-32). ADR 0008 "As implemented".
 
-### 9.4 Excel export (M13)
-Library **not decided**: `exceljs@4.4.0` (MIT) last published 2023-10-19, repo pushed 2025-01-21 → fails
-CLAUDE.md §0.10 "< 6 months since last commit"; `xlsx@0.18.5` on npm last published 2022-03-24 (SheetJS
-moved distribution off npm — not verified this session). Options for F3: CSV (UTF-8 BOM, `;` separator
-for Indonesian Excel locale) as baseline + an XLSX writer selected by nextjs-developer with fresh
-evidence (open decision, needs Lead/user).
+### 9.4 Excel export (M13) — As decided (user 2026-09-24, Q-F3-3) and implemented (F3)
+Decision record: `f3/export-library-decision.md` (registry facts + RAM measurements of the analyst).
+- **CSV always** (no library): streamed, keyset pages of 1 000 rows each in its own short transaction, UTF-8 BOM,
+  separator `;`, CRLF, RFC 4180 quoting, formula-injection guard (`'` prefix), ≤ 100 000 rows (`lib/csv.ts`).
+- **XLSX = `write-excel-file@4.1.1`** (MIT, one dependency `fflate` 0.8.3; npm release 2026-06-08, i.e. past the
+  `.npmrc` `min-release-age=7`), server side only, imported lazily (0 idle RAM). In-memory workbook → **≤ 10 000 data
+  rows per file**, else 413 "Persempit filter atau pakai CSV". Amounts are numbers with `#,##0`, dates real Excel
+  dates (`Date.UTC`, no TZ shift), text always `type: String` (never formula cells). Rollback switch
+  `EXPORT_XLSX_ENABLED=false` (button hidden, endpoint 404) — `lib/xlsx.ts`.
+- **PDF** for Rekap Kas, Pengeluaran per Kategori, Anggaran Project only (≤ 500 rows, A4 landscape) with the existing
+  `@react-pdf/renderer` 4.9.0 (ADR 0008).
+- XLSX and PDF (incl. the F2 document PDF) share one in-process semaphore: **2 concurrent, 10 s wait → 503**
+  (`lib/heavy-gate.ts`). CSV takes no slot. Every download writes one audit row `export` (report, format, filters,
+  row count); exports are rate limited 10/min per user; PM exports are team-scoped exactly like the screen.
+- Measured RAM in the production image under `--memory 384m`: see ADR 0008 revision 2026-09-24 (F3).
 
 ---
 
@@ -1391,3 +1428,7 @@ measurement gate is F1 (idle) and F6 (load).
   acknowledge/reject with `access_denied` audit; new G17 Finance self-involvement (DB triggers
   `pk_request_involves`); guard order 409-before-403 noted; operational 4xx logged at warn; office-only fields
   hidden for Staff/PM. UAT evidence: `uat/f2-uat-report.md`.
+- **2026-09-24 (F3):** §6.3 dashboard/report endpoints as implemented; §9.4 Excel export "As decided" (user
+  2026-09-24: `write-excel-file` 4.1.1, 10 000-row XLSX cap, CSV always, shared render semaphore with PDF, report PDFs
+  for 3 reports). Admin: `admin.components.views.dashboard` replaced by the role home pages; custom views
+  `/laporan`, `/laporan/:kode`, `/audit-log`. Company setting `lpjDueDays` (Q-F3-1).

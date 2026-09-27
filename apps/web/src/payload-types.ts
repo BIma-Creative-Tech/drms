@@ -98,6 +98,10 @@ export interface Config {
     settlements: Settlement;
     'cash-entries': CashEntry;
     'period-closings': PeriodClosing;
+    attendances: Attendance;
+    'attendance-corrections': AttendanceCorrection;
+    'progress-reports': ProgressReport;
+    'budget-addenda': BudgetAddendum;
     notifications: Notification;
     devices: Device;
     'web-sessions': WebSession;
@@ -148,6 +152,10 @@ export interface Config {
     settlements: SettlementsSelect<false> | SettlementsSelect<true>;
     'cash-entries': CashEntriesSelect<false> | CashEntriesSelect<true>;
     'period-closings': PeriodClosingsSelect<false> | PeriodClosingsSelect<true>;
+    attendances: AttendancesSelect<false> | AttendancesSelect<true>;
+    'attendance-corrections': AttendanceCorrectionsSelect<false> | AttendanceCorrectionsSelect<true>;
+    'progress-reports': ProgressReportsSelect<false> | ProgressReportsSelect<true>;
+    'budget-addenda': BudgetAddendaSelect<false> | BudgetAddendaSelect<true>;
     notifications: NotificationsSelect<false> | NotificationsSelect<true>;
     devices: DevicesSelect<false> | DevicesSelect<true>;
     'web-sessions': WebSessionsSelect<false> | WebSessionsSelect<true>;
@@ -187,6 +195,8 @@ export interface Config {
       auditDailyAnchor: TaskAuditDailyAnchor;
       sendEmail: TaskSendEmail;
       reimburseAutoClose: TaskReimburseAutoClose;
+      selfieRetention: TaskSelfieRetention;
+      dailyReminders: TaskDailyReminders;
       inline: {
         input: unknown;
         output: unknown;
@@ -255,6 +265,7 @@ export interface Employee {
   nickname?: string | null;
   position?: string | null;
   phone?: string | null;
+  workSchedule?: (number | null) | WorkSchedule;
   faceRefPhoto?: (number | null) | MediaSelfy;
   /**
    * Referensi Odoo (diisi saat mirror, ADR 0009).
@@ -262,6 +273,33 @@ export interface Employee {
   odooEmployeeRef?: string | null;
   active?: boolean | null;
   uuid?: string | null;
+  /**
+   * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
+   */
+  changeReason?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "work-schedules".
+ */
+export interface WorkSchedule {
+  id: number;
+  name: string;
+  startTime: string;
+  endTime: string;
+  lateToleranceMin?: number | null;
+  workDays?: {
+    mon?: boolean | null;
+    tue?: boolean | null;
+    wed?: boolean | null;
+    thu?: boolean | null;
+    fri?: boolean | null;
+    sat?: boolean | null;
+    sun?: boolean | null;
+  };
+  active?: boolean | null;
   /**
    * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
    */
@@ -284,6 +322,7 @@ export interface MediaSelfy {
   originalHeight?: number | null;
   originalSize?: number | null;
   capturedAt?: string | null;
+  removedAt?: string | null;
   /**
    * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
    */
@@ -428,12 +467,19 @@ export interface Project {
   address?: string | null;
   lat?: number | null;
   lng?: number | null;
+  /**
+   * Kosong = radius default perusahaan (Setting perusahaan).
+   */
   radiusM?: number | null;
   pm?: (number | null) | User;
   budget?: number | null;
   startDate?: string | null;
   targetDate?: string | null;
   status: 'perencanaan' | 'berjalan' | 'ditunda' | 'selesai' | 'arsip';
+  /**
+   * Dihitung dari bobot × progress tahapan (hanya lewat laporan progress).
+   */
+  progressPct?: number | null;
   /**
    * Referensi Odoo (diisi saat mirror, ADR 0009).
    */
@@ -457,6 +503,10 @@ export interface ProjectStage {
   weightPct?: number | null;
   sequence: number;
   progressPct?: number | null;
+  /**
+   * Nonaktif = tidak dihitung dalam bobot & progress project.
+   */
+  active?: boolean | null;
   uuid?: string | null;
   /**
    * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
@@ -580,6 +630,10 @@ export interface CashAccount {
   accountNo?: string | null;
   accountHolder?: string | null;
   openingBalance?: number | null;
+  /**
+   * Tanggal go-live akun ini. Transaksi kas sebelum tanggal ini ditolak; saldo awal terkunci setelah periode sejak tanggal ini ditutup. Kosong = tanpa kunci.
+   */
+  openingBalanceDate?: string | null;
   odooJournalCode?: string | null;
   active?: boolean | null;
   uuid?: string | null;
@@ -619,30 +673,18 @@ export interface CostCenter {
   name: string;
   type: 'operational' | 'department';
   manager?: (number | null) | User;
+  lat?: number | null;
+  lng?: number | null;
+  /**
+   * Kosong = radius default perusahaan (Setting perusahaan).
+   */
+  radiusM?: number | null;
   /**
    * Referensi Odoo (diisi saat mirror, ADR 0009).
    */
   odooAnalyticRef?: string | null;
   active?: boolean | null;
   uuid?: string | null;
-  /**
-   * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
-   */
-  changeReason?: string | null;
-  updatedAt: string;
-  createdAt: string;
-}
-/**
- * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "work-schedules".
- */
-export interface WorkSchedule {
-  id: number;
-  name: string;
-  startTime: string;
-  endTime: string;
-  lateToleranceMin?: number | null;
-  active?: boolean | null;
   /**
    * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
    */
@@ -828,6 +870,9 @@ export interface ExpenseRequest {
   notes?: string | null;
   requesters?: (number | Employee)[] | null;
   createdBy?: (number | null) | User;
+  /**
+   * Hanya rekening milik pemohon. Kosongkan untuk memakai rekening default pemohon pertama.
+   */
   bankAccount?: (number | null) | EmployeeBankAccount;
   bankSnapshot?: {
     bankName?: string | null;
@@ -872,6 +917,7 @@ export interface ExpenseRequest {
   resubmitOf?: (number | null) | ExpenseRequest;
   cancelReason?: string | null;
   rejectReason?: string | null;
+  syncRev?: number | null;
   clientUuid?: string | null;
   source?: ('web' | 'apk' | 'system' | 'job') | null;
   uuid?: string | null;
@@ -954,7 +1000,8 @@ export interface ExpenseLineSnapshot {
 export interface Approval {
   id: number;
   docType: 'expense_request' | 'budget_addendum';
-  request: number | ExpenseRequest;
+  request?: (number | null) | ExpenseRequest;
+  addendum?: (number | null) | BudgetAddendum;
   cycle: number;
   position: 'diajukan' | 'dibuat' | 'diketahui' | 'approval';
   level: number;
@@ -973,6 +1020,51 @@ export interface Approval {
   signatureSource?: ('profile' | 'captured' | 'none') | null;
   deviceId?: string | null;
   source?: ('web' | 'apk' | 'system' | 'job') | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * Diajukan dan diputuskan lewat layar Addendum RAB (bukan dari form ini).
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "budget-addenda".
+ */
+export interface BudgetAddendum {
+  id: number;
+  docNo?: string | null;
+  project: number | Project;
+  status: 'draft' | 'pending_ack' | 'pending_approval' | 'approved' | 'rejected' | 'cancelled';
+  addition: number;
+  reason: string;
+  budgetAtSubmit?: number | null;
+  /**
+   * Dibaca ulang saat disetujui (terkunci).
+   */
+  oldBudget?: number | null;
+  newBudget?: number | null;
+  createdBy: number | User;
+  submittedAt?: string | null;
+  decidedAt?: string | null;
+  approvalRule?: (number | null) | ApprovalRule;
+  approvalSnapshot?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  approvalCycle?: number | null;
+  currentLevel?: number | null;
+  rejectReason?: string | null;
+  cancelReason?: string | null;
+  source?: ('web' | 'apk') | null;
+  uuid?: string | null;
+  /**
+   * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
+   */
+  changeReason?: string | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -1003,6 +1095,7 @@ export interface Receipt {
   verifiedAt?: string | null;
   entrySource?: ('manual' | 'ocr') | null;
   createdBy?: (number | null) | User;
+  clientUuid?: string | null;
   uuid?: string | null;
   /**
    * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
@@ -1221,6 +1314,10 @@ export interface Settlement {
   settledBy?: (number | null) | User;
   refundCashEntry?: (number | null) | CashEntry;
   shortfallTransfer?: (number | null) | Transfer;
+  reversalCount?: number | null;
+  lastReversedAt?: string | null;
+  lastReversedBy?: (number | null) | User;
+  lastReversalReason?: string | null;
   uuid?: string | null;
   /**
    * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
@@ -1248,20 +1345,54 @@ export interface PeriodClosing {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "notifications".
+ * via the `definition` "attendances".
  */
-export interface Notification {
+export interface Attendance {
   id: number;
-  user: number | User;
-  event: string;
-  title: string;
-  body: string;
-  docType?: string | null;
-  docId?: string | null;
-  docNo?: string | null;
-  readAt?: string | null;
-  pushStatus: 'skipped' | 'pending' | 'sent' | 'failed';
-  uuid?: string | null;
+  employee: number | Employee;
+  user?: (number | null) | User;
+  kind: 'check_in' | 'check_out';
+  project?: (number | null) | Project;
+  costCenter?: (number | null) | CostCenter;
+  source: 'self' | 'pm';
+  recordedBy?: (number | null) | User;
+  onBehalfReason?: string | null;
+  localDate: string;
+  attendanceTime: string;
+  receivedAt: string;
+  deviceTime?: string | null;
+  estimatedTime?: string | null;
+  timeTrust: 'server' | 'estimated' | 'device_only';
+  offline?: boolean | null;
+  lat: number;
+  lng: number;
+  accuracyM?: number | null;
+  distanceM: number;
+  selfie: number | MediaSelfy;
+  device?: (number | null) | Device;
+  flags?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  schedule?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  clientUuid: string;
+  /**
+   * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
+   */
+  changeReason?: string | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -1280,6 +1411,18 @@ export interface Device {
   keycloakSid?: string | null;
   status: 'active' | 'revoked' | 'lost';
   revokeReason?: string | null;
+  /**
+   * Root, emulator atau lokasi palsu terdeteksi pada pemeriksaan terakhir.
+   */
+  integrityRisk?: boolean | null;
+  integrity?: {
+    rooted?: boolean | null;
+    emulator?: boolean | null;
+    developerMode?: boolean | null;
+    adbEnabled?: boolean | null;
+    mockLocation?: boolean | null;
+  };
+  integrityCheckedAt?: string | null;
   registeredAt?: string | null;
   lastSeenAt?: string | null;
   revokedAt?: string | null;
@@ -1288,6 +1431,94 @@ export interface Device {
    * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
    */
   changeReason?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "attendance-corrections".
+ */
+export interface AttendanceCorrection {
+  id: number;
+  attendance: number | Attendance;
+  employee: number | Employee;
+  project?: (number | null) | Project;
+  costCenter?: (number | null) | CostCenter;
+  kind: 'check_in' | 'check_out';
+  localDate: string;
+  oldTime: string;
+  newTime: string;
+  reason: string;
+  correctedBy: number | User;
+  correctedAt: string;
+  /**
+   * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
+   */
+  changeReason?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * Laporan dibuat dari aplikasi Android atau layar laporan progress (bukan dari form ini).
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "progress-reports".
+ */
+export interface ProgressReport {
+  id: number;
+  docNo?: string | null;
+  project: number | Project;
+  stage: number | ProjectStage;
+  reportDate: string;
+  pctBefore: number;
+  pctAfter: number;
+  projectPctBefore?: number | null;
+  projectPctAfter?: number | null;
+  work: string;
+  issues?: string | null;
+  reporter: number | User;
+  photoCount?: number | null;
+  receivedAt?: string | null;
+  editableUntil?: string | null;
+  deviceTime?: string | null;
+  timeTrust?: ('server' | 'estimated' | 'device_only') | null;
+  offline?: boolean | null;
+  source?: ('web' | 'apk') | null;
+  flags?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  syncRev?: number | null;
+  clientUuid?: string | null;
+  uuid?: string | null;
+  /**
+   * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
+   */
+  changeReason?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "notifications".
+ */
+export interface Notification {
+  id: number;
+  user: number | User;
+  event: string;
+  title: string;
+  body: string;
+  docType?: string | null;
+  docId?: string | null;
+  docNo?: string | null;
+  readAt?: string | null;
+  pushStatus: 'skipped' | 'pending' | 'sent' | 'failed';
+  uuid?: string | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -1356,7 +1587,10 @@ export interface AuditLog {
     | 'reject'
     | 'verify'
     | 'acknowledge_delegated'
-    | 'access_denied';
+    | 'access_denied'
+    | 'approval_skipped'
+    | 'retention_purge'
+    | 'import';
   field?: string | null;
   lineNo?: number | null;
   oldValue?:
@@ -1531,7 +1765,8 @@ export interface PayloadJob {
     | {
         executedAt: string;
         completedAt: string;
-        taskSlug: 'inline' | 'auditDailyAnchor' | 'sendEmail' | 'reimburseAutoClose';
+        taskSlug:
+          'inline' | 'auditDailyAnchor' | 'sendEmail' | 'reimburseAutoClose' | 'selfieRetention' | 'dailyReminders';
         taskID: string;
         input?:
           | {
@@ -1564,7 +1799,8 @@ export interface PayloadJob {
         id?: string | null;
       }[]
     | null;
-  taskSlug?: ('inline' | 'auditDailyAnchor' | 'sendEmail' | 'reimburseAutoClose') | null;
+  taskSlug?:
+    ('inline' | 'auditDailyAnchor' | 'sendEmail' | 'reimburseAutoClose' | 'selfieRetention' | 'dailyReminders') | null;
   queue?: string | null;
   waitUntil?: string | null;
   processing?: boolean | null;
@@ -1704,6 +1940,22 @@ export interface PayloadLockedDocument {
         value: number | PeriodClosing;
       } | null)
     | ({
+        relationTo: 'attendances';
+        value: number | Attendance;
+      } | null)
+    | ({
+        relationTo: 'attendance-corrections';
+        value: number | AttendanceCorrection;
+      } | null)
+    | ({
+        relationTo: 'progress-reports';
+        value: number | ProgressReport;
+      } | null)
+    | ({
+        relationTo: 'budget-addenda';
+        value: number | BudgetAddendum;
+      } | null)
+    | ({
         relationTo: 'devices';
         value: number | Device;
       } | null)
@@ -1804,6 +2056,7 @@ export interface EmployeesSelect<T extends boolean = true> {
   nickname?: T;
   position?: T;
   phone?: T;
+  workSchedule?: T;
   faceRefPhoto?: T;
   odooEmployeeRef?: T;
   active?: T;
@@ -1892,6 +2145,7 @@ export interface ProjectsSelect<T extends boolean = true> {
   startDate?: T;
   targetDate?: T;
   status?: T;
+  progressPct?: T;
   odooAnalyticRef?: T;
   uuid?: T;
   changeReason?: T;
@@ -1908,6 +2162,7 @@ export interface ProjectStagesSelect<T extends boolean = true> {
   weightPct?: T;
   sequence?: T;
   progressPct?: T;
+  active?: T;
   uuid?: T;
   changeReason?: T;
   updatedAt?: T;
@@ -1986,6 +2241,7 @@ export interface CashAccountsSelect<T extends boolean = true> {
   accountNo?: T;
   accountHolder?: T;
   openingBalance?: T;
+  openingBalanceDate?: T;
   odooJournalCode?: T;
   active?: T;
   uuid?: T;
@@ -2017,6 +2273,17 @@ export interface WorkSchedulesSelect<T extends boolean = true> {
   startTime?: T;
   endTime?: T;
   lateToleranceMin?: T;
+  workDays?:
+    | T
+    | {
+        mon?: T;
+        tue?: T;
+        wed?: T;
+        thu?: T;
+        fri?: T;
+        sat?: T;
+        sun?: T;
+      };
   active?: T;
   changeReason?: T;
   updatedAt?: T;
@@ -2122,6 +2389,9 @@ export interface CostCentersSelect<T extends boolean = true> {
   name?: T;
   type?: T;
   manager?: T;
+  lat?: T;
+  lng?: T;
+  radiusM?: T;
   odooAnalyticRef?: T;
   active?: T;
   uuid?: T;
@@ -2199,6 +2469,7 @@ export interface ExpenseRequestsSelect<T extends boolean = true> {
   resubmitOf?: T;
   cancelReason?: T;
   rejectReason?: T;
+  syncRev?: T;
   clientUuid?: T;
   source?: T;
   uuid?: T;
@@ -2228,6 +2499,7 @@ export interface ExpenseLineSnapshotsSelect<T extends boolean = true> {
 export interface ApprovalsSelect<T extends boolean = true> {
   docType?: T;
   request?: T;
+  addendum?: T;
   cycle?: T;
   position?: T;
   level?: T;
@@ -2275,6 +2547,7 @@ export interface ReceiptsSelect<T extends boolean = true> {
   verifiedAt?: T;
   entrySource?: T;
   createdBy?: T;
+  clientUuid?: T;
   uuid?: T;
   changeReason?: T;
   updatedAt?: T;
@@ -2358,6 +2631,10 @@ export interface SettlementsSelect<T extends boolean = true> {
   settledBy?: T;
   refundCashEntry?: T;
   shortfallTransfer?: T;
+  reversalCount?: T;
+  lastReversedAt?: T;
+  lastReversedBy?: T;
+  lastReversalReason?: T;
   uuid?: T;
   changeReason?: T;
   updatedAt?: T;
@@ -2415,6 +2692,118 @@ export interface PeriodClosingsSelect<T extends boolean = true> {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "attendances_select".
+ */
+export interface AttendancesSelect<T extends boolean = true> {
+  employee?: T;
+  user?: T;
+  kind?: T;
+  project?: T;
+  costCenter?: T;
+  source?: T;
+  recordedBy?: T;
+  onBehalfReason?: T;
+  localDate?: T;
+  attendanceTime?: T;
+  receivedAt?: T;
+  deviceTime?: T;
+  estimatedTime?: T;
+  timeTrust?: T;
+  offline?: T;
+  lat?: T;
+  lng?: T;
+  accuracyM?: T;
+  distanceM?: T;
+  selfie?: T;
+  device?: T;
+  flags?: T;
+  schedule?: T;
+  clientUuid?: T;
+  changeReason?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "attendance-corrections_select".
+ */
+export interface AttendanceCorrectionsSelect<T extends boolean = true> {
+  attendance?: T;
+  employee?: T;
+  project?: T;
+  costCenter?: T;
+  kind?: T;
+  localDate?: T;
+  oldTime?: T;
+  newTime?: T;
+  reason?: T;
+  correctedBy?: T;
+  correctedAt?: T;
+  changeReason?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "progress-reports_select".
+ */
+export interface ProgressReportsSelect<T extends boolean = true> {
+  docNo?: T;
+  project?: T;
+  stage?: T;
+  reportDate?: T;
+  pctBefore?: T;
+  pctAfter?: T;
+  projectPctBefore?: T;
+  projectPctAfter?: T;
+  work?: T;
+  issues?: T;
+  reporter?: T;
+  photoCount?: T;
+  receivedAt?: T;
+  editableUntil?: T;
+  deviceTime?: T;
+  timeTrust?: T;
+  offline?: T;
+  source?: T;
+  flags?: T;
+  syncRev?: T;
+  clientUuid?: T;
+  uuid?: T;
+  changeReason?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "budget-addenda_select".
+ */
+export interface BudgetAddendaSelect<T extends boolean = true> {
+  docNo?: T;
+  project?: T;
+  status?: T;
+  addition?: T;
+  reason?: T;
+  budgetAtSubmit?: T;
+  oldBudget?: T;
+  newBudget?: T;
+  createdBy?: T;
+  submittedAt?: T;
+  decidedAt?: T;
+  approvalRule?: T;
+  approvalSnapshot?: T;
+  approvalCycle?: T;
+  currentLevel?: T;
+  rejectReason?: T;
+  cancelReason?: T;
+  source?: T;
+  uuid?: T;
+  changeReason?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "notifications_select".
  */
 export interface NotificationsSelect<T extends boolean = true> {
@@ -2445,6 +2834,17 @@ export interface DevicesSelect<T extends boolean = true> {
   keycloakSid?: T;
   status?: T;
   revokeReason?: T;
+  integrityRisk?: T;
+  integrity?:
+    | T
+    | {
+        rooted?: T;
+        emulator?: T;
+        developerMode?: T;
+        adbEnabled?: T;
+        mockLocation?: T;
+      };
+  integrityCheckedAt?: T;
   registeredAt?: T;
   lastSeenAt?: T;
   revokedAt?: T;
@@ -2596,6 +2996,7 @@ export interface MediaSelfiesSelect<T extends boolean = true> {
   originalHeight?: T;
   originalSize?: T;
   capturedAt?: T;
+  removedAt?: T;
   changeReason?: T;
   updatedAt?: T;
   createdAt?: T;
@@ -2833,6 +3234,9 @@ export interface CompanySetting {
    * Proses server memakai env TZ (cron, tanggal bisnis); ubah keduanya bersamaan.
    */
   timezone: string;
+  /**
+   * Dipakai untuk absensi bila project/pusat biaya punya titik lokasi tetapi radiusnya kosong.
+   */
   defaultGeofenceRadiusM: number;
   lateReportDays: number;
   budgetWarnPct: number;
@@ -2842,7 +3246,72 @@ export interface CompanySetting {
   receiptRoundingTolerance: number;
   receiptMaxAgeDays: number;
   reimburseAutoCloseDays: number;
+  /**
+   * Uang muka tanpa LPJ lebih lama dari ini tampil sebagai "LPJ terlambat" di dashboard/laporan.
+   */
+  lpjDueDays: number;
   minAppVersion?: string | null;
+  latestAppVersion?: string | null;
+  /**
+   * https://… (APK side-load). Kosong = aplikasi menampilkan "hubungi admin".
+   */
+  appDownloadUrl?: string | null;
+  /**
+   * Nonaktif → item offline ditolak FEATURE_DISABLED (ADR 0010 rollback).
+   */
+  syncExpenseDraftsEnabled?: boolean | null;
+  /**
+   * Absen masuk/pulang sendiri di project/pusat biaya yang ditugaskan (geofence, selfie, lokasi palsu ditolak) dan "diabsenkan PM". Nonaktif → item absensi ditolak FEATURE_DISABLED. Nyalakan di prod setelah checklist go-live.
+   */
+  syncAttendanceEnabled?: boolean | null;
+  /**
+   * Dipakai untuk karyawan tanpa jadwal sendiri. Kosong = keterlambatan tidak dihitung.
+   */
+  defaultWorkSchedule?: (number | null) | WorkSchedule;
+  /**
+   * Selfie lebih tua dari ini dihapus dari penyimpanan saat penghapusan otomatis aktif (data absensi tetap). Default 12 bulan; menunggu keputusan klien (Q-33).
+   */
+  selfieRetentionMonths: number;
+  /**
+   * Nonaktif = job hanya menghitung (dry run). Aktif = file selfie dihapus permanen setiap malam (02:30), tercatat di audit log.
+   */
+  selfieRetentionDeleteEnabled?: boolean | null;
+  selfieRetentionBatch: number;
+  /**
+   * E4: laporan progress harian + foto dari APK. Nonaktif → item laporan ditolak FEATURE_DISABLED (rollback).
+   */
+  syncProgressReportsEnabled?: boolean | null;
+  /**
+   * Nonaktif = job pengingat tidak mengirim apa pun (rollback).
+   */
+  remindersEnabled?: boolean | null;
+  reminderHour: number;
+  /**
+   * Selain notifikasi in-app. Batas SMTP 30 email/jam per mailbox — aktifkan setelah alamat email pengguna benar.
+   */
+  reminderEmailEnabled?: boolean | null;
+  /**
+   * Batas hari = "Batas hari laporan progress terlambat".
+   */
+  reminderLateProgressEnabled?: boolean | null;
+  /**
+   * Batas hari = "Batas LPJ uang muka".
+   */
+  reminderLpjOverdueEnabled?: boolean | null;
+  reminderRevisionEnabled?: boolean | null;
+  reminderRevisionDays: number;
+  /**
+   * Ambang = "Ambang anggaran kuning" dan "merah" di atas; sekali per ambang per project.
+   */
+  reminderBudgetEnabled?: boolean | null;
+  /**
+   * Pemohon lain dan pembuat diberi tahu; pelaku aksi tidak diberi tahu tentang aksinya sendiri.
+   */
+  notifyRequesterStatusEnabled?: boolean | null;
+  /**
+   * Selain notifikasi in-app. Isi email tanpa nominal/nama pemohon. Batas SMTP 30 email/jam per mailbox.
+   */
+  approvalEmailEnabled?: boolean | null;
   offlineMaxAgeDays: number;
   imageTargets: {
     receiptsMaxPx: number;
@@ -2897,7 +3366,27 @@ export interface CompanySettingsSelect<T extends boolean = true> {
   receiptRoundingTolerance?: T;
   receiptMaxAgeDays?: T;
   reimburseAutoCloseDays?: T;
+  lpjDueDays?: T;
   minAppVersion?: T;
+  latestAppVersion?: T;
+  appDownloadUrl?: T;
+  syncExpenseDraftsEnabled?: T;
+  syncAttendanceEnabled?: T;
+  defaultWorkSchedule?: T;
+  selfieRetentionMonths?: T;
+  selfieRetentionDeleteEnabled?: T;
+  selfieRetentionBatch?: T;
+  syncProgressReportsEnabled?: T;
+  remindersEnabled?: T;
+  reminderHour?: T;
+  reminderEmailEnabled?: T;
+  reminderLateProgressEnabled?: T;
+  reminderLpjOverdueEnabled?: T;
+  reminderRevisionEnabled?: T;
+  reminderRevisionDays?: T;
+  reminderBudgetEnabled?: T;
+  notifyRequesterStatusEnabled?: T;
+  approvalEmailEnabled?: T;
   offlineMaxAgeDays?: T;
   imageTargets?:
     | T
@@ -2967,6 +3456,32 @@ export interface TaskReimburseAutoClose {
   input?: unknown;
   output: {
     closed: number;
+  };
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "TaskSelfieRetention".
+ */
+export interface TaskSelfieRetention {
+  input?: unknown;
+  output: {
+    months: number;
+    cutoff: string;
+    candidates: number;
+    deleted: number;
+  };
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "TaskDailyReminders".
+ */
+export interface TaskDailyReminders {
+  input?: unknown;
+  output: {
+    status: string;
+    date: string;
+    notified: number;
+    emails: number;
   };
 }
 /**

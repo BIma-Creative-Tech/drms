@@ -14,6 +14,8 @@ import { getTestPayload, installFakeKeycloak, webSessionCookie, type TestUser } 
  * Isolated F2a test world per test file (all files share one DB): own employees, users (each with
  * a profile signature), project/cost center, bank accounts, cash account and an approval rule
  * scoped to the world's project/cost center (more specific than the seeded default → wins).
+ * ADR 0013 (E1): `owner`/`owner2` are Direktur ("Diketahui" = approval), `finance`/`finance2` approve,
+ * `pm` only monitors.
  */
 export const ORIGIN = 'http://localhost:3000'
 
@@ -94,6 +96,7 @@ export async function makeWorld(tag: string) {
     pm: await makeFlowUser(['pk-pm'], `${tag}-pm`, emp.pm),
     otherPm: await makeFlowUser(['pk-pm'], `${tag}-other-pm`, null),
     finance: await makeFlowUser(['pk-finance'], `${tag}-finance`, null),
+    finance2: await makeFlowUser(['pk-finance'], `${tag}-finance2`, null),
     owner: await makeFlowUser(['pk-owner'], `${tag}-owner`, null),
     owner2: await makeFlowUser(['pk-owner'], `${tag}-owner2`, null),
     admin: await makeFlowUser(['pk-admin'], `${tag}-admin`, emp.admin),
@@ -119,18 +122,19 @@ export async function makeWorld(tag: string) {
   const uom = { l: await ids('uoms', 'code', 'L'), bln: await ids('uoms', 'code', 'BLN'), kmr: await ids('uoms', 'code', 'KMR'), prs: await ids('uoms', 'code', 'PRS') }
   const vehicle = await sysCreate('vehicles', { plateNo: `KH ${1000 + (Date.now() % 8000)} ${tag.slice(0, 2).toUpperCase()}`, type: 'Hilux' })
   const cashInSource = await ids('cash-in-sources', 'code', 'MODAL')
-  // World rules (priority 10, scoped): Owner level 1; > 10 juta: owner + owner (two approvers, Q-31 example).
-  const ruleBase = { docType: 'expense_request', requestType: 'any', priority: 10, acknowledge: 'required', acknowledgeBy: 'scope_manager', active: true }
+  // World rules (priority 10, scoped), ADR 0013: "Diketahui" = Direktur (pk-owner, `owner`/`owner2`)
+  // approval, then Finance level 1; > 10 juta: two Finance levels (`finance` + `finance2`, Q-31 example).
+  const ruleBase = { docType: 'expense_request', requestType: 'any', priority: 10, acknowledge: 'required', acknowledgeBy: 'role', acknowledgeRole: 'pk-owner', active: true }
   for (const scope of [{ project }, { costCenter }]) {
-    await sysCreate('approval-rules', { ...ruleBase, ...scope, name: `${tag} rule ≤10jt ${JSON.stringify(scope)}`, minAmount: 0, maxAmount: 10_000_000, steps: [{ level: 1, approverRole: 'pk-owner' }] })
+    await sysCreate('approval-rules', { ...ruleBase, ...scope, name: `${tag} rule ≤10jt ${JSON.stringify(scope)}`, minAmount: 0, maxAmount: 10_000_000, steps: [{ level: 1, approverRole: 'pk-finance' }] })
     await sysCreate('approval-rules', {
       ...ruleBase,
       ...scope,
       name: `${tag} rule >10jt ${JSON.stringify(scope)}`,
       minAmount: 10_000_001,
       steps: [
-        { level: 1, approverRole: 'pk-owner' },
-        { level: 2, approverRole: 'pk-owner' },
+        { level: 1, approverRole: 'pk-finance' },
+        { level: 2, approverRole: 'pk-finance' },
       ],
     })
   }

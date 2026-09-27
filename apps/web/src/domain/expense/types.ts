@@ -1,3 +1,5 @@
+import type { Where } from 'payload'
+
 /**
  * T1 expense requests (requirements v1.1 §7 T1, architecture §5.1/§5.2) — shared vocabulary.
  * Pure module: no Payload import (unit-tested, bundled into the OpenAPI generator).
@@ -35,7 +37,7 @@ export type RequestStatus = (typeof REQUEST_STATUSES)[number]
 
 export const STATUS_LABELS: Record<RequestStatus, string> = {
   draft: 'Draft',
-  pending_ack: 'Menunggu Diketahui',
+  pending_ack: 'Menunggu Diketahui (Direktur)',
   pending_approval: 'Menunggu Approval',
   approved: 'Disetujui',
   receipt_revision: 'Revisi Nota',
@@ -124,4 +126,16 @@ export function addDays(date: string, days: number): string {
   const [y, m, d] = date.split('-').map(Number) as [number, number, number]
   const dt = new Date(Date.UTC(y, m - 1, d + days))
   return dt.toISOString().slice(0, 10)
+}
+
+/**
+ * US-19: requests ready to be transferred — Uang Muka "Disetujui (Antri Transfer)" + Reimburse "Nota
+ * Terverifikasi". ONE definition for the view title, the nav badge and the API count (S3e, S-07:
+ * the badge used to add Reimburse still waiting for receipt verification).
+ */
+export const TRANSFER_QUEUE_WHERE: Where = {
+  or: [
+    { and: [{ type: { equals: 'advance' } }, { status: { equals: 'approved' } }] },
+    { and: [{ type: { equals: 'reimburse' } }, { status: { equals: 'receipts_verified' } }] },
+  ],
 }

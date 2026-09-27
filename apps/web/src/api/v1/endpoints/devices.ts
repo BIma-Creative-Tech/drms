@@ -12,6 +12,8 @@ type DeviceDoc = {
   registeredAt?: string | null
   lastSeenAt?: string | null
   revokedAt?: string | null
+  integrityRisk?: boolean | null
+  integrityCheckedAt?: string | null
 }
 
 const dto = (d: DeviceDoc) => ({
@@ -23,6 +25,8 @@ const dto = (d: DeviceDoc) => ({
   registeredAt: d.registeredAt ?? null,
   lastSeenAt: d.lastSeenAt ?? null,
   revokedAt: d.revokedAt ?? null,
+  integrityRisk: d.integrityRisk === true,
+  integrityCheckedAt: d.integrityCheckedAt ?? null,
 })
 
 /**

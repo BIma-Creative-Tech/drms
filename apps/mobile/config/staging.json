@@ -1,0 +1,9 @@
+{
+  "PK_FLAVOR": "staging",
+  "PK_API_BASE_URL": "https://drms-kas.staging.bimacreative.tech",
+  "PK_OIDC_ISSUER": "https://auth.bimacreative.tech/realms/drms-staging",
+  "PK_OIDC_CLIENT_ID": "proyekkas-mobile",
+  "PK_OIDC_REDIRECT_URI": "id.co.drms.proyekkas:/oauth2redirect",
+  "PK_PUSH_ENABLED": "false",
+  "PK_LOGIN_MODE": "password"
+}

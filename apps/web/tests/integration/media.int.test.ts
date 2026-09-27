@@ -13,7 +13,7 @@ let phone: Buffer
 
 beforeAll(async () => {
   finance = { ...(await makeUser(['pk-finance'], { label: 'media' })), _strategy: 'oidcSession' }
-  // 4032×3024 "phone photo" with EXIF → must be resized to ≤ 2000 px and all metadata stripped
+  // 4032×3024 "phone photo" with EXIF → must be resized to ≤ 1600 px (S3e, US-57) and all metadata stripped
   phone = await sharp({ create: { width: 4032, height: 3024, channels: 3, background: { r: 200, g: 180, b: 150 } } })
     .jpeg({ quality: 95 })
     .withExif({ IFD0: { Make: 'TestPhone', Model: 'X', Copyright: 'loc -2.2,113.9' } })
@@ -25,7 +25,7 @@ afterAll(async () => {
 })
 
 describe('media-receipts (ADR 0004 §2/§3)', () => {
-  it('re-encodes to ≤ 2000 px JPEG without EXIF/GPS, UUID name, sha256 of the discarded original, thumb 320 webp', async () => {
+  it('re-encodes to ≤ 1600 px JPEG without EXIF/GPS, UUID name, sha256 of the discarded original, thumb 320 webp', async () => {
     const p = await getTestPayload()
     const doc = await p.create({
       collection: 'media-receipts',
@@ -38,7 +38,7 @@ describe('media-receipts (ADR 0004 §2/§3)', () => {
     expect(doc.filename).toMatch(/^[0-9a-f-]{36}\.jpg$/)
     expect(doc.sha256Original).toBe(createHash('sha256').update(phone).digest('hex'))
     expect([doc.originalWidth, doc.originalHeight]).toEqual([4032, 3024])
-    expect([doc.width, doc.height]).toEqual([2000, 1500])
+    expect([doc.width, doc.height]).toEqual([1600, 1200])
     expect(doc.uploadedBy).toBe(finance.id)
     const dir = path.join(process.env.MEDIA_DIR!, 'media-receipts')
     const files = readdirSync(dir).filter((f) => f.startsWith(doc.filename!.slice(0, 36)))

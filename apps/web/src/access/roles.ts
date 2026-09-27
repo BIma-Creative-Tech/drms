@@ -4,11 +4,15 @@ import type { Access, PayloadRequest } from 'payload'
 export const ROLES = ['pk-staff', 'pk-pm', 'pk-finance', 'pk-owner', 'pk-admin'] as const
 export type Role = (typeof ROLES)[number]
 
+/**
+ * Display labels. ADR 0013 / GATE 1 G1-1 (user 2026-09-26): the realm role `pk-owner` is shown as
+ * "Direktur" (no separate Keycloak role; the role id stays `pk-owner`).
+ */
 export const ROLE_LABELS: Record<Role, string> = {
   'pk-staff': 'Staff lapangan',
   'pk-pm': 'Project Manager',
   'pk-finance': 'Finance',
-  'pk-owner': 'Owner',
+  'pk-owner': 'Direktur',
   'pk-admin': 'Admin',
 }
 

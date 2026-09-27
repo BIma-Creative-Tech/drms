@@ -1,12 +1,15 @@
-import { APIError, type CollectionConfig } from 'payload'
+import { APIError, type CollectionConfig, type Option } from 'payload'
 
-import { ROLES, ROLE_LABELS, denyAll } from '@/access/roles'
+import { ROLES, ROLE_LABELS, denyAll, relId, rolesOf, type Role } from '@/access/roles'
 import { byRole, rolesAllowed } from '@/access/policies'
 import { reasonOnAnyUpdate, withAudit } from '@/audit/hooks'
-import { stepsError } from '@/domain/expense/rules'
+import { isDecisionRole, ruleDecisionError } from '@/domain/expense/decision'
+import { stepsError, type AckBy, type AckMode } from '@/domain/expense/rules'
 import { activeField, rupiahField } from '@/fields/common'
 
 const roleOptions = ROLES.map((r) => ({ label: ROLE_LABELS[r], value: r }))
+/** ADR 0013: only Direktur/Finance are offered for decision positions (the DB enum keeps every role). */
+const decisionRoleOptions = ({ options }: { options: Option[] }): Option[] => options.filter((o) => isDecisionRole(typeof o === 'string' ? o : o.value))
 
 /**
  * Aturan approval (US-34): amount range, request type, signature positions ("Diajukan Oleh" /
@@ -14,6 +17,7 @@ const roleOptions = ROLES.map((r) => ({ label: ROLE_LABELS[r], value: r }))
  * optional category/project/cost center. Engine: src/domain/expense/rules.ts (rule resolved and
  * SNAPSHOTTED on the request at submit — later rule changes never affect submitted requests).
  * Every change requires a reason (requirements §8). Admin C/R/U, Owner R/U, Finance R.
+ * ADR 0013 (E1): decision positions only for Direktur (`pk-owner`) / Finance — see `ruleDecisionError`.
  */
 export const ApprovalRules: CollectionConfig = withAudit(
   {
@@ -28,16 +32,48 @@ export const ApprovalRules: CollectionConfig = withAudit(
     },
     hooks: {
       beforeChange: [
-        ({ data, originalDoc }) => {
+        async ({ data, originalDoc, req }) => {
           const min = (data.minAmount ?? originalDoc?.minAmount ?? 0) as number
           const max = (data.maxAmount ?? originalDoc?.maxAmount ?? null) as number | null
           if (max !== null && max < min) throw new APIError('Nominal maksimum harus ≥ minimum.', 400, null, true)
-          const steps = (data.steps ?? originalDoc?.steps ?? []) as Array<{ level: number; approverRole?: never; approverUser?: never }>
+          const steps = ((data.steps ?? originalDoc?.steps ?? []) as Array<{ level: number; approverRole?: Role | null; approverUser?: unknown }>).map((s) => ({
+            level: s.level,
+            approverRole: s.approverRole ?? null,
+            approverUser: relId(s.approverUser) ?? null,
+          }))
+          const docType = (data.docType ?? originalDoc?.docType ?? 'expense_request') as string
+          if (docType === 'budget_addendum') {
+            // E5: addenda have no request type / expense category — such a rule would never match.
+            if ((data.requestType ?? originalDoc?.requestType ?? 'any') !== 'any') throw new APIError('Aturan Addendum RAB: jenis pengajuan harus "Semua".', 400, null, true)
+            if (relId(data.category !== undefined ? data.category : originalDoc?.category)) throw new APIError('Aturan Addendum RAB tidak memakai kategori biaya.', 400, null, true)
+          }
           const err = stepsError(steps)
           if (err) throw new APIError(err, 400, null, true)
-          const ackBy = data.acknowledgeBy ?? originalDoc?.acknowledgeBy ?? 'scope_manager'
-          if (ackBy === 'role' && !(data.acknowledgeRole ?? originalDoc?.acknowledgeRole)) throw new APIError('Pilih peran "Diketahui Oleh".', 400, null, true)
-          if (ackBy === 'user' && !(data.acknowledgeUser ?? originalDoc?.acknowledgeUser)) throw new APIError('Pilih user "Diketahui Oleh".', 400, null, true)
+          // ADR 0013 (E1): "Diketahui" = Direktur approval, then Finance; PM/Staff never decide,
+          // "PM project / penanggung jawab" (scope_manager) is retired, Direktur is never optional.
+          const rule = {
+            acknowledge: (data.acknowledge ?? originalDoc?.acknowledge ?? 'required') as AckMode,
+            acknowledgeBy: (data.acknowledgeBy ?? originalDoc?.acknowledgeBy ?? 'role') as AckBy,
+            acknowledgeRole: (data.acknowledgeRole !== undefined ? data.acknowledgeRole : originalDoc?.acknowledgeRole) as Role | null | undefined,
+            acknowledgeUser: relId(data.acknowledgeUser !== undefined ? data.acknowledgeUser : originalDoc?.acknowledgeUser) ?? null,
+            steps,
+          }
+          const named = [rule.acknowledgeUser, ...steps.map((s) => s.approverUser)].filter((x): x is number => typeof x === 'number')
+          const roles = new Map<number, Role[]>()
+          if (named.length > 0) {
+            const users = await req.payload.find({
+              collection: 'users',
+              where: { id: { in: named } },
+              depth: 0,
+              pagination: false,
+              select: { roles: true },
+              overrideAccess: true, // SYSTEM-READ: roles of users named in a rule (ADR 0013 validation)
+              req,
+            })
+            for (const u of users.docs) roles.set(u.id as number, rolesOf(u))
+          }
+          const decisionErr = ruleDecisionError(rule, (id) => roles.get(id))
+          if (decisionErr) throw new APIError(decisionErr, 400, null, true)
           return data
         },
       ],
@@ -76,9 +112,9 @@ export const ApprovalRules: CollectionConfig = withAudit(
       {
         name: 'acknowledge',
         type: 'select',
-        label: 'Diketahui Oleh',
+        label: 'Diketahui Oleh (persetujuan Direktur)',
         required: true,
-        defaultValue: 'optional',
+        defaultValue: 'required',
         options: [
           { label: 'Wajib', value: 'required' },
           { label: 'Opsional', value: 'optional' },
@@ -90,14 +126,17 @@ export const ApprovalRules: CollectionConfig = withAudit(
         type: 'select',
         label: 'Pengisi "Diketahui Oleh"',
         required: true,
-        defaultValue: 'scope_manager',
+        defaultValue: 'role',
+        // `scope_manager` stays in the enum so snapshots/rules saved before ADR 0013 remain readable;
+        // it can no longer be chosen (hook: 400).
         options: [
-          { label: 'PM project / penanggung jawab pusat biaya (Q-07)', value: 'scope_manager' },
+          { label: 'PM project / penanggung jawab pusat biaya (tidak dipakai lagi — ADR 0013)', value: 'scope_manager' },
           { label: 'Peran tertentu', value: 'role' },
           { label: 'User tertentu', value: 'user' },
         ],
+        filterOptions: ({ options }) => options.filter((o) => (typeof o === 'string' ? o : o.value) !== 'scope_manager'),
       },
-      { name: 'acknowledgeRole', type: 'select', label: 'Peran "Diketahui Oleh"', options: roleOptions },
+      { name: 'acknowledgeRole', type: 'select', label: 'Peran "Diketahui Oleh"', defaultValue: 'pk-owner', options: roleOptions, filterOptions: decisionRoleOptions },
       { name: 'acknowledgeUser', type: 'relationship', relationTo: 'users', label: 'User "Diketahui Oleh"' },
       {
         name: 'signDiajukan',
@@ -130,7 +169,7 @@ export const ApprovalRules: CollectionConfig = withAudit(
         minRows: 1,
         fields: [
           { name: 'level', type: 'number', label: 'Level', required: true, min: 1 },
-          { name: 'approverRole', type: 'select', label: 'Peran approver', options: roleOptions },
+          { name: 'approverRole', type: 'select', label: 'Peran approver', options: roleOptions, filterOptions: decisionRoleOptions },
           { name: 'approverUser', type: 'relationship', relationTo: 'users', label: 'Approver (user tertentu)' },
         ],
       },

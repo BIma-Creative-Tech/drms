@@ -1,0 +1,1082 @@
+{
+  "@@locale": "id",
+  "appTitle": "ProyekKas",
+  "loading": "Memuat…",
+  "retry": "Coba lagi",
+  "cancel": "Batal",
+  "save": "Simpan",
+  "close": "Tutup",
+  "delete": "Hapus",
+  "yes": "Ya",
+  "no": "Tidak",
+  "next": "Lanjut",
+  "needsInternet": "Butuh koneksi internet",
+  "offlineBanner": "Offline — data disimpan di HP dan dikirim otomatis saat online.",
+  "pendingQueue": "{count} data menunggu dikirim",
+  "@pendingQueue": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "failedQueue": "{count} data gagal dikirim — buka Antrean",
+  "@failedQueue": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "loginTitle": "Masuk ke ProyekKas",
+  "loginSubtitle": "Gunakan akun DRMS Anda. Halaman masuk dibuka di browser HP.",
+  "loginButton": "Masuk",
+  "loginCancelled": "Login dibatalkan. Jika halaman login tidak kembali ke aplikasi, tutup browser lalu tekan Masuk lagi.",
+  "loginFailed": "Login gagal. Coba lagi.",
+  "loginNeedsInternet": "Login pertama kali butuh koneksi internet.",
+  "sessionEnded": "Sesi berakhir atau perangkat dicabut. Silakan masuk kembali.",
+  "deviceRevoked": "Perangkat ini sudah dicabut dari akun Anda oleh Admin/Direktur. Silakan masuk kembali atau hubungi Admin.",
+  "stagingBadge": "STAGING",
+  "loginSubtitlePassword": "Gunakan akun DRMS Anda.",
+  "loginUsernameLabel": "Email atau username",
+  "loginUsernameRequired": "Isi email atau username.",
+  "loginPasswordLabel": "Kata sandi",
+  "loginPasswordRequired": "Isi kata sandi.",
+  "loginShowPassword": "Tampilkan kata sandi",
+  "loginHidePassword": "Sembunyikan kata sandi",
+  "loginForgotPassword": "Lupa kata sandi? Hubungi Admin.",
+  "updateRequiredTitle": "Perbarui aplikasi",
+  "updateRequiredBody": "Versi aplikasi ini ({current}) sudah tidak didukung. Versi minimal: {minimum}.",
+  "@updateRequiredBody": {
+    "placeholders": {
+      "current": {
+        "type": "String"
+      },
+      "minimum": {
+        "type": "String"
+      }
+    }
+  },
+  "updateDownloadHint": "Unduh versi terbaru dari:",
+  "copyLink": "Salin tautan",
+  "updateContactAdmin": "Hubungi admin untuk mendapatkan APK terbaru.",
+  "updateAvailable": "Versi baru tersedia ({version}).",
+  "@updateAvailable": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
+  "navHome": "Beranda",
+  "navRequests": "Pengajuan",
+  "navInbox": "Persetujuan",
+  "navQueue": "Antrean",
+  "navProfile": "Profil",
+  "greeting": "Halo, {name}",
+  "@greeting": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "actionNewAdvance": "Ajukan Uang Muka",
+  "actionNewReimburse": "Ajukan Reimburse",
+  "actionMyRequests": "Pengajuan Saya",
+  "actionInbox": "Menunggu Persetujuan",
+  "actionAttendance": "Absensi",
+  "actionAttendanceOff": "Absensi (belum diaktifkan Admin)",
+  "actionAllRequests": "Semua Pengajuan",
+  "financeHint": "Transfer, verifikasi nota/LPJ, dan buku kas dikerjakan di web admin.",
+  "inboxCount": "{count} menunggu",
+  "@inboxCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "requestsTitle": "Pengajuan",
+  "tabDrafts": "Draft di HP",
+  "tabSent": "Terkirim",
+  "noDrafts": "Belum ada draft.",
+  "noRequests": "Belum ada pengajuan.",
+  "loadMore": "Muat lagi",
+  "draftUntitled": "(tanpa judul)",
+  "syncStateLocal": "Belum dikirim",
+  "syncStateQueued": "Menunggu sinkron",
+  "syncStateSynced": "Tersimpan di server",
+  "syncStateConflict": "Konflik — diubah di web",
+  "syncStateRejected": "Ditolak server",
+  "syncStateSubmitted": "Sudah diajukan",
+  "detailTitle": "Detail Pengajuan",
+  "turnLabel": "Giliran",
+  "timelineTitle": "Posisi tanda tangan",
+  "linesTitle": "Baris item",
+  "receiptsTitle": "Nota",
+  "flagsTitle": "Flag validasi",
+  "grandTotal": "Grand total",
+  "approvedAmount": "Disetujui",
+  "neededDate": "Tanggal dibutuhkan",
+  "requestDate": "Tanggal pengajuan",
+  "requesters": "Diajukan oleh",
+  "createdBy": "Dibuat oleh",
+  "bankAccount": "Rekening tujuan",
+  "scopeLabel": "Project / pusat biaya",
+  "rejectReasonLabel": "Alasan ditolak",
+  "budgetImpact": "Dampak anggaran",
+  "budgetNone": "Tanpa anggaran",
+  "budgetChange": "{before} → {after}",
+  "@budgetChange": {
+    "placeholders": {
+      "before": {
+        "type": "String"
+      },
+      "after": {
+        "type": "String"
+      }
+    }
+  },
+  "receiptThumbFailed": "Gambar tidak dapat dimuat",
+  "totalPreview": "Total (pratinjau)",
+  "previewNote": "Nilai final dihitung server.",
+  "editorNewTitle": "Pengajuan baru",
+  "editorEditTitle": "Ubah draft",
+  "fieldType": "Jenis",
+  "fieldTitle": "Judul",
+  "fieldProject": "Project",
+  "fieldCostCenter": "Pusat biaya",
+  "fieldNeededDate": "Tanggal dibutuhkan",
+  "fieldNotes": "Keterangan",
+  "fieldRequesters": "Diajukan oleh (pemohon)",
+  "fieldBankAccount": "Rekening tujuan",
+  "scopeProject": "Project",
+  "scopeCostCenter": "Pusat biaya",
+  "none": "— Tidak ada —",
+  "choose": "Pilih…",
+  "addLine": "Tambah baris",
+  "saveDraft": "Simpan draft",
+  "submit": "Ajukan",
+  "submitConfirm": "Ajukan pengajuan ini? Setelah diajukan, nomor dokumen dibuat server dan draft tidak bisa diubah bebas.",
+  "submitted": "Pengajuan berhasil diajukan.",
+  "draftSaved": "Draft disimpan di HP.",
+  "draftSavedQueued": "Draft disimpan dan akan dikirim saat online.",
+  "deleteDraftConfirm": "Hapus draft ini dari HP?",
+  "mastersMissing": "Data master belum tersedia. Buka aplikasi saat online sekali untuk mengunduhnya.",
+  "lineTitle": "Baris {no}",
+  "@lineTitle": {
+    "placeholders": {
+      "no": {
+        "type": "int"
+      }
+    }
+  },
+  "fieldDescription": "Uraian",
+  "fieldQty": "Jumlah",
+  "fieldUom": "Satuan",
+  "fieldUnitPrice": "Harga satuan",
+  "fieldTotal": "Total",
+  "fieldCategory": "Kategori",
+  "fieldVehicle": "Kendaraan",
+  "fieldLineNotes": "Keterangan baris",
+  "unitPriceHint": "Informasi saja — total tidak dihitung otomatis.",
+  "receiptDiff": "Selisih total baris vs nota: {amount}",
+  "@receiptDiff": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "addReceiptCamera": "Foto nota (kamera)",
+  "addReceiptGallery": "Dari galeri",
+  "receiptNo": "Nomor nota",
+  "receiptVendor": "Toko / vendor",
+  "receiptDate": "Tanggal nota",
+  "receiptTime": "Jam nota",
+  "receiptAmount": "Nominal di nota",
+  "receiptDetailsTitle": "Data nota",
+  "photoCompressing": "Mengompres foto…",
+  "searchHint": "Cari…",
+  "draftNotFound": "Draft tidak ditemukan.",
+  "cameraUnavailable": "Kamera belakang tidak tersedia.",
+  "cameraPermission": "Izin kamera ditolak. Aktifkan di Pengaturan HP.",
+  "takePhoto": "Ambil foto",
+  "invalidAmount": "Nominal tidak valid",
+  "required": "Wajib diisi",
+  "inboxTitle": "Menunggu Persetujuan",
+  "inboxEmpty": "Tidak ada pengajuan yang menunggu Anda.",
+  "stepAcknowledge": "Diketahui",
+  "stepApprove": "Approval level {level}",
+  "@stepApprove": {
+    "placeholders": {
+      "level": {
+        "type": "int"
+      }
+    }
+  },
+  "flagsCount": "{warning} peringatan · {info} info",
+  "@flagsCount": {
+    "placeholders": {
+      "warning": {
+        "type": "int"
+      },
+      "info": {
+        "type": "int"
+      }
+    }
+  },
+  "actionAcknowledge": "Diketahui",
+  "actionApprove": "Setujui",
+  "actionReject": "Tolak",
+  "decisionTitleAcknowledge": "Tandai diketahui",
+  "decisionTitleApprove": "Setujui pengajuan",
+  "decisionTitleReject": "Tolak pengajuan",
+  "rejectReason": "Alasan penolakan",
+  "rejectReasonTooShort": "Alasan wajib diisi (minimal 3 karakter).",
+  "signatureMode": "Tanda tangan",
+  "signatureProfile": "Pakai tanda tangan profil",
+  "signatureDraw": "Tanda tangan di layar",
+  "signatureClear": "Ulangi",
+  "signatureEmpty": "Tanda tangan belum dibuat.",
+  "signatureTooLarge": "Tanda tangan terlalu besar. Ulangi dengan goresan lebih sederhana.",
+  "confirm": "Konfirmasi",
+  "decisionDone": "Keputusan tersimpan.",
+  "transferTitle": "Transfer dari Finance",
+  "transferNone": "Belum ada transfer.",
+  "transferTotal": "Total ditransfer",
+  "transferRef": "Ref. bank",
+  "transferPosted": "Tercatat",
+  "transferVoid": "Dibatalkan",
+  "transferVoidReason": "Alasan batal: {reason}",
+  "@transferVoidReason": {
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+  "lpjTitle": "LPJ (Laporan Pertanggungjawaban)",
+  "lpjStatus": "Status LPJ",
+  "lpjReceiptsTotal": "Total nota",
+  "lpjVerifiedTotal": "Nota terverifikasi",
+  "lpjDifference": "Selisih",
+  "lpjSettlement": "Penyelesaian",
+  "lpjUsageNotes": "Keterangan penggunaan dana",
+  "lpjFinanceNotes": "Catatan Finance",
+  "requesterActionsTitle": "Nota & LPJ",
+  "addReceiptOnlineCamera": "Tambah nota (kamera)",
+  "addReceiptOnlineGallery": "Tambah nota dari galeri",
+  "chooseLine": "Nota ini untuk baris mana?",
+  "uploadingReceipt": "Mengunggah nota…",
+  "receiptSaved": "Nota tersimpan.",
+  "receiptRemove": "Hapus nota",
+  "receiptRemoveReason": "Alasan menghapus nota",
+  "receiptRemoved": "Nota dihapus.",
+  "reasonTooShort": "Wajib diisi (minimal 3 karakter).",
+  "actionReceiptsComplete": "Nota sudah lengkap",
+  "actionReceiptsCompleteConfirm": "Tandai semua nota sudah lengkap? Setelah itu Anda bisa mengirim LPJ.",
+  "actionLpjSubmit": "Kirim LPJ",
+  "actionLpjResubmit": "Kirim ulang LPJ",
+  "lpjUsageNotesHint": "Jelaskan penggunaan dana (wajib pada pengiriman pertama).",
+  "actionReceiptsResubmit": "Kirim ulang nota",
+  "actionReceiptsResubmitConfirm": "Kirim ulang nota yang sudah diperbaiki ke Finance?",
+  "actionComplete": "Tandai selesai",
+  "actionCompleteConfirm": "Dana sudah diterima dan pengajuan ini selesai?",
+  "actionSaved": "Tersimpan.",
+  "integrityWarning": "HP ini terdeteksi di-root atau berupa emulator. Aktivitas dari HP ini ditandai untuk ditinjau Admin.",
+  "attendanceTitle": "Absensi",
+  "attendanceDisabled": "Absensi dari aplikasi belum diaktifkan Admin (Setting perusahaan).",
+  "attendanceNoProjects": "Anda belum ditugaskan di project atau pusat biaya mana pun. Hubungi PM/Admin.",
+  "attendanceProject": "Project",
+  "attendanceCheckIn": "Absen masuk",
+  "attendanceCheckOut": "Absen pulang",
+  "attendanceLocating": "Membaca lokasi GPS…",
+  "attendanceOutside": "Anda di luar radius lokasi ({distance} m dari titik, radius {radius} m). Absen hanya bisa di lokasi.",
+  "@attendanceOutside": {
+    "placeholders": {
+      "distance": {
+        "type": "int"
+      },
+      "radius": {
+        "type": "int"
+      }
+    }
+  },
+  "attendanceInside": "Di dalam radius lokasi ({distance} m dari titik, radius {radius} m).",
+  "@attendanceInside": {
+    "placeholders": {
+      "distance": {
+        "type": "int"
+      },
+      "radius": {
+        "type": "int"
+      }
+    }
+  },
+  "attendanceNoGeofence": "Titik lokasi/radius belum diatur Admin. Absen belum bisa dilakukan di lokasi ini.",
+  "attendanceMocked": "Lokasi palsu (mock location) terdeteksi. Matikan aplikasi lokasi palsu. Absen ditolak.",
+  "attendanceSelfieTitle": "Selfie absensi",
+  "attendanceSavedOnline": "Absen tersimpan dan sedang dikirim.",
+  "attendanceSavedOffline": "Absen tersimpan di HP (offline). Dikirim otomatis saat ada sinyal; jam absen dihitung server.",
+  "attendanceHistory": "Riwayat absen di HP ini",
+  "attendanceHistoryEmpty": "Belum ada absen dari HP ini.",
+  "attendanceOfflineTag": "offline",
+  "frontCameraUnavailable": "Kamera depan tidak tersedia. Absen butuh selfie dengan kamera depan.",
+  "notificationsTitle": "Notifikasi",
+  "notificationsEmpty": "Belum ada notifikasi.",
+  "notificationsReadAll": "Tandai semua dibaca",
+  "queueTitle": "Antrean kirim",
+  "queueEmpty": "Tidak ada data yang menunggu dikirim.",
+  "syncNow": "Kirim sekarang",
+  "retryFailed": "Coba lagi yang gagal",
+  "syncServerUnsupported": "Server belum mendukung sinkron offline. Data tetap aman di HP.",
+  "syncDone": "Sinkron selesai.",
+  "queueStatusPending": "Menunggu",
+  "queueStatusApplied": "Terkirim",
+  "queueStatusRejected": "Ditolak",
+  "queueStatusConflict": "Konflik",
+  "queueStatusFailed": "Gagal dikirim",
+  "queueStatusSuperseded": "Diganti",
+  "queueUsage": "Penyimpanan offline: {used} dari 100 MB",
+  "@queueUsage": {
+    "placeholders": {
+      "used": {
+        "type": "String"
+      }
+    }
+  },
+  "profileTitle": "Profil",
+  "profileRoles": "Peran",
+  "profileEmployee": "Karyawan",
+  "profileVersion": "Versi aplikasi",
+  "profileDevice": "ID perangkat",
+  "pushDisabled": "Notifikasi push belum aktif.",
+  "logout": "Keluar",
+  "logoutConfirm": "Keluar dari aplikasi?",
+  "logoutPendingWarning": "Masih ada {count} data belum terkirim ke server. Data ini TIDAK dihapus: tetap tersimpan terenkripsi di HP dan baru dikirim setelah Anda masuk lagi dengan akun yang sama. Jika ada sinyal, kirim dulu lewat menu Antrean.",
+  "@logoutPendingWarning": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "logoutAnyway": "Tetap keluar",
+  "logoutInProgress": "Sedang keluar…",
+  "offlineRecheck": "Ketuk untuk cek koneksi.",
+  "stepAcknowledgeDirektur": "Persetujuan Direktur (Diketahui)",
+  "budgetOverWarn": "Melewati batas peringatan anggaran",
+  "decisionForbidden": "Anda tidak dapat memutuskan pengajuan ini. Hanya Direktur (Diketahui) dan Finance (Approval) yang memutuskan, dan hanya pada gilirannya. Data dimuat ulang.",
+  "decisionTitleAcknowledgeDirektur": "Setujui sebagai Direktur (Diketahui)",
+  "decisionHintDirektur": "Persetujuan Direktur tercatat sebagai \"Diketahui\". Setelah itu pengajuan diteruskan ke Finance untuk Approval.",
+  "actionAcknowledgeDirektur": "Setujui (Diketahui)",
+  "historyTitle": "Riwayat",
+  "historyEmpty": "Belum ada riwayat.",
+  "historyField": "Field",
+  "historyChange": "Lama → Baru",
+  "historyReason": "Alasan",
+  "historySource": "Sumber",
+  "serverReceiptLocked": "Nota sudah di server — tidak dapat diubah dari HP.",
+  "lifecycleActionsTitle": "Aksi pengajuan",
+  "actionEditOnPhone": "Ubah & ajukan di HP",
+  "actionResubmit": "Ajukan ulang (buat draft baru)",
+  "actionWithdraw": "Tarik kembali ke Draft",
+  "actionCancelRequest": "Batalkan pengajuan",
+  "editOnWebHint": "Draft ini diubah lewat web (peran Anda tidak membuat pengajuan di HP).",
+  "withdrawReason": "Alasan tarik kembali",
+  "withdrawHint": "Pengajuan kembali ke Draft; ubah lalu ajukan lagi.",
+  "cancelReason": "Alasan pembatalan",
+  "cancelHint": "Pengajuan dibatalkan dan tidak diproses lagi.",
+  "withdrawDone": "Pengajuan ditarik kembali ke Draft; silakan ubah lalu kirim lagi.",
+  "cancelDone": "Pengajuan dibatalkan.",
+  "resubmitConfirm": "Buat draft baru dari pengajuan yang ditolak ini?",
+  "resubmitDone": "Draft baru dibuat dari pengajuan yang ditolak. Periksa, ubah bila perlu, lalu ajukan.",
+  "tabTeam": "Tim",
+  "teamReadOnlyHint": "Pantauan tim — hanya lihat. Persetujuan dilakukan Direktur dan Finance.",
+  "teamNoScope": "Anda belum menjadi PM project atau penanggung jawab pusat biaya.",
+  "kpiSummaryTitle": "Ringkasan",
+  "kpiTeamTitle": "Pantauan tim",
+  "homeActionsTitle": "Aksi",
+  "kpiUnavailable": "Ringkasan belum bisa dimuat",
+  "kpiCashTotal": "Saldo kas total",
+  "kpiMonthInOut": "Bulan ini +{cashIn} / −{cashOut}",
+  "@kpiMonthInOut": {
+    "placeholders": {
+      "cashIn": {
+        "type": "String"
+      },
+      "cashOut": {
+        "type": "String"
+      }
+    }
+  },
+  "kpiBalanceTrend": "Tren saldo akhir bulan",
+  "kpiWaiting": "Pengajuan menunggu",
+  "kpiWaitingSplit": "Diketahui {ack} · Approval {approval}",
+  "@kpiWaitingSplit": {
+    "placeholders": {
+      "ack": {
+        "type": "int"
+      },
+      "approval": {
+        "type": "int"
+      }
+    }
+  },
+  "kpiWaitingForMe": "{count} menunggu saya",
+  "@kpiWaitingForMe": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "kpiOldest": "tertua {days} hari",
+  "@kpiOldest": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      }
+    }
+  },
+  "kpiDisbursedMonth": "Pencairan bulan ini",
+  "kpiDisbursedNet": "{amount} dicairkan bersih",
+  "@kpiDisbursedNet": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "kpiDisbursedTrend": "Tren pencairan bersih per bulan",
+  "kpiBudgetRealized": "Realisasi vs anggaran",
+  "kpiOfBudget": "{realized} dari RAB {budget}",
+  "@kpiOfBudget": {
+    "placeholders": {
+      "realized": {
+        "type": "String"
+      },
+      "budget": {
+        "type": "String"
+      }
+    }
+  },
+  "kpiBudgetAlerts": "{over} lewat RAB · {warn} waspada",
+  "@kpiBudgetAlerts": {
+    "placeholders": {
+      "over": {
+        "type": "int"
+      },
+      "warn": {
+        "type": "int"
+      }
+    }
+  },
+  "kpiCashFlowTitle": "Arus kas bulanan",
+  "kpiCashFlowSubtitle": "Masuk vs keluar, tanpa transaksi yang di-void. Ketuk bulan untuk melihat angkanya.",
+  "kpiCashFlowSubtitleFinance": "Buku kas, termasuk koreksi void. Ketuk bulan untuk melihat angkanya.",
+  "kpiIn": "Masuk",
+  "kpiOut": "Keluar",
+  "kpiTransferQueue": "Antrian transfer",
+  "kpiOverdue": "{count} lewat tanggal dibutuhkan",
+  "@kpiOverdue": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "kpiOnTime": "Tepat waktu",
+  "kpiToVerify": "Menunggu verifikasi",
+  "kpiToVerifySplit": "{lpj} LPJ · {reimburse} nota reimburse",
+  "@kpiToVerifySplit": {
+    "placeholders": {
+      "lpj": {
+        "type": "int"
+      },
+      "reimburse": {
+        "type": "int"
+      }
+    }
+  },
+  "kpiLpjToSettle": "Selisih LPJ",
+  "kpiAdvancesOverdue": "{count} uang muka terlambat LPJ",
+  "@kpiAdvancesOverdue": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "kpiTeamMonth": "Pengajuan tim bulan ini",
+  "kpiTeamWaiting": "{count} menunggu persetujuan",
+  "@kpiTeamWaiting": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "kpiTeamTrend": "Tren jumlah pengajuan tim",
+  "kpiTeamLpj": "Uang muka tim belum LPJ",
+  "kpiLpjOverdue": "{count} terlambat",
+  "@kpiLpjOverdue": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "kpiLpjNoneOverdue": "Tidak ada yang terlambat",
+  "kpiTeamBudget": "Realisasi anggaran project saya",
+  "routeErrorTitle": "Halaman tidak bisa dibuka",
+  "routeErrorBody": "Terjadi kesalahan saat membuka halaman ini. Kembali ke beranda lalu coba lagi.",
+  "routeErrorHome": "Ke beranda",
+  "actionProgress": "Laporan progress",
+  "actionProgressRead": "Progress project",
+  "progressPendingCount": "{count} laporan belum terkirim",
+  "@progressPendingCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "actionAttendanceSub": "Absen masuk/pulang, rekap bulanan",
+  "actionAttendanceOffSub": "Rekap bulanan (absen dari aplikasi belum diaktifkan Admin)",
+  "actionAttendanceTeamSub": "Kehadiran tim hari ini",
+  "seeAll": "Lihat semua",
+  "attendanceTabCheck": "Absen",
+  "attendanceTabRecap": "Rekap",
+  "attendanceTabTeam": "Tim",
+  "attendanceLocation": "Lokasi (project / pusat biaya)",
+  "attendanceRadius": "radius {meters} m",
+  "@attendanceRadius": {
+    "placeholders": {
+      "meters": {
+        "type": "int"
+      }
+    }
+  },
+  "attendanceCheckDistance": "Cek jarak ke lokasi",
+  "siteProject": "Project",
+  "siteCostCenter": "Pusat biaya",
+  "distanceInside": "Di dalam area absen",
+  "distanceOutside": "Di luar area absen",
+  "distanceDetail": "Radius {radius} m + toleransi GPS {allowance} m (akurasi GPS ±{accuracy} m, maks. 50 m dihitung).",
+  "@distanceDetail": {
+    "placeholders": {
+      "radius": {
+        "type": "int"
+      },
+      "allowance": {
+        "type": "int"
+      },
+      "accuracy": {
+        "type": "int"
+      }
+    }
+  },
+  "dowMon": "Sen",
+  "dowTue": "Sel",
+  "dowWed": "Rab",
+  "dowThu": "Kam",
+  "dowFri": "Jum",
+  "dowSat": "Sab",
+  "dowSun": "Min",
+  "recapPrevMonth": "Bulan sebelumnya",
+  "recapNextMonth": "Bulan berikutnya",
+  "recapSchedule": "Jadwal {name}: {start}–{end}, toleransi {tolerance} menit",
+  "@recapSchedule": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "start": {
+        "type": "String"
+      },
+      "end": {
+        "type": "String"
+      },
+      "tolerance": {
+        "type": "int"
+      }
+    }
+  },
+  "recapPresent": "Hadir",
+  "recapWorkingDays": "dari hari kerja s.d. hari ini",
+  "recapWorkHours": "Total jam kerja",
+  "recapLate": "Terlambat",
+  "recapEarlyLeave": "Pulang cepat",
+  "recapAbsent": "Tidak hadir",
+  "recapIncomplete": "Belum absen pulang",
+  "recapDays": "{count} hari",
+  "@recapDays": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "recapMinutes": "{count} menit",
+  "@recapMinutes": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "recapStatusDone": "Selesai",
+  "recapStatusPresent": "Hadir",
+  "recapStatusNotYet": "Belum absen",
+  "recapStatusAbsent": "Tidak hadir",
+  "recapStatusHoliday": "Libur",
+  "recapStatusNoSchedule": "Tanpa jadwal",
+  "recapLegendMark": "terlambat / oleh PM / dikoreksi",
+  "recapInOut": "Masuk {checkIn} · Pulang {checkOut}",
+  "@recapInOut": {
+    "placeholders": {
+      "checkIn": {
+        "type": "String"
+      },
+      "checkOut": {
+        "type": "String"
+      }
+    }
+  },
+  "recapWorked": "Jam kerja: {duration}",
+  "@recapWorked": {
+    "placeholders": {
+      "duration": {
+        "type": "String"
+      }
+    }
+  },
+  "recapLateBy": "Terlambat {minutes} menit",
+  "@recapLateBy": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "recapEarlyBy": "Pulang cepat {minutes} menit",
+  "@recapEarlyBy": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "recapOnBehalf": "Diabsenkan oleh PM: {names}",
+  "@recapOnBehalf": {
+    "placeholders": {
+      "names": {
+        "type": "String"
+      }
+    }
+  },
+  "recapCorrected": "Jam absen dikoreksi (T10).",
+  "recapFlags": "Penanda: {flags}",
+  "@recapFlags": {
+    "placeholders": {
+      "flags": {
+        "type": "String"
+      }
+    }
+  },
+  "recapMemberTitle": "Rekap absensi karyawan",
+  "teamStatusNotYet": "Belum absen",
+  "teamStatusPresent": "Hadir",
+  "teamStatusDone": "Selesai",
+  "teamAll": "Semua {count}",
+  "@teamAll": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "teamEmpty": "Tidak ada anggota tim dengan status ini.",
+  "teamIn": "Masuk",
+  "teamOut": "Pulang",
+  "teamOnBehalfTag": "Oleh PM",
+  "teamCorrectedTag": "Dikoreksi",
+  "onBehalfAction": "Absenkan anggota tim",
+  "onBehalfTitle": "Diabsenkan PM",
+  "onBehalfIntro": "Untuk anggota tim yang tidak bisa absen sendiri. Lokasi diambil dari HP Anda, foto karyawan diambil dengan kamera HP Anda. Nama Anda dan alasannya tercatat.",
+  "onBehalfNoTeam": "Belum ada anggota tim yang ditugaskan hari ini (data tim dari server; tarik ulang di Beranda saat online).",
+  "onBehalfEmployee": "Karyawan",
+  "onBehalfReason": "Alasan (wajib)",
+  "onBehalfReasonHint": "Contoh: tidak punya HP / HP rusak",
+  "onBehalfCamera": "Kamera untuk foto karyawan",
+  "lensBack": "Belakang",
+  "lensFront": "Depan",
+  "onBehalfCheckIn": "Absenkan masuk",
+  "onBehalfCheckOut": "Absenkan pulang",
+  "onBehalfPhotoTitle": "Foto {name}",
+  "@onBehalfPhotoTitle": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "onBehalfSavedOnline": "Absen {name} tersimpan dan sedang dikirim.",
+  "@onBehalfSavedOnline": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "onBehalfSavedOffline": "Absen {name} tersimpan di HP (offline). Dikirim otomatis saat ada sinyal.",
+  "@onBehalfSavedOffline": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "correctionTitleIn": "Koreksi jam masuk",
+  "correctionTitleOut": "Koreksi jam pulang",
+  "correctionOld": "Tercatat: {date} {time}",
+  "@correctionOld": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      },
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "correctionNew": "Jam baru: {time}",
+  "@correctionNew": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "correctionReason": "Alasan koreksi (wajib)",
+  "correctionReasonHelp": "Tanggal tetap sama; jam lama dan baru tercatat di audit.",
+  "correctionSaved": "Koreksi absensi tersimpan.",
+  "progressTitle": "Progress project",
+  "progressTabReports": "Laporan",
+  "progressTabProjects": "Project",
+  "progressNew": "Laporan baru",
+  "progressHomeTitle": "Progress fisik vs anggaran",
+  "progressLocalTitle": "Di HP ini (belum diterima server)",
+  "progressServerTitle": "Laporan terbaru",
+  "progressFilterProject": "Filter project",
+  "progressFilterAll": "Semua project",
+  "progressListOffline": "Daftar laporan butuh koneksi internet. Laporan baru tetap bisa dibuat offline.",
+  "progressListEmpty": "Belum ada laporan progress.",
+  "progressProjectsIntro": "Selisih = % anggaran terpakai − % progress fisik. Hijau aman, kuning perlu dicek, merah anggaran jauh mendahului pekerjaan.",
+  "progressProjectsEmpty": "Belum ada project.",
+  "progressPhysical": "Progress fisik",
+  "progressBudgetUsed": "Anggaran terpakai",
+  "progressGap": "Selisih {value}",
+  "@progressGap": {
+    "placeholders": {
+      "value": {
+        "type": "String"
+      }
+    }
+  },
+  "progressStagesIncomplete": "Bobot tahapan baru {value} (harus 100%).",
+  "@progressStagesIncomplete": {
+    "placeholders": {
+      "value": {
+        "type": "String"
+      }
+    }
+  },
+  "progressNoReportYet": "Belum ada laporan progress.",
+  "progressLastReport": "Laporan terakhir {date} · {count} laporan",
+  "@progressLastReport": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      },
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "progressToneOk": "Sesuai",
+  "progressToneWarn": "Perlu dicek",
+  "progressToneBad": "Anggaran mendahului",
+  "progressToneNone": "Belum bisa dihitung",
+  "progressRemovePhoto": "Hapus foto",
+  "progressStateQueued": "Menunggu kirim",
+  "progressStateLocal": "Belum terkirim",
+  "progressStateConflict": "Konflik",
+  "progressStateRejected": "Ditolak",
+  "progressStateSynced": "Terkirim",
+  "progressEditTag": "edit",
+  "progressPhotoCount": "{count} foto",
+  "@progressPhotoCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "progressConflictHint": "Ketuk untuk memilih versi yang dipakai.",
+  "progressOfflineTag": "offline",
+  "progressEditableTag": "bisa diedit",
+  "progressPhotoTitle": "Foto progress",
+  "progressEditTitle": "Edit laporan progress",
+  "progressNewTitle": "Laporan progress harian",
+  "progressNotFound": "Laporan tidak ditemukan di HP ini.",
+  "progressPickProject": "Pilih project.",
+  "progressPickStage": "Pilih tahapan.",
+  "progressPhotoFailed": "Foto gagal diproses. Ambil ulang foto.",
+  "progressSent": "Laporan terkirim.",
+  "progressQueuedOnline": "Laporan tersimpan dan sedang dikirim.",
+  "progressQueuedOffline": "Laporan tersimpan di HP (offline). Dikirim otomatis saat ada sinyal.",
+  "progressKeptLocal": "Tidak ada koneksi. Laporan disimpan di HP; kirim dari menu Progress saat online.",
+  "progressDiscardTitle": "Hapus laporan ini?",
+  "progressDiscardBody": "Laporan dan fotonya dihapus dari HP. Server belum menerimanya.",
+  "progressOnlineOnlyNote": "Server belum mengizinkan kirim offline: laporan dikirim langsung (butuh internet).",
+  "progressOnlineOnlyOffline": "Anda offline dan server belum mengizinkan kirim offline. Laporan disimpan di HP dan dikirim saat online.",
+  "progressEditWindow": "Bisa diedit sampai {time}.",
+  "@progressEditWindow": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "progressProject": "Project",
+  "progressNoProjects": "Tidak ada project untuk Anda.",
+  "progressStagesCached": "Offline: tahapan dan % dari data terakhir di HP; server memeriksa ulang saat kirim.",
+  "progressStage": "Tahapan",
+  "progressStageOption": "{name} (bobot {weight}, sekarang {pct})",
+  "@progressStageOption": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "weight": {
+        "type": "String"
+      },
+      "pct": {
+        "type": "String"
+      }
+    }
+  },
+  "progressPctTitle": "Progress tahapan {stage}",
+  "@progressPctTitle": {
+    "placeholders": {
+      "stage": {
+        "type": "String"
+      }
+    }
+  },
+  "progressPctBefore": "Sebelum laporan: {value}",
+  "@progressPctBefore": {
+    "placeholders": {
+      "value": {
+        "type": "String"
+      }
+    }
+  },
+  "progressPctAfterLabel": "Progress setelah pekerjaan",
+  "progressPctDelta": "Naik {value} dari sebelumnya.",
+  "@progressPctDelta": {
+    "placeholders": {
+      "value": {
+        "type": "String"
+      }
+    }
+  },
+  "progressWork": "Pekerjaan",
+  "progressWorkHint": "Pekerjaan yang dilakukan hari ini",
+  "progressIssues": "Kendala (opsional)",
+  "progressPhotosTitle": "Foto ({count}/{max})",
+  "@progressPhotosTitle": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "max": {
+        "type": "int"
+      }
+    }
+  },
+  "progressPhotosOnServer": "{count} foto sudah di server (foto tidak bisa dihapus, hanya ditambah).",
+  "@progressPhotosOnServer": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "progressAddPhoto": "Foto",
+  "progressReason": "Alasan edit (wajib)",
+  "progressReasonHelp": "Tercatat di riwayat audit laporan.",
+  "progressSaveQueue": "Simpan & kirim",
+  "progressSendOnline": "Kirim laporan",
+  "progressDetailTitle": "Laporan progress",
+  "progressWeight": "bobot {value}",
+  "@progressWeight": {
+    "placeholders": {
+      "value": {
+        "type": "String"
+      }
+    }
+  },
+  "progressStageBeforeAfter": "Tahapan (sebelumnya {before})",
+  "@progressStageBeforeAfter": {
+    "placeholders": {
+      "before": {
+        "type": "String"
+      }
+    }
+  },
+  "progressProjectBeforeAfter": "Project (sebelumnya {before})",
+  "@progressProjectBeforeAfter": {
+    "placeholders": {
+      "before": {
+        "type": "String"
+      }
+    }
+  },
+  "progressNoPhotos": "Tanpa foto.",
+  "progressDate": "Tanggal",
+  "progressReporter": "Pelapor",
+  "progressReceivedAt": "Diterima server",
+  "progressTimeTrust": "dibuat offline (waktu: {trust})",
+  "@progressTimeTrust": {
+    "placeholders": {
+      "trust": {
+        "type": "String"
+      }
+    }
+  },
+  "progressFlags": "Penanda",
+  "progressEditableUntil": "Bisa diedit s.d.",
+  "progressEdit": "Edit laporan (≤ 24 jam)",
+  "progressConflictTitle": "Konflik laporan",
+  "progressConflictGone": "Konflik sudah diselesaikan.",
+  "progressPhotosLabel": "Foto",
+  "progressNewPhotos": "+{count} foto baru",
+  "@progressNewPhotos": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "progressUseServer": "Pakai versi server",
+  "progressResendMine": "Kirim versi HP (dengan alasan)",
+  "progressNotEditableAnymore": "Batas edit 24 jam sudah lewat: hanya versi server yang berlaku.",
+  "progressDiffers": "berbeda",
+  "progressServerVersion": "Server",
+  "progressMyVersion": "HP ini",
+  "progressUsedServer": "Versi server dipakai; salinan di HP dihapus.",
+  "progressResent": "Versi HP dikirim sebagai edit.",
+  "addendumTitle": "Addendum RAB",
+  "addendumInboxTitle": "Addendum RAB menunggu Anda ({count})",
+  "@addendumInboxTitle": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "addendumWaitingCount": "{count} menunggu keputusan Anda",
+  "@addendumWaitingCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "addendumNew": "Addendum baru",
+  "addendumNewTitle": "Ajukan addendum RAB",
+  "addendumEmpty": "Belum ada addendum RAB.",
+  "addendumAddition": "Tambahan RAB",
+  "addendumReason": "Alasan",
+  "addendumSubmit": "Ajukan",
+  "addendumSaveDraft": "Simpan sebagai draft",
+  "addendumSubmitted": "Addendum diajukan. Menunggu Direktur.",
+  "addendumSavedDraft": "Draft addendum tersimpan.",
+  "addendumRabBeforeAfter": "RAB {before} → {after}",
+  "@addendumRabBeforeAfter": {
+    "placeholders": {
+      "before": {
+        "type": "String"
+      },
+      "after": {
+        "type": "String"
+      }
+    }
+  },
+  "addendumCommittedPct": "Komitmen terhadap RAB {before} → {after}",
+  "@addendumCommittedPct": {
+    "placeholders": {
+      "before": {
+        "type": "String"
+      },
+      "after": {
+        "type": "String"
+      }
+    }
+  },
+  "addendumWaiting": "Menunggu: {step}",
+  "@addendumWaiting": {
+    "placeholders": {
+      "step": {
+        "type": "String"
+      }
+    }
+  },
+  "addendumRejectedBecause": "Ditolak: {reason}",
+  "@addendumRejectedBecause": {
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+  "addendumCancelledBecause": "Dibatalkan: {reason}",
+  "@addendumCancelledBecause": {
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+  "addendumBy": "Diajukan oleh {name}",
+  "@addendumBy": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "addendumSubmittedAt": "diajukan {time}",
+  "@addendumSubmittedAt": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "addendumTimeline": "Riwayat keputusan",
+  "addendumDecAck": "Disetujui Direktur",
+  "addendumDecApproved": "Disetujui Finance",
+  "addendumDecRejected": "Ditolak",
+  "addendumAcknowledge": "Setujui (Direktur)",
+  "addendumApprove": "Setujui (Finance)",
+  "addendumReject": "Tolak",
+  "addendumCancel": "Batalkan addendum",
+  "addendumConfirmBody": "Keputusan dicatat dengan nama dan tanda tangan profil Anda. Setelah persetujuan terakhir, RAB project bertambah.",
+  "addendumDone": "Tersimpan."
+}

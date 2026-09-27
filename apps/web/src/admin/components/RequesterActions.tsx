@@ -248,7 +248,7 @@ function FlagList({ flags }: { flags: Flag[] }) {
   return (
     <ul style={{ margin: '4px 0 0', paddingLeft: 16, fontSize: 12 }}>
       {flags.map((f) => (
-        <li key={f.id} style={{ color: f.level === 'warning' ? '#ef6c00' : 'inherit' }}>
+        <li key={f.id} style={{ color: f.level === 'warning' ? 'var(--pk-tone-warn-text)' : 'inherit' }}>
           {f.label}
           {f.lineNo ? ` (baris ${f.lineNo})` : ''}: {f.message}
           {f.status === 'reviewed' ? ' — sudah diperiksa Finance' : ''}
@@ -376,7 +376,7 @@ export function RequesterActions(p: RequesterActionsProps) {
             </div>
           ) : null}
           {p.settlement?.financeNotes ? (
-            <div style={{ marginTop: 6, padding: 8, borderLeft: '3px solid #ef6c00', background: 'var(--theme-elevation-50)' }} data-pk-revision-note>
+            <div style={{ marginTop: 6, padding: 8, borderLeft: '3px solid var(--pk-accent)', background: 'var(--theme-elevation-50)' }} data-pk-revision-note>
               <strong>Catatan revisi Finance:</strong> {p.settlement.financeNotes}
             </div>
           ) : null}

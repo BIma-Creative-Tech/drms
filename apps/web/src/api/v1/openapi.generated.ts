@@ -3,7 +3,7 @@ export const openapiDocument = {
   "openapi": "3.1.0",
   "info": {
     "title": "ProyekKas API v1",
-    "version": "0.2.1",
+    "version": "0.3.0",
     "description": "Versioned contract for the Android APK and admin custom views (architecture §6). Errors: RFC 9457."
   },
   "servers": [
@@ -92,6 +92,29 @@ export const openapiDocument = {
             "items": {
               "$ref": "#/components/schemas/Role"
             }
+          },
+          "capabilities": {
+            "type": "object",
+            "properties": {
+              "approvalInbox": {
+                "type": "boolean",
+                "description": "ADR 0013: holds pk-owner (label \"Direktur\") or pk-finance → show the approval inbox."
+              },
+              "teamMonitor": {
+                "type": "boolean",
+                "description": "Holds pk-pm → team list/dashboard (monitoring only, no decisions)."
+              },
+              "progressReportCreate": {
+                "type": "boolean",
+                "description": "E4: holds pk-pm (team projects) or pk-owner (all) → may create progress reports."
+              }
+            },
+            "required": [
+              "approvalInbox",
+              "teamMonitor",
+              "progressReportCreate"
+            ],
+            "description": "UI hints for the APK (E1); the server guards stay authoritative."
           },
           "employee": {
             "type": [
@@ -195,6 +218,7 @@ export const openapiDocument = {
           "email",
           "name",
           "roles",
+          "capabilities",
           "employee",
           "authMethod",
           "device",
@@ -274,6 +298,10 @@ export const openapiDocument = {
           },
           "minAppVersion": {
             "type": "string"
+          },
+          "code": {
+            "type": "string",
+            "description": "Machine-readable reason. 401 DEVICE_REVOKED = the token is valid but X-Device-Id was revoked/marked lost: the APK ends the session without a refresh."
           }
         },
         "required": [
@@ -367,6 +395,16 @@ export const openapiDocument = {
               "string",
               "null"
             ]
+          },
+          "integrityRisk": {
+            "type": "boolean",
+            "description": "Any integrity signal set at the last check (rooted, emulator, mock location)."
+          },
+          "integrityCheckedAt": {
+            "type": [
+              "string",
+              "null"
+            ]
           }
         },
         "required": [
@@ -377,7 +415,9 @@ export const openapiDocument = {
           "appVersion",
           "registeredAt",
           "lastSeenAt",
-          "revokedAt"
+          "revokedAt",
+          "integrityRisk",
+          "integrityCheckedAt"
         ]
       },
       "DeviceRegister": {
@@ -403,8 +443,16 @@ export const openapiDocument = {
             "pattern": "^[0-9A-Za-z.+-]{1,32}$"
           },
           "fcmToken": {
-            "type": "string",
-            "maxLength": 4096
+            "type": [
+              "string",
+              "null"
+            ],
+            "minLength": 1,
+            "maxLength": 4096,
+            "description": "FCM token (ADR 0011); null clears it, omitted keeps it. Push is not enabled yet (GET /app/config features.pushEnabled)."
+          },
+          "integrity": {
+            "$ref": "#/components/schemas/DeviceIntegrity"
           }
         },
         "required": [
@@ -412,6 +460,37 @@ export const openapiDocument = {
           "platform"
         ],
         "additionalProperties": false
+      },
+      "DeviceIntegrity": {
+        "type": "object",
+        "properties": {
+          "rooted": {
+            "type": "boolean"
+          },
+          "emulator": {
+            "type": "boolean"
+          },
+          "developerMode": {
+            "type": "boolean"
+          },
+          "adbEnabled": {
+            "type": "boolean"
+          },
+          "mockLocation": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "rooted",
+          "emulator",
+          "developerMode",
+          "adbEnabled"
+        ],
+        "additionalProperties": false,
+        "description": "Best-effort device signals (ADR 0010 decision 10), sent at register. Recorded and audited, never blocking; omitted keeps the stored values. mockLocation null = not measured (needs a GPS fix, F5)."
       },
       "DeviceRevoke": {
         "type": "object",
@@ -940,6 +1019,71 @@ export const openapiDocument = {
                   "null"
                 ]
               },
+              "acknowledgeBy": {
+                "type": "string",
+                "enum": [
+                  "scope_manager",
+                  "role",
+                  "user"
+                ],
+                "description": "scope_manager only on pre-E1 snapshots (PM \"Diketahui\")."
+              },
+              "acknowledgeRole": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "ADR 0013: pk-owner (label \"Direktur\") when \"Diketahui\" is the Direktur approval."
+              },
+              "decisionRoles": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "ADR 0013: roles that may acknowledge/approve/reject ([pk-owner, pk-finance]); empty = pre-E1 snapshot (old guards)."
+              },
+              "skipped": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "position": {
+                      "type": "string",
+                      "enum": [
+                        "diketahui",
+                        "approval"
+                      ]
+                    },
+                    "level": {
+                      "type": "integer"
+                    },
+                    "role": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "userId": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ],
+                      "exclusiveMinimum": 0
+                    },
+                    "reason": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "position",
+                    "level",
+                    "role",
+                    "userId",
+                    "reason"
+                  ]
+                },
+                "description": "ADR 0013 G1-2: positions skipped at submit because their only holders are requester/creator — show \"(tidak berlaku — pemohon)\"."
+              },
               "steps": {
                 "type": "array",
                 "items": {
@@ -993,6 +1137,10 @@ export const openapiDocument = {
               "acknowledgerUserId",
               "acknowledgeDelegatedTo",
               "acknowledgeDelegationReason",
+              "acknowledgeBy",
+              "acknowledgeRole",
+              "decisionRoles",
+              "skipped",
               "steps",
               "signDiajukan",
               "signDibuat"
@@ -1444,6 +1592,57 @@ export const openapiDocument = {
               "string",
               "null"
             ]
+          },
+          "rev": {
+            "type": "integer",
+            "description": "Content revision (sync `base_rev` for offline edits of a draft, ADR 0010)."
+          },
+          "timeline": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "$ref": "#/components/schemas/RequestStatus"
+                },
+                "label": {
+                  "type": "string"
+                },
+                "state": {
+                  "type": "string",
+                  "enum": [
+                    "done",
+                    "current",
+                    "todo"
+                  ]
+                }
+              },
+              "required": [
+                "status",
+                "label",
+                "state"
+              ]
+            },
+            "description": "Status path of the request type with done / current / todo marks (US-05)."
+          },
+          "nextActor": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "who": {
+                "type": "string"
+              },
+              "what": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "who",
+              "what"
+            ],
+            "description": "\"Giliran\": who is expected to act next and what (display text, Bahasa Indonesia); null when finished."
           }
         },
         "required": [
@@ -1492,7 +1691,10 @@ export const openapiDocument = {
           "cancelReason",
           "rejectReason",
           "clientUuid",
-          "createdAt"
+          "createdAt",
+          "rev",
+          "timeline",
+          "nextActor"
         ]
       },
       "Ref": {
@@ -1642,6 +1844,22 @@ export const openapiDocument = {
               "null"
             ],
             "exclusiveMinimum": 0
+          },
+          "reversalCount": {
+            "type": "integer",
+            "description": "E9: how often the settlement was reversed (void of the refund KM / shortfall transfer)."
+          },
+          "lastReversedAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "lastReversalReason": {
+            "type": [
+              "string",
+              "null"
+            ]
           }
         },
         "required": [
@@ -1661,7 +1879,10 @@ export const openapiDocument = {
           "verifiedAt",
           "settledAt",
           "refundCashEntryId",
-          "shortfallTransferId"
+          "shortfallTransferId",
+          "reversalCount",
+          "lastReversedAt",
+          "lastReversalReason"
         ],
         "description": "T5 LPJ (Uang Muka only; null before \"Nota Lengkap\")."
       },
@@ -1689,7 +1910,8 @@ export const openapiDocument = {
           "lpj_submit",
           "lpj_request_revision",
           "lpj_verify",
-          "settle"
+          "settle",
+          "settle_reverse"
         ]
       },
       "ExpenseRequestCreate": {
@@ -2367,7 +2589,9 @@ export const openapiDocument = {
           "receipts",
           "transfer-proofs",
           "signatures",
-          "attachments"
+          "attachments",
+          "selfies",
+          "progress-photos"
         ]
       },
       "CashEntryList": {
@@ -2985,6 +3209,72 @@ export const openapiDocument = {
         ],
         "additionalProperties": false
       },
+      "SettleReverseResult": {
+        "type": "object",
+        "properties": {
+          "request": {
+            "$ref": "#/components/schemas/ExpenseRequestDetail"
+          },
+          "voided": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "refund",
+                  "shortfall"
+                ]
+              },
+              "amount": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 10000000000000
+              },
+              "refundCashEntryId": {
+                "type": "integer",
+                "exclusiveMinimum": 0
+              },
+              "refundCashEntryNo": {
+                "type": "string"
+              },
+              "shortfallTransferId": {
+                "type": "integer",
+                "exclusiveMinimum": 0
+              },
+              "shortfallTransferNo": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "reversalCashEntryId": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "exclusiveMinimum": 0
+              },
+              "reversalCashEntryNo": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "type",
+              "amount",
+              "reversalCashEntryId",
+              "reversalCashEntryNo"
+            ],
+            "description": "Documents voided by the reversal (also in the audit log)."
+          }
+        },
+        "required": [
+          "request",
+          "voided"
+        ]
+      },
       "ApprovalInbox": {
         "type": "object",
         "properties": {
@@ -3067,6 +3357,14 @@ export const openapiDocument = {
                     "null"
                   ]
                 },
+                "stepLabel": {
+                  "type": "string",
+                  "description": "ADR 0013: \"Persetujuan Direktur (Diketahui)\" | \"Approval level n\" (legacy PM step: \"Diketahui Oleh\")."
+                },
+                "decisionFlow": {
+                  "type": "boolean",
+                  "description": "ADR 0013 Direktur → Finance request (acknowledge = the Direktur approval, button \"Setujui\"); false = pre-E1 snapshot."
+                },
                 "budget": {
                   "type": "object",
                   "properties": {
@@ -3132,6 +3430,8 @@ export const openapiDocument = {
                 "requestDate",
                 "step",
                 "level",
+                "stepLabel",
+                "decisionFlow",
                 "budget",
                 "flags"
               ]
@@ -3246,8 +3546,3495 @@ export const openapiDocument = {
           "transfer-proofs",
           "signatures",
           "attachments",
-          "company"
+          "company",
+          "progress-photos",
+          "selfies"
         ]
+      },
+      "SignedMediaUrl": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "Relative URL: /api/v1/media/{collection}/{id}/file?…&exp=&uid=&sig="
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "ttlSeconds": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "url",
+          "expiresAt",
+          "ttlSeconds"
+        ]
+      },
+      "AppConfig": {
+        "type": "object",
+        "properties": {
+          "minSupportedVersion": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Below this every authenticated call answers 426."
+          },
+          "latestVersion": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "downloadUrl": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "APK download page (side-load); null = not published yet (\"hubungi admin\")."
+          },
+          "updateRequired": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "description": "Only with ?version=."
+          },
+          "updateAvailable": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "description": "Only with ?version=."
+          },
+          "timezone": {
+            "type": "string",
+            "description": "Company display timezone (IANA)."
+          },
+          "serverTime": {
+            "type": "string"
+          },
+          "android": {
+            "type": "object",
+            "properties": {
+              "packageName": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "packageName"
+            ]
+          },
+          "features": {
+            "type": "object",
+            "properties": {
+              "pushEnabled": {
+                "type": "boolean",
+                "description": "false until FCM is configured (ADR 0011) — poll GET /notifications instead."
+              },
+              "syncExpenseDrafts": {
+                "type": "boolean"
+              },
+              "syncAttendance": {
+                "type": "boolean"
+              },
+              "syncProgressReports": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "pushEnabled",
+              "syncExpenseDrafts",
+              "syncAttendance",
+              "syncProgressReports"
+            ]
+          },
+          "sync": {
+            "type": "object",
+            "properties": {
+              "maxItemsPerBatch": {
+                "type": "integer"
+              },
+              "maxBatchBytes": {
+                "type": "integer"
+              },
+              "rateLimitPerMinute": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "maxItemsPerBatch",
+              "maxBatchBytes",
+              "rateLimitPerMinute"
+            ]
+          }
+        },
+        "required": [
+          "minSupportedVersion",
+          "latestVersion",
+          "downloadUrl",
+          "updateRequired",
+          "updateAvailable",
+          "timezone",
+          "serverTime",
+          "android",
+          "features",
+          "sync"
+        ]
+      },
+      "SyncBatchResponse": {
+        "type": "object",
+        "properties": {
+          "batch_id": {
+            "type": "string"
+          },
+          "server_time": {
+            "type": "string"
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SyncResult"
+            }
+          }
+        },
+        "required": [
+          "batch_id",
+          "server_time",
+          "results"
+        ]
+      },
+      "SyncResult": {
+        "type": "object",
+        "properties": {
+          "client_uuid": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "applied",
+              "duplicate",
+              "rejected",
+              "conflict",
+              "deferred",
+              "unsupported"
+            ],
+            "description": "applied | duplicate (replay; original result below) | rejected (business rule, never retry) | conflict (stale base_rev, server wins, see server_copy) | deferred (retry later) | unsupported (item type not enabled on this server yet — keep it queued, do not count as an attempt; see GET /app/config features)."
+          },
+          "original_status": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "applied",
+              "rejected",
+              "conflict",
+              null
+            ],
+            "description": "For duplicate: the status of the first processing."
+          },
+          "server_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Server id (numeric, as string) of the expense request / attendance / progress report."
+          },
+          "rev": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "received_at": {
+            "type": "string",
+            "description": "Authoritative server time of (first) processing, UTC."
+          },
+          "time_trust": {
+            "type": "string",
+            "enum": [
+              "server",
+              "estimated",
+              "device_only"
+            ]
+          },
+          "flags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "OFFLINE, CLOCK_SKEW, CLIENT_TOTAL_MISMATCH, ALREADY_CANCELLED, DEVICE_TIME_ONLY."
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "string",
+                  "description": "VALIDATION, NOT_EDITABLE, STALE_REV (conflict), NOT_FOUND, FORBIDDEN, MEDIA_MISSING, CLIENT_UUID_CONFLICT, FEATURE_DISABLED, DEPENDENCY_FAILED, DEPENDENCY_PENDING, STATE_CONFLICT, INTEGRITY, UNSUPPORTED, INTERNAL; attendance: MOCK_LOCATION, OUTSIDE_GEOFENCE, NOT_ASSIGNED, NO_GEOFENCE, ALREADY_CHECKED_IN, NO_CHECK_IN, ALREADY_CHECKED_OUT (on_behalf also FORBIDDEN: not a PM / not a team location / own attendance); progress reports: WEIGHTS_INCOMPLETE, PROGRESS_DECREASED, PHOTO_LIMIT, MEDIA_IN_USE."
+                },
+                "field": {
+                  "type": "string"
+                },
+                "message": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "code",
+                "message"
+              ]
+            }
+          },
+          "server_copy": {
+            "$ref": "#/components/schemas/SyncDraftCopy"
+          },
+          "server_report": {
+            "$ref": "#/components/schemas/SyncProgressReportCopy"
+          }
+        },
+        "required": [
+          "client_uuid",
+          "status",
+          "original_status",
+          "server_id",
+          "rev",
+          "received_at",
+          "time_trust",
+          "flags",
+          "errors",
+          "server_copy"
+        ]
+      },
+      "SyncDraftCopy": {
+        "type": [
+          "object",
+          "null"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "exclusiveMinimum": 0
+          },
+          "uuid": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "client_uuid": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "rev": {
+            "type": "integer"
+          },
+          "status": {
+            "type": "string"
+          },
+          "doc_no": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "advance",
+              "reimburse"
+            ]
+          },
+          "title": {
+            "type": "string"
+          },
+          "project_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "exclusiveMinimum": 0
+          },
+          "cost_center_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "exclusiveMinimum": 0
+          },
+          "needed_date": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "period_from": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "period_to": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "notes": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "requester_ids": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "exclusiveMinimum": 0
+            }
+          },
+          "bank_account_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "exclusiveMinimum": 0
+          },
+          "grand_total": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000000000000
+          },
+          "updated_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "no": {
+                  "type": "integer"
+                },
+                "description": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "qty": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "uom_id": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "exclusiveMinimum": 0
+                },
+                "unit_price": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "minimum": 0,
+                  "maximum": 10000000000000
+                },
+                "total": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "minimum": 0,
+                  "maximum": 10000000000000
+                },
+                "notes": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "category_id": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "exclusiveMinimum": 0
+                },
+                "vehicle_id": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "exclusiveMinimum": 0
+                }
+              },
+              "required": [
+                "id",
+                "no",
+                "description",
+                "qty",
+                "uom_id",
+                "unit_price",
+                "total",
+                "notes",
+                "category_id",
+                "vehicle_id"
+              ]
+            }
+          },
+          "receipts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                "client_uuid": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "line_id": {
+                  "type": "string"
+                },
+                "receipt_no": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "vendor_name": {
+                  "type": "string"
+                },
+                "receipt_date": {
+                  "type": "string"
+                },
+                "receipt_time": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "amount": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 10000000000000
+                },
+                "tax_amount": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "minimum": 0,
+                  "maximum": 10000000000000
+                },
+                "media_id": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "exclusiveMinimum": 0
+                },
+                "status": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "client_uuid",
+                "line_id",
+                "receipt_no",
+                "vendor_name",
+                "receipt_date",
+                "receipt_time",
+                "amount",
+                "tax_amount",
+                "media_id",
+                "status"
+              ]
+            }
+          }
+        },
+        "required": [
+          "id",
+          "uuid",
+          "client_uuid",
+          "rev",
+          "status",
+          "doc_no",
+          "kind",
+          "title",
+          "project_id",
+          "cost_center_id",
+          "needed_date",
+          "period_from",
+          "period_to",
+          "notes",
+          "requester_ids",
+          "bank_account_id",
+          "grand_total",
+          "updated_at",
+          "lines",
+          "receipts"
+        ],
+        "description": "Server version of the draft (server wins on conflict)."
+      },
+      "SyncProgressReportCopy": {
+        "type": [
+          "object",
+          "null"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "exclusiveMinimum": 0
+          },
+          "client_uuid": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "rev": {
+            "type": "integer"
+          },
+          "doc_no": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "project_id": {
+            "type": "integer",
+            "exclusiveMinimum": 0
+          },
+          "stage_id": {
+            "type": "integer",
+            "exclusiveMinimum": 0
+          },
+          "report_date": {
+            "type": "string"
+          },
+          "pct_before": {
+            "type": "number"
+          },
+          "pct_after": {
+            "type": "number"
+          },
+          "project_pct_after": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "work": {
+            "type": "string"
+          },
+          "issues": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "photo_media_ids": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "exclusiveMinimum": 0
+            }
+          },
+          "offline": {
+            "type": "boolean"
+          },
+          "editable_until": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "updated_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "client_uuid",
+          "rev",
+          "doc_no",
+          "project_id",
+          "stage_id",
+          "report_date",
+          "pct_before",
+          "pct_after",
+          "project_pct_after",
+          "work",
+          "issues",
+          "photo_media_ids",
+          "offline",
+          "editable_until",
+          "updated_at"
+        ],
+        "description": "Server version of a progress report (server wins on conflict)."
+      },
+      "SyncBatch": {
+        "type": "object",
+        "properties": {
+          "batch_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "device_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Must equal the X-Device-Id of the registered device."
+          },
+          "clock": {
+            "$ref": "#/components/schemas/SyncClock"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SyncItem"
+            },
+            "minItems": 1,
+            "maxItems": 50
+          }
+        },
+        "required": [
+          "batch_id",
+          "device_id",
+          "clock",
+          "items"
+        ],
+        "additionalProperties": false,
+        "description": "≤ 50 items and ≤ 262144 bytes JSON per batch (ADR 0010 decision 14)."
+      },
+      "SyncClock": {
+        "type": "object",
+        "properties": {
+          "device_time": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Device wall clock at send time (with offset). Comparison only."
+          },
+          "elapsed_ms": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Android monotonic time since boot at send time."
+          },
+          "boot_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "last_server_time": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "server_time of the last successful online call on this boot."
+          },
+          "last_server_elapsed_ms": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0,
+            "description": "elapsed_ms recorded together with last_server_time."
+          }
+        },
+        "required": [
+          "device_time",
+          "elapsed_ms",
+          "boot_id"
+        ],
+        "additionalProperties": false
+      },
+      "SyncItem": {
+        "type": "object",
+        "properties": {
+          "client_uuid": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Idempotency key of this queue item (UUIDv7). Replays return `duplicate` with the stored result."
+          },
+          "type": {
+            "$ref": "#/components/schemas/SyncItemType"
+          },
+          "schema_version": {
+            "type": "number",
+            "enum": [
+              1
+            ]
+          },
+          "offline": {
+            "type": "boolean",
+            "description": "true = created while offline (stored as a comparison flag)."
+          },
+          "device_time": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Device wall clock when the user acted. Comparison only; the server time is authoritative."
+          },
+          "elapsed_ms": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Monotonic time since boot when the user acted."
+          },
+          "boot_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "Boot of elapsed_ms (default: clock.boot_id). A different boot → time_trust device_only."
+          },
+          "base_rev": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1,
+            "description": "Server `rev` the edit is based on (null/absent = new draft; on an existing draft → conflict). A new draft starts at rev 1 and every applied edit adds exactly 1, so queued edits of a draft created offline use 1, 2, … in queue order."
+          },
+          "depends_on": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "maxItems": 50,
+            "description": "client_uuid of earlier items that must be applied first."
+          },
+          "payload": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SyncDraftUpsertPayload"
+              },
+              {
+                "$ref": "#/components/schemas/SyncDraftDeletePayload"
+              },
+              {
+                "$ref": "#/components/schemas/SyncAttendancePayload"
+              },
+              {
+                "$ref": "#/components/schemas/SyncOnBehalfPayload"
+              },
+              {
+                "$ref": "#/components/schemas/SyncProgressReportPayload"
+              },
+              {
+                "type": "object",
+                "additionalProperties": {}
+              }
+            ],
+            "description": "Type specific: expense_request.draft_upsert → SyncDraftUpsertPayload, expense_request.draft_delete → SyncDraftDeletePayload, attendance.check_in / attendance.check_out → SyncAttendancePayload, attendance.on_behalf → SyncOnBehalfPayload, progress_report.draft_upsert → SyncProgressReportPayload; other types: free-form until supported."
+          }
+        },
+        "required": [
+          "client_uuid",
+          "type",
+          "schema_version",
+          "offline",
+          "device_time",
+          "elapsed_ms",
+          "payload"
+        ],
+        "additionalProperties": false
+      },
+      "SyncItemType": {
+        "type": "string",
+        "enum": [
+          "attendance.check_in",
+          "attendance.check_out",
+          "attendance.on_behalf",
+          "expense_request.draft_upsert",
+          "expense_request.draft_delete",
+          "progress_report.draft_upsert"
+        ],
+        "description": "attendance.on_behalf (US-14, E6): PM only. progress_report.draft_upsert (E4) = create or edit (≤ 24 h) of a progress report (company-settings.syncProgressReportsEnabled)."
+      },
+      "SyncDraftUpsertPayload": {
+        "type": "object",
+        "properties": {
+          "request_id": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "description": "Server id of a draft created online."
+          },
+          "draft_client_uuid": {
+            "type": "string",
+            "format": "uuid",
+            "description": "APK id of the draft (default: the item client_uuid, i.e. the item that created it)."
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "advance",
+              "reimburse"
+            ],
+            "description": "Required for a new draft. advance = Uang Muka."
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "description": "Required for a new draft."
+          },
+          "project_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "exclusiveMinimum": 0
+          },
+          "cost_center_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "exclusiveMinimum": 0
+          },
+          "needed_date": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$"
+          },
+          "period_from": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$"
+          },
+          "period_to": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$"
+          },
+          "notes": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 2000
+          },
+          "requester_ids": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "exclusiveMinimum": 0
+            },
+            "maxItems": 20
+          },
+          "bank_account_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "exclusiveMinimum": 0
+          },
+          "client_grand_total": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 10000000000000,
+            "description": "Advisory; mismatch with the server total → flag CLIENT_TOTAL_MISMATCH."
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SyncLineInput"
+            },
+            "maxItems": 200,
+            "description": "Replaces ALL lines when present."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Omitted fields stay unchanged on an existing draft."
+      },
+      "SyncLineInput": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "Server line id (lines that came from the server)."
+          },
+          "client_uuid": {
+            "type": "string",
+            "format": "uuid",
+            "description": "APK id of a new line; becomes the server line id."
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "qty": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "exclusiveMinimum": 0,
+            "maximum": 1000000000
+          },
+          "uom_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "exclusiveMinimum": 0
+          },
+          "unit_price": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 10000000000000
+          },
+          "total": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1,
+            "maximum": 10000000000000
+          },
+          "notes": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 500
+          },
+          "category_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "exclusiveMinimum": 0
+          },
+          "vehicle_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "exclusiveMinimum": 0
+          },
+          "receipts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SyncReceiptInput"
+            },
+            "maxItems": 20,
+            "description": "Reimburse drafts only. Upserted by client_uuid; receipts missing here are NOT removed."
+          }
+        },
+        "additionalProperties": false
+      },
+      "SyncReceiptInput": {
+        "type": "object",
+        "properties": {
+          "client_uuid": {
+            "type": "string",
+            "format": "uuid",
+            "description": "APK id of the receipt (stable across edits)."
+          },
+          "receipt_no": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 64
+          },
+          "vendor_name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "vendor_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "exclusiveMinimum": 0
+          },
+          "receipt_date": {
+            "type": "string",
+            "pattern": "^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$"
+          },
+          "receipt_time": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^([01]\\d|2[0-3]):[0-5]\\d(:[0-5]\\d)?$"
+          },
+          "amount": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10000000000000,
+            "description": "Total PRINTED on the receipt."
+          },
+          "tax_amount": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 10000000000000
+          },
+          "media_id": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "description": "media-receipts id uploaded by the caller (POST /api/v1/media/receipts). Cannot change once synced."
+          }
+        },
+        "required": [
+          "client_uuid",
+          "vendor_name",
+          "receipt_date",
+          "amount",
+          "media_id"
+        ],
+        "additionalProperties": false
+      },
+      "SyncDraftDeletePayload": {
+        "type": "object",
+        "properties": {
+          "request_id": {
+            "type": "integer",
+            "exclusiveMinimum": 0
+          },
+          "draft_client_uuid": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 1000,
+            "description": "Default \"Draft dihapus dari aplikasi\"."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Soft delete = the draft is cancelled (no hard delete)."
+      },
+      "SyncAttendancePayload": {
+        "type": "object",
+        "properties": {
+          "project_id": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "description": "Project (one of project_id / cost_center_id)."
+          },
+          "cost_center_id": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "description": "Cost center / operational location (E6, Q-40)."
+          },
+          "lat": {
+            "type": "number",
+            "minimum": -90,
+            "maximum": 90
+          },
+          "lng": {
+            "type": "number",
+            "minimum": -180,
+            "maximum": 180
+          },
+          "accuracy_m": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 10000,
+            "description": "GPS accuracy radius (m); up to 50 m is added to the geofence radius."
+          },
+          "is_mocked": {
+            "type": "boolean",
+            "description": "Android Position.isMocked of this fix; true → rejected MOCK_LOCATION."
+          },
+          "selfie_media_id": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "description": "media-selfies id uploaded by the caller (POST /api/v1/media/selfies)."
+          },
+          "camera_lens": {
+            "type": "string",
+            "enum": [
+              "front"
+            ]
+          }
+        },
+        "required": [
+          "lat",
+          "lng",
+          "is_mocked",
+          "selfie_media_id"
+        ],
+        "additionalProperties": false
+      },
+      "SyncOnBehalfPayload": {
+        "type": "object",
+        "properties": {
+          "employee_id": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "description": "Team member (employees id; may have no user account)."
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "check_in",
+              "check_out"
+            ]
+          },
+          "project_id": {
+            "type": "integer",
+            "exclusiveMinimum": 0
+          },
+          "cost_center_id": {
+            "type": "integer",
+            "exclusiveMinimum": 0
+          },
+          "lat": {
+            "type": "number",
+            "minimum": -90,
+            "maximum": 90
+          },
+          "lng": {
+            "type": "number",
+            "minimum": -180,
+            "maximum": 180
+          },
+          "accuracy_m": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 10000
+          },
+          "is_mocked": {
+            "type": "boolean"
+          },
+          "selfie_media_id": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "description": "media-selfies id uploaded by the PM (photo of the employee)."
+          },
+          "camera_lens": {
+            "type": "string",
+            "enum": [
+              "front",
+              "back"
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 500,
+            "description": "Why the PM records it (e.g. \"tidak punya HP\"). Required."
+          }
+        },
+        "required": [
+          "employee_id",
+          "kind",
+          "lat",
+          "lng",
+          "is_mocked",
+          "selfie_media_id",
+          "reason"
+        ],
+        "additionalProperties": false
+      },
+      "SyncProgressReportPayload": {
+        "type": "object",
+        "properties": {
+          "report_id": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "description": "Server id of a report created online (edit)."
+          },
+          "report_client_uuid": {
+            "type": "string",
+            "format": "uuid",
+            "description": "APK id of the report (default: the client_uuid of the item that created it)."
+          },
+          "project_id": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "description": "Required for a new report."
+          },
+          "stage_id": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "description": "Required for a new report; a stage of project_id."
+          },
+          "pct_after": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100,
+            "description": "Stage % after the work (required for a new report; never below the server stage %)."
+          },
+          "work": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 2000,
+            "description": "Pekerjaan (required for a new report)."
+          },
+          "issues": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 2000,
+            "description": "Kendala."
+          },
+          "photo_media_ids": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "exclusiveMinimum": 0
+            },
+            "maxItems": 5,
+            "description": "media-progress-photos ids uploaded by the caller. On an edit: ids not yet on the report are added (photos are never removed)."
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 1000,
+            "description": "Required when editing an existing report."
+          }
+        },
+        "additionalProperties": false
+      },
+      "ProjectProgressList": {
+        "type": "object",
+        "properties": {
+          "asOf": {
+            "type": "string"
+          },
+          "warnGapPct": {
+            "type": "number"
+          },
+          "badGapPct": {
+            "type": "number"
+          },
+          "projects": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProjectProgressItem"
+            }
+          }
+        },
+        "required": [
+          "asOf",
+          "warnGapPct",
+          "badGapPct",
+          "projects"
+        ]
+      },
+      "ProjectProgressItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "exclusiveMinimum": 0
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "budget": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "committed": {
+            "type": "number",
+            "description": "K-07 Komitmen (Rp)."
+          },
+          "budgetPct": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "description": "K-08 % of RAB (null = no RAB)."
+          },
+          "budgetTone": {
+            "type": "string",
+            "enum": [
+              "none",
+              "ok",
+              "warn",
+              "over"
+            ]
+          },
+          "progressPct": {
+            "type": "number",
+            "description": "Physical progress (%)."
+          },
+          "weightSum": {
+            "type": "number"
+          },
+          "stagesComplete": {
+            "type": "boolean"
+          },
+          "gap": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "description": "K-09 selisih = budgetPct − progressPct (null = not computable)."
+          },
+          "tone": {
+            "type": "string",
+            "enum": [
+              "none",
+              "ok",
+              "warn",
+              "bad"
+            ],
+            "description": "ok (hijau) ≤ warnGapPct · warn (kuning) ≤ badGapPct · bad (merah) > badGapPct."
+          },
+          "toneLabel": {
+            "type": "string"
+          },
+          "lastReportDate": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reportCount": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "name",
+          "status",
+          "budget",
+          "committed",
+          "budgetPct",
+          "budgetTone",
+          "progressPct",
+          "weightSum",
+          "stagesComplete",
+          "gap",
+          "tone",
+          "toneLabel",
+          "lastReportDate",
+          "reportCount"
+        ]
+      },
+      "ProjectStageSet": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "integer",
+            "exclusiveMinimum": 0
+          },
+          "weightSum": {
+            "type": "number",
+            "description": "Σ weights of active stages."
+          },
+          "complete": {
+            "type": "boolean",
+            "description": "weightSum = 100 → progress reports can be created."
+          },
+          "progressPct": {
+            "type": "number",
+            "description": "Project physical progress = Σ(weight × stage %) / 100."
+          },
+          "stages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProjectStage"
+            }
+          }
+        },
+        "required": [
+          "projectId",
+          "weightSum",
+          "complete",
+          "progressPct",
+          "stages"
+        ]
+      },
+      "ProjectStage": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "exclusiveMinimum": 0
+          },
+          "name": {
+            "type": "string"
+          },
+          "weightPct": {
+            "type": "number"
+          },
+          "sequence": {
+            "type": "integer"
+          },
+          "progressPct": {
+            "type": "number"
+          },
+          "active": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "weightPct",
+          "sequence",
+          "progressPct",
+          "active"
+        ]
+      },
+      "StageSetBody": {
+        "type": "object",
+        "properties": {
+          "stages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StageInput"
+            },
+            "minItems": 1,
+            "maxItems": 100,
+            "description": "The whole active set. Existing stages missing here are deactivated (Direktur only)."
+          },
+          "templateId": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "description": "Apply a stage template to a project without stages (instead of `stages`)."
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 1000,
+            "description": "Required when a weight changes or a stage is (de)activated (G7)."
+          }
+        },
+        "additionalProperties": false
+      },
+      "StageInput": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "description": "Existing stage id; omit for a new stage (Direktur only)."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "weightPct": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100,
+            "description": "Bobot (%); the ACTIVE set must total exactly 100."
+          },
+          "sequence": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 999
+          }
+        },
+        "required": [
+          "name",
+          "weightPct",
+          "sequence"
+        ],
+        "additionalProperties": false
+      },
+      "ProgressReportList": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProgressReport"
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ]
+      },
+      "ProgressReport": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "exclusiveMinimum": 0
+          },
+          "uuid": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "docNo": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "LP/YYMM/####"
+          },
+          "project": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "exclusiveMinimum": 0
+              },
+              "code": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "name": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "code",
+              "name"
+            ]
+          },
+          "stage": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "exclusiveMinimum": 0
+              },
+              "name": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "weightPct": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "weightPct"
+            ]
+          },
+          "reportDate": {
+            "type": "string",
+            "description": "Business date (company TZ) of the time that counts."
+          },
+          "pctBefore": {
+            "type": "number"
+          },
+          "pctAfter": {
+            "type": "number"
+          },
+          "projectPctBefore": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "projectPctAfter": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "work": {
+            "type": "string"
+          },
+          "issues": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reporter": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "exclusiveMinimum": 0
+              },
+              "name": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "name"
+            ]
+          },
+          "photos": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProgressPhoto"
+            }
+          },
+          "offline": {
+            "type": "boolean"
+          },
+          "timeTrust": {
+            "type": "string",
+            "enum": [
+              "server",
+              "estimated",
+              "device_only"
+            ]
+          },
+          "source": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "web",
+              "apk",
+              null
+            ]
+          },
+          "flags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "receivedAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "editableUntil": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "editable": {
+            "type": "boolean",
+            "description": "The caller is the reporter and the 24 h window is open."
+          },
+          "rev": {
+            "type": "integer",
+            "description": "Content revision (sync base_rev)."
+          },
+          "clientUuid": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "createdAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "uuid",
+          "docNo",
+          "project",
+          "stage",
+          "reportDate",
+          "pctBefore",
+          "pctAfter",
+          "projectPctBefore",
+          "projectPctAfter",
+          "work",
+          "issues",
+          "reporter",
+          "photos",
+          "offline",
+          "timeTrust",
+          "source",
+          "flags",
+          "receivedAt",
+          "editableUntil",
+          "editable",
+          "rev",
+          "clientUuid",
+          "createdAt"
+        ]
+      },
+      "ProgressPhoto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "exclusiveMinimum": 0
+          },
+          "width": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "height": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "filesize": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "url": {
+            "type": "string",
+            "description": "GET (auth) — /api/v1/media/progress-photos/{id}/file"
+          },
+          "thumbUrl": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "width",
+          "height",
+          "filesize",
+          "url",
+          "thumbUrl"
+        ]
+      },
+      "ProgressReportCreate": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "integer",
+            "exclusiveMinimum": 0
+          },
+          "stageId": {
+            "type": "integer",
+            "exclusiveMinimum": 0
+          },
+          "pctAfter": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100,
+            "description": "Stage progress after this report (%); never below the current stage %."
+          },
+          "work": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 2000,
+            "description": "Pekerjaan."
+          },
+          "issues": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 2000,
+            "description": "Kendala."
+          },
+          "photoIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "exclusiveMinimum": 0
+            },
+            "maxItems": 5,
+            "description": "media-progress-photos ids uploaded by the caller (POST /media/progress-photos), max 5."
+          },
+          "clientUuid": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Client id; a replay returns the existing report (200)."
+          }
+        },
+        "required": [
+          "projectId",
+          "stageId",
+          "pctAfter",
+          "work"
+        ],
+        "additionalProperties": false
+      },
+      "ProgressReportUpdate": {
+        "type": "object",
+        "properties": {
+          "pctAfter": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100,
+            "description": "Correction; only on the latest report of the stage, never below pctBefore."
+          },
+          "work": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 2000
+          },
+          "issues": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 2000
+          },
+          "addPhotoIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "exclusiveMinimum": 0
+            },
+            "maxItems": 5,
+            "description": "Photos to add (total per report ≤ 5)."
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 1000,
+            "description": "Required for every edit (requirements §8 T11)."
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "additionalProperties": false
+      },
+      "AttendanceRecap": {
+        "type": "object",
+        "properties": {
+          "employee": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "exclusiveMinimum": 0
+              },
+              "code": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "code",
+              "name"
+            ]
+          },
+          "month": {
+            "type": "string",
+            "pattern": "^\\d{4}-(0[1-9]|1[0-2])$"
+          },
+          "from": {
+            "type": "string",
+            "pattern": "^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$"
+          },
+          "to": {
+            "type": "string",
+            "pattern": "^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$"
+          },
+          "timezone": {
+            "type": "string"
+          },
+          "schedule": {
+            "$ref": "#/components/schemas/WorkScheduleSnapshot"
+          },
+          "days": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AttendanceDay"
+            },
+            "description": "Every date of the month up to today."
+          },
+          "summary": {
+            "$ref": "#/components/schemas/AttendanceSummary"
+          }
+        },
+        "required": [
+          "employee",
+          "month",
+          "from",
+          "to",
+          "timezone",
+          "schedule",
+          "days",
+          "summary"
+        ]
+      },
+      "WorkScheduleSnapshot": {
+        "type": [
+          "object",
+          "null"
+        ],
+        "properties": {
+          "id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "exclusiveMinimum": 0
+          },
+          "name": {
+            "type": "string"
+          },
+          "start": {
+            "type": "string",
+            "description": "HH:MM local"
+          },
+          "end": {
+            "type": "string"
+          },
+          "toleranceMin": {
+            "type": "integer"
+          },
+          "workDays": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 7
+            },
+            "description": "ISO weekdays (1 = Monday … 7 = Sunday)."
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "start",
+          "end",
+          "toleranceMin",
+          "workDays"
+        ]
+      },
+      "AttendanceDay": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "pattern": "^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$"
+          },
+          "weekday": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 7
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "workday",
+              "holiday",
+              "off",
+              "unscheduled"
+            ]
+          },
+          "holidayName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "selesai",
+              "hadir",
+              "belum_absen",
+              "tidak_hadir",
+              "libur",
+              "tanpa_jadwal"
+            ],
+            "description": "selesai = every check-in has a check-out; hadir = a location still open; tidak_hadir = past working day without check-in; libur = holiday/off day without attendance."
+          },
+          "checkIn": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "First effective check-in (corrections applied)."
+          },
+          "checkOut": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Last effective check-out, null while a location is still open."
+          },
+          "checkInLocal": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "HH:MM company TZ"
+          },
+          "checkOutLocal": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "workMinutes": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "Sum of closed check-in → check-out pairs."
+          },
+          "lateMinutes": {
+            "type": "integer",
+            "description": "Minutes after the schedule start when above the tolerance; 0 on holidays/off days."
+          },
+          "earlyLeaveMinutes": {
+            "type": "integer"
+          },
+          "onBehalf": {
+            "type": "boolean",
+            "description": "At least one row \"diabsenkan oleh PM\" (US-14)."
+          },
+          "onBehalfBy": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "corrected": {
+            "type": "boolean",
+            "description": "At least one row corrected (T10)."
+          },
+          "flags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "locations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AttendanceLocationDay"
+            }
+          }
+        },
+        "required": [
+          "date",
+          "weekday",
+          "kind",
+          "holidayName",
+          "status",
+          "checkIn",
+          "checkOut",
+          "checkInLocal",
+          "checkOutLocal",
+          "workMinutes",
+          "lateMinutes",
+          "earlyLeaveMinutes",
+          "onBehalf",
+          "onBehalfBy",
+          "corrected",
+          "flags",
+          "locations"
+        ]
+      },
+      "AttendanceLocationDay": {
+        "type": "object",
+        "properties": {
+          "location": {
+            "$ref": "#/components/schemas/AttendanceLocationRef"
+          },
+          "checkIn": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "type": "integer",
+                "exclusiveMinimum": 0
+              },
+              "time": {
+                "type": "string",
+                "description": "UTC ISO-8601 instant."
+              },
+              "source": {
+                "type": "string",
+                "enum": [
+                  "self",
+                  "pm"
+                ]
+              },
+              "corrected": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "id",
+              "time",
+              "source",
+              "corrected"
+            ]
+          },
+          "checkOut": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "type": "integer",
+                "exclusiveMinimum": 0
+              },
+              "time": {
+                "type": "string",
+                "description": "UTC ISO-8601 instant."
+              },
+              "source": {
+                "type": "string",
+                "enum": [
+                  "self",
+                  "pm"
+                ]
+              },
+              "corrected": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "id",
+              "time",
+              "source",
+              "corrected"
+            ]
+          }
+        },
+        "required": [
+          "location",
+          "checkIn",
+          "checkOut"
+        ]
+      },
+      "AttendanceLocationRef": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "project",
+              "cost_center"
+            ]
+          },
+          "id": {
+            "type": "integer",
+            "exclusiveMinimum": 0
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "id",
+          "code",
+          "name"
+        ]
+      },
+      "AttendanceSummary": {
+        "type": "object",
+        "properties": {
+          "presentDays": {
+            "type": "integer"
+          },
+          "workingDays": {
+            "type": "integer",
+            "description": "Scheduled working days up to today (holidays excluded)."
+          },
+          "absentDays": {
+            "type": "integer"
+          },
+          "lateDays": {
+            "type": "integer"
+          },
+          "lateMinutes": {
+            "type": "integer"
+          },
+          "earlyLeaveDays": {
+            "type": "integer"
+          },
+          "earlyLeaveMinutes": {
+            "type": "integer"
+          },
+          "workMinutes": {
+            "type": "integer"
+          },
+          "holidayWorkDays": {
+            "type": "integer"
+          },
+          "offDayWorkDays": {
+            "type": "integer"
+          },
+          "incompleteDays": {
+            "type": "integer",
+            "description": "Past days with a check-in but without check-out."
+          },
+          "onBehalfDays": {
+            "type": "integer"
+          },
+          "correctedDays": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "presentDays",
+          "workingDays",
+          "absentDays",
+          "lateDays",
+          "lateMinutes",
+          "earlyLeaveDays",
+          "earlyLeaveMinutes",
+          "workMinutes",
+          "holidayWorkDays",
+          "offDayWorkDays",
+          "incompleteDays",
+          "onBehalfDays",
+          "correctedDays"
+        ]
+      },
+      "TeamToday": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "pattern": "^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$"
+          },
+          "timezone": {
+            "type": "string"
+          },
+          "holidayName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "scope": {
+            "type": "string",
+            "enum": [
+              "all",
+              "team"
+            ]
+          },
+          "counts": {
+            "type": "object",
+            "properties": {
+              "total": {
+                "type": "integer"
+              },
+              "belum_absen": {
+                "type": "integer"
+              },
+              "hadir": {
+                "type": "integer"
+              },
+              "selesai": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "total",
+              "belum_absen",
+              "hadir",
+              "selesai"
+            ]
+          },
+          "members": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "employee": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "code",
+                    "name"
+                  ]
+                },
+                "assigned": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AttendanceLocationRef"
+                  }
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "belum_absen",
+                    "hadir",
+                    "selesai"
+                  ]
+                },
+                "checkIn": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "UTC ISO-8601 instant."
+                },
+                "checkOut": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "UTC ISO-8601 instant."
+                },
+                "checkInLocal": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "checkOutLocal": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "lateMinutes": {
+                  "type": "integer"
+                },
+                "onBehalf": {
+                  "type": "boolean"
+                },
+                "corrected": {
+                  "type": "boolean"
+                },
+                "locations": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AttendanceLocationDay"
+                  }
+                }
+              },
+              "required": [
+                "employee",
+                "assigned",
+                "status",
+                "checkIn",
+                "checkOut",
+                "checkInLocal",
+                "checkOutLocal",
+                "lateMinutes",
+                "onBehalf",
+                "corrected",
+                "locations"
+              ]
+            }
+          }
+        },
+        "required": [
+          "date",
+          "timezone",
+          "holidayName",
+          "scope",
+          "counts",
+          "members"
+        ]
+      },
+      "AttendanceCorrection": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "exclusiveMinimum": 0
+          },
+          "attendanceId": {
+            "type": "integer",
+            "exclusiveMinimum": 0
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "check_in",
+              "check_out"
+            ]
+          },
+          "localDate": {
+            "type": "string",
+            "pattern": "^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$"
+          },
+          "oldTime": {
+            "type": "string",
+            "description": "UTC ISO-8601 instant."
+          },
+          "newTime": {
+            "type": "string",
+            "description": "UTC ISO-8601 instant."
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "attendanceId",
+          "kind",
+          "localDate",
+          "oldTime",
+          "newTime",
+          "reason"
+        ]
+      },
+      "AttendanceCorrectBody": {
+        "type": "object",
+        "properties": {
+          "new_time": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Corrected time (same local date as the attendance; not in the future)."
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 500,
+            "description": "Mandatory (T10)."
+          }
+        },
+        "required": [
+          "new_time",
+          "reason"
+        ],
+        "additionalProperties": false
+      },
+      "BudgetAddendumList": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BudgetAddendumSummary"
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ]
+      },
+      "BudgetAddendumSummary": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "exclusiveMinimum": 0
+          },
+          "uuid": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "docNo": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "ADD/YYMM/#### (allocated at submit)."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "pending_ack",
+              "pending_approval",
+              "approved",
+              "rejected",
+              "cancelled"
+            ]
+          },
+          "statusLabel": {
+            "type": "string"
+          },
+          "stepLabel": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Current decision step (Direktur / Finance level)."
+          },
+          "project": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "exclusiveMinimum": 0
+              },
+              "code": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "name": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "budget": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "code",
+              "name",
+              "budget"
+            ]
+          },
+          "addition": {
+            "type": "integer"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "budgetAtSubmit": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "oldBudget": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "RAB re-read under lock at approval."
+          },
+          "newBudget": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "oldBudget + addition (set when approved)."
+          },
+          "createdBy": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "exclusiveMinimum": 0
+              },
+              "name": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "name"
+            ]
+          },
+          "submittedAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "decidedAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "rejectReason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "cancelReason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "currentLevel": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "source": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "web",
+              "apk",
+              null
+            ]
+          },
+          "createdAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "uuid",
+          "docNo",
+          "status",
+          "statusLabel",
+          "stepLabel",
+          "project",
+          "addition",
+          "reason",
+          "budgetAtSubmit",
+          "oldBudget",
+          "newBudget",
+          "createdBy",
+          "submittedAt",
+          "decidedAt",
+          "rejectReason",
+          "cancelReason",
+          "currentLevel",
+          "source",
+          "createdAt"
+        ]
+      },
+      "BudgetAddendumInbox": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                "uuid": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "docNo": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "ADD/YYMM/#### (allocated at submit)."
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "draft",
+                    "pending_ack",
+                    "pending_approval",
+                    "approved",
+                    "rejected",
+                    "cancelled"
+                  ]
+                },
+                "statusLabel": {
+                  "type": "string"
+                },
+                "stepLabel": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "Current decision step (Direktur / Finance level)."
+                },
+                "project": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0
+                    },
+                    "code": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "name": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "budget": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "code",
+                    "name",
+                    "budget"
+                  ]
+                },
+                "addition": {
+                  "type": "integer"
+                },
+                "reason": {
+                  "type": "string"
+                },
+                "budgetAtSubmit": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "oldBudget": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "description": "RAB re-read under lock at approval."
+                },
+                "newBudget": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "description": "oldBudget + addition (set when approved)."
+                },
+                "createdBy": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0
+                    },
+                    "name": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name"
+                  ]
+                },
+                "submittedAt": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "decidedAt": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "rejectReason": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "cancelReason": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "currentLevel": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "source": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "enum": [
+                    "web",
+                    "apk",
+                    null
+                  ]
+                },
+                "createdAt": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "step": {
+                  "type": "string",
+                  "enum": [
+                    "acknowledge",
+                    "approve"
+                  ],
+                  "description": "acknowledge → POST …/acknowledge (Direktur); approve → POST …/approve (Finance)."
+                },
+                "budget": {
+                  "type": "object",
+                  "properties": {
+                    "current": {
+                      "type": "integer"
+                    },
+                    "afterAddition": {
+                      "type": "integer"
+                    },
+                    "committedPctBefore": {
+                      "type": [
+                        "number",
+                        "null"
+                      ]
+                    },
+                    "committedPctAfter": {
+                      "type": [
+                        "number",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "current",
+                    "afterAddition",
+                    "committedPctBefore",
+                    "committedPctAfter"
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "uuid",
+                "docNo",
+                "status",
+                "statusLabel",
+                "stepLabel",
+                "project",
+                "addition",
+                "reason",
+                "budgetAtSubmit",
+                "oldBudget",
+                "newBudget",
+                "createdBy",
+                "submittedAt",
+                "decidedAt",
+                "rejectReason",
+                "cancelReason",
+                "currentLevel",
+                "source",
+                "createdAt",
+                "step",
+                "budget"
+              ]
+            }
+          }
+        },
+        "required": [
+          "items"
+        ]
+      },
+      "BudgetAddendumDetail": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "exclusiveMinimum": 0
+          },
+          "uuid": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "docNo": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "ADD/YYMM/#### (allocated at submit)."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "pending_ack",
+              "pending_approval",
+              "approved",
+              "rejected",
+              "cancelled"
+            ]
+          },
+          "statusLabel": {
+            "type": "string"
+          },
+          "stepLabel": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Current decision step (Direktur / Finance level)."
+          },
+          "project": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "exclusiveMinimum": 0
+              },
+              "code": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "name": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "budget": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "code",
+              "name",
+              "budget"
+            ]
+          },
+          "addition": {
+            "type": "integer"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "budgetAtSubmit": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "oldBudget": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "RAB re-read under lock at approval."
+          },
+          "newBudget": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "oldBudget + addition (set when approved)."
+          },
+          "createdBy": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "exclusiveMinimum": 0
+              },
+              "name": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "name"
+            ]
+          },
+          "submittedAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "decidedAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "rejectReason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "cancelReason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "currentLevel": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "source": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "web",
+              "apk",
+              null
+            ]
+          },
+          "createdAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "allowedActions": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "edit",
+                "submit",
+                "cancel",
+                "acknowledge",
+                "approve",
+                "reject"
+              ]
+            },
+            "description": "What the caller may do now (edit/submit/cancel: creator PM; acknowledge = Direktur \"Setujui\"; approve = Finance; reject)."
+          },
+          "budget": {
+            "type": "object",
+            "properties": {
+              "current": {
+                "type": "integer"
+              },
+              "committed": {
+                "type": "integer",
+                "description": "K-07 Komitmen of the project."
+              },
+              "afterAddition": {
+                "type": "integer"
+              },
+              "committedPctBefore": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "committedPctAfter": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "current",
+              "committed",
+              "afterAddition",
+              "committedPctBefore",
+              "committedPctAfter"
+            ]
+          },
+          "approvalRule": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "type": "integer",
+                "exclusiveMinimum": 0
+              },
+              "name": {
+                "type": "string"
+              },
+              "acknowledgeRole": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "levels": {
+                "type": "integer"
+              },
+              "skipped": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "position": {
+                      "type": "string"
+                    },
+                    "level": {
+                      "type": "integer"
+                    },
+                    "role": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "userId": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ]
+                    },
+                    "reason": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "position",
+                    "level",
+                    "role",
+                    "userId",
+                    "reason"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "acknowledgeRole",
+              "levels",
+              "skipped"
+            ]
+          },
+          "decisions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                "position": {
+                  "type": "string",
+                  "enum": [
+                    "diketahui",
+                    "approval"
+                  ]
+                },
+                "level": {
+                  "type": "integer"
+                },
+                "actor": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ],
+                      "exclusiveMinimum": 0
+                    },
+                    "name": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name"
+                  ]
+                },
+                "decision": {
+                  "type": "string",
+                  "enum": [
+                    "acknowledged",
+                    "approved",
+                    "rejected"
+                  ]
+                },
+                "reason": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "decidedAt": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "budgetPctBefore": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "budgetPctAfter": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "signatureSource": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "position",
+                "level",
+                "actor",
+                "decision",
+                "reason",
+                "decidedAt",
+                "budgetPctBefore",
+                "budgetPctAfter",
+                "signatureSource"
+              ]
+            }
+          }
+        },
+        "required": [
+          "id",
+          "uuid",
+          "docNo",
+          "status",
+          "statusLabel",
+          "stepLabel",
+          "project",
+          "addition",
+          "reason",
+          "budgetAtSubmit",
+          "oldBudget",
+          "newBudget",
+          "createdBy",
+          "submittedAt",
+          "decidedAt",
+          "rejectReason",
+          "cancelReason",
+          "currentLevel",
+          "source",
+          "createdAt",
+          "allowedActions",
+          "budget",
+          "approvalRule",
+          "decisions"
+        ]
+      },
+      "BudgetAddendumCreate": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "integer",
+            "exclusiveMinimum": 0
+          },
+          "addition": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 1000000000000,
+            "description": "Tambahan RAB (Rp, > 0)."
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 1000,
+            "description": "Alasan addendum (wajib)."
+          },
+          "submit": {
+            "type": "boolean",
+            "description": "true = ajukan langsung (tanpa tinggal di Draft)."
+          }
+        },
+        "required": [
+          "projectId",
+          "addition",
+          "reason"
+        ],
+        "additionalProperties": false
+      },
+      "BudgetAddendumUpdate": {
+        "type": "object",
+        "properties": {
+          "addition": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 1000000000000
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 1000
+          }
+        },
+        "additionalProperties": false
+      },
+      "BudgetAddendumReason": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 1000
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "additionalProperties": false
+      },
+      "BudgetAddendumDecision": {
+        "type": "object",
+        "properties": {
+          "signatureMediaId": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "exclusiveMinimum": 0,
+            "description": "Optional captured signature (media-signatures of the caller); else the profile signature, if any."
+          }
+        },
+        "additionalProperties": false
+      },
+      "BudgetAddendumReject": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 1000
+          },
+          "signatureMediaId": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "exclusiveMinimum": 0
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "additionalProperties": false
       }
     },
     "parameters": {}
@@ -4993,7 +8780,7 @@ export const openapiDocument = {
     },
     "/expense-requests/{id}/acknowledge": {
       "post": {
-        "summary": "\"Diketahui Oleh\" (US-42)",
+        "summary": "\"Diketahui Oleh\" = Direktur approval (US-42, ADR 0013); PM/Staff/Admin → 403 (audited)",
         "security": [
           {
             "bearer": []
@@ -5140,7 +8927,7 @@ export const openapiDocument = {
     },
     "/expense-requests/{id}/approve": {
       "post": {
-        "summary": "Approve the current level (G1/G2; budget % before → after)",
+        "summary": "Approve the current level — Finance by default (G1/G2, ADR 0013; budget % before → after); PM/Staff/Admin → 403 (audited)",
         "security": [
           {
             "bearer": []
@@ -5287,7 +9074,7 @@ export const openapiDocument = {
     },
     "/expense-requests/{id}/reject": {
       "post": {
-        "summary": "Reject (reason)",
+        "summary": "Reject (reason) at \"Diketahui\" (Direktur) or an approval level (Finance); PM/Staff/Admin → 403 (audited)",
         "security": [
           {
             "bearer": []
@@ -7149,7 +10936,7 @@ export const openapiDocument = {
     },
     "/media/{kind}": {
       "post": {
-        "summary": "Upload a file (multipart field \"file\"); server resizes images (receipts ≤ 2000 px, original discarded)",
+        "summary": "Upload a file (multipart field \"file\"); server resizes images (receipts ≤ 1600 px, original discarded); image resizing is queued — queue full → 503 + Retry-After (code UPLOAD_BUSY), retry later",
         "security": [
           {
             "bearer": []
@@ -7287,13 +11074,23 @@ export const openapiDocument = {
                 }
               }
             }
+          },
+          "503": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           }
         }
       }
     },
     "/cash-entries": {
       "get": {
-        "summary": "Finance/Owner/Admin: cash ledger (KM/KK, reversals)",
+        "summary": "Finance/Direktur (pk-owner)/Admin: cash ledger (KM/KK, reversals)",
         "security": [
           {
             "bearer": []
@@ -7319,6 +11116,24 @@ export const openapiDocument = {
             },
             "required": false,
             "name": "cashAccountId",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0
+            },
+            "required": false,
+            "name": "projectId",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0
+            },
+            "required": false,
+            "name": "costCenterId",
             "in": "query"
           },
           {
@@ -7522,6 +11337,28 @@ export const openapiDocument = {
             "required": true,
             "name": "id",
             "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": false,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422."
+            },
+            "required": false,
+            "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422.",
+            "name": "Idempotency-Key",
+            "in": "header"
           }
         ],
         "requestBody": {
@@ -7746,7 +11583,7 @@ export const openapiDocument = {
     },
     "/cash-accounts/balances": {
       "get": {
-        "summary": "Finance/Owner: balance per cash account (opening + in − out)",
+        "summary": "Finance/Direktur (pk-owner): balance per cash account (opening + in − out)",
         "security": [
           {
             "bearer": []
@@ -7844,7 +11681,7 @@ export const openapiDocument = {
         }
       },
       "post": {
-        "summary": "Finance/Owner: close a past month (DB rejects postings dated ≤ lock date)",
+        "summary": "Finance/Direktur (pk-owner): close a past month (DB rejects postings dated ≤ lock date)",
         "security": [
           {
             "bearer": []
@@ -7962,7 +11799,7 @@ export const openapiDocument = {
     },
     "/period-closings/{period}/reopen": {
       "post": {
-        "summary": "Owner: re-open the latest closed period (reason)",
+        "summary": "Direktur (role pk-owner): re-open the latest closed period (reason)",
         "security": [
           {
             "bearer": []
@@ -8822,6 +12659,153 @@ export const openapiDocument = {
         }
       }
     },
+    "/expense-requests/{id}/settle/reverse": {
+      "post": {
+        "summary": "E9 Finance: reverse a settlement — void the refund KM / shortfall transfer (+ KK reversal) → LPJ \"Terverifikasi\" again (reason; closed period → 409)",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d+$"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": false,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422."
+            },
+            "required": false,
+            "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422.",
+            "name": "Idempotency-Key",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReasonBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Reversed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettleReverseResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/expense-requests/{id}/pdf": {
       "get": {
         "summary": "PDF \"Pengajuan Biaya\" (client form replica + receipt photos); any status after submit; audited as export",
@@ -9420,7 +13404,177 @@ export const openapiDocument = {
     },
     "/media/{collection}/{id}/file": {
       "get": {
-        "summary": "Download a stored file the caller may read (owner-document scope; else 404); private, no-store",
+        "summary": "Download a stored file the caller may read (owner-document scope; else 404); private, no-store. E9: alternatively a SIGNED URL from GET …/signed-url (query exp, uid, sig; no bearer/cookie needed) — expired/invalid → 403 (code URL_EXPIRED / URL_INVALID), valid signature but the user may not read the file → 403 (code FORBIDDEN)",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          },
+          {}
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "$ref": "#/components/schemas/FileCollection"
+            },
+            "required": true,
+            "name": "collection",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d+$"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "thumb"
+              ]
+            },
+            "required": false,
+            "name": "variant",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d+$",
+              "description": "Signed URL: expiry (unix seconds)"
+            },
+            "required": false,
+            "description": "Signed URL: expiry (unix seconds)",
+            "name": "exp",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d+$",
+              "description": "Signed URL: user the URL was minted for"
+            },
+            "required": false,
+            "description": "Signed URL: user the URL was minted for",
+            "name": "uid",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "Signed URL: base64url HMAC-SHA256 (ADR 0004 §4)"
+            },
+            "required": false,
+            "description": "Signed URL: base64url HMAC-SHA256 (ADR 0004 §4)",
+            "name": "sig",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": true,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "APK version; below company minimum → 426."
+            },
+            "required": false,
+            "description": "APK version; below company minimum → 426.",
+            "name": "X-App-Version",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "File bytes (image/jpeg, image/png, image/webp thumb, application/pdf)",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/media/{collection}/{id}/signed-url": {
+      "get": {
+        "summary": "E9 (ADR 0004 §4): mint a signed, 5-minute URL of the file endpoint for the caller (same visibility as the download; else 404). The URL is relative to the API origin",
         "security": [
           {
             "bearer": []
@@ -9482,9 +13636,4693 @@ export const openapiDocument = {
         ],
         "responses": {
           "200": {
-            "description": "File bytes (image/jpeg, image/png, image/webp thumb, application/pdf)",
+            "description": "Signed URL",
             "content": {
-              "application/octet-stream": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SignedMediaUrl"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/app/config": {
+      "get": {
+        "summary": "PUBLIC app gate: min/latest APK version, download URL, company timezone, feature flags, sync limits (call before login and on start)",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d+\\.\\d+\\.\\d+$",
+              "description": "Installed APK version → updateRequired / updateAvailable."
+            },
+            "required": false,
+            "description": "Installed APK version → updateRequired / updateAvailable.",
+            "name": "version",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Config (Cache-Control: public, max-age=60)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppConfig"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sync/batch": {
+      "post": {
+        "summary": "APK offline queue replay (bearer + registered device = device_id). Items in order, one transaction each; always 200 with one result per item (applied | duplicate | rejected | conflict | deferred | unsupported). Rate limit 12/min.",
+        "description": "Item types: expense_request.draft_upsert (payload SyncDraftUpsertPayload), expense_request.draft_delete (payload SyncDraftDeletePayload), attendance.check_in / attendance.check_out (payload SyncAttendancePayload: project_id OR cost_center_id; selfie first with POST /media/selfies; company-settings.syncAttendanceEnabled, else rejected FEATURE_DISABLED; rejection codes MOCK_LOCATION, OUTSIDE_GEOFENCE, NOT_ASSIGNED, NO_GEOFENCE, ALREADY_CHECKED_IN, NO_CHECK_IN, ALREADY_CHECKED_OUT, MEDIA_MISSING, FORBIDDEN), attendance.on_behalf (payload SyncOnBehalfPayload, US-14: PM only, team location, not own, reason required; GPS + photo from the PM phone); progress_report.draft_upsert (payload SyncProgressReportPayload; photos first with POST /media/progress-photos, ≤ 5; new report = PM of a team project or Direktur; edit = reporter within 24 h with base_rev + reason, else conflict/NOT_EDITABLE with server_report; company-settings.syncProgressReportsEnabled, else FEATURE_DISABLED; codes WEIGHTS_INCOMPLETE, PROGRESS_DECREASED, PHOTO_LIMIT, MEDIA_IN_USE, MEDIA_MISSING, FORBIDDEN). Receipt images are uploaded first with POST /media/receipts and referenced by media_id. Replaying a client_uuid returns the stored result as duplicate. Edits of an existing draft need base_rev = server rev, else conflict + server_copy (server wins).",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id; must equal body.device_id."
+            },
+            "required": true,
+            "description": "Registered install id; must equal body.device_id.",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "APK version; below company minimum → 426."
+            },
+            "required": false,
+            "description": "APK version; below company minimum → 426.",
+            "name": "X-App-Version",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Optional (= batch_id); items are idempotent by client_uuid."
+            },
+            "required": false,
+            "description": "Optional (= batch_id); items are idempotent by client_uuid.",
+            "name": "Idempotency-Key",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SyncBatch"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Per-item results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SyncBatchResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/projects/progress": {
+      "get": {
+        "summary": "K-09 progress fisik vs anggaran per project (Finance/Direktur all, PM team): K-08 % vs Σ(weight × stage %), selisih + colour",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0
+            },
+            "required": false,
+            "name": "project",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ya"
+              ],
+              "description": "Include archived projects."
+            },
+            "required": false,
+            "description": "Include archived projects.",
+            "name": "arsip",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": true,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "APK version; below company minimum → 426."
+            },
+            "required": false,
+            "description": "APK version; below company minimum → 426.",
+            "name": "X-App-Version",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Projects",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectProgressList"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/projects/{id}/stages": {
+      "get": {
+        "summary": "Stage set of a readable project: weights, stage %, active total and project progress",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d+$"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": true,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "APK version; below company minimum → 426."
+            },
+            "required": false,
+            "description": "APK version; below company minimum → 426.",
+            "name": "X-App-Version",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Stages",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectStageSet"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "summary": "Stage editor: save the whole active set (total weight = 100 %, G11); Direktur any project (add/deactivate), PM team projects (rename/reorder/re-weight); reason for weight changes (G7)",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d+$"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": false,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422."
+            },
+            "required": false,
+            "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422.",
+            "name": "Idempotency-Key",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StageSetBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Saved set",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectStageSet"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/progress-reports": {
+      "get": {
+        "summary": "Progress reports in the caller scope (PM team, Direktur/Finance all), newest first (US-31), filter project/stage/date, cursor paging",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0
+            },
+            "required": false,
+            "name": "project",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0
+            },
+            "required": false,
+            "name": "stage",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$"
+            },
+            "required": false,
+            "name": "from",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$"
+            },
+            "required": false,
+            "name": "to",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "1",
+                "true"
+              ],
+              "description": "Only reports created by the caller."
+            },
+            "required": false,
+            "description": "Only reports created by the caller.",
+            "name": "mine",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 25
+            },
+            "required": false,
+            "name": "limit",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 64
+            },
+            "required": false,
+            "name": "cursor",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": true,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "APK version; below company minimum → 426."
+            },
+            "required": false,
+            "description": "APK version; below company minimum → 426.",
+            "name": "X-App-Version",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Page",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProgressReportList"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create a progress report (US-10): PM of the project or Direktur; photos from POST /media/progress-photos (≤ 5); stage % before → after and project progress in the same transaction. Replayed clientUuid → 200",
+        "description": "Problem `code`: FORBIDDEN (not PM of the project / Staff), WEIGHTS_INCOMPLETE (active stage weights ≠ 100 %), PROGRESS_DECREASED, PHOTO_LIMIT, MEDIA_MISSING, MEDIA_IN_USE, VALIDATION, STATE_CONFLICT (archived project / inactive stage).",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": false,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422."
+            },
+            "required": false,
+            "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422.",
+            "name": "Idempotency-Key",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProgressReportCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Existing report for this clientUuid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProgressReport"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProgressReport"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/progress-reports/{id}": {
+      "get": {
+        "summary": "Report detail with photos (file URLs under /media/progress-photos/{id}/file)",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d+$"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": true,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "APK version; below company minimum → 426."
+            },
+            "required": false,
+            "description": "APK version; below company minimum → 426.",
+            "name": "X-App-Version",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Report",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProgressReport"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "summary": "Edit within 24 h by the reporter (reason required): work/issues, add photos (total ≤ 5), correct pctAfter on the latest report of the stage",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d+$"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": false,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422."
+            },
+            "required": false,
+            "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422.",
+            "name": "Idempotency-Key",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProgressReportUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Report after the edit",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProgressReport"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/dashboard/owner": {
+      "get": {
+        "summary": "Owner home: cash (K-01, K-02b), budgets (K-07/K-08), completeness (K-12), approvals (K-10), cost centers (K-15), transfer queue (K-11)",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": true,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "APK version; below company minimum → 426."
+            },
+            "required": false,
+            "description": "APK version; below company minimum → 426.",
+            "name": "X-App-Version",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Dashboard",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "asOf": {
+                      "type": "string"
+                    },
+                    "month": {
+                      "type": "string"
+                    },
+                    "cash": {
+                      "type": "object",
+                      "properties": {
+                        "total": {
+                          "type": "integer",
+                          "description": "Rupiah (integer)"
+                        },
+                        "accounts": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "integer"
+                              },
+                              "name": {
+                                "type": "string"
+                              },
+                              "active": {
+                                "type": "boolean"
+                              },
+                              "balance": {
+                                "type": "integer",
+                                "description": "Rupiah (integer)"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "name",
+                              "active",
+                              "balance"
+                            ]
+                          }
+                        },
+                        "monthIn": {
+                          "type": "integer",
+                          "description": "Rupiah (integer)"
+                        },
+                        "monthOut": {
+                          "type": "integer",
+                          "description": "Rupiah (integer)"
+                        }
+                      },
+                      "required": [
+                        "total",
+                        "accounts",
+                        "monthIn",
+                        "monthOut"
+                      ]
+                    },
+                    "budget": {
+                      "type": "object",
+                      "properties": {
+                        "running": {
+                          "type": "integer"
+                        },
+                        "over": {
+                          "type": "integer"
+                        },
+                        "warn": {
+                          "type": "integer"
+                        },
+                        "ok": {
+                          "type": "integer"
+                        },
+                        "none": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "running",
+                        "over",
+                        "warn",
+                        "ok",
+                        "none"
+                      ]
+                    },
+                    "completeness": {
+                      "type": "object",
+                      "properties": {
+                        "ratioDone": {
+                          "type": "integer"
+                        },
+                        "ratioTotal": {
+                          "type": "integer"
+                        },
+                        "withoutLpj": {
+                          "type": "integer"
+                        },
+                        "overdue": {
+                          "type": "integer"
+                        },
+                        "reimburseToVerify": {
+                          "type": "integer"
+                        },
+                        "openWarnings": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "ratioDone",
+                        "ratioTotal",
+                        "withoutLpj",
+                        "overdue",
+                        "reimburseToVerify",
+                        "openWarnings"
+                      ]
+                    },
+                    "approvals": {
+                      "type": "object",
+                      "properties": {
+                        "count": {
+                          "type": "integer"
+                        },
+                        "sum": {
+                          "type": "integer",
+                          "description": "Rupiah (integer)"
+                        },
+                        "waitingForMe": {
+                          "type": "integer"
+                        },
+                        "oldestDays": {
+                          "type": [
+                            "integer",
+                            "null"
+                          ]
+                        },
+                        "pendingAck": {
+                          "type": "object",
+                          "properties": {
+                            "count": {
+                              "type": "integer"
+                            },
+                            "sum": {
+                              "type": "integer",
+                              "description": "Rupiah (integer)"
+                            }
+                          },
+                          "required": [
+                            "count",
+                            "sum"
+                          ]
+                        },
+                        "pendingApproval": {
+                          "type": "object",
+                          "properties": {
+                            "count": {
+                              "type": "integer"
+                            },
+                            "sum": {
+                              "type": "integer",
+                              "description": "Rupiah (integer)"
+                            }
+                          },
+                          "required": [
+                            "count",
+                            "sum"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "count",
+                        "sum",
+                        "waitingForMe",
+                        "oldestDays",
+                        "pendingAck",
+                        "pendingApproval"
+                      ]
+                    },
+                    "cashFlow": {
+                      "type": "object",
+                      "properties": {
+                        "basis": {
+                          "type": "string",
+                          "enum": [
+                            "K-02b"
+                          ]
+                        },
+                        "months": {
+                          "type": "integer"
+                        },
+                        "rows": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "period": {
+                                "type": "string"
+                              },
+                              "masuk": {
+                                "type": "integer",
+                                "description": "Rupiah (integer)"
+                              },
+                              "keluar": {
+                                "type": "integer",
+                                "description": "Rupiah (integer)"
+                              },
+                              "koreksi": {
+                                "type": "integer",
+                                "description": "Rupiah (integer)"
+                              }
+                            },
+                            "required": [
+                              "period",
+                              "masuk",
+                              "keluar"
+                            ]
+                          }
+                        }
+                      },
+                      "required": [
+                        "basis",
+                        "months",
+                        "rows"
+                      ]
+                    },
+                    "projects": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer"
+                          },
+                          "code": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "status": {
+                            "type": "string"
+                          },
+                          "budget": {
+                            "type": [
+                              "integer",
+                              "null"
+                            ],
+                            "description": "Rupiah (integer)"
+                          },
+                          "committed": {
+                            "type": "integer",
+                            "description": "K-07 Komitmen"
+                          },
+                          "committedCount": {
+                            "type": "integer"
+                          },
+                          "pct": {
+                            "type": [
+                              "number",
+                              "null"
+                            ],
+                            "description": "K-08 % komitmen / RAB"
+                          },
+                          "tone": {
+                            "type": "string",
+                            "enum": [
+                              "none",
+                              "ok",
+                              "warn",
+                              "over"
+                            ],
+                            "description": "K-08 colour: Tanpa RAB / Aman / Waspada / Lewat RAB (Komitmen basis)"
+                          },
+                          "disbursedNet": {
+                            "type": "integer",
+                            "description": "K-05 Dicairkan bersih"
+                          },
+                          "realized": {
+                            "type": "integer",
+                            "description": "K-06 Realisasi terverifikasi"
+                          },
+                          "pctDisbursed": {
+                            "type": [
+                              "number",
+                              "null"
+                            ],
+                            "description": "Percent, 2 decimals; null = no budget"
+                          },
+                          "pctRealized": {
+                            "type": [
+                              "number",
+                              "null"
+                            ],
+                            "description": "Percent, 2 decimals; null = no budget"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "code",
+                          "name",
+                          "status",
+                          "budget",
+                          "committed",
+                          "committedCount",
+                          "pct",
+                          "tone",
+                          "disbursedNet",
+                          "realized",
+                          "pctDisbursed",
+                          "pctRealized"
+                        ]
+                      }
+                    },
+                    "costCenters": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer"
+                          },
+                          "code": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "fromRequests": {
+                            "type": "integer",
+                            "description": "Rupiah (integer)"
+                          },
+                          "manualOut": {
+                            "type": "integer",
+                            "description": "Rupiah (integer)"
+                          },
+                          "manualIn": {
+                            "type": "integer",
+                            "description": "Rupiah (integer)"
+                          },
+                          "total": {
+                            "type": "integer",
+                            "description": "K-15"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "code",
+                          "name",
+                          "fromRequests",
+                          "manualOut",
+                          "manualIn",
+                          "total"
+                        ]
+                      }
+                    },
+                    "transferQueue": {
+                      "type": "object",
+                      "properties": {
+                        "count": {
+                          "type": "integer"
+                        },
+                        "sum": {
+                          "type": "integer",
+                          "description": "Rupiah (integer)"
+                        },
+                        "overdue": {
+                          "type": "integer"
+                        },
+                        "reimburseToVerify": {
+                          "type": "integer"
+                        },
+                        "reimburseToVerifyWarnings": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "count",
+                        "sum",
+                        "overdue",
+                        "reimburseToVerify",
+                        "reimburseToVerifyWarnings"
+                      ]
+                    },
+                    "viz": {
+                      "type": "object",
+                      "properties": {
+                        "balanceTrend": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "period": {
+                                "type": "string"
+                              },
+                              "balance": {
+                                "type": "integer",
+                                "description": "K-01 closing balance at month end (book)"
+                              }
+                            },
+                            "required": [
+                              "period",
+                              "balance"
+                            ]
+                          }
+                        },
+                        "disbursed": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "period": {
+                                "type": "string"
+                              },
+                              "net": {
+                                "type": "integer",
+                                "description": "K-05 Dicairkan bersih in the month"
+                              }
+                            },
+                            "required": [
+                              "period",
+                              "net"
+                            ]
+                          }
+                        },
+                        "requestTrend": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "period": {
+                                "type": "string"
+                              },
+                              "count": {
+                                "type": "integer"
+                              },
+                              "sum": {
+                                "type": "integer",
+                                "description": "K-13 Σ grand total of non-draft requests dated in the month"
+                              }
+                            },
+                            "required": [
+                              "period",
+                              "count",
+                              "sum"
+                            ]
+                          }
+                        },
+                        "pipeline": {
+                          "type": "object",
+                          "properties": {
+                            "stages": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "key": {
+                                    "type": "string",
+                                    "enum": [
+                                      "ack",
+                                      "approval",
+                                      "queue",
+                                      "lpj",
+                                      "done",
+                                      "exit"
+                                    ]
+                                  },
+                                  "label": {
+                                    "type": "string"
+                                  },
+                                  "count": {
+                                    "type": "integer"
+                                  },
+                                  "sum": {
+                                    "type": "integer",
+                                    "description": "Rupiah (integer)"
+                                  },
+                                  "statuses": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string"
+                                    }
+                                  }
+                                },
+                                "required": [
+                                  "key",
+                                  "label",
+                                  "count",
+                                  "sum",
+                                  "statuses"
+                                ]
+                              }
+                            },
+                            "exit": {
+                              "type": "object",
+                              "properties": {
+                                "key": {
+                                  "type": "string",
+                                  "enum": [
+                                    "ack",
+                                    "approval",
+                                    "queue",
+                                    "lpj",
+                                    "done",
+                                    "exit"
+                                  ]
+                                },
+                                "label": {
+                                  "type": "string"
+                                },
+                                "count": {
+                                  "type": "integer"
+                                },
+                                "sum": {
+                                  "type": "integer",
+                                  "description": "Rupiah (integer)"
+                                },
+                                "statuses": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                }
+                              },
+                              "required": [
+                                "key",
+                                "label",
+                                "count",
+                                "sum",
+                                "statuses"
+                              ]
+                            },
+                            "total": {
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "stages",
+                            "exit",
+                            "total"
+                          ],
+                          "description": "K-13 per status (all request dates, drafts excluded) folded into ordered stages; rejected/cancelled = exit"
+                        },
+                        "categories": {
+                          "type": "object",
+                          "properties": {
+                            "from": {
+                              "type": "string"
+                            },
+                            "to": {
+                              "type": "string"
+                            },
+                            "total": {
+                              "type": "integer",
+                              "description": "Rupiah (integer)"
+                            },
+                            "includesManual": {
+                              "type": "boolean"
+                            },
+                            "items": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "label": {
+                                    "type": "string"
+                                  },
+                                  "total": {
+                                    "type": "integer",
+                                    "description": "Rupiah (integer)"
+                                  },
+                                  "other": {
+                                    "type": "boolean"
+                                  },
+                                  "categoryId": {
+                                    "type": [
+                                      "integer",
+                                      "null"
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "label",
+                                  "total",
+                                  "other",
+                                  "categoryId"
+                                ]
+                              },
+                              "description": "K-17 Dicairkan per category, top 6 + \"Lainnya\""
+                            }
+                          },
+                          "required": [
+                            "from",
+                            "to",
+                            "total",
+                            "includesManual",
+                            "items"
+                          ]
+                        },
+                        "budgetTotals": {
+                          "type": "object",
+                          "properties": {
+                            "projects": {
+                              "type": "integer"
+                            },
+                            "budget": {
+                              "type": "integer",
+                              "description": "Rupiah (integer)"
+                            },
+                            "committed": {
+                              "type": "integer",
+                              "description": "Rupiah (integer)"
+                            },
+                            "realized": {
+                              "type": "integer",
+                              "description": "Rupiah (integer)"
+                            }
+                          },
+                          "required": [
+                            "projects",
+                            "budget",
+                            "committed",
+                            "realized"
+                          ],
+                          "description": "Σ over running projects with a budget"
+                        },
+                        "recentCash": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "integer"
+                              },
+                              "entryNo": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "entryDate": {
+                                "type": "string"
+                              },
+                              "direction": {
+                                "type": "string",
+                                "enum": [
+                                  "in",
+                                  "out"
+                                ]
+                              },
+                              "amount": {
+                                "type": "integer",
+                                "description": "Rupiah (integer)"
+                              },
+                              "status": {
+                                "type": "string",
+                                "enum": [
+                                  "posted",
+                                  "void"
+                                ]
+                              },
+                              "sourceType": {
+                                "type": "string"
+                              },
+                              "account": {
+                                "type": "string"
+                              },
+                              "label": {
+                                "type": "string"
+                              },
+                              "requestId": {
+                                "type": [
+                                  "integer",
+                                  "null"
+                                ]
+                              },
+                              "requestDocNo": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "entryNo",
+                              "entryDate",
+                              "direction",
+                              "amount",
+                              "status",
+                              "sourceType",
+                              "account",
+                              "label",
+                              "requestId",
+                              "requestDocNo"
+                            ]
+                          }
+                        },
+                        "inbox": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "integer"
+                              },
+                              "docNo": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "title": {
+                                "type": "string"
+                              },
+                              "type": {
+                                "type": "string",
+                                "enum": [
+                                  "advance",
+                                  "reimburse"
+                                ]
+                              },
+                              "status": {
+                                "type": "string"
+                              },
+                              "statusLabel": {
+                                "type": "string"
+                              },
+                              "step": {
+                                "type": "string",
+                                "enum": [
+                                  "approve",
+                                  "acknowledge"
+                                ]
+                              },
+                              "scopeName": {
+                                "type": "string"
+                              },
+                              "requesters": {
+                                "type": "string"
+                              },
+                              "grandTotal": {
+                                "type": "integer",
+                                "description": "Rupiah (integer)"
+                              },
+                              "requestDate": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "overWarn": {
+                                "type": "boolean"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "docNo",
+                              "title",
+                              "type",
+                              "status",
+                              "statusLabel",
+                              "step",
+                              "scopeName",
+                              "requesters",
+                              "grandTotal",
+                              "requestDate",
+                              "overWarn"
+                            ]
+                          }
+                        },
+                        "warnPct": {
+                          "type": "number",
+                          "description": "company-settings.budgetWarnPct (K-08 Waspada threshold)"
+                        }
+                      },
+                      "required": [
+                        "balanceTrend",
+                        "disbursed",
+                        "requestTrend",
+                        "pipeline",
+                        "categories",
+                        "budgetTotals",
+                        "recentCash",
+                        "inbox",
+                        "warnPct"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "asOf",
+                    "month",
+                    "cash",
+                    "budget",
+                    "completeness",
+                    "approvals",
+                    "cashFlow",
+                    "projects",
+                    "costCenters",
+                    "transferQueue",
+                    "viz"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/dashboard/finance": {
+      "get": {
+        "summary": "Finance home: work queues (K-11, K-12c/d/e), balances per account (K-01), advances without LPJ (K-12a/b), cash flow (K-02a)",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": true,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "APK version; below company minimum → 426."
+            },
+            "required": false,
+            "description": "APK version; below company minimum → 426.",
+            "name": "X-App-Version",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Dashboard",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "asOf": {
+                      "type": "string"
+                    },
+                    "month": {
+                      "type": "string"
+                    },
+                    "transferQueue": {
+                      "type": "object",
+                      "properties": {
+                        "count": {
+                          "type": "integer"
+                        },
+                        "sum": {
+                          "type": "integer",
+                          "description": "Rupiah (integer)"
+                        },
+                        "overdue": {
+                          "type": "integer"
+                        },
+                        "reimburseToVerify": {
+                          "type": "integer"
+                        },
+                        "reimburseToVerifyWarnings": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "count",
+                        "sum",
+                        "overdue",
+                        "reimburseToVerify",
+                        "reimburseToVerifyWarnings"
+                      ]
+                    },
+                    "reimburseToVerify": {
+                      "type": "object",
+                      "properties": {
+                        "count": {
+                          "type": "integer"
+                        },
+                        "warnings": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "count",
+                        "warnings"
+                      ]
+                    },
+                    "lpjToVerify": {
+                      "type": "integer"
+                    },
+                    "lpjToSettle": {
+                      "type": "object",
+                      "properties": {
+                        "count": {
+                          "type": "integer"
+                        },
+                        "refund": {
+                          "type": "integer",
+                          "description": "Rupiah (integer)"
+                        },
+                        "shortfall": {
+                          "type": "integer",
+                          "description": "Rupiah (integer)"
+                        }
+                      },
+                      "required": [
+                        "count",
+                        "refund",
+                        "shortfall"
+                      ]
+                    },
+                    "accounts": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "active": {
+                            "type": "boolean"
+                          },
+                          "balance": {
+                            "type": "integer",
+                            "description": "Rupiah (integer)"
+                          },
+                          "monthIn": {
+                            "type": "integer",
+                            "description": "Rupiah (integer)"
+                          },
+                          "monthOut": {
+                            "type": "integer",
+                            "description": "Rupiah (integer)"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "active",
+                          "balance",
+                          "monthIn",
+                          "monthOut"
+                        ]
+                      }
+                    },
+                    "cashTotal": {
+                      "type": "integer",
+                      "description": "Rupiah (integer)"
+                    },
+                    "advancesWithoutLpj": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer"
+                          },
+                          "docNo": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "title": {
+                            "type": "string"
+                          },
+                          "requesters": {
+                            "type": "string"
+                          },
+                          "scopeName": {
+                            "type": "string"
+                          },
+                          "status": {
+                            "type": "string"
+                          },
+                          "transferredTotal": {
+                            "type": "integer",
+                            "description": "Rupiah (integer)"
+                          },
+                          "firstTransfer": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "ageDays": {
+                            "type": [
+                              "integer",
+                              "null"
+                            ]
+                          },
+                          "overdue": {
+                            "type": "boolean",
+                            "description": "K-12b: age > company-settings.lpjDueDays"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "docNo",
+                          "title",
+                          "requesters",
+                          "scopeName",
+                          "status",
+                          "transferredTotal",
+                          "firstTransfer",
+                          "ageDays",
+                          "overdue"
+                        ]
+                      }
+                    },
+                    "lpjDueDays": {
+                      "type": "integer"
+                    },
+                    "cashFlow": {
+                      "type": "object",
+                      "properties": {
+                        "basis": {
+                          "type": "string",
+                          "enum": [
+                            "K-02a"
+                          ]
+                        },
+                        "months": {
+                          "type": "integer"
+                        },
+                        "rows": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "period": {
+                                "type": "string"
+                              },
+                              "masuk": {
+                                "type": "integer",
+                                "description": "Rupiah (integer)"
+                              },
+                              "keluar": {
+                                "type": "integer",
+                                "description": "Rupiah (integer)"
+                              },
+                              "koreksi": {
+                                "type": "integer",
+                                "description": "Rupiah (integer)"
+                              }
+                            },
+                            "required": [
+                              "period",
+                              "masuk",
+                              "keluar"
+                            ]
+                          }
+                        }
+                      },
+                      "required": [
+                        "basis",
+                        "months",
+                        "rows"
+                      ]
+                    },
+                    "lastClosedPeriod": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "nextClosable": {
+                      "type": "string"
+                    },
+                    "viz": {
+                      "type": "object",
+                      "properties": {
+                        "balanceTrend": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "period": {
+                                "type": "string"
+                              },
+                              "balance": {
+                                "type": "integer",
+                                "description": "K-01 closing balance at month end (book)"
+                              }
+                            },
+                            "required": [
+                              "period",
+                              "balance"
+                            ]
+                          }
+                        },
+                        "disbursed": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "period": {
+                                "type": "string"
+                              },
+                              "net": {
+                                "type": "integer",
+                                "description": "K-05 Dicairkan bersih in the month"
+                              }
+                            },
+                            "required": [
+                              "period",
+                              "net"
+                            ]
+                          }
+                        },
+                        "pipeline": {
+                          "type": "object",
+                          "properties": {
+                            "stages": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "key": {
+                                    "type": "string",
+                                    "enum": [
+                                      "ack",
+                                      "approval",
+                                      "queue",
+                                      "lpj",
+                                      "done",
+                                      "exit"
+                                    ]
+                                  },
+                                  "label": {
+                                    "type": "string"
+                                  },
+                                  "count": {
+                                    "type": "integer"
+                                  },
+                                  "sum": {
+                                    "type": "integer",
+                                    "description": "Rupiah (integer)"
+                                  },
+                                  "statuses": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string"
+                                    }
+                                  }
+                                },
+                                "required": [
+                                  "key",
+                                  "label",
+                                  "count",
+                                  "sum",
+                                  "statuses"
+                                ]
+                              }
+                            },
+                            "exit": {
+                              "type": "object",
+                              "properties": {
+                                "key": {
+                                  "type": "string",
+                                  "enum": [
+                                    "ack",
+                                    "approval",
+                                    "queue",
+                                    "lpj",
+                                    "done",
+                                    "exit"
+                                  ]
+                                },
+                                "label": {
+                                  "type": "string"
+                                },
+                                "count": {
+                                  "type": "integer"
+                                },
+                                "sum": {
+                                  "type": "integer",
+                                  "description": "Rupiah (integer)"
+                                },
+                                "statuses": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                }
+                              },
+                              "required": [
+                                "key",
+                                "label",
+                                "count",
+                                "sum",
+                                "statuses"
+                              ]
+                            },
+                            "total": {
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "stages",
+                            "exit",
+                            "total"
+                          ],
+                          "description": "K-13 per status (all request dates, drafts excluded) folded into ordered stages; rejected/cancelled = exit"
+                        },
+                        "categories": {
+                          "type": "object",
+                          "properties": {
+                            "from": {
+                              "type": "string"
+                            },
+                            "to": {
+                              "type": "string"
+                            },
+                            "total": {
+                              "type": "integer",
+                              "description": "Rupiah (integer)"
+                            },
+                            "includesManual": {
+                              "type": "boolean"
+                            },
+                            "items": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "label": {
+                                    "type": "string"
+                                  },
+                                  "total": {
+                                    "type": "integer",
+                                    "description": "Rupiah (integer)"
+                                  },
+                                  "other": {
+                                    "type": "boolean"
+                                  },
+                                  "categoryId": {
+                                    "type": [
+                                      "integer",
+                                      "null"
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "label",
+                                  "total",
+                                  "other",
+                                  "categoryId"
+                                ]
+                              },
+                              "description": "K-17 Dicairkan per category, top 6 + \"Lainnya\""
+                            }
+                          },
+                          "required": [
+                            "from",
+                            "to",
+                            "total",
+                            "includesManual",
+                            "items"
+                          ]
+                        },
+                        "recentCash": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "integer"
+                              },
+                              "entryNo": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "entryDate": {
+                                "type": "string"
+                              },
+                              "direction": {
+                                "type": "string",
+                                "enum": [
+                                  "in",
+                                  "out"
+                                ]
+                              },
+                              "amount": {
+                                "type": "integer",
+                                "description": "Rupiah (integer)"
+                              },
+                              "status": {
+                                "type": "string",
+                                "enum": [
+                                  "posted",
+                                  "void"
+                                ]
+                              },
+                              "sourceType": {
+                                "type": "string"
+                              },
+                              "account": {
+                                "type": "string"
+                              },
+                              "label": {
+                                "type": "string"
+                              },
+                              "requestId": {
+                                "type": [
+                                  "integer",
+                                  "null"
+                                ]
+                              },
+                              "requestDocNo": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "entryNo",
+                              "entryDate",
+                              "direction",
+                              "amount",
+                              "status",
+                              "sourceType",
+                              "account",
+                              "label",
+                              "requestId",
+                              "requestDocNo"
+                            ]
+                          }
+                        },
+                        "transferTop": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "integer"
+                              },
+                              "docNo": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "title": {
+                                "type": "string"
+                              },
+                              "type": {
+                                "type": "string",
+                                "enum": [
+                                  "advance",
+                                  "reimburse"
+                                ]
+                              },
+                              "status": {
+                                "type": "string"
+                              },
+                              "scopeName": {
+                                "type": "string"
+                              },
+                              "amount": {
+                                "type": "integer",
+                                "description": "Rupiah (integer)"
+                              },
+                              "neededDate": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "overdue": {
+                                "type": "boolean"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "docNo",
+                              "title",
+                              "type",
+                              "status",
+                              "scopeName",
+                              "amount",
+                              "neededDate",
+                              "overdue"
+                            ]
+                          }
+                        }
+                      },
+                      "required": [
+                        "balanceTrend",
+                        "disbursed",
+                        "pipeline",
+                        "categories",
+                        "recentCash",
+                        "transferTop"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "asOf",
+                    "month",
+                    "transferQueue",
+                    "reimburseToVerify",
+                    "lpjToVerify",
+                    "lpjToSettle",
+                    "accounts",
+                    "cashTotal",
+                    "advancesWithoutLpj",
+                    "lpjDueDays",
+                    "cashFlow",
+                    "lastClosedPeriod",
+                    "nextClosable",
+                    "viz"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/dashboard/pm": {
+      "get": {
+        "summary": "PM home (team scope): waiting for my \"Diketahui\", team month (K-13), LPJ (K-12a/b), project budgets (K-08), cost centers (K-15); attendance/progress = F5",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": true,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "APK version; below company minimum → 426."
+            },
+            "required": false,
+            "description": "APK version; below company minimum → 426.",
+            "name": "X-App-Version",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Dashboard",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "asOf": {
+                      "type": "string"
+                    },
+                    "month": {
+                      "type": "string"
+                    },
+                    "hasScope": {
+                      "type": "boolean"
+                    },
+                    "waitingForMe": {
+                      "type": "integer",
+                      "description": "ADR 0013: 0 for Direktur → Finance requests (PM monitors only); kept for compatibility."
+                    },
+                    "teamWaiting": {
+                      "type": "object",
+                      "properties": {
+                        "count": {
+                          "type": "integer"
+                        },
+                        "direktur": {
+                          "type": "integer"
+                        },
+                        "finance": {
+                          "type": "integer"
+                        },
+                        "oldestDays": {
+                          "type": [
+                            "integer",
+                            "null"
+                          ]
+                        },
+                        "items": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "integer"
+                              },
+                              "docNo": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "title": {
+                                "type": "string"
+                              },
+                              "type": {
+                                "type": "string",
+                                "enum": [
+                                  "advance",
+                                  "reimburse"
+                                ]
+                              },
+                              "status": {
+                                "type": "string"
+                              },
+                              "waitingFor": {
+                                "type": "string",
+                                "enum": [
+                                  "direktur",
+                                  "finance"
+                                ]
+                              },
+                              "scopeName": {
+                                "type": "string"
+                              },
+                              "requesters": {
+                                "type": "string"
+                              },
+                              "grandTotal": {
+                                "type": "integer",
+                                "description": "Rupiah (integer)"
+                              },
+                              "submittedDate": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "days": {
+                                "type": [
+                                  "integer",
+                                  "null"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "docNo",
+                              "title",
+                              "type",
+                              "status",
+                              "waitingFor",
+                              "scopeName",
+                              "requesters",
+                              "grandTotal",
+                              "submittedDate",
+                              "days"
+                            ]
+                          }
+                        }
+                      },
+                      "required": [
+                        "count",
+                        "direktur",
+                        "finance",
+                        "oldestDays",
+                        "items"
+                      ],
+                      "description": "S3e (US-17): team requests waiting for the Direktur (Diketahui) or Finance (Approval), oldest first (max 8 items)."
+                    },
+                    "teamMonth": {
+                      "type": "object",
+                      "properties": {
+                        "count": {
+                          "type": "integer"
+                        },
+                        "sum": {
+                          "type": "integer",
+                          "description": "Rupiah (integer)"
+                        },
+                        "waiting": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "count",
+                        "sum",
+                        "waiting"
+                      ]
+                    },
+                    "lpj": {
+                      "type": "object",
+                      "properties": {
+                        "withoutLpj": {
+                          "type": "integer"
+                        },
+                        "overdue": {
+                          "type": "integer"
+                        },
+                        "lpjDueDays": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "withoutLpj",
+                        "overdue",
+                        "lpjDueDays"
+                      ]
+                    },
+                    "projects": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer"
+                          },
+                          "code": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "status": {
+                            "type": "string"
+                          },
+                          "budget": {
+                            "type": [
+                              "integer",
+                              "null"
+                            ],
+                            "description": "Rupiah (integer)"
+                          },
+                          "committed": {
+                            "type": "integer",
+                            "description": "K-07 Komitmen"
+                          },
+                          "committedCount": {
+                            "type": "integer"
+                          },
+                          "pct": {
+                            "type": [
+                              "number",
+                              "null"
+                            ],
+                            "description": "K-08 % komitmen / RAB"
+                          },
+                          "tone": {
+                            "type": "string",
+                            "enum": [
+                              "none",
+                              "ok",
+                              "warn",
+                              "over"
+                            ],
+                            "description": "K-08 colour: Tanpa RAB / Aman / Waspada / Lewat RAB (Komitmen basis)"
+                          },
+                          "disbursedNet": {
+                            "type": "integer",
+                            "description": "K-05 Dicairkan bersih"
+                          },
+                          "realized": {
+                            "type": "integer",
+                            "description": "K-06 Realisasi terverifikasi"
+                          },
+                          "pctDisbursed": {
+                            "type": [
+                              "number",
+                              "null"
+                            ],
+                            "description": "Percent, 2 decimals; null = no budget"
+                          },
+                          "pctRealized": {
+                            "type": [
+                              "number",
+                              "null"
+                            ],
+                            "description": "Percent, 2 decimals; null = no budget"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "code",
+                          "name",
+                          "status",
+                          "budget",
+                          "committed",
+                          "committedCount",
+                          "pct",
+                          "tone",
+                          "disbursedNet",
+                          "realized",
+                          "pctDisbursed",
+                          "pctRealized"
+                        ]
+                      }
+                    },
+                    "costCenters": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer"
+                          },
+                          "code": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "fromRequests": {
+                            "type": "integer",
+                            "description": "Rupiah (integer)"
+                          },
+                          "manualOut": {
+                            "type": "integer",
+                            "description": "Rupiah (integer)"
+                          },
+                          "manualIn": {
+                            "type": "integer",
+                            "description": "Rupiah (integer)"
+                          },
+                          "total": {
+                            "type": "integer",
+                            "description": "K-15"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "code",
+                          "name",
+                          "fromRequests",
+                          "manualOut",
+                          "manualIn",
+                          "total"
+                        ]
+                      }
+                    },
+                    "latest": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer"
+                          },
+                          "docNo": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "requestDate": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "type": {
+                            "type": "string",
+                            "enum": [
+                              "advance",
+                              "reimburse"
+                            ]
+                          },
+                          "title": {
+                            "type": "string"
+                          },
+                          "scopeName": {
+                            "type": "string"
+                          },
+                          "requesters": {
+                            "type": "string"
+                          },
+                          "status": {
+                            "type": "string"
+                          },
+                          "grandTotal": {
+                            "type": "integer",
+                            "description": "Rupiah (integer)"
+                          },
+                          "approvedAmount": {
+                            "type": [
+                              "integer",
+                              "null"
+                            ],
+                            "description": "Rupiah (integer)"
+                          },
+                          "disbursed": {
+                            "type": "integer",
+                            "description": "Rupiah (integer)"
+                          },
+                          "refund": {
+                            "type": "integer",
+                            "description": "Rupiah (integer)"
+                          },
+                          "realized": {
+                            "type": "integer",
+                            "description": "Rupiah (integer)"
+                          },
+                          "openFlags": {
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "docNo",
+                          "requestDate",
+                          "type",
+                          "title",
+                          "scopeName",
+                          "requesters",
+                          "status",
+                          "grandTotal",
+                          "approvedAmount",
+                          "disbursed",
+                          "refund",
+                          "realized",
+                          "openFlags"
+                        ]
+                      }
+                    },
+                    "attendance": {
+                      "type": "object",
+                      "properties": {
+                        "available": {
+                          "type": "boolean",
+                          "enum": [
+                            false
+                          ]
+                        },
+                        "phase": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "available",
+                        "phase"
+                      ]
+                    },
+                    "progressReports": {
+                      "type": "object",
+                      "properties": {
+                        "available": {
+                          "type": "boolean",
+                          "enum": [
+                            false
+                          ]
+                        },
+                        "phase": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "available",
+                        "phase"
+                      ]
+                    },
+                    "viz": {
+                      "type": "object",
+                      "properties": {
+                        "requestTrend": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "period": {
+                                "type": "string"
+                              },
+                              "count": {
+                                "type": "integer"
+                              },
+                              "sum": {
+                                "type": "integer",
+                                "description": "K-13 Σ grand total of non-draft requests dated in the month"
+                              }
+                            },
+                            "required": [
+                              "period",
+                              "count",
+                              "sum"
+                            ]
+                          }
+                        },
+                        "pipeline": {
+                          "type": "object",
+                          "properties": {
+                            "stages": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "key": {
+                                    "type": "string",
+                                    "enum": [
+                                      "ack",
+                                      "approval",
+                                      "queue",
+                                      "lpj",
+                                      "done",
+                                      "exit"
+                                    ]
+                                  },
+                                  "label": {
+                                    "type": "string"
+                                  },
+                                  "count": {
+                                    "type": "integer"
+                                  },
+                                  "sum": {
+                                    "type": "integer",
+                                    "description": "Rupiah (integer)"
+                                  },
+                                  "statuses": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string"
+                                    }
+                                  }
+                                },
+                                "required": [
+                                  "key",
+                                  "label",
+                                  "count",
+                                  "sum",
+                                  "statuses"
+                                ]
+                              }
+                            },
+                            "exit": {
+                              "type": "object",
+                              "properties": {
+                                "key": {
+                                  "type": "string",
+                                  "enum": [
+                                    "ack",
+                                    "approval",
+                                    "queue",
+                                    "lpj",
+                                    "done",
+                                    "exit"
+                                  ]
+                                },
+                                "label": {
+                                  "type": "string"
+                                },
+                                "count": {
+                                  "type": "integer"
+                                },
+                                "sum": {
+                                  "type": "integer",
+                                  "description": "Rupiah (integer)"
+                                },
+                                "statuses": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                }
+                              },
+                              "required": [
+                                "key",
+                                "label",
+                                "count",
+                                "sum",
+                                "statuses"
+                              ]
+                            },
+                            "total": {
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "stages",
+                            "exit",
+                            "total"
+                          ],
+                          "description": "K-13 per status (all request dates, drafts excluded) folded into ordered stages; rejected/cancelled = exit"
+                        },
+                        "categories": {
+                          "type": "object",
+                          "properties": {
+                            "from": {
+                              "type": "string"
+                            },
+                            "to": {
+                              "type": "string"
+                            },
+                            "total": {
+                              "type": "integer",
+                              "description": "Rupiah (integer)"
+                            },
+                            "includesManual": {
+                              "type": "boolean"
+                            },
+                            "items": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "label": {
+                                    "type": "string"
+                                  },
+                                  "total": {
+                                    "type": "integer",
+                                    "description": "Rupiah (integer)"
+                                  },
+                                  "other": {
+                                    "type": "boolean"
+                                  },
+                                  "categoryId": {
+                                    "type": [
+                                      "integer",
+                                      "null"
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "label",
+                                  "total",
+                                  "other",
+                                  "categoryId"
+                                ]
+                              },
+                              "description": "K-17 Dicairkan per category, top 6 + \"Lainnya\""
+                            }
+                          },
+                          "required": [
+                            "from",
+                            "to",
+                            "total",
+                            "includesManual",
+                            "items"
+                          ]
+                        },
+                        "budgetTotals": {
+                          "type": "object",
+                          "properties": {
+                            "projects": {
+                              "type": "integer"
+                            },
+                            "budget": {
+                              "type": "integer",
+                              "description": "Rupiah (integer)"
+                            },
+                            "committed": {
+                              "type": "integer",
+                              "description": "Rupiah (integer)"
+                            },
+                            "realized": {
+                              "type": "integer",
+                              "description": "Rupiah (integer)"
+                            }
+                          },
+                          "required": [
+                            "projects",
+                            "budget",
+                            "committed",
+                            "realized"
+                          ],
+                          "description": "Σ over running projects with a budget"
+                        },
+                        "inbox": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "integer"
+                              },
+                              "docNo": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "title": {
+                                "type": "string"
+                              },
+                              "type": {
+                                "type": "string",
+                                "enum": [
+                                  "advance",
+                                  "reimburse"
+                                ]
+                              },
+                              "status": {
+                                "type": "string"
+                              },
+                              "statusLabel": {
+                                "type": "string"
+                              },
+                              "step": {
+                                "type": "string",
+                                "enum": [
+                                  "approve",
+                                  "acknowledge"
+                                ]
+                              },
+                              "scopeName": {
+                                "type": "string"
+                              },
+                              "requesters": {
+                                "type": "string"
+                              },
+                              "grandTotal": {
+                                "type": "integer",
+                                "description": "Rupiah (integer)"
+                              },
+                              "requestDate": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "overWarn": {
+                                "type": "boolean"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "docNo",
+                              "title",
+                              "type",
+                              "status",
+                              "statusLabel",
+                              "step",
+                              "scopeName",
+                              "requesters",
+                              "grandTotal",
+                              "requestDate",
+                              "overWarn"
+                            ]
+                          }
+                        },
+                        "warnPct": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "requestTrend",
+                        "pipeline",
+                        "categories",
+                        "budgetTotals",
+                        "inbox",
+                        "warnPct"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "asOf",
+                    "month",
+                    "hasScope",
+                    "waitingForMe",
+                    "teamWaiting",
+                    "teamMonth",
+                    "lpj",
+                    "projects",
+                    "costCenters",
+                    "latest",
+                    "attendance",
+                    "progressReports",
+                    "viz"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/dashboard/admin": {
+      "get": {
+        "summary": "Admin home: master-data gaps and latest audit rows",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": true,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "APK version; below company minimum → 426."
+            },
+            "required": false,
+            "description": "APK version; below company minimum → 426.",
+            "name": "X-App-Version",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Dashboard",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "gaps": {
+                      "type": "object",
+                      "properties": {
+                        "usersIncomplete": {
+                          "type": "integer"
+                        },
+                        "projectsWithoutPm": {
+                          "type": "integer"
+                        },
+                        "costCentersWithoutManager": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "usersIncomplete",
+                        "projectsWithoutPm",
+                        "costCentersWithoutManager"
+                      ]
+                    },
+                    "latestAudit": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": {}
+                      }
+                    }
+                  },
+                  "required": [
+                    "gaps",
+                    "latestAudit"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/dashboard/me": {
+      "get": {
+        "summary": "Own requests: \"Perlu tindakan saya\" and latest (any role)",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": true,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "APK version; below company minimum → 426."
+            },
+            "required": false,
+            "description": "APK version; below company minimum → 426.",
+            "name": "X-App-Version",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Dashboard",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "actions": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer"
+                          },
+                          "docNo": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "title": {
+                            "type": "string"
+                          },
+                          "type": {
+                            "type": "string",
+                            "enum": [
+                              "advance",
+                              "reimburse"
+                            ]
+                          },
+                          "status": {
+                            "type": "string"
+                          },
+                          "grandTotal": {
+                            "type": "integer",
+                            "description": "Rupiah (integer)"
+                          },
+                          "ageDays": {
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "docNo",
+                          "title",
+                          "type",
+                          "status",
+                          "grandTotal",
+                          "ageDays"
+                        ]
+                      }
+                    },
+                    "latest": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer"
+                          },
+                          "docNo": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "title": {
+                            "type": "string"
+                          },
+                          "type": {
+                            "type": "string",
+                            "enum": [
+                              "advance",
+                              "reimburse"
+                            ]
+                          },
+                          "status": {
+                            "type": "string"
+                          },
+                          "grandTotal": {
+                            "type": "integer",
+                            "description": "Rupiah (integer)"
+                          },
+                          "ageDays": {
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "docNo",
+                          "title",
+                          "type",
+                          "status",
+                          "grandTotal",
+                          "ageDays"
+                        ]
+                      }
+                    },
+                    "month": {
+                      "type": "string"
+                    },
+                    "viz": {
+                      "type": "object",
+                      "properties": {
+                        "requestTrend": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "period": {
+                                "type": "string"
+                              },
+                              "count": {
+                                "type": "integer"
+                              },
+                              "sum": {
+                                "type": "integer",
+                                "description": "K-13 Σ grand total of non-draft requests dated in the month"
+                              }
+                            },
+                            "required": [
+                              "period",
+                              "count",
+                              "sum"
+                            ]
+                          }
+                        },
+                        "pipeline": {
+                          "type": "object",
+                          "properties": {
+                            "stages": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "key": {
+                                    "type": "string",
+                                    "enum": [
+                                      "ack",
+                                      "approval",
+                                      "queue",
+                                      "lpj",
+                                      "done",
+                                      "exit"
+                                    ]
+                                  },
+                                  "label": {
+                                    "type": "string"
+                                  },
+                                  "count": {
+                                    "type": "integer"
+                                  },
+                                  "sum": {
+                                    "type": "integer",
+                                    "description": "Rupiah (integer)"
+                                  },
+                                  "statuses": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string"
+                                    }
+                                  }
+                                },
+                                "required": [
+                                  "key",
+                                  "label",
+                                  "count",
+                                  "sum",
+                                  "statuses"
+                                ]
+                              }
+                            },
+                            "exit": {
+                              "type": "object",
+                              "properties": {
+                                "key": {
+                                  "type": "string",
+                                  "enum": [
+                                    "ack",
+                                    "approval",
+                                    "queue",
+                                    "lpj",
+                                    "done",
+                                    "exit"
+                                  ]
+                                },
+                                "label": {
+                                  "type": "string"
+                                },
+                                "count": {
+                                  "type": "integer"
+                                },
+                                "sum": {
+                                  "type": "integer",
+                                  "description": "Rupiah (integer)"
+                                },
+                                "statuses": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                }
+                              },
+                              "required": [
+                                "key",
+                                "label",
+                                "count",
+                                "sum",
+                                "statuses"
+                              ]
+                            },
+                            "total": {
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "stages",
+                            "exit",
+                            "total"
+                          ],
+                          "description": "K-13 per status (all request dates, drafts excluded) folded into ordered stages; rejected/cancelled = exit"
+                        }
+                      },
+                      "required": [
+                        "requestTrend",
+                        "pipeline"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "actions",
+                    "latest",
+                    "month",
+                    "viz"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/reports/{code}": {
+      "get": {
+        "summary": "One report page as JSON (same filters/scope as /admin/laporan/{code}); audit-log: Owner/Admin/Finance",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "rekap-kas",
+                "buku-kas",
+                "pengeluaran-kategori",
+                "anggaran-project",
+                "rekap-pengajuan",
+                "kelengkapan",
+                "biaya-kendaraan",
+                "absensi",
+                "audit-log"
+              ]
+            },
+            "required": true,
+            "name": "code",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "Keyset cursor (paged reports: buku-kas, rekap-pengajuan, audit-log)"
+            },
+            "required": false,
+            "description": "Keyset cursor (paged reports: buku-kas, rekap-pengajuan, audit-log)",
+            "name": "cursor",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "From: YYYY-MM-DD (rekap-kas: YYYY-MM)"
+            },
+            "required": false,
+            "description": "From: YYYY-MM-DD (rekap-kas: YYYY-MM)",
+            "name": "dari",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "To: YYYY-MM-DD (rekap-kas: YYYY-MM)"
+            },
+            "required": false,
+            "description": "To: YYYY-MM-DD (rekap-kas: YYYY-MM)",
+            "name": "sampai",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": false,
+            "name": "project",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "Cost center id"
+            },
+            "required": false,
+            "description": "Cost center id",
+            "name": "pusat",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": false,
+            "name": "kategori",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "advance | reimburse (audit-log: document type)"
+            },
+            "required": false,
+            "description": "advance | reimburse (audit-log: document type)",
+            "name": "jenis",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "Comma separated request statuses (rekap-pengajuan)"
+            },
+            "required": false,
+            "description": "Comma separated request statuses (rekap-pengajuan)",
+            "name": "status",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": false,
+            "name": "akun",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": false,
+            "name": "kendaraan",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": false,
+            "name": "pemohon",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "dicairkan | realisasi (pengeluaran-kategori)"
+            },
+            "required": false,
+            "description": "dicairkan | realisasi (pengeluaran-kategori)",
+            "name": "dasar",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "kategori | lingkup (pengeluaran-kategori)"
+            },
+            "required": false,
+            "description": "kategori | lingkup (pengeluaran-kategori)",
+            "name": "grup",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": false,
+            "name": "user",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": false,
+            "name": "aksi",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": false,
+            "name": "nodok",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": false,
+            "name": "sumber",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "YYYY-MM (absensi; default current month)"
+            },
+            "required": false,
+            "description": "YYYY-MM (absensi; default current month)",
+            "name": "bulan",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": true,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "APK version; below company minimum → 426."
+            },
+            "required": false,
+            "description": "APK version; below company minimum → 426.",
+            "name": "X-App-Version",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Report",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "rekap-kas",
+                        "buku-kas",
+                        "pengeluaran-kategori",
+                        "anggaran-project",
+                        "rekap-pengajuan",
+                        "kelengkapan",
+                        "biaya-kendaraan",
+                        "absensi",
+                        "audit-log"
+                      ]
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "kpi": {
+                      "type": "string"
+                    },
+                    "scope": {
+                      "type": "string",
+                      "enum": [
+                        "all",
+                        "team"
+                      ]
+                    },
+                    "count": {
+                      "type": "integer"
+                    },
+                    "nextCursor": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "main": {
+                      "type": "object",
+                      "properties": {
+                        "key": {
+                          "type": "string"
+                        },
+                        "title": {
+                          "type": "string"
+                        },
+                        "columns": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "key": {
+                                "type": "string"
+                              },
+                              "label": {
+                                "type": "string"
+                              },
+                              "type": {
+                                "type": "string",
+                                "enum": [
+                                  "text",
+                                  "money",
+                                  "int",
+                                  "date",
+                                  "datetime",
+                                  "pct"
+                                ]
+                              },
+                              "primary": {
+                                "type": "boolean"
+                              },
+                              "width": {
+                                "type": "number"
+                              }
+                            },
+                            "required": [
+                              "key",
+                              "label",
+                              "type"
+                            ]
+                          }
+                        },
+                        "rows": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "additionalProperties": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            }
+                          }
+                        },
+                        "totals": {
+                          "type": [
+                            "object",
+                            "null"
+                          ],
+                          "additionalProperties": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          }
+                        }
+                      },
+                      "required": [
+                        "key",
+                        "title",
+                        "columns",
+                        "rows",
+                        "totals"
+                      ]
+                    },
+                    "extra": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "key": {
+                            "type": "string"
+                          },
+                          "title": {
+                            "type": "string"
+                          },
+                          "columns": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "key": {
+                                  "type": "string"
+                                },
+                                "label": {
+                                  "type": "string"
+                                },
+                                "type": {
+                                  "type": "string",
+                                  "enum": [
+                                    "text",
+                                    "money",
+                                    "int",
+                                    "date",
+                                    "datetime",
+                                    "pct"
+                                  ]
+                                },
+                                "primary": {
+                                  "type": "boolean"
+                                },
+                                "width": {
+                                  "type": "number"
+                                }
+                              },
+                              "required": [
+                                "key",
+                                "label",
+                                "type"
+                              ]
+                            }
+                          },
+                          "rows": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "additionalProperties": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "number"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              }
+                            }
+                          },
+                          "totals": {
+                            "type": [
+                              "object",
+                              "null"
+                            ],
+                            "additionalProperties": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            }
+                          }
+                        },
+                        "required": [
+                          "key",
+                          "title",
+                          "columns",
+                          "rows",
+                          "totals"
+                        ]
+                      }
+                    },
+                    "notes": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "formats": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "enum": [
+                          "csv",
+                          "xlsx",
+                          "pdf"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "title",
+                    "kpi",
+                    "scope",
+                    "count",
+                    "nextCursor",
+                    "main",
+                    "extra",
+                    "notes",
+                    "formats"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/reports/{code}/{format}": {
+      "get": {
+        "summary": "Download (CSV streamed UTF-8 BOM \";\"; XLSX ≤ 10 000 rows; PDF ≤ 500 rows for rekap-kas, pengeluaran-kategori, anggaran-project). Audited `export`; 10/min per user",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "rekap-kas",
+                "buku-kas",
+                "pengeluaran-kategori",
+                "anggaran-project",
+                "rekap-pengajuan",
+                "kelengkapan",
+                "biaya-kendaraan",
+                "absensi",
+                "audit-log"
+              ]
+            },
+            "required": true,
+            "name": "code",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "csv",
+                "xlsx",
+                "pdf"
+              ]
+            },
+            "required": true,
+            "name": "format",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "Keyset cursor (paged reports: buku-kas, rekap-pengajuan, audit-log)"
+            },
+            "required": false,
+            "description": "Keyset cursor (paged reports: buku-kas, rekap-pengajuan, audit-log)",
+            "name": "cursor",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "From: YYYY-MM-DD (rekap-kas: YYYY-MM)"
+            },
+            "required": false,
+            "description": "From: YYYY-MM-DD (rekap-kas: YYYY-MM)",
+            "name": "dari",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "To: YYYY-MM-DD (rekap-kas: YYYY-MM)"
+            },
+            "required": false,
+            "description": "To: YYYY-MM-DD (rekap-kas: YYYY-MM)",
+            "name": "sampai",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": false,
+            "name": "project",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "Cost center id"
+            },
+            "required": false,
+            "description": "Cost center id",
+            "name": "pusat",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": false,
+            "name": "kategori",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "advance | reimburse (audit-log: document type)"
+            },
+            "required": false,
+            "description": "advance | reimburse (audit-log: document type)",
+            "name": "jenis",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "Comma separated request statuses (rekap-pengajuan)"
+            },
+            "required": false,
+            "description": "Comma separated request statuses (rekap-pengajuan)",
+            "name": "status",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": false,
+            "name": "akun",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": false,
+            "name": "kendaraan",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": false,
+            "name": "pemohon",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "dicairkan | realisasi (pengeluaran-kategori)"
+            },
+            "required": false,
+            "description": "dicairkan | realisasi (pengeluaran-kategori)",
+            "name": "dasar",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "kategori | lingkup (pengeluaran-kategori)"
+            },
+            "required": false,
+            "description": "kategori | lingkup (pengeluaran-kategori)",
+            "name": "grup",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": false,
+            "name": "user",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": false,
+            "name": "aksi",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": false,
+            "name": "nodok",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": false,
+            "name": "sumber",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "YYYY-MM (absensi; default current month)"
+            },
+            "required": false,
+            "description": "YYYY-MM (absensi; default current month)",
+            "name": "bulan",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": true,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "APK version; below company minimum → 426."
+            },
+            "required": false,
+            "description": "APK version; below company minimum → 426.",
+            "name": "X-App-Version",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "File (Content-Disposition: attachment)",
+            "content": {
+              "text/csv": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "application/pdf": {
                 "schema": {
                   "type": "string",
                   "format": "binary"
@@ -9512,7 +18350,1945 @@ export const openapiDocument = {
               }
             }
           },
+          "403": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
           "404": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/attendance/me": {
+      "get": {
+        "summary": "US-09 own monthly attendance recap (every day of the month up to today: check-in/out, duration, late / early minutes, holiday/off-day flags, PM on-behalf, corrections)",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
+              "description": "Default: current month (company TZ)."
+            },
+            "required": false,
+            "description": "Default: current month (company TZ).",
+            "name": "month",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": true,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "APK version; below company minimum → 426."
+            },
+            "required": false,
+            "description": "APK version; below company minimum → 426.",
+            "name": "X-App-Version",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Recap",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttendanceRecap"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/attendance/recap": {
+      "get": {
+        "summary": "Monthly recap of one employee: PM for team members (team locations only), Admin/Direktur/Finance all",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{1,10}$",
+              "description": "employees id"
+            },
+            "required": true,
+            "description": "employees id",
+            "name": "employee_id",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}-(0[1-9]|1[0-2])$"
+            },
+            "required": false,
+            "name": "month",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": true,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "APK version; below company minimum → 426."
+            },
+            "required": false,
+            "description": "APK version; below company minimum → 426.",
+            "name": "X-App-Version",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Recap",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttendanceRecap"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/attendance/team-today": {
+      "get": {
+        "summary": "US-13 team presence for a date (belum absen / hadir / selesai per member): PM team, Admin/Direktur/Finance all",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$",
+              "description": "Default: today (company TZ); not in the future."
+            },
+            "required": false,
+            "description": "Default: today (company TZ); not in the future.",
+            "name": "date",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{1,10}$"
+            },
+            "required": false,
+            "name": "project_id",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{1,10}$"
+            },
+            "required": false,
+            "name": "cost_center_id",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": true,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "APK version; below company minimum → 426."
+            },
+            "required": false,
+            "description": "APK version; below company minimum → 426.",
+            "name": "X-App-Version",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Team presence",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TeamToday"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/attendance/{id}/correct": {
+      "post": {
+        "summary": "US-15 T10 correction of one attendance time (PM of the team location or Admin; never own attendance; reason required; same local date). Creates an append-only correction; audit old → new",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d+$"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": false,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422."
+            },
+            "required": false,
+            "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422.",
+            "name": "Idempotency-Key",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AttendanceCorrectBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Correction",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttendanceCorrection"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/attendance/{id}/selfie": {
+      "get": {
+        "summary": "Selfie of a visible attendance (own, PM team, Admin/Direktur/Finance). Viewing another person’s selfie is audited view_sensitive. 404 once removed by retention (Q-33)",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d+$"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": true,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "APK version; below company minimum → 426."
+            },
+            "required": false,
+            "description": "APK version; below company minimum → 426.",
+            "name": "X-App-Version",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "JPEG",
+            "content": {
+              "image/jpeg": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/budget-addenda": {
+      "get": {
+        "summary": "Addendum RAB list, newest first (PM: team projects + own; Direktur/Finance: all; others: empty)",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0
+            },
+            "required": false,
+            "name": "project",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "draft",
+                "pending_ack",
+                "pending_approval",
+                "approved",
+                "rejected",
+                "cancelled"
+              ]
+            },
+            "required": false,
+            "name": "status",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "1",
+                "true"
+              ],
+              "description": "Only addenda created by the caller."
+            },
+            "required": false,
+            "description": "Only addenda created by the caller.",
+            "name": "mine",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 25
+            },
+            "required": false,
+            "name": "limit",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 64
+            },
+            "required": false,
+            "name": "cursor",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": true,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "APK version; below company minimum → 426."
+            },
+            "required": false,
+            "description": "APK version; below company minimum → 426.",
+            "name": "X-App-Version",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Addenda",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BudgetAddendumList"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "US-18 create an addendum (PM of the project team only; other callers 403 + access_denied audit). Nominal > 0 and reason required; submit:true submits at once",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": false,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422."
+            },
+            "required": false,
+            "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422.",
+            "name": "Idempotency-Key",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BudgetAddendumCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Addendum",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BudgetAddendumDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/budget-addenda/inbox": {
+      "get": {
+        "summary": "Addenda waiting for the caller: Direktur \"Setujui\" (step acknowledge) or Finance approval (step approve), with RAB impact",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": true,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "APK version; below company minimum → 426."
+            },
+            "required": false,
+            "description": "APK version; below company minimum → 426.",
+            "name": "X-App-Version",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Inbox",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BudgetAddendumInbox"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/budget-addenda/{id}": {
+      "get": {
+        "summary": "Addendum detail: RAB impact, decision timeline, allowed actions",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d+$"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": true,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "APK version; below company minimum → 426."
+            },
+            "required": false,
+            "description": "APK version; below company minimum → 426.",
+            "name": "X-App-Version",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Addendum",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BudgetAddendumDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "summary": "Edit a Draft (creator PM)",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d+$"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": false,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422."
+            },
+            "required": false,
+            "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422.",
+            "name": "Idempotency-Key",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BudgetAddendumUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Addendum",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BudgetAddendumDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/budget-addenda/{id}/submit": {
+      "post": {
+        "summary": "Submit a Draft: approval rule (docType budget_addendum) snapshotted, number ADD/YYMM/#### allocated → Menunggu Direktur",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d+$"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": false,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422."
+            },
+            "required": false,
+            "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422.",
+            "name": "Idempotency-Key",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Addendum",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BudgetAddendumDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/budget-addenda/{id}/cancel": {
+      "post": {
+        "summary": "Cancel (creator, before any decision; reason required)",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d+$"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": false,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422."
+            },
+            "required": false,
+            "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422.",
+            "name": "Idempotency-Key",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BudgetAddendumReason"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Addendum",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BudgetAddendumDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/budget-addenda/{id}/acknowledge": {
+      "post": {
+        "summary": "Direktur \"Setujui\" (Diketahui = approval, ADR 0013) → Menunggu Finance (or approved when no Finance level remains)",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d+$"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": false,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422."
+            },
+            "required": false,
+            "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422.",
+            "name": "Idempotency-Key",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BudgetAddendumDecision"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Addendum",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BudgetAddendumDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/budget-addenda/{id}/approve": {
+      "post": {
+        "summary": "Finance approval; the last level sets projects.budget = current RAB + addition in the same transaction (audited before → after)",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d+$"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": false,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422."
+            },
+            "required": false,
+            "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422.",
+            "name": "Idempotency-Key",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BudgetAddendumDecision"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Addendum",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BudgetAddendumDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/budget-addenda/{id}/reject": {
+      "post": {
+        "summary": "Reject at the Direktur or Finance step (reason required)",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d+$"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": false,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422."
+            },
+            "required": false,
+            "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422.",
+            "name": "Idempotency-Key",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BudgetAddendumReject"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Addendum",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BudgetAddendumDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
             "description": "Problem",
             "content": {
               "application/problem+json": {

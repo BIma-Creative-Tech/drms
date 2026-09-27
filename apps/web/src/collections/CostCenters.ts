@@ -9,6 +9,7 @@ import { activeField, codeField, odooRefField, uuidField } from '@/fields/common
 /**
  * Pusat biaya / lokasi operasional (form item 9: "Ops Palangka Banjar" is not a project).
  * Staff R assigned, PM R team, Finance R all, Owner/Admin C/R/U (requirements v1.1 §4).
+ * E6 (Q-40): optional lat/lng/radius → attendance geofence of the location.
  */
 export const CostCenters: CollectionConfig = withAudit(
   {
@@ -42,6 +43,17 @@ export const CostCenters: CollectionConfig = withAudit(
         ],
       },
       { name: 'manager', type: 'relationship', relationTo: 'users', label: 'Penanggung jawab', index: true },
+      // E6 / Q-40: optional geofence of an operational location (absensi di pusat biaya). No point =
+      // attendance at this cost center is refused (NO_GEOFENCE), like a project without a point.
+      // S3e: a point without radius uses company-settings.defaultGeofenceRadiusM.
+      {
+        type: 'row',
+        fields: [
+          { name: 'lat', type: 'number', label: 'Latitude', min: -90, max: 90 },
+          { name: 'lng', type: 'number', label: 'Longitude', min: -180, max: 180 },
+          { name: 'radiusM', type: 'number', label: 'Radius geofence (m)', min: 10, max: 5000, admin: { description: 'Kosong = radius default perusahaan (Setting perusahaan).' } },
+        ],
+      },
       odooRefField('odooAnalyticRef', 'Ref. akun analitik Odoo'),
       activeField(),
       uuidField(),

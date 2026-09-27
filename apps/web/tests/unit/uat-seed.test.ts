@@ -27,6 +27,10 @@ describe('UAT_USERS parsing', () => {
     expect(bad([valid[0], { ...valid[1], role: 'pk-staff' }])).toThrow(/duplicate role/)
     expect(bad([valid[0], { ...valid[1], keycloakSub: valid[0]!.keycloakSub }])).toThrow(/duplicate keycloakSub/)
     expect(bad([valid[0], { ...valid[1], role: 'pk-owner' }])).toThrow(/pk-pm user is required/)
+    // ADR 0013: up to two Finance / two Direktur (pk-owner) users; a third one is refused
+    const fin = (n: number) => ({ email: `fin${n}@proyekkas.test`, name: `Fin ${n}`, role: 'pk-finance', keycloakSub: `00000000-0000-4000-8000-00000000000${n}` })
+    expect(parseUatUsers(JSON.stringify([...valid, fin(1), fin(2)]))).toHaveLength(4)
+    expect(bad([...valid, fin(1), fin(2), fin(3)])).toThrow(/4\.role: duplicate role \(max 2 × pk-finance\)/)
     let msg = ''
     try {
       parseUatUsers(JSON.stringify([{ ...valid[0], keycloakSub: 'secret-value' }, valid[1]]))

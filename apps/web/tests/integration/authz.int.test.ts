@@ -200,7 +200,9 @@ describe('update scopes and protected fields', () => {
     await expect(p.update({ collection: 'vehicles', id: v.id, data: { brandModel: 'x' }, user: users['pk-finance'], overrideAccess: false })).rejects.toMatchObject({ status: 403 })
     expect((await p.update({ collection: 'vehicles', id: v.id, data: { brandModel: 'Hino' }, user: users['pk-owner'], overrideAccess: false })).brandModel).toBe('Hino')
     const st = await p.create({ collection: 'project-stages', data: { project: teamProject, name: 'S', weightPct: 10, sequence: 1 }, user: users['pk-owner'], overrideAccess: false })
-    const upd = await p.update({ collection: 'project-stages', id: st.id, data: { progressPct: 90, name: 'S2' }, user: users['pk-owner'], overrideAccess: false })
+    // E4: an explicit different progressPct is refused (403), not silently dropped; other fields still editable
+    await expect(p.update({ collection: 'project-stages', id: st.id, data: { progressPct: 90, name: 'S2' }, user: users['pk-owner'], overrideAccess: false })).rejects.toMatchObject({ status: 403 })
+    const upd = await p.update({ collection: 'project-stages', id: st.id, data: { name: 'S2' }, user: users['pk-owner'], overrideAccess: false })
     expect(upd.progressPct).toBe(0)
   })
 

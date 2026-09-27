@@ -11,6 +11,9 @@ const UNSAFE = new Set(['POST', 'PUT', 'PATCH', 'DELETE'])
 const NONE: AuthStrategyResult = { user: null }
 const DEVICE_HEADER_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
+/** `req.context` key set when a bearer token is valid but its device was revoked (http.ts → 401 DEVICE_REVOKED). */
+export const AUTH_FAILURE_KEY = 'pkAuthFailure'
+
 /** Paths a bearer token may use WITHOUT an already registered device (relative to routes.api). */
 const DEVICELESS_PATHS = new Set(['/v1/devices/register'])
 
@@ -145,15 +148,20 @@ export const mobileBearerStrategy: AuthStrategy = {
     if (!deviceId || !DEVICE_HEADER_RE.test(deviceId)) return NONE
     const dev = await payload.find({
       collection: 'devices',
-      where: { and: [{ deviceId: { equals: deviceId.toLowerCase() } }, { user: { equals: user.id } }, { status: { equals: 'active' } }] },
+      where: { and: [{ deviceId: { equals: deviceId.toLowerCase() } }, { user: { equals: user.id } }] },
       limit: 1,
       depth: 0,
       pagination: false,
       overrideAccess: true, // SYSTEM-READ
     })
     const device = dev.docs[0]
-    if (device) extras._pkDevice = { id: device.id, deviceId: device.deviceId }
-    else if (!deviceless) return NONE
+    if (device?.status === 'active') extras._pkDevice = { id: device.id, deviceId: device.deviceId }
+    else if (!deviceless) {
+      // A revoked/lost install of THIS user (valid token): tell the APK so it ends the session at
+      // once instead of refreshing (ADR 0003 §5). Unknown devices stay a plain 401.
+      if (device && req.context) req.context[AUTH_FAILURE_KEY] = 'device_revoked'
+      return NONE
+    }
     return { user: { ...user, roles, ...extras, collection: 'users', _strategy: 'mobileBearer' } }
   },
 }

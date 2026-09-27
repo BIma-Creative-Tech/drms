@@ -143,10 +143,9 @@ export async function seed(payload: Payload, data: SeedData = DEFAULT_SEED_DATA)
     await ensure('document-sequences', { docType: { equals: s.docType } }, { ...s, timezone: COMPANY.timezone, active: true }, `seq:${s.docType}`)
   }
 
-  // Approval rules (US-34). Q-31 default: ONE approver (Owner) for every amount; Q-07 default:
-  // "Diketahui Oleh" required, filled by the project PM / cost-center manager; Q-08: never a
-  // requester or the creator. The "> Rp 10 juta → 2 approvers" rule is seeded INACTIVE as the
-  // configurable example (activate it once the client names the threshold/second approver).
+  // Approval rules (US-34), ADR 0013 (E1): "Diketahui" = Direktur (pk-owner) approval, then Finance,
+  // for every amount (Q-31: no threshold yet); requester/creator never decide (G1, Q-08). The
+  // threshold example is seeded INACTIVE (activate once the client names the threshold, O-4).
   for (const r of DEFAULT_APPROVAL_RULES) {
     await ensure('approval-rules', { name: { equals: r.name } }, { ...r }, `rule:${r.name}`)
   }

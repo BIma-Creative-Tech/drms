@@ -7,12 +7,15 @@ import { buildConfig } from 'payload'
 import sharp from 'sharp'
 
 import { withStaffHiddenGlobals, withStaffPanelVisibility } from './access/panel-visibility'
-import { F2_ADMIN_VIEWS } from './admin/config'
+import { E2_ADMIN_VIEWS, E6_ADMIN_VIEWS, F2_ADMIN_VIEWS, F3_ADMIN_VIEWS, S2A_ADMIN_VIEWS, S3E_ADMIN_VIEWS } from './admin/config'
 import { v1Endpoints } from './api/v1'
+import { Attendances } from './collections/Attendances'
+import { AttendanceCorrections } from './collections/AttendanceCorrections'
 import { ApprovalRules } from './collections/ApprovalRules'
 import { Approvals } from './collections/Approvals'
 import { AuditLogs } from './collections/AuditLogs'
 import { Banks } from './collections/Banks'
+import { BudgetAddenda } from './collections/BudgetAddenda'
 import { BudgetLines } from './collections/BudgetLines'
 import { CashAccounts } from './collections/CashAccounts'
 import { CashEntries } from './collections/CashEntries'
@@ -31,6 +34,7 @@ import { MEDIA_COLLECTIONS } from './collections/media'
 import { NotificationTemplates } from './collections/NotificationTemplates'
 import { Notifications } from './collections/Notifications'
 import { PeriodClosings } from './collections/PeriodClosings'
+import { ProgressReports } from './collections/ProgressReports'
 import { Projects } from './collections/Projects'
 import { ProjectStages } from './collections/ProjectStages'
 import { ReceiptFlags } from './collections/ReceiptFlags'
@@ -51,6 +55,8 @@ import { smtpEmailAdapter } from './email/adapter'
 import { getEnv, parseSmtpEnv, readSecret } from './lib/env'
 import { loggerOptions } from './lib/logger'
 import { MAX_UPLOAD_BYTES } from './collections/media/factory'
+import { withBodyGuard, withGlobalBodyGuard } from './lib/body-guard'
+import { gateSharp, setImageQueueLogger } from './lib/image-queue'
 
 const dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -58,8 +64,13 @@ const dirname = path.dirname(fileURLToPath(import.meta.url))
 // adapter is built with the config); otherwise Payload's console adapter (dev/tests/migrate).
 const smtp = parseSmtpEnv(process.env)
 
-// ADR 0004: one sharp instance (the one passed to buildConfig), concurrency 1 (RAM budget).
+// ADR 0004: one sharp instance (the one passed to buildConfig), concurrency 1 (RAM budget): one
+// libvips thread per pipeline. E9 P-1: no libvips operation cache (every upload is a new image, the
+// cache only holds RAM), and every pipeline runs through the bounded image queue (lib/image-queue:
+// max IMAGE_RESIZE_CONCURRENCY jobs, the v1 upload endpoint queues whole uploads → 503 when full).
 sharp.concurrency(1)
+sharp.cache(false)
+const queuedSharp = gateSharp(sharp)
 
 export const MASTER_COLLECTIONS = [
   Employees,
@@ -103,11 +114,16 @@ export default buildConfig({
     user: Users.slug,
     importMap: { baseDir: path.resolve(dirname) },
     components: {
+      // Web-starter retheme: DRMS mark/name instead of the Payload graphics (src/theme/graphics.tsx).
+      graphics: { Icon: '@/theme/graphics#Icon', Logo: '@/theme/graphics#Logo' },
       beforeLogin: ['@/components/SsoLoginButton#SsoLoginButton'],
       logout: { Button: '@/components/LogoutButton#LogoutButton' },
       // F2 work views (approval inbox, transfer queue, LPJ verification) + nav badges.
       afterNavLinks: ['@/admin/components/F2NavLinks#F2NavLinks'],
-      views: F2_ADMIN_VIEWS,
+      // S3e: notification bell + unread count on every admin page (US-05).
+      beforeNavLinks: ['@/admin/components/NotificationBell#NotificationBell'],
+      // F3: role dashboards (Beranda), reports, global audit log.
+      views: { ...F2_ADMIN_VIEWS, ...F3_ADMIN_VIEWS, ...E2_ADMIN_VIEWS, ...E6_ADMIN_VIEWS, ...S2A_ADMIN_VIEWS, ...S3E_ADMIN_VIEWS },
     },
     timezones: { defaultTimezone: 'Asia/Makassar' },
     // Default 'gravatar' sends md5(email) to www.gravatar.com (privacy + CSP img-src), spike f.
@@ -115,8 +131,9 @@ export default buildConfig({
     meta: { titleSuffix: ' — ProyekKas DRMS' },
   },
   // F2c: staff-only users see only their requests, receipts, notifications and profile.
-  collections: withStaffPanelVisibility([Users, ...MASTER_COLLECTIONS, ...FLOW_COLLECTIONS, Notifications, Devices, WebSessions, AuditLogs, ...MEDIA_COLLECTIONS]),
-  globals: withStaffHiddenGlobals([CompanySettings]),
+  // E9 B-1 (G-21): non-object REST bodies (form/text, JSON arrays) → 400 before any hook runs.
+  collections: withBodyGuard(withStaffPanelVisibility([Users, ...MASTER_COLLECTIONS, ...FLOW_COLLECTIONS, Attendances, AttendanceCorrections, ProgressReports, BudgetAddenda, Notifications, Devices, WebSessions, AuditLogs, ...MEDIA_COLLECTIONS])),
+  globals: withGlobalBodyGuard(withStaffHiddenGlobals([CompanySettings])),
   // Admin UI in Bahasa Indonesia (ADR 0001 §5; @payloadcms/translations/languages/id @3.90.1).
   i18n: { supportedLanguages: { id }, fallbackLanguage: 'id' },
   graphQL: { disable: true },
@@ -136,7 +153,7 @@ export default buildConfig({
     push: false,
     migrationDir: path.resolve(dirname, 'migrations'),
   }),
-  sharp,
+  sharp: queuedSharp,
   // ADR 0004 §2: ≤ 8 MiB per file, 5 files, request ≤ 10 MiB (Traefik buffering-pk/AppSec 10 MiB).
   upload: { limits: { fileSize: MAX_UPLOAD_BYTES, files: 5, fields: 30 }, requestSizeLimit: 10 * 1024 * 1024 },
   endpoints: v1Endpoints,
@@ -153,6 +170,7 @@ export default buildConfig({
   typescript: { outputFile: path.resolve(dirname, 'payload-types.ts') },
   onInit: async (payload) => {
     if (process.env.PK_SKIP_ENV_CHECK !== 'true') getEnv() // fail fast on invalid env
+    setImageQueueLogger(payload.logger)
     payload.logger.info({ msg: 'payload initialised', pid: process.pid, tz: Intl.DateTimeFormat().resolvedOptions().timeZone })
   },
 })

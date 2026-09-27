@@ -151,3 +151,17 @@ None.
   every download audited `export`; measured peak RSS ≈ 138 MiB isolated / 149 MiB web cgroup after 3 renders.
   Layout approved by the user 2026-09-24 (receipts on separate pages, 2 per page); logo pending (Q-32).
   Status stays accepted.
+- **2026-09-24 (F3):** report PDFs (Q-F3-5: Rekap Kas, Pengeluaran per Kategori, Anggaran Project; A4 landscape,
+  ≤ 500 rows, `pdf/ReportPdf.tsx`) with the same renderer; the semaphore moved to `lib/heavy-gate.ts` and is now
+  **shared with the XLSX exports** (2 concurrent, 10 s → 503); the worker bundle stubs `@/pdf/report-render` too.
+  Measured on the production image `pk-f3-web:measure` (target `runner`, built with `docker build --memory 2g`: OK, 6 min 57 s),
+  `--memory 384m --memory-swap 384m --cpus 0.75`, `NODE_OPTIONS=--max-old-space-size=256` (= staging), app role on a
+  throwaway DB with 597 requests, 49 624 audit rows and 10 000 ledger rows in one month. cgroup v2 `memory.current` /
+  `memory.peak`: idle **70 MiB** (peak 108 MiB during start-up); Owner Beranda HTML ×3 (heaviest dashboard: 9 KPI
+  queries + approval inbox + SVG chart) **107 MiB**, peak 147 MiB, 1.3–3.3 s; dashboard APIs owner/finance ×3 106 MiB;
+  report pages 117 MiB; **XLSX 10 000 rows** (Buku Kas, 387 KB, 2.5 s) 137 MiB, second run peak **213 MiB**;
+  **2 × XLSX 10 000 rows + 1 report PDF concurrently**: cgroup peak **223 MiB** (58 % of 384 MiB; process VmHWM
+  271 MiB incl. shared file pages), third request waited on the shared gate (5.0 s / 7.8 s); CSV 10 000 rows
+  (streamed, 916 KB) 156 MiB; back to 105 MiB after 20 s. No OOM, no error log. `write-excel-file` is bundled into
+  the server chunks by webpack (not needed in the traced `node_modules`); verified by a real XLSX download.
+  Status stays accepted.

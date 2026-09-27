@@ -15,9 +15,15 @@ const noPdfInWorker = {
   name: 'no-pdf-in-worker',
   setup(b) {
     b.onResolve({ filter: /^@\/pdf\/render$/ }, () => ({ path: 'pdf-render-stub', namespace: 'pk-stub' }))
-    b.onLoad({ filter: /.*/, namespace: 'pk-stub' }, () => ({
+    // F3: report PDF (same renderer) — exports run in the web process only.
+    b.onResolve({ filter: /^@\/pdf\/report-render$/ }, () => ({ path: 'pdf-report-render-stub', namespace: 'pk-stub' }))
+    b.onLoad({ filter: /^pdf-render-stub$/, namespace: 'pk-stub' }, () => ({
       contents:
         "export class PdfBusyError extends Error {}\nexport async function renderPengajuanBiaya() { throw new Error('PDF rendering runs in the web process only (ADR 0008 §2)') }\n",
+      loader: 'js',
+    }))
+    b.onLoad({ filter: /^pdf-report-render-stub$/, namespace: 'pk-stub' }, () => ({
+      contents: "export async function renderReportPdf() { throw new Error('Report PDF rendering runs in the web process only (F3)') }\n",
       loader: 'js',
     }))
   },

@@ -2,10 +2,13 @@ import { addDataAndFileToRequest, APIError, ValidationError, type Endpoint, type
 import type { z } from 'zod'
 
 import { hasRole, type Role } from '@/access/roles'
+import { AUTH_FAILURE_KEY } from '@/auth/strategies'
 import { claimKey, IDEMPOTENCY_KEY_RE, requestHash, storeResponse } from '@/lib/idempotency'
 import { requestMeta } from '@/lib/request-meta'
 import { takeToken } from '@/lib/rate-limit'
 import { withReqTransaction } from '@/lib/system-tx'
+
+export const DEVICE_REVOKED_DETAIL = 'Perangkat ini sudah dicabut dari akun Anda. Silakan masuk kembali atau hubungi Admin.'
 
 /** RFC 9457 problem details (architecture §6.2). Never echoes internals. */
 export function problem(status: number, title: string, extra: Record<string, unknown> = {}): Response {
@@ -61,7 +64,7 @@ async function minAppVersion(req: PayloadRequest): Promise<string | null> {
 
 export type V1Options<B extends z.ZodType | undefined> = {
   path: string
-  method: 'get' | 'post' | 'patch'
+  method: 'get' | 'post' | 'patch' | 'put'
   /** 'public' = no authentication (health only). Default: any authenticated user. */
   auth?: 'public' | 'user'
   roles?: Role[]
@@ -76,8 +79,16 @@ export type V1Options<B extends z.ZodType | undefined> = {
    * send the header on these endpoints (400 without it); web callers may omit it.
    */
   idempotent?: boolean
+  /**
+   * E9 (ADR 0004 §4): a request carrying `sig` in its query is a SIGNED URL — no session/bearer
+   * needed; the wrapper skips the user checks (rate limit keyed on the claimed `uid`) and the
+   * handler MUST verify the signature and re-check access for that user (see lib/signed-url.ts).
+   */
+  signedAccess?: boolean
   /** multipart/form-data upload (file in field `file`, JSON fields in `_payload`); no zod body. */
   multipart?: boolean
+  /** Upper bound of the JSON body in bytes (413 above it). */
+  maxBodyBytes?: number
   handler: (ctx: {
     req: PayloadRequest
     body: B extends z.ZodType ? z.infer<B> : undefined
@@ -96,8 +107,21 @@ export function v1<B extends z.ZodType | undefined = undefined>(opts: V1Options<
     method: opts.method,
     handler: async (req) => {
       try {
-        if (opts.auth !== 'public') {
-          if (!req.user) return problem(401, 'Unauthorized')
+        const signed = opts.signedAccess === true && req.searchParams?.has('sig') === true
+        if (signed && opts.rateLimit) {
+          const [n, windowMs] = opts.rateLimit
+          const claimed = (req.searchParams.get('uid') ?? '').slice(0, 12)
+          if (!takeToken(`v1:${opts.method}:${opts.path}:signed:${claimed}`, n, windowMs)) return problem(429, 'Too Many Requests')
+        }
+        if (opts.auth !== 'public' && !signed) {
+          if (!req.user) {
+            // Valid token, revoked/lost device (mobileBearer): a code the APK maps to a forced logout
+            // without trying a token refresh. Nothing else about the caller is disclosed.
+            if (req.context?.[AUTH_FAILURE_KEY] === 'device_revoked') {
+              return problem(401, 'Unauthorized', { code: 'DEVICE_REVOKED', detail: DEVICE_REVOKED_DETAIL })
+            }
+            return problem(401, 'Unauthorized')
+          }
           if (opts.roles && !hasRole(req, ...opts.roles)) return problem(403, 'Forbidden')
           const meta = requestMeta(req)
           if (meta.source === 'apk') {
@@ -121,15 +145,19 @@ export function v1<B extends z.ZodType | undefined = undefined>(opts: V1Options<
           let raw: unknown
           try {
             rawText = (await req.text?.()) ?? ''
+            if (opts.maxBodyBytes !== undefined && Buffer.byteLength(rawText, 'utf8') > opts.maxBodyBytes) {
+              return problem(413, 'Content Too Large', { detail: `Body maksimal ${opts.maxBodyBytes} byte.` })
+            }
             raw = rawText ? JSON.parse(rawText) : {}
           } catch {
             return problem(400, 'Bad Request', { detail: 'Body harus JSON.' })
           }
           const parsed = opts.body.safeParse(raw)
           if (!parsed.success) {
-            return problem(400, 'Bad Request', {
-              errors: parsed.error.issues.map((i) => ({ path: i.path.join('.'), message: i.message })),
-            })
+            const errors = parsed.error.issues.map((i) => ({ path: i.path.join('.'), message: i.message }))
+            // S3e (S-06): `detail` = the field messages, so a client that shows only `detail` (web
+            // ActionButton, APK snackbar) tells the user WHAT is wrong.
+            return problem(400, 'Bad Request', { detail: bodyErrorDetail(errors), errors })
           }
           body = parsed.data
         }
@@ -171,7 +199,12 @@ export function v1<B extends z.ZodType | undefined = undefined>(opts: V1Options<
         }
         if (err instanceof APIError && err.status < 500) {
           const errors = (err.data as { errors?: unknown } | null | undefined)?.errors
-          return problem(err.status, err.isPublic ? err.message : 'Request rejected', err.isPublic && Array.isArray(errors) ? { errors } : {})
+          // Domain errors may carry a stable machine code (e.g. E4 ProgressError: PHOTO_LIMIT, WEIGHTS_INCOMPLETE).
+          const code = (err as { pkCode?: unknown }).pkCode
+          return problem(err.status, err.isPublic ? err.message : 'Request rejected', {
+            ...(err.isPublic && Array.isArray(errors) ? { errors } : {}),
+            ...(err.isPublic && typeof code === 'string' ? { code } : {}),
+          })
         }
         const pg = err as { code?: string; message?: string }
         if (typeof pg.code === 'string' && /^(42501|23505|23514|P0001)$/.test(pg.code)) {
@@ -204,4 +237,11 @@ export function headOf(endpoint: Endpoint): Endpoint {
       return new Response(null, { status: res.status, statusText: res.statusText, headers: res.headers })
     },
   }
+}
+
+/** S3e (S-06): human `detail` of a body validation error — distinct messages joined, max 3. */
+export function bodyErrorDetail(errors: Array<{ path: string; message: string }>): string {
+  const msgs = [...new Set(errors.map((e) => e.message).filter(Boolean))]
+  if (msgs.length === 0) return 'Data tidak valid.'
+  return msgs.slice(0, 3).join(' ') + (msgs.length > 3 ? ` (+${msgs.length - 3} lainnya)` : '')
 }

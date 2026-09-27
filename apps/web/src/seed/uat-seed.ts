@@ -9,6 +9,7 @@ import { withSystemTransaction } from '@/lib/system-tx'
  * (src/seed/seed.ts must have run: bank MANDIRI + cost center OPS-PB are required).
  *
  * Input `UAT_USERS` = JSON array of { email, name, role, keycloakSub } — EXISTING Keycloak users
+ * (one Staff, one PM, up to two Finance and two Direktur = `pk-owner`, ADR 0013)
  * (created by infra); nothing is written to Keycloak (context `skipKeycloakSync`). Every step is
  * idempotent (natural keys) and never overwrites data it did not create, except:
  * - an existing user (same keycloakSub) gets its missing UAT role added and, when unlinked, the UAT employee;
@@ -23,6 +24,15 @@ export const UAT_EMPLOYEE_CODE: Record<UatRole, string> = {
   'pk-pm': 'UJI-PM',
   'pk-finance': 'UJI-FIN',
   'pk-owner': 'UJI-OWN',
+}
+
+/** How many UAT users per role (ADR 0013: a second Direktur / Finance tests the G1-2 fallback). */
+export const UAT_ROLE_MAX: Record<UatRole, number> = { 'pk-staff': 1, 'pk-pm': 1, 'pk-finance': 2, 'pk-owner': 2 }
+const UAT_MAX_USERS = Object.values(UAT_ROLE_MAX).reduce((a, b) => a + b, 0)
+
+/** Employee code of the n-th (1-based) UAT user of `role`: UJI-FIN, UJI-FIN-2, … */
+export function uatEmployeeCode(role: UatRole, n: number): string {
+  return n <= 1 ? UAT_EMPLOYEE_CODE[role] : `${UAT_EMPLOYEE_CODE[role]}-${n}`
 }
 
 export const UAT_FIXTURE = {
@@ -42,9 +52,9 @@ export const UatUsersSchema = z
     }),
   )
   .min(2)
-  .max(UAT_ROLES.length)
+  .max(UAT_MAX_USERS)
   .superRefine((list, ctx) => {
-    const dup = (key: 'email' | 'role' | 'keycloakSub') => {
+    const dup = (key: 'email' | 'keycloakSub') => {
       const seen = new Set<string>()
       list.forEach((u, i) => {
         const v = u[key].toLowerCase()
@@ -53,8 +63,15 @@ export const UatUsersSchema = z
       })
     }
     dup('email')
-    dup('role')
     dup('keycloakSub')
+    // ADR 0013: up to two Direktur (pk-owner) and two Finance users so that the G1-2 skip rule and
+    // "another Direktur/Finance decides" can be tested; Staff and PM stay single.
+    const count = new Map<UatRole, number>()
+    list.forEach((u, i) => {
+      const n = (count.get(u.role) ?? 0) + 1
+      count.set(u.role, n)
+      if (n > UAT_ROLE_MAX[u.role]) ctx.addIssue({ code: 'custom', path: [i, 'role'], message: `duplicate role (max ${UAT_ROLE_MAX[u.role]} × ${u.role})` })
+    })
     for (const r of ['pk-staff', 'pk-pm'] as const) {
       if (!list.some((u) => u.role === r)) ctx.addIssue({ code: 'custom', path: [], message: `a ${r} user is required` })
     }
@@ -109,26 +126,30 @@ export async function seedUat(payload: Payload, users: UatUser[]): Promise<UatRe
   // 1 + 2: employee + user per entry.
   const userIds = new Map<UatRole, number>()
   const empIds = new Map<UatRole, number>()
+  const seenRole = new Map<UatRole, number>()
   for (const u of users) {
+    const nth = (seenRole.get(u.role) ?? 0) + 1
+    seenRole.set(u.role, nth)
     await step(async (req) => {
-      const code = UAT_EMPLOYEE_CODE[u.role]
+      const code = uatEmployeeCode(u.role, nth)
       let emp = (await findOne(req, 'employees', { code: { equals: code } }))?.id
       if (emp === undefined) {
         emp = await create(req, 'employees', { code, name: u.name, active: true })
         tally('employees', 'created')
       } else tally('employees', 'skipped')
-      empIds.set(u.role, emp)
+      if (nth === 1) empIds.set(u.role, emp)
 
       const bySub = await findOne(req, 'users', { keycloakSub: { equals: u.keycloakSub } })
       if (!bySub) {
         const byEmail = await findOne(req, 'users', { email: { equals: u.email } })
         if (byEmail) throw new Error(`users: ${u.role} email already belongs to another account (different keycloakSub) — fix manually`)
         if (await findOne(req, 'users', { employee: { equals: emp } })) throw new Error(`employees: ${code} is already linked to another user — fix manually`)
-        userIds.set(u.role, await create(req, 'users', { email: u.email, name: u.name, keycloakSub: u.keycloakSub, roles: [u.role], employee: emp, active: true }))
+        const created = await create(req, 'users', { email: u.email, name: u.name, keycloakSub: u.keycloakSub, roles: [u.role], employee: emp, active: true })
+        if (nth === 1) userIds.set(u.role, created)
         tally('users', 'created')
         return
       }
-      userIds.set(u.role, bySub.id)
+      if (nth === 1) userIds.set(u.role, bySub.id)
       const roles = Array.isArray(bySub.roles) ? (bySub.roles as string[]) : []
       const patch: Record<string, unknown> = {}
       if (!roles.includes(u.role)) patch.roles = [...roles, u.role]

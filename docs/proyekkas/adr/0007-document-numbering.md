@@ -144,3 +144,7 @@ None.
   number without touching the live counter, audited `number_issued`; form fixture `228/PB-DRMS/20/IX/2026`);
   withdraw → resubmit keeps number and date; reversals numbered KM/KK (the `reversal` doc type is unused).
   Verified against `develop` `c8c1af6`. Status stays accepted.
+- **2026-09-26 (S3b, E11):** go-live cut-over implemented by the data import (`apps/web/src/import/run.ts`):
+  `expense_request.startAt` = the workbook's `nomor_pb_mulai` (default 229); an existing counter below it is raised
+  (upward only, audited `update` field `nextValue` with the import reason), a counter already beyond it is left
+  unchanged (warning). Runbook `runbooks/import-data-golive.md`. Status stays accepted.

@@ -7,7 +7,7 @@ import { getPayload } from 'payload'
 import { isRole } from '@/access/roles'
 import { oidcTxCookieName, readCookie, serializeCookie, sessionCookieName } from '@/auth/cookies'
 import { getWebOidcConfig, openTx } from '@/auth/oidc'
-import { createWebSession } from '@/auth/sessions'
+import { auditLoginFailed, createWebSession } from '@/auth/sessions'
 import { getEnv } from '@/lib/env'
 
 export const dynamic = 'force-dynamic'
@@ -46,6 +46,7 @@ export async function GET(request: NextRequest): Promise<Response> {
     const user = found.docs[0]
     if (!user) {
       payload.logger.warn({ msg: 'login denied: unknown or inactive user' })
+      await auditLoginFailed(payload, request.headers, { reason: 'unknown_or_inactive_user', keycloakSub: idClaims.sub })
       return fail(403, 'Akun belum terdaftar atau tidak aktif di ProyekKas.')
     }
     if (JSON.stringify([...(user.roles ?? [])].sort()) !== JSON.stringify(tokenRoles)) {
@@ -71,6 +72,7 @@ export async function GET(request: NextRequest): Promise<Response> {
     return new Response(null, { status: 302, headers })
   } catch (err) {
     payload.logger.warn({ msg: 'oidc callback failed', err: (err as Error).message })
+    await auditLoginFailed(payload, request.headers, { reason: 'oidc_callback_error' })
     return fail(400, 'Login gagal. Silakan ulangi.')
   }
 }

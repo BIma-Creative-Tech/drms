@@ -16,16 +16,14 @@ vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: () => {} }) }))
 
 /**
  * F2e — final-UAT fixes:
- * 1. "Diketahui Oleh" fallback (user decision option a): PM / penanggung jawab is a requester or
- *    the creator → submit OK, "Diketahui" delegated to an Owner (else Admin), never the person who
- *    must also approve; G1 negatives; audit + timeline + PDF record the delegation.
+ * 1. "Diketahui Oleh" fallback (user decision option a) — since E1 (ADR 0013) only for LEGACY
+ *    snapshots: a delegated pre-E1 request still completes (G1 negatives, audit, timeline, PDF).
  * 2. "Pengajuan ulang dari" shows the old request's NUMBER + title (panel banner + form field).
  * 5. Finance cannot verify receipts / review flags on its own request (domain 403 + audited
  *    denied attempt + DB trigger).
  */
 let w: World
 let accPm: number
-let ccOwnerApprover: number
 const E = '/api/v1/expense-requests'
 const key = () => ({ 'Idempotency-Key': randomUUID() })
 const yesterday = () => addDays(new Date().toISOString().slice(0, 10), -1)
@@ -36,20 +34,6 @@ beforeAll(async () => {
   // with the PM as "Diajukan Oleh" on that cost center is the UAT case.
   const bank = (await sqlAs('app', "SELECT id FROM banks WHERE code = 'MANDIRI'")).rows[0].id as number
   accPm = await sysCreate('employee-bank-accounts', { employee: w.emp.pm, bank, accountNo: `8${Date.now() % 1e9}3`, accountHolder: 'FE PM', isDefault: true })
-  // Second cost center (same manager) whose rule names the world's Owner as THE approver.
-  ccOwnerApprover = await sysCreate('cost-centers', { code: 'FE-CC2', name: 'FE Ops 2', manager: w.users.pm.id })
-  await sysCreate('approval-rules', {
-    docType: 'expense_request',
-    requestType: 'any',
-    priority: 5,
-    costCenter: ccOwnerApprover,
-    acknowledge: 'required',
-    acknowledgeBy: 'scope_manager',
-    active: true,
-    name: 'FE rule approver = named Owner',
-    minAmount: 0,
-    steps: [{ level: 1, approverUser: w.users.owner.id }],
-  })
 })
 
 afterAll(async () => {
@@ -71,55 +55,45 @@ async function panelHtml(user: FlowUser, id: number): Promise<string> {
   return el ? renderToString(el) : ''
 }
 
-/** Temporarily deactivates every active user of `role` except `keep` (restored afterwards). */
-async function onlyActive<T>(role: string, keep: number[], fn: () => Promise<T>): Promise<T> {
-  const r = await sqlAs('app', `SELECT u.id FROM users u JOIN users_roles r ON r.parent_id = u.id WHERE r.value = $1 AND u.active AND NOT (u.id = ANY($2::int[]))`, [role, keep])
-  const ids = r.rows.map((x) => x.id as number)
-  if (ids.length) await sqlAs('app', 'UPDATE users SET active = false WHERE id = ANY($1::int[])', [ids])
-  try {
-    return await fn()
-  } finally {
-    if (ids.length) await sqlAs('app', 'UPDATE users SET active = true WHERE id = ANY($1::int[])', [ids])
-  }
-}
-
-describe('F2e acknowledger fallback (Q-07/Q-08, option a)', () => {
-  it('PM as requester on his cost center: submit OK, "Diketahui" delegated to Owner; requester cannot acknowledge; Owner acknowledges; a DIFFERENT Owner approves', async () => {
-    const { id, submit } = await pmRequest(w.users.admin, w.costCenter)
-    expect(submit.body.status).toBe('pending_ack')
-    expect(submit.body.approvalRule).toMatchObject({
+describe('F2e acknowledger delegation — LEGACY snapshots only (ADR 0013 supersedes it for new requests)', () => {
+  it('a pre-E1 request whose "Diketahui" was delegated to the Owner (PM = requester) still completes: delegate acknowledges, another Owner approves, PDF "(dilimpahkan)"', async () => {
+    // Submitted before E1: the PM (requester) on his cost center → "Diketahui" delegated to the Owners.
+    const { id } = await pmRequest(w.users.admin, w.costCenter)
+    expect((await api('POST', `${E}/${id}/withdraw`, w.users.admin, { reason: 'simulasi pra-E1' }, key())).status).toBe(200)
+    const legacy = {
+      ruleId: 1,
+      ruleName: 'Default — Owner (semua nominal)',
       acknowledge: 'required',
+      acknowledgeBy: 'scope_manager',
       acknowledgerUserId: null,
+      acknowledgeRole: null,
+      signDiajukan: 'required',
+      signDibuat: 'required',
+      steps: [{ level: 1, approverRole: 'pk-owner', approverUserId: null }],
       acknowledgeDelegatedTo: 'owner',
       acknowledgeDelegationReason: 'PM/penanggung jawab adalah pemohon/pembuat (Q-07/Q-08)',
-    })
-    const snap = (await sqlAs('app', 'SELECT approval_snapshot AS s FROM expense_requests WHERE id = $1', [id])).rows[0].s
-    expect(snap.acknowledgeDelegateUserIds).toEqual(expect.arrayContaining([w.users.owner.id, w.users.owner2.id]))
-    expect(snap.acknowledgeOriginalUserId).toBe(w.users.pm.id)
-    const delegated = (await auditRows('expense_request', id)).find((r) => r.action === 'acknowledge_delegated')
-    expect(delegated?.reason).toBe('PM/penanggung jawab adalah pemohon/pembuat (Q-07/Q-08)')
-    expect(delegated?.new_value?.v).toMatchObject({ delegatedTo: 'owner' })
+      acknowledgeDelegateUserIds: [w.users.owner.id, w.users.owner2.id],
+      acknowledgeOriginalUserId: w.users.pm.id,
+    }
+    await sqlAs('app', "UPDATE expense_requests SET status = 'pending_ack', current_level = 0, approval_snapshot = $2::jsonb WHERE id = $1", [id, JSON.stringify(legacy)])
 
-    // timeline: "Giliran: Owner — Diketahui (dilimpahkan)"
+    // timeline: "Giliran: Direktur — Diketahui (dilimpahkan)" (pk-owner is labelled Direktur since E1)
     const html = await panelHtml(w.users.admin, id)
-    expect(html.replace(/<!-- -->/g, '')).toMatch(/Giliran: <strong>Owner<\/strong> — Diketahui \(dilimpahkan\)/)
+    expect(html.replace(/<!-- -->/g, '')).toMatch(/Giliran: <strong>Direktur<\/strong> — Diketahui \(dilimpahkan\)/)
 
     // G1: the PM (requester) may not acknowledge — 403 and an audited denied attempt
     const denied = await api('POST', `${E}/${id}/acknowledge`, w.users.pm, {}, key())
     expect(denied.status).toBe(403)
     expect((await auditRows('expense_request', id)).some((r) => r.action === 'access_denied' && r.field === 'acknowledge' && r.user_id === String(w.users.pm.id))).toBe(true)
-    // neither may the creator (Admin), nor Finance (not a delegate)
-    expect((await api('POST', `${E}/${id}/acknowledge`, w.users.admin, {}, key())).status).toBe(403)
-    expect((await api('POST', `${E}/${id}/acknowledge`, w.users.finance, {}, key())).status).toBe(403)
+    expect((await api('POST', `${E}/${id}/acknowledge`, w.users.admin, {}, key())).status).toBe(403) // creator
+    expect((await api('POST', `${E}/${id}/acknowledge`, w.users.finance, {}, key())).status).toBe(403) // not a delegate
 
-    const inbox = await api('GET', '/api/v1/approvals/inbox', w.users.owner)
-    expect(inbox.body.items.find((x: { id: number }) => x.id === id)).toMatchObject({ step: 'acknowledge' })
     const ack = await api('POST', `${E}/${id}/acknowledge`, w.users.owner, {}, key())
     expect(ack.status, JSON.stringify(ack.body)).toBe(200)
     expect(ack.body).toMatchObject({ status: 'pending_approval', currentLevel: 1 })
     const ackAudit = (await auditRows('expense_request', id)).find((r) => r.action === 'acknowledge')
     expect(ackAudit?.new_value?.v).toMatchObject({ delegatedTo: 'owner' })
-    expect(ackAudit?.reason).toMatch(/dilimpahkan ke Owner/)
+    expect(ackAudit?.reason).toMatch(/dilimpahkan ke Direktur/)
 
     // the acknowledging Owner cannot also approve (G1 one position per person); another Owner can
     expect((await api('POST', `${E}/${id}/approve`, w.users.owner, {}, key())).status).toBe(403)
@@ -127,57 +101,17 @@ describe('F2e acknowledger fallback (Q-07/Q-08, option a)', () => {
     expect(ok.status, JSON.stringify(ok.body)).toBe(200)
     expect(ok.body.status).toBe('approved')
 
-    // PDF "Diketahui Oleh": the actual person + "(dilimpahkan)"
     const pdf = await asUser(w.users.owner, (req) => buildPdfData(req, id, { internal: false, printedBy: 'test' }))
     const box = pdf.signatures.find((s) => s.label === 'Diketahui Oleh')
     const ackName = ack.body.approvals.find((a: { position: string }) => a.position === 'diketahui').actorName as string
     expect(box?.names).toBe(`${ackName} (dilimpahkan)`)
-    expect(ok.body.approvals.find((a: { position: string }) => a.position === 'diketahui').actorId).toBe(w.users.owner.id)
   })
 
-  it('rule names an Owner as THE approver: that Owner is not a delegate (acknowledge ≠ approve); another Owner acknowledges, the named Owner approves', async () => {
-    const { id, submit } = await pmRequest(w.users.admin, ccOwnerApprover)
-    expect(submit.body.approvalRule).toMatchObject({ acknowledgeDelegatedTo: 'owner', steps: [{ level: 1, approverUserId: w.users.owner.id }] })
-    const snap = (await sqlAs('app', 'SELECT approval_snapshot AS s FROM expense_requests WHERE id = $1', [id])).rows[0].s
-    expect(snap.acknowledgeDelegateUserIds).not.toContain(w.users.owner.id)
-    expect(snap.acknowledgeDelegateUserIds).toContain(w.users.owner2.id)
-    expect((await api('POST', `${E}/${id}/acknowledge`, w.users.owner, {}, key())).status).toBe(403)
-    expect((await api('POST', `${E}/${id}/acknowledge`, w.users.owner2, {}, key())).status).toBe(200)
-    const ok = await api('POST', `${E}/${id}/approve`, w.users.owner, {}, key())
-    expect(ok.status, JSON.stringify(ok.body)).toBe(200)
-    expect(ok.body.status).toBe('approved')
-  })
-
-  it('only one eligible Owner and he is the approver → delegated to an Admin; the Admin acknowledges, the Owner approves', async () => {
-    await onlyActive('pk-owner', [w.users.owner.id], async () => {
-      const { id, submit } = await pmRequest(w.users.finance, ccOwnerApprover)
-      expect(submit.body.approvalRule).toMatchObject({ acknowledgeDelegatedTo: 'admin' })
-      expect((await api('POST', `${E}/${id}/acknowledge`, w.users.owner, {}, key())).status).toBe(403)
-      expect((await api('POST', `${E}/${id}/acknowledge`, w.users.finance, {}, key())).status).toBe(403) // creator
-      expect((await panelHtml(w.users.finance, id)).replace(/<!-- -->/g, '')).toMatch(/Giliran: <strong>Admin<\/strong> — Diketahui \(dilimpahkan\)/)
-      expect((await api('POST', `${E}/${id}/acknowledge`, w.users.admin, {}, key())).status).toBe(200)
-      expect((await api('POST', `${E}/${id}/approve`, w.users.admin, {}, key())).status).toBe(403) // not the approver anyway
-      const ok = await api('POST', `${E}/${id}/approve`, w.users.owner, {}, key())
-      expect(ok.status, JSON.stringify(ok.body)).toBe(200)
-    })
-  })
-
-  it('nobody can take over (single Owner is the approver, no eligible Admin) → the 409 stays, with a clear message', async () => {
-    await onlyActive('pk-owner', [w.users.owner.id], () =>
-      onlyActive('pk-admin', [], async () => {
-        const { submit } = await pmRequest(w.users.finance, ccOwnerApprover, 409)
-        expect(JSON.stringify(submit.body)).toMatch(/Diketahui Oleh.*tidak dapat ditentukan.*Owner\/Admin/)
-      }),
-    )
-  })
-
-  it('PM not involved → unchanged: PM acknowledges, no delegation', async () => {
-    const d = await api('POST', E, w.users.staffA, draftBody(w, { projectId: undefined, costCenterId: w.costCenter }), key())
-    expect(d.status, JSON.stringify(d.body)).toBe(201)
-    const s = await api('POST', `${E}/${d.body.id}/submit`, w.users.staffA, {}, key())
-    expect(s.body.approvalRule).toMatchObject({ acknowledgerUserId: w.users.pm.id, acknowledgeDelegatedTo: null })
-    expect((await api('POST', `${E}/${d.body.id}/acknowledge`, w.users.owner, {}, key())).status).toBe(403)
-    expect((await api('POST', `${E}/${d.body.id}/acknowledge`, w.users.pm, {}, key())).status).toBe(200)
+  it('new requests: PM as requester no longer triggers a delegation — the Direktur approves as for everyone', async () => {
+    const { submit } = await pmRequest(w.users.admin, w.costCenter)
+    expect(submit.body.status).toBe('pending_ack')
+    expect(submit.body.approvalRule).toMatchObject({ acknowledgeBy: 'role', acknowledgeRole: 'pk-owner', acknowledgeDelegatedTo: null, skipped: [] })
+    expect((await auditRows('expense_request', submit.body.id)).some((r) => r.action === 'acknowledge_delegated')).toBe(false)
   })
 })
 
@@ -188,7 +122,7 @@ describe('F2e "Pengajuan ulang dari" shows the old number', () => {
     const s = await api('POST', `${E}/${id}/submit`, w.users.staffA, {}, key())
     const docNo = s.body.docNo as string
     expect(docNo).toMatch(/\/PB-DRMS\//)
-    expect((await api('POST', `${E}/${id}/reject`, w.users.pm, { reason: 'Lengkapi rincian material' }, key())).status).toBe(200)
+    expect((await api('POST', `${E}/${id}/reject`, w.users.owner, { reason: 'Lengkapi rincian material' }, key())).status).toBe(200)
     const r = await api('POST', `${E}/${id}/resubmit`, w.users.staffA, {}, key())
     expect(r.status, JSON.stringify(r.body)).toBe(201)
     expect(r.body.resubmitOf).toEqual({ id, docNo, title: 'Material gudang FE' })
@@ -207,7 +141,7 @@ describe('F2e "Pengajuan ulang dari" shows the old number', () => {
 describe('F2e Finance self-involvement guard on receipt verification (Reimburse)', () => {
   it('Finance who created the request cannot mark valid / reject / review flags / verify all (403, audited); another Finance can; DB refuses self-verification', async () => {
     const creatorFinance = w.users.finance
-    const otherFinance = await makeFlowUser(['pk-finance'], 'FE-finance2', null)
+    const otherFinance = await makeFlowUser(['pk-finance'], 'FE-finance3', null)
     const d = await api('POST', E, creatorFinance, draftBody(w, { type: 'reimburse' }), key()) // on behalf of Staff A (Q-09)
     expect(d.status, JSON.stringify(d.body)).toBe(201)
     const id = d.body.id as number
@@ -217,8 +151,8 @@ describe('F2e Finance self-involvement guard on receipt verification (Reimburse)
       expect(rc.status, JSON.stringify(rc.body)).toBe(201)
     }
     expect((await api('POST', `${E}/${id}/submit`, creatorFinance, {}, key())).status).toBe(200)
-    expect((await api('POST', `${E}/${id}/acknowledge`, w.users.pm, {}, key())).status).toBe(200)
-    const a = await api('POST', `${E}/${id}/approve`, w.users.owner, {}, key())
+    expect((await api('POST', `${E}/${id}/acknowledge`, w.users.owner, {}, key())).status).toBe(200)
+    const a = await api('POST', `${E}/${id}/approve`, w.users.finance2, {}, key()) // the creator (Finance) never approves (G1)
     expect(a.body.status).toBe('approved')
     const receipt = a.body.receipts[0] as { id: number }
     const flag = (a.body.flags as Array<{ id: number; status: string; level: string }>).find((f) => f.status === 'open')!

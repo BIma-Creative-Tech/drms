@@ -46,8 +46,8 @@ async function approvedReimburse() {
     expect(r.status, JSON.stringify(r.body)).toBe(201)
   }
   expect((await api('POST', `${E}/${id}/submit`, w.users.staffA, {}, key())).status).toBe(200)
-  expect((await api('POST', `${E}/${id}/acknowledge`, w.users.pm, {}, key())).status).toBe(200)
-  const a = await api('POST', `${E}/${id}/approve`, w.users.owner, {}, key())
+  expect((await api('POST', `${E}/${id}/acknowledge`, w.users.owner, {}, key())).status).toBe(200)
+  const a = await api('POST', `${E}/${id}/approve`, w.users.finance, {}, key())
   expect(a.status, JSON.stringify(a.body)).toBe(200)
   expect(a.body.status).toBe('approved')
   return a.body as { id: number; receipts: Array<{ id: number; status: string }>; flags: Array<{ id: number; kind: string; level: string; status: string }> }

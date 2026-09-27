@@ -4,6 +4,7 @@ import type { CollectionSlug, PayloadRequest } from 'payload'
 
 import { relId } from '@/access/roles'
 import { approvalsOf, settings, type ApprovalRow, type RequestDoc } from '@/domain/expense/common'
+import { SKIPPED_LABEL } from '@/domain/expense/decision'
 import { displayUnitPrice } from '@/domain/expense/lines'
 import { receiptsOf } from '@/domain/expense/receipts'
 import { FLAG_LABELS, REQUEST_TYPE_LABELS, statusLabel, type FlagKind } from '@/domain/expense/types'
@@ -70,6 +71,9 @@ export async function buildPdfData(req: PayloadRequest, requestId: number, opts:
   const approvals = rows.filter((r) => r.position === 'approval' && (r.decision === 'approved' || r.decision === 'rejected')).sort((a, b) => a.level - b.level)
   const creator = typeof doc.createdBy === 'object' ? doc.createdBy : null
   const creatorName = (creator?.employee && typeof creator.employee === 'object' ? creator.employee.name : undefined) || creator?.name || dibuat?.actorName || ''
+  const skipped = doc.approvalSnapshot?.skipped ?? []
+  const skippedAck = skipped.some((x) => x.position === 'diketahui')
+  const skippedApproval = skipped.some((x) => x.position === 'approval') && (doc.approvalSnapshot?.steps.length ?? 0) === 0
   const approvalImages: PdfImage[] = []
   for (const a of approvals.slice(-2)) approvalImages.push(...(await sig(a)))
 
@@ -84,18 +88,25 @@ export async function buildPdfData(req: PayloadRequest, requestId: number, opts:
     { label: 'Dibuat Oleh', names: pdfSafe(creatorName), images: await sig(dibuat), time: formatServerTime(dibuat?.decidedAt, tz) },
     {
       label: 'Diketahui Oleh',
-      // F2e: delegated "Diketahui" (PM/penanggung jawab is a requester/creator) → the actual person + "(dilimpahkan)".
+      // ADR 0013: the Direktur's approval. F2e (legacy snapshots): delegated "Diketahui" → the actual person + "(dilimpahkan)".
       names: pdfSafe(diketahui?.actorName ? `${diketahui.actorName}${doc.approvalSnapshot?.acknowledgeDelegatedTo ? ' (dilimpahkan)' : ''}` : ''),
       images: diketahui?.decision === 'acknowledged' ? await sig(diketahui) : [],
       time: formatServerTime(diketahui?.decidedAt, tz),
-      note: diketahui?.decision === 'rejected' ? 'DITOLAK' : undefined,
+      // ADR 0013 G1-2: the only Direktur was requester/creator → the position did not apply.
+      note: diketahui?.decision === 'rejected' ? 'DITOLAK' : !diketahui && skippedAck ? pdfSafe(SKIPPED_LABEL) : undefined,
     },
     {
       label: 'Approval',
       names: pdfSafe(approvals.map((a) => a.actorName ?? '').filter(Boolean).join(', ')),
       images: approvals.some((a) => a.decision === 'rejected') ? [] : approvalImages,
       time: formatServerTime(approvals.at(-1)?.decidedAt, tz),
-      note: approvals.some((a) => a.decision === 'rejected') ? 'DITOLAK' : approvals.length > 1 ? `${approvals.length} level` : undefined,
+      note: approvals.some((a) => a.decision === 'rejected')
+        ? 'DITOLAK'
+        : approvals.length === 0 && skippedApproval
+          ? pdfSafe(SKIPPED_LABEL)
+          : approvals.length > 1
+            ? `${approvals.length} level`
+            : undefined,
     },
   ]
 

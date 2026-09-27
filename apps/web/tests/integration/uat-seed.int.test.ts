@@ -12,7 +12,7 @@ import { api, uploadMedia, type FlowUser } from './flow-world'
 /**
  * UAT seed (src/seed/uat.ts): creates users/employees/bank account/project/assignments on top of
  * the base seed, never overwrites a real OPS-PB manager, is a no-op on re-run, and leaves staging
- * ready for a Staff request on OPS-PB whose "Diketahui" resolves to the PM.
+ * ready for a Staff request on OPS-PB whose "Diketahui" is the Direktur's approval (ADR 0013), then Finance.
  * Fictional ".test" accounts with random Keycloak ids (no Keycloak call is made).
  */
 const USERS = parseUatUsers(
@@ -20,7 +20,9 @@ const USERS = parseUatUsers(
     { email: 'staff.uji@proyekkas.test', name: 'Staff Uji', role: 'pk-staff', keycloakSub: randomUUID() },
     { email: 'pm.uji@proyekkas.test', name: 'PM Uji', role: 'pk-pm', keycloakSub: randomUUID() },
     { email: 'finance.uji@proyekkas.test', name: 'Finance Uji', role: 'pk-finance', keycloakSub: randomUUID() },
-    { email: 'owner.uji@proyekkas.test', name: 'Owner Uji', role: 'pk-owner', keycloakSub: randomUUID() },
+    { email: 'owner.uji@proyekkas.test', name: 'Direktur Uji', role: 'pk-owner', keycloakSub: randomUUID() },
+    // ADR 0013: a second Finance user so "another Finance decides" / the G1-2 fallback is testable.
+    { email: 'finance2.uji@proyekkas.test', name: 'Finance Uji 2', role: 'pk-finance', keycloakSub: randomUUID() },
   ]),
 )
 
@@ -63,8 +65,8 @@ describe('UAT seed', () => {
     await setManager(realManager)
     const r = await seedUat(p, USERS)
     expect(r).toMatchObject({
-      employees: { created: 4, linked: 0, skipped: 0 },
-      users: { created: 4, linked: 0, skipped: 0 },
+      employees: { created: 5, linked: 0, skipped: 0 },
+      users: { created: 5, linked: 0, skipped: 0 },
       'cost-centers.manager': { created: 0, linked: 0, skipped: 1 },
       'employee-bank-accounts': { created: 1, linked: 0, skipped: 0 },
       projects: { created: 1, linked: 0, skipped: 0 },
@@ -78,7 +80,7 @@ describe('UAT seed', () => {
     const staffEmp = await one('employees', 'code', 'UJI-STAFF')
     expect(staff).toMatchObject({ name: 'Staff Uji', roles: ['pk-staff'], active: true, employee: staffEmp.id, keycloakSub: USERS[0]!.keycloakSub })
     expect(staffEmp.name).toBe('Staff Uji')
-    for (const code of ['UJI-PM', 'UJI-FIN', 'UJI-OWN']) expect(await one('employees', 'code', code)).toBeDefined()
+    for (const code of ['UJI-PM', 'UJI-FIN', 'UJI-OWN', 'UJI-FIN-2']) expect(await one('employees', 'code', code)).toBeDefined()
     expect(await one('projects', 'code', 'UJI-PRJ')).toMatchObject({ name: 'Proyek Uji', pm: pm.id, budget: 50_000_000, status: 'berjalan' })
     const mandiri = await one('banks', 'code', 'MANDIRI')
     expect(await one('employee-bank-accounts', 'accountNo', '9990001112223')).toMatchObject({ employee: staffEmp.id, bank: mandiri.id, accountHolder: 'Staff Uji', isDefault: true })
@@ -99,7 +101,7 @@ describe('UAT seed', () => {
     const third = await seedUat(p, USERS)
     expect(sum(third, 'created')).toBe(0)
     expect(sum(third, 'linked')).toBe(0)
-    expect(sum(third, 'skipped')).toBe(4 + 4 + 1 + 1 + 1 + 3)
+    expect(sum(third, 'skipped')).toBe(5 + 5 + 1 + 1 + 1 + 3)
   })
 
   it('rejects inconsistent input against the DB (same email, other Keycloak id) without writing', async () => {
@@ -108,7 +110,7 @@ describe('UAT seed', () => {
     await expect(seedUat(p, clash)).rejects.toThrow(/email already belongs to another account/)
   })
 
-  it('Staff Uji can submit a request on OPS-PB; "Diketahui" resolves to PM Uji, who acknowledges', async () => {
+  it('Staff Uji can submit a request on OPS-PB; Direktur Uji approves ("Diketahui"), PM Uji cannot (ADR 0013), Finance Uji approves', async () => {
     const asFlow = async (email: string): Promise<FlowUser> => {
       const u = await one('users', 'email', email)
       const f = { id: u.id, email, keycloakSub: '', roles: u.roles as Role[], employee: u.employee as number, collection: 'users', cookie: '', _strategy: 'oidcSession' } as FlowUser
@@ -120,6 +122,8 @@ describe('UAT seed', () => {
     }
     const staff = await asFlow('staff.uji@proyekkas.test')
     const pm = await asFlow('pm.uji@proyekkas.test')
+    const direktur = await asFlow('owner.uji@proyekkas.test')
+    const finance = await asFlow('finance.uji@proyekkas.test')
     const account = await one('employee-bank-accounts', 'accountNo', '9990001112223')
     const ksm = await one('expense-categories', 'code', 'KSM')
     const E = '/api/v1/expense-requests'
@@ -135,9 +139,13 @@ describe('UAT seed', () => {
     expect(c.status, JSON.stringify(c.body)).toBe(201)
     const s = await api('POST', `${E}/${c.body.id}/submit`, staff, {})
     expect(s.status, JSON.stringify(s.body)).toBe(200)
-    expect(s.body).toMatchObject({ status: 'pending_ack', approvalRule: { acknowledgerUserId: pm.id } })
-    const ack = await api('POST', `${E}/${c.body.id}/acknowledge`, pm, {})
+    expect(s.body).toMatchObject({ status: 'pending_ack', approvalRule: { acknowledgeRole: 'pk-owner' } })
+    expect((await api('POST', `${E}/${c.body.id}/acknowledge`, pm, {})).status).toBe(403)
+    const ack = await api('POST', `${E}/${c.body.id}/acknowledge`, direktur, {})
     expect(ack.status, JSON.stringify(ack.body)).toBe(200)
     expect(ack.body.status).toBe('pending_approval')
+    const ok = await api('POST', `${E}/${c.body.id}/approve`, finance, {})
+    expect(ok.status, JSON.stringify(ok.body)).toBe(200)
+    expect(ok.body.status).toBe('approved')
   })
 })

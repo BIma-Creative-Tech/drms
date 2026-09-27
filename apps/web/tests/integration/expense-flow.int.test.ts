@@ -39,8 +39,8 @@ async function approvedAdvance(over: Record<string, unknown> = {}) {
   expect(c.status, JSON.stringify(c.body)).toBe(201)
   const id = c.body.id as number
   expect((await api('POST', `${E}/${id}/submit`, w.users.staffA, {})).status).toBe(200)
-  expect((await api('POST', `${E}/${id}/acknowledge`, w.users.pm, {})).status).toBe(200)
-  const a = await api('POST', `${E}/${id}/approve`, w.users.owner, {})
+  expect((await api('POST', `${E}/${id}/acknowledge`, w.users.owner, {})).status).toBe(200)
+  const a = await api('POST', `${E}/${id}/approve`, w.users.finance, {})
   expect(a.status, JSON.stringify(a.body)).toBe(200)
   return a.body
 }
@@ -88,25 +88,37 @@ describe('Uang Muka (advance) — happy path', () => {
     expect(r.body.status).toBe('pending_ack')
     expect(r.body.docNo).toMatch(/^\d+\/PB-DRMS\/\d{2}\/[IVX]+\/\d{4}$/)
     expect(r.body.approvals.map((a: { position: string }) => a.position).sort()).toEqual(['diajukan', 'dibuat'])
-    expect(r.body.approvalRule).toMatchObject({ acknowledge: 'required', acknowledgerUserId: w.users.pm.id, steps: [{ level: 1, approverRole: 'pk-owner' }] })
+    expect(r.body.approvalRule).toMatchObject({
+      acknowledge: 'required',
+      acknowledgeBy: 'role',
+      acknowledgeRole: 'pk-owner',
+      acknowledgerUserId: null,
+      decisionRoles: ['pk-owner', 'pk-finance'],
+      skipped: [],
+      steps: [{ level: 1, approverRole: 'pk-finance' }],
+    })
     const snap = await sqlAs('app', 'SELECT reason, grand_total::int AS g, content_hash IS NOT NULL AS h FROM expense_line_snapshots WHERE request_id = $1', [id])
     expect(snap.rows).toEqual([{ reason: 'submit', g: 800_000, h: true }])
     expect((await api('PATCH', `${E}/${id}`, w.users.staffA, { title: 'x' })).status).toBe(409) // G8
   })
 
-  it('Diketahui by the project PM → Approval by Owner: budget % before → after (US-26), approvedAmount frozen', async () => {
-    expect((await api('POST', `${E}/${id}/approve`, w.users.owner, {})).status).toBe(409) // still waiting for Diketahui
+  it('Diketahui = Direktur approval → Approval by Finance: budget % before → after (US-26), approvedAmount frozen (AC-3)', async () => {
+    expect((await api('POST', `${E}/${id}/approve`, w.users.finance, {})).status).toBe(409) // still waiting for Diketahui
     expect((await api('POST', `${E}/${id}/acknowledge`, w.users.otherPm, {})).status).toBe(404) // not his project
-    const ack = await api('POST', `${E}/${id}/acknowledge`, w.users.pm, {})
+    const ack = await api('POST', `${E}/${id}/acknowledge`, w.users.owner, {})
     expect(ack.status, JSON.stringify(ack.body)).toBe(200)
     expect(ack.body).toMatchObject({ status: 'pending_approval', currentLevel: 1 })
     expect((await api('POST', `${E}/${id}/approve`, w.users.pm, {})).status).toBe(403) // PM cannot approve (US-17)
-    expect((await api('POST', `${E}/${id}/approve`, w.users.finance, {})).status).toBe(403)
-    const ok = await api('POST', `${E}/${id}/approve`, w.users.owner, {})
+    expect((await api('POST', `${E}/${id}/approve`, w.users.owner, {})).status).toBe(403) // one position per person (G1)
+    expect((await api('POST', `${E}/${id}/approve`, w.users.owner2, {})).status).toBe(403) // Direktur is not the approval step
+    const ok = await api('POST', `${E}/${id}/approve`, w.users.finance, {})
     expect(ok.status, JSON.stringify(ok.body)).toBe(200)
     expect(ok.body).toMatchObject({ status: 'approved', statusLabel: 'Disetujui (Antri Transfer)', approvedAmount: 800_000 })
     const appr = ok.body.approvals.find((a: { position: string }) => a.position === 'approval')
-    expect(appr).toMatchObject({ budgetPctBefore: 0, budgetPctAfter: 0.8, signatureSource: 'profile' })
+    expect(appr).toMatchObject({ actorId: w.users.finance.id, budgetPctBefore: 0, budgetPctAfter: 0.8, signatureSource: 'profile' })
+    const dik = ok.body.approvals.find((a: { position: string }) => a.position === 'diketahui')
+    expect(dik).toMatchObject({ actorId: w.users.owner.id, decision: 'acknowledged', signatureSource: 'profile' })
+    expect(dik.signatureSha256).toMatch(/^[0-9a-f]{64}$/)
     expect(appr.signatureSha256).toMatch(/^[0-9a-f]{64}$/)
   })
 
@@ -202,9 +214,9 @@ describe('Reimburse — receipts at submission, revision, re-approval, verificat
     expect((await api('POST', `${E}/${id}/receipts`, w.users.staffA, { lineId: c.body.lines[0].id, vendorName: 'x', receiptDate: '2026-09-20', amount: 1, imageId: await receiptImage() })).status).toBe(409)
   })
 
-  it('cost-center manager acknowledges, Owner approves; Finance rejects a receipt → Revisi Nota', async () => {
-    expect((await api('POST', `${E}/${id}/acknowledge`, w.users.pm, {})).status).toBe(200)
-    expect((await api('POST', `${E}/${id}/approve`, w.users.owner, {})).status).toBe(200)
+  it('Direktur approves (Diketahui), Finance approves; Finance rejects a receipt → Revisi Nota', async () => {
+    expect((await api('POST', `${E}/${id}/acknowledge`, w.users.owner, {})).status).toBe(200)
+    expect((await api('POST', `${E}/${id}/approve`, w.users.finance, {})).status).toBe(200)
     d = (await api('GET', `${E}/${id}`, w.users.finance)).body
     expect(d.allowedActions).toEqual(expect.arrayContaining(['receipt_verify', 'receipt_reject', 'verify_receipts']))
     expect((await api('POST', `${E}/${id}/transfer`, w.users.finance, { cashAccountId: w.cashAccount, bankRef: 'X', proofMediaId: await proof() })).status).toBe(409) // not verified yet
@@ -214,7 +226,7 @@ describe('Reimburse — receipts at submission, revision, re-approval, verificat
     expect(rj.body.status).toBe('receipt_revision')
   })
 
-  it('requester fixes receipts and the amount changed → back to Menunggu Approval (new cycle); unchanged → Disetujui', async () => {
+  it('requester fixes receipts and the amount changed → back to Menunggu Diketahui (Direktur), new cycle (AC-7)', async () => {
     const lines = d.lines.map((l: { id: string; description: string; total: number; category: { id: number } }, i: number) => ({
       id: l.id,
       description: l.description,
@@ -236,8 +248,12 @@ describe('Reimburse — receipts at submission, revision, re-approval, verificat
     expect(add.status, JSON.stringify(add.body)).toBe(201)
     const rs = await api('POST', `${E}/${id}/receipts-resubmit`, w.users.staffA, {})
     expect(rs.status, JSON.stringify(rs.body)).toBe(200)
-    expect(rs.body).toMatchObject({ status: 'pending_approval', grandTotal: 740_000, approvedAmount: 750_000, approvalCycle: 2 })
-    const re = await api('POST', `${E}/${id}/approve`, w.users.owner, {})
+    expect(rs.body).toMatchObject({ status: 'pending_ack', currentLevel: 0, grandTotal: 740_000, approvedAmount: 750_000, approvalCycle: 2 })
+    expect((await api('POST', `${E}/${id}/approve`, w.users.finance, {})).status).toBe(409) // Direktur first
+    const ack2 = await api('POST', `${E}/${id}/acknowledge`, w.users.owner, {})
+    expect(ack2.status, JSON.stringify(ack2.body)).toBe(200)
+    expect(ack2.body).toMatchObject({ status: 'pending_approval', currentLevel: 1 })
+    const re = await api('POST', `${E}/${id}/approve`, w.users.finance, {})
     expect(re.status, JSON.stringify(re.body)).toBe(200)
     expect(re.body).toMatchObject({ status: 'approved', approvedAmount: 740_000 })
   })
@@ -262,15 +278,15 @@ describe('Reimburse — receipts at submission, revision, re-approval, verificat
 })
 
 describe('approval rules by amount (US-34): > Rp 10 juta needs two different approvers', () => {
-  it('level 1 → level 2; the same Owner cannot hold two levels (G1, DB unique); second Owner approves', async () => {
+  it('Direktur, then Finance level 1 → level 2; the same Finance cannot hold two levels (G1, DB unique); second Finance approves', async () => {
     const c = await api('POST', E, w.users.staffA, draftBody(w, { lines: [{ description: 'Genset', total: 12_000_000, categoryId: w.cat.mat }] }))
     const id = c.body.id
     expect((await api('POST', `${E}/${id}/submit`, w.users.staffA, {})).body.approvalRule.steps).toHaveLength(2)
-    await api('POST', `${E}/${id}/acknowledge`, w.users.pm, {})
-    const l1 = await api('POST', `${E}/${id}/approve`, w.users.owner, {})
+    await api('POST', `${E}/${id}/acknowledge`, w.users.owner, {})
+    const l1 = await api('POST', `${E}/${id}/approve`, w.users.finance, {})
     expect(l1.body).toMatchObject({ status: 'pending_approval', currentLevel: 2 })
-    expect((await api('POST', `${E}/${id}/approve`, w.users.owner, {})).status).toBe(403)
-    const l2 = await api('POST', `${E}/${id}/approve`, w.users.owner2, {})
+    expect((await api('POST', `${E}/${id}/approve`, w.users.finance, {})).status).toBe(403)
+    const l2 = await api('POST', `${E}/${id}/approve`, w.users.finance2, {})
     expect(l2.body).toMatchObject({ status: 'approved', approvedAmount: 12_000_000 })
   })
 })
@@ -287,20 +303,20 @@ describe('withdraw / cancel / reject / resubmit (US-04, US-06, G7, G8)', () => {
     expect((await api('PATCH', `${E}/${id}`, w.users.staffA, { title: 'Perbaikan' })).status).toBe(200)
     const s2 = await api('POST', `${E}/${id}/submit`, w.users.staffA, {})
     expect(s2.body).toMatchObject({ docNo: no, approvalCycle: 2 })
-    await api('POST', `${E}/${id}/acknowledge`, w.users.pm, {})
+    await api('POST', `${E}/${id}/acknowledge`, w.users.owner, {})
     expect((await api('POST', `${E}/${id}/withdraw`, w.users.staffA, { reason: 'x terlambat' })).status).toBe(403)
     expect((await api('POST', `${E}/${id}/cancel`, w.users.staffA, { reason: 'x terlambat' })).status).toBe(403)
     const st = await auditRows('expense_request', id)
     expect(st.find((r) => r.action === 'status_change' && r.reason === 'salah jumlah')).toBeTruthy()
   })
 
-  it('reject needs a reason; resubmit clones into a new Draft with a reference and gets a NEW number', async () => {
+  it('reject needs a reason (Finance, AC-4); resubmit clones into a new Draft with a reference and gets a NEW number', async () => {
     const c = await api('POST', E, w.users.staffA, draftBody(w))
     const id = c.body.id
     const first = (await api('POST', `${E}/${id}/submit`, w.users.staffA, {})).body.docNo
-    await api('POST', `${E}/${id}/acknowledge`, w.users.pm, {})
-    expect((await api('POST', `${E}/${id}/reject`, w.users.owner, {})).status).toBe(400)
-    const rj = await api('POST', `${E}/${id}/reject`, w.users.owner, { reason: 'anggaran belum ada' })
+    await api('POST', `${E}/${id}/acknowledge`, w.users.owner, {})
+    expect((await api('POST', `${E}/${id}/reject`, w.users.finance, {})).status).toBe(400)
+    const rj = await api('POST', `${E}/${id}/reject`, w.users.finance, { reason: 'anggaran belum ada' })
     expect(rj.body).toMatchObject({ status: 'rejected', rejectReason: 'anggaran belum ada' })
     expect((await api('POST', `${E}/${id}/resubmit`, w.users.staffB, {})).status).toBe(404)
     const rs = await api('POST', `${E}/${id}/resubmit`, w.users.staffA, {})
@@ -406,9 +422,11 @@ describe('lists and history', () => {
     const c = await api('POST', E, w.users.staffA, draftBody(w))
     await api('POST', `${E}/${c.body.id}/submit`, w.users.staffA, {})
     const pmInbox = await api('GET', `${E}?scope=inbox`, w.users.pm)
-    expect(pmInbox.body.items.map((i: { id: number }) => i.id)).toContain(c.body.id)
+    expect(pmInbox.body.items.map((i: { id: number }) => i.id)).not.toContain(c.body.id) // ADR 0013: PM only monitors
     const ownerInbox = await api('GET', `${E}?scope=inbox`, w.users.owner)
-    expect(ownerInbox.body.items.map((i: { id: number }) => i.id)).not.toContain(c.body.id) // waiting for Diketahui
+    expect(ownerInbox.body.items.map((i: { id: number }) => i.id)).toContain(c.body.id) // Direktur approval ("Diketahui")
+    const financeInbox = await api('GET', `${E}?scope=inbox`, w.users.finance)
+    expect(financeInbox.body.items.map((i: { id: number }) => i.id)).not.toContain(c.body.id) // waiting for the Direktur
     const team = await api('GET', `${E}?scope=team&limit=100`, w.users.otherPm)
     expect(team.body.items).toEqual([])
     const page1 = await api('GET', `${E}?limit=2`, w.users.finance)

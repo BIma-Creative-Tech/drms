@@ -36,6 +36,14 @@ export const meEndpoint = v1({
       email: u.email,
       name: u.name ?? null,
       roles: userRoles(req),
+      // ADR 0013 (E1): what the APK should show. Decisions (approval inbox) = Direktur (pk-owner) or
+      // Finance only; the PM monitors the team list. The server guard stays authoritative.
+      capabilities: {
+        approvalInbox: userRoles(req).some((r) => r === 'pk-owner' || r === 'pk-finance'),
+        teamMonitor: userRoles(req).includes('pk-pm'),
+        // E4 (requirements §4): progress reports are created by the PM (team projects) or the Direktur.
+        progressReportCreate: userRoles(req).some((r) => r === 'pk-pm' || r === 'pk-owner'),
+      },
       employee: employee ? { id: employee.id, code: employee.code, name: employee.name } : null,
       authMethod: u._strategy ?? 'oidcSession',
       device: u._pkDevice ?? null,
@@ -49,7 +57,7 @@ export const meEndpoint = v1({
         receiptRoundingTolerance: s.receiptRoundingTolerance,
         receiptMaxAgeDays: s.receiptMaxAgeDays,
         imageTargets: {
-          receiptsMaxPx: s.imageTargets?.receiptsMaxPx ?? 2000,
+          receiptsMaxPx: s.imageTargets?.receiptsMaxPx ?? 1600,
           selfiesMaxPx: s.imageTargets?.selfiesMaxPx ?? 720,
           transferProofsMaxPx: s.imageTargets?.transferProofsMaxPx ?? 1600,
           progressPhotosMaxPx: s.imageTargets?.progressPhotosMaxPx ?? 1600,
