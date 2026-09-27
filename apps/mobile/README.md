@@ -6,6 +6,18 @@ Riverpod, go_router, drift + SQLite3MultipleCiphers (encrypted DB), dio, flutter
 staging uses the in-app password login instead, see below).
 All UI text is Bahasa Indonesia (`lib/l10n/app_id.arb`).
 
+## Look (ADR 0015)
+
+Colours, fonts and icons follow the web admin (`apps/web` v0.4.0): `lib/app/theme/tokens.dart` = web
+`src/theme/tokens.ts` (test `test/unit/theme_tokens_test.dart` fails on drift), `lib/app/theme.dart` builds the light
+and dark Material 3 themes (`context.pk` for status colours), fonts Space Grotesk + DM Sans are bundled
+(`assets/fonts/`, SIL OFL), Iconsax glyphs are path data in `lib/shared/icons/iconsax.dart` (same as web
+`icons.ts`). Profil → Tampilan switches Sistem / Terang / Gelap. Preview screenshots without a device (not run by CI):
+
+```sh
+flutter test test_preview/screens_preview_test.dart --dart-define=PK_SHOTS_DIR=/tmp/pk-shots
+```
+
 ## Build flavors
 
 | Flavor | Config | API / Keycloak realm |

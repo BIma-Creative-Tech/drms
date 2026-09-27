@@ -6,6 +6,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed
+- **APK 0.2.0 — tampilan selaras web admin** (`apps/mobile`, branch `feat/mobile-ui-refresh`; ADR 0015 *proposed*,
+  plan `docs/proyekkas/plans/mobile-ui-refresh.md`). Look only — behaviour, API, sync and DB unchanged:
+  - Theme built from the web tokens (`apps/web/src/theme/tokens.ts` → `lib/app/theme/tokens.dart`): primary #2563EB,
+    accent #EA580C, slate surfaces, radius 14, surface-style app bar, **light and dark**; field sizes kept (52 dp
+    buttons, ≥ 48 dp targets). `StatusColors` replaced by the `PkColors` theme extension (`context.pk`, ok/warn/bad +
+    dark-mode text variants). New **Profil → Tampilan** (Sistem / Terang / Gelap), stored on the phone.
+  - Space Grotesk + DM Sans bundled as assets (SIL OFL 1.1, from google/fonts, licence texts in the licence page).
+  - Iconsax glyphs identical to the web (path data from `icons.ts`, drawn by an in-house SVG path parser; no icon
+    package).
+  - Home = module launcher: greeting + role, gradient tiles (web module gradients, count badges, staggered entrance,
+    off with reduced motion) replacing the big-button list; all visibility rules, routes and test keys kept. Bottom
+    navigation with Iconsax Linear/Bulk icons on a primary-tint pill. Login/splash in the new palette.
+  - Hard-coded colours on the other screens moved to theme tokens (status chips, timeline, attendance distance/recap/
+    team, tab bars made for the old solid app bar).
+  - Tests: token drift + WCAG contrast (`theme_tokens_test.dart`), glyph drift + parser (`iconsax_test.dart`),
+    Tampilan/launcher (`ui_refresh_test.dart`); widget tests now run with the real theme. Preview screenshots without
+    a device: `test_preview/screens_preview_test.dart` (manual, not in CI). No new package.
+
 ## [0.4.0] - 2026-09-27
 
 ### Changed
