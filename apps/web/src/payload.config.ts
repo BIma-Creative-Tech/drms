@@ -123,6 +123,9 @@ export default buildConfig({
       // bell S3e/US-05, avatar menu with profile/theme/logout). Replacing Nav drops before/afterNavLinks
       // (F2 work-view links + badges now live in the registry).
       Nav: '@/admin/shell/ModuleNav#ModuleNav',
+      // Loader (Uiverse "thin-lionfish-5" dots) on module navigation and every create/update/delete:
+      // one client provider around every admin page (built-in views included), see src/admin/loading.
+      providers: ['@/admin/loading/LoadingProvider#LoadingProvider'],
       // F3: module launcher at /admin, role dashboards at /admin/dashboard, reports, global audit log.
       views: { ...F2_ADMIN_VIEWS, ...F3_ADMIN_VIEWS, ...E2_ADMIN_VIEWS, ...E6_ADMIN_VIEWS, ...S2A_ADMIN_VIEWS, ...S3E_ADMIN_VIEWS },
     },

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { MODULES } from '@/admin/modules/registry'
-import { contrastRatio, moduleGradients, ramps, semantic, themeCssVariables } from '@/theme/tokens'
+import { contrastRatio, loaderDots, moduleGradients, ramps, semantic, themeCssVariables } from '@/theme/tokens'
 
 /**
  * Web-starter retheme (src/theme/tokens.ts): WCAG AA contrast (≥ 4.5:1 text, ≥ 3:1 focus ring /
@@ -91,6 +91,32 @@ describe('module launcher gradients (Odoo-style tiles)', () => {
   }
 })
 
+describe('admin loading dots (src/admin/loading)', () => {
+  const lum = (hex: string) => contrastRatio(hex, '#000000')
+  for (const mode of ['light', 'dark'] as const) {
+    const c = semantic[mode]
+    const { rest, peak } = loaderDots[mode]
+    it(`${mode}: peak dot ≥ 3:1 on background and card (WCAG 1.4.11)`, () => {
+      expect(contrastRatio(c[peak], c.background)).toBeGreaterThanOrEqual(3)
+      expect(contrastRatio(c[peak], c.card)).toBeGreaterThanOrEqual(3)
+    })
+    it(`${mode}: rest and peak are different brand tokens`, () => {
+      expect(c[rest]).not.toBe(c[peak])
+      expect([rest, peak].every((k) => k.startsWith('primary'))).toBe(true)
+    })
+  }
+  it('light pulses pale → primary (peak darker), dark pulses primary → hover (peak brighter)', () => {
+    expect(loaderDots.light).toEqual({ rest: 'primarySoft', peak: 'primary' })
+    expect(loaderDots.dark).toEqual({ rest: 'primary', peak: 'primaryHover' })
+    expect(lum(semantic.light.primarySoft)).toBeGreaterThan(lum(semantic.light.primary))
+    expect(lum(semantic.dark.primaryHover)).toBeGreaterThan(lum(semantic.dark.primary))
+  })
+  it('primarySoft: light tint in light mode, deep tint in dark mode', () => {
+    expect(lum(semantic.light.primarySoft)).toBeGreaterThan(lum(semantic.light.primary))
+    expect(lum(semantic.dark.primarySoft)).toBeLessThan(lum(semantic.dark.primary))
+  })
+})
+
 describe('themeCssVariables', () => {
   const vars = themeCssVariables()
 
@@ -103,6 +129,11 @@ describe('themeCssVariables', () => {
     expect(vars['--pk-light-accent']).toBe('#EA580C')
     expect(vars['--pk-dark-background']).toBe('#0B1120')
     expect(vars['--pk-radius']).toBe('0.875rem')
+    expect(vars['--pk-light-primary-soft']).toBe('#BFDBFE')
+    expect(vars['--pk-light-loader-rest']).toBe('#BFDBFE')
+    expect(vars['--pk-light-loader-peak']).toBe('#2563EB')
+    expect(vars['--pk-dark-loader-rest']).toBe('#60A5FA')
+    expect(vars['--pk-dark-loader-peak']).toBe('#93C5FD')
     expect(vars['--pk-light-mod-dashboard-from']).toBe('#2563EB')
     expect(vars['--pk-dark-mod-sistem-to']).toBe('#042F2E')
   })

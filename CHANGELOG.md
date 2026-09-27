@@ -6,6 +6,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+- **Admin loader** (`apps/web`, branch `feat/admin-loading-dots`): five pulsing dots (Uiverse.io
+  "thin-lionfish-5" by adamgiebl, MIT © 2023 Uiverse.io — provenance + licence in ADR 0014 addendum and
+  `src/admin/loading/_loading-dots.scss`) on every **module navigation** (launcher, module menu, breadcrumbs, links
+  inside views, filter forms, Payload redirects) and during every **create / update / delete** (Payload Save /
+  Publish / Delete / bulk actions / Duplicate and every custom-view `/api/v1` POST/PATCH/DELETE). One client
+  provider (`admin.components.providers` → `src/admin/loading/LoadingProvider.tsx`): same-origin link clicks +
+  `useRouteTransition` for navigation, a single `window.fetch` wrapper counting unsafe `/api/` requests for
+  mutations (exclusions: autosave, preferences, document locks, access probes, auth/session, notification
+  read-marks, POST-as-GET queries, server actions). Shown after 180 ms, ≥ 300 ms, never > 15 s; navigation overlay
+  keeps the module bar visible, the save overlay blocks pointer input (no double submit). Colours follow the admin
+  theme (light pale primary → primary, dark primary → primaryHover; new token `primarySoft`); reduced motion =
+  static dots; `role="status"` "Memuat…" / "Menyimpan…". Unit tests `tests/unit/admin-loading.test.ts` + theme
+  contrast checks.
+
 ## [0.4.1] - 2026-09-27
 
 ### Added

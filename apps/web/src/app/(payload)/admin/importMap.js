@@ -8,6 +8,7 @@ import { LogoutButton as LogoutButton_db9ac62598c46d0f1db201f6af05442e } from '@
 import { Icon as Icon_bbc58174e2e54453bd848c29fea2f58a } from '@/theme/graphics'
 import { Logo as Logo_bbc58174e2e54453bd848c29fea2f58a } from '@/theme/graphics'
 import { SsoLoginButton as SsoLoginButton_e910a89f6cf03666cb4ab2594dae916d } from '@/components/SsoLoginButton'
+import { LoadingProvider as LoadingProvider_102ab52fcb0bfaca8f09b2ac251085a9 } from '@/admin/loading/LoadingProvider'
 import { ApprovalInbox as ApprovalInbox_38358c8fa3c2f08f616ef2728997b5dc } from '@/admin/views/ApprovalInbox'
 import { TransferQueue as TransferQueue_8a6e0f53c8f086ccf31fb1d3d209ace9 } from '@/admin/views/TransferQueue'
 import { LpjVerification as LpjVerification_0e13d2751aafbaa3ddc692019a4025e1 } from '@/admin/views/LpjVerification'
@@ -45,6 +46,7 @@ export const importMap = {
   "@/theme/graphics#Icon": Icon_bbc58174e2e54453bd848c29fea2f58a,
   "@/theme/graphics#Logo": Logo_bbc58174e2e54453bd848c29fea2f58a,
   "@/components/SsoLoginButton#SsoLoginButton": SsoLoginButton_e910a89f6cf03666cb4ab2594dae916d,
+  "@/admin/loading/LoadingProvider#LoadingProvider": LoadingProvider_102ab52fcb0bfaca8f09b2ac251085a9,
   "@/admin/views/ApprovalInbox#ApprovalInbox": ApprovalInbox_38358c8fa3c2f08f616ef2728997b5dc,
   "@/admin/views/TransferQueue#TransferQueue": TransferQueue_8a6e0f53c8f086ccf31fb1d3d209ace9,
   "@/admin/views/LpjVerification#LpjVerification": LpjVerification_0e13d2751aafbaa3ddc692019a4025e1,

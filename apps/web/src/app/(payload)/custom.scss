@@ -14,6 +14,9 @@
 //   those use the --pk-* tokens directly.
 // Only colour, typography, radius, surfaces and focus styles change — no layout/behaviour.
 
+// Admin loader overlay + dots (src/admin/loading, Uiverse.io MIT — notice in the partial).
+@use '../../admin/loading/loading-dots';
+
 @layer payload {
   // ---------------------------------------------------------------------------------------------
   // Tokens → Payload variables
