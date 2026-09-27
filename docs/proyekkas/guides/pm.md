@@ -69,4 +69,4 @@ Butuh internet. Hanya untuk project yang Anda pegang dan sudah punya RAB.
 - Web **Laporan**: Anggaran Project, Pengeluaran per Kategori, Rekap Pengajuan, Kelengkapan Nota/LPJ, Biaya per
   Kendaraan, Laporan Absensi — untuk project tim Anda; unduh Excel/CSV/PDF.
 - Pengingat otomatis (lonceng): project Anda belum ada laporan progress beberapa hari, atau anggaran melewati ambang.
-  Di web, lonceng **Notifikasi** ada di atas menu kiri (angka = belum dibaca).
+  Di web, lonceng **Notifikasi** ada di bar atas, kanan (angka = belum dibaca).

@@ -19,12 +19,15 @@ export const F2_ADMIN_VIEWS = {
 
 /**
  * F3 (wireframes §0): `dashboard` replaces the admin homepage (Payload 3.90.1
- * admin.components.views.dashboard, rendered inside the default template); the other views are
+ * admin.components.views.dashboard, rendered inside the default template) — since the Odoo-style
+ * navigation (2026-09-27) that homepage is the module launcher and the role dashboard is its own
+ * module at `/dashboard` (exact; custom root view wrapped in PageTemplate). The other views are
  * custom root views wrapped by Shell. `/laporan` must be exact, else it prefix-matches
  * `/laporan/<kode>` (isPathMatchingRoute: non-exact = prefix).
  */
 export const F3_ADMIN_VIEWS = {
-  dashboard: { Component: '@/admin/views/Dashboard#Dashboard' },
+  dashboard: { Component: '@/admin/views/Launcher#Launcher' },
+  dashboardPage: { Component: '@/admin/views/Dashboard#DashboardPage', path: '/dashboard' as const, exact: true, meta: { title: 'Dashboard' } },
   reports: { Component: '@/admin/views/Reports#ReportsIndex', path: '/laporan' as const, exact: true, meta: { title: 'Laporan' } },
   report: { Component: '@/admin/views/Reports#ReportView', path: '/laporan/:kode' as const, meta: { title: 'Laporan' } },
   auditLog: { Component: '@/admin/views/Reports#AuditLogView', path: '/audit-log' as const, exact: true, meta: { title: 'Audit Log' } },
@@ -67,7 +70,7 @@ export const S2A_ADMIN_VIEWS = {
   addendumDetail: { Component: '@/admin/views/Addendum#AddendumDetail', path: '/addendum/detail/:id' as const, exact: true, meta: { title: 'Addendum RAB' } },
 }
 
-/** S3e (US-05, S-04): the caller's notifications (bell in the nav, admin.components.beforeNavLinks). */
+/** S3e (US-05, S-04): the caller's notifications (bell in the top module bar, src/admin/shell/ModuleNav.tsx). */
 export const S3E_ADMIN_VIEWS = {
   notifications: { Component: '@/admin/views/Notifikasi#NotificationsView', path: '/notifikasi' as const, exact: true, meta: { title: 'Notifikasi' } },
 }

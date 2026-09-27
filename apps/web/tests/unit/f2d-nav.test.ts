@@ -1,38 +1,38 @@
-import type { Payload, TypedUser } from 'payload'
-import { renderToString } from 'react-dom/server'
+import type { TypedUser } from 'payload'
 import { describe, expect, it } from 'vitest'
 
-import { F2NavLinks } from '@/admin/components/F2NavLinks'
-import type { Role } from '@/access/roles'
+import { isStaffOnly, type Role } from '@/access/roles'
+import { profileHref, resolveModules } from '@/admin/modules/registry'
+import { navUser } from '@/admin/shell/modules-server'
 
 /**
- * F2d (UAT): every panel role that signs reaches its own profile ("Profil & tanda tangan") from
- * the nav — Owner included (approvals need the profile signature, US-43). Server-rendered with a
- * stub payload (badge counts only).
+ * F2d (UAT): every panel role that signs reaches its own profile ("Profil & tanda tangan") — Owner
+ * included (approvals need the profile signature, US-43). Since the Odoo-style navigation the link
+ * sits in the avatar menu of the top bar (ModuleBar, data-pk-nav-link="profile", not role-gated);
+ * "+ Buat pengajuan" is an item of Keuangan › Pengajuan (registry role rule).
  */
-const payload = { count: async () => ({ totalDocs: 2 }) } as unknown as Payload
+const nav = (roles: Role[]) => resolveModules({ roles, staffOnly: isStaffOnly({ roles }), canSee: () => true, labelOf: (_, s) => s })
+const keys = (roles: Role[]) => nav(roles).flatMap((m) => m.sections.flatMap((s) => s.items.map((i) => i.navKey)))
 
-async function nav(roles: Role[], id = 42): Promise<string> {
-  const el = await F2NavLinks({ payload, user: { id, roles, collection: 'users' } as unknown as TypedUser })
-  return el ? renderToString(el) : ''
-}
-
-describe('F2NavLinks — profile link for every signing role', () => {
-  it('Owner gets "Profil & tanda tangan" to their own user (and no "Buat pengajuan")', async () => {
-    const html = await nav(['pk-owner'], 7)
-    expect(html).toContain('Profil &amp; tanda tangan')
-    expect(html).toContain('href="/admin/collections/users/7"')
-    expect(html).not.toContain('Buat pengajuan')
-    expect(html).toContain('Antrian Transfer')
+describe('profile link for every signing role', () => {
+  it.each([['pk-staff'], ['pk-pm'], ['pk-finance'], ['pk-admin'], ['pk-owner']] as Array<[Role]>)('%s → own profile', (role) => {
+    const u = navUser({ id: 42, roles: [role], collection: 'users' } as unknown as TypedUser)
+    expect(profileHref(u)).toBe('/admin/collections/users/42')
   })
 
-  it.each([['pk-staff'], ['pk-pm'], ['pk-finance'], ['pk-admin'], ['pk-owner']] as Array<[Role]>)('%s → profile link', async (role) => {
-    const html = await nav([role])
-    expect(html).toContain('data-pk-nav-link="profile"')
-    expect(html).toContain('href="/admin/collections/users/42"')
+  it('Owner: own profile, no "Buat pengajuan", sees Antrian Transfer', () => {
+    expect(profileHref(navUser({ id: 7, roles: ['pk-owner'] } as unknown as TypedUser))).toBe('/admin/collections/users/7')
+    expect(keys(['pk-owner'])).not.toContain('buat-pengajuan')
+    expect(keys(['pk-owner'])).toContain('antrian-transfer')
   })
 
-  it('creators keep "+ Buat pengajuan"', async () => {
-    for (const r of ['pk-staff', 'pk-pm', 'pk-finance', 'pk-admin'] as Role[]) expect(await nav([r])).toContain('Buat pengajuan')
+  it('creators keep "+ Buat pengajuan"', () => {
+    for (const r of ['pk-staff', 'pk-pm', 'pk-finance', 'pk-admin'] as Role[]) {
+      const item = nav([r])
+        .flatMap((m) => m.sections.flatMap((s) => s.items))
+        .find((i) => i.navKey === 'buat-pengajuan')
+      expect(item?.href).toBe('/admin/collections/expense-requests/create')
+      expect(item?.label).toBe('+ Buat pengajuan')
+    }
   })
 })

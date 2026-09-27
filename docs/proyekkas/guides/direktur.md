@@ -18,7 +18,7 @@ Setiap pengajuan baru menunggu Anda dulu (**Menunggu Diketahui (Direktur)**), la
 
 **Di web:** **Persetujuan** → buka **Rincian baris, nota & flag** di bawah pengajuan (baris item, foto nota, flag per
 baris) → **Setujui** / **Tolak** (tanda tangan profil dipakai otomatis; alasan tolak minimal 3 karakter). Pengajuan
-baru juga muncul di lonceng **Notifikasi** (atas menu kiri) dan — bila Admin menyalakan **Email ke Direktur/Finance**
+baru juga muncul di lonceng **Notifikasi** (bar atas, kanan) dan — bila Admin menyalakan **Email ke Direktur/Finance**
 — lewat email berisi nomor pengajuan dan tautan ke Persetujuan.
 
 ![TODO screenshot: kartu Menunggu Persetujuan APK dengan Dampak anggaran](img/direktur-inbox.png)

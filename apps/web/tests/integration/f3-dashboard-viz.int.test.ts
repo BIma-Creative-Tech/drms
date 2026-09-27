@@ -1,4 +1,10 @@
+import { getVisibleEntities } from '@payloadcms/ui/shared'
+import { createLocalReq, getAccessResults } from 'payload'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+
+import { F3_ADMIN_VIEWS } from '@/admin/config'
+import { loadModules } from '@/admin/shell/modules-server'
+import { TRANSFER_QUEUE_WHERE } from '@/domain/expense/types'
 
 import { financeDashboard, ownerDashboard, pmDashboard, staffDashboard } from '@/domain/reports/dashboards'
 import { disbursedMonthly, recentCashEntries, requestStatusCounts, requestTrendMonthly, transferQueueTop } from '@/domain/reports/kpi'
@@ -180,5 +186,55 @@ describe('dashboards `viz` + API', () => {
     expect((await api('GET', '/api/v1/dashboard/owner', w.users.pm)).status).toBe(403)
     resetRateLimits()
     expect((await api('GET', '/api/v1/dashboard/finance', w.users.staffA)).status).toBe(403)
+  })
+})
+
+/**
+ * Odoo-style navigation (2026-09-27): the role dashboard moved from /admin to /admin/dashboard (the
+ * admin home is the module launcher). The launcher/top bar data is computed with the REAL access
+ * layer (getAccessResults + getVisibleEntities, as Payload's initPage does) — badges equal the
+ * queues the pages list, staff-only gets the restricted module set.
+ */
+describe('module launcher + /admin/dashboard', () => {
+  async function modulesOf(user: FlowUser) {
+    const p = await getTestPayload()
+    const req = await createLocalReq({ user: { ...user, collection: 'users' } as never }, p)
+    const permissions = await getAccessResults({ req })
+    const visibleEntities = getVisibleEntities({ req })
+    return { mods: await loadModules({ payload: p, user: req.user!, permissions, visibleEntities }), req, p }
+  }
+
+  it('dashboard view path is /dashboard (exact); home = launcher', () => {
+    expect(F3_ADMIN_VIEWS.dashboardPage).toMatchObject({ path: '/dashboard', exact: true })
+    expect(F3_ADMIN_VIEWS.dashboard.Component).toBe('@/admin/views/Launcher#Launcher')
+  })
+
+  it('finance: Persetujuan badges = transfer queue / LPJ counts under finance access', async () => {
+    const { mods, req, p } = await modulesOf(w.users.finance)
+    const per = mods.find((m) => m.id === 'persetujuan')!
+    const item = (k: string) => per.sections.flatMap((s) => s.items).find((i) => i.navKey === k)
+    const tq = await p.count({ collection: 'expense-requests', where: TRANSFER_QUEUE_WHERE, user: req.user, overrideAccess: false })
+    const lpj = await p.count({ collection: 'expense-requests', where: { status: { in: ['lpj_submitted', 'lpj_verified'] } }, user: req.user, overrideAccess: false })
+    expect(tq.totalDocs).toBeGreaterThan(0) // this world queued one approved advance
+    expect(item('antrian-transfer')!.badge ?? 0).toBe(tq.totalDocs)
+    expect(item('verifikasi-lpj')!.badge ?? 0).toBe(lpj.totalDocs)
+    expect(per.badge).toBe(tq.totalDocs + lpj.totalDocs)
+    expect(mods.map((m) => m.id)).toEqual(expect.arrayContaining(['dashboard', 'keuangan', 'laporan', 'sistem']))
+  })
+
+  it('staff-only: Dashboard, Keuangan (own requests/receipts), Absensi saya, profile, notifications', async () => {
+    const { mods } = await modulesOf(w.users.staffA)
+    expect(mods.map((m) => m.id).sort()).toEqual(['absensi', 'dashboard', 'keuangan', 'pengguna', 'sistem'])
+    expect(mods.every((m) => m.badge === 0)).toBe(true)
+  })
+
+  it('PM: Proyek with progress/addendum; Persetujuan only as the read-only approvals list (ADR 0013: PM monitors)', async () => {
+    const { mods } = await modulesOf(w.users.pm)
+    const proyek = mods.find((m) => m.id === 'proyek')!
+    expect(proyek.sections.flatMap((s) => s.items.map((i) => i.navKey))).toEqual(expect.arrayContaining(['progress', 'addendum']))
+    const per = mods.find((m) => m.id === 'persetujuan')
+    // no decision views (Persetujuan inbox / Antrian Transfer / Verifikasi LPJ are Direktur/Finance only)
+    expect(per?.sections.flatMap((s) => s.items.map((i) => i.href)) ?? []).toEqual(['/admin/collections/approvals'])
+    expect(per?.badge ?? 0).toBe(0)
   })
 })

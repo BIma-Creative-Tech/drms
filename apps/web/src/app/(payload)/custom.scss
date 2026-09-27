@@ -367,3 +367,631 @@
     }
   }
 }
+
+// =================================================================================================
+// Odoo-style navigation (2026-09-27): top module bar (src/admin/shell/ModuleBar.tsx, rendered as
+// admin.components.Nav) + module launcher at /admin (src/admin/views/Launcher*.tsx).
+// Payload 3.90.1 templates/Default lays Nav and the page out as a 2-column grid with a sidebar
+// toggler; here the template becomes a column (bar on top, full-width content) and the sidebar
+// toggler/hamburgers are hidden. The AppHeader row (breadcrumbs + document actions) stays below.
+// =================================================================================================
+$pk-modules: dashboard, persetujuan, proyek, keuangan, absensi, laporan, pengguna, master, media, pengaturan, sistem;
+
+@layer payload {
+  :root {
+    --pk-bar-h: 60px;
+    @each $m in $pk-modules {
+      --pk-mod-#{$m}-from: var(--pk-light-mod-#{$m}-from);
+      --pk-mod-#{$m}-to: var(--pk-light-mod-#{$m}-to);
+    }
+  }
+
+  html[data-theme='dark'] {
+    @each $m in $pk-modules {
+      --pk-mod-#{$m}-from: var(--pk-dark-mod-#{$m}-from);
+      --pk-mod-#{$m}-to: var(--pk-dark-mod-#{$m}-to);
+    }
+  }
+
+  @each $m in $pk-modules {
+    [data-mod='#{$m}'] {
+      --pk-tile-from: var(--pk-mod-#{$m}-from);
+      --pk-tile-to: var(--pk-mod-#{$m}-to);
+    }
+  }
+
+  // Focus not obscured (WCAG 2.4.11): anchors/focus scroll below the sticky bar.
+  html {
+    scroll-padding-top: calc(var(--pk-bar-h) + 8px);
+  }
+
+  // ---- template: bar on top, content full width -------------------------------------------------
+  .template-default,
+  .template-default--nav-open,
+  .template-default--nav-hydrated,
+  .template-default--nav-hydrated.template-default--nav-open {
+    display: flex;
+    flex-direction: column;
+    grid-template-columns: none;
+  }
+
+  .template-default__nav-toggler-wrapper,
+  .app-header__mobile-nav-toggler,
+  .app-header__account {
+    display: none;
+  }
+
+  .template-default__wrap {
+    min-width: 0;
+    width: 100%;
+  }
+
+  // Launcher (/admin): no (empty) breadcrumb row above the greeting.
+  .template-default__wrap:has(.pk-launcher) > .app-header {
+    display: none;
+  }
+
+  // Payload's sticky rows sit below the bar instead of under it.
+  .doc-controls,
+  .edit-many__document-actions,
+  .edit-many-bulk-uploads__document-actions {
+    top: var(--pk-bar-h);
+  }
+
+  // ---- bar ---------------------------------------------------------------------------------------
+  .pk-bar {
+    position: sticky;
+    top: 0;
+    z-index: 25; // above Payload's nav layer (20), below modals/drawers (30)
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    height: var(--pk-bar-h);
+    padding: 0 var(--gutter-h);
+    border-bottom: 1px solid color-mix(in oklab, var(--pk-border) 85%, transparent);
+    background-color: color-mix(in oklab, var(--pk-card) 82%, transparent);
+    backdrop-filter: blur(16px) saturate(160%);
+    color: var(--pk-fg);
+    font-size: 14px; // px: Payload's root font-size is 13px, rem would shrink the bar
+  }
+
+  .pk-bar__start,
+  .pk-bar__end {
+    display: flex;
+    flex-shrink: 0;
+    gap: 8px;
+    align-items: center;
+  }
+
+  // The module name may shrink (ellipsis) so the bell/avatar/☰ never leave the viewport.
+  .pk-bar__start {
+    flex-shrink: 1;
+    min-width: 0;
+  }
+
+  .pk-bar__mid {
+    flex: 1;
+    min-width: 0;
+    height: 100%;
+    overflow-x: clip; // clips the menu horizontally without clipping the dropdowns
+  }
+
+  .pk-bar__nav {
+    display: flex;
+    gap: 2px;
+    align-items: center;
+    width: max-content;
+    height: 100%;
+  }
+
+  .pk-bar[data-compact] .pk-bar__nav {
+    visibility: hidden;
+  }
+
+  .pk-bar__icon-btn,
+  .pk-bar__avatar {
+    position: relative;
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    border: 0;
+    border-radius: 12px;
+    background: transparent;
+    color: var(--pk-muted-fg);
+    text-decoration: none;
+    cursor: pointer;
+
+    &:hover {
+      background: var(--pk-muted-bg);
+      color: var(--pk-fg);
+    }
+  }
+
+  .pk-bar__launcher[aria-current='page'] {
+    background: color-mix(in oklab, var(--pk-primary) 12%, transparent);
+    color: var(--pk-primary);
+  }
+
+  .pk-bar__avatar {
+    width: 38px;
+    height: 38px;
+    border-radius: 999px;
+    background: linear-gradient(135deg, var(--pk-light-primary), var(--pk-mod-proyek-from));
+    color: #FFFFFF;
+    font-family: var(--pk-font-heading);
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+
+    &:hover {
+      background: linear-gradient(135deg, var(--pk-light-primary-hover), var(--pk-mod-proyek-to));
+      color: #FFFFFF;
+    }
+  }
+
+  .pk-bar__count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    border-radius: 999px;
+    background: var(--pk-tone-bad);
+    color: #FFFFFF;
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1;
+  }
+
+  .pk-bell .pk-bar__count {
+    position: absolute;
+    top: 4px;
+    right: 3px;
+    box-shadow: 0 0 0 2px var(--pk-card);
+  }
+
+  .pk-bar__module {
+    display: inline-flex;
+    gap: 10px;
+    align-items: center;
+    min-width: 0;
+    padding: 4px 8px 4px 4px;
+    border-radius: 12px;
+    color: var(--pk-fg);
+    font-family: var(--pk-font-heading);
+    font-size: 17px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    text-decoration: none;
+    white-space: nowrap;
+  }
+
+  a.pk-bar__module:hover {
+    background: var(--pk-muted-bg);
+  }
+
+  .pk-bar__module-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .pk-bar__brand-sub {
+    color: var(--pk-muted-fg);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.16em;
+  }
+
+  .pk-bar__chip {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 10px;
+    background: linear-gradient(135deg, var(--pk-tile-from), var(--pk-tile-to));
+    box-shadow: 0 4px 12px -4px color-mix(in oklab, var(--pk-tile-from) 70%, transparent);
+    color: #FFFFFF;
+  }
+
+  .pk-bar__chip--sm {
+    width: 24px;
+    height: 24px;
+    border-radius: 7px;
+  }
+
+  // top-level entries
+  .pk-bar__link {
+    position: relative;
+    display: inline-flex;
+    gap: 6px;
+    align-items: center;
+    height: 38px;
+    padding: 0 12px;
+    border: 0;
+    border-radius: 10px;
+    background: transparent;
+    color: var(--pk-muted-fg);
+    font: inherit;
+    font-weight: 600;
+    text-decoration: none;
+    white-space: nowrap;
+    cursor: pointer;
+
+    &:hover {
+      background: var(--pk-muted-bg);
+      color: var(--pk-fg);
+    }
+
+    &[data-active] {
+      color: var(--pk-primary);
+    }
+
+    > :not(.pk-bar__pill) {
+      position: relative; // above the pill
+    }
+  }
+
+  .pk-bar__pill {
+    position: absolute;
+    inset: 0;
+    border-radius: 10px;
+    background: color-mix(in oklab, var(--pk-primary) 12%, var(--pk-card));
+    box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--pk-primary) 28%, transparent);
+  }
+
+  .pk-bar__chev {
+    transition: transform 0.18s ease;
+  }
+
+  .pk-bar__dd {
+    position: relative;
+  }
+
+  .pk-bar__dd[data-open] .pk-bar__chev {
+    transform: rotate(180deg);
+  }
+
+  .pk-bar__menu {
+    position: absolute;
+    top: calc(100% + 8px);
+    left: 0;
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 232px;
+    padding: 6px;
+    border: 1px solid var(--pk-border);
+    border-radius: 14px;
+    background: var(--pk-card);
+    box-shadow: 0 16px 40px -12px rgb(15 23 42 / 0.28), 0 2px 6px rgb(15 23 42 / 0.06);
+    transform-origin: top left;
+  }
+
+  .pk-bar__dd--end .pk-bar__menu {
+    right: 0;
+    left: auto;
+    transform-origin: top right;
+  }
+
+  .pk-bar__menu-link {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    width: 100%;
+    min-height: 40px;
+    padding: 8px 10px;
+    border: 0;
+    border-radius: 9px;
+    background: transparent;
+    color: var(--pk-fg);
+    font: inherit;
+    font-weight: 500;
+    text-align: start;
+    text-decoration: none;
+    cursor: pointer;
+
+    &:hover {
+      background: var(--pk-muted-bg);
+    }
+
+    &[aria-current='page'] {
+      background: color-mix(in oklab, var(--pk-primary) 12%, transparent);
+      color: var(--pk-primary);
+      font-weight: 600;
+    }
+
+    .pk-bar__label {
+      flex: 1;
+    }
+
+    svg {
+      flex-shrink: 0;
+      color: var(--pk-muted-fg);
+    }
+  }
+
+  .pk-bar__who {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin-bottom: 4px;
+    padding: 8px 10px 10px;
+    border-bottom: 1px solid var(--pk-border);
+
+    strong {
+      font-family: var(--pk-font-heading);
+    }
+
+    span {
+      color: var(--pk-muted-fg);
+      font-size: 13px;
+    }
+  }
+
+  .pk-bar__email {
+    overflow: hidden;
+    max-width: 260px;
+    text-overflow: ellipsis;
+  }
+
+  .pk-bar__logout {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    margin-top: 4px;
+    padding: 6px 10px 2px;
+    border-top: 1px solid var(--pk-border);
+
+    > svg {
+      color: var(--pk-muted-fg);
+    }
+
+    .pk-logout {
+      flex: 1;
+    }
+
+    .pk-logout .btn {
+      width: 100%;
+      margin: 0;
+    }
+  }
+
+  // ---- mobile sheet ------------------------------------------------------------------------------
+  .pk-sheet {
+    position: fixed;
+    inset: 0;
+    z-index: 35;
+  }
+
+  .pk-sheet__scrim {
+    position: absolute;
+    inset: 0;
+    background: rgb(2 6 23 / 0.45);
+    backdrop-filter: blur(2px);
+  }
+
+  .pk-sheet__panel {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    flex-direction: column;
+    width: min(88vw, 360px);
+    border-left: 1px solid var(--pk-border);
+    background: var(--pk-card);
+    box-shadow: -16px 0 40px -12px rgb(15 23 42 / 0.35);
+  }
+
+  .pk-sheet__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: var(--pk-bar-h);
+    padding: 0 8px 0 16px;
+    border-bottom: 1px solid var(--pk-border);
+  }
+
+  .pk-sheet__body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 10px;
+    overscroll-behavior: contain;
+  }
+
+  .pk-sheet__all {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    min-height: 44px;
+    margin-bottom: 6px;
+    padding: 8px 10px;
+    border-radius: 10px;
+    background: var(--pk-muted-bg);
+    color: var(--pk-fg);
+    font-weight: 600;
+    text-decoration: none;
+  }
+
+  .pk-sheet__section + .pk-sheet__section {
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid var(--pk-border);
+  }
+
+  .pk-sheet__label {
+    padding: 6px 10px 4px;
+    color: var(--pk-muted-fg);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .pk-sheet .pk-bar__menu-link {
+    min-height: 44px;
+  }
+
+  // ---- launcher ----------------------------------------------------------------------------------
+  .pk-launcher {
+    max-width: 1120px;
+    margin: 0 auto;
+    padding: clamp(20px, 5vw, 56px) 0 64px;
+  }
+
+  .pk-launcher__head {
+    margin-bottom: clamp(24px, 4vw, 40px);
+    text-align: center;
+  }
+
+  .pk-launcher__hello {
+    margin: 0;
+    color: var(--pk-muted-fg);
+    font-size: 16px;
+  }
+
+  .pk-launcher__name {
+    margin: 2px 0 10px;
+    font-size: clamp(26px, 3.4vw, 36px);
+    line-height: 1.15;
+  }
+
+  .pk-launcher__role {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 10px;
+    align-items: center;
+    justify-content: center;
+    margin: 0;
+    color: var(--pk-muted-fg);
+    font-size: 15px;
+  }
+
+  .pk-launcher__role-pill {
+    padding: 3px 10px;
+    border-radius: 999px;
+    background: color-mix(in oklab, var(--pk-primary) 12%, var(--pk-card));
+    color: var(--pk-primary);
+    font-size: 13px;
+    font-weight: 700;
+  }
+
+  .pk-launcher__grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
+    gap: clamp(12px, 2.4vw, 28px) clamp(8px, 2vw, 20px);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  @media (max-width: 560px) {
+    .pk-launcher__grid {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+
+  .pk-launcher__empty {
+    color: var(--pk-muted-fg);
+    text-align: center;
+  }
+
+  .pk-tile {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    align-items: center;
+    padding: 10px 4px;
+    border-radius: 18px;
+    color: var(--pk-fg);
+    text-align: center;
+    text-decoration: none;
+
+    &:focus-visible {
+      outline: var(--accessibility-outline);
+      outline-offset: 2px;
+    }
+  }
+
+  .pk-tile__icon {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: clamp(64px, 18vw, 92px);
+    aspect-ratio: 1;
+    margin-bottom: 6px;
+    border-radius: 24%;
+    background:
+      radial-gradient(120% 90% at 20% 0%, rgb(255 255 255 / 0.22), transparent 55%),
+      linear-gradient(135deg, var(--pk-tile-from), var(--pk-tile-to));
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.25),
+      0 10px 24px -10px color-mix(in oklab, var(--pk-tile-from) 75%, transparent);
+    color: #FFFFFF;
+  }
+
+  .pk-tile__badge {
+    position: absolute;
+    top: -6px;
+    right: -6px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 24px;
+    height: 24px;
+    padding: 0 7px;
+    border-radius: 999px;
+    background: var(--pk-tone-bad);
+    box-shadow: 0 0 0 3px var(--pk-bg);
+    color: #FFFFFF;
+    font-size: 12px;
+    font-weight: 700;
+  }
+
+  .pk-tile__label {
+    font-family: var(--pk-font-heading);
+    font-size: 15px;
+    font-weight: 600;
+    line-height: 1.2;
+  }
+
+  .pk-tile__hint {
+    color: var(--pk-muted-fg);
+    font-size: 12px;
+    line-height: 1.3;
+  }
+
+  @media (max-width: 560px) {
+    .pk-tile__hint {
+      display: none;
+    }
+
+    .pk-tile__label {
+      font-size: 13px;
+    }
+  }
+
+  @media (max-width: 768px) {
+    .pk-bar {
+      gap: 6px;
+      padding: 0 8px;
+    }
+
+    .pk-bar__brand-sub {
+      display: none;
+    }
+
+    .pk-bar__module {
+      gap: 8px;
+      font-size: 15px;
+    }
+  }
+}

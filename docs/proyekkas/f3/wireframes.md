@@ -8,6 +8,12 @@
 
 ---
 
+> **Update 2026-09-27 (navigasi gaya Odoo):** `/admin` kini **layar modul** (launcher: kotak gradien + ikon Iconsax,
+> `src/admin/views/Launcher.tsx`, lewat `admin.components.views.dashboard`). Beranda per peran di bawah ini pindah ke
+> modul **Dashboard** di `/admin/dashboard` (custom view, isi dan tab `?peran=`/`bulan=` sama). Menu kiri Payload
+> diganti bar menu modul di atas (`admin.components.Nav` → `src/admin/shell/ModuleNav.tsx`; registry modul
+> `src/admin/modules/registry.ts`). Di bawah, "`/admin`" untuk beranda peran dibaca `/admin/dashboard`.
+
 ## 0. Kerangka teknis (realistis untuk Payload admin 3.90.1)
 
 | Topik | Usulan | Dasar |

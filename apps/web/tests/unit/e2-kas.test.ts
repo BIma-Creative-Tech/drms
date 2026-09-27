@@ -1,36 +1,34 @@
-import type { Payload, TypedUser } from 'payload'
-import { renderToString } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 
-import { F2NavLinks } from '@/admin/components/F2NavLinks'
+import { isStaffOnly, type Role } from '@/access/roles'
 import { E2_ADMIN_VIEWS } from '@/admin/config'
-import type { Role } from '@/access/roles'
+import { resolveModules } from '@/admin/modules/registry'
 import { bookWhere, canEdit, canVoid, closablePeriods, minPostingDate, parseBookQuery, parseRupiahInput, periodState, recentPeriods, voidHint } from '@/domain/cash/book'
 
 /**
- * E2 (fase1-golive §E2): pure rules of the Kas views + menu visibility per role. The server
- * re-checks every rule (ledger.ts); these are the UI hints and the query parsing.
+ * E2 (fase1-golive §E2): pure rules of the Kas views + menu visibility per role (module registry,
+ * Keuangan › Kas / Tutup buku). The server re-checks every rule (ledger.ts); these are the UI hints
+ * and the query parsing.
  */
-const payload = { count: async () => ({ totalDocs: 0 }) } as unknown as Payload
-async function nav(roles: Role[]): Promise<string> {
-  const el = await F2NavLinks({ payload, user: { id: 5, roles, collection: 'users' } as unknown as TypedUser })
-  return el ? renderToString(el) : ''
+function nav(roles: Role[]) {
+  const items = resolveModules({ roles, staffOnly: isStaffOnly({ roles }), canSee: () => true, labelOf: (_, s) => s }).flatMap((m) => m.sections.flatMap((s) => s.items))
+  return { keys: items.map((i) => i.navKey), hrefs: items.map((i) => i.href) }
 }
 
 describe('E2 menu: Kas + Tutup buku only for Finance and Direktur (pk-owner)', () => {
-  it.each([['pk-finance'], ['pk-owner']] as Array<[Role]>)('%s sees Kas and Tutup buku', async (r) => {
-    const html = await nav([r])
-    expect(html).toContain('data-pk-nav-link="kas"')
-    expect(html).toContain('href="/admin/kas"')
-    expect(html).toContain('href="/admin/tutup-buku"')
+  it.each([['pk-finance'], ['pk-owner']] as Array<[Role]>)('%s sees Kas and Tutup buku', (r) => {
+    const m = nav([r])
+    expect(m.keys).toContain('kas')
+    expect(m.hrefs).toContain('/admin/kas')
+    expect(m.hrefs).toContain('/admin/tutup-buku')
   })
-  it.each([['pk-pm'], ['pk-staff'], ['pk-admin']] as Array<[Role]>)('%s does not see them', async (r) => {
-    const html = await nav([r])
-    expect(html).not.toContain('/admin/kas')
-    expect(html).not.toContain('/admin/tutup-buku')
+  it.each([['pk-pm'], ['pk-staff'], ['pk-admin']] as Array<[Role]>)('%s does not see them', (r) => {
+    const m = nav([r])
+    expect(m.hrefs).not.toContain('/admin/kas')
+    expect(m.hrefs).not.toContain('/admin/tutup-buku')
   })
-  it('PM + Staff together still no menu', async () => {
-    expect(await nav(['pk-pm', 'pk-staff'])).not.toContain('/admin/kas')
+  it('PM + Staff together still no menu', () => {
+    expect(nav(['pk-pm', 'pk-staff']).hrefs).not.toContain('/admin/kas')
   })
   it('views are registered with exact paths (no prefix capture of /kas/baru)', () => {
     expect(E2_ADMIN_VIEWS.kasBook).toMatchObject({ path: '/kas', exact: true })

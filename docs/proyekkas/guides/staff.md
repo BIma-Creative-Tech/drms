@@ -53,7 +53,7 @@ Pilih jenisnya dulu:
 
 Setelah diajukan, nomor dokumen terbit (mis. `229/PB-DRMS/01/X/2026`) dan status **Menunggu Diketahui (Direktur)**.
 Pantau di **Pengajuan Saya** atau lonceng. Pemohon lain yang Anda cantumkan diberi tahu saat pengajuan dibuat atas
-namanya, diajukan, dan ditarik kembali; di web lonceng **Notifikasi** ada di atas menu kiri.
+namanya, diajukan, dan ditarik kembali; di web lonceng **Notifikasi** ada di bar atas, kanan.
 
 **Pesan yang sering muncul:** "Reimburse wajib melampirkan minimal 1 nota." · "Pilih salah satu: project atau pusat
 biaya." · "Rekening tujuan wajib dipilih." · "Data master belum tersedia…" (buka aplikasi saat online sekali).

@@ -41,7 +41,7 @@ function Mark({ size, label }: { size: number | string; label?: string }) {
 
 /** Step-nav/home icon. Payload's home link has no text of its own → the mark carries the name. */
 export function Icon() {
-  return <Mark size="100%" label={`${BRAND_NAME} ${BRAND_PRODUCT} — Beranda`} />
+  return <Mark size="100%" label={`${BRAND_NAME} ${BRAND_PRODUCT} — Semua modul`} />
 }
 
 /** Login page brand block. */

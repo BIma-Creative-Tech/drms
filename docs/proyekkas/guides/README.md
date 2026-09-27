@@ -17,18 +17,22 @@ Satu orang bisa punya lebih dari satu peran; baca semua panduan yang sesuai.
 **Alamat web:** `https://drms-kas.bimacreative.tech/admin` (produksi, menyusul) — selama uji coba:
 `https://drms-kas.staging.bimacreative.tech/admin`. Klik **Masuk dengan akun DRMS (SSO)**.
 
+**Panel web = layar modul:** setelah masuk, `/admin` menampilkan kotak modul (Dashboard, Persetujuan, Proyek,
+Keuangan, Absensi, Laporan, …) — hanya modul yang boleh Anda buka. Klik modul → menunya ada di **bar atas**; tombol
+**⊞** kembali ke layar modul; di HP menu dibuka dengan **☰**. Ringkasan per peran ada di modul **Dashboard**.
+
 **Aplikasi Android:** pasang APK yang dibagikan Admin. Buka → **Masuk ke ProyekKas** → isi **Email atau username** dan
 **Kata sandi** → **Masuk**. Login pertama butuh internet. Lupa kata sandi: hubungi Admin.
 
 ![TODO screenshot: layar Masuk APK dan tombol SSO web](img/umum-login.png)
 
 **Tanda tangan:** sebelum mengajukan atau menyetujui apa pun, unggah gambar tanda tangan Anda **sekali** di web:
-menu **Profil & tanda tangan** → unggah gambar PNG (tanda tangan di kertas putih, difoto/dipindai). Tanpa tanda
+menu akun (lingkaran inisial di kanan atas) → **Profil & tanda tangan** → unggah gambar PNG (tanda tangan di kertas putih, difoto/dipindai). Tanpa tanda
 tangan, aplikasi menolak dengan pesan "Tanda tangan wajib…". Tanda tangan tidak bisa diunggah dari APK.
 
 **Notifikasi:** di APK, lihat **ikon lonceng** di kanan atas Beranda (diperbarui tiap ± 2 menit saat aplikasi
 terbuka). Notifikasi *push* ke HP yang terkunci **belum aktif** — buka aplikasi secara rutin. Di web, **lonceng
-Notifikasi** ada di atas menu kiri (angka = belum dibaca; diperbarui saat pindah halaman) → halaman Notifikasi:
+Notifikasi** ada di bar atas, kanan (angka = belum dibaca; diperbarui saat pindah halaman) → halaman Notifikasi:
 **Buka** menandai dibaca dan membuka dokumennya, **Tandai semua dibaca**. Direktur/Finance dapat juga menerima email
 saat pengajuan menunggu keputusannya (bila dinyalakan Admin).
 
