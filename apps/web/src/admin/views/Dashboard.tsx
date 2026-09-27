@@ -16,6 +16,7 @@ import { officeScope, teamScope } from '@/domain/reports/scope'
 
 import { TeamTodayWidget } from './Absensi'
 import { ChartHover } from './ChartHover'
+import { PageTemplate } from './frame'
 import { dateId, ProgressCell, ProgressVsBudgetCard } from './progress-ui'
 import { BudgetBadge, F3Root } from './f3-ui'
 import {
@@ -46,9 +47,9 @@ import {
 } from './viz'
 
 /**
- * "Beranda" — replaces Payload's default dashboard (admin.components.views.dashboard, verified in
- * @payloadcms/next 3.90.1 views/Dashboard: rendered inside the default template, receives
- * initPageResult + searchParams). Layout by role, Owner > Finance > PM > Admin > Staff; further
+ * Dashboard module (/admin/dashboard, custom root view wrapped in PageTemplate — the admin home
+ * /admin is the Odoo-style module launcher since 2026-09-27, ./Launcher.tsx). Formerly "Beranda"
+ * = Payload's dashboard view; receives initPageResult + searchParams either way. Layout by role, Owner > Finance > PM > Admin > Staff; further
  * roles appear as tabs (?peran=…). Redesign 2026-09-25 (user: "terlalu text based"): KPI tiles,
  * charts and card tables in a 12-column bento grid (kit: ./viz.tsx). Server-rendered; the data
  * streams behind a skeleton (Suspense); every number links to the list/report that produces it
@@ -84,12 +85,12 @@ export async function Dashboard(props: AdminViewServerProps) {
     <Gutter>
       <F3Root name={`beranda-${layout ?? 'none'}`}>
         <style>{VIZ_STYLE}</style>
-        <DashHead title={`Beranda${layout ? ` · ${LABEL[layout]}` : ''}`}>
+        <DashHead title={`Dashboard${layout ? ` · ${LABEL[layout]}` : ''}`}>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             {layouts.length > 1 ? (
               <nav className="pk-tabs" aria-label="Tampilan peran" style={{ margin: 0 }}>
                 {layouts.map((l) => (
-                  <a key={l} href={`/admin?peran=${l}`} aria-current={l === layout ? 'page' : undefined} data-pk-role-tab={l}>
+                  <a key={l} href={`/admin/dashboard?peran=${l}`} aria-current={l === layout ? 'page' : undefined} data-pk-role-tab={l}>
                     {LABEL[l]}
                   </a>
                 ))}
@@ -97,10 +98,10 @@ export async function Dashboard(props: AdminViewServerProps) {
             ) : null}
             {layout === 'owner' ? (
               <nav className="pk-tabs" aria-label="Rentang grafik" style={{ margin: 0 }}>
-                <Link href="/admin?peran=owner&bulan=12" aria-current={months === 12 ? 'page' : undefined}>
+                <Link href="/admin/dashboard?peran=owner&bulan=12" aria-current={months === 12 ? 'page' : undefined}>
                   12 bulan
                 </Link>
-                <Link href="/admin?peran=owner&bulan=6" aria-current={months === 6 ? 'page' : undefined}>
+                <Link href="/admin/dashboard?peran=owner&bulan=6" aria-current={months === 6 ? 'page' : undefined}>
                   6 bulan
                 </Link>
               </nav>
@@ -1238,6 +1239,15 @@ async function Staff({ req }: { req: PayloadRequest }) {
         </Card>
       </Bento>
     </>
+  )
+}
+
+/** `/admin/dashboard` (admin/config.ts F3_ADMIN_VIEWS.dashboardPage): Dashboard inside the default template. */
+export function DashboardPage(props: AdminViewServerProps) {
+  return (
+    <PageTemplate props={props}>
+      <Dashboard {...props} />
+    </PageTemplate>
   )
 }
 

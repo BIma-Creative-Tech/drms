@@ -6,6 +6,32 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-09-27
+
+### Changed
+- **Admin navigation "gaya Odoo"** (`apps/web`, ADR 0014 accepted):
+  - `/admin` is now a **module launcher**: greeting (name + role) and a tile per visible module — Iconsax Bulk glyph
+    in white on a module gradient, badge = summed pending counts, staggered entrance / hover lift (motion), off with
+    `prefers-reduced-motion`. 11 modules: Dashboard, Persetujuan, Proyek, Keuangan, Absensi, Laporan, Pengguna & Akses,
+    Master Data, Media, Pengaturan, Sistem (`src/admin/modules/registry.ts`, single source of truth).
+  - The left sidebar is replaced by a **sticky top module bar** (`admin.components.Nav` →
+    `src/admin/shell/ModuleNav.tsx` + `ModuleBar.tsx`): ⊞ launcher, current module, horizontal menu with ▾ dropdowns
+    and an animated active pill, notification bell (moved from `beforeNavLinks`) and an avatar menu (Profil & tanda
+    tangan, light/dark theme, logout). Narrow screens (≤ 768 px or a menu that does not fit) get a ☰ sheet; keyboard:
+    ←/→/Home/End, ↓ opens, Esc closes, focus rings, `aria-current`.
+  - The role dashboard ("Beranda") moved to its own module at **`/admin/dashboard`** (same tabs `?peran=`/`bulan=`).
+  - Visibility unchanged in substance: Payload read permission ∧ `visibleEntities` (F2c staff whitelist) ∧ the role
+    rules formerly in `F2NavLinks.tsx` (retired; `beforeNavLinks`/`afterNavLinks` removed). Badge counts unchanged
+    (S3e S-07 transfer queue definition).
+
+### Added
+- Module gradient tokens (light + dark) in `src/theme/tokens.ts`; white glyph ≥ 3:1 on every stop (theme test).
+- Dependency `motion` 13.4.0 (MIT, exact pin). Iconsax glyphs are inline SVG (`src/admin/modules/icons.ts`) — the
+  `iconsax-reactjs`/`iconsax-react` packages were rejected (last release 2025-04 / 2022-05, §0.10 maintenance rule).
+- Tests: `tests/unit/admin-modules.test.ts` (every collection/global in exactly one module, per-role tiles with the
+  real config, active-module resolution, bar SSR); nav tests (f2d, e2, s3e) target the registry; launcher
+  integration test with the real access layer.
+
 ## [0.3.0] - 2026-09-27
 
 Fase 1 go-live build (web + API; images `ghcr.io/bctech-adm/proyekkas-{web,migrate}:0.3.0`). Covers F3 dashboards,

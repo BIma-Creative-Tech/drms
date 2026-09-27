@@ -1,8 +1,8 @@
 import type { Payload, TypedUser } from 'payload'
-import { renderToString } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 
-import { F2NavLinks } from '@/admin/components/F2NavLinks'
+import { resolveModules } from '@/admin/modules/registry'
+import { loadBadges } from '@/admin/shell/modules-server'
 import { openFlagCounts } from '@/admin/components/ReviewDetails'
 import type { Role } from '@/access/roles'
 import { bodyErrorDetail } from '@/api/v1/http'
@@ -142,7 +142,7 @@ describe('S-05 flag count definition', () => {
 })
 
 describe('S-07 transfer badge = transfer queue; S-23 Admin reaches Laporan', () => {
-  async function nav(roles: Role[]) {
+  async function badges(roles: Role[]) {
     const wheres: unknown[] = []
     const payload = {
       count: async (args: { collection: string; where: unknown }) => {
@@ -150,18 +150,22 @@ describe('S-07 transfer badge = transfer queue; S-23 Admin reaches Laporan', () 
         return { totalDocs: 3 }
       },
     } as unknown as Payload
-    const el = await F2NavLinks({ payload, user: { id: 1, roles, collection: 'users' } as unknown as TypedUser })
-    return { html: el ? renderToString(el) : '', wheres }
+    const b = await loadBadges(payload, { id: 1, roles, collection: 'users' } as unknown as TypedUser)
+    return { b, wheres }
   }
+  const navKeys = (roles: Role[]) =>
+    resolveModules({ roles, staffOnly: false, canSee: () => true, labelOf: (_, s) => s }).flatMap((m) => m.sections.flatMap((s) => s.items.map((i) => i.navKey)))
 
   it('badge counts exactly TRANSFER_QUEUE_WHERE (no Reimburse waiting for verification)', async () => {
-    const { wheres } = await nav(['pk-finance'])
+    const { wheres, b } = await badges(['pk-finance'])
     expect(wheres[0]).toBe(TRANSFER_QUEUE_WHERE)
     expect(JSON.stringify(TRANSFER_QUEUE_WHERE)).not.toContain('"in"')
+    expect(b).toEqual({ transfers: 3, lpj: 3 })
+    expect((await badges(['pk-pm'])).wheres).toEqual([]) // no count for non-office roles
   })
 
-  it('Admin gets the Laporan link (attendance report export)', async () => {
-    expect((await nav(['pk-admin'])).html).toContain('data-pk-nav-link="laporan"')
-    expect((await nav(['pk-staff'])).html).not.toContain('data-pk-nav-link="laporan"')
+  it('Admin gets the Laporan link (attendance report export)', () => {
+    expect(navKeys(['pk-admin'])).toContain('laporan')
+    expect(navKeys(['pk-staff'])).not.toContain('laporan')
   })
 })

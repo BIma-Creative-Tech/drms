@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
-import { contrastRatio, ramps, semantic, themeCssVariables } from '@/theme/tokens'
+import { MODULES } from '@/admin/modules/registry'
+import { contrastRatio, moduleGradients, ramps, semantic, themeCssVariables } from '@/theme/tokens'
 
 /**
  * Web-starter retheme (src/theme/tokens.ts): WCAG AA contrast (≥ 4.5:1 text, ≥ 3:1 focus ring /
@@ -77,6 +78,19 @@ describe('theme tokens — WCAG contrast', () => {
   })
 })
 
+describe('module launcher gradients (Odoo-style tiles)', () => {
+  it('one gradient per registry module, no orphans', () => {
+    expect(Object.keys(moduleGradients).sort()).toEqual(MODULES.map((m) => m.id).sort())
+  })
+  for (const [id, g] of Object.entries(moduleGradients)) {
+    for (const mode of ['light', 'dark'] as const) {
+      it(`${mode}: white icon on ${id} gradient ≥ 3:1 at both stops`, () => {
+        for (const stop of g[mode]) expect(contrastRatio(WHITE, stop)).toBeGreaterThanOrEqual(3)
+      })
+    }
+  }
+})
+
 describe('themeCssVariables', () => {
   const vars = themeCssVariables()
 
@@ -89,6 +103,8 @@ describe('themeCssVariables', () => {
     expect(vars['--pk-light-accent']).toBe('#EA580C')
     expect(vars['--pk-dark-background']).toBe('#0B1120')
     expect(vars['--pk-radius']).toBe('0.875rem')
+    expect(vars['--pk-light-mod-dashboard-from']).toBe('#2563EB')
+    expect(vars['--pk-dark-mod-sistem-to']).toBe('#042F2E')
   })
 
   it('only emits static hex colours / the radius (safe for an inline style attribute)', () => {

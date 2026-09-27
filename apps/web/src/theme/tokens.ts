@@ -128,6 +128,26 @@ export const ramps = {
   ]),
 }
 
+/**
+ * Launcher tile gradients per module (src/admin/modules/registry.ts ids): [from, to] at 135°, white
+ * Iconsax Bulk glyph on top. Every stop keeps white ≥ 3:1 (WCAG 1.4.11 non-text contrast, checked
+ * by tests/unit/theme.test.ts); dark mode uses one step deeper stops so the tiles do not glow on
+ * the dark background. Tailwind 600/700/800 hues.
+ */
+export const moduleGradients: Record<string, { light: [string, string]; dark: [string, string] }> = {
+  dashboard: { light: ['#2563EB', '#1E40AF'], dark: ['#1D4ED8', '#1E3A8A'] },
+  persetujuan: { light: ['#EA580C', '#B91C1C'], dark: ['#C2410C', '#991B1B'] },
+  proyek: { light: ['#4F46E5', '#3730A3'], dark: ['#4338CA', '#312E81'] },
+  keuangan: { light: ['#059669', '#065F46'], dark: ['#047857', '#064E3B'] },
+  absensi: { light: ['#0284C7', '#075985'], dark: ['#0369A1', '#0C4A6E'] },
+  laporan: { light: ['#7C3AED', '#5B21B6'], dark: ['#6D28D9', '#4C1D95'] },
+  pengguna: { light: ['#DB2777', '#9D174D'], dark: ['#BE185D', '#831843'] },
+  master: { light: ['#B45309', '#78350F'], dark: ['#92400E', '#78350F'] },
+  media: { light: ['#C026D3', '#86198F'], dark: ['#A21CAF', '#701A75'] },
+  pengaturan: { light: ['#475569', '#1E293B'], dark: ['#334155', '#0F172A'] },
+  sistem: { light: ['#0F766E', '#134E4A'], dark: ['#115E59', '#042F2E'] },
+}
+
 /** Base radius (web-starter brand.radius); Payload's s/m/l are derived like web-starter sm/md/lg. */
 export const radius = '0.875rem'
 
@@ -145,6 +165,12 @@ export function themeCssVariables(): Record<string, string> {
   for (const [step, v] of Object.entries(ramps.warning)) vars[`--color-warning-${step}`] = v
   for (const mode of ['light', 'dark'] as const) {
     for (const [k, v] of Object.entries(semantic[mode])) vars[`--pk-${mode}-${kebab(k)}`] = v
+  }
+  for (const [id, g] of Object.entries(moduleGradients)) {
+    for (const mode of ['light', 'dark'] as const) {
+      vars[`--pk-${mode}-mod-${id}-from`] = g[mode][0]
+      vars[`--pk-${mode}-mod-${id}-to`] = g[mode][1]
+    }
   }
   vars['--pk-radius'] = radius
   return vars

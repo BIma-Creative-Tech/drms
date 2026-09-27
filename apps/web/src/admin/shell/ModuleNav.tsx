@@ -1,0 +1,32 @@
+import type { Payload, SanitizedPermissions, TypedUser, VisibleEntities } from 'payload'
+import React from 'react'
+
+import { NotificationBell } from '@/admin/components/NotificationBell'
+import { LogoutButton } from '@/components/LogoutButton'
+
+import { ModuleBar } from './ModuleBar'
+import { loadModules, navUser } from './modules-server'
+
+/**
+ * admin.components.Nav (Payload 3.90.1 templates/Default: rendered on EVERY page that uses the
+ * DefaultTemplate — built-in list/edit/account views and our custom views wrapped in Frame/Shell —
+ * with serverProps {payload, permissions, user, i18n, …} + clientProps {visibleEntities}). Replaces
+ * the left sidebar by the Odoo-style top bar: the server computes the visible modules, badges and
+ * the bell, the client ModuleBar resolves the active module from the pathname and renders the menu.
+ * Replacing Nav drops before/afterNavLinks and the default logout slot → bell + logout live here.
+ */
+type Props = {
+  payload: Payload
+  user?: TypedUser
+  permissions?: SanitizedPermissions
+  visibleEntities?: VisibleEntities
+  i18n?: Parameters<typeof loadModules>[0]['i18n']
+}
+
+export async function ModuleNav({ payload, user, permissions, visibleEntities, i18n }: Props) {
+  if (!payload?.config || !user) return null
+  const modules = await loadModules({ payload, user, permissions, visibleEntities, i18n })
+  return <ModuleBar modules={modules} user={navUser(user)} bell={<NotificationBell payload={payload} user={user} />} logout={<LogoutButton />} />
+}
+
+export default ModuleNav
