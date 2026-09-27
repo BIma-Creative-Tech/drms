@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:proyekkas/app/providers.dart';
+import 'package:proyekkas/app/theme.dart';
 import 'package:proyekkas/core/config/app_env.dart';
 import 'package:proyekkas/core/connectivity/connectivity_controller.dart';
 import 'package:proyekkas/core/storage/secure_store.dart';
@@ -87,6 +88,7 @@ Future<void> pumpScreen(
         ...overrides,
       ],
       child: MaterialApp(
+        theme: buildTheme(),
         locale: const Locale('id'),
         supportedLocales: AppLocalizations.supportedLocales,
         localizationsDelegates: const [

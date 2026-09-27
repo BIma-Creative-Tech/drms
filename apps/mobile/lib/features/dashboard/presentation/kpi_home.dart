@@ -49,7 +49,6 @@ class KpiCard extends StatelessWidget {
     return Card(
       elevation: 0,
       color: emphasis ? scheme.primaryContainer : scheme.surfaceContainerLow,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       clipBehavior: Clip.antiAlias,
       margin: EdgeInsets.zero,
       child: InkWell(
@@ -128,7 +127,6 @@ class _SectionCard extends StatelessWidget {
     return Card(
       elevation: 0,
       color: theme.colorScheme.surfaceContainerLow,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       margin: const EdgeInsets.only(bottom: 12),
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -228,7 +226,7 @@ class DirekturKpis extends ConsumerWidget {
                 lines: [
                   _small(context, t.kpiOfBudget(formatRupiahShort(bt.realized), formatRupiahShort(bt.budget))),
                   if (d.budgetOver > 0 || d.budgetWarn > 0)
-                    _small(context, t.kpiBudgetAlerts(d.budgetOver, d.budgetWarn), color: StatusColors.warning),
+                    _small(context, t.kpiBudgetAlerts(d.budgetOver, d.budgetWarn), color: context.pk.warnText),
                 ],
                 footer: Meter(value: bt.realized, max: bt.budget),
               ),
@@ -281,7 +279,7 @@ class FinanceKpis extends ConsumerWidget {
                   _small(
                     context,
                     d.transferOverdue > 0 ? t.kpiOverdue(d.transferOverdue) : t.kpiOnTime,
-                    color: d.transferOverdue > 0 ? StatusColors.warning : null,
+                    color: d.transferOverdue > 0 ? context.pk.warnText : null,
                   ),
                 ],
               ),
@@ -297,7 +295,7 @@ class FinanceKpis extends ConsumerWidget {
                 value: '${d.lpjToSettle}',
                 lines: [
                   if (d.advancesOverdue > 0)
-                    _small(context, t.kpiAdvancesOverdue(d.advancesOverdue), color: StatusColors.danger),
+                    _small(context, t.kpiAdvancesOverdue(d.advancesOverdue), color: context.pk.badText),
                 ],
               ),
             ],
@@ -353,7 +351,7 @@ class PmTeamKpis extends ConsumerWidget {
               _small(
                 context,
                 d.lpjOverdue > 0 ? t.kpiLpjOverdue(d.lpjOverdue) : t.kpiLpjNoneOverdue,
-                color: d.lpjOverdue > 0 ? StatusColors.danger : null,
+                color: d.lpjOverdue > 0 ? context.pk.badText : null,
               ),
             ],
           ),

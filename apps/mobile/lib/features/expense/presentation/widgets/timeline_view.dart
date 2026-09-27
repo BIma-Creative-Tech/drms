@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../app/theme.dart';
 import '../../../../core/format/dates.dart';
 import '../../domain/turn_timeline.dart';
 
@@ -25,9 +26,9 @@ class TimelineView extends StatelessWidget {
                 TurnState.pending => Icons.radio_button_unchecked,
               },
               color: switch (s.state) {
-                TurnState.done => Colors.green.shade700,
+                TurnState.done => context.pk.okText,
                 TurnState.current => scheme.primary,
-                TurnState.rejected => scheme.error,
+                TurnState.rejected => context.pk.badText,
                 _ => scheme.outline,
               },
             ),

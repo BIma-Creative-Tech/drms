@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../l10n/gen/app_localizations.dart';
+import '../../../shared/widgets/brand_mark.dart';
 
 class SplashScreen extends StatelessWidget {
   const SplashScreen({super.key});
@@ -13,11 +14,11 @@ class SplashScreen extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.account_balance_wallet, size: 72),
-            const SizedBox(height: 16),
+            const BrandMark(size: 80),
+            const SizedBox(height: 20),
             Text(t.appTitle, style: Theme.of(context).textTheme.headlineSmall),
-            const SizedBox(height: 24),
-            const CircularProgressIndicator(),
+            const SizedBox(height: 28),
+            const SizedBox.square(dimension: 28, child: CircularProgressIndicator(strokeWidth: 3)),
           ],
         ),
       ),

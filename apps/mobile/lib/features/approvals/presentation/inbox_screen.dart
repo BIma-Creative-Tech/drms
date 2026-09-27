@@ -128,13 +128,13 @@ class InboxCard extends StatelessWidget {
                     Text(
                       t.budgetChange(pct(it.budget.pctBefore), pct(after)),
                       style: theme.textTheme.labelMedium?.copyWith(
-                        color: it.budgetOverWarn ? StatusColors.danger : null,
+                        color: it.budgetOverWarn ? context.pk.badText : null,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
                     if (it.budgetOverWarn) ...[
                       const SizedBox(width: 4),
-                      Icon(Icons.warning_amber, color: StatusColors.danger, size: 18, semanticLabel: t.budgetOverWarn),
+                      Icon(Icons.warning_amber, color: context.pk.badText, size: 18, semanticLabel: t.budgetOverWarn),
                     ],
                   ],
                 ),
@@ -144,7 +144,7 @@ class InboxCard extends StatelessWidget {
                   child: LinearProgressIndicator(
                     value: ((after ?? 0) / 100).clamp(0, 1).toDouble(),
                     minHeight: 8,
-                    color: it.budgetOverWarn ? StatusColors.danger : theme.colorScheme.primary,
+                    color: it.budgetOverWarn ? context.pk.badText : theme.colorScheme.primary,
                     backgroundColor: theme.colorScheme.surfaceContainerHighest,
                   ),
                 ),
@@ -156,7 +156,7 @@ class InboxCard extends StatelessWidget {
                   Icon(
                     Icons.flag,
                     size: 16,
-                    color: it.warningFlags > 0 ? StatusColors.warning : theme.colorScheme.outline,
+                    color: it.warningFlags > 0 ? context.pk.warnText : theme.colorScheme.outline,
                   ),
                   const SizedBox(width: 4),
                   Text(t.flagsCount(it.warningFlags, it.infoFlags), style: theme.textTheme.bodySmall),

@@ -743,6 +743,21 @@ class AppLocalizationsId extends AppLocalizations {
   String get profileDevice => 'ID perangkat';
 
   @override
+  String get profileAppearance => 'Tampilan';
+
+  @override
+  String get profileAppearanceHint => 'Sistem = ikuti pengaturan terang/gelap HP.';
+
+  @override
+  String get themeSystem => 'Sistem';
+
+  @override
+  String get themeLight => 'Terang';
+
+  @override
+  String get themeDark => 'Gelap';
+
+  @override
   String get pushDisabled => 'Notifikasi push belum aktif.';
 
   @override

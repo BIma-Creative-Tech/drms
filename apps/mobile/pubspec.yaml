@@ -3,7 +3,7 @@ description: "ProyekKas — aplikasi Android DRMS (pengajuan biaya, approval, ab
 publish_to: 'none'
 
 # X.Y.Z+N — N (versionCode) is overridden by CI with --build-number (ADR 0010 decision 13).
-version: 0.1.0+1
+version: 0.2.0+1
 
 environment:
   sdk: ">=3.13.4 <4.0.0"
@@ -63,3 +63,28 @@ hooks:
 flutter:
   uses-material-design: true
   generate: true
+  # OFL licence texts, shown in the licence page (LicenseRegistry, lib/app/fonts.dart).
+  assets:
+    - assets/fonts/OFL-SpaceGrotesk.txt
+    - assets/fonts/OFL-DMSans.txt
+  # Web admin typography (apps/web/src/theme/fonts.ts, ADR 0015), bundled — no runtime download, no
+  # google_fonts package. SIL OFL 1.1 (no Reserved Font Name). Source: github.com/google/fonts @
+  # 23e54b51ddffbc7713c583748e3bd86f62b1fa4a, ofl/spacegrotesk/SpaceGrotesk[wght].ttf and
+  # ofl/dmsans/DMSans[opsz,wght].ttf, cut into static instances with fontTools 4.60.1
+  # `varLib.instancer --static` (DM Sans at opsz=14) so FontWeight selects the right face on every engine.
+  # Only the weights the theme uses.
+  fonts:
+    - family: SpaceGrotesk
+      fonts:
+        - asset: assets/fonts/SpaceGrotesk-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/SpaceGrotesk-Bold.ttf
+          weight: 700
+    - family: DMSans
+      fonts:
+        - asset: assets/fonts/DMSans-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/DMSans-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/DMSans-Bold.ttf
+          weight: 700

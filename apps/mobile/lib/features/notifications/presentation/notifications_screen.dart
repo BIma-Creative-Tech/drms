@@ -8,6 +8,7 @@ import '../../../shared/widgets/async_body.dart';
 import '../../auth/application/auth_controller.dart';
 import '../application/notifications_providers.dart';
 import '../domain/app_notification.dart';
+import '../../../shared/icons/iconsax.dart';
 
 /// Bell icon with the unread count (home app bar).
 class NotificationBell extends ConsumerWidget {
@@ -24,7 +25,7 @@ class NotificationBell extends ConsumerWidget {
       icon: Badge(
         isLabelVisible: unread > 0,
         label: Text(unread > 99 ? '99+' : '$unread'),
-        child: const Icon(Icons.notifications),
+        child: const PkIcon(PkIcons.bell),
       ),
     );
   }

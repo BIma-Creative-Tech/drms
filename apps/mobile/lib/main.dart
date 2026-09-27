@@ -6,8 +6,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/date_symbol_data_local.dart';
 
 import 'app/app.dart';
+import 'app/fonts.dart';
 import 'app/providers.dart';
 import 'app/route_error_screen.dart';
+import 'app/theme_mode.dart';
 import 'core/config/app_env.dart';
 import 'core/db/app_database.dart';
 import 'core/device/device_identity.dart';
@@ -26,10 +28,12 @@ Future<void> main() async {
   // Only what the first frame needs, in parallel: install id + app version (request headers) and the
   // DB handle. The DB itself opens lazily in drift's background isolate on the first query, so the
   // SQLite3MultipleCiphers key derivation never runs on the UI thread.
-  final (_, device, db) = await (
+  registerFontLicenses();
+  final (_, device, db, themeMode) = await (
     initializeDateFormatting('id'),
     DeviceIdentity.load(store),
     openEncryptedDatabase(store),
+    loadThemeMode(store),
   ).wait;
   StartupTrace.mark('bootstrap done');
   // E3-b: WorkManager background sync. The UI isolate's port is registered before the first token
@@ -48,6 +52,7 @@ Future<void> main() async {
         secureStoreProvider.overrideWithValue(store),
         deviceIdentityProvider.overrideWithValue(device),
         databaseProvider.overrideWithValue(db),
+        initialThemeModeProvider.overrideWithValue(themeMode),
       ],
       child: const ProyekKasApp(),
     ),

@@ -54,7 +54,6 @@ class AttendanceScreen extends ConsumerWidget {
       AttendanceTab.recap => const RecapView(),
       AttendanceTab.team => const TeamTodayView(),
     };
-    final onPrimary = Theme.of(context).colorScheme.onPrimary;
     return DefaultTabController(
       length: tabs.length,
       initialIndex: initial,
@@ -64,9 +63,6 @@ class AttendanceScreen extends ConsumerWidget {
           bottom: tabs.length < 2
               ? null
               : TabBar(
-                  labelColor: onPrimary,
-                  unselectedLabelColor: onPrimary.withValues(alpha: 0.75),
-                  indicatorColor: onPrimary,
                   tabs: [for (final tab in tabs) Tab(key: Key('attendance-tab-${tab.name}'), text: label(tab))],
                 ),
         ),
@@ -264,8 +260,8 @@ class _History extends ConsumerWidget {
                   ? Icons.cloud_done
                   : (r.status == 'rejected' || r.status == 'failed' ? Icons.error : Icons.schedule),
               color: r.status == 'applied'
-                  ? StatusColors.ok
-                  : (r.status == 'rejected' || r.status == 'failed' ? StatusColors.danger : null),
+                  ? context.pk.okText
+                  : (r.status == 'rejected' || r.status == 'failed' ? context.pk.badText : null),
             ),
             title: Text(
               '${_label(r)} · '
