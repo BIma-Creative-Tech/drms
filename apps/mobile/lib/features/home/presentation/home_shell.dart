@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../l10n/gen/app_localizations.dart';
+import '../../../shared/icons/iconsax.dart';
 import '../../../shared/widgets/offline_banner.dart';
 import '../../auth/application/auth_controller.dart';
 
@@ -15,7 +16,8 @@ abstract final class Tabs {
   static const profile = 4;
 }
 
-/// Bottom navigation per role; only the tabs a role needs are shown (branches stay the same).
+/// Bottom navigation per role; only the tabs a role needs are shown (branches stay the same). Iconsax
+/// Linear glyphs, Bulk when selected, on the primary-tint pill of the theme (ADR 0015).
 class HomeShell extends ConsumerWidget {
   const HomeShell({super.key, required this.shell});
   final StatefulNavigationShell shell;
@@ -28,16 +30,16 @@ class HomeShell extends ConsumerWidget {
       (
         Tabs.home,
         NavigationDestination(
-          icon: const Icon(Icons.home_outlined),
-          selectedIcon: const Icon(Icons.home),
+          icon: const PkIcon(PkIcons.homeLinear),
+          selectedIcon: const PkIcon(PkIcons.home),
           label: t.navHome,
         ),
       ),
       (
         Tabs.requests,
         NavigationDestination(
-          icon: const Icon(Icons.receipt_long_outlined),
-          selectedIcon: const Icon(Icons.receipt_long),
+          icon: const PkIcon(PkIcons.requestsLinear),
+          selectedIcon: const PkIcon(PkIcons.requests),
           label: t.navRequests,
         ),
       ),
@@ -45,8 +47,8 @@ class HomeShell extends ConsumerWidget {
         (
           Tabs.inbox,
           NavigationDestination(
-            icon: const Icon(Icons.fact_check_outlined),
-            selectedIcon: const Icon(Icons.fact_check),
+            icon: const PkIcon(PkIcons.approvalLinear),
+            selectedIcon: const PkIcon(PkIcons.approval),
             label: t.navInbox,
           ),
         ),
@@ -54,16 +56,16 @@ class HomeShell extends ConsumerWidget {
         (
           Tabs.queue,
           NavigationDestination(
-            icon: const Icon(Icons.cloud_sync_outlined),
-            selectedIcon: const Icon(Icons.cloud_sync),
+            icon: const PkIcon(PkIcons.queueLinear),
+            selectedIcon: const PkIcon(PkIcons.queue),
             label: t.navQueue,
           ),
         ),
       (
         Tabs.profile,
         NavigationDestination(
-          icon: const Icon(Icons.person_outline),
-          selectedIcon: const Icon(Icons.person),
+          icon: const PkIcon(PkIcons.profileLinear),
+          selectedIcon: const PkIcon(PkIcons.profile),
           label: t.navProfile,
         ),
       ),
@@ -77,10 +79,15 @@ class HomeShell extends ConsumerWidget {
           Expanded(child: shell),
         ],
       ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: selected,
-        destinations: [for (final e in tabs) e.$2],
-        onDestinationSelected: (i) => shell.goBranch(tabs[i].$1, initialLocation: tabs[i].$1 == shell.currentIndex),
+      bottomNavigationBar: DecoratedBox(
+        decoration: BoxDecoration(
+          border: Border(top: BorderSide(color: Theme.of(context).colorScheme.outlineVariant)),
+        ),
+        child: NavigationBar(
+          selectedIndex: selected,
+          destinations: [for (final e in tabs) e.$2],
+          onDestinationSelected: (i) => shell.goBranch(tabs[i].$1, initialLocation: tabs[i].$1 == shell.currentIndex),
+        ),
       ),
     );
   }

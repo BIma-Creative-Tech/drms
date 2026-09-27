@@ -34,7 +34,7 @@ class TransferSection extends StatelessWidget {
             child: ListTile(
               leading: Icon(
                 tr.isVoid ? Icons.money_off : Icons.account_balance,
-                color: tr.isVoid ? StatusColors.danger : StatusColors.ok,
+                color: tr.isVoid ? context.pk.badText : context.pk.okText,
               ),
               title: Text('${tr.kindLabel} · ${formatRupiah(tr.amount)}'),
               subtitle: Text(

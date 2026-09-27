@@ -49,3 +49,7 @@ in our own product is explicitly allowed by Iconsax; if a strict OSI-only readin
 - Accessibility: white glyph ≥ 3:1 on every gradient stop (light + dark, `tests/unit/theme.test.ts`), visible focus
   rings, ←/→ between menu entries, ↓/Esc in dropdowns, focus-trapped mobile sheet, `aria-current="page"`.
 - Old deep links unchanged; only the home `/admin` changed (launcher) and the role dashboard moved to `/admin/dashboard`.
+- Follow-up (fix/admin-nav-polish): Payload's AppHeader row (StepNav with the graphics-Icon home crumb) is hidden
+  while it renders no view actions; breadcrumbs are a line under the bar rendered by `ModuleBar` from Payload's
+  `useStepNav()` (home crumb = current module, `src/admin/shell/crumbs.ts`). If a future view adds `viewActions`,
+  the AppHeader row reappears automatically (CSS `:has(.app-header__actions > *)`).

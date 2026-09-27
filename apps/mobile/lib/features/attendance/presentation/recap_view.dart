@@ -11,15 +11,19 @@ import '../domain/attendance.dart';
 import '../domain/attendance_recap.dart';
 
 /// Visual of a day status: colour + icon + short text (never colour alone).
-({Color color, IconData icon, String label}) dayStatusVisual(DayStatus s, AppLocalizations t, ColorScheme scheme) =>
-    switch (s) {
-      DayStatus.selesai => (color: StatusColors.ok, icon: Icons.check_circle, label: t.recapStatusDone),
-      DayStatus.hadir => (color: const Color(0xFF2A78D6), icon: Icons.login, label: t.recapStatusPresent),
-      DayStatus.belumAbsen => (color: scheme.outline, icon: Icons.schedule, label: t.recapStatusNotYet),
-      DayStatus.tidakHadir => (color: StatusColors.danger, icon: Icons.cancel, label: t.recapStatusAbsent),
-      DayStatus.libur => (color: scheme.outline, icon: Icons.beach_access, label: t.recapStatusHoliday),
-      DayStatus.tanpaJadwal => (color: scheme.outlineVariant, icon: Icons.remove, label: t.recapStatusNoSchedule),
-    };
+({Color color, IconData icon, String label}) dayStatusVisual(
+  DayStatus s,
+  AppLocalizations t,
+  ColorScheme scheme,
+  PkColors pk,
+) => switch (s) {
+  DayStatus.selesai => (color: pk.okText, icon: Icons.check_circle, label: t.recapStatusDone),
+  DayStatus.hadir => (color: pk.info, icon: Icons.login, label: t.recapStatusPresent),
+  DayStatus.belumAbsen => (color: scheme.outline, icon: Icons.schedule, label: t.recapStatusNotYet),
+  DayStatus.tidakHadir => (color: pk.badText, icon: Icons.cancel, label: t.recapStatusAbsent),
+  DayStatus.libur => (color: scheme.outline, icon: Icons.beach_access, label: t.recapStatusHoliday),
+  DayStatus.tanpaJadwal => (color: scheme.outlineVariant, icon: Icons.remove, label: t.recapStatusNoSchedule),
+};
 
 /// US-09 monthly recap: month switcher, totals and a Monday-first calendar grid. [employeeId] null =
 /// own recap (GET /attendance/me); otherwise a team member's (GET /attendance/recap).
@@ -137,7 +141,6 @@ class _SummaryGrid extends StatelessWidget {
                   elevation: 0,
                   margin: EdgeInsets.zero,
                   color: Theme.of(context).colorScheme.surfaceContainerLow,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                   child: Padding(
                     padding: const EdgeInsets.all(12),
                     child: Column(
@@ -234,7 +237,7 @@ class _DayCell extends StatelessWidget {
         ),
       );
     }
-    final v = dayStatusVisual(d.status, t, theme.colorScheme);
+    final v = dayStatusVisual(d.status, t, theme.colorScheme, context.pk);
     final marks = d.lateMinutes > 0 || d.onBehalf || d.corrected;
     return Padding(
       padding: const EdgeInsets.all(2),
@@ -264,7 +267,7 @@ class _DayCell extends StatelessWidget {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Icon(v.icon, size: 14, color: v.color),
-                      if (marks) Icon(Icons.circle, size: 5, color: StatusColors.warning),
+                      if (marks) Icon(Icons.circle, size: 5, color: context.pk.warnText),
                     ],
                   ),
                   if (d.checkInLocal != null)
@@ -292,7 +295,7 @@ class _Legend extends StatelessWidget {
         for (final s in DayStatus.values)
           Builder(
             builder: (context) {
-              final v = dayStatusVisual(s, t, theme.colorScheme);
+              final v = dayStatusVisual(s, t, theme.colorScheme, context.pk);
               return Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -306,7 +309,7 @@ class _Legend extends StatelessWidget {
         Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.circle, size: 6, color: StatusColors.warning),
+            Icon(Icons.circle, size: 6, color: context.pk.warnText),
             const SizedBox(width: 4),
             Text(t.recapLegendMark, style: theme.textTheme.bodySmall),
           ],
@@ -327,7 +330,7 @@ class DayDetailSheet extends StatelessWidget {
     final t = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final d = day;
-    final v = dayStatusVisual(d.status, t, theme.colorScheme);
+    final v = dayStatusVisual(d.status, t, theme.colorScheme, context.pk);
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
@@ -349,10 +352,9 @@ class DayDetailSheet extends StatelessWidget {
             if (d.checkInLocal != null || d.checkOutLocal != null)
               Text(t.recapInOut(d.checkInLocal ?? '—', d.checkOutLocal ?? '—')),
             if (d.workMinutes != null) Text(t.recapWorked(hoursMinutes(d.workMinutes!))),
-            if (d.lateMinutes > 0)
-              Text(t.recapLateBy(d.lateMinutes), style: const TextStyle(color: StatusColors.warning)),
+            if (d.lateMinutes > 0) Text(t.recapLateBy(d.lateMinutes), style: TextStyle(color: context.pk.warnText)),
             if (d.earlyLeaveMinutes > 0)
-              Text(t.recapEarlyBy(d.earlyLeaveMinutes), style: const TextStyle(color: StatusColors.warning)),
+              Text(t.recapEarlyBy(d.earlyLeaveMinutes), style: TextStyle(color: context.pk.warnText)),
             if (d.onBehalf) Text(t.recapOnBehalf(d.onBehalfBy.join(', '))),
             if (d.corrected) Text(t.recapCorrected),
             if (d.flags.isNotEmpty) Text(t.recapFlags(d.flags.join(', ')), style: theme.textTheme.bodySmall),

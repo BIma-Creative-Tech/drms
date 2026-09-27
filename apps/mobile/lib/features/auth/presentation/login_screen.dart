@@ -5,6 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../app/providers.dart';
 import '../../../core/connectivity/connectivity_controller.dart';
 import '../../../l10n/gen/app_localizations.dart';
+import '../../../shared/widgets/brand_mark.dart';
+import '../../../shared/widgets/module_tile.dart' show StagingBadge;
 import '../application/auth_controller.dart';
 
 /// Login. `PK_LOGIN_MODE=browser` (default): one button that opens the Keycloak page in a Custom Tab
@@ -99,16 +101,20 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final t = AppLocalizations.of(context);
     final env = ref.watch(appEnvProvider);
     return [
-      const Icon(Icons.account_balance_wallet, size: 80),
-      const SizedBox(height: 16),
-      Text(t.loginTitle, textAlign: TextAlign.center, style: Theme.of(context).textTheme.headlineSmall),
+      const Center(child: BrandMark(size: 80)),
+      const SizedBox(height: 20),
+      Text(t.loginTitle, textAlign: TextAlign.center, style: Theme.of(context).textTheme.headlineMedium),
       if (!env.isProd)
         Padding(
-          padding: const EdgeInsets.only(top: 8),
-          child: Center(child: Chip(label: Text(t.stagingBadge))),
+          padding: const EdgeInsets.only(top: 10),
+          child: Center(child: StagingBadge(label: t.stagingBadge)),
         ),
       const SizedBox(height: 12),
-      Text(subtitle, textAlign: TextAlign.center),
+      Text(
+        subtitle,
+        textAlign: TextAlign.center,
+        style: Theme.of(context).textTheme.bodyLarge?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+      ),
     ];
   }
 
@@ -116,7 +122,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     color: Theme.of(context).colorScheme.errorContainer,
     child: Padding(
       padding: const EdgeInsets.all(12),
-      child: Text(notice, key: const Key('login-notice')),
+      child: Text(
+        notice,
+        key: const Key('login-notice'),
+        style: TextStyle(color: Theme.of(context).colorScheme.onErrorContainer),
+      ),
     ),
   );
 

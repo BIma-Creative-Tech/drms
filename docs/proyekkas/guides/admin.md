@@ -15,6 +15,12 @@ bar ada **lonceng Notifikasi** dan **menu akun** (inisial nama: Profil & tanda t
 Di HP (layar sempit) menu modul dibuka dengan tombol **☰**. Modul hanya tampil bila Anda punya akses ke minimal
 satu isinya; angka merah = jumlah yang menunggu tindakan.
 
+Di halaman daftar dan formulir data, baris kecil di bawah bar menunjukkan **lokasi halaman**, mis.
+**Keuangan › Pengajuan biaya › PB-2026-0001**: klik nama modul untuk ke menu pertamanya, klik nama daftar untuk
+kembali ke daftar. Halaman khusus (Kas, Antrian Transfer, Laporan, dst.) tidak punya baris ini — judul halaman sudah
+cukup. Di HP, tabel lebar bisa digeser ke samping di dalam kotaknya (bayangan di tepi = masih ada kolom); Antrian
+Transfer tampil sebagai kartu per pengajuan.
+
 | Modul | Isi menu |
 |---|---|
 | **Dashboard** | Ringkasan per peran (tab peran bila punya lebih dari satu), `/admin/dashboard` |

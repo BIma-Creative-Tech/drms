@@ -7,7 +7,7 @@ import { withReqTransaction } from '@/lib/system-tx'
 
 import { ActionButton } from '../components/ActionButton'
 import { MoneyForm } from '../components/MoneyForm'
-import { Empty, Forbidden, Shell, allowed, badge, docLink, num, rp, table, td, th } from './shared'
+import { Empty, Forbidden, Shell, TableScroll, allowed, badge, docLink, num, rp, table, td, th } from './shared'
 
 type Detail = Awaited<ReturnType<typeof detail>>
 
@@ -73,55 +73,57 @@ export async function LpjVerification(props: AdminViewServerProps) {
               ))}
             </ul>
           ) : null}
-          <table style={{ ...table, marginTop: 8 }}>
-            <thead>
-              <tr>
-                <th style={th}>Foto</th>
-                <th style={th}>Baris</th>
-                <th style={th}>Nota</th>
-                <th style={th}>Tanggal</th>
-                <th style={{ ...th, textAlign: 'right' }}>Nominal</th>
-                <th style={th}>Status</th>
-                <th style={th}>Aksi</th>
-              </tr>
-            </thead>
-            <tbody>
-              {d.receipts
-                .filter((r) => r.status !== 'removed')
-                .map((r) => (
-                  <tr key={r.id}>
-                    <td style={td}>
-                      {r.imageId ? (
-                        <a href={`/api/v1/media/receipts/${r.imageId}/file`} target="_blank" rel="noopener noreferrer">
-                          {/* eslint-disable-next-line @next/next/no-img-element -- authenticated API file, not a static asset */}
-                          <img src={`/api/v1/media/receipts/${r.imageId}/file?variant=thumb`} alt={`Nota ${r.receiptNo ?? r.id}`} style={{ width: 80, height: 80, objectFit: 'cover' }} />
-                        </a>
-                      ) : (
-                        '—'
-                      )}
-                    </td>
-                    <td style={td}>{r.lineNo ?? '—'}</td>
-                    <td style={td}>
-                      {r.vendorName}
-                      <div style={{ fontSize: 12 }}>No. {r.receiptNo ?? '—'}</div>
-                    </td>
-                    <td style={td}>{r.receiptDate}</td>
-                    <td style={num}>{rp(r.amount)}</td>
-                    <td style={td}>
-                      <span style={badge(r.status === 'valid' ? 'ok' : r.status === 'rejected' ? 'bad' : 'muted')}>{r.status === 'valid' ? 'valid' : r.status === 'rejected' ? 'ditolak' : 'menunggu'}</span>
-                    </td>
-                    <td style={td}>
-                      {finance && d.allowedActions.includes('receipt_verify') ? (
-                        <>
-                          {r.status !== 'valid' ? <ActionButton url={`${base(d.id)}/receipts/${r.id}/verify`} label="Valid" /> : null}
-                          {r.status !== 'rejected' ? <ActionButton url={`${base(d.id)}/receipts/${r.id}/reject`} label="Tolak" prompt={{ field: 'reason', message: 'Alasan nota ditolak (wajib):', minLength: 3 }} /> : null}
-                        </>
-                      ) : null}
-                    </td>
-                  </tr>
-                ))}
-            </tbody>
-          </table>
+          <TableScroll label="Nota LPJ">
+            <table style={{ ...table, marginTop: 8 }}>
+              <thead>
+                <tr>
+                  <th style={th}>Foto</th>
+                  <th style={th}>Baris</th>
+                  <th style={th}>Nota</th>
+                  <th style={th}>Tanggal</th>
+                  <th style={{ ...th, textAlign: 'right' }}>Nominal</th>
+                  <th style={th}>Status</th>
+                  <th style={th}>Aksi</th>
+                </tr>
+              </thead>
+              <tbody>
+                {d.receipts
+                  .filter((r) => r.status !== 'removed')
+                  .map((r) => (
+                    <tr key={r.id}>
+                      <td style={td}>
+                        {r.imageId ? (
+                          <a href={`/api/v1/media/receipts/${r.imageId}/file`} target="_blank" rel="noopener noreferrer">
+                            {/* eslint-disable-next-line @next/next/no-img-element -- authenticated API file, not a static asset */}
+                            <img src={`/api/v1/media/receipts/${r.imageId}/file?variant=thumb`} alt={`Nota ${r.receiptNo ?? r.id}`} style={{ width: 80, height: 80, objectFit: 'cover' }} />
+                          </a>
+                        ) : (
+                          '—'
+                        )}
+                      </td>
+                      <td style={td}>{r.lineNo ?? '—'}</td>
+                      <td style={td}>
+                        {r.vendorName}
+                        <div style={{ fontSize: 12 }}>No. {r.receiptNo ?? '—'}</div>
+                      </td>
+                      <td style={td}>{r.receiptDate}</td>
+                      <td style={num}>{rp(r.amount)}</td>
+                      <td style={td}>
+                        <span style={badge(r.status === 'valid' ? 'ok' : r.status === 'rejected' ? 'bad' : 'muted')}>{r.status === 'valid' ? 'valid' : r.status === 'rejected' ? 'ditolak' : 'menunggu'}</span>
+                      </td>
+                      <td style={td}>
+                        {finance && d.allowedActions.includes('receipt_verify') ? (
+                          <>
+                            {r.status !== 'valid' ? <ActionButton url={`${base(d.id)}/receipts/${r.id}/verify`} label="Valid" /> : null}
+                            {r.status !== 'rejected' ? <ActionButton url={`${base(d.id)}/receipts/${r.id}/reject`} label="Tolak" prompt={{ field: 'reason', message: 'Alasan nota ditolak (wajib):', minLength: 3 }} /> : null}
+                          </>
+                        ) : null}
+                      </td>
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
+          </TableScroll>
           {finance ? (
             <div style={{ marginTop: 8 }}>
               {d.allowedActions.includes('lpj_verify') ? (

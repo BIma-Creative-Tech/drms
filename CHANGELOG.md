@@ -6,6 +6,41 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed
+- **Admin breadcrumbs** (`apps/web`): Payload's AppHeader row under the module bar (a lone graphics-Icon "D" home
+  crumb, and an empty row on pages without crumbs) is replaced by a slim **breadcrumb line** under the bar
+  (`ModuleBar` → `PageCrumbs`, pure derivation in `src/admin/shell/crumbs.ts`): home = the current module (icon +
+  name → its first menu item; "Semua modul" outside every module), then Payload's steps, e.g. **Keuangan › Pengajuan
+  biaya › PB-2026-0001**; last crumb `aria-current="page"`. Shown on collection list/edit, globals and account; custom
+  views and the launcher have no crumbs → no row, no gap. Steps left over from the previous page (custom views set
+  none) are ignored; before Payload sets them, the module menu labels are used (no jump after hydration).
+- **APK 0.2.0 — tampilan selaras web admin** (`apps/mobile`, branch `feat/mobile-ui-refresh`; ADR 0015 accepted,
+  plan `docs/proyekkas/plans/mobile-ui-refresh.md`). Look only — behaviour, API, sync and DB unchanged:
+  - Theme built from the web tokens (`apps/web/src/theme/tokens.ts` → `lib/app/theme/tokens.dart`): primary #2563EB,
+    accent #EA580C, slate surfaces, radius 14, surface-style app bar, **light and dark**; field sizes kept (52 dp
+    buttons, ≥ 48 dp targets). `StatusColors` replaced by the `PkColors` theme extension (`context.pk`, ok/warn/bad +
+    dark-mode text variants). New **Profil → Tampilan** (Sistem / Terang / Gelap), stored on the phone.
+  - Space Grotesk + DM Sans bundled as assets (SIL OFL 1.1, from google/fonts, licence texts in the licence page).
+  - Iconsax glyphs identical to the web (path data from `icons.ts`, drawn by an in-house SVG path parser; no icon
+    package).
+  - Home = module launcher: greeting + role, gradient tiles (web module gradients, count badges, staggered entrance,
+    off with reduced motion) replacing the big-button list, shown above the KPI section so no role has to scroll to
+    its menu; all visibility rules, routes and test keys kept. Bottom
+    navigation with Iconsax Linear/Bulk icons on a primary-tint pill. Login/splash in the new palette.
+  - Hard-coded colours on the other screens moved to theme tokens (status chips, timeline, attendance distance/recap/
+    team, tab bars made for the old solid app bar).
+  - Request detail: the "Dampak anggaran > 85%" warning uses a warning icon instead of a ⚠ text glyph (not in DM Sans).
+  - Tests: token drift + WCAG contrast (`theme_tokens_test.dart`), glyph drift + parser (`iconsax_test.dart`),
+    Tampilan/launcher (`ui_refresh_test.dart`); widget tests now run with the real theme. Preview screenshots without
+    a device: `test_preview/screens_preview_test.dart` (manual, not in CI). No new package.
+
+### Fixed
+- **No horizontal page scroll at 390 px** (audit of every custom view, launcher, collection list/edit, globals and
+  account × 5 roles): Antrian Transfer (−253 px) becomes stacked cards per request on screens ≤ 640 px (the transfer
+  form stays inside its card); the other custom-view tables (Verifikasi LPJ −28 px, Persetujuan, Notifikasi, transfer
+  void list, Riwayat, nota tables in the edit view) scroll inside their own focusable box with edge shadows
+  (`TableScroll`); the account view (−60 px, Payload's settings divider wider than the page) is contained.
+
 ## [0.4.0] - 2026-09-27
 
 ### Changed

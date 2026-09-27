@@ -5,6 +5,7 @@ import { detail } from '@/domain/expense/dto'
 import { formatRupiah } from '@/lib/money'
 
 import { ActionButton } from './ActionButton'
+import { TableScroll } from './TableScroll'
 
 type Detail = Awaited<ReturnType<typeof detail>>
 
@@ -126,70 +127,72 @@ function RequestReview({ d }: { d: Detail }) {
             {rs.length === 0 ? (
               <div style={{ fontSize: 12, color: 'var(--theme-error-500)' }}>Belum ada nota untuk baris ini.</div>
             ) : (
-              <table style={{ ...table, marginTop: 4 }}>
-                <thead>
-                  <tr>
-                    <th style={th}>Foto</th>
-                    <th style={th}>Nota</th>
-                    <th style={th}>Tanggal</th>
-                    <th style={{ ...th, textAlign: 'right' }}>Nominal</th>
-                    <th style={th}>Status</th>
-                    <th style={th}>Flag</th>
-                    <th style={th}>Aksi</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {rs.map((r) => {
-                    const st = RECEIPT_STATUS[r.status] ?? RECEIPT_STATUS.pending!
-                    const flags = d.flags.filter((f) => f.receiptId === r.id)
-                    return (
-                      <tr key={r.id} data-pk-receipt={r.id}>
-                        <td style={td}>
-                          {r.imageId ? (
-                            <a href={`/api/v1/media/receipts/${r.imageId}/file`} target="_blank" rel="noopener noreferrer">
-                              {/* eslint-disable-next-line @next/next/no-img-element -- authenticated API file, not a static asset */}
-                              <img src={`/api/v1/media/receipts/${r.imageId}/file?variant=thumb`} alt={`Nota ${r.receiptNo ?? r.id}`} style={{ width: 80, height: 80, objectFit: 'cover' }} />
-                            </a>
-                          ) : (
-                            '—'
-                          )}
-                        </td>
-                        <td style={td}>
-                          {r.vendorName}
-                          <div style={{ fontSize: 12 }}>No. {r.receiptNo ?? '—'}</div>
-                        </td>
-                        <td style={td}>{r.receiptDate}</td>
-                        <td style={num}>{rp(r.amount)}</td>
-                        <td style={td}>
-                          <span style={badge(st.tone)}>{st.text}</span>
-                        </td>
-                        <td style={td}>
-                          {flags.length === 0 ? (
-                            '—'
-                          ) : (
-                            <ul style={{ margin: 0, paddingLeft: 16, fontSize: 12 }}>
-                              {flags.map((f) => (
-                                <FlagItem key={f.id} d={d} f={f} canReview={canReview} />
-                              ))}
-                            </ul>
-                          )}
-                        </td>
-                        <td style={td}>
-                          {canVerify && r.status !== 'valid' ? <ActionButton url={`${base}/receipts/${r.id}/verify`} label="Valid" testId="receipt-valid" /> : null}
-                          {canReject && r.status !== 'rejected' ? (
-                            <ActionButton
-                              url={`${base}/receipts/${r.id}/reject`}
-                              label="Tolak"
-                              prompt={{ field: 'reason', message: 'Alasan nota ditolak (wajib). Pengajuan kembali ke pemohon sebagai "Revisi Nota":', minLength: 3 }}
-                              testId="receipt-reject"
-                            />
-                          ) : null}
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
+              <TableScroll label="Nota per baris">
+                <table style={{ ...table, marginTop: 4 }}>
+                  <thead>
+                    <tr>
+                      <th style={th}>Foto</th>
+                      <th style={th}>Nota</th>
+                      <th style={th}>Tanggal</th>
+                      <th style={{ ...th, textAlign: 'right' }}>Nominal</th>
+                      <th style={th}>Status</th>
+                      <th style={th}>Flag</th>
+                      <th style={th}>Aksi</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rs.map((r) => {
+                      const st = RECEIPT_STATUS[r.status] ?? RECEIPT_STATUS.pending!
+                      const flags = d.flags.filter((f) => f.receiptId === r.id)
+                      return (
+                        <tr key={r.id} data-pk-receipt={r.id}>
+                          <td style={td}>
+                            {r.imageId ? (
+                              <a href={`/api/v1/media/receipts/${r.imageId}/file`} target="_blank" rel="noopener noreferrer">
+                                {/* eslint-disable-next-line @next/next/no-img-element -- authenticated API file, not a static asset */}
+                                <img src={`/api/v1/media/receipts/${r.imageId}/file?variant=thumb`} alt={`Nota ${r.receiptNo ?? r.id}`} style={{ width: 80, height: 80, objectFit: 'cover' }} />
+                              </a>
+                            ) : (
+                              '—'
+                            )}
+                          </td>
+                          <td style={td}>
+                            {r.vendorName}
+                            <div style={{ fontSize: 12 }}>No. {r.receiptNo ?? '—'}</div>
+                          </td>
+                          <td style={td}>{r.receiptDate}</td>
+                          <td style={num}>{rp(r.amount)}</td>
+                          <td style={td}>
+                            <span style={badge(st.tone)}>{st.text}</span>
+                          </td>
+                          <td style={td}>
+                            {flags.length === 0 ? (
+                              '—'
+                            ) : (
+                              <ul style={{ margin: 0, paddingLeft: 16, fontSize: 12 }}>
+                                {flags.map((f) => (
+                                  <FlagItem key={f.id} d={d} f={f} canReview={canReview} />
+                                ))}
+                              </ul>
+                            )}
+                          </td>
+                          <td style={td}>
+                            {canVerify && r.status !== 'valid' ? <ActionButton url={`${base}/receipts/${r.id}/verify`} label="Valid" testId="receipt-valid" /> : null}
+                            {canReject && r.status !== 'rejected' ? (
+                              <ActionButton
+                                url={`${base}/receipts/${r.id}/reject`}
+                                label="Tolak"
+                                prompt={{ field: 'reason', message: 'Alasan nota ditolak (wajib). Pengajuan kembali ke pemohon sebagai "Revisi Nota":', minLength: 3 }}
+                                testId="receipt-reject"
+                              />
+                            ) : null}
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </TableScroll>
             )}
           </div>
         )

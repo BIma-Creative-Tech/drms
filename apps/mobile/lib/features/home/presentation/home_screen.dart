@@ -4,7 +4,9 @@ import 'package:go_router/go_router.dart';
 
 import '../../../app/providers.dart';
 import '../../../l10n/gen/app_localizations.dart';
-import '../../../shared/widgets/big_action_button.dart';
+import '../../../app/theme.dart';
+import '../../../shared/icons/iconsax.dart';
+import '../../../shared/widgets/module_tile.dart';
 import '../../addendum/presentation/addendum_providers.dart';
 import '../../app_config/application/app_config_providers.dart';
 import '../../app_config/domain/app_config.dart';
@@ -18,7 +20,9 @@ import '../../notifications/presentation/notifications_screen.dart';
 import '../../progress/application/progress_providers.dart';
 import '../../progress/presentation/widgets/project_progress_summary.dart';
 
-/// Role home: KPI summary (Direktur / Finance, US-27; PM team monitor, US-17) above big action buttons.
+/// Role home: KPI summary (Direktur / Finance, US-27; PM team monitor, US-17) above the module launcher
+/// (gradient tiles in the web admin look, ADR 0015). Visibility rules, badges and routes per tile are
+/// unchanged from the former big action buttons; the tile keys (`home-inbox`, …) are kept for tests.
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
 
@@ -38,37 +42,43 @@ class HomeScreen extends ConsumerWidget {
 
     final actions = <Widget>[
       if (profile.hasApprovalInbox)
-        BigActionButton(
+        ModuleTile(
           key: const Key('home-inbox'),
-          icon: Icons.fact_check,
+          module: PkModule.persetujuan,
+          icon: PkIcons.approval,
           label: t.actionInbox,
           badge: inboxCount == null || inboxCount == 0 ? null : '$inboxCount',
           subtitle: inboxCount == null ? null : t.inboxCount(inboxCount),
           onPressed: () => context.go('/inbox'),
         ),
       if (profile.canCreateRequests) ...[
-        BigActionButton(
+        ModuleTile(
           key: const Key('home-new-advance'),
-          icon: Icons.payments,
+          module: PkModule.keuangan,
+          icon: PkIcons.advance,
           label: t.actionNewAdvance,
           onPressed: () => context.push('/drafts/new?type=${RequestType.advance.code}'),
         ),
-        BigActionButton(
+        ModuleTile(
           key: const Key('home-new-reimburse'),
-          icon: Icons.receipt,
+          module: PkModule.keuangan,
+          icon: PkIcons.reimburse,
           label: t.actionNewReimburse,
           onPressed: () => context.push('/drafts/new?type=${RequestType.reimburse.code}'),
         ),
       ],
-      BigActionButton(
-        icon: Icons.list_alt,
+      ModuleTile(
+        key: const Key('home-requests'),
+        module: PkModule.laporan,
+        icon: PkIcons.requests,
         label: kind == HomeKind.direktur || kind == HomeKind.finance ? t.actionAllRequests : t.actionMyRequests,
         onPressed: () => context.go('/requests'),
       ),
       if (profile.canReadProgress)
-        BigActionButton(
+        ModuleTile(
           key: const Key('home-progress'),
-          icon: Icons.construction,
+          module: PkModule.proyek,
+          icon: PkIcons.progress,
           label: profile.canCreateProgress ? t.actionProgress : t.actionProgressRead,
           subtitle: openProgress > 0 ? t.progressPendingCount(openProgress) : null,
           badge: openProgress > 0 ? '$openProgress' : null,
@@ -76,9 +86,10 @@ class HomeScreen extends ConsumerWidget {
         ),
       // E5 Addendum RAB: PM creates (team projects), Direktur/Finance follow all (decisions via the inbox).
       if (profile.has(Role.pm) || profile.hasApprovalInbox)
-        BigActionButton(
+        ModuleTile(
           key: const Key('home-addenda'),
-          icon: Icons.request_quote,
+          module: PkModule.proyek,
+          icon: PkIcons.addendum,
           label: t.addendumTitle,
           subtitle: addendumInbox > 0 ? t.addendumWaitingCount(addendumInbox) : null,
           onPressed: () => context.push('/addenda'),
@@ -86,9 +97,10 @@ class HomeScreen extends ConsumerWidget {
       // E6: the recap (own month) and "Tim hari ini" are online reads and stay available when the company
       // setting "Absensi dari APK" is off; only check-in / on-behalf follow the flag.
       if (profile.hasOwnAttendance || profile.canSeeTeamAttendance)
-        BigActionButton(
+        ModuleTile(
           key: const Key('home-attendance'),
-          icon: Icons.fingerprint,
+          module: PkModule.absensi,
+          icon: PkIcons.attendance,
           label: t.actionAttendance,
           subtitle: profile.hasOwnAttendance
               ? (attendanceOn ? t.actionAttendanceSub : t.actionAttendanceOffSub)
@@ -111,7 +123,7 @@ class HomeScreen extends ConsumerWidget {
           if (!ref.watch(appEnvProvider).isProd)
             Padding(
               padding: const EdgeInsets.only(right: 12),
-              child: Chip(label: Text(t.stagingBadge)),
+              child: Center(child: StagingBadge(label: t.stagingBadge)),
             ),
         ],
       ),
@@ -127,32 +139,32 @@ class HomeScreen extends ConsumerWidget {
           ref.invalidate(projectProgressProvider);
         },
         child: ListView(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.fromLTRB(16, 20, 16, 24),
           children: [
-            Text(t.greeting(profile.displayName), style: Theme.of(context).textTheme.titleLarge),
+            _Greeting(name: profile.displayName, roles: profile.roleLabels),
             if (ref.watch(integrityReportProvider).value?.risky ?? false)
               Card(
                 key: const Key('integrity-warning'),
                 color: Theme.of(context).colorScheme.errorContainer,
-                child: ListTile(leading: const Icon(Icons.gpp_maybe), title: Text(t.integrityWarning)),
+                child: ListTile(
+                  leading: Icon(Icons.gpp_maybe, color: Theme.of(context).colorScheme.onErrorContainer),
+                  title: Text(t.integrityWarning),
+                  textColor: Theme.of(context).colorScheme.onErrorContainer,
+                ),
               ),
             if (gate == VersionGate.updateAvailable && latest != null)
               Padding(padding: const EdgeInsets.only(top: 8), child: Text(t.updateAvailable(latest))),
-            const SizedBox(height: 16),
+            const SizedBox(height: 20),
+            // Launcher tiles first so every role reaches its menu without scrolling (user decision 2026-09-27).
+            if (kpis != null) _SectionTitle(t.homeActionsTitle),
+            ModuleGrid(children: actions),
             if (kpis != null) ...[
-              Text(
-                kind == HomeKind.pm || kind == HomeKind.staff ? t.kpiTeamTitle : t.kpiSummaryTitle,
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 20),
+              _SectionTitle(kind == HomeKind.pm || kind == HomeKind.staff ? t.kpiTeamTitle : t.kpiSummaryTitle),
               kpis,
-              const SizedBox(height: 8),
-              Text(t.homeActionsTitle, style: Theme.of(context).textTheme.titleMedium),
-              const SizedBox(height: 8),
             ],
-            for (final a in actions) Padding(padding: const EdgeInsets.only(bottom: 12), child: a),
             if (profile.has(Role.pm) || profile.has(Role.owner)) ...[
-              const SizedBox(height: 4),
+              const SizedBox(height: 20),
               const ProjectProgressSummary(),
             ],
           ],
@@ -160,4 +172,49 @@ class HomeScreen extends ConsumerWidget {
       ),
     );
   }
+}
+
+/// Web launcher head: greeting + role pill (primary tint).
+class _Greeting extends StatelessWidget {
+  const _Greeting({required this.name, required this.roles});
+  final String name;
+  final String roles;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(AppLocalizations.of(context).greeting(name), style: theme.textTheme.headlineSmall),
+        if (roles.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: scheme.primary.withValues(alpha: theme.brightness == Brightness.dark ? 0.18 : 0.10),
+              borderRadius: BorderRadius.circular(999),
+            ),
+            child: Text(
+              roles,
+              key: const Key('home-roles'),
+              style: theme.textTheme.labelMedium?.copyWith(color: scheme.primary, fontWeight: FontWeight.w700),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _SectionTitle extends StatelessWidget {
+  const _SectionTitle(this.text);
+  final String text;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(bottom: 10),
+    child: Text(text, style: Theme.of(context).textTheme.titleMedium),
+  );
 }

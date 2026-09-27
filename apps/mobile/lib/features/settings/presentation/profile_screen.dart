@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/providers.dart';
+import '../../../app/theme_mode.dart';
 import '../../../l10n/gen/app_localizations.dart';
+import '../../../shared/icons/iconsax.dart';
 import '../../auth/application/auth_controller.dart';
 import '../../sync/application/sync_coordinator.dart';
 import '../../sync/data/outbox_repository.dart';
@@ -97,6 +99,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           ),
           if (!push.available) ListTile(leading: const Icon(Icons.notifications_off), title: Text(t.pushDisabled)),
           const Divider(),
+          const _AppearanceSetting(),
+          const Divider(),
           Padding(
             padding: const EdgeInsets.all(16),
             child: OutlinedButton.icon(
@@ -106,6 +110,59 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   ? const SizedBox.square(dimension: 18, child: CircularProgressIndicator(strokeWidth: 2))
                   : const Icon(Icons.logout),
               label: Text(_loggingOut ? t.logoutInProgress : t.logout),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Profil → Tampilan: follow the phone (default), light or dark (ADR 0015). Stored on this phone only.
+class _AppearanceSetting extends ConsumerWidget {
+  const _AppearanceSetting();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final t = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final mode = ref.watch(themeModeProvider);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(t.profileAppearance, style: theme.textTheme.titleMedium),
+          const SizedBox(height: 4),
+          Text(
+            t.profileAppearanceHint,
+            style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: SegmentedButton<ThemeMode>(
+              key: const Key('theme-mode'),
+              showSelectedIcon: false,
+              segments: [
+                ButtonSegment(
+                  value: ThemeMode.system,
+                  icon: const PkIcon(PkIcons.monitor, size: 20),
+                  label: Text(t.themeSystem, key: const Key('theme-mode-system')),
+                ),
+                ButtonSegment(
+                  value: ThemeMode.light,
+                  icon: const PkIcon(PkIcons.sun, size: 20),
+                  label: Text(t.themeLight, key: const Key('theme-mode-light')),
+                ),
+                ButtonSegment(
+                  value: ThemeMode.dark,
+                  icon: const PkIcon(PkIcons.moon, size: 20),
+                  label: Text(t.themeDark, key: const Key('theme-mode-dark')),
+                ),
+              ],
+              selected: {mode},
+              onSelectionChanged: (s) => ref.read(themeModeProvider.notifier).set(s.single),
             ),
           ),
         ],

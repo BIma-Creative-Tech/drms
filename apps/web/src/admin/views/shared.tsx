@@ -6,6 +6,8 @@ import React from 'react'
 import { hasRole, type Role } from '@/access/roles'
 import { formatRupiah } from '@/lib/money'
 
+export { TableScroll } from '../components/TableScroll'
+
 /**
  * Shared bits of the F2 admin custom views (architecture §8, phase plan F2 "admin custom views"):
  * root views are rendered WITHOUT a template by Payload 3.90.1 (views/Root/getRouteData.js: custom

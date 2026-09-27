@@ -66,9 +66,9 @@ class ToneChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final (IconData icon, Color color) = switch (tone) {
-      ProgressTone.ok => (Icons.check_circle, StatusColors.ok),
-      ProgressTone.warn => (Icons.warning_amber_rounded, StatusColors.warning),
-      ProgressTone.bad => (Icons.error, StatusColors.danger),
+      ProgressTone.ok => (Icons.check_circle, context.pk.okText),
+      ProgressTone.warn => (Icons.warning_amber_rounded, context.pk.warnText),
+      ProgressTone.bad => (Icons.error, context.pk.badText),
       ProgressTone.none => (Icons.help_outline, Theme.of(context).colorScheme.outline),
     };
     return Container(
@@ -116,7 +116,6 @@ class ProjectProgressCard extends StatelessWidget {
       key: Key('project-progress-${item.id}'),
       elevation: 0,
       color: scheme.surfaceContainerLow,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
@@ -317,10 +316,10 @@ class ProgressStateChip extends StatelessWidget {
     final t = AppLocalizations.of(context);
     final (IconData icon, Color? color, String label) = switch (state) {
       ProgressSyncState.queued => (Icons.schedule, null, t.progressStateQueued),
-      ProgressSyncState.local => (Icons.cloud_off, StatusColors.warning, t.progressStateLocal),
-      ProgressSyncState.conflict => (Icons.call_split, StatusColors.warning, t.progressStateConflict),
-      ProgressSyncState.rejected => (Icons.error, StatusColors.danger, t.progressStateRejected),
-      ProgressSyncState.synced => (Icons.cloud_done, StatusColors.ok, t.progressStateSynced),
+      ProgressSyncState.local => (Icons.cloud_off, context.pk.warnText, t.progressStateLocal),
+      ProgressSyncState.conflict => (Icons.call_split, context.pk.warnText, t.progressStateConflict),
+      ProgressSyncState.rejected => (Icons.error, context.pk.badText, t.progressStateRejected),
+      ProgressSyncState.synced => (Icons.cloud_done, context.pk.okText, t.progressStateSynced),
     };
     return Chip(
       avatar: Icon(icon, size: 18, color: color),

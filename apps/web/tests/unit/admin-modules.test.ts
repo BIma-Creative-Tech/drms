@@ -5,6 +5,7 @@ import { beforeAll, describe, expect, it, vi } from 'vitest'
 
 import type { Role } from '@/access/roles'
 import { activeHref, entityModuleMap, MODULES, moduleForPath, resolveModules, type ModuleId, type ResolvedModule } from '@/admin/modules/registry'
+import { deriveCrumbs, routeOf, type StepLike } from '@/admin/shell/crumbs'
 import { loadBadges, loadModules, navUser } from '@/admin/shell/modules-server'
 
 /**
@@ -15,9 +16,13 @@ import { loadBadges, loadModules, navUser } from '@/admin/shell/modules-server'
  */
 let config: SanitizedConfig
 
-const nav = vi.hoisted(() => ({ path: '/admin' }))
+const nav = vi.hoisted(() => ({ path: '/admin', steps: [] as Array<{ label: unknown; url?: string }> }))
 vi.mock('next/navigation', () => ({ usePathname: () => nav.path }))
-vi.mock('@payloadcms/ui', () => ({ useTheme: () => ({ theme: 'light', setTheme: () => undefined, autoMode: false }) }))
+vi.mock('@payloadcms/ui', () => ({
+  useTheme: () => ({ theme: 'light', setTheme: () => undefined, autoMode: false }),
+  useStepNav: () => ({ stepNav: nav.steps, setStepNav: () => undefined }),
+  useTranslation: () => ({ i18n: { language: 'id', fallbackLanguage: 'en' }, t: (k: string) => k }),
+}))
 
 beforeAll(async () => {
   process.env.PK_SKIP_ENV_CHECK = 'true'
@@ -238,8 +243,9 @@ describe('server helpers', () => {
 })
 
 describe('ModuleBar (SSR with mocked pathname/theme)', () => {
-  async function bar(path: string, roles: Role[]) {
+  async function bar(path: string, roles: Role[], steps: Array<{ label: unknown; url?: string }> = []) {
     nav.path = path
+    nav.steps = steps
     const { ModuleBar } = await import('@/admin/shell/ModuleBar')
     const modules = await modulesFor(roles, 2)
     const user = navUser({ id: 42, roles, name: 'Uji Coba' } as unknown as TypedUser)
@@ -271,4 +277,106 @@ describe('ModuleBar (SSR with mocked pathname/theme)', () => {
     expect(html).toContain('>Pengajuan<')
     expect(html).toContain('>Transfer &amp; LPJ<')
   })
+
+  it('breadcrumb line: none on custom views and the launcher (no empty row), module home on entity pages', async () => {
+    expect(await bar('/admin/kas', ['pk-finance'])).not.toContain('pk-crumbs')
+    expect(await bar('/admin', ['pk-finance'])).not.toContain('pk-crumbs')
+    const html = await bar('/admin/collections/expense-requests/1', ['pk-finance'], [
+      { label: { id: 'Pengajuan biaya', en: 'Expense requests' }, url: '/admin/collections/expense-requests' },
+      { label: 'PB-2026-0001' },
+    ])
+    expect(html).toContain('aria-label="Lokasi halaman"')
+    expect(html).toMatch(/data-pk-crumb="home" data-mod="keuangan"/)
+    expect(html).toContain('>Keuangan<')
+    expect(html).toContain('>Pengajuan biaya<')
+    expect(html).toMatch(/aria-current="page"[^>]*>.*?PB-2026-0001/)
+    // no Payload graphics icon / "D" home crumb
+    expect(html).not.toContain('step-nav')
+  })
 })
+
+describe('breadcrumbs (deriveCrumbs)', () => {
+  const t = (l: unknown) => (typeof l === 'string' ? l : ((l as Record<string, string>)?.id ?? ''))
+  let keu: ResolvedModule
+  let persetujuan: ResolvedModule
+  beforeAll(async () => {
+    const mods = await modulesFor(['pk-finance'])
+    keu = mods.find((m) => m.id === 'keuangan')!
+    persetujuan = mods.find((m) => m.id === 'persetujuan')!
+  })
+  const crumbs = (pathname: string, module: ResolvedModule | null, steps: StepLike[] | null) =>
+    deriveCrumbs({ pathname, module, steps, translate: t }).map((c) => [c.label, c.href ?? null, c.current ? 'current' : ''])
+
+  it('routeOf', () => {
+    expect(routeOf('/admin/collections/receipts/5?x=1')).toEqual({ kind: 'collection', slug: 'receipts', deeper: true })
+    expect(routeOf('/admin/globals/company-settings/')).toEqual({ kind: 'global', slug: 'company-settings', deeper: false })
+    expect(routeOf('/admin/account')).toEqual({ kind: 'account' })
+    expect(routeOf('/admin/kas')).toEqual({ kind: 'other' })
+    expect(routeOf('/admin')).toEqual({ kind: 'other' })
+  })
+
+  it('list view: module home (→ first menu item) › collection (current)', () => {
+    expect(crumbs('/admin/collections/expense-requests', keu, [{ label: { id: 'Pengajuan biaya' } }])).toEqual([
+      ['Keuangan', keu.href, ''],
+      ['Pengajuan biaya', null, 'current'],
+    ])
+    const home = deriveCrumbs({ pathname: '/admin/collections/expense-requests', module: keu, steps: null, translate: t })[0]!
+    expect(home).toMatchObject({ icon: 'finance', mod: 'keuangan' })
+  })
+
+  it('edit view: module › collection (link) › document (current)', () => {
+    expect(
+      crumbs('/admin/collections/expense-requests/1', keu, [
+        { label: 'Pengajuan biaya', url: '/admin/collections/expense-requests' },
+        { label: 'PB-2026-0001' },
+      ]),
+    ).toEqual([
+      ['Keuangan', keu.href, ''],
+      ['Pengajuan biaya', '/admin/collections/expense-requests', ''],
+      ['PB-2026-0001', null, 'current'],
+    ])
+  })
+
+  it('before Payload set its steps (SSR / previous page): fallback from the module menu, no jump', () => {
+    const label = keu.sections.flatMap((s) => s.items).find((i) => i.href === '/admin/collections/cash-entries')!.label
+    expect(crumbs('/admin/collections/cash-entries', keu, null)).toEqual([
+      ['Keuangan', keu.href, ''],
+      [label, null, 'current'],
+    ])
+    expect(crumbs('/admin/collections/cash-entries/9', keu, null)).toEqual([
+      ['Keuangan', keu.href, ''],
+      [label, '/admin/collections/cash-entries', ''],
+    ])
+  })
+
+  it('custom views and the launcher: no crumbs → no row', () => {
+    expect(crumbs('/admin/kas', keu, null)).toEqual([])
+    expect(crumbs('/admin/antrian-transfer', persetujuan, null)).toEqual([])
+    expect(crumbs('/admin', null, null)).toEqual([])
+    expect(crumbs('/admin/collections/unknown', null, null)).toEqual([])
+  })
+
+  it('outside every module (account, entity hidden from the menu): home = "Semua modul" → launcher', () => {
+    expect(crumbs('/admin/account', null, [{ label: 'Akun' }])).toEqual([
+      ['Semua modul', '/admin', ''],
+      ['Akun', null, 'current'],
+    ])
+    expect(crumbs('/admin/account', null, null)).toEqual([
+      ['Semua modul', '/admin', ''],
+      ['Akun', null, 'current'],
+    ])
+  })
+
+  it('a step repeating the module name is not shown twice', () => {
+    expect(crumbs('/admin/collections/approvals', persetujuan, [{ label: 'Persetujuan' }])).toEqual([['Persetujuan', null, 'current']])
+    expect(crumbs('/admin/collections/approvals/3', persetujuan, [{ label: 'Persetujuan', url: '/admin/collections/approvals' }, { label: 'APV-1' }])).toEqual([
+      ['Persetujuan', persetujuan.href, ''],
+      ['APV-1', null, 'current'],
+    ])
+  })
+
+  it('empty labels are dropped', () => {
+    expect(crumbs('/admin/globals/company-settings', null, [{ label: '' }])).toEqual([])
+  })
+})
+
