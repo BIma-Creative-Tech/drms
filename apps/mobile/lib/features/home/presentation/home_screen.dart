@@ -155,13 +155,14 @@ class HomeScreen extends ConsumerWidget {
             if (gate == VersionGate.updateAvailable && latest != null)
               Padding(padding: const EdgeInsets.only(top: 8), child: Text(t.updateAvailable(latest))),
             const SizedBox(height: 20),
+            // Launcher tiles first so every role reaches its menu without scrolling (user decision 2026-09-27).
+            if (kpis != null) _SectionTitle(t.homeActionsTitle),
+            ModuleGrid(children: actions),
             if (kpis != null) ...[
+              const SizedBox(height: 20),
               _SectionTitle(kind == HomeKind.pm || kind == HomeKind.staff ? t.kpiTeamTitle : t.kpiSummaryTitle),
               kpis,
-              const SizedBox(height: 20),
-              _SectionTitle(t.homeActionsTitle),
             ],
-            ModuleGrid(children: actions),
             if (profile.has(Role.pm) || profile.has(Role.owner)) ...[
               const SizedBox(height: 20),
               const ProjectProgressSummary(),

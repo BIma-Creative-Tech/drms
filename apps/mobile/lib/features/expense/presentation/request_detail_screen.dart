@@ -117,7 +117,16 @@ class _DetailBody extends StatelessWidget {
           t.budgetImpact,
           d.budget.hasBudget ? t.budgetChange(pct(d.budget.pctBefore), pct(d.budget.pctAfter)) : t.budgetNone,
         ),
-        if (over) Text('⚠ ${t.budgetImpact} > 85%', style: TextStyle(color: context.pk.badText)),
+        if (over)
+          Row(
+            children: [
+              Icon(Icons.warning_amber_rounded, size: 18, color: context.pk.badText),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text('${t.budgetImpact} > 85%', style: TextStyle(color: context.pk.badText)),
+              ),
+            ],
+          ),
         if (d.rejectReason != null) row(t.rejectReasonLabel, d.rejectReason!),
         if (TransferSection.visibleFor(d)) TransferSection(detail: d),
         if (d.settlement != null) LpjSection(settlement: d.settlement!),

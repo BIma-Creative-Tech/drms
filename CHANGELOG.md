@@ -17,10 +17,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   - Iconsax glyphs identical to the web (path data from `icons.ts`, drawn by an in-house SVG path parser; no icon
     package).
   - Home = module launcher: greeting + role, gradient tiles (web module gradients, count badges, staggered entrance,
-    off with reduced motion) replacing the big-button list; all visibility rules, routes and test keys kept. Bottom
+    off with reduced motion) replacing the big-button list, shown above the KPI section so no role has to scroll to
+    its menu; all visibility rules, routes and test keys kept. Bottom
     navigation with Iconsax Linear/Bulk icons on a primary-tint pill. Login/splash in the new palette.
   - Hard-coded colours on the other screens moved to theme tokens (status chips, timeline, attendance distance/recap/
     team, tab bars made for the old solid app bar).
+  - Request detail: the "Dampak anggaran > 85%" warning uses a warning icon instead of a ⚠ text glyph (not in DM Sans).
   - Tests: token drift + WCAG contrast (`theme_tokens_test.dart`), glyph drift + parser (`iconsax_test.dart`),
     Tampilan/launcher (`ui_refresh_test.dart`); widget tests now run with the real theme. Preview screenshots without
     a device: `test_preview/screens_preview_test.dart` (manual, not in CI). No new package.

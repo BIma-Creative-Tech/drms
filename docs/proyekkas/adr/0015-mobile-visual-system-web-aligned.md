@@ -1,6 +1,6 @@
 # ADR 0015 — APK visual system aligned with the web admin: tokens, bundled OFL fonts, Iconsax glyphs
 
-- **Status:** proposed (2026-09-27, awaiting user approval of the screenshots)
+- **Status:** accepted (2026-09-27, user approved the screenshots and the Iconsax licence for the APK; follow-ups: launcher tiles above the KPIs, ⚠ text replaced by an icon, Addendum keeps the Proyek gradient)
 - **Date:** 2026-09-27
 - **Related:** ADR 0014 (web admin "gaya Odoo", Iconsax licence accepted 2026-09-27), ADR 0010 (Flutter APK),
   plan `plans/mobile-ui-refresh.md`, /opt/infra CLAUDE.md §0.10 (trusted OSS, licence, < 6 months maintenance,
