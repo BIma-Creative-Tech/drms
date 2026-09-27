@@ -1,0 +1,274 @@
+import type { Payload, SanitizedConfig, TypedUser } from 'payload'
+import { createElement } from 'react'
+import { renderToString } from 'react-dom/server'
+import { beforeAll, describe, expect, it, vi } from 'vitest'
+
+import type { Role } from '@/access/roles'
+import { activeHref, entityModuleMap, MODULES, moduleForPath, resolveModules, type ModuleId, type ResolvedModule } from '@/admin/modules/registry'
+import { loadBadges, loadModules, navUser } from '@/admin/shell/modules-server'
+
+/**
+ * Odoo-style navigation (src/admin/modules/registry.ts): guard that every collection/global of the
+ * Payload config maps to exactly one module (a new collection must not silently disappear from the
+ * menu), per-role tile visibility with the REAL config (admin.hidden = visibleEntities, access.read
+ * = Payload read permission) + the registry role rules, and active-module resolution.
+ */
+let config: SanitizedConfig
+
+const nav = vi.hoisted(() => ({ path: '/admin' }))
+vi.mock('next/navigation', () => ({ usePathname: () => nav.path }))
+vi.mock('@payloadcms/ui', () => ({ useTheme: () => ({ theme: 'light', setTheme: () => undefined, autoMode: false }) }))
+
+beforeAll(async () => {
+  process.env.PK_SKIP_ENV_CHECK = 'true'
+  config = await (await import('@/payload.config')).default
+})
+
+const INTERNAL = (slug: string) => slug.startsWith('payload-')
+
+/** Same rule as @payloadcms/ui getVisibleEntities (3.90.1): hidden fn(user) / boolean. */
+function visibleFor(user: unknown) {
+  const vis = (h: unknown) => !(typeof h === 'function' ? (h as (a: { user: unknown }) => boolean)({ user }) : h)
+  return {
+    collections: config.collections.filter((c) => vis(c.admin?.hidden)).map((c) => c.slug),
+    globals: config.globals.filter((g) => vis(g.admin?.hidden)).map((g) => g.slug),
+  }
+}
+
+/**
+ * Payload read permission: access.read(true | Where | Promise<…>) is truthy → read = true
+ * (payload getEntityPermissions: a Where query still grants the nav entry). A rule that needs the
+ * database (row-level scopes) counts as granted — the stub payload throws, like a Where it only
+ * narrows rows, it never hides the entity.
+ */
+async function readPermissions(user: { id: number; roles: Role[] }) {
+  const payload = new Proxy({}, { get: () => () => Promise.reject(new Error('no db in unit test')) })
+  const req = { user: { ...user, collection: 'users' }, payload, context: {} }
+  const out: { collections: Record<string, { read: boolean }>; globals: Record<string, { read: boolean }> } = { collections: {}, globals: {} }
+  const check = async (fn: unknown) => {
+    if (fn === undefined) return true
+    try {
+      return Boolean(await (fn as (a: unknown) => unknown)({ req }))
+    } catch {
+      return true
+    }
+  }
+  for (const c of config.collections) out.collections[c.slug] = { read: await check(c.access?.read) }
+  for (const g of config.globals) out.globals[g.slug] = { read: await check(g.access?.read) }
+  return out
+}
+
+async function modulesFor(roles: Role[], badge = 0): Promise<ResolvedModule[]> {
+  const user = { id: 42, roles, collection: 'users', email: 'uji@contoh.test', name: 'Uji Coba' } as unknown as TypedUser
+  const payload = { config, count: async () => ({ totalDocs: badge }) } as unknown as Payload
+  return loadModules({ payload, user, permissions: (await readPermissions({ id: 42, roles })) as never, visibleEntities: visibleFor(user) as never })
+}
+
+const ids = (m: ResolvedModule[]) => m.map((x) => x.id)
+const navKeys = (m: ResolvedModule[]) => m.flatMap((x) => x.sections.flatMap((s) => s.items.map((i) => i.navKey))).filter(Boolean)
+const hrefs = (m: ResolvedModule[]) => m.flatMap((x) => x.sections.flatMap((s) => s.items.map((i) => i.href)))
+
+describe('registry guard: every entity maps to exactly one module', () => {
+  it('each collection of payload.config.ts is in exactly one module', () => {
+    const map = entityModuleMap()
+    const slugs: string[] = config.collections.map((c) => c.slug as string).filter((s) => !INTERNAL(s))
+    const missing = slugs.filter((s) => !map.collections.has(s))
+    expect(missing).toEqual([])
+    // exactly once (entityModuleMap throws on a slug mapped to two modules; also no double listing)
+    const listed = MODULES.flatMap((m) => m.sections.flatMap((s) => s.items.flatMap((i) => ('collection' in i ? [i.collection] : []))))
+    expect(listed.length).toBe(new Set(listed).size)
+    // and no stale slug in the registry
+    expect([...map.collections.keys()].filter((s) => !slugs.includes(s))).toEqual([])
+  })
+
+  it('each global is in exactly one module', () => {
+    const map = entityModuleMap()
+    expect(config.globals.map((g) => g.slug as string).filter((s) => !INTERNAL(s) && !map.globals.has(s))).toEqual([])
+    expect([...map.globals.keys()].filter((s) => !config.globals.some((g) => g.slug === s))).toEqual([])
+  })
+
+  it('a slug in two modules is rejected', () => {
+    const dup = [
+      { ...MODULES[0]!, sections: [{ items: [{ collection: 'banks' }] }] },
+      { ...MODULES[1]!, sections: [{ items: [{ collection: 'banks' }] }] },
+    ]
+    expect(() => entityModuleMap(dup)).toThrow(/banks/)
+  })
+
+  it('every custom view item points at a registered admin view path', async () => {
+    const { E2_ADMIN_VIEWS, E6_ADMIN_VIEWS, F2_ADMIN_VIEWS, F3_ADMIN_VIEWS, S2A_ADMIN_VIEWS, S3E_ADMIN_VIEWS } = await import('@/admin/config')
+    const paths = new Set(Object.values({ ...F2_ADMIN_VIEWS, ...F3_ADMIN_VIEWS, ...E2_ADMIN_VIEWS, ...E6_ADMIN_VIEWS, ...S2A_ADMIN_VIEWS, ...S3E_ADMIN_VIEWS }).map((v) => ('path' in v ? v.path : '')))
+    for (const m of MODULES)
+      for (const s of m.sections)
+        for (const i of s.items) if ('view' in i && !i.view.startsWith('/collections/')) expect(paths, `${m.id}: ${i.view}`).toContain(i.view)
+  })
+
+  it('launcher = dashboard view, role dashboard = /dashboard (exact)', async () => {
+    const { F3_ADMIN_VIEWS } = await import('@/admin/config')
+    expect(F3_ADMIN_VIEWS.dashboard.Component).toBe('@/admin/views/Launcher#Launcher')
+    expect(F3_ADMIN_VIEWS.dashboardPage).toMatchObject({ path: '/dashboard', exact: true, Component: '@/admin/views/Dashboard#DashboardPage' })
+  })
+
+  it('Nav slot replaced by the module bar; before/afterNavLinks gone', () => {
+    const c = config.admin.components as Record<string, unknown>
+    expect(c.Nav).toBe('@/admin/shell/ModuleNav#ModuleNav')
+    expect(c.beforeNavLinks ?? []).toEqual([])
+    expect(c.afterNavLinks ?? []).toEqual([])
+  })
+})
+
+describe('tile visibility per role (real config: admin.hidden + access.read + role rules)', () => {
+  it('Direktur (pk-owner): office modules incl. Persetujuan, Keuangan with Kas + Tutup buku', async () => {
+    const m = await modulesFor(['pk-owner'])
+    expect(ids(m)).toEqual(expect.arrayContaining<ModuleId>(['dashboard', 'persetujuan', 'proyek', 'keuangan', 'absensi', 'laporan', 'sistem', 'pengaturan']))
+    expect(navKeys(m)).toEqual(expect.arrayContaining(['persetujuan', 'antrian-transfer', 'verifikasi-lpj', 'kas', 'tutup-buku', 'progress', 'addendum', 'laporan', 'absensi', 'audit-log']))
+    expect(navKeys(m)).not.toContain('buat-pengajuan') // Owner does not create requests
+  })
+
+  it('Finance: same office views + "+ Buat pengajuan"', async () => {
+    const k = navKeys(await modulesFor(['pk-finance']))
+    expect(k).toEqual(expect.arrayContaining(['persetujuan', 'kas', 'tutup-buku', 'buat-pengajuan', 'audit-log']))
+  })
+
+  it('PM: no decisions, no cash, no audit log; progress/addendum/laporan/absensi', async () => {
+    const m = await modulesFor(['pk-pm'])
+    const k = navKeys(m)
+    expect(k).toEqual(expect.arrayContaining(['progress', 'laporan-progress', 'addendum', 'laporan', 'absensi', 'buat-pengajuan']))
+    for (const no of ['persetujuan', 'antrian-transfer', 'verifikasi-lpj', 'kas', 'tutup-buku', 'audit-log']) expect(k).not.toContain(no)
+  })
+
+  it('Admin: users/master/sistem + laporan (S3e S-23) + audit log, no cash/decisions', async () => {
+    const m = await modulesFor(['pk-admin'])
+    expect(ids(m)).toEqual(expect.arrayContaining<ModuleId>(['dashboard', 'pengguna', 'master', 'media', 'pengaturan', 'sistem', 'laporan', 'absensi']))
+    const k = navKeys(m)
+    expect(k).toEqual(expect.arrayContaining(['laporan', 'absensi', 'audit-log']))
+    for (const no of ['persetujuan', 'kas', 'tutup-buku', 'progress']) expect(k).not.toContain(no)
+    expect(hrefs(m)).toContain('/admin/collections/web-sessions') // admin-only entity
+  })
+
+  it('staff-only: a small set — own requests/receipts, own attendance recap, notifications, profile', async () => {
+    const m = await modulesFor(['pk-staff'])
+    expect(ids(m).sort()).toEqual(['absensi', 'dashboard', 'keuangan', 'pengguna', 'sistem'])
+    const keu = m.find((x) => x.id === 'keuangan')!
+    expect(keu.sections.flatMap((s) => s.items.map((i) => i.href))).toEqual(['/admin/collections/expense-requests', '/admin/collections/expense-requests/create', '/admin/collections/receipts'])
+    const abs = m.find((x) => x.id === 'absensi')!
+    expect(abs.sections.flatMap((s) => s.items.map((i) => i.label))).toEqual(['Rekap absensi saya'])
+    expect(hrefs(m)).not.toContain('/admin/kas')
+    expect(hrefs(m)).not.toContain('/admin/laporan')
+    for (const hidden of ['persetujuan', 'proyek', 'master', 'media', 'pengaturan', 'laporan']) expect(ids(m)).not.toContain(hidden)
+  })
+
+  it('staff + PM = PM menu (roles are a union)', async () => {
+    expect(navKeys(await modulesFor(['pk-staff', 'pk-pm']))).toContain('progress')
+    expect(navKeys(await modulesFor(['pk-pm', 'pk-staff']))).not.toContain('kas')
+  })
+
+  it('no role → no module', async () => {
+    expect(await modulesFor([])).toEqual([])
+  })
+
+  it('badges on the items and summed on the tile (office only)', async () => {
+    const m = await modulesFor(['pk-finance'], 3)
+    const p = m.find((x) => x.id === 'persetujuan')!
+    expect(p.badge).toBe(6)
+    expect(p.sections[0]!.items.find((i) => i.navKey === 'antrian-transfer')!.badge).toBe(3)
+    expect((await modulesFor(['pk-pm'], 3)).every((x) => x.badge === 0)).toBe(true)
+  })
+
+  it('a module with nothing visible is dropped; tile href = first visible item', () => {
+    const r = resolveModules({ roles: ['pk-pm'], staffOnly: false, canSee: (k, s) => s === 'holidays', labelOf: (_, s) => s })
+    const abs = r.find((x) => x.id === 'absensi')!
+    expect(abs.href).toBe('/admin/absensi')
+    expect(r.find((x) => x.id === 'master')).toBeUndefined()
+    expect(r.find((x) => x.id === 'media')).toBeUndefined()
+  })
+})
+
+describe('active module resolution', () => {
+  it.each([
+    ['/admin', null],
+    ['/admin/', null],
+    ['/admin/account', null],
+    ['/elsewhere/kas', null],
+    ['/admin/dashboard', 'dashboard'],
+    ['/admin/dashboard?peran=pm', 'dashboard'],
+    ['/admin/collections/cash-entries', 'keuangan'],
+    ['/admin/collections/cash-entries/12', 'keuangan'],
+    ['/admin/collections/expense-requests/create', 'keuangan'],
+    ['/admin/collections/media-selfies/3', 'media'],
+    ['/admin/collections/unknown-thing', null],
+    ['/admin/globals/company-settings', 'pengaturan'],
+    ['/admin/kas', 'keuangan'],
+    ['/admin/kas/baru', 'keuangan'],
+    ['/admin/kas/7/ubah', 'keuangan'],
+    ['/admin/tutup-buku', 'keuangan'],
+    ['/admin/laporan', 'laporan'],
+    ['/admin/laporan/rekap-kas', 'laporan'],
+    ['/admin/progress/laporan/4', 'proyek'],
+    ['/admin/progress/project/9', 'proyek'],
+    ['/admin/addendum/detail/2', 'proyek'],
+    ['/admin/absensi/jadwal', 'absensi'],
+    ['/admin/antrian-transfer', 'persetujuan'],
+    ['/admin/audit-log', 'sistem'],
+    ['/admin/notifikasi', 'sistem'],
+  ] as Array<[string, ModuleId | null]>)('%s → %s', (path, id) => {
+    expect(moduleForPath(path)).toBe(id)
+  })
+
+  it('active menu item = longest matching href', () => {
+    const hs = ['/admin/collections/expense-requests', '/admin/collections/expense-requests/create', '/admin/progress', '/admin/progress/laporan']
+    expect(activeHref('/admin/collections/expense-requests/5', hs)).toBe('/admin/collections/expense-requests')
+    expect(activeHref('/admin/collections/expense-requests/create', hs)).toBe('/admin/collections/expense-requests/create')
+    expect(activeHref('/admin/progress/laporan/3', hs)).toBe('/admin/progress/laporan')
+    expect(activeHref('/admin/progress-x', hs)).toBeNull()
+  })
+})
+
+describe('server helpers', () => {
+  it('navUser: display name, initials, role labels (pk-owner shown as Direktur)', () => {
+    const u = navUser({ id: 7, roles: ['pk-owner', 'pk-finance'], email: 'budi.santoso@contoh.test' } as unknown as TypedUser)
+    expect(u).toMatchObject({ id: 7, name: 'budi.santoso', initials: 'BS', roleLabel: 'Direktur · Finance', staffOnly: false })
+    expect(navUser({ id: 1, roles: ['pk-staff'], name: 'Sari Dewi' } as unknown as TypedUser)).toMatchObject({ initials: 'SD', staffOnly: true })
+  })
+
+  it('loadBadges: a failing count never breaks the nav', async () => {
+    const payload = { count: async () => Promise.reject(new Error('db down')) } as unknown as Payload
+    expect(await loadBadges(payload, { id: 1, roles: ['pk-owner'] } as unknown as TypedUser)).toEqual({ transfers: 0, lpj: 0 })
+  })
+})
+
+describe('ModuleBar (SSR with mocked pathname/theme)', () => {
+  async function bar(path: string, roles: Role[]) {
+    nav.path = path
+    const { ModuleBar } = await import('@/admin/shell/ModuleBar')
+    const modules = await modulesFor(roles, 2)
+    const user = navUser({ id: 42, roles, name: 'Uji Coba' } as unknown as TypedUser)
+    return renderToString(createElement(ModuleBar, { modules, user, bell: createElement('a', { 'data-pk-nav-link': 'notifikasi' }), logout: null }))
+  }
+
+  it('launcher page: brand, launcher link current, no module menu', async () => {
+    const html = await bar('/admin', ['pk-finance'])
+    expect(html).toContain('data-module="launcher"')
+    expect(html).toContain('data-pk-nav-link="launcher"')
+    expect(html).toMatch(/data-pk-nav-link="launcher"[^>]*aria-current="page"|aria-current="page"[^>]*data-pk-nav-link="launcher"/)
+    expect(html).not.toContain('pk-bar__nav')
+    expect(html).toContain('data-pk-nav-link="notifikasi"')
+    expect(html).toContain('data-pk-avatar')
+  })
+
+  it('Persetujuan module: role-gated links with badges; active link aria-current', async () => {
+    const html = await bar('/admin/antrian-transfer', ['pk-owner'])
+    expect(html).toContain('data-module="persetujuan"')
+    expect(html).toContain('href="/admin/persetujuan"')
+    expect(html).toMatch(/aria-current="page"[^>]*href="\/admin\/antrian-transfer"/)
+    expect(html).toContain('pk-bar__count')
+  })
+
+  it('Keuangan: labelled sections render as dropdown triggers, the one with the active item marked', async () => {
+    const html = await bar('/admin/kas/baru', ['pk-finance'])
+    expect(html).toContain('data-module="keuangan"')
+    expect(html).toMatch(/aria-expanded="false"[^>]*data-active="true"[^>]*>.*?Kas</)
+    expect(html).toContain('>Pengajuan<')
+    expect(html).toContain('>Transfer &amp; LPJ<')
+  })
+})

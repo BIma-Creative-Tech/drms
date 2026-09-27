@@ -118,11 +118,12 @@ export default buildConfig({
       graphics: { Icon: '@/theme/graphics#Icon', Logo: '@/theme/graphics#Logo' },
       beforeLogin: ['@/components/SsoLoginButton#SsoLoginButton'],
       logout: { Button: '@/components/LogoutButton#LogoutButton' },
-      // F2 work views (approval inbox, transfer queue, LPJ verification) + nav badges.
-      afterNavLinks: ['@/admin/components/F2NavLinks#F2NavLinks'],
-      // S3e: notification bell + unread count on every admin page (US-05).
-      beforeNavLinks: ['@/admin/components/NotificationBell#NotificationBell'],
-      // F3: role dashboards (Beranda), reports, global audit log.
+      // Odoo-style navigation (2026-09-27): the left sidebar is replaced by a top module bar on every
+      // DefaultTemplate page (launcher ⊞, module menu from src/admin/modules/registry.ts, notification
+      // bell S3e/US-05, avatar menu with profile/theme/logout). Replacing Nav drops before/afterNavLinks
+      // (F2 work-view links + badges now live in the registry).
+      Nav: '@/admin/shell/ModuleNav#ModuleNav',
+      // F3: module launcher at /admin, role dashboards at /admin/dashboard, reports, global audit log.
       views: { ...F2_ADMIN_VIEWS, ...F3_ADMIN_VIEWS, ...E2_ADMIN_VIEWS, ...E6_ADMIN_VIEWS, ...S2A_ADMIN_VIEWS, ...S3E_ADMIN_VIEWS },
     },
     timezones: { defaultTimezone: 'Asia/Makassar' },

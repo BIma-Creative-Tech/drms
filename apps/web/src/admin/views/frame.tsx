@@ -9,8 +9,11 @@ import { F3Root } from './f3-ui'
 import { PROGRESS_STYLE } from './progress-ui'
 import { VIZ_STYLE } from './viz'
 
-/** DefaultTemplate (nav + header) around a pk-f3 root with the dashboard + progress styles. */
-export function Frame({ props, name, children }: { props: AdminViewServerProps; name: string; children: React.ReactNode }) {
+/**
+ * DefaultTemplate (top module bar = admin.components.Nav + header) for a custom root view — Payload
+ * 3.90.1 renders custom root views without a template.
+ */
+export function PageTemplate({ props, children }: { props: AdminViewServerProps; children: React.ReactNode }) {
   const { initPageResult, params, searchParams } = props
   return (
     <DefaultTemplate
@@ -23,6 +26,15 @@ export function Frame({ props, name, children }: { props: AdminViewServerProps; 
       user={initPageResult.req.user ?? undefined}
       visibleEntities={initPageResult.visibleEntities}
     >
+      {children}
+    </DefaultTemplate>
+  )
+}
+
+/** PageTemplate around a pk-f3 root with the dashboard + progress styles. */
+export function Frame({ props, name, children }: { props: AdminViewServerProps; name: string; children: React.ReactNode }) {
+  return (
+    <PageTemplate props={props}>
       <Gutter>
         <F3Root name={name}>
           <style>{VIZ_STYLE}</style>
@@ -31,7 +43,7 @@ export function Frame({ props, name, children }: { props: AdminViewServerProps; 
           {children}
         </F3Root>
       </Gutter>
-    </DefaultTemplate>
+    </PageTemplate>
   )
 }
 
