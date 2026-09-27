@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-09-27
+
+Fase 1 go-live build (web + API; images `ghcr.io/bctech-adm/proyekkas-{web,migrate}:0.3.0`). Covers F3 dashboards,
+reports and exports, the F4 APK backend (`/api/v1/sync/batch`, devices, masters) and fase1-golive epics E1–E11:
+approval flow Direktur → Finance (ADR 0013), Finance cash UI (E2), project stages/progress + Addendum RAB (E4/E5),
+attendance + selfie retention (E6), scheduled reminders (E7), E9 hardening (signed media URLs, settlement reversal,
+coverage gate, upload resize queue), E10 GHCR images + prod compose, E11 Excel import/cut-over, and the S3 Fase 1 UAT
+gap fixes. The APK (`apps/mobile`) changes listed here ship on their own `mobile-vX.Y.Z` tags (pubspec version),
+not with this web release.
+
 ### Added
 - **E9 follow-ups — upload resize queue, B-1, B-2** (`apps/web`, branch `fix/e9-upload-resize-queue`; QA report
   `docs/proyekkas/qa/s3-e9-qa-report.md` §7, user decision 2026-09-27):
