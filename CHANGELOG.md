@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-09-27
+
 ### Added
 - **MC0 — multi-company analysis (docs only, branch `docs/mc0-multi-company`; user decision 2026-09-27):** several PTs
   of the client group in one ProyekKas, one login per person, per-PT role matrix, full consolidation, mutations always
