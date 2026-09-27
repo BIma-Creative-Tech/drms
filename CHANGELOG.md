@@ -21,6 +21,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   static dots; `role="status"` "Memuat…" / "Menyimpan…". Unit tests `tests/unit/admin-loading.test.ts` + theme
   contrast checks.
 
+### Fixed
+- **Flaky F3 KPI integration test across midnight** (`tests/integration/f3-kpi-reconciliation.int.test.ts`): the
+  suite runs ~10 min and captured "today" once in `beforeAll`; a CI run started 23:57 WITA crossed midnight, so the
+  code's today (company TZ) moved on while the expectations did not (K-01, K-02, K-11, K-12 off by one day). "today"
+  and the current month are now re-read before every test. Test-only change, no app code touched.
+
 ## [0.4.1] - 2026-09-27
 
 ### Added
