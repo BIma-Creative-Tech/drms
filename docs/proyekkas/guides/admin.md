@@ -19,7 +19,7 @@ satu isinya; angka merah = jumlah yang menunggu tindakan.
 |---|---|
 | **Dashboard** | Ringkasan per peran (tab peran bila punya lebih dari satu), `/admin/dashboard` |
 | **Persetujuan** | Persetujuan · Antrian Transfer · Verifikasi LPJ (Direktur/Finance) · Approval & tanda tangan |
-| **Proyek** | Project · Tahapan project · Template tahapan · RAB per kategori · Klien · Pusat biaya · Penugasan tim · Progress ▾ · Addendum ▾ |
+| **Proyek** | Project · RAB per kategori · Tahapan ▾ (Tahapan project, Template tahapan) · Data pendukung ▾ (Klien, Pusat biaya, Penugasan tim) · Progress ▾ · Addendum ▾ |
 | **Keuangan** | Pengajuan ▾ (Pengajuan biaya, + Buat pengajuan, Snapshot, Nota, Flag nota) · Kas ▾ · Transfer & LPJ ▾ · Tutup buku ▾ |
 | **Absensi** | Tim hari ini · Rekap bulanan · Jadwal & hari libur · Absensi · Koreksi absensi · Konfigurasi ▾ (Jadwal kerja, Hari libur) |
 | **Laporan** | Semua laporan (Admin: laporan absensi) |

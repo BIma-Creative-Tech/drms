@@ -100,7 +100,10 @@ export const MODULES: readonly ModuleDef[] = [
     icon: 'project',
     hint: 'Project, RAB, progress',
     sections: [
-      { items: [{ collection: 'projects' }, { collection: 'project-stages' }, { collection: 'stage-templates' }, { collection: 'budget-lines' }, { collection: 'clients' }, { collection: 'cost-centers' }, { collection: 'team-assignments' }] },
+      // Grouped so the whole menu fits one bar row at 1440px (7 flat entries + 2 dropdowns did not).
+      { items: [{ collection: 'projects' }, { collection: 'budget-lines' }] },
+      { label: 'Tahapan', items: [{ collection: 'project-stages' }, { collection: 'stage-templates' }] },
+      { label: 'Data pendukung', items: [{ collection: 'clients' }, { collection: 'cost-centers' }, { collection: 'team-assignments' }] },
       {
         label: 'Progress',
         items: [
