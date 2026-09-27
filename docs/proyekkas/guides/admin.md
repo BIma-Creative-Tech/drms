@@ -7,7 +7,31 @@ kas. Semua di **web**. Baca juga [Hal umum](README.md#hal-umum-untuk-semua-peran
 Aturan umum panel: data **tidak pernah dihapus** — gunakan centang **Aktif** (nonaktifkan) dengan alasan. Setiap
 perubahan tercatat di **Audit Log**.
 
-![TODO screenshot: menu panel admin (Pengguna & Akses, Master Data, Proyek, Keuangan, Sistem)](img/admin-menu.png)
+### Navigasi: layar modul (gaya Odoo)
+
+Buka `/admin` → **layar modul**: kotak-kotak berwarna, satu per modul. Klik modul → menu modul tampil di **bar atas**
+(bukan menu kiri). Menu dengan ▾ membuka daftar turunan. Tombol **⊞** di kiri bar kembali ke layar modul; di kanan
+bar ada **lonceng Notifikasi** dan **menu akun** (inisial nama: Profil & tanda tangan, Tema terang/gelap, Keluar).
+Di HP (layar sempit) menu modul dibuka dengan tombol **☰**. Modul hanya tampil bila Anda punya akses ke minimal
+satu isinya; angka merah = jumlah yang menunggu tindakan.
+
+| Modul | Isi menu |
+|---|---|
+| **Dashboard** | Ringkasan per peran (tab peran bila punya lebih dari satu), `/admin/dashboard` |
+| **Persetujuan** | Persetujuan · Antrian Transfer · Verifikasi LPJ (Direktur/Finance) · Approval & tanda tangan |
+| **Proyek** | Project · Tahapan project · Template tahapan · RAB per kategori · Klien · Pusat biaya · Penugasan tim · Progress ▾ · Addendum ▾ |
+| **Keuangan** | Pengajuan ▾ (Pengajuan biaya, + Buat pengajuan, Snapshot, Nota, Flag nota) · Kas ▾ · Transfer & LPJ ▾ · Tutup buku ▾ |
+| **Absensi** | Tim hari ini · Rekap bulanan · Jadwal & hari libur · Absensi · Koreksi absensi · Konfigurasi ▾ (Jadwal kerja, Hari libur) |
+| **Laporan** | Semua laporan (Admin: laporan absensi) |
+| **Pengguna & Akses** | Pengguna · Karyawan · Rekening karyawan · Perangkat · Sesi web |
+| **Master Data** | Bank · Satuan · Kategori pengeluaran · Kendaraan · Vendor |
+| **Media** | Foto nota · Bukti transfer · Selfie absensi · Foto progress · Tanda tangan · Logo perusahaan · Lampiran |
+| **Pengaturan** | Setting perusahaan · Aturan approval · Template notifikasi · Penomoran dokumen |
+| **Sistem** | Audit Log · Notifikasi saya · Notifikasi |
+
+Tautan lama tetap berlaku (mis. `/admin/kas`, `/admin/collections/...`); hanya beranda `/admin` yang kini layar modul.
+
+![TODO screenshot: layar modul Admin + bar menu modul Pengguna & Akses](img/admin-menu.png)
 
 ## 1. Pengguna dan peran
 
@@ -28,18 +52,20 @@ Kolom **Risiko integritas** tercentang = HP di-root/emulator — tinjau.
 
 ## 3. Master data
 
-| Menu | Isi |
+| Modul | Isi |
 |---|---|
-| **Master Data** | Bank, Satuan, Kategori pengeluaran (satuan wajar, perlu kendaraan), Kendaraan (nomor polisi unik, contoh `DA 1234 XY`), Vendor, Jadwal kerja, Hari libur |
+| **Master Data** | Bank, Satuan, Kategori pengeluaran (satuan wajar, perlu kendaraan), Kendaraan (nomor polisi unik, contoh `DA 1234 XY`), Vendor |
+| **Absensi → Konfigurasi** | Jadwal kerja, Hari libur |
 | **Proyek** | Project (dibuat Direktur), Pusat biaya, Klien, Template tahapan, Penugasan tim |
-| **Keuangan** | Akun kas/bank (saldo awal), Sumber kas masuk, Aturan approval |
+| **Keuangan → Kas** | Akun kas/bank (saldo awal), Sumber kas masuk |
+| **Pengaturan** | Aturan approval, Template notifikasi, Penomoran dokumen, Setting perusahaan |
 | **Pengguna & Akses** | Pengguna, Karyawan, Rekening karyawan, Perangkat |
 
 Data yang sudah dipakai tetap tampil di dokumen lama walau dinonaktifkan.
 
 ## 4. Aturan approval
 
-**Keuangan → Aturan approval**. Aturan standar (ADR 0013): **Diketahui Oleh (persetujuan Direktur) = Wajib** oleh
+**Pengaturan → Aturan approval**. Aturan standar (ADR 0013): **Diketahui Oleh (persetujuan Direktur) = Wajib** oleh
 peran Direktur, lalu **Level 1 = Finance**. Sistem menolak PM/Staff sebagai pemberi keputusan dan menolak
 "Diketahui" opsional. Setiap perubahan wajib alasan dan hanya berlaku untuk pengajuan **baru** (yang sudah diajukan
 memakai aturan lama). Direktur cuti: buat/ubah aturan sementara dengan pengganti bernama, lalu kembalikan.

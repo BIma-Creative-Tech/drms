@@ -4,7 +4,7 @@ Tugas Anda di ProyekKas: **Approval** pengajuan (setelah Direktur), **verifikasi
 transfer**, **verifikasi LPJ** dan penyelesaian selisih, **kas masuk/keluar manual**, **void**, **tutup buku**, dan
 **laporan**. Sebagian besar di **web**; APK untuk persetujuan cepat. Baca juga [Hal umum](README.md#hal-umum-untuk-semua-peran).
 
-Menu web **Alur kerja**: Persetujuan · Antrian Transfer · Verifikasi LPJ · Kas · Tutup buku · Laporan · Audit Log · …
+Modul web (layar modul `/admin`): **Persetujuan** (Persetujuan · Antrian Transfer · Verifikasi LPJ) · **Keuangan** (Pengajuan · Kas · Transfer & LPJ · Tutup buku) · **Laporan** · **Sistem** (Audit Log) · **Dashboard** · …
 Badge merah di menu = jumlah pekerjaan menunggu.
 
 ![TODO screenshot: Beranda web Finance](img/finance-beranda.png)
