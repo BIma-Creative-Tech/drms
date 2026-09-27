@@ -189,9 +189,12 @@ class AuthController extends Notifier<AuthState> {
   Future<String?> login() => _guardedLogin(() => ref.read(oidcBrowserClientProvider).login());
 
   /// In-app login (`PK_LOGIN_MODE=password`, ADR 0012). The password is passed straight to the token
-  /// request and is never stored or logged.
-  Future<String?> loginWithPassword({required String username, required String password}) =>
-      _guardedLogin(() => ref.read(passwordLoginClientProvider).login(username: username.trim(), password: password));
+  /// request and is never stored or logged; so is the optional authenticator code [totp] (optional
+  /// self-service 2FA, ADR 0017), sent only when non-empty.
+  Future<String?> loginWithPassword({required String username, required String password, String? totp}) =>
+      _guardedLogin(
+        () => ref.read(passwordLoginClientProvider).login(username: username.trim(), password: password, totp: totp),
+      );
 
   Future<String?> _guardedLogin(Future<OidcTokens> Function() obtainTokens) async {
     if (_busy) return null;

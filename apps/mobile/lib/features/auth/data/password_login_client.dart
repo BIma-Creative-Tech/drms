@@ -37,8 +37,9 @@ class PasswordLoginException implements Exception {
 /// In-app login against Keycloak without a browser (ADR 0012, `PK_LOGIN_MODE=password`, staging only):
 /// Resource Owner Password Credentials grant for the public client, plus the non-browser logout.
 abstract interface class PasswordLoginClient {
-  /// Throws [PasswordLoginException] on every failure.
-  Future<OidcTokens> login({required String username, required String password});
+  /// Throws [PasswordLoginException] on every failure. [totp] = the 6-digit authenticator code of an
+  /// account with optional 2FA (ADR 0017); sent only when non-empty, never stored or logged.
+  Future<OidcTokens> login({required String username, required String password, String? totp});
 
   /// Ends the Keycloak (offline) session of [refreshToken]. Best effort: never throws.
   Future<void> logout({required String refreshToken});
@@ -52,8 +53,17 @@ class KeycloakPasswordClient implements PasswordLoginClient {
 
   /// `POST <issuer>/protocol/openid-connect/token`, `grant_type=password` (Keycloak 26.7.4
   /// `ResourceOwnerPasswordCredentialsGrantType`; the client needs Direct Access Grants enabled).
+  ///
+  /// Optional 2FA (ADR 0017): the realm's direct grant flow runs "Direct Grant - Conditional OTP"
+  /// (`direct-grant-validate-otp`), which reads the form parameter `otp`, else `totp`, only for users
+  /// who configured an authenticator. Keycloak 26.7.4 `ValidateOTP` answers a MISSING or WRONG code
+  /// with 400 `invalid_grant` "Invalid user credentials" — identical to a wrong password (verified live
+  /// against quay.io/keycloak/keycloak:26.7.4; a reused code answers the same; each failure counts for
+  /// brute-force detection) — so the app cannot tell them apart; the login screen offers the optional
+  /// code field after such a failure.
   @override
-  Future<OidcTokens> login({required String username, required String password}) async {
+  Future<OidcTokens> login({required String username, required String password, String? totp}) async {
+    final code = normalizeTotp(totp);
     final Response<dynamic> res;
     try {
       res = await _dio.post<dynamic>(
@@ -64,6 +74,7 @@ class KeycloakPasswordClient implements PasswordLoginClient {
           'username': username,
           'password': password,
           'scope': AppEnv.scopes.join(' '),
+          'totp': ?code,
         },
         options: idpFormOptions(),
       );
@@ -108,6 +119,12 @@ class KeycloakPasswordClient implements PasswordLoginClient {
     } on DioException catch (e) {
       Log.i('auth: keycloak logout skipped (${e.type.name})');
     }
+  }
+
+  /// The authenticator code to send, or null (= parameter omitted): whitespace removed, digits only.
+  static String? normalizeTotp(String? totp) {
+    final digits = (totp ?? '').replaceAll(RegExp(r'\s'), '');
+    return digits.isEmpty || !RegExp(r'^\d+$').hasMatch(digits) ? null : digits;
   }
 
   static PasswordLoginError _transportError(DioException e) => switch (e.type) {

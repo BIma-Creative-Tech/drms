@@ -107,6 +107,14 @@ cannot log in this way and must set their password on the web first. Rollback: b
 `--dart-define=PK_LOGIN_MODE=browser` and turn Direct Access Grants off again. Token refresh is the same plain
 `refresh_token` grant in both modes (`TokenManager`).
 
+**Optional 2FA (ADR 0017):** users may enable an authenticator (TOTP) for their own account on the web
+("Keamanan akun"). The realm's direct grant flow then requires the code as form parameter `totp`
+(`direct-grant-validate-otp`). Keycloak 26.7.4 answers a missing or wrong code with the same
+`invalid_grant` "Invalid user credentials" as a wrong password, so after such an answer the form shows the
+optional field "Kode autentikator (bila 2FA aktif)" (6 digits, numeric keyboard, one-time-code autofill).
+Empty = no `totp` parameter (users without 2FA see no difference). The code is cleared after every attempt and
+never stored or logged. Browser mode shows Keycloak's own OTP page instead.
+
 ## OIDC redirect: App Link vs. fallback scheme (browser mode)
 
 - **App Link** `https://<host>/app/callback` is the default (ADR 0003/0010). Android only verifies it when the

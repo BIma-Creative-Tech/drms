@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:proyekkas/app/providers.dart';
 import 'package:proyekkas/core/config/app_env.dart';
 import 'package:proyekkas/core/connectivity/connectivity_controller.dart';
+import 'package:proyekkas/core/logging/log.dart';
 import 'package:proyekkas/core/network/api_client.dart';
 import 'package:proyekkas/core/storage/secure_store.dart';
 import 'package:proyekkas/core/time/device_clock.dart';
@@ -185,6 +186,57 @@ void main() {
       await expectLater(client.login(username: 'x', password: 'y'), _fails(PasswordLoginError.incompleteResponse));
     });
 
+    test('optional 2FA: totp is sent when given, omitted when empty/whitespace, never logged', () async {
+      final lines = <String>[];
+      Log.testSink = lines.add;
+      addTearDown(() => Log.testSink = null);
+      final adapter = FakeDioAdapter(
+        (_) => (400, {'error': 'invalid_grant', 'error_description': 'Invalid user credentials'}),
+      );
+      final client = KeycloakPasswordClient(_env(), dio: fakeDio(adapter));
+
+      // Keycloak 26.7.4 ValidateOTP: missing/wrong code = the same invalid_grant as a wrong password.
+      await expectLater(
+        client.login(username: 'x', password: 'y', totp: '482913'),
+        _fails(PasswordLoginError.invalidCredentials),
+      );
+      await expectLater(client.login(username: 'x', password: 'y'), _fails(PasswordLoginError.invalidCredentials));
+      await expectLater(
+        client.login(username: 'x', password: 'y', totp: ''),
+        _fails(PasswordLoginError.invalidCredentials),
+      );
+      await expectLater(
+        client.login(username: 'x', password: 'y', totp: '   '),
+        _fails(PasswordLoginError.invalidCredentials),
+      );
+      await expectLater(
+        client.login(username: 'x', password: 'y', totp: ' 123 456 '),
+        _fails(PasswordLoginError.invalidCredentials),
+      );
+
+      expect(adapter.calls[0].form['totp'], '482913');
+      expect(adapter.calls[1].form.containsKey('totp'), isFalse);
+      expect(adapter.calls[2].form.containsKey('totp'), isFalse);
+      expect(adapter.calls[3].form.containsKey('totp'), isFalse);
+      expect(adapter.calls[4].form['totp'], '123456');
+      expect(adapter.calls[0].form.containsKey('otp'), isFalse);
+
+      adapter.respond = (_) => (
+        200,
+        {
+          'access_token': _jwt({'sub': 'u1'}),
+          'refresh_token': 'r1',
+          'expires_in': 300,
+        },
+      );
+      final t = await client.login(username: 'x', password: 'y', totp: '482913');
+      expect(t.refreshToken, 'r1');
+
+      expect(lines, isNotEmpty, reason: 'rejections are logged (codes only)');
+      expect(lines.any((l) => l.contains('482913') || l.contains('123456')), isFalse);
+      expect(KeycloakPasswordClient.normalizeTotp('12a456'), isNull);
+    });
+
     test('exceptions never carry the password', () {
       const e = PasswordLoginException(PasswordLoginError.invalidCredentials);
       expect(e.toString(), 'PasswordLoginException(invalidCredentials)');
@@ -289,6 +341,14 @@ void main() {
       expect(c.read(authControllerProvider), isA<AuthSignedOut>());
     });
 
+    test('the optional authenticator code is passed through to the token request, not persisted', () async {
+      final c = container();
+      final ctrl = await signedOutController(c);
+      expect(await ctrl.loginWithPassword(username: 'doni', password: 'pw', totp: '482913'), isNull);
+      expect(password.totps.single, '482913');
+      expect(store.data.values.any((v) => v.contains('482913')), isFalse);
+    });
+
     test('logout ends the Keycloak session with the refresh token, without AppAuth', () async {
       final c = container();
       final ctrl = await signedOutController(c);
@@ -319,12 +379,14 @@ OidcTokens _tokens() =>
 
 class _FakePasswordClient implements PasswordLoginClient {
   final logins = <(String, String)>[];
+  final totps = <String?>[];
   final logouts = <String>[];
   PasswordLoginException? error;
 
   @override
-  Future<OidcTokens> login({required String username, required String password}) async {
+  Future<OidcTokens> login({required String username, required String password, String? totp}) async {
     logins.add((username, password));
+    totps.add(totp);
     if (error != null) throw error!;
     return _tokens();
   }
