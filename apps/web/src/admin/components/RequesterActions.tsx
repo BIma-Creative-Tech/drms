@@ -2,6 +2,7 @@
 import React, { useRef, useState, useSyncExternalStore } from 'react'
 
 import { postJson, problemText } from './ActionButton'
+import { TableScroll } from './TableScroll'
 
 /**
  * Requester actions of the expense-request edit view (F2c, US-03…US-08): submit, withdraw/cancel
@@ -315,47 +316,49 @@ export function RequesterActions(p: RequesterActionsProps) {
           <strong>Nota {p.type === 'reimburse' ? '(wajib per baris sebelum kirim, US-38)' : '(setelah dana ditransfer)'}</strong>
           {p.receipts.length === 0 ? <div style={{ marginTop: 6 }}>Belum ada nota.</div> : null}
           {p.receipts.length > 0 ? (
-            <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: 6 }}>
-              <thead>
-                <tr>
-                  {['Foto', 'Baris', 'Nota', 'Tanggal', 'Nominal', 'Status', ''].map((h) => (
-                    <th key={h} style={{ textAlign: 'left', padding: 4, borderBottom: '1px solid var(--theme-elevation-150)' }}>
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {p.receipts.map((r) => (
-                  <tr key={r.id} style={{ opacity: r.status === 'removed' ? 0.5 : 1 }}>
-                    <td style={{ padding: 4, verticalAlign: 'top' }}>
-                      {r.imageId ? (
-                        <a href={`/api/v1/media/receipts/${r.imageId}/file`} target="_blank" rel="noopener noreferrer">
-                          {/* eslint-disable-next-line @next/next/no-img-element -- authenticated API file, not a static asset */}
-                          <img src={`/api/v1/media/receipts/${r.imageId}/file?variant=thumb`} alt={`Nota ${r.receiptNo ?? r.id}`} style={{ width: 64, height: 64, objectFit: 'cover' }} />
-                        </a>
-                      ) : (
-                        '—'
-                      )}
-                    </td>
-                    <td style={{ padding: 4, verticalAlign: 'top' }}>{r.lineNo ?? '—'}</td>
-                    <td style={{ padding: 4, verticalAlign: 'top' }}>
-                      {r.vendorName}
-                      <div style={{ fontSize: 11 }}>No. {r.receiptNo ?? '—'}</div>
-                      <FlagList flags={r.flags} />
-                    </td>
-                    <td style={{ padding: 4, verticalAlign: 'top' }}>{r.receiptDate}</td>
-                    <td style={{ padding: 4, verticalAlign: 'top', whiteSpace: 'nowrap' }}>{rp(r.amount)}</td>
-                    <td style={{ padding: 4, verticalAlign: 'top' }}>{RECEIPT_STATUS[r.status] ?? r.status}</td>
-                    <td style={{ padding: 4, verticalAlign: 'top' }}>
-                      {has('add_receipt') && r.status !== 'removed' ? (
-                        <Act testId={`remove-receipt-${r.id}`} label="Hapus" url={`${url}/receipts/${r.id}/remove`} reason="Alasan menghapus nota (wajib):" success="Nota dihapus (tercatat di riwayat)." />
-                      ) : null}
-                    </td>
+            <TableScroll label="Nota">
+              <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: 6 }}>
+                <thead>
+                  <tr>
+                    {['Foto', 'Baris', 'Nota', 'Tanggal', 'Nominal', 'Status', ''].map((h) => (
+                      <th key={h} style={{ textAlign: 'left', padding: 4, borderBottom: '1px solid var(--theme-elevation-150)' }}>
+                        {h}
+                      </th>
+                    ))}
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {p.receipts.map((r) => (
+                    <tr key={r.id} style={{ opacity: r.status === 'removed' ? 0.5 : 1 }}>
+                      <td style={{ padding: 4, verticalAlign: 'top' }}>
+                        {r.imageId ? (
+                          <a href={`/api/v1/media/receipts/${r.imageId}/file`} target="_blank" rel="noopener noreferrer">
+                            {/* eslint-disable-next-line @next/next/no-img-element -- authenticated API file, not a static asset */}
+                            <img src={`/api/v1/media/receipts/${r.imageId}/file?variant=thumb`} alt={`Nota ${r.receiptNo ?? r.id}`} style={{ width: 64, height: 64, objectFit: 'cover' }} />
+                          </a>
+                        ) : (
+                          '—'
+                        )}
+                      </td>
+                      <td style={{ padding: 4, verticalAlign: 'top' }}>{r.lineNo ?? '—'}</td>
+                      <td style={{ padding: 4, verticalAlign: 'top' }}>
+                        {r.vendorName}
+                        <div style={{ fontSize: 11 }}>No. {r.receiptNo ?? '—'}</div>
+                        <FlagList flags={r.flags} />
+                      </td>
+                      <td style={{ padding: 4, verticalAlign: 'top' }}>{r.receiptDate}</td>
+                      <td style={{ padding: 4, verticalAlign: 'top', whiteSpace: 'nowrap' }}>{rp(r.amount)}</td>
+                      <td style={{ padding: 4, verticalAlign: 'top' }}>{RECEIPT_STATUS[r.status] ?? r.status}</td>
+                      <td style={{ padding: 4, verticalAlign: 'top' }}>
+                        {has('add_receipt') && r.status !== 'removed' ? (
+                          <Act testId={`remove-receipt-${r.id}`} label="Hapus" url={`${url}/receipts/${r.id}/remove`} reason="Alasan menghapus nota (wajib):" success="Nota dihapus (tercatat di riwayat)." />
+                        ) : null}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </TableScroll>
           ) : null}
           {has('add_receipt') ? (
             p.lines.length === 0 ? (

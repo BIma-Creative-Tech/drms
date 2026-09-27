@@ -373,7 +373,7 @@
 // admin.components.Nav) + module launcher at /admin (src/admin/views/Launcher*.tsx).
 // Payload 3.90.1 templates/Default lays Nav and the page out as a 2-column grid with a sidebar
 // toggler; here the template becomes a column (bar on top, full-width content) and the sidebar
-// toggler/hamburgers are hidden. The AppHeader row (breadcrumbs + document actions) stays below.
+// toggler/hamburgers are hidden. Breadcrumbs = the slim .pk-crumbs line under the bar (no AppHeader row).
 // =================================================================================================
 $pk-modules: dashboard, persetujuan, proyek, keuangan, absensi, laporan, pengguna, master, media, pengaturan, sistem;
 
@@ -426,8 +426,10 @@ $pk-modules: dashboard, persetujuan, proyek, keuangan, absensi, laporan, penggun
     width: 100%;
   }
 
-  // Launcher (/admin): no (empty) breadcrumb row above the greeting.
-  .template-default__wrap:has(.pk-launcher) > .app-header {
+  // Payload's AppHeader row (StepNav with the graphics-Icon home crumb + view actions) is replaced by
+  // the breadcrumb line under the bar (.pk-crumbs, ModuleBar PageCrumbs). The row only stays when a
+  // view renders actions into it (none today) — never an empty row / lone "D" icon.
+  .template-default__wrap > .app-header:not(:has(.app-header__actions > *)) {
     display: none;
   }
 
@@ -992,6 +994,267 @@ $pk-modules: dashboard, persetujuan, proyek, keuangan, absensi, laporan, penggun
     .pk-bar__module {
       gap: 8px;
       font-size: 15px;
+    }
+  }
+}
+
+// =================================================================================================
+// Breadcrumb line under the bar (ModuleBar PageCrumbs, src/admin/shell/crumbs.ts) + wide tables of
+// the custom views (TableScroll / responsive stacked tables, src/admin/views/shared.tsx).
+// =================================================================================================
+@layer payload {
+  .pk-crumbs {
+    min-width: 0;
+    padding: 12px var(--gutter-h) 0;
+    color: var(--pk-muted-fg);
+    font-size: 13px; // px: Payload's root font-size is 13px
+    line-height: 20px;
+  }
+
+  .pk-crumbs__list {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .pk-crumbs__item {
+    display: flex;
+    flex: 0 1 auto;
+    gap: 4px;
+    align-items: center;
+    min-width: 0;
+  }
+
+  .pk-crumbs__item[data-home] {
+    flex-shrink: 0;
+    max-width: 45%;
+  }
+
+  // chevron separator (decorative pseudo element → not announced)
+  .pk-crumbs__item + .pk-crumbs__item::before {
+    content: '';
+    flex: none;
+    width: 6px;
+    height: 6px;
+    margin: 0 4px 0 2px;
+    border-top: 1.5px solid currentColor;
+    border-right: 1.5px solid currentColor;
+    opacity: 0.6;
+    transform: rotate(45deg);
+  }
+
+  .pk-crumbs__link,
+  .pk-crumbs__current {
+    display: inline-flex;
+    gap: 6px;
+    align-items: center;
+    min-width: 0;
+    max-width: 100%;
+    padding: 2px 6px;
+    border-radius: 7px;
+    color: inherit;
+    text-decoration: none;
+  }
+
+  .pk-crumbs__item[data-home] > .pk-crumbs__link,
+  .pk-crumbs__item[data-home] > .pk-crumbs__current {
+    padding-left: 2px;
+  }
+
+  .pk-crumbs__link:hover {
+    background: color-mix(in oklab, var(--pk-muted-bg) 85%, transparent);
+    color: var(--pk-fg);
+  }
+
+  .pk-crumbs__link:focus-visible {
+    outline: var(--accessibility-outline);
+    outline-offset: 1px;
+  }
+
+  .pk-crumbs__current {
+    color: var(--pk-fg);
+    font-weight: 600;
+  }
+
+  .pk-crumbs__label {
+    overflow: hidden;
+    min-width: 0;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .pk-crumbs__item:not(:last-child, [data-home]) .pk-crumbs__label {
+    max-width: 24ch;
+  }
+
+  .pk-crumbs__chip {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    border-radius: 6px;
+    background: linear-gradient(135deg, var(--pk-tile-from, var(--color-base-500)), var(--pk-tile-to, var(--color-base-700)));
+    color: #FFFFFF;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .pk-crumbs {
+      animation: pk-crumbs-in 0.18s ease-out;
+    }
+
+    @keyframes pk-crumbs-in {
+      from {
+        opacity: 0;
+      }
+    }
+  }
+
+  @media (max-width: 560px) {
+    .pk-crumbs {
+      padding-top: 10px;
+    }
+
+    .pk-crumbs__item:not(:last-child, [data-home]) .pk-crumbs__label {
+      max-width: 14ch;
+    }
+  }
+
+  // Account view (/admin/account): Payload's divider lines above/below "Pengaturan Payload" are
+  // `width: 100% + 5 × base` from `left: -gutter` → 60px page overflow at 390px. Span the gutters
+  // exactly instead.
+  .payload-settings::before,
+  .payload-settings::after {
+    right: calc(var(--gutter-h) * -1);
+    left: calc(var(--gutter-h) * -1);
+    width: auto;
+  }
+
+  .pk-crumbs + .template-default__wrap {
+    // breathing room between the crumb line and Payload's list/edit header
+    padding-top: 4px;
+  }
+
+  // ---- wide tables (custom views): scroll inside their own box, never the page -------------------
+  .pk-tscroll {
+    position: relative;
+    overflow-x: auto;
+    max-width: 100%;
+    margin: 0 0 12px;
+    overscroll-behavior-x: contain;
+    // scroll shadows: the edge shadows appear only where more content is hidden (pure CSS)
+    background:
+      linear-gradient(to right, var(--pk-bg) 30%, transparent) left center / 40px 100% no-repeat local,
+      linear-gradient(to left, var(--pk-bg) 30%, transparent) right center / 40px 100% no-repeat local,
+      radial-gradient(farthest-side at 0 50%, rgb(15 23 42 / 0.16), transparent) left center / 14px 100% no-repeat scroll,
+      radial-gradient(farthest-side at 100% 50%, rgb(15 23 42 / 0.16), transparent) right center / 14px 100% no-repeat scroll;
+  }
+
+  html[data-theme='dark'] .pk-tscroll {
+    background:
+      linear-gradient(to right, var(--pk-bg) 30%, transparent) left center / 40px 100% no-repeat local,
+      linear-gradient(to left, var(--pk-bg) 30%, transparent) right center / 40px 100% no-repeat local,
+      radial-gradient(farthest-side at 0 50%, rgb(0 0 0 / 0.55), transparent) left center / 14px 100% no-repeat scroll,
+      radial-gradient(farthest-side at 100% 50%, rgb(0 0 0 / 0.55), transparent) right center / 14px 100% no-repeat scroll;
+  }
+
+  .pk-tscroll:focus-visible {
+    outline: var(--accessibility-outline);
+    outline-offset: 2px;
+  }
+
+  .pk-tscroll > table {
+    min-width: max-content;
+  }
+
+  // Responsive table (antrian transfer): each <tbody> = one item; on narrow screens every item
+  // becomes a stacked card, cells get their column name from data-label. Inline cell styles of the
+  // F2 views need !important here.
+  @media (max-width: 640px) {
+    .pk-rtable,
+    .pk-rtable tbody,
+    .pk-rtable tr,
+    .pk-rtable td {
+      display: block;
+      width: 100%;
+    }
+
+    .pk-rtable thead {
+      position: absolute;
+      overflow: hidden;
+      width: 1px;
+      height: 1px;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+
+    .pk-rtable tbody {
+      margin: 0 0 12px;
+      padding: 4px 12px;
+      border: 1px solid var(--pk-border);
+      border-radius: var(--style-radius-l);
+      background: var(--pk-card);
+      box-shadow: var(--pk-shadow);
+    }
+
+    .pk-rtable td {
+      padding: 8px 0 !important;
+      border-bottom: 1px solid color-mix(in oklab, var(--pk-border) 70%, transparent) !important;
+      text-align: left !important;
+      white-space: normal !important;
+    }
+
+    .pk-rtable tr:last-child td:last-child {
+      border-bottom: 0 !important;
+    }
+
+    // item row = compact 2-column grid: primary cell (number/title) first, long cells full width
+    .pk-rtable tbody > tr:first-child {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      column-gap: 12px;
+    }
+
+    .pk-rtable td[data-span='full'] {
+      grid-column: 1 / -1;
+    }
+
+    .pk-rtable td[data-primary] {
+      order: -1;
+      font-weight: 600;
+    }
+
+    .pk-rtable td:empty {
+      display: none;
+    }
+
+    .pk-rtable td[data-label]::before {
+      content: attr(data-label);
+      display: block;
+      margin-bottom: 2px;
+      color: var(--pk-muted-fg);
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+    }
+
+    // forms inside a card (MoneyForm): one full-width field per line instead of a wider card
+    .pk-rtable form > label {
+      flex: 1 1 100%;
+      min-width: 0;
+    }
+
+    .pk-rtable form :is(input, select) {
+      box-sizing: border-box;
+      width: 100%;
+      max-width: 100%;
+      min-height: 40px;
     }
   }
 }

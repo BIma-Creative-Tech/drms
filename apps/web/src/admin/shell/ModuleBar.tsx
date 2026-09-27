@@ -1,6 +1,7 @@
 'use client'
 
-import { useTheme } from '@payloadcms/ui'
+import { getTranslation } from '@payloadcms/translations'
+import { useStepNav, useTheme, useTranslation } from '@payloadcms/ui'
 import { AnimatePresence, motion, MotionConfig } from 'motion/react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
@@ -9,6 +10,7 @@ import React, { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef,
 import { Icon } from '@/admin/modules/Icon'
 import { activeHref, moduleForPath, profileHref, type ResolvedItem, type ResolvedModule, type ResolvedSection } from '@/admin/modules/registry'
 
+import { deriveCrumbs, type Crumb } from './crumbs'
 import type { NavUser } from './modules-server'
 
 /**
@@ -20,6 +22,7 @@ import type { NavUser } from './modules-server'
  * no horizontal scroll at 390px. Keyboard: ←/→/Home/End between top-level entries, ↓/Enter/Space
  * opens a dropdown, ↑/↓ inside, Esc closes and returns focus, visible focus rings (custom.scss),
  * aria-current="page" on the active link. Reduced motion: MotionConfig reducedMotion="user".
+ * Below the bar: the breadcrumb line (PageCrumbs) — only on pages that have crumbs.
  */
 
 type Props = { modules: ResolvedModule[]; user: NavUser; bell: React.ReactNode; logout: React.ReactNode }
@@ -316,6 +319,69 @@ function Sheet({ mod, modules, current, onClose }: { mod: ResolvedModule | null;
   )
 }
 
+// ------------------------------------------------------------------------------ breadcrumbs
+
+/**
+ * Payload's step-nav items, but only while they belong to the current pathname: custom views never
+ * set steps, so after a client navigation from an edit view the old steps would linger. The steps
+ * are stamped with the path they were set on (state adjusted during render, no effect).
+ */
+function useOwnedSteps(pathname: string) {
+  const { stepNav } = useStepNav()
+  const [owned, setOwned] = useState<{ nav: typeof stepNav; path: string } | null>(null)
+  if (owned?.nav !== stepNav) setOwned({ nav: stepNav, path: pathname })
+  const nav = owned?.nav === stepNav ? owned : { nav: stepNav, path: pathname }
+  return nav.path === pathname && nav.nav.length ? nav.nav : null
+}
+
+/**
+ * Slim breadcrumb line under the bar (replaces Payload's AppHeader row — its lone graphics-Icon home
+ * crumb and the empty row on pages without crumbs). Home = current module; see ./crumbs.ts.
+ */
+function PageCrumbs({ pathname, mod }: { pathname: string; mod: ResolvedModule | null }) {
+  const { i18n } = useTranslation()
+  const steps = useOwnedSteps(pathname)
+  const crumbs = deriveCrumbs({
+    pathname,
+    module: mod,
+    steps,
+    translate: (l) => (typeof l === 'string' ? l : l && typeof l === 'object' ? getTranslation(l as Record<string, string>, i18n) : ''),
+  })
+  if (!crumbs.length) return null
+  return (
+    <nav className="pk-crumbs" aria-label="Lokasi halaman" data-pk-crumbs>
+      <ol className="pk-crumbs__list">
+        {crumbs.map((c) => (
+          <li key={c.key} className="pk-crumbs__item" data-home={c.key === 'home' || undefined}>
+            {c.href ? (
+              <Link href={c.href} className="pk-crumbs__link" data-pk-crumb={c.key} data-mod={c.mod} title={c.label}>
+                <CrumbInner c={c} />
+              </Link>
+            ) : (
+              <span className="pk-crumbs__current" aria-current="page" data-pk-crumb={c.key} data-mod={c.mod} title={c.label}>
+                <CrumbInner c={c} />
+              </span>
+            )}
+          </li>
+        ))}
+      </ol>
+    </nav>
+  )
+}
+
+function CrumbInner({ c }: { c: Crumb }) {
+  return (
+    <>
+      {c.icon ? (
+        <span className="pk-crumbs__chip" aria-hidden="true">
+          <Icon name={c.icon} size={12} />
+        </span>
+      ) : null}
+      <span className="pk-crumbs__label">{c.label}</span>
+    </>
+  )
+}
+
 // ------------------------------------------------------------------------------ bar
 
 export function ModuleBar({ modules, user, bell, logout }: Props) {
@@ -431,6 +497,7 @@ export function ModuleBar({ modules, user, bell, logout }: Props) {
           ) : null}
         </div>
       </header>
+      <PageCrumbs pathname={pathname} mod={mod} />
       <AnimatePresence>{sheet ? <Sheet mod={mod} modules={modules} current={current} onClose={() => setSheet(false)} /> : null}</AnimatePresence>
     </MotionConfig>
   )

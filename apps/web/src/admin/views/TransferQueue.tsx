@@ -10,7 +10,7 @@ import { ReasonAction } from '../components/kas/ReasonAction'
 import { KAS_STYLE } from '../components/kas/style'
 import { MoneyForm } from '../components/MoneyForm'
 import { ReimburseReceiptReview, loadReimburseReview } from '../components/ReimburseReceiptReview'
-import { Empty, Forbidden, Shell, allowed, badge, docLink, num, rp, table, td, th } from './shared'
+import { Empty, Forbidden, Shell, TableScroll, allowed, badge, docLink, num, rp, table, td, th } from './shared'
 
 /**
  * "Antrian Transfer" (M05, US-19/US-20): Uang Muka "Disetujui (Antri Transfer)" and Reimburse
@@ -37,7 +37,9 @@ export async function TransferQueue(props: AdminViewServerProps) {
       {items.length === 0 ? (
         <Empty text="Antrian transfer kosong." />
       ) : (
-        <table style={table}>
+        // Wide (6 columns + the transfer form): stacked cards ≤ 640px (custom.scss .pk-rtable), one
+        // <tbody> per item so the item row and its form stay one card; a plain table on wider screens.
+        <table style={table} className="pk-rtable" data-pk-table="transfer-queue">
           <thead>
             <tr>
               <th style={th}>Dibutuhkan</th>
@@ -48,45 +50,53 @@ export async function TransferQueue(props: AdminViewServerProps) {
               <th style={th}>Flag terbuka</th>
             </tr>
           </thead>
-          <tbody>
-            {items.map((r) => (
-              <React.Fragment key={r.id}>
+          {items.map((r) => (
+            <tbody key={r.id} data-pk-queue-item={r.id}>
+              <tr>
+                <td style={td} data-label="Dibutuhkan">
+                  {r.neededDate ?? '—'}
+                </td>
+                <td style={td} data-label="Nomor / Judul" data-span="full" data-primary>
+                  {docLink(r.id, r.docNo ?? `#${r.id}`)}
+                  <div>{r.title}</div>
+                  <div style={{ fontSize: 12 }}>{r.scope}</div>
+                </td>
+                <td style={td} data-label="Jenis">
+                  {r.statusLabel}
+                </td>
+                <td style={{ ...td, overflowWrap: 'anywhere' }} data-label="Rekening tujuan" data-span="full">
+                  {r.bank ? `${r.bank.bankName ?? ''} · ${r.bank.accountHolder ?? ''} · ${r.bank.accountNo ?? ''}` : '—'}
+                </td>
+                <td style={num} data-label="Nominal disetujui">
+                  {rp(r.approvedAmount)}
+                </td>
+                <td style={td} data-label="Flag terbuka">
+                  {r.flags.warning + r.flags.info > 0 ? <span style={badge(r.flags.warning ? 'warn' : 'muted')}>{r.flags.warning + r.flags.info}</span> : '—'}
+                </td>
+              </tr>
+              {canTransfer ? (
                 <tr>
-                  <td style={td}>{r.neededDate ?? '—'}</td>
-                  <td style={td}>
-                    {docLink(r.id, r.docNo ?? `#${r.id}`)}
-                    <div>{r.title}</div>
-                    <div style={{ fontSize: 12 }}>{r.scope}</div>
+                  <td style={td} />
+                  <td style={td} colSpan={5}>
+                    {mine.has(r.id) ? (
+                      // ADR 0013 O-2: allowed (audited), but made visible before the money moves.
+                      <div role="note" data-pk-self-approved={r.id} style={{ margin: '0 0 6px', padding: '6px 8px', borderLeft: '3px solid var(--pk-tone-warn)', background: 'var(--theme-elevation-50)', fontSize: 13 }}>
+                        <span style={badge('warn')}>Perhatian</span> <strong>Anda juga yang menyetujui</strong> pengajuan ini. Bila ada Finance lain, sebaiknya transfer dicatat oleh orang lain (pemisahan tugas).
+                      </div>
+                    ) : null}
+                    <MoneyForm
+                      url={`/api/v1/expense-requests/${r.id}/transfer`}
+                      submitLabel="Catat transfer"
+                      cashAccounts={accounts}
+                      bankRef="required"
+                      proof={{ kind: 'transfer-proofs', required: true }}
+                      amountText={`Transfer ${rp(r.approvedAmount)}`}
+                    />
                   </td>
-                  <td style={td}>{r.statusLabel}</td>
-                  <td style={td}>{r.bank ? `${r.bank.bankName ?? ''} · ${r.bank.accountHolder ?? ''} · ${r.bank.accountNo ?? ''}` : '—'}</td>
-                  <td style={num}>{rp(r.approvedAmount)}</td>
-                  <td style={td}>{r.flags.warning + r.flags.info > 0 ? <span style={badge(r.flags.warning ? 'warn' : 'muted')}>{r.flags.warning + r.flags.info}</span> : '—'}</td>
                 </tr>
-                {canTransfer ? (
-                  <tr>
-                    <td style={td} />
-                    <td style={td} colSpan={5}>
-                      {mine.has(r.id) ? (
-                        // ADR 0013 O-2: allowed (audited), but made visible before the money moves.
-                        <div role="note" data-pk-self-approved={r.id} style={{ margin: '0 0 6px', padding: '6px 8px', borderLeft: '3px solid var(--pk-tone-warn)', background: 'var(--theme-elevation-50)', fontSize: 13 }}>
-                          <span style={badge('warn')}>Perhatian</span> <strong>Anda juga yang menyetujui</strong> pengajuan ini. Bila ada Finance lain, sebaiknya transfer dicatat oleh orang lain (pemisahan tugas).
-                        </div>
-                      ) : null}
-                      <MoneyForm
-                        url={`/api/v1/expense-requests/${r.id}/transfer`}
-                        submitLabel="Catat transfer"
-                        cashAccounts={accounts}
-                        bankRef="required"
-                        proof={{ kind: 'transfer-proofs', required: true }}
-                        amountText={`Transfer ${rp(r.approvedAmount)}`}
-                      />
-                    </td>
-                  </tr>
-                ) : null}
-              </React.Fragment>
-            ))}
-          </tbody>
+              ) : null}
+            </tbody>
+          ))}
         </table>
       )}
       <style>{KAS_STYLE}</style>
@@ -101,48 +111,50 @@ export async function TransferQueue(props: AdminViewServerProps) {
       {done.length === 0 ? (
         <Empty text="Tidak ada transfer yang bisa dibatalkan." />
       ) : (
-        <table style={table} data-pk-table="voidable-transfers">
-          <thead>
-            <tr>
-              <th style={th}>Tanggal</th>
-              <th style={th}>Transfer</th>
-              <th style={th}>Pengajuan</th>
-              <th style={{ ...th, textAlign: 'right' }}>Nominal</th>
-              {canTransfer ? <th style={th}>Aksi</th> : null}
-            </tr>
-          </thead>
-          <tbody>
-            {done.map((t) => (
-              <tr key={t.transferId} data-pk-transfer={t.transferNo}>
-                <td style={td}>{t.transferDate}</td>
-                <td style={td}>{t.transferNo}</td>
-                <td style={td}>
-                  {docLink(t.requestId, t.requestNo ?? `#${t.requestId}`)}
-                  <div>{t.requestTitle}</div>
-                  <div style={{ fontSize: 12 }}>{t.requestType === 'advance' ? 'Uang Muka' : 'Reimburse'}</div>
-                </td>
-                <td style={num}>{rp(t.amount)}</td>
-                {canTransfer ? (
-                  <td style={td}>
-                    <ReasonAction
-                      url={`/api/v1/expense-requests/${t.requestId}/transfers/${t.transferId}/void`}
-                      label="Void transfer"
-                      title={`Void transfer ${t.transferNo}?`}
-                      description={
-                        <>
-                          KK transfer ini dibalik dengan jurnal balik (saldo akun kembali), transfer ditandai Void, dan pengajuan {t.requestNo ?? ''} kembali ke{' '}
-                          <strong>{t.requestType === 'advance' ? 'Disetujui (Antri Transfer)' : 'Nota Terverifikasi (Antri Transfer)'}</strong> untuk ditransfer ulang.
-                        </>
-                      }
-                      confirmLabel="Void transfer"
-                      testId={`void-transfer-${t.transferId}`}
-                    />
-                  </td>
-                ) : null}
+        <TableScroll label="Transfer tercatat">
+          <table style={table} data-pk-table="voidable-transfers">
+            <thead>
+              <tr>
+                <th style={th}>Tanggal</th>
+                <th style={th}>Transfer</th>
+                <th style={th}>Pengajuan</th>
+                <th style={{ ...th, textAlign: 'right' }}>Nominal</th>
+                {canTransfer ? <th style={th}>Aksi</th> : null}
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {done.map((t) => (
+                <tr key={t.transferId} data-pk-transfer={t.transferNo}>
+                  <td style={td}>{t.transferDate}</td>
+                  <td style={td}>{t.transferNo}</td>
+                  <td style={td}>
+                    {docLink(t.requestId, t.requestNo ?? `#${t.requestId}`)}
+                    <div>{t.requestTitle}</div>
+                    <div style={{ fontSize: 12 }}>{t.requestType === 'advance' ? 'Uang Muka' : 'Reimburse'}</div>
+                  </td>
+                  <td style={num}>{rp(t.amount)}</td>
+                  {canTransfer ? (
+                    <td style={td}>
+                      <ReasonAction
+                        url={`/api/v1/expense-requests/${t.requestId}/transfers/${t.transferId}/void`}
+                        label="Void transfer"
+                        title={`Void transfer ${t.transferNo}?`}
+                        description={
+                          <>
+                            KK transfer ini dibalik dengan jurnal balik (saldo akun kembali), transfer ditandai Void, dan pengajuan {t.requestNo ?? ''} kembali ke{' '}
+                            <strong>{t.requestType === 'advance' ? 'Disetujui (Antri Transfer)' : 'Nota Terverifikasi (Antri Transfer)'}</strong> untuk ditransfer ulang.
+                          </>
+                        }
+                        confirmLabel="Void transfer"
+                        testId={`void-transfer-${t.transferId}`}
+                      />
+                    </td>
+                  ) : null}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </TableScroll>
       )}
     </Shell>
   )
