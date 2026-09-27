@@ -6,6 +6,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed
+- **Admin breadcrumbs** (`apps/web`): Payload's AppHeader row under the module bar (a lone graphics-Icon "D" home
+  crumb, and an empty row on pages without crumbs) is replaced by a slim **breadcrumb line** under the bar
+  (`ModuleBar` → `PageCrumbs`, pure derivation in `src/admin/shell/crumbs.ts`): home = the current module (icon +
+  name → its first menu item; "Semua modul" outside every module), then Payload's steps, e.g. **Keuangan › Pengajuan
+  biaya › PB-2026-0001**; last crumb `aria-current="page"`. Shown on collection list/edit, globals and account; custom
+  views and the launcher have no crumbs → no row, no gap. Steps left over from the previous page (custom views set
+  none) are ignored; before Payload sets them, the module menu labels are used (no jump after hydration).
+
+### Fixed
+- **No horizontal page scroll at 390 px** (audit of every custom view, launcher, collection list/edit, globals and
+  account × 5 roles): Antrian Transfer (−253 px) becomes stacked cards per request on screens ≤ 640 px (the transfer
+  form stays inside its card); the other custom-view tables (Verifikasi LPJ −28 px, Persetujuan, Notifikasi, transfer
+  void list, Riwayat, nota tables in the edit view) scroll inside their own focusable box with edge shadows
+  (`TableScroll`); the account view (−60 px, Payload's settings divider wider than the page) is contained.
+
 ## [0.4.0] - 2026-09-27
 
 ### Changed

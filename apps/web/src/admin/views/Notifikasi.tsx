@@ -7,7 +7,7 @@ import { DEFAULT_TZ } from '@/lib/time'
 import { ActionButton } from '../components/ActionButton'
 import { NotificationOpen } from '../components/NotificationOpen'
 import { dateTimeId } from './progress-ui'
-import { Empty, Shell, badge, table, td, th } from './shared'
+import { Empty, Shell, TableScroll, badge, table, td, th } from './shared'
 
 /**
  * S3e (US-05, S-04): the caller's own in-app notifications (bell in the nav → here). Newest first,
@@ -35,31 +35,33 @@ export async function NotificationsView(props: AdminViewServerProps) {
       {rows.length === 0 ? (
         <Empty text="Belum ada notifikasi." />
       ) : (
-        <table style={table} data-pk-table="notifications">
-          <thead>
-            <tr>
-              <th style={th}>Waktu (WITA)</th>
-              <th style={th}>Notifikasi</th>
-              <th style={th}>Dokumen</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((n) => {
-              const href = notificationHref(n.docType, n.docId)
-              return (
-                <tr key={n.id} data-pk-notification={n.id} data-pk-read={n.readAt ? 'true' : 'false'}>
-                  <td style={{ ...td, whiteSpace: 'nowrap' }}>{dateTimeId(n.createdAt, tz)}</td>
-                  <td style={td}>
-                    {!n.readAt ? <span style={{ ...badge('warn'), marginRight: 6 }}>baru</span> : null}
-                    <span style={{ fontWeight: n.readAt ? 400 : 700 }}>{n.title}</span>
-                    <div style={{ fontSize: 12 }}>{n.body}</div>
-                  </td>
-                  <td style={td}>{href ? <NotificationOpen id={n.id} href={href} unread={!n.readAt} label={n.docNo ? `Buka ${n.docNo}` : 'Buka'} /> : (n.docNo ?? '—')}</td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
+        <TableScroll label="Notifikasi">
+          <table style={table} data-pk-table="notifications">
+            <thead>
+              <tr>
+                <th style={th}>Waktu (WITA)</th>
+                <th style={th}>Notifikasi</th>
+                <th style={th}>Dokumen</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((n) => {
+                const href = notificationHref(n.docType, n.docId)
+                return (
+                  <tr key={n.id} data-pk-notification={n.id} data-pk-read={n.readAt ? 'true' : 'false'}>
+                    <td style={{ ...td, whiteSpace: 'nowrap' }}>{dateTimeId(n.createdAt, tz)}</td>
+                    <td style={td}>
+                      {!n.readAt ? <span style={{ ...badge('warn'), marginRight: 6 }}>baru</span> : null}
+                      <span style={{ fontWeight: n.readAt ? 400 : 700 }}>{n.title}</span>
+                      <div style={{ fontSize: 12 }}>{n.body}</div>
+                    </td>
+                    <td style={td}>{href ? <NotificationOpen id={n.id} href={href} unread={!n.readAt} label={n.docNo ? `Buka ${n.docNo}` : 'Buka'} /> : (n.docNo ?? '—')}</td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </TableScroll>
       )}
       {res.totalDocs > LIMIT ? <p style={{ fontSize: 12 }}>Menampilkan {LIMIT} terbaru dari {res.totalDocs}. Riwayat lengkap: menu Sistem → Notifikasi.</p> : null}
     </Shell>

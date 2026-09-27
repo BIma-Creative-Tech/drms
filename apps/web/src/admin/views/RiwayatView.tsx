@@ -8,7 +8,7 @@ import { formatServerTime } from '@/pdf/format'
 import { DEFAULT_TZ } from '@/lib/time'
 import { withReqTransaction } from '@/lib/system-tx'
 
-import { Empty, table, td, th } from './shared'
+import { Empty, TableScroll, table, td, th } from './shared'
 
 const ACTION_LABELS: Record<string, string> = {
   create: 'dibuat',
@@ -77,49 +77,51 @@ export async function RiwayatView(props: DocumentViewServerProps) {
       <h2 style={{ margin: '16px 0' }}>Riwayat</h2>
       {denied ? <Empty text="Dokumen tidak ditemukan." /> : rows.length === 0 ? <Empty text="Belum ada riwayat." /> : null}
       {rows.length > 0 ? (
-        <table style={table}>
-          <thead>
-            <tr>
-              <th style={th}>Waktu (server)</th>
-              <th style={th}>Oleh</th>
-              <th style={th}>Dokumen</th>
-              <th style={th}>Aksi</th>
-              <th style={th}>Field</th>
-              <th style={th}>Lama → Baru</th>
-              <th style={th}>Alasan</th>
-              <th style={th}>Sumber / perangkat</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((r) => (
-              <tr key={r.id}>
-                <td style={{ ...td, whiteSpace: 'nowrap' }}>{formatServerTime(r.serverTime, tz)}</td>
-                <td style={td}>
-                  {r.userName ?? (r.source === 'job' ? 'sistem (job)' : r.userId ? `user#${r.userId}` : 'sistem')}
-                  {r.userRoles ? <div style={{ fontSize: 11 }}>{r.userRoles}</div> : null}
-                </td>
-                <td style={td}>
-                  {DOC_LABELS[r.docType] ?? r.docType}
-                  {r.docNo && r.docType !== 'expense_request' ? <div style={{ fontSize: 11 }}>{r.docNo}</div> : null}
-                </td>
-                <td style={td}>{ACTION_LABELS[r.action] ?? r.action}</td>
-                <td style={td}>
-                  {r.field ?? '—'}
-                  {r.lineNo ? ` (baris ${r.lineNo})` : ''}
-                </td>
-                <td style={td}>
-                  {r.statusFrom || r.statusTo ? `${r.statusFrom ?? '—'} → ${r.statusTo ?? '—'}` : `${show(r.oldValue)} → ${show(r.newValue)}`}
-                </td>
-                <td style={td}>{r.reason ?? '—'}</td>
-                <td style={td}>
-                  {r.source ?? '—'}
-                  {r.appVersion ? ` ${r.appVersion}` : ''}
-                  {r.deviceId ? <div style={{ fontSize: 11 }}>perangkat {r.deviceId.slice(0, 8)}…</div> : null}
-                </td>
+        <TableScroll label="Riwayat dokumen">
+          <table style={table}>
+            <thead>
+              <tr>
+                <th style={th}>Waktu (server)</th>
+                <th style={th}>Oleh</th>
+                <th style={th}>Dokumen</th>
+                <th style={th}>Aksi</th>
+                <th style={th}>Field</th>
+                <th style={th}>Lama → Baru</th>
+                <th style={th}>Alasan</th>
+                <th style={th}>Sumber / perangkat</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {rows.map((r) => (
+                <tr key={r.id}>
+                  <td style={{ ...td, whiteSpace: 'nowrap' }}>{formatServerTime(r.serverTime, tz)}</td>
+                  <td style={td}>
+                    {r.userName ?? (r.source === 'job' ? 'sistem (job)' : r.userId ? `user#${r.userId}` : 'sistem')}
+                    {r.userRoles ? <div style={{ fontSize: 11 }}>{r.userRoles}</div> : null}
+                  </td>
+                  <td style={td}>
+                    {DOC_LABELS[r.docType] ?? r.docType}
+                    {r.docNo && r.docType !== 'expense_request' ? <div style={{ fontSize: 11 }}>{r.docNo}</div> : null}
+                  </td>
+                  <td style={td}>{ACTION_LABELS[r.action] ?? r.action}</td>
+                  <td style={td}>
+                    {r.field ?? '—'}
+                    {r.lineNo ? ` (baris ${r.lineNo})` : ''}
+                  </td>
+                  <td style={td}>
+                    {r.statusFrom || r.statusTo ? `${r.statusFrom ?? '—'} → ${r.statusTo ?? '—'}` : `${show(r.oldValue)} → ${show(r.newValue)}`}
+                  </td>
+                  <td style={td}>{r.reason ?? '—'}</td>
+                  <td style={td}>
+                    {r.source ?? '—'}
+                    {r.appVersion ? ` ${r.appVersion}` : ''}
+                    {r.deviceId ? <div style={{ fontSize: 11 }}>perangkat {r.deviceId.slice(0, 8)}…</div> : null}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </TableScroll>
       ) : null}
     </Gutter>
   )
