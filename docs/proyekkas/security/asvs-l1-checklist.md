@@ -302,9 +302,9 @@ Catatan L2: event `login_failed` bersumber dari log event Keycloak (keputusan E9
 | G-14 | Redaksi log satu level; tidak ada test redaksi | 7.1.1, 7.1.2 | nextjs + qa | Rendah | Unit test `loggerOptions().redact`; review log Loki saat load test. |
 | G-15 | ~~Header versi, metode HTTP ekstra~~ (terverifikasi E9 QA: 14.3.3, 14.5.1, 4.3.2); HPP tidak seragam (nilai pertama vs terakhir) | 5.1.1 | nextjs | Rendah | Seragamkan pembacaan query + test parameter ganda. |
 | G-16 | Tanpa `Clear-Site-Data` saat logout | 8.2.3 | nextjs | Rendah | Tambah header di `POST /auth/logout`. |
-| G-17 | ~~Rate limit belum diuji beban terautentikasi~~ — diuji 2026-09-27 (35 akun `lt-*`): 0× 429, error 0% | 11.1.2, 11.1.4 | qa | — | Tutup. Temuan kapasitas terpisah: P-1 (p95 unggah/resize > 2 s, CPU web 0,75 ter-throttle) — keputusan user, laporan QA §7.3.3. |
-| G-21 | REST generik Payload: body non-JSON → 500 (seharusnya 400) | 7.4.1, 13.2.x | nextjs | Rendah | Guard `data ?? {}` / validasi Content-Type sebelum hook koleksi (`expense-requests`, `budget-lines`, `clients`, `cost-centers`, `projects`, `project-stages`, `stage-templates`, global `company-settings`) — bug B-1. |
-| G-22 | Nonaktif pengguna lewat impor E11 tidak mencabut sesi Keycloak | 3.3.x, 2.x | nextjs + Lead | Rendah | Service seed tanpa env OIDC/KC admin → `keycloak device session delete failed`; tambahkan langkah disable/logout Keycloak di runbook atau env (B-2). |
+| G-17 | ~~Rate limit belum diuji beban terautentikasi~~ — diuji 2026-09-27 (35 akun `lt-*`): 0× 429, error 0% | 11.1.2, 11.1.4 | qa | — | Tutup. Temuan kapasitas terpisah: P-1 (p95 unggah/resize > 2 s, CPU web 0,75 ter-throttle) — keputusan user 2026-09-27: antre resize (`lib/image-queue.ts`, maks `IMAGE_RESIZE_CONCURRENCY` = 2, antrean penuh → 503 + `Retry-After`), target unggah p95 < 5 s, aksi lain < 2 s; uji ulang (laporan QA §7.3.3). |
+| G-21 | ~~REST generik Payload: body non-JSON → 500 (seharusnya 400)~~ — **diperbaiki** (branch `fix/e9-upload-resize-queue`) | 7.4.1, 13.2.x | nextjs | — | `lib/body-guard.ts`: hook `beforeOperation` PERTAMA di setiap koleksi + global `company-settings` — create/update dengan `data` bukan objek (form/text, multipart tanpa `_payload`, JSON array/null) → 400 "Isi permintaan tidak valid: kirim objek JSON …" sebelum hook/akses/DB. Uji: `tests/integration/e9-perf.int.test.ts` (7 koleksi B-1 + global, POST/PATCH), `tests/unit/e9-perf.test.ts`. Tutup setelah deploy + ZAP ulang. |
+| G-22 | Nonaktif pengguna lewat impor E11 tidak mencabut sesi Keycloak | 3.3.x, 2.x | nextjs + Lead | Rendah | **Mitigasi prosedural** (branch `fix/e9-upload-resize-queue`): impor tidak lagi mencoba Keycloak per perangkat (audit `device_revoke` = `keycloak_skipped`), laporan CLI menampilkan SATU blok `PERINGATAN KEYCLOAK` + `…-keycloak-tindak-lanjut.csv`; langkah disable + logout + cabut consent via `kc_*` di `runbooks/import-data-golive.md` §3.5 dan `cabut-perangkat.md` §B.1 (B-2). Sisa risiko: bergantung operator menjalankan langkah itu. |
 | G-18 | Batas panjang field teks belum seragam | 5.2.2 | nextjs | Rendah | Audit `maxLength` koleksi + zod. |
 | G-19 | Kebersihan DNS (subdomain takeover) | 10.3.3 | user | Rendah | Review record Hostinger saat membuat A record prod. |
 | G-20 | ~~Kontrol E9 perlu dikonfirmasi~~ — **selesai**: §3 diperbarui dengan file & test final; 404 tetap untuk jalur non-signed (lihat catatan §3) | 3.x/4.x/11.1.5 | nextjs | — | Tutup. |
@@ -317,7 +317,8 @@ plaintext (read access `false`); pertimbangkan tidak menyimpan atau mengenkripsi
 
 - ~~ZAP baseline staging~~ — selesai tanpa login (2026-09-26) dan **terautentikasi** (2026-09-27, Staff + Direktur), §8.
 - ~~Load test terautentikasi~~ — dijalankan 2026-09-27 (laporan QA §7.3): RAM lulus (web 49%), **p95 unggah/resize
-  2,1–3,2 s gagal target** → keputusan kapasitas P-1, lalu uji ulang.
+  2,1–3,2 s gagal target** → keputusan user P-1 (2026-09-27): antre resize + target unggah p95 < 5 s (latar belakang
+  APK), aksi lain < 2 s; **uji ulang setelah deploy** branch `fix/e9-upload-resize-queue`.
 - ~~Restore drill DB + media ke `pk_drms_restoretest`~~ — selesai, RTO 6,1 s, baris & checksum cocok (laporan QA §3).
   Ulangi untuk `pk_drms` + `drms_pk_media_prod` setelah prod ada.
 - **Verifikasi realm/router prod** (`bruteForceProtected`, TOTP, SMTP, TLS) — infra, E10.

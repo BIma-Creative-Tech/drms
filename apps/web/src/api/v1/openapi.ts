@@ -216,14 +216,14 @@ export function buildOpenApiDocument(version: string) {
   registry.registerPath({
     method: 'post',
     path: '/media/{kind}',
-    summary: 'Upload a file (multipart field "file"); server resizes images (receipts ≤ 2000 px, original discarded)',
+    summary: 'Upload a file (multipart field "file"); server resizes images (receipts ≤ 1600 px, original discarded); image resizing is queued — queue full → 503 + Retry-After (code UPLOAD_BUSY), retry later',
     security,
     request: {
       headers: deviceHeader,
       params: z.object({ kind: F.MediaKindEnum }),
       body: { content: { 'multipart/form-data': { schema: z.object({ file: z.string().meta({ format: 'binary' }) }) } } },
     },
-    responses: res(201, 'Uploaded', F.MediaUploaded, [400, 401, 403, 404, 413, 426, 429]),
+    responses: res(201, 'Uploaded', F.MediaUploaded, [400, 401, 403, 404, 413, 426, 429, 503]),
   })
   registry.registerPath({
     method: 'get',

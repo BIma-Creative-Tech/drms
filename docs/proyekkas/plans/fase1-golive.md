@@ -184,7 +184,10 @@ Agen: **nextjs-developer** (web), **flutter-developer** (`.claude/agents/flutter
   (DB + media, RTO ≤ 4 jam), verifikasi backup `pk_drms` + `drms_pk_media_prod`, ambang coverage di CI.
 - AC: tidak ada temuan HIGH/CRITICAL terbuka; URL media kedaluwarsa → 403 dan user tanpa akses → 403 walau `sig` valid;
   `/admin/collections/...` tanpa sesi → 302 ke login; reversal settlement mengembalikan saldo & status dengan audit;
-  load test p95 < 2 s pada aksi utama (ESTIMASI target) dan RAM puncak web/worker < 80% limit; restore drill ke DB uji
+  load test p95 < 5 s untuk **unggahan** (foto nota, selfie, foto progress, tanda tangan, lampiran, logo — APK mengunggah
+  di latar belakang/antrean offline; resize gambar diantre di proses web, antrean penuh → 503 + `Retry-After` yang
+  dicoba ulang APK; **keputusan user 2026-09-27**, P-1) dan p95 < 2 s untuk **semua aksi lain** (termasuk `/sync/batch`,
+  laporan progress, dashboard, inbox approval, laporan), serta RAM puncak web/worker < 80% limit; restore drill ke DB uji
   `pk_drms_restoretest` selesai < 4 jam dengan jumlah baris & checksum media cocok.
 - Estimasi: nextjs 6–9 · qa 6–8 · infra 1–1,5 · analyst 0,5 → **13,5–19**.
 

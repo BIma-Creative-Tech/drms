@@ -47,6 +47,10 @@ x-app-env: &app-env
   ANDROID_APP_CERT_SHA256: ${ANDROID_APP_CERT_SHA256:-}
   # F3 rollback switch for Excel exports (write-excel-file): false → Excel buttons hidden, .xlsx → 404.
   EXPORT_XLSX_ENABLED: ${EXPORT_XLSX_ENABLED:-true}
+  # E9 P-1 image-resize queue (src/lib/image-queue.ts, user decision 2026-09-27): sharp jobs at once in
+  # the web process / uploads allowed to wait; one more → 503 + Retry-After (the APK retries).
+  IMAGE_RESIZE_CONCURRENCY: ${IMAGE_RESIZE_CONCURRENCY:-2}
+  IMAGE_RESIZE_MAX_QUEUE: ${IMAGE_RESIZE_MAX_QUEUE:-20}
   # FCM push (ADR 0011): must stay false until the Firebase project (Q-44) and the dispatcher exist;
   # `true` is refused at boot by the env schema.
   PUSH_FCM_ENABLED: ${PUSH_FCM_ENABLED:-false}

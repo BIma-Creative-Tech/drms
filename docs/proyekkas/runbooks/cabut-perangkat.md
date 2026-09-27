@@ -43,6 +43,18 @@ antrean hilang; karyawan mengulang input dari HP baru.
    - Bila pengguna adalah **PM**: ganti **Project Manager** di project terkait (Direktur) dan akhiri **Penugasan tim**.
    - Uang muka yang belum LPJ: Finance menindaklanjuti (laporan **Kelengkapan Nota/LPJ**).
 4. Data karyawan (**Karyawan**) dinonaktifkan terpisah bila perlu (alasan wajib); riwayat pengajuan dan absensi tetap.
+5. Verifikasi Keycloak (realm `drms`): akun `enabled = false` dan tanpa sesi. Bila Admin REST Keycloak sedang tidak
+   bisa dihubungi, penyimpanan di langkah 1 **gagal** (tidak ada yang berubah) — ulangi nanti atau lakukan langkah B.1.
+
+### B.1 Penonaktifan massal lewat impor E11 / tanpa hook Keycloak (E9 B-2, ASVS G-22)
+
+Menonaktifkan banyak pengguna lewat **impor go-live** (`aktif = Tidak` di sheet Pengguna) mencabut perangkat & sesi web
+ProyekKas, tetapi **tidak** menonaktifkan akun Keycloak dan **tidak** mengakhiri sesi SSO / offline token APK (container
+seed tanpa env Keycloak). Laporan impor menampilkan satu blok `PERINGATAN KEYCLOAK` dengan daftar username dan menulis
+`…-keycloak-tindak-lanjut.csv`. Operator (Lead/infra) **wajib** menjalankan langkah Keycloak — disable + logout +
+cabut consent `proyekkas-mobile` via lib infra `kc_*` (`kc_init drms`) — persis seperti
+`import-data-golive.md` §3.5, lalu verifikasi `enabled = false` dan 0 sesi. Sampai langkah itu selesai, akun masih
+bisa login SSO ke aplikasi lain di realm yang sama (ProyekKas sendiri menolak karena pengguna nonaktif).
 
 ## C. HP ditandai root / emulator
 

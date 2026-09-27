@@ -12,7 +12,7 @@ import config from '@payload-config'
 import { sql, type PostgresAdapter } from '@payloadcms/db-postgres'
 import { getPayload } from 'payload'
 
-import { formatReport, keycloakCsv } from './report'
+import { formatReport, keycloakCsv, keycloakFollowUpCsv } from './report'
 import { parseKcMap } from './resolve'
 import { runImport, type Mode } from './run'
 
@@ -78,6 +78,10 @@ try {
       writeFileSync(`${base}-keycloak-users.json`, `${JSON.stringify(report.keycloakUsers, null, 2)}\n`, { mode: 0o600 })
       writeFileSync(`${base}-keycloak-users.csv`, keycloakCsv(report.keycloakUsers), { mode: 0o600 })
       console.log(`Pengguna untuk Keycloak (realm drms): ${base}-keycloak-users.{json,csv}`)
+    }
+    if (report.keycloakFollowUp.length > 0) {
+      writeFileSync(`${base}-keycloak-tindak-lanjut.csv`, keycloakFollowUpCsv(report.keycloakFollowUp), { mode: 0o600 })
+      console.log(`Langkah Keycloak (disable + logout / enable): ${base}-keycloak-tindak-lanjut.csv`)
     }
   }
   code = report.ok ? 0 : 1

@@ -131,7 +131,9 @@ Without server/device resize (typical 3–5 MB phone photos) the same volume wou
 
 - Deterministic, small files; EXIF (incl. GPS) removed server-side — location evidence comes from explicit
   API fields instead.
-- Server CPU spikes on upload (sharp); bounded by sharp concurrency 1 and 10 MiB request cap.
+- Server CPU spikes on upload (sharp); bounded by sharp concurrency 1 and 10 MiB request cap. **E9 P-1 (2026-09-27):**
+  plus a process-wide FIFO queue (`apps/web/src/lib/image-queue.ts`, max `IMAGE_RESIZE_CONCURRENCY` = 2 jobs,
+  `IMAGE_RESIZE_MAX_QUEUE` = 20 waiting → 503 + `Retry-After`), libvips cache off; upload target p95 < 5 s (user decision).
 - Loss of the unprocessed original is irreversible for receipts (flagged to client).
 
 ## Security implications

@@ -15,6 +15,7 @@ import sharp from 'sharp'
 
 import { denyAll } from '@/access/roles'
 import { withAudit } from '@/audit/hooks'
+import { imageQueue, insideImageSlot } from '@/lib/image-queue'
 import { takeToken } from '@/lib/rate-limit'
 
 const MEDIA_DIR = process.env.MEDIA_DIR ?? '/data/media'
@@ -91,6 +92,11 @@ export function mediaCollection(spec: MediaSpec): CollectionConfig {
     const a = args as { data?: Record<string, unknown> }
     assertNoRemoteSource({ operation, data: a.data, hasFile: Boolean(req.file?.data?.length || req.file?.tempFilePath) })
     if (operation !== 'create' || !req.file) return args
+    // E9 P-1: generic REST uploads (admin panel) are not queued as a whole job; refuse them early
+    // while the image queue is saturated (the /api/v1 upload endpoint queues whole jobs itself).
+    if (req.file.mimetype?.startsWith('image/') && !insideImageSlot() && imageQueue().saturated) {
+      throw new APIError('Server sedang memproses banyak foto. Coba lagi sebentar lagi.', 503, null, true)
+    }
     const uid = (req.user as { id?: number } | null)?.id
     if (uid !== undefined && !takeToken(`upload:${uid}`, UPLOADS_PER_MINUTE, 60_000)) {
       throw new APIError('Terlalu banyak upload. Coba lagi sebentar lagi.', 429, null, true)

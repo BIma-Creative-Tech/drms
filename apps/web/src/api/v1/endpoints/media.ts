@@ -8,11 +8,12 @@ import { relId, userId } from '@/access/roles'
 import { writeAudit, writeAuditDetached } from '@/audit/writer'
 import { visibleRequestIds } from '@/domain/expense/access'
 import { getEnv } from '@/lib/env'
+import { ImageQueueFullError, withImageSlot } from '@/lib/image-queue'
 import { fileSize, mediaPath } from '@/lib/media-files'
 import { parseSignedParams, signedMediaPath, signingKeys, signMedia, verifyMedia } from '@/lib/signed-url'
 import { withReqTransaction } from '@/lib/system-tx'
 
-import { HttpError, json, v1 } from '../http'
+import { HttpError, json, problem, v1 } from '../http'
 import { FileCollectionEnum, MediaKindEnum } from '../schemas-flow'
 
 const COLLECTION: Record<string, CollectionSlug> = {
@@ -38,20 +39,38 @@ export const uploadMediaEndpoint = v1({
   method: 'post',
   multipart: true,
   rateLimit: [60, 60_000],
-  transactional: true,
+  // E9 P-1: the transaction is opened INSIDE the image-queue slot (below), so a queued upload does
+  // not hold a pooled DB connection while it waits.
+  transactional: false,
   handler: async ({ req, params }) => {
     const kind = MediaKindEnum.safeParse(params.kind)
     if (!kind.success) throw new HttpError(404, 'Not Found')
-    if (!req.file?.data?.length) throw new HttpError(400, 'Bad Request', { detail: 'Field "file" wajib (multipart/form-data).' })
-    const doc = (await req.payload.create({
-      collection: COLLECTION[kind.data]!,
-      data: {},
-      file: req.file,
-      depth: 0,
-      user: req.user,
-      overrideAccess: false, // collection create access decides who may upload what
-      req,
-    })) as unknown as { id: number; mimeType?: string; filesize?: number; width?: number; height?: number; sha256Original?: string }
+    const file = req.file
+    if (!file?.data?.length) throw new HttpError(400, 'Bad Request', { detail: 'Field "file" wajib (multipart/form-data).' })
+    const create = () =>
+      withReqTransaction(req, () =>
+        req.payload.create({
+          collection: COLLECTION[kind.data]!,
+          data: {},
+          file,
+          depth: 0,
+          user: req.user,
+          overrideAccess: false, // collection create access decides who may upload what
+          req,
+        }),
+      )
+    let doc: { id: number; mimeType?: string; filesize?: number; width?: number; height?: number; sha256Original?: string }
+    try {
+      // Raster images are re-encoded by sharp → one image-queue slot per upload (PDFs are stored as-is).
+      doc = (await (file.mimetype?.startsWith('image/') ? withImageSlot(create, `media:${kind.data}`) : create())) as unknown as typeof doc
+    } catch (err) {
+      if (err instanceof ImageQueueFullError) {
+        const res = problem(503, 'Service Unavailable', { code: 'UPLOAD_BUSY', detail: 'Server sedang memproses banyak foto. Unggahan akan dicoba lagi otomatis.' })
+        res.headers.set('Retry-After', String(err.retryAfterSeconds))
+        return res
+      }
+      throw err
+    }
     return json(
       {
         id: doc.id,
