@@ -1,6 +1,6 @@
 # ADR 0014 — Admin navigation "gaya Odoo": module launcher + top menu bar, icon and animation dependencies
 
-- **Status:** proposed (awaiting user review of the screenshots; branch `feat/admin-odoo-launcher`)
+- **Status:** accepted (2026-09-27, user approved screenshots + Iconsax licence)
 - **Date:** 2026-09-27
 - **Related:** plan `tolong-rubah-tampilan-managementnya` (user decision: launcher at `/admin`, tiles = Iconsax on a
   gradient, Dashboard as its own module at `/admin/dashboard`); /opt/infra CLAUDE.md §0.10 (trusted OSS, licence,
@@ -36,7 +36,8 @@ Icon path data was rendered once from `iconsax-reactjs@0.0.8` (`dist/cjs/<Name>.
 `src/admin/modules/icons.ts`; nothing from the package is installed. Only the glyphs we render are shipped, as part
 of the product UI (not as an icon set).
 
-**Open point for the user:** the Iconsax artwork licence is a custom free licence, not one of the OSI licences listed in
+**Licence decision (user, 2026-09-27): accepted.** For this project "open source" in §0.10 means *free of cost*;
+the Iconsax Free License (free commercial use inside the product) qualifies. Background: the Iconsax artwork licence is a custom free licence, not one of the OSI licences listed in
 §0.10 (MIT/Apache-2/BSD/LGPL/AGPL). The npm wrappers declare MIT, but that covers the wrapper code. Embedding the glyphs
 in our own product is explicitly allowed by Iconsax; if a strict OSI-only reading is required, the fallback is to swap
 `icons.ts` for an MIT/ISC set (e.g. Lucide) without touching any component.

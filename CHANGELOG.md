@@ -7,7 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ## [Unreleased]
 
 ### Changed
-- **Admin navigation "gaya Odoo"** (`apps/web`, branch `feat/admin-odoo-launcher`, ADR 0014 proposed):
+- **Admin navigation "gaya Odoo"** (`apps/web`, ADR 0014 accepted):
   - `/admin` is now a **module launcher**: greeting (name + role) and a tile per visible module — Iconsax Bulk glyph
     in white on a module gradient, badge = summed pending counts, staggered entrance / hover lift (motion), off with
     `prefers-reduced-motion`. 11 modules: Dashboard, Persetujuan, Proyek, Keuangan, Absensi, Laporan, Pengguna & Akses,
