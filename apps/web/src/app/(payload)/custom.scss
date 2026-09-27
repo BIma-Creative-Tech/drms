@@ -463,6 +463,12 @@ $pk-modules: dashboard, persetujuan, proyek, keuangan, absensi, laporan, penggun
     align-items: center;
   }
 
+  // The module name may shrink (ellipsis) so the bell/avatar/☰ never leave the viewport.
+  .pk-bar__start {
+    flex-shrink: 1;
+    min-width: 0;
+  }
+
   .pk-bar__mid {
     flex: 1;
     min-width: 0;
@@ -981,6 +987,11 @@ $pk-modules: dashboard, persetujuan, proyek, keuangan, absensi, laporan, penggun
 
     .pk-bar__brand-sub {
       display: none;
+    }
+
+    .pk-bar__module {
+      gap: 8px;
+      font-size: 15px;
     }
   }
 }
