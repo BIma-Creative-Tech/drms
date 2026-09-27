@@ -132,7 +132,7 @@ Seluruh login (password, TOTP, brute force, reset) ada di Keycloak; aplikasi mem
 | 4.1.3 | Least privilege | Terpenuhi | Matriks per peran di `byRole`; delete ditolak semua peran (`denyAll`); role DB app tanpa UPDATE/DELETE/TRUNCATE di `audit_logs`, DELETE hanya allow-list (`DELETE_GRANTS`) | `int/db-security.int.test.ts` "grants (least privilege)"; `int/authz.int.test.ts` "delete is forbidden…"; `unit/config-guards.test.ts`. |
 | 4.1.5 | Gagal secara aman | Terpenuhi | `byRole` → `false` bila tidak ada rule cocok; `v1()` → 500 generik; guard DB → 409; strategi → `{ user: null }` pada error | E9: 403 dicek sebelum 409 di `requireAction` (`web/src/domain/expense/common.ts`). |
 | 4.2.1 | Perlindungan IDOR / akses data | Terpenuhi | Scope own/team/assigned (`scope.ts`, `ownUser`, `teamProjects`); `mediaFileEndpoint` memakai `findByID(overrideAccess:false)`; `visibleRequestIds` | `int/authz.int.test.ts` "read scopes…"; `int/files.int.test.ts` "other user's receipt → 404…". E9: URL media bertanda tangan tetap cek akses ulang. |
-| 4.2.2 | Anti-CSRF | Terpenuhi | `oidcSessionStrategy`: metode unsafe dengan `Origin`/`Sec-Fetch-Site` asing → tidak terautentikasi; `SameSite=Lax`; logout hanya POST + cek `Origin` | `int/api.int.test.ts` "cross-origin POST is not authenticated". |
+| 4.2.2 | Anti-CSRF | Terpenuhi | `oidcSessionStrategy`: metode unsafe dengan `Origin`/`Sec-Fetch-Site` asing → tidak terautentikasi; `SameSite=Lax`; logout hanya POST + cek `Origin` | `int/api.int.test.ts` "cross-origin POST is not authenticated". ZAP terautentikasi 2026-09-27: alert "Absence of Anti-CSRF Tokens" (form logout/edit) = false positive karena kontrol ini (`../qa/s3-e9-qa-report.md` §7.4). |
 | 4.3.1 | MFA untuk antarmuka administratif | Sebagian | [KC] required action `CONFIGURE_TOTP` dipakai pada akun admin bootstrap/UAT (ADR 0003 §6; UAT F2 memakai password + TOTP) | Aplikasi **tidak** menegakkan MFA (tidak ada cek `acr`/`amr`); bergantung pada setiap akun diberi TOTP. Usul: OTP wajib di realm untuk peran panel, atau cek `amr` di `auth/callback`. |
 | 4.3.2 | Directory listing mati, metadata (.git) tidak terekspos | Terpenuhi | Next standalone tanpa listing; `.dockerignore` mengecualikan `.git`, `.env*`, `docs`; media di `/data/media` tidak disajikan statis | Diverifikasi E9 QA 2026-09-26: `/.git/HEAD`, `/.git/config`, `/.env`, `/package.json` → 403 (WAF), `/server.js` → 404, tanpa listing (`../qa/s3-e9-qa-report.md` §1.4). |
 
@@ -179,7 +179,7 @@ Seluruh login (password, TOTP, brute force, reset) ada di Keycloak; aplikasi mem
 |---|---|---|---|---|
 | 7.1.1 | Kredensial/token sesi tidak di-log | Terpenuhi | `loggerOptions` `redact` (`authorization`, `cookie`, `*.accessToken`, `*.refreshToken`, `*.idToken`, `*.client_secret`) di `web/src/lib/logger.ts`; sesi hanya tersimpan sebagai hash | Tidak ada test yang memverifikasi redaksi. |
 | 7.1.2 | Data sensitif lain tidak di-log | Sebagian | `*.accountNo` di-redact; komentar "No tokens, cookies or bodies in logs" | Redact hanya satu level (`*.accountNo`); belum ada review log nyata. QA: periksa log Loki selama ZAP/load test. |
-| 7.4.1 | Pesan error generik + id untuk support | Terpenuhi | `problem(500, 'Internal Server Error')` (`http.ts`); callback "Login gagal. Silakan ulangi."; `X-Request-Id` (`web/src/proxy.ts`, `web/src/lib/request-meta.ts`) | E9: urutan 403/409 konsisten. Diverifikasi E9 QA: REST generik (`/api/users`, `/api/users/abc`) → 403 pesan generik; `/api/v1/*` 401 `problem+json`, rute tak dikenal 404 JSON Payload `Route not found` — tanpa stack (`../qa/s3-e9-qa-report.md` §1.4). |
+| 7.4.1 | Pesan error generik + id untuk support | Terpenuhi | `problem(500, 'Internal Server Error')` (`http.ts`); callback "Login gagal. Silakan ulangi."; `X-Request-Id` (`web/src/proxy.ts`, `web/src/lib/request-meta.ts`) | E9: urutan 403/409 konsisten. Diverifikasi E9 QA: REST generik (`/api/users`, `/api/users/abc`) → 403 pesan generik; `/api/v1/*` 401 `problem+json`, rute tak dikenal 404 JSON Payload `Route not found` — tanpa stack (`../qa/s3-e9-qa-report.md` §1.4). E9 QA auth 2026-09-27: REST generik dengan body non-JSON → **500** (TypeError di hook; stack hanya di log server) — bug B-1 (Low), seharusnya 400 (`../qa/s3-e9-qa-report.md` §7.4). |
 
 Catatan L2: event `login_failed` bersumber dari log event Keycloak (keputusan E9, ADR 0003 §7); keputusan hash-chain
 `audit_logs` dicatat di ADR 0006 §5 (E9). Audit append-only sudah ditegakkan DB (`int/db-security.int.test.ts`).
@@ -188,7 +188,7 @@ Catatan L2: event `login_failed` bersumber dari log event Keycloak (keputusan E9
 
 | # | Persyaratan | Status | Bukti | Catatan |
 |---|---|---|---|---|
-| 8.2.1 | Header anti-cache untuk data sensitif | Sebagian | `/api/v1`: `Cache-Control: no-store` (`json()`, `problem()`); file media `private, no-store` (`modifyResponseHeaders`, `mediaFileEndpoint`) | E9 QA: HTML admin `private, no-cache, no-store, max-age=0, must-revalidate` (terverifikasi); REST generik `/api/<slug>` **tanpa** `Cache-Control` (temuan M-3, Low) → G-08. |
+| 8.2.1 | Header anti-cache untuk data sensitif | Sebagian | `/api/v1`: `Cache-Control: no-store` (`json()`, `problem()`); file media `private, no-store` (`modifyResponseHeaders`, `mediaFileEndpoint`) | E9 QA: HTML admin `private, no-cache, no-store, max-age=0, must-revalidate` (terverifikasi); REST generik `/api/<slug>` **tanpa** `Cache-Control` (temuan M-3, Low) → G-08. Auth 2026-09-27: `/api/v1` terautentikasi `no-store` (terverifikasi); unduhan laporan `private, no-store`. |
 | 8.2.2 | Data sensitif tidak di storage browser | Terpenuhi | Web: sesi hanya cookie HttpOnly, tanpa JWT Payload (`refresh` hook `setCookie: false`); APK: `apps/mobile/lib/core/storage/secure_store.dart`, `allowBackup="false"` | |
 | 8.2.3 | Data klien dibersihkan setelah sesi berakhir | Sebagian | Cookie dihapus saat logout (`Max-Age=0`) | Tanpa `Clear-Site-Data`; pembersihan data APK saat logout tidak dinilai di dokumen ini. |
 | 8.3.1 | Data sensitif di body/header, bukan query string | Terpenuhi | Token di header; body JSON | `sig` URL media (E9) bukan data sensitif. |
@@ -218,7 +218,7 @@ Catatan L2: event `login_failed` bersumber dari log event Keycloak (keputusan E9
 | 11.1.1 | Alur berurutan | Terpenuhi | State machine (`web/src/domain/expense/state.ts`, `requireAction` di `common.ts`); guard DB `pk_expense_requests_guard` (ADR 0006) | `int/expense-flow.int.test.ts`, `int/lpj.int.test.ts`. |
 | 11.1.2 | Langkah dalam waktu manusiawi | Sebagian | Rate limit per user di 42 dari 64 endpoint `v1()` | Tidak ada cek waktu minimum antar langkah; risiko rendah (alur approval manusia). |
 | 11.1.3 | Batas per aksi bisnis | Terpenuhi | Aturan approval (`ApprovalRules`), ≤ 5 foto per laporan (E4), upload 60/menit (`UPLOADS_PER_MINUTE`), Idempotency-Key (`web/src/lib/idempotency.ts`) | |
-| 11.1.4 | Anti-otomasi panggilan berlebihan | Terpenuhi | `takeToken` (`web/src/lib/rate-limit.ts`) di `v1()`; [infra] `ratelimit-pk-api` 20/s, `ratelimit-default` untuk REST generik, CrowdSec (architecture §3.3) | Bucket in-memory (hilang saat restart, satu instance). Load test (E9, QA) pending. |
+| 11.1.4 | Anti-otomasi panggilan berlebihan | Terpenuhi | `takeToken` (`web/src/lib/rate-limit.ts`) di `v1()`; [infra] `ratelimit-pk-api` 20/s, `ratelimit-default` untuk REST generik, CrowdSec (architecture §3.3) | Bucket in-memory (hilang saat restart, satu instance). Load test terautentikasi Q-34 (2026-09-27): 0× 429 dari limit app/Traefik pada beban normal; p95 unggah+resize > 2 s (P-1, kapasitas) (`../qa/s3-e9-qa-report.md` §7.3). |
 | 11.1.5 | Batas logika bisnis & validasi | Terpenuhi | Tutup buku (G5, DB), nominal dihitung server (`lpj.ts`), guard 42501/23514 → 409 (`http.ts`); E9: reversal settlement Finance saja, teraudit, sadar tutup buku | `int/f2-authz-db.int.test.ts`, `int/f2e-uat-fixes.int.test.ts`. |
 
 ### V12 — File & resource
@@ -302,7 +302,9 @@ Catatan L2: event `login_failed` bersumber dari log event Keycloak (keputusan E9
 | G-14 | Redaksi log satu level; tidak ada test redaksi | 7.1.1, 7.1.2 | nextjs + qa | Rendah | Unit test `loggerOptions().redact`; review log Loki saat load test. |
 | G-15 | ~~Header versi, metode HTTP ekstra~~ (terverifikasi E9 QA: 14.3.3, 14.5.1, 4.3.2); HPP tidak seragam (nilai pertama vs terakhir) | 5.1.1 | nextjs | Rendah | Seragamkan pembacaan query + test parameter ganda. |
 | G-16 | Tanpa `Clear-Site-Data` saat logout | 8.2.3 | nextjs | Rendah | Tambah header di `POST /auth/logout`. |
-| G-17 | Rate limit in-memory, belum diuji beban terautentikasi | 11.1.2, 11.1.4 | qa + Lead/user | Rendah | E9 QA: Q-34 tanpa login OK (0× 429, RAM web 29%); run terautentikasi butuh ≥ 30 akun uji lapangan (limit per user) — laporan QA §2.5. |
+| G-17 | ~~Rate limit belum diuji beban terautentikasi~~ — diuji 2026-09-27 (35 akun `lt-*`): 0× 429, error 0% | 11.1.2, 11.1.4 | qa | — | Tutup. Temuan kapasitas terpisah: P-1 (p95 unggah/resize > 2 s, CPU web 0,75 ter-throttle) — keputusan user, laporan QA §7.3.3. |
+| G-21 | REST generik Payload: body non-JSON → 500 (seharusnya 400) | 7.4.1, 13.2.x | nextjs | Rendah | Guard `data ?? {}` / validasi Content-Type sebelum hook koleksi (`expense-requests`, `budget-lines`, `clients`, `cost-centers`, `projects`, `project-stages`, `stage-templates`, global `company-settings`) — bug B-1. |
+| G-22 | Nonaktif pengguna lewat impor E11 tidak mencabut sesi Keycloak | 3.3.x, 2.x | nextjs + Lead | Rendah | Service seed tanpa env OIDC/KC admin → `keycloak device session delete failed`; tambahkan langkah disable/logout Keycloak di runbook atau env (B-2). |
 | G-18 | Batas panjang field teks belum seragam | 5.2.2 | nextjs | Rendah | Audit `maxLength` koleksi + zod. |
 | G-19 | Kebersihan DNS (subdomain takeover) | 10.3.3 | user | Rendah | Review record Hostinger saat membuat A record prod. |
 | G-20 | ~~Kontrol E9 perlu dikonfirmasi~~ — **selesai**: §3 diperbarui dengan file & test final; 404 tetap untuk jalur non-signed (lihat catatan §3) | 3.x/4.x/11.1.5 | nextjs | — | Tutup. |
@@ -313,9 +315,9 @@ plaintext (read access `false`); pertimbangkan tidak menyimpan atau mengenkripsi
 
 ## 7. Pending (bukan bagian dokumen ini)
 
-- ~~ZAP baseline staging~~ — selesai tanpa login (2026-09-26, §8). **Sisa:** ZAP terautentikasi (butuh kredensial uji).
-- **Load test terautentikasi** (30 lapangan + 5 kantor, p95 < 2 s, RAM) — QA, E9; terblokir kredensial/akun uji
-  (laporan QA §2.5). Jalur tanpa login sudah diuji.
+- ~~ZAP baseline staging~~ — selesai tanpa login (2026-09-26) dan **terautentikasi** (2026-09-27, Staff + Direktur), §8.
+- ~~Load test terautentikasi~~ — dijalankan 2026-09-27 (laporan QA §7.3): RAM lulus (web 49%), **p95 unggah/resize
+  2,1–3,2 s gagal target** → keputusan kapasitas P-1, lalu uji ulang.
 - ~~Restore drill DB + media ke `pk_drms_restoretest`~~ — selesai, RTO 6,1 s, baris & checksum cocok (laporan QA §3).
   Ulangi untuk `pk_drms` + `drms_pk_media_prod` setelah prod ada.
 - **Verifikasi realm/router prod** (`bruteForceProtected`, TOTP, SMTP, TLS) — infra, E10.
@@ -336,3 +338,11 @@ ZAP 2.17.0 `zap-baseline.py` (pasif) 2 run tanpa login (`/` dan `/admin/login` +
 | Tanpa header versi; metode ekstra 403; tanpa ACAO; `.git`/`.env` 403 | — | 14.3.3, 14.5.1, 14.5.3, 4.3.2 | Terpenuhi (diverifikasi) |
 
 Perubahan status: 14.3.3 dan 14.5.1 Sebagian → Terpenuhi (ringkasan §2: Terpenuhi 82, Sebagian 23).
+
+### 8.1 ZAP baseline terautentikasi (QA E9, 2026-09-27)
+
+Sesi web akun uji beban `lt-field-30` (Staff) dan `lt-office-04` (Direktur): 142 / 837 URL, **0 FAIL, 0 High/Critical**.
+Temuan baru: B-1 (500 pada body non-JSON di REST generik, Low → G-21); lainnya false positive/Info (CSRF token —
+dikendalikan Origin/Sec-Fetch-Site + SameSite; IP privat di audit log = IP hairpin uji; parameter filter dipantulkan
+tetapi di-escape React). Detail: `docs/proyekkas/qa/s3-e9-qa-report.md` §7.4. Status ringkasan §2 tidak berubah.
+

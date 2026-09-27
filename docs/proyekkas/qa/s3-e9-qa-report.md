@@ -1,5 +1,8 @@
 # ProyekKas — Laporan QA E9 (Sprint S3): ZAP baseline, load test, restore drill
 
+> **Pembaruan 2026-09-27:** load test & ZAP **terautentikasi** dengan akun uji beban `lt-*` — lihat §7 (menggantikan
+> blocker BLK-1 di §2.1/§2.5).
+
 - **Tanggal:** 2026-09-26, 23:08–23:30 WIB · **Penguji:** agen QA (Claude) atas permintaan Lead ProyekKas
 - **Target:** staging `https://drms-kas.staging.bimacreative.tech` (Traefik v3 + CrowdSec bouncer/AppSec, Keycloak realm
   `drms-staging`), image `ghcr.io/bctech-adm/proyekkas-web:0.2.1-stg-13b1f05` (web `drms-pk-stg` 384 MiB, worker
@@ -15,13 +18,13 @@
 
 | AC E9 | Hasil | Status |
 |---|---|---|
-| Tidak ada temuan HIGH/CRITICAL terbuka | ZAP baseline pasif (2 run, tanpa login): **0 FAIL, 0 High**; 1 Medium (CSP `style-src 'unsafe-inline'` = deviasi yang sudah diterima user 2026-09-23), sisanya Low/Info. Pemindaian **terautentikasi tidak bisa** (tidak ada kredensial uji, §1.3). | **PASS untuk permukaan tanpa login**; permukaan terautentikasi belum dipindai |
-| Load test p95 < 2 s pada aksi utama (Q-34: 30 lapangan + 5 kantor, termasuk unggah foto/selfie) | **DIBLOKIR**: kredensial akun uji staging tidak tercatat di repo/infra (§2.1). Yang bisa dijalankan: campuran Q-34 **tanpa login** (35 VU, ±10 menit): semua jalur p95 ≤ 109 ms, error 0%, 0× 429. | **TIDAK TERVERIFIKASI** (aksi utama butuh login) |
-| RAM puncak web/worker < 80% limit | Selama run tanpa login: web **111,7 / 384 MiB (29,1%)**, worker **69,9 / 192 MiB (36,4%)**. Jalur sharp (resize foto/selfie) **belum** terbebani. | PASS sebagian (tanpa beban unggah terautentikasi) |
+| Tidak ada temuan HIGH/CRITICAL terbuka | ZAP baseline pasif tanpa login (26/9, 2 run) **dan terautentikasi** (27/9, 1 akun lapangan + 1 akun Direktur, 142 / 837 URL): **0 FAIL, 0 High/Critical**. Medium hanya CSP `style-src 'unsafe-inline'` (diterima) dan "Absence of Anti-CSRF Tokens" (false positive, §7.4). Bug baru B-1 (500 pada body non-JSON, Low). | **PASS** |
+| Load test p95 < 2 s pada aksi utama (Q-34: 30 lapangan + 5 kantor, termasuk unggah foto/selfie) | Run terautentikasi 27/9 (§7.3, campuran opsi b): check-in 1,02 s, dashboard 0,81 s, inbox approval 1,88 s, laporan 0,81 s → lulus; **unggah nota 3,18 s, laporan progress 2,71 s, draft pengajuan 2,60 s, unggah foto progress 2,20 s, unggah selfie 2,11 s → lewat target**. Error 0%, 0× 429, 0× WAF. Penyebab: CPU web dibatasi 0,75 vCPU — 38% periode CFS ter-*throttle* (§7.3.3). | **FAIL** (jalur unggah/resize) — perlu keputusan kapasitas (P-1) |
+| RAM puncak web/worker < 80% limit | Run terautentikasi dengan resize sharp: web **189,5 / 384 MiB (49,3%)**, worker **70,1 / 192 MiB (36,5%)**; di bawah ambang flag 307 MiB. | **PASS** |
 | Restore drill `pk_drms_restoretest` (DB + media) < 4 jam, jumlah baris & checksum media cocok | RTO terukur **6,1 s** (DB 5,1 s + media 0,7 s + verifikasi 0,3 s); **68 tabel / 2 078 baris cocok**, **58 sequence cocok**, **46 file media sha256 + owner/mode cocok**. DB uji & direktori sementara dihapus. | **PASS** |
 
-**Keputusan yang dibutuhkan (Lead/user)** — lihat §2.5: sediakan kredensial uji staging untuk load test terautentikasi
-(idealnya ≥ 30 akun lapangan fiktif + 5 kantor tanpa OTP, atau cara TOTP), lalu jalankan ulang `MODE=auth`.
+**Keputusan yang dibutuhkan (Lead/user)** — P-1 (§7.3.3): naikkan `cpus` web staging/prod (mis. 0,75 → 1,5) atau batasi/ pindahkan
+resize sharp, lalu ulangi load test terautentikasi. Bagian §1–§6 = run 26/9 (tanpa login); §7 = run terautentikasi 27/9.
 
 ## 1. ZAP baseline (pasif)
 
@@ -264,3 +267,169 @@ Container `e9qa-zap-unauth`, `e9qa-zap-admin`, `e9qa-k6-anon` dihapus; tidak ada
 DB `pk_drms_restoretest` di-drop; direktori restore media dihapus; tidak ada decision CrowdSec yang dibuat oleh uji ini.
 Snapshot restic tambahan 23:10 (`c35a41c3`, `38682a6d`, dan snapshot DB lain dari run yang sama) akan dirapikan oleh
 `restic-prune.timer` sesuai retensi 7d/4w/3m.
+
+## 7. Pembaruan 2026-09-27 — load test & ZAP terautentikasi (BLK-1 ditutup)
+
+- **Persetujuan:** user 2026-09-27 ("lanjutkan") lewat Lead; campuran beban **opsi (b)** diputuskan Lead.
+- **Build yang diuji:** staging tetap `0.2.1-stg-13b1f05` (web/worker `RestartCount=0`, tanpa OOM sepanjang uji).
+- Kredensial tidak pernah dicetak / di-commit: `/root/drms-loadtest-users.csv` (0600 root) → `--env-file` root-only.
+
+### 7.1 Akun uji beban (Keycloak realm `drms-staging` saja)
+
+| Hal | Nilai |
+|---|---|
+| Alat | `/opt/infra/scripts/lib/keycloak-admin.sh` (`kc_init drms-staging`, client `automation` realm drms-staging — dibuat infra Lead 2026-09-27), Admin REST via `:8443` |
+| Akun | `lt-field-01..30` (`pk-staff`), `lt-office-01..02` (`pk-finance`), `lt-office-03..04` (`pk-owner` = Direktur), `lt-office-05` (`pk-pm`); email `<username>@proyekkas.test`, `emailVerified`, tanpa required action/OTP, password acak 24 karakter sesuai policy realm |
+| Penanda | **Grup `loadtest-e9`** (atribut grup `loadtest=e9`), 35 anggota. Atribut user `loadtest=e9` **dibuang** Keycloak: user profile realm memakai kebijakan default (unmanaged attribute nonaktif) dan mengubahnya butuh `manage-realm` → deviasi D-1. |
+| Akun lama | 5 user yang sudah ada tidak diubah (diverifikasi). |
+
+### 7.2 Data ProyekKas (impor E11, CLI resmi)
+
+- `docker compose --profile seed run --rm -v /srv/drms-import-e9:/import:ro -v /srv/drms-import-e9/out:/out drms-pk-stg-seed
+  node /app/node_modules/payload/bin.js run src/import/cli.ts -- (--dry-run|--commit) --file /import/lt-e9-import.xlsx
+  --kc-map /import/kc-map.csv --out /out --operator "QA E9 load test"` — dry-run 0 error lalu commit
+  (sha256 `9a6578d9…`, run `b7530312-…`): Karyawan 35, Pengguna 35, Project 1, Tahapan 3, Penugasan 31 baru.
+- Sheet Pengaturan dibuat **no-op**: `nomor_pb_mulai` 229 (= `start_at` staging; counter 236 tidak berubah),
+  `tutup_periode_sebelum_golive` = Tidak (tidak ada tutup buku) — diverifikasi di DB.
+- **Deviasi D-2:** `PRJ-UJI-01` tidak ada di staging (hanya `UJI-PRJ` tanpa koordinat/tahapan). Agar laporan progress
+  beban tidak menaikkan % tahapan data UAT, dibuat project fiktif khusus **`PRJ-LT-E9`** (id 4, PM `lt-office-05`,
+  titik -3,32 / 114,59, radius 200 m, tahapan Persiapan 20 · Struktur 30 · Finishing 50; 30 akun lapangan ditugaskan Staff).
+- `syncAttendanceEnabled` dinyalakan **lewat aplikasi**: login OIDC web `lt-office-03` (Direktur) →
+  `POST /api/globals/company-settings` dengan `changeReason`; audit `audit_logs` id 3128 (user 108 `pk-owner`, source
+  `web`, false → true). Dump baris setting sebelum/sesudah: hanya kolom itu (+ `updated_at`) yang berubah.
+  `syncProgressReportsEnabled` sudah ON, tidak diubah. **Setting dibiarkan ON** (dibutuhkan juga oleh UAT P-06).
+
+### 7.3 Load test terautentikasi (k6 `MODE=auth`)
+
+#### 7.3.1 Campuran (opsi b, keputusan Lead 2026-09-27)
+
+Laporan progress hanya boleh dibuat PM tim / Direktur (`domain/progress/access.ts` `canReportOn`; unggah
+`media-progress-photos` hanya `pk-pm`/`pk-owner`), dan akun lapangan tetap `pk-staff` (seperti prod). Karena itu:
+
+| Grup | VU/akun | Aksi per iterasi (jeda manusia) |
+|---|---:|---|
+| Lapangan (Staff) | 30 | `/me` (+ `/masters` tiap 3 iterasi); 45%: selfie 720 px (`POST /media/selfies`) + `attendance.check_in`/`check_out` via `/sync/batch`; 55%: foto nota 1600 px (`POST /media/receipts`) + draft Reimburse lump sum dengan nota + `draft_delete` (dibatalkan) dalam satu batch, lalu daftar pengajuan + `/dashboard/me`; jeda 20–40 s |
+| Finance | 2 | `/dashboard/finance`, `/approvals/inbox`, `/transfer-queue`, laporan (`rekap-kas`, `rekap-pengajuan`, `anggaran-project`, `buku-kas`) |
+| Direktur | 2 | `/dashboard/owner`, `/approvals/inbox`, `/projects/progress`, 60%: laporan progress + 1–3 foto 1600 px |
+| PM | 1 | `/dashboard/pm`, `/projects/progress`, 60%: laporan progress + 1–3 foto |
+
+**Porsi laporan progress lebih kecil** daripada campuran hipotetis "semua lapangan = PM" (hanya 3 dari 35 akun yang
+melapor; 20 laporan / 43 foto progress dalam 10 menit). Beban resize tetap tinggi karena 220 foto nota 1600 px dan
+178 selfie ikut di-resize sharp di container web.
+
+Perintah (dua proses k6 paralel — `ONLY=field|office` agar 1 VU = 1 akun deterministik; env-file root-only):
+
+```bash
+E=/root/drms-e9-auth/k6-auth.env   # MODE=auth, PROJECT_ID=4, LAT=-3.32, LNG=114.59, FIELD_USERS, OFFICE_USERS (0600)
+docker run -d --name e9qa-k6-field  --network host --env-file $E -e ONLY=field  -v <load>:/load:ro -v <out>:/out grafana/k6 run --quiet /load/q34-mix.js
+docker run -d --name e9qa-k6-office --network host --env-file $E -e ONLY=office -v <load>:/load:ro -v <out>:/out grafana/k6 run --quiet /load/q34-mix.js
+# pemantau 5 s: docker stats + loadavg + probe prod (cp, auth realm platform); abort otomatis (docker stop k6) bila
+# 3 sampel berturut-turut probe ≠ 200/307 atau > 2 s, atau load1 > 6 (4 vCPU)
+```
+
+Dua smoke run singkat (1+1 VU, lalu 1+5 VU, ±1,5 menit) sebelum run utama memvalidasi payload (perbaikan: baris
+draft lump sum — `Satuan wajib bila jumlah diisi`).
+
+#### 7.3.2 Hasil (08:02:43–08:12:34 WIB, ramp 1 m → 8 m → 30 s; **tidak di-abort**)
+
+2 178 request, **error HTTP 0%** (checks 100%), **0× 429**, 0× 403 WAF. Sync: 496 item `applied`, 122 `rejected`
+— semuanya `ALREADY_CHECKED_IN/OUT` (aturan bisnis 1× masuk + 1× pulang per hari; diharapkan dari iterasi berulang).
+Laporan progress tercipta 20 (0× 409).
+
+| Aksi | n | p50 (ms) | p95 (ms) | maks (ms) | Target p95 < 2 s |
+|---|---:|---:|---:|---:|---|
+| token (password grant / refresh) | 70 | 66 | 151–191 | 291 | ✓ |
+| `/me` | 398 | 30 | 621 | 3 349 | ✓ |
+| `/masters` | 144 | 101 | 832 | 6 590 | ✓ |
+| unggah selfie 720 px | 178 | 316 | **2 110** | 3 979 | ✗ |
+| check-in/out (`/sync/batch`) | 178 | 133 | 1 015 | 2 901 | ✓ |
+| unggah nota 1600 px | 220 | 940 | **3 184** | 5 173 | ✗ |
+| draft Reimburse + batal (`/sync/batch`) | 220 | 670 | **2 600** | 4 109 | ✗ |
+| daftar pengajuan | 220 | 54 | 695 | 4 339 | ✓ |
+| `/dashboard/me` | 220 | 56 | 443 | 2 385 | ✓ |
+| dashboard kantor (finance/owner/pm) | 66 | 103 | 807 | 3 656 | ✓ |
+| `/approvals/inbox` | 53 | 69 | 1 880 | 3 302 | ✓ (tipis) |
+| `/transfer-queue` | 27 | 25 | 139 | 174 | ✓ |
+| laporan (`/reports/{code}`) | 27 | 82 | 809 | 1 090 | ✓ |
+| `/projects/progress` | 39 | 48 | 230 | 510 | ✓ |
+| tahapan project | 20 | 34 | 552 | 756 | ✓ |
+| unggah foto progress 1600 px | 43 | 611 | **2 195** | 3 357 | ✗ |
+| laporan progress (`POST /progress-reports`) | 20 | 451 | **2 708** | 3 802 | ✗ |
+
+#### 7.3.3 Sumber daya & penyebab
+
+| Container | Awal | Puncak RAM | % limit | CPU p50 / p95 / maks (% 1 core) |
+|---|---:|---:|---:|---|
+| `drms-pk-stg` (web, 384 MiB, **cpus 0,75**) | 109,9 MiB | **189,5 MiB** | **49,3%** | 41 / **80** / 85 |
+| `drms-pk-stg-worker` (192 MiB, cpus 0,25) | 69,7 MiB | 70,1 MiB | 36,5% | 0 / 2 / 9 |
+| `postgres` (2 GiB) | 202 MiB | 254 MiB | 12,4% | 6 / 18 / 29 |
+| `traefik` / `crowdsec` / `keycloak` | — | 108 / 150 / 559 MiB | ≤ 42% | ≤ 18 (p95) |
+
+- cgroup `cpu.stat` web setelah run: `nr_throttled` **6 205 / 16 183** periode (38%), `throttled_usec` 455,7 s →
+  **CPU web jenuh** pada batas 0,75 vCPU; RAM tidak menjadi masalah (ambang flag 307 MiB tidak tercapai, sharp
+  menambah ≈ 80 MiB).
+- Host (4 vCPU): load1 maks **5,7**; probe prod 166 sampel semua 200/307, p50 50 ms, p95 115 ms, maks 331 ms → tidak ada
+  degradasi prod (run tidak di-abort). Container prod lain tidak berubah berarti.
+- **P-1 (Medium, kapasitas — keputusan user/Lead):** jalur yang me-resize gambar (nota, selfie, foto progress) dan batch
+  sync yang ikut antre di event loop yang sama melewati p95 2 s. Opsi: (a) naikkan `cpus` web ke 1,5 (RAM tetap 384 MiB;
+  host masih punya headroom CPU tetapi load1 5,7 perlu dipantau), (b) batasi konkurensi sharp (`sharp.concurrency(1)`,
+  antre) atau pindahkan resize ke worker (ADR 0002 §6 (b)), (c) terima target lebih longgar untuk unggahan (mis. p95 < 4 s,
+  karena APK mengunggah di latar belakang/antrean offline). Ulangi load test setelah keputusan.
+
+### 7.4 ZAP baseline terautentikasi
+
+- Sesi web didapat lewat login OIDC aplikasi (`lt-field-30` Staff, `lt-office-04` Direktur); cookie `__Host-pk_session`
+  dimasukkan lewat `-configfile` ZAP (0600, uid ZAP; tidak di argv). Spider tradisional (tanpa AJAX spider),
+  `logout`/`/auth/` dikecualikan, `-m 3`, target `/admin`.
+- Hasil: Staff **142 URL**, Direktur **837 URL** (sesi aktif) — `FAIL-NEW 0`, WARN 11/12.
+- **Catatan metode:** walau `spider.postform=false`/`spider.processform=false` diset, ZAP tetap mengirim 8 POST form
+  (Direktur/Staff) ke REST generik Payload. Diverifikasi **tidak ada data tersimpan**: setting perusahaan identik
+  (dump), 0 baris baru/berubah di `expense_requests`, `budget_lines`, `clients`, `cost_centers`, `projects`,
+  `project_stages`, `stage_templates`, `users`, `employees`; audit hanya `login` (2) dan `export` laporan (15, GET unduh).
+  Scan berikutnya: pakai akun tanpa hak tulis atau nama kunci konfigurasi ZAP yang benar (`spider.postForm`).
+
+| # | Temuan ZAP (auth) | Risiko ZAP | Triase | Severity akhir |
+|---|---|---|---|---|
+| B-1 | 500 `Internal Server Error` pada `POST /api/{expense-requests,budget-lines,clients,cost-centers,projects,project-stages,stage-templates}` dan `/api/globals/company-settings` dengan body form (bukan JSON) — ZAP 90022 | Low | **True positive (bug robustness):** hook koleksi membaca `data.project/name/code` saat `data` undefined → `TypeError` (log app level error, stack hanya di log server). Seharusnya 400. Tidak ada data tersimpan. | **Low** (nextjs) |
+| Z-6 | HSTS tidak ada pada respons 500 tersebut (10035) | Low | Hanya pada respons error B-1 (respons lain membawa HSTS); tertutup bila B-1 diperbaiki. | Info |
+| Z-7 | CSRF token tidak ada pada form logout/edit (10202) | Medium | False positive: CSRF ditangani `Origin`/`Sec-Fetch-Site` di `oidcSessionStrategy` + cookie `SameSite=Lax` (ASVS 4.2.2 Terpenuhi) | Info |
+| Z-8 | `Private IP Disclosure` (2) di halaman audit log (Direktur) | Low | Nilai = IP hairpin `10.100.0.1` milik uji dari host; pengguna nyata tercatat IP publik. Data audit untuk peran berwenang. | Info |
+| Z-9 | Parameter filter dipantulkan ke atribut HTML (10031: `bulan`, `peran`, `dari`, `sampai`) | Info | React meng-escape nilai, CSP nonce; tanpa eksekusi skrip | Info |
+| Z-10 | Email di URL (10024), timestamp Unix (10096), cache-control (10015) | Info | URL dengan email dibuat ZAP sendiri dari form; REST generik tanpa `Cache-Control` = M-3 (sudah tercatat); laporan CSV/XLSX `private, no-store` | Info |
+| — | CSP `unsafe-inline` style, CORP/COEP | — | sama seperti §1.4 (Z-1…Z-3) | — |
+
+Cek header API terautentikasi (bearer `lt-field-29`): `/devices/register`, `/me`, `/masters`, 403 dan 404 semuanya
+`Cache-Control: no-store`, HSTS, `nosniff`, tanpa `Access-Control-Allow-Origin`, tanpa `Server`/`X-Powered-By`.
+CrowdSec: 8 alert AppSec (tanpa decision) dari 10.100.0.1 pada 08:15–08:18 WIB = POST form ZAP di atas; tidak ada
+decision untuk IP uji selama seluruh sesi.
+
+### 7.5 Pembersihan & data uji yang tercipta (staging, fiktif)
+
+- **Dinonaktifkan (tidak dihapus):** ProyekKas — 35 pengguna & 35 karyawan `aktif = Tidak` lewat impor E11 kedua
+  (`lt-e9-deactivate.xlsx`, sha256 `dcb1615b…`, dry-run lalu commit, alasan audit "QA E9 load test (nonaktif)");
+  44 perangkat `revoked`, semua `web_sessions` dicabut. Keycloak — 35 akun `enabled=false` + `logout` (login uji →
+  `invalid_grant "Account disabled"`), tetap anggota grup `loadtest-e9` sebagai penanda. Akun dipertahankan sampai
+  konfirmasi Lead.
+- **B-2 (Low, nextjs/runbook):** saat impor menonaktifkan pengguna, hook mencatat 88× `keycloak device session delete
+  failed` (env `APP_URL`/`OIDC_*` tidak ada di service `drms-pk-stg-seed`) → sesi Keycloak **tidak** dicabut oleh impor.
+  Di uji ini ditutup manual (disable + logout via `kc_*`). Runbook impor/offboarding harus menambah langkah Keycloak
+  atau service seed diberi env OIDC/KC admin.
+- **Data yang tersisa di staging** (termasuk dua smoke run): project `PRJ-LT-E9` (id 4, progress 1,6%; tahapan 2,75 /
+  2,25 / 0,75%), 31 penugasan, 60 absensi, 182 selfie (4,4 MB), 222 foto nota (54,6 MB), 54 foto progress (11,3 MB),
+  221 draft Reimburse berstatus `cancelled`, 25 laporan progress, 44 perangkat (revoked), baris audit terkait,
+  `syncAttendanceEnabled = true`. Volume media staging 528 KB → 69 MB. File impor & laporan: `/srv/drms-import-e9/`
+  (uid 1001, 0400/0600).
+- Tidak ada container/network tersisa; tidak ada perubahan konfigurasi staging/prod, Traefik, CrowdSec, Keycloak realm.
+
+### 7.6 Ringkasan temuan baru
+
+| ID | Severity | Pemilik | Ringkas |
+|---|---|---|---|
+| P-1 | **Medium (AC gagal)** | user/Lead + nextjs/infra | p95 unggah + resize 2,1–3,2 s pada Q-34; CPU web 0,75 vCPU ter-throttle 38% |
+| B-1 | Low | nextjs | REST generik Payload: body non-JSON → 500 (TypeError di hook), seharusnya 400 |
+| B-2 | Low | nextjs + Lead (runbook) | Nonaktif lewat impor E11 tidak mencabut sesi Keycloak (env OIDC tidak ada di service seed) |
+| D-1 | Info (deviasi) | infra | Penanda `loadtest=e9` di grup, bukan atribut user (unmanaged attribute nonaktif) |
+| D-2 | Info (deviasi) | — | Project uji beban `PRJ-LT-E9` menggantikan `PRJ-UJI-01` yang tidak ada di staging |
+| Z-6…Z-10 | Info | — | §7.4 |
+
+BLK-1 **ditutup**. Tidak ada HIGH/CRITICAL.

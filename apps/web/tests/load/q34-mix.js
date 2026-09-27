@@ -4,20 +4,28 @@
 // Dua mode (env MODE):
 //   anon (default) — tanpa kredensial: jalur publik & jalur yang ditolak auth (health, app/config,
 //                    /admin/login SSR, redirect gate /admin, 401 API, unggah multipart tanpa token).
-//   auth           — butuh akun uji staging (password grant client proyekkas-mobile, realm drms-staging,
-//                    ADR 0012 — HANYA staging). Kredensial lewat env, JANGAN di-commit:
-//                      FIELD_USERS='[{"u":"staff.uji@proyekkas.test","p":"…","totp":""}]'   (didaur ulang ke 30 VU)
-//                      OFFICE_USERS='[{"u":"finance.uji@proyekkas.test","p":"…"}]'         (didaur ulang ke 5 VU)
-//                      PROJECT_ID, STAGE_ID (tahapan PRJ-UJI-01), LAT, LNG (titik geofence project uji)
-//                    Membuat data uji: absensi (1× per user per hari — sisanya ditolak ALREADY_CHECKED_IN),
-//                    laporan progress (+ foto), draft pengajuan (dibatalkan lagi lewat draft_delete).
+//   auth           — akun uji beban staging `lt-*` (password grant client proyekkas-mobile, realm drms-staging,
+//                    ADR 0012 — HANYA staging). Kredensial lewat --env-file root-only, JANGAN di-commit:
+//                      FIELD_USERS='[{"u":"lt-field-01","p":"…"}, …]'            (30 akun pk-staff, 1 akun per VU)
+//                      OFFICE_USERS='[{"u":"lt-office-01","p":"…","r":"finance"}, …]'  (r = finance|owner|pm)
+//                      PROJECT_ID, LAT, LNG (project uji beban PRJ-LT-E9 + titik geofence)
+//                    Campuran (keputusan Lead 2026-09-27, opsi b — hanya PM/Direktur yang boleh lapor progress):
+//                      lapangan (Staff): /me, /masters, selfie + check-in/check-out (sync), nota foto 1600 px +
+//                                        draft Reimburse lalu draft_delete (dibatalkan), daftar pengajuan, /dashboard/me
+//                      kantor Finance:   dashboard finance, inbox approval, antrian transfer, laporan
+//                      kantor Direktur:  dashboard owner, inbox approval, progress project, laporan progress + 1–3 foto
+//                      kantor PM:        dashboard pm, progress project, laporan progress + 1–3 foto
+//                    Membuat data uji: absensi (check-in + check-out 1×/user/hari; sisanya `rejected`), foto
+//                    selfie/nota/progress, draft pengajuan yang langsung dibatalkan, laporan progress.
 //
 // Jalankan (dari host VPS, lalu lintas hairpin tiba di Traefik sebagai 10.100.0.1 — IP privat, di-whitelist
 // parser crowdsecurity/whitelists; SEMUA VU berbagi satu bucket rate limit Traefik per IP):
-//   docker run --rm --network host -v "$PWD/apps/web/tests/load:/load:ro" -e MODE=anon \
+//   docker run --rm --network host -v "$PWD/apps/web/tests/load:/load:ro" -v "$OUT:/out" -e MODE=anon \
 //     grafana/k6 run /load/q34-mix.js
+//   (auth: tambah --env-file <file 0600 berisi MODE=auth, FIELD_USERS=…, OFFICE_USERS=…, PROJECT_ID=…, LAT=…, LNG=…>)
 // Gambar uji: /load/fixtures/{photo,selfie}.jpg (sintetis, dibuat dengan sharp; bukan foto orang).
 import http from 'k6/http'
+import exec from 'k6/execution'
 import { check, sleep } from 'k6'
 import { Trend, Rate, Counter } from 'k6/metrics'
 
@@ -39,7 +47,13 @@ for (const n of [
   'health', 'app_config', 'admin_login_page', 'admin_gate', 'api_401', 'upload_anon',
   'token', 'me', 'masters', 'upload_selfie', 'checkin', 'upload_photo', 'progress_report',
   'expense_draft', 'expense_list', 'dashboard', 'approvals_inbox', 'report', 'transfer_queue',
+  'upload_receipt', 'device_register', 'stages', 'projects_progress', 'dashboard_me',
 ]) T[n] = new Trend(`act_${n}`, true)
+// Hasil bisnis item /sync/batch dan laporan progress (HTTP 200 tetapi item bisa `rejected`).
+const syncApplied = new Counter('sync_applied')
+const syncRejected = new Counter('sync_rejected')
+const syncOther = new Counter('sync_other')
+const progressCreated = new Counter('progress_created')
 const errors = new Rate('act_errors')
 const ratelimited = new Counter('http_429')
 const wafBlocked = new Counter('http_403_waf')
@@ -51,10 +65,12 @@ const stages = (vus) => [
 ]
 
 export const options = {
-  scenarios: {
+  // ONLY=field|office: satu skenario per proses k6 (dua container paralel) → exec.vu.idInTest = 1..N per skenario,
+  // sehingga 1 VU = 1 akun secara deterministik. Tanpa ONLY: kedua skenario dalam satu proses (mode anon).
+  scenarios: Object.fromEntries(Object.entries({
     field: { executor: 'ramping-vus', exec: MODE === 'auth' ? 'fieldAuth' : 'fieldAnon', startVUs: 0, stages: stages(FIELD_VUS), gracefulRampDown: '20s' },
     office: { executor: 'ramping-vus', exec: MODE === 'auth' ? 'officeAuth' : 'officeAnon', startVUs: 0, stages: stages(OFFICE_VUS), gracefulRampDown: '20s' },
-  },
+  }).filter(([k]) => !__ENV.ONLY || __ENV.ONLY === k)),
   thresholds: {
     // AC E9: p95 < 2 s pada aksi utama (ESTIMASI target).
     act_checkin: ['p(95)<2000'],
@@ -62,6 +78,7 @@ export const options = {
     act_upload_photo: ['p(95)<2000'],
     act_upload_selfie: ['p(95)<2000'],
     act_expense_draft: ['p(95)<2000'],
+    act_upload_receipt: ['p(95)<2000'],
     act_dashboard: ['p(95)<2000'],
     act_approvals_inbox: ['p(95)<2000'],
     act_admin_login_page: ['p(95)<2000'],
@@ -121,6 +138,8 @@ function uuid() {
 
 const users = (k) => JSON.parse(__ENV[k] || '[]')
 let session = null // per VU
+let attendanceStep = 0 // per VU: 0 = check-in, 1 = check-out, ≥ 2 = ulang (diharapkan `rejected`)
+const seenReject = {}
 
 function tokenReq(form) {
   const res = http.post(TOKEN_URL, form, { tags: { name: 'token' } })
@@ -133,24 +152,25 @@ function tokenReq(form) {
 function login(pool) {
   const list = users(pool)
   if (!list.length) throw new Error(`${pool} kosong — MODE=auth butuh kredensial uji lewat env`)
-  const u = list[(__VU - 1) % list.length]
-  // Jeda acak agar 35 login tidak melampaui ratelimit-drms-kc-token (60/menit, burst 30).
-  sleep(Math.random() * 30)
-  const form = { grant_type: 'password', client_id: 'proyekkas-mobile', username: u.u, password: u.p, scope: 'openid' }
-  if (u.totp) form.totp = u.totp
-  const tok = tokenReq(form)
+  // 1 akun per VU: indeks VU di dalam skenario (bukan __VU global yang dipakai bersama dua skenario).
+  const idx = exec.vu.idInTest
+  const u = list[(idx - 1) % list.length]
+  // Jeda acak agar ≤ 35 login tidak melampaui ratelimit-drms-kc-token (60/menit, burst 30).
+  sleep(Math.random() * 45)
+  const tok = tokenReq({ grant_type: 'password', client_id: 'proyekkas-mobile', username: u.u, password: u.p, scope: 'openid' })
   if (!tok) return null
   const deviceId = uuid()
-  const s = { ...tok, deviceId }
+  const s = { ...tok, deviceId, user: u.u, role: u.r || 'staff' }
   const r = http.post(`${BASE}/api/v1/devices/register`, JSON.stringify({ deviceId, platform: 'android', model: 'k6-loadtest', appVersion: APP_VERSION }), { headers: hdr(s, true), tags: { name: 'device_register' } })
-  check(r, { 'device registered': (x) => x.status === 200 || x.status === 201 })
+  rec('device_register', r, [200, 201])
+  console.log(`login ${exec.scenario.name} vu=${idx} user=${u.u} role=${s.role}`)
   return s
 }
 
-function hdr(s, jsonBody) {
+function hdr(s, jsonBody, extra) {
   const h = { Authorization: `Bearer ${s.at}`, 'X-Device-Id': s.deviceId, 'X-App-Version': APP_VERSION }
   if (jsonBody) h['Content-Type'] = 'application/json'
-  return h
+  return Object.assign(h, extra || {})
 }
 
 function ensure(pool) {
@@ -178,70 +198,100 @@ function syncItem(type, payload) {
 
 function sync(s, items, metric) {
   const body = { batch_id: uuid(), device_id: s.deviceId, clock: clock(), items }
-  const res = http.post(`${BASE}/api/v1/sync/batch`, JSON.stringify(body), { headers: hdr(s, true), tags: { name: metric } })
-  rec(metric, res, [200])
+  const res = http.post(`${BASE}/api/v1/sync/batch`, JSON.stringify(body), { headers: hdr(s, true, { 'Idempotency-Key': body.batch_id }), tags: { name: metric } })
+  if (rec(metric, res, [200])) {
+    for (const r of res.json('results') || []) {
+      if (r.status === 'applied' || r.status === 'duplicate') syncApplied.add(1, { item: metric })
+      else if (r.status === 'rejected') {
+        syncRejected.add(1, { item: metric })
+        const code = (r.errors && r.errors[0] && r.errors[0].code) || '?'
+        if (!seenReject[metric + code]) { seenReject[metric + code] = 1; console.log(`sync ${metric} rejected ${code}: ${(r.errors[0] && r.errors[0].message) || ''}`) }
+      } else syncOther.add(1, { item: metric })
+    }
+  }
   return res
 }
 
 const PROJECT_ID = Number(__ENV.PROJECT_ID || 0)
-const STAGE_ID = Number(__ENV.STAGE_ID || 0)
 const LAT = Number(__ENV.LAT || 0)
 const LNG = Number(__ENV.LNG || 0)
+const today = () => new Date(Date.now() + 8 * 3600e3).toISOString().slice(0, 10) // WITA
 
 export function fieldAuth() {
   const s = ensure('FIELD_USERS')
   if (!s) { think(10, 20); return }
   rec('me', http.get(`${BASE}/api/v1/me`, { headers: hdr(s), tags: { name: 'me' } }), [200])
-  think(2, 5)
-  rec('masters', http.get(`${BASE}/api/v1/masters`, { headers: hdr(s), tags: { name: 'masters' } }), [200])
-  think(5, 10)
-  const r = Math.random()
-  if (r < 0.35 && PROJECT_ID) {
-    // Absensi: selfie lalu check-in (hanya check-in pertama hari itu diterima; sisanya `rejected`).
+  if (exec.vu.iterationInScenario % 3 === 0) rec('masters', http.get(`${BASE}/api/v1/masters`, { headers: hdr(s), tags: { name: 'masters' } }), [200])
+  think(3, 8)
+  if (Math.random() < 0.45 && PROJECT_ID) {
+    // Absensi: selfie 720 px lalu check-in / check-out (sharp resize di web).
     const mid = upload(s, 'selfies', SELFIE, 'selfie.jpg', 'upload_selfie')
-    if (mid) sync(s, [syncItem('attendance.check_in', { project_id: PROJECT_ID, lat: LAT, lng: LNG, accuracy_m: 10, is_mocked: false, selfie_media_id: mid, camera_lens: 'front' })], 'checkin')
-  } else if (r < 0.65 && PROJECT_ID && STAGE_ID) {
-    // Laporan progress dengan 1–3 foto (kamera belakang), pct_after naik sedikit.
-    const n = 1 + Math.floor(Math.random() * 3)
-    const ids = []
-    for (let i = 0; i < n; i++) { const id = upload(s, 'progress-photos', PHOTO, `progress-${i}.jpg`, 'upload_photo'); if (id) ids.push(id); think(1, 3) }
-    sync(s, [syncItem('progress_report.draft_upsert', { project_id: PROJECT_ID, stage_id: STAGE_ID, pct_after: 0, work: 'Uji beban k6 E9 (data fiktif)', photo_media_ids: ids })], 'progress_report')
+    const type = attendanceStep % 2 === 0 ? 'attendance.check_in' : 'attendance.check_out'
+    attendanceStep++
+    if (mid) sync(s, [syncItem(type, { project_id: PROJECT_ID, lat: LAT, lng: LNG, accuracy_m: 8, is_mocked: false, selfie_media_id: mid, camera_lens: 'front' })], 'checkin')
   } else {
-    // Draft pengajuan lalu dibatalkan (draft_delete) agar tidak menumpuk.
+    // Nota foto 1600 px + draft Reimburse (1 baris, 1 nota) lalu dibatalkan (draft_delete) di batch yang sama.
+    const rid = upload(s, 'receipts', PHOTO, 'nota.jpg', 'upload_receipt')
     const cu = uuid()
-    const up = syncItem('expense_request.draft_upsert', { kind: 'reimburse', title: 'Uji beban k6 E9', project_id: PROJECT_ID || null, lines: [{ client_uuid: uuid(), description: 'Konsumsi uji', qty: 1, unit_price: 50000, total: 50000 }] })
+    const line = { client_uuid: uuid(), description: 'Konsumsi uji beban (lump sum)', total: 50000 }
+    if (rid) line.receipts = [{ client_uuid: uuid(), vendor_name: 'Warung Uji Beban', receipt_date: today(), amount: 50000, media_id: rid }]
+    const up = syncItem('expense_request.draft_upsert', { kind: 'reimburse', title: 'Uji beban k6 E9 (fiktif)', project_id: PROJECT_ID || null, lines: [line] })
     up.client_uuid = cu
     sync(s, [up, { ...syncItem('expense_request.draft_delete', { draft_client_uuid: cu, reason: 'Data uji beban k6 E9' }), depends_on: [cu] }], 'expense_draft')
-    rec('expense_list', http.get(`${BASE}/api/v1/expense-requests?limit=20`, { headers: hdr(s), tags: { name: 'expense_list' } }), [200])
+    think(2, 5)
+    rec('expense_list', http.get(`${BASE}/api/v1/expense-requests?scope=mine&limit=20`, { headers: hdr(s), tags: { name: 'expense_list' } }), [200])
+    rec('dashboard_me', http.get(`${BASE}/api/v1/dashboard/me`, { headers: hdr(s), tags: { name: 'dashboard_me' } }), [200])
   }
   think(20, 40)
+}
+
+function progressReport(s) {
+  const st = http.get(`${BASE}/api/v1/projects/${PROJECT_ID}/stages`, { headers: hdr(s), tags: { name: 'stages' } })
+  if (!rec('stages', st, [200])) return
+  const open = (st.json('stages') || []).filter((x) => Number(x.progressPct ?? 0) < 100)
+  if (!open.length) return
+  const stg = open[Math.floor(Math.random() * open.length)]
+  const pct = Math.min(100, Math.round((Number(stg.progressPct ?? 0) + 0.25) * 100) / 100)
+  const ids = []
+  const n = 1 + Math.floor(Math.random() * 3)
+  for (let i = 0; i < n; i++) { const id = upload(s, 'progress-photos', PHOTO, `progress-${i}.jpg`, 'upload_photo'); if (id) ids.push(id); think(1, 3) }
+  const body = { projectId: PROJECT_ID, stageId: stg.id, pctAfter: pct, work: 'Uji beban k6 E9 (data fiktif)', photoIds: ids, clientUuid: uuid() }
+  const r = http.post(`${BASE}/api/v1/progress-reports`, JSON.stringify(body), { headers: hdr(s, true, { 'Idempotency-Key': uuid() }), tags: { name: 'progress_report' } })
+  // 409 PROGRESS_DECREASED = balapan dua pelapor pada tahapan yang sama (bukan error beban).
+  if (rec('progress_report', r, [200, 201, 409]) && r.status !== 409) progressCreated.add(1)
 }
 
 export function officeAuth() {
   const s = ensure('OFFICE_USERS')
   if (!s) { think(10, 20); return }
-  for (const d of ['finance', 'owner']) {
-    const res = http.get(`${BASE}/api/v1/dashboard/${d}`, { headers: hdr(s), tags: { name: `dashboard_${d}` } })
-    rec('dashboard', res, [200, 403]) // 403 = peran tidak cocok (bukan error beban)
-    think(2, 5)
+  const dash = { finance: 'finance', owner: 'owner', pm: 'pm' }[s.role] || 'me'
+  rec('dashboard', http.get(`${BASE}/api/v1/dashboard/${dash}`, { headers: hdr(s), tags: { name: `dashboard_${dash}` } }), [200])
+  think(3, 8)
+  if (s.role !== 'pm') {
+    rec('approvals_inbox', http.get(`${BASE}/api/v1/approvals/inbox`, { headers: hdr(s), tags: { name: 'approvals_inbox' } }), [200])
+    think(3, 8)
   }
-  rec('approvals_inbox', http.get(`${BASE}/api/v1/approvals/inbox`, { headers: hdr(s), tags: { name: 'approvals_inbox' } }), [200])
-  think(3, 8)
-  rec('transfer_queue', http.get(`${BASE}/api/v1/transfer-queue`, { headers: hdr(s), tags: { name: 'transfer_queue' } }), [200, 403])
-  think(3, 8)
-  const code = ['rekap-kas', 'rekap-pengajuan', 'anggaran-project', 'absensi'][Math.floor(Math.random() * 4)]
-  rec('report', http.get(`${BASE}/api/v1/reports/${code}`, { headers: hdr(s), tags: { name: `report_${code}` } }), [200, 400, 403])
-  think(10, 20)
+  if (s.role === 'finance') {
+    rec('transfer_queue', http.get(`${BASE}/api/v1/transfer-queue`, { headers: hdr(s), tags: { name: 'transfer_queue' } }), [200])
+    think(3, 8)
+    const code = ['rekap-kas', 'rekap-pengajuan', 'anggaran-project', 'buku-kas'][Math.floor(Math.random() * 4)]
+    rec('report', http.get(`${BASE}/api/v1/reports/${code}`, { headers: hdr(s), tags: { name: `report_${code}` } }), [200])
+  } else {
+    rec('projects_progress', http.get(`${BASE}/api/v1/projects/progress`, { headers: hdr(s), tags: { name: 'projects_progress' } }), [200])
+    think(3, 8)
+    if (PROJECT_ID && Math.random() < 0.6) progressReport(s)
+  }
+  think(15, 30)
 }
 
 export function handleSummary(data) {
-  return { stdout: textSummary(data), '/out/summary.json': JSON.stringify(data, null, 1) }
+  return { stdout: textSummary(data), [`/out/summary${__ENV.ONLY ? '-' + __ENV.ONLY : ''}.json`]: JSON.stringify(data, null, 1) }
 }
 
 function textSummary(data) {
   const lines = [`MODE=${MODE} BASE=${BASE}`]
   for (const [k, m] of Object.entries(data.metrics)) {
-    if (!k.startsWith('act_') && !['http_req_duration', 'http_reqs', 'http_req_failed', 'http_429', 'http_403_waf', 'iterations'].includes(k)) continue
+    if (!k.startsWith('act_') && !['http_req_duration', 'http_reqs', 'http_req_failed', 'http_429', 'http_403_waf', 'iterations', 'sync_applied', 'sync_rejected', 'sync_other', 'progress_created'].includes(k)) continue
     const v = m.values
     if (m.type === 'trend') { if (v.count) lines.push(`${k.padEnd(24)} n=${v.count} p50=${v.med.toFixed(0)}ms p95=${v['p(95)'].toFixed(0)}ms max=${v.max.toFixed(0)}ms`) }
     else lines.push(`${k.padEnd(24)} ${JSON.stringify(v)}`)
