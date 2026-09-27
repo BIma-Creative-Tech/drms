@@ -51,7 +51,6 @@ class ProgressDetailScreen extends ConsumerWidget {
                 Card(
                   elevation: 0,
                   color: theme.colorScheme.surfaceContainerLow,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                   child: Padding(
                     padding: const EdgeInsets.all(16),
                     child: Column(

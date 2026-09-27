@@ -6,6 +6,7 @@ import '../features/sync/application/sync_coordinator.dart';
 import '../l10n/gen/app_localizations.dart';
 import 'router.dart';
 import 'theme.dart';
+import 'theme_mode.dart';
 
 class ProyekKasApp extends ConsumerWidget {
   const ProyekKasApp({super.key});
@@ -15,7 +16,9 @@ class ProyekKasApp extends ConsumerWidget {
     ref.watch(syncCoordinatorProvider); // keeps sync triggers alive for the app lifetime
     return MaterialApp.router(
       onGenerateTitle: (c) => AppLocalizations.of(c).appTitle,
-      theme: buildTheme(),
+      theme: buildTheme(Brightness.light),
+      darkTheme: buildTheme(Brightness.dark),
+      themeMode: ref.watch(themeModeProvider),
       routerConfig: ref.watch(routerProvider),
       locale: const Locale('id'),
       supportedLocales: AppLocalizations.supportedLocales,

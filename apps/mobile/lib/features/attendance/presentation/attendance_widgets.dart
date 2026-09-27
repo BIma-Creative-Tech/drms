@@ -58,14 +58,14 @@ class DistanceCard extends StatelessWidget {
     final allowance = accuracyM.clamp(0, accuracyAllowanceCapM).toDouble();
     final limit = radius + allowance;
     final inside = distanceM <= limit;
-    final color = inside ? StatusColors.ok : StatusColors.danger;
+    final color = inside ? context.pk.okText : context.pk.badText;
     final scale = limit <= 0 ? 1.0 : (limit * 1.5);
     return Card(
       key: const Key('attendance-distance'),
       elevation: 0,
       color: color.withValues(alpha: 0.08),
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(PkTokens.radius),
         side: BorderSide(color: color.withValues(alpha: 0.4)),
       ),
       child: Padding(
@@ -115,7 +115,7 @@ class DistanceCard extends StatelessWidget {
                         height: 8,
                         child: DecoratedBox(
                           decoration: BoxDecoration(
-                            color: StatusColors.ok.withValues(alpha: 0.35),
+                            color: context.pk.okText.withValues(alpha: 0.35),
                             borderRadius: BorderRadius.circular(4),
                           ),
                         ),

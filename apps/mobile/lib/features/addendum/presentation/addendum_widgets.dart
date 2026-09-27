@@ -16,9 +16,9 @@ class AddendumStatusChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final (IconData icon, Color? color) = switch (a.status) {
       AddendumStatus.draft => (Icons.edit_note, null),
-      AddendumStatus.pendingAck || AddendumStatus.pendingApproval => (Icons.hourglass_top, StatusColors.warning),
-      AddendumStatus.approved => (Icons.check_circle, StatusColors.ok),
-      AddendumStatus.rejected => (Icons.cancel, StatusColors.danger),
+      AddendumStatus.pendingAck || AddendumStatus.pendingApproval => (Icons.hourglass_top, context.pk.warnText),
+      AddendumStatus.approved => (Icons.check_circle, context.pk.okText),
+      AddendumStatus.rejected => (Icons.cancel, context.pk.badText),
       AddendumStatus.cancelled => (Icons.block, null),
     };
     return Chip(

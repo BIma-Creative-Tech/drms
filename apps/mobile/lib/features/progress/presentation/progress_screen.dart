@@ -37,9 +37,6 @@ class _ProgressScreenState extends ConsumerState<ProgressScreen> {
         appBar: AppBar(
           title: Text(t.progressTitle),
           bottom: TabBar(
-            labelColor: Theme.of(context).colorScheme.onPrimary,
-            unselectedLabelColor: Theme.of(context).colorScheme.onPrimary.withValues(alpha: 0.75),
-            indicatorColor: Theme.of(context).colorScheme.onPrimary,
             tabs: [
               Tab(key: const Key('progress-tab-reports'), text: t.progressTabReports),
               Tab(key: const Key('progress-tab-projects'), text: t.progressTabProjects),

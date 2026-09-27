@@ -17,11 +17,11 @@ import '../domain/attendance.dart';
 import '../domain/attendance_recap.dart';
 import 'recap_view.dart';
 
-({Color color, IconData icon, String label}) memberStatusVisual(MemberStatus s, AppLocalizations t, ColorScheme c) =>
+({Color color, IconData icon, String label}) memberStatusVisual(MemberStatus s, AppLocalizations t, PkColors pk) =>
     switch (s) {
-      MemberStatus.belumAbsen => (color: StatusColors.warning, icon: Icons.schedule, label: t.teamStatusNotYet),
-      MemberStatus.hadir => (color: const Color(0xFF2A78D6), icon: Icons.login, label: t.teamStatusPresent),
-      MemberStatus.selesai => (color: StatusColors.ok, icon: Icons.check_circle, label: t.teamStatusDone),
+      MemberStatus.belumAbsen => (color: pk.warnText, icon: Icons.schedule, label: t.teamStatusNotYet),
+      MemberStatus.hadir => (color: pk.info, icon: Icons.login, label: t.teamStatusPresent),
+      MemberStatus.selesai => (color: pk.okText, icon: Icons.check_circle, label: t.teamStatusDone),
     };
 
 /// US-13 "Tim hari ini": counts, members with status/time; PM actions: absenkan (US-14) and koreksi
@@ -78,7 +78,7 @@ class _TeamTodayViewState extends ConsumerState<TeamTodayView> {
                   ])
                     Builder(
                       builder: (context) {
-                        final v = memberStatusVisual(s, t, Theme.of(context).colorScheme);
+                        final v = memberStatusVisual(s, t, context.pk);
                         return FilterChip(
                           key: Key('team-filter-${s.name}'),
                           avatar: Icon(v.icon, size: 18, color: v.color),
@@ -125,7 +125,7 @@ class _MemberCard extends ConsumerWidget {
     final t = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final m = member;
-    final v = memberStatusVisual(m.status, t, theme.colorScheme);
+    final v = memberStatusVisual(m.status, t, context.pk);
     final profile = ref.watch(currentProfileProvider);
     final attendanceOn = ref.watch(appConfigProvider).value?.syncAttendance ?? false;
     final isSelf = profile?.employee?.id == m.employee.id;

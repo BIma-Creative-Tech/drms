@@ -1483,6 +1483,36 @@ abstract class AppLocalizations {
   /// **'ID perangkat'**
   String get profileDevice;
 
+  /// No description provided for @profileAppearance.
+  ///
+  /// In id, this message translates to:
+  /// **'Tampilan'**
+  String get profileAppearance;
+
+  /// No description provided for @profileAppearanceHint.
+  ///
+  /// In id, this message translates to:
+  /// **'Sistem = ikuti pengaturan terang/gelap HP.'**
+  String get profileAppearanceHint;
+
+  /// No description provided for @themeSystem.
+  ///
+  /// In id, this message translates to:
+  /// **'Sistem'**
+  String get themeSystem;
+
+  /// No description provided for @themeLight.
+  ///
+  /// In id, this message translates to:
+  /// **'Terang'**
+  String get themeLight;
+
+  /// No description provided for @themeDark.
+  ///
+  /// In id, this message translates to:
+  /// **'Gelap'**
+  String get themeDark;
+
   /// No description provided for @pushDisabled.
   ///
   /// In id, this message translates to:

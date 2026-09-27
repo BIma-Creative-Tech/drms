@@ -117,7 +117,7 @@ class _DetailBody extends StatelessWidget {
           t.budgetImpact,
           d.budget.hasBudget ? t.budgetChange(pct(d.budget.pctBefore), pct(d.budget.pctAfter)) : t.budgetNone,
         ),
-        if (over) Text('⚠ ${t.budgetImpact} > 85%', style: const TextStyle(color: StatusColors.danger)),
+        if (over) Text('⚠ ${t.budgetImpact} > 85%', style: TextStyle(color: context.pk.badText)),
         if (d.rejectReason != null) row(t.rejectReasonLabel, d.rejectReason!),
         if (TransferSection.visibleFor(d)) TransferSection(detail: d),
         if (d.settlement != null) LpjSection(settlement: d.settlement!),
@@ -140,7 +140,7 @@ class _DetailBody extends StatelessWidget {
           for (final f in d.flags)
             ListTile(
               dense: true,
-              leading: Icon(Icons.flag, color: f.level == 'warning' ? StatusColors.warning : theme.colorScheme.outline),
+              leading: Icon(Icons.flag, color: f.level == 'warning' ? context.pk.warnText : theme.colorScheme.outline),
               title: Text(f.kindLabel),
               subtitle: Text('${f.lineNo != null ? 'Baris ${f.lineNo}: ' : ''}${f.message}'),
             ),
