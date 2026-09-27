@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-09-27
+
 ### Changed
 - **Admin navigation "gaya Odoo"** (`apps/web`, ADR 0014 accepted):
   - `/admin` is now a **module launcher**: greeting (name + role) and a tile per visible module — Iconsax Bulk glyph
