@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.4.2] - 2026-09-28
+
 ### Added
 - **Admin loader** (`apps/web`, branch `feat/admin-loading-dots`): five pulsing dots (Uiverse.io
   "thin-lionfish-5" by adamgiebl, MIT © 2023 Uiverse.io — provenance + licence in ADR 0014 addendum and
