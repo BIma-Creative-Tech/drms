@@ -567,6 +567,8 @@ function stateTone(s: ReturnType<typeof periodState>, explicit: boolean): { tone
   return s === 'closed' ? (explicit ? { tone: 'ok', label: 'Ditutup' } : { tone: 'none', label: 'Terkunci' }) : s === 'current' ? { tone: 'progress', label: 'Berjalan' } : { tone: 'wait', label: 'Terbuka' }
 }
 
+// TODO(mc2-contract §4, after merging feat/mc2-backend): one PT per screen — `kasAccessIn(req)`, PT picker,
+// `lockDates` / `periodSummaries(req, periods, [pt])`, close/reopen with `company`; Kas book PT column (`BookRow.companyId`).
 export async function TutupBuku(props: AdminViewServerProps) {
   const req = props.initPageResult.req
   if (!kasAccess(req.user).view) return <Denied props={props} title="Tutup buku" roles="Finance dan Direktur" />

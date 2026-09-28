@@ -6,14 +6,14 @@
  */
 import { BANKS, CATEGORIES, UOMS } from '@/seed/data'
 
-import { SAMPLE } from './sample'
+import { SAMPLE, sampleTwoPts } from './sample'
 import { isTextColumn, SETTINGS, SHEETS, validationFor, type SheetKey } from './spec'
 import { writeXlsx, type WriteCell, type WriteSheet } from './xlsx-io'
 
 export type SheetRows = Partial<Record<Exclude<SheetKey, 'pengaturan'>, Array<Record<string, string | number | null>>>>
 export type WorkbookContent = { settings: Record<string, string | number>; rows: SheetRows }
 
-export const TEMPLATE_VERSION = 'S3b-1'
+export const TEMPLATE_VERSION = 'MC2-5'
 
 const V = (v: string | number | null | undefined): WriteCell => (v === null || v === undefined || v === '' ? null : v)
 
@@ -50,6 +50,8 @@ function petunjuk(sample: boolean): WriteSheet {
     [{ v: '9. File boleh diimpor berulang kali: data yang sama tidak digandakan, data yang berubah diperbarui (tercatat di audit log).', s: 'wrap' }],
     [{ v: '10. File berisi data pribadi (nomor rekening, No. HP): kirim hanya lewat saluran yang disepakati dengan Lead, jangan diunggah ke tempat umum.', s: 'wrap' }],
     [{ v: '11. Simpan sebagai .xlsx (Excel Workbook). Jangan menambah sheet lain; sheet yang tidak dikenal diabaikan.', s: 'wrap' }],
+    [{ v: '12. Beberapa PT dalam satu file: daftarkan setiap PT di sheet Perusahaan dan isi kolom kode_pt di setiap baris (kode karyawan/project/kategori boleh sama di PT berbeda). Referensi (mis. rekening → karyawan, tahapan → project) harus ke data PT yang SAMA. Satu PT saja: kode_pt boleh kosong.', s: 'wrap' }],
+    [{ v: '13. Pengguna yang bekerja di beberapa PT: satu baris di sheet Pengguna (akses di PT kode_pt), lalu satu baris per PT lain di sheet AksesPT (peran boleh berbeda per PT).', s: 'wrap' }],
     [],
     [{ v: 'Isi per sheet', s: 'bold' }],
     [{ v: 'Sheet', s: 'header' }, { v: 'Kolom', s: 'header' }, { v: 'Wajib', s: 'header' }, { v: 'Keterangan', s: 'header' }],
@@ -95,4 +97,9 @@ export function buildTemplate(): Uint8Array {
 /** Clearly fictional sample (tests, training, staging rehearsal). */
 export function buildSample(over: Partial<WorkbookContent> = {}): Uint8Array {
   return buildWorkbook({ settings: { ...SAMPLE.settings, ...(over.settings ?? {}) }, rows: { ...SAMPLE.rows, ...(over.rows ?? {}) } }, { sample: true })
+}
+
+/** MC2-5: fictional sample with two PTs (DRMS + CS1, AksesPT) — training / multi-PT rehearsal. */
+export function buildSampleTwoPts(): Uint8Array {
+  return buildWorkbook({ settings: { ...SAMPLE.settings }, rows: sampleTwoPts() }, { sample: true })
 }

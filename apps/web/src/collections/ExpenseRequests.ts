@@ -16,7 +16,7 @@ import { rupiahField, uuidField } from '@/fields/common'
 import { requestMeta } from '@/lib/request-meta'
 import { forceDeferredChecks } from '@/lib/system-tx'
 import { notifyCreated, notifyTransition } from '@/domain/notifications'
-import { companyField, companyHook } from '@/fields/company'
+import { companyField, companyHook, pickerSameCompany } from '@/fields/company'
 
 /**
  * T1 Pengajuan biaya (requirements v1.1 §7 T1; architecture §4.3, §5.1/§5.2).
@@ -271,14 +271,14 @@ export const ExpenseRequests: CollectionConfig = withAudit(
         admin: { ...ro, position: 'sidebar' },
       },
       { name: 'title', type: 'text', label: 'Judul / subjek', required: true, maxLength: 200 },
-      { name: 'project', type: 'relationship', relationTo: 'projects', label: 'Project', index: true },
-      { name: 'costCenter', type: 'relationship', relationTo: 'cost-centers', label: 'Pusat biaya', index: true },
+      { name: 'project', type: 'relationship', relationTo: 'projects', label: 'Project', index: true, ...pickerSameCompany() },
+      { name: 'costCenter', type: 'relationship', relationTo: 'cost-centers', label: 'Pusat biaya', index: true, ...pickerSameCompany() },
       businessDate('requestDate', 'Tanggal pengajuan (server)', { access: system, admin: { ...ro, position: 'sidebar' } }),
       businessDate('neededDate', 'Tanggal dibutuhkan'),
       businessDate('periodFrom', 'Periode kegiatan dari (opsional, Q-04)'),
       businessDate('periodTo', 'Periode kegiatan sampai'),
       { name: 'notes', type: 'textarea', label: 'Keterangan', maxLength: 2000 },
-      { name: 'requesters', type: 'relationship', relationTo: 'employees', hasMany: true, label: 'Diajukan Oleh', admin: { isSortable: true } },
+      { name: 'requesters', type: 'relationship', relationTo: 'employees', hasMany: true, label: 'Diajukan Oleh', admin: { isSortable: true }, ...pickerSameCompany() },
       { name: 'createdBy', type: 'relationship', relationTo: 'users', label: 'Dibuat Oleh', index: true, access: system, admin: { ...ro, position: 'sidebar' } },
       {
         name: 'bankAccount',

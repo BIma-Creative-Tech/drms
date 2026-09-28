@@ -79,3 +79,11 @@ export const S3E_ADMIN_VIEWS = {
 export const ACCOUNT_ADMIN_VIEWS = {
   accountSecurity: { Component: '@/admin/views/KeamananAkun#KeamananAkunView', path: '/keamanan-akun' as const, exact: true, meta: { title: 'Keamanan akun' } },
 }
+
+/**
+ * MC2-4 (ADR 0016 §11, wireframe mc/wireframes.md §2): role matrix "Pengguna & akses PT" (user × PT ×
+ * roles, employee of that PT). Admin of a PT / group admin; checks inside the view + REST access.
+ */
+export const MC2_ADMIN_VIEWS = {
+  accessMatrix: { Component: '@/admin/views/AksesPt#AksesPtView', path: '/akses-pt' as const, exact: true, meta: { title: 'Pengguna & akses PT' } },
+}

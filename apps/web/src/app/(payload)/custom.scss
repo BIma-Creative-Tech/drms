@@ -1261,3 +1261,737 @@ $pk-modules: dashboard, persetujuan, proyek, keuangan, absensi, laporan, penggun
     }
   }
 }
+
+// =================================================================================================
+// MC2-4 PT switcher (src/admin/shell/CompanySwitcher.tsx, wireframe mc/wireframes.md §1a)
+// =================================================================================================
+@layer payload {
+  .pk-pt {
+    display: inline-flex;
+    gap: 6px;
+    align-items: center;
+    max-width: 180px;
+    height: 38px;
+    padding: 0 10px;
+    border: 1px solid var(--pk-border);
+    border-radius: 10px;
+    background: var(--pk-card);
+    color: var(--pk-fg);
+    font: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: pointer;
+
+    > svg:first-child {
+      flex-shrink: 0;
+      color: var(--pk-primary);
+    }
+
+    &:hover {
+      border-color: color-mix(in oklab, var(--pk-primary) 45%, var(--pk-border));
+      background: var(--pk-muted-bg);
+    }
+  }
+
+  .pk-pt__text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .pk-pt--static {
+    border-style: dashed;
+    cursor: default;
+
+    &:hover {
+      border-color: var(--pk-border);
+      background: var(--pk-card);
+    }
+  }
+
+  .pk-pt-dd[data-open] > .pk-pt {
+    border-color: var(--pk-primary);
+    box-shadow: 0 0 0 3px color-mix(in oklab, var(--pk-primary) 18%, transparent);
+  }
+
+  .pk-pt__panel {
+    width: min(92vw, 380px);
+    padding: 10px;
+    gap: 4px;
+  }
+
+  .pk-pt__scrim {
+    display: none;
+  }
+
+  .pk-pt__title {
+    padding: 4px 6px 0;
+    font-family: var(--pk-font-heading);
+    font-size: 15px;
+    font-weight: 700;
+  }
+
+  .pk-pt__hint {
+    margin: 0 0 4px;
+    padding: 0 6px 8px;
+    border-bottom: 1px solid var(--pk-border);
+    color: var(--pk-muted-fg);
+    font-size: 12px;
+    line-height: 1.4;
+  }
+
+  .pk-pt__list {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    max-height: min(50vh, 360px);
+    overflow-y: auto;
+    padding-top: 4px;
+    border-top: 1px solid var(--pk-border);
+  }
+
+  .pk-pt__opt {
+    display: grid;
+    grid-template-columns: 20px 56px 1fr;
+    column-gap: 10px;
+    align-items: center;
+    min-height: 44px;
+    padding: 6px 8px;
+    border-radius: 9px;
+    cursor: pointer;
+
+    &:hover {
+      background: var(--pk-muted-bg);
+    }
+
+    &:has(input:focus-visible) {
+      outline: 2px solid var(--pk-primary);
+      outline-offset: -2px;
+    }
+
+    input {
+      width: 18px;
+      height: 18px;
+      margin: 0;
+      accent-color: var(--pk-primary);
+    }
+  }
+
+  .pk-pt__opt--all {
+    grid-template-columns: 20px 1fr;
+    font-weight: 600;
+  }
+
+  .pk-pt__code {
+    justify-self: start;
+    min-width: 44px;
+    padding: 1px 6px;
+    border-radius: 6px;
+    background: color-mix(in oklab, var(--pk-primary) 12%, transparent);
+    color: var(--pk-primary);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-align: center;
+  }
+
+  .pk-pt__name {
+    overflow: hidden;
+    min-width: 0;
+    font-weight: 500;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .pk-pt__roles {
+    grid-column: 3;
+    color: var(--pk-muted-fg);
+    font-size: 12px;
+  }
+
+  .pk-pt__msg {
+    margin: 4px 6px;
+    color: var(--pk-tone-warn-text);
+    font-size: 12px;
+    font-weight: 600;
+
+    &[data-tone='bad'] {
+      color: var(--pk-tone-bad-text);
+    }
+  }
+
+  .pk-pt__actions {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+    margin-top: 6px;
+    padding: 8px 4px 2px;
+    border-top: 1px solid var(--pk-border);
+  }
+
+  .pk-pt__btn {
+    min-height: 38px;
+    padding: 0 16px;
+    border: 1px solid var(--pk-input);
+    border-radius: 9px;
+    background: var(--pk-card);
+    color: var(--pk-fg);
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+
+    &:hover {
+      border-color: var(--pk-primary);
+      color: var(--pk-primary);
+    }
+
+    &:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+  }
+
+  .pk-pt__btn--primary {
+    border-color: var(--pk-primary);
+    background: var(--pk-primary);
+    color: var(--pk-on-primary);
+
+    &:hover:not(:disabled) {
+      background: var(--pk-primary-hover);
+      color: var(--pk-on-primary);
+    }
+  }
+
+  // very narrow bars: the module chip stays, its name gives way to the PT switcher
+  @media (max-width: 440px) {
+    .pk-bar:has(.pk-pt) .pk-bar__module-name {
+      display: none;
+    }
+  }
+
+  // ≤ 768px: code only; the dialog is a bottom sheet over a scrim, portalled to <body>
+  @media (max-width: 768px) {
+    .pk-pt {
+      max-width: 112px;
+      padding: 0 8px;
+    }
+
+    .pk-pt .pk-bar__chev {
+      display: none;
+    }
+  }
+
+  .pk-pt-sheet .pk-pt__scrim {
+    position: fixed;
+    inset: 0;
+    z-index: 34;
+    display: block;
+    background: rgb(2 6 23 / 0.45);
+  }
+
+  .pk-bar__menu.pk-pt__panel--sheet {
+    position: fixed;
+    top: auto;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 35;
+    width: 100%;
+    max-height: 85vh;
+    padding: 14px 16px calc(14px + env(safe-area-inset-bottom));
+    border-radius: 18px 18px 0 0;
+    font-size: 14px;
+    transform-origin: bottom center;
+  }
+}
+
+// MC2-4 PT column chip (CompanyCell) + PT filter chips above list tables (CompanyListFilter)
+@layer payload {
+  .pk-pt-chip {
+    display: inline-block;
+    min-width: 40px;
+    padding: 1px 7px;
+    border-radius: 6px;
+    background: color-mix(in oklab, var(--pk-primary) 12%, transparent);
+    color: var(--pk-primary);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-align: center;
+    white-space: nowrap;
+  }
+
+  .pk-pt-filter {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 12px;
+    align-items: center;
+    margin: 0 0 12px;
+  }
+
+  .pk-pt-filter__label {
+    color: var(--pk-muted-fg);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .pk-pt-filter__chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .pk-pt-filter__chip {
+    display: inline-flex;
+    align-items: center;
+    min-height: 32px;
+    padding: 0 12px;
+    border: 1px solid var(--pk-border);
+    border-radius: 999px;
+    background: var(--pk-card);
+    color: var(--pk-fg);
+    font-size: 13px;
+    font-weight: 600;
+    text-decoration: none;
+
+    &:hover {
+      border-color: var(--pk-primary);
+      color: var(--pk-primary);
+    }
+
+    &[aria-current='true'] {
+      border-color: var(--pk-primary);
+      background: var(--pk-primary);
+      color: var(--pk-on-primary);
+    }
+  }
+
+  .pk-pt-filter__meta {
+    color: var(--pk-muted-fg);
+    font-size: 13px;
+  }
+}
+
+// MC2-4 role matrix (/admin/akses-pt, src/admin/components/access/RoleMatrix.tsx, wireframe §2)
+@layer payload {
+  .pk-rmx__cols {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 10px;
+    align-items: center;
+    margin: 0 0 12px;
+    padding: 0;
+    border: 0;
+
+    legend {
+      float: left;
+      margin-right: 6px;
+      color: var(--pk-muted-fg);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+  }
+
+  .pk-rmx__col {
+    display: inline-flex;
+    gap: 6px;
+    align-items: center;
+    min-height: 32px;
+    padding: 0 10px;
+    border: 1px solid var(--pk-border);
+    border-radius: 999px;
+    background: var(--pk-card);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+
+    input {
+      accent-color: var(--pk-primary);
+    }
+  }
+
+  .pk-rmx__warn {
+    margin: 0 0 12px;
+    padding: 10px 14px;
+    border: 1px solid var(--pk-tone-warn-text);
+    border-radius: var(--style-radius-m);
+    background: color-mix(in oklab, var(--pk-tone-warn) 12%, var(--pk-card));
+    color: var(--pk-tone-warn-text);
+    font-size: 13px;
+    font-weight: 600;
+
+    p {
+      margin: 2px 0;
+    }
+  }
+
+  .pk-rmx__sr {
+    position: absolute;
+    overflow: hidden;
+    width: 1px;
+    height: 1px;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .pk-rmx__table {
+    th[data-pk-col],
+    td[data-pk-cell] {
+      min-width: 250px;
+    }
+  }
+
+  .pk-rmx__cname {
+    color: var(--pk-fg);
+    font-weight: 600;
+  }
+
+  .pk-rmx__user {
+    min-width: 170px;
+    text-align: left;
+    font-weight: 600;
+
+    a {
+      color: var(--pk-fg);
+      text-decoration: none;
+    }
+
+    a:hover {
+      color: var(--pk-primary);
+    }
+  }
+
+  .pk-rmx__email {
+    display: block;
+    overflow: hidden;
+    max-width: 220px;
+    color: var(--pk-muted-fg);
+    font-size: 12px;
+    font-weight: 400;
+    text-overflow: ellipsis;
+  }
+
+  .pk-rmx__table td[data-changed] {
+    background: color-mix(in oklab, var(--pk-primary) 7%, transparent);
+    box-shadow: inset 3px 0 0 var(--pk-primary);
+  }
+
+  .pk-rmx__table td[data-error] {
+    box-shadow: inset 3px 0 0 var(--pk-tone-bad);
+  }
+
+  .pk-rmx__cell[data-inactive] .pk-rmx__roles {
+    opacity: 0.75;
+  }
+
+  .pk-rmx__roles {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+
+  .pk-rmx__role {
+    display: inline-flex;
+    gap: 4px;
+    align-items: center;
+    min-height: 30px;
+    padding: 0 8px 0 6px;
+    border: 1px solid var(--pk-border);
+    border-radius: 8px;
+    background: var(--pk-card);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+
+    input {
+      width: 15px;
+      height: 15px;
+      margin: 0;
+      accent-color: var(--pk-primary);
+    }
+
+    &[data-on] {
+      border-color: color-mix(in oklab, var(--pk-primary) 55%, var(--pk-border));
+      background: color-mix(in oklab, var(--pk-primary) 12%, var(--pk-card));
+      color: var(--pk-primary);
+    }
+
+    &:has(input:disabled) {
+      cursor: not-allowed;
+      opacity: 0.6;
+    }
+
+    &:has(input:focus-visible) {
+      outline: 2px solid var(--pk-primary);
+      outline-offset: 1px;
+    }
+  }
+
+  .pk-rmx__emp {
+    display: flex;
+    gap: 6px;
+    align-items: flex-end;
+    margin-top: 6px;
+
+    label {
+      display: flex;
+      flex: 1;
+      flex-direction: column;
+      gap: 2px;
+      min-width: 0;
+    }
+
+    select {
+      width: 100%;
+      min-height: 32px;
+      padding: 2px 6px;
+      border: 1px solid var(--pk-input);
+      border-radius: var(--style-radius-s);
+      background: var(--theme-input-bg, var(--theme-elevation-0));
+      color: var(--theme-text);
+      font-size: 12px;
+    }
+
+    select[aria-invalid='true'] {
+      border-color: var(--pk-tone-bad);
+    }
+  }
+
+  .pk-rmx__emp-label {
+    color: var(--pk-muted-fg);
+    font-size: 11px;
+  }
+
+  .pk-rmx__emp-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border: 1px solid var(--pk-border);
+    border-radius: 8px;
+    color: var(--pk-primary);
+    text-decoration: none;
+  }
+
+  .pk-rmx__state {
+    display: block;
+    margin-top: 4px;
+    color: var(--pk-muted-fg);
+    font-size: 11px;
+  }
+
+  .pk-rmx__none {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+    color: var(--pk-muted-fg);
+    font-style: italic;
+  }
+
+  .pk-rmx__add {
+    min-height: 30px;
+    padding: 0 10px;
+    border: 1px dashed var(--pk-primary);
+    border-radius: 8px;
+    background: transparent;
+    color: var(--pk-primary);
+    font: inherit;
+    font-size: 12px;
+    font-style: normal;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .pk-rmx__err {
+    margin: 6px 0 0;
+    color: var(--pk-tone-bad-text);
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  .pk-rmx__bar {
+    position: sticky;
+    bottom: 0;
+    z-index: 5;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 12px;
+    align-items: flex-end;
+    margin-top: 12px;
+    padding: 12px 14px;
+    border: 1px solid var(--pk-border);
+    border-radius: var(--style-radius-l);
+    background: var(--pk-card);
+    box-shadow: var(--pk-shadow);
+
+    &[data-dirty] {
+      border-color: var(--pk-primary);
+    }
+
+    // nothing to save: no sticky bar covering the matrix (mobile cards especially)
+    &:not([data-dirty]) {
+      position: static;
+    }
+  }
+
+  .pk-rmx__count {
+    align-self: center;
+    font-weight: 700;
+  }
+
+  .pk-rmx__reason {
+    display: flex;
+    flex: 1 1 260px;
+    flex-direction: column;
+    gap: 2px;
+    font-size: 12px;
+
+    input {
+      min-height: 34px;
+      padding: 4px 8px;
+      border: 1px solid var(--pk-input);
+      border-radius: var(--style-radius-s);
+      background: var(--theme-input-bg, var(--theme-elevation-0));
+      color: var(--theme-text);
+      font-size: 13px;
+    }
+  }
+
+  .pk-rmx__hint {
+    align-self: center;
+    color: var(--pk-tone-warn-text);
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  .pk-rmx__hint--bad,
+  .pk-rmx__msg--bad {
+    color: var(--pk-tone-bad-text);
+  }
+
+  .pk-rmx__msg {
+    align-self: center;
+    font-size: 13px;
+    font-weight: 600;
+  }
+
+  .pk-rmx__msg--ok {
+    color: var(--pk-tone-ok-text);
+  }
+
+  // ≤ 768px: one card per user, one section per PT (no wide table)
+  @media (max-width: 768px) {
+    .pk-rmx__scroll {
+      overflow: visible;
+      border: 0;
+      background: transparent;
+      box-shadow: none;
+    }
+
+    .pk-rmx__table,
+    .pk-rmx__table tbody,
+    .pk-rmx__table tr,
+    .pk-rmx__table th,
+    .pk-rmx__table td {
+      display: block;
+      width: 100%;
+      min-width: 0 !important;
+      box-sizing: border-box;
+    }
+
+    .pk-rmx__table thead {
+      display: none;
+    }
+
+    .pk-rmx__table tr {
+      margin: 0 0 12px;
+      border: 1px solid var(--pk-border);
+      border-radius: var(--style-radius-l);
+      background: var(--pk-card);
+      box-shadow: var(--pk-shadow);
+    }
+
+    .pk-rmx__table td[data-label]::before {
+      content: attr(data-label);
+      display: block;
+      margin-bottom: 6px;
+      color: var(--pk-muted-fg);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .pk-rmx__email {
+      max-width: 100%;
+    }
+
+    .pk-rmx__bar {
+      position: sticky;
+      bottom: 0;
+    }
+  }
+}
+
+@layer payload {
+  .pk-status-pill {
+    display: inline-flex;
+    gap: 4px;
+    align-items: center;
+    padding: 1px 8px;
+    border: 1px solid currentColor;
+    border-radius: 999px;
+    color: var(--pk-tone-ok-text);
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  .pk-status-pill--off {
+    color: var(--pk-muted-fg);
+  }
+
+  .pk-pt-scope {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+    margin: -4px 0 12px;
+    color: var(--pk-muted-fg);
+    font-size: 13px;
+  }
+}
+
+@layer payload {
+  // MC2-4 per-PT rows under a combined KPI (Dashboard, wireframe §5)
+  .pk-perpt {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    margin: 8px 0 0;
+    padding: 8px 0 0;
+    border-top: 1px dashed var(--pk-border);
+    list-style: none;
+    font-size: 12px;
+
+    li {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      justify-content: space-between;
+    }
+  }
+
+  .pk-perpt__v {
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+  }
+}

@@ -82,6 +82,30 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   - Tests: web unit + integration (Keycloak mocked), `tests/kc/two-factor.kc.test.ts` against a real throwaway
     Keycloak 26.7.4 (`test-env/kc-setup.sh` gains a TEST-ONLY `proyekkas-web` client + user); mobile unit + widget.
   - Docs: ADR 0017; revisions in ADR 0012, `plans/fase1-golive.md` G1-3, ASVS checklist 4.3.1 / G-01 (decided).
+- **MC2-4 — PT switcher** (`apps/web`, branch `feat/mc2-admin-ui`, ADR 0016 §5, wireframe `mc/wireframes.md` §1a):
+  module-bar control left of the bell (`admin/shell/CompanySwitcher.tsx`): one membership → the PT code as text;
+  several → dialog with "Semua PT saya" (tri-state) + one checkbox per PT (code, name, the user's roles there),
+  Terapkan / Batal, ≥ 1 PT, ↑/↓/Space/Esc, bottom sheet ≤ 768 px. New `POST /api/v1/me/companies` sets the HttpOnly
+  cookie `pk-company-ids` (`__Host-` on https; "Semua PT" = cookie cleared); a PT without membership → 403
+  `COMPANY_NOT_ALLOWED` (audited). OpenAPI regenerated.
+- **MC2-4 — Master Perusahaan + PT column/filter + employee ↔ PT** (ADR 0016 §11, wireframes §3–§4): companies form
+  in tabs (Identitas / Operasional / Absensi & retensi / Pengingat & notifikasi), list Kode · Nama · Zona waktu ·
+  Anggota · Aktif · Dibuat; every list with a PT column (30 per-PT collections, memberships, notifications, audit
+  logs) shows the PT short-code chip first and, with more than one PT selected, PT filter chips above the table
+  (`admin/company-list.ts`). A chosen PT sits at the top of master forms; employee create requires the PT when
+  several PTs are selected; employee / project / cost-center / work-schedule pickers list only the document's PT.
+- **MC2-4 — role matrix "Pengguna & akses PT"** (`/admin/akses-pt`, wireframe §2): users × PTs, cell = membership
+  (role checkboxes, employee of that PT, add / deactivate), Admin of the PT or group admin, reason required, audit
+  `role_change` server-side, warnings for a PT without active Direktur / Finance, mobile cards.
+- **MC2-4 — PT in custom views + dashboards:** approval inbox, transfer queue, LPJ verification and addendum list
+  show a PT column when more than one PT is selected; transfer / settlement forms offer only cash accounts of the
+  request's PT; Direktur / Finance dashboard tiles show per-PT rows under the combined totals (backend payload
+  `byCompany`).
+- **MC2-5 — go-live import per PT** (`apps/web/src/import`, runbook §4.1): sheet `Perusahaan` (target PTs; existing
+  ones untouched, new ones created with default numbering + approval rules), `kode_pt` as first column of every
+  per-PT sheet (codes unique per PT; empty = the only PT), sheet `AksesPT` (roles per user per PT), validation of
+  unknown / inactive PTs and cross-PT references, cut-over per PT (PB start per PT). Template `MC2-5` regenerated,
+  new fictional two-PT sample `drms-impor-golive-contoh-fiktif-2pt.xlsx`.
 
 ### Changed
 - **`company-settings` global = app-wide only** (APK gate, device image targets, offline max age, selfie batch

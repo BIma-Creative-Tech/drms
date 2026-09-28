@@ -15,9 +15,11 @@ export function formatReport(r: ImportReport): string {
       out.push(`${m.sheet.padEnd(14)} ${String(m.rows).padStart(5)} ${String(m.created).padStart(5)} ${String(m.updated).padStart(5)} ${String(m.unchanged).padStart(5)} ${String(m.skipped).padStart(7)}`)
     }
   }
-  if (r.cutover) {
-    const c = r.cutover
-    out.push('', `Cut-over: go-live ${c.goLiveDate} · PB mulai ${c.pbStartAt} (counter ${c.pbCounterBefore ?? 'belum ada'} → ${c.pbCounterAfter ?? 'belum ada'}) · PB pertama: ${c.firstPbNumber ?? '-'} · ${c.closeNote}`)
+  // MC2-5: one cut-over line per PT
+  const cutovers = r.cutovers?.length ? r.cutovers : r.cutover ? [r.cutover] : []
+  if (cutovers.length > 0) out.push('')
+  for (const c of cutovers) {
+    out.push(`Cut-over PT ${c.pt}: go-live ${c.goLiveDate} · PB mulai ${c.pbStartAt} (counter ${c.pbCounterBefore ?? 'belum ada'} → ${c.pbCounterAfter ?? 'belum ada'}) · PB pertama: ${c.firstPbNumber ?? '-'} · ${c.closeNote}`)
   }
   const line = (i: ImportReport['issues'][number]) => `  [${i.sheet}${i.row ? ` baris ${i.row}` : ''}${i.column ? ` kolom ${i.column}` : ''}] ${i.message}`
   if (errors.length > 0) out.push('', 'ERROR:', ...errors.map(line))

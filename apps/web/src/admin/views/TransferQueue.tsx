@@ -1,6 +1,7 @@
 import type { AdminViewServerProps } from 'payload'
 import React from 'react'
 
+import { relId } from '@/access/roles'
 import { voidableTransfers } from '@/domain/cash/book'
 import { transferQueue } from '@/domain/expense/queues'
 import { approvedByCaller } from '@/domain/expense/transfers'
@@ -10,6 +11,7 @@ import { ReasonAction } from '../components/kas/ReasonAction'
 import { KAS_STYLE } from '../components/kas/style'
 import { MoneyForm } from '../components/MoneyForm'
 import { ReimburseReceiptReview, loadReimburseReview } from '../components/ReimburseReceiptReview'
+import { accountsOf, itemCompany, PtChip, PtScopeNote, ptView, requestCompanies } from './pt'
 import { Empty, Forbidden, Shell, TableScroll, allowed, badge, docLink, num, rp, table, td, th } from './shared'
 
 /**
@@ -20,18 +22,24 @@ import { Empty, Forbidden, Shell, TableScroll, allowed, badge, docLink, num, rp,
 export async function TransferQueue(props: AdminViewServerProps) {
   const req = props.initPageResult.req
   if (!allowed(req, ['pk-finance', 'pk-owner'])) return <Forbidden props={props} title="Antrian Transfer" roles={['pk-finance', 'pk-owner']} />
-  const { items, review, done, mine } = await withReqTransaction(req, async () => {
+  const pt = await ptView(req)
+  const { items, review, done, mine, companies } = await withReqTransaction(req, async () => {
     const q = await transferQueue(req)
-    return { items: q, review: await loadReimburseReview(req), done: await voidableTransfers(req), mine: await approvedByCaller(req, q.map((x) => x.id)) }
+    const done = await voidableTransfers(req)
+    // MC2-4: PT of every row (backend `company` ref, else the request's company column) — also picks
+    // the cash accounts offered in each transfer form (never an account of another PT).
+    const companies = await requestCompanies(req, [...q.filter((i) => !('company' in i)).map((i) => i.id), ...(pt.multi ? done.map((t) => t.requestId) : [])])
+    return { items: q, review: await loadReimburseReview(req), done, mine: await approvedByCaller(req, q.map((x) => x.id)), companies }
   })
   const canTransfer = allowed(req, ['pk-finance'])
   const accounts = canTransfer
     ? (
-        await req.payload.find({ collection: 'cash-accounts', where: { active: { not_equals: false } }, depth: 0, pagination: false, sort: 'name', user: req.user, overrideAccess: false, req })
-      ).docs.map((a) => ({ id: a.id as number, name: a.name as string }))
+        await req.payload.find({ collection: 'cash-accounts', where: { active: { not_equals: false } }, depth: 0, pagination: false, sort: 'name', select: { name: true, company: true }, user: req.user, overrideAccess: false, req })
+      ).docs.map((a) => ({ id: a.id as number, name: a.name as string, company: relId((a as { company?: unknown }).company) ?? null }))
     : []
   return (
     <Shell props={props} title={`Antrian Transfer (${items.length})`}>
+      <PtScopeNote pt={pt} />
       <ReimburseReceiptReview data={review} />
       <h2>Siap ditransfer ({items.length})</h2>
       {items.length === 0 ? (
@@ -42,6 +50,7 @@ export async function TransferQueue(props: AdminViewServerProps) {
         <table style={table} className="pk-rtable" data-pk-table="transfer-queue">
           <thead>
             <tr>
+              {pt.multi ? <th style={th}>PT</th> : null}
               <th style={th}>Dibutuhkan</th>
               <th style={th}>Nomor / Judul</th>
               <th style={th}>Jenis</th>
@@ -53,6 +62,11 @@ export async function TransferQueue(props: AdminViewServerProps) {
           {items.map((r) => (
             <tbody key={r.id} data-pk-queue-item={r.id}>
               <tr>
+                {pt.multi ? (
+                  <td style={td} data-label="PT">
+                    <PtChip pt={pt.ref(itemCompany(r, companies))} />
+                  </td>
+                ) : null}
                 <td style={td} data-label="Dibutuhkan">
                   {r.neededDate ?? '—'}
                 </td>
@@ -77,7 +91,7 @@ export async function TransferQueue(props: AdminViewServerProps) {
               {canTransfer ? (
                 <tr>
                   <td style={td} />
-                  <td style={td} colSpan={5}>
+                  <td style={td} colSpan={pt.multi ? 6 : 5}>
                     {mine.has(r.id) ? (
                       // ADR 0013 O-2: allowed (audited), but made visible before the money moves.
                       <div role="note" data-pk-self-approved={r.id} style={{ margin: '0 0 6px', padding: '6px 8px', borderLeft: '3px solid var(--pk-tone-warn)', background: 'var(--theme-elevation-50)', fontSize: 13 }}>
@@ -87,7 +101,7 @@ export async function TransferQueue(props: AdminViewServerProps) {
                     <MoneyForm
                       url={`/api/v1/expense-requests/${r.id}/transfer`}
                       submitLabel="Catat transfer"
-                      cashAccounts={accounts}
+                      cashAccounts={accountsOf(accounts, itemCompany(r, companies))}
                       bankRef="required"
                       proof={{ kind: 'transfer-proofs', required: true }}
                       amountText={`Transfer ${rp(r.approvedAmount)}`}
@@ -115,6 +129,7 @@ export async function TransferQueue(props: AdminViewServerProps) {
           <table style={table} data-pk-table="voidable-transfers">
             <thead>
               <tr>
+                {pt.multi ? <th style={th}>PT</th> : null}
                 <th style={th}>Tanggal</th>
                 <th style={th}>Transfer</th>
                 <th style={th}>Pengajuan</th>
@@ -125,6 +140,11 @@ export async function TransferQueue(props: AdminViewServerProps) {
             <tbody>
               {done.map((t) => (
                 <tr key={t.transferId} data-pk-transfer={t.transferNo}>
+                  {pt.multi ? (
+                    <td style={td}>
+                      <PtChip pt={pt.ref(companies.get(t.requestId))} />
+                    </td>
+                  ) : null}
                   <td style={td}>{t.transferDate}</td>
                   <td style={td}>{t.transferNo}</td>
                   <td style={td}>

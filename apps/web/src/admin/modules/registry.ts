@@ -175,7 +175,19 @@ export const MODULES: readonly ModuleDef[] = [
     label: 'Pengguna & Akses',
     icon: 'users',
     hint: 'User, karyawan, perangkat',
-    sections: [{ items: [{ collection: 'users' }, { collection: 'company-memberships' }, { collection: 'employees' }, { collection: 'employee-bank-accounts' }, { collection: 'devices' }, { collection: 'web-sessions' }] }],
+    sections: [
+      {
+        items: [
+          // MC2-4: role matrix user × PT (Admin of a PT / group admin; the view re-checks)
+          { view: '/akses-pt', label: 'Akses PT (matriks)', roles: ['pk-admin'], navKey: 'akses-pt' },
+          { collection: 'users' },
+          { collection: 'company-memberships', label: 'Data akses PT' },
+          { collection: 'employees' },
+          { collection: 'employee-bank-accounts' },
+        ],
+      },
+      { label: 'Perangkat & sesi', items: [{ collection: 'devices' }, { collection: 'web-sessions' }] },
+    ],
   },
   {
     id: 'master',

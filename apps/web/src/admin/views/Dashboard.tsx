@@ -18,6 +18,8 @@ import { TeamTodayWidget } from './Absensi'
 import { ChartHover } from './ChartHover'
 import { PageTemplate } from './frame'
 import { dateId, ProgressCell, ProgressVsBudgetCard } from './progress-ui'
+import { PtScopeNote, ptView } from './pt'
+import { PerPt, type PtRow } from './pt-breakdown'
 import { BudgetBadge, F3Root } from './f3-ui'
 import {
   Bento,
@@ -586,6 +588,9 @@ function LatestProgressReports({ rows }: { rows: Awaited<ReturnType<typeof listR
 
 async function Owner({ req, months }: { req: PayloadRequest; months: 6 | 12 }) {
   const d = await withReqTransaction(req, () => ownerDashboard(req, { months }))
+  // MC2-4: per-PT rows of the backend payload (read defensively until mc2-contract lands)
+  const pt = await ptView(req)
+  const by = (o: unknown, k = 'byCompany'): unknown => (o && typeof o === 'object' ? (o as Record<string, unknown>)[k] : undefined)
   const k09 = await withReqTransaction(req, async () => projectProgressVsBudget(req, await officeScope(req)))
   const v = d.viz
   const bal = v.balanceTrend
@@ -602,8 +607,9 @@ async function Owner({ req, months }: { req: PayloadRequest; months: 6 | 12 }) {
   const a = d.approvals
   return (
     <>
+      <PtScopeNote pt={pt} />
       <p className="pk-note" style={{ margin: '-8px 0 16px' }}>
-        Per {d.asOf} (WITA) · grafik {d.cashFlow.months} bulan terakhir · warna anggaran dari Komitmen.
+        Per {d.asOf} (WITA) · grafik {d.cashFlow.months} bulan terakhir · warna anggaran dari Komitmen.{pt.multi ? ' Angka besar = gabungan PT tempat Anda Direktur; rincian per PT di bawahnya.' : ''}
       </p>
       <Bento label="Ringkasan Direktur">
         <KpiRow>
@@ -614,6 +620,7 @@ async function Owner({ req, months }: { req: PayloadRequest; months: 6 | 12 }) {
             <p className="pk-kpi-x" data-pk-kpi="k02b-month">
               Bulan ini <b>+{rpShort(d.cash.monthIn)}</b> / <b>−{rpShort(d.cash.monthOut)}</b>
             </p>
+            <PerPt pt={pt} data={by(d.cash)} fmt={rpShort} label="Saldo kas" />
           </KpiTile>
           <KpiTile id="approvals" icon="clock" label="Pengajuan menunggu" value={`${a.count}`} title={`${a.count} pengajuan`} kpi="k10-count" href={statusList(WAITING)} more="Lihat pengajuan" i={1}>
             <p className="pk-kpi-x" data-pk-kpi="k10-sum">
@@ -635,6 +642,7 @@ async function Owner({ req, months }: { req: PayloadRequest; months: 6 | 12 }) {
             <p className="pk-kpi-x" data-pk-kpi="k10-mine">
               <b>{a.waitingForMe}</b> menunggu saya{a.oldestDays !== null ? ` · tertua ${a.oldestDays} hari` : ''}
             </p>
+            <PerPt pt={pt} data={by(a)} keys={['count', 'total']} label="Pengajuan menunggu" />
           </KpiTile>
           <KpiTile id="disbursed" icon="send" label="Pencairan bulan ini" value={rpShort(disb.net)} title={rp(disb.net)} kpi="k05-month" href="/admin/laporan/pengeluaran-kategori" more="Pengeluaran per kategori" i={2}>
             <p className="pk-kpi-x">{rp(disb.net)} dicairkan bersih</p>
@@ -658,6 +666,8 @@ async function Owner({ req, months }: { req: PayloadRequest; months: 6 | 12 }) {
                 </>
               ) : null}
             </p>
+            {/* per PT: colour counts with THAT PT's thresholds — no combined percentage (wireframe §5 rule 2) */}
+            <PerPt pt={pt} data={by(d.budget)} label="Project berjalan" render={(r: PtRow) => `${num(r.running)} berjalan · ${num(r.over)} merah · ${num(r.warn)} kuning`} />
           </KpiTile>
         </KpiRow>
 
@@ -697,6 +707,7 @@ async function Owner({ req, months }: { req: PayloadRequest; months: 6 | 12 }) {
           <p className="pk-kpi-x" data-pk-kpi="k12f">
             <b>{d.completeness.openWarnings}</b> flag peringatan terbuka
           </p>
+          <PerPt pt={pt} data={by(d.completeness)} label="Kelengkapan LPJ" render={(r: PtRow) => `${num(r.ratioDone)}/${num(r.ratioTotal)} · ${num(r.overdue)} terlambat`} />
         </Card>
 
         <ProgressVsBudgetCard id="owner-progress" data={k09} i={11} />
@@ -756,6 +767,8 @@ async function Owner({ req, months }: { req: PayloadRequest; months: 6 | 12 }) {
 
 async function Finance({ req }: { req: PayloadRequest }) {
   const d = await withReqTransaction(req, () => financeDashboard(req))
+  const pt = await ptView(req)
+  const extra = d as unknown as Record<string, unknown> // MC2 per-PT fields (mc2-contract), read defensively
   const k09 = await withReqTransaction(req, async () => projectProgressVsBudget(req, await officeScope(req)))
   const v = d.viz
   const flows = d.cashFlow.rows
@@ -766,8 +779,9 @@ async function Finance({ req }: { req: PayloadRequest }) {
   type A = (typeof d.advancesWithoutLpj)[number]
   return (
     <>
+      <PtScopeNote pt={pt} />
       <p className="pk-note" style={{ margin: '-8px 0 16px' }}>
-        Per {d.asOf} (WITA) · buku kas termasuk koreksi void.
+        Per {d.asOf} (WITA) · buku kas termasuk koreksi void.{pt.multi ? ' Angka besar = gabungan PT tempat Anda Finance.' : ''}
       </p>
       <Bento label="Ringkasan Finance">
         <KpiRow cols={6}>
@@ -775,6 +789,7 @@ async function Finance({ req }: { req: PayloadRequest }) {
             <p className="pk-kpi-x">{rp(d.cashTotal)}</p>
             {balPrev ? <Delta d={delta(d.cashTotal, balPrev.balance)} good="up" vs={`vs akhir ${short(balPrev.period)}`} /> : null}
             <Sparkline label="Saldo akhir bulan" values={v.balanceTrend.map((b) => ({ label: short(b.period), value: b.balance }))} />
+            <PerPt pt={pt} data={extra.cashByCompany} fmt={rpShort} label="Saldo kas" />
           </KpiTile>
           <KpiTile id="transfer-queue" icon="send" label="Antrian transfer" value={`${d.transferQueue.count}`} title={`${d.transferQueue.count} pengajuan`} kpi="k11-count" href="/admin/antrian-transfer" more="Antrian Transfer" i={1}>
             <p className="pk-kpi-x">
@@ -791,6 +806,7 @@ async function Finance({ req }: { req: PayloadRequest }) {
             <p className="pk-kpi-x" data-pk-kpi="k12e">
               <b>{d.reimburseToVerify.count}</b> nota reimburse · {d.reimburseToVerify.warnings} flag
             </p>
+            <PerPt pt={pt} data={extra.completenessByCompany} label="Menunggu verifikasi" render={(r: PtRow) => `${num(r.lpjToVerify)} LPJ · ${num(r.reimburseToVerify)} nota`} />
           </KpiTile>
           <KpiTile id="month-in" icon="down" label={`Kas masuk ${short(cur.period)}`} value={rpShort(cur.masuk)} title={rp(cur.masuk)} kpi="k02a-in" href={rekapKasMonth(cur.period)} more="Rekap Kas" i={3}>
             <p className="pk-kpi-x">{rp(cur.masuk)}</p>
@@ -1252,3 +1268,8 @@ export function DashboardPage(props: AdminViewServerProps) {
 }
 
 export default Dashboard
+
+/** Defensive number of a per-PT row field (MC2 payloads). */
+function num(v: unknown): string {
+  return typeof v === 'number' ? String(v) : '—'
+}

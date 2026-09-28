@@ -5,7 +5,7 @@ import { NotificationBell } from '@/admin/components/NotificationBell'
 import { LogoutButton } from '@/components/LogoutButton'
 
 import { ModuleBar } from './ModuleBar'
-import { loadModules, navUser } from './modules-server'
+import { loadModules, loadSwitcher, navUser } from './modules-server'
 
 /**
  * admin.components.Nav (Payload 3.90.1 templates/Default: rendered on EVERY page that uses the
@@ -25,8 +25,8 @@ type Props = {
 
 export async function ModuleNav({ payload, user, permissions, visibleEntities, i18n }: Props) {
   if (!payload?.config || !user) return null
-  const modules = await loadModules({ payload, user, permissions, visibleEntities, i18n })
-  return <ModuleBar modules={modules} user={navUser(user)} bell={<NotificationBell payload={payload} user={user} />} logout={<LogoutButton />} />
+  const [modules, companies] = await Promise.all([loadModules({ payload, user, permissions, visibleEntities, i18n }), loadSwitcher(payload, user)])
+  return <ModuleBar modules={modules} user={navUser(user)} companies={companies} bell={<NotificationBell payload={payload} user={user} />} logout={<LogoutButton />} />
 }
 
 export default ModuleNav

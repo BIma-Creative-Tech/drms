@@ -4,7 +4,7 @@ import { denyAll, hasRole, relId } from '@/access/roles'
 import { anyOf, byRole, rolesAllowed, teamCostCenters, teamProjects } from '@/access/policies'
 import { resolveScope } from '@/access/scope'
 import { reasonOnChange, withAudit } from '@/audit/hooks'
-import { companyField, companyHook } from '@/fields/company'
+import { companyField, companyHook, pickerSameCompany } from '@/fields/company'
 
 /**
  * Penugasan tim: employee ↔ project XOR cost center (form item 9), role in project, period.
@@ -53,9 +53,9 @@ export const TeamAssignments: CollectionConfig = withAudit(
     hooks: { beforeChange: [companyHook('team-assignments', { derive: [{ field: 'employee', collection: 'employees' }], check: [{ field: 'project', collection: 'projects' }, { field: 'costCenter', collection: 'cost-centers' }] }), guard] },
     fields: [
       companyField({ derived: true }),
-      { name: 'employee', type: 'relationship', relationTo: 'employees', label: 'Karyawan', required: true, index: true },
-      { name: 'project', type: 'relationship', relationTo: 'projects', label: 'Project', index: true },
-      { name: 'costCenter', type: 'relationship', relationTo: 'cost-centers', label: 'Pusat biaya', index: true },
+      { name: 'employee', type: 'relationship', relationTo: 'employees', label: 'Karyawan', required: true, index: true, ...pickerSameCompany({ required: true }) },
+      { name: 'project', type: 'relationship', relationTo: 'projects', label: 'Project', index: true, ...pickerSameCompany() },
+      { name: 'costCenter', type: 'relationship', relationTo: 'cost-centers', label: 'Pusat biaya', index: true, ...pickerSameCompany() },
       {
         name: 'roleInProject',
         type: 'select',

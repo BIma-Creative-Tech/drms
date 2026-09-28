@@ -4,7 +4,7 @@ import { denyAll } from '@/access/roles'
 import { byRole, fieldRoles, ownEmployee, rolesAllowed } from '@/access/policies'
 import { reasonOnChange, reasonOnDeactivate, withAudit } from '@/audit/hooks'
 import { activeField, uuidField } from '@/fields/common'
-import { companyField, companyHook } from '@/fields/company'
+import { companyField, companyHook, pickerSameCompany } from '@/fields/company'
 
 /**
  * Rekening karyawan (transfer target). Sensitive: readable by the owning employee and by
@@ -49,7 +49,7 @@ export const EmployeeBankAccounts: CollectionConfig = withAudit(
     },
     fields: [
       companyField({ derived: true }),
-      { name: 'employee', type: 'relationship', relationTo: 'employees', label: 'Karyawan', required: true, index: true },
+      { name: 'employee', type: 'relationship', relationTo: 'employees', label: 'Karyawan', required: true, index: true, ...pickerSameCompany({ required: true }) },
       { name: 'bank', type: 'relationship', relationTo: 'banks', label: 'Bank', required: true },
       {
         name: 'accountNo',
