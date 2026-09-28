@@ -8,6 +8,8 @@ import { getRequestTx } from '@/lib/tx'
 
 import { attendanceContext, attendanceScope, teamMembers, type AttScope } from './queries'
 
+// MC2: LEAK POINT — attendance web SQL uses the company-blind AttScope `all`.
+
 /**
  * E6 web (S2) — read helpers of the admin views (/admin/absensi…). Same scope rules as the
  * /api/v1/attendance endpoints (attendanceScope: office roles all, PM team, Staff none → own recap

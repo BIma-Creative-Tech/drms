@@ -8,6 +8,8 @@ import { inSequence, num, reportContext, rows } from './kpi'
 import { daysBetween } from './rules'
 import type { SQL } from './scope'
 
+// MC2: LEAK POINT — audit-log report / filter options list rows of every PT (company_id filter, MC2-2).
+
 /**
  * K-16 global audit log (requirements §8 "Tampilan log", wireframe §6): read-only view over
  * `audit_logs` for Owner/Admin/Finance (Q-F3-4, user 2026-09-24). Filters: WITA date range

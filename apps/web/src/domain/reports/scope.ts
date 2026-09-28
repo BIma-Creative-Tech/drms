@@ -22,7 +22,12 @@ export type ReportScope =
   | { kind: 'own'; userId: number; employeeId: number | null }
   | { kind: 'none' }
 
-/** Office scope of the caller: Finance/Owner → all, else PM → team, else none. */
+/**
+ * Office scope of the caller: Finance/Owner → all, else PM → team, else none.
+ * MC2: LEAK POINT once a 2nd PT exists — `all` is company-blind (`TRUE` in every *ScopeSql below) and
+ * the role check is "any selected PT"; ADR 0016 §6 replaces ReportScope by a list of per-company scopes
+ * (`x.company_id = $c AND …`, empty = FALSE). With one PT (MC1) the result is identical.
+ */
 export async function officeScope(req: PayloadRequest): Promise<ReportScope> {
   if (hasRoleAny(req, 'pk-finance', 'pk-owner')) return { kind: 'all' }
   if (hasRoleAny(req, 'pk-pm')) {

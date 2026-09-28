@@ -22,6 +22,9 @@ const ownerRequestRule: Rule = async ({ req }) => {
   return where
 }
 
+// MC2/MC3: LEAK POINT — office roles read media of EVERY PT (media rows carry no company; ADR 0016
+// §4 "access follows the owning document" → owner-document company check, inventory MC1-2 media /
+// MC3-1 media.ts). With one PT the behaviour is unchanged.
 const ownOrOffice: Access = byRoleAny({
   'pk-admin': true,
   'pk-owner': true,

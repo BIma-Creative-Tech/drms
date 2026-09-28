@@ -21,6 +21,7 @@ import { parseSnapshot, snapshotOf, type ScheduleSnapshot } from './schedule'
  * Attendance data scope (requirements v1.1 §4 "Absensi"): Admin R/U, Owner R all, Finance R (upah)
  * → all; PM → team projects/cost centers; Staff → own only (endpoints /attendance/me).
  */
+// MC2: LEAK POINT — `all` is company-blind (raw SQL `TRUE`); per-company scopes in ADR 0016 §6.
 export type AttScope = { kind: 'all' } | { kind: 'team'; projects: number[]; costCenters: number[] }
 
 export async function attendanceScope(req: PayloadRequest): Promise<AttScope | null> {

@@ -32,7 +32,10 @@ let kc: ReturnType<typeof installFakeKeycloak>
 
 async function one(collection: 'users' | 'employees' | 'cost-centers' | 'projects' | 'employee-bank-accounts' | 'banks' | 'expense-categories', field: string, value: unknown) {
   const p = await getTestPayload()
-  const r = await p.find({ collection, where: { [field]: { equals: value } }, limit: 1, depth: 0, overrideAccess: true /* SYSTEM-READ: test */ })
+  // ADR 0016: masters are per PT (the UAT runs in company #1 DRMS; codes repeat in other PTs)
+  const perPt = ['employees', 'cost-centers', 'projects', 'employee-bank-accounts', 'expense-categories'].includes(collection)
+  const where = perPt ? { and: [{ company: { equals: await companyId() } }, { [field]: { equals: value } }] } : { [field]: { equals: value } }
+  const r = await p.find({ collection, where, limit: 1, depth: 0, overrideAccess: true /* SYSTEM-READ: test */ })
   return r.docs[0] as unknown as Record<string, unknown> & { id: number }
 }
 

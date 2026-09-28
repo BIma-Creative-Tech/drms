@@ -31,6 +31,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   child rows, PM / cost-center manager / named approvers need an active membership in the row's PT),
   `pk_cash_lock_date(company_id)` in the transfer / cash-entry / opening-balance guards (closing PT A never locks
   PT B), `closePeriod` / `reopenPeriod` per PT, `reminder_runs` keyed `(company_id, run_date)`.
+- **MC1-5 — numbering per PT** (migration `20260928_000200_mc1_numbering`): counters `(company_id, doc_type,
+  period_key)`, `{COMPANY}` = short code of the document's PT, DRMS counters continue (PB 229…), `shortCode`
+  immutable once a PT has numbered documents.
+- **Go-live import / LPJ refund per PT:** the import matches and creates per-PT masters inside its PT (MC1: first
+  active PT; `kode_pt` = MC2); the LPJ refund cash entry uses the "Pengembalian LPJ" source of the request's PT.
+- **MC1-6 — isolation suite** `tests/integration/mc-isolation.int.test.ts` (two PTs, per-PT reads/writes/approvals,
+  forged header/cookie, DB cross-PT guards, per-PT numbering and period lock) + unit tests `mc1-access.test.ts`.
 - **Seed:** `SEED_DATA_FILE` accepts the old single-company shape (→ company #1 DRMS) and a new
   `{ uoms, banks, companies: [...] }` shape; every PT gets the default sequences and approval rules.
 

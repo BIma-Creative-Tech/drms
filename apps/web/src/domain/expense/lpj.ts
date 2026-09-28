@@ -219,7 +219,8 @@ export async function settle(req: PayloadRequest, id: number, input: SettleInput
   if (st.type === 'refund') {
     const source = await req.payload.find({
       collection: 'cash-in-sources',
-      where: { code: { equals: 'LPJ' } },
+      // ADR 0016: the "Pengembalian LPJ" source OF THE REQUEST's PT (seeded per PT)
+      where: { and: [{ company: { equals: relId((raw as { company?: unknown }).company) } }, { code: { equals: 'LPJ' } }] },
       limit: 1,
       depth: 0,
       overrideAccess: true, // SYSTEM-READ: master "Pengembalian LPJ" (seed/data.ts)

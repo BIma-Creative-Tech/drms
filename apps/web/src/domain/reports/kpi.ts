@@ -9,6 +9,10 @@ import { getRequestTx } from '@/lib/tx'
 import { budgetPct, budgetTone, daysBetween, firstDay, lastDay, periodRange, type BudgetTone } from './rules'
 import { cashScopeSql, costCenterScopeSql, includesManualCash, inList, projectScopeSql, requestScopeSql, type ReportScope, type SQL } from './scope'
 
+// MC2: LEAK POINTS once a 2nd PT exists — raw SQL here is company-blind: cashBalances, cashFlowMonthly,
+// accountMonthFlows, cashBreakdown, requestMoney, transferQueueSummary, masterGaps, lastClosedPeriod take no
+// scope; the others use ReportScope `all` = TRUE (domain/reports/scope.ts). ADR 0016 §6 / inventory MC2-2.
+
 /**
  * KPI queries of the F3 dashboards and reports — one function per KPI of
  * docs/proyekkas/f3/kpi-definitions.md (K-01 … K-17). Rules:

@@ -97,8 +97,11 @@ function errorText(e: unknown): string {
 // ------------------------------------------------------------------ DB keys (read-only)
 
 export async function loadDbKeys(payload: Payload): Promise<DbKeys> {
+  // ADR 0016: per-PT masters are matched INSIDE the import's PT (MC2-5: `kode_pt`; MC1 = first active PT)
+  const companyId = await firstActiveCompanyId(payload)
   const codes = async (collection: CollectionSlug) => {
-    const r = await payload.find({ collection, depth: 0, pagination: false, limit: 0, select: { code: true } as never, overrideAccess: true /* SYSTEM-READ: import reference check */ })
+    const where = PER_PT_IMPORT.has(collection) ? { company: { equals: companyId } } : undefined
+    const r = await payload.find({ collection, ...(where ? { where } : {}), depth: 0, pagination: false, limit: 0, select: { code: true } as never, overrideAccess: true /* SYSTEM-READ: import reference check */ })
     return new Set((r.docs as unknown as Array<{ code: string }>).map((d) => d.code))
   }
   const users = await payload.find({
@@ -149,6 +152,17 @@ function norm(v: unknown, isDate: boolean): unknown {
 /** ISO timestamp at 12:00 UTC: the same calendar day in every timezone of Indonesia (and ±11 h). */
 export const dateValue = (d: string | null) => (d ? `${d}T12:00:00.000Z` : null)
 
+/**
+ * Per-PT collections the import writes / looks up (ADR 0016 §4): natural keys are unique PER PT, so every
+ * lookup is scoped to the import's PT and new master rows get it explicitly (MC2-5: `kode_pt` per row).
+ */
+const PER_PT_IMPORT = new Set<CollectionSlug>([
+  'employees', 'expense-categories', 'cost-centers', 'projects', 'project-stages', 'budget-lines', 'vehicles', 'team-assignments',
+  'cash-accounts', 'employee-bank-accounts', 'clients', 'document-sequences', 'period-closings', 'cash-in-sources',
+])
+/** Of those, the ones whose company is chosen on create (the others derive it from their parent). */
+const COMPANY_ON_CREATE = new Set<CollectionSlug>(['employees', 'expense-categories', 'cost-centers', 'projects', 'vehicles', 'cash-accounts', 'clients', 'document-sequences', 'period-closings', 'cash-in-sources'])
+
 class Exec {
   readonly cache = new Map<string, number>()
   readonly kcFollowUp: KeycloakFollowUpRow[] = []
@@ -156,10 +170,12 @@ class Exec {
     readonly req: PayloadRequest,
     readonly data: ImportData,
     readonly users: Map<string, UserPlan>,
+    readonly companyId: number,
   ) {}
 
   async findOne(collection: CollectionSlug, where: Where): Promise<Record<string, unknown> | null> {
-    const r = await this.req.payload.find({ collection, where, limit: 1, depth: 0, pagination: false, overrideAccess: true /* SYSTEM-READ: import upsert */, req: this.req })
+    const scoped: Where = PER_PT_IMPORT.has(collection) ? { and: [{ company: { equals: this.companyId } }, where] } : where
+    const r = await this.req.payload.find({ collection, where: scoped, limit: 1, depth: 0, pagination: false, overrideAccess: true /* SYSTEM-READ: import upsert */, req: this.req })
     return (r.docs[0] as unknown as Record<string, unknown>) ?? null
   }
 
@@ -195,7 +211,8 @@ class Exec {
     if (opts.context) Object.assign(this.req.context, opts.context)
     try {
       if (!existing) {
-        const doc = await this.req.payload.create({ collection, data: { ...clean, ...(opts.createOnly ?? {}) } as never, depth: 0, overrideAccess: true /* SYSTEM-WRITE: go-live import */, req: this.req })
+        const company = COMPANY_ON_CREATE.has(collection) ? { company: this.companyId } : {}
+        const doc = await this.req.payload.create({ collection, data: { ...clean, ...company, ...(opts.createOnly ?? {}) } as never, depth: 0, overrideAccess: true /* SYSTEM-WRITE: go-live import */, req: this.req })
         if (opts.cacheKey) this.cache.set(opts.cacheKey, doc.id as number)
         return { action: 'created', id: doc.id as number }
       }
@@ -629,7 +646,7 @@ async function executePass(payload: Payload, data: ImportData, users: Map<string
         payload,
         null,
         async (req) => {
-          const x = new Exec(req, data, users)
+          const x = new Exec(req, data, users, await firstActiveCompanyId(payload, req))
           for (const st of steps) {
             const rep: MasterReport = { key: st.key, sheet: st.sheet, rows: st.rows, created: 0, updated: 0, unchanged: 0, skipped: 0 }
             await st.run(x, rep)
@@ -655,7 +672,7 @@ async function executePass(payload: Payload, data: ImportData, users: Map<string
       payload,
       null,
       async (req) => {
-        const x = new Exec(req, data, users)
+        const x = new Exec(req, data, users, await firstActiveCompanyId(payload, req))
         for (const [k, v] of cache) x.cache.set(k, v)
         await st.run(x, rep)
         await audit(req, rep)

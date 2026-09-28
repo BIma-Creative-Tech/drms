@@ -28,7 +28,7 @@ data: `pg_dump` of a DB migrated to develop head and filled by the full integrat
 | MC1-3 access helpers + auth | done | `42586c8` + `4b8095b` | split: context/auth in MC1-1, per-PT policies/guards in MC1-2 |
 | MC1-4 security migration (triggers, lock date, NOT NULL) | done | see git log | NOT NULL + derive triggers already in MC1-2's migration; this one: immutability, cross-PT refs, lock date per PT, `reminder_runs` per PT |
 | MC1-5 numbering per PT | done | see git log | counters `(company_id, doc_type, period_key)`, `{COMPANY}` = document PT, shortCode immutable once numbered |
-| MC1-6 isolation tests + seed shapes | in progress | — | seed shapes landed in MC1-2 (needed by the per-PT masters); isolation suite + helper unit tests here |
+| MC1-6 isolation tests + seed shapes | done | see git log | + order-independence fixes (import / LPJ source per PT) | seed shapes landed in MC1-2 (needed by the per-PT masters); isolation suite + helper unit tests here |
 
 ### MC1-1 (done)
 
@@ -90,6 +90,19 @@ data: `pg_dump` of a DB migrated to develop head and filled by the full integrat
   `{COMPANY}` = `companies.shortCode` of the document; every caller passes the document PT (submit, transfer, LPJ,
   cash entry, progress report, addendum). Migration `20260928_000200_mc1_numbering` (counters → company #1, PK
   per PT, monotonic guard freezes the company). `companies.shortCode` immutable once the PT has a counter.
+
+### MC1-6 (done)
+
+- `tests/integration/mc-isolation.int.test.ts` (DRMS world + fictional CS1 via the multi-company seed; Rina = Finance
+  DRMS / Staff CS1): REST sweep over the 30 per-PT collections, 404 across PTs, users/memberships per PT, forged
+  header → 403 `COMPANY_NOT_ALLOWED` (+ audit), forged cookie ignored, create/submit/approve per document PT,
+  PB-CS1 numbering, mixed-PT draft → 400, DB `cross-company reference` (5 cases), immutable/NOT NULL `company_id`,
+  per-PT uniques, closing DRMS never locks CS1, audit rows tagged with the PT. CS1 is deactivated in afterAll.
+- Order-independence with a 2nd PT in the shared test DB: fixtures and tests look masters up inside company #1
+  (`flow-world`, `form-228`, `uat-seed`, `s3b-import`); the go-live import scopes every per-PT lookup/create to its PT
+  (MC1: first active PT); the LPJ refund uses the "Pengembalian LPJ" source of the request's PT.
+- `tests/unit/mc1-access.test.ts` (context parsing, selection, `hasRole`/`rolesIn`/`companiesWithRole`, per-PT
+  `byRole`, create/field access, login gate); `tests/unit/seed-data.test.ts` (both seed shapes).
 
 ## Migration check (US-MC-19)
 

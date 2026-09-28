@@ -8,6 +8,8 @@ import { getRequestTx } from '@/lib/tx'
 import type { CashEntryDoc } from './ledger'
 import { isPeriod, periodEnd } from './periods'
 
+// MC2: LEAK POINT — cash book / balances SQL has no company predicate (inventory MC2-1 cash).
+
 /**
  * E2 (fase1-golive §E2): read side of the web "Kas" views — buku kas with filters, saldo per
  * akun, period summaries for "Tutup buku". Writes stay in ledger.ts behind /api/v1 (the views

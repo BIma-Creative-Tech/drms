@@ -31,6 +31,9 @@ import { attendanceTimeOf, employeeOfUser } from './attendance'
 import { judgeTime, type TimeVerdict } from './clock'
 import { applyProgressReport, ProgressSyncReject } from './progress'
 
+// MC2: feature flags come from the context PT; items are not re-checked against the PT of their
+// references (COMPANY_MISMATCH, ADR 0016 §8) — the DB cross-company triggers still reject mixed rows.
+
 /**
  * POST /api/v1/sync/batch — offline queue replay (ADR 0010 "Sync contract").
  *
