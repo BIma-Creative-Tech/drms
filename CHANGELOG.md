@@ -214,6 +214,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
     APK `test/unit/misc_test.dart` + `test/widget/release_notes_test.dart`. No new dependency.
 
 ### Changed
+- **Release APK on self-hosted**: release builds (R8 + obfuscation) get Gradle heap 2.5 GiB / metaspace 512 MiB
+  (`GRADLE_OPTS_RELEASE`; debug keeps 1.5 GiB) — `assembleStagingRelease` died after ~8 min with exit 1 and no kernel
+  OOM at 1.5–2 GiB. `tool/build_with_retry.sh` now prints a failure excerpt (FAILURE / What went wrong /
+  OutOfMemoryError / error:) and can keep the full log (`BUILD_LOG_KEEP`); the staging release log is uploaded on
+  failure (3 days).
 - **Trivy cache on self-hosted** uses the runner's persistent `TRIVY_CACHE_DIR` instead of `_temp` (root-owned files
   there could not be cleaned by the runner); GitHub-hosted unchanged.
 - **Self-hosted image publish hang (plan 12 R10)**: buildkitd (docker-container) now runs with
