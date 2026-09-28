@@ -59,18 +59,16 @@ jobs:
   verify:
     name: analyze · format · codegen drift · tests
     runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '"ubuntu-24.04"') }}
-    timeout-minutes: 30
+    timeout-minutes: 45 # self-hosted = 2 vCPU
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Install Flutter ${{ env.FLUTTER_VERSION }} (official tarball, sha256-verified)
-        working-directory: ${{ runner.temp }}
-        run: |
-          curl -fsSL -o flutter.tar.xz \
-            "https://storage.googleapis.com/flutter_infra_release/releases/stable/linux/flutter_linux_${FLUTTER_VERSION}-stable.tar.xz"
-          echo "${FLUTTER_SHA256}  flutter.tar.xz" | sha256sum -c -
-          tar xJf flutter.tar.xz && rm flutter.tar.xz
-          echo "${RUNNER_TEMP}/flutter/bin" >> "$GITHUB_PATH"
+      - name: Install Flutter ${{ env.FLUTTER_VERSION }} (official tarball, sha256-verified; self-hosted keeps it in the local cache)
+        env:
+          RUNNER_ENV: ${{ runner.environment }}
+        run: tool/ci_install_flutter.sh
+      # GitHub cache only on GitHub-hosted; the self-hosted runner has PUB_CACHE in its persistent cache (plan 12 §4).
       - uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
+        if: runner.environment == 'github-hosted'
         with:
           path: ~/.pub-cache
           key: pub-${{ runner.os }}-${{ env.FLUTTER_VERSION }}-${{ hashFiles('apps/mobile/pubspec.lock') }}
@@ -87,7 +85,13 @@ jobs:
             | xargs dart format --set-exit-if-changed --output=none
       - run: flutter analyze --no-fatal-infos
       - run: flutter test --coverage
+      - name: Coverage summary (job summary; the lcov artifact is uploaded on GitHub-hosted only)
+        run: |
+          awk -F: '/^LF:/ { lf += $2 } /^LH:/ { lh += $2 }
+            END { printf "Mobile line coverage: %d / %d lines (%.1f%%)\n", lh, lf, (lf ? 100 * lh / lf : 0) }' \
+            coverage/lcov.info | tee -a "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: runner.environment == 'github-hosted'
         with:
           name: mobile-coverage
           path: apps/mobile/coverage/lcov.info
@@ -97,7 +101,7 @@ jobs:
     name: build APKs (staging)
     needs: verify
     runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '"ubuntu-24.04"') }}
-    timeout-minutes: 45
+    timeout-minutes: 75 # self-hosted = 2 vCPU / 4 GiB (debug + 3-ABI release build)
     env:
       HAS_STAGING_KEY: ${{ secrets.ANDROID_STAGING_KEYSTORE_B64 != '' }}
     steps:
@@ -106,15 +110,13 @@ jobs:
         with:
           distribution: temurin
           java-version: ${{ env.JAVA_VERSION }}
-      - name: Install Flutter ${{ env.FLUTTER_VERSION }} (official tarball, sha256-verified)
-        working-directory: ${{ runner.temp }}
-        run: |
-          curl -fsSL -o flutter.tar.xz \
-            "https://storage.googleapis.com/flutter_infra_release/releases/stable/linux/flutter_linux_${FLUTTER_VERSION}-stable.tar.xz"
-          echo "${FLUTTER_SHA256}  flutter.tar.xz" | sha256sum -c -
-          tar xJf flutter.tar.xz && rm flutter.tar.xz
-          echo "${RUNNER_TEMP}/flutter/bin" >> "$GITHUB_PATH"
+      - name: Install Flutter ${{ env.FLUTTER_VERSION }} (official tarball, sha256-verified; self-hosted keeps it in the local cache)
+        env:
+          RUNNER_ENV: ${{ runner.environment }}
+        run: tool/ci_install_flutter.sh
+      # GitHub cache only on GitHub-hosted; self-hosted: PUB_CACHE + GRADLE_USER_HOME are persistent dirs in the runner image.
       - uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
+        if: runner.environment == 'github-hosted'
         with:
           path: |
             ~/.pub-cache
@@ -124,6 +126,13 @@ jobs:
           restore-keys: |
             apk-${{ runner.os }}-${{ env.FLUTTER_VERSION }}-
       - run: flutter config --no-analytics && flutter pub get --enforce-lockfile
+      - name: Self-hosted limits (2 vCPU / 4 GiB, plan 12 §6) → Gradle/Kotlin settings
+        if: runner.environment == 'self-hosted'
+        run: |
+          # System properties beat android/gradle.properties (org.gradle.jvmargs=-Xmx8G is sized for 16 GB hosted runners).
+          # No Gradle daemon kept around, 2 workers, Kotlin compiled inside the Gradle JVM (no second Kotlin daemon).
+          echo 'GRADLE_OPTS=-Dorg.gradle.daemon=false -Dorg.gradle.workers.max=2 -Dorg.gradle.parallel=false "-Dorg.gradle.jvmargs=-Xmx2g -XX:MaxMetaspaceSize=512m" -Dorg.gradle.project.kotlin.compiler.execution.strategy=in-process' >> "$GITHUB_ENV"
+          echo "::notice::self-hosted: PUB_CACHE=${PUB_CACHE:-unset} GRADLE_USER_HOME=${GRADLE_USER_HOME:-unset} ANDROID_HOME=${ANDROID_HOME:-unset}"
 
       - name: Debug APK (staging flavor, custom-scheme redirect)
         run: |
@@ -179,7 +188,7 @@ jobs:
           path: |
             apps/mobile/build/app/outputs/flutter-apk/app-*-staging-release.apk
             apps/mobile/build/symbols/
-          retention-days: 7 # Free plan: 500 MB Actions storage
+          retention-days: 3 # Free plan: 500 MB Actions storage (plan 12 §7)
           if-no-files-found: error
       - name: Remove keystore
         if: always()
@@ -191,7 +200,7 @@ jobs:
     # Tag pushes only: a merge to main never builds a production APK (release gate, decision 2026-09-27).
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/mobile-v')
     runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '"ubuntu-24.04"') }}
-    timeout-minutes: 45
+    timeout-minutes: 75 # self-hosted = 2 vCPU / 4 GiB (debug + 3-ABI release build)
     # The production keystore secrets exist ONLY as secrets of this environment (deployment tags
     # restricted to mobile-v*). Required reviewers need a paid plan for private repos; add them there
     # if the organisation upgrades.
@@ -208,6 +217,11 @@ jobs:
         run: |
           echo "::error::Secret ANDROID_KEYSTORE_B64 is not set on environment android-release-prod (see apps/mobile/README.md 'Production signing key')."
           exit 1
+      - name: Runner tools (gh, python3, xz, jq — the self-hosted image must provide them)
+        run: |
+          missing=""
+          for t in gh python3 xz jq curl; do command -v "$t" > /dev/null || missing+=" $t"; done
+          [[ -z "$missing" ]] || { echo "::error::runner lacks:$missing (infra plan 12 R3/R6)"; exit 1; }
       - name: Tag matches pubspec version
         run: |
           want="${GITHUB_REF_NAME#mobile-v}"
@@ -224,16 +238,24 @@ jobs:
         with:
           distribution: temurin
           java-version: ${{ env.JAVA_VERSION }}
-      - name: Install Flutter ${{ env.FLUTTER_VERSION }} (official tarball, sha256-verified)
-        working-directory: ${{ runner.temp }}
+      - name: Install Flutter ${{ env.FLUTTER_VERSION }} (official tarball, sha256-verified; self-hosted keeps it in the local cache)
+        env:
+          RUNNER_ENV: ${{ runner.environment }}
+        run: tool/ci_install_flutter.sh
+      # No shared cache here (GitHub cache or the self-hosted runner's persistent dirs): a release is built from a clean
+      # dependency download into $RUNNER_TEMP (lockfile enforced; plan 12 §4 T3 cache poisoning).
+      - name: Job-local PUB_CACHE and GRADLE_USER_HOME (no shared cache for a release)
         run: |
-          curl -fsSL -o flutter.tar.xz \
-            "https://storage.googleapis.com/flutter_infra_release/releases/stable/linux/flutter_linux_${FLUTTER_VERSION}-stable.tar.xz"
-          echo "${FLUTTER_SHA256}  flutter.tar.xz" | sha256sum -c -
-          tar xJf flutter.tar.xz && rm flutter.tar.xz
-          echo "${RUNNER_TEMP}/flutter/bin" >> "$GITHUB_PATH"
-      # No cache restore here: a release is built from a clean dependency download (lockfile enforced).
+          mkdir -p "$RUNNER_TEMP/pub-cache" "$RUNNER_TEMP/gradle-home"
+          { echo "PUB_CACHE=$RUNNER_TEMP/pub-cache"; echo "GRADLE_USER_HOME=$RUNNER_TEMP/gradle-home"; } >> "$GITHUB_ENV"
       - run: flutter config --no-analytics && flutter pub get --enforce-lockfile
+      - name: Self-hosted limits (2 vCPU / 4 GiB, plan 12 §6) → Gradle/Kotlin settings
+        if: runner.environment == 'self-hosted'
+        run: |
+          # System properties beat android/gradle.properties (org.gradle.jvmargs=-Xmx8G is sized for 16 GB hosted runners).
+          # No Gradle daemon kept around, 2 workers, Kotlin compiled inside the Gradle JVM (no second Kotlin daemon).
+          echo 'GRADLE_OPTS=-Dorg.gradle.daemon=false -Dorg.gradle.workers.max=2 -Dorg.gradle.parallel=false "-Dorg.gradle.jvmargs=-Xmx2g -XX:MaxMetaspaceSize=512m" -Dorg.gradle.project.kotlin.compiler.execution.strategy=in-process' >> "$GITHUB_ENV"
+          echo "::notice::self-hosted: PUB_CACHE=${PUB_CACHE:-unset} GRADLE_USER_HOME=${GRADLE_USER_HOME:-unset} ANDROID_HOME=${ANDROID_HOME:-unset}"
       - name: Decode production keystore, print certificate SHA-256
         env:
           KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}

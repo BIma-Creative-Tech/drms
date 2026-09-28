@@ -160,3 +160,27 @@ staging/drms-proyekkas`. Butuh login GHCR yang sama (§6a).
 
 Tag `test-*` (branch `ci/ghcr-*`) dan `sha-*` boleh dihapus berkala oleh admin paket di GitHub; **jangan** hapus versi
 `X.Y.Z` (jalur rollback). Cache GHA dibatasi GitHub 10 GB/repo (LRU otomatis).
+
+## 10. Runner self-hosted (plan infra 12, ADR infra 0014)
+
+- **Saklar:** variabel repo `CI_RUNS_ON` (*Settings → Secrets and variables → Actions → Variables*) =
+  `["self-hosted","linux","x64","drms"]` → semua job `ci`, `mobile`, `release-notes` jalan di runner ephemeral
+  (sysbox, 1 job sekaligus, 2 vCPU / 4 GiB). Tidak diset = `ubuntu-24.04` (GitHub-hosted). `DEPLOY_RUNS_ON` **tidak**
+  diset (deploy prod tidak di runner ini).
+- **Cache di self-hosted** (kondisi `runner.environment`): tanpa `actions/cache`, tanpa `setup-node cache`, tanpa buildx
+  `type=gha`. Yang dipakai: env image runner `npm_config_cache`, `PUB_CACHE`, `GRADLE_USER_HOME`, `ANDROID_HOME`
+  (di `/cache/…` = `/srv/ci/cache` host), tarball Flutter di `/cache/flutter` (`FLUTTER_TARBALL_CACHE`, sha256 dicek
+  tiap job; salah → dihapus & diunduh ulang), cache layer dockerd bagian dalam (buildx driver `docker`; fallback
+  `docker-container` bila dockerd tanpa containerd image store). GitHub-hosted tetap memakai cache GitHub seperti biasa.
+- **Rilis tanpa cache bersama:** tag `vX.Y.Z` → build image `no-cache` (keduanya); `mobile-vX.Y.Z` (`release-prod`) →
+  `PUB_CACHE`/`GRADLE_USER_HOME` di `$RUNNER_TEMP`.
+- **APK di 4 GiB:** job `apk`/`release-prod` di self-hosted men-set `GRADLE_OPTS` (tanpa daemon, `workers.max=2`,
+  `org.gradle.jvmargs=-Xmx2g`, Kotlin in-process) — menimpa `-Xmx8G` di `android/gradle.properties`.
+- **Artifact:** coverage mobile hanya di-upload di GitHub-hosted (ringkasan baris di job summary selalu ada); APK
+  release staging 3 hari, debug 7 hari, prod 90 hari.
+- **Alat yang wajib ada di image runner:** `docker` (dockerd dalam, socket bisa diakses uid runner), `git`, `curl`, `jq`,
+  `xz`, `tar`, `unzip`, `openssl`, `python3` (scan APK), `gh` (GitHub Release di `release-notes` dan `release-prod`),
+  Android SDK di `ANDROID_HOME` (platform + build-tools dengan `apksigner`, lisensi diterima). Tidak ada langkah yang
+  memakai `sudo`/`apt` (sudo mati karena NNP).
+- **Rollback:** hapus/kosongkan `CI_RUNS_ON` → run berikutnya kembali ke GitHub-hosted, tanpa ubah kode. Cache lokal yang
+  dicurigai tercemar: reset `/srv/ci/cache/<dir>` oleh infra (runbook infra `docs/03-operations/ci-runner.md`).

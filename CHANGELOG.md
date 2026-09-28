@@ -219,6 +219,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   `["self-hosted","linux","x64","drms"]`; unset = `ubuntu-24.04` as before, so switching back needs no code change.
   `ci` / `mobile` no longer run on pushes to `feat/**`, `fix/**` (they run on the pull request; a push + PR used to
   run everything twice). Staging APK artifacts kept 7 days (was 30), coverage 3 days (was 14) to stay under 500 MB.
+  **Self-hosted-ready (plan 12 R8):** on `runner.environment == 'self-hosted'` no GitHub cache (`actions/cache`,
+  `setup-node` npm cache) — the runner image's persistent `npm_config_cache` / `PUB_CACHE` / `GRADLE_USER_HOME` are
+  used; the Flutter tarball is kept in `/cache/flutter` (`FLUTTER_TARBALL_CACHE`) and sha256-checked on every use
+  (`apps/mobile/tool/ci_install_flutter.sh`); buildx `docker` driver without `type=gha` (GitHub-hosted keeps
+  `type=gha`); release tags `v*` build images with `no-cache`, `release-prod` APK with job-local pub/Gradle dirs;
+  APK jobs get `GRADLE_OPTS` for 4 GiB (no daemon, 2 workers, `-Xmx2g`, Kotlin in-process); mobile coverage
+  artifact on GitHub-hosted only (job summary line everywhere); staging release APK kept 3 days; timeouts raised
+  for 2 vCPU (verify/security 30, integration 40, mobile verify 45, image/APK 75 min); `ci` image job reads the
+  version with `jq` (no `node` on the runner PATH).
 - **`company-settings` global = app-wide only** (APK gate, device image targets, offline max age, selfie batch
   size, new group letterhead `groupName`/`groupLogo`/`groupPdfHeader`); editable by the group admin only. Per-PT
   settings (thresholds, reminders, sync flags, default schedule, retention) live on the company record.

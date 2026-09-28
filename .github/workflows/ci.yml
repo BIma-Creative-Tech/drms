@@ -35,13 +35,15 @@ jobs:
   verify:
     name: lint · typecheck · unit + coverage · openapi drift
     runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '"ubuntu-24.04"') }}
-    timeout-minutes: 20
+    timeout-minutes: 30 # self-hosted = 2 vCPU
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: npm
+          # GitHub cache on GitHub-hosted only; self-hosted: npm_config_cache is a persistent dir of the runner image.
+          cache: ${{ runner.environment == 'github-hosted' && 'npm' || '' }}
+          package-manager-cache: ${{ runner.environment == 'github-hosted' }}
       - run: npm ci --no-audit --no-fund
       - run: npm run lint
       - run: npm run typecheck
@@ -55,7 +57,7 @@ jobs:
   integration:
     name: integration (throwaway Postgres, migrations as owner, tests as app role)
     runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '"ubuntu-24.04"') }}
-    timeout-minutes: 25
+    timeout-minutes: 40 # self-hosted = 2 vCPU
     services:
       postgres:
         image: postgres:16.15-bookworm@sha256:efedf3595f1d6f415c08568ba171029bf54052e754cc9f030e3f2412b21f3d67
@@ -69,7 +71,9 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: npm
+          # GitHub cache on GitHub-hosted only; self-hosted: npm_config_cache is a persistent dir of the runner image.
+          cache: ${{ runner.environment == 'github-hosted' && 'npm' || '' }}
+          package-manager-cache: ${{ runner.environment == 'github-hosted' }}
       - run: npm ci --no-audit --no-fund
       - name: Throwaway role passwords
         run: |
@@ -114,7 +118,7 @@ jobs:
   security:
     name: gitleaks · semgrep · trivy fs · hadolint
     runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '"ubuntu-24.04"') }}
-    timeout-minutes: 20
+    timeout-minutes: 30 # self-hosted = 2 vCPU
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -146,7 +150,7 @@ jobs:
     name: image build (runner + migrate) · trivy · GHCR push
     needs: [verify, integration, security]
     runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '"ubuntu-24.04"') }}
-    timeout-minutes: 45
+    timeout-minutes: 75 # self-hosted = 2 vCPU; release tags build without cache
     permissions:
       contents: read
       packages: write # GHCR push with GITHUB_TOKEN (read-only on fork PRs; push steps are skipped there)
@@ -165,10 +169,11 @@ jobs:
         env:
           REF: ${{ github.ref }}
           EVENT: ${{ github.event_name }}
+          RUNNER_ENV: ${{ runner.environment }}
         run: |
           set -euo pipefail
           sha7="${GITHUB_SHA::7}"
-          pkg="$(node -p "require('./package.json').version")"
+          pkg="$(jq -r .version package.json)" # jq: node is not on PATH in the self-hosted runner image
           publish=false; tags=""; version="$pkg-dev-$sha7"
           if [[ "$EVENT" == "push" ]]; then
             case "$REF" in
@@ -186,6 +191,24 @@ jobs:
                 publish=true; tags="test-$sha7"; version="test-$sha7" ;;
             esac
           fi
+          # Build cache (plan 12 §4/§7): release tags vX.Y.Z → no cache at all (reproducible, no stale/poisoned layers).
+          # GitHub-hosted → type=gha. Self-hosted → none here; the buildx `docker` driver uses the runner's own dockerd
+          # layer cache (persistent /srv/ci/docker).
+          no_cache=false; gha=false
+          if [[ "$EVENT" == "push" && "$REF" == refs/tags/v* ]]; then no_cache=true
+          elif [[ "$RUNNER_ENV" == "github-hosted" ]]; then gha=true; fi
+          {
+            echo "no_cache=$no_cache"
+            for name in web migrate; do
+              other=migrate; [[ $name == migrate ]] && other=web
+              if [[ $gha == true ]]; then
+                printf '%s_cache_from<<EOF_CACHE\ntype=gha,scope=pk-%s\ntype=gha,scope=pk-%s\nEOF_CACHE\n' "$name" "$name" "$other"
+                echo "${name}_cache_to=type=gha,mode=max,scope=pk-$name"
+              else
+                echo "${name}_cache_from="; echo "${name}_cache_to="
+              fi
+            done
+          } >> "$GITHUB_OUTPUT"
           {
             echo "publish=$publish"
             echo "tags=$tags"
@@ -212,9 +235,28 @@ jobs:
               echo "EOF_LABELS"
             done
           } >> "$GITHUB_OUTPUT"
-          echo "publish=$publish tags=[$tags] version=$version"
+          echo "publish=$publish tags=[$tags] version=$version no_cache=$no_cache gha_cache=$gha runner=$RUNNER_ENV"
 
+      # Self-hosted: buildx `docker` driver = BuildKit of the job's own (inner) dockerd, its layer cache persists on the
+      # runner. Push-by-digest + SBOM/provenance with that driver need the containerd image store (default for a fresh
+      # Docker 29 daemon); without it we fall back to docker-container (works, but no persistent layer cache).
+      - name: Buildx driver
+        id: bx
+        env:
+          RUNNER_ENV: ${{ runner.environment }}
+        run: |
+          driver=docker-container
+          if [[ "$RUNNER_ENV" == "self-hosted" ]]; then
+            if docker info --format '{{json .DriverStatus}}' | grep -q 'io.containerd.snapshotter'; then
+              driver=docker
+            else
+              echo "::warning::inner dockerd without the containerd image store → buildx docker-container (no layer cache)"
+            fi
+          fi
+          echo "driver=$driver" | tee -a "$GITHUB_OUTPUT"
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+        with:
+          driver: ${{ steps.bx.outputs.driver }}
 
       # Build ONCE per target. Publishing runs push an UNTAGGED manifest (push-by-digest); Trivy scans exactly that
       # digest; only a passing digest gets tags (imagetools create). Nothing tagged is ever unscanned.
@@ -253,10 +295,9 @@ jobs:
           provenance: false
           tags: proyekkas-web:ci
           labels: ${{ steps.meta.outputs.web_labels }}
-          cache-from: |
-            type=gha,scope=pk-web
-            type=gha,scope=pk-migrate
-          cache-to: type=gha,mode=max,scope=pk-web
+          no-cache: ${{ steps.meta.outputs.no_cache == 'true' }}
+          cache-from: ${{ steps.meta.outputs.web_cache_from }}
+          cache-to: ${{ steps.meta.outputs.web_cache_to }}
       - name: Build migrate target → local
         if: steps.meta.outputs.publish != 'true'
         id: migrate-local
@@ -272,10 +313,9 @@ jobs:
           provenance: false
           tags: proyekkas-migrate:ci
           labels: ${{ steps.meta.outputs.migrate_labels }}
-          cache-from: |
-            type=gha,scope=pk-migrate
-            type=gha,scope=pk-web
-          cache-to: type=gha,mode=max,scope=pk-migrate
+          no-cache: ${{ steps.meta.outputs.no_cache == 'true' }}
+          cache-from: ${{ steps.meta.outputs.migrate_cache_from }}
+          cache-to: ${{ steps.meta.outputs.migrate_cache_to }}
 
       - name: Build web (runner target) → GHCR by digest (untagged) + SBOM + provenance
         if: steps.meta.outputs.publish == 'true'
@@ -292,10 +332,9 @@ jobs:
           sbom: true
           provenance: mode=max
           labels: ${{ steps.meta.outputs.web_labels }}
-          cache-from: |
-            type=gha,scope=pk-web
-            type=gha,scope=pk-migrate
-          cache-to: type=gha,mode=max,scope=pk-web
+          no-cache: ${{ steps.meta.outputs.no_cache == 'true' }}
+          cache-from: ${{ steps.meta.outputs.web_cache_from }}
+          cache-to: ${{ steps.meta.outputs.web_cache_to }}
       - name: Build migrate target → GHCR by digest (untagged) + SBOM + provenance
         if: steps.meta.outputs.publish == 'true'
         id: migrate-push
@@ -311,10 +350,9 @@ jobs:
           sbom: true
           provenance: mode=max
           labels: ${{ steps.meta.outputs.migrate_labels }}
-          cache-from: |
-            type=gha,scope=pk-migrate
-            type=gha,scope=pk-web
-          cache-to: type=gha,mode=max,scope=pk-migrate
+          no-cache: ${{ steps.meta.outputs.no_cache == 'true' }}
+          cache-from: ${{ steps.meta.outputs.migrate_cache_from }}
+          cache-to: ${{ steps.meta.outputs.migrate_cache_to }}
 
       - name: Scan targets
         id: scan
