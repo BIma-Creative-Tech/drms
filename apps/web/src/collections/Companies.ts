@@ -36,7 +36,7 @@ function validateTimezone(v: unknown): true | string {
  * `shortCode` is the `{COMPANY}` token of issued document numbers → immutable once this PT has a
  * numbered document (a counter row exists, MC1-5).
  */
-export const shortCodeGuard: CollectionBeforeChangeHook = async ({ data, originalDoc, operation, req }) => {
+const shortCodeGuard: CollectionBeforeChangeHook = async ({ data, originalDoc, operation, req }) => {
   if (operation !== 'update' || !originalDoc || data.shortCode === undefined || data.shortCode === originalDoc.shortCode) return data
   const res = await req.payload.db.drizzle.execute(
     // raw: counters are not a collection (ADR 0007); bound parameter only
@@ -211,8 +211,7 @@ export const Companies: CollectionConfig = withAudit(
       update: ({ req }) => (isGroupAdmin(req) ? true : { id: { in: companiesWithRole(req, ['pk-admin', 'pk-owner'], { all: true }) } }),
       delete: denyAll,
     },
-    // MC1-5: shortCodeGuard (immutable once a counter of this PT exists)
-    hooks: { beforeChange: [] },
+    hooks: { beforeChange: [shortCodeGuard] },
     fields: [
       { name: 'name', type: 'text', label: 'Nama perusahaan', required: true, maxLength: 160 },
       {

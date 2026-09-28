@@ -529,12 +529,12 @@ async function runCutover(x: Exec, rep: MasterReport, issues: Issue[], reason: s
   tally(rep, seq.action)
   const cfg = (await x.findOne('document-sequences', { id: { equals: seq.id } }))!
   const key = periodKey(cfg.resetPolicy as ResetPolicy, parseBusinessDate(s.goLiveDate))
-  const cur = (await tx.execute(sql`SELECT next_value::int AS n FROM document_sequence_counters WHERE doc_type = 'expense_request' AND period_key = ${key}`)) as unknown as { rows: Array<{ n: number }> }
+  const cur = (await tx.execute(sql`SELECT next_value::int AS n FROM document_sequence_counters WHERE company_id = ${pt.companyId} AND doc_type = 'expense_request' AND period_key = ${key}`)) as unknown as { rows: Array<{ n: number }> }
   const before = cur.rows[0]?.n ?? null
   let after = before
   if (before !== null && before < s.pbStartAt) {
     // only upward (DB trigger pk_counter_monotonic) — "set next value" of ADR 0007 §1, audited
-    await tx.execute(sql`UPDATE document_sequence_counters SET next_value = ${s.pbStartAt} WHERE doc_type = 'expense_request' AND period_key = ${key}`)
+    await tx.execute(sql`UPDATE document_sequence_counters SET next_value = ${s.pbStartAt} WHERE company_id = ${pt.companyId} AND doc_type = 'expense_request' AND period_key = ${key}`)
     await writeAudit(req, [{ action: 'update', docType: 'document_sequence', docId: String(seq.id), field: 'nextValue', oldValue: before, newValue: s.pbStartAt, reason }])
     after = s.pbStartAt
     rep.updated++

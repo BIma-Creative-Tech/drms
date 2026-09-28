@@ -107,7 +107,9 @@ describe('protected columns (OLD IS DISTINCT FROM NEW per column)', () => {
   })
 
   it('document_sequence_counters: next_value only increases, no delete', async () => {
-    await sqlAs('app', "INSERT INTO document_sequence_counters VALUES ('dbsec', 'ALL', 10)")
+    // ADR 0016: counters are per PT (company #1)
+    await sqlAs('app', "INSERT INTO document_sequence_counters (company_id, doc_type, period_key, next_value) VALUES ((SELECT min(id) FROM companies), 'dbsec', 'ALL', 10)")
+    expect((await sqlError('app', "UPDATE document_sequence_counters SET company_id = company_id + 1000 WHERE doc_type = 'dbsec'"))?.code).toBeDefined()
     expect((await sqlError('app', "UPDATE document_sequence_counters SET next_value = 9 WHERE doc_type = 'dbsec'"))?.message).toContain('may only increase')
     expect(await sqlError('app', "UPDATE document_sequence_counters SET next_value = 11 WHERE doc_type = 'dbsec'")).toBeNull()
     expect((await sqlError('app', "DELETE FROM document_sequence_counters WHERE doc_type = 'dbsec'"))?.code).toBe('42501')

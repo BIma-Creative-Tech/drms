@@ -115,7 +115,8 @@ export async function submitLpj(req: PayloadRequest, id: number, input: { usageN
   const transferred = raw.transferredTotal ?? 0
   const receiptsTotal = sum(active)
   let docNo = s.docNo ?? null
-  if (!docNo) docNo = (await allocateDocNo(req, 'settlement', { date: parseBusinessDate(await today(req)), docId: String(s.id) })).docNo
+  const companyId = relId((raw as { company?: unknown }).company)!
+  if (!docNo) docNo = (await allocateDocNo(req, 'settlement', { companyId, date: parseBusinessDate(await today(req, companyId)), docId: String(s.id) })).docNo
   await updateSettlement(req, s.id, {
     docNo,
     status: 'submitted',
@@ -247,7 +248,7 @@ export async function settle(req: PayloadRequest, id: number, input: SettleInput
     if (!bankRef) fail(400, 'Nomor referensi bank wajib diisi untuk transfer kekurangan.', [{ path: 'bankRef', message: 'Wajib.' }])
     if (!input.proofMediaId) fail(400, 'Bukti transfer wajib untuk transfer kekurangan.', [{ path: 'proofMediaId', message: 'Wajib.' }])
     if (!raw.bankSnapshot?.accountNo) fail(409, 'Rekening tujuan belum tersimpan pada pengajuan.')
-    const { docNo } = await allocateDocNo(req, 'transfer', { date: parseBusinessDate(date) })
+    const { docNo } = await allocateDocNo(req, 'transfer', { companyId: relId((raw as { company?: unknown }).company)!, date: parseBusinessDate(date) })
     await claimMedia(req, 'media-transfer-proofs', input.proofMediaId, id)
     const transfer = (await req.payload.create({
       collection: 'transfers',

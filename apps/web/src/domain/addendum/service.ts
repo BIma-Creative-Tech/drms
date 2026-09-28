@@ -367,7 +367,7 @@ export async function submitAddendum(req: PayloadRequest, id: number): Promise<A
   if (!rule) fail(409, 'NO_RULE', 'Tidak ada aturan approval addendum RAB yang berlaku (approval-rules docType budget_addendum). Hubungi Admin.')
   const snapshot = await snapshotForRule(req, rule!, new Set([relId(doc.createdBy)!]), companyId)
   const date = await today(req)
-  const docNo = doc.docNo ?? (await allocateDocNo(req, 'budget_addendum', { date: parseBusinessDate(date), docId: String(id) })).docNo
+  const docNo = doc.docNo ?? (await allocateDocNo(req, 'budget_addendum', { companyId, date: parseBusinessDate(date), docId: String(id) })).docNo
   const needsAck = snapshot.acknowledge === 'required'
   const updated = await updateAddendum(req, id, {
     status: needsAck ? 'pending_ack' : 'pending_approval',

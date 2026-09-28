@@ -48,7 +48,7 @@ export async function recordTransfer(req: PayloadRequest, id: number, input: Tra
   const lock = await currentLockDate(req, relId((doc as { company?: unknown }).company))
   if (lock && transferDate <= lock) fail(409, `Periode ${transferDate.slice(0, 7)} sudah ditutup (tutup buku s/d ${lock}).`)
 
-  const { docNo } = await allocateDocNo(req, 'transfer', { date: parseBusinessDate(transferDate) })
+  const { docNo } = await allocateDocNo(req, 'transfer', { companyId: relId((doc as { company?: unknown }).company)!, date: parseBusinessDate(transferDate) })
   await claimMedia(req, 'media-transfer-proofs', input.proofMediaId, id)
   const transfer = (await req.payload.create({
     collection: 'transfers',

@@ -2,7 +2,7 @@ import { sql } from '@payloadcms/db-postgres'
 import { APIError, type PayloadRequest } from 'payload'
 
 import { writeAudit } from '@/audit/writer'
-import { settings } from '@/domain/companies'
+import { companyById } from '@/domain/companies'
 import { DEFAULT_TZ, localDateInTz, type LocalDate } from '@/lib/time'
 import { getRequestTx } from '@/lib/tx'
 
@@ -10,11 +10,11 @@ import { formatDocNo, periodKey, validatePattern, type ResetPolicy, type Sequenc
 
 export type Allocation = { docNo: string; seq: number; periodKey: string; docType: string }
 
-/** Active sequence config of `docType` (SYSTEM-READ inside the request transaction). */
-export async function loadSequence(req: PayloadRequest, docType: string): Promise<SequenceConfig> {
+/** Active sequence config of `docType` IN ONE PT (SYSTEM-READ inside the request transaction). */
+export async function loadSequence(req: PayloadRequest, docType: string, companyId: number): Promise<SequenceConfig> {
   const res = await req.payload.find({
     collection: 'document-sequences',
-    where: { and: [{ docType: { equals: docType } }, { active: { equals: true } }] },
+    where: { and: [{ company: { equals: companyId } }, { docType: { equals: docType } }, { active: { equals: true } }] },
     limit: 1,
     depth: 0,
     pagination: false,
@@ -34,8 +34,9 @@ export async function loadSequence(req: PayloadRequest, docType: string): Promis
   }
 }
 
-async function companyCode(req: PayloadRequest): Promise<string> {
-  return (await settings(req)).shortCode || 'DRMS'
+/** `{COMPANY}` = short code of the DOCUMENT's PT (ADR 0016 §4 / ADR 0007 revision). */
+async function companyCode(req: PayloadRequest, companyId: number): Promise<string> {
+  return (await companyById(req, companyId)).shortCode
 }
 
 /**
@@ -48,28 +49,30 @@ async function companyCode(req: PayloadRequest): Promise<string> {
 export async function allocateDocNo(
   req: PayloadRequest,
   docType: string,
-  opts: { date?: LocalDate; docId?: string; audit?: boolean } = {},
+  opts: { companyId: number; date?: LocalDate; docId?: string; audit?: boolean },
 ): Promise<Allocation> {
   const tx = await getRequestTx(req)
-  const cfg = await loadSequence(req, docType)
+  const companyId = opts.companyId
+  if (!Number.isSafeInteger(companyId) || companyId <= 0) throw new Error('numbering: companyId is required (ADR 0016)')
+  const cfg = await loadSequence(req, docType, companyId)
   validatePattern(cfg.pattern, cfg.resetPolicy)
   const date = opts.date ?? localDateInTz(new Date(), cfg.timezone)
   const key = periodKey(cfg.resetPolicy, date)
   await tx.execute(sql`
-    INSERT INTO document_sequence_counters (doc_type, period_key, next_value)
-    VALUES (${cfg.docType}, ${key}, ${cfg.startAt})
-    ON CONFLICT (doc_type, period_key) DO NOTHING`)
+    INSERT INTO document_sequence_counters (company_id, doc_type, period_key, next_value)
+    VALUES (${companyId}, ${cfg.docType}, ${key}, ${cfg.startAt})
+    ON CONFLICT (company_id, doc_type, period_key) DO NOTHING`)
   const res = await tx.execute(sql`
     UPDATE document_sequence_counters SET next_value = next_value + 1
-    WHERE doc_type = ${cfg.docType} AND period_key = ${key}
+    WHERE company_id = ${companyId} AND doc_type = ${cfg.docType} AND period_key = ${key}
     RETURNING next_value - 1 AS allocated`)
   const row = (res as unknown as { rows: Array<{ allocated: number | string }> }).rows[0]
   if (!row) throw new Error('numbering: counter row missing')
   const seq = Number(row.allocated)
-  const docNo = formatDocNo(cfg, seq, date, await companyCode(req))
+  const docNo = formatDocNo(cfg, seq, date, await companyCode(req, companyId))
   if (opts.audit !== false) {
     await writeAudit(req, [
-      { action: 'number_issued', docType: cfg.docType, docId: opts.docId, docNo, field: 'docNo', newValue: docNo },
+      { action: 'number_issued', docType: cfg.docType, docId: opts.docId, docNo, field: 'docNo', newValue: docNo, companyId },
     ])
   }
   return { docNo, seq, periodKey: key, docType: cfg.docType }

@@ -27,8 +27,8 @@ data: `pg_dump` of a DB migrated to develop head and filled by the full integrat
 | MC1-2 company column + access per PT | done | `4b8095b` | incl. MC1-3 remainder (selection, per-PT decision guards); integration 33 files / 437 + 1 skipped green |
 | MC1-3 access helpers + auth | done | `42586c8` + `4b8095b` | split: context/auth in MC1-1, per-PT policies/guards in MC1-2 |
 | MC1-4 security migration (triggers, lock date, NOT NULL) | done | see git log | NOT NULL + derive triggers already in MC1-2's migration; this one: immutability, cross-PT refs, lock date per PT, `reminder_runs` per PT |
-| MC1-5 numbering per PT | open | — | counters `(company_id, doc_type, period_key)`, `{COMPANY}` = document PT, shortCode immutable once numbered |
-| MC1-6 isolation tests + seed shapes | open | — | seed shapes landed in MC1-2 (needed by the per-PT masters); isolation suite + helper unit tests here |
+| MC1-5 numbering per PT | done | see git log | counters `(company_id, doc_type, period_key)`, `{COMPANY}` = document PT, shortCode immutable once numbered |
+| MC1-6 isolation tests + seed shapes | in progress | — | seed shapes landed in MC1-2 (needed by the per-PT masters); isolation suite + helper unit tests here |
 
 ### MC1-1 (done)
 
@@ -83,6 +83,22 @@ data: `pg_dump` of a DB migrated to develop head and filled by the full integrat
   `reminder_runs` PK `(company_id, run_date)`. G1 guards were already switched to memberships in MC1-1.
 - App: `currentLockDate(req, companyId)`, `closePeriod/reopenPeriod(…, companyId)` (role in THAT PT), import cut-over
   per PT, reminders write the run of their PT.
+
+### MC1-5 (done)
+
+- `allocateDocNo(req, docType, { companyId, … })` (company required), `loadSequence(req, docType, companyId)`,
+  `{COMPANY}` = `companies.shortCode` of the document; every caller passes the document PT (submit, transfer, LPJ,
+  cash entry, progress report, addendum). Migration `20260928_000200_mc1_numbering` (counters → company #1, PK
+  per PT, monotonic guard freezes the company). `companies.shortCode` immutable once the PT has a counter.
+
+## Migration check (US-MC-19)
+
+Develop-head DB filled by the full integration suite (269 users, 637 requests, 475 cash entries, 346 transfers,
+2 050 approvals, 58 519 audit rows) restored as `pk_mig`, `payload migrate` (4 MC1 migrations in one batch):
+row counts and money sums of 16 tables identical before/after; 1 company (DRMS), 269 memberships (1 per user),
+275 membership roles (= `users_roles`), 108 employee links (= `users.employee_id`), 29 group admins (= Admins);
+every per-PT row + 20 counter rows → company #1 (PB counter unchanged). `migrate:down` of the batch → identical to
+the pre-migration DB (`users_roles`, `users.employee_id`, global columns restored); `migrate` again → identical.
 
 ## `// MC2:` leak points (raw SQL / company-blind paths)
 

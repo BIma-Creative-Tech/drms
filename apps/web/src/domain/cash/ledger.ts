@@ -84,7 +84,8 @@ export async function postEntry(req: PayloadRequest, input: PostInput): Promise<
   const lock = await currentLockDate(req, companyId)
   if (lock && input.entryDate <= lock) fail(409, `Periode ${input.entryDate.slice(0, 7)} sudah ditutup (tutup buku s/d ${lock}).`)
   await assertAccount(req, input.cashAccountId)
-  const { docNo } = await allocateDocNo(req, input.direction === 'in' ? 'cash_in' : 'cash_out', { date: parseBusinessDate(input.entryDate) })
+  if (companyId === undefined) fail(400, 'Akun kas tidak ditemukan atau nonaktif.')
+  const { docNo } = await allocateDocNo(req, input.direction === 'in' ? 'cash_in' : 'cash_out', { companyId: companyId!, date: parseBusinessDate(input.entryDate) })
   const doc = await req.payload.create({
     collection: 'cash-entries',
     data: {
