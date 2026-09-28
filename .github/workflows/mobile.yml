@@ -30,7 +30,8 @@ name: mobile
 
 on:
   push:
-    branches: [main, develop, "feat/mobile-**", "fix/mobile-**"]
+    # feat/mobile-** and fix/mobile-** run via pull_request only (avoids duplicate push + PR runs).
+    branches: [main, develop]
     # Release tags (path filters are not evaluated for tag pushes).
     tags: ["mobile-v*"]
     paths: ["apps/mobile/**", ".github/workflows/mobile.yml"]
@@ -57,7 +58,7 @@ defaults:
 jobs:
   verify:
     name: analyze · format · codegen drift · tests
-    runs-on: ubuntu-24.04
+    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '"ubuntu-24.04"') }}
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -90,12 +91,12 @@ jobs:
         with:
           name: mobile-coverage
           path: apps/mobile/coverage/lcov.info
-          retention-days: 14
+          retention-days: 3 # Free plan: 500 MB Actions storage
 
   apk:
     name: build APKs (staging)
     needs: verify
-    runs-on: ubuntu-24.04
+    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '"ubuntu-24.04"') }}
     timeout-minutes: 45
     env:
       HAS_STAGING_KEY: ${{ secrets.ANDROID_STAGING_KEYSTORE_B64 != '' }}
@@ -137,7 +138,7 @@ jobs:
         with:
           name: proyekkas-staging-debug-apk
           path: apps/mobile/build/app/outputs/flutter-apk/app-staging-debug.apk
-          retention-days: 30
+          retention-days: 7 # Free plan: 500 MB Actions storage
           if-no-files-found: error
 
       - name: No staging signing key → skip the signed release build
@@ -178,7 +179,7 @@ jobs:
           path: |
             apps/mobile/build/app/outputs/flutter-apk/app-*-staging-release.apk
             apps/mobile/build/symbols/
-          retention-days: 90
+          retention-days: 7 # Free plan: 500 MB Actions storage
           if-no-files-found: error
       - name: Remove keystore
         if: always()
@@ -189,7 +190,7 @@ jobs:
     needs: verify
     # Tag pushes only: a merge to main never builds a production APK (release gate, decision 2026-09-27).
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/mobile-v')
-    runs-on: ubuntu-24.04
+    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '"ubuntu-24.04"') }}
     timeout-minutes: 45
     # The production keystore secrets exist ONLY as secrets of this environment (deployment tags
     # restricted to mobile-v*). Required reviewers need a paid plan for private repos; add them there

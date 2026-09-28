@@ -20,7 +20,7 @@ concurrency:
 jobs:
   github-release:
     name: GitHub Release from CHANGELOG.md
-    runs-on: ubuntu-24.04
+    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '"ubuntu-24.04"') }}
     timeout-minutes: 5
     permissions:
       contents: write

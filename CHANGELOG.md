@@ -214,6 +214,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
     APK `test/unit/misc_test.dart` + `test/widget/release_notes_test.dart`. No new dependency.
 
 ### Changed
+- **CI runner switchable + fewer runs** (GitHub Free minutes exhausted 2026-09-28; owner chose a self-hosted runner,
+  infra plan 12): every job's `runs-on` reads repo variable `CI_RUNS_ON` (deploy-prod: `DEPLOY_RUNS_ON`) as JSON, e.g.
+  `["self-hosted","linux","x64","drms"]`; unset = `ubuntu-24.04` as before, so switching back needs no code change.
+  `ci` / `mobile` no longer run on pushes to `feat/**`, `fix/**` (they run on the pull request; a push + PR used to
+  run everything twice). Staging APK artifacts kept 7 days (was 30), coverage 3 days (was 14) to stay under 500 MB.
 - **`company-settings` global = app-wide only** (APK gate, device image targets, offline max age, selfie batch
   size, new group letterhead `groupName`/`groupLogo`/`groupPdfHeader`); editable by the group admin only. Per-PT
   settings (thresholds, reminders, sync flags, default schedule, retention) live on the company record.

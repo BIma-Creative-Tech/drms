@@ -13,7 +13,8 @@ name: ci
 on:
   push:
     # ci/ghcr-*: throwaway branches to test the GHCR publish (images tagged test-<sha7> only).
-    branches: [main, develop, "feat/**", "fix/**", "ci/ghcr-*"]
+    # feat/** and fix/** run via pull_request only (a push + PR used to run the whole pipeline twice).
+    branches: [main, develop, "ci/ghcr-*"]
     # Release tags vX.Y.Z → images X.Y.Z (prod). mobile-v* tags belong to mobile.yml.
     tags: ["v*.*.*"]
   pull_request:
@@ -33,7 +34,7 @@ env:
 jobs:
   verify:
     name: lint · typecheck · unit + coverage · openapi drift
-    runs-on: ubuntu-24.04
+    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '"ubuntu-24.04"') }}
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -53,7 +54,7 @@ jobs:
 
   integration:
     name: integration (throwaway Postgres, migrations as owner, tests as app role)
-    runs-on: ubuntu-24.04
+    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '"ubuntu-24.04"') }}
     timeout-minutes: 25
     services:
       postgres:
@@ -112,7 +113,7 @@ jobs:
 
   security:
     name: gitleaks · semgrep · trivy fs · hadolint
-    runs-on: ubuntu-24.04
+    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '"ubuntu-24.04"') }}
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -144,7 +145,7 @@ jobs:
   image:
     name: image build (runner + migrate) · trivy · GHCR push
     needs: [verify, integration, security]
-    runs-on: ubuntu-24.04
+    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '"ubuntu-24.04"') }}
     timeout-minutes: 45
     permissions:
       contents: read
