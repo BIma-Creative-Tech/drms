@@ -364,8 +364,24 @@ Branch `feat/mc2-integration` = backend + admin UI merged, every `TODO(mc2-contr
 | 4 | Role matrix save "tidak ada simpan sebagian" | one `POST /api/v1/company-memberships/batch` (Idempotency-Key); errors carry `errors[].path = items.<i>` so the UI marks the cell | per-cell REST calls could save half a matrix |
 | 5 | "Tim hari ini" rows | `TeamTodayRow.companyId` (+ OpenAPI `TeamToday.members[].companyId`) | PT chip on the board with > 1 PT |
 
+## Implementation notes (MC3-1 API, 2026-09-28)
+
+Branch `feat/mc3-api` (`/api/v1` for the multi-company APK; the APK itself is MC3-2). Contract, route table and the
+released-APK compatibility matrix: `../mc/mc3-progress.md` §API.
+
+| # | Design | Implementation | Reason |
+|---|---|---|---|
+| 1 | `/me` returns `companies[]` + app-wide settings | `companies[]` (every active membership: roles, employee, capabilities, per-PT settings, `selected`), `activeCompanyIds`, `appSettings`; the old single-PT fields stay, DEPRECATED: `roles`/`capabilities` = union over the selected PTs, `employee`/`settings` = `legacyCompanyId` (first selected membership with an employee, else the first) | mobile-v0.2.0 keeps working unchanged for one PT; the old `settings` fallback (company #1) could name a PT outside the memberships |
+| 2 | Outbox item synced "under its own PT (`X-Company-Ids` = that PT)" | each item carries `company_id` (snake_case like the envelope); the item is processed under it whatever the header says (selection narrowed to that PT per item); `COMPANY_NOT_ALLOWED` (not a membership) / `COMPANY_MISMATCH` (references of another PT) per item; results carry `company_id` | one batch may mix PTs; a project-less draft needs an explicit PT; the header is a read selection, not a write target |
+| 3 | Items of the released APK (no PT) | accepted only for an account with exactly one active PT; otherwise the whole batch → 409 `COMPANY_REQUIRED` (nothing processed) | an item without PT is ambiguous for several PTs; 409 makes the old APK keep the items queued with a clear message (no silent wrong-PT write) |
+| 4 | Masters per selected PT, caches per PT | `company` + `shared` on every item, per-PT default radius, `companies[].version` + `sharedVersion`, weak `ETag` / 304; `Cache-Control: private, no-store` kept | ETag lets the APK revalidate per PT without letting HTTP caches store master data |
+| 5 | Queue endpoints with PT filter | `?company=` on 12 list routes = subset of the selection, else 403 `COMPANY_NOT_ALLOWED` (audited; malformed 400); new `GET /lpj-queue` | same answer as a foreign header; never an empty "filter" that widens |
+| 6 | `X-Company-Ids` header component in OpenAPI | `components.parameters.CompanyIds` referenced by every authenticated path (`extendZodWithOpenApi` in the build-time generator only) | one definition for the Dart client |
+| 7 | Every `/api/v1` route checked | route table (91 routes: 6 public, 10 own, 20 selection, 47 document, 8 named-PT) enforced by a completeness test; fixed: `?company=` of `/cash-accounts/balances` (cross-PT balances) and `/period-closings` (lock date) were unchecked | isolation of every route, not only the reviewed ones |
+
 ## Revision history
 
+- **2026-09-28 (MC3-1 API):** implementation notes MC3-1 (1–7).
 - **2026-09-28 (MC2 integration):** implementation notes MC2 integration (1–5).
 
 - **2026-09-28 (MC2 backend):** implementation notes MC2 (deviations 1–10).

@@ -33,6 +33,17 @@ certs in the agent scratchpad), `pk-mc3a-node` (node:24.21.0-bookworm-slim, work
 | OpenAPI (`X-Company-Ids` component, new fields/params) | done | `openapi.ts` (`components.parameters.CompanyIds`), `packages/api-contract/openapi.json` |
 | tests | done | `tests/integration/mc3-api.int.test.ts` (19), `tests/unit/mc3-api.test.ts` (6), `mc2-isolation` sync test adapted |
 
+### Result (tree of the last commit)
+
+- Baseline (MC2 end, `mc2-progress.md`): unit 37 files / 535 tests; integration 36 files / 483 + 1 skipped.
+- Now: unit 43 files / 593 tests (coverage gate green: lines 39.0 %, statements 37.6 %, functions 35.1 %,
+  branches 28.4 %); integration **39 files / 512 passed + 1 skipped** (incl. `mc3-api` 19 tests, `mc2-isolation` sync
+  test adapted to `company_id`); lint, typecheck, `check:openapi`, `check:import-template`, `npm run build` green;
+  semgrep (CI rules incl. `payload-local-api-implicit-override-access`) 0 findings; gitleaks over the branch commits
+  clean. Dockerfile / dependencies untouched (trivy fs / hadolint inputs unchanged).
+- Test fixtures use the fictional PTs "PT Contoh Enam" (CS6) and "PT Contoh Tujuh" (CS7) — CS4 is used by
+  `mc2-integration`, and a PT deactivated by one file would stay inactive for the next file seeding the same code.
+
 ### Contract for the APK (short)
 
 **Headers.** `X-Company-Ids: 1,3` = READ selection of any authenticated call (OpenAPI parameter component
