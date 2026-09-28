@@ -53,10 +53,9 @@ export async function AksesPtView(props: AdminViewServerProps) {
   const withInactive = one(sp.nonaktif as string | string[] | undefined) === '1'
   const page = Math.max(1, Number.parseInt(one(sp.hal as string | string[] | undefined), 10) || 1)
   const user = req.user
-  const read = { user, overrideAccess: false as const, req, depth: 0 as const }
 
   // PT columns: active PTs the caller may administer, narrowed to the switcher selection
-  const companiesRes = await req.payload.find({ collection: 'companies', where: { active: { equals: true } }, sort: 'shortCode', pagination: false, select: { shortCode: true, name: true }, ...read })
+  const companiesRes = await req.payload.find({ collection: 'companies', where: { active: { equals: true } }, sort: 'shortCode', pagination: false, select: { shortCode: true, name: true }, user, overrideAccess: false, req, depth: 0 })
   const all: MatrixCompany[] = companiesRes.docs.map((c) => ({ id: c.id as number, shortCode: String(c.shortCode), name: String(c.name ?? '') }))
   const memberIds = (ctx?.memberships ?? []).map((m) => m.company)
   const narrowed = ctx && ctx.selected.length < memberIds.length ? ctx.selected : null
@@ -74,13 +73,13 @@ export async function AksesPtView(props: AdminViewServerProps) {
     limit: PAGE_SIZE,
     page,
     select: { name: true, email: true, active: true },
-    ...read,
+    user, overrideAccess: false, req, depth: 0,
   })
   const users: MatrixUser[] = usersRes.docs.map((u) => ({ id: u.id as number, name: String(u.name ?? ''), email: String(u.email ?? ''), active: u.active !== false }))
 
   // every membership of the column PTs (warnings + "employee already linked" need the whole PT)
   const cellsRes = colIds.length
-    ? await req.payload.find({ collection: 'company-memberships', where: { company: { in: colIds } }, pagination: false, select: { user: true, company: true, roles: true, employee: true, active: true }, ...read })
+    ? await req.payload.find({ collection: 'company-memberships', where: { company: { in: colIds } }, pagination: false, select: { user: true, company: true, roles: true, employee: true, active: true }, user, overrideAccess: false, req, depth: 0 })
     : { docs: [] }
   const cells: MatrixCell[] = (cellsRes.docs as unknown as Array<Record<string, unknown>>).map((m) => ({
     id: m.id as number,
@@ -94,12 +93,12 @@ export async function AksesPtView(props: AdminViewServerProps) {
   // active flag of every account holding a membership there (coverage warnings)
   const holderIds = [...new Set(cells.map((c) => c.user))]
   const holdersRes = holderIds.length
-    ? await req.payload.find({ collection: 'users', where: { and: [{ id: { in: holderIds } }, { active: { equals: true } }] }, pagination: false, select: { active: true }, ...read })
+    ? await req.payload.find({ collection: 'users', where: { and: [{ id: { in: holderIds } }, { active: { equals: true } }] }, pagination: false, select: { active: true }, user, overrideAccess: false, req, depth: 0 })
     : { docs: [] }
   const activeUserIds = holdersRes.docs.map((u) => u.id as number)
 
   const employeesRes = colIds.length
-    ? await req.payload.find({ collection: 'employees', where: { company: { in: colIds } }, sort: 'code', pagination: false, select: { code: true, name: true, active: true, company: true }, ...read })
+    ? await req.payload.find({ collection: 'employees', where: { company: { in: colIds } }, sort: 'code', pagination: false, select: { code: true, name: true, active: true, company: true }, user, overrideAccess: false, req, depth: 0 })
     : { docs: [] }
   const employees: MatrixEmployee[] = (employeesRes.docs as unknown as Array<Record<string, unknown>>).map((e) => ({
     id: e.id as number,

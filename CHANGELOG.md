@@ -149,6 +149,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - **Mobile token parity** (`apps/mobile/lib/app/theme/tokens.dart`): the web token `primarySoft` added in 0.4.2
   (loader dots) was missing on the Flutter side, so `test/unit/theme_tokens_test.dart` failed (22 ≠ 23 keys) and
   the mobile workflow was red on develop. `PkTokens.primarySoft` added (light `#BFDBFE`, dark `#1E40AF`).
+- **CI semgrep red on develop** (`admin/views/AksesPt.tsx`, MC2 role matrix): five Local API reads passed their
+  access arguments through a spread (`...read`), which rule `payload-local-api-implicit-override-access` cannot see.
+  The arguments `user, overrideAccess: false, req, depth: 0` are now written literally in each call (same behaviour).
 
 ## [0.4.2] - 2026-09-28
 
