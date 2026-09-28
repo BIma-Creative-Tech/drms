@@ -38,6 +38,33 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   active PT; `kode_pt` = MC2); the LPJ refund cash entry uses the "Pengembalian LPJ" source of the request's PT.
 - **MC1-6 — isolation suite** `tests/integration/mc-isolation.int.test.ts` (two PTs, per-PT reads/writes/approvals,
   forged header/cookie, DB cross-PT guards, per-PT numbering and period lock) + unit tests `mc1-access.test.ts`.
+- **MC2-2 — reports / KPI / exports per PT** (branch `feat/mc2-backend`, ADR 0016 §6, requirements v1.2 §5/§6):
+  `ReportScope` = list of per-PT scopes built from the role IN each selected PT (`officeScope`, `roleScope`,
+  `auditScope`, `teamScope`, `ownScope`); every raw SQL carries a company predicate (`companyScopeSql`,
+  `ledgerScopeSql`, …; "all" = the caller's PTs for that role, a company-blind `{ kind: 'all' }` matches nothing);
+  the 8 formerly unscoped KPI functions take a scope. Reports: parameter `pt` (narrows only), PT column + "Subtotal
+  per PT" table when > 1 PT, master labels prefixed `[CS1]`, categories never merged across PTs. Dashboards: per-PT
+  breakdown (`byCompany`) next to every combined total. Exports/PDF: one PT → that PT's letterhead, several → the
+  group letterhead (`groupName`/`groupPdfHeader`, else "Laporan gabungan: …") + PT list; PDF Author/Subject
+  metadata. Audit-log report per PT (rows without PT: Admin/Owner only).
+- **MC2-1 — domain services per PT:** approval inbox / transfer queue / LPJ queue (`lpjQueue`) consolidated with a
+  PT ref per item + optional PT filter; Kas balances / flows / period summaries limited to the Kas PTs of the
+  caller (`kasAccessIn`, `lockDates`), `POST /period-closings` `company` + `?company=` on reopen / list / balances
+  (400 "PT wajib dipilih" when ambiguous); attendance scope per PT (`AttScope.parts`, `narrowAttScope`), recap /
+  team today / corrections per employee PT, default schedule of the employee's PT; progress thresholds per project
+  PT; display names / PDF "Dibuat Oleh" = employee of the document's PT.
+- **MC2-3 — jobs per active PT:** daily reminders (own hour/toggles, recipients holding the role IN that PT,
+  notifications tagged with the PT, `reminder_runs (company_id, run_date)`, one PT's failure logged), reimburse
+  auto-close (that PT's days), selfie retention (months/switch per PT, app-wide batch per run).
+- **Media / sync (MC2):** office roles read media of their PTs only (all rows only when they hold the role in
+  every active PT); sync items are processed under the PT derived from their references — outside the
+  `X-Company-Ids` selection → rejected `COMPANY_MISMATCH`; feature flags / own employee of the item's PT.
+- **Role matrix batch save:** `POST /api/v1/company-memberships/batch` — all-or-nothing, Admin of each item's PT
+  or group admin, reason → `role_change` audit rows.
+- **Tests:** `tests/integration/mc2-isolation.int.test.ts` (3 PTs, users with different roles per PT: reports,
+  KPI, dashboards, exports/letterhead, queues, Kas, attendance, reminders, retention, media, sync) and the raw-SQL
+  company lint `tests/unit/mc2-sql-lint.test.ts`. Contract for the admin UI: `docs/proyekkas/mc/mc2-contract.md`.
+
 - **Seed:** `SEED_DATA_FILE` accepts the old single-company shape (→ company #1 DRMS) and a new
   `{ uoms, banks, companies: [...] }` shape; every PT gets the default sequences and approval rules.
 
@@ -65,6 +92,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   **MC1 transition:** any legacy `pk-*` realm role is accepted as the same login marker until the infra change
   assigns `pk-user`. User create in the admin assigns only `pk-user` in Keycloak (fallback `pk-staff` marker while
   the realm lacks `pk-user`); role edits never call Keycloak.
+
+### Security
+- **MC2 per-PT fixes of MC1 leftovers:** addendum decisions used the union of the caller's roles over the selected
+  PTs (Finance of PT A + PM of PT B could decide a PT B addendum) → roles IN the addendum's PT; manual cash
+  posting / edit / void checked only "Finance in any PT" → Finance of the account's / entry's PT (else 400/404);
+  internal PDF copy, full bank number in the request DTO, cash rows in the request history, device revoke,
+  attendance correction and PM on-behalf check-in now check the role in the document's PT.
 
 ### Removed
 - `users.roles` and `users.employee` (replaced by `company-memberships`).

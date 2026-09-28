@@ -2980,6 +2980,126 @@ export const openapiDocument = {
           "items"
         ]
       },
+      "MembershipBatchResult": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                "user": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                "company": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                "roles": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "employee": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "exclusiveMinimum": 0
+                },
+                "active": {
+                  "type": "boolean"
+                },
+                "created": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "id",
+                "user",
+                "company",
+                "roles",
+                "employee",
+                "active",
+                "created"
+              ]
+            }
+          }
+        },
+        "required": [
+          "items"
+        ]
+      },
+      "MembershipBatchBody": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 1000
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "user": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                "company": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                "roles": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "enum": [
+                      "pk-staff",
+                      "pk-pm",
+                      "pk-finance",
+                      "pk-owner",
+                      "pk-admin"
+                    ]
+                  },
+                  "maxItems": 5
+                },
+                "employee": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "exclusiveMinimum": 0,
+                  "description": "Employee of THIS PT (null = unlink; omitted = unchanged)."
+                },
+                "active": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "user",
+                "company",
+                "roles"
+              ],
+              "additionalProperties": false
+            },
+            "minItems": 1,
+            "maxItems": 200
+          }
+        },
+        "required": [
+          "reason",
+          "items"
+        ],
+        "additionalProperties": false
+      },
       "PeriodClosingList": {
         "type": "object",
         "properties": {
@@ -11683,6 +11803,124 @@ export const openapiDocument = {
             }
           },
           "403": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/company-memberships/batch": {
+      "post": {
+        "summary": "MC2 role matrix: save many memberships atomically (all-or-nothing); each item needs Admin of ITS PT or the group admin; reason → audit (role_change)",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": false,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422."
+            },
+            "required": false,
+            "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422.",
+            "name": "Idempotency-Key",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MembershipBatchBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Saved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MembershipBatchResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
             "description": "Problem",
             "content": {
               "application/problem+json": {

@@ -509,6 +509,34 @@ export const PeriodCloseBody = z
   .strict()
   .meta({ id: 'PeriodCloseBody' })
 
+/** MC2: atomic role-matrix save (all-or-nothing; one audit row per changed membership, reason required). */
+export const MembershipBatchBody = z
+  .object({
+    reason,
+    items: z
+      .array(
+        z
+          .object({
+            user: id,
+            company: id,
+            roles: z.array(z.enum(['pk-staff', 'pk-pm', 'pk-finance', 'pk-owner', 'pk-admin'])).max(5),
+            employee: id.nullable().optional().meta({ description: 'Employee of THIS PT (null = unlink; omitted = unchanged).' }),
+            active: z.boolean().optional(),
+          })
+          .strict(),
+      )
+      .min(1)
+      .max(200),
+  })
+  .strict()
+  .meta({ id: 'MembershipBatchBody' })
+
+export const MembershipBatchResult = z
+  .object({
+    items: z.array(z.object({ id, user: id, company: id, roles: z.array(z.string()), employee: id.nullable(), active: z.boolean(), created: z.boolean() })),
+  })
+  .meta({ id: 'MembershipBatchResult' })
+
 export const PeriodClosing = z
   .object({
     id,

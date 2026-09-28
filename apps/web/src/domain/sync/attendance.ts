@@ -48,9 +48,10 @@ export function localDateString(instant: Date, timeZone: string = DEFAULT_TZ): s
 }
 
 /**
- * Employee linked to the user account (membership employee, ADR 0016 §2), or undefined.
- * MC2: pick the membership of the location's PT (a person in two PTs has two employees).
+ * Employee linked to the user account (membership employee, ADR 0016 §2) in `companyId` when given
+ * (a person in two PTs has two employees — the sync service passes the location's PT), else the
+ * first membership with an employee; undefined when none.
  */
-export async function employeeOfUser(req: PayloadRequest, uid: number): Promise<number | undefined> {
-  return (await displayEmployeeByUser(req, [uid])).get(uid)
+export async function employeeOfUser(req: PayloadRequest, uid: number, companyId?: number): Promise<number | undefined> {
+  return (await displayEmployeeByUser(req, [uid], companyId)).get(uid)
 }

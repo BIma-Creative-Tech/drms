@@ -258,6 +258,13 @@ export function buildOpenApiDocument(version: string) {
     request: { query: z.object({ asOf: z.string().optional(), company: z.string().regex(/^\d+$/).optional() }) },
     responses: res(200, 'Balances', F.Balances, [400, 401, 403]),
   })
+  post(
+    '/company-memberships/batch',
+    'MC2 role matrix: save many memberships atomically (all-or-nothing); each item needs Admin of ITS PT or the group admin; reason → audit (role_change)',
+    F.MembershipBatchBody,
+    [],
+    res(200, 'Saved', F.MembershipBatchResult, [400, 401, 403, 409, 422, 429]),
+  )
   registry.registerPath({
     method: 'get',
     path: '/period-closings',

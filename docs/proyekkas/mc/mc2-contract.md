@@ -111,6 +111,24 @@ where the caller's role grants read access.
 
 `projectProgressVsBudget` rows carry `companyId`; colour thresholds per project PT.
 
-## 7. Changelog of this contract
+## 7. System collections / media / sync (backend only, for information)
 
-- 2026-09-28: initial (reports, dashboards, queues, kas, attendance).
+- `audit-logs` REST: rows without PT only for Admin/Direktur (and group admins) — Finance sees its PTs' rows.
+- `web-sessions` REST: an Admin reads the sessions of users of his PTs (+ accounts without membership).
+- Media collections: office roles read the files of their PTs (all rows only when they hold the role in every
+  active PT) — a thumbnail of another PT's receipt now answers 404/403 in the admin list.
+- `POST /api/v1/sync/batch`: an item whose PT (derived from project / cost center / draft / report) is not in the
+  `X-Company-Ids` selection is rejected `COMPANY_MISMATCH` (MC3 APK sends each item under its own PT).
+
+## 8. Role matrix batch save
+
+`POST /api/v1/company-memberships/batch` (Idempotency-Key, web session or bearer):
+`{ reason: string(3..), items: [{ user, company, roles: Role[], employee?: id|null, active?: boolean }] }` (≤ 200).
+All-or-nothing in one transaction: every item needs Admin OF ITS PT or the group admin (else 403, nothing
+saved); duplicate (user, PT) → 400; same-PT employee / immutable user+PT hooks of the collection apply (400);
+new row = `create`, changed roles/active = `role_change` audit rows carrying `reason`. Response
+`{ items: [{ id, user, company, roles, employee, active, created }] }`.
+
+## 9. Changelog of this contract
+
+- 2026-09-28: initial (reports, dashboards, queues, kas, attendance); §7 system collections / media / sync; §8 role-matrix batch endpoint.

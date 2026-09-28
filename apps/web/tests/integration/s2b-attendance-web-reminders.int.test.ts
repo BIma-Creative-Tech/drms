@@ -204,8 +204,8 @@ describe('E7 daily reminders (fake clock)', () => {
     expect(rj.body.status).toBe('receipt_revision')
   })
 
-  const owners = async () => (await sqlAs('app', "SELECT DISTINCT u.id FROM users u JOIN company_memberships m ON m.user_id = u.id AND coalesce(m.active, true) JOIN company_memberships_roles r ON r.parent_id = m.id WHERE r.value = 'pk-owner' AND coalesce(u.active, true) ORDER BY u.id")).rows.map((x) => Number(x.id))
-  const finance = async () => (await sqlAs('app', "SELECT DISTINCT u.id FROM users u JOIN company_memberships m ON m.user_id = u.id AND coalesce(m.active, true) JOIN company_memberships_roles r ON r.parent_id = m.id WHERE r.value = 'pk-finance' AND coalesce(u.active, true) ORDER BY u.id")).rows.map((x) => Number(x.id))
+  const owners = async () => (await sqlAs('app', "SELECT DISTINCT u.id FROM users u JOIN company_memberships m ON m.user_id = u.id AND coalesce(m.active, true) AND m.company_id = (SELECT id FROM companies WHERE short_code = 'DRMS') JOIN company_memberships_roles r ON r.parent_id = m.id WHERE r.value = 'pk-owner' AND coalesce(u.active, true) ORDER BY u.id")).rows.map((x) => Number(x.id))
+  const finance = async () => (await sqlAs('app', "SELECT DISTINCT u.id FROM users u JOIN company_memberships m ON m.user_id = u.id AND coalesce(m.active, true) AND m.company_id = (SELECT id FROM companies WHERE short_code = 'DRMS') JOIN company_memberships_roles r ON r.parent_id = m.id WHERE r.value = 'pk-finance' AND coalesce(u.active, true) ORDER BY u.id")).rows.map((x) => Number(x.id))
 
   it('before the configured hour / disabled → nothing', async () => {
     const p = await getTestPayload()

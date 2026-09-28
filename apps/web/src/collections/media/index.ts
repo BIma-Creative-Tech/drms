@@ -1,7 +1,8 @@
-import type { Access, Where } from 'payload'
+import type { Access, CollectionSlug, PayloadRequest, Where } from 'payload'
 
-import { anyRole } from '@/access/roles'
+import { anyRole, companiesWithRole, type Role } from '@/access/roles'
 import { anyOf, byRoleAny, ownUser, rolesAllowedAny, type Rule } from '@/access/policies'
+import { activeCompanyIds } from '@/domain/companies'
 import { visibleRequestIds } from '@/domain/expense/access'
 import { reportPhotoWhere } from '@/domain/progress/access'
 
@@ -22,13 +23,79 @@ const ownerRequestRule: Rule = async ({ req }) => {
   return where
 }
 
-// MC2/MC3: LEAK POINT — office roles read media of EVERY PT (media rows carry no company; ADR 0016
-// §4 "access follows the owning document" → owner-document company check, inventory MC1-2 media /
-// MC3-1 media.ts). With one PT the behaviour is unchanged.
+/**
+ * MC2 (ADR 0016 §4 "media: access follows the owning document"): media rows carry no company. An
+ * office role (Admin/Owner/Finance) reads the files of THE PTs where it holds that role:
+ * - holder in EVERY active PT (always the case with one PT) → all rows (as before, no id lists);
+ * - otherwise: own uploads + files whose owner document (expense request / progress report) belongs
+ *   to one of those PTs; selfies: those of attendances of those PTs; signatures: uploads of members
+ *   of those PTs. The GET /api/v1/media/…/file endpoint adds the owner-document fallbacks.
+ */
+const OFFICE: readonly Role[] = ['pk-admin', 'pk-owner', 'pk-finance']
+type OfficeScope = { all: boolean; ids: number[] }
+
+async function officeScope(req: PayloadRequest): Promise<OfficeScope> {
+  const key = 'pkMediaOffice'
+  req.context ??= {}
+  const hit = req.context[key] as OfficeScope | undefined
+  if (hit) return hit
+  const ids = companiesWithRole(req, OFFICE)
+  const active = ids.length ? await activeCompanyIds(req.payload, req) : []
+  const scope = { all: ids.length > 0 && active.every((a) => ids.includes(a)), ids }
+  req.context[key] = scope
+  return scope
+}
+
+/** Ids (as text) of `collection` rows of the PTs `companyIds` (SYSTEM-READ, cached per request). */
+async function idsOfCompanies(req: PayloadRequest, collection: CollectionSlug, companyIds: number[], field = 'id'): Promise<string[]> {
+  const key = `pkMediaIds:${collection}:${field}:${companyIds.join(',')}`
+  req.context ??= {}
+  const hit = req.context[key] as string[] | undefined
+  if (hit) return hit
+  const res = await req.payload.find({
+    collection,
+    where: { company: { in: companyIds } } as Where,
+    depth: 0,
+    pagination: false,
+    select: field === 'id' ? { updatedAt: true } : { [field]: true },
+    overrideAccess: true, // SYSTEM-READ: owner documents of the caller's office PTs (media access)
+    req,
+  })
+  const out = res.docs.map((d) => (field === 'id' ? d.id : (d as Record<string, unknown>)[field])).filter((v) => v !== null && v !== undefined).map(String)
+  req.context[key] = out
+  return out
+}
+
+/** Office rule of one media collection (true when office in every active PT). */
+function officeRule(where: (req: PayloadRequest, ids: number[]) => Promise<Where | false>): Rule {
+  return async ({ req }) => {
+    const s = await officeScope(req)
+    if (s.all) return true
+    const w = await where(req, s.ids)
+    const own: Where = { uploadedBy: { equals: (req.user as { id?: number } | null)?.id ?? -1 } }
+    return w ? ({ or: [w, own] } as Where) : own
+  }
+}
+
+const idsWhere = (field: string, ids: string[], extra?: Where): Where | false => (ids.length ? (extra ? { and: [extra, { [field]: { in: ids } }] } : { [field]: { in: ids } }) : false)
+
+const officeRequests = officeRule(async (req, ids) => idsWhere('ownerDocId', await idsOfCompanies(req, 'expense-requests', ids), { ownerDocType: { equals: 'expense_request' } }))
+const officeReports = officeRule(async (req, ids) => idsWhere('ownerDocId', await idsOfCompanies(req, 'progress-reports', ids), { ownerDocType: { equals: 'progress_report' } }))
+const officeSelfies = officeRule(async (req, ids) => idsWhere('id', await idsOfCompanies(req, 'attendances', ids, 'selfie')))
+const officeSignatures = officeRule(async (req, ids) => idsWhere('uploadedBy', await idsOfCompanies(req, 'company-memberships', ids, 'user')))
+
 const ownOrOffice: Access = byRoleAny({
-  'pk-admin': true,
-  'pk-owner': true,
-  'pk-finance': true,
+  'pk-admin': officeSelfies,
+  'pk-owner': officeSelfies,
+  'pk-finance': officeSelfies,
+  'pk-pm': ownUser('uploadedBy'),
+  'pk-staff': ownUser('uploadedBy'),
+})
+
+const signatureRead: Access = byRoleAny({
+  'pk-admin': officeSignatures,
+  'pk-owner': officeSignatures,
+  'pk-finance': officeSignatures,
   'pk-pm': ownUser('uploadedBy'),
   'pk-staff': ownUser('uploadedBy'),
 })
@@ -38,22 +105,23 @@ const ownOrOffice: Access = byRoleAny({
  * expense request (owner link set by the domain service, immutable once set — DB trigger).
  */
 const ownerLinked: Access = byRoleAny({
-  'pk-admin': true,
-  'pk-owner': true,
-  'pk-finance': true,
+  'pk-admin': anyOf(officeRequests, ownerRequestRule),
+  'pk-owner': anyOf(officeRequests, ownerRequestRule),
+  'pk-finance': anyOf(officeRequests, ownerRequestRule),
   'pk-pm': anyOf(ownUser('uploadedBy'), ownerRequestRule),
   'pk-staff': anyOf(ownUser('uploadedBy'), ownerRequestRule),
 })
 
 /**
- * E4: progress photos are readable by their uploader, office roles, and everyone who may read the
- * owning progress report (PM team; owner link set by the report service, immutable — DB trigger).
+ * E4: progress photos are readable by their uploader, office roles (of the report's PT), and
+ * everyone who may read the owning progress report (PM team; owner link set by the report service,
+ * immutable — DB trigger).
  */
 const reportPhotoRule: Rule = async ({ req }) => reportPhotoWhere(req)
 const progressPhotoRead: Access = byRoleAny({
-  'pk-admin': true,
-  'pk-owner': true,
-  'pk-finance': true,
+  'pk-admin': anyOf(officeReports, reportPhotoRule),
+  'pk-owner': anyOf(officeReports, reportPhotoRule),
+  'pk-finance': anyOf(officeReports, reportPhotoRule),
   'pk-pm': anyOf(ownUser('uploadedBy'), reportPhotoRule),
   'pk-staff': ownUser('uploadedBy'),
 })
@@ -133,7 +201,7 @@ export const MediaSignatures = mediaCollection({
   resizeOptions: { width: 800, height: 300, fit: 'inside', withoutEnlargement: true },
   maxBytesByMime: { 'image/png': 2 * 1024 * 1024 }, // S3e: a drawn/scanned signature never needs more
   formatOptions: { format: 'png', options: { palette: true, compressionLevel: 9 } },
-  access: { read: ownOrOffice, create: anyRole },
+  access: { read: signatureRead, create: anyRole },
 })
 
 export const MediaCompany = mediaCollection({

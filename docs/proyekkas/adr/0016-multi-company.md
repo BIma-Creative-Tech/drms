@@ -328,8 +328,32 @@ cross-PT triggers, per-PT `byRole` / `resolveScope`, decision guards on the docu
 | 8 | Users read by Admin/Direktur of the PT | users with a membership in those PTs **plus accounts without any membership** | onboarding: the Admin creates the account first, then the membership |
 | 9 | Jobs per PT | `reminder_runs` keyed `(company_id, run_date)`; the jobs still run company #1 only (MC2 loop) | MC2 scope |
 
+## Implementation notes (MC2 backend, 2026-09-28)
+
+Branch `feat/mc2-backend` (domain, reports, jobs, media, sync; the admin UI + import run in parallel on
+`feat/mc2-admin-ui`). Contract for the UI: `../mc/mc2-contract.md`; progress: `../mc/mc2-progress.md`.
+
+| # | Design | Implementation | Reason |
+|---|---|---|---|
+| 1 | `ReportScope` = `{ companies: CompanyScope[] }` | `{ kind (summary), …legacy team/own fields, companies }`; a literal WITHOUT `companies` is fail-closed (`all` → FALSE, team/own ids unchanged) | admin views (other branch) still build/read `scope.kind`; fail-closed keeps them safe until they adopt the builders |
+| 2 | Per-PT subtotal rows in reports | leading `PT` column + a separate "Subtotal per PT" table (Σ = total); paged reports get their per-PT totals from SQL | keeps the table model (CSV/XLSX/PDF) unchanged; no interleaved total rows in exports |
+| 3 | Dashboards per PT | each layout reads the PTs where the caller holds THAT role (Owner layout: `pk-owner` PTs, Finance: `pk-finance` PTs, PM: team per PM PT, Admin: `pk-admin` PTs); `byCompany` next to every combined total; Finance "last closed period" combined = the OLDEST of the PTs' latest | a Direktur of A who is Staff in B must not get B numbers on the Direktur home |
+| 4 | Media access follows the owning document (no company column) | office roles: all rows only when they hold the role in EVERY active PT (always with one PT); otherwise own uploads + files owned by requests / progress reports of their PTs, selfies of attendances of their PTs, signatures uploaded by members of their PTs (id lists, cached per request) | no migration; exact per-PT answer; performance to be measured with 3 PTs in MC4 |
+| 5 | Selfie retention per PT | selfies without attendance and selfies of INACTIVE PTs are handled by the first active PT's run; the app-wide batch caps one run across all PTs | every file belongs to exactly one run (UU PDP: nothing is kept forever) |
+| 6 | `COMPANY_MISMATCH` when the item PT ≠ header | item PT derived from project / cost center / existing draft or report; rejected when not in the EFFECTIVE selection (header ∩ memberships, default all memberships); on-behalf also when employee PT ≠ location PT | same rule for header and no-header requests; the DB triggers stay the last line |
+| 7 | Semgrep rule for raw `sql` without company helper | unit test `tests/unit/mc2-sql-lint.test.ts` (per function, per-PT tables, allow-list with reasons) | runs in the existing unit job (no new CI tool); fails on a new unscoped function |
+| 8 | Notification texts prefixed `[shortCode]` | not prefixed; rows carry `company` (reminders + late-progress now too) for the UI label | texts stay stable for the one-PT case and the APK; label = UI concern |
+| 9 | Group logo on consolidated PDFs | text letterhead only (name, header lines, PT list; Author/Subject metadata) | the report PDF had no logo before (F3); logo rendering is a UI/PDF follow-up |
+| 10 | "Gabungkan kategori berkode sama" [Usulan] | not implemented — categories are never merged across PTs | proposal only (requirements v1.2 §5) |
+
+MC1 leftovers fixed here (security): addendum decisions used the union of roles over the selected PTs; manual
+cash posting/edit/void checked "Finance in any PT"; internal PDF, full bank number in the DTO, cash rows in the
+request history, device revoke, attendance correction, PM on-behalf check-in — all now check the role in the
+document's PT.
+
 ## Revision history
 
+- **2026-09-28 (MC2 backend):** implementation notes MC2 (deviations 1–10).
 - **2026-09-28 (MC1):** implementation notes added (deviations 1–9 above).
 - **2026-09-27 (MC0):** proposed; design approved by the user the same day; Analyst additions: `groupAdmin`,
   global vehicle plate, TZ = process TZ in MC1, `reminder_runs` per company, `period-closings/:period/reopen` needs a

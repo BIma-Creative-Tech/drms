@@ -2,7 +2,8 @@ import { sql } from '@payloadcms/db-postgres'
 import { APIError, ValidationError, type PayloadRequest } from 'payload'
 import type { z } from 'zod'
 
-import { hasRoleAny, relId, userId } from '@/access/roles'
+import { companyContextOf, employeeIn, hasRole, relId, userId } from '@/access/roles'
+import { companyOf } from '@/domain/companies'
 import {
   SyncAttendancePayload,
   SyncDraftDeletePayload,
@@ -31,9 +32,13 @@ import { attendanceTimeOf, employeeOfUser } from './attendance'
 import { judgeTime, type TimeVerdict } from './clock'
 import { applyProgressReport, ProgressSyncReject } from './progress'
 
-// MC2: feature flags come from the context PT; items are not re-checked against the PT of their
-// references (COMPANY_MISMATCH, ADR 0016 §8) — the DB cross-company triggers still reject mixed rows.
-
+/**
+ * MC2 (ADR 0016 §8): every item is processed under ITS PT — derived server-side from its references
+ * (project / cost center / existing draft or report). An item whose PT is not in the request's
+ * effective selection (`X-Company-Ids` ∩ memberships, default all memberships) is rejected
+ * `COMPANY_MISMATCH` (the APK sends each item under its own PT); feature flags and the timezone are
+ * those of the item's PT; the own employee is the membership employee of that PT.
+ */
 /**
  * POST /api/v1/sync/batch — offline queue replay (ADR 0010 "Sync contract").
  *
@@ -89,8 +94,45 @@ type Outcome = {
 
 type ItemCtx = { req: PayloadRequest; uid: number; item: SyncItemIn }
 
-/** Server switches + company timezone, read once per batch. */
+/** Server switches + company timezone of one PT (cached per batch). */
 type Features = { drafts: boolean; attendance: boolean; progress: boolean; timezone: string }
+
+async function featuresOf(req: PayloadRequest, companyId?: number | null): Promise<Features> {
+  const s = (await settings(req, companyId)) as { syncExpenseDraftsEnabled?: boolean | null; syncAttendanceEnabled?: boolean | null; syncProgressReportsEnabled?: boolean | null; timezone?: string | null }
+  return {
+    drafts: s.syncExpenseDraftsEnabled !== false,
+    attendance: s.syncAttendanceEnabled === true,
+    progress: s.syncProgressReportsEnabled !== false,
+    timezone: s.timezone || DEFAULT_TZ,
+  }
+}
+
+const posId = (v: unknown): number | undefined => (typeof v === 'number' && Number.isSafeInteger(v) && v > 0 ? v : undefined)
+
+/** PT of an item from its references (null = nothing to derive it from, e.g. an invalid payload). */
+export async function itemCompany(req: PayloadRequest, item: SyncItemIn): Promise<number | null> {
+  const p = (item.payload && typeof item.payload === 'object' ? item.payload : {}) as Record<string, unknown>
+  const pid = posId(p.project_id)
+  if (pid !== undefined) return (await companyOf(req, 'projects', pid)) ?? null
+  const cc = posId(p.cost_center_id)
+  if (cc !== undefined) return (await companyOf(req, 'cost-centers', cc)) ?? null
+  const byUuid = async (collection: 'expense-requests' | 'progress-reports', uuid: unknown): Promise<number | null> => {
+    if (typeof uuid !== 'string' || !/^[0-9a-f-]{36}$/i.test(uuid)) return null
+    const r = await req.payload.find({ collection, where: { clientUuid: { equals: uuid } }, depth: 0, limit: 1, pagination: false, overrideAccess: true /* SYSTEM-READ: PT of an offline id */, req })
+    return relId((r.docs[0] as { company?: unknown } | undefined)?.company) ?? null
+  }
+  if (item.type === 'expense_request.draft_upsert' || item.type === 'expense_request.draft_delete') {
+    const rid = posId(p.request_id)
+    if (rid !== undefined) return (await companyOf(req, 'expense-requests', rid)) ?? null
+    return byUuid('expense-requests', p.draft_client_uuid ?? (item.type === 'expense_request.draft_upsert' ? item.client_uuid : undefined))
+  }
+  if (item.type === 'progress_report.draft_upsert') {
+    const rid = posId(p.report_id)
+    if (rid !== undefined) return (await companyOf(req, 'progress-reports', rid)) ?? null
+    return byUuid('progress-reports', p.report_client_uuid ?? item.client_uuid)
+  }
+  return null
+}
 
 const UNSUPPORTED: ReadonlySet<SyncItemType> = new Set<SyncItemType>([])
 const ATTENDANCE: ReadonlySet<SyncItemType> = new Set<SyncItemType>(['attendance.check_in', 'attendance.check_out', 'attendance.on_behalf'])
@@ -414,17 +456,20 @@ async function applyAttendance(c: ItemCtx, verdict: TimeVerdict, receivedAt: Dat
   const { req, uid, item } = c
   const onBehalf = item.type === 'attendance.on_behalf'
   const p = onBehalf ? parsePayload(SyncOnBehalfPayload, item.payload) : parsePayload(SyncAttendancePayload, item.payload)
-  const own = await employeeOfUser(req, uid)
+  // ADR 0016 D1: the caller's employee IN THE LOCATION's PT (one employee per PT)
+  const locCompany = await companyOf(req, p.project_id !== undefined ? 'projects' : 'cost-centers', p.project_id ?? p.cost_center_id!)
+  const own = locCompany !== undefined ? employeeIn(req, locCompany) : await employeeOfUser(req, uid)
   let employee: number
   let user: number | null
   if (onBehalf) {
     const ob = p as SyncOnBehalf
     // US-14: "diabsenkan oleh PM" — requirements §4 "Absensi": PM C (atas nama tim). Not an approval
     // (ADR 0013 covers expense decisions only), so the PM keeps this right.
-    if (!hasRoleAny(req, 'pk-pm')) reject('FORBIDDEN', 'Hanya PM yang dapat mengabsenkan anggota tim.')
+    if (!hasRole(req, 'pk-pm', locCompany)) reject('FORBIDDEN', 'Hanya PM yang dapat mengabsenkan anggota tim.')
     if (own !== undefined && own === ob.employee_id) reject('FORBIDDEN', 'Absensi Anda sendiri dicatat lewat absen masuk/pulang biasa.', 'payload.employee_id')
-    const emp = (await req.payload.findByID({ collection: 'employees', id: ob.employee_id, depth: 0, overrideAccess: true /* SYSTEM-READ: target employee of on-behalf */, req, disableErrors: true })) as { active?: boolean | null } | null
+    const emp = (await req.payload.findByID({ collection: 'employees', id: ob.employee_id, depth: 0, overrideAccess: true /* SYSTEM-READ: target employee of on-behalf */, req, disableErrors: true })) as { active?: boolean | null; company?: unknown } | null
     if (!emp) reject('NOT_FOUND', 'Karyawan tidak ditemukan.', 'payload.employee_id')
+    if (relId(emp!.company) !== locCompany) reject('COMPANY_MISMATCH', 'Karyawan dan lokasi berada di PT yang berbeda.', 'payload.employee_id')
     if (emp!.active === false) reject('VALIDATION', 'Karyawan sudah nonaktif.', 'payload.employee_id')
     employee = ob.employee_id
     user = await userOfEmployee(req, employee)
@@ -596,7 +641,7 @@ function duplicateOf(stored: StoredRow, uid: number, fallback: SyncResultOut): S
   return { ...stored.result, status: 'duplicate', original_status: stored.status }
 }
 
-async function processItem(req: PayloadRequest, batch: SyncBatchIn, deviceId: string, uid: number, item: SyncItemIn, features: Features): Promise<SyncResultOut> {
+async function processItem(req: PayloadRequest, batch: SyncBatchIn, deviceId: string, uid: number, item: SyncItemIn, batchFeatures: Features): Promise<SyncResultOut> {
   const receivedAt = new Date()
   const verdict = judgeTime(item, batch.clock, receivedAt)
   const base = baseResult(item, receivedAt, verdict)
@@ -609,6 +654,14 @@ async function processItem(req: PayloadRequest, batch: SyncBatchIn, deviceId: st
       await lockItem(req, item.client_uuid)
       const stored = await readStored(req, item.client_uuid)
       if (stored) return duplicateOf(stored, uid, base)
+      // ADR 0016 §8: the item's PT (derived server-side) must be in the effective selection
+      const company = await itemCompany(req, item)
+      let features = batchFeatures
+      if (company !== null) {
+        const selected = companyContextOf(req.user)?.selected ?? []
+        if (!selected.includes(company)) reject('COMPANY_MISMATCH', 'Data ini milik PT lain dari PT yang dipilih/diizinkan untuk pengiriman ini.', 'payload')
+        features = await featuresOf(req, company)
+      }
       const isAttendance = ATTENDANCE.has(item.type)
       const isProgress = item.type === 'progress_report.draft_upsert'
       if (isAttendance && !features.attendance) reject('FEATURE_DISABLED', 'Absensi dari aplikasi belum diaktifkan server (Setting perusahaan).')
@@ -678,13 +731,8 @@ async function processItem(req: PayloadRequest, batch: SyncBatchIn, deviceId: st
 export async function processBatch(req: PayloadRequest, batch: SyncBatchIn, deviceId: string) {
   const uid = userId(req)
   if (uid === undefined) throw new APIError('Unauthorized', 401)
-  const s = (await settings(req)) as { syncExpenseDraftsEnabled?: boolean | null; syncAttendanceEnabled?: boolean | null; syncProgressReportsEnabled?: boolean | null; timezone?: string | null }
-  const features: Features = {
-    drafts: s.syncExpenseDraftsEnabled !== false,
-    attendance: s.syncAttendanceEnabled === true,
-    progress: s.syncProgressReportsEnabled !== false,
-    timezone: s.timezone || DEFAULT_TZ,
-  }
+  // default flags (items without a derivable PT) = the context PT; items with a PT use theirs
+  const features = await featuresOf(req)
   const results: SyncResultOut[] = []
   for (const item of batch.items) {
     results.push(await processItem(req, batch, deviceId, uid, item, features))
