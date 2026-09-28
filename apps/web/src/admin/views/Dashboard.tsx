@@ -685,7 +685,7 @@ async function Owner({ req, months }: { req: PayloadRequest; months: 6 | 12 }) {
             empty="Belum ada akun kas."
             items={[...d.cash.accounts]
               .sort((x, y) => y.balance - x.balance)
-              .map((acc) => ({ key: String(acc.id), label: `${acc.name}${acc.active ? '' : ' (nonaktif)'}`, value: Math.max(0, acc.balance), href: `/admin/laporan/rekap-kas?akun=${acc.id}`, attrs: { 'data-pk-account': String(acc.id) } }))}
+              .map((acc) => ({ key: String(acc.id), label: `${pt.multi ? `[${pt.ref(acc.companyId)?.shortCode ?? acc.companyId}] ` : ''}${acc.name}${acc.active ? '' : ' (nonaktif)'}`, value: Math.max(0, acc.balance), href: `/admin/laporan/rekap-kas?akun=${acc.id}`, attrs: { 'data-pk-account': String(acc.id) } }))}
           />
         </Card>
         <Card id="completeness" title="Kelengkapan nota/LPJ" span={3} i={10} action={{ href: '/admin/laporan/kelengkapan', label: 'Laporan' }}>
@@ -839,7 +839,7 @@ async function Finance({ req }: { req: PayloadRequest }) {
             empty="Belum ada akun kas."
             items={[...d.accounts]
               .sort((x, y) => y.balance - x.balance)
-              .map((acc) => ({ key: String(acc.id), label: `${acc.name}${acc.active ? '' : ' (nonaktif)'}`, value: Math.max(0, acc.balance), href: `/admin/laporan/rekap-kas?akun=${acc.id}`, attrs: { 'data-pk-account': String(acc.id) } }))}
+              .map((acc) => ({ key: String(acc.id), label: `${pt.multi ? `[${pt.ref(acc.companyId)?.shortCode ?? acc.companyId}] ` : ''}${acc.name}${acc.active ? '' : ' (nonaktif)'}`, value: Math.max(0, acc.balance), href: `/admin/laporan/rekap-kas?akun=${acc.id}`, attrs: { 'data-pk-account': String(acc.id) } }))}
           />
           <TableView>
             <table className="pk-t" data-pk-table="accounts">
@@ -860,7 +860,10 @@ async function Finance({ req }: { req: PayloadRequest }) {
               <tbody>
                 {d.accounts.map((acc) => (
                   <tr key={acc.id}>
-                    <td>{acc.name}</td>
+                    <td>
+                      {pt.multi ? `[${pt.ref(acc.companyId)?.shortCode ?? acc.companyId}] ` : ''}
+                      {acc.name}
+                    </td>
                     <td className="n">{rp(acc.balance)}</td>
                     <td className="n">{rp(acc.monthIn)}</td>
                     <td className="n">{rp(acc.monthOut)}</td>

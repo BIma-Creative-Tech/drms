@@ -9,6 +9,66 @@
 - **Contract backend → UI:** `mc2-contract.md` (read it before touching a view that calls a domain function).
 - **Purpose of this file:** resume point for another agent; updated with every work package.
 
+## Integration (`feat/mc2-integration`) — **MC2 complete**
+
+Worktree `/opt/src/proyekkas-wt/mc2-int`, branch `feat/mc2-integration` = `feat/mc2-backend` (`012be12`) + merge of
+`feat/mc2-admin-ui` (`b0c7eae`) + the integration commits. Containers of this step (remove by exact name only, never
+`docker … prune`): `pk-mc2i-net`, `pk-mc2i-pg`, `pk-mc2i-node`, `pk-mc2i-mailpit`, `pk-mc2i-web` (visual), `pk-mc2i-pw`.
+
+### Contract TODOs closed (`TODO(mc2-contract)` — none left in code)
+
+| Contract | File(s) | Done |
+|---|---|---|
+| §0.1 attendance scope from user input | `admin/views/Absensi.tsx` | `narrow()` removed → `narrowAttScope`; PT filter (`narrowAttToCompanies`, new in `domain/attendance/queries.ts`); `mayCorrect(…, employee PT)`; PT chips + `[PT]` option labels. **Security:** an office user of PT A filtering by a PT B project id saw B's attendance — closed, regression test in `mc2-integration.int.test.ts` |
+| §0.1/§1 audit scope, `pt` parameter | `admin/views/Reports.tsx` | audit log → `auditScope(req)` (none → "no access"); letterhead line of the effective PTs (`exportLetterhead`); `pt` multiselect + PT column + "Subtotal per PT" rendered generically |
+| §4 Kas / Tutup buku | `admin/views/Kas.tsx`, `admin/components/kas/client.ts` | `kasAccessIn` everywhere; book: `balances`/`accountFlows` per shown PTs + per-PT subtotal, PT filter (`BookQuery.pt`), PT chip (`BookRow.companyId`), edit/void + lock date per row PT; new entry / edit: ONE PT (chooser, tabs, pickers of that PT, lock date + today of that PT); Tutup buku: one PT per screen (chooser when > 1), `periodSummaries(…, [pt])`, history of that PT, close `{ period, company }`, reopen `?company=`; 400 "PT wajib dipilih" → instruction text |
+| §2 dashboards | `admin/views/pt-breakdown.tsx`, `Dashboard.tsx` | `PerPt` is generic over the typed rows (no `unknown` reads — a renamed field is a compile error); fields verified against §2: `cash.byCompany`, `approvals.byCompany`, `budget.byCompany`, `completeness.byCompany`, `cashByCompany`, `completenessByCompany`, `transferQueue.byCompany`, `lastClosedByCompany` |
+| §3 queues | `admin/views/pt.tsx`, `ApprovalInbox.tsx`, `TransferQueue.tsx` | `itemCompany` uses the `company` ref / `companyId` only (fallback lookups removed; `VoidableTransfer.companyId` added); transfer / void actions only for Finance OF the item PT |
+| §6 K-09 rows | `admin/views/progress-ui.tsx`, `Progress.tsx`, `Dashboard.tsx` | PT chip / column from `ProjectProgress.companyId` |
+| §8 role matrix batch | `admin/components/access/{RoleMatrix.tsx,role-matrix.ts}`, `api/v1/endpoints/memberships.ts` | one `POST /api/v1/company-memberships/batch` (Idempotency-Key, new key when the drafts/reason change); endpoint errors now carry `errors[].path = items.<i>` (403 / duplicate / hook / DB guard) → the cell is marked, nothing saved |
+| "Tim hari ini" PT id | `domain/attendance/{aggregate,service}.ts`, `api/v1/schemas-attendance.ts` | trivial → done: `TeamTodayRow.companyId` (+ OpenAPI `TeamToday.members[].companyId`), `teamTodayFor({ companyIds })` |
+
+Found while wiring (fixed, security): the Finance queues (`transferQueue`, `lpjQueue`, their counts, LPJ view,
+`GET /api/v1/transfer-queue`) used collection read access only → a user who is Finance in A and PM in B got B's TEAM
+requests in the transfer queue with the unmasked bank snapshot. Now limited to the PTs where the caller is Finance /
+Direktur (`officeQueueWhere`, contract §3 wording).
+
+### Checks (containers `pk-mc2i-*`)
+
+- lint, typecheck, `test:coverage` (**42 files / 587 tests**, + `mc2-integration.test.ts`), `check:openapi` (regenerated:
+  `TeamToday.members[].companyId`), `check:import-template`, `generate:importmap` / `generate:types` (no diff),
+  `npm run build` (web + worker) — green.
+- Integration (throwaway `pk_test`, Mailpit STARTTLS+AUTH sink as in CI, `TZ=Asia/Makassar`): **38 files / 493 passed +
+  1 skipped**. Isolation suites combined (`mc-isolation`, `mc2-isolation`, `mc2-import`, `s3b-import`,
+  `mc2-integration`: 61 tests) green in 8 runs with shuffled FILE order. The shuffle found an order dependency that was
+  a real per-PT bug: the `cash-accounts` opening-balance hook counted closings of ANY PT (a CS3 closing locked a DRMS
+  account; the DB trigger was already per PT) → fixed (`collections/CashAccounts.ts`) + `s3b-import` test scoped to the
+  account's PT.
+- New `tests/integration/mc2-integration.int.test.ts` (2 PTs; users: Finance+Admin A / PM B, Finance A+B, Finance A):
+  Absensi leak regression (company-less literal leaks B, `narrowAttScope` does not; team-today + PT filter), rows carry
+  PT ids, switcher cookie gates finance/PM dashboards (foreign PT → 403), Σ `byCompany` = total, queue `company` refs +
+  cookie-narrowed `/transfer-queue`, PM PT never in the Finance queue, closing 400 without PT / B closed keeps A's lock /
+  reopen by Direktur of B, role-matrix batch (mixed PTs → 403 `items.1`, nothing saved; hook error → `items.0`; A-only
+  saves + audit reason).
+- Visual (Playwright v1.55.0 against `next start` of the production build, DB `pk_vis`, fictional PTs DRMS / CS1 /
+  CS2): Absensi (today + rekap with PT filter), Kas book, Tutup buku chooser + CS1 close dialog, role matrix save
+  ("1 perubahan tersimpan."), Direktur dashboard per-PT rows — light + dark, 1440 + 390, no horizontal scroll, no
+  console errors. Fixed from the shots: K-09 PT chip rendered as a full-width bar; account bars on the dashboards
+  prefixed `[PT]` (duplicate names "Bank Operasional" across PTs).
+
+### Remaining → MC3 / MC4
+
+- **MC3/MC4 — "copy defaults from DRMS" on PT create** (lead ask 6b, wireframe §3 "Saat dibuat: salin penomoran /
+  aturan approval / kategori & jadwal"): admin action on `companies` create. Today the seed (`SEED_DATA_FILE`
+  `companies[]`) and the import (sheet `Perusahaan`) give a new PT the default sequences + approval rules.
+- **MC4 — media-access performance:** office rules build id lists when the role is held in a SUBSET of the active
+  PTs; measure with Q-34 × 3 PTs (E9 p95 target) and move to a `company_id` column on media if needed.
+- **MC3:** `/me companies[]`, masters per selected PT for the APK, OpenAPI `X-Company-Ids` header component, APK
+  per-PT sync batches (`COMPANY_MISMATCH` already enforced), `/api/v1` queue endpoints `?company=` filter.
+- **MC4 review points:** legacy parts-less `AttScope` / `ReportScope` literals are still accepted by the domain
+  (`team` ids unchanged; `all` fail-closed) — no caller builds them from user input any more; notification template
+  editing (Admin of any PT) — decide group admin; group logo on consolidated PDFs.
+
 ## Backend (`feat/mc2-backend`)
 
 ### How to run (host has no node)
@@ -83,13 +143,11 @@ options, `domain/cash/ledger.ts` manual posting / edit / void, media collections
 
 ### Open / next
 
-- UI branch: adopt `narrowAttScope` in `Absensi.tsx` (company-less `narrow()` there), pass `auditScope` in
-  `Reports.tsx`, per-PT Kas / Tutup buku screens (`kasAccessIn`, `lockDates`, `company` on close), PT chips from
-  `company` / `companyId` fields, dashboard breakdown rows (`byCompany`). See `mc2-contract.md` §0.
+- ~~UI branch: adopt `narrowAttScope` …~~ → done in the integration (§Integration above).
 - **MC3/MC4 item (lead ask 6b, not built):** optional "copy defaults from DRMS" when a PT is created (numbering
   sequences, approval rules, work schedules, categories). Today the seed (`SEED_DATA_FILE` `companies[]` shape) gives
   every seeded PT the default sequences + approval rules; an admin action on `companies` create is open.
-- Attendance "Tim hari ini" rows (`TeamTodayRow`) carry no PT id yet (team members do: `TeamMember.companyId`).
+- ~~Attendance "Tim hari ini" rows carry no PT id~~ → `TeamTodayRow.companyId` (integration).
 - MC3: `/me companies[]`, masters per PT, OpenAPI `X-Company-Ids` header component, APK per-PT sync batches.
 - Performance: media office rules build id lists only for callers with the role in a SUBSET of the active PTs;
   measure with Q-34 × 3 PTs in MC4 (E9 p95 target).
@@ -226,10 +284,10 @@ by exact name only, never `docker … prune`): `pk-mc2u-net`, `pk-mc2u-node` (no
 
 ## Open TODOs / notes (UI)
 
-- **After merging feat/mc2-backend (`mc2-contract.md`):** `Absensi.tsx` `narrow()` → `narrowAttScope` (§0.1,
+- **Closed in the integration (§Integration):** `Absensi.tsx` `narrow()` → `narrowAttScope` (§0.1,
   cross-PT leak for office users until then); audit-log view → `auditScope(req)`; Tutup buku per PT (`kasAccessIn`,
   `lockDates`, close/reopen with `company`, §4); PT column in the Kas book (`BookRow.companyId`), attendance and
   K-09 progress (`companyId` on rows); switch `itemCompany` fallback lookups to the queue `company` refs (§3);
   report filter `pt` is rendered by the generic multiselect. TODO markers `TODO(mc2-contract …)` in code.
-- **Backend asks (not in the contract):** atomic batch endpoint for the role matrix (wireframe "tidak ada simpan
-  sebagian"); copy-from-DRMS actions on PT create (the import already seeds numbering + approval rules for new PTs).
+- **Backend asks (not in the contract):** atomic batch endpoint for the role matrix — done (contract §8, wired in the
+  integration); copy-from-DRMS actions on PT create → MC3/MC4 (the import already seeds numbering + approval rules).

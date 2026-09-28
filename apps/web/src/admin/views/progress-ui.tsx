@@ -23,6 +23,7 @@ export const PROGRESS_STYLE = `
 .pk-f3 a.pk-pvb-row:hover, .pk-f3 .pk-pvb-row:focus-visible { background: color-mix(in oklab, var(--pk-primary) 6%, transparent); }
 .pk-f3 .pk-pvb-row .l { min-width: 0; font-size: 13px; }
 .pk-f3 .pk-pvb-row .l span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pk-f3 .pk-pvb-row .l span.pk-pt-chip { display: inline-block; margin-right: 6px; vertical-align: 1px; }
 .pk-f3 .pk-pvb-row .l small { display: block; color: var(--pk-muted-fg); font-size: 11px; }
 .pk-f3 .pk-pvb-row .t { display: grid; gap: 2px; position: relative; }
 .pk-f3 .pk-pvb-row .t > span { position: relative; height: 10px; background: var(--viz-track); border-radius: 0 4px 4px 0; }

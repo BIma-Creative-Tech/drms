@@ -38,32 +38,70 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   active PT; `kode_pt` = MC2); the LPJ refund cash entry uses the "Pengembalian LPJ" source of the request's PT.
 - **MC1-6 — isolation suite** `tests/integration/mc-isolation.int.test.ts` (two PTs, per-PT reads/writes/approvals,
   forged header/cookie, DB cross-PT guards, per-PT numbering and period lock) + unit tests `mc1-access.test.ts`.
-- **MC2-2 — reports / KPI / exports per PT** (branch `feat/mc2-backend`, ADR 0016 §6, requirements v1.2 §5/§6):
-  `ReportScope` = list of per-PT scopes built from the role IN each selected PT (`officeScope`, `roleScope`,
-  `auditScope`, `teamScope`, `ownScope`); every raw SQL carries a company predicate (`companyScopeSql`,
-  `ledgerScopeSql`, …; "all" = the caller's PTs for that role, a company-blind `{ kind: 'all' }` matches nothing);
-  the 8 formerly unscoped KPI functions take a scope. Reports: parameter `pt` (narrows only), PT column + "Subtotal
-  per PT" table when > 1 PT, master labels prefixed `[CS1]`, categories never merged across PTs. Dashboards: per-PT
-  breakdown (`byCompany`) next to every combined total. Exports/PDF: one PT → that PT's letterhead, several → the
-  group letterhead (`groupName`/`groupPdfHeader`, else "Laporan gabungan: …") + PT list; PDF Author/Subject
-  metadata. Audit-log report per PT (rows without PT: Admin/Owner only).
-- **MC2-1 — domain services per PT:** approval inbox / transfer queue / LPJ queue (`lpjQueue`) consolidated with a
-  PT ref per item + optional PT filter; Kas balances / flows / period summaries limited to the Kas PTs of the
-  caller (`kasAccessIn`, `lockDates`), `POST /period-closings` `company` + `?company=` on reopen / list / balances
-  (400 "PT wajib dipilih" when ambiguous); attendance scope per PT (`AttScope.parts`, `narrowAttScope`), recap /
-  team today / corrections per employee PT, default schedule of the employee's PT; progress thresholds per project
-  PT; display names / PDF "Dibuat Oleh" = employee of the document's PT.
-- **MC2-3 — jobs per active PT:** daily reminders (own hour/toggles, recipients holding the role IN that PT,
-  notifications tagged with the PT, `reminder_runs (company_id, run_date)`, one PT's failure logged), reimburse
-  auto-close (that PT's days), selfie retention (months/switch per PT, app-wide batch per run).
-- **Media / sync (MC2):** office roles read media of their PTs only (all rows only when they hold the role in
-  every active PT); sync items are processed under the PT derived from their references — outside the
-  `X-Company-Ids` selection → rejected `COMPANY_MISMATCH`; feature flags / own employee of the item's PT.
-- **Role matrix batch save:** `POST /api/v1/company-memberships/batch` — all-or-nothing, Admin of each item's PT
-  or group admin, reason → `role_change` audit rows.
-- **Tests:** `tests/integration/mc2-isolation.int.test.ts` (3 PTs, users with different roles per PT: reports,
-  KPI, dashboards, exports/letterhead, queues, Kas, attendance, reminders, retention, media, sync) and the raw-SQL
-  company lint `tests/unit/mc2-sql-lint.test.ts`. Contract for the admin UI: `docs/proyekkas/mc/mc2-contract.md`.
+- **MC2 — multi-company domain, reports, jobs, admin UI and import** (branch `feat/mc2-integration` =
+  `feat/mc2-backend` + `feat/mc2-admin-ui`, ADR 0016 §5–§11, requirements v1.2 §5/§6; progress `mc/mc2-progress.md`):
+  - **Reports / KPI / exports per PT (MC2-2)** (ADR 0016 §6, requirements v1.2 §5/§6):
+    `ReportScope` = list of per-PT scopes built from the role IN each selected PT (`officeScope`, `roleScope`,
+    `auditScope`, `teamScope`, `ownScope`); every raw SQL carries a company predicate (`companyScopeSql`,
+    `ledgerScopeSql`, …; "all" = the caller's PTs for that role, a company-blind `{ kind: 'all' }` matches nothing);
+    the 8 formerly unscoped KPI functions take a scope. Reports: parameter `pt` (narrows only), PT column + "Subtotal
+    per PT" table when > 1 PT, master labels prefixed `[CS1]`, categories never merged across PTs. Dashboards: per-PT
+    breakdown (`byCompany`) next to every combined total. Exports/PDF: one PT → that PT's letterhead, several → the
+    group letterhead (`groupName`/`groupPdfHeader`, else "Laporan gabungan: …") + PT list; PDF Author/Subject
+    metadata. Audit-log report per PT (rows without PT: Admin/Owner only).
+  - **Domain services per PT (MC2-1):** approval inbox / transfer queue / LPJ queue (`lpjQueue`) consolidated with a
+    PT ref per item + optional PT filter; Kas balances / flows / period summaries limited to the Kas PTs of the
+    caller (`kasAccessIn`, `lockDates`), `POST /period-closings` `company` + `?company=` on reopen / list / balances
+    (400 "PT wajib dipilih" when ambiguous); attendance scope per PT (`AttScope.parts`, `narrowAttScope`), recap /
+    team today / corrections per employee PT, default schedule of the employee's PT; progress thresholds per project
+    PT; display names / PDF "Dibuat Oleh" = employee of the document's PT.
+  - **Jobs per active PT (MC2-3):** daily reminders (own hour/toggles, recipients holding the role IN that PT,
+    notifications tagged with the PT, `reminder_runs (company_id, run_date)`, one PT's failure logged), reimburse
+    auto-close (that PT's days), selfie retention (months/switch per PT, app-wide batch per run).
+  - **Media / sync:** office roles read media of their PTs only (all rows only when they hold the role in
+    every active PT); sync items are processed under the PT derived from their references — outside the
+    `X-Company-Ids` selection → rejected `COMPANY_MISMATCH`; feature flags / own employee of the item's PT.
+  - **Role matrix batch save:** `POST /api/v1/company-memberships/batch` — all-or-nothing, Admin of each item's PT
+    or group admin, reason → `role_change` audit rows; errors name the item (`errors[].path = items.<i>`).
+  - **PT switcher (MC2-4)** (ADR 0016 §5, wireframe `mc/wireframes.md` §1a):
+    module-bar control left of the bell (`admin/shell/CompanySwitcher.tsx`): one membership → the PT code as text;
+    several → dialog with "Semua PT saya" (tri-state) + one checkbox per PT (code, name, the user's roles there),
+    Terapkan / Batal, ≥ 1 PT, ↑/↓/Space/Esc, bottom sheet ≤ 768 px. New `POST /api/v1/me/companies` sets the HttpOnly
+    cookie `pk-company-ids` (`__Host-` on https; "Semua PT" = cookie cleared); a PT without membership → 403
+    `COMPANY_NOT_ALLOWED` (audited). OpenAPI regenerated.
+  - **Master Perusahaan + PT column/filter + employee ↔ PT (MC2-4)** (ADR 0016 §11, wireframes §3–§4): companies form
+    in tabs (Identitas / Operasional / Absensi & retensi / Pengingat & notifikasi), list Kode · Nama · Zona waktu ·
+    Anggota · Aktif · Dibuat; every list with a PT column (30 per-PT collections, memberships, notifications, audit
+    logs) shows the PT short-code chip first and, with more than one PT selected, PT filter chips above the table
+    (`admin/company-list.ts`). A chosen PT sits at the top of master forms; employee create requires the PT when
+    several PTs are selected; employee / project / cost-center / work-schedule pickers list only the document's PT.
+  - **Role matrix "Pengguna & akses PT" (MC2-4)** (`/admin/akses-pt`, wireframe §2): users × PTs, cell = membership
+    (role checkboxes, employee of that PT, add / deactivate), Admin of the PT or group admin, reason required, saved
+    in ONE atomic batch (a refused batch saves nothing and marks the failing cell), audit `role_change`, warnings for
+    a PT without active Direktur / Finance, mobile cards.
+  - **PT in custom views + dashboards (MC2-4):** approval inbox, transfer queue, LPJ verification and addendum list
+    show a PT column when more than one PT is selected; transfer / settlement forms offer only cash accounts of the
+    request's PT (transfer / void actions only for Finance OF that PT); Direktur / Finance / PM dashboard tiles show
+    per-PT rows under the combined totals (cash, waiting approvals, budget colours, completeness, transfer queue,
+    last closed period); K-09 progress rows carry a PT chip.
+  - **Kas + Tutup buku per PT:** balances with per-PT subtotal next to the combined total, PT filter + PT chip in the
+    book, edit / void and lock date per row PT; "Kas masuk/keluar" and "Tutup buku" act on ONE PT (PT chooser / tabs
+    when the caller holds the role in several), close / reopen always send `company` (a 400 "PT wajib dipilih" is
+    explained instead of echoed).
+  - **Absensi per PT:** PT filter on "Tim hari ini" and the monthly recap, project / cost-center filters bound to their
+    PT (`narrowAttScope`), PT chips on the grid and board (`TeamToday.members[].companyId`), option labels `[PT]`.
+  - **Reports view:** audit log uses `auditScope`; letterhead line of the effective PTs above the tables.
+  - **Go-live import per PT (MC2-5)** (`apps/web/src/import`, runbook §4.1): sheet `Perusahaan` (target PTs; existing
+    ones untouched, new ones created with default numbering + approval rules), `kode_pt` as first column of every
+    per-PT sheet (codes unique per PT; empty = the only PT), sheet `AksesPT` (roles per user per PT), validation of
+    unknown / inactive PTs and cross-PT references, cut-over per PT (PB start per PT). Template `MC2-5` regenerated,
+    new fictional two-PT sample `drms-impor-golive-contoh-fiktif-2pt.xlsx`.
+  - **Tests:** `tests/integration/mc2-isolation.int.test.ts` (3 PTs, users with different roles per PT: reports,
+    KPI, dashboards, exports/letterhead, queues, Kas, attendance, reminders, retention, media, sync) and the raw-SQL
+    company lint `tests/unit/mc2-sql-lint.test.ts`; `tests/integration/mc2-integration.int.test.ts` (2 PTs, different
+    roles per PT: switcher cookie × dashboards × queue × closing × role-matrix batch, Absensi filter regression),
+    `mc2-import`, unit `mc2-{admin-ui,switcher,role-matrix,import,integration}`. Contract backend ↔ UI:
+    `docs/proyekkas/mc/mc2-contract.md`.
 
 - **Seed:** `SEED_DATA_FILE` accepts the old single-company shape (→ company #1 DRMS) and a new
   `{ uoms, banks, companies: [...] }` shape; every PT gets the default sequences and approval rules.
@@ -82,30 +120,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   - Tests: web unit + integration (Keycloak mocked), `tests/kc/two-factor.kc.test.ts` against a real throwaway
     Keycloak 26.7.4 (`test-env/kc-setup.sh` gains a TEST-ONLY `proyekkas-web` client + user); mobile unit + widget.
   - Docs: ADR 0017; revisions in ADR 0012, `plans/fase1-golive.md` G1-3, ASVS checklist 4.3.1 / G-01 (decided).
-- **MC2-4 — PT switcher** (`apps/web`, branch `feat/mc2-admin-ui`, ADR 0016 §5, wireframe `mc/wireframes.md` §1a):
-  module-bar control left of the bell (`admin/shell/CompanySwitcher.tsx`): one membership → the PT code as text;
-  several → dialog with "Semua PT saya" (tri-state) + one checkbox per PT (code, name, the user's roles there),
-  Terapkan / Batal, ≥ 1 PT, ↑/↓/Space/Esc, bottom sheet ≤ 768 px. New `POST /api/v1/me/companies` sets the HttpOnly
-  cookie `pk-company-ids` (`__Host-` on https; "Semua PT" = cookie cleared); a PT without membership → 403
-  `COMPANY_NOT_ALLOWED` (audited). OpenAPI regenerated.
-- **MC2-4 — Master Perusahaan + PT column/filter + employee ↔ PT** (ADR 0016 §11, wireframes §3–§4): companies form
-  in tabs (Identitas / Operasional / Absensi & retensi / Pengingat & notifikasi), list Kode · Nama · Zona waktu ·
-  Anggota · Aktif · Dibuat; every list with a PT column (30 per-PT collections, memberships, notifications, audit
-  logs) shows the PT short-code chip first and, with more than one PT selected, PT filter chips above the table
-  (`admin/company-list.ts`). A chosen PT sits at the top of master forms; employee create requires the PT when
-  several PTs are selected; employee / project / cost-center / work-schedule pickers list only the document's PT.
-- **MC2-4 — role matrix "Pengguna & akses PT"** (`/admin/akses-pt`, wireframe §2): users × PTs, cell = membership
-  (role checkboxes, employee of that PT, add / deactivate), Admin of the PT or group admin, reason required, audit
-  `role_change` server-side, warnings for a PT without active Direktur / Finance, mobile cards.
-- **MC2-4 — PT in custom views + dashboards:** approval inbox, transfer queue, LPJ verification and addendum list
-  show a PT column when more than one PT is selected; transfer / settlement forms offer only cash accounts of the
-  request's PT; Direktur / Finance dashboard tiles show per-PT rows under the combined totals (backend payload
-  `byCompany`).
-- **MC2-5 — go-live import per PT** (`apps/web/src/import`, runbook §4.1): sheet `Perusahaan` (target PTs; existing
-  ones untouched, new ones created with default numbering + approval rules), `kode_pt` as first column of every
-  per-PT sheet (codes unique per PT; empty = the only PT), sheet `AksesPT` (roles per user per PT), validation of
-  unknown / inactive PTs and cross-PT references, cut-over per PT (PB start per PT). Template `MC2-5` regenerated,
-  new fictional two-PT sample `drms-impor-golive-contoh-fiktif-2pt.xlsx`.
 
 ### Changed
 - **`company-settings` global = app-wide only** (APK gate, device image targets, offline max age, selfie batch
@@ -123,6 +137,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   posting / edit / void checked only "Finance in any PT" → Finance of the account's / entry's PT (else 400/404);
   internal PDF copy, full bank number in the request DTO, cash rows in the request history, device revoke,
   attendance correction and PM on-behalf check-in now check the role in the document's PT.
+- **MC2 integration:** the Absensi recap built a company-less team scope from the query string — an office user of
+  PT A filtering by a project id of PT B saw B's attendance → `narrowAttScope` (filters stay inside each PT). The
+  Finance queues (transfer queue, LPJ verification, `GET /api/v1/transfer-queue`) listed the team requests of a PT
+  where the caller is only PM (with the bank snapshot) → limited to the PTs where the caller is Finance / Direktur.
 
 ### Removed
 - `users.roles` and `users.employee` (replaced by `company-memberships`).

@@ -351,7 +351,22 @@ cash posting/edit/void checked "Finance in any PT"; internal PDF, full bank numb
 request history, device revoke, attendance correction, PM on-behalf check-in — all now check the role in the
 document's PT.
 
+## Implementation notes (MC2 integration, 2026-09-28)
+
+Branch `feat/mc2-integration` = backend + admin UI merged, every `TODO(mc2-contract)` closed (see
+`../mc/mc2-progress.md` §Integration).
+
+| # | Design / contract | Implementation | Reason |
+|---|---|---|---|
+| 1 | UI builds scopes with the domain builders only (contract §0.1) | Absensi `narrow()` removed → `narrowAttScope`; new `narrowAttToCompanies` for the PT filter; audit-log view → `auditScope` | the company-less literal matched a project id of another PT (office user of A saw B's attendance) |
+| 2 | Queue rows = PTs where the caller's role grants read access (contract §3) | Finance queues (transfer queue, LPJ verification, their counts, `GET /api/v1/transfer-queue`) additionally limited to the PTs where the caller is Finance / Direktur (`officeQueueWhere`) | collection read access also returns the TEAM requests of a PT where the caller is only PM — with the unmasked bank snapshot of the queue row |
+| 3 | Closing names its PT | Tutup buku is one PT per screen (PT chooser / tabs), close / reopen always send `company`; a 400 "PT wajib dipilih" is shown as an instruction | ADR §4: closing PT A never locks PT B |
+| 4 | Role matrix save "tidak ada simpan sebagian" | one `POST /api/v1/company-memberships/batch` (Idempotency-Key); errors carry `errors[].path = items.<i>` so the UI marks the cell | per-cell REST calls could save half a matrix |
+| 5 | "Tim hari ini" rows | `TeamTodayRow.companyId` (+ OpenAPI `TeamToday.members[].companyId`) | PT chip on the board with > 1 PT |
+
 ## Revision history
+
+- **2026-09-28 (MC2 integration):** implementation notes MC2 integration (1–5).
 
 - **2026-09-28 (MC2 backend):** implementation notes MC2 (deviations 1–10).
 - **2026-09-28 (MC1):** implementation notes added (deviations 1–9 above).

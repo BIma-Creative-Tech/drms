@@ -236,6 +236,13 @@
   switcher in the module bar, `PT` column + filter in list views, import workbook with `kode_pt`.
   **Gate:** KPI reconciliation per PT and Σ PT = total (extends `f3-kpi-reconciliation`); US-MC-06…13, 15, 16, 18
   pass; browser check of switcher/matrix/consolidated screens at 1440 px and 390 px.
+  > **Status 2026-09-28 (branch `feat/mc2-integration` = `feat/mc2-backend` + `feat/mc2-admin-ui`): MC2 implemented** —
+  > progress log `mc/mc2-progress.md` (§Integration). Domain / reports / jobs / media / sync per PT, admin UI (switcher,
+  > company master, role matrix with atomic batch save, PT columns/filters, per-PT Kas + Tutup buku, Absensi PT filter,
+  > dashboard per-PT rows) and import `kode_pt`; every `TODO(mc2-contract)` closed. Gate evidence: Σ per PT = total
+  > (`mc2-isolation`, `mc2-integration`), isolation suites `mc-isolation` / `mc2-isolation` / `mc2-import` /
+  > `mc2-integration` green, visual check 1440 + 390 px light/dark. Moved on: "copy defaults from DRMS" on PT create
+  > (MC3/MC4 admin action), media-access performance with 3 PTs (MC4), `/me companies[]` + APK (MC3).
 - **MC3 — API + APK:** `X-Company-Ids`, `/me` `companies[]`, OpenAPI regenerated (`packages/api-contract`), APK PT
   switcher, per-PT capabilities, drift schema v3 (`companyId` on drafts/outbox/progress), per-PT master caches, sync per
   PT (`COMPANY_MISMATCH`). **Gate:** Flutter unit/widget tests + mock-backend flow with two PTs; phone test on staging

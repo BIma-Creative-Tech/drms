@@ -11,12 +11,13 @@ v1.2 §5/§6.
    (`officeScope`, `attendanceOfficeScope`, `auditScope`, `roleScope`, `teamScope`, `ownScope`,
    `attendanceScope`) and narrow with `narrowScope` / `narrowToCompanies` / `narrowAttScope`.
    A literal `{ kind: 'all' }` (no `companies`) now matches **nothing** (fail closed).
-   **Open UI item:** `admin/views/Absensi.tsx` `narrow()` (≈ L653) builds a company-less
+   **Closed in the integration:** `admin/views/Absensi.tsx` `narrow()` built a company-less
    `{ kind: 'team', projects: [id] }` from the query string — for an office user of PT A this matches
    the project id of PT B. Replace it with `narrowAttScope(scope, projectId, costCenterId)`
-   (`@/domain/attendance/queries`, also re-exported from `@/domain/attendance/web`).
+   (`@/domain/attendance/queries`, also re-exported from `@/domain/attendance/web`) — done; UI PT filter =
+   `narrowAttToCompanies(scope, ids)` (narrows only).
    `admin/views/Reports.tsx:102` passes `{ kind: 'all' }` to the audit report — harmless now (the audit
-   report ignores company-less scopes and uses `auditScope(req)`), but please pass `await auditScope(req)`.
+   report ignores company-less scopes and uses `auditScope(req)`), but please pass `await auditScope(req)` — done.
 2. **`hasRoleAny` / `req.user.roles` are UI hints only** (union over the selected PTs). For a button on
    a document use `hasRole(req, role, doc.company)`; for a list use the PT sets below.
 3. **Mutations name their PT.** `closePeriod` / `reopenPeriod` and `POST /api/v1/period-closings`
@@ -76,7 +77,8 @@ Invariant (tested): Σ `byCompany` = combined total.
 ## 3. Queues (`@/domain/expense/queues`)
 
 `approvalInbox(req, { companyIds? })`, `transferQueue(req, { companyIds? })`, `lpjQueue(req, { companyIds? })`
-(new), `transferQueueCount` / `lpjQueueCount(req, { companyIds? })`. Items carry
+(new), `transferQueueCount` / `lpjQueueCount(req, { companyIds? })`. The Finance queues (transfer, LPJ) list only the
+selected PTs where the caller is Finance / Direktur (`officeQueueWhere`; a PM PT's team requests never appear). Items carry
 `company: { id, shortCode, name } | null`; `approvalInbox` items' `budget.warnPct` is the item PT's
 threshold. `companyIds` = UI PT filter (narrows only). Rows are already limited to the selected PTs
 where the caller's role grants read access.
@@ -102,7 +104,8 @@ where the caller's role grants read access.
 - `AttScope` = `{ kind, … , parts: AttPart[] }`, `AttPart = { company, all, projects, costCenters }`.
   `attendanceScope(req)`: Admin/Owner/Finance of a PT → that PT in full; PM → team there.
 - `narrowAttScope(scope, projectId?, costCenterId?)` (see rule 1), `fullCompanies(scope)`.
-- `recapEmployees`, `scopeLocations`, `teamTodayFor` are per PT; `mayCorrect(req, scope, employeeId,
+- `recapEmployees`, `scopeLocations` (options carry `companyId`), `teamTodayFor` (`companyIds?` PT filter; rows carry
+  `companyId`) are per PT; `mayCorrect(req, scope, employeeId,
   companyId?)` — pass the employee's PT. `myRecap(req, month, companyId?)` (employee of that PT;
   default: first selected membership with an employee). `employeeRef` returns `companyId`.
 - `attendanceContext(req, companyId?)` — settings (TZ/default schedule) of that PT.
@@ -127,8 +130,11 @@ where the caller's role grants read access.
 All-or-nothing in one transaction: every item needs Admin OF ITS PT or the group admin (else 403, nothing
 saved); duplicate (user, PT) → 400; same-PT employee / immutable user+PT hooks of the collection apply (400);
 new row = `create`, changed roles/active = `role_change` audit rows carrying `reason`. Response
-`{ items: [{ id, user, company, roles, employee, active, created }] }`.
+`{ items: [{ id, user, company, roles, employee, active, created }] }`. Errors name the item:
+`errors: [{ path: 'items.<i>', message }]` (403 foreign PT, 400 duplicate / hook, 409 DB guard) — the matrix marks that cell.
 
 ## 9. Changelog of this contract
 
 - 2026-09-28: initial (reports, dashboards, queues, kas, attendance); §7 system collections / media / sync; §8 role-matrix batch endpoint.
+- 2026-09-28 (integration): §0.1 closed; §3 Finance queues limited to Finance/Direktur PTs; §5 `narrowAttToCompanies`,
+  option / team-today `companyId`; §8 per-item error paths; `VoidableTransfer.companyId`.

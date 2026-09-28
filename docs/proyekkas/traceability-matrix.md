@@ -162,7 +162,7 @@ migration = Direktur ("Diketahui" = approval) → Finance level 1 (Sprint S2 dec
 
 ## MC — Multi-company (ADR 0016, `requirements-v1.2.md`, added 2026-09-27)
 
-Status: **MC1 implemented** (branch `feat/mc1-foundation`, 2026-09-28; progress `mc/mc1-progress.md`) — MC2/MC3 planned.
+Status: **MC1 + MC2 implemented** (MC1 `feat/mc1-foundation`; MC2 `feat/mc2-integration`, 2026-09-28; progress `mc/mc1-progress.md`, `mc/mc2-progress.md`) — MC3/MC4 planned.
 Phase = MC sub-phase of `phase-plan.md`. "Isolation" = a user of PT A only gets 404 for PT B ids; "cross-PT" = DB
 trigger rejects the row.
 
@@ -183,6 +183,25 @@ trigger rejects the row.
 | US-MC-14 | REST sweep over the 30 per-PT collections + id 404 + forged header/cookie done; `/api/v1` route generator, media, PDF, export = MC2/MC3 | `mc-isolation` |
 | US-MC-18 | audit rows carry `company` (+ actor roles of that PT); filters = MC2 | `mc-isolation` (audit) |
 | US-MC-19 | done: migration on a develop-head copy (269 users, 637 requests, 475 cash entries): row counts + money sums identical before/after, down → up identical, next PB number unchanged | `mc/mc1-progress.md` §Migration check |
+
+**MC2 coverage (2026-09-28, branch `feat/mc2-integration`):**
+
+| US | MC2 status | Evidence |
+|---|---|---|
+| US-MC-01 | company master UI done (tabs, member count, group-admin create/deactivate); "copy defaults from DRMS" on create = MC3/MC4 (seed + import already give a new PT the default sequences + approval rules) | `tests/unit/mc2-admin-ui.test.ts`, `mc2-import.int.test.ts` |
+| US-MC-02 | role matrix `/admin/akses-pt` done; atomic `POST /api/v1/company-memberships/batch` (all-or-nothing, per-cell error path, `role_change` + reason) | `mc2-role-matrix.test.ts`, `mc2-isolation` (batch), `mc2-integration` (Admin of A: mixed batch 403 `items.1`, nothing saved) |
+| US-MC-03 | employee ↔ PT: PT on top of master forms, pickers per PT, PT required when ambiguous | `mc2-admin-ui.test.ts` |
+| US-MC-04 | PT switcher + `POST /api/v1/me/companies` done | `mc2-switcher.test.ts`, `mc2-integration` (cookie gates finance/PM dashboards; foreign PT → 403) |
+| US-MC-06 | queues per PT with `company` ref + PT column; Finance queues limited to Finance/Direktur PTs | `mc2-isolation` (queues), `mc2-integration` (PM PT never in the transfer queue) |
+| US-MC-09 | Tutup buku one PT per screen, `company` on close/reopen, lock date per PT | `mc2-isolation`, `mc2-integration` (Finance of 2 PTs: 400 without PT, closing B keeps A's lock date) |
+| US-MC-10 | dashboards per role PTs with typed `byCompany` rows (Σ = total) | `mc2-isolation` (dashboards), `mc2-integration` (switcher × dashboards), `mc2-integration.test.ts` |
+| US-MC-11 | reports: `pt` parameter, PT column, subtotal per PT, per-PT / group letterhead (screen + exports) | `mc2-isolation` (reports, exports) |
+| US-MC-12 | approval holders per PT (MC1) + inbox PT chips + warn % of the item's PT | `mc2-isolation`, E1 suites |
+| US-MC-13 | pickers per PT (forms, Kas, attendance filters with `[PT]` labels) | `mc2-admin-ui.test.ts`, `mc2-integration` (Absensi) |
+| US-MC-14 | attendance filters bound to the PT (`narrowAttScope`); media per PT; sync `COMPANY_MISMATCH` | `mc2-integration` (office user of A + project of B → nothing), `mc2-isolation` (media, sync) |
+| US-MC-15 | jobs loop over active PTs with that PT's settings | `mc2-isolation` (reminders, retention) |
+| US-MC-16 | import `kode_pt`, sheets Perusahaan + AksesPT | `mc2-import.test.ts`, `mc2-import.int.test.ts` |
+| US-MC-18 | audit log per PT (`auditScope`), rows without PT: Admin/Direktur only | `mc2-isolation` (audit) |
 
 | US | Module | Roles | Payload collections | API | Screen | Phase | Test type |
 |---|---|---|---|---|---|---|---|
