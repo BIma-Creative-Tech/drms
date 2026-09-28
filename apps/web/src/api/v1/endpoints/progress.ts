@@ -7,6 +7,7 @@ import { createReport, editReport, loadVisibleReport } from '@/domain/progress/r
 import { loadStageSet, requireVisibleProject, saveStageSet } from '@/domain/progress/stages'
 import { withReqTransaction } from '@/lib/system-tx'
 
+import { companyQuery } from '../company-query'
 import { HttpError, json, v1 } from '../http'
 import { ProgressReportCreate, ProgressReportListQuery, ProgressReportUpdate, ProjectProgressQuery, StageSetBody } from '../schemas-progress'
 
@@ -80,6 +81,7 @@ export const listReportsEndpoint = v1({
         mine: q.mine !== undefined,
         limit: q.limit,
         after: decodeCursor(q.cursor),
+        companyIds: await companyQuery(req),
       })
       return json({ items: page.items, nextCursor: page.nextCursor === null ? null : encodeCursor(page.nextCursor) })
     }

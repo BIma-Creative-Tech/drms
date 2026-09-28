@@ -563,6 +563,7 @@ function summary(d: AddendumDoc, n: Names) {
   return {
     id: d.id,
     uuid: d.uuid ?? null,
+    companyId: relId(d.company) ?? null, // MC3: PT chip
     docNo: d.docNo ?? null,
     status: d.status,
     statusLabel: ADDENDUM_STATUS_LABELS[d.status],
@@ -614,7 +615,7 @@ export async function addendumDetail(req: PayloadRequest, doc: AddendumDoc) {
   }
 }
 
-export type AddendumFilter = { projectId?: number; status?: AddendumStatus; mine?: boolean; limit: number; after?: number }
+export type AddendumFilter = { projectId?: number; status?: AddendumStatus; mine?: boolean; limit: number; after?: number; companyIds?: readonly number[] }
 
 /** List (newest first, caller scope: PM team/own, Direktur/Finance all), cursor on id. */
 export async function listAddenda(req: PayloadRequest, f: AddendumFilter): Promise<{ items: AddendumSummary[]; nextCursor: number | null }> {
@@ -624,6 +625,7 @@ export async function listAddenda(req: PayloadRequest, f: AddendumFilter): Promi
   if (f.status) and.push({ status: { equals: f.status } })
   if (f.mine) and.push({ createdBy: { equals: userId(req) ?? -1 } })
   if (f.after !== undefined) and.push({ id: { less_than: f.after } })
+  if (f.companyIds?.length) and.push({ company: { in: [...f.companyIds] } }) // MC3: narrows only
   const res = await req.payload.find({
     collection: 'budget-addenda',
     where: and.length ? { and } : undefined,
@@ -641,11 +643,11 @@ export async function listAddenda(req: PayloadRequest, f: AddendumFilter): Promi
 }
 
 /** Addenda waiting for the CALLER's decision (Direktur "Diketahui" / Finance level), oldest first. */
-export async function addendumInbox(req: PayloadRequest) {
+export async function addendumInbox(req: PayloadRequest, f: { companyIds?: readonly number[] } = {}) {
   if (!hasRoleAny(req, 'pk-owner', 'pk-finance')) return { items: [] as Array<AddendumSummary & { step: 'acknowledge' | 'approve'; budget: { current: number; afterAddition: number; committedPctBefore: number | null; committedPctAfter: number | null } }> }
   const res = await req.payload.find({
     collection: 'budget-addenda',
-    where: { status: { in: ['pending_ack', 'pending_approval'] } },
+    where: f.companyIds?.length ? { and: [{ status: { in: ['pending_ack', 'pending_approval'] } }, { company: { in: [...f.companyIds] } }] } : { status: { in: ['pending_ack', 'pending_approval'] } },
     sort: 'submittedAt',
     limit: 200,
     depth: 0,

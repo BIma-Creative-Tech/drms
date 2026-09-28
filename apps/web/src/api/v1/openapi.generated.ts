@@ -27,6 +27,10 @@ export const openapiDocument = {
       }
     },
     "schemas": {
+      "CompanyIds": {
+        "type": "string",
+        "pattern": "^[1-9]\\d{0,8}([, ]+[1-9]\\d{0,8})*$"
+      },
       "Health": {
         "type": "object",
         "properties": {
@@ -91,7 +95,8 @@ export const openapiDocument = {
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/Role"
-            }
+            },
+            "description": "DEPRECATED (MC3, kept for mobile-v0.2.0): union of the roles over the SELECTED PTs. Use companies[].roles."
           },
           "capabilities": {
             "type": "object",
@@ -114,7 +119,7 @@ export const openapiDocument = {
               "teamMonitor",
               "progressReportCreate"
             ],
-            "description": "UI hints for the APK (E1); the server guards stay authoritative."
+            "description": "DEPRECATED (MC3): derived from the top-level `roles` (union over the selected PTs). Use companies[].capabilities."
           },
           "employee": {
             "type": [
@@ -136,7 +141,8 @@ export const openapiDocument = {
               "id",
               "code",
               "name"
-            ]
+            ],
+            "description": "DEPRECATED (MC3): employee of the PT `legacyCompanyId`. Use companies[].employee."
           },
           "authMethod": {
             "type": "string",
@@ -207,7 +213,59 @@ export const openapiDocument = {
               "receiptRoundingTolerance",
               "receiptMaxAgeDays",
               "imageTargets"
-            ]
+            ],
+            "description": "DEPRECATED (MC3): per-PT values of `legacyCompanyId` + app-wide values. Use companies[].settings + appSettings."
+          },
+          "companies": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MeCompany"
+            },
+            "description": "MC3: every active membership of the caller (active PTs), ascending id."
+          },
+          "activeCompanyIds": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            },
+            "description": "MC3: effective selection of this request (ascending)."
+          },
+          "legacyCompanyId": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "MC3: PT of the deprecated single-PT fields = first selected membership (ascending id) with an employee, else the first selected one. One PT → that PT."
+          },
+          "appSettings": {
+            "type": "object",
+            "properties": {
+              "minAppVersion": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "latestAppVersion": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "offlineMaxAgeDays": {
+                "type": "integer"
+              },
+              "imageTargets": {
+                "$ref": "#/components/schemas/ImageTargets"
+              }
+            },
+            "required": [
+              "minAppVersion",
+              "latestAppVersion",
+              "offlineMaxAgeDays",
+              "imageTargets"
+            ],
+            "description": "MC3: app-wide settings (one APK for all PTs)."
           },
           "serverTime": {
             "type": "string"
@@ -223,6 +281,10 @@ export const openapiDocument = {
           "authMethod",
           "device",
           "settings",
+          "companies",
+          "activeCompanyIds",
+          "legacyCompanyId",
+          "appSettings",
           "serverTime"
         ]
       },
@@ -262,6 +324,142 @@ export const openapiDocument = {
           "progressPhotosMaxPx",
           "jpegQuality"
         ]
+      },
+      "MeCompany": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "code": {
+            "type": "string",
+            "description": "PT short code ({COMPANY} token of document numbers), e.g. DRMS."
+          },
+          "name": {
+            "type": "string"
+          },
+          "timezone": {
+            "type": "string",
+            "description": "IANA; this release: equals the server TZ for every PT (ADR 0016 §9)."
+          },
+          "selected": {
+            "type": "boolean",
+            "description": "In the effective selection of THIS request (X-Company-Ids / cookie ∩ memberships; default all)."
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Role"
+            },
+            "description": "Roles IN this PT (company_memberships)."
+          },
+          "employeeId": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "Employee record of the caller in this PT (ADR 0016 D1: one per PT)."
+          },
+          "employee": {
+            "$ref": "#/components/schemas/EmployeeRef"
+          },
+          "capabilities": {
+            "$ref": "#/components/schemas/Capabilities"
+          },
+          "settings": {
+            "type": "object",
+            "properties": {
+              "defaultGeofenceRadiusM": {
+                "type": "integer"
+              },
+              "receiptRoundingTolerance": {
+                "type": "integer"
+              },
+              "receiptMaxAgeDays": {
+                "type": "integer"
+              },
+              "budgetWarnPct": {
+                "type": "number"
+              },
+              "syncExpenseDraftsEnabled": {
+                "type": "boolean"
+              },
+              "syncAttendanceEnabled": {
+                "type": "boolean"
+              },
+              "syncProgressReportsEnabled": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "defaultGeofenceRadiusM",
+              "receiptRoundingTolerance",
+              "receiptMaxAgeDays",
+              "budgetWarnPct",
+              "syncExpenseDraftsEnabled",
+              "syncAttendanceEnabled",
+              "syncProgressReportsEnabled"
+            ],
+            "description": "Per-PT settings the APK needs (feature flags are applied per item PT: sync FEATURE_DISABLED)."
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "name",
+          "timezone",
+          "selected",
+          "roles",
+          "employeeId",
+          "employee",
+          "capabilities",
+          "settings"
+        ]
+      },
+      "EmployeeRef": {
+        "type": [
+          "object",
+          "null"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "name"
+        ]
+      },
+      "Capabilities": {
+        "type": "object",
+        "properties": {
+          "approvalInbox": {
+            "type": "boolean",
+            "description": "ADR 0013: holds pk-owner (label \"Direktur\") or pk-finance → show the approval inbox."
+          },
+          "teamMonitor": {
+            "type": "boolean",
+            "description": "Holds pk-pm → team list/dashboard (monitoring only, no decisions)."
+          },
+          "progressReportCreate": {
+            "type": "boolean",
+            "description": "E4: holds pk-pm (team projects) or pk-owner (all) → may create progress reports."
+          }
+        },
+        "required": [
+          "approvalInbox",
+          "teamMonitor",
+          "progressReportCreate"
+        ],
+        "description": "UI hints for the APK (E1); the server guards stay authoritative."
       },
       "Problem": {
         "type": "object",
@@ -317,6 +515,38 @@ export const openapiDocument = {
           "serverTime": {
             "type": "string"
           },
+          "companies": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer"
+                },
+                "code": {
+                  "type": "string"
+                },
+                "defaultGeofenceRadiusM": {
+                  "type": "integer"
+                },
+                "version": {
+                  "type": "string",
+                  "description": "Hash of this PT's items of the requested types in this answer (same types → same version = nothing changed)."
+                }
+              },
+              "required": [
+                "id",
+                "code",
+                "defaultGeofenceRadiusM",
+                "version"
+              ]
+            },
+            "description": "MC3: PTs covered by this answer (selection narrowed by ?company=), ascending id."
+          },
+          "sharedVersion": {
+            "type": "string",
+            "description": "MC3: hash of the shared masters in this answer."
+          },
           "types": {
             "type": "object",
             "additionalProperties": {
@@ -341,13 +571,16 @@ export const openapiDocument = {
         },
         "required": [
           "serverTime",
+          "companies",
+          "sharedVersion",
           "types"
-        ]
+        ],
+        "description": "Response header ETag (weak); send it back as If-None-Match → 304 without a body when nothing changed. Cache per PT: request with X-Company-Ids (or ?company=) = one PT."
       },
       "MasterItem": {
         "type": "object",
         "additionalProperties": {},
-        "description": "Whitelisted fields per type (id, updatedAt, active, …)"
+        "description": "Whitelisted fields per type (id, updatedAt, active, …) plus MC3 `company` (PT id; null for shared masters) and `shared` (true for banks, uoms, holidays)."
       },
       "Device": {
         "type": "object",
@@ -626,6 +859,14 @@ export const openapiDocument = {
               "null"
             ]
           },
+          "companyId": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "exclusiveMinimum": 0,
+            "description": "MC3: PT of the request (label: GET /me companies[])."
+          },
           "openWarningFlags": {
             "type": "integer"
           }
@@ -645,7 +886,8 @@ export const openapiDocument = {
           "requestDate",
           "neededDate",
           "createdById",
-          "updatedAt"
+          "updatedAt",
+          "companyId"
         ]
       },
       "RequestType": {
@@ -754,6 +996,14 @@ export const openapiDocument = {
               "string",
               "null"
             ]
+          },
+          "companyId": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "exclusiveMinimum": 0,
+            "description": "MC3: PT of the request (label: GET /me companies[])."
           },
           "openWarningFlags": {
             "type": "integer"
@@ -1661,6 +1911,7 @@ export const openapiDocument = {
           "neededDate",
           "createdById",
           "updatedAt",
+          "companyId",
           "openWarningFlags",
           "uuid",
           "project",
@@ -2532,6 +2783,126 @@ export const openapiDocument = {
         ],
         "additionalProperties": false
       },
+      "LpjQueue": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                "company": {
+                  "$ref": "#/components/schemas/CompanyRef"
+                },
+                "docNo": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "type": {
+                  "$ref": "#/components/schemas/RequestType"
+                },
+                "typeLabel": {
+                  "type": "string"
+                },
+                "status": {
+                  "$ref": "#/components/schemas/RequestStatus"
+                },
+                "statusLabel": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "scope": {
+                  "type": "string"
+                },
+                "requesters": {
+                  "type": "string"
+                },
+                "grandTotal": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 10000000000000
+                },
+                "approvedAmount": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "minimum": 0,
+                  "maximum": 10000000000000
+                },
+                "neededDate": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "requestDate": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "transferredTotal": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 10000000000000
+                }
+              },
+              "required": [
+                "id",
+                "company",
+                "docNo",
+                "type",
+                "typeLabel",
+                "status",
+                "statusLabel",
+                "title",
+                "scope",
+                "requesters",
+                "grandTotal",
+                "approvedAmount",
+                "neededDate",
+                "requestDate",
+                "transferredTotal"
+              ]
+            }
+          }
+        },
+        "required": [
+          "items"
+        ]
+      },
+      "CompanyRef": {
+        "type": [
+          "object",
+          "null"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "exclusiveMinimum": 0
+          },
+          "shortCode": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "shortCode",
+          "name"
+        ]
+      },
       "MediaUploaded": {
         "type": "object",
         "properties": {
@@ -2747,6 +3118,14 @@ export const openapiDocument = {
               "string",
               "null"
             ]
+          },
+          "companyId": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "exclusiveMinimum": 0,
+            "description": "MC3: PT of the entry."
           }
         },
         "required": [
@@ -2770,7 +3149,8 @@ export const openapiDocument = {
           "reversalOfId",
           "reversedById",
           "voidReason",
-          "postedAt"
+          "postedAt",
+          "companyId"
         ]
       },
       "CashEntryCreate": {
@@ -3450,6 +3830,30 @@ export const openapiDocument = {
                   "type": "integer",
                   "exclusiveMinimum": 0
                 },
+                "company": {
+                  "type": [
+                    "object",
+                    "null"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0
+                    },
+                    "shortCode": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "shortCode",
+                    "name"
+                  ],
+                  "description": "MC2/MC3: PT of the request."
+                },
                 "docNo": {
                   "type": [
                     "string",
@@ -3576,6 +3980,7 @@ export const openapiDocument = {
               },
               "required": [
                 "id",
+                "company",
                 "docNo",
                 "type",
                 "typeLabel",
@@ -3673,6 +4078,14 @@ export const openapiDocument = {
           },
           "createdAt": {
             "type": "string"
+          },
+          "companyId": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "exclusiveMinimum": 0,
+            "description": "MC3: PT of the document the notification is about (null = app-wide)."
           }
         },
         "required": [
@@ -3685,7 +4098,8 @@ export const openapiDocument = {
           "docId",
           "docNo",
           "readAt",
-          "createdAt"
+          "createdAt",
+          "companyId"
         ]
       },
       "NotificationsReadAll": {
@@ -3943,7 +4357,7 @@ export const openapiDocument = {
               "properties": {
                 "code": {
                   "type": "string",
-                  "description": "VALIDATION, NOT_EDITABLE, STALE_REV (conflict), NOT_FOUND, FORBIDDEN, MEDIA_MISSING, CLIENT_UUID_CONFLICT, COMPANY_MISMATCH (MC2: the PT derived from the item references is not in the X-Company-Ids selection / memberships; send the item under its own PT), FEATURE_DISABLED, DEPENDENCY_FAILED, DEPENDENCY_PENDING, STATE_CONFLICT, INTEGRITY, UNSUPPORTED, INTERNAL; attendance: MOCK_LOCATION, OUTSIDE_GEOFENCE, NOT_ASSIGNED, NO_GEOFENCE, ALREADY_CHECKED_IN, NO_CHECK_IN, ALREADY_CHECKED_OUT (on_behalf also FORBIDDEN: not a PM / not a team location / own attendance); progress reports: WEIGHTS_INCOMPLETE, PROGRESS_DECREASED, PHOTO_LIMIT, MEDIA_IN_USE."
+                  "description": "VALIDATION, NOT_EDITABLE, STALE_REV (conflict), NOT_FOUND, FORBIDDEN, MEDIA_MISSING, CLIENT_UUID_CONFLICT, COMPANY_NOT_ALLOWED (MC3: company_id is not an active membership of the caller), COMPANY_MISMATCH (MC3: the PT derived from the item references ≠ company_id — or ≠ the only PT of a caller without company_id), FEATURE_DISABLED, DEPENDENCY_FAILED, DEPENDENCY_PENDING, STATE_CONFLICT, INTEGRITY, UNSUPPORTED, INTERNAL; attendance: MOCK_LOCATION, OUTSIDE_GEOFENCE, NOT_ASSIGNED, NO_GEOFENCE, ALREADY_CHECKED_IN, NO_CHECK_IN, ALREADY_CHECKED_OUT (on_behalf also FORBIDDEN: not a PM / not a team location / own attendance); progress reports: WEIGHTS_INCOMPLETE, PROGRESS_DECREASED, PHOTO_LIMIT, MEDIA_IN_USE."
                 },
                 "field": {
                   "type": "string"
@@ -3957,6 +4371,13 @@ export const openapiDocument = {
                 "message"
               ]
             }
+          },
+          "company_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "MC3: PT the item was processed under (company_id, or the only PT of a legacy item); null when it was not an allowed PT."
           },
           "server_copy": {
             "$ref": "#/components/schemas/SyncDraftCopy"
@@ -4451,6 +4872,11 @@ export const openapiDocument = {
           },
           "type": {
             "$ref": "#/components/schemas/SyncItemType"
+          },
+          "company_id": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "description": "MC3: PT of this item (an active membership of the caller). The item is processed under this PT whatever X-Company-Ids says; the PT derived from its references must match (else COMPANY_MISMATCH). Omitted (released APK ≤ 0.2.x) → the caller's only PT; a caller with several PTs gets 409 COMPANY_REQUIRED for the whole batch."
           },
           "schema_version": {
             "type": "number",
@@ -5293,6 +5719,14 @@ export const openapiDocument = {
               "null"
             ]
           },
+          "companyId": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "exclusiveMinimum": 0,
+            "description": "MC3: PT of the project."
+          },
           "docNo": {
             "type": [
               "string",
@@ -5472,6 +5906,7 @@ export const openapiDocument = {
         "required": [
           "id",
           "uuid",
+          "companyId",
           "docNo",
           "project",
           "stage",
@@ -6294,6 +6729,14 @@ export const openapiDocument = {
               "null"
             ]
           },
+          "companyId": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "exclusiveMinimum": 0,
+            "description": "MC3: PT of the project."
+          },
           "docNo": {
             "type": [
               "string",
@@ -6451,6 +6894,7 @@ export const openapiDocument = {
         "required": [
           "id",
           "uuid",
+          "companyId",
           "docNo",
           "status",
           "statusLabel",
@@ -6488,6 +6932,14 @@ export const openapiDocument = {
                     "string",
                     "null"
                   ]
+                },
+                "companyId": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "exclusiveMinimum": 0,
+                  "description": "MC3: PT of the project."
                 },
                 "docNo": {
                   "type": [
@@ -6683,6 +7135,7 @@ export const openapiDocument = {
               "required": [
                 "id",
                 "uuid",
+                "companyId",
                 "docNo",
                 "status",
                 "statusLabel",
@@ -6723,6 +7176,14 @@ export const openapiDocument = {
               "string",
               "null"
             ]
+          },
+          "companyId": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "exclusiveMinimum": 0,
+            "description": "MC3: PT of the project."
           },
           "docNo": {
             "type": [
@@ -7091,6 +7552,7 @@ export const openapiDocument = {
         "required": [
           "id",
           "uuid",
+          "companyId",
           "docNo",
           "status",
           "statusLabel",
@@ -7253,7 +7715,17 @@ export const openapiDocument = {
         "additionalProperties": false
       }
     },
-    "parameters": {}
+    "parameters": {
+      "CompanyIds": {
+        "schema": {
+          "$ref": "#/components/schemas/CompanyIds"
+        },
+        "required": false,
+        "name": "X-Company-Ids",
+        "in": "header",
+        "description": "PTs to read (comma separated company ids, e.g. \"1,3\"). Only NARROWS the caller's active memberships; absent = all memberships (web: the switcher cookie). A PT without an active membership (or a malformed value) → 403 code COMPANY_NOT_ALLOWED (audited). Mutations are checked against the role in the DOCUMENT's PT; sync items carry their own company_id."
+      }
+    }
   },
   "paths": {
     "/health": {
@@ -7321,7 +7793,7 @@ export const openapiDocument = {
     },
     "/me": {
       "get": {
-        "summary": "Current user, effective roles, employee link and settings subset",
+        "summary": "Current user + company context: companies[] (roles, employee, capabilities, settings per PT), activeCompanyIds; deprecated single-PT fields for the released APK (legacyCompanyId)",
         "security": [
           {
             "bearer": []
@@ -7351,6 +7823,9 @@ export const openapiDocument = {
             "description": "APK version; below company minimum → 426.",
             "name": "X-App-Version",
             "in": "header"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
           }
         ],
         "responses": {
@@ -7389,7 +7864,7 @@ export const openapiDocument = {
     },
     "/masters": {
       "get": {
-        "summary": "Master data for the APK (access-filtered, delta sync)",
+        "summary": "Master data for the APK per PT (access-filtered, delta sync, company on each item, shared masters marked, per-PT version + ETag)",
         "security": [
           {
             "bearer": []
@@ -7403,10 +7878,10 @@ export const openapiDocument = {
             "schema": {
               "type": "string",
               "pattern": "^[a-z-]+(,[a-z-]+)*$",
-              "description": "Comma separated subset of: projects, project-stages, cost-centers, expense-categories, uoms, vehicles, employees, banks, bank-accounts, work-schedules, holidays, team-assignments. Default: all."
+              "description": "Comma separated subset of: projects, project-stages, cost-centers, expense-categories, uoms, vehicles, employees, banks, bank-accounts, work-schedules, holidays, team-assignments, vendors, cash-in-sources. Default: all."
             },
             "required": false,
-            "description": "Comma separated subset of: projects, project-stages, cost-centers, expense-categories, uoms, vehicles, employees, banks, bank-accounts, work-schedules, holidays, team-assignments. Default: all.",
+            "description": "Comma separated subset of: projects, project-stages, cost-centers, expense-categories, uoms, vehicles, employees, banks, bank-accounts, work-schedules, holidays, team-assignments, vendors, cash-in-sources. Default: all.",
             "name": "types",
             "in": "query"
           },
@@ -7419,6 +7894,17 @@ export const openapiDocument = {
             "required": false,
             "description": "Only records updated after this instant (delta sync).",
             "name": "since",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9]\\d{0,8}(,[1-9]\\d{0,8})*$",
+              "description": "MC3: PT filter (comma separated ids). Only narrows the effective selection (X-Company-Ids / cookie ∩ memberships); a PT outside it → 403 COMPANY_NOT_ALLOWED."
+            },
+            "required": false,
+            "description": "MC3: PT filter (comma separated ids). Only narrows the effective selection (X-Company-Ids / cookie ∩ memberships); a PT outside it → 403 COMPANY_NOT_ALLOWED.",
+            "name": "company",
             "in": "query"
           },
           {
@@ -7441,11 +7927,24 @@ export const openapiDocument = {
             "description": "APK version; below company minimum → 426.",
             "name": "X-App-Version",
             "in": "header"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "ETag of a previous answer → 304 when unchanged."
+            },
+            "required": false,
+            "description": "ETag of a previous answer → 304 when unchanged.",
+            "name": "If-None-Match",
+            "in": "header"
           }
         ],
         "responses": {
           "200": {
-            "description": "Masters",
+            "description": "Masters (header ETag)",
             "content": {
               "application/json": {
                 "schema": {
@@ -7453,6 +7952,9 @@ export const openapiDocument = {
                 }
               }
             }
+          },
+          "304": {
+            "description": "Not modified (If-None-Match matched the ETag)"
           },
           "400": {
             "description": "Problem",
@@ -7465,6 +7967,16 @@ export const openapiDocument = {
             }
           },
           "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
             "description": "Problem",
             "content": {
               "application/problem+json": {
@@ -7516,6 +8028,9 @@ export const openapiDocument = {
             "description": "APK version; below company minimum → 426.",
             "name": "X-App-Version",
             "in": "header"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
           }
         ],
         "requestBody": {
@@ -7653,6 +8168,9 @@ export const openapiDocument = {
             "description": "APK version; below company minimum → 426.",
             "name": "X-App-Version",
             "in": "header"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
           }
         ],
         "requestBody": {
@@ -7899,6 +8417,17 @@ export const openapiDocument = {
           {
             "schema": {
               "type": "string",
+              "pattern": "^[1-9]\\d{0,8}(,[1-9]\\d{0,8})*$",
+              "description": "MC3: PT filter (comma separated ids). Only narrows the effective selection (X-Company-Ids / cookie ∩ memberships); a PT outside it → 403 COMPANY_NOT_ALLOWED."
+            },
+            "required": false,
+            "description": "MC3: PT filter (comma separated ids). Only narrows the effective selection (X-Company-Ids / cookie ∩ memberships); a PT outside it → 403 COMPANY_NOT_ALLOWED.",
+            "name": "company",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
               "format": "uuid",
               "description": "Registered install id (APK)."
             },
@@ -7916,6 +8445,9 @@ export const openapiDocument = {
             "description": "APK version; below company minimum → 426.",
             "name": "X-App-Version",
             "in": "header"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
           }
         ],
         "responses": {
@@ -7972,6 +8504,9 @@ export const openapiDocument = {
           }
         ],
         "parameters": [
+          {
+            "$ref": "#/components/parameters/CompanyIds"
+          },
           {
             "schema": {
               "type": "string",
@@ -8139,6 +8674,9 @@ export const openapiDocument = {
             "description": "APK version; below company minimum → 426.",
             "name": "X-App-Version",
             "in": "header"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
           }
         ],
         "responses": {
@@ -8224,6 +8762,9 @@ export const openapiDocument = {
             "description": "APK version; below company minimum → 426.",
             "name": "X-App-Version",
             "in": "header"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
           }
         ],
         "requestBody": {
@@ -8370,6 +8911,9 @@ export const openapiDocument = {
             "description": "APK version; below company minimum → 426.",
             "name": "X-App-Version",
             "in": "header"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
           }
         ],
         "responses": {
@@ -8436,6 +8980,9 @@ export const openapiDocument = {
             "required": true,
             "name": "id",
             "in": "path"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
           },
           {
             "schema": {
@@ -8585,6 +9132,9 @@ export const openapiDocument = {
             "in": "path"
           },
           {
+            "$ref": "#/components/parameters/CompanyIds"
+          },
+          {
             "schema": {
               "type": "string",
               "format": "uuid",
@@ -8730,6 +9280,9 @@ export const openapiDocument = {
             "required": true,
             "name": "id",
             "in": "path"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
           },
           {
             "schema": {
@@ -8879,6 +9432,9 @@ export const openapiDocument = {
             "in": "path"
           },
           {
+            "$ref": "#/components/parameters/CompanyIds"
+          },
+          {
             "schema": {
               "type": "string",
               "format": "uuid",
@@ -9014,6 +9570,9 @@ export const openapiDocument = {
             "required": true,
             "name": "id",
             "in": "path"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
           },
           {
             "schema": {
@@ -9163,6 +9722,9 @@ export const openapiDocument = {
             "in": "path"
           },
           {
+            "$ref": "#/components/parameters/CompanyIds"
+          },
+          {
             "schema": {
               "type": "string",
               "format": "uuid",
@@ -9308,6 +9870,9 @@ export const openapiDocument = {
             "required": true,
             "name": "id",
             "in": "path"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
           },
           {
             "schema": {
@@ -9457,6 +10022,9 @@ export const openapiDocument = {
             "in": "path"
           },
           {
+            "$ref": "#/components/parameters/CompanyIds"
+          },
+          {
             "schema": {
               "type": "string",
               "format": "uuid",
@@ -9602,6 +10170,9 @@ export const openapiDocument = {
             "required": true,
             "name": "id",
             "in": "path"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
           },
           {
             "schema": {
@@ -9779,6 +10350,9 @@ export const openapiDocument = {
             "description": "APK version; below company minimum → 426.",
             "name": "X-App-Version",
             "in": "header"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
           }
         ],
         "requestBody": {
@@ -9913,6 +10487,9 @@ export const openapiDocument = {
             "required": true,
             "name": "rid",
             "in": "path"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
           },
           {
             "schema": {
@@ -10071,6 +10648,9 @@ export const openapiDocument = {
             "in": "path"
           },
           {
+            "$ref": "#/components/parameters/CompanyIds"
+          },
+          {
             "schema": {
               "type": "string",
               "format": "uuid",
@@ -10227,6 +10807,9 @@ export const openapiDocument = {
             "in": "path"
           },
           {
+            "$ref": "#/components/parameters/CompanyIds"
+          },
+          {
             "schema": {
               "type": "string",
               "format": "uuid",
@@ -10374,6 +10957,9 @@ export const openapiDocument = {
             "in": "path"
           },
           {
+            "$ref": "#/components/parameters/CompanyIds"
+          },
+          {
             "schema": {
               "type": "string",
               "format": "uuid",
@@ -10519,6 +11105,9 @@ export const openapiDocument = {
             "required": true,
             "name": "id",
             "in": "path"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
           },
           {
             "schema": {
@@ -10677,6 +11266,9 @@ export const openapiDocument = {
             "in": "path"
           },
           {
+            "$ref": "#/components/parameters/CompanyIds"
+          },
+          {
             "schema": {
               "type": "string",
               "format": "uuid",
@@ -10822,6 +11414,9 @@ export const openapiDocument = {
             "required": true,
             "name": "id",
             "in": "path"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
           },
           {
             "schema": {
@@ -10980,6 +11575,9 @@ export const openapiDocument = {
             "in": "path"
           },
           {
+            "$ref": "#/components/parameters/CompanyIds"
+          },
+          {
             "schema": {
               "type": "string",
               "format": "uuid",
@@ -11107,13 +11705,50 @@ export const openapiDocument = {
     },
     "/transfer-queue": {
       "get": {
-        "summary": "Finance/Owner: Uang Muka \"Disetujui\" + Reimburse \"Nota Terverifikasi\", by needed date (US-19)",
+        "summary": "Finance/Owner: Uang Muka \"Disetujui\" + Reimburse \"Nota Terverifikasi\", by needed date (US-19); PTs where the caller is Finance/Direktur, ?company= narrows",
         "security": [
           {
             "bearer": []
           },
           {
             "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9]\\d{0,8}(,[1-9]\\d{0,8})*$",
+              "description": "MC3: PT filter (comma separated ids). Only narrows the effective selection (X-Company-Ids / cookie ∩ memberships); a PT outside it → 403 COMPANY_NOT_ALLOWED."
+            },
+            "required": false,
+            "description": "MC3: PT filter (comma separated ids). Only narrows the effective selection (X-Company-Ids / cookie ∩ memberships); a PT outside it → 403 COMPANY_NOT_ALLOWED.",
+            "name": "company",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": true,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "APK version; below company minimum → 426."
+            },
+            "required": false,
+            "description": "APK version; below company minimum → 426.",
+            "name": "X-App-Version",
+            "in": "header"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
           }
         ],
         "responses": {
@@ -11123,6 +11758,16 @@ export const openapiDocument = {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ExpenseRequestList"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
                 }
               }
             }
@@ -11138,6 +11783,108 @@ export const openapiDocument = {
             }
           },
           "403": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/lpj-queue": {
+      "get": {
+        "summary": "MC3 Finance/Owner: LPJ verification list (Uang Muka \"LPJ Diajukan\" / \"LPJ Terverifikasi\", US-21) of the PTs where the caller is Finance/Direktur, with company refs; ?company= narrows",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9]\\d{0,8}(,[1-9]\\d{0,8})*$",
+              "description": "MC3: PT filter (comma separated ids). Only narrows the effective selection (X-Company-Ids / cookie ∩ memberships); a PT outside it → 403 COMPANY_NOT_ALLOWED."
+            },
+            "required": false,
+            "description": "MC3: PT filter (comma separated ids). Only narrows the effective selection (X-Company-Ids / cookie ∩ memberships); a PT outside it → 403 COMPANY_NOT_ALLOWED.",
+            "name": "company",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": true,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "APK version; below company minimum → 426."
+            },
+            "required": false,
+            "description": "APK version; below company minimum → 426.",
+            "name": "X-App-Version",
+            "in": "header"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Queue",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LpjQueue"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
             "description": "Problem",
             "content": {
               "application/problem+json": {
@@ -11190,6 +11937,9 @@ export const openapiDocument = {
             "description": "APK version; below company minimum → 426.",
             "name": "X-App-Version",
             "in": "header"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
           }
         ],
         "requestBody": {
@@ -11371,6 +12121,41 @@ export const openapiDocument = {
             "required": false,
             "name": "cursor",
             "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9]\\d{0,8}(,[1-9]\\d{0,8})*$",
+              "description": "MC3: PT filter (comma separated ids). Only narrows the effective selection (X-Company-Ids / cookie ∩ memberships); a PT outside it → 403 COMPANY_NOT_ALLOWED."
+            },
+            "required": false,
+            "description": "MC3: PT filter (comma separated ids). Only narrows the effective selection (X-Company-Ids / cookie ∩ memberships); a PT outside it → 403 COMPANY_NOT_ALLOWED.",
+            "name": "company",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": true,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "APK version; below company minimum → 426."
+            },
+            "required": false,
+            "description": "APK version; below company minimum → 426.",
+            "name": "X-App-Version",
+            "in": "header"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
           }
         ],
         "responses": {
@@ -11427,6 +12212,9 @@ export const openapiDocument = {
           }
         ],
         "parameters": [
+          {
+            "$ref": "#/components/parameters/CompanyIds"
+          },
           {
             "schema": {
               "type": "string",
@@ -11553,6 +12341,9 @@ export const openapiDocument = {
             "required": true,
             "name": "id",
             "in": "path"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
           },
           {
             "schema": {
@@ -11682,6 +12473,9 @@ export const openapiDocument = {
             "in": "path"
           },
           {
+            "$ref": "#/components/parameters/CompanyIds"
+          },
+          {
             "schema": {
               "type": "string",
               "format": "uuid",
@@ -11799,7 +12593,7 @@ export const openapiDocument = {
     },
     "/cash-accounts/balances": {
       "get": {
-        "summary": "Finance/Direktur (pk-owner): balance per cash account (opening + in − out)",
+        "summary": "Finance/Direktur (pk-owner): balance per cash account (opening + in − out) of the selected PTs where the caller is Finance/Direktur; ?company= narrows (outside the selection → 403 COMPANY_NOT_ALLOWED)",
         "security": [
           {
             "bearer": []
@@ -11820,11 +12614,37 @@ export const openapiDocument = {
           {
             "schema": {
               "type": "string",
-              "pattern": "^\\d+$"
+              "pattern": "^[1-9]\\d{0,8}(,[1-9]\\d{0,8})*$",
+              "description": "MC3: PT filter (comma separated ids). Only narrows the effective selection (X-Company-Ids / cookie ∩ memberships); a PT outside it → 403 COMPANY_NOT_ALLOWED."
             },
             "required": false,
+            "description": "MC3: PT filter (comma separated ids). Only narrows the effective selection (X-Company-Ids / cookie ∩ memberships); a PT outside it → 403 COMPANY_NOT_ALLOWED.",
             "name": "company",
             "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": true,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "APK version; below company minimum → 426."
+            },
+            "required": false,
+            "description": "APK version; below company minimum → 426.",
+            "name": "X-App-Version",
+            "in": "header"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
           }
         ],
         "responses": {
@@ -11883,6 +12703,9 @@ export const openapiDocument = {
           }
         ],
         "parameters": [
+          {
+            "$ref": "#/components/parameters/CompanyIds"
+          },
           {
             "schema": {
               "type": "string",
@@ -11991,7 +12814,7 @@ export const openapiDocument = {
     },
     "/period-closings": {
       "get": {
-        "summary": "Closed periods and the lock date per PT (`company` narrows to one PT)",
+        "summary": "Closed periods and the lock date per PT (`company` narrows to one selected PT; outside the selection → 403 COMPANY_NOT_ALLOWED)",
         "security": [
           {
             "bearer": []
@@ -12004,11 +12827,35 @@ export const openapiDocument = {
           {
             "schema": {
               "type": "string",
-              "pattern": "^\\d+$"
+              "pattern": "^[1-9]\\d{0,8}$"
             },
             "required": false,
             "name": "company",
             "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": true,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "APK version; below company minimum → 426."
+            },
+            "required": false,
+            "description": "APK version; below company minimum → 426.",
+            "name": "X-App-Version",
+            "in": "header"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
           }
         ],
         "responses": {
@@ -12065,6 +12912,9 @@ export const openapiDocument = {
           }
         ],
         "parameters": [
+          {
+            "$ref": "#/components/parameters/CompanyIds"
+          },
           {
             "schema": {
               "type": "string",
@@ -12202,6 +13052,9 @@ export const openapiDocument = {
             "in": "query"
           },
           {
+            "$ref": "#/components/parameters/CompanyIds"
+          },
+          {
             "schema": {
               "type": "string",
               "format": "uuid",
@@ -12327,6 +13180,9 @@ export const openapiDocument = {
             "required": true,
             "name": "id",
             "in": "path"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
           },
           {
             "schema": {
@@ -12476,6 +13332,9 @@ export const openapiDocument = {
             "in": "path"
           },
           {
+            "$ref": "#/components/parameters/CompanyIds"
+          },
+          {
             "schema": {
               "type": "string",
               "format": "uuid",
@@ -12621,6 +13480,9 @@ export const openapiDocument = {
             "required": true,
             "name": "id",
             "in": "path"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
           },
           {
             "schema": {
@@ -12770,6 +13632,9 @@ export const openapiDocument = {
             "in": "path"
           },
           {
+            "$ref": "#/components/parameters/CompanyIds"
+          },
+          {
             "schema": {
               "type": "string",
               "format": "uuid",
@@ -12917,6 +13782,9 @@ export const openapiDocument = {
             "in": "path"
           },
           {
+            "$ref": "#/components/parameters/CompanyIds"
+          },
+          {
             "schema": {
               "type": "string",
               "format": "uuid",
@@ -13062,6 +13930,9 @@ export const openapiDocument = {
             "required": true,
             "name": "id",
             "in": "path"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
           },
           {
             "schema": {
@@ -13244,6 +14115,9 @@ export const openapiDocument = {
             "description": "APK version; below company minimum → 426.",
             "name": "X-App-Version",
             "in": "header"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
           }
         ],
         "responses": {
@@ -13343,7 +14217,7 @@ export const openapiDocument = {
     },
     "/approvals/inbox": {
       "get": {
-        "summary": "Requests waiting for the caller's \"Diketahui\"/approval, with budget impact % before → after and open flags (US-26, US-59)",
+        "summary": "Requests waiting for the caller's \"Diketahui\"/approval, with budget impact % before → after, open flags and the PT (US-26, US-59); ?company= narrows",
         "security": [
           {
             "bearer": []
@@ -13353,6 +14227,17 @@ export const openapiDocument = {
           }
         ],
         "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9]\\d{0,8}(,[1-9]\\d{0,8})*$",
+              "description": "MC3: PT filter (comma separated ids). Only narrows the effective selection (X-Company-Ids / cookie ∩ memberships); a PT outside it → 403 COMPANY_NOT_ALLOWED."
+            },
+            "required": false,
+            "description": "MC3: PT filter (comma separated ids). Only narrows the effective selection (X-Company-Ids / cookie ∩ memberships); a PT outside it → 403 COMPANY_NOT_ALLOWED.",
+            "name": "company",
+            "in": "query"
+          },
           {
             "schema": {
               "type": "string",
@@ -13373,6 +14258,9 @@ export const openapiDocument = {
             "description": "APK version; below company minimum → 426.",
             "name": "X-App-Version",
             "in": "header"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
           }
         ],
         "responses": {
@@ -13458,6 +14346,17 @@ export const openapiDocument = {
           {
             "schema": {
               "type": "string",
+              "pattern": "^[1-9]\\d{0,8}(,[1-9]\\d{0,8})*$",
+              "description": "MC3: PT filter (comma separated ids). Only narrows the effective selection (X-Company-Ids / cookie ∩ memberships); a PT outside it → 403 COMPANY_NOT_ALLOWED."
+            },
+            "required": false,
+            "description": "MC3: PT filter (comma separated ids). Only narrows the effective selection (X-Company-Ids / cookie ∩ memberships); a PT outside it → 403 COMPANY_NOT_ALLOWED.",
+            "name": "company",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
               "format": "uuid",
               "description": "Registered install id (APK)."
             },
@@ -13475,6 +14374,9 @@ export const openapiDocument = {
             "description": "APK version; below company minimum → 426.",
             "name": "X-App-Version",
             "in": "header"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
           }
         ],
         "responses": {
@@ -13563,6 +14465,9 @@ export const openapiDocument = {
             "description": "APK version; below company minimum → 426.",
             "name": "X-App-Version",
             "in": "header"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
           }
         ],
         "responses": {
@@ -13651,6 +14556,9 @@ export const openapiDocument = {
             "description": "APK version; below company minimum → 426.",
             "name": "X-App-Version",
             "in": "header"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
           }
         ],
         "responses": {
@@ -13739,6 +14647,9 @@ export const openapiDocument = {
             "description": "APK version; below company minimum → 426.",
             "name": "X-App-Version",
             "in": "header"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
           }
         ],
         "responses": {
@@ -13878,6 +14789,9 @@ export const openapiDocument = {
             "description": "APK version; below company minimum → 426.",
             "name": "X-App-Version",
             "in": "header"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
           }
         ],
         "responses": {
@@ -14015,6 +14929,9 @@ export const openapiDocument = {
             "description": "APK version; below company minimum → 426.",
             "name": "X-App-Version",
             "in": "header"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
           }
         ],
         "responses": {
@@ -14124,7 +15041,7 @@ export const openapiDocument = {
     "/sync/batch": {
       "post": {
         "summary": "APK offline queue replay (bearer + registered device = device_id). Items in order, one transaction each; always 200 with one result per item (applied | duplicate | rejected | conflict | deferred | unsupported). Rate limit 12/min.",
-        "description": "Item types: expense_request.draft_upsert (payload SyncDraftUpsertPayload), expense_request.draft_delete (payload SyncDraftDeletePayload), attendance.check_in / attendance.check_out (payload SyncAttendancePayload: project_id OR cost_center_id; selfie first with POST /media/selfies; company-settings.syncAttendanceEnabled, else rejected FEATURE_DISABLED; rejection codes MOCK_LOCATION, OUTSIDE_GEOFENCE, NOT_ASSIGNED, NO_GEOFENCE, ALREADY_CHECKED_IN, NO_CHECK_IN, ALREADY_CHECKED_OUT, MEDIA_MISSING, FORBIDDEN), attendance.on_behalf (payload SyncOnBehalfPayload, US-14: PM only, team location, not own, reason required; GPS + photo from the PM phone); progress_report.draft_upsert (payload SyncProgressReportPayload; photos first with POST /media/progress-photos, ≤ 5; new report = PM of a team project or Direktur; edit = reporter within 24 h with base_rev + reason, else conflict/NOT_EDITABLE with server_report; company-settings.syncProgressReportsEnabled, else FEATURE_DISABLED; codes WEIGHTS_INCOMPLETE, PROGRESS_DECREASED, PHOTO_LIMIT, MEDIA_IN_USE, MEDIA_MISSING, FORBIDDEN). Receipt images are uploaded first with POST /media/receipts and referenced by media_id. Replaying a client_uuid returns the stored result as duplicate. Edits of an existing draft need base_rev = server rev, else conflict + server_copy (server wins).",
+        "description": "Item types: expense_request.draft_upsert (payload SyncDraftUpsertPayload), expense_request.draft_delete (payload SyncDraftDeletePayload), attendance.check_in / attendance.check_out (payload SyncAttendancePayload: project_id OR cost_center_id; selfie first with POST /media/selfies; company-settings.syncAttendanceEnabled, else rejected FEATURE_DISABLED; rejection codes MOCK_LOCATION, OUTSIDE_GEOFENCE, NOT_ASSIGNED, NO_GEOFENCE, ALREADY_CHECKED_IN, NO_CHECK_IN, ALREADY_CHECKED_OUT, MEDIA_MISSING, FORBIDDEN), attendance.on_behalf (payload SyncOnBehalfPayload, US-14: PM only, team location, not own, reason required; GPS + photo from the PM phone); progress_report.draft_upsert (payload SyncProgressReportPayload; photos first with POST /media/progress-photos, ≤ 5; new report = PM of a team project or Direktur; edit = reporter within 24 h with base_rev + reason, else conflict/NOT_EDITABLE with server_report; company-settings.syncProgressReportsEnabled, else FEATURE_DISABLED; codes WEIGHTS_INCOMPLETE, PROGRESS_DECREASED, PHOTO_LIMIT, MEDIA_IN_USE, MEDIA_MISSING, FORBIDDEN). Receipt images are uploaded first with POST /media/receipts and referenced by media_id. Replaying a client_uuid returns the stored result as duplicate. Edits of an existing draft need base_rev = server rev, else conflict + server_copy (server wins). MC3 (ADR 0016 §8): every item carries company_id (an active membership) and is processed under that PT whatever X-Company-Ids says (feature flags, timezone, own employee of that PT); the PT derived from the references must match (else rejected COMPANY_MISMATCH; a foreign company_id → COMPANY_NOT_ALLOWED). Items WITHOUT company_id (released APK ≤ 0.2.x) are accepted only for an account with exactly one PT; otherwise the whole batch answers 409 code COMPANY_REQUIRED (errors[].path = items.<i>.company_id, nothing processed).",
         "security": [
           {
             "bearer": []
@@ -14162,6 +15079,9 @@ export const openapiDocument = {
             "description": "Optional (= batch_id); items are idempotent by client_uuid.",
             "name": "Idempotency-Key",
             "in": "header"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
           }
         ],
         "requestBody": {
@@ -14205,6 +15125,16 @@ export const openapiDocument = {
             }
           },
           "403": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
             "description": "Problem",
             "content": {
               "application/problem+json": {
@@ -14301,6 +15231,9 @@ export const openapiDocument = {
             "description": "APK version; below company minimum → 426.",
             "name": "X-App-Version",
             "in": "header"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
           }
         ],
         "responses": {
@@ -14408,6 +15341,9 @@ export const openapiDocument = {
             "description": "APK version; below company minimum → 426.",
             "name": "X-App-Version",
             "in": "header"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
           }
         ],
         "responses": {
@@ -14472,6 +15408,9 @@ export const openapiDocument = {
             "required": true,
             "name": "id",
             "in": "path"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
           },
           {
             "schema": {
@@ -14684,6 +15623,17 @@ export const openapiDocument = {
           {
             "schema": {
               "type": "string",
+              "pattern": "^[1-9]\\d{0,8}(,[1-9]\\d{0,8})*$",
+              "description": "MC3: PT filter (comma separated ids). Only narrows the effective selection (X-Company-Ids / cookie ∩ memberships); a PT outside it → 403 COMPANY_NOT_ALLOWED."
+            },
+            "required": false,
+            "description": "MC3: PT filter (comma separated ids). Only narrows the effective selection (X-Company-Ids / cookie ∩ memberships); a PT outside it → 403 COMPANY_NOT_ALLOWED.",
+            "name": "company",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
               "format": "uuid",
               "description": "Registered install id (APK)."
             },
@@ -14701,6 +15651,9 @@ export const openapiDocument = {
             "description": "APK version; below company minimum → 426.",
             "name": "X-App-Version",
             "in": "header"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
           }
         ],
         "responses": {
@@ -14758,6 +15711,9 @@ export const openapiDocument = {
           }
         ],
         "parameters": [
+          {
+            "$ref": "#/components/parameters/CompanyIds"
+          },
           {
             "schema": {
               "type": "string",
@@ -14935,6 +15891,9 @@ export const openapiDocument = {
             "description": "APK version; below company minimum → 426.",
             "name": "X-App-Version",
             "in": "header"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
           }
         ],
         "responses": {
@@ -14999,6 +15958,9 @@ export const openapiDocument = {
             "required": true,
             "name": "id",
             "in": "path"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
           },
           {
             "schema": {
@@ -15158,6 +16120,9 @@ export const openapiDocument = {
             "description": "APK version; below company minimum → 426.",
             "name": "X-App-Version",
             "in": "header"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
           }
         ],
         "responses": {
@@ -16045,6 +17010,9 @@ export const openapiDocument = {
             "description": "APK version; below company minimum → 426.",
             "name": "X-App-Version",
             "in": "header"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
           }
         ],
         "responses": {
@@ -16716,6 +17684,9 @@ export const openapiDocument = {
             "description": "APK version; below company minimum → 426.",
             "name": "X-App-Version",
             "in": "header"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
           }
         ],
         "responses": {
@@ -17513,6 +18484,9 @@ export const openapiDocument = {
             "description": "APK version; below company minimum → 426.",
             "name": "X-App-Version",
             "in": "header"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
           }
         ],
         "responses": {
@@ -17633,6 +18607,9 @@ export const openapiDocument = {
             "description": "APK version; below company minimum → 426.",
             "name": "X-App-Version",
             "in": "header"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
           }
         ],
         "responses": {
@@ -18132,6 +19109,9 @@ export const openapiDocument = {
             "description": "APK version; below company minimum → 426.",
             "name": "X-App-Version",
             "in": "header"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
           }
         ],
         "responses": {
@@ -18688,6 +19668,9 @@ export const openapiDocument = {
             "description": "APK version; below company minimum → 426.",
             "name": "X-App-Version",
             "in": "header"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
           }
         ],
         "responses": {
@@ -18822,6 +19805,17 @@ export const openapiDocument = {
           {
             "schema": {
               "type": "string",
+              "pattern": "^[1-9]\\d{0,8}(,[1-9]\\d{0,8})*$",
+              "description": "MC3: ONE PT = whose own employee (one employee per PT); default: the first selected PT with an employee. Outside the selection → 403 COMPANY_NOT_ALLOWED."
+            },
+            "required": false,
+            "description": "MC3: ONE PT = whose own employee (one employee per PT); default: the first selected PT with an employee. Outside the selection → 403 COMPANY_NOT_ALLOWED.",
+            "name": "company",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
               "format": "uuid",
               "description": "Registered install id (APK)."
             },
@@ -18839,6 +19833,9 @@ export const openapiDocument = {
             "description": "APK version; below company minimum → 426.",
             "name": "X-App-Version",
             "in": "header"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
           }
         ],
         "responses": {
@@ -18957,6 +19954,9 @@ export const openapiDocument = {
             "description": "APK version; below company minimum → 426.",
             "name": "X-App-Version",
             "in": "header"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
           }
         ],
         "responses": {
@@ -19077,6 +20077,17 @@ export const openapiDocument = {
           {
             "schema": {
               "type": "string",
+              "pattern": "^[1-9]\\d{0,8}(,[1-9]\\d{0,8})*$",
+              "description": "MC3: PT filter (comma separated ids). Only narrows the effective selection (X-Company-Ids / cookie ∩ memberships); a PT outside it → 403 COMPANY_NOT_ALLOWED."
+            },
+            "required": false,
+            "description": "MC3: PT filter (comma separated ids). Only narrows the effective selection (X-Company-Ids / cookie ∩ memberships); a PT outside it → 403 COMPANY_NOT_ALLOWED.",
+            "name": "company",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
               "format": "uuid",
               "description": "Registered install id (APK)."
             },
@@ -19094,6 +20105,9 @@ export const openapiDocument = {
             "description": "APK version; below company minimum → 426.",
             "name": "X-App-Version",
             "in": "header"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
           }
         ],
         "responses": {
@@ -19180,6 +20194,9 @@ export const openapiDocument = {
             "required": true,
             "name": "id",
             "in": "path"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
           },
           {
             "schema": {
@@ -19348,6 +20365,9 @@ export const openapiDocument = {
             "description": "APK version; below company minimum → 426.",
             "name": "X-App-Version",
             "in": "header"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
           }
         ],
         "responses": {
@@ -19479,6 +20499,17 @@ export const openapiDocument = {
           {
             "schema": {
               "type": "string",
+              "pattern": "^[1-9]\\d{0,8}(,[1-9]\\d{0,8})*$",
+              "description": "MC3: PT filter (comma separated ids). Only narrows the effective selection (X-Company-Ids / cookie ∩ memberships); a PT outside it → 403 COMPANY_NOT_ALLOWED."
+            },
+            "required": false,
+            "description": "MC3: PT filter (comma separated ids). Only narrows the effective selection (X-Company-Ids / cookie ∩ memberships); a PT outside it → 403 COMPANY_NOT_ALLOWED.",
+            "name": "company",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
               "format": "uuid",
               "description": "Registered install id (APK)."
             },
@@ -19496,6 +20527,9 @@ export const openapiDocument = {
             "description": "APK version; below company minimum → 426.",
             "name": "X-App-Version",
             "in": "header"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
           }
         ],
         "responses": {
@@ -19552,6 +20586,9 @@ export const openapiDocument = {
           }
         ],
         "parameters": [
+          {
+            "$ref": "#/components/parameters/CompanyIds"
+          },
           {
             "schema": {
               "type": "string",
@@ -19680,7 +20717,7 @@ export const openapiDocument = {
     },
     "/budget-addenda/inbox": {
       "get": {
-        "summary": "Addenda waiting for the caller: Direktur \"Setujui\" (step acknowledge) or Finance approval (step approve), with RAB impact",
+        "summary": "Addenda waiting for the caller: Direktur \"Setujui\" (step acknowledge) or Finance approval (step approve), with RAB impact; ?company= narrows (MC3)",
         "security": [
           {
             "bearer": []
@@ -19690,6 +20727,17 @@ export const openapiDocument = {
           }
         ],
         "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9]\\d{0,8}(,[1-9]\\d{0,8})*$",
+              "description": "MC3: PT filter (comma separated ids). Only narrows the effective selection (X-Company-Ids / cookie ∩ memberships); a PT outside it → 403 COMPANY_NOT_ALLOWED."
+            },
+            "required": false,
+            "description": "MC3: PT filter (comma separated ids). Only narrows the effective selection (X-Company-Ids / cookie ∩ memberships); a PT outside it → 403 COMPANY_NOT_ALLOWED.",
+            "name": "company",
+            "in": "query"
+          },
           {
             "schema": {
               "type": "string",
@@ -19710,6 +20758,9 @@ export const openapiDocument = {
             "description": "APK version; below company minimum → 426.",
             "name": "X-App-Version",
             "in": "header"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
           }
         ],
         "responses": {
@@ -19787,6 +20838,9 @@ export const openapiDocument = {
             "description": "APK version; below company minimum → 426.",
             "name": "X-App-Version",
             "in": "header"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
           }
         ],
         "responses": {
@@ -19851,6 +20905,9 @@ export const openapiDocument = {
             "required": true,
             "name": "id",
             "in": "path"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
           },
           {
             "schema": {
@@ -20000,6 +21057,9 @@ export const openapiDocument = {
             "in": "path"
           },
           {
+            "$ref": "#/components/parameters/CompanyIds"
+          },
+          {
             "schema": {
               "type": "string",
               "format": "uuid",
@@ -20136,6 +21196,9 @@ export const openapiDocument = {
             "required": true,
             "name": "id",
             "in": "path"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
           },
           {
             "schema": {
@@ -20285,6 +21348,9 @@ export const openapiDocument = {
             "in": "path"
           },
           {
+            "$ref": "#/components/parameters/CompanyIds"
+          },
+          {
             "schema": {
               "type": "string",
               "format": "uuid",
@@ -20432,6 +21498,9 @@ export const openapiDocument = {
             "in": "path"
           },
           {
+            "$ref": "#/components/parameters/CompanyIds"
+          },
+          {
             "schema": {
               "type": "string",
               "format": "uuid",
@@ -20577,6 +21646,9 @@ export const openapiDocument = {
             "required": true,
             "name": "id",
             "in": "path"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
           },
           {
             "schema": {

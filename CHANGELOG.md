@@ -6,6 +6,37 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### MC3 — API (MC3-1, branch `feat/mc3-api`; ADR 0016 §5/§8, `docs/proyekkas/mc/mc3-progress.md`)
+
+#### Added
+- **`GET /api/v1/me` company context:** `companies[]` (every active membership: `code`, `name`, `timezone`,
+  `selected`, roles, `employeeId`/`employee`, capabilities and APK settings per PT), `activeCompanyIds`,
+  `legacyCompanyId`, app-wide `appSettings`.
+- **Masters per PT:** `company` + `shared` on every item (banks, UoM, holidays shared), default geofence radius of the
+  item's PT, `companies[].version` + `sharedVersion`, weak `ETag` with `If-None-Match` → 304, `?company=`; new types
+  `vendors`, `cash-in-sources`.
+- **`sync/batch` per-item `company_id`:** processed under that PT whatever `X-Company-Ids` says (flags, TZ, own
+  employee of that PT); codes `COMPANY_NOT_ALLOWED` / `COMPANY_MISMATCH` per item, `company_id` in results; items of
+  the released APK (no `company_id`) accepted for one-PT accounts, otherwise 409 `COMPANY_REQUIRED` for the batch.
+- **`?company=` PT filter** (subset of the selection, else 403 `COMPANY_NOT_ALLOWED`) on the approval inbox,
+  transfer queue, new `GET /api/v1/lpj-queue`, expense list, addenda list/inbox, progress reports, cash entries,
+  balances, period closings, notifications, attendance (`/attendance/me` per PT, team today).
+- `companyId` on expense list/detail, cash entries, notifications, addenda and progress reports; `company` ref on
+  approval inbox rows.
+- OpenAPI: reusable header parameter `X-Company-Ids` (`components.parameters.CompanyIds`) on every authenticated
+  path; contract regenerated (`packages/api-contract/openapi.json`).
+- Route table of all 91 `/api/v1` routes with a completeness test (`tests/integration/mc3-api.int.test.ts`,
+  `tests/unit/mc3-api.test.ts`).
+
+#### Deprecated
+- Top-level `roles`, `capabilities`, `employee`, `settings` of `GET /me` (kept for mobile-v0.2.0; one PT → unchanged
+  values; several PTs → union roles, employee/settings of `legacyCompanyId`).
+
+#### Security
+- `GET /api/v1/cash-accounts/balances?company=` returned the balances of any PT; `GET /api/v1/period-closings?company=`
+  the lock date of any PT — both now limited to the caller's selection (403 + audit otherwise).
+- `GET /me` `settings` no longer falls back to company #1 for a user who is not a member there.
+
 ### Added
 - **MC1-1 — companies + per-PT memberships** (`apps/web`, branch `feat/mc1-foundation`, ADR 0016 §1–§2):
   collections `companies` (identity + per-PT operational settings moved from the `company-settings` global; company

@@ -130,7 +130,8 @@ export function v1<B extends z.ZodType | undefined = undefined>(opts: V1Options<
             return problem(403, 'Forbidden', { code: 'COMPANY_NOT_ALLOWED', detail: 'PT yang diminta bukan PT Anda.' })
           }
           // role in ANY selected PT (list endpoints); document mutations re-check the role in the
-          // document's PT inside the domain services (ADR 0016 §5). MC3: per-route review.
+          // document's PT inside the domain services (ADR 0016 §5). MC3-1 route table (class per
+          // route + evidence): docs/proyekkas/mc/mc3-progress.md, tests/integration/mc3-api.int.test.ts.
           if (opts.roles && !hasRoleAny(req, ...opts.roles)) return problem(403, 'Forbidden')
           const meta = requestMeta(req)
           if (meta.source === 'apk') {

@@ -1,5 +1,7 @@
 import { z } from 'zod'
 
+import { companyFilterParam } from './schemas'
+
 /**
  * E6 — attendance read/correct contract (US-09, US-13, US-15). Pure module (bundled by
  * scripts/gen-openapi.mjs). Writes of check-in/out and PM on-behalf go through POST /sync/batch
@@ -10,7 +12,12 @@ const businessDate = z.string().regex(/^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[0
 const month = z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, 'YYYY-MM')
 const iso = z.string().meta({ description: 'UTC ISO-8601 instant.' })
 
-export const AttendanceMonthQuery = z.object({ month: month.optional().meta({ description: 'Default: current month (company TZ).' }) }).meta({ id: 'AttendanceMonthQuery' })
+export const AttendanceMonthQuery = z
+  .object({
+    month: month.optional().meta({ description: 'Default: current month (company TZ).' }),
+    company: companyFilterParam.meta({ description: 'MC3: ONE PT = whose own employee (one employee per PT); default: the first selected PT with an employee. Outside the selection → 403 COMPANY_NOT_ALLOWED.' }),
+  })
+  .meta({ id: 'AttendanceMonthQuery' })
 export const AttendanceRecapQuery = z
   .object({ employee_id: z.string().regex(/^\d{1,10}$/).meta({ description: 'employees id' }), month: month.optional() })
   .meta({ id: 'AttendanceRecapQuery' })
@@ -19,6 +26,7 @@ export const TeamTodayQuery = z
     date: businessDate.optional().meta({ description: 'Default: today (company TZ); not in the future.' }),
     project_id: z.string().regex(/^\d{1,10}$/).optional(),
     cost_center_id: z.string().regex(/^\d{1,10}$/).optional(),
+    company: companyFilterParam,
   })
   .meta({ id: 'TeamTodayQuery' })
 

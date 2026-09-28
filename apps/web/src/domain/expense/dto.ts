@@ -40,6 +40,7 @@ export function listItem(doc: RequestDoc & { project?: unknown; costCenter?: unk
     neededDate: doc.neededDate ?? null,
     createdById: relId(doc.createdBy) ?? null,
     updatedAt: doc.updatedAt ?? null,
+    companyId: relId((doc as { company?: unknown }).company) ?? null, // MC3: PT chip (labels: /me companies[])
     ...extra,
   }
 }

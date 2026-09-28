@@ -1,5 +1,7 @@
 import { z } from 'zod'
 
+import { companyFilterParam } from './schemas'
+
 import { ADDENDUM_ACTIONS, ADDENDUM_STATUSES, MAX_ADDITION } from '@/domain/addendum/rules'
 
 /**
@@ -47,6 +49,7 @@ export const AddendumListQuery = z
     mine: z.enum(['1', 'true']).optional().meta({ description: 'Only addenda created by the caller.' }),
     limit: z.coerce.number().int().min(1).max(100).default(25),
     cursor: z.string().max(64).optional(),
+    company: companyFilterParam,
   })
   .meta({ id: 'BudgetAddendumListQuery' })
 
@@ -56,6 +59,7 @@ export const AddendumSummary = z
   .object({
     id,
     uuid: z.string().nullable(),
+    companyId: id.nullable().meta({ description: 'MC3: PT of the project.' }),
     docNo: z.string().nullable().meta({ description: 'ADD/YYMM/#### (allocated at submit).' }),
     status,
     statusLabel: z.string(),

@@ -1,5 +1,7 @@
-import { relId, userRoles } from '@/access/roles'
-import { settings } from '@/domain/companies'
+import type { PayloadRequest } from 'payload'
+
+import { companyContextOf, membershipsOf, userRoles, type Membership, type Role } from '@/access/roles'
+import { appSettings, companyById, settings } from '@/domain/companies'
 
 import { json, v1 } from '../http'
 
@@ -7,46 +9,118 @@ type UserShape = {
   id: number
   email: string
   name?: string | null
-  employee?: unknown
   _strategy?: 'oidcSession' | 'mobileBearer'
   _pkDevice?: { id: number; deviceId: string }
 }
 
-/** GET /api/v1/me — profile, effective roles, employee link, settings subset for the APK. */
+/**
+ * APK UI hints from a role set (ADR 0013 E1 / E4) — the same rule for the legacy top-level object
+ * (roles of the selected PTs) and for each PT in `companies[]` (roles IN that PT). Decisions
+ * (approval inbox) = Direktur (pk-owner) or Finance; the PM monitors the team list; progress
+ * reports are created by the PM (team projects) or the Direktur. The server guards stay authoritative.
+ */
+export function capabilitiesOf(roles: readonly Role[]) {
+  return {
+    approvalInbox: roles.some((r) => r === 'pk-owner' || r === 'pk-finance'),
+    teamMonitor: roles.includes('pk-pm'),
+    progressReportCreate: roles.some((r) => r === 'pk-pm' || r === 'pk-owner'),
+  }
+}
+
+/**
+ * PT of the DEPRECATED single-PT fields of /me (`employee`, `settings`) — MC3-1 compatibility rule
+ * for the released APK (mobile-v0.2.0): the first SELECTED membership (ascending PT id) that has an
+ * employee, else the first selected membership, else null. With exactly one PT this is that PT
+ * (identical to the pre-MC3 answer); with several PTs it is the lowest-id selected PT with an
+ * employee (= DRMS for users of the DRMS migration) — the PT whose employee `req.user.employee`
+ * already named. Never a PT outside the caller's memberships.
+ */
+export function legacyCompanyOf(selected: readonly Membership[]): number | null {
+  const sorted = [...selected].sort((a, b) => a.company - b.company)
+  return (sorted.find((m) => m.employee !== null) ?? sorted[0])?.company ?? null
+}
+
+type EmployeeRef = { id: number; code: string; name: string }
+
+async function employeeRefs(req: PayloadRequest, ids: number[]): Promise<Map<number, EmployeeRef>> {
+  const out = new Map<number, EmployeeRef>()
+  if (ids.length === 0) return out
+  const res = await req.payload.find({
+    collection: 'employees',
+    where: { id: { in: ids } },
+    depth: 0,
+    pagination: false,
+    select: { code: true, name: true },
+    overrideAccess: true, // SYSTEM-READ: the caller's OWN membership employees (ids from the auth context)
+    req,
+  })
+  for (const e of res.docs as unknown as EmployeeRef[]) out.set(e.id, { id: e.id, code: e.code, name: e.name })
+  return out
+}
+
+/**
+ * GET /api/v1/me — profile + company context (ADR 0016 §8, MC3-1).
+ * - `companies[]`: EVERY active membership (active PT) of the caller, ascending id, with the roles,
+ *   employee, capabilities and APK-relevant settings OF THAT PT, and `selected` (= in the request's
+ *   effective selection). `activeCompanyIds` = that selection (`X-Company-Ids` / cookie ∩
+ *   memberships; default all). `appSettings` = app-wide values (one APK for all PTs).
+ * - Deprecated (kept for mobile-v0.2.0): `roles` / `capabilities` = union over the SELECTED PTs
+ *   (unchanged), `employee` / `settings` = the PT `legacyCompanyId` (see legacyCompanyOf).
+ */
 export const meEndpoint = v1({
   path: '/me',
   method: 'get',
   handler: async ({ req }) => {
     const u = req.user as unknown as UserShape
-    const employeeId = relId(u.employee)
-    const employee =
-      employeeId === undefined
-        ? null
-        : await req.payload.findByID({
-            collection: 'employees',
-            id: employeeId,
-            depth: 0,
-            select: { code: true, name: true },
-            overrideAccess: false,
-            req,
-            disableErrors: true,
-          })
-    // MC3: `companies[]` with per-PT roles/settings (ADR 0016 §8); MC1 = settings of the context PT.
-    const s = await settings(req)
+    const ctx = companyContextOf(req.user)
+    const all = [...(ctx?.memberships ?? [])].sort((a, b) => a.company - b.company)
+    const selected = membershipsOf(req.user)
+    const activeCompanyIds = selected.map((m) => m.company).sort((a, b) => a - b)
+    const legacyCompanyId = legacyCompanyOf(selected)
+    const employees = await employeeRefs(req, [...new Set(all.map((m) => m.employee).filter((e): e is number => typeof e === 'number'))])
+    const app = await appSettings(req)
+    const companies = []
+    for (const m of all) {
+      const c = await companyById(req, m.company)
+      const roles = [...m.roles].sort() as Role[]
+      companies.push({
+        id: m.company,
+        code: c.shortCode,
+        name: c.name,
+        timezone: c.timezone,
+        selected: activeCompanyIds.includes(m.company),
+        roles,
+        employeeId: m.employee,
+        employee: m.employee !== null ? (employees.get(m.employee) ?? null) : null,
+        capabilities: capabilitiesOf(roles),
+        settings: {
+          defaultGeofenceRadiusM: c.defaultGeofenceRadiusM,
+          receiptRoundingTolerance: c.receiptRoundingTolerance,
+          receiptMaxAgeDays: c.receiptMaxAgeDays,
+          budgetWarnPct: c.budgetWarnPct,
+          syncExpenseDraftsEnabled: c.syncExpenseDraftsEnabled !== false,
+          syncAttendanceEnabled: c.syncAttendanceEnabled === true,
+          syncProgressReportsEnabled: c.syncProgressReportsEnabled !== false,
+        },
+      })
+    }
+    const legacyEmployeeId = selected.find((m) => m.company === legacyCompanyId)?.employee ?? null
+    const s = await settings(req, legacyCompanyId)
+    const roles = userRoles(req)
+    const imageTargets = {
+      receiptsMaxPx: app.imageTargets?.receiptsMaxPx ?? 1600,
+      selfiesMaxPx: app.imageTargets?.selfiesMaxPx ?? 720,
+      transferProofsMaxPx: app.imageTargets?.transferProofsMaxPx ?? 1600,
+      progressPhotosMaxPx: app.imageTargets?.progressPhotosMaxPx ?? 1600,
+      jpegQuality: app.imageTargets?.jpegQuality ?? 80,
+    }
     return json({
       id: u.id,
       email: u.email,
       name: u.name ?? null,
-      roles: userRoles(req),
-      // ADR 0013 (E1): what the APK should show. Decisions (approval inbox) = Direktur (pk-owner) or
-      // Finance only; the PM monitors the team list. The server guard stays authoritative.
-      capabilities: {
-        approvalInbox: userRoles(req).some((r) => r === 'pk-owner' || r === 'pk-finance'),
-        teamMonitor: userRoles(req).includes('pk-pm'),
-        // E4 (requirements §4): progress reports are created by the PM (team projects) or the Direktur.
-        progressReportCreate: userRoles(req).some((r) => r === 'pk-pm' || r === 'pk-owner'),
-      },
-      employee: employee ? { id: employee.id, code: employee.code, name: employee.name } : null,
+      roles,
+      capabilities: capabilitiesOf(roles),
+      employee: legacyEmployeeId !== null ? (employees.get(legacyEmployeeId) ?? null) : null,
       authMethod: u._strategy ?? 'oidcSession',
       device: u._pkDevice ?? null,
       settings: {
@@ -58,13 +132,16 @@ export const meEndpoint = v1({
         defaultGeofenceRadiusM: s.defaultGeofenceRadiusM,
         receiptRoundingTolerance: s.receiptRoundingTolerance,
         receiptMaxAgeDays: s.receiptMaxAgeDays,
-        imageTargets: {
-          receiptsMaxPx: s.imageTargets?.receiptsMaxPx ?? 1600,
-          selfiesMaxPx: s.imageTargets?.selfiesMaxPx ?? 720,
-          transferProofsMaxPx: s.imageTargets?.transferProofsMaxPx ?? 1600,
-          progressPhotosMaxPx: s.imageTargets?.progressPhotosMaxPx ?? 1600,
-          jpegQuality: s.imageTargets?.jpegQuality ?? 80,
-        },
+        imageTargets,
+      },
+      companies,
+      activeCompanyIds,
+      legacyCompanyId,
+      appSettings: {
+        minAppVersion: app.minAppVersion ?? null,
+        latestAppVersion: app.latestAppVersion ?? null,
+        offlineMaxAgeDays: app.offlineMaxAgeDays,
+        imageTargets,
       },
       serverTime: new Date().toISOString(),
     })

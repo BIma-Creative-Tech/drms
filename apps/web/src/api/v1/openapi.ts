@@ -1,4 +1,4 @@
-import { OpenAPIRegistry, OpenApiGeneratorV31 } from '@asteasolutions/zod-to-openapi'
+import { extendZodWithOpenApi, OpenAPIRegistry, OpenApiGeneratorV31 } from '@asteasolutions/zod-to-openapi'
 import { z } from 'zod'
 
 import { registerAddendumPaths } from './openapi-addendum'
@@ -17,6 +17,8 @@ import * as S from './schemas-sync'
  * GET /api/v1/openapi.json.
  */
 export function buildOpenApiDocument(version: string) {
+  // registerParameter (reusable header component) needs `.openapi()`; build-time only module.
+  extendZodWithOpenApi(z)
   const registry = new OpenAPIRegistry()
   const bearer = registry.registerComponent('securitySchemes', 'bearer', {
     type: 'http',
@@ -31,9 +33,26 @@ export function buildOpenApiDocument(version: string) {
     description: 'Admin web session (OIDC login via /auth/login).',
   })
   const security = [{ [bearer.name]: [] }, { [cookie.name]: [] }]
+  // MC3-1 (ADR 0016 §5): the read selection of every authenticated /api/v1 call (one component).
+  const companyIds = registry.registerParameter(
+    'CompanyIds',
+    z
+      .string()
+      .regex(/^[1-9]\d{0,8}([, ]+[1-9]\d{0,8})*$/)
+      .optional()
+      .meta({
+        param: {
+          name: 'X-Company-Ids',
+          in: 'header',
+          description:
+            'PTs to read (comma separated company ids, e.g. "1,3"). Only NARROWS the caller\'s active memberships; absent = all memberships (web: the switcher cookie). A PT without an active membership (or a malformed value) → 403 code COMPANY_NOT_ALLOWED (audited). Mutations are checked against the role in the DOCUMENT\'s PT; sync items carry their own company_id.',
+        },
+      }),
+  )
   const deviceHeader = z.object({
     'X-Device-Id': z.uuid().meta({ description: 'Registered install id (APK).' }),
     'X-App-Version': z.string().optional().meta({ description: 'APK version; below company minimum → 426.' }),
+    'X-Company-Ids': companyIds,
   })
   const problemResponses = (...codes: number[]) =>
     Object.fromEntries(
@@ -72,7 +91,7 @@ export function buildOpenApiDocument(version: string) {
   registry.registerPath({
     method: 'get',
     path: '/me',
-    summary: 'Current user, effective roles, employee link and settings subset',
+    summary: 'Current user + company context: companies[] (roles, employee, capabilities, settings per PT), activeCompanyIds; deprecated single-PT fields for the released APK (legacyCompanyId)',
     security,
     request: { headers: deviceHeader },
     responses: { 200: { description: 'Profile', content: { 'application/json': { schema: Me } } }, ...problemResponses(401, 426) },
@@ -80,10 +99,14 @@ export function buildOpenApiDocument(version: string) {
   registry.registerPath({
     method: 'get',
     path: '/masters',
-    summary: 'Master data for the APK (access-filtered, delta sync)',
+    summary: 'Master data for the APK per PT (access-filtered, delta sync, company on each item, shared masters marked, per-PT version + ETag)',
     security,
-    request: { headers: deviceHeader, query: MastersQuery },
-    responses: { 200: { description: 'Masters', content: { 'application/json': { schema: Masters } } }, ...problemResponses(400, 401, 426) },
+    request: { headers: deviceHeader.extend({ 'If-None-Match': z.string().optional().meta({ description: 'ETag of a previous answer → 304 when unchanged.' }) }), query: MastersQuery },
+    responses: {
+      200: { description: 'Masters (header ETag)', content: { 'application/json': { schema: Masters } } },
+      304: { description: 'Not modified (If-None-Match matched the ETag)' },
+      ...problemResponses(400, 401, 403, 426),
+    },
   })
   registry.registerPath({
     method: 'post',
@@ -129,6 +152,7 @@ export function buildOpenApiDocument(version: string) {
 
   // ---- F2a expense-request flow (T1–T4, T6–T8, period closing) ----
   const idem = z.object({
+    'X-Company-Ids': companyIds,
     'X-Device-Id': z.uuid().optional().meta({ description: 'Registered install id (APK).' }),
     'Idempotency-Key': z.uuid().optional().meta({ description: 'Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422.' }),
   })
@@ -210,9 +234,18 @@ export function buildOpenApiDocument(version: string) {
   registry.registerPath({
     method: 'get',
     path: '/transfer-queue',
-    summary: 'Finance/Owner: Uang Muka "Disetujui" + Reimburse "Nota Terverifikasi", by needed date (US-19)',
+    summary: 'Finance/Owner: Uang Muka "Disetujui" + Reimburse "Nota Terverifikasi", by needed date (US-19); PTs where the caller is Finance/Direktur, ?company= narrows',
     security,
-    responses: res(200, 'Queue', F.ExpenseRequestList, [401, 403]),
+    request: { headers: deviceHeader, query: F.CompanyFilterQuery },
+    responses: res(200, 'Queue', F.ExpenseRequestList, [400, 401, 403]),
+  })
+  registry.registerPath({
+    method: 'get',
+    path: '/lpj-queue',
+    summary: 'MC3 Finance/Owner: LPJ verification list (Uang Muka "LPJ Diajukan" / "LPJ Terverifikasi", US-21) of the PTs where the caller is Finance/Direktur, with company refs; ?company= narrows',
+    security,
+    request: { headers: deviceHeader, query: F.CompanyFilterQuery },
+    responses: res(200, 'Queue', F.LpjQueue, [400, 401, 403, 426]),
   })
   registry.registerPath({
     method: 'post',
@@ -231,7 +264,7 @@ export function buildOpenApiDocument(version: string) {
     path: '/cash-entries',
     summary: 'Finance/Direktur (pk-owner)/Admin: cash ledger (KM/KK, reversals)',
     security,
-    request: { query: F.CashListQuery },
+    request: { headers: deviceHeader, query: F.CashListQuery },
     responses: res(200, 'Page', F.CashEntryList, [400, 401, 403]),
   })
   registry.registerPath({
@@ -254,9 +287,9 @@ export function buildOpenApiDocument(version: string) {
   registry.registerPath({
     method: 'get',
     path: '/cash-accounts/balances',
-    summary: 'Finance/Direktur (pk-owner): balance per cash account (opening + in − out)',
+    summary: 'Finance/Direktur (pk-owner): balance per cash account (opening + in − out) of the selected PTs where the caller is Finance/Direktur; ?company= narrows (outside the selection → 403 COMPANY_NOT_ALLOWED)',
     security,
-    request: { query: z.object({ asOf: z.string().optional(), company: z.string().regex(/^\d+$/).optional() }) },
+    request: { headers: deviceHeader, query: z.object({ asOf: z.string().optional(), company: F.CompanyFilterQuery.shape.company }) },
     responses: res(200, 'Balances', F.Balances, [400, 401, 403]),
   })
   post(
@@ -269,9 +302,9 @@ export function buildOpenApiDocument(version: string) {
   registry.registerPath({
     method: 'get',
     path: '/period-closings',
-    summary: 'Closed periods and the lock date per PT (`company` narrows to one PT)',
+    summary: 'Closed periods and the lock date per PT (`company` narrows to one selected PT; outside the selection → 403 COMPANY_NOT_ALLOWED)',
     security,
-    request: { query: z.object({ company: z.string().regex(/^\d+$/).optional() }) },
+    request: { headers: deviceHeader, query: z.object({ company: z.string().regex(/^[1-9]\d{0,8}$/).optional() }) },
     responses: res(200, 'Periods', F.PeriodClosingList, [400, 401, 403]),
   })
   post('/period-closings', 'Finance/Direktur (pk-owner): close a past month (DB rejects postings dated ≤ lock date)', F.PeriodCloseBody, [], res(201, 'Closed', F.PeriodClosing, [400, 401, 403, 409, 422, 429]))
@@ -317,9 +350,9 @@ export function buildOpenApiDocument(version: string) {
   registry.registerPath({
     method: 'get',
     path: '/approvals/inbox',
-    summary: 'Requests waiting for the caller\'s "Diketahui"/approval, with budget impact % before → after and open flags (US-26, US-59)',
+    summary: 'Requests waiting for the caller\'s "Diketahui"/approval, with budget impact % before → after, open flags and the PT (US-26, US-59); ?company= narrows',
     security,
-    request: { headers: deviceHeader },
+    request: { headers: deviceHeader, query: F.CompanyFilterQuery },
     responses: res(200, 'Inbox', F.ApprovalInbox, [401, 426]),
   })
   registry.registerPath({
@@ -402,17 +435,18 @@ export function buildOpenApiDocument(version: string) {
     summary:
       'APK offline queue replay (bearer + registered device = device_id). Items in order, one transaction each; always 200 with one result per item (applied | duplicate | rejected | conflict | deferred | unsupported). Rate limit 12/min.',
     description:
-      'Item types: expense_request.draft_upsert (payload SyncDraftUpsertPayload), expense_request.draft_delete (payload SyncDraftDeletePayload), attendance.check_in / attendance.check_out (payload SyncAttendancePayload: project_id OR cost_center_id; selfie first with POST /media/selfies; company-settings.syncAttendanceEnabled, else rejected FEATURE_DISABLED; rejection codes MOCK_LOCATION, OUTSIDE_GEOFENCE, NOT_ASSIGNED, NO_GEOFENCE, ALREADY_CHECKED_IN, NO_CHECK_IN, ALREADY_CHECKED_OUT, MEDIA_MISSING, FORBIDDEN), attendance.on_behalf (payload SyncOnBehalfPayload, US-14: PM only, team location, not own, reason required; GPS + photo from the PM phone); progress_report.draft_upsert (payload SyncProgressReportPayload; photos first with POST /media/progress-photos, ≤ 5; new report = PM of a team project or Direktur; edit = reporter within 24 h with base_rev + reason, else conflict/NOT_EDITABLE with server_report; company-settings.syncProgressReportsEnabled, else FEATURE_DISABLED; codes WEIGHTS_INCOMPLETE, PROGRESS_DECREASED, PHOTO_LIMIT, MEDIA_IN_USE, MEDIA_MISSING, FORBIDDEN). Receipt images are uploaded first with POST /media/receipts and referenced by media_id. Replaying a client_uuid returns the stored result as duplicate. Edits of an existing draft need base_rev = server rev, else conflict + server_copy (server wins).',
+      'Item types: expense_request.draft_upsert (payload SyncDraftUpsertPayload), expense_request.draft_delete (payload SyncDraftDeletePayload), attendance.check_in / attendance.check_out (payload SyncAttendancePayload: project_id OR cost_center_id; selfie first with POST /media/selfies; company-settings.syncAttendanceEnabled, else rejected FEATURE_DISABLED; rejection codes MOCK_LOCATION, OUTSIDE_GEOFENCE, NOT_ASSIGNED, NO_GEOFENCE, ALREADY_CHECKED_IN, NO_CHECK_IN, ALREADY_CHECKED_OUT, MEDIA_MISSING, FORBIDDEN), attendance.on_behalf (payload SyncOnBehalfPayload, US-14: PM only, team location, not own, reason required; GPS + photo from the PM phone); progress_report.draft_upsert (payload SyncProgressReportPayload; photos first with POST /media/progress-photos, ≤ 5; new report = PM of a team project or Direktur; edit = reporter within 24 h with base_rev + reason, else conflict/NOT_EDITABLE with server_report; company-settings.syncProgressReportsEnabled, else FEATURE_DISABLED; codes WEIGHTS_INCOMPLETE, PROGRESS_DECREASED, PHOTO_LIMIT, MEDIA_IN_USE, MEDIA_MISSING, FORBIDDEN). Receipt images are uploaded first with POST /media/receipts and referenced by media_id. Replaying a client_uuid returns the stored result as duplicate. Edits of an existing draft need base_rev = server rev, else conflict + server_copy (server wins). MC3 (ADR 0016 §8): every item carries company_id (an active membership) and is processed under that PT whatever X-Company-Ids says (feature flags, timezone, own employee of that PT); the PT derived from the references must match (else rejected COMPANY_MISMATCH; a foreign company_id → COMPANY_NOT_ALLOWED). Items WITHOUT company_id (released APK ≤ 0.2.x) are accepted only for an account with exactly one PT; otherwise the whole batch answers 409 code COMPANY_REQUIRED (errors[].path = items.<i>.company_id, nothing processed).',
     security: [{ [bearer.name]: [] }],
     request: {
       headers: z.object({
         'X-Device-Id': z.uuid().meta({ description: 'Registered install id; must equal body.device_id.' }),
         'X-App-Version': z.string().optional().meta({ description: 'APK version; below company minimum → 426.' }),
         'Idempotency-Key': z.uuid().optional().meta({ description: 'Optional (= batch_id); items are idempotent by client_uuid.' }),
+        'X-Company-Ids': companyIds,
       }),
       body: jsonBody(S.SyncBatch),
     },
-    responses: res(200, 'Per-item results', S.SyncBatchResponse, [400, 401, 403, 413, 426, 429]),
+    responses: res(200, 'Per-item results', S.SyncBatchResponse, [400, 401, 403, 409, 413, 426, 429]),
   })
 
   // ---- E4: project stages (G11), progress reports (T11, US-10/US-31), K-09 (US-12) ----
