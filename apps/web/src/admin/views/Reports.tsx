@@ -99,6 +99,7 @@ export async function AuditLogView(props: AdminViewServerProps) {
   await withReqTransaction(req, () =>
     writeAudit(req, [{ action: 'export', docType: 'audit_log', docId: 'view', field: 'view', newValue: { filters: Object.fromEntries([...sp.entries()].slice(0, 20)) } }]),
   )
+  // TODO(mc2-contract §0.1, after merging feat/mc2-backend): pass `await auditScope(req)` instead of the literal
   return <ReportPage props={props} def={AUDIT_REPORT} scope={{ kind: 'all' }} base="/admin/audit-log" />
 }
 

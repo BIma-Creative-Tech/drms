@@ -650,6 +650,8 @@ export async function AbsensiRekap(props: AdminViewServerProps) {
   )
 }
 
+// TODO(mc2-contract §0.1, after merging feat/mc2-backend): replace by `narrowAttScope(scope, projectId,
+// costCenterId)` — this company-less team scope matches a project id of ANOTHER PT for office users.
 function narrow(scope: AttScope, projectId?: number, costCenterId?: number): AttScope {
   if (!projectId && !costCenterId) return scope
   const ok = (ids: number[], id?: number) => id !== undefined && (scope.kind === 'all' || ids.includes(id))

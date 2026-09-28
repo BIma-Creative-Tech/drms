@@ -91,8 +91,8 @@ by exact name only, never `docker … prune`): `pk-mc2u-net`, `pk-mc2u-node` (no
 - `views/pt-breakdown.tsx` `PerPt`: rows per PT under a combined KPI (only > 1 PT and > 1 row). Owner: cash
   (`cash.byCompany`), waiting (`approvals.byCompany`), running projects per PT (`budget.byCompany`, colour counts,
   never a combined %), completeness (`completeness.byCompany`); Finance: cash (`cashByCompany`), verification
-  (`completenessByCompany`). Field names follow the feat/mc2-backend working copy (2026-09-28, uncommitted) and are
-  read as `unknown` — the single-PT layout renders until the payload carries them.
+  (`completenessByCompany`). Field names match `mc2-contract.md` §2 (feat/mc2-backend `a15270f`) and are read as
+  `unknown` — the single-PT layout renders until the merged payload carries them.
 
 ### UI-7 Import per PT (MC2-5, done)
 
@@ -112,9 +112,26 @@ by exact name only, never `docker … prune`): `pk-mc2u-net`, `pk-mc2u-node` (no
   sample stays single-PT (DRMS rows with `kode_pt`) so the shared integration DB keeps one active PT.
 - Runbook `import-data-golive.md` §4.1.
 
+## Checks (UI branch, containers `pk-mc2u-*`)
+
+- lint, typecheck, `test:coverage` (40 files / 576 tests, lines 40.4 %), `check:openapi`, `check:import-template`,
+  `generate:importmap` (no diff), `npm run build` (web + worker) — green.
+- Integration (throwaway `pk_test`, Mailpit STARTTLS+AUTH sink as in CI): 36 files / 463 passed + 1 skipped
+  (incl. new `mc2-import.int.test.ts`).
+- Visual (Playwright v1.55.0 against `next start` of the production build, DB `pk_vis` with fictional PTs DRMS /
+  CS1 / CS2 and users Andi (group admin), Rina (Direktur DRMS, Finance CS1/CS2), Budi, Dewi, Sari, Tono, Admin CS1):
+  switcher, role matrix, company master, consolidated expense-request list, company form, single-PT switcher,
+  employee create error — light + dark, 390 + 1440 px, no horizontal page scroll. Flows verified: switcher
+  keyboard + apply (cookie `pk-company-ids=2`, list narrowed), "Semua PT" clears the cookie, PT chip filter, foreign
+  PT → 403; matrix add/deactivate/reactivate with reason → audit `create` / `role_change` rows, Admin CS1 sees only
+  the CS1 column, non-admin gets the notice.
+
 ## Open TODOs / notes (UI)
 
-- **Contract (backend):** atomic batch endpoint for the role matrix (wireframe "tidak ada simpan sebagian");
-  copy-from-DRMS actions on PT create (numbering / approval rules / categories / schedules); per-PT rows in Kas book,
-  attendance "Tim hari ini"/recap and K-09 progress (then PT columns there); verify dashboard field names against
-  `mc2-contract.md` once committed.
+- **After merging feat/mc2-backend (`mc2-contract.md`):** `Absensi.tsx` `narrow()` → `narrowAttScope` (§0.1,
+  cross-PT leak for office users until then); audit-log view → `auditScope(req)`; Tutup buku per PT (`kasAccessIn`,
+  `lockDates`, close/reopen with `company`, §4); PT column in the Kas book (`BookRow.companyId`), attendance and
+  K-09 progress (`companyId` on rows); switch `itemCompany` fallback lookups to the queue `company` refs (§3);
+  report filter `pt` is rendered by the generic multiselect. TODO markers `TODO(mc2-contract …)` in code.
+- **Backend asks (not in the contract):** atomic batch endpoint for the role matrix (wireframe "tidak ada simpan
+  sebagian"); copy-from-DRMS actions on PT create (the import already seeds numbering + approval rules for new PTs).
