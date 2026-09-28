@@ -15,7 +15,6 @@ class PkSemantic {
     required this.cardForeground,
     required this.primary,
     required this.primaryHover,
-    required this.primarySoft,
     required this.primaryForeground,
     required this.primarySoft,
     required this.accent,
@@ -41,9 +40,6 @@ class PkSemantic {
   final Color cardForeground;
   final Color primary;
   final Color primaryHover;
-
-  /// Pale primary (web 0.4.2 admin loader dots; blue-200 light / blue-800 dark). Kept for drift parity.
-  final Color primarySoft;
   final Color primaryForeground;
   /// Pale primary (web `primarySoft`, loader dots / soft fills).
   final Color primarySoft;
@@ -75,7 +71,6 @@ class PkSemantic {
     'cardForeground': cardForeground,
     'primary': primary,
     'primaryHover': primaryHover,
-    'primarySoft': primarySoft,
     'primaryForeground': primaryForeground,
     'primarySoft': primarySoft,
     'accent': accent,
@@ -104,7 +99,6 @@ abstract final class PkTokens {
     cardForeground: Color(0xFF1E293B),
     primary: Color(0xFF2563EB),
     primaryHover: Color(0xFF1D4ED8),
-    primarySoft: Color(0xFFBFDBFE),
     primaryForeground: Color(0xFFFFFFFF),
     primarySoft: Color(0xFFBFDBFE),
     accent: Color(0xFFEA580C),
@@ -131,7 +125,6 @@ abstract final class PkTokens {
     cardForeground: Color(0xFFE2E8F0),
     primary: Color(0xFF60A5FA),
     primaryHover: Color(0xFF93C5FD),
-    primarySoft: Color(0xFF1E40AF),
     primaryForeground: Color(0xFF0B1120),
     primarySoft: Color(0xFF1E40AF),
     accent: Color(0xFFFB923C),
