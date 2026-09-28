@@ -1,6 +1,6 @@
 import type { PayloadRequest, Where } from 'payload'
 
-import { hasRoleAny, userId } from '@/access/roles'
+import { hasRole, membershipsOf, ownEmployees, relId, userId, type Role } from '@/access/roles'
 import { resolveScope } from '@/access/scope'
 import { writeAudit } from '@/audit/writer'
 import { actorContext, displayName, loadVisible, type RequestDoc } from '@/domain/expense/common'
@@ -69,18 +69,30 @@ export const listRequestsEndpoint = v1({
     const { scope, status, type, limit, cursor } = q.data
     const and: Where[] = []
     const uid = userId(req)!
-    const s = await resolveScope(req)
     if (scope === 'mine') {
+      // ADR 0016 D1: one employee per PT — "mine" = created by me or naming ANY of my employees
       const own: Where[] = [{ createdBy: { equals: uid } }]
-      if (s.employeeId !== null) own.push({ requesters: { in: [s.employeeId] } })
+      const emps = ownEmployees(req)
+      if (emps.length) own.push({ requesters: { in: emps } })
       and.push({ or: own })
     }
-    if (scope === 'team' && hasRoleAny(req, 'pk-pm') && !hasRoleAny(req, 'pk-finance', 'pk-owner', 'pk-admin')) {
-      const team: Where[] = []
-      if (s.teamProjects.length) team.push({ project: { in: s.teamProjects } })
-      if (s.teamCostCenters.length) team.push({ costCenter: { in: s.teamCostCenters } })
-      if (team.length === 0) return json({ items: [], nextCursor: null })
-      and.push({ or: team })
+    const members = membershipsOf(req.user)
+    if (scope === 'team' && members.some((m) => m.roles.includes('pk-pm'))) {
+      // per PT (ADR 0016 §5): office PTs in full, PM PTs team only, other PTs nothing
+      const office: Role[] = ['pk-finance', 'pk-owner', 'pk-admin']
+      const parts: Where[] = []
+      for (const m of members) {
+        if (m.roles.some((r) => office.includes(r))) parts.push({ company: { equals: m.company } })
+        else if (m.roles.includes('pk-pm')) {
+          const s = await resolveScope(req, m.company)
+          const team: Where[] = []
+          if (s.teamProjects.length) team.push({ project: { in: s.teamProjects } })
+          if (s.teamCostCenters.length) team.push({ costCenter: { in: s.teamCostCenters } })
+          if (team.length) parts.push({ and: [{ company: { equals: m.company } }, { or: team }] })
+        }
+      }
+      if (parts.length === 0) return json({ items: [], nextCursor: null })
+      and.push({ or: parts })
     }
     if (scope === 'inbox') and.push({ status: { in: ['pending_ack', 'pending_approval'] } })
     if (status) and.push({ status: { in: status.split(',') } })
@@ -437,10 +449,13 @@ export const pdfEndpoint = v1({
     const q = PdfQuery.safeParse(Object.fromEntries(req.searchParams.entries()))
     if (!q.success) throw new HttpError(400, 'Bad Request', { detail: 'variant harus standard atau internal.' })
     const internal = q.data.variant === 'internal'
-    if (internal && !hasRoleAny(req, 'pk-finance', 'pk-owner', 'pk-admin')) throw new HttpError(403, 'Forbidden', { detail: 'Salinan internal hanya untuk Finance/Direktur/Admin.' })
     const { buildPdfData } = await import('@/pdf/data')
     const data = await withReqTransaction(req, async () => {
       const doc = await loadVisible(req, id)
+      // ADR 0016 §5: the internal copy needs the office role IN THE DOCUMENT's PT
+      if (internal && !hasRole(req, ['pk-finance', 'pk-owner', 'pk-admin'], relId((doc as { company?: unknown }).company))) {
+        throw new HttpError(403, 'Forbidden', { detail: 'Salinan internal hanya untuk Finance/Direktur/Admin.' })
+      }
       if (doc.status === 'draft' || !doc.docNo) throw new HttpError(409, 'Conflict', { detail: 'PDF tersedia setelah pengajuan diajukan (bernomor).' })
       const built = await buildPdfData(req, id, { internal, printedBy: await displayName(req, userId(req)!) })
       await writeAudit(req, [

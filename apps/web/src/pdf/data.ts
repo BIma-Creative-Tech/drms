@@ -72,8 +72,9 @@ export async function buildPdfData(req: PayloadRequest, requestId: number, opts:
   const diketahui = rows.find((r) => r.position === 'diketahui' && (r.decision === 'acknowledged' || r.decision === 'rejected'))
   const approvals = rows.filter((r) => r.position === 'approval' && (r.decision === 'approved' || r.decision === 'rejected')).sort((a, b) => a.level - b.level)
   const creator = typeof doc.createdBy === 'object' ? doc.createdBy : null
-  // ADR 0016: the creator's employee = membership link (MC2: of the document's PT)
-  const creatorName = (creator ? (await displayNames(req, [creator.id], { emailFallback: false })).get(creator.id)?.replace(/^user#\d+$/, '') : undefined) || dibuat?.actorName || ''
+  // ADR 0016 D1: the creator's employee = membership link IN THE DOCUMENT's PT
+  const creatorName =
+    (creator ? (await displayNames(req, [creator.id], { emailFallback: false, companyId: relId((doc as { company?: unknown }).company) })).get(creator.id)?.replace(/^user#\d+$/, '') : undefined) || dibuat?.actorName || ''
   const skipped = doc.approvalSnapshot?.skipped ?? []
   const skippedAck = skipped.some((x) => x.position === 'diketahui')
   const skippedApproval = skipped.some((x) => x.position === 'approval') && (doc.approvalSnapshot?.steps.length ?? 0) === 0

@@ -27,7 +27,7 @@ export const Notifications: CollectionConfig = {
   lockDocuments: false,
   fields: [
     { name: 'user', type: 'relationship', relationTo: 'users', label: 'Penerima', required: true, index: true, admin: ro },
-    // ADR 0016 §4: PT of the document the notification is about (nullable; MC2: reminders set it too)
+    // ADR 0016 §4: PT of the document the notification is about (nullable; reminders and the late-progress job set it too)
     { name: 'company', type: 'relationship', relationTo: 'companies', label: 'PT', index: true, admin: ro },
     { name: 'event', type: 'text', label: 'Event', required: true, maxLength: 64, index: true, admin: ro },
     { name: 'title', type: 'text', label: 'Judul', required: true, maxLength: 160, admin: ro },

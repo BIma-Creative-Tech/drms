@@ -1,7 +1,7 @@
 import type { CollectionConfig } from 'payload'
 
 import { denyAll, hasRoleAny } from '@/access/roles'
-import { byRoleAny } from '@/access/policies'
+import { byRoleAny, usersOfMyCompanies } from '@/access/policies'
 
 /**
  * Browser sessions of the admin (ADR 0003 §3): opaque 256-bit id in an HttpOnly cookie, stored
@@ -16,7 +16,8 @@ export const WebSessions: CollectionConfig = {
     defaultColumns: ['user', 'createdAt', 'expiresAt', 'revokedAt', 'revokeReason', 'ip'],
     hidden: ({ user }) => !hasRoleAny({ user } as never, 'pk-admin'),
   },
-  access: { read: byRoleAny({ 'pk-admin': true }), create: denyAll, update: denyAll, delete: denyAll },
+  // ADR 0016 §5 (MC2): an Admin reads the sessions of users of HIS PTs (+ accounts without membership)
+  access: { read: byRoleAny({ 'pk-admin': usersOfMyCompanies('user', ['pk-admin']) }), create: denyAll, update: denyAll, delete: denyAll },
   lockDocuments: false,
   fields: [
     { name: 'idHash', type: 'text', required: true, unique: true, index: true, access: { read: () => false } },

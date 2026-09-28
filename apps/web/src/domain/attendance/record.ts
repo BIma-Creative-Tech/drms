@@ -1,7 +1,7 @@
 import { sql } from '@payloadcms/db-postgres'
 import type { PayloadRequest } from 'payload'
 
-import { relId } from '@/access/roles'
+import { hasRole, relId } from '@/access/roles'
 import { resolveScope } from '@/access/scope'
 import { haversineM, insideGeofence, localDateString, type AttendanceKind } from '@/domain/sync/attendance'
 import { getRequestTx } from '@/lib/tx'
@@ -35,7 +35,7 @@ const reject = (code: string, message: string, field?: string): never => {
 
 export type Location = { type: 'project'; id: number } | { type: 'cost_center'; id: number }
 
-type GeoDoc = { id: number; code?: string | null; name?: string | null; lat?: number | null; lng?: number | null; radiusM?: number | null; status?: string | null; active?: boolean | null }
+type GeoDoc = { id: number; company?: unknown; code?: string | null; name?: string | null; lat?: number | null; lng?: number | null; radiusM?: number | null; status?: string | null; active?: boolean | null }
 
 export type RecordInput = {
   kind: AttendanceKind
@@ -156,7 +156,10 @@ export async function recordAttendance(req: PayloadRequest, input: RecordInput):
   const localDate = localDateString(input.time, input.timeZone)
   if (input.source === 'pm') {
     // US-14: only for the PM's own team locations (the team scope of the CALLER).
-    const scope = await resolveScope(req)
+    // ADR 0016 §5: PM role + team scope IN THE LOCATION's PT
+    const company = relId((geo as { company?: unknown }).company)
+    if (!hasRole(req, 'pk-pm', company)) reject('FORBIDDEN', `Hanya untuk ${LABEL[input.location.type]} tim Anda.`, locField)
+    const scope = await resolveScope(req, company ?? null)
     const team = input.location.type === 'project' ? scope.teamProjects : scope.teamCostCenters
     if (!team.includes(input.location.id)) reject('FORBIDDEN', `Hanya untuk ${LABEL[input.location.type]} tim Anda.`, locField)
   }

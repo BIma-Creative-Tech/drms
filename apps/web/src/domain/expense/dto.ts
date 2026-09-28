@@ -1,6 +1,6 @@
 import type { PayloadRequest } from 'payload'
 
-import { hasRoleAny, relId } from '@/access/roles'
+import { hasRole, relId } from '@/access/roles'
 
 import { actorContext, approvalsOf, displayName, projectCommitted, type RequestDoc } from './common'
 import { displayUnitPrice } from './lines'
@@ -61,7 +61,8 @@ export async function detail(req: PayloadRequest, id: number) {
     currentLevel: doc.currentLevel,
   } as RequestDoc)
   const own = ctx.isCreator || ctx.isRequester
-  const fullBank = own || hasRoleAny(req, 'pk-finance', 'pk-owner', 'pk-admin')
+  // ADR 0016 §5: the full account number for office roles OF THE DOCUMENT's PT only
+  const fullBank = own || hasRole(req, ['pk-finance', 'pk-owner', 'pk-admin'], relId((doc as { company?: unknown }).company))
   const approvals = await approvalsOf(req, id)
   const receipts = await receiptsOf(req, id)
   const flags = (

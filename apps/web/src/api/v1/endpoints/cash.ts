@@ -1,7 +1,7 @@
 import type { PayloadRequest, Where } from 'payload'
 
 import { relId } from '@/access/roles'
-import { balances, closePeriod, createManualEntry, currentLockDate, editManualEntry, reopenPeriod, voidEntry, type CashEntryDoc } from '@/domain/cash/ledger'
+import { balances, closePeriod, createManualEntry, currentLockDate, editManualEntry, kasCompanies, lockDates, reopenPeriod, voidEntry, type CashEntryDoc } from '@/domain/cash/ledger'
 
 import { HttpError, json, v1 } from '../http'
 import { CashEntryCreate, CashEntryUpdate, CashListQuery, PeriodCloseBody, ReasonBody } from '../schemas-flow'
@@ -130,13 +130,24 @@ export const balancesEndpoint = v1({
   transactional: true, // read inside a transaction (raw SQL uses the request transaction handle)
   handler: async ({ req }) => {
     const asOf = req.searchParams.get('asOf') ?? undefined
-    return json({ asOf: asOf ?? null, items: await balances(req, asOf) })
+    // ADR 0016 §5: accounts of the selected PTs where the caller is Finance/Direktur; `company` narrows.
+    const company = companyParam(req)
+    return json({ asOf: asOf ?? null, items: await balances(req, asOf, company === undefined ? {} : { companyIds: [company] }) })
   },
 })
+
+/** Optional `?company=<id>` (per-PT closing / balances, ADR 0016 §4); malformed → 400. */
+function companyParam(req: PayloadRequest): number | undefined {
+  const raw = req.searchParams.get('company')
+  if (raw === null || raw === '') return undefined
+  if (!/^[1-9]\d{0,8}$/.test(raw)) throw new HttpError(400, 'Bad Request', { detail: 'company tidak valid.' })
+  return Number(raw)
+}
 
 function periodDto(p: Record<string, unknown>) {
   return {
     id: p.id as number,
+    companyId: relId(p.company) ?? null,
     period: p.period as string,
     status: p.status as 'closed' | 'reopened',
     note: (p.note as string) ?? null,
@@ -154,8 +165,25 @@ export const listPeriodsEndpoint = v1({
   roles: ['pk-finance', 'pk-owner', 'pk-admin'],
   transactional: true,
   handler: async ({ req }) => {
-    const res = await req.payload.find({ collection: 'period-closings', sort: '-id', limit: 200, depth: 0, user: req.user, overrideAccess: false, req })
-    return json({ lockDate: await currentLockDate(req), items: res.docs.map((d) => periodDto(d as unknown as Record<string, unknown>)) })
+    const company = companyParam(req)
+    const res = await req.payload.find({
+      collection: 'period-closings',
+      where: company === undefined ? undefined : { company: { equals: company } },
+      sort: '-id',
+      limit: 200,
+      depth: 0,
+      user: req.user,
+      overrideAccess: false,
+      req,
+    })
+    // closings are per PT: one lock date per readable PT (`lockDate` = the requested / only PT, else null)
+    const pts = company !== undefined ? [company] : kasCompanies(req, ['pk-finance', 'pk-owner', 'pk-admin'])
+    const locks = await lockDates(req, pts)
+    return json({
+      lockDate: company !== undefined || locks.length === 1 ? (locks[0]?.lockDate ?? null) : locks.length === 0 ? await currentLockDate(req) : null,
+      lockDates: locks,
+      items: res.docs.map((d) => periodDto(d as unknown as Record<string, unknown>)),
+    })
   },
 })
 
@@ -167,7 +195,7 @@ export const closePeriodEndpoint = v1({
   rateLimit: WRITE_LIMIT,
   transactional: true,
   idempotent: true,
-  handler: async ({ req, body }) => json(periodDto((await closePeriod(req, body.period, body.note)) as unknown as Record<string, unknown>), 201),
+  handler: async ({ req, body }) => json(periodDto((await closePeriod(req, body.period, body.note, body.company)) as unknown as Record<string, unknown>), 201),
 })
 
 export const reopenPeriodEndpoint = v1({
@@ -178,7 +206,7 @@ export const reopenPeriodEndpoint = v1({
   rateLimit: WRITE_LIMIT,
   transactional: true,
   idempotent: true,
-  handler: async ({ req, body, params }) => json(periodDto((await reopenPeriod(req, params.period ?? '', body.reason)) as unknown as Record<string, unknown>)),
+  handler: async ({ req, body, params }) => json(periodDto((await reopenPeriod(req, params.period ?? '', body.reason, companyParam(req))) as unknown as Record<string, unknown>)),
 })
 
 export const CASH_ENDPOINTS = [

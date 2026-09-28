@@ -1,6 +1,7 @@
 import type { PayloadRequest, Where } from 'payload'
 
-import { hasRoleAny } from '@/access/roles'
+import { hasRole } from '@/access/roles'
+import { companyOf } from '@/domain/companies'
 import { displayNames } from '@/domain/companies'
 
 /**
@@ -92,7 +93,9 @@ export async function requestHistory(req: PayloadRequest, requestId: number): Pr
     { docType: 'transfer', ids: await idsOf(req, 'transfers', 'request', requestId) },
     { docType: 'settlement', ids: await idsOf(req, 'settlements', 'request', requestId) },
   ]
-  if (hasRoleAny(req, 'pk-finance', 'pk-owner', 'pk-admin')) {
+  // ADR 0016 §5: ledger rows only for office roles OF THE REQUEST's PT
+  const company = await companyOf(req, 'expense-requests', requestId)
+  if (hasRole(req, ['pk-finance', 'pk-owner', 'pk-admin'], company)) {
     targets.push({ docType: 'cash_entry', ids: await idsOf(req, 'cash-entries', 'expenseRequest', requestId) })
   }
   return historyRows(req, targets)

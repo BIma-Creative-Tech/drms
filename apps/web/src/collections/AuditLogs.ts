@@ -1,6 +1,6 @@
 import type { CollectionConfig, Field, Where } from 'payload'
 
-import { denyAll, hasRoleAny } from '@/access/roles'
+import { denyAll, hasRoleAny, isGroupAdmin } from '@/access/roles'
 import { byRole } from '@/access/policies'
 import { AUDIT_ACTIONS } from '@/audit/writer'
 
@@ -58,13 +58,16 @@ export const AuditLogs: CollectionConfig = {
     listSearchableFields: ['docNo', 'docId', 'docType'],
   },
   access: {
-    // ADR 0016: rows of a PT → office roles of THAT PT; rows without PT (logins, shared masters,
-    // app-wide settings, domain rows not tagged yet — MC2) → office roles in any PT.
+    // ADR 0016 / requirements v1.2 §5: rows of a PT → office roles of THAT PT; rows without PT
+    // (logins, shared masters, app-wide settings) → Admin / Direktur of any PT and group admins (MC2:
+    // no longer Finance — same rule as the audit-log report).
     read: async (args) => {
       if (!hasRoleAny(args.req, 'pk-admin', 'pk-owner', 'pk-finance')) return false
       const perPt = await byRole({ 'pk-admin': true, 'pk-owner': true, 'pk-finance': true })(args)
-      const untagged: Where = { company: { exists: false } }
-      return perPt === true ? true : perPt ? { or: [perPt as Where, untagged] } : untagged
+      if (perPt === true) return true
+      const untagged: Where | null = hasRoleAny(args.req, 'pk-admin', 'pk-owner') || isGroupAdmin(args.req) ? { company: { exists: false } } : null
+      if (!untagged) return perPt
+      return perPt ? { or: [perPt as Where, untagged] } : untagged
     },
     create: denyAll, // only SYSTEM-WRITE via writeAudit()
     update: denyAll,

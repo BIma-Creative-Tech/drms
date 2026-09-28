@@ -1,7 +1,7 @@
 import { sql } from '@payloadcms/db-postgres'
 import { APIError, type PayloadRequest, type Where } from 'payload'
 
-import { hasRoleAny, relId, userId, userRoles, type Role } from '@/access/roles'
+import { companiesWithRole, hasRoleAny, relId, rolesIn, userId, userRoles, type Role } from '@/access/roles'
 import { resolveScope } from '@/access/scope'
 import { writeAudit, writeAuditDetached } from '@/audit/writer'
 import { displayName, projectCommitted, resolveSignature, today, type Signature } from '@/domain/expense/common'
@@ -133,7 +133,10 @@ export async function decisionsOf(req: PayloadRequest, addendumId: number): Prom
 
 export async function actorContext(req: PayloadRequest, doc: AddendumDoc, rows?: DecisionRow[]): Promise<AddendumActorContext & { lacksDecisionRole: boolean }> {
   const uid = userId(req) ?? -1
-  const roles = userRoles(req)
+  // ADR 0016 §5: decisions are checked against the caller's roles IN THE ADDENDUM's PT (MC2 fix:
+  // was the union over the selected PTs → Finance of PT A + PM of PT B could decide a PT B addendum)
+  const company = relId((doc as { company?: unknown }).company)
+  const roles = company !== undefined ? rolesIn(req, company) : userRoles(req)
   const cycle = doc.approvalCycle ?? 0
   const decisions = (rows ?? (cycle > 0 ? await decisionsOf(req, doc.id) : [])).filter((r) => r.cycle === cycle)
   const snap = doc.approvalSnapshot ?? null
@@ -673,12 +676,14 @@ export async function addendumProjectOptions(req: PayloadRequest): Promise<Array
     sort: 'code',
     depth: 0,
     pagination: false,
-    select: { code: true, name: true, budget: true },
+    select: { code: true, name: true, budget: true, company: true },
     user: req.user,
     overrideAccess: false,
     req,
   })
-  const team = new Set((await resolveScope(req)).teamProjects)
+  // ADR 0016 §5: PM role + team scope IN THE PROJECT's PT
+  const team = new Set<number>()
+  for (const c of companiesWithRole(req, ['pk-pm'])) for (const p of (await resolveScope(req, c)).teamProjects) team.add(p)
   return (res.docs as unknown as Array<{ id: number; code: string; name: string; budget?: number | null }>)
     .filter((p) => team.has(p.id))
     .map((p) => ({ id: p.id, code: p.code, name: p.name, budget: p.budget ?? null }))

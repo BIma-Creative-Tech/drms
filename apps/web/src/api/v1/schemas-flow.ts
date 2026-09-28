@@ -495,18 +495,24 @@ export const VoidResult = z.object({ original: CashEntry, reversal: CashEntry })
 export const Balances = z
   .object({
     asOf: z.string().nullable(),
-    items: z.array(z.object({ cashAccountId: id, name: z.string(), openingBalance: z.number().int(), totalIn: z.number().int(), totalOut: z.number().int(), balance: z.number().int() })),
+    items: z.array(z.object({ cashAccountId: id, companyId: id, name: z.string(), openingBalance: z.number().int(), totalIn: z.number().int(), totalOut: z.number().int(), balance: z.number().int() })),
   })
   .meta({ id: 'Balances' })
 
 export const PeriodCloseBody = z
-  .object({ period: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/), note: z.string().max(500).optional() })
+  .object({
+    period: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/),
+    note: z.string().max(500).optional(),
+    /** ADR 0016 §4: PT to close; required when the caller is Finance/Direktur in more than one selected PT. */
+    company: z.number().int().positive().optional(),
+  })
   .strict()
   .meta({ id: 'PeriodCloseBody' })
 
 export const PeriodClosing = z
   .object({
     id,
+    companyId: id.nullable(),
     period: z.string(),
     status: z.enum(['closed', 'reopened']),
     note: z.string().nullable(),
@@ -517,7 +523,14 @@ export const PeriodClosing = z
     reopenReason: z.string().nullable(),
   })
   .meta({ id: 'PeriodClosing' })
-export const PeriodClosingList = z.object({ lockDate: z.string().nullable(), items: z.array(PeriodClosing) }).meta({ id: 'PeriodClosingList' })
+export const PeriodClosingList = z
+  .object({
+    lockDate: z.string().nullable(),
+    /** ADR 0016 §4: lock date per PT readable by the caller. */
+    lockDates: z.array(z.object({ companyId: id, lockDate: z.string().nullable() })),
+    items: z.array(PeriodClosing),
+  })
+  .meta({ id: 'PeriodClosingList' })
 
 export const TransferResult = z
   .object({

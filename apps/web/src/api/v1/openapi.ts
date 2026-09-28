@@ -255,15 +255,16 @@ export function buildOpenApiDocument(version: string) {
     path: '/cash-accounts/balances',
     summary: 'Finance/Direktur (pk-owner): balance per cash account (opening + in − out)',
     security,
-    request: { query: z.object({ asOf: z.string().optional() }) },
-    responses: res(200, 'Balances', F.Balances, [401, 403]),
+    request: { query: z.object({ asOf: z.string().optional(), company: z.string().regex(/^\d+$/).optional() }) },
+    responses: res(200, 'Balances', F.Balances, [400, 401, 403]),
   })
   registry.registerPath({
     method: 'get',
     path: '/period-closings',
-    summary: 'Closed periods and the current lock date',
+    summary: 'Closed periods and the lock date per PT (`company` narrows to one PT)',
     security,
-    responses: res(200, 'Periods', F.PeriodClosingList, [401, 403]),
+    request: { query: z.object({ company: z.string().regex(/^\d+$/).optional() }) },
+    responses: res(200, 'Periods', F.PeriodClosingList, [400, 401, 403]),
   })
   post('/period-closings', 'Finance/Direktur (pk-owner): close a past month (DB rejects postings dated ≤ lock date)', F.PeriodCloseBody, [], res(201, 'Closed', F.PeriodClosing, [400, 401, 403, 409, 422, 429]))
   registry.registerPath({
@@ -271,7 +272,7 @@ export function buildOpenApiDocument(version: string) {
     path: '/period-closings/{period}/reopen',
     summary: 'Direktur (role pk-owner): re-open the latest closed period (reason)',
     security,
-    request: { headers: idem, params: z.object({ period: z.string().regex(/^\d{4}-\d{2}$/) }), body: jsonBody(F.ReasonBody) },
+    request: { headers: idem, params: z.object({ period: z.string().regex(/^\d{4}-\d{2}$/) }), query: z.object({ company: z.string().regex(/^\d+$/).optional() }), body: jsonBody(F.ReasonBody) },
     responses: res(200, 'Re-opened', F.PeriodClosing, [400, 401, 403, 409, 422, 429]),
   })
 

@@ -2,13 +2,11 @@ import { sql } from '@payloadcms/db-postgres'
 import type { PayloadRequest, Where } from 'payload'
 import { z } from 'zod'
 
-import { relId, rolesOf, type Role } from '@/access/roles'
+import { companiesWithRole, relId, rolesOf, type Role } from '@/access/roles'
 import { getRequestTx } from '@/lib/tx'
 
 import type { CashEntryDoc } from './ledger'
 import { isPeriod, periodEnd } from './periods'
-
-// MC2: LEAK POINT — cash book / balances SQL has no company predicate (inventory MC2-1 cash).
 
 /**
  * E2 (fase1-golive §E2): read side of the web "Kas" views — buku kas with filters, saldo per
@@ -16,6 +14,8 @@ import { isPeriod, periodEnd } from './periods'
  * post to the domain endpoints; the collections keep create/update: denyAll).
  * Reads use the CALLER's collection access (overrideAccess:false); raw SQL (sums) runs inside the
  * request transaction with parameters only.
+ * MC2 (ADR 0016 §4/§5): sums are limited to the selected PTs where the caller is Finance/Direktur
+ * (`companyIds` narrows further — the Kas PT filter / "Tutup buku" per PT); every row carries its PT.
  */
 
 // ---------------------------------------------------------------- pure rules (unit-tested)
@@ -28,11 +28,30 @@ import { isPeriod, periodEnd } from './periods'
 export const KAS_VIEW_ROLES: Role[] = ['pk-finance', 'pk-owner']
 export const KAS_WRITE_ROLES: Role[] = ['pk-finance']
 
+/** UI hint over the selected PTs (any PT). Per-PT answer: `kasAccessIn`. */
 export function kasAccess(user: unknown): { view: boolean; write: boolean; close: boolean; reopen: boolean } {
   const r = rolesOf(user)
   const view = r.some((x) => KAS_VIEW_ROLES.includes(x))
   return { view, write: r.some((x) => KAS_WRITE_ROLES.includes(x)), close: view, reopen: r.includes('pk-owner') }
 }
+
+/** Kas rights per selected PT (ADR 0016 §5): which PTs the caller may view / write / close / reopen. */
+export function kasAccessIn(req: Pick<PayloadRequest, 'user'>): { view: number[]; write: number[]; close: number[]; reopen: number[] } {
+  const view = companiesWithRole(req, KAS_VIEW_ROLES)
+  return { view, write: companiesWithRole(req, KAS_WRITE_ROLES), close: view, reopen: companiesWithRole(req, ['pk-owner']) }
+}
+
+const pts = (req: PayloadRequest, companyIds?: readonly number[]) => {
+  const allowed = companiesWithRole(req, KAS_VIEW_ROLES)
+  return companyIds ? allowed.filter((c) => companyIds.includes(c)) : allowed
+}
+const ptSql = (ids: number[]) =>
+  ids.length
+    ? sql`company_id IN (${sql.join(
+        ids.map((c) => sql`${c}`),
+        sql`, `,
+      )})`
+    : sql`FALSE`
 
 const optId = z.preprocess((v) => (v === '' || v === undefined ? undefined : v), z.coerce.number().int().positive().max(2_147_483_647).optional())
 const optPeriod = z.preprocess((v) => (v === '' || v === undefined ? undefined : v), z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/).optional())
@@ -44,6 +63,8 @@ export const BookQuery = z.object({
   project: optId,
   pusat: optId,
   arah: z.enum(['masuk', 'keluar']).optional().catch(undefined),
+  /** MC2: PT filter of the Kas list (a PT without Kas access simply yields no rows). */
+  pt: optId,
   status: z.enum(['posted', 'void']).optional().catch(undefined),
   hal: z.coerce.number().int().min(1).max(10_000).default(1).catch(1),
 })
@@ -72,6 +93,7 @@ export function bookWhere(q: BookQuery): Where | undefined {
   if (q.pusat) and.push({ costCenter: { equals: q.pusat } })
   if (q.arah) and.push({ direction: { equals: q.arah === 'masuk' ? 'in' : 'out' } })
   if (q.status) and.push({ status: { equals: q.status } })
+  if (q.pt) and.push({ company: { equals: q.pt } })
   return and.length ? { and } : undefined
 }
 
@@ -145,7 +167,7 @@ export function parseRupiahInput(v: string): number | null {
 
 // ---------------------------------------------------------------- DB reads
 
-export type Option = { id: number; label: string; active: boolean }
+export type Option = { id: number; label: string; active: boolean; companyId: number | null }
 export type Lookups = {
   accounts: Option[]
   projects: Option[]
@@ -161,6 +183,7 @@ async function all(req: PayloadRequest, collection: 'cash-accounts' | 'projects'
 }
 
 const codeName = (d: Record<string, unknown>) => [d.code, d.name].filter(Boolean).join(' ')
+const cid = (d: Record<string, unknown>) => relId(d.company) ?? null
 
 /** Masters for filters, labels and the forms (Finance/Owner may read all of them). */
 export async function cashLookups(req: PayloadRequest): Promise<Lookups> {
@@ -173,17 +196,18 @@ export async function cashLookups(req: PayloadRequest): Promise<Lookups> {
     all(req, 'vehicles', 'plateNo'),
   ])
   return {
-    accounts: accounts.map((d) => ({ id: d.id as number, label: String(d.name ?? ''), active: d.active !== false })),
-    projects: projects.map((d) => ({ id: d.id as number, label: codeName(d), active: d.status !== 'selesai' && d.status !== 'arsip' })),
-    costCenters: costCenters.map((d) => ({ id: d.id as number, label: codeName(d), active: d.active !== false })),
-    categories: categories.map((d) => ({ id: d.id as number, label: codeName(d), active: d.active !== false, requiresVehicle: d.requiresVehicle === true })),
-    sources: sources.map((d) => ({ id: d.id as number, label: codeName(d), active: d.active !== false })),
-    vehicles: vehicles.map((d) => ({ id: d.id as number, label: [d.plateDisplay ?? d.plateNo, d.type].filter(Boolean).join(' · '), active: d.active !== false })),
+    accounts: accounts.map((d) => ({ id: d.id as number, companyId: cid(d), label: String(d.name ?? ''), active: d.active !== false })),
+    projects: projects.map((d) => ({ id: d.id as number, companyId: cid(d), label: codeName(d), active: d.status !== 'selesai' && d.status !== 'arsip' })),
+    costCenters: costCenters.map((d) => ({ id: d.id as number, companyId: cid(d), label: codeName(d), active: d.active !== false })),
+    categories: categories.map((d) => ({ id: d.id as number, companyId: cid(d), label: codeName(d), active: d.active !== false, requiresVehicle: d.requiresVehicle === true })),
+    sources: sources.map((d) => ({ id: d.id as number, companyId: cid(d), label: codeName(d), active: d.active !== false })),
+    vehicles: vehicles.map((d) => ({ id: d.id as number, companyId: cid(d), label: [d.plateDisplay ?? d.plateNo, d.type].filter(Boolean).join(' · '), active: d.active !== false })),
   }
 }
 
 export type BookRow = {
   id: number
+  companyId: number | null
   entryNo: string
   entryDate: string
   period: string | null
@@ -241,6 +265,7 @@ export async function cashBookPage(req: PayloadRequest, q: BookQuery, limit = PA
     const rid = relId(d.expenseRequest)
     return {
       id: d.id,
+      companyId: relId((d as { company?: unknown }).company) ?? null,
       entryNo: d.entryNo,
       entryDate: d.entryDate,
       period: d.period ?? null,
@@ -273,21 +298,24 @@ async function sums(req: PayloadRequest, query: ReturnType<typeof sql>): Promise
   return r.rows.map((x) => ({ key: String(x.k), n: Number(x.n), tin: Number(x.tin), tout: Number(x.tout) }))
 }
 
-/** Σ in / Σ out per cash account in one period (all rows: void + reversal cancel out, ADR 0005). */
-export async function accountFlows(req: PayloadRequest, period: string): Promise<Map<number, { n: number; tin: number; tout: number }>> {
+/** Σ in / Σ out per cash account in one period (all rows: void + reversal cancel out, ADR 0005), Kas PTs only. */
+export async function accountFlows(req: PayloadRequest, period: string, companyIds?: readonly number[]): Promise<Map<number, { n: number; tin: number; tout: number }>> {
   if (!isPeriod(period)) return new Map()
   const rows = await sums(
     req,
     sql`SELECT cash_account_id AS k, count(*)::int AS n,
                coalesce(sum(CASE WHEN direction = 'in' THEN amount ELSE 0 END), 0)::text AS tin,
                coalesce(sum(CASE WHEN direction = 'out' THEN amount ELSE 0 END), 0)::text AS tout
-        FROM cash_entries WHERE period = ${period} GROUP BY cash_account_id`,
+        FROM cash_entries WHERE period = ${period} AND ${ptSql(pts(req, companyIds))} GROUP BY cash_account_id`,
   )
   return new Map(rows.map((r) => [Number(r.key), { n: r.n, tin: r.tin, tout: r.tout }]))
 }
 
-/** Per period: number of rows, Σ in, Σ out, voided rows (Tutup buku overview). */
-export async function periodSummaries(req: PayloadRequest, periods: string[]): Promise<Map<string, { n: number; tin: number; tout: number; voids: number }>> {
+/**
+ * Per period: number of rows, Σ in, Σ out, voided rows (Tutup buku overview) of the Kas PTs — pass
+ * ONE `companyId` for the per-PT closing screen (closing is always one PT, ADR 0016 §4).
+ */
+export async function periodSummaries(req: PayloadRequest, periods: string[], companyIds?: readonly number[]): Promise<Map<string, { n: number; tin: number; tout: number; voids: number }>> {
   const valid = periods.filter(isPeriod)
   if (valid.length === 0) return new Map()
   const tx = await getRequestTx(req)
@@ -296,7 +324,7 @@ export async function periodSummaries(req: PayloadRequest, periods: string[]): P
            coalesce(sum(CASE WHEN direction = 'in' THEN amount ELSE 0 END), 0)::text AS tin,
            coalesce(sum(CASE WHEN direction = 'out' THEN amount ELSE 0 END), 0)::text AS tout,
            count(*) FILTER (WHERE status = 'void')::int AS voids
-    FROM cash_entries WHERE period IN (${sql.join(
+    FROM cash_entries WHERE ${ptSql(pts(req, companyIds))} AND period IN (${sql.join(
       valid.map((p) => sql`${p}`),
       sql`, `,
     )}) GROUP BY period`)) as unknown as { rows: Array<{ k: string; n: number; tin: string; tout: string; voids: number }> }

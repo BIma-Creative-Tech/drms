@@ -2943,6 +2943,10 @@ export const openapiDocument = {
                   "type": "integer",
                   "exclusiveMinimum": 0
                 },
+                "companyId": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
                 "name": {
                   "type": "string"
                 },
@@ -2961,6 +2965,7 @@ export const openapiDocument = {
               },
               "required": [
                 "cashAccountId",
+                "companyId",
                 "name",
                 "openingBalance",
                 "totalIn",
@@ -2984,6 +2989,28 @@ export const openapiDocument = {
               "null"
             ]
           },
+          "lockDates": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "companyId": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                "lockDate": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "companyId",
+                "lockDate"
+              ]
+            }
+          },
           "items": {
             "type": "array",
             "items": {
@@ -2993,6 +3020,7 @@ export const openapiDocument = {
         },
         "required": [
           "lockDate",
+          "lockDates",
           "items"
         ]
       },
@@ -3001,6 +3029,13 @@ export const openapiDocument = {
         "properties": {
           "id": {
             "type": "integer",
+            "exclusiveMinimum": 0
+          },
+          "companyId": {
+            "type": [
+              "integer",
+              "null"
+            ],
             "exclusiveMinimum": 0
           },
           "period": {
@@ -3054,6 +3089,7 @@ export const openapiDocument = {
         },
         "required": [
           "id",
+          "companyId",
           "period",
           "status",
           "note",
@@ -3074,6 +3110,10 @@ export const openapiDocument = {
           "note": {
             "type": "string",
             "maxLength": 500
+          },
+          "company": {
+            "type": "integer",
+            "exclusiveMinimum": 0
           }
         },
         "required": [
@@ -3776,7 +3816,7 @@ export const openapiDocument = {
               "properties": {
                 "code": {
                   "type": "string",
-                  "description": "VALIDATION, NOT_EDITABLE, STALE_REV (conflict), NOT_FOUND, FORBIDDEN, MEDIA_MISSING, CLIENT_UUID_CONFLICT, FEATURE_DISABLED, DEPENDENCY_FAILED, DEPENDENCY_PENDING, STATE_CONFLICT, INTEGRITY, UNSUPPORTED, INTERNAL; attendance: MOCK_LOCATION, OUTSIDE_GEOFENCE, NOT_ASSIGNED, NO_GEOFENCE, ALREADY_CHECKED_IN, NO_CHECK_IN, ALREADY_CHECKED_OUT (on_behalf also FORBIDDEN: not a PM / not a team location / own attendance); progress reports: WEIGHTS_INCOMPLETE, PROGRESS_DECREASED, PHOTO_LIMIT, MEDIA_IN_USE."
+                  "description": "VALIDATION, NOT_EDITABLE, STALE_REV (conflict), NOT_FOUND, FORBIDDEN, MEDIA_MISSING, CLIENT_UUID_CONFLICT, COMPANY_MISMATCH (MC2: the PT derived from the item references is not in the X-Company-Ids selection / memberships; send the item under its own PT), FEATURE_DISABLED, DEPENDENCY_FAILED, DEPENDENCY_PENDING, STATE_CONFLICT, INTEGRITY, UNSUPPORTED, INTERNAL; attendance: MOCK_LOCATION, OUTSIDE_GEOFENCE, NOT_ASSIGNED, NO_GEOFENCE, ALREADY_CHECKED_IN, NO_CHECK_IN, ALREADY_CHECKED_OUT (on_behalf also FORBIDDEN: not a PM / not a team location / own attendance); progress reports: WEIGHTS_INCOMPLETE, PROGRESS_DECREASED, PHOTO_LIMIT, MEDIA_IN_USE."
                 },
                 "field": {
                   "type": "string"
@@ -11600,6 +11640,15 @@ export const openapiDocument = {
             "required": false,
             "name": "asOf",
             "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d+$"
+            },
+            "required": false,
+            "name": "company",
+            "in": "query"
           }
         ],
         "responses": {
@@ -11609,6 +11658,16 @@ export const openapiDocument = {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Balances"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
                 }
               }
             }
@@ -11638,13 +11697,24 @@ export const openapiDocument = {
     },
     "/period-closings": {
       "get": {
-        "summary": "Closed periods and the current lock date",
+        "summary": "Closed periods and the lock date per PT (`company` narrows to one PT)",
         "security": [
           {
             "bearer": []
           },
           {
             "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d+$"
+            },
+            "required": false,
+            "name": "company",
+            "in": "query"
           }
         ],
         "responses": {
@@ -11654,6 +11724,16 @@ export const openapiDocument = {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/PeriodClosingList"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
                 }
               }
             }
@@ -11817,6 +11897,15 @@ export const openapiDocument = {
             "required": true,
             "name": "period",
             "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d+$"
+            },
+            "required": false,
+            "name": "company",
+            "in": "query"
           },
           {
             "schema": {
