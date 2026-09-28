@@ -120,6 +120,45 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   - Tests: web unit + integration (Keycloak mocked), `tests/kc/two-factor.kc.test.ts` against a real throwaway
     Keycloak 26.7.4 (`test-env/kc-setup.sh` gains a TEST-ONLY `proyekkas-web` client + user); mobile unit + widget.
   - Docs: ADR 0017; revisions in ADR 0012, `plans/fase1-golive.md` G1-3, ASVS checklist 4.3.1 / G-01 (decided).
+- **Public APK download on the DRMS server** (`apps/web`, branch `feat/apk-download-page`; user decision 2026-09-27
+  "host on the DRMS server"): `GET /unduh` — a public page in Indonesian (web-starter tokens/fonts, light/dark, 390 px,
+  server component, `noindex`): version, size, publish date (WITA), big **Unduh APK** button, install/update steps,
+  SHA-256 of the file and of the signing certificate, "Hanya untuk karyawan PT DRMS". `GET|HEAD /unduh/proyekkas.apk`
+  — stable URL for Pengaturan → "URL unduh APK": streams the current release with
+  `application/vnd.android.package-archive`, `attachment; filename="ProyekKas-<version>.apk"`, `Content-Length`,
+  `Cache-Control: no-cache` + `ETag` (= SHA-256, 304 on match), `nosniff`, `X-Robots-Tag`; 404 with an Indonesian
+  message while nothing is published. No login; the `/admin` gate and CSP nonce proxy are unchanged (own root layout
+  in route group `(public)`, no Payload, no client components).
+  - Files live in the existing media volume under `${MEDIA_DIR}/app-release/` with a manifest `latest.json`
+    validated strictly by zod (`src/lib/app-release.ts`: fixed file-name pattern, path kept inside the directory,
+    size must match → a partial copy is never served).
+  - `apps/web/scripts/publish-apk.mjs` (Node built-ins only, shipped in the runner image): copies an APK, computes
+    SHA-256, writes `latest.json` atomically, keeps the current + 2 previous versions; refuses a different file under
+    an already published version. Runbook `docs/proyekkas/runbooks/rilis-apk.md` (one-shot `docker run --rm` with the
+    running web image + media volume; no running container is touched).
+  - Tests: `tests/unit/apk-download.test.ts` (manifest schema incl. traversal, route 404/200/HEAD/304, publish
+    retention, page markup). No new dependency.
+- **Release notes per version ("deskripsi rilis") in three places** (web + APK 0.2.1; user decision 2026-09-28):
+  - Source of truth for the APK: `docs/release-notes/apk/<X.Y.Z>.md` — short Indonesian bullets for field employees
+    (0.2.0 and 0.2.1 written; format rules in `docs/release-notes/README.md`). Must exist before the tag is pushed.
+  - **`/unduh`**: `scripts/publish-apk.mjs --notes <file.md>` stores the bullets as plain text `notes: string[]` in
+    `latest.json` (markdown bullets, continuation lines, title/blank lines ignored, inline markup reduced to text;
+    1–15 bullets × ≤ 300 chars, no control characters; a bad file fails before anything is copied). The zod manifest
+    schema accepts the optional field (older manifests stay valid); the page shows "Yang baru di versi X" as escaped
+    text. Retention unchanged. Runbook `rilis-apk.md` passes `--notes /in/notes.md`.
+  - **In the APK**: `GET /api/v1/app/config` gains optional `releaseNotes: string[]` — the manifest notes when the
+    published APK's version equals "Versi APK terbaru" (else omitted; cached with the settings for 60 s). OpenAPI
+    regenerated. APK: tolerant parsing (`AppConfig.releaseNotes`, ≤ 15 × ≤ 300), the home line "Versi baru tersedia"
+    became a tappable banner → sheet with "Yang baru di versi X", install hint and the download link (copy button as
+    before); the blocking "Perbarui aplikasi" screen shows the same list and scrolls when long. New ARB strings only.
+  - **GitHub Releases**: `mobile.yml` job `release-prod` fails before building when the notes file for the tag version
+    is missing, and after the APKs are verified creates/updates the Release of `mobile-vX.Y.Z` (body = notes file +
+    certificate SHA-256 + CHANGELOG link; assets = the three ABI APKs + `SHA256SUMS.txt`; job-level
+    `contents: write`, workflow default stays read). New workflow `release-notes.yml`: tag `vX.Y.Z` → Release with the
+    `## [X.Y.Z]` section of this file (fails when the section is missing).
+  - Tests: `tests/unit/apk-download.test.ts` (schema limits, markdown parsing, publish with/without notes,
+    `releaseNotesFor`, page escaping), `tests/integration/f4-mobile.int.test.ts` (app config `releaseNotes`),
+    APK `test/unit/misc_test.dart` + `test/widget/release_notes_test.dart`. No new dependency.
 
 ### Changed
 - **`company-settings` global = app-wide only** (APK gate, device image targets, offline max age, selfie batch

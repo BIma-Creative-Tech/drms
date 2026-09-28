@@ -20,6 +20,12 @@
 #                                      decision 13). The certificate SHA-256 is printed to the log and the
 #                                      job summary (Firebase / App Links). apps/mobile/README.md
 #                                      "Production signing key" lists the custodian steps.
+#                                      After the APKs are verified it creates/updates the GitHub Release of
+#                                      the tag: body = docs/release-notes/apk/<version>.md (user-facing,
+#                                      Indonesian; the job fails BEFORE building when the file is missing) +
+#                                      certificate SHA-256 + CHANGELOG link, assets = the three ABI APKs +
+#                                      SHA256SUMS.txt (never the obfuscation symbols). Only this job gets
+#                                      `contents: write`; the workflow default stays read.
 name: mobile
 
 on:
@@ -189,6 +195,9 @@ jobs:
     # restricted to mobile-v*). Required reviewers need a paid plan for private repos; add them there
     # if the organisation upgrades.
     environment: android-release-prod
+    # contents: write only for `gh release create/upload` at the end of this job.
+    permissions:
+      contents: write
     env:
       HAS_PROD_KEY: ${{ secrets.ANDROID_KEYSTORE_B64 != '' }}
     steps:
@@ -204,6 +213,12 @@ jobs:
           have="$(sed -n 's/^version: \([0-9][0-9.]*\)+.*/\1/p' pubspec.yaml)"
           echo "tag=${want} pubspec=${have}"
           test "${want}" = "${have}" || { echo "::error::tag ${GITHUB_REF_NAME} != pubspec version ${have}"; exit 1; }
+      - name: Release notes exist (docs/release-notes/apk/<version>.md)
+        run: |
+          f="../../docs/release-notes/apk/${GITHUB_REF_NAME#mobile-v}.md"
+          test -f "$f" || { echo "::error::$f is missing — write the user-facing release notes before tagging (docs/release-notes/README.md)"; exit 1; }
+          grep -qE '^ {0,3}[-*][[:space:]]+[^[:space:]]' "$f" || { echo "::error::$f has no '- ' bullet"; exit 1; }
+          echo "Release notes: $f"; cat "$f"
       - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
           distribution: temurin
@@ -269,6 +284,36 @@ jobs:
             apps/mobile/build/symbols/
           retention-days: 90
           if-no-files-found: error
+      - name: GitHub Release (release notes + APKs)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          v="${GITHUB_REF_NAME#mobile-v}"
+          out="$RUNNER_TEMP/github-release"; mkdir -p "$out"
+          for abi in arm64-v8a armeabi-v7a x86_64; do
+            cp "build/app/outputs/flutter-apk/app-${abi}-prod-release.apk" "$out/ProyekKas-${v}-${abi}.apk"
+          done
+          (cd "$out" && sha256sum ./*.apk | sed 's# \./# #' > SHA256SUMS.txt && cat SHA256SUMS.txt)
+          {
+            cat "../../docs/release-notes/apk/${v}.md"
+            echo
+            echo "---"
+            echo "HP Android biasa: pakai **ProyekKas-${v}-arm64-v8a.apk** (sama dengan https://drms-kas.bimacreative.tech/unduh setelah diterbitkan)."
+            echo
+            echo "Sertifikat penandatangan (SHA-256): \`${PROD_CERT_SHA256}\`"
+            echo
+            echo "Perubahan teknis: [CHANGELOG.md](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/blob/${GITHUB_REF_NAME}/CHANGELOG.md)"
+          } > "$RUNNER_TEMP/release-body.md"
+          if gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1; then
+            gh release edit "$GITHUB_REF_NAME" --title "ProyekKas APK ${v}" --notes-file "$RUNNER_TEMP/release-body.md"
+            gh release upload "$GITHUB_REF_NAME" "$out"/* --clobber
+          else
+            # --latest=false: the "Latest" badge stays on the web release (v*); APK users get /unduh.
+            gh release create "$GITHUB_REF_NAME" --verify-tag --latest=false --title "ProyekKas APK ${v}" \
+              --notes-file "$RUNNER_TEMP/release-body.md" "$out"/*
+          fi
+          echo "GitHub Release: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/releases/tag/${GITHUB_REF_NAME}" >> "$GITHUB_STEP_SUMMARY"
       - name: Remove keystore
         if: always()
         run: rm -f "$RUNNER_TEMP/prod.jks"

@@ -72,6 +72,16 @@
       }
     }
   },
+  "updateAvailableTap": "Ketuk untuk melihat yang baru dan cara memperbarui.",
+  "updateHowTo": "Pasang APK versi baru di atas aplikasi ini, tanpa menghapusnya. Data dan login tetap tersimpan.",
+  "releaseNotesTitle": "Yang baru di versi {version}",
+  "@releaseNotesTitle": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
   "navHome": "Beranda",
   "navRequests": "Pengajuan",
   "navInbox": "Persetujuan",
