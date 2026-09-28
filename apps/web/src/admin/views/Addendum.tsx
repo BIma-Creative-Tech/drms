@@ -2,7 +2,7 @@ import type { AdminViewServerProps, PayloadRequest } from 'payload'
 import Link from 'next/link'
 import React from 'react'
 
-import { hasRoleAny } from '@/access/roles'
+import { hasRoleAny, relId } from '@/access/roles'
 import { AddendumForm } from '@/admin/components/addendum/AddendumForm'
 import { ConfirmAction } from '@/admin/components/addendum/ConfirmAction'
 import { ReasonAction } from '@/admin/components/kas/ReasonAction'
@@ -18,6 +18,7 @@ import { KAS_STYLE } from '@/admin/components/kas/style'
 import { F3Root } from './f3-ui'
 import { Frame } from './frame'
 import { Alert, dateTimeId } from './progress-ui'
+import { PtChip, ptView } from './pt'
 import { Bento, Card, DashHead, DataTable, EmptyState, KpiRow, KpiTile, pctText, rp, rpShort, StatusPill, VIZ_STYLE, type Col } from './viz'
 
 /**
@@ -54,15 +55,19 @@ export async function AddendumList(props: AdminViewServerProps) {
   const d = await withReqTransaction(req, async () => {
     const page = await listAddenda(req, { projectId: project, status, limit: 25, after: before })
     const all = await listAddenda(req, { projectId: project, limit: 100 })
-    const projects = (await req.payload.find({ collection: 'projects', sort: 'code', depth: 0, pagination: false, select: { code: true, name: true }, user: req.user, overrideAccess: false, req }).catch(() => ({ docs: [] }))).docs as Array<{ id: number; code: string; name: string }>
+    const projects = (await req.payload.find({ collection: 'projects', sort: 'code', depth: 0, pagination: false, select: { code: true, name: true, company: true }, user: req.user, overrideAccess: false, req }).catch(() => ({ docs: [] }))).docs as Array<{ id: number; code: string; name: string; company?: unknown }>
     const inbox = await addendumInbox(req)
     const canCreate = (await addendumProjectOptions(req)).length > 0
     return { page, all: all.items, projects, inbox: inbox.items.length, canCreate }
   })
+  // MC2-4: PT column when > 1 PT is selected (PT of the addendum = PT of its project)
+  const pt = await ptView(req)
+  const projectPt = new Map(d.projects.map((p) => [p.id, relId(p.company) ?? null]))
   const pending = d.all.filter((a) => a.status === 'pending_ack' || a.status === 'pending_approval')
   const approved = d.all.filter((a) => a.status === 'approved')
   const filtered = Boolean(status || project)
   const cols: Col<AddendumSummary>[] = [
+    ...(pt.multi ? [{ key: 'pt', label: 'PT', cell: (a: AddendumSummary) => <PtChip pt={pt.ref(projectPt.get(a.project.id) ?? null)} /> }] : []),
     {
       key: 'no',
       label: 'Addendum',
