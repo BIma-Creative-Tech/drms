@@ -18,6 +18,7 @@ import { projectScopeSql, type ReportScope } from './scope'
  */
 export type ProjectProgress = {
   id: number
+  companyId: number
   code: string
   name: string
   status: string
@@ -41,6 +42,12 @@ export async function projectProgressVsBudget(req: PayloadRequest, scope: Report
   const warn = Number(s.progressWarnGapPct ?? 0)
   const bad = Number(s.progressBadGapPct ?? 8)
   const budgets = await projectBudgets(req, scope, opts)
+  // MC2: colour thresholds of each project's PT (ADR 0016 §1 per-PT settings); top-level = context PT.
+  const gaps = new Map<number, { warn: number; bad: number }>()
+  for (const cid of new Set(budgets.map((b) => b.companyId))) {
+    const cs = (await settings(req, cid)) as { progressWarnGapPct?: number | null; progressBadGapPct?: number | null }
+    gaps.set(cid, { warn: Number(cs.progressWarnGapPct ?? 0), bad: Number(cs.progressBadGapPct ?? 8) })
+  }
   if (budgets.length === 0) return { warnGapPct: warn, badGapPct: bad, asOf: ctx.today, projects: [] }
   const extra = await rows(
     req,
@@ -62,9 +69,11 @@ export async function projectProgressVsBudget(req: PayloadRequest, scope: Report
       const weightSum = num(x?.weight_sum)
       const stagesComplete = isComplete(weightSum)
       const gap = stagesComplete ? progressGap(b.pct, progressPct) : null
-      const tone = progressTone(gap, warn, bad)
+      const g = gaps.get(b.companyId) ?? { warn, bad }
+      const tone = progressTone(gap, g.warn, g.bad)
       return {
         id: b.id,
+        companyId: b.companyId,
         code: b.code,
         name: b.name,
         status: b.status,

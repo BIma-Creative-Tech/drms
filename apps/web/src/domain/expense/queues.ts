@@ -1,6 +1,7 @@
 import type { PayloadRequest, Where } from 'payload'
 
 import { relId } from '@/access/roles'
+import { companyRefs, type CompanyRef } from '@/domain/companies'
 
 import { actorContext, ids, projectCommitted, settings, type RequestDoc } from './common'
 import { isDecisionSnapshot } from './decision'
@@ -8,20 +9,27 @@ import { budgetImpact } from './rules'
 import { allowedActions } from './state'
 import { REQUEST_TYPE_LABELS, statusLabel, TRANSFER_QUEUE_WHERE } from './types'
 
-// MC2: queue items carry no PT label yet; settings (budget warn %) of the context PT (ADR 0016 §5).
-
 export { TRANSFER_QUEUE_WHERE }
 
 /**
  * Work queues of the F2 admin views and the APK (US-19 transfer queue, US-21 LPJ verification,
  * US-26/US-59 approval inbox). Reads run with the CALLER's access (overrideAccess:false); budget
  * figures use the request transaction handle → call inside a transaction.
+ *
+ * MC2 (ADR 0016 §5, requirements v1.2 §5): one consolidated list over the SELECTED PTs where the
+ * caller's role grants read access (collection access is per PT); every item carries
+ * `company { id, shortCode, name }`; thresholds (budget warn %) are those of the item's PT. The
+ * optional `companyIds` filter narrows further (UI PT filter) — it never widens.
  */
 type Populated = Omit<RequestDoc, 'project' | 'costCenter' | 'requesters'> & {
   project?: { id: number; code?: string; name?: string; budget?: number | null } | number | null
   costCenter?: { id: number; code?: string; name?: string } | number | null
   requesters?: Array<{ id: number; name?: string } | number> | null
 }
+
+export type QueueFilter = { companyIds?: readonly number[] | null }
+
+const narrow = (where: Where, f?: QueueFilter): Where => (f?.companyIds?.length ? { and: [where, { company: { in: [...f.companyIds] } }] } : where)
 
 async function findVisible(req: PayloadRequest, where: Where, sort: string, limit = 200): Promise<Populated[]> {
   try {
@@ -54,8 +62,15 @@ const scopeName = (d: Populated) => {
 }
 const requesterNames = (d: Populated) => (d.requesters ?? []).map((r) => (typeof r === 'object' ? (r.name ?? '') : '')).filter(Boolean).join(', ')
 
-const base = (d: Populated) => ({
+/** PT refs of the documents (one lookup per PT, request cache). */
+async function refsOf(req: PayloadRequest, docs: Populated[]): Promise<Map<number, CompanyRef>> {
+  const ids = [...new Set(docs.map((d) => relId((d as { company?: unknown }).company)).filter((x): x is number => x !== undefined))]
+  return new Map((await companyRefs(req, ids)).map((r) => [r.id, r]))
+}
+
+const base = (d: Populated, refs: Map<number, CompanyRef>) => ({
   id: d.id,
+  company: refs.get(relId((d as { company?: unknown }).company) ?? -1) ?? null,
   docNo: d.docNo ?? null,
   type: d.type,
   typeLabel: REQUEST_TYPE_LABELS[d.type],
@@ -71,12 +86,17 @@ const base = (d: Populated) => ({
 })
 
 /** Approval inbox: requests waiting for the CALLER's "Diketahui" or approval (G1/G2 applied). */
-export async function approvalInbox(req: PayloadRequest) {
-  const docs = await findVisible(req, { status: { in: ['pending_ack', 'pending_approval'] } }, 'submittedAt')
+export async function approvalInbox(req: PayloadRequest, f?: QueueFilter) {
+  const docs = await findVisible(req, narrow({ status: { in: ['pending_ack', 'pending_approval'] } }, f), 'submittedAt')
+  const refs = await refsOf(req, docs)
   const s = await settings(req)
   const warnPct = s.budgetWarnPct ?? 85
+  const warnOf = new Map<number, number>()
   const out = []
   for (const d of docs) {
+    const cid = relId((d as { company?: unknown }).company)
+    if (cid !== undefined && !warnOf.has(cid)) warnOf.set(cid, (await settings(req, cid)).budgetWarnPct ?? 85)
+    const itemWarn = cid !== undefined ? warnOf.get(cid)! : warnPct
     const ctx = await actorContext(req, { ...d, createdBy: relId(d.createdBy), requesters: ids(d.requesters as unknown[]) } as unknown as RequestDoc)
     const acts = allowedActions(ctx)
     const step = acts.includes('approve') ? 'approve' : acts.includes('acknowledge') ? 'acknowledge' : null
@@ -85,13 +105,13 @@ export async function approvalInbox(req: PayloadRequest) {
     const b = p ? budgetImpact(p.budget, await projectCommitted(req, p.id, d.id), d.grandTotal ?? 0) : { before: null, after: null }
     const decisionFlow = isDecisionSnapshot(d.approvalSnapshot)
     out.push({
-      ...base(d),
+      ...base(d, refs),
       step,
       level: d.currentLevel ?? null,
       // ADR 0013: human label of the step (web + APK) and whether this is the Direktur → Finance flow.
       stepLabel: step === 'acknowledge' ? (decisionFlow ? 'Persetujuan Direktur (Diketahui)' : 'Diketahui Oleh') : `Approval level ${d.currentLevel ?? 1}`,
       decisionFlow,
-      budget: { basis: p?.budget ? ('project' as const) : ('none' as const), pctBefore: b.before, pctAfter: b.after, overWarn: b.after !== null && b.after > warnPct },
+      budget: { basis: p?.budget ? ('project' as const) : ('none' as const), pctBefore: b.before, pctAfter: b.after, overWarn: b.after !== null && b.after > itemWarn, warnPct: itemWarn },
       flags: await flagCounts(req, d.id),
     })
   }
@@ -99,19 +119,20 @@ export async function approvalInbox(req: PayloadRequest) {
 }
 
 /** US-19: transfer queue by needed date. */
-export async function transferQueue(req: PayloadRequest) {
-  const docs = await findVisible(req, TRANSFER_QUEUE_WHERE, 'neededDate', 500)
+export async function transferQueue(req: PayloadRequest, f?: QueueFilter) {
+  const docs = await findVisible(req, narrow(TRANSFER_QUEUE_WHERE, f), 'neededDate', 500)
+  const refs = await refsOf(req, docs)
   const items = []
-  for (const d of docs) items.push({ ...base(d), bank: d.bankSnapshot ?? null, flags: await flagCounts(req, d.id) })
+  for (const d of docs) items.push({ ...base(d, refs), bank: d.bankSnapshot ?? null, flags: await flagCounts(req, d.id) })
   // needed date ascending, requests without a date last
   items.sort((a, b) => (a.neededDate ?? '9999-12-31').localeCompare(b.neededDate ?? '9999-12-31') || a.id - b.id)
   return items
 }
 
-export async function transferQueueCount(req: PayloadRequest): Promise<number> {
+export async function transferQueueCount(req: PayloadRequest, f?: QueueFilter): Promise<number> {
   const r = await req.payload.count({
     collection: 'expense-requests',
-    where: TRANSFER_QUEUE_WHERE,
+    where: narrow(TRANSFER_QUEUE_WHERE, f),
     user: req.user,
     overrideAccess: false,
     req,
@@ -119,7 +140,14 @@ export async function transferQueueCount(req: PayloadRequest): Promise<number> {
   return r.totalDocs
 }
 
-export async function lpjQueueCount(req: PayloadRequest): Promise<number> {
-  const r = await req.payload.count({ collection: 'expense-requests', where: { status: { in: ['lpj_submitted', 'lpj_verified'] } }, user: req.user, overrideAccess: false, req })
+export async function lpjQueueCount(req: PayloadRequest, f?: QueueFilter): Promise<number> {
+  const r = await req.payload.count({ collection: 'expense-requests', where: narrow({ status: { in: ['lpj_submitted', 'lpj_verified'] } }, f), user: req.user, overrideAccess: false, req })
   return r.totalDocs
+}
+
+/** US-21 LPJ verification list (Uang Muka `lpj_submitted` / `lpj_verified`), consolidated with PT refs. */
+export async function lpjQueue(req: PayloadRequest, f?: QueueFilter) {
+  const docs = await findVisible(req, narrow({ and: [{ type: { equals: 'advance' } }, { status: { in: ['lpj_submitted', 'lpj_verified'] } }] }, f), 'updatedAt', 500)
+  const refs = await refsOf(req, docs)
+  return docs.map((d) => ({ ...base(d, refs), transferredTotal: (d as { transferredTotal?: number | null }).transferredTotal ?? 0 }))
 }

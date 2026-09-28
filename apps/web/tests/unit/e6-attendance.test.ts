@@ -255,7 +255,14 @@ describe('contracts', () => {
     expect(attendanceReportScope(team)).toEqual({ kind: 'team', projects: [1, 2], costCenters: [9] })
     expect(attendanceReportScope(team, 2)).toEqual({ kind: 'team', projects: [2], costCenters: [] })
     expect(attendanceReportScope(team, 3)).toEqual({ kind: 'team', projects: [], costCenters: [] })
-    expect(attendanceReportScope({ kind: 'all' }, undefined, 44)).toEqual({ kind: 'team', projects: [], costCenters: [44] })
+    // MC2: a company-blind `all` literal never becomes an unscoped id filter (fail closed) …
+    expect(attendanceReportScope({ kind: 'all' }, undefined, 44)).toEqual({ kind: 'team', projects: [], costCenters: [] })
     expect(attendanceReportScope({ kind: 'all' })).toEqual({ kind: 'all' })
+    // … a per-PT scope keeps the id bound to each office PT (company_id = PT AND cost_center_id = 44)
+    const perPt = attendanceReportScope({ kind: 'all', companies: [{ company: 1, kind: 'all' }, { company: 2, kind: 'team', projects: [5], costCenters: [] }] }, undefined, 44)
+    expect(perPt.parts).toEqual([
+      { company: 1, all: false, projects: [], costCenters: [44] },
+      { company: 2, all: false, projects: [], costCenters: [] },
+    ])
   })
 })

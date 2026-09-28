@@ -3,8 +3,9 @@ import type { PayloadRequest } from 'payload'
 import { hasRoleAny } from '@/access/roles'
 import { adminDashboard, financeDashboard, ownerDashboard, pmDashboard, staffDashboard } from '@/domain/reports/dashboards'
 import { csvStream, downloadHeaders, ExportRefused, pdfBuffer, prepareExport, xlsxBuffer } from '@/domain/reports/export'
-import { reportByCode, type Format, type ReportDef } from '@/domain/reports/registry'
-import { officeScope, type ReportScope } from '@/domain/reports/scope'
+import { companyRefs } from '@/domain/companies'
+import { effectiveScope, reportByCode, type Format, type ReportDef } from '@/domain/reports/registry'
+import { officeScope, scopeCompanies, type ReportScope } from '@/domain/reports/scope'
 import { BusyError } from '@/lib/heavy-gate'
 import { withReqTransaction } from '@/lib/system-tx'
 import { xlsxEnabled } from '@/lib/xlsx'
@@ -18,6 +19,9 @@ import { HttpError, json, problem, v1 } from '../http'
  * - GET /reports/{code}/{csv|xlsx|pdf}          — download; audited `export`; 10/min per user.
  * Scope: Finance/Owner all, PM team (filters intersected), Staff/Admin no office reports; the
  * global audit log (`audit-log`) for Owner/Admin/Finance (Q-F3-4). Reads run in one transaction.
+ * MC2 (ADR 0016 §6): the scope is per PT (role IN each selected PT); query `pt` (repeatable / comma
+ * list) narrows it further; the JSON carries `companies` (PTs covered) — > 1 PT adds a PT column and
+ * a "Subtotal per PT" table; exports use the PT / group letterhead.
  */
 const READ_LIMIT: [number, number] = [60, 60_000]
 const EXPORT_LIMIT: [number, number] = [10, 60_000]
@@ -42,7 +46,7 @@ export async function resolveReport(req: PayloadRequest, code: string | undefine
   const def = code ? reportByCode(code) : undefined
   if (!def) throw new HttpError(404, 'Not Found')
   if (!hasRoleAny(req, ...def.roles)) throw new HttpError(403, 'Forbidden', { detail: 'Laporan ini tidak tersedia untuk peran Anda.' })
-  const scope: ReportScope = def.code === 'audit-log' ? { kind: 'all' } : def.scope ? await def.scope(req) : await officeScope(req)
+  const scope: ReportScope = def.scope ? await def.scope(req) : await officeScope(req)
   if (scope.kind === 'none') throw new HttpError(403, 'Forbidden')
   return { def, scope }
 }
@@ -63,6 +67,7 @@ export const reportJsonEndpoint = v1({
       title: def.title,
       kpi: def.kpi,
       scope: scope.kind,
+      companies: await companyRefs(req, scopeCompanies(effectiveScope(scope, sp))),
       count: res.count,
       nextCursor: res.next,
       main: table(res.main),

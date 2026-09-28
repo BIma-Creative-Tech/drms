@@ -179,7 +179,7 @@ export function summarize(days: DayRecap[], today: string): RecapSummary {
   }
 }
 
-export type TeamMember = { employeeId: number; code: string; name: string; locations: LocationRef[] }
+export type TeamMember = { employeeId: number; companyId?: number; code: string; name: string; locations: LocationRef[] }
 
 export type TeamTodayRow = {
   employee: { id: number; code: string; name: string }

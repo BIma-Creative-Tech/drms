@@ -7,11 +7,21 @@ import { DEFAULT_TZ } from '@/lib/time'
 import { getRequestTx } from '@/lib/tx'
 
 import { budgetPct, budgetTone, daysBetween, firstDay, lastDay, periodRange, type BudgetTone } from './rules'
-import { cashScopeSql, costCenterScopeSql, includesManualCash, inList, projectScopeSql, requestScopeSql, type ReportScope, type SQL } from './scope'
-
-// MC2: LEAK POINTS once a 2nd PT exists — raw SQL here is company-blind: cashBalances, cashFlowMonthly,
-// accountMonthFlows, cashBreakdown, requestMoney, transferQueueSummary, masterGaps, lastClosedPeriod take no
-// scope; the others use ReportScope `all` = TRUE (domain/reports/scope.ts). ADR 0016 §6 / inventory MC2-2.
+import {
+  companyScopeSql,
+  costCenterScopeSql,
+  includesManualCash,
+  inList,
+  ledgerCompanies,
+  ledgerScopeSql,
+  masterScopeSql,
+  projectScopeSql,
+  requestScopeSql,
+  scopeCompanies,
+  splitScope,
+  type ReportScope,
+  type SQL,
+} from './scope'
 
 /**
  * KPI queries of the F3 dashboards and reports — one function per KPI of
@@ -20,6 +30,10 @@ import { cashScopeSql, costCenterScopeSql, includesManualCash, inList, projectSc
  * - C2: business dates are text 'YYYY-MM-DD' (compared lexically); timestamps are bucketed in the
  *   company timezone (`AT TIME ZONE <settings.timezone>`);
  * - C5: every query is filtered by a ReportScope (scope.ts); an empty scope returns nothing;
+ * - MC2 (ADR 0016 §6): every query carries a company predicate built from the scope (per-PT scopes,
+ *   OR-ed; office/ledger data only for the PTs where the scope is `all`); rows carry `companyId` so
+ *   views can show a per-PT breakdown + combined total (`byCompany`, `perCompany`). Thresholds
+ *   (budget / LPJ due days) are those of the row's PT (`companyCtx`);
  * - C8: computed at request time, raw parameterised SQL on the request transaction
  *   (call inside withReqTransaction). No user input is ever interpolated as SQL text.
  * The reconciliation SQL of the doc is re-run by tests/integration/f3-kpi-reconciliation.int.test.ts.
@@ -61,6 +75,44 @@ export const ADVANCE_WITH_LPJ: readonly RequestStatus[] = ['lpj_submitted', 'lpj
 
 export type Ctx = { today: string; month: string; tz: string; lpjDueDays: number; budgetWarnPct: number; budgetOverPct: number; companyName: string }
 
+/** Per-PT thresholds (budget colours, LPJ due days) — settings of that PT, cached per request. */
+export type CompanyCtx = { companyId: number; lpjDueDays: number; budgetWarnPct: number; budgetOverPct: number; companyName: string; shortCode: string }
+
+export async function companyCtx(req: PayloadRequest, companyId: number): Promise<CompanyCtx> {
+  req.context ??= {}
+  const cache = (req.context.pkCompanyCtx ??= new Map<number, CompanyCtx>()) as Map<number, CompanyCtx>
+  const hit = cache.get(companyId)
+  if (hit) return hit
+  const s = await settings(req, companyId)
+  const c: CompanyCtx = {
+    companyId,
+    lpjDueDays: (s as { lpjDueDays?: number | null }).lpjDueDays ?? 7,
+    budgetWarnPct: s.budgetWarnPct ?? 85,
+    budgetOverPct: s.budgetOverPct ?? 100,
+    companyName: s.name ?? '',
+    shortCode: s.shortCode ?? '',
+  }
+  cache.set(companyId, c)
+  return c
+}
+
+/** Thresholds of every PT of the scope (lookup by company id; falls back to the report context). */
+async function ctxByCompany(req: PayloadRequest, companyIds: readonly number[]): Promise<Map<number, CompanyCtx>> {
+  const m = new Map<number, CompanyCtx>()
+  for (const id of companyIds) m.set(id, await companyCtx(req, id))
+  return m
+}
+
+/**
+ * Per-PT breakdown helper (requirements v1.2 §5 "rincian per PT + total gabungan"): runs `fn` once per
+ * PT of the scope with a single-PT scope. One PT → one entry, no extra query semantics.
+ */
+export async function perCompany<T>(scope: ReportScope, fn: (s: ReportScope, companyId: number) => Promise<T>): Promise<Array<{ companyId: number; value: T }>> {
+  const out: Array<{ companyId: number; value: T }> = []
+  for (const part of splitScope(scope)) out.push({ companyId: part.company, value: await fn(part.scope, part.company) })
+  return out
+}
+
 /** Settings + "today" (company TZ) once per request. */
 export async function reportContext(req: PayloadRequest): Promise<Ctx> {
   const cached = req.context.pkReportCtx as Ctx | undefined
@@ -92,27 +144,37 @@ const REFUND = sql`coalesce((SELECT sum(c.amount) FROM cash_entries c WHERE c.ex
 
 // ================================================================ K-01 cash balance per account
 
-export type AccountBalance = { id: number; name: string; kind: string; active: boolean; opening: number; totalIn: number; totalOut: number; balance: number }
+export type AccountBalance = { id: number; companyId: number; name: string; kind: string; active: boolean; opening: number; totalIn: number; totalOut: number; balance: number }
 
-/** K-01: opening + Σ in − Σ out over ALL rows (posted, void, reversal) with entry_date ≤ asOf. */
-export async function cashBalances(req: PayloadRequest, asOf: string, accountId?: number): Promise<{ accounts: AccountBalance[]; total: number }> {
+/** Σ of `value(row)` per company id (per-PT breakdown of row lists), ordered by company id. */
+export function byCompany<T extends { companyId: number }>(list: readonly T[], value: (x: T) => number, companyIds?: readonly number[]): Array<{ companyId: number; total: number }> {
+  const m = new Map<number, number>((companyIds ?? []).map((c) => [c, 0]))
+  for (const x of list) m.set(x.companyId, (m.get(x.companyId) ?? 0) + value(x))
+  return [...m.entries()].sort((a, b) => a[0] - b[0]).map(([companyId, total]) => ({ companyId, total }))
+}
+
+/**
+ * K-01: opening + Σ in − Σ out over ALL rows (posted, void, reversal) with entry_date ≤ asOf, per
+ * account of the scope's LEDGER PTs (Finance/Owner of the PT). `total` = Σ over those PTs.
+ */
+export async function cashBalances(req: PayloadRequest, scope: ReportScope, asOf: string, accountId?: number): Promise<{ accounts: AccountBalance[]; total: number; byCompany: Array<{ companyId: number; total: number }> }> {
   const r = await rows(
     req,
-    sql`SELECT a.id, a.name, a.kind::text AS kind, coalesce(a.active, true) AS active, coalesce(a.opening_balance, 0)::text AS opening,
+    sql`SELECT a.id, a.company_id, a.name, a.kind::text AS kind, coalesce(a.active, true) AS active, coalesce(a.opening_balance, 0)::text AS opening,
           coalesce(sum(e.amount) FILTER (WHERE e.direction = 'in'), 0)::text AS tin,
           coalesce(sum(e.amount) FILTER (WHERE e.direction = 'out'), 0)::text AS tout
         FROM cash_accounts a
         LEFT JOIN cash_entries e ON e.cash_account_id = a.id AND e.entry_date <= ${asOf}
-        WHERE ${accountId ? sql`a.id = ${accountId}` : sql`TRUE`}
+        WHERE ${ledgerScopeSql(scope, 'a')} AND ${accountId ? sql`a.id = ${accountId}` : sql`TRUE`}
         GROUP BY a.id ORDER BY a.name, a.id`,
   )
   const accounts = r.map((x) => {
     const opening = num(x.opening)
     const totalIn = num(x.tin)
     const totalOut = num(x.tout)
-    return { id: num(x.id), name: String(x.name), kind: String(x.kind), active: x.active !== false, opening, totalIn, totalOut, balance: opening + totalIn - totalOut }
+    return { id: num(x.id), companyId: num(x.company_id), name: String(x.name), kind: String(x.kind), active: x.active !== false, opening, totalIn, totalOut, balance: opening + totalIn - totalOut }
   })
-  return { accounts, total: accounts.reduce((s, a) => s + a.balance, 0) }
+  return { accounts, total: accounts.reduce((s, a) => s + a.balance, 0), byCompany: byCompany(accounts, (a) => a.balance, ledgerCompanies(scope)) }
 }
 
 /** Display rule of K-01: inactive accounts with balance 0 are hidden. */
@@ -130,8 +192,8 @@ export type FlowRow = { period: string; masuk: number; keluar: number; net: numb
  * only (Owner chart, Q-F3-7). Opening/closing balances (K-01 at month ends) when no project/cost
  * center filter is set (book mode only).
  */
-export async function cashFlowMonthly(req: PayloadRequest, f: FlowFilter, mode: FlowMode): Promise<FlowRow[]> {
-  const where = [sql`ce.period BETWEEN ${f.from} AND ${f.to}`]
+export async function cashFlowMonthly(req: PayloadRequest, scope: ReportScope, f: FlowFilter, mode: FlowMode): Promise<FlowRow[]> {
+  const where = [sql`ce.period BETWEEN ${f.from} AND ${f.to}`, ledgerScopeSql(scope)]
   if (f.accountId) where.push(sql`ce.cash_account_id = ${f.accountId}`)
   if (f.projectId) where.push(sql`ce.project_id = ${f.projectId}`)
   if (f.costCenterId) where.push(sql`ce.cost_center_id = ${f.costCenterId}`)
@@ -150,9 +212,9 @@ export async function cashFlowMonthly(req: PayloadRequest, f: FlowFilter, mode: 
   if (withBalance) {
     const o = await rows(
       req,
-      sql`SELECT (SELECT coalesce(sum(a.opening_balance), 0) FROM cash_accounts a WHERE ${f.accountId ? sql`a.id = ${f.accountId}` : sql`TRUE`})::text AS opening,
+      sql`SELECT (SELECT coalesce(sum(a.opening_balance), 0) FROM cash_accounts a WHERE ${ledgerScopeSql(scope, 'a')} AND ${f.accountId ? sql`a.id = ${f.accountId}` : sql`TRUE`})::text AS opening,
             (SELECT coalesce(sum(CASE WHEN ce.direction = 'in' THEN ce.amount ELSE -ce.amount END), 0) FROM cash_entries ce
-              WHERE ce.entry_date < ${firstDay(f.from)} AND ${f.accountId ? sql`ce.cash_account_id = ${f.accountId}` : sql`TRUE`})::text AS before`,
+              WHERE ce.entry_date < ${firstDay(f.from)} AND ${ledgerScopeSql(scope)} AND ${f.accountId ? sql`ce.cash_account_id = ${f.accountId}` : sql`TRUE`})::text AS before`,
     )
     running = num(o[0]?.opening) + num(o[0]?.before)
   }
@@ -167,13 +229,13 @@ export async function cashFlowMonthly(req: PayloadRequest, f: FlowFilter, mode: 
 }
 
 /** Month in/out per cash account (Finance widget [5]: K-02a; Owner card [1]: K-02b). */
-export async function accountMonthFlows(req: PayloadRequest, period: string, mode: FlowMode): Promise<Map<number, { masuk: number; keluar: number }>> {
+export async function accountMonthFlows(req: PayloadRequest, scope: ReportScope, period: string, mode: FlowMode): Promise<Map<number, { masuk: number; keluar: number }>> {
   const r = await rows(
     req,
     sql`SELECT ce.cash_account_id AS id,
           coalesce(sum(ce.amount) FILTER (WHERE ce.direction = 'in'), 0)::text AS masuk,
           coalesce(sum(ce.amount) FILTER (WHERE ce.direction = 'out'), 0)::text AS keluar
-        FROM cash_entries ce WHERE ce.period = ${period}
+        FROM cash_entries ce WHERE ce.period = ${period} AND ${ledgerScopeSql(scope)}
           ${mode === 'operational' ? sql`AND ce.status = 'posted' AND ce.source_type <> 'reversal'` : sql``}
         GROUP BY ce.cash_account_id`,
   )
@@ -181,8 +243,8 @@ export async function accountMonthFlows(req: PayloadRequest, period: string, mod
 }
 
 /** Rekap Kas breakdown: in per cash-in source, out per source type (K-02a, all rows). */
-export async function cashBreakdown(req: PayloadRequest, f: FlowFilter) {
-  const where = [sql`ce.period BETWEEN ${f.from} AND ${f.to}`]
+export async function cashBreakdown(req: PayloadRequest, scope: ReportScope, f: FlowFilter) {
+  const where = [sql`ce.period BETWEEN ${f.from} AND ${f.to}`, ledgerScopeSql(scope)]
   if (f.accountId) where.push(sql`ce.cash_account_id = ${f.accountId}`)
   if (f.projectId) where.push(sql`ce.project_id = ${f.projectId}`)
   if (f.costCenterId) where.push(sql`ce.cost_center_id = ${f.costCenterId}`)
@@ -200,9 +262,9 @@ export async function cashBreakdown(req: PayloadRequest, f: FlowFilter) {
 
 export type RequestMoney = { disbursed: number; refund: number; net: number; realized: number }
 
-/** K-03/K-04/K-05/K-06 of one request (per-request dashboard/detail figures). */
-export async function requestMoney(req: PayloadRequest, requestId: number): Promise<RequestMoney> {
-  const r = await rows(req, sql`SELECT ${DISBURSED}::text AS d, ${REFUND}::text AS rf, (${REALIZED})::text AS rl FROM expense_requests er WHERE er.id = ${requestId}`)
+/** K-03/K-04/K-05/K-06 of one request in scope (per-request dashboard/detail figures); out of scope → zeros. */
+export async function requestMoney(req: PayloadRequest, scope: ReportScope, requestId: number): Promise<RequestMoney> {
+  const r = await rows(req, sql`SELECT ${DISBURSED}::text AS d, ${REFUND}::text AS rf, (${REALIZED})::text AS rl FROM expense_requests er WHERE er.id = ${requestId} AND ${requestScopeSql(scope)}`)
   const d = num(r[0]?.d)
   const rf = num(r[0]?.rf)
   return { disbursed: d, refund: rf, net: d - rf, realized: num(r[0]?.rl) }
@@ -227,6 +289,7 @@ export async function disbursedInRange(req: PayloadRequest, scope: ReportScope, 
 
 export type ProjectBudget = {
   id: number
+  companyId: number
   code: string
   name: string
   status: string
@@ -243,10 +306,11 @@ export type ProjectBudget = {
 
 /** K-07 (Komitmen), K-08 (% + colour), K-05 (Dicairkan bersih), K-06 (Realisasi) per project. */
 export async function projectBudgets(req: PayloadRequest, scope: ReportScope, opts: { projectId?: number; includeArchived?: boolean } = {}): Promise<ProjectBudget[]> {
+  const ctxs = await ctxByCompany(req, scopeCompanies(scope))
   const ctx = await reportContext(req)
   const r = await rows(
     req,
-    sql`SELECT p.id, p.code, p.name, p.status::text AS status, p.budget::text AS budget,
+    sql`SELECT p.id, p.company_id, p.code, p.name, p.status::text AS status, p.budget::text AS budget,
           coalesce(sum(er.grand_total) FILTER (WHERE er.status::text IN (${COMMITTED})), 0)::text AS committed,
           count(er.id) FILTER (WHERE er.status::text IN (${COMMITTED}))::int AS committed_n,
           coalesce(sum(m.d - m.rf), 0)::text AS disbursed_net,
@@ -265,8 +329,10 @@ export async function projectBudgets(req: PayloadRequest, scope: ReportScope, op
     const pct = budgetPct(committed, budget)
     const disbursedNet = num(x.disbursed_net)
     const realized = num(x.realized)
+    const c = ctxs.get(num(x.company_id)) ?? ctx
     return {
       id: num(x.id),
+      companyId: num(x.company_id),
       code: String(x.code),
       name: String(x.name),
       status: String(x.status),
@@ -274,7 +340,7 @@ export async function projectBudgets(req: PayloadRequest, scope: ReportScope, op
       committed,
       committedCount: num(x.committed_n),
       pct,
-      tone: budgetTone(pct, ctx.budgetWarnPct, ctx.budgetOverPct),
+      tone: budgetTone(pct, c.budgetWarnPct, c.budgetOverPct),
       disbursedNet,
       realized,
       pctDisbursed: budgetPct(disbursedNet, budget),
@@ -317,16 +383,22 @@ export async function pendingApprovals(req: PayloadRequest, scope: ReportScope) 
   const ctx = await reportContext(req)
   const r = await rows(
     req,
-    sql`SELECT er.status::text AS status, count(*)::int AS n, coalesce(sum(er.grand_total), 0)::text AS s,
+    sql`SELECT er.company_id, er.status::text AS status, count(*)::int AS n, coalesce(sum(er.grand_total), 0)::text AS s,
           min((er.submitted_at AT TIME ZONE ${ctx.tz})::date)::text AS oldest
         FROM expense_requests er WHERE er.status IN ('pending_ack', 'pending_approval') AND ${requestScopeSql(scope)}
-        GROUP BY er.status`,
+        GROUP BY er.company_id, er.status`,
   )
-  const get = (s: string) => r.find((x) => x.status === s)
-  const ack = { count: num(get('pending_ack')?.n), sum: num(get('pending_ack')?.s) }
-  const appr = { count: num(get('pending_approval')?.n), sum: num(get('pending_approval')?.s) }
+  const pick = (s: string, c?: number) => r.filter((x) => x.status === s && (c === undefined || num(x.company_id) === c))
+  const agg = (list: typeof r) => ({ count: list.reduce((a, x) => a + num(x.n), 0), sum: list.reduce((a, x) => a + num(x.s), 0) })
+  const ack = agg(pick('pending_ack'))
+  const appr = agg(pick('pending_approval'))
   const oldest = r.map((x) => x.oldest as string | null).filter((x): x is string => !!x).sort()[0] ?? null
-  return { pendingAck: ack, pendingApproval: appr, count: ack.count + appr.count, sum: ack.sum + appr.sum, oldestDays: oldest ? daysBetween(oldest, ctx.today) : null }
+  const perPt = scopeCompanies(scope).map((c) => {
+    const a = agg(pick('pending_ack', c))
+    const p = agg(pick('pending_approval', c))
+    return { companyId: c, count: a.count + p.count, sum: a.sum + p.sum }
+  })
+  return { pendingAck: ack, pendingApproval: appr, count: ack.count + appr.count, sum: ack.sum + appr.sum, oldestDays: oldest ? daysBetween(oldest, ctx.today) : null, byCompany: perPt }
 }
 
 /**
@@ -335,7 +407,7 @@ export async function pendingApprovals(req: PayloadRequest, scope: ReportScope) 
  * Direktur approval) or "Menunggu Finance" (pending_approval). Legacy snapshots (PM "Diketahui",
  * Owner approval) are rare and labelled by status the same way.
  */
-export type TeamWaitingItem = { id: number; docNo: string | null; title: string; type: RequestType; status: RequestStatus; waitingFor: 'direktur' | 'finance'; scopeName: string; requesters: string; grandTotal: number; submittedDate: string | null; days: number | null }
+export type TeamWaitingItem = { id: number; companyId: number; docNo: string | null; title: string; type: RequestType; status: RequestStatus; waitingFor: 'direktur' | 'finance'; scopeName: string; requesters: string; grandTotal: number; submittedDate: string | null; days: number | null }
 
 export async function teamWaiting(req: PayloadRequest, scope: ReportScope, top = 8) {
   const ctx = await reportContext(req)
@@ -345,7 +417,7 @@ export async function teamWaiting(req: PayloadRequest, scope: ReportScope, top =
     () =>
       rows(
         req,
-        sql`SELECT er.id, er.doc_no, er.title, er.type::text AS type, er.status::text AS status, coalesce(er.grand_total, 0)::text AS gt,
+        sql`SELECT er.id, er.company_id, er.doc_no, er.title, er.type::text AS type, er.status::text AS status, coalesce(er.grand_total, 0)::text AS gt,
               ((er.submitted_at AT TIME ZONE ${ctx.tz})::date)::text AS submitted,
               coalesce((SELECT string_agg(e.name, ', ' ORDER BY rr."order") FROM expense_requests_rels rr JOIN employees e ON e.id = rr.employees_id
                         WHERE rr.parent_id = er.id AND rr.path = 'requesters'), '') AS requesters,
@@ -361,6 +433,7 @@ export async function teamWaiting(req: PayloadRequest, scope: ReportScope, top =
     const submitted = (x.submitted as string | null) ?? null
     return {
       id: num(x.id),
+      companyId: num(x.company_id),
       docNo: (x.doc_no as string | null) ?? null,
       title: String(x.title),
       type: x.type as RequestType,
@@ -378,8 +451,10 @@ export async function teamWaiting(req: PayloadRequest, scope: ReportScope, top =
 
 // ================================================================ K-11 transfer queue
 
-export async function transferQueueSummary(req: PayloadRequest) {
+/** K-11 over the scope's LEDGER PTs (Finance/Owner of the PT); `byCompany` = count/sum per PT. */
+export async function transferQueueSummary(req: PayloadRequest, scope: ReportScope) {
   const ctx = await reportContext(req)
+  const pts = ledgerCompanies(scope)
   const r = await rows(
     req,
     sql`SELECT
@@ -388,24 +463,35 @@ export async function transferQueueSummary(req: PayloadRequest) {
           count(*) FILTER (WHERE q AND er.needed_date < ${ctx.today})::int AS overdue,
           count(*) FILTER (WHERE er.type = 'reimburse' AND er.status = 'approved')::int AS to_verify,
           (SELECT count(*) FROM receipt_flags f JOIN expense_requests r2 ON r2.id = f.request_id
-            WHERE f.status = 'open' AND f.level = 'warning' AND r2.type = 'reimburse' AND r2.status = 'approved')::int AS to_verify_flags
+            WHERE f.status = 'open' AND f.level = 'warning' AND r2.type = 'reimburse' AND r2.status = 'approved' AND ${companyScopeSql(sql`r2.company_id`, pts)})::int AS to_verify_flags
         FROM (SELECT er.*, ((er.type = 'advance' AND er.status = 'approved') OR (er.type = 'reimburse' AND er.status = 'receipts_verified')) AS q
-              FROM expense_requests er) er`,
+              FROM expense_requests er WHERE ${companyScopeSql(sql`er.company_id`, pts)}) er`,
+  )
+  const per = await rows(
+    req,
+    sql`SELECT er.company_id, count(*)::int AS n, coalesce(sum(er.approved_amount), 0)::text AS s FROM expense_requests er
+        WHERE ((er.type = 'advance' AND er.status = 'approved') OR (er.type = 'reimburse' AND er.status = 'receipts_verified')) AND ${companyScopeSql(sql`er.company_id`, pts)}
+        GROUP BY er.company_id`,
   )
   const x = r[0] ?? {}
-  return { count: num(x.n), sum: num(x.s), overdue: num(x.overdue), reimburseToVerify: num(x.to_verify), reimburseToVerifyWarnings: num(x.to_verify_flags) }
+  const byPt = pts.map((c) => {
+    const y = per.find((p) => num(p.company_id) === c)
+    return { companyId: c, count: num(y?.n), sum: num(y?.s) }
+  })
+  return { count: num(x.n), sum: num(x.s), overdue: num(x.overdue), reimburseToVerify: num(x.to_verify), reimburseToVerifyWarnings: num(x.to_verify_flags), byCompany: byPt }
 }
 
 // ================================================================ K-12 receipts / LPJ completeness
 
-export type AdvanceWithoutLpj = { id: number; docNo: string | null; title: string; requesters: string; scopeName: string; status: string; transferredTotal: number; firstTransfer: string | null; ageDays: number | null; overdue: boolean }
+export type AdvanceWithoutLpj = { id: number; companyId: number; docNo: string | null; title: string; requesters: string; scopeName: string; status: string; transferredTotal: number; firstTransfer: string | null; ageDays: number | null; overdue: boolean }
 
 /** K-12a/K-12b rows: Uang Muka transferred without LPJ; age from the first posted advance transfer. */
 export async function advancesWithoutLpj(req: PayloadRequest, scope: ReportScope): Promise<AdvanceWithoutLpj[]> {
   const ctx = await reportContext(req)
+  const ctxs = await ctxByCompany(req, scopeCompanies(scope))
   const r = await rows(
     req,
-    sql`SELECT er.id, er.doc_no, er.title, er.status::text AS status, coalesce(er.transferred_total, 0)::text AS tt,
+    sql`SELECT er.id, er.company_id, er.doc_no, er.title, er.status::text AS status, coalesce(er.transferred_total, 0)::text AS tt,
           (SELECT min(t.transfer_date) FROM transfers t WHERE t.request_id = er.id AND t.status = 'posted' AND t.kind = 'advance') AS first_transfer,
           coalesce((SELECT string_agg(e.name, ', ' ORDER BY rr."order") FROM expense_requests_rels rr JOIN employees e ON e.id = rr.employees_id
                     WHERE rr.parent_id = er.id AND rr.path = 'requesters'), '') AS requesters,
@@ -418,8 +504,10 @@ export async function advancesWithoutLpj(req: PayloadRequest, scope: ReportScope
   return r.map((x) => {
     const first = (x.first_transfer as string | null) ?? null
     const age = first ? daysBetween(first, ctx.today) : null
+    const due = (ctxs.get(num(x.company_id)) ?? ctx).lpjDueDays
     return {
       id: num(x.id),
+      companyId: num(x.company_id),
       docNo: (x.doc_no as string | null) ?? null,
       title: String(x.title),
       requesters: String(x.requesters),
@@ -428,7 +516,7 @@ export async function advancesWithoutLpj(req: PayloadRequest, scope: ReportScope
       transferredTotal: num(x.tt),
       firstTransfer: first,
       ageDays: age,
-      overdue: age !== null && age > ctx.lpjDueDays,
+      overdue: age !== null && age > due,
     }
   })
 }
@@ -494,6 +582,7 @@ export function requestFilterSql(f: RequestFilter): SQL {
 
 export type RequestRow = {
   id: number
+  companyId: number
   docNo: string | null
   requestDate: string | null
   type: RequestType
@@ -513,7 +602,7 @@ export type RequestRow = {
 export async function requestRows(req: PayloadRequest, scope: ReportScope, f: RequestFilter, page: { after?: number; limit: number }): Promise<RequestRow[]> {
   const r = await rows(
     req,
-    sql`SELECT er.id, er.doc_no, er.request_date, er.type::text AS type, er.title, er.status::text AS status,
+    sql`SELECT er.id, er.company_id, er.doc_no, er.request_date, er.type::text AS type, er.title, er.status::text AS status,
           coalesce(er.grand_total, 0)::text AS gt, er.approved_amount::text AS aa,
           ${DISBURSED}::text AS d, ${REFUND}::text AS rf, (${REALIZED})::text AS rl,
           (SELECT count(*) FROM receipt_flags f WHERE f.request_id = er.id AND f.status = 'open')::int AS flags,
@@ -527,6 +616,7 @@ export async function requestRows(req: PayloadRequest, scope: ReportScope, f: Re
   )
   return r.map((x) => ({
     id: num(x.id),
+    companyId: num(x.company_id),
     docNo: (x.doc_no as string | null) ?? null,
     requestDate: (x.request_date as string | null) ?? null,
     type: x.type as RequestType,
@@ -551,18 +641,24 @@ export async function requestSummary(req: PayloadRequest, scope: ReportScope, f:
     () => rows(req, sql`SELECT er.type::text AS type, count(*)::int AS n, coalesce(sum(er.grand_total), 0)::text AS s FROM expense_requests er WHERE ${base} GROUP BY 1 ORDER BY 1`),
     () => rows(
       req,
-      sql`SELECT l.category_id, c.code, c.name, count(DISTINCT er.id)::int AS n, coalesce(sum(l.total), 0)::text AS s
+      sql`SELECT er.company_id, l.category_id, c.code, c.name, count(DISTINCT er.id)::int AS n, coalesce(sum(l.total), 0)::text AS s
           FROM expense_requests er JOIN expense_requests_lines l ON l._parent_id = er.id LEFT JOIN expense_categories c ON c.id = l.category_id
           WHERE ${base} ${f.categoryId ? sql`AND l.category_id = ${f.categoryId}` : sql``}
-          GROUP BY l.category_id, c.code, c.name ORDER BY sum(l.total) DESC NULLS LAST, c.code`,
+          GROUP BY er.company_id, l.category_id, c.code, c.name ORDER BY sum(l.total) DESC NULLS LAST, c.code, er.company_id`,
     ),
-    () => rows(req, sql`SELECT count(*)::int AS n, coalesce(sum(er.grand_total), 0)::text AS s FROM expense_requests er WHERE ${base}`),
+    () => rows(req, sql`SELECT er.company_id, count(*)::int AS n, coalesce(sum(er.grand_total), 0)::text AS s FROM expense_requests er WHERE ${base} GROUP BY er.company_id`),
   )
+  const perPt = scopeCompanies(scope).map((c) => {
+    const y = total.find((t) => num(t.company_id) === c)
+    return { companyId: c, count: num(y?.n), sum: num(y?.s) }
+  })
   return {
     byStatus: byStatus.map((x) => ({ type: x.type as RequestType, status: x.status as RequestStatus, count: num(x.n), sum: num(x.s) })),
     byType: byType.map((x) => ({ type: x.type as RequestType, count: num(x.n), sum: num(x.s) })),
-    byCategory: byCategory.map((x) => ({ categoryId: numOrNull(x.category_id), code: (x.code as string | null) ?? null, name: (x.name as string | null) ?? 'Tanpa kategori', count: num(x.n), sum: num(x.s) })),
-    total: { count: num(total[0]?.n), sum: num(total[0]?.s) },
+    // categories are per PT (requirements v1.2 §5: never summed across PTs) — one row per PT × category
+    byCategory: byCategory.map((x) => ({ companyId: num(x.company_id), categoryId: numOrNull(x.category_id), code: (x.code as string | null) ?? null, name: (x.name as string | null) ?? 'Tanpa kategori', count: num(x.n), sum: num(x.s) })),
+    total: { count: total.reduce((a, t) => a + num(t.n), 0), sum: total.reduce((a, t) => a + num(t.s), 0) },
+    byCompany: perPt,
   }
 }
 
@@ -590,22 +686,22 @@ export async function vehicleCosts(req: PayloadRequest, scope: ReportScope, f: V
         b AS (
           SELECT ce.vehicle_id, ce.category_id, sum(ce.amount) AS amount
           FROM cash_entries ce
-          WHERE ${manual ? sql`TRUE` : sql`FALSE`} AND ce.vehicle_id IS NOT NULL AND ce.source_type = 'manual' AND ce.direction = 'out' AND ce.status = 'posted'
+          WHERE ${ledgerScopeSql(scope)} AND ce.vehicle_id IS NOT NULL AND ce.source_type = 'manual' AND ce.direction = 'out' AND ce.status = 'posted'
             AND ce.entry_date BETWEEN ${f.from} AND ${f.to}
             ${f.vehicleId ? sql`AND ce.vehicle_id = ${f.vehicleId}` : sql``}
             ${f.categoryId ? sql`AND ce.category_id = ${f.categoryId}` : sql``}
           GROUP BY 1, 2),
         u AS (SELECT vehicle_id, category_id, amount AS a, 0::numeric AS b FROM a UNION ALL SELECT vehicle_id, category_id, 0, amount FROM b)
-        SELECT v.id, coalesce(v.plate_display, v.plate_no) AS plate, v.type, u.category_id, c.name AS category,
+        SELECT v.id, v.company_id, coalesce(v.plate_display, v.plate_no) AS plate, v.type, u.category_id, c.name AS category,
                sum(u.a)::text AS from_requests, sum(u.b)::text AS from_manual
         FROM u JOIN vehicles v ON v.id = u.vehicle_id LEFT JOIN expense_categories c ON c.id = u.category_id
-        GROUP BY v.id, plate, v.type, u.category_id, c.name ORDER BY plate, c.name NULLS LAST`,
+        GROUP BY v.id, v.company_id, plate, v.type, u.category_id, c.name ORDER BY plate, c.name NULLS LAST`,
   )
-  type V = { id: number; plate: string; type: string; fromRequests: number; fromManual: number; total: number; categories: Array<{ categoryId: number | null; name: string; fromRequests: number; fromManual: number }> }
+  type V = { id: number; companyId: number; plate: string; type: string; fromRequests: number; fromManual: number; total: number; categories: Array<{ categoryId: number | null; name: string; fromRequests: number; fromManual: number }> }
   const map = new Map<number, V>()
   for (const x of r) {
     const id = num(x.id)
-    const v = map.get(id) ?? { id, plate: String(x.plate), type: String(x.type), fromRequests: 0, fromManual: 0, total: 0, categories: [] }
+    const v = map.get(id) ?? { id, companyId: num(x.company_id), plate: String(x.plate), type: String(x.type), fromRequests: 0, fromManual: 0, total: 0, categories: [] }
     const a = num(x.from_requests)
     const b = num(x.from_manual)
     v.fromRequests += a
@@ -629,7 +725,7 @@ export async function costCenterMonth(req: PayloadRequest, scope: ReportScope, p
   const to = lastDay(period)
   const r = await rows(
     req,
-    sql`SELECT cc.id, cc.code, cc.name,
+    sql`SELECT cc.id, cc.company_id, cc.code, cc.name,
           (SELECT coalesce(sum(t.amount), 0) FROM transfers t JOIN expense_requests er ON er.id = t.request_id
             WHERE er.cost_center_id = cc.id AND t.status = 'posted' AND t.transfer_date BETWEEN ${from} AND ${to})::text AS transfers,
           (SELECT coalesce(sum(c.amount), 0) FROM cash_entries c JOIN expense_requests er ON er.id = c.expense_request_id
@@ -644,7 +740,7 @@ export async function costCenterMonth(req: PayloadRequest, scope: ReportScope, p
     const fromRequests = num(x.transfers) - num(x.refunds)
     const manualOut = num(x.manual_out)
     const manualIn = num(x.manual_in)
-    return { id: num(x.id), code: String(x.code), name: String(x.name), fromRequests, manualOut, manualIn, total: fromRequests + manualOut - manualIn }
+    return { id: num(x.id), companyId: num(x.company_id), code: String(x.code), name: String(x.name), fromRequests, manualOut, manualIn, total: fromRequests + manualOut - manualIn }
   })
 }
 
@@ -667,56 +763,80 @@ export async function spending(req: PayloadRequest, scope: ReportScope, f: Spend
   if (f.projectId) reqWhere.push(sql`er.project_id = ${f.projectId}`)
   if (f.costCenterId) reqWhere.push(sql`er.cost_center_id = ${f.costCenterId}`)
   const catWhere = f.categoryId ? sql`AND l.category_id = ${f.categoryId}` : sql``
-  const manWhere: SQL[] = [sql`ce.source_type = 'manual'`, sql`ce.direction = 'out'`, sql`ce.status = 'posted'`, sql`ce.entry_date BETWEEN ${f.from} AND ${f.to}`, cashScopeSql(scope)]
+  const manWhere: SQL[] = [sql`ce.source_type = 'manual'`, sql`ce.direction = 'out'`, sql`ce.status = 'posted'`, sql`ce.entry_date BETWEEN ${f.from} AND ${f.to}`, ledgerScopeSql(scope)]
   if (f.projectId) manWhere.push(sql`ce.project_id = ${f.projectId}`)
   if (f.costCenterId) manWhere.push(sql`ce.cost_center_id = ${f.costCenterId}`)
   if (f.categoryId) manWhere.push(sql`ce.category_id = ${f.categoryId}`)
   const W = sql.join(reqWhere, sql` AND `)
   const lineSource =
     f.basis === 'dicairkan'
-      ? sql`SELECT er.id AS rid, er.project_id, er.cost_center_id, l.category_id, l.total AS amount
+      ? sql`SELECT er.id AS rid, er.company_id, er.project_id, er.cost_center_id, l.category_id, l.total AS amount
             FROM expense_requests er JOIN expense_requests_lines l ON l._parent_id = er.id
             WHERE ${W} ${catWhere} AND EXISTS (SELECT 1 FROM transfers t WHERE t.request_id = er.id AND t.status = 'posted' AND t.kind IN ('advance', 'reimburse') AND t.transfer_date BETWEEN ${f.from} AND ${f.to})`
-      : sql`SELECT er.id AS rid, er.project_id, er.cost_center_id, l.category_id, r.amount
+      : sql`SELECT er.id AS rid, er.company_id, er.project_id, er.cost_center_id, l.category_id, r.amount
             FROM expense_requests er JOIN receipts r ON r.request_id = er.id AND r.status = 'valid' JOIN expense_requests_lines l ON l.id = r.line_id
             WHERE ${W} ${catWhere} AND er.type = 'advance' AND er.status IN ('lpj_verified', 'completed')
               AND ((SELECT max(s.verified_at) FROM settlements s WHERE s.request_id = er.id) AT TIME ZONE ${ctx.tz})::date BETWEEN ${f.from}::date AND ${f.to}::date
             UNION ALL
-            SELECT er.id, er.project_id, er.cost_center_id, l.category_id, l.total
+            SELECT er.id, er.company_id, er.project_id, er.cost_center_id, l.category_id, l.total
             FROM expense_requests er JOIN expense_requests_lines l ON l._parent_id = er.id
             WHERE ${W} ${catWhere} AND er.type = 'reimburse' AND er.status IN ('receipts_verified', 'transferred', 'completed')
               AND ((SELECT max(r.verified_at) FROM receipts r WHERE r.request_id = er.id AND r.status = 'valid') AT TIME ZONE ${ctx.tz})::date BETWEEN ${f.from}::date AND ${f.to}::date`
-  const key = f.group === 'kategori' ? sql`category_id::text` : sql`coalesce('p' || project_id::text, 'c' || cost_center_id::text, '-')`
+  // the key includes the PT: categories / scopes are never merged across PTs (requirements v1.2 §5);
+  // "no category" / "no scope" buckets exist once per PT ('<company>:-').
+  const key =
+    f.group === 'kategori'
+      ? sql`coalesce(category_id::text, company_id::text || ':-')`
+      : sql`coalesce('p' || project_id::text, 'c' || cost_center_id::text, company_id::text || ':-')`
   const r = await rows(
     req,
     sql`WITH src AS (${lineSource}),
-          man AS (SELECT ce.project_id, ce.cost_center_id, ce.category_id, ce.amount FROM cash_entries ce WHERE ${manual ? sql.join(manWhere, sql` AND `) : sql`FALSE`}),
+          man AS (SELECT ce.company_id, ce.project_id, ce.cost_center_id, ce.category_id, ce.amount FROM cash_entries ce WHERE ${manual ? sql.join(manWhere, sql` AND `) : sql`FALSE`}),
           agg AS (
-            SELECT ${key} AS k, count(DISTINCT rid)::int AS n, sum(amount) AS req_amount, 0::numeric AS man_amount FROM src GROUP BY 1
+            SELECT ${key} AS k, company_id, count(DISTINCT rid)::int AS n, sum(amount) AS req_amount, 0::numeric AS man_amount FROM src GROUP BY 1, 2
             UNION ALL
-            SELECT ${key}, 0, 0, sum(amount) FROM man GROUP BY 1)
-        SELECT k, sum(n)::int AS n, sum(req_amount)::text AS req_amount, sum(man_amount)::text AS man_amount FROM agg GROUP BY k`,
+            SELECT ${key}, company_id, 0, 0, sum(amount) FROM man GROUP BY 1, 2)
+        SELECT k, company_id, sum(n)::int AS n, sum(req_amount)::text AS req_amount, sum(man_amount)::text AS man_amount FROM agg GROUP BY k, company_id`,
   )
-  const labels = await groupLabels(req, f.group)
+  const multi = scopeCompanies(scope).length > 1
+  const labels = await groupLabels(req, scope, f.group, multi)
   const items = r
     .map((x) => {
-      const k = (x.k as string | null) ?? '-'
+      const raw = (x.k as string | null) ?? '-'
+      const none = raw.endsWith(':-')
+      const k = none ? '-' : raw
       const fromRequests = num(x.req_amount)
       const fromManual = num(x.man_amount)
-      return { key: k, label: labels.get(k) ?? (f.group === 'kategori' ? 'Tanpa kategori' : 'Tanpa project/pusat biaya'), requestCount: num(x.n), fromRequests, fromManual, total: fromRequests + fromManual }
+      const companyId = num(x.company_id)
+      const fallback = f.group === 'kategori' ? 'Tanpa kategori' : 'Tanpa project/pusat biaya'
+      const label = none ? (multi ? `[${labels.get(`pt:${companyId}`) ?? companyId}] ${fallback}` : fallback) : (labels.get(k) ?? fallback)
+      return { key: k, companyId, label, requestCount: num(x.n), fromRequests, fromManual, total: fromRequests + fromManual }
     })
     .sort((a, b) => b.total - a.total || a.label.localeCompare(b.label))
   const total = items.reduce((s, i) => s + i.total, 0)
-  return { items: items.map((i) => ({ ...i, share: total > 0 ? Math.round((i.total / total) * 1000) / 10 : 0 })), total, includesManual: manual }
+  return {
+    items: items.map((i) => ({ ...i, share: total > 0 ? Math.round((i.total / total) * 1000) / 10 : 0 })),
+    total,
+    includesManual: manual,
+    byCompany: byCompany(items, (i) => i.total, scopeCompanies(scope)),
+  }
 }
 
-async function groupLabels(req: PayloadRequest, group: SpendFilter['group']): Promise<Map<string, string>> {
-  if (group === 'kategori') {
-    const r = await rows(req, sql`SELECT id::text AS k, code || ' ' || name AS label FROM expense_categories`)
-    return new Map(r.map((x) => [String(x.k), String(x.label)]))
-  }
-  const r = await rows(req, sql`SELECT 'p' || id::text AS k, code || ' ' || name AS label FROM projects UNION ALL SELECT 'c' || id::text, code || ' ' || name FROM cost_centers`)
-  return new Map(r.map((x) => [String(x.k), String(x.label)]))
+/** Labels of the scope's categories / projects / cost centers; `[CS1] ` prefix when > 1 PT (+ `pt:<id>` → short code). */
+async function groupLabels(req: PayloadRequest, scope: ReportScope, group: SpendFilter['group'], multi: boolean): Promise<Map<string, string>> {
+  const pre = multi ? sql`'[' || co.short_code || '] '` : sql`''`
+  const r =
+    group === 'kategori'
+      ? await rows(req, sql`SELECT x.id::text AS k, ${pre} || x.code || ' ' || x.name AS label FROM expense_categories x JOIN companies co ON co.id = x.company_id WHERE ${masterScopeSql(scope, 'x')}`)
+      : await rows(
+          req,
+          sql`SELECT 'p' || x.id::text AS k, ${pre} || x.code || ' ' || x.name AS label FROM projects x JOIN companies co ON co.id = x.company_id WHERE ${masterScopeSql(scope, 'x')}
+              UNION ALL SELECT 'c' || x.id::text, ${pre} || x.code || ' ' || x.name FROM cost_centers x JOIN companies co ON co.id = x.company_id WHERE ${masterScopeSql(scope, 'x')}`,
+        )
+  const out = new Map(r.map((x) => [String(x.k), String(x.label)]))
+  const pts = await rows(req, sql`SELECT co.id, co.short_code FROM companies co WHERE ${companyScopeSql(sql`co.id`, scopeCompanies(scope))}`)
+  for (const p of pts) out.set(`pt:${num(p.id)}`, String(p.short_code))
+  return out
 }
 
 // ================================================================ Staff / Admin homes
@@ -728,23 +848,49 @@ export async function ownRequests(req: PayloadRequest, scope: ReportScope, opts:
   const ctx = await reportContext(req)
   const r = await rows(
     req,
-    sql`SELECT er.id, er.doc_no, er.title, er.type::text AS type, er.status::text AS status, coalesce(er.grand_total, 0)::text AS gt,
+    sql`SELECT er.id, er.company_id, er.doc_no, er.title, er.type::text AS type, er.status::text AS status, coalesce(er.grand_total, 0)::text AS gt,
           (${ctx.today}::date - (coalesce(er.updated_at, er.created_at) AT TIME ZONE ${ctx.tz})::date)::int AS age
         FROM expense_requests er WHERE ${requestScopeSql(scope)} ${opts.statuses ? sql`AND er.status::text IN (${textList(opts.statuses)})` : sql``}
         ORDER BY er.id DESC LIMIT ${opts.limit}`,
   )
-  return r.map((x) => ({ id: num(x.id), docNo: (x.doc_no as string | null) ?? null, title: String(x.title), type: x.type as RequestType, status: x.status as RequestStatus, grandTotal: num(x.gt), ageDays: num(x.age) }))
+  return r.map((x) => ({ id: num(x.id), companyId: num(x.company_id), docNo: (x.doc_no as string | null) ?? null, title: String(x.title), type: x.type as RequestType, status: x.status as RequestStatus, grandTotal: num(x.gt), ageDays: num(x.age) }))
 }
 
-/** Admin home: onboarding gaps (approval prerequisites, F2). */
-export async function masterGaps(req: PayloadRequest) {
-  const [u, p, c] = await inSequence(
-    // ADR 0016: complete = at least one active membership with an employee AND a role. MC2: per PT.
-    () => rows(req, sql`SELECT count(*)::int AS n FROM users u WHERE coalesce(u.active, true) AND NOT EXISTS (SELECT 1 FROM company_memberships m WHERE m.user_id = u.id AND coalesce(m.active, true) AND m.employee_id IS NOT NULL AND EXISTS (SELECT 1 FROM company_memberships_roles r WHERE r.parent_id = m.id))`),
-    () => rows(req, sql`SELECT count(*)::int AS n FROM projects p WHERE p.pm_id IS NULL AND p.status <> 'arsip'`),
-    () => rows(req, sql`SELECT count(*)::int AS n FROM cost_centers cc WHERE cc.manager_id IS NULL AND coalesce(cc.active, true)`),
+/**
+ * Admin home: onboarding gaps (approval prerequisites, F2) of the PTs `companyIds` (the caller's
+ * Admin PTs, ADR 0016): active accounts with an incomplete membership (no employee or no role) in
+ * those PTs + active accounts without any membership (onboarding: account first, membership next);
+ * projects without PM and cost centers without manager of those PTs. `byCompany` per PT.
+ */
+export async function masterGaps(req: PayloadRequest, companyIds: readonly number[]) {
+  const pts = companyScopeSql(sql`m.company_id`, companyIds)
+  const [u, orphan, p, c] = await inSequence(
+    () =>
+      rows(
+        req,
+        sql`SELECT m.company_id, count(DISTINCT u.id)::int AS n FROM users u JOIN company_memberships m ON m.user_id = u.id AND coalesce(m.active, true)
+            WHERE coalesce(u.active, true) AND ${pts}
+              AND (m.employee_id IS NULL OR NOT EXISTS (SELECT 1 FROM company_memberships_roles r WHERE r.parent_id = m.id))
+              AND NOT EXISTS (SELECT 1 FROM company_memberships m2 WHERE m2.user_id = u.id AND coalesce(m2.active, true) AND m2.employee_id IS NOT NULL
+                              AND EXISTS (SELECT 1 FROM company_memberships_roles r2 WHERE r2.parent_id = m2.id))
+            GROUP BY m.company_id`,
+      ),
+    () =>
+      companyIds.length
+        ? rows(req, sql`SELECT count(*)::int AS n FROM users u WHERE coalesce(u.active, true) AND NOT EXISTS (SELECT 1 FROM company_memberships m WHERE m.user_id = u.id AND coalesce(m.active, true))`)
+        : Promise.resolve([{ n: 0 }]),
+    () => rows(req, sql`SELECT p.company_id, count(*)::int AS n FROM projects p WHERE p.pm_id IS NULL AND p.status <> 'arsip' AND ${companyScopeSql(sql`p.company_id`, companyIds)} GROUP BY p.company_id`),
+    () => rows(req, sql`SELECT cc.company_id, count(*)::int AS n FROM cost_centers cc WHERE cc.manager_id IS NULL AND coalesce(cc.active, true) AND ${companyScopeSql(sql`cc.company_id`, companyIds)} GROUP BY cc.company_id`),
   )
-  return { usersIncomplete: num(u[0]?.n), projectsWithoutPm: num(p[0]?.n), costCentersWithoutManager: num(c[0]?.n) }
+  const sum = (list: Array<Record<string, unknown>>) => list.reduce((a, x) => a + num(x.n), 0)
+  const of = (list: Array<Record<string, unknown>>, cid: number) => num(list.find((x) => num(x.company_id) === cid)?.n)
+  return {
+    usersIncomplete: sum(u) + num(orphan[0]?.n),
+    usersWithoutMembership: num(orphan[0]?.n),
+    projectsWithoutPm: sum(p),
+    costCentersWithoutManager: sum(c),
+    byCompany: [...companyIds].sort((a, b) => a - b).map((cid) => ({ companyId: cid, usersIncomplete: of(u, cid), projectsWithoutPm: of(p, cid), costCentersWithoutManager: of(c, cid) })),
+  }
 }
 
 /** PM: team requests created this month (wireframe PM [2]). */
@@ -758,10 +904,16 @@ export async function teamMonth(req: PayloadRequest, scope: ReportScope, period:
   return { count: num(r[0]?.n), sum: num(r[0]?.s), waiting: num(r[0]?.waiting) }
 }
 
-/** Latest closed period (Finance [8]). */
-export async function lastClosedPeriod(req: PayloadRequest): Promise<string | null> {
-  const r = await rows(req, sql`SELECT max(period) AS p FROM period_closings WHERE status = 'closed'`)
-  return (r[0]?.p as string | null) ?? null
+/**
+ * Latest closed period per PT of `companyIds` (Finance [8]; closing is always per PT, ADR 0016 §4).
+ * `period` = the OLDEST of the PTs' latest closed periods (the least advanced PT; null when one PT
+ * never closed) — with one PT identical to the single-company value.
+ */
+export async function lastClosedPeriod(req: PayloadRequest, companyIds: readonly number[]): Promise<{ period: string | null; byCompany: Array<{ companyId: number; period: string | null }> }> {
+  const r = await rows(req, sql`SELECT pc.company_id, max(pc.period) AS p FROM period_closings pc WHERE pc.status = 'closed' AND ${companyScopeSql(sql`pc.company_id`, companyIds)} GROUP BY pc.company_id`)
+  const byPt = [...companyIds].sort((a, b) => a - b).map((c) => ({ companyId: c, period: (r.find((x) => num(x.company_id) === c)?.p as string | null) ?? null }))
+  const period = byPt.length === 0 || byPt.some((x) => x.period === null) ? null : byPt.map((x) => x.period!).sort()[0]!
+  return { period, byCompany: byPt }
 }
 
 // ================================================================ dashboard charts (Beranda 2026-09-25)
@@ -819,6 +971,7 @@ export async function disbursedMonthly(req: PayloadRequest, scope: ReportScope, 
 
 export type RecentCashEntry = {
   id: number
+  companyId: number
   entryNo: string | null
   entryDate: string
   direction: 'in' | 'out'
@@ -836,10 +989,10 @@ export type RecentCashEntry = {
  * only (scope.ts): any scope other than `all` returns nothing, without querying.
  */
 export async function recentCashEntries(req: PayloadRequest, scope: ReportScope, limit: number): Promise<RecentCashEntry[]> {
-  if (scope.kind !== 'all') return []
+  if (ledgerCompanies(scope).length === 0) return []
   const r = await rows(
     req,
-    sql`SELECT ce.id, ce.entry_no, ce.entry_date, ce.direction::text AS direction, ce.amount::text AS amount, ce.status::text AS status,
+    sql`SELECT ce.id, ce.company_id, ce.entry_no, ce.entry_date, ce.direction::text AS direction, ce.amount::text AS amount, ce.status::text AS status,
           ce.source_type::text AS source_type, a.name AS account,
           coalesce(nullif(ce.description, ''), c.name, s.name, '') AS label, er.id AS rid, er.doc_no
         FROM cash_entries ce
@@ -847,10 +1000,12 @@ export async function recentCashEntries(req: PayloadRequest, scope: ReportScope,
         LEFT JOIN expense_categories c ON c.id = ce.category_id
         LEFT JOIN cash_in_sources s ON s.id = ce.cash_in_source_id
         LEFT JOIN expense_requests er ON er.id = ce.expense_request_id
+        WHERE ${ledgerScopeSql(scope)}
         ORDER BY ce.entry_date DESC, ce.id DESC LIMIT ${Math.max(1, Math.min(50, Math.floor(limit)))}`,
   )
   return r.map((x) => ({
     id: num(x.id),
+    companyId: num(x.company_id),
     entryNo: (x.entry_no as string | null) ?? null,
     entryDate: String(x.entry_date),
     direction: x.direction === 'in' ? ('in' as const) : ('out' as const),
@@ -869,22 +1024,24 @@ export async function recentCashEntries(req: PayloadRequest, scope: ReportScope,
  * by needed date — Finance "Menunggu tindakan saya". Office data: scope `all` only.
  */
 export async function transferQueueTop(req: PayloadRequest, scope: ReportScope, limit: number) {
-  if (scope.kind !== 'all') return []
+  const pts = ledgerCompanies(scope)
+  if (pts.length === 0) return []
   const ctx = await reportContext(req)
   const r = await rows(
     req,
-    sql`SELECT er.id, er.doc_no, er.title, er.type::text AS type, er.status::text AS status, er.needed_date,
+    sql`SELECT er.id, er.company_id, er.doc_no, er.title, er.type::text AS type, er.status::text AS status, er.needed_date,
           coalesce(er.approved_amount, er.grand_total, 0)::text AS amount,
           coalesce(p.code || ' ' || p.name, cc.code || ' ' || cc.name, '') AS scope_name
         FROM expense_requests er
         LEFT JOIN projects p ON p.id = er.project_id LEFT JOIN cost_centers cc ON cc.id = er.cost_center_id
-        WHERE (er.type = 'advance' AND er.status = 'approved') OR (er.type = 'reimburse' AND er.status = 'receipts_verified')
+        WHERE ((er.type = 'advance' AND er.status = 'approved') OR (er.type = 'reimburse' AND er.status = 'receipts_verified')) AND ${companyScopeSql(sql`er.company_id`, pts)}
         ORDER BY er.needed_date NULLS LAST, er.id LIMIT ${Math.max(1, Math.min(50, Math.floor(limit)))}`,
   )
   return r.map((x) => {
     const needed = (x.needed_date as string | null) ?? null
     return {
       id: num(x.id),
+      companyId: num(x.company_id),
       docNo: (x.doc_no as string | null) ?? null,
       title: String(x.title),
       type: x.type as RequestType,

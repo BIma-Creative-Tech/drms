@@ -1,19 +1,18 @@
 import { sql } from '@payloadcms/db-postgres'
 import type { PayloadRequest } from 'payload'
 
-import { hasRoleAny, relId, userId } from '@/access/roles'
+import { hasRole, hasRoleAny, ownEmployees, relId, userId } from '@/access/roles'
 import { attendanceMonth } from '@/domain/reports/attendance-report'
-import { idList } from '@/domain/reports/scope'
+import { companyScopeSql, idList, inList } from '@/domain/reports/scope'
 import { getRequestTx } from '@/lib/tx'
 
-import { attendanceContext, attendanceScope, teamMembers, type AttScope } from './queries'
-
-// MC2: LEAK POINT — attendance web SQL uses the company-blind AttScope `all`.
+import { attendanceContext, attendanceScope, employeeCompanySql, fullCompanies, narrowAttScope, teamMembers, type AttScope } from './queries'
 
 /**
  * E6 web (S2) — read helpers of the admin views (/admin/absensi…). Same scope rules as the
  * /api/v1/attendance endpoints (attendanceScope: office roles all, PM team, Staff none → own recap
  * only); every id is a bound parameter. Callers run inside one request transaction.
+ * MC2: every query is limited per PT by the AttScope parts (office PTs in full, PM PTs team only).
  */
 type Row = Record<string, unknown>
 async function rows<T = Row>(req: PayloadRequest, q: ReturnType<typeof sql>): Promise<T[]> {
@@ -25,23 +24,30 @@ export type Opt = { id: number; label: string }
 
 /** Employees the caller may open a recap of (month): office all active + with attendance; PM team members. */
 export async function recapEmployees(req: PayloadRequest, scope: AttScope, from: string, to: string): Promise<Opt[]> {
-  if (scope.kind === 'team') {
-    const m = await teamMembers(req, scope, from, to)
-    return m.map((x) => ({ id: x.employeeId, label: `${x.name} (${x.code})` })).sort((a, b) => a.label.localeCompare(b.label, 'id'))
+  const out = new Map<number, string>()
+  const teamParts = scope.parts?.filter((p) => !p.all) ?? []
+  const team: AttScope | null = scope.parts ? (teamParts.length ? { kind: 'team', projects: [], costCenters: [], parts: teamParts } : null) : scope.kind === 'team' ? scope : null
+  if (team) for (const x of await teamMembers(req, team, from, to)) out.set(x.employeeId, `${x.name} (${x.code})`)
+  if (fullCompanies(scope).length > 0) {
+    const r = await rows<{ id: number; code: string; name: string }>(
+      req,
+      sql`SELECT e.id, e.code, e.name FROM employees e
+           WHERE ${employeeCompanySql(scope)}
+             AND (coalesce(e.active, true) OR EXISTS (SELECT 1 FROM attendances a WHERE a.employee_id = e.id AND a.local_date BETWEEN ${from} AND ${to}))
+           ORDER BY e.name, e.id`,
+    )
+    for (const x of r) out.set(Number(x.id), `${x.name} (${x.code})`)
   }
-  const r = await rows<{ id: number; code: string; name: string }>(
-    req,
-    sql`SELECT e.id, e.code, e.name FROM employees e
-         WHERE coalesce(e.active, true) OR EXISTS (SELECT 1 FROM attendances a WHERE a.employee_id = e.id AND a.local_date BETWEEN ${from} AND ${to})
-         ORDER BY e.name, e.id`,
-  )
-  return r.map((x) => ({ id: Number(x.id), label: `${x.name} (${x.code})` }))
+  return [...out.entries()].map(([id, label]) => ({ id, label })).sort((a, b) => a.label.localeCompare(b.label, 'id') || a.id - b.id)
 }
 
 /** Projects / cost centers of the scope (filters of "Tim hari ini" and the team grid). */
 export async function scopeLocations(req: PayloadRequest, scope: AttScope): Promise<{ projects: Opt[]; costCenters: Opt[] }> {
-  const pw = scope.kind === 'all' ? sql`p.status::text <> 'arsip'` : scope.projects.length ? sql`p.id IN (${idList(scope.projects)})` : sql`FALSE`
-  const cw = scope.kind === 'all' ? sql`coalesce(cc.active, true)` : scope.costCenters.length ? sql`cc.id IN (${idList(scope.costCenters)})` : sql`FALSE`
+  const full = fullCompanies(scope)
+  const teamP = scope.parts ? scope.parts.filter((p) => !p.all).flatMap((p) => p.projects) : scope.kind === 'team' ? scope.projects : []
+  const teamC = scope.parts ? scope.parts.filter((p) => !p.all).flatMap((p) => p.costCenters) : scope.kind === 'team' ? scope.costCenters : []
+  const pw = sql`((${companyScopeSql(sql`p.company_id`, full)} AND p.status::text <> 'arsip') OR ${inList(sql`p.id`, teamP)})`
+  const cw = sql`((${companyScopeSql(sql`cc.company_id`, full)} AND coalesce(cc.active, true)) OR ${inList(sql`cc.id`, teamC)})`
   const p = await rows<{ id: number; code: string; name: string }>(req, sql`SELECT p.id, p.code, p.name FROM projects p WHERE ${pw} ORDER BY p.code`)
   const c = await rows<{ id: number; code: string; name: string }>(req, sql`SELECT cc.id, cc.code, cc.name FROM cost_centers cc WHERE ${cw} ORDER BY cc.code`)
   return { projects: p.map((x) => ({ id: Number(x.id), label: `${x.code} ${x.name}` })), costCenters: c.map((x) => ({ id: Number(x.id), label: `${x.code} ${x.name}` })) }
@@ -79,12 +85,17 @@ export async function selfieState(req: PayloadRequest, attendanceIds: number[]):
   return new Map(r.map((x) => [Number(x.id), x.ok === true]))
 }
 
-/** Can the caller correct (T10) attendance of `employeeId`? Mirrors corrections.ts (server re-checks). */
-export function mayCorrect(req: PayloadRequest, scope: AttScope | null, employeeId: number): boolean {
+/**
+ * Can the caller correct (T10) attendance of `employeeId` (of PT `companyId`)? Mirrors corrections.ts
+ * (server re-checks): never the own employee (any PT); Admin OF THE EMPLOYEE'S PT, or PM there with a
+ * team scope. Without `companyId` (legacy UI hint): any PT of the scope.
+ */
+export function mayCorrect(req: PayloadRequest, scope: AttScope | null, employeeId: number, companyId?: number): boolean {
   if (!scope) return false
-  const own = relId((req.user as { employee?: unknown } | null)?.employee)
-  if (own === employeeId) return false
-  return hasRoleAny(req, 'pk-admin') || (hasRoleAny(req, 'pk-pm') && scope.kind === 'team')
+  if (ownEmployees(req).includes(employeeId) || relId((req.user as { employee?: unknown } | null)?.employee) === employeeId) return false
+  if (!scope.parts) return hasRoleAny(req, 'pk-admin') || (hasRoleAny(req, 'pk-pm') && scope.kind === 'team') // legacy literal (UI hint)
+  const pts = companyId !== undefined ? [companyId] : scope.parts.map((p) => p.company)
+  return pts.some((c) => hasRole(req, 'pk-admin', c) || (hasRole(req, 'pk-pm', c) && scope.parts!.some((p) => p.company === c && !p.all)))
 }
 
 /** Team month grid (all members of the scope/filters), same aggregation as the M13 report. */
@@ -92,4 +103,4 @@ export async function teamMonth(req: PayloadRequest, scope: AttScope, month: str
   return attendanceMonth(req, scope, month)
 }
 
-export { attendanceContext, attendanceScope, userId }
+export { attendanceContext, attendanceScope, narrowAttScope, userId }

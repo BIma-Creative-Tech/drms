@@ -8,6 +8,7 @@ import type { ProjectProgress } from '@/domain/reports/progress'
 /** E4 web (US-12): K-09 widget markup — status never colour-only, bars clamped, placeholders gone. */
 const row = (over: Partial<ProjectProgress> = {}): ProjectProgress => ({
   id: 1,
+  companyId: 1,
   code: 'PRJ-A',
   name: 'Gudang Contoh',
   status: 'berjalan',

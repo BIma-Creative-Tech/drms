@@ -66,8 +66,8 @@ export async function activeCompanyIds(payload: Payload, req?: PayloadRequest): 
 
 /**
  * PT whose settings apply when the caller has no document at hand: the caller's only selected PT,
- * else company #1. MC2: every caller of `settings(req)` without a company must pass the document's
- * PT (thresholds / flags of the wrong PT otherwise).
+ * else company #1. Domain callers pass the document's PT (`settings(req, company)`); remaining
+ * company-less callers are UI/context hints (MC2 review, see docs/proyekkas/mc/mc2-progress.md).
  */
 export async function contextCompanyId(req: PayloadRequest): Promise<number> {
   return soleCompany(req) ?? firstActiveCompanyId(req.payload, req)
@@ -88,6 +88,42 @@ export async function defaultCompanyForWrite(req: PayloadRequest): Promise<numbe
   return ids[0]!
 }
 
+/** Short reference of a PT (labels, PT columns, breakdown rows). */
+export type CompanyRef = { id: number; shortCode: string; name: string }
+
+/** References of `ids` (SYSTEM-READ via the per-request cache), in the given order; unknown ids skipped. */
+export async function companyRefs(req: PayloadRequest, ids: readonly number[]): Promise<CompanyRef[]> {
+  const out: CompanyRef[] = []
+  for (const id of [...new Set(ids)]) {
+    const c = await companyById(req, id).catch(() => null)
+    if (c) out.push({ id, shortCode: c.shortCode, name: c.name })
+  }
+  return out
+}
+
+/**
+ * Letterhead of a report / export over `companyIds` (requirements v1.2 §6, ADR 0016 §6): one PT →
+ * that PT's name, logo, PDF header, address and phone; several PTs → the GROUP letterhead of the
+ * app-wide settings (groupName / groupLogo / groupPdfHeader) — or, when the group name is empty,
+ * "Laporan gabungan: DRMS, CS1". `companies` = the PTs covered (PT list line of the header).
+ */
+export type Letterhead = { kind: 'company' | 'group'; name: string; lines: string[]; logo: number | null; companies: CompanyRef[] }
+
+export async function letterheadOf(req: PayloadRequest, companyIds: readonly number[]): Promise<Letterhead> {
+  const refs = await companyRefs(req, [...companyIds].sort((a, b) => a - b))
+  if (refs.length === 1) {
+    const c = await companyById(req, refs[0]!.id)
+    const lines = [...(c.pdfHeader ?? '').split('\n'), c.address ?? '', c.phone ? `Telp. ${c.phone}` : ''].map((l) => l.trim()).filter(Boolean)
+    return { kind: 'company', name: c.name, lines, logo: relId(c.logo) ?? null, companies: refs }
+  }
+  const app = await appSettings(req)
+  const g = app as { groupName?: string | null; groupPdfHeader?: string | null; groupLogo?: unknown }
+  const list = refs.map((r) => r.shortCode).join(', ')
+  const name = g.groupName?.trim() || `Laporan gabungan: ${list}`
+  const lines = [...(g.groupPdfHeader ?? '').split('\n').map((l) => l.trim()).filter(Boolean), ...(g.groupName?.trim() ? [`PT: ${list}`] : [])]
+  return { kind: 'group', name, lines, logo: relId(g.groupLogo) ?? null, companies: refs }
+}
+
 /** App-wide settings (global `company-settings`, ADR 0016 §1). */
 export async function appSettings(req: PayloadRequest): Promise<CompanySetting> {
   return req.payload.findGlobal({ slug: 'company-settings', depth: 0, overrideAccess: true /* SYSTEM-READ: app-wide settings */, req })
@@ -101,8 +137,8 @@ export async function settings(req: PayloadRequest, companyId?: number | null): 
 }
 
 /**
- * Same for jobs / code without a request: company `companyId`, default company #1.
- * MC2: the jobs loop over every active PT (ADR 0016 §7) instead of company #1.
+ * Same for jobs / code without a request: company `companyId`, default company #1 (the jobs loop
+ * over every active PT and pass it, ADR 0016 §7).
  */
 export async function settingsOf(payload: Payload, companyId?: number | null, req?: PayloadRequest): Promise<EffectiveSettings> {
   const id = typeof companyId === 'number' ? companyId : await firstActiveCompanyId(payload, req)
@@ -188,8 +224,11 @@ export async function employeeOfUser(req: PayloadRequest, userId: number, compan
   return relId(rows[0]?.employee) ?? null
 }
 
-/** Display employee (first membership with an employee) per user — names in history/DTOs. */
-export async function displayEmployeeByUser(req: PayloadRequest, userIds: number[]): Promise<Map<number, number>> {
+/**
+ * Display employee per user — names in history/DTOs/PDF: the membership employee of `preferCompany`
+ * (the document's PT) when there is one, else the first membership (lowest PT id) with an employee.
+ */
+export async function displayEmployeeByUser(req: PayloadRequest, userIds: number[], preferCompany?: number | null): Promise<Map<number, number>> {
   const out = new Map<number, number>()
   if (userIds.length === 0) return out
   const res = await req.payload.find({
@@ -201,7 +240,9 @@ export async function displayEmployeeByUser(req: PayloadRequest, userIds: number
     overrideAccess: true, // SYSTEM-READ: display names
     req,
   })
-  for (const r of res.docs as unknown as MRow[]) {
+  const rows = res.docs as unknown as MRow[]
+  const ordered = typeof preferCompany === 'number' ? [...rows.filter((r) => relId(r.company) === preferCompany), ...rows.filter((r) => relId(r.company) !== preferCompany)] : rows
+  for (const r of ordered) {
     const u = relId(r.user)
     const e = relId(r.employee)
     if (u !== undefined && e !== undefined && !out.has(u)) out.set(u, e)
@@ -219,10 +260,11 @@ export async function companyOf(req: PayloadRequest, collection: string, id: num
 }
 
 /**
- * Display name per user: the employee name of its first membership (lowest PT id) that links an
- * employee, else the account name, else the email. MC2: prefer the employee of the document's PT.
+ * Display name per user: the employee name of its membership in `opts.companyId` (the document's PT,
+ * ADR 0016 D1), else of its first membership (lowest PT id) that links an employee, else the account
+ * name, else the email.
  */
-export async function displayNames(req: PayloadRequest, userIds: number[], opts: { emailFallback?: boolean } = {}): Promise<Map<number, string>> {
+export async function displayNames(req: PayloadRequest, userIds: number[], opts: { emailFallback?: boolean; companyId?: number | null } = {}): Promise<Map<number, string>> {
   const out = new Map<number, string>()
   const ids = [...new Set(userIds)]
   if (ids.length === 0) return out
@@ -236,7 +278,7 @@ export async function displayNames(req: PayloadRequest, userIds: number[], opts:
       overrideAccess: true, // SYSTEM-READ: display names
       req,
     }),
-    displayEmployeeByUser(req, ids),
+    displayEmployeeByUser(req, ids, opts.companyId),
   ])
   const empIds = [...new Set(empByUser.values())]
   const emps = empIds.length

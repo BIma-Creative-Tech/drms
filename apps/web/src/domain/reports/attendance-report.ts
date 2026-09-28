@@ -2,13 +2,12 @@ import { sql } from '@payloadcms/db-postgres'
 import type { PayloadRequest } from 'payload'
 
 import { recapRange, type DayRecap, type RecapSummary } from '@/domain/attendance/aggregate'
-import { currentSchedules, loadFacts, loadHolidays, teamMembers, type AttScope } from '@/domain/attendance/queries'
+import { attScopeOf, currentSchedules, loadFacts, loadHolidays, narrowAttScope, teamMembers, type AttScope } from '@/domain/attendance/queries'
 
 import { reportContext, rows } from './kpi'
 import type { FilterField, Option, ReportDef, Table } from './registry'
 import { firstDay, lastDay, PERIOD_RE, periodLabel } from './rules'
 import { attendanceOfficeScope, costCenterScopeSql, idList, projectScopeSql, type ReportScope } from './scope'
-import { settings } from '@/domain/companies'
 
 /**
  * E6 / M13 "Laporan absensi" (requirements v1.1 §5 M13, plan fase1-golive E6): per employee and
@@ -29,35 +28,40 @@ function monthOf(sp: URLSearchParams, today: string): string {
   return PERIOD_RE.test(m) && m <= today.slice(0, 7) ? m : today.slice(0, 7)
 }
 
-/** Report scope → attendance scope, narrowed by the project / cost-center filter (PM: team only). */
+/**
+ * Report scope → attendance scope PER PT (office PTs in full, PM PTs team only), narrowed by the
+ * project / cost-center filter (narrowAttScope: ids bound to their PT). A legacy scope without
+ * companies keeps the old id semantics (`all` → nothing, fail closed).
+ */
 export function attendanceReportScope(scope: ReportScope, projectId?: number, costCenterId?: number): AttScope {
-  const base: AttScope = scope.kind === 'all' ? { kind: 'all' } : scope.kind === 'team' ? { kind: 'team', projects: scope.projects, costCenters: scope.costCenters } : { kind: 'team', projects: [], costCenters: [] }
+  const base: AttScope = scope.companies
+    ? (attScopeOf(scope.companies.filter((c) => c.kind !== 'own').map((c) => (c.kind === 'all' ? { company: c.company, all: true, projects: [], costCenters: [] } : { company: c.company, all: false, projects: c.kind === 'team' ? c.projects : [], costCenters: c.kind === 'team' ? c.costCenters : [] }))) ?? { kind: 'team', projects: [], costCenters: [], parts: [] })
+    : scope.kind === 'all'
+      ? { kind: 'all' }
+      : scope.kind === 'team'
+        ? { kind: 'team', projects: scope.projects, costCenters: scope.costCenters }
+        : { kind: 'team', projects: [], costCenters: [] }
   if (!projectId && !costCenterId) return base
-  const allowed = (ids: number[], id?: number) => id !== undefined && (base.kind === 'all' || ids.includes(id))
-  return {
-    kind: 'team',
-    projects: allowed(base.kind === 'team' ? base.projects : [], projectId) ? [projectId!] : [],
-    costCenters: allowed(base.kind === 'team' ? base.costCenters : [], costCenterId) ? [costCenterId!] : [],
-  }
+  if (!base.parts && base.kind === 'all') return { kind: 'team', projects: [], costCenters: [] } // legacy company-blind literal: fail closed
+  return narrowAttScope(base, projectId, costCenterId)
 }
 
-export type EmployeeMonth = { id: number; code: string; name: string; days: DayRecap[]; summary: RecapSummary }
+export type EmployeeMonth = { id: number; companyId: number | null; code: string; name: string; days: DayRecap[]; summary: RecapSummary }
 
 /** Per-employee recap of a month in the scope (shared by the report and its reconciliation test). */
 export async function attendanceMonth(req: PayloadRequest, scope: AttScope, month: string, employeeId?: number): Promise<EmployeeMonth[]> {
   const ctx = await reportContext(req)
-  // MC2: default schedule of each employee's PT (ADR 0016 §6).
-  const s = await settings(req)
-  const defaultId = typeof s.defaultWorkSchedule === 'number' ? s.defaultWorkSchedule : null
+  // ADR 0016 §6: the default schedule is that of each employee's PT (currentSchedules joins companies).
+  const defaultId = null
   const from = firstDay(month)
   const to = lastDay(month)
   const members = await teamMembers(req, scope, from, to, employeeId)
   const facts = await loadFacts(req, { from, to, scope, employeeIds: employeeId !== undefined ? [employeeId] : undefined })
-  const people = new Map<number, { code: string; name: string }>(members.map((m) => [m.employeeId, { code: m.code, name: m.name }]))
+  const people = new Map<number, { code: string; name: string; companyId: number | null }>(members.map((m) => [m.employeeId, { code: m.code, name: m.name, companyId: m.companyId ?? null }]))
   const missing = [...new Set(facts.map((f) => f.employeeId))].filter((id) => !people.has(id))
   if (missing.length) {
-    const r = await rows(req, sql`SELECT id, code, name FROM employees WHERE id IN (${idList(missing)})`)
-    for (const x of r) people.set(Number(x.id), { code: String(x.code), name: String(x.name) })
+    const r = await rows(req, sql`SELECT id, company_id, code, name FROM employees WHERE id IN (${idList(missing)})`)
+    for (const x of r) people.set(Number(x.id), { code: String(x.code), name: String(x.name), companyId: Number(x.company_id) })
   }
   const ids = [...people.keys()]
   const holidays = await loadHolidays(req, from, to)
@@ -66,7 +70,7 @@ export async function attendanceMonth(req: PayloadRequest, scope: AttScope, mont
     .map((id) => {
       const p = people.get(id)!
       const r = recapRange({ from, to, today: ctx.today, facts: facts.filter((f) => f.employeeId === id), holidays, fallbackSchedule: schedules.get(id) ?? null, timeZone: ctx.tz })
-      return { id, code: p.code, name: p.name, ...r }
+      return { id, companyId: p.companyId, code: p.code, name: p.name, ...r }
     })
     .sort((a, b) => a.name.localeCompare(b.name, 'id'))
 }
@@ -125,6 +129,7 @@ export const absensiReport: ReportDef = {
         e.days
           .filter((d) => d.checkIn || d.status === 'tidak_hadir')
           .map((d) => ({
+            company: e.companyId,
             cells: {
               tanggal: d.date,
               karyawan: `${e.name} (${e.code})`,
@@ -170,6 +175,7 @@ export const absensiReport: ReportDef = {
         rows: list.map((e) => ({
           // E6 web: the employee's calendar, day detail, corrections and selfies (same numbers).
           href: `/admin/absensi/rekap?karyawan=${e.id}&bulan=${month}`,
+          company: e.companyId,
           cells: {
             karyawan: `${e.name} (${e.code})`,
             hariKerja: e.summary.workingDays,

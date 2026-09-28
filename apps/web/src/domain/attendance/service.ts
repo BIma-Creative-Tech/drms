@@ -1,10 +1,10 @@
 import { APIError, type PayloadRequest } from 'payload'
 
-import { relId } from '@/access/roles'
+import { employeeIn, membershipsOf, relId } from '@/access/roles'
 import { firstDay, lastDay, PERIOD_RE } from '@/domain/reports/rules'
 
 import { recapRange, teamToday, type DayRecap, type RecapSummary, type TeamTodayRow } from './aggregate'
-import { attendanceContext, attendanceScope, currentSchedules, employeeRef, loadFacts, loadHolidays, teamMembers, type AttScope } from './queries'
+import { attendanceContext, attendanceScope, currentSchedules, employeeRef, fullCompanies, loadFacts, loadHolidays, narrowAttScope, teamMembers, type AttScope } from './queries'
 import type { ScheduleSnapshot } from './schedule'
 
 /**
@@ -30,10 +30,11 @@ export function monthBounds(month: string | null | undefined, today: string): { 
 }
 
 async function recapOf(req: PayloadRequest, employeeId: number, month: string | null | undefined, scope: AttScope): Promise<MonthlyRecap> {
-  const ctx = await attendanceContext(req)
-  const b = monthBounds(month, ctx.today)
   const emp = await employeeRef(req, employeeId)
   if (!emp) throw new APIError('Karyawan tidak ditemukan.', 404, null, true)
+  // ADR 0016 §6: today / TZ / default schedule of the EMPLOYEE's PT
+  const ctx = await attendanceContext(req, emp.companyId)
+  const b = monthBounds(month, ctx.today)
   const [facts, holidays, schedules] = [
     await loadFacts(req, { from: b.from, to: b.to, employeeIds: [employeeId], scope }),
     await loadHolidays(req, b.from, b.to),
@@ -44,11 +45,17 @@ async function recapOf(req: PayloadRequest, employeeId: number, month: string | 
   return { employee: { id: emp.id, code: emp.code, name: emp.name }, month: b.month, from: b.from, to: b.to, timezone: ctx.timeZone, schedule, ...r }
 }
 
-/** US-09: own monthly recap (any role with an employee link). */
-export async function myRecap(req: PayloadRequest, month: string | null | undefined): Promise<MonthlyRecap> {
-  const employee = relId((req.user as { employee?: unknown } | null)?.employee)
+/**
+ * US-09: own monthly recap (any role with an employee link). ADR 0016 D1: one employee per PT —
+ * `companyId` picks the PT (default: the first selected membership with an employee).
+ */
+export async function myRecap(req: PayloadRequest, month: string | null | undefined, companyId?: number): Promise<MonthlyRecap> {
+  const m = companyId !== undefined ? membershipsOf(req.user, { all: true }).find((x) => x.company === companyId) : membershipsOf(req.user).find((x) => x.employee !== null)
+  const employee = m ? (companyId !== undefined ? employeeIn(req, companyId) : (m.employee ?? undefined)) : relId((req.user as { employee?: unknown } | null)?.employee)
   if (employee === undefined) throw new APIError('Akun Anda belum terhubung ke data karyawan. Hubungi Admin.', 409, null, true)
-  return recapOf(req, employee, month, { kind: 'all' })
+  const emp = await employeeRef(req, employee)
+  if (!emp) throw new APIError('Karyawan tidak ditemukan.', 404, null, true)
+  return recapOf(req, employee, month, { kind: 'all', parts: [{ company: emp.companyId, all: true, projects: [], costCenters: [] }] })
 }
 
 /**
@@ -58,11 +65,15 @@ export async function myRecap(req: PayloadRequest, month: string | null | undefi
 export async function employeeRecap(req: PayloadRequest, employeeId: number, month: string | null | undefined): Promise<MonthlyRecap> {
   const scope = await attendanceScope(req)
   if (!scope) throw new APIError('Forbidden', 403, null, true)
-  if (scope.kind === 'team') {
-    const ctx = await attendanceContext(req)
+  const emp = await employeeRef(req, employeeId)
+  // ADR 0016 §5: office roles of the EMPLOYEE's PT see everything of that PT; else PM team only.
+  if (!emp || !fullCompanies(scope).includes(emp.companyId)) {
+    const ctx = await attendanceContext(req, emp?.companyId)
     const b = monthBounds(month, ctx.today)
-    const members = await teamMembers(req, scope, b.from, b.to, employeeId)
+    const team: AttScope = { kind: 'team', projects: [], costCenters: [], parts: (scope.parts ?? []).filter((p) => !p.all) }
+    const members = emp ? await teamMembers(req, team, b.from, b.to, employeeId) : []
     if (members.length === 0) throw new APIError('Karyawan tidak ditemukan di tim Anda.', 404, null, true)
+    return recapOf(req, employeeId, month, team)
   }
   return recapOf(req, employeeId, month, scope)
 }
@@ -84,15 +95,8 @@ export async function teamTodayFor(req: PayloadRequest, q: { date?: string; proj
   const ctx = await attendanceContext(req)
   const date = q.date ?? ctx.today
   if (date > ctx.today) throw new APIError('Tanggal tidak boleh di masa depan.', 400, null, true)
-  if (q.projectId !== undefined || q.costCenterId !== undefined) {
-    // Filters narrow the scope; an id outside a PM's team → empty (never other data).
-    const ok = (ids: number[], id?: number) => id !== undefined && (scope!.kind === 'all' || ids.includes(id))
-    scope = {
-      kind: 'team',
-      projects: ok(scope.kind === 'team' ? scope.projects : [], q.projectId) ? [q.projectId!] : [],
-      costCenters: ok(scope.kind === 'team' ? scope.costCenters : [], q.costCenterId) ? [q.costCenterId!] : [],
-    }
-  }
+  // Filters narrow the scope PER PT; an id outside a PM's team / of another PT → empty (never other data).
+  if (q.projectId !== undefined || q.costCenterId !== undefined) scope = narrowAttScope(scope, q.projectId, q.costCenterId)
   const members = await teamMembers(req, scope, date)
   const ids = members.map((m) => m.employeeId)
   const facts = await loadFacts(req, { from: date, to: date, employeeIds: ids, scope })

@@ -11,10 +11,10 @@ import { formatServerTime } from '@/pdf/format'
 
 import { auditRangeDays, AUDIT_EXPORT_MAX_DAYS, parseAuditFilter } from './audit-log'
 import { reportContext } from './kpi'
-import { describeFilters, type Cell, type ColType, type Format, type ReportDef, type ReportResult, type Table } from './registry'
+import { describeFilters, effectiveScope, type Cell, type ColType, type Format, type ReportDef, type ReportResult, type Table } from './registry'
 import { formatPct } from './rules'
-import type { ReportScope } from './scope'
-import { settings as companySettings } from '@/domain/companies'
+import { scopeCompanies, type ReportScope } from './scope'
+import { letterheadOf, type Letterhead } from '@/domain/companies'
 
 /**
  * Report exports (F3 export-library-decision §4, Q-F3-3/Q-F3-5):
@@ -60,13 +60,23 @@ function csvValue(v: Cell): CsvCell {
   return v
 }
 
-async function titleRows(req: PayloadRequest, def: ReportDef, scope: ReportScope, sp: URLSearchParams): Promise<string[]> {
+/**
+ * Letterhead of an export (requirements v1.2 §6, ADR 0016 §6): the PTs of the EFFECTIVE scope (role
+ * scope narrowed by `pt`): one PT → that PT's letterhead, several → the group letterhead (+ PT list).
+ */
+export async function exportLetterhead(req: PayloadRequest, def: ReportDef, scope: ReportScope, sp: URLSearchParams): Promise<Letterhead> {
+  const base = scope.companies || !def.scope ? scope : await def.scope(req)
+  return letterheadOf(req, scopeCompanies(effectiveScope(base, sp)))
+}
+
+async function titleRows(req: PayloadRequest, def: ReportDef, scope: ReportScope, sp: URLSearchParams, kop: Letterhead): Promise<string[]> {
   const ctx = await reportContext(req)
   const fields = await def.filters(req, scope, sp)
   const who = await displayName(req, userId(req)!)
   return [
     def.title,
-    ctx.companyName,
+    kop.name,
+    ...(kop.kind === 'group' ? [`PT: ${kop.companies.map((c) => `${c.shortCode} (${c.name})`).join(', ')}`] : []),
     ...describeFilters(fields),
     ...(scope.kind === 'team' ? ['Cakupan: project/pusat biaya tim saya (PM)'] : []),
     `Dibuat oleh ${who} · ${formatServerTime(new Date().toISOString(), ctx.tz)}`,
@@ -82,6 +92,7 @@ export type PreparedExport = {
   filename: string
   title: string[]
   first: ReportResult
+  letterhead: Letterhead
 }
 
 /**
@@ -101,7 +112,8 @@ export async function prepareExport(req: PayloadRequest, def: ReportDef, scope: 
     if (format === 'xlsx' && biggest > XLSX_MAX_ROWS) throw new ExportRefused(413, `Lebih dari ${XLSX_MAX_ROWS.toLocaleString('id-ID')} baris. Persempit filter atau pakai CSV.`)
     if (format === 'pdf' && biggest > PDF_MAX_ROWS) throw new ExportRefused(413, `PDF maksimal ${PDF_MAX_ROWS} baris. Persempit filter atau pakai Excel/CSV.`)
     if (format === 'csv' && count > CSV_MAX_ROWS) throw new ExportRefused(413, `Lebih dari ${CSV_MAX_ROWS.toLocaleString('id-ID')} baris. Persempit filter.`)
-    const title = await titleRows(req, def, scope, sp)
+    const letterhead = await exportLetterhead(req, def, scope, sp)
+    const title = await titleRows(req, def, scope, sp, letterhead)
     await writeAudit(req, [
       {
         action: 'export',
@@ -109,10 +121,10 @@ export async function prepareExport(req: PayloadRequest, def: ReportDef, scope: 
         docId: def.code,
         docNo: def.code,
         field: format,
-        newValue: { report: def.code, format, filters: Object.fromEntries([...sp.entries()].slice(0, 30)), rows: count, scope: scope.kind },
+        newValue: { report: def.code, format, filters: Object.fromEntries([...sp.entries()].slice(0, 30)), rows: count, scope: scope.kind, companies: letterhead.companies.map((c) => c.shortCode) },
       },
     ])
-    return { def, format, filename: `${def.fileStem(ctx, sp)}.${format}`, title, first }
+    return { def, format, filename: `${def.fileStem(ctx, sp)}.${format}`, title, first, letterhead }
   })
 }
 
@@ -192,14 +204,9 @@ export async function xlsxBuffer(p: PreparedExport): Promise<Buffer> {
   return withHeavySlot(() => writeXlsx([main, ...extra]))
 }
 
-export async function pdfBuffer(req: PayloadRequest, p: PreparedExport): Promise<Buffer> {
-  const ctx = await reportContext(req)
-  // MC2: > 1 PT in the export → group letterhead (groupName/groupLogo/groupPdfHeader, ADR 0016 §6).
-  const settings = await companySettings(req)
-  const kop = [ctx.companyName, ...(settings.pdfHeader ?? '').split('\n'), settings.address ?? '', settings.phone ? `Telp. ${settings.phone}` : '']
-    .map((l) => l.trim())
-    .filter(Boolean)
-    .slice(0, 5)
+export async function pdfBuffer(_req: PayloadRequest, p: PreparedExport): Promise<Buffer> {
+  // ADR 0016 §6: one PT → its letterhead; > 1 PT → group letterhead (groupName/groupPdfHeader) + PT list.
+  const kop = [p.letterhead.name, ...p.letterhead.lines].map((l) => l.trim()).filter(Boolean).slice(0, 5)
   const toPdf = (t: Table) => {
     const weights = t.columns.map((c) => (c.type === 'text' ? (c.width ?? 18) : 11))
     const sum = weights.reduce((a, b) => a + b, 0)
@@ -211,7 +218,8 @@ export async function pdfBuffer(req: PayloadRequest, p: PreparedExport): Promise
     }
   }
   const { renderReportPdf } = await import('@/pdf/report-render')
-  return renderReportPdf({ kop, title: p.def.title, meta: p.title.slice(2), tables: [toPdf(p.first.main), ...p.first.extra.map(toPdf)], notes: p.first.notes })
+  const subject = `PT: ${p.letterhead.companies.map((c) => c.shortCode).join(', ')}`
+  return renderReportPdf({ kop, subject, title: p.def.title, meta: p.title.slice(2), tables: [toPdf(p.first.main), ...p.first.extra.map(toPdf)], notes: p.first.notes })
 }
 
 export function downloadHeaders(p: Pick<PreparedExport, 'format' | 'filename'>, length?: number): Headers {
