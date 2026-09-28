@@ -2,26 +2,31 @@ import type { PayloadRequest, Where } from 'payload'
 
 import { DEFAULT_TZ, startOfLocalDay } from '@/lib/time'
 
-import { relId, userId } from './roles'
+import { membershipsOf, relId, userId } from './roles'
 
 /**
- * Scope data of the current user (architecture §7.1), resolved once per request and cached in
- * `req.context.pkScope`:
- * - team      = projects with `pm = user`, or active `team-assignments` (roleInProject = pm) of
- *               user.employee; cost centers with `manager = user` or a pm assignment;
- * - assigned  = projects / cost centers of any active `team-assignments` of user.employee.
+ * Scope data of the current user (architecture §7.1) PER PT (ADR 0016 §5), resolved once per
+ * request and PT and cached in `req.context.pkScope`:
+ * - team      = projects of the PT with `pm = user`, or active `team-assignments` (roleInProject = pm)
+ *               of the user's employee IN THAT PT; cost centers with `manager = user` or a pm assignment;
+ * - assigned  = projects / cost centers of any active `team-assignments` of that employee.
+ * `companyId = null` = union over every selected PT (collections without a company column).
  */
 export type Scope = {
   userId: number
+  companyId: number | null
+  /** Employee of the membership (first one for the union scope). */
   employeeId: number | null
+  employeeIds: number[]
   teamProjects: number[]
   assignedProjects: number[]
   teamCostCenters: number[]
   assignedCostCenters: number[]
 }
 
-const EMPTY: Omit<Scope, 'userId'> = {
+const EMPTY: Omit<Scope, 'userId' | 'companyId'> = {
   employeeId: null,
+  employeeIds: [],
   teamProjects: [],
   assignedProjects: [],
   teamCostCenters: [],
@@ -30,21 +35,33 @@ const EMPTY: Omit<Scope, 'userId'> = {
 
 type AssignmentRow = { project?: unknown; costCenter?: unknown; roleInProject?: unknown }
 
-export async function resolveScope(req: PayloadRequest): Promise<Scope> {
-  const cached = req.context?.pkScope as Scope | undefined
-  const uid = userId(req)
-  if (cached && cached.userId === uid) return cached
-  if (uid === undefined) return { userId: -1, ...EMPTY }
+const sortU = (s: Iterable<number>) => [...new Set(s)].sort((a, b) => a - b)
 
-  const employeeId = relId((req.user as { employee?: unknown }).employee) ?? null
+export async function resolveScope(req: PayloadRequest, companyId: number | null = null): Promise<Scope> {
+  const uid = userId(req)
+  if (uid === undefined) return { userId: -1, companyId, ...EMPTY }
+  const key = `${uid}:${companyId ?? '*'}`
+  req.context ??= {}
+  const cache = (req.context.pkScope ??= {}) as Record<string, Scope>
+  if (cache[key]) return cache[key]
+
+  const members = membershipsOf(req.user, { all: companyId !== null }).filter((m) => companyId === null || m.company === companyId)
+  const companies = members.map((m) => m.company)
+  const employeeIds = sortU(members.map((m) => m.employee).filter((e): e is number => typeof e === 'number'))
+  if (companies.length === 0) {
+    const s: Scope = { userId: uid, companyId, ...EMPTY }
+    cache[key] = s
+    return s
+  }
   const now = new Date()
   const today = startOfLocalDay(now, process.env.TZ || DEFAULT_TZ)
+  const inCompany: Where = { company: { in: companies } }
 
   // SYSTEM-READ (overrideAccess): access functions must not recurse into access control.
   const [pmProjects, managedCostCenters, assignments] = await Promise.all([
     req.payload.find({
       collection: 'projects',
-      where: { pm: { equals: uid } },
+      where: { and: [{ pm: { equals: uid } }, inCompany] },
       depth: 0,
       pagination: false,
       select: { code: true },
@@ -53,20 +70,20 @@ export async function resolveScope(req: PayloadRequest): Promise<Scope> {
     }),
     req.payload.find({
       collection: 'cost-centers',
-      where: { manager: { equals: uid } },
+      where: { and: [{ manager: { equals: uid } }, inCompany] },
       depth: 0,
       pagination: false,
       select: { code: true },
       overrideAccess: true, // SYSTEM-READ: scope resolution
       req,
     }),
-    employeeId === null
+    employeeIds.length === 0
       ? Promise.resolve({ docs: [] as AssignmentRow[] })
       : req.payload.find({
           collection: 'team-assignments',
           where: {
             and: [
-              { employee: { equals: employeeId } },
+              { employee: { in: employeeIds } },
               { or: [{ startDate: { exists: false } }, { startDate: { less_than_equal: now.toISOString() } }] },
               { or: [{ endDate: { exists: false } }, { endDate: { greater_than_equal: today.toISOString() } }] },
             ],
@@ -97,13 +114,15 @@ export async function resolveScope(req: PayloadRequest): Promise<Scope> {
   }
   const scope: Scope = {
     userId: uid,
-    employeeId,
-    teamProjects: [...team].sort((a, b) => a - b),
-    assignedProjects: [...new Set([...assigned, ...team])].sort((a, b) => a - b),
-    teamCostCenters: [...teamCc].sort((a, b) => a - b),
-    assignedCostCenters: [...new Set([...assignedCc, ...teamCc])].sort((a, b) => a - b),
+    companyId,
+    employeeId: employeeIds[0] ?? null,
+    employeeIds,
+    teamProjects: sortU(team),
+    assignedProjects: sortU([...assigned, ...team]),
+    teamCostCenters: sortU(teamCc),
+    assignedCostCenters: sortU([...assignedCc, ...teamCc]),
   }
-  req.context.pkScope = scope
+  cache[key] = scope
   return scope
 }
 

@@ -1,6 +1,7 @@
 import type { PayloadRequest } from 'payload'
 
 import { getEnv } from '@/lib/env'
+import { settingsOf } from '@/domain/companies'
 import { DEFAULT_TZ } from '@/lib/time'
 
 import { compareVersions, HttpError, v1 } from '../http'
@@ -26,15 +27,9 @@ export function resetAppConfigCache(): void {
 /** Public endpoint → settings cached 60 s in-process (no DB read per anonymous request). */
 async function gateSettings(req: PayloadRequest): Promise<GateSettings> {
   if (cache && Date.now() - cache.at < 60_000) return cache.value
-  const s = (await req.payload.findGlobal({ slug: 'company-settings', depth: 0, overrideAccess: true /* SYSTEM-READ: public app gate subset */, req })) as {
-    minAppVersion?: string | null
-    latestAppVersion?: string | null
-    appDownloadUrl?: string | null
-    timezone?: string | null
-    syncExpenseDraftsEnabled?: boolean | null
-    syncAttendanceEnabled?: boolean | null
-    syncProgressReportsEnabled?: boolean | null
-  }
+  // App gate = app-wide global; TZ + feature flags are per PT (ADR 0016 §1). Public → no PT known:
+  // company #1. MC3: per-PT flags in /me `companies[]` (the APK then decides per selected PT).
+  const s = await settingsOf(req.payload, null, req)
   const value: GateSettings = {
     minAppVersion: s.minAppVersion || null,
     latestAppVersion: s.latestAppVersion || null,

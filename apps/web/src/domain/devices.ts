@@ -1,6 +1,6 @@
 import { APIError, type PayloadRequest, type Where } from 'payload'
 
-import { hasRole, relId } from '@/access/roles'
+import { hasRoleAny, relId } from '@/access/roles'
 import { getKeycloakAdmin } from '@/auth/keycloak-admin'
 import { writeAudit } from '@/audit/writer'
 
@@ -111,7 +111,7 @@ export async function registerDevice(req: PayloadRequest, input: RegisterInput, 
 
 /** Who may revoke: Admin/Owner any device, everyone else only their own. */
 export function canRevoke(req: PayloadRequest, device: { user: unknown }): boolean {
-  return hasRole(req, 'pk-admin', 'pk-owner') || relId(device.user) === relId(req.user)
+  return hasRoleAny(req, 'pk-admin', 'pk-owner') || relId(device.user) === relId(req.user)
 }
 
 /**

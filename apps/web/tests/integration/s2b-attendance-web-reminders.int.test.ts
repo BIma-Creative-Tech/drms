@@ -10,7 +10,7 @@ import { runDailyReminders } from '@/domain/reminders/service'
 import { addDays } from '@/domain/expense/types'
 import { mediaPath } from '@/lib/media-files'
 
-import { getTestPayload, sqlAs, sqlError } from './helpers'
+import { companyId, companySettingsDoc, getTestPayload, sqlAs, sqlError, updateCompany } from './helpers'
 import { api, asUser, draftBody, makeFlowUser, makeWorld, png, sysCreate, upload, uploadMedia, type FlowUser, type World } from './flow-world'
 
 /**
@@ -36,15 +36,18 @@ async function jpeg(seed: number): Promise<Buffer> {
 }
 
 async function setSettings(data: Record<string, unknown>) {
-  const p = await getTestPayload()
-  await p.updateGlobal({ slug: 'company-settings', data: data as never, overrideAccess: true /* SYSTEM-WRITE: test settings */ })
+  // ADR 0016 §1: selfieRetentionBatch stays app-wide (global), everything else is per PT (company #1)
+  const { selfieRetentionBatch, ...perCompany } = data
+  if (selfieRetentionBatch !== undefined) {
+    await (await getTestPayload()).updateGlobal({ slug: 'company-settings', data: { selfieRetentionBatch } as never, overrideAccess: true /* SYSTEM-WRITE: test settings */ })
+  }
+  if (Object.keys(perCompany).length > 0) await updateCompany(perCompany)
 }
 
 beforeAll(async () => {
   w = await makeWorld('sbw')
   today = (await sqlAs('app', `SELECT to_char(now() AT TIME ZONE '${TZ}', 'YYYY-MM-DD') AS d`)).rows[0].d as string
-  const p = await getTestPayload()
-  settingsBefore = (await p.findGlobal({ slug: 'company-settings', depth: 0, overrideAccess: true /* SYSTEM-READ: test */ })) as unknown as Record<string, unknown>
+  settingsBefore = await companySettingsDoc()
 })
 
 afterAll(async () => {
@@ -201,8 +204,8 @@ describe('E7 daily reminders (fake clock)', () => {
     expect(rj.body.status).toBe('receipt_revision')
   })
 
-  const owners = async () => (await sqlAs('app', "SELECT DISTINCT u.id FROM users u JOIN users_roles r ON r.parent_id = u.id WHERE r.value = 'pk-owner' AND coalesce(u.active, true) ORDER BY u.id")).rows.map((x) => Number(x.id))
-  const finance = async () => (await sqlAs('app', "SELECT DISTINCT u.id FROM users u JOIN users_roles r ON r.parent_id = u.id WHERE r.value = 'pk-finance' AND coalesce(u.active, true) ORDER BY u.id")).rows.map((x) => Number(x.id))
+  const owners = async () => (await sqlAs('app', "SELECT DISTINCT u.id FROM users u JOIN company_memberships m ON m.user_id = u.id AND coalesce(m.active, true) JOIN company_memberships_roles r ON r.parent_id = m.id WHERE r.value = 'pk-owner' AND coalesce(u.active, true) ORDER BY u.id")).rows.map((x) => Number(x.id))
+  const finance = async () => (await sqlAs('app', "SELECT DISTINCT u.id FROM users u JOIN company_memberships m ON m.user_id = u.id AND coalesce(m.active, true) JOIN company_memberships_roles r ON r.parent_id = m.id WHERE r.value = 'pk-finance' AND coalesce(u.active, true) ORDER BY u.id")).rows.map((x) => Number(x.id))
 
   it('before the configured hour / disabled → nothing', async () => {
     const p = await getTestPayload()
@@ -282,9 +285,8 @@ describe('E7 daily reminders (fake clock)', () => {
   it('reminder tables are append-only for the app role; settings are range-checked', async () => {
     expect(await sqlError('app', 'UPDATE reminder_deliveries SET period_key = period_key')).toMatchObject({ code: '42501' })
     expect(await sqlError('app', 'DELETE FROM reminder_deliveries')).toMatchObject({ code: '42501' })
-    expect(await sqlError('app', 'UPDATE company_settings SET reminder_hour = 24')).toMatchObject({ code: '23514' })
-    const p = await getTestPayload()
-    await expect(p.updateGlobal({ slug: 'company-settings', data: { reminderHour: 25 } as never, overrideAccess: true /* SYSTEM-WRITE: test */ })).rejects.toThrow()
+    expect(await sqlError('app', 'UPDATE companies SET reminder_hour = 24')).toMatchObject({ code: '23514' })
+    await expect(updateCompany({ reminderHour: 25 })).rejects.toThrow()
   })
 })
 
@@ -305,7 +307,9 @@ describe('E6 web: masters edited from /admin/absensi/jadwal keep collection acce
     expect((await api('POST', '/api/holidays?depth=0', w.users.finance, { date: '2031-01-02', name: 's2b libur uji' })).status).toBe(403)
     expect((await api('POST', '/api/holidays?depth=0', w.users.admin, { date: '2031-01-02', name: 's2b libur uji' })).status).toBe(201)
     expect((await api('PATCH', `/api/employees/${w.emp.a}?depth=0`, w.users.pm, { workSchedule: null })).status).toBe(403)
-    expect((await api('POST', '/api/globals/company-settings?depth=0', w.users.pm, { defaultWorkSchedule: null })).status).toBe(403)
+    expect((await api('POST', '/api/globals/company-settings?depth=0', w.users.pm, { latestAppVersion: '9.9.9' })).status).toBe(403)
+    // ADR 0016 §1: the default schedule is a PT setting — a PM is neither Admin nor Direktur of the PT
+    expect([403, 404]).toContain((await api('PATCH', `/api/companies/${await companyId()}?depth=0`, w.users.pm, { defaultWorkSchedule: null })).status)
   })
 
   it('helpers: nobody corrects own attendance; a PM lists only team members', async () => {

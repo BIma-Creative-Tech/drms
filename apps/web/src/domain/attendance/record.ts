@@ -8,6 +8,7 @@ import { getRequestTx } from '@/lib/tx'
 
 import { snapshotOf, type ScheduleSnapshot } from './schedule'
 import { effectiveRadiusM } from './calendar'
+import { settings, userOfEmployee as userOfEmployeeLink } from '@/domain/companies'
 
 /**
  * E6 — the ONE write path of `attendances` (sync items attendance.check_in / check_out / on_behalf,
@@ -94,7 +95,7 @@ export async function scheduleOfEmployee(req: PayloadRequest, employee: number, 
   if (own) return own
   let defId = defaultScheduleId
   if (defId === undefined) {
-    const s = (await req.payload.findGlobal({ slug: 'company-settings', depth: 0, overrideAccess: true /* SYSTEM-READ: default schedule */, req })) as { defaultWorkSchedule?: unknown }
+    const s = await settings(req, relId((emp as { company?: unknown } | null)?.company))
     defId = relId(s.defaultWorkSchedule) ?? null
   }
   if (!defId) return null
@@ -102,18 +103,9 @@ export async function scheduleOfEmployee(req: PayloadRequest, employee: number, 
   return snapshotOf(doc as Record<string, unknown> | null)
 }
 
-/** Account linked to an employee (users.employee), or null. */
+/** Account linked to an employee (membership employee, ADR 0016 §2), or null. */
 export async function userOfEmployee(req: PayloadRequest, employee: number): Promise<number | null> {
-  const res = await req.payload.find({
-    collection: 'users',
-    where: { employee: { equals: employee } },
-    depth: 0,
-    limit: 1,
-    select: { email: true },
-    overrideAccess: true, // SYSTEM-READ: account of the attendance's employee
-    req,
-  })
-  return (res.docs[0]?.id as number | undefined) ?? null
+  return userOfEmployeeLink(req, employee)
 }
 
 async function loadLocation(req: PayloadRequest, loc: Location, field: string): Promise<GeoDoc> {
@@ -133,7 +125,7 @@ async function loadLocation(req: PayloadRequest, loc: Location, field: string): 
   }
   if (typeof doc.radiusM !== 'number') {
     // S3e (US-01, S-19): a point without its own radius uses the company default radius.
-    const s = (await req.payload.findGlobal({ slug: 'company-settings', depth: 0, overrideAccess: true /* SYSTEM-READ: default geofence radius */, req })) as { defaultGeofenceRadiusM?: number | null }
+    const s = await settings(req, relId((doc as { company?: unknown }).company))
     return { ...doc, radiusM: effectiveRadiusM(null, s.defaultGeofenceRadiusM) }
   }
   return doc

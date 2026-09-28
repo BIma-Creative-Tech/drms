@@ -162,8 +162,27 @@ migration = Direktur ("Diketahui" = approval) → Finance level 1 (Sprint S2 dec
 
 ## MC — Multi-company (ADR 0016, `requirements-v1.2.md`, added 2026-09-27)
 
-Status: **planned** (MC0 analysis; nothing implemented). Phase = MC sub-phase of `phase-plan.md`. Test files are
-proposed names. "Isolation" = a user of PT A only gets 404 for PT B ids; "cross-PT" = DB trigger rejects the row.
+Status: **MC1 implemented** (branch `feat/mc1-foundation`, 2026-09-28; progress `mc/mc1-progress.md`) — MC2/MC3 planned.
+Phase = MC sub-phase of `phase-plan.md`. "Isolation" = a user of PT A only gets 404 for PT B ids; "cross-PT" = DB
+trigger rejects the row.
+
+**MC1 coverage (2026-09-28):**
+
+| US | MC1 status | Evidence |
+|---|---|---|
+| US-MC-01 | model done (collection `companies`, shortCode format + immutable after a numbered doc, group-admin create); UI + copy-defaults = MC2 | `collections/Companies.ts`, migration `*_mc1_companies` |
+| US-MC-02 | model + access done (memberships per PT, Admin of PT A cannot write PT B → 403, `role_change` audit, no Keycloak role sync, new account → `pk-user`); matrix UI = MC2 | `tests/integration/mc-isolation.int.test.ts` (users / memberships), `users-keycloak.int.test.ts`, `authz.int.test.ts` |
+| US-MC-03 | done at model level (employee `company`, membership employee same PT — hook + DB) | `mc-isolation` (DB guards) |
+| US-MC-04 | context done (cookie ∩ memberships, stale cookie → all); switcher UI = MC2 | `mc-isolation` (selection), `tests/unit/mc1-access.test.ts` |
+| US-MC-05 | header `X-Company-Ids` + 403 `COMPANY_NOT_ALLOWED` done; `/me companies[]` = MC3 | `mc-isolation` (selection) |
+| US-MC-07 | done (role in the document PT, DB `cross-company reference`, immutable `company_id`) | `mc-isolation` (mutations, DB guards) |
+| US-MC-08 | done (counters per PT, `{COMPANY}` = document PT, DRMS continues 229…) | `numbering.int.test.ts`, `mc-isolation` (PB-CS1) |
+| US-MC-09 | done in DB + domain (`closePeriod`/`reopenPeriod` per PT); `company` API parameter = MC3 | `mc-isolation` (closing DRMS never locks CS1) |
+| US-MC-12 | approver pools / recipients / G1 per document PT done; UI chips = MC2 | `mc-isolation` (approval holders), E1 suites green |
+| US-MC-13 | per-PT uniques done (same code in two PTs, duplicate in one PT → 23505); picker filters = MC2 | `mc-isolation` (DB guards) |
+| US-MC-14 | REST sweep over the 30 per-PT collections + id 404 + forged header/cookie done; `/api/v1` route generator, media, PDF, export = MC2/MC3 | `mc-isolation` |
+| US-MC-18 | audit rows carry `company` (+ actor roles of that PT); filters = MC2 | `mc-isolation` (audit) |
+| US-MC-19 | done: migration on a develop-head copy (269 users, 637 requests, 475 cash entries): row counts + money sums identical before/after, down → up identical, next PB number unchanged | `mc/mc1-progress.md` §Migration check |
 
 | US | Module | Roles | Payload collections | API | Screen | Phase | Test type |
 |---|---|---|---|---|---|---|---|

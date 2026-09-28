@@ -21,6 +21,7 @@ import { sql } from '@payloadcms/db-postgres'
 import type { CollectionSlug, Payload, PayloadRequest, Where } from 'payload'
 
 import { writeAudit } from '@/audit/writer'
+import { firstActiveCompanyId, settings as companySettings } from '@/domain/companies'
 import { periodEnd } from '@/domain/cash/periods'
 import { DEFAULT_SEQUENCES, formatDocNo, parseBusinessDate, periodKey, type ResetPolicy } from '@/domain/numbering'
 import { CTX_STAGE_EDITOR, projectStages, recalcProjectProgress } from '@/domain/progress/recalc'
@@ -96,8 +97,11 @@ function errorText(e: unknown): string {
 // ------------------------------------------------------------------ DB keys (read-only)
 
 export async function loadDbKeys(payload: Payload): Promise<DbKeys> {
+  // ADR 0016: per-PT masters are matched INSIDE the import's PT (MC2-5: `kode_pt`; MC1 = first active PT)
+  const companyId = await firstActiveCompanyId(payload)
   const codes = async (collection: CollectionSlug) => {
-    const r = await payload.find({ collection, depth: 0, pagination: false, limit: 0, select: { code: true } as never, overrideAccess: true /* SYSTEM-READ: import reference check */ })
+    const where = PER_PT_IMPORT.has(collection) ? { company: { equals: companyId } } : undefined
+    const r = await payload.find({ collection, ...(where ? { where } : {}), depth: 0, pagination: false, limit: 0, select: { code: true } as never, overrideAccess: true /* SYSTEM-READ: import reference check */ })
     return new Set((r.docs as unknown as Array<{ code: string }>).map((d) => d.code))
   }
   const users = await payload.find({
@@ -105,13 +109,19 @@ export async function loadDbKeys(payload: Payload): Promise<DbKeys> {
     depth: 0,
     pagination: false,
     limit: 0,
-    select: { email: true, keycloakSub: true, employee: true } as never,
+    select: { email: true, keycloakSub: true } as never,
     overrideAccess: true, // SYSTEM-READ: import reference check
   })
+  const employeeOf = await (async () => {
+    const m = await payload.find({ collection: 'company-memberships', depth: 0, pagination: false, limit: 0, overrideAccess: true /* SYSTEM-READ: import reference check */ })
+    const out = new Map<number, number>()
+    for (const r of m.docs as unknown as Array<{ user: number; employee?: number | null }>) if (typeof r.employee === 'number' && !out.has(r.user)) out.set(r.user, r.employee)
+    return out
+  })()
   const usersByEmail = new Map<string, { id: number; sub: string | null; employee: number | null }>()
   const usersBySub = new Map<string, { id: number; email: string }>()
-  for (const u of users.docs as unknown as Array<{ id: number; email: string; keycloakSub?: string | null; employee?: number | null }>) {
-    usersByEmail.set(u.email.toLowerCase(), { id: u.id, sub: u.keycloakSub ?? null, employee: u.employee ?? null })
+  for (const u of users.docs as unknown as Array<{ id: number; email: string; keycloakSub?: string | null }>) {
+    usersByEmail.set(u.email.toLowerCase(), { id: u.id, sub: u.keycloakSub ?? null, employee: employeeOf.get(u.id) ?? null })
     if (u.keycloakSub) usersBySub.set(u.keycloakSub.toLowerCase(), { id: u.id, email: u.email })
   }
   return {
@@ -142,6 +152,17 @@ function norm(v: unknown, isDate: boolean): unknown {
 /** ISO timestamp at 12:00 UTC: the same calendar day in every timezone of Indonesia (and ±11 h). */
 export const dateValue = (d: string | null) => (d ? `${d}T12:00:00.000Z` : null)
 
+/**
+ * Per-PT collections the import writes / looks up (ADR 0016 §4): natural keys are unique PER PT, so every
+ * lookup is scoped to the import's PT and new master rows get it explicitly (MC2-5: `kode_pt` per row).
+ */
+const PER_PT_IMPORT = new Set<CollectionSlug>([
+  'employees', 'expense-categories', 'cost-centers', 'projects', 'project-stages', 'budget-lines', 'vehicles', 'team-assignments',
+  'cash-accounts', 'employee-bank-accounts', 'clients', 'document-sequences', 'period-closings', 'cash-in-sources',
+])
+/** Of those, the ones whose company is chosen on create (the others derive it from their parent). */
+const COMPANY_ON_CREATE = new Set<CollectionSlug>(['employees', 'expense-categories', 'cost-centers', 'projects', 'vehicles', 'cash-accounts', 'clients', 'document-sequences', 'period-closings', 'cash-in-sources'])
+
 class Exec {
   readonly cache = new Map<string, number>()
   readonly kcFollowUp: KeycloakFollowUpRow[] = []
@@ -149,10 +170,12 @@ class Exec {
     readonly req: PayloadRequest,
     readonly data: ImportData,
     readonly users: Map<string, UserPlan>,
+    readonly companyId: number,
   ) {}
 
   async findOne(collection: CollectionSlug, where: Where): Promise<Record<string, unknown> | null> {
-    const r = await this.req.payload.find({ collection, where, limit: 1, depth: 0, pagination: false, overrideAccess: true /* SYSTEM-READ: import upsert */, req: this.req })
+    const scoped: Where = PER_PT_IMPORT.has(collection) ? { and: [{ company: { equals: this.companyId } }, where] } : where
+    const r = await this.req.payload.find({ collection, where: scoped, limit: 1, depth: 0, pagination: false, overrideAccess: true /* SYSTEM-READ: import upsert */, req: this.req })
     return (r.docs[0] as unknown as Record<string, unknown>) ?? null
   }
 
@@ -188,7 +211,8 @@ class Exec {
     if (opts.context) Object.assign(this.req.context, opts.context)
     try {
       if (!existing) {
-        const doc = await this.req.payload.create({ collection, data: { ...clean, ...(opts.createOnly ?? {}) } as never, depth: 0, overrideAccess: true /* SYSTEM-WRITE: go-live import */, req: this.req })
+        const company = COMPANY_ON_CREATE.has(collection) ? { company: this.companyId } : {}
+        const doc = await this.req.payload.create({ collection, data: { ...clean, ...company, ...(opts.createOnly ?? {}) } as never, depth: 0, overrideAccess: true /* SYSTEM-WRITE: go-live import */, req: this.req })
         if (opts.cacheKey) this.cache.set(opts.cacheKey, doc.id as number)
         return { action: 'created', id: doc.id as number }
       }
@@ -282,7 +306,7 @@ const MASTERS: Array<{ key: SheetKey; rows: (d: ImportData) => number; run: Mast
           continue
         }
         const r = await atRow(rep.sheet, u._row, async () => {
-          const data: Record<string, unknown> = { name: u.name, roles: u.roles, employee: await x.idOf('employees', 'code', u.employeeCode), phone: u.phone, active: u.active }
+          const data: Record<string, unknown> = { name: u.name, phone: u.phone, active: u.active }
           const where: Where = plan.sub ? { keycloakSub: { equals: plan.sub } } : { email: { equals: plan.email } }
           const existing = await x.findOne('users', where)
           const wasActive = existing ? existing.active !== false : null
@@ -293,6 +317,14 @@ const MASTERS: Array<{ key: SheetKey; rows: (d: ImportData) => number; run: Mast
           if (!existing || !isPlaceholderEmail(email) || isPlaceholderEmail(String(existing.email ?? ''))) data.email = email
           const res = await x.upsert('users', where, data, { createOnly: { keycloakSub: plan.sub }, context: { skipKeycloakSync: true } })
           x.cache.set(`users:email:${plan.email}`, res.id)
+          // ADR 0016 §2: roles + employee link = membership of the PT. MC2-5: `kode_pt` per row
+          // (sheet AksesPT); MC1 = the only / first active PT.
+          const company = await firstActiveCompanyId(x.req.payload, x.req)
+          await x.upsert(
+            'company-memberships',
+            { and: [{ user: { equals: res.id } }, { company: { equals: company } }] },
+            { user: res.id, company, roles: u.roles, employee: await x.idOf('employees', 'code', u.employeeCode), active: u.active },
+          )
           return res
         })
         tally(rep, r.action)
@@ -504,27 +536,29 @@ async function runCutover(x: Exec, rep: MasterReport, issues: Issue[], reason: s
   const req = x.req
   const tx = await getRequestTx(req)
   const sheet = SHEET_BY_KEY.pengaturan.name
+  // MC2-5: per-PT cut-over (`kode_pt`); MC1 = the only / first active PT.
+  const pt = await companySettings(req)
   // (1) PB sequence: startAt (Q-17) — used when the counter row does not exist yet
   const { startAt: _default, ...dflt } = DEFAULT_SEQUENCES.find((d) => d.docType === 'expense_request')!
   const seq = await atRow(sheet, undefined, () =>
-    x.upsert('document-sequences', { docType: { equals: 'expense_request' } }, { startAt: s.pbStartAt, active: true }, { createOnly: { ...dflt, timezone: 'Asia/Makassar' } }),
+    x.upsert('document-sequences', { and: [{ company: { equals: pt.companyId } }, { docType: { equals: 'expense_request' } }] }, { startAt: s.pbStartAt, active: true }, { createOnly: { ...dflt, company: pt.companyId, timezone: 'Asia/Makassar' } }),
   )
   tally(rep, seq.action)
   const cfg = (await x.findOne('document-sequences', { id: { equals: seq.id } }))!
   const key = periodKey(cfg.resetPolicy as ResetPolicy, parseBusinessDate(s.goLiveDate))
-  const cur = (await tx.execute(sql`SELECT next_value::int AS n FROM document_sequence_counters WHERE doc_type = 'expense_request' AND period_key = ${key}`)) as unknown as { rows: Array<{ n: number }> }
+  const cur = (await tx.execute(sql`SELECT next_value::int AS n FROM document_sequence_counters WHERE company_id = ${pt.companyId} AND doc_type = 'expense_request' AND period_key = ${key}`)) as unknown as { rows: Array<{ n: number }> }
   const before = cur.rows[0]?.n ?? null
   let after = before
   if (before !== null && before < s.pbStartAt) {
     // only upward (DB trigger pk_counter_monotonic) — "set next value" of ADR 0007 §1, audited
-    await tx.execute(sql`UPDATE document_sequence_counters SET next_value = ${s.pbStartAt} WHERE doc_type = 'expense_request' AND period_key = ${key}`)
+    await tx.execute(sql`UPDATE document_sequence_counters SET next_value = ${s.pbStartAt} WHERE company_id = ${pt.companyId} AND doc_type = 'expense_request' AND period_key = ${key}`)
     await writeAudit(req, [{ action: 'update', docType: 'document_sequence', docId: String(seq.id), field: 'nextValue', oldValue: before, newValue: s.pbStartAt, reason }])
     after = s.pbStartAt
     rep.updated++
   } else if (before !== null && before > s.pbStartAt) {
     issues.push({ level: 'warning', sheet, message: `Nomor PB sudah berjalan: nomor berikutnya ${before} (> ${s.pbStartAt}); counter tidak diubah (nomor tidak pernah mundur).` })
   }
-  const settings = (await req.payload.findGlobal({ slug: 'company-settings', depth: 0, overrideAccess: true /* SYSTEM-READ: company code */, req })) as { shortCode?: string | null }
+  const settings = pt
   const firstPbNumber = formatDocNo(
     { pattern: String(cfg.pattern), padding: Number(cfg.padding ?? 0), docCode: (cfg.docCode as string) ?? undefined },
     Math.max(after ?? s.pbStartAt, s.pbStartAt),
@@ -537,8 +571,10 @@ async function runCutover(x: Exec, rep: MasterReport, issues: Issue[], reason: s
   let closeNote = 'tidak diminta (tutup_periode_sebelum_golive = Tidak)'
   if (s.closePrevPeriod) {
     const period = previousPeriod(s.goLiveDate)
-    const rows = await req.payload.find({ collection: 'period-closings', where: { period: { equals: period } }, depth: 0, pagination: false, overrideAccess: true /* SYSTEM-READ: cut-over */, req })
-    const lock = (await tx.execute(sql`SELECT pk_cash_lock_date()::text AS d`)) as unknown as { rows: Array<{ d: string | null }> }
+    // MC2-5: per PT (`kode_pt`); MC1 = the only / first active PT
+    const cid = settings.companyId
+    const rows = await req.payload.find({ collection: 'period-closings', where: { and: [{ company: { equals: cid } }, { period: { equals: period } }] }, depth: 0, pagination: false, overrideAccess: true /* SYSTEM-READ: cut-over */, req })
+    const lock = (await tx.execute(sql`SELECT pk_cash_lock_date(${cid}::integer)::text AS d`)) as unknown as { rows: Array<{ d: string | null }> }
     const lockDate = lock.rows[0]?.d ?? null
     if (rows.docs.some((d) => (d as { status?: string }).status === 'closed')) closeNote = `periode ${period} sudah ditutup`
     else if (rows.docs.length > 0) {
@@ -547,7 +583,7 @@ async function runCutover(x: Exec, rep: MasterReport, issues: Issue[], reason: s
     } else if (lockDate && lockDate >= periodEnd(period)) closeNote = `sudah terkunci s/d ${lockDate}`
     else {
       const doc = await atRow(sheet, undefined, () =>
-        req.payload.create({ collection: 'period-closings', data: { period, status: 'closed', note: `Cut-over go-live ${s.goLiveDate} (impor data)` } as never, depth: 0, overrideAccess: true /* SYSTEM-WRITE: cut-over period close */, req }),
+        req.payload.create({ collection: 'period-closings', data: { company: cid, period, status: 'closed', note: `Cut-over go-live ${s.goLiveDate} (impor data)` } as never, depth: 0, overrideAccess: true /* SYSTEM-WRITE: cut-over period close */, req }),
       )
       await writeAudit(req, [{ action: 'period_close', docType: 'period_closing', docId: String(doc.id), docNo: period, field: 'period', newValue: { period, lockDate: periodEnd(period) }, reason }])
       closedPeriod = period
@@ -610,7 +646,7 @@ async function executePass(payload: Payload, data: ImportData, users: Map<string
         payload,
         null,
         async (req) => {
-          const x = new Exec(req, data, users)
+          const x = new Exec(req, data, users, await firstActiveCompanyId(payload, req))
           for (const st of steps) {
             const rep: MasterReport = { key: st.key, sheet: st.sheet, rows: st.rows, created: 0, updated: 0, unchanged: 0, skipped: 0 }
             await st.run(x, rep)
@@ -636,7 +672,7 @@ async function executePass(payload: Payload, data: ImportData, users: Map<string
       payload,
       null,
       async (req) => {
-        const x = new Exec(req, data, users)
+        const x = new Exec(req, data, users, await firstActiveCompanyId(payload, req))
         for (const [k, v] of cache) x.cache.set(k, v)
         await st.run(x, rep)
         await audit(req, rep)

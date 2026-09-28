@@ -9,6 +9,7 @@ import { SETTLEMENT_STATUSES, SETTLEMENT_STATUS_LABELS } from '@/domain/expense/
 import { uuidField } from '@/fields/common'
 
 import { ro } from './fields-f2'
+import { companyField, companyHook } from '@/fields/company'
 
 /**
  * T5 LPJ & settlement (requirements v1.1 §7 T5, US-08/US-21/US-22; architecture §4.3 `settlements`,
@@ -36,8 +37,10 @@ export const Settlements: CollectionConfig = withAudit(
       update: denyAll,
       delete: denyDeleteLogged('settlement'),
     },
+    hooks: { beforeChange: [companyHook('settlements', { derive: [{ field: 'request', collection: 'expense-requests' }], check: [{ field: 'refundCashEntry', collection: 'cash-entries' }, { field: 'shortfallTransfer', collection: 'transfers' }] })] },
     fields: [
-      { name: 'docNo', type: 'text', label: 'Nomor LPJ', unique: true, index: true, admin: ro },
+      companyField({ derived: true }),
+      { name: 'docNo', type: 'text', label: 'Nomor LPJ', index: true, admin: ro },
       { name: 'request', type: 'relationship', relationTo: 'expense-requests', label: 'Pengajuan', required: true, unique: true, index: true, admin: ro },
       {
         name: 'status',

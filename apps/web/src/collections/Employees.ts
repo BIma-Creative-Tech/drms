@@ -1,9 +1,10 @@
 import type { CollectionConfig } from 'payload'
 
-import { anyRole, denyAll, hasRole, relId } from '@/access/roles'
-import { byRole, rolesAllowed } from '@/access/policies'
+import { denyAll, hasRole, ownEmployees, relId } from '@/access/roles'
+import { byRole, rolesAllowed, anyMember } from '@/access/policies'
 import { reasonOnDeactivate, withAudit } from '@/audit/hooks'
 import { activeField, codeField, odooRefField, uuidField } from '@/fields/common'
+import { companyField, companyHook } from '@/fields/company'
 
 /**
  * Karyawan / staff. An employee without a user account can still be a requester ("Diajukan
@@ -16,13 +17,15 @@ export const Employees: CollectionConfig = withAudit(
     labels: { singular: 'Karyawan', plural: 'Karyawan' },
     admin: { useAsTitle: 'name', group: 'Pengguna & Akses', defaultColumns: ['code', 'name', 'position', 'active'] },
     access: {
-      read: anyRole,
+      read: anyMember,
       create: rolesAllowed('pk-admin'),
       update: byRole({ 'pk-admin': true, 'pk-owner': true }),
       delete: denyAll,
     },
+    hooks: { beforeChange: [companyHook('employees', { check: [{ field: 'workSchedule', collection: 'work-schedules' }] })] },
     fields: [
-      codeField(),
+      companyField(),
+      codeField('Kode', 32, { perCompany: true }),
       { name: 'name', type: 'text', label: 'Nama lengkap', required: true, maxLength: 128 },
       { name: 'nickname', type: 'text', label: 'Nama panggilan', maxLength: 64 },
       { name: 'position', type: 'text', label: 'Jabatan', maxLength: 128 },
@@ -32,9 +35,10 @@ export const Employees: CollectionConfig = withAudit(
         label: 'No. HP',
         maxLength: 32,
         access: {
+          // office roles / PM of the employee's PT, or the employee themself (ADR 0016 §5)
           read: ({ req, doc }) =>
-            hasRole(req, 'pk-admin', 'pk-owner', 'pk-finance', 'pk-pm') ||
-            (relId((req.user as { employee?: unknown } | null)?.employee) ?? -1) === (doc as { id?: unknown } | undefined)?.id,
+            hasRole(req, ['pk-admin', 'pk-owner', 'pk-finance', 'pk-pm'], relId((doc as { company?: unknown } | undefined)?.company)) ||
+            ownEmployees(req).includes(relId((doc as { id?: unknown } | undefined)?.id) ?? -1),
         },
       },
       // E6: jadwal kerja karyawan (kosong = jadwal default di Setting perusahaan).

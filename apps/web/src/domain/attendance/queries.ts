@@ -1,7 +1,7 @@
 import { sql } from '@payloadcms/db-postgres'
 import type { PayloadRequest } from 'payload'
 
-import { hasRole, relId } from '@/access/roles'
+import { hasRoleAny, relId } from '@/access/roles'
 import { resolveScope } from '@/access/scope'
 import { settings, today } from '@/domain/expense/common'
 import { idList, inList, type SQL } from '@/domain/reports/scope'
@@ -21,11 +21,12 @@ import { parseSnapshot, snapshotOf, type ScheduleSnapshot } from './schedule'
  * Attendance data scope (requirements v1.1 §4 "Absensi"): Admin R/U, Owner R all, Finance R (upah)
  * → all; PM → team projects/cost centers; Staff → own only (endpoints /attendance/me).
  */
+// MC2: LEAK POINT — `all` is company-blind (raw SQL `TRUE`); per-company scopes in ADR 0016 §6.
 export type AttScope = { kind: 'all' } | { kind: 'team'; projects: number[]; costCenters: number[] }
 
 export async function attendanceScope(req: PayloadRequest): Promise<AttScope | null> {
-  if (hasRole(req, 'pk-admin', 'pk-owner', 'pk-finance')) return { kind: 'all' }
-  if (hasRole(req, 'pk-pm')) {
+  if (hasRoleAny(req, 'pk-admin', 'pk-owner', 'pk-finance')) return { kind: 'all' }
+  if (hasRoleAny(req, 'pk-pm')) {
     const s = await resolveScope(req)
     return { kind: 'team', projects: s.teamProjects, costCenters: s.teamCostCenters }
   }

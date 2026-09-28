@@ -1,7 +1,7 @@
 import { sql } from '@payloadcms/db-postgres'
 import { APIError, type PayloadRequest, type Where } from 'payload'
 
-import { hasRole, relId, userId, userRoles } from '@/access/roles'
+import { hasRoleAny, relId, userId, userRoles, type Role } from '@/access/roles'
 import { resolveScope } from '@/access/scope'
 import { writeAudit, writeAuditDetached } from '@/audit/writer'
 import { displayName, projectCommitted, resolveSignature, today, type Signature } from '@/domain/expense/common'
@@ -18,6 +18,7 @@ import { getRequestTx } from '@/lib/tx'
 
 import { isTeamPm, mayReadAddenda } from './access'
 import { addendumAllowedActions, addendumInputErrors, ADDENDUM_STATUS_LABELS, newBudget, pctOf, type AddendumAction, type AddendumActorContext, type AddendumStatus } from './rules'
+import { contextCompanyId, membersWithRole } from '@/domain/companies'
 
 /**
  * E5 Addendum RAB (T12, US-18/US-30) — the single write path behind /api/v1/budget-addenda.
@@ -47,6 +48,7 @@ const fail = (status: number, code: string, message: string, field?: string): ne
 }
 
 export type AddendumDoc = {
+  company?: unknown
   id: number
   uuid?: string | null
   docNo?: string | null
@@ -229,17 +231,9 @@ const DEFAULTS: Record<AddendumEvent, { title: string; body: string }> = {
   'addendum.rejected': { title: 'Addendum ditolak: {docNo}', body: 'Addendum RAB {docNo} ({project}) ditolak. Lihat alasan di detail addendum.' },
 }
 
-async function usersWithRole(req: PayloadRequest, role: string): Promise<number[]> {
-  const res = await req.payload.find({
-    collection: 'users',
-    where: { and: [{ roles: { in: [role] } }, { active: { equals: true } }] },
-    depth: 0,
-    pagination: false,
-    select: { email: true },
-    overrideAccess: true, // SYSTEM-READ: notification recipients by role
-    req,
-  })
-  return res.docs.map((d) => d.id as number)
+/** Holders of `role` in the addendum's PT (ADR 0016 §5). */
+async function usersWithRole(req: PayloadRequest, role: string, doc: { company?: unknown }): Promise<number[]> {
+  return membersWithRole(req, role as Role, relId(doc.company) ?? (await contextCompanyId(req)))
 }
 
 async function stepRecipients(req: PayloadRequest, doc: AddendumDoc, kind: 'ack' | 'approval'): Promise<number[]> {
@@ -248,11 +242,11 @@ async function stepRecipients(req: PayloadRequest, doc: AddendumDoc, kind: 'ack'
   let ids: number[] = []
   if (kind === 'ack') {
     if (snap.acknowledgerUserId !== null) ids = [snap.acknowledgerUserId]
-    else if (snap.acknowledgeBy === 'role' && snap.acknowledgeRole) ids = await usersWithRole(req, snap.acknowledgeRole)
+    else if (snap.acknowledgeBy === 'role' && snap.acknowledgeRole) ids = await usersWithRole(req, snap.acknowledgeRole, doc)
   } else {
     const step = snap.steps.find((s) => s.level === (doc.currentLevel ?? 1))
     if (step?.approverUserId) ids = [step.approverUserId]
-    else if (step?.approverRole) ids = await usersWithRole(req, step.approverRole)
+    else if (step?.approverRole) ids = await usersWithRole(req, step.approverRole, doc)
   }
   const creator = relId(doc.createdBy)
   return ids.filter((x) => x !== creator) // G1: the creator never decides
@@ -275,6 +269,7 @@ async function notify(req: PayloadRequest, doc: AddendumDoc, event: AddendumEven
         docType: 'budget_addendum',
         docId: String(doc.id),
         docNo: doc.docNo ?? null,
+        company: relId(doc.company) ?? null, // ADR 0016 §4
         pushStatus: pushEnabled() ? 'pending' : 'skipped',
       } as never,
       depth: 0,
@@ -360,7 +355,8 @@ export async function submitAddendum(req: PayloadRequest, id: number): Promise<A
   const project = await loadProject(req, projectId)
   checkInput(doc)
   checkProjectOpen(project)
-  const rule = selectRule(await loadActiveRules(req, 'budget_addendum'), {
+  const companyId = relId((doc as { company?: unknown }).company) ?? (await contextCompanyId(req))
+  const rule = selectRule(await loadActiveRules(req, 'budget_addendum', companyId), {
     docType: 'budget_addendum',
     type: null,
     grandTotal: doc.addition,
@@ -369,9 +365,9 @@ export async function submitAddendum(req: PayloadRequest, id: number): Promise<A
     costCenterId: null,
   })
   if (!rule) fail(409, 'NO_RULE', 'Tidak ada aturan approval addendum RAB yang berlaku (approval-rules docType budget_addendum). Hubungi Admin.')
-  const snapshot = await snapshotForRule(req, rule!, new Set([relId(doc.createdBy)!]))
+  const snapshot = await snapshotForRule(req, rule!, new Set([relId(doc.createdBy)!]), companyId)
   const date = await today(req)
-  const docNo = doc.docNo ?? (await allocateDocNo(req, 'budget_addendum', { date: parseBusinessDate(date), docId: String(id) })).docNo
+  const docNo = doc.docNo ?? (await allocateDocNo(req, 'budget_addendum', { companyId, date: parseBusinessDate(date), docId: String(id) })).docNo
   const needsAck = snapshot.acknowledge === 'required'
   const updated = await updateAddendum(req, id, {
     status: needsAck ? 'pending_ack' : 'pending_approval',
@@ -481,7 +477,7 @@ async function finalize(req: PayloadRequest, doc: AddendumDoc, project: ProjectR
     delete req.context.auditReason
   }
   const creator = relId(doc.createdBy)
-  const finance = await usersWithRole(req, 'pk-finance')
+  const finance = await usersWithRole(req, 'pk-finance', doc)
   await notify(req, approved, 'addendum.approved', [...(creator ? [creator] : []), ...finance], fresh)
   return approved
 }
@@ -643,7 +639,7 @@ export async function listAddenda(req: PayloadRequest, f: AddendumFilter): Promi
 
 /** Addenda waiting for the CALLER's decision (Direktur "Diketahui" / Finance level), oldest first. */
 export async function addendumInbox(req: PayloadRequest) {
-  if (!hasRole(req, 'pk-owner', 'pk-finance')) return { items: [] as Array<AddendumSummary & { step: 'acknowledge' | 'approve'; budget: { current: number; afterAddition: number; committedPctBefore: number | null; committedPctAfter: number | null } }> }
+  if (!hasRoleAny(req, 'pk-owner', 'pk-finance')) return { items: [] as Array<AddendumSummary & { step: 'acknowledge' | 'approve'; budget: { current: number; afterAddition: number; committedPctBefore: number | null; committedPctAfter: number | null } }> }
   const res = await req.payload.find({
     collection: 'budget-addenda',
     where: { status: { in: ['pending_ack', 'pending_approval'] } },
@@ -670,7 +666,7 @@ export async function addendumInbox(req: PayloadRequest) {
 
 /** Team projects of the caller (PM) that can receive an addendum — web form options. */
 export async function addendumProjectOptions(req: PayloadRequest): Promise<Array<{ id: number; code: string; name: string; budget: number | null }>> {
-  if (!hasRole(req, 'pk-pm')) return []
+  if (!hasRoleAny(req, 'pk-pm')) return []
   const res = await req.payload.find({
     collection: 'projects',
     where: { status: { not_equals: 'arsip' } },

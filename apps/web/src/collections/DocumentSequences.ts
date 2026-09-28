@@ -6,6 +6,7 @@ import { reasonOnAnyUpdate, withAudit } from '@/audit/hooks'
 import { DOC_TYPES, patternError, type ResetPolicy } from '@/domain/numbering'
 import { activeField } from '@/fields/common'
 import { DEFAULT_TZ, isValidTimeZone } from '@/lib/time'
+import { companyField, companyHook } from '@/fields/company'
 
 /**
  * Penomoran dokumen (ADR 0007): one active sequence per document type. Counter state lives in
@@ -24,13 +25,15 @@ export const DocumentSequences: CollectionConfig = withAudit(
       update: byRole({ 'pk-admin': true }),
       delete: denyAll,
     },
+    hooks: { beforeChange: [companyHook('document-sequences')] },
     fields: [
+      companyField(),
       {
         name: 'docType',
         type: 'select',
         label: 'Jenis dokumen',
         required: true,
-        unique: true,
+        index: true, // unique per (company_id, doc_type) — raw index, ADR 0016 §4
         options: DOC_TYPES.map((d) => ({ label: d, value: d })),
         access: { update: () => false },
       },

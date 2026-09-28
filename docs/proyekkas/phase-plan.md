@@ -224,6 +224,12 @@
   **isolation test suite** (every per-PT collection + every `/api/v1` route with ids, 404 across PTs).
   **Gate:** isolation suite green; existing suites green on a two-PT fixture; migration up/down on a staging copy
   with row counts and balances equal before/after (US-MC-19).
+  > **Status 2026-09-28 (branch `feat/mc1-foundation`): MC1 implemented** — progress log `mc/mc1-progress.md`.
+  > MC1-1…MC1-6 done: companies, memberships, app-wide global, `groupAdmin`, `pk-user` login (legacy transition),
+  > `company_id NOT NULL` + per-PT uniques on 30 tables, per-PT access (`byRole`, scope, decision guards), cross-PT
+  > triggers, per-PT lock date and numbering, isolation suite `mc-isolation.int.test.ts`; migrations verified on a
+  > develop-head copy (counts/sums identical, down/up). **Infra request open:** realm role `pk-user` in `drms` /
+  > `drms-staging` assigned to every ProyekKas user (T-MC1-kc). Deviations: ADR 0016 "Implementation notes (MC1)".
 - **MC2 — Domain, reports, admin UI:** approval holders/notifications/queues per PT (ADR 0013 revision), jobs per PT,
   `ReportScope` per company + company predicates in all raw SQL, consolidated dashboards/reports/exports with PT
   breakdown + totals, letterheads per PT / group, admin: company master, role matrix, employee ↔ PT mapping, PT

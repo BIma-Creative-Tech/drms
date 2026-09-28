@@ -4,10 +4,10 @@ import type { NextRequest } from 'next/server'
 import * as client from 'openid-client'
 import { getPayload } from 'payload'
 
-import { isRole } from '@/access/roles'
 import { oidcTxCookieName, readCookie, serializeCookie, sessionCookieName } from '@/auth/cookies'
 import { getWebOidcConfig, openTx } from '@/auth/oidc'
 import { auditLoginFailed, createWebSession } from '@/auth/sessions'
+import { tokenAllowsLogin } from '@/auth/strategies'
 import { getEnv } from '@/lib/env'
 
 export const dynamic = 'force-dynamic'
@@ -34,7 +34,6 @@ export async function GET(request: NextRequest): Promise<Response> {
     const idClaims = tokens.claims()
     if (!idClaims?.sub) return fail(400, 'Login gagal.')
     const access = decodeJwt(tokens.access_token) as { realm_access?: { roles?: string[] } }
-    const tokenRoles = (access.realm_access?.roles ?? []).filter(isRole).sort()
     const found = await payload.find({
       collection: 'users',
       where: { and: [{ keycloakSub: { equals: idClaims.sub } }, { active: { equals: true } }] },
@@ -49,18 +48,14 @@ export async function GET(request: NextRequest): Promise<Response> {
       await auditLoginFailed(payload, request.headers, { reason: 'unknown_or_inactive_user', keycloakSub: idClaims.sub })
       return fail(403, 'Akun belum terdaftar atau tidak aktif di ProyekKas.')
     }
-    if (JSON.stringify([...(user.roles ?? [])].sort()) !== JSON.stringify(tokenRoles)) {
-      // Keycloak realm roles are the source of truth (ADR 0003 §2) → refresh the mirror; audited as role_sync.
-      await payload.update({
-        collection: 'users',
-        id: user.id,
-        data: { roles: tokenRoles },
-        depth: 0,
-        overrideAccess: true, // SYSTEM-WRITE: login-time role sync (no Keycloak write-back)
-        context: { roleSync: true },
-      })
+    // ADR 0016 §2: the token proves identity + `pk-user` (MC1 transition: or a legacy pk-* role);
+    // per-PT roles are DB-only (company-memberships) — no role sync from the token any more.
+    if (!tokenAllowsLogin(access.realm_access?.roles)) {
+      payload.logger.warn({ msg: 'login denied: no pk-user realm role' })
+      await auditLoginFailed(payload, request.headers, { reason: 'no_login_role', userId: user.id, keycloakSub: idClaims.sub })
+      return fail(403, 'Akun belum diberi akses ProyekKas.')
     }
-    const session = await createWebSession(payload, { id: user.id, roles: tokenRoles }, {
+    const session = await createWebSession(payload, { id: user.id }, {
       keycloakSid: typeof idClaims.sid === 'string' ? idClaims.sid : undefined,
       idToken: tokens.id_token,
       ip: request.headers.get('x-forwarded-for')?.split(',')[0]?.trim(),

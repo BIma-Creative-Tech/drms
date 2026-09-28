@@ -230,7 +230,7 @@ export async function createReport(req: PayloadRequest, input: ReportInput, timi
 
   const t: ReportTiming = timing ?? { time: new Date(), timeTrust: 'server', offline: false }
   const reportDate = localDate(t.time, await companyTz(req))
-  const { docNo } = await allocateDocNo(req, 'progress_report', { date: parseBusinessDate(reportDate) })
+  const { docNo } = await allocateDocNo(req, 'progress_report', { companyId: relId((projectRow as { company?: unknown }).company)!, date: parseBusinessDate(reportDate) })
   const receivedAt = new Date()
   const meta = requestMeta(req)
   const doc = (await req.payload.create({

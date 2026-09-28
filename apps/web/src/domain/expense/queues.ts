@@ -8,6 +8,8 @@ import { budgetImpact } from './rules'
 import { allowedActions } from './state'
 import { REQUEST_TYPE_LABELS, statusLabel, TRANSFER_QUEUE_WHERE } from './types'
 
+// MC2: queue items carry no PT label yet; settings (budget warn %) of the context PT (ADR 0016 §5).
+
 export { TRANSFER_QUEUE_WHERE }
 
 /**

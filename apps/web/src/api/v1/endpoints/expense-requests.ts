@@ -1,6 +1,6 @@
 import type { PayloadRequest, Where } from 'payload'
 
-import { hasRole, userId } from '@/access/roles'
+import { hasRoleAny, userId } from '@/access/roles'
 import { resolveScope } from '@/access/scope'
 import { writeAudit } from '@/audit/writer'
 import { actorContext, displayName, loadVisible, type RequestDoc } from '@/domain/expense/common'
@@ -75,7 +75,7 @@ export const listRequestsEndpoint = v1({
       if (s.employeeId !== null) own.push({ requesters: { in: [s.employeeId] } })
       and.push({ or: own })
     }
-    if (scope === 'team' && hasRole(req, 'pk-pm') && !hasRole(req, 'pk-finance', 'pk-owner', 'pk-admin')) {
+    if (scope === 'team' && hasRoleAny(req, 'pk-pm') && !hasRoleAny(req, 'pk-finance', 'pk-owner', 'pk-admin')) {
       const team: Where[] = []
       if (s.teamProjects.length) team.push({ project: { in: s.teamProjects } })
       if (s.teamCostCenters.length) team.push({ costCenter: { in: s.teamCostCenters } })
@@ -437,7 +437,7 @@ export const pdfEndpoint = v1({
     const q = PdfQuery.safeParse(Object.fromEntries(req.searchParams.entries()))
     if (!q.success) throw new HttpError(400, 'Bad Request', { detail: 'variant harus standard atau internal.' })
     const internal = q.data.variant === 'internal'
-    if (internal && !hasRole(req, 'pk-finance', 'pk-owner', 'pk-admin')) throw new HttpError(403, 'Forbidden', { detail: 'Salinan internal hanya untuk Finance/Direktur/Admin.' })
+    if (internal && !hasRoleAny(req, 'pk-finance', 'pk-owner', 'pk-admin')) throw new HttpError(403, 'Forbidden', { detail: 'Salinan internal hanya untuk Finance/Direktur/Admin.' })
     const { buildPdfData } = await import('@/pdf/data')
     const data = await withReqTransaction(req, async () => {
       const doc = await loadVisible(req, id)

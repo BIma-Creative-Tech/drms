@@ -1,7 +1,7 @@
 import { sql } from '@payloadcms/db-postgres'
 import type { PayloadRequest } from 'payload'
 
-import { hasRole, userId } from '@/access/roles'
+import { hasRoleAny, userId } from '@/access/roles'
 import { resolveScope } from '@/access/scope'
 
 /** drizzle SQL fragment (the type is not re-exported by @payloadcms/db-postgres 3.90.1). */
@@ -22,10 +22,15 @@ export type ReportScope =
   | { kind: 'own'; userId: number; employeeId: number | null }
   | { kind: 'none' }
 
-/** Office scope of the caller: Finance/Owner → all, else PM → team, else none. */
+/**
+ * Office scope of the caller: Finance/Owner → all, else PM → team, else none.
+ * MC2: LEAK POINT once a 2nd PT exists — `all` is company-blind (`TRUE` in every *ScopeSql below) and
+ * the role check is "any selected PT"; ADR 0016 §6 replaces ReportScope by a list of per-company scopes
+ * (`x.company_id = $c AND …`, empty = FALSE). With one PT (MC1) the result is identical.
+ */
 export async function officeScope(req: PayloadRequest): Promise<ReportScope> {
-  if (hasRole(req, 'pk-finance', 'pk-owner')) return { kind: 'all' }
-  if (hasRole(req, 'pk-pm')) {
+  if (hasRoleAny(req, 'pk-finance', 'pk-owner')) return { kind: 'all' }
+  if (hasRoleAny(req, 'pk-pm')) {
     const s = await resolveScope(req)
     return { kind: 'team', projects: s.teamProjects, costCenters: s.teamCostCenters }
   }
@@ -37,7 +42,7 @@ export async function officeScope(req: PayloadRequest): Promise<ReportScope> {
  * → all, PM → team. Admin sees attendance only — never the finance reports (officeScope → none).
  */
 export async function attendanceOfficeScope(req: PayloadRequest): Promise<ReportScope> {
-  if (hasRole(req, 'pk-admin')) return { kind: 'all' }
+  if (hasRoleAny(req, 'pk-admin')) return { kind: 'all' }
   return officeScope(req)
 }
 

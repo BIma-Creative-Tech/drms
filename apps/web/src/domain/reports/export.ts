@@ -14,6 +14,7 @@ import { reportContext } from './kpi'
 import { describeFilters, type Cell, type ColType, type Format, type ReportDef, type ReportResult, type Table } from './registry'
 import { formatPct } from './rules'
 import type { ReportScope } from './scope'
+import { settings as companySettings } from '@/domain/companies'
 
 /**
  * Report exports (F3 export-library-decision §4, Q-F3-3/Q-F3-5):
@@ -193,7 +194,8 @@ export async function xlsxBuffer(p: PreparedExport): Promise<Buffer> {
 
 export async function pdfBuffer(req: PayloadRequest, p: PreparedExport): Promise<Buffer> {
   const ctx = await reportContext(req)
-  const settings = await req.payload.findGlobal({ slug: 'company-settings', depth: 0, overrideAccess: true /* SYSTEM-READ: PDF header */, req })
+  // MC2: > 1 PT in the export → group letterhead (groupName/groupLogo/groupPdfHeader, ADR 0016 §6).
+  const settings = await companySettings(req)
   const kop = [ctx.companyName, ...(settings.pdfHeader ?? '').split('\n'), settings.address ?? '', settings.phone ? `Telp. ${settings.phone}` : '']
     .map((l) => l.trim())
     .filter(Boolean)

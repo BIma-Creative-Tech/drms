@@ -4,6 +4,7 @@ import { withEffectiveRadius } from '@/domain/attendance/calendar'
 
 import { MASTER_TYPES, MastersQuery, type MasterType } from '../schemas'
 import { HttpError, json, problem, v1 } from '../http'
+import { settings } from '@/domain/companies'
 
 const LIMIT = 500
 
@@ -47,7 +48,8 @@ async function loadType(req: PayloadRequest, type: MasterType, since?: string) {
     })
     let items = res.docs.map((d) => pick(d as unknown as Record<string, unknown>, fields))
     if (type === 'projects' || type === 'cost-centers') {
-      const s = (await req.payload.findGlobal({ slug: 'company-settings', depth: 0, overrideAccess: true /* SYSTEM-READ: default geofence radius */, req })) as { defaultGeofenceRadiusM?: number | null }
+      // MC3: default radius of each item's PT (masters per selected PT)
+      const s = await settings(req)
       items = items.map((i) => withEffectiveRadius(i, s.defaultGeofenceRadiusM))
     }
     return { items, hasMore: res.hasNextPage }

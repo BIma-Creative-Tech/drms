@@ -8,7 +8,7 @@ import { withSystemTransaction } from '@/lib/system-tx'
 import config from '@/payload.config'
 import { seed } from '@/seed/seed'
 
-import { getTestPayload, installFakeKeycloak, webSessionCookie, type TestUser } from './helpers'
+import { addMembership, companyId, getTestPayload, installFakeKeycloak, webSessionCookie, withContext, type TestUser } from './helpers'
 
 /**
  * Isolated F2a test world per test file (all files share one DB): own employees, users (each with
@@ -53,17 +53,20 @@ export async function uploadMedia(collection: CollectionSlug, user: FlowUser, by
   return doc.id as number
 }
 
-export async function makeFlowUser(roles: Role[], label: string, employee: number | null, opts: { signature?: boolean } = {}): Promise<FlowUser> {
+export async function makeFlowUser(roles: Role[], label: string, employee: number | null, opts: { signature?: boolean; company?: number; groupAdmin?: boolean } = {}): Promise<FlowUser> {
   const p = await getTestPayload()
   const email = `${label}-${randomUUID().slice(0, 8)}@drms.test`.toLowerCase()
+  const groupAdmin = opts.groupAdmin ?? roles.includes('pk-admin')
   const doc = (await p.create({
     collection: 'users',
-    data: { email, name: label, keycloakSub: randomUUID(), roles, active: true, employee },
+    data: { email, name: label, keycloakSub: randomUUID(), active: true, groupAdmin },
     depth: 0,
     overrideAccess: true, // SYSTEM-WRITE: test fixture (bootstrap path)
     context: { skipKeycloakSync: true },
   })) as unknown as { id: number }
-  const base = { id: doc.id, email, keycloakSub: '', roles, employee, collection: 'users' as const }
+  // ADR 0016: roles + employee = membership of company #1 DRMS (default)
+  await addMembership(doc.id, opts.company ?? (await companyId()), roles, employee)
+  const base = await withContext({ id: doc.id, email, keycloakSub: '', groupAdmin, collection: 'users' as const })
   const u = { ...base, cookie: '', _strategy: 'oidcSession' as const } as FlowUser
   u.cookie = await webSessionCookie(u)
   if (opts.signature !== false) {
@@ -80,8 +83,11 @@ export async function makeWorld(tag: string) {
   installFakeKeycloak()
   await seed(p) // masters, sequences, default approval rules (idempotent)
   const code = (c: string) => `${tag}-${c}`
+  // ADR 0016: masters are per PT (codes repeat across PTs) — the world lives in company #1 DRMS
+  const drms = await companyId()
+  const shared = new Set<CollectionSlug>(['banks', 'uoms'])
   const ids = async (collection: CollectionSlug, field: string, value: string) =>
-    ((await p.find({ collection, where: { [field]: { equals: value } }, limit: 1, depth: 0, overrideAccess: true /* SYSTEM-READ: fixture */ })).docs[0]?.id as number)
+    ((await p.find({ collection, where: shared.has(collection) ? { [field]: { equals: value } } : { and: [{ company: { equals: drms } }, { [field]: { equals: value } }] }, limit: 1, depth: 0, overrideAccess: true /* SYSTEM-READ: fixture */ })).docs[0]?.id as number)
 
   const emp = {
     a: await sysCreate('employees', { code: code('A'), name: `${tag} Staff A` }),

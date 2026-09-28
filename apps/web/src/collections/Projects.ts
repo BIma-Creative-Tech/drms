@@ -6,6 +6,7 @@ import { inIds } from '@/access/scope'
 import { reasonOnChange, withAudit } from '@/audit/hooks'
 import { progressWriteGuard } from '@/domain/progress/guards'
 import { codeField, odooRefField, percentField, rupiahField, uuidField } from '@/fields/common'
+import { companyField, companyHook } from '@/fields/company'
 
 export const PROJECT_STATUSES = [
   { label: 'Perencanaan', value: 'perencanaan' },
@@ -44,9 +45,10 @@ export const Projects: CollectionConfig = withAudit(
       }),
       delete: denyAll,
     },
-    hooks: { beforeOperation: [progressWriteGuard('projects')] },
+    hooks: { beforeChange: [companyHook('projects', { check: [{ field: 'client', collection: 'clients' }, { field: 'pm', collection: 'users', member: true }] })], beforeOperation: [progressWriteGuard('projects')] },
     fields: [
-      { ...codeField(), access: { update: ownerOnly } },
+      companyField(),
+      { ...codeField('Kode', 32, { perCompany: true }), access: { update: ownerOnly } },
       { name: 'name', type: 'text', label: 'Nama project', required: true, maxLength: 160 },
       { name: 'client', type: 'relationship', relationTo: 'clients', label: 'Klien', access: { update: ownerOnly } },
       { name: 'address', type: 'textarea', label: 'Alamat', maxLength: 500 },

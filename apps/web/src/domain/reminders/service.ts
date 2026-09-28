@@ -12,6 +12,7 @@ import { DEFAULT_TZ } from '@/lib/time'
 import { getRequestTx } from '@/lib/tx'
 
 import { companyClock, crossedThresholds, DEFAULT_TEXTS, fill, REMINDER_EVENTS, reminderSettingsOf, runDecision, type ReminderRule, type ReminderSettings } from './rules'
+import { settingsOf } from '@/domain/companies'
 
 /**
  * E7 — daily scheduled reminders (M12, US-11; plan fase1-golive §E7). Job `dailyReminders` fires
@@ -57,8 +58,15 @@ async function activeOnly(req: PayloadRequest, userIds: Iterable<number>): Promi
   return r.map((x) => Number(x.id))
 }
 
+// MC2: role holders of the SUBJECT's PT only (ADR 0016 §5/§7) — today: holders in any PT (leaks
+// reminders across PTs once a 2nd PT exists).
 async function roleHolders(req: PayloadRequest, role: string): Promise<number[]> {
-  const r = await q<{ id: number }>(req, sql`SELECT DISTINCT u.id FROM users u JOIN users_roles ur ON ur.parent_id = u.id WHERE ur.value::text = ${role} AND coalesce(u.active, true) ORDER BY u.id`)
+  const r = await q<{ id: number }>(
+    req,
+    sql`SELECT DISTINCT u.id FROM users u JOIN company_memberships m ON m.user_id = u.id AND coalesce(m.active, true)
+          JOIN company_memberships_roles mr ON mr.parent_id = m.id
+         WHERE mr.value::text = ${role} AND coalesce(u.active, true) ORDER BY u.id`,
+  )
   return r.map((x) => Number(x.id))
 }
 
@@ -68,7 +76,7 @@ async function requestPeople(req: PayloadRequest, requestId: number): Promise<nu
     req,
     sql`SELECT er.created_by_id AS id FROM expense_requests er WHERE er.id = ${requestId} AND er.created_by_id IS NOT NULL
         UNION
-        SELECT u.id FROM expense_requests_rels rr JOIN users u ON u.employee_id = rr.employees_id
+        SELECT m.user_id FROM expense_requests_rels rr JOIN company_memberships m ON m.employee_id = rr.employees_id
          WHERE rr.parent_id = ${requestId} AND rr.path = 'requesters'`,
   )
   return r.map((x) => Number(x.id))
@@ -249,7 +257,8 @@ async function budgetThreshold(run: Run) {
 // ---------------------------------------------------------------- run
 
 export async function reminderSettings(payload: Payload, req?: PayloadRequest): Promise<ReminderSettings> {
-  const s = (await payload.findGlobal({ slug: 'company-settings', depth: 0, overrideAccess: true /* SYSTEM-READ: reminder settings (job) */, req })) as unknown as Record<string, unknown>
+  // MC2: one run per active PT with that PT's settings (ADR 0016 §7); MC1 = company #1.
+  const s = (await settingsOf(payload, null, req)) as unknown as Record<string, unknown>
   return reminderSettingsOf(s, process.env.TZ || DEFAULT_TZ)
 }
 
@@ -270,7 +279,9 @@ export async function runDailyReminders(payload: Payload, opts: { now?: Date; fo
     async (req) => {
       const tx = await getRequestTx(req)
       await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended('pk:daily-reminders', 0))`)
-      const ran = await q(req, sql`SELECT 1 FROM reminder_runs WHERE run_date = ${date}`)
+      // ADR 0016 §7: one run per PT and day — MC1 runs company #1 only (MC2: loop over active PTs)
+      const cid = s.companyId
+      const ran = await q(req, sql`SELECT 1 FROM reminder_runs WHERE company_id = ${cid} AND run_date = ${date}`)
       const decision = opts.force ? 'run' : runDecision(s, hour, ran.length > 0)
       if (decision !== 'run') return { ...base, status: decision }
       const run = new Run(req, s, date)
@@ -280,8 +291,8 @@ export async function runDailyReminders(payload: Payload, opts: { now?: Date; fo
       if (s.budget.enabled) await budgetThreshold(run)
       const result: ReminderRunResult = { ...base, rules: run.rules, emails: run.emails }
       await tx.execute(
-        sql`INSERT INTO reminder_runs (run_date, summary) VALUES (${date}, ${JSON.stringify({ rules: run.rules, emails: run.emails })}::jsonb)
-            ON CONFLICT (run_date) DO UPDATE SET summary = EXCLUDED.summary, finished_at = clock_timestamp()`,
+        sql`INSERT INTO reminder_runs (company_id, run_date, summary) VALUES (${cid}, ${date}, ${JSON.stringify({ rules: run.rules, emails: run.emails })}::jsonb)
+            ON CONFLICT (company_id, run_date) DO UPDATE SET summary = EXCLUDED.summary, finished_at = clock_timestamp()`,
       )
       return result
     },

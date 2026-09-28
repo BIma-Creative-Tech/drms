@@ -1,6 +1,6 @@
 import type { Access, PayloadRequest, Where } from 'payload'
 
-import { hasRole, relId, userId } from '@/access/roles'
+import { companiesWithRole, relId, userId } from '@/access/roles'
 import { anyOf, byRole, type Rule } from '@/access/policies'
 import { inIds } from '@/access/scope'
 import { writeAuditDetached } from '@/audit/writer'
@@ -79,12 +79,19 @@ export async function visibleRequestIds(req: PayloadRequest): Promise<number[]> 
   return ids
 }
 
-/** Satellite read access: office roles all, everyone else only rows of visible requests. */
+/**
+ * Satellite read access (ADR 0016 §5): office roles see every row OF THE PTs where they hold the
+ * role (satellites carry `company`, derived from the request); everyone else only rows of visible
+ * requests.
+ */
 export function byVisibleRequest(field = 'request'): Access {
   return async ({ req }) => {
     if (!req.user) return false
-    if (hasRole(req, 'pk-finance', 'pk-owner', 'pk-admin')) return true
-    return inIds(field, await visibleRequestIds(req))
+    const office = companiesWithRole(req, ['pk-finance', 'pk-owner', 'pk-admin'])
+    const own = inIds(field, await visibleRequestIds(req))
+    const all: Where | false = office.length > 0 ? { company: { in: office } } : false
+    const or = [all, own].filter((w): w is Where => w !== false)
+    return or.length === 0 ? false : or.length === 1 ? (or[0] as Where) : { or }
   }
 }
 

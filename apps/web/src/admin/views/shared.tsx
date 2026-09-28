@@ -3,7 +3,7 @@ import { Gutter } from '@payloadcms/ui'
 import type { AdminViewServerProps, PayloadRequest } from 'payload'
 import React from 'react'
 
-import { hasRole, type Role } from '@/access/roles'
+import { hasRoleAny, type Role } from '@/access/roles'
 import { formatRupiah } from '@/lib/money'
 
 export { TableScroll } from '../components/TableScroll'
@@ -45,7 +45,7 @@ export function Forbidden({ props, title, roles }: { props: AdminViewServerProps
 }
 
 export function allowed(req: PayloadRequest, roles: Role[]): boolean {
-  return hasRole(req, ...roles)
+  return hasRoleAny(req, ...roles)
 }
 
 export const table: React.CSSProperties = { width: '100%', borderCollapse: 'collapse', fontSize: 13 }

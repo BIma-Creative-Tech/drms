@@ -1,12 +1,14 @@
 import { sql } from '@payloadcms/db-postgres'
 import type { PayloadRequest } from 'payload'
 
-import { hasRole, relId, userId } from '@/access/roles'
+import { hasRoleAny, relId, userId } from '@/access/roles'
 import { attendanceMonth } from '@/domain/reports/attendance-report'
 import { idList } from '@/domain/reports/scope'
 import { getRequestTx } from '@/lib/tx'
 
 import { attendanceContext, attendanceScope, teamMembers, type AttScope } from './queries'
+
+// MC2: LEAK POINT — attendance web SQL uses the company-blind AttScope `all`.
 
 /**
  * E6 web (S2) — read helpers of the admin views (/admin/absensi…). Same scope rules as the
@@ -82,7 +84,7 @@ export function mayCorrect(req: PayloadRequest, scope: AttScope | null, employee
   if (!scope) return false
   const own = relId((req.user as { employee?: unknown } | null)?.employee)
   if (own === employeeId) return false
-  return hasRole(req, 'pk-admin') || (hasRole(req, 'pk-pm') && scope.kind === 'team')
+  return hasRoleAny(req, 'pk-admin') || (hasRoleAny(req, 'pk-pm') && scope.kind === 'team')
 }
 
 /** Team month grid (all members of the scope/filters), same aggregation as the M13 report. */

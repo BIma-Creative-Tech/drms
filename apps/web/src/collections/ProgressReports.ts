@@ -5,6 +5,7 @@ import { anyOf, byRole, ownUser, teamProjects } from '@/access/policies'
 import { withAudit } from '@/audit/hooks'
 import { businessDateField, ro } from './fields-f2'
 import { uuidField } from '@/fields/common'
+import { companyField, companyHook } from '@/fields/company'
 
 /** Read-only JSON without Monaco (CSP, config-guards.test.ts). */
 const jsonView = { readOnly: true, components: { Field: '@/components/ReadOnlyJson#ReadOnlyJson' } }
@@ -41,8 +42,10 @@ export const ProgressReports: CollectionConfig = withAudit(
       update: denyAll,
       delete: denyAll,
     },
+    hooks: { beforeChange: [companyHook('progress-reports', { derive: [{ field: 'project', collection: 'projects' }], check: [{ field: 'stage', collection: 'project-stages' }] })] },
     fields: [
-      { name: 'docNo', type: 'text', label: 'No. laporan', unique: true, index: true, admin: ro },
+      companyField({ derived: true }),
+      { name: 'docNo', type: 'text', label: 'No. laporan', index: true, admin: ro },
       { name: 'project', type: 'relationship', relationTo: 'projects', label: 'Project', required: true, index: true, admin: ro },
       { name: 'stage', type: 'relationship', relationTo: 'project-stages', label: 'Tahapan', required: true, index: true, admin: ro },
       businessDateField('reportDate', 'Tanggal laporan', { required: true, index: true, admin: ro }),

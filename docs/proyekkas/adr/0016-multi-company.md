@@ -1,7 +1,8 @@
 # ADR 0016 — Multi-company: several PTs in one ProyekKas deployment, per-PT roles, full consolidation
 
 - **Status:** proposed — design approved by the user 2026-09-27; final acceptance at the **MC0 gate** (client answers
-  Q-51…Q-61, `../open-questions-client.md` §L)
+  Q-51…Q-61, `../open-questions-client.md` §L). **MC1 implemented** on branch `feat/mc1-foundation` (2026-09-28) with
+  the deviations listed in "Implementation notes (MC1)" below.
 - **Date:** 2026-09-27
 - **Author:** Analyst (phase MC0, branch `docs/mc0-multi-company`, based on `develop` `74cf7f2`)
 - **Related:** ADR 0003 (auth, roles), 0005 (cash ledger, period closing), 0006 (audit, DB roles), 0007 (numbering),
@@ -309,8 +310,27 @@ separation) — forward fixes only.
 - `groupAdmin` flag (§2) and `vehicles.plate_no` staying global (§4) are Analyst additions — confirm at the MC0 gate.
 - Per-PT timezone beyond WITA (§9) only if Q-59 requires it.
 
+## Implementation notes (MC1, 2026-09-28)
+
+Implemented as designed (companies, memberships, `groupAdmin`, `company_id NOT NULL` on the 30 per-PT tables with
+backfill to company #1, per-PT uniques, counters `(company_id, doc_type, period_key)`, `pk_cash_lock_date(company_id)`,
+cross-PT triggers, per-PT `byRole` / `resolveScope`, decision guards on the document PT, `pk-user` login). Deviations:
+
+| # | Design | Implementation | Reason |
+|---|---|---|---|
+| 1 | Cookie `__Host-pk-companies` | `pk-company-ids` (`__Host-pk-company-ids` on https, same pattern as the session cookie) | name fixed by the MC1 task; the switcher that sets it is MC2 |
+| 2 | Header naming a foreign PT → 403 everywhere | `/api/v1` → 403 `COMPANY_NOT_ALLOWED` + `access_denied` audit; generic `/api/<slug>` uses the intersection (foreign ids ignored, empty = no rows) | auth strategies cannot answer 403 for Payload's own REST; the result never contains foreign rows |
+| 3 | Token must carry `pk-user` | MC1 transition: `pk-user` **or** any legacy `pk-*` realm role is the login marker (never a permission); user create assigns `pk-user`, falls back to `pk-staff` while the realm lacks `pk-user` (Keycloak 422) | the realm change is an infra request (see phase plan); logins must keep working until it is applied |
+| 4 | `company` required on per-PT masters | Payload field not `required` (DB `NOT NULL`); `companyHook` fills it (caller's only selected PT, or the only active PT for a system write, else 400 "PT wajib dipilih") | typed Local API calls (seed, import, fixtures) stay valid; same guarantee |
+| 5 | Composite uniques as Payload indexes | raw SQL unique indexes `<table>_company_<col>_key` (migration `*_mc1_company_columns`) | Payload names compound indexes by column list only (`company_code_idx` collides across tables) |
+| 6 | `users.roles` removed | removed as a column; `req.user.roles` / `req.user.employee` remain as DERIVED per-request values (union over the selected PTs) for UI hints and the MC2 transition; legacy checks renamed `hasRoleAny` | 60+ call sites (admin views, list endpoints) move to per-PT checks in MC2; no second source of truth |
+| 7 | Rows without PT (audit) → Admin/group admin only | office roles in any PT (as before) | domain audit rows are not tagged yet (MC2); keeps single-PT behaviour identical |
+| 8 | Users read by Admin/Direktur of the PT | users with a membership in those PTs **plus accounts without any membership** | onboarding: the Admin creates the account first, then the membership |
+| 9 | Jobs per PT | `reminder_runs` keyed `(company_id, run_date)`; the jobs still run company #1 only (MC2 loop) | MC2 scope |
+
 ## Revision history
 
+- **2026-09-28 (MC1):** implementation notes added (deviations 1–9 above).
 - **2026-09-27 (MC0):** proposed; design approved by the user the same day; Analyst additions: `groupAdmin`,
   global vehicle plate, TZ = process TZ in MC1, `reminder_runs` per company, `period-closings/:period/reopen` needs a
   company parameter.

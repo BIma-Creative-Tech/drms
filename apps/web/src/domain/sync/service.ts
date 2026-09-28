@@ -2,7 +2,7 @@ import { sql } from '@payloadcms/db-postgres'
 import { APIError, ValidationError, type PayloadRequest } from 'payload'
 import type { z } from 'zod'
 
-import { hasRole, relId, userId } from '@/access/roles'
+import { hasRoleAny, relId, userId } from '@/access/roles'
 import {
   SyncAttendancePayload,
   SyncDraftDeletePayload,
@@ -30,6 +30,9 @@ import { AttendanceReject, recordAttendance, userOfEmployee } from '@/domain/att
 import { attendanceTimeOf, employeeOfUser } from './attendance'
 import { judgeTime, type TimeVerdict } from './clock'
 import { applyProgressReport, ProgressSyncReject } from './progress'
+
+// MC2: feature flags come from the context PT; items are not re-checked against the PT of their
+// references (COMPANY_MISMATCH, ADR 0016 §8) — the DB cross-company triggers still reject mixed rows.
 
 /**
  * POST /api/v1/sync/batch — offline queue replay (ADR 0010 "Sync contract").
@@ -418,7 +421,7 @@ async function applyAttendance(c: ItemCtx, verdict: TimeVerdict, receivedAt: Dat
     const ob = p as SyncOnBehalf
     // US-14: "diabsenkan oleh PM" — requirements §4 "Absensi": PM C (atas nama tim). Not an approval
     // (ADR 0013 covers expense decisions only), so the PM keeps this right.
-    if (!hasRole(req, 'pk-pm')) reject('FORBIDDEN', 'Hanya PM yang dapat mengabsenkan anggota tim.')
+    if (!hasRoleAny(req, 'pk-pm')) reject('FORBIDDEN', 'Hanya PM yang dapat mengabsenkan anggota tim.')
     if (own !== undefined && own === ob.employee_id) reject('FORBIDDEN', 'Absensi Anda sendiri dicatat lewat absen masuk/pulang biasa.', 'payload.employee_id')
     const emp = (await req.payload.findByID({ collection: 'employees', id: ob.employee_id, depth: 0, overrideAccess: true /* SYSTEM-READ: target employee of on-behalf */, req, disableErrors: true })) as { active?: boolean | null } | null
     if (!emp) reject('NOT_FOUND', 'Karyawan tidak ditemukan.', 'payload.employee_id')

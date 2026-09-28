@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto'
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
-import { accessToken, auditRows, getTestPayload, installLocalJwks, registerDevice, sqlAs, http } from './helpers'
+import { accessToken, addMembership, auditRows, companyId, getTestPayload, installLocalJwks, registerDevice, sqlAs, http } from './helpers'
 import { api, draftBody, makeWorld, png, upload, type World } from './flow-world'
 
 /**
@@ -361,7 +361,7 @@ describe('draft validation (US-03, US-40, US-44, US-53, G9, G10, Q-09, Q-22)', (
 
   it('a required signature that does not exist blocks the submit (US-43)', async () => {
     const p = await getTestPayload()
-    await p.update({ collection: 'users', id: w.users.nosig.id, data: { employee: w.emp.noAccount }, overrideAccess: true /* SYSTEM-WRITE: fixture */, context: { skipKeycloakSync: true } })
+    await addMembership(w.users.nosig.id, await companyId(), ['pk-staff'], w.emp.noAccount)
     await sqlAs('app', 'UPDATE web_sessions SET revoked_at = NULL WHERE user_id = $1', [w.users.nosig.id])
     await p.create({ collection: 'team-assignments', data: { employee: w.emp.noAccount, project: w.project, roleInProject: 'staff' }, overrideAccess: true /* SYSTEM-WRITE: fixture */ })
     const c = await api('POST', E, w.users.nosig, draftBody(w, { requesterIds: [w.emp.noAccount], bankAccountId: null }))

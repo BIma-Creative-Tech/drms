@@ -6,6 +6,54 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+- **MC1-1 — companies + per-PT memberships** (`apps/web`, branch `feat/mc1-foundation`, ADR 0016 §1–§2):
+  collections `companies` (identity + per-PT operational settings moved from the `company-settings` global; company
+  #1 = DRMS) and `company-memberships` (user × PT: roles, employee link, active; unique (user, PT) and (PT, employee));
+  `users.groupAdmin` (DB-only flag: companies, app-wide settings). Access context per request = active memberships
+  ∩ selection (`X-Company-Ids` header / `pk-company-ids` cookie); `hasRole(req, role, companyId)` requires the PT,
+  legacy "any selected PT" checks are `hasRoleAny` (MC2 review points). Approver pools, recipients, G1 requester
+  accounts and display names resolve through memberships. Migration `20260927_230033_mc1_companies` (backfill:
+  company #1 from the global, one membership per user from its former roles/employee, Admins → group admins;
+  down migration restores the single-company shape).
+
+- **MC1-2/MC1-3 — company column + access per PT** (ADR 0016 §4–§5): `company` on the 30 per-PT collections
+  (masters chosen on create — default = the caller's only PT; transactions derived from their parent by
+  `fields/company.ts` `companyHook` and, for raw inserts, the DB trigger `pk_company_from_parent`), nullable PT tag on
+  `notifications` / `audit-logs`. `byRole` is evaluated PER PT ("see all" = all rows of the PTs where the role is held;
+  scope rules AND-ed with their PT; `resolveScope` per PT), shared masters / per-user rows use `byRoleAny`; creates
+  are re-checked against the role in the resolved PT. Decision guards (approve, acknowledge, transfer, LPJ …) use
+  the caller's roles and employee IN THE DOCUMENT's PT; `X-Company-Ids` naming a foreign PT → 403
+  `COMPANY_NOT_ALLOWED` (audited `access_denied`). Codes/names/document numbers unique per PT. Migration
+  `20260927_234849_mc1_company_columns` (backfill → company #1, NOT NULL, per-PT unique indexes).
+- **MC1-4 — DB guards per PT** (migration `20260928_000100_mc1_security`): `company_id` immutable, cross-PT
+  references rejected by triggers (SQLSTATE 23514 `cross-company reference`: every per-PT FK pair, requester/line
+  child rows, PM / cost-center manager / named approvers need an active membership in the row's PT),
+  `pk_cash_lock_date(company_id)` in the transfer / cash-entry / opening-balance guards (closing PT A never locks
+  PT B), `closePeriod` / `reopenPeriod` per PT, `reminder_runs` keyed `(company_id, run_date)`.
+- **MC1-5 — numbering per PT** (migration `20260928_000200_mc1_numbering`): counters `(company_id, doc_type,
+  period_key)`, `{COMPANY}` = short code of the document's PT, DRMS counters continue (PB 229…), `shortCode`
+  immutable once a PT has numbered documents.
+- **Go-live import / LPJ refund per PT:** the import matches and creates per-PT masters inside its PT (MC1: first
+  active PT; `kode_pt` = MC2); the LPJ refund cash entry uses the "Pengembalian LPJ" source of the request's PT.
+- **MC1-6 — isolation suite** `tests/integration/mc-isolation.int.test.ts` (two PTs, per-PT reads/writes/approvals,
+  forged header/cookie, DB cross-PT guards, per-PT numbering and period lock) + unit tests `mc1-access.test.ts`.
+- **Seed:** `SEED_DATA_FILE` accepts the old single-company shape (→ company #1 DRMS) and a new
+  `{ uoms, banks, companies: [...] }` shape; every PT gets the default sequences and approval rules.
+
+### Changed
+- **`company-settings` global = app-wide only** (APK gate, device image targets, offline max age, selfie batch
+  size, new group letterhead `groupName`/`groupLogo`/`groupPdfHeader`); editable by the group admin only. Per-PT
+  settings (thresholds, reminders, sync flags, default schedule, retention) live on the company record.
+- **Login / Keycloak (ADR 0016 §2):** per-PT roles are DB-only; the web callback no longer syncs realm roles into
+  `users.roles` (removed), the APK bearer no longer intersects token roles; a login needs the realm role `pk-user` —
+  **MC1 transition:** any legacy `pk-*` realm role is accepted as the same login marker until the infra change
+  assigns `pk-user`. User create in the admin assigns only `pk-user` in Keycloak (fallback `pk-staff` marker while
+  the realm lacks `pk-user`); role edits never call Keycloak.
+
+### Removed
+- `users.roles` and `users.employee` (replaced by `company-memberships`).
+
 ## [0.4.2] - 2026-09-28
 
 ### Added

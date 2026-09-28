@@ -1,6 +1,6 @@
 import type { PayloadRequest } from 'payload'
 
-import { relId, ROLE_LABELS, userId } from '@/access/roles'
+import { employeeIn, relId, ROLE_LABELS, userId } from '@/access/roles'
 import { writeAudit } from '@/audit/writer'
 import { allocateDocNo, loadSequence } from '@/domain/numbering-db'
 import { formatDocNo, parseBusinessDate } from '@/domain/numbering'
@@ -167,7 +167,9 @@ export async function submit(req: PayloadRequest, id: number, opts: SubmitOption
 
   // Signatures are checked before anything is written (a missing required one aborts cleanly).
   const firstRequester = ids(doc.requesters)[0]!
-  const callerEmp = relId((req.user as { employee?: unknown } | null)?.employee)
+  // ADR 0016: the caller's employee IN THE REQUEST's PT
+  const companyId = relId((doc as { company?: unknown }).company)!
+  const callerEmp = employeeIn(req, companyId)
   const dibuatSig = await requireSignature(req, creator, snapshot.signDibuat, caller === creator ? opts.signatureMediaId : null)
   const diajukanSig = await requireSignature(req, caller, snapshot.signDiajukan, opts.signatureMediaId)
 
@@ -175,14 +177,14 @@ export async function submit(req: PayloadRequest, id: number, opts: SubmitOption
   let docNo = doc.docNo ?? null
   if (!docNo) {
     if (opts.historical) {
-      const cfg = await loadSequence(req, 'expense_request')
-      const s = await settings(req)
+      const cfg = await loadSequence(req, 'expense_request', companyId)
+      const s = await settings(req, companyId)
       docNo = formatDocNo(cfg, opts.historical.seq, parseBusinessDate(opts.historical.requestDate), s.shortCode || 'DRMS')
       await writeAudit(req, [
         { action: 'number_issued', docType: 'expense_request', docId: String(id), docNo, field: 'docNo', newValue: docNo, reason: 'nomor historis (dokumen kertas), counter tidak berubah' },
       ])
     } else {
-      docNo = (await allocateDocNo(req, 'expense_request', { date: parseBusinessDate(requestDate), docId: String(id) })).docNo
+      docNo = (await allocateDocNo(req, 'expense_request', { companyId, date: parseBusinessDate(requestDate), docId: String(id) })).docNo
     }
   }
 

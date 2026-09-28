@@ -8,6 +8,8 @@ import { inSequence, num, reportContext, rows } from './kpi'
 import { daysBetween } from './rules'
 import type { SQL } from './scope'
 
+// MC2: LEAK POINT — audit-log report / filter options list rows of every PT (company_id filter, MC2-2).
+
 /**
  * K-16 global audit log (requirements §8 "Tampilan log", wireframe §6): read-only view over
  * `audit_logs` for Owner/Admin/Finance (Q-F3-4, user 2026-09-24). Filters: WITA date range
@@ -110,7 +112,8 @@ export async function auditLogPage(req: PayloadRequest, f: AuditFilter, page: { 
           a.user_id, coalesce(e.name, u.name, u.email) AS user_name, a.user_roles, a.action::text AS action, a.doc_type, a.doc_id, a.doc_no,
           a.field, a.line_no, a.old_value, a.new_value, a.status_from, a.status_to, a.reason, a.source::text AS source, a.app_version,
           a.ip, a.device_id, a.request_id
-        FROM audit_logs a LEFT JOIN users u ON u.id = a.user_id LEFT JOIN employees e ON e.id = u.employee_id
+        FROM audit_logs a LEFT JOIN users u ON u.id = a.user_id
+          LEFT JOIN LATERAL (SELECT e1.name FROM company_memberships m JOIN employees e1 ON e1.id = m.employee_id WHERE m.user_id = u.id ORDER BY m.company_id LIMIT 1) e ON true
         WHERE ${where(f, ctx.tz)} ${c ? sql`AND (a.server_time, a.id) < (${c.t}::timestamptz, ${c.id})` : sql``}
         ORDER BY a.server_time DESC, a.id DESC LIMIT ${page.limit + 1}`,
   )
@@ -157,7 +160,7 @@ export async function auditLogCount(req: PayloadRequest, f: AuditFilter): Promis
 /** Filter dropdowns: users that appear in the log, document types in use. */
 export async function auditFilterOptions(req: PayloadRequest) {
   const [users, types] = await inSequence(
-    () => rows(req, sql`SELECT u.id, coalesce(e.name, u.name, u.email) AS name FROM users u LEFT JOIN employees e ON e.id = u.employee_id ORDER BY 2`),
+    () => rows(req, sql`SELECT u.id, coalesce(e.name, u.name, u.email) AS name FROM users u LEFT JOIN LATERAL (SELECT e1.name FROM company_memberships m JOIN employees e1 ON e1.id = m.employee_id WHERE m.user_id = u.id ORDER BY m.company_id LIMIT 1) e ON true ORDER BY 2`),
     () => rows(req, sql`SELECT DISTINCT doc_type FROM audit_logs ORDER BY 1`),
   )
   return {

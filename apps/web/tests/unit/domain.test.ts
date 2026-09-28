@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { byRole } from '@/access/policies'
+import { withCompanyContext } from '@/access/roles'
 import { compareVersions } from '@/api/v1/http'
 import { assertNoRemoteSource } from '@/collections/media/factory'
 import { formatPlate, normalizePlate, PLATE_RE } from '@/domain/plates'
@@ -57,7 +58,8 @@ describe('APK minimum version (426)', () => {
 })
 
 describe('byRole access union (requirements §4)', () => {
-  const req = (roles: string[]) => ({ user: { id: 7, roles }, context: {}, payload: {} }) as never
+  // ADR 0016: roles of the (only) membership in company #1; rules are evaluated per PT
+  const req = (roles: string[]) => ({ user: withCompanyContext({ id: 7 }, [{ company: 1, roles: roles as never, employee: null }], null, false), context: {}, payload: {} }) as never
   it('no role → false; any true rule → true; Where rules are OR-ed', async () => {
     const access = byRole({
       'pk-admin': true,
@@ -66,10 +68,10 @@ describe('byRole access union (requirements §4)', () => {
     })
     expect(await access({ req: req([]) })).toBe(false)
     expect(await access({ req: req(['pk-finance']) })).toBe(false)
-    expect(await access({ req: req(['pk-staff', 'pk-admin']) })).toBe(true)
-    expect(await access({ req: req(['pk-pm']) })).toEqual({ project: { in: [1] } })
+    expect(await access({ req: req(['pk-staff', 'pk-admin']) })).toEqual({ company: { in: [1] } })
+    expect(await access({ req: req(['pk-pm']) })).toEqual({ and: [{ company: { equals: 1 } }, { project: { in: [1] } }] })
     expect(await access({ req: req(['pk-pm', 'pk-staff']) })).toEqual({
-      or: [{ project: { in: [1] } }, { createdBy: { equals: 7 } }],
+      and: [{ company: { equals: 1 } }, { or: [{ project: { in: [1] } }, { createdBy: { equals: 7 } }] }],
     })
   })
   it('ignores unknown role strings (e.g. Keycloak default roles)', async () => {

@@ -8,6 +8,7 @@ import { byVisibleRequest, denyDeleteLogged } from '@/domain/expense/access'
 import { uuidField } from '@/fields/common'
 
 import { businessDateField, ro } from './fields-f2'
+import { companyField, companyHook } from '@/fields/company'
 
 /**
  * T4 Nota (requirements v1.1 §7 T4, US-07/US-38/US-39): many per request, each linked to ONE line
@@ -22,7 +23,9 @@ export const Receipts: CollectionConfig = withAudit(
     labels: { singular: 'Nota', plural: 'Nota' },
     admin: { group: 'Keuangan', useAsTitle: 'receiptNo', defaultColumns: ['request', 'lineNo', 'receiptNo', 'vendorName', 'receiptDate', 'amount', 'status'], components: { views: { edit: RIWAYAT_TAB } } },
     access: { read: byVisibleRequest('request'), create: denyAll, update: denyAll, delete: denyDeleteLogged('receipt') },
+    hooks: { beforeChange: [companyHook('receipts', { derive: [{ field: 'request', collection: 'expense-requests' }], check: [{ field: 'vendor', collection: 'vendors' }] })] },
     fields: [
+      companyField({ derived: true }),
       { name: 'request', type: 'relationship', relationTo: 'expense-requests', required: true, index: true, admin: ro },
       { name: 'lineId', type: 'text', label: 'ID baris', required: true, index: true, admin: ro },
       { name: 'lineNo', type: 'number', label: 'Baris ke-', admin: ro },

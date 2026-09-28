@@ -29,6 +29,8 @@ import {
 import { BUDGET_LABELS, dateRange, formatPct, lastDay, monthRange, periodLabel } from './rules'
 import { costCenterScopeSql, includesManualCash, projectScopeSql, requestScopeSql, type ReportScope, type SQL } from './scope'
 
+// MC2: LEAK POINT — report SQL filters by ReportScope only (company-blind `all`); inventory MC2-2.
+
 /**
  * F3 report catalogue (wireframes.md §5.1): one definition per report drives the screen
  * (/admin/laporan/<kode>), CSV, XLSX and PDF exports (/api/v1/reports/<kode>/<format>) and the
