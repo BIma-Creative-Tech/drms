@@ -1,10 +1,10 @@
-import type { CollectionConfig } from 'payload'
+import { ValidationError, type CollectionConfig } from 'payload'
+import { relationship } from 'payload/shared'
 
 import { denyAll, hasRole, ownEmployees, relId } from '@/access/roles'
 import { byRole, rolesAllowed, anyMember } from '@/access/policies'
 import { reasonOnDeactivate, withAudit } from '@/audit/hooks'
 import { activeField, codeField, odooRefField, uuidField } from '@/fields/common'
-import { relationship } from 'payload/shared'
 
 import { companyField, companyHook, pickerSameCompany, requireCompanyWhenAmbiguous } from '@/fields/company'
 
@@ -24,7 +24,18 @@ export const Employees: CollectionConfig = withAudit(
       update: byRole({ 'pk-admin': true, 'pk-owner': true }),
       delete: denyAll,
     },
-    hooks: { beforeChange: [companyHook('employees', { check: [{ field: 'workSchedule', collection: 'work-schedules' }] })] },
+    hooks: {
+      // MC2-4: a field error next to the PT picker (collection beforeChange hooks run before field
+      // validation in Payload 3, so the company hook's generic 400 would win otherwise)
+      beforeValidate: [
+        ({ data, operation, req }) => {
+          const msg = requireCompanyWhenAmbiguous(data?.company, { operation, req })
+          if (msg !== true) throw new ValidationError({ collection: 'employees', errors: [{ path: 'company', message: msg }], req })
+          return data
+        },
+      ],
+      beforeChange: [companyHook('employees', { check: [{ field: 'workSchedule', collection: 'work-schedules' }] })],
+    },
     fields: [
       {
         ...companyField(),

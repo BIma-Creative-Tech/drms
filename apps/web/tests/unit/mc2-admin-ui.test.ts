@@ -95,6 +95,14 @@ describe('employee ↔ PT mapping', () => {
     expect(requireCompanyWhenAmbiguous(undefined, { operation: 'create', req: {} })).toBe(true) // system write
   })
 
+  it('employees: beforeValidate turns the ambiguous PT into a field error on `company`', async () => {
+    const hook = config.collections.find((c) => c.slug === 'employees')!.hooks.beforeValidate[0]!
+    const call = (data: Record<string, unknown>, selection: number[] | null) => hook({ data, operation: 'create', req: { user: user(selection), t: (k: string) => k } } as never)
+    await expect(Promise.resolve().then(() => call({ code: 'K-1' }, null))).rejects.toMatchObject({ data: { errors: [{ path: 'company' }] } })
+    expect(await call({ code: 'K-1' }, [2])).toEqual({ code: 'K-1' })
+    expect(await call({ code: 'K-1', company: 1 }, null)).toEqual({ code: 'K-1', company: 1 })
+  })
+
   it('pickers show only the document PT; save never re-reads with the caller access', () => {
     expect(sameCompanyOptions({ data: { company: 2 } })).toEqual({ company: { equals: 2 } })
     expect(sameCompanyOptions({ data: { company: { id: 3 } } })).toEqual({ company: { equals: 3 } })

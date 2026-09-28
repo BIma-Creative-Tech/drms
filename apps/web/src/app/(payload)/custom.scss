@@ -1579,13 +1579,6 @@ $pk-modules: dashboard, persetujuan, proyek, keuangan, absensi, laporan, penggun
 
 // MC2-4 role matrix (/admin/akses-pt, src/admin/components/access/RoleMatrix.tsx, wireframe §2)
 @layer payload {
-  .pk-f3 form.pk-filter label.pk-rm__check {
-    flex-direction: row;
-    gap: 6px;
-    align-items: center;
-    min-height: 32px;
-  }
-
   .pk-rmx__cols {
     display: flex;
     flex-wrap: wrap;
@@ -1825,11 +1818,6 @@ $pk-modules: dashboard, persetujuan, proyek, keuangan, absensi, laporan, penggun
     font-weight: 600;
   }
 
-  .pk-rm .pk-btn:disabled {
-    opacity: 0.55;
-    cursor: not-allowed;
-  }
-
   .pk-rmx__bar {
     position: sticky;
     bottom: 0;
@@ -1847,6 +1835,11 @@ $pk-modules: dashboard, persetujuan, proyek, keuangan, absensi, laporan, penggun
 
     &[data-dirty] {
       border-color: var(--pk-primary);
+    }
+
+    // nothing to save: no sticky bar covering the matrix (mobile cards especially)
+    &:not([data-dirty]) {
+      position: static;
     }
   }
 
