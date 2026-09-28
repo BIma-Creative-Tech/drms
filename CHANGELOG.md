@@ -67,6 +67,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   logs) shows the PT short-code chip first and, with more than one PT selected, PT filter chips above the table
   (`admin/company-list.ts`). A chosen PT sits at the top of master forms; employee create requires the PT when
   several PTs are selected; employee / project / cost-center / work-schedule pickers list only the document's PT.
+- **MC2-4 — role matrix "Pengguna & akses PT"** (`/admin/akses-pt`, wireframe §2): users × PTs, cell = membership
+  (role checkboxes, employee of that PT, add / deactivate), Admin of the PT or group admin, reason required, audit
+  `role_change` server-side, warnings for a PT without active Direktur / Finance, mobile cards.
+- **MC2-4 — PT in custom views + dashboards:** approval inbox, transfer queue, LPJ verification and addendum list
+  show a PT column when more than one PT is selected; transfer / settlement forms offer only cash accounts of the
+  request's PT; Direktur / Finance dashboard tiles show per-PT rows under the combined totals (backend payload
+  `byCompany`).
 
 ### Changed
 - **`company-settings` global = app-wide only** (APK gate, device image targets, offline max age, selfie batch

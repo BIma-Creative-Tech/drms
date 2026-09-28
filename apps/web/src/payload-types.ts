@@ -289,23 +289,31 @@ export interface MediaSignature {
   focalY?: number | null;
 }
 /**
+ * Satu baris per PT. Admin grup membuat dan menonaktifkan PT; Admin/Direktur PT itu mengubah identitas dan pengaturan operasionalnya.
+ *
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "companies".
  */
 export interface Company {
   id: number;
-  name: string;
   /**
-   * Token {COMPANY} di nomor dokumen. Tidak dapat diubah setelah ada dokumen bernomor.
+   * Token {COMPANY} di nomor dokumen (mis. 1/PB-CS1/27/IX/2026): huruf besar/angka, 2–16 karakter. Terkunci setelah PT ini punya dokumen bernomor.
    */
   shortCode: string;
+  name: string;
   legalName?: string | null;
+  /**
+   * PNG/JPG, dipakai di kop PDF dan ekspor PT ini.
+   */
   logo?: (number | null) | MediaCompany;
+  /**
+   * Teks kop surat PDF PT ini (alamat, kontak).
+   */
   pdfHeader?: string | null;
   address?: string | null;
   phone?: string | null;
   /**
-   * MC1: harus sama dengan zona waktu server (ADR 0016 §9).
+   * Rilis ini: harus sama dengan zona waktu server (ADR 0016 §9, Q-59).
    */
   timezone: string;
   /**
@@ -329,13 +337,17 @@ export interface Company {
    */
   syncExpenseDraftsEnabled?: boolean | null;
   /**
-   * Absen masuk/pulang sendiri di project/pusat biaya yang ditugaskan (geofence, selfie, lokasi palsu ditolak) dan "diabsenkan PM". Nonaktif → item absensi ditolak FEATURE_DISABLED. Nyalakan di prod setelah checklist go-live.
-   */
-  syncAttendanceEnabled?: boolean | null;
-  /**
    * Dipakai untuk karyawan tanpa jadwal sendiri. Kosong = keterlambatan tidak dihitung.
    */
   defaultWorkSchedule?: (number | null) | WorkSchedule;
+  /**
+   * E4: laporan progress harian + foto dari APK. Nonaktif → item laporan ditolak FEATURE_DISABLED (rollback).
+   */
+  syncProgressReportsEnabled?: boolean | null;
+  /**
+   * Absen masuk/pulang sendiri di project/pusat biaya yang ditugaskan (geofence, selfie, lokasi palsu ditolak) dan "diabsenkan PM". Nonaktif → item absensi ditolak FEATURE_DISABLED. Nyalakan di prod setelah checklist go-live.
+   */
+  syncAttendanceEnabled?: boolean | null;
   /**
    * Selfie lebih tua dari ini dihapus dari penyimpanan saat penghapusan otomatis aktif (data absensi tetap). Default 12 bulan; menunggu keputusan klien (Q-33).
    */
@@ -344,10 +356,6 @@ export interface Company {
    * Nonaktif = job hanya menghitung (dry run). Aktif = file selfie dihapus permanen setiap malam (02:30), tercatat di audit log.
    */
   selfieRetentionDeleteEnabled?: boolean | null;
-  /**
-   * E4: laporan progress harian + foto dari APK. Nonaktif → item laporan ditolak FEATURE_DISABLED (rollback).
-   */
-  syncProgressReportsEnabled?: boolean | null;
   /**
    * Nonaktif = job pengingat tidak mengirim apa pun (rollback).
    */
@@ -379,6 +387,9 @@ export interface Company {
    * Selain notifikasi in-app. Isi email tanpa nominal/nama pemohon. Batas SMTP 30 email/jam per mailbox.
    */
   approvalEmailEnabled?: boolean | null;
+  /**
+   * Hanya Admin grup yang dapat membuat atau menonaktifkan PT (alasan wajib).
+   */
   active?: boolean | null;
   uuid?: string | null;
   /**
@@ -426,7 +437,7 @@ export interface MediaCompany {
 export interface WorkSchedule {
   id: number;
   /**
-   * Wajib bila Anda anggota lebih dari satu PT; tidak dapat diubah setelah dibuat.
+   * Wajib bila Anda memilih lebih dari satu PT di pemilih PT; tidak dapat diubah setelah dibuat.
    */
   company?: (number | null) | Company;
   name: string;
@@ -475,7 +486,7 @@ export interface CompanyMembership {
 export interface Employee {
   id: number;
   /**
-   * Wajib bila Anda anggota lebih dari satu PT; tidak dapat diubah setelah dibuat.
+   * PT tempat karyawan ini bekerja (1 data karyawan = 1 PT; orang yang bekerja di 2 PT punya 2 data karyawan). Tidak dapat diubah setelah dibuat.
    */
   company?: (number | null) | Company;
   code: string;
@@ -580,7 +591,7 @@ export interface Bank {
 export interface Client {
   id: number;
   /**
-   * Wajib bila Anda anggota lebih dari satu PT; tidak dapat diubah setelah dibuat.
+   * Wajib bila Anda memilih lebih dari satu PT di pemilih PT; tidak dapat diubah setelah dibuat.
    */
   company?: (number | null) | Company;
   name: string;
@@ -607,7 +618,7 @@ export interface Client {
 export interface Vendor {
   id: number;
   /**
-   * Wajib bila Anda anggota lebih dari satu PT; tidak dapat diubah setelah dibuat.
+   * Wajib bila Anda memilih lebih dari satu PT di pemilih PT; tidak dapat diubah setelah dibuat.
    */
   company?: (number | null) | Company;
   name: string;
@@ -634,7 +645,7 @@ export interface Vendor {
 export interface Project {
   id: number;
   /**
-   * Wajib bila Anda anggota lebih dari satu PT; tidak dapat diubah setelah dibuat.
+   * Wajib bila Anda memilih lebih dari satu PT di pemilih PT; tidak dapat diubah setelah dibuat.
    */
   company?: (number | null) | Company;
   code: string;
@@ -702,7 +713,7 @@ export interface ProjectStage {
 export interface StageTemplate {
   id: number;
   /**
-   * Wajib bila Anda anggota lebih dari satu PT; tidak dapat diubah setelah dibuat.
+   * Wajib bila Anda memilih lebih dari satu PT di pemilih PT; tidak dapat diubah setelah dibuat.
    */
   company?: (number | null) | Company;
   name: string;
@@ -749,7 +760,7 @@ export interface BudgetLine {
 export interface ExpenseCategory {
   id: number;
   /**
-   * Wajib bila Anda anggota lebih dari satu PT; tidak dapat diubah setelah dibuat.
+   * Wajib bila Anda memilih lebih dari satu PT di pemilih PT; tidak dapat diubah setelah dibuat.
    */
   company?: (number | null) | Company;
   code: string;
@@ -799,7 +810,7 @@ export interface Uom {
 export interface CashInSource {
   id: number;
   /**
-   * Wajib bila Anda anggota lebih dari satu PT; tidak dapat diubah setelah dibuat.
+   * Wajib bila Anda memilih lebih dari satu PT di pemilih PT; tidak dapat diubah setelah dibuat.
    */
   company?: (number | null) | Company;
   code: string;
@@ -821,7 +832,7 @@ export interface CashInSource {
 export interface CashAccount {
   id: number;
   /**
-   * Wajib bila Anda anggota lebih dari satu PT; tidak dapat diubah setelah dibuat.
+   * Wajib bila Anda memilih lebih dari satu PT di pemilih PT; tidak dapat diubah setelah dibuat.
    */
   company?: (number | null) | Company;
   name: string;
@@ -874,7 +885,7 @@ export interface TeamAssignment {
 export interface CostCenter {
   id: number;
   /**
-   * Wajib bila Anda anggota lebih dari satu PT; tidak dapat diubah setelah dibuat.
+   * Wajib bila Anda memilih lebih dari satu PT di pemilih PT; tidak dapat diubah setelah dibuat.
    */
   company?: (number | null) | Company;
   code: string;
@@ -922,7 +933,7 @@ export interface Holiday {
 export interface ApprovalRule {
   id: number;
   /**
-   * Wajib bila Anda anggota lebih dari satu PT; tidak dapat diubah setelah dibuat.
+   * Wajib bila Anda memilih lebih dari satu PT di pemilih PT; tidak dapat diubah setelah dibuat.
    */
   company?: (number | null) | Company;
   name: string;
@@ -984,7 +995,7 @@ export interface NotificationTemplate {
 export interface Vehicle {
   id: number;
   /**
-   * Wajib bila Anda anggota lebih dari satu PT; tidak dapat diubah setelah dibuat.
+   * Wajib bila Anda memilih lebih dari satu PT di pemilih PT; tidak dapat diubah setelah dibuat.
    */
   company?: (number | null) | Company;
   plateNo: string;
@@ -1016,7 +1027,7 @@ export interface Vehicle {
 export interface DocumentSequence {
   id: number;
   /**
-   * Wajib bila Anda anggota lebih dari satu PT; tidak dapat diubah setelah dibuat.
+   * Wajib bila Anda memilih lebih dari satu PT di pemilih PT; tidak dapat diubah setelah dibuat.
    */
   company?: (number | null) | Company;
   docType:
@@ -1055,7 +1066,7 @@ export interface DocumentSequence {
 export interface ExpenseRequest {
   id: number;
   /**
-   * Wajib bila Anda anggota lebih dari satu PT; tidak dapat diubah setelah dibuat.
+   * Wajib bila Anda memilih lebih dari satu PT di pemilih PT; tidak dapat diubah setelah dibuat.
    */
   company?: (number | null) | Company;
   docNo?: string | null;
@@ -1589,7 +1600,7 @@ export interface Settlement {
 export interface PeriodClosing {
   id: number;
   /**
-   * Wajib bila Anda anggota lebih dari satu PT; tidak dapat diubah setelah dibuat.
+   * Wajib bila Anda memilih lebih dari satu PT di pemilih PT; tidak dapat diubah setelah dibuat.
    */
   company?: (number | null) | Company;
   period: string;
@@ -2303,8 +2314,8 @@ export interface UsersSelect<T extends boolean = true> {
  * via the `definition` "companies_select".
  */
 export interface CompaniesSelect<T extends boolean = true> {
-  name?: T;
   shortCode?: T;
+  name?: T;
   legalName?: T;
   logo?: T;
   pdfHeader?: T;
@@ -2322,11 +2333,11 @@ export interface CompaniesSelect<T extends boolean = true> {
   reimburseAutoCloseDays?: T;
   lpjDueDays?: T;
   syncExpenseDraftsEnabled?: T;
-  syncAttendanceEnabled?: T;
   defaultWorkSchedule?: T;
+  syncProgressReportsEnabled?: T;
+  syncAttendanceEnabled?: T;
   selfieRetentionMonths?: T;
   selfieRetentionDeleteEnabled?: T;
-  syncProgressReportsEnabled?: T;
   remindersEnabled?: T;
   reminderHour?: T;
   reminderEmailEnabled?: T;

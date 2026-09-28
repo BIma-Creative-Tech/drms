@@ -15,10 +15,10 @@ by exact name only, never `docker … prune`): `pk-mc2u-net`, `pk-mc2u-node` (no
 |---|---|---|
 | UI-1 PT switcher | done | `admin/shell/CompanySwitcher.tsx` + pure state `company-switcher.ts`, `POST /api/v1/me/companies` (cookie), `tests/unit/mc2-switcher.test.ts` |
 | UI-2 Master Perusahaan | done | tabs + list columns (member count), group-admin create/deactivate (existing access) |
-| UI-3 Matriks role `/admin/akses-pt` | open | |
+| UI-3 Matriks role `/admin/akses-pt` | done | `views/AksesPt.tsx` + `components/access/{RoleMatrix.tsx,role-matrix.ts}`, `tests/unit/mc2-role-matrix.test.ts`; atomic batch save = contract TODO |
 | UI-4 Employee ↔ PT, pickers per PT | done | PT at the top of master forms, required on employee create when ambiguous, 7 pickers filtered per PT |
-| UI-5 PT column + filter (lists, custom views) | Payload lists done; custom views open | `admin/company-list.ts` wrapper (33 collections) |
-| UI-6 Dashboards per PT | open | depends on the backend contract |
+| UI-5 PT column + filter (lists, custom views) | done (Payload lists; inbox, transfer queue, LPJ, addendum); Kas/Absensi/Progress rows = backend TODO | `admin/company-list.ts` wrapper (33 collections), `views/pt.tsx` |
+| UI-6 Dashboards per PT | layout done, data from backend | `views/pt-breakdown.tsx`; Owner (cash, waiting, budget, completeness) + Finance (cash, verification) tiles read `byCompany` rows defensively |
 | UI-7 Import `kode_pt` (MC2-5) | open | |
 
 ### UI-1 PT switcher (done)
@@ -62,6 +62,41 @@ by exact name only, never `docker … prune`): `pk-mc2u-net`, `pk-mc2u-node` (no
   sort/limit/search, "Menampilkan DRMS, CS1 · 42 data"). Users with saved column preferences keep their columns
   (Payload list preferences) until they reset them.
 
+### UI-3 Matriks role (done)
+
+- `/admin/akses-pt` (module Pengguna & Akses, "Akses PT (matriks)", Admin only in the menu; the view itself admits
+  Admins of ≥ 1 PT and group admins). Columns = PTs the viewer administers (group admin: all active PTs), narrowed by
+  the PT switcher; "Kolom PT" toggles; rows = accounts readable by the viewer (search `q`, `nonaktif=1`, 40 per page).
+- Cell = membership: 5 role checkboxes (Staff/PM/Fin/Dir/Adm), employee select (active employees of THAT PT not linked
+  to another account there; the current one stays; ↗ opens the employee), "bukan anggota + Tambah". No role left =
+  membership inactive (never deleted). Warnings: PT without active Direktur / Finance (wireframe §2, not blocking);
+  duplicate employee link blocks saving.
+- Save bar: pending count, reason (≥ 3 chars, `changeReason` → audit `role_change` via `withAudit`), Simpan /
+  Batalkan. One REST call per changed cell (`POST`/`PATCH /api/company-memberships`); ops in PTs outside the
+  viewer's rights are refused client-side before anything is sent; the server re-checks (MC1 access + hooks).
+- ≤ 768 px: one card per user, one labelled section per PT.
+
+### UI-5b PT column in custom views (done)
+
+- `views/pt.tsx`: `ptView(req)` (selection + labels), `PtChip`, `PtScopeNote` ("Menampilkan PT: …"), `itemCompany`
+  (backend `company` ref when the queue item has it — MC2-1 adds `company { id, shortCode, name }` — else a
+  caller-access lookup of the request's `company`), `accountsOf`.
+- Approval inbox, transfer queue (+ voidable transfers), LPJ verification: PT column / chip with > 1 PT selected.
+  Transfer + settlement forms now offer ONLY cash accounts of the request's PT (before: every readable account → a
+  cross-PT choice the DB trigger would reject).
+- Addendum list: PT column (PT of the project).
+
+### UI-6 Dashboards (layout done)
+
+- `views/pt-breakdown.tsx` `PerPt`: rows per PT under a combined KPI (only > 1 PT and > 1 row). Owner: cash
+  (`cash.byCompany`), waiting (`approvals.byCompany`), running projects per PT (`budget.byCompany`, colour counts,
+  never a combined %), completeness (`completeness.byCompany`); Finance: cash (`cashByCompany`), verification
+  (`completenessByCompany`). Field names follow the feat/mc2-backend working copy (2026-09-28, uncommitted) and are
+  read as `unknown` — the single-PT layout renders until the payload carries them.
+
 ## Open TODOs / notes (UI)
 
-- (filled per WP)
+- **Contract (backend):** atomic batch endpoint for the role matrix (wireframe "tidak ada simpan sebagian");
+  copy-from-DRMS actions on PT create (numbering / approval rules / categories / schedules); per-PT rows in Kas book,
+  attendance "Tim hari ini"/recap and K-09 progress (then PT columns there); verify dashboard field names against
+  `mc2-contract.md` once committed.

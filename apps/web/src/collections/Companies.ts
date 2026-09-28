@@ -219,6 +219,7 @@ export const companySettingKey = settingKey
 export const Companies: CollectionConfig = withAudit(
   {
     slug: 'companies',
+    defaultSort: 'shortCode',
     labels: { singular: 'Perusahaan (PT)', plural: 'Perusahaan (PT)' },
     admin: {
       useAsTitle: 'name',
@@ -289,7 +290,15 @@ export const Companies: CollectionConfig = withAudit(
           { label: 'Pengingat & notifikasi', fields: settingFields(REMINDERS) },
         ],
       },
-      { name: 'active', type: 'checkbox', label: 'Aktif', defaultValue: true, index: true, access: groupAdminOnly, admin: { position: 'sidebar', description: 'Hanya Admin grup yang dapat membuat atau menonaktifkan PT (alasan wajib).' } },
+      {
+        name: 'active',
+        type: 'checkbox',
+        label: 'Aktif',
+        defaultValue: true,
+        index: true,
+        access: groupAdminOnly,
+        admin: { position: 'sidebar', description: 'Hanya Admin grup yang dapat membuat atau menonaktifkan PT (alasan wajib).', components: { Cell: '@/admin/components/companies/ActiveCell#ActiveCell' } },
+      },
       // list-only column (MC2-4): active members of the PT
       { name: 'memberCount', type: 'ui', label: 'Anggota', admin: { disableListColumn: false, components: { Cell: '@/admin/components/companies/MemberCountCell#MemberCountCell' } } },
       uuidField(),

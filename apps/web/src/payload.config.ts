@@ -8,7 +8,7 @@ import sharp from 'sharp'
 
 import { withStaffHiddenGlobals, withStaffPanelVisibility } from './access/panel-visibility'
 import { withCompanyListUi } from './admin/company-list'
-import { ACCOUNT_ADMIN_VIEWS, E2_ADMIN_VIEWS, E6_ADMIN_VIEWS, F2_ADMIN_VIEWS, F3_ADMIN_VIEWS, S2A_ADMIN_VIEWS, S3E_ADMIN_VIEWS } from './admin/config'
+import { ACCOUNT_ADMIN_VIEWS, E2_ADMIN_VIEWS, E6_ADMIN_VIEWS, F2_ADMIN_VIEWS, F3_ADMIN_VIEWS, MC2_ADMIN_VIEWS, S2A_ADMIN_VIEWS, S3E_ADMIN_VIEWS } from './admin/config'
 import { v1Endpoints } from './api/v1'
 import { Attendances } from './collections/Attendances'
 import { AttendanceCorrections } from './collections/AttendanceCorrections'
@@ -130,7 +130,7 @@ export default buildConfig({
       // one client provider around every admin page (built-in views included), see src/admin/loading.
       providers: ['@/admin/loading/LoadingProvider#LoadingProvider'],
       // F3: module launcher at /admin, role dashboards at /admin/dashboard, reports, global audit log.
-      views: { ...F2_ADMIN_VIEWS, ...F3_ADMIN_VIEWS, ...E2_ADMIN_VIEWS, ...E6_ADMIN_VIEWS, ...S2A_ADMIN_VIEWS, ...S3E_ADMIN_VIEWS, ...ACCOUNT_ADMIN_VIEWS },
+      views: { ...F2_ADMIN_VIEWS, ...F3_ADMIN_VIEWS, ...E2_ADMIN_VIEWS, ...E6_ADMIN_VIEWS, ...S2A_ADMIN_VIEWS, ...S3E_ADMIN_VIEWS, ...ACCOUNT_ADMIN_VIEWS, ...MC2_ADMIN_VIEWS },
     },
     timezones: { defaultTimezone: 'Asia/Makassar' },
     // Default 'gravatar' sends md5(email) to www.gravatar.com (privacy + CSP img-src), spike f.
