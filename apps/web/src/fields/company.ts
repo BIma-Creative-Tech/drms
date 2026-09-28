@@ -1,7 +1,7 @@
 import { APIError, ValidationError, type CollectionBeforeChangeHook, type CollectionSlug, type PayloadRequest, type RelationshipField } from 'payload'
 
 import { PENDING_CREATE_ROLES } from '@/access/policies'
-import { hasRole, relId, type Role } from '@/access/roles'
+import { hasRole, relId, soleCompany, type Role } from '@/access/roles'
 import { defaultCompanyForWrite } from '@/domain/companies'
 
 /**
@@ -23,11 +23,10 @@ export function companyField(opts: { derived?: boolean } = {}): RelationshipFiel
     // NOT NULL (migration *_mc1_company_columns). Keeps typed Local API calls without `company` valid.
     index: true,
     access: opts.derived ? { create: () => false, update: () => false } : { update: () => false },
-    admin: {
-      position: 'sidebar',
-      readOnly: opts.derived === true,
-      description: opts.derived ? 'Mengikuti dokumen induk.' : 'Wajib bila Anda anggota lebih dari satu PT; tidak dapat diubah setelah dibuat.',
-    },
+    // MC2-4 (wireframe §4 "Buat baru"): a chosen PT sits at the top of the form; a derived one in the sidebar.
+    admin: opts.derived
+      ? { position: 'sidebar', readOnly: true, description: 'Mengikuti dokumen induk.' }
+      : { description: 'Wajib bila Anda memilih lebih dari satu PT di pemilih PT; tidak dapat diubah setelah dibuat.' },
   }
 }
 
@@ -136,8 +135,41 @@ export function companyHook(slug: CollectionSlug, opts: { derive?: CompanyRef[];
   }
 }
 
-/** `filterOptions` of a per-PT relationship: rows of the document's PT only (admin pickers). */
+/**
+ * `filterOptions` of a per-PT relationship: rows of the document's PT only (admin pickers). Before a
+ * PT is known (a derived document on create) every readable row. NOTE: Payload re-validates a value
+ * against filterOptions with the caller's read access — use it only where the editor can read the
+ * referenced rows anyway (employee pickers, MC2-4).
+ */
 export const sameCompanyOptions = ({ data }: { data?: unknown }) => {
   const c = relId((data as { company?: unknown } | undefined)?.company)
   return c === undefined ? true : { company: { equals: c } }
+}
+
+/**
+ * Picker-only PT filter (MC2-4, "employee picker filtered by PT"): `filterOptions` narrows the admin
+ * dropdown to the document's PT, while the save-time re-validation of filterOptions (which re-reads
+ * the referenced rows with the CALLER's access) is switched off — same pattern as
+ * `expense-requests.bankAccount`. Cross-PT values stay impossible: `companyHook` + DB trigger
+ * `pk_same_company` (`cross-company reference`).
+ */
+export function pickerSameCompany(opts: { required?: boolean } = {}) {
+  return {
+    filterOptions: sameCompanyOptions,
+    validate: (v: unknown) => (opts.required && (v === null || v === undefined || v === '' || (Array.isArray(v) && v.length === 0)) ? 'Wajib diisi.' : true),
+  } as const
+}
+
+/**
+ * Employees (MC2-4, D1 "1 employee = 1 PT"): the PT must be chosen explicitly on create when the
+ * caller has more than one PT selected (same condition as `defaultCompanyForWrite`, but as a field
+ * error next to the PT picker instead of a generic 400). System writes (no user) keep the default.
+ */
+export function requireCompanyWhenAmbiguous(
+  value: unknown,
+  opts: { operation?: string; req?: { user?: unknown } },
+): true | string {
+  if (value !== null && value !== undefined && value !== '') return true
+  if (opts.operation !== 'create' || !opts.req?.user) return true
+  return soleCompany(opts.req as never) === undefined ? 'PT wajib dipilih: Anda memilih lebih dari satu PT (atau belum punya PT).' : true
 }
