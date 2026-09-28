@@ -3,6 +3,7 @@ import { z } from 'zod'
 
 import { registerAddendumPaths } from './openapi-addendum'
 import { registerAttendancePaths } from './openapi-attendance'
+import { registerCompanyPaths } from './openapi-companies'
 import { Device, DeviceRegister, DeviceRevoke, Health, Masters, MastersQuery, Me, Problem, Ready, TestEmailQueued } from './schemas'
 import * as F from './schemas-flow'
 import * as P from './schemas-progress'
@@ -507,6 +508,8 @@ export function buildOpenApiDocument(version: string) {
   registerAttendancePaths(registry, { security, deviceHeader, idem, res, problemResponses })
   // ---- E5 addendum RAB (T12, US-18/US-30) ------------------------------------------------------
   registerAddendumPaths(registry, { security, deviceHeader, idem, res })
+  // MC2-4: web PT switcher
+  registerCompanyPaths(registry, { security, res })
 
   return new OpenApiGeneratorV31(registry.definitions).generateDocument({
     openapi: '3.1.0',

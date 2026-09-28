@@ -7034,6 +7034,47 @@
           "reason"
         ],
         "additionalProperties": false
+      },
+      "MeCompaniesResult": {
+        "type": "object",
+        "properties": {
+          "selected": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            },
+            "description": "Effective selection after the change (ascending ids)."
+          },
+          "all": {
+            "type": "boolean",
+            "description": "true = every membership selected (no cookie stored)."
+          }
+        },
+        "required": [
+          "selected",
+          "all"
+        ]
+      },
+      "MeCompaniesBody": {
+        "type": "object",
+        "properties": {
+          "companyIds": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "integer",
+              "exclusiveMinimum": 0
+            },
+            "maxItems": 50,
+            "description": "PTs to show (each must be an active membership of the caller); null = all memberships (\"Semua PT\", cookie cleared)."
+          }
+        },
+        "required": [
+          "companyIds"
+        ],
+        "additionalProperties": false
       }
     },
     "parameters": {}
@@ -20298,6 +20339,100 @@
             }
           },
           "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/me/companies": {
+      "post": {
+        "summary": "Web PT switcher: store the READ selection in the HttpOnly cookie pk-company-ids (__Host- on https). Only narrows the active memberships; a foreign PT → 403 COMPANY_NOT_ALLOWED. The APK sends X-Company-Ids per request instead.",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MeCompaniesBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Selection stored (Set-Cookie)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeCompaniesResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "413": {
             "description": "Problem",
             "content": {
               "application/problem+json": {

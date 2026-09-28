@@ -1261,3 +1261,238 @@ $pk-modules: dashboard, persetujuan, proyek, keuangan, absensi, laporan, penggun
     }
   }
 }
+
+// =================================================================================================
+// MC2-4 PT switcher (src/admin/shell/CompanySwitcher.tsx, wireframe mc/wireframes.md §1a)
+// =================================================================================================
+@layer payload {
+  .pk-pt {
+    display: inline-flex;
+    gap: 6px;
+    align-items: center;
+    max-width: 180px;
+    height: 38px;
+    padding: 0 10px;
+    border: 1px solid var(--pk-border);
+    border-radius: 10px;
+    background: var(--pk-card);
+    color: var(--pk-fg);
+    font: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: pointer;
+
+    > svg:first-child {
+      flex-shrink: 0;
+      color: var(--pk-primary);
+    }
+
+    &:hover {
+      border-color: color-mix(in oklab, var(--pk-primary) 45%, var(--pk-border));
+      background: var(--pk-muted-bg);
+    }
+  }
+
+  .pk-pt__text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .pk-pt--static {
+    border-style: dashed;
+    cursor: default;
+
+    &:hover {
+      border-color: var(--pk-border);
+      background: var(--pk-card);
+    }
+  }
+
+  .pk-pt-dd[data-open] > .pk-pt {
+    border-color: var(--pk-primary);
+    box-shadow: 0 0 0 3px color-mix(in oklab, var(--pk-primary) 18%, transparent);
+  }
+
+  .pk-pt__panel {
+    width: min(92vw, 380px);
+    padding: 10px;
+    gap: 4px;
+  }
+
+  .pk-pt__scrim {
+    display: none;
+  }
+
+  .pk-pt__title {
+    padding: 4px 6px 0;
+    font-family: var(--pk-font-heading);
+    font-size: 15px;
+    font-weight: 700;
+  }
+
+  .pk-pt__hint {
+    margin: 0 0 4px;
+    padding: 0 6px 8px;
+    border-bottom: 1px solid var(--pk-border);
+    color: var(--pk-muted-fg);
+    font-size: 12px;
+    line-height: 1.4;
+  }
+
+  .pk-pt__list {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    max-height: min(50vh, 360px);
+    overflow-y: auto;
+    padding-top: 4px;
+    border-top: 1px solid var(--pk-border);
+  }
+
+  .pk-pt__opt {
+    display: grid;
+    grid-template-columns: 20px auto 1fr;
+    column-gap: 10px;
+    align-items: center;
+    min-height: 44px;
+    padding: 6px 8px;
+    border-radius: 9px;
+    cursor: pointer;
+
+    &:hover {
+      background: var(--pk-muted-bg);
+    }
+
+    &:has(input:focus-visible) {
+      outline: 2px solid var(--pk-primary);
+      outline-offset: -2px;
+    }
+
+    input {
+      width: 18px;
+      height: 18px;
+      margin: 0;
+      accent-color: var(--pk-primary);
+    }
+  }
+
+  .pk-pt__opt--all {
+    grid-template-columns: 20px 1fr;
+    font-weight: 600;
+  }
+
+  .pk-pt__code {
+    min-width: 44px;
+    padding: 1px 6px;
+    border-radius: 6px;
+    background: color-mix(in oklab, var(--pk-primary) 12%, transparent);
+    color: var(--pk-primary);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-align: center;
+  }
+
+  .pk-pt__name {
+    overflow: hidden;
+    min-width: 0;
+    font-weight: 500;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .pk-pt__roles {
+    grid-column: 3;
+    color: var(--pk-muted-fg);
+    font-size: 12px;
+  }
+
+  .pk-pt__msg {
+    margin: 4px 6px;
+    color: var(--pk-tone-warn-text);
+    font-size: 12px;
+    font-weight: 600;
+
+    &[data-tone='bad'] {
+      color: var(--pk-tone-bad-text);
+    }
+  }
+
+  .pk-pt__actions {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+    margin-top: 6px;
+    padding: 8px 4px 2px;
+    border-top: 1px solid var(--pk-border);
+  }
+
+  .pk-pt__btn {
+    min-height: 38px;
+    padding: 0 16px;
+    border: 1px solid var(--pk-input);
+    border-radius: 9px;
+    background: var(--pk-card);
+    color: var(--pk-fg);
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+
+    &:hover {
+      border-color: var(--pk-primary);
+      color: var(--pk-primary);
+    }
+
+    &:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+  }
+
+  .pk-pt__btn--primary {
+    border-color: var(--pk-primary);
+    background: var(--pk-primary);
+    color: var(--pk-on-primary);
+
+    &:hover:not(:disabled) {
+      background: var(--pk-primary-hover);
+      color: var(--pk-on-primary);
+    }
+  }
+
+  // ≤ 768px: code only; the dialog is a bottom sheet over a scrim, portalled to <body>
+  @media (max-width: 768px) {
+    .pk-pt {
+      max-width: 112px;
+      padding: 0 8px;
+    }
+
+    .pk-pt .pk-bar__chev {
+      display: none;
+    }
+  }
+
+  .pk-pt-sheet .pk-pt__scrim {
+    position: fixed;
+    inset: 0;
+    z-index: 34;
+    display: block;
+    background: rgb(2 6 23 / 0.45);
+  }
+
+  .pk-bar__menu.pk-pt__panel--sheet {
+    position: fixed;
+    top: auto;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 35;
+    width: 100%;
+    max-height: 85vh;
+    padding: 14px 16px calc(14px + env(safe-area-inset-bottom));
+    border-radius: 18px 18px 0 0;
+    font-size: 14px;
+    transform-origin: bottom center;
+  }
+}

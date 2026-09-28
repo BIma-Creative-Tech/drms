@@ -11,6 +11,7 @@ import { mastersEndpoint } from './endpoints/masters'
 import { mediaFileEndpoint, mediaSignedUrlEndpoint, uploadMediaEndpoint } from './endpoints/media'
 import { NOTIFICATION_ENDPOINTS } from './endpoints/notifications'
 import { meEndpoint } from './endpoints/me'
+import { meCompaniesEndpoint } from './endpoints/me-companies'
 import { openapiEndpoint } from './endpoints/openapi'
 import { PROGRESS_ENDPOINTS } from './endpoints/progress'
 import { REPORT_ENDPOINTS } from './endpoints/reports'
@@ -24,6 +25,8 @@ export const v1Endpoints: Endpoint[] = [
   readyEndpoint,
   readyHeadEndpoint,
   meEndpoint,
+  // MC2-4: web PT switcher (cookie pk-company-ids)
+  meCompaniesEndpoint,
   mastersEndpoint,
   registerDeviceEndpoint,
   revokeDeviceEndpoint,

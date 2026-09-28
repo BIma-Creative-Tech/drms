@@ -55,6 +55,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   - Tests: web unit + integration (Keycloak mocked), `tests/kc/two-factor.kc.test.ts` against a real throwaway
     Keycloak 26.7.4 (`test-env/kc-setup.sh` gains a TEST-ONLY `proyekkas-web` client + user); mobile unit + widget.
   - Docs: ADR 0017; revisions in ADR 0012, `plans/fase1-golive.md` G1-3, ASVS checklist 4.3.1 / G-01 (decided).
+- **MC2-4 — PT switcher** (`apps/web`, branch `feat/mc2-admin-ui`, ADR 0016 §5, wireframe `mc/wireframes.md` §1a):
+  module-bar control left of the bell (`admin/shell/CompanySwitcher.tsx`): one membership → the PT code as text;
+  several → dialog with "Semua PT saya" (tri-state) + one checkbox per PT (code, name, the user's roles there),
+  Terapkan / Batal, ≥ 1 PT, ↑/↓/Space/Esc, bottom sheet ≤ 768 px. New `POST /api/v1/me/companies` sets the HttpOnly
+  cookie `pk-company-ids` (`__Host-` on https; "Semua PT" = cookie cleared); a PT without membership → 403
+  `COMPANY_NOT_ALLOWED` (audited). OpenAPI regenerated.
 
 ### Changed
 - **`company-settings` global = app-wide only** (APK gate, device image targets, offline max age, selfie batch
