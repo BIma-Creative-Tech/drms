@@ -101,6 +101,16 @@ jobs:
       HAS_STAGING_KEY: ${{ secrets.ANDROID_STAGING_KEYSTORE_B64 != '' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # GitHub's ubuntu-24.04 image has ~14 GB free; Flutter + Gradle + three ABIs + the cache save filled it
+      # ("zstd: No space left on device" in Post actions/cache, 2026-09-27/28). Drop toolchains this job never
+      # uses (.NET, Haskell, CodeQL, Boost, Swift, PowerShell, browsers). Android SDK, Java and Docker stay.
+      - name: Free runner disk space
+        run: |
+          df -h / | tail -1
+          sudo rm -rf /usr/share/dotnet /usr/local/.ghcup /opt/ghc /opt/hostedtoolcache/CodeQL \
+            /usr/local/share/boost /usr/share/swift /usr/local/share/powershell /usr/local/share/chromium \
+            /opt/google/chrome /opt/microsoft
+          df -h / | tail -1
       - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
           distribution: temurin
@@ -202,6 +212,16 @@ jobs:
       HAS_PROD_KEY: ${{ secrets.ANDROID_KEYSTORE_B64 != '' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # GitHub's ubuntu-24.04 image has ~14 GB free; Flutter + Gradle + three ABIs + the cache save filled it
+      # ("zstd: No space left on device" in Post actions/cache, 2026-09-27/28). Drop toolchains this job never
+      # uses (.NET, Haskell, CodeQL, Boost, Swift, PowerShell, browsers). Android SDK, Java and Docker stay.
+      - name: Free runner disk space
+        run: |
+          df -h / | tail -1
+          sudo rm -rf /usr/share/dotnet /usr/local/.ghcup /opt/ghc /opt/hostedtoolcache/CodeQL \
+            /usr/local/share/boost /usr/share/swift /usr/local/share/powershell /usr/local/share/chromium \
+            /opt/google/chrome /opt/microsoft
+          df -h / | tail -1
       - name: Production key present in the environment
         if: env.HAS_PROD_KEY != 'true'
         run: |

@@ -244,6 +244,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - **CI semgrep red on develop** (`admin/views/AksesPt.tsx`, MC2 role matrix): five Local API reads passed their
   access arguments through a spread (`...read`), which rule `payload-local-api-implicit-override-access` cannot see.
   The arguments `user, overrideAccess: false, req, depth: 0` are now written literally in each call (same behaviour).
+- **Mobile CI red after a green build** (`.github/workflows/mobile.yml`): the runner disk filled up while `actions/cache`
+  saved the pub/Gradle cache after the APK build ("zstd: No space left on device"), marking successful runs as failed.
+  The `apk` and `release-prod` jobs now remove unused runner toolchains (.NET, Haskell, CodeQL, Boost, Swift,
+  PowerShell, browsers) first; Android SDK, Java and Docker are kept.
 
 ## [0.4.2] - 2026-09-28
 
