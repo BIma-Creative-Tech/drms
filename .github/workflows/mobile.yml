@@ -130,8 +130,10 @@ jobs:
         if: runner.environment == 'self-hosted'
         run: |
           # System properties beat android/gradle.properties (org.gradle.jvmargs=-Xmx8G is sized for 16 GB hosted runners).
-          # No Gradle daemon kept around, 2 workers, Kotlin compiled inside the Gradle JVM (no second Kotlin daemon).
-          echo 'GRADLE_OPTS=-Dorg.gradle.daemon=false -Dorg.gradle.workers.max=2 -Dorg.gradle.parallel=false "-Dorg.gradle.jvmargs=-Xmx2g -XX:MaxMetaspaceSize=512m" -Dorg.gradle.project.kotlin.compiler.execution.strategy=in-process' >> "$GITHUB_ENV"
+          # No Gradle daemon kept around, 1 worker, Kotlin compiled inside the Gradle JVM (no second Kotlin daemon).
+          # Heap 1.5 GiB: Gradle -Xmx2g + dart frontend_server (~0.9 GiB) + gen_kernel hit the 4 GiB cgroup OOM killer
+          # (infra plan 12 R10 F1, mobile run 36409822850); the passing run peaked at 3.53 GiB.
+          echo 'GRADLE_OPTS=-Dorg.gradle.daemon=false -Dorg.gradle.workers.max=1 -Dorg.gradle.parallel=false "-Dorg.gradle.jvmargs=-Xmx1536m -XX:MaxMetaspaceSize=384m" -Dorg.gradle.project.kotlin.compiler.execution.strategy=in-process' >> "$GITHUB_ENV"
           echo "::notice::self-hosted: PUB_CACHE=${PUB_CACHE:-unset} GRADLE_USER_HOME=${GRADLE_USER_HOME:-unset} ANDROID_HOME=${ANDROID_HOME:-unset}"
 
       - name: Debug APK (staging flavor, custom-scheme redirect)
@@ -253,8 +255,10 @@ jobs:
         if: runner.environment == 'self-hosted'
         run: |
           # System properties beat android/gradle.properties (org.gradle.jvmargs=-Xmx8G is sized for 16 GB hosted runners).
-          # No Gradle daemon kept around, 2 workers, Kotlin compiled inside the Gradle JVM (no second Kotlin daemon).
-          echo 'GRADLE_OPTS=-Dorg.gradle.daemon=false -Dorg.gradle.workers.max=2 -Dorg.gradle.parallel=false "-Dorg.gradle.jvmargs=-Xmx2g -XX:MaxMetaspaceSize=512m" -Dorg.gradle.project.kotlin.compiler.execution.strategy=in-process' >> "$GITHUB_ENV"
+          # No Gradle daemon kept around, 1 worker, Kotlin compiled inside the Gradle JVM (no second Kotlin daemon).
+          # Heap 1.5 GiB: Gradle -Xmx2g + dart frontend_server (~0.9 GiB) + gen_kernel hit the 4 GiB cgroup OOM killer
+          # (infra plan 12 R10 F1, mobile run 36409822850); the passing run peaked at 3.53 GiB.
+          echo 'GRADLE_OPTS=-Dorg.gradle.daemon=false -Dorg.gradle.workers.max=1 -Dorg.gradle.parallel=false "-Dorg.gradle.jvmargs=-Xmx1536m -XX:MaxMetaspaceSize=384m" -Dorg.gradle.project.kotlin.compiler.execution.strategy=in-process' >> "$GITHUB_ENV"
           echo "::notice::self-hosted: PUB_CACHE=${PUB_CACHE:-unset} GRADLE_USER_HOME=${GRADLE_USER_HOME:-unset} ANDROID_HOME=${ANDROID_HOME:-unset}"
       - name: Decode production keystore, print certificate SHA-256
         env:

@@ -237,16 +237,18 @@ jobs:
           } >> "$GITHUB_OUTPUT"
           echo "publish=$publish tags=[$tags] version=$version no_cache=$no_cache gha_cache=$gha runner=$RUNNER_ENV"
 
-      # Self-hosted: buildx `docker` driver = BuildKit of the job's own (inner) dockerd, its layer cache persists on the
-      # runner. Push-by-digest + SBOM/provenance with that driver need the containerd image store (default for a fresh
-      # Docker 29 daemon); without it we fall back to docker-container (works, but no persistent layer cache).
+      # Self-hosted, local-only builds: buildx `docker` driver = BuildKit of the job's own (inner) dockerd, its layer
+      # cache persists on the runner (needs the containerd image store, default for a fresh Docker 29 daemon).
+      # Publishing runs ALWAYS use docker-container: the docker driver cannot push-by-digest ("push-by-digest is
+      # currently not implemented for docker driver", infra plan 12 R10 F2, run 36409822758).
       - name: Buildx driver
         id: bx
         env:
           RUNNER_ENV: ${{ runner.environment }}
+          PUBLISH: ${{ steps.meta.outputs.publish }}
         run: |
           driver=docker-container
-          if [[ "$RUNNER_ENV" == "self-hosted" ]]; then
+          if [[ "$RUNNER_ENV" == "self-hosted" && "$PUBLISH" != "true" ]]; then
             if docker info --format '{{json .DriverStatus}}' | grep -q 'io.containerd.snapshotter'; then
               driver=docker
             else

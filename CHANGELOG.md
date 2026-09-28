@@ -214,6 +214,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
     APK `test/unit/misc_test.dart` + `test/widget/release_notes_test.dart`. No new dependency.
 
 ### Changed
+- **Self-hosted runner fixes (infra plan 12 R10)**: APK jobs on self-hosted use Gradle heap 1.5 GiB, metaspace 384 MiB,
+  1 worker (F1: the 4 GiB cgroup OOM-killed Gradle during the staging APK build); publishing image builds always use
+  buildx `docker-container` because the `docker` driver cannot push-by-digest (F2); local-only builds keep `docker`.
 - **CI runner switchable + fewer runs** (GitHub Free minutes exhausted 2026-09-28; owner chose a self-hosted runner,
   infra plan 12): every job's `runs-on` reads repo variable `CI_RUNS_ON` (deploy-prod: `DEPLOY_RUNS_ON`) as JSON, e.g.
   `["self-hosted","linux","x64","drms"]`; unset = `ubuntu-24.04` as before, so switching back needs no code change.
