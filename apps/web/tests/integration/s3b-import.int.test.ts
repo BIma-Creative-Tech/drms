@@ -267,13 +267,15 @@ describe('E11 go-live import (dry-run → commit → idempotent re-run)', () => 
 describe('E11 opening balance lock + go-live date guard (ADR 0005 As implemented S3b)', () => {
   it('after a period on/after the opening date is closed, the opening balance is locked (hook 409, DB trigger, import dry-run error)', async () => {
     const p = await getTestPayload()
-    const acc = (await sqlAs('app', "SELECT id FROM cash_accounts WHERE name = 'Kas Kecil Contoh (FIKTIF)'")).rows[0].id
-    const closedLater = await count("SELECT count(*) AS n FROM period_closings WHERE status = 'closed' AND period >= '2020-02'")
+    const accRow = (await sqlAs('app', "SELECT id, company_id FROM cash_accounts WHERE name = 'Kas Kecil Contoh (FIKTIF)'")).rows[0]
+    const acc = accRow.id
+    // ADR 0016 §4: the lock is per PT — only a closing of the ACCOUNT's PT counts (mc2-isolation closes other PTs)
+    const closedLater = Number((await sqlAs('app', "SELECT count(*) AS n FROM period_closings WHERE status = 'closed' AND period >= '2020-02' AND company_id = $1", [accRow.company_id])).rows[0].n)
     if (closedLater === 0) {
       // before the close: Finance may still correct it (reason required)
       await p.update({ collection: 'cash-accounts', id: acc, data: { openingBalance: 5000001, changeReason: 'koreksi uji' }, overrideAccess: true /* SYSTEM-WRITE: test */ })
       await p.update({ collection: 'cash-accounts', id: acc, data: { openingBalance: 5000000, changeReason: 'koreksi uji kembali' }, overrideAccess: true /* SYSTEM-WRITE: test */ })
-      await withSystemTransaction(p, null, (req) => p.create({ collection: 'period-closings', data: { period: '2020-02', status: 'closed', note: 'uji kunci saldo awal' }, overrideAccess: true /* SYSTEM-WRITE: test */, req }))
+      await withSystemTransaction(p, null, (req) => p.create({ collection: 'period-closings', data: { company: accRow.company_id, period: '2020-02', status: 'closed', note: 'uji kunci saldo awal' }, overrideAccess: true /* SYSTEM-WRITE: test */, req }))
     } // else: another file (shared DB) already closed a month after the go-live date → already locked
     await expect(p.update({ collection: 'cash-accounts', id: acc, data: { openingBalance: 1, changeReason: 'tidak boleh' }, overrideAccess: true /* SYSTEM-WRITE: test */ })).rejects.toThrow(/Saldo awal terkunci: periode \d{4}-\d{2} sudah ditutup/)
     const db = await sqlError('app', 'UPDATE cash_accounts SET opening_balance = 1 WHERE id = $1', [acc])

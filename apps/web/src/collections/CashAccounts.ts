@@ -1,6 +1,6 @@
 import { APIError, type CollectionBeforeChangeHook, type CollectionConfig } from 'payload'
 
-import { denyAll } from '@/access/roles'
+import { denyAll, relId } from '@/access/roles'
 import { byRole, rolesAllowed } from '@/access/policies'
 import { reasonOnChange, reasonOnDeactivate, withAudit } from '@/audit/hooks'
 import { activeField, rupiahField, uuidField } from '@/fields/common'
@@ -19,9 +19,11 @@ const openingBalanceLock: CollectionBeforeChangeHook = async ({ data, originalDo
   const changed = (['openingBalance', 'openingBalanceDate'] as const).some((f) => f in data && (data[f] ?? null) !== (originalDoc[f] ?? null))
   if (!changed) return data
   const month = String(originalDoc.openingBalanceDate).slice(0, 7)
+  // ADR 0016 §4: closings are per PT — only a closing of the ACCOUNT's PT locks it (same as the DB trigger)
+  const company = relId((originalDoc as { company?: unknown }).company)
   const closed = await req.payload.find({
     collection: 'period-closings',
-    where: { and: [{ status: { equals: 'closed' } }, { period: { greater_than_equal: month } }] },
+    where: { and: [{ status: { equals: 'closed' } }, { period: { greater_than_equal: month } }, ...(company !== undefined ? [{ company: { equals: company } }] : [])] },
     limit: 1,
     depth: 0,
     pagination: false,

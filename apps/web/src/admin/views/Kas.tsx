@@ -317,7 +317,7 @@ export async function KasBook(props: AdminViewServerProps) {
             title="Buku kas"
             sub={`${page.totalDocs} transaksi${filtered ? ' (terfilter)' : ''} · terbaru dulu · baris void tetap tampil, jurnal baliknya tertaut`}
           >
-            <LedgerTable rows={page.rows} lk={lk} lockOf={lockOf} writeIn={writeIn} canWrite={canWrite} filtered={filtered} pt={multi && q.pt === undefined ? pt : null} />
+            <LedgerTable rows={page.rows} lk={d.lk} lockOf={lockOf} writeIn={writeIn} canWrite={canWrite} filtered={filtered} pt={multi && q.pt === undefined ? pt : null} />
             <Pager q={q} page={page.page} totalPages={page.totalPages} />
           </Card>
         </Bento>
