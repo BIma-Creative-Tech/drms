@@ -234,6 +234,11 @@ locally (CI builds them).
 - Baseline (6f6f8cf): 375 tests. Now **402 tests passed** (`flutter test --coverage`), `flutter analyze` no issues,
   `dart format` 0 changed (173 files), build_runner + gen-l10n no drift.
 
+### Governance
+
+CHANGELOG `[Unreleased]` "MC3 — APK" block, ADR 0010 "Implementation note MC3-2" (deviations: no batch header,
+checkbox switcher, held NULL rows), `apps/mobile/README.md` "Multi-company". No version bump, no tag.
+
 ### API gaps (not changed here — for MC4 / the API owner)
 
 1. `/dashboard/owner|finance|pm` have no per-PT breakdown (and embedded lists no `company`): the wireframe's "rows per

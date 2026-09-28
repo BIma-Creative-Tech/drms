@@ -6,6 +6,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### MC3 — APK (MC3-2, branch `feat/mc3-mobile`; ADR 0016 §8, ADR 0010 MC note, `docs/proyekkas/mc/mc3-progress.md` §APK)
+
+#### Added
+- **Profile per PT:** `GET /me` `companies[]` parsed (roles, employee, capabilities, settings incl. sync flags per PT);
+  menus and home tiles follow the union over the selected PTs, document actions the roles IN the document's PT.
+- **PT switcher** (home app bar + Profil "PT aktif"): "Semua PT" or any subset, stored per user, sent as
+  `X-Company-Ids`; one PT = static code. 403 `COMPANY_NOT_ALLOWED` resets the selection and reloads `/me`.
+- **Create in one PT:** new request asks the PT first when several are possible; progress reports and check-ins take
+  the PT of their project / location; pickers show that PT's masters only; check-in / progress queue flags per PT.
+- **PT chips** on requests, drafts, inbox, LPJ queue, notifications, addenda, progress reports, team attendance and
+  the send queue when more than one PT is shown; **LPJ queue** (`GET /lpj-queue`) in the Persetujuan inbox; own
+  attendance recap per PT (`/attendance/me?company=`).
+- **"Pilih PT untuk data offline"**: offline data from before the update, when the account has several PTs.
+
+#### Changed
+- drift schema **v3**: `company_id` on local drafts, progress reports and outbox; migration keeps every v2 row
+  (one PT → assigned, several PTs → held until chosen, never guessed).
+- Sync: every item sends its own row's `company_id`, one batch per PT, no `X-Company-Ids`; `COMPANY_MISMATCH` /
+  `COMPANY_NOT_ALLOWED` = final rejection with a clear Indonesian text; batch 409 `COMPANY_REQUIRED` holds PT-less
+  items without losing them.
+- Masters cache per user **and** PT with `ETag` / `If-None-Match` (304 keeps the cache).
+
 ### MC3 — API (MC3-1, branch `feat/mc3-api`; ADR 0016 §5/§8, `docs/proyekkas/mc/mc3-progress.md`)
 
 #### Added
