@@ -256,9 +256,14 @@ jobs:
             fi
           fi
           echo "driver=$driver" | tee -a "$GITHUB_OUTPUT"
+      # Self-hosted (sysbox): buildkitd in docker-container would start every RUN step in a nested pid namespace, where
+      # sysbox-fs 0.7.1 leaks an unreaped helper → the build hangs forever (plan 12 R10, publishing run of 47ac6cd).
+      # --oci-worker-no-process-sandbox keeps RUN steps in buildkitd's own pid ns; the job container is already the
+      # sandbox. GitHub-hosted keeps the action's default flags.
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
         with:
           driver: ${{ steps.bx.outputs.driver }}
+          buildkitd-flags: ${{ runner.environment == 'self-hosted' && '--oci-worker-no-process-sandbox' || '--allow-insecure-entitlement security.insecure --allow-insecure-entitlement network.host' }}
 
       # Build ONCE per target. Publishing runs push an UNTAGGED manifest (push-by-digest); Trivy scans exactly that
       # digest; only a passing digest gets tags (imagetools create). Nothing tagged is ever unscanned.
