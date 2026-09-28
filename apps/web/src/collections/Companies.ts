@@ -195,6 +195,22 @@ export const COMPANY_SETTING_FIELDS: Field[] = [
   },
 ]
 
+/** Top-level field names / labels of a setting field (rows/collapsibles are grouped by their first named field). */
+function settingKey(f: Field): string {
+  if ('name' in f && typeof f.name === 'string') return f.name
+  if ('fields' in f && Array.isArray(f.fields)) return f.fields.map(settingKey).find(Boolean) ?? ''
+  return ''
+}
+const OPERATIONAL = ['defaultGeofenceRadiusM', 'lateReportDays', 'budgetWarnPct', 'progressWarnGapPct', 'receiptRoundingTolerance', 'receiptMaxAgeDays', 'reimburseAutoCloseDays', 'lpjDueDays', 'syncExpenseDraftsEnabled', 'syncProgressReportsEnabled', 'defaultWorkSchedule']
+const ATTENDANCE = ['syncAttendanceEnabled', 'selfieRetentionMonths', 'selfieRetentionDeleteEnabled']
+const REMINDERS = ['remindersEnabled', 'notifyRequesterStatusEnabled']
+/** COMPANY_SETTING_FIELDS in tab order; every field lands in exactly one tab (unit test). */
+export function settingFields(keys: readonly string[]): Field[] {
+  return COMPANY_SETTING_FIELDS.filter((f) => keys.includes(settingKey(f)))
+}
+export const COMPANY_SETTING_TABS = { OPERATIONAL, ATTENDANCE, REMINDERS } as const
+export const companySettingKey = settingKey
+
 /**
  * Perusahaan / PT (ADR 0016 §1, US-MC-01). Company #1 = DRMS (created by migration
  * `*_mc1_companies` from the former global). Read: members of the PT (+ group admin); create and
@@ -204,7 +220,14 @@ export const Companies: CollectionConfig = withAudit(
   {
     slug: 'companies',
     labels: { singular: 'Perusahaan (PT)', plural: 'Perusahaan (PT)' },
-    admin: { useAsTitle: 'name', group: 'Sistem', defaultColumns: ['shortCode', 'name', 'active'] },
+    admin: {
+      useAsTitle: 'name',
+      group: 'Sistem',
+      // MC2-4 (wireframe §3): Kode · Nama · Zona waktu · Anggota · Status · Dibuat
+      defaultColumns: ['shortCode', 'name', 'timezone', 'memberCount', 'active', 'createdAt'],
+      listSearchableFields: ['shortCode', 'name', 'legalName'],
+      description: 'Satu baris per PT. Admin grup membuat dan menonaktifkan PT; Admin/Direktur PT itu mengubah identitas dan pengaturan operasionalnya.',
+    },
     access: {
       read: ({ req }) => (isGroupAdmin(req) ? true : { id: { in: memberCompanies(req, { all: true }) } }),
       create: ({ req }) => isGroupAdmin(req),
@@ -213,34 +236,62 @@ export const Companies: CollectionConfig = withAudit(
     },
     hooks: { beforeChange: [shortCodeGuard] },
     fields: [
-      { name: 'name', type: 'text', label: 'Nama perusahaan', required: true, maxLength: 160 },
+      // MC2-4 (wireframe §3): tabs = the groups moved from "Setting perusahaan" (unnamed tabs: no schema change)
       {
-        name: 'shortCode',
-        type: 'text',
-        label: 'Kode singkat',
-        required: true,
-        unique: true,
-        index: true,
-        maxLength: 16,
-        admin: { description: 'Token {COMPANY} di nomor dokumen. Tidak dapat diubah setelah ada dokumen bernomor.' },
-        validate: (v: unknown) => (typeof v === 'string' && SHORT_CODE_RE.test(v) ? true : 'Huruf besar/angka, 2–16 karakter (token {COMPANY}).'),
+        type: 'tabs',
+        tabs: [
+          {
+            label: 'Identitas',
+            fields: [
+              {
+                type: 'row',
+                fields: [
+                  {
+                    name: 'shortCode',
+                    type: 'text',
+                    label: 'Kode singkat',
+                    required: true,
+                    unique: true,
+                    index: true,
+                    maxLength: 16,
+                    admin: {
+                      width: '30%',
+                      description: 'Token {COMPANY} di nomor dokumen (mis. 1/PB-CS1/27/IX/2026): huruf besar/angka, 2–16 karakter. Terkunci setelah PT ini punya dokumen bernomor.',
+                    },
+                    validate: (v: unknown) => (typeof v === 'string' && SHORT_CODE_RE.test(v) ? true : 'Huruf besar/angka, 2–16 karakter (token {COMPANY}).'),
+                  },
+                  { name: 'name', type: 'text', label: 'Nama perusahaan', required: true, maxLength: 160, admin: { width: '70%' } },
+                ],
+              },
+              { name: 'legalName', type: 'text', label: 'Nama legal', maxLength: 200 },
+              { name: 'logo', type: 'upload', relationTo: 'media-company', label: 'Logo', admin: { description: 'PNG/JPG, dipakai di kop PDF dan ekspor PT ini.' } },
+              { name: 'pdfHeader', type: 'textarea', label: 'Kop PDF', maxLength: 1000, admin: { description: 'Teks kop surat PDF PT ini (alamat, kontak).' } },
+              {
+                type: 'row',
+                fields: [
+                  { name: 'address', type: 'textarea', label: 'Alamat', maxLength: 500, admin: { width: '65%' } },
+                  { name: 'phone', type: 'text', label: 'Telepon', maxLength: 32, admin: { width: '35%' } },
+                ],
+              },
+              {
+                name: 'timezone',
+                type: 'text',
+                label: 'Zona waktu',
+                required: true,
+                defaultValue: DEFAULT_TZ,
+                validate: validateTimezone,
+                admin: { description: 'Rilis ini: harus sama dengan zona waktu server (ADR 0016 §9, Q-59).' },
+              },
+            ],
+          },
+          { label: 'Operasional', fields: settingFields(OPERATIONAL) },
+          { label: 'Absensi & retensi', fields: settingFields(ATTENDANCE) },
+          { label: 'Pengingat & notifikasi', fields: settingFields(REMINDERS) },
+        ],
       },
-      { name: 'legalName', type: 'text', label: 'Nama legal', maxLength: 200 },
-      { name: 'logo', type: 'upload', relationTo: 'media-company', label: 'Logo' },
-      { name: 'pdfHeader', type: 'textarea', label: 'Kop PDF', maxLength: 1000 },
-      { name: 'address', type: 'textarea', label: 'Alamat', maxLength: 500 },
-      { name: 'phone', type: 'text', label: 'Telepon', maxLength: 32 },
-      {
-        name: 'timezone',
-        type: 'text',
-        label: 'Zona waktu',
-        required: true,
-        defaultValue: DEFAULT_TZ,
-        validate: validateTimezone,
-        admin: { description: 'MC1: harus sama dengan zona waktu server (ADR 0016 §9).' },
-      },
-      ...COMPANY_SETTING_FIELDS,
-      { name: 'active', type: 'checkbox', label: 'Aktif', defaultValue: true, index: true, access: groupAdminOnly, admin: { position: 'sidebar' } },
+      { name: 'active', type: 'checkbox', label: 'Aktif', defaultValue: true, index: true, access: groupAdminOnly, admin: { position: 'sidebar', description: 'Hanya Admin grup yang dapat membuat atau menonaktifkan PT (alasan wajib).' } },
+      // list-only column (MC2-4): active members of the PT
+      { name: 'memberCount', type: 'ui', label: 'Anggota', admin: { disableListColumn: false, components: { Cell: '@/admin/components/companies/MemberCountCell#MemberCountCell' } } },
       uuidField(),
     ],
   },

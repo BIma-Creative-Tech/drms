@@ -1,3 +1,6 @@
+import { MemberCountCell as MemberCountCell_0560bc1409d80e4fbd9f8971b0f4bccb } from '@/admin/components/companies/MemberCountCell'
+import { CompanyCell as CompanyCell_a3ad1a52c7c805d12e2b4c793adf9c6d } from '@/admin/components/companies/CompanyCell'
+import { CompanyListFilter as CompanyListFilter_b31d22e0603f5879a90d350d8ff6b31b } from '@/admin/components/companies/CompanyListFilter'
 import { WorkflowPanel as WorkflowPanel_6fcc9de32a179d40aa1576187df45f1e } from '@/admin/components/WorkflowPanel'
 import { PdfLinks as PdfLinks_baf3bc4fa5b0188cc15c74a19f03943f } from '@/admin/components/PdfLinks'
 import { ReadOnlyJson as ReadOnlyJson_08329374a86bb7164f48836797d5c216 } from '@/components/ReadOnlyJson'
@@ -37,6 +40,9 @@ import { CollectionCards as CollectionCards_f9c02e79a4aed9a3924487c0cd4cafb1 } f
 
 /** @type import('payload').ImportMap */
 export const importMap = {
+  "@/admin/components/companies/MemberCountCell#MemberCountCell": MemberCountCell_0560bc1409d80e4fbd9f8971b0f4bccb,
+  "@/admin/components/companies/CompanyCell#CompanyCell": CompanyCell_a3ad1a52c7c805d12e2b4c793adf9c6d,
+  "@/admin/components/companies/CompanyListFilter#CompanyListFilter": CompanyListFilter_b31d22e0603f5879a90d350d8ff6b31b,
   "@/admin/components/WorkflowPanel#WorkflowPanel": WorkflowPanel_6fcc9de32a179d40aa1576187df45f1e,
   "@/admin/components/PdfLinks#PdfLinks": PdfLinks_baf3bc4fa5b0188cc15c74a19f03943f,
   "@/components/ReadOnlyJson#ReadOnlyJson": ReadOnlyJson_08329374a86bb7164f48836797d5c216,

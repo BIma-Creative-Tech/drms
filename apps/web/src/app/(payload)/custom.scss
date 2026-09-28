@@ -1496,3 +1496,75 @@ $pk-modules: dashboard, persetujuan, proyek, keuangan, absensi, laporan, penggun
     transform-origin: bottom center;
   }
 }
+
+// MC2-4 PT column chip (CompanyCell) + PT filter chips above list tables (CompanyListFilter)
+@layer payload {
+  .pk-pt-chip {
+    display: inline-block;
+    min-width: 40px;
+    padding: 1px 7px;
+    border-radius: 6px;
+    background: color-mix(in oklab, var(--pk-primary) 12%, transparent);
+    color: var(--pk-primary);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-align: center;
+    white-space: nowrap;
+  }
+
+  .pk-pt-filter {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 12px;
+    align-items: center;
+    margin: 0 0 12px;
+  }
+
+  .pk-pt-filter__label {
+    color: var(--pk-muted-fg);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .pk-pt-filter__chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .pk-pt-filter__chip {
+    display: inline-flex;
+    align-items: center;
+    min-height: 32px;
+    padding: 0 12px;
+    border: 1px solid var(--pk-border);
+    border-radius: 999px;
+    background: var(--pk-card);
+    color: var(--pk-fg);
+    font-size: 13px;
+    font-weight: 600;
+    text-decoration: none;
+
+    &:hover {
+      border-color: var(--pk-primary);
+      color: var(--pk-primary);
+    }
+
+    &[aria-current='true'] {
+      border-color: var(--pk-primary);
+      background: var(--pk-primary);
+      color: var(--pk-on-primary);
+    }
+  }
+
+  .pk-pt-filter__meta {
+    color: var(--pk-muted-fg);
+    font-size: 13px;
+  }
+}

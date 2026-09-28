@@ -61,6 +61,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   Terapkan / Batal, ≥ 1 PT, ↑/↓/Space/Esc, bottom sheet ≤ 768 px. New `POST /api/v1/me/companies` sets the HttpOnly
   cookie `pk-company-ids` (`__Host-` on https; "Semua PT" = cookie cleared); a PT without membership → 403
   `COMPANY_NOT_ALLOWED` (audited). OpenAPI regenerated.
+- **MC2-4 — Master Perusahaan + PT column/filter + employee ↔ PT** (ADR 0016 §11, wireframes §3–§4): companies form
+  in tabs (Identitas / Operasional / Absensi & retensi / Pengingat & notifikasi), list Kode · Nama · Zona waktu ·
+  Anggota · Aktif · Dibuat; every list with a PT column (30 per-PT collections, memberships, notifications, audit
+  logs) shows the PT short-code chip first and, with more than one PT selected, PT filter chips above the table
+  (`admin/company-list.ts`). A chosen PT sits at the top of master forms; employee create requires the PT when
+  several PTs are selected; employee / project / cost-center / work-schedule pickers list only the document's PT.
 
 ### Changed
 - **`company-settings` global = app-wide only** (APK gate, device image targets, offline max age, selfie batch

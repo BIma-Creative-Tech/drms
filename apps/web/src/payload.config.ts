@@ -7,6 +7,7 @@ import { buildConfig } from 'payload'
 import sharp from 'sharp'
 
 import { withStaffHiddenGlobals, withStaffPanelVisibility } from './access/panel-visibility'
+import { withCompanyListUi } from './admin/company-list'
 import { ACCOUNT_ADMIN_VIEWS, E2_ADMIN_VIEWS, E6_ADMIN_VIEWS, F2_ADMIN_VIEWS, F3_ADMIN_VIEWS, S2A_ADMIN_VIEWS, S3E_ADMIN_VIEWS } from './admin/config'
 import { v1Endpoints } from './api/v1'
 import { Attendances } from './collections/Attendances'
@@ -138,7 +139,8 @@ export default buildConfig({
   },
   // F2c: staff-only users see only their requests, receipts, notifications and profile.
   // E9 B-1 (G-21): non-object REST bodies (form/text, JSON arrays) → 400 before any hook runs.
-  collections: withBodyGuard(withStaffPanelVisibility([Users, Companies, CompanyMemberships, ...MASTER_COLLECTIONS, ...FLOW_COLLECTIONS, Attendances, AttendanceCorrections, ProgressReports, BudgetAddenda, Notifications, Devices, WebSessions, AuditLogs, ...MEDIA_COLLECTIONS])),
+  // MC2-4: PT column (short-code chip) + PT filter chips on every list with a `company` column.
+  collections: withBodyGuard(withStaffPanelVisibility(withCompanyListUi([Users, Companies, CompanyMemberships, ...MASTER_COLLECTIONS, ...FLOW_COLLECTIONS, Attendances, AttendanceCorrections, ProgressReports, BudgetAddenda, Notifications, Devices, WebSessions, AuditLogs, ...MEDIA_COLLECTIONS]))),
   globals: withGlobalBodyGuard(withStaffHiddenGlobals([CompanySettings])),
   // Admin UI in Bahasa Indonesia (ADR 0001 §5; @payloadcms/translations/languages/id @3.90.1).
   i18n: { supportedLanguages: { id }, fallbackLanguage: 'id' },
