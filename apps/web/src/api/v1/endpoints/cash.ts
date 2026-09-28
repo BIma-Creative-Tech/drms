@@ -3,6 +3,7 @@ import type { PayloadRequest, Where } from 'payload'
 import { relId } from '@/access/roles'
 import { balances, closePeriod, createManualEntry, currentLockDate, editManualEntry, kasCompanies, lockDates, reopenPeriod, voidEntry, type CashEntryDoc } from '@/domain/cash/ledger'
 
+import { companyQuery, singleCompanyQuery } from '../company-query'
 import { HttpError, json, v1 } from '../http'
 import { CashEntryCreate, CashEntryUpdate, CashListQuery, PeriodCloseBody, ReasonBody } from '../schemas-flow'
 
@@ -32,6 +33,7 @@ export function cashDto(e: CashEntryDoc & { postedAt?: string | null }) {
     reversedById: relId(e.reversedBy) ?? null,
     voidReason: e.voidReason ?? null,
     postedAt: e.postedAt ?? null,
+    companyId: relId((e as { company?: unknown }).company) ?? null, // MC3
   }
 }
 
@@ -57,6 +59,8 @@ export const listCashEndpoint = v1({
     if (q.data.cashAccountId) and.push({ cashAccount: { equals: q.data.cashAccountId } })
     if (q.data.projectId) and.push({ project: { equals: q.data.projectId } })
     if (q.data.costCenterId) and.push({ costCenter: { equals: q.data.costCenterId } })
+    const companies = await companyQuery(req) // MC3: narrows only
+    if (companies) and.push({ company: { in: companies } })
     if (q.data.cursor) {
       const n = Number(Buffer.from(q.data.cursor, 'base64url').toString('utf8'))
       if (!Number.isSafeInteger(n) || n <= 0) throw new HttpError(400, 'Bad Request', { detail: 'cursor tidak valid.' })
@@ -131,8 +135,11 @@ export const balancesEndpoint = v1({
   handler: async ({ req }) => {
     const asOf = req.searchParams.get('asOf') ?? undefined
     // ADR 0016 §5: accounts of the selected PTs where the caller is Finance/Direktur; `company` narrows.
-    const company = companyParam(req)
-    return json({ asOf: asOf ?? null, items: await balances(req, asOf, company === undefined ? {} : { companyIds: [company] }) })
+    // MC3 fix: `company` was passed through unchecked (any PT's balances) — now ⊆ selection ∩ Kas PTs.
+    const companies = await companyQuery(req)
+    const kas = kasCompanies(req)
+    const companyIds = companies === undefined ? kas : companies.filter((c) => kas.includes(c))
+    return json({ asOf: asOf ?? null, items: await balances(req, asOf, { companyIds }) })
   },
 })
 
@@ -165,7 +172,8 @@ export const listPeriodsEndpoint = v1({
   roles: ['pk-finance', 'pk-owner', 'pk-admin'],
   transactional: true,
   handler: async ({ req }) => {
-    const company = companyParam(req)
+    // MC3 fix: the lock date of `?company=` was read for ANY PT — now the PT must be in the selection
+    const company = await singleCompanyQuery(req)
     const res = await req.payload.find({
       collection: 'period-closings',
       where: company === undefined ? undefined : { company: { equals: company } },
@@ -177,7 +185,8 @@ export const listPeriodsEndpoint = v1({
       req,
     })
     // closings are per PT: one lock date per readable PT (`lockDate` = the requested / only PT, else null)
-    const pts = company !== undefined ? [company] : kasCompanies(req, ['pk-finance', 'pk-owner', 'pk-admin'])
+    const readable = kasCompanies(req, ['pk-finance', 'pk-owner', 'pk-admin'])
+    const pts = company !== undefined ? readable.filter((c) => c === company) : readable
     const locks = await lockDates(req, pts)
     return json({
       lockDate: company !== undefined || locks.length === 1 ? (locks[0]?.lockDate ?? null) : locks.length === 0 ? await currentLockDate(req) : null,

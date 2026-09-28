@@ -1,5 +1,7 @@
 import { z } from 'zod'
 
+import { companyFilterParam } from './schemas'
+
 /**
  * /api/v1 contract for E4: project stages (G11 editor), progress reports (T11, US-10/US-31) and the
  * K-09 progress-vs-budget data (US-12). Percentages have ≤ 2 decimals; business dates 'YYYY-MM-DD'
@@ -86,6 +88,7 @@ export const ProgressReportListQuery = z
     mine: z.enum(['1', 'true']).optional().meta({ description: 'Only reports created by the caller.' }),
     limit: z.coerce.number().int().min(1).max(100).default(25),
     cursor: z.string().max(64).optional(),
+    company: companyFilterParam,
   })
   .meta({ id: 'ProgressReportListQuery' })
 
@@ -104,6 +107,7 @@ export const ProgressReport = z
   .object({
     id,
     uuid: z.string().nullable(),
+    companyId: id.nullable().meta({ description: 'MC3: PT of the project.' }),
     docNo: z.string().nullable().meta({ description: 'LP/YYMM/####' }),
     project: z.object({ id, code: z.string().nullable(), name: z.string().nullable() }),
     stage: z.object({ id, name: z.string().nullable(), weightPct: z.number().nullable() }),

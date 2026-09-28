@@ -484,39 +484,44 @@ describe('MC2 — media of office roles per PT', () => {
   })
 })
 
-describe('MC2 — sync: items are processed under their own PT (COMPANY_MISMATCH)', () => {
-  it('dewi (Staff A + B): a B draft sent under X-Company-Ids A is rejected COMPANY_MISMATCH; under B it applies', async () => {
+describe('MC2/MC3 — sync: items are processed under their own PT (COMPANY_MISMATCH)', () => {
+  it('dewi (Staff A + B): a B draft with company_id A is rejected COMPANY_MISMATCH; with company_id B it applies (any header); without company_id → 409', async () => {
     await installLocalJwks()
     const p = await getTestPayload()
     const doc = await p.findByID({ collection: 'users', id: dewi.id, depth: 0, overrideAccess: true /* SYSTEM-READ: fixture */ })
     const t: TestUser = { ...dewi, keycloakSub: doc.keycloakSub as string }
     const token = await accessToken(t, ['pk-user'])
     const device = await registerDevice(t, token)
-    const item = () => ({
+    const item = (company?: number) => ({
       client_uuid: randomUUID(),
       type: 'expense_request.draft_upsert',
+      ...(company === undefined ? {} : { company_id: company }),
       schema_version: 1,
       offline: true,
       device_time: new Date().toISOString(),
       elapsed_ms: 10_000_000,
       payload: { kind: 'advance', title: 'MC2 sync', project_id: X.projectB, requester_ids: [X.empDewiB], bank_account_id: X.accDewiB, needed_date: '2026-09-30', lines: [{ description: 'x', total: 10_000, category_id: X.catB }] },
     })
-    const send = async (pt: number) => {
+    const send = async (pt: number, company?: number) => {
       resetRateLimits()
       const now = Date.now()
       const clock = { device_time: new Date(now).toISOString(), elapsed_ms: 10_000_000, boot_id: 'b', last_server_time: new Date(now - 60_000).toISOString(), last_server_elapsed_ms: 10_000_000 - 60_000 }
       const r = await http('POST', '/api/v1/sync/batch', {
         headers: { Authorization: `Bearer ${token}`, 'X-Device-Id': device, 'X-App-Version': '1.0.0', 'X-Company-Ids': String(pt) },
-        json: { batch_id: randomUUID(), device_id: device, clock, items: [item()] },
+        json: { batch_id: randomUUID(), device_id: device, clock, items: [item(company)] },
       })
+      if (company === undefined) return { status: String(r.status), errors: [{ code: String((r.body as { code?: string }).code) }] }
       expect(r.status, JSON.stringify(r.body)).toBe(200)
       return (r.body as { results: Array<{ status: string; errors: Array<{ code: string }> }> }).results[0]!
     }
-    const wrong = await send(A)
+    const wrong = await send(A, A)
     expect(wrong.status).toBe('rejected')
     expect(wrong.errors.map((e) => e.code)).toEqual(['COMPANY_MISMATCH'])
-    const right = await send(B)
+    // MC3: processed under company_id whatever X-Company-Ids says
+    const right = await send(A, B)
     expect(right.status, JSON.stringify(right)).toBe('applied')
+    // MC3: released APK (no company_id) with two PTs → 409 COMPANY_REQUIRED
+    expect(await send(B)).toEqual({ status: '409', errors: [{ code: 'COMPANY_REQUIRED' }] })
   })
 })
 

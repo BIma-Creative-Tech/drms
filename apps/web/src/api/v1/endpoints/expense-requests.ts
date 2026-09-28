@@ -13,7 +13,9 @@ import { recordTransfer, voidTransfer } from '@/domain/expense/transfers'
 import { acknowledge, approve, cancel, complete, reject, submit, withdraw } from '@/domain/expense/workflow'
 import { receiptsComplete, requestLpjRevision, reverseSettlement, settle, submitLpj, verifyLpj } from '@/domain/expense/lpj'
 import { requestHistory } from '@/domain/history'
-import { approvalInbox, officeQueueWhere } from '@/domain/expense/queues'
+import { approvalInbox, lpjQueue, officeQueueWhere } from '@/domain/expense/queues'
+
+import { companyQuery } from '../company-query'
 
 import { HttpError, json, problem, v1 } from '../http'
 import {
@@ -94,6 +96,9 @@ export const listRequestsEndpoint = v1({
       if (parts.length === 0) return json({ items: [], nextCursor: null })
       and.push({ or: parts })
     }
+    // MC3: ?company= narrows the selection (never widens; foreign → 403 COMPANY_NOT_ALLOWED)
+    const companies = await companyQuery(req)
+    if (companies) and.push({ company: { in: companies } })
     if (scope === 'inbox') and.push({ status: { in: ['pending_ack', 'pending_approval'] } })
     if (status) and.push({ status: { in: status.split(',') } })
     if (type) and.push({ type: { equals: type } })
@@ -183,15 +188,20 @@ export const transferQueueEndpoint = v1({
   method: 'get',
   roles: ['pk-finance', 'pk-owner'],
   handler: async ({ req }) => {
+    const companies = await companyQuery(req)
     const res = await req.payload.find({
       collection: 'expense-requests',
-      // MC2: only PTs where the caller is Finance / Direktur (not the team requests of a PM PT)
-      where: officeQueueWhere(req, {
-        or: [
-          { and: [{ type: { equals: 'advance' } }, { status: { equals: 'approved' } }] },
-          { and: [{ type: { equals: 'reimburse' } }, { status: { equals: 'receipts_verified' } }] },
-        ],
-      }),
+      // MC2: only PTs where the caller is Finance / Direktur (not the team requests of a PM PT); MC3: ?company=
+      where: officeQueueWhere(
+        req,
+        {
+          or: [
+            { and: [{ type: { equals: 'advance' } }, { status: { equals: 'approved' } }] },
+            { and: [{ type: { equals: 'reimburse' } }, { status: { equals: 'receipts_verified' } }] },
+          ],
+        },
+        { companyIds: companies },
+      ),
       sort: 'neededDate',
       limit: 500,
       depth: 0,
@@ -221,7 +231,18 @@ export const approvalInboxEndpoint = v1({
   path: '/approvals/inbox',
   method: 'get',
   transactional: true, // budget figures use the request transaction handle
-  handler: async ({ req }) => json(await approvalInbox(req)),
+  handler: async ({ req }) => json(await approvalInbox(req, { companyIds: await companyQuery(req) })),
+})
+
+/**
+ * GET /lpj-queue[?company=] — US-21 LPJ verification list (Uang Muka "LPJ Diajukan" / "LPJ
+ * Terverifikasi") of the PTs where the caller is Finance / Direktur, with `company` refs (MC3-1).
+ */
+export const lpjQueueEndpoint = v1({
+  path: '/lpj-queue',
+  method: 'get',
+  roles: ['pk-finance', 'pk-owner'],
+  handler: async ({ req }) => json({ items: await lpjQueue(req, { companyIds: await companyQuery(req) }) }),
 })
 
 // ---------------------------------------------------------------- drafts
@@ -498,6 +519,7 @@ export const EXPENSE_ENDPOINTS = [
   historyEndpoint,
   transferQueueEndpoint,
   approvalInboxEndpoint,
+  lpjQueueEndpoint,
   submitEndpoint,
   withdrawEndpoint,
   cancelEndpoint,

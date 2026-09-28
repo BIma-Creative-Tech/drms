@@ -69,6 +69,7 @@ export async function reportDtos(req: PayloadRequest, docs: readonly ReportDoc[]
     return {
       id: d.id,
       uuid: d.uuid ?? null,
+      companyId: relId((d as { company?: unknown }).company) ?? null, // MC3: PT chip
       docNo: d.docNo ?? null,
       project: { id: projectId, code: n.project.get(projectId)?.code ?? null, name: n.project.get(projectId)?.name ?? null },
       stage: { id: stageId, name: n.stage.get(stageId)?.name ?? null, weightPct: n.stage.get(stageId)?.weightPct ?? null },
@@ -108,7 +109,7 @@ export async function reportDto(req: PayloadRequest, d: ReportDoc): Promise<Repo
   return (await reportDtos(req, [d]))[0]!
 }
 
-export type ReportListFilter = { projectId?: number; stageId?: number; from?: string; to?: string; mine?: boolean; limit: number; after?: number }
+export type ReportListFilter = { projectId?: number; stageId?: number; from?: string; to?: string; mine?: boolean; limit: number; after?: number; companyIds?: readonly number[] }
 
 /** US-31: newest first, filter by project (and stage / date range), caller's read scope, cursor on id. */
 export async function listReports(req: PayloadRequest, f: ReportListFilter): Promise<{ items: ReportDto[]; nextCursor: number | null }> {
@@ -121,6 +122,7 @@ export async function listReports(req: PayloadRequest, f: ReportListFilter): Pro
   if (f.to) and.push({ reportDate: { less_than_equal: f.to } })
   if (f.mine) and.push({ reporter: { equals: userId(req) ?? -1 } })
   if (f.after !== undefined) and.push({ id: { less_than: f.after } })
+  if (f.companyIds?.length) and.push({ company: { in: [...f.companyIds] } }) // MC3: narrows only
   let docs: ReportDoc[] = []
   try {
     const res = await req.payload.find({
