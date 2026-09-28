@@ -38,7 +38,7 @@ env:
 jobs:
   resolve:
     name: resolve release → image@digest
-    runs-on: ubuntu-24.04
+    runs-on: ${{ fromJSON(vars.DEPLOY_RUNS_ON || '"ubuntu-24.04"') }}
     timeout-minutes: 10
     permissions:
       contents: read
@@ -91,7 +91,7 @@ jobs:
     name: deploy prod (environment infra-deploy — approval)
     needs: resolve
     if: vars.PROD_DEPLOY_ENABLED == 'true'
-    runs-on: ubuntu-24.04
+    runs-on: ${{ fromJSON(vars.DEPLOY_RUNS_ON || '"ubuntu-24.04"') }}
     timeout-minutes: 20
     environment:
       name: infra-deploy

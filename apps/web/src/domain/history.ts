@@ -1,6 +1,8 @@
 import type { PayloadRequest, Where } from 'payload'
 
 import { hasRole } from '@/access/roles'
+import { companyOf } from '@/domain/companies'
+import { displayNames } from '@/domain/companies'
 
 /**
  * "Riwayat" (US-35, requirements v1.1 §8 "Tampilan log"): audit rows of a document — who (user +
@@ -59,22 +61,7 @@ export async function historyRows(req: PayloadRequest, targets: Array<{ docType:
     req,
   })
   const userIds = [...new Set(res.docs.map((a) => a.userId).filter((x): x is number => typeof x === 'number'))]
-  const names = new Map<number, string>()
-  if (userIds.length > 0) {
-    const users = await req.payload.find({
-      collection: 'users',
-      where: { id: { in: userIds } },
-      depth: 1,
-      pagination: false,
-      select: { name: true, email: true, employee: true },
-      overrideAccess: true, // SYSTEM-READ: display names for the history (no other user data exposed)
-      req,
-    })
-    for (const u of users.docs) {
-      const emp = u.employee && typeof u.employee === 'object' ? (u.employee as { name?: string }).name : undefined
-      names.set(u.id as number, emp || (u.name as string) || `user#${u.id}`)
-    }
-  }
+  const names = await displayNames(req, userIds, { emailFallback: false })
   return res.docs.map((a) => ({
     id: a.id as number,
     serverTime: (a.serverTime as string) ?? '',
@@ -106,7 +93,9 @@ export async function requestHistory(req: PayloadRequest, requestId: number): Pr
     { docType: 'transfer', ids: await idsOf(req, 'transfers', 'request', requestId) },
     { docType: 'settlement', ids: await idsOf(req, 'settlements', 'request', requestId) },
   ]
-  if (hasRole(req, 'pk-finance', 'pk-owner', 'pk-admin')) {
+  // ADR 0016 §5: ledger rows only for office roles OF THE REQUEST's PT
+  const company = await companyOf(req, 'expense-requests', requestId)
+  if (hasRole(req, ['pk-finance', 'pk-owner', 'pk-admin'], company)) {
     targets.push({ docType: 'cash_entry', ids: await idsOf(req, 'cash-entries', 'expenseRequest', requestId) })
   }
   return historyRows(req, targets)

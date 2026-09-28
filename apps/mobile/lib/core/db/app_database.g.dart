@@ -31,6 +31,17 @@ class $LocalDraftsTable extends LocalDrafts
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _companyIdMeta = const VerificationMeta(
+    'companyId',
+  );
+  @override
+  late final GeneratedColumn<int> companyId = GeneratedColumn<int>(
+    'company_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _typeMeta = const VerificationMeta('type');
   @override
   late final GeneratedColumn<String> type = GeneratedColumn<String>(
@@ -212,6 +223,7 @@ class $LocalDraftsTable extends LocalDrafts
   List<GeneratedColumn> get $columns => [
     clientUuid,
     userSub,
+    companyId,
     type,
     title,
     projectId,
@@ -256,6 +268,12 @@ class $LocalDraftsTable extends LocalDrafts
       );
     } else if (isInserting) {
       context.missing(_userSubMeta);
+    }
+    if (data.containsKey('company_id')) {
+      context.handle(
+        _companyIdMeta,
+        companyId.isAcceptableOrUnknown(data['company_id']!, _companyIdMeta),
+      );
     }
     if (data.containsKey('type')) {
       context.handle(
@@ -388,6 +406,10 @@ class $LocalDraftsTable extends LocalDrafts
         DriftSqlType.string,
         data['${effectivePrefix}user_sub'],
       )!,
+      companyId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}company_id'],
+      ),
       type: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}type'],
@@ -464,6 +486,10 @@ class $LocalDraftsTable extends LocalDrafts
 class LocalDraft extends DataClass implements Insertable<LocalDraft> {
   final String clientUuid;
   final String userSub;
+
+  /// MC3 (schema v3): PT of the draft. Null = written before v3 and not yet assigned ("needs PT" when
+  /// the user has several PTs; see `CompanyBackfill`). Lines and receipts belong to the draft's PT.
+  final int? companyId;
   final String type;
   final String title;
   final int? projectId;
@@ -485,6 +511,7 @@ class LocalDraft extends DataClass implements Insertable<LocalDraft> {
   const LocalDraft({
     required this.clientUuid,
     required this.userSub,
+    this.companyId,
     required this.type,
     required this.title,
     this.projectId,
@@ -507,6 +534,9 @@ class LocalDraft extends DataClass implements Insertable<LocalDraft> {
     final map = <String, Expression>{};
     map['client_uuid'] = Variable<String>(clientUuid);
     map['user_sub'] = Variable<String>(userSub);
+    if (!nullToAbsent || companyId != null) {
+      map['company_id'] = Variable<int>(companyId);
+    }
     map['type'] = Variable<String>(type);
     map['title'] = Variable<String>(title);
     if (!nullToAbsent || projectId != null) {
@@ -548,6 +578,9 @@ class LocalDraft extends DataClass implements Insertable<LocalDraft> {
     return LocalDraftsCompanion(
       clientUuid: Value(clientUuid),
       userSub: Value(userSub),
+      companyId: companyId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(companyId),
       type: Value(type),
       title: Value(title),
       projectId: projectId == null && nullToAbsent
@@ -593,6 +626,7 @@ class LocalDraft extends DataClass implements Insertable<LocalDraft> {
     return LocalDraft(
       clientUuid: serializer.fromJson<String>(json['clientUuid']),
       userSub: serializer.fromJson<String>(json['userSub']),
+      companyId: serializer.fromJson<int?>(json['companyId']),
       type: serializer.fromJson<String>(json['type']),
       title: serializer.fromJson<String>(json['title']),
       projectId: serializer.fromJson<int?>(json['projectId']),
@@ -617,6 +651,7 @@ class LocalDraft extends DataClass implements Insertable<LocalDraft> {
     return <String, dynamic>{
       'clientUuid': serializer.toJson<String>(clientUuid),
       'userSub': serializer.toJson<String>(userSub),
+      'companyId': serializer.toJson<int?>(companyId),
       'type': serializer.toJson<String>(type),
       'title': serializer.toJson<String>(title),
       'projectId': serializer.toJson<int?>(projectId),
@@ -639,6 +674,7 @@ class LocalDraft extends DataClass implements Insertable<LocalDraft> {
   LocalDraft copyWith({
     String? clientUuid,
     String? userSub,
+    Value<int?> companyId = const Value.absent(),
     String? type,
     String? title,
     Value<int?> projectId = const Value.absent(),
@@ -658,6 +694,7 @@ class LocalDraft extends DataClass implements Insertable<LocalDraft> {
   }) => LocalDraft(
     clientUuid: clientUuid ?? this.clientUuid,
     userSub: userSub ?? this.userSub,
+    companyId: companyId.present ? companyId.value : this.companyId,
     type: type ?? this.type,
     title: title ?? this.title,
     projectId: projectId.present ? projectId.value : this.projectId,
@@ -685,6 +722,7 @@ class LocalDraft extends DataClass implements Insertable<LocalDraft> {
           ? data.clientUuid.value
           : this.clientUuid,
       userSub: data.userSub.present ? data.userSub.value : this.userSub,
+      companyId: data.companyId.present ? data.companyId.value : this.companyId,
       type: data.type.present ? data.type.value : this.type,
       title: data.title.present ? data.title.value : this.title,
       projectId: data.projectId.present ? data.projectId.value : this.projectId,
@@ -719,6 +757,7 @@ class LocalDraft extends DataClass implements Insertable<LocalDraft> {
     return (StringBuffer('LocalDraft(')
           ..write('clientUuid: $clientUuid, ')
           ..write('userSub: $userSub, ')
+          ..write('companyId: $companyId, ')
           ..write('type: $type, ')
           ..write('title: $title, ')
           ..write('projectId: $projectId, ')
@@ -743,6 +782,7 @@ class LocalDraft extends DataClass implements Insertable<LocalDraft> {
   int get hashCode => Object.hash(
     clientUuid,
     userSub,
+    companyId,
     type,
     title,
     projectId,
@@ -766,6 +806,7 @@ class LocalDraft extends DataClass implements Insertable<LocalDraft> {
       (other is LocalDraft &&
           other.clientUuid == this.clientUuid &&
           other.userSub == this.userSub &&
+          other.companyId == this.companyId &&
           other.type == this.type &&
           other.title == this.title &&
           other.projectId == this.projectId &&
@@ -787,6 +828,7 @@ class LocalDraft extends DataClass implements Insertable<LocalDraft> {
 class LocalDraftsCompanion extends UpdateCompanion<LocalDraft> {
   final Value<String> clientUuid;
   final Value<String> userSub;
+  final Value<int?> companyId;
   final Value<String> type;
   final Value<String> title;
   final Value<int?> projectId;
@@ -807,6 +849,7 @@ class LocalDraftsCompanion extends UpdateCompanion<LocalDraft> {
   const LocalDraftsCompanion({
     this.clientUuid = const Value.absent(),
     this.userSub = const Value.absent(),
+    this.companyId = const Value.absent(),
     this.type = const Value.absent(),
     this.title = const Value.absent(),
     this.projectId = const Value.absent(),
@@ -828,6 +871,7 @@ class LocalDraftsCompanion extends UpdateCompanion<LocalDraft> {
   LocalDraftsCompanion.insert({
     required String clientUuid,
     required String userSub,
+    this.companyId = const Value.absent(),
     required String type,
     this.title = const Value.absent(),
     this.projectId = const Value.absent(),
@@ -853,6 +897,7 @@ class LocalDraftsCompanion extends UpdateCompanion<LocalDraft> {
   static Insertable<LocalDraft> custom({
     Expression<String>? clientUuid,
     Expression<String>? userSub,
+    Expression<int>? companyId,
     Expression<String>? type,
     Expression<String>? title,
     Expression<int>? projectId,
@@ -874,6 +919,7 @@ class LocalDraftsCompanion extends UpdateCompanion<LocalDraft> {
     return RawValuesInsertable({
       if (clientUuid != null) 'client_uuid': clientUuid,
       if (userSub != null) 'user_sub': userSub,
+      if (companyId != null) 'company_id': companyId,
       if (type != null) 'type': type,
       if (title != null) 'title': title,
       if (projectId != null) 'project_id': projectId,
@@ -897,6 +943,7 @@ class LocalDraftsCompanion extends UpdateCompanion<LocalDraft> {
   LocalDraftsCompanion copyWith({
     Value<String>? clientUuid,
     Value<String>? userSub,
+    Value<int?>? companyId,
     Value<String>? type,
     Value<String>? title,
     Value<int?>? projectId,
@@ -918,6 +965,7 @@ class LocalDraftsCompanion extends UpdateCompanion<LocalDraft> {
     return LocalDraftsCompanion(
       clientUuid: clientUuid ?? this.clientUuid,
       userSub: userSub ?? this.userSub,
+      companyId: companyId ?? this.companyId,
       type: type ?? this.type,
       title: title ?? this.title,
       projectId: projectId ?? this.projectId,
@@ -946,6 +994,9 @@ class LocalDraftsCompanion extends UpdateCompanion<LocalDraft> {
     }
     if (userSub.present) {
       map['user_sub'] = Variable<String>(userSub.value);
+    }
+    if (companyId.present) {
+      map['company_id'] = Variable<int>(companyId.value);
     }
     if (type.present) {
       map['type'] = Variable<String>(type.value);
@@ -1006,6 +1057,7 @@ class LocalDraftsCompanion extends UpdateCompanion<LocalDraft> {
     return (StringBuffer('LocalDraftsCompanion(')
           ..write('clientUuid: $clientUuid, ')
           ..write('userSub: $userSub, ')
+          ..write('companyId: $companyId, ')
           ..write('type: $type, ')
           ..write('title: $title, ')
           ..write('projectId: $projectId, ')
@@ -2971,6 +3023,17 @@ class $OutboxTable extends Outbox with TableInfo<$OutboxTable, OutboxData> {
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _companyIdMeta = const VerificationMeta(
+    'companyId',
+  );
+  @override
+  late final GeneratedColumn<int> companyId = GeneratedColumn<int>(
+    'company_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _typeMeta = const VerificationMeta('type');
   @override
   late final GeneratedColumn<String> type = GeneratedColumn<String>(
@@ -3142,6 +3205,7 @@ class $OutboxTable extends Outbox with TableInfo<$OutboxTable, OutboxData> {
   List<GeneratedColumn> get $columns => [
     opUuid,
     userSub,
+    companyId,
     type,
     targetUuid,
     payloadJson,
@@ -3185,6 +3249,12 @@ class $OutboxTable extends Outbox with TableInfo<$OutboxTable, OutboxData> {
       );
     } else if (isInserting) {
       context.missing(_userSubMeta);
+    }
+    if (data.containsKey('company_id')) {
+      context.handle(
+        _companyIdMeta,
+        companyId.isAcceptableOrUnknown(data['company_id']!, _companyIdMeta),
+      );
     }
     if (data.containsKey('type')) {
       context.handle(
@@ -3322,6 +3392,10 @@ class $OutboxTable extends Outbox with TableInfo<$OutboxTable, OutboxData> {
         DriftSqlType.string,
         data['${effectivePrefix}user_sub'],
       )!,
+      companyId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}company_id'],
+      ),
       type: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}type'],
@@ -3394,6 +3468,10 @@ class $OutboxTable extends Outbox with TableInfo<$OutboxTable, OutboxData> {
 class OutboxData extends DataClass implements Insertable<OutboxData> {
   final String opUuid;
   final String userSub;
+
+  /// MC3 (schema v3): PT of the item, sent as `company_id` (the item's own PT, never the switcher
+  /// selection). Null = queued before v3: assigned when the user has one PT, else held until chosen.
+  final int? companyId;
   final String type;
   final String targetUuid;
   final String payloadJson;
@@ -3414,6 +3492,7 @@ class OutboxData extends DataClass implements Insertable<OutboxData> {
   const OutboxData({
     required this.opUuid,
     required this.userSub,
+    this.companyId,
     required this.type,
     required this.targetUuid,
     required this.payloadJson,
@@ -3435,6 +3514,9 @@ class OutboxData extends DataClass implements Insertable<OutboxData> {
     final map = <String, Expression>{};
     map['op_uuid'] = Variable<String>(opUuid);
     map['user_sub'] = Variable<String>(userSub);
+    if (!nullToAbsent || companyId != null) {
+      map['company_id'] = Variable<int>(companyId);
+    }
     map['type'] = Variable<String>(type);
     map['target_uuid'] = Variable<String>(targetUuid);
     map['payload_json'] = Variable<String>(payloadJson);
@@ -3465,6 +3547,9 @@ class OutboxData extends DataClass implements Insertable<OutboxData> {
     return OutboxCompanion(
       opUuid: Value(opUuid),
       userSub: Value(userSub),
+      companyId: companyId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(companyId),
       type: Value(type),
       targetUuid: Value(targetUuid),
       payloadJson: Value(payloadJson),
@@ -3499,6 +3584,7 @@ class OutboxData extends DataClass implements Insertable<OutboxData> {
     return OutboxData(
       opUuid: serializer.fromJson<String>(json['opUuid']),
       userSub: serializer.fromJson<String>(json['userSub']),
+      companyId: serializer.fromJson<int?>(json['companyId']),
       type: serializer.fromJson<String>(json['type']),
       targetUuid: serializer.fromJson<String>(json['targetUuid']),
       payloadJson: serializer.fromJson<String>(json['payloadJson']),
@@ -3522,6 +3608,7 @@ class OutboxData extends DataClass implements Insertable<OutboxData> {
     return <String, dynamic>{
       'opUuid': serializer.toJson<String>(opUuid),
       'userSub': serializer.toJson<String>(userSub),
+      'companyId': serializer.toJson<int?>(companyId),
       'type': serializer.toJson<String>(type),
       'targetUuid': serializer.toJson<String>(targetUuid),
       'payloadJson': serializer.toJson<String>(payloadJson),
@@ -3543,6 +3630,7 @@ class OutboxData extends DataClass implements Insertable<OutboxData> {
   OutboxData copyWith({
     String? opUuid,
     String? userSub,
+    Value<int?> companyId = const Value.absent(),
     String? type,
     String? targetUuid,
     String? payloadJson,
@@ -3561,6 +3649,7 @@ class OutboxData extends DataClass implements Insertable<OutboxData> {
   }) => OutboxData(
     opUuid: opUuid ?? this.opUuid,
     userSub: userSub ?? this.userSub,
+    companyId: companyId.present ? companyId.value : this.companyId,
     type: type ?? this.type,
     targetUuid: targetUuid ?? this.targetUuid,
     payloadJson: payloadJson ?? this.payloadJson,
@@ -3587,6 +3676,7 @@ class OutboxData extends DataClass implements Insertable<OutboxData> {
     return OutboxData(
       opUuid: data.opUuid.present ? data.opUuid.value : this.opUuid,
       userSub: data.userSub.present ? data.userSub.value : this.userSub,
+      companyId: data.companyId.present ? data.companyId.value : this.companyId,
       type: data.type.present ? data.type.value : this.type,
       targetUuid: data.targetUuid.present
           ? data.targetUuid.value
@@ -3624,6 +3714,7 @@ class OutboxData extends DataClass implements Insertable<OutboxData> {
     return (StringBuffer('OutboxData(')
           ..write('opUuid: $opUuid, ')
           ..write('userSub: $userSub, ')
+          ..write('companyId: $companyId, ')
           ..write('type: $type, ')
           ..write('targetUuid: $targetUuid, ')
           ..write('payloadJson: $payloadJson, ')
@@ -3647,6 +3738,7 @@ class OutboxData extends DataClass implements Insertable<OutboxData> {
   int get hashCode => Object.hash(
     opUuid,
     userSub,
+    companyId,
     type,
     targetUuid,
     payloadJson,
@@ -3669,6 +3761,7 @@ class OutboxData extends DataClass implements Insertable<OutboxData> {
       (other is OutboxData &&
           other.opUuid == this.opUuid &&
           other.userSub == this.userSub &&
+          other.companyId == this.companyId &&
           other.type == this.type &&
           other.targetUuid == this.targetUuid &&
           other.payloadJson == this.payloadJson &&
@@ -3689,6 +3782,7 @@ class OutboxData extends DataClass implements Insertable<OutboxData> {
 class OutboxCompanion extends UpdateCompanion<OutboxData> {
   final Value<String> opUuid;
   final Value<String> userSub;
+  final Value<int?> companyId;
   final Value<String> type;
   final Value<String> targetUuid;
   final Value<String> payloadJson;
@@ -3708,6 +3802,7 @@ class OutboxCompanion extends UpdateCompanion<OutboxData> {
   const OutboxCompanion({
     this.opUuid = const Value.absent(),
     this.userSub = const Value.absent(),
+    this.companyId = const Value.absent(),
     this.type = const Value.absent(),
     this.targetUuid = const Value.absent(),
     this.payloadJson = const Value.absent(),
@@ -3728,6 +3823,7 @@ class OutboxCompanion extends UpdateCompanion<OutboxData> {
   OutboxCompanion.insert({
     required String opUuid,
     required String userSub,
+    this.companyId = const Value.absent(),
     required String type,
     required String targetUuid,
     required String payloadJson,
@@ -3756,6 +3852,7 @@ class OutboxCompanion extends UpdateCompanion<OutboxData> {
   static Insertable<OutboxData> custom({
     Expression<String>? opUuid,
     Expression<String>? userSub,
+    Expression<int>? companyId,
     Expression<String>? type,
     Expression<String>? targetUuid,
     Expression<String>? payloadJson,
@@ -3776,6 +3873,7 @@ class OutboxCompanion extends UpdateCompanion<OutboxData> {
     return RawValuesInsertable({
       if (opUuid != null) 'op_uuid': opUuid,
       if (userSub != null) 'user_sub': userSub,
+      if (companyId != null) 'company_id': companyId,
       if (type != null) 'type': type,
       if (targetUuid != null) 'target_uuid': targetUuid,
       if (payloadJson != null) 'payload_json': payloadJson,
@@ -3798,6 +3896,7 @@ class OutboxCompanion extends UpdateCompanion<OutboxData> {
   OutboxCompanion copyWith({
     Value<String>? opUuid,
     Value<String>? userSub,
+    Value<int?>? companyId,
     Value<String>? type,
     Value<String>? targetUuid,
     Value<String>? payloadJson,
@@ -3818,6 +3917,7 @@ class OutboxCompanion extends UpdateCompanion<OutboxData> {
     return OutboxCompanion(
       opUuid: opUuid ?? this.opUuid,
       userSub: userSub ?? this.userSub,
+      companyId: companyId ?? this.companyId,
       type: type ?? this.type,
       targetUuid: targetUuid ?? this.targetUuid,
       payloadJson: payloadJson ?? this.payloadJson,
@@ -3845,6 +3945,9 @@ class OutboxCompanion extends UpdateCompanion<OutboxData> {
     }
     if (userSub.present) {
       map['user_sub'] = Variable<String>(userSub.value);
+    }
+    if (companyId.present) {
+      map['company_id'] = Variable<int>(companyId.value);
     }
     if (type.present) {
       map['type'] = Variable<String>(type.value);
@@ -3902,6 +4005,7 @@ class OutboxCompanion extends UpdateCompanion<OutboxData> {
     return (StringBuffer('OutboxCompanion(')
           ..write('opUuid: $opUuid, ')
           ..write('userSub: $userSub, ')
+          ..write('companyId: $companyId, ')
           ..write('type: $type, ')
           ..write('targetUuid: $targetUuid, ')
           ..write('payloadJson: $payloadJson, ')
@@ -4156,6 +4260,17 @@ class $LocalProgressReportsTable extends LocalProgressReports
     false,
     type: DriftSqlType.string,
     requiredDuringInsert: true,
+  );
+  static const VerificationMeta _companyIdMeta = const VerificationMeta(
+    'companyId',
+  );
+  @override
+  late final GeneratedColumn<int> companyId = GeneratedColumn<int>(
+    'company_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
   );
   static const VerificationMeta _projectIdMeta = const VerificationMeta(
     'projectId',
@@ -4416,6 +4531,7 @@ class $LocalProgressReportsTable extends LocalProgressReports
   List<GeneratedColumn> get $columns => [
     clientUuid,
     userSub,
+    companyId,
     projectId,
     projectLabel,
     stageId,
@@ -4467,6 +4583,12 @@ class $LocalProgressReportsTable extends LocalProgressReports
       );
     } else if (isInserting) {
       context.missing(_userSubMeta);
+    }
+    if (data.containsKey('company_id')) {
+      context.handle(
+        _companyIdMeta,
+        companyId.isAcceptableOrUnknown(data['company_id']!, _companyIdMeta),
+      );
     }
     if (data.containsKey('project_id')) {
       context.handle(
@@ -4654,6 +4776,10 @@ class $LocalProgressReportsTable extends LocalProgressReports
         DriftSqlType.string,
         data['${effectivePrefix}user_sub'],
       )!,
+      companyId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}company_id'],
+      ),
       projectId: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
         data['${effectivePrefix}project_id'],
@@ -4759,6 +4885,9 @@ class LocalProgressReport extends DataClass
     implements Insertable<LocalProgressReport> {
   final String clientUuid;
   final String userSub;
+
+  /// MC3 (schema v3): PT of the report (= PT of its project). Null = written before v3, not yet assigned.
+  final int? companyId;
   final int projectId;
   final String projectLabel;
   final int stageId;
@@ -4799,6 +4928,7 @@ class LocalProgressReport extends DataClass
   const LocalProgressReport({
     required this.clientUuid,
     required this.userSub,
+    this.companyId,
     required this.projectId,
     required this.projectLabel,
     required this.stageId,
@@ -4828,6 +4958,9 @@ class LocalProgressReport extends DataClass
     final map = <String, Expression>{};
     map['client_uuid'] = Variable<String>(clientUuid);
     map['user_sub'] = Variable<String>(userSub);
+    if (!nullToAbsent || companyId != null) {
+      map['company_id'] = Variable<int>(companyId);
+    }
     map['project_id'] = Variable<int>(projectId);
     map['project_label'] = Variable<String>(projectLabel);
     map['stage_id'] = Variable<int>(stageId);
@@ -4880,6 +5013,9 @@ class LocalProgressReport extends DataClass
     return LocalProgressReportsCompanion(
       clientUuid: Value(clientUuid),
       userSub: Value(userSub),
+      companyId: companyId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(companyId),
       projectId: Value(projectId),
       projectLabel: Value(projectLabel),
       stageId: Value(stageId),
@@ -4936,6 +5072,7 @@ class LocalProgressReport extends DataClass
     return LocalProgressReport(
       clientUuid: serializer.fromJson<String>(json['clientUuid']),
       userSub: serializer.fromJson<String>(json['userSub']),
+      companyId: serializer.fromJson<int?>(json['companyId']),
       projectId: serializer.fromJson<int>(json['projectId']),
       projectLabel: serializer.fromJson<String>(json['projectLabel']),
       stageId: serializer.fromJson<int>(json['stageId']),
@@ -4967,6 +5104,7 @@ class LocalProgressReport extends DataClass
     return <String, dynamic>{
       'clientUuid': serializer.toJson<String>(clientUuid),
       'userSub': serializer.toJson<String>(userSub),
+      'companyId': serializer.toJson<int?>(companyId),
       'projectId': serializer.toJson<int>(projectId),
       'projectLabel': serializer.toJson<String>(projectLabel),
       'stageId': serializer.toJson<int>(stageId),
@@ -4996,6 +5134,7 @@ class LocalProgressReport extends DataClass
   LocalProgressReport copyWith({
     String? clientUuid,
     String? userSub,
+    Value<int?> companyId = const Value.absent(),
     int? projectId,
     String? projectLabel,
     int? stageId,
@@ -5022,6 +5161,7 @@ class LocalProgressReport extends DataClass
   }) => LocalProgressReport(
     clientUuid: clientUuid ?? this.clientUuid,
     userSub: userSub ?? this.userSub,
+    companyId: companyId.present ? companyId.value : this.companyId,
     projectId: projectId ?? this.projectId,
     projectLabel: projectLabel ?? this.projectLabel,
     stageId: stageId ?? this.stageId,
@@ -5060,6 +5200,7 @@ class LocalProgressReport extends DataClass
           ? data.clientUuid.value
           : this.clientUuid,
       userSub: data.userSub.present ? data.userSub.value : this.userSub,
+      companyId: data.companyId.present ? data.companyId.value : this.companyId,
       projectId: data.projectId.present ? data.projectId.value : this.projectId,
       projectLabel: data.projectLabel.present
           ? data.projectLabel.value
@@ -5107,6 +5248,7 @@ class LocalProgressReport extends DataClass
     return (StringBuffer('LocalProgressReport(')
           ..write('clientUuid: $clientUuid, ')
           ..write('userSub: $userSub, ')
+          ..write('companyId: $companyId, ')
           ..write('projectId: $projectId, ')
           ..write('projectLabel: $projectLabel, ')
           ..write('stageId: $stageId, ')
@@ -5138,6 +5280,7 @@ class LocalProgressReport extends DataClass
   int get hashCode => Object.hashAll([
     clientUuid,
     userSub,
+    companyId,
     projectId,
     projectLabel,
     stageId,
@@ -5168,6 +5311,7 @@ class LocalProgressReport extends DataClass
       (other is LocalProgressReport &&
           other.clientUuid == this.clientUuid &&
           other.userSub == this.userSub &&
+          other.companyId == this.companyId &&
           other.projectId == this.projectId &&
           other.projectLabel == this.projectLabel &&
           other.stageId == this.stageId &&
@@ -5197,6 +5341,7 @@ class LocalProgressReportsCompanion
     extends UpdateCompanion<LocalProgressReport> {
   final Value<String> clientUuid;
   final Value<String> userSub;
+  final Value<int?> companyId;
   final Value<int> projectId;
   final Value<String> projectLabel;
   final Value<int> stageId;
@@ -5224,6 +5369,7 @@ class LocalProgressReportsCompanion
   const LocalProgressReportsCompanion({
     this.clientUuid = const Value.absent(),
     this.userSub = const Value.absent(),
+    this.companyId = const Value.absent(),
     this.projectId = const Value.absent(),
     this.projectLabel = const Value.absent(),
     this.stageId = const Value.absent(),
@@ -5252,6 +5398,7 @@ class LocalProgressReportsCompanion
   LocalProgressReportsCompanion.insert({
     required String clientUuid,
     required String userSub,
+    this.companyId = const Value.absent(),
     required int projectId,
     this.projectLabel = const Value.absent(),
     required int stageId,
@@ -5286,6 +5433,7 @@ class LocalProgressReportsCompanion
   static Insertable<LocalProgressReport> custom({
     Expression<String>? clientUuid,
     Expression<String>? userSub,
+    Expression<int>? companyId,
     Expression<int>? projectId,
     Expression<String>? projectLabel,
     Expression<int>? stageId,
@@ -5314,6 +5462,7 @@ class LocalProgressReportsCompanion
     return RawValuesInsertable({
       if (clientUuid != null) 'client_uuid': clientUuid,
       if (userSub != null) 'user_sub': userSub,
+      if (companyId != null) 'company_id': companyId,
       if (projectId != null) 'project_id': projectId,
       if (projectLabel != null) 'project_label': projectLabel,
       if (stageId != null) 'stage_id': stageId,
@@ -5344,6 +5493,7 @@ class LocalProgressReportsCompanion
   LocalProgressReportsCompanion copyWith({
     Value<String>? clientUuid,
     Value<String>? userSub,
+    Value<int?>? companyId,
     Value<int>? projectId,
     Value<String>? projectLabel,
     Value<int>? stageId,
@@ -5372,6 +5522,7 @@ class LocalProgressReportsCompanion
     return LocalProgressReportsCompanion(
       clientUuid: clientUuid ?? this.clientUuid,
       userSub: userSub ?? this.userSub,
+      companyId: companyId ?? this.companyId,
       projectId: projectId ?? this.projectId,
       projectLabel: projectLabel ?? this.projectLabel,
       stageId: stageId ?? this.stageId,
@@ -5407,6 +5558,9 @@ class LocalProgressReportsCompanion
     }
     if (userSub.present) {
       map['user_sub'] = Variable<String>(userSub.value);
+    }
+    if (companyId.present) {
+      map['company_id'] = Variable<int>(companyId.value);
     }
     if (projectId.present) {
       map['project_id'] = Variable<int>(projectId.value);
@@ -5488,6 +5642,7 @@ class LocalProgressReportsCompanion
     return (StringBuffer('LocalProgressReportsCompanion(')
           ..write('clientUuid: $clientUuid, ')
           ..write('userSub: $userSub, ')
+          ..write('companyId: $companyId, ')
           ..write('projectId: $projectId, ')
           ..write('projectLabel: $projectLabel, ')
           ..write('stageId: $stageId, ')
@@ -5547,6 +5702,7 @@ typedef $$LocalDraftsTableCreateCompanionBuilder =
     LocalDraftsCompanion Function({
       required String clientUuid,
       required String userSub,
+      Value<int?> companyId,
       required String type,
       Value<String> title,
       Value<int?> projectId,
@@ -5569,6 +5725,7 @@ typedef $$LocalDraftsTableUpdateCompanionBuilder =
     LocalDraftsCompanion Function({
       Value<String> clientUuid,
       Value<String> userSub,
+      Value<int?> companyId,
       Value<String> type,
       Value<String> title,
       Value<int?> projectId,
@@ -5648,6 +5805,11 @@ class $$LocalDraftsTableFilterComposer
 
   ColumnFilters<String> get userSub => $composableBuilder(
     column: $table.userSub,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get companyId => $composableBuilder(
+    column: $table.companyId,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -5801,6 +5963,11 @@ class $$LocalDraftsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<int> get companyId => $composableBuilder(
+    column: $table.companyId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get type => $composableBuilder(
     column: $table.type,
     builder: (column) => ColumnOrderings(column),
@@ -5898,6 +6065,9 @@ class $$LocalDraftsTableAnnotationComposer
 
   GeneratedColumn<String> get userSub =>
       $composableBuilder(column: $table.userSub, builder: (column) => column);
+
+  GeneratedColumn<int> get companyId =>
+      $composableBuilder(column: $table.companyId, builder: (column) => column);
 
   GeneratedColumn<String> get type =>
       $composableBuilder(column: $table.type, builder: (column) => column);
@@ -6038,6 +6208,7 @@ class $$LocalDraftsTableTableManager
               ({
                 Value<String> clientUuid = const Value.absent(),
                 Value<String> userSub = const Value.absent(),
+                Value<int?> companyId = const Value.absent(),
                 Value<String> type = const Value.absent(),
                 Value<String> title = const Value.absent(),
                 Value<int?> projectId = const Value.absent(),
@@ -6058,6 +6229,7 @@ class $$LocalDraftsTableTableManager
               }) => LocalDraftsCompanion(
                 clientUuid: clientUuid,
                 userSub: userSub,
+                companyId: companyId,
                 type: type,
                 title: title,
                 projectId: projectId,
@@ -6080,6 +6252,7 @@ class $$LocalDraftsTableTableManager
               ({
                 required String clientUuid,
                 required String userSub,
+                Value<int?> companyId = const Value.absent(),
                 required String type,
                 Value<String> title = const Value.absent(),
                 Value<int?> projectId = const Value.absent(),
@@ -6100,6 +6273,7 @@ class $$LocalDraftsTableTableManager
               }) => LocalDraftsCompanion.insert(
                 clientUuid: clientUuid,
                 userSub: userSub,
+                companyId: companyId,
                 type: type,
                 title: title,
                 projectId: projectId,
@@ -7543,6 +7717,7 @@ typedef $$MediaBlobsTableProcessedTableManager =
 typedef $$OutboxTableCreateCompanionBuilder = OutboxCompanion Function({
   required String opUuid,
   required String userSub,
+  Value<int?> companyId,
   required String type,
   required String targetUuid,
   required String payloadJson,
@@ -7563,6 +7738,7 @@ typedef $$OutboxTableCreateCompanionBuilder = OutboxCompanion Function({
 typedef $$OutboxTableUpdateCompanionBuilder = OutboxCompanion Function({
   Value<String> opUuid,
   Value<String> userSub,
+  Value<int?> companyId,
   Value<String> type,
   Value<String> targetUuid,
   Value<String> payloadJson,
@@ -7597,6 +7773,11 @@ class $$OutboxTableFilterComposer
 
   ColumnFilters<String> get userSub => $composableBuilder(
     column: $table.userSub,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get companyId => $composableBuilder(
+    column: $table.companyId,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -7695,6 +7876,11 @@ class $$OutboxTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<int> get companyId => $composableBuilder(
+    column: $table.companyId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get type => $composableBuilder(
     column: $table.type,
     builder: (column) => ColumnOrderings(column),
@@ -7786,6 +7972,9 @@ class $$OutboxTableAnnotationComposer
   GeneratedColumn<String> get userSub =>
       $composableBuilder(column: $table.userSub, builder: (column) => column);
 
+  GeneratedColumn<int> get companyId =>
+      $composableBuilder(column: $table.companyId, builder: (column) => column);
+
   GeneratedColumn<String> get type =>
       $composableBuilder(column: $table.type, builder: (column) => column);
 
@@ -7876,6 +8065,7 @@ class $$OutboxTableTableManager
               ({
                 Value<String> opUuid = const Value.absent(),
                 Value<String> userSub = const Value.absent(),
+                Value<int?> companyId = const Value.absent(),
                 Value<String> type = const Value.absent(),
                 Value<String> targetUuid = const Value.absent(),
                 Value<String> payloadJson = const Value.absent(),
@@ -7895,6 +8085,7 @@ class $$OutboxTableTableManager
               }) => OutboxCompanion(
                 opUuid: opUuid,
                 userSub: userSub,
+                companyId: companyId,
                 type: type,
                 targetUuid: targetUuid,
                 payloadJson: payloadJson,
@@ -7916,6 +8107,7 @@ class $$OutboxTableTableManager
               ({
                 required String opUuid,
                 required String userSub,
+                Value<int?> companyId = const Value.absent(),
                 required String type,
                 required String targetUuid,
                 required String payloadJson,
@@ -7935,6 +8127,7 @@ class $$OutboxTableTableManager
               }) => OutboxCompanion.insert(
                 opUuid: opUuid,
                 userSub: userSub,
+                companyId: companyId,
                 type: type,
                 targetUuid: targetUuid,
                 payloadJson: payloadJson,
@@ -8121,6 +8314,7 @@ typedef $$LocalProgressReportsTableCreateCompanionBuilder =
     LocalProgressReportsCompanion Function({
       required String clientUuid,
       required String userSub,
+      Value<int?> companyId,
       required int projectId,
       Value<String> projectLabel,
       required int stageId,
@@ -8150,6 +8344,7 @@ typedef $$LocalProgressReportsTableUpdateCompanionBuilder =
     LocalProgressReportsCompanion Function({
       Value<String> clientUuid,
       Value<String> userSub,
+      Value<int?> companyId,
       Value<int> projectId,
       Value<String> projectLabel,
       Value<int> stageId,
@@ -8192,6 +8387,11 @@ class $$LocalProgressReportsTableFilterComposer
 
   ColumnFilters<String> get userSub => $composableBuilder(
     column: $table.userSub,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get companyId => $composableBuilder(
+    column: $table.companyId,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -8330,6 +8530,11 @@ class $$LocalProgressReportsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<int> get companyId => $composableBuilder(
+    column: $table.companyId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<int> get projectId => $composableBuilder(
     column: $table.projectId,
     builder: (column) => ColumnOrderings(column),
@@ -8463,6 +8668,9 @@ class $$LocalProgressReportsTableAnnotationComposer
   GeneratedColumn<String> get userSub =>
       $composableBuilder(column: $table.userSub, builder: (column) => column);
 
+  GeneratedColumn<int> get companyId =>
+      $composableBuilder(column: $table.companyId, builder: (column) => column);
+
   GeneratedColumn<int> get projectId =>
       $composableBuilder(column: $table.projectId, builder: (column) => column);
 
@@ -8594,6 +8802,7 @@ class $$LocalProgressReportsTableTableManager
               ({
                 Value<String> clientUuid = const Value.absent(),
                 Value<String> userSub = const Value.absent(),
+                Value<int?> companyId = const Value.absent(),
                 Value<int> projectId = const Value.absent(),
                 Value<String> projectLabel = const Value.absent(),
                 Value<int> stageId = const Value.absent(),
@@ -8621,6 +8830,7 @@ class $$LocalProgressReportsTableTableManager
               }) => LocalProgressReportsCompanion(
                 clientUuid: clientUuid,
                 userSub: userSub,
+                companyId: companyId,
                 projectId: projectId,
                 projectLabel: projectLabel,
                 stageId: stageId,
@@ -8650,6 +8860,7 @@ class $$LocalProgressReportsTableTableManager
               ({
                 required String clientUuid,
                 required String userSub,
+                Value<int?> companyId = const Value.absent(),
                 required int projectId,
                 Value<String> projectLabel = const Value.absent(),
                 required int stageId,
@@ -8677,6 +8888,7 @@ class $$LocalProgressReportsTableTableManager
               }) => LocalProgressReportsCompanion.insert(
                 clientUuid: clientUuid,
                 userSub: userSub,
+                companyId: companyId,
                 projectId: projectId,
                 projectLabel: projectLabel,
                 stageId: stageId,

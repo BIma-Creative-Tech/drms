@@ -22,7 +22,8 @@ class SyncApi {
         'clock': clock.toJson(),
         'items': [for (final i in items) i.toJson()],
       },
-      options: Options(headers: {'Idempotency-Key': batchId}),
+      // MC3: every item names its own PT (`company_id`); the switcher selection must not narrow the batch.
+      options: ApiClient.allCompanies(Options(headers: {'Idempotency-Key': batchId})),
     ),
     (data) => BatchResponse.fromJson(data as Map<String, dynamic>),
   );

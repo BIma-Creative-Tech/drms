@@ -16,6 +16,12 @@ for i in $(seq 1 "$attempts"); do
     sleep 60
     continue
   fi
+  # Failure diagnostics: Flutter often hides the Gradle cause ("Gradle task … failed with exit code 1").
+  # Print the usual cause lines and, when BUILD_LOG_KEEP is set, keep the full log for an artifact upload.
+  echo "::group::Build failure excerpt (FAILURE / What went wrong / OutOfMemoryError / error:)"
+  grep -nE -A12 'FAILURE:|What went wrong|OutOfMemoryError|GC overhead|Daemon disappeared|daemon.*(crash|stopped)|Killed|R8:|ERROR:|error:' "$log" | tail -200 || true
+  echo "::endgroup::"
+  if [ -n "${BUILD_LOG_KEEP:-}" ]; then cp "$log" "$BUILD_LOG_KEEP" || true; fi
   exit 1
 done
 exit 1

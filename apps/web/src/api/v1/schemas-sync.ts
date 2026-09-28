@@ -194,6 +194,12 @@ export const SyncItem = z
   .object({
     client_uuid: z.uuid().meta({ description: 'Idempotency key of this queue item (UUIDv7). Replays return `duplicate` with the stored result.' }),
     type: SyncItemTypeEnum,
+    company_id: id
+      .optional()
+      .meta({
+        description:
+          'MC3: PT of this item (an active membership of the caller). The item is processed under this PT whatever X-Company-Ids says; the PT derived from its references must match (else COMPANY_MISMATCH). Omitted (released APK ≤ 0.2.x) → the caller\'s only PT; a caller with several PTs gets 409 COMPANY_REQUIRED for the whole batch.',
+      }),
     schema_version: z.literal(1),
     offline: z.boolean().meta({ description: 'true = created while offline (stored as a comparison flag).' }),
     device_time: dateTime.meta({ description: 'Device wall clock when the user acted. Comparison only; the server time is authoritative.' }),
@@ -328,11 +334,12 @@ export const SyncResult = z
     flags: z.array(z.string()).meta({ description: 'OFFLINE, CLOCK_SKEW, CLIENT_TOTAL_MISMATCH, ALREADY_CANCELLED, DEVICE_TIME_ONLY.' }),
     errors: z.array(
       z.object({
-        code: z.string().meta({ description: 'VALIDATION, NOT_EDITABLE, STALE_REV (conflict), NOT_FOUND, FORBIDDEN, MEDIA_MISSING, CLIENT_UUID_CONFLICT, FEATURE_DISABLED, DEPENDENCY_FAILED, DEPENDENCY_PENDING, STATE_CONFLICT, INTEGRITY, UNSUPPORTED, INTERNAL; attendance: MOCK_LOCATION, OUTSIDE_GEOFENCE, NOT_ASSIGNED, NO_GEOFENCE, ALREADY_CHECKED_IN, NO_CHECK_IN, ALREADY_CHECKED_OUT (on_behalf also FORBIDDEN: not a PM / not a team location / own attendance); progress reports: WEIGHTS_INCOMPLETE, PROGRESS_DECREASED, PHOTO_LIMIT, MEDIA_IN_USE.' }),
+        code: z.string().meta({ description: 'VALIDATION, NOT_EDITABLE, STALE_REV (conflict), NOT_FOUND, FORBIDDEN, MEDIA_MISSING, CLIENT_UUID_CONFLICT, COMPANY_NOT_ALLOWED (MC3: company_id is not an active membership of the caller), COMPANY_MISMATCH (MC3: the PT derived from the item references ≠ company_id — or ≠ the only PT of a caller without company_id), FEATURE_DISABLED, DEPENDENCY_FAILED, DEPENDENCY_PENDING, STATE_CONFLICT, INTEGRITY, UNSUPPORTED, INTERNAL; attendance: MOCK_LOCATION, OUTSIDE_GEOFENCE, NOT_ASSIGNED, NO_GEOFENCE, ALREADY_CHECKED_IN, NO_CHECK_IN, ALREADY_CHECKED_OUT (on_behalf also FORBIDDEN: not a PM / not a team location / own attendance); progress reports: WEIGHTS_INCOMPLETE, PROGRESS_DECREASED, PHOTO_LIMIT, MEDIA_IN_USE.' }),
         field: z.string().optional(),
         message: z.string(),
       }),
     ),
+    company_id: z.number().int().nullable().optional().meta({ description: 'MC3: PT the item was processed under (company_id, or the only PT of a legacy item); null when it was not an allowed PT.' }),
     server_copy: SyncDraftCopy.nullable(),
     // progress_report.draft_upsert only: server version of the report (applied, conflict, NOT_EDITABLE).
     server_report: SyncProgressReportCopy.nullable().optional(),
@@ -355,6 +362,13 @@ export const AppConfig = z
     minSupportedVersion: z.string().nullable().meta({ description: 'Below this every authenticated call answers 426.' }),
     latestVersion: z.string().nullable(),
     downloadUrl: z.string().nullable().meta({ description: 'APK download page (side-load); null = not published yet ("hubungi admin").' }),
+    releaseNotes: z
+      .array(z.string())
+      .optional()
+      .meta({
+        description:
+          'Plain-text "Yang baru di versi …" bullets (Indonesian, ≤ 15 × ≤ 300 chars) of latestVersion, from the /unduh release manifest; omitted when the published APK is not latestVersion or has no notes.',
+      }),
     updateRequired: z.boolean().nullable().meta({ description: 'Only with ?version=.' }),
     updateAvailable: z.boolean().nullable().meta({ description: 'Only with ?version=.' }),
     timezone: z.string().meta({ description: 'Company display timezone (IANA).' }),

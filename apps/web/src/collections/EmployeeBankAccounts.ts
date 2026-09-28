@@ -4,6 +4,7 @@ import { denyAll } from '@/access/roles'
 import { byRole, fieldRoles, ownEmployee, rolesAllowed } from '@/access/policies'
 import { reasonOnChange, reasonOnDeactivate, withAudit } from '@/audit/hooks'
 import { activeField, uuidField } from '@/fields/common'
+import { companyField, companyHook, pickerSameCompany } from '@/fields/company'
 
 /**
  * Rekening karyawan (transfer target). Sensitive: readable by the owning employee and by
@@ -38,7 +39,7 @@ export const EmployeeBankAccounts: CollectionConfig = withAudit(
           return data
         },
       ],
-      beforeChange: [
+      beforeChange: [companyHook('employee-bank-accounts', { derive: [{ field: 'employee', collection: 'employees' }] }),
         ({ data }) => {
           const no = typeof data.accountNo === 'string' ? data.accountNo : ''
           data.label = no ? `${String(data.accountHolder ?? '').trim()} ••${no.slice(-4)}` : data.label
@@ -47,7 +48,8 @@ export const EmployeeBankAccounts: CollectionConfig = withAudit(
       ],
     },
     fields: [
-      { name: 'employee', type: 'relationship', relationTo: 'employees', label: 'Karyawan', required: true, index: true },
+      companyField({ derived: true }),
+      { name: 'employee', type: 'relationship', relationTo: 'employees', label: 'Karyawan', required: true, index: true, ...pickerSameCompany({ required: true }) },
       { name: 'bank', type: 'relationship', relationTo: 'banks', label: 'Bank', required: true },
       {
         name: 'accountNo',

@@ -120,6 +120,7 @@ class Addendum {
     this.allowedActions = const {},
     this.decisions = const [],
     this.createdAt,
+    this.companyId,
   });
 
   final int id;
@@ -147,6 +148,9 @@ class Addendum {
   final Set<AddendumAction> allowedActions;
   final List<AddendumDecision> decisions;
   final String? createdAt;
+
+  /// MC3: PT of the addendum (`companyId`).
+  final int? companyId;
 
   String get projectLabel => [projectCode, projectName].whereType<String>().where((e) => e.isNotEmpty).join(' — ');
 
@@ -176,6 +180,7 @@ class Addendum {
       allowedActions: {for (final a in _list(j['allowedActions'])) ?AddendumAction.fromCode('$a')},
       decisions: [for (final d in _list(j['decisions'])) AddendumDecision.fromJson(_map(d))],
       createdAt: _strN(j['createdAt']),
+      companyId: _intN(j['companyId']) ?? _intN(_map(j['company'])['id']),
     );
   }
 }

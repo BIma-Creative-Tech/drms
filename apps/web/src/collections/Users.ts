@@ -1,7 +1,7 @@
 import { APIError, type CollectionBeforeOperationHook, type CollectionConfig } from 'payload'
 
-import { PANEL_ROLES, ROLES, ROLE_LABELS, denyAll, hasRole, relId, userId, userRoles } from '@/access/roles'
-import { byRole, fieldRoles, ownUser, rolesAllowed } from '@/access/policies'
+import { PANEL_ROLES, denyAll, hasRoleAny, isGroupAdmin, relId, userId, userRoles } from '@/access/roles'
+import { anyOf, byRoleAny, fieldRoles, ownUser, rolesAllowedAny, usersOfMyCompanies } from '@/access/policies'
 import { revokeCurrentWebSession } from '@/auth/sessions'
 import { mobileBearerStrategy, oidcSessionStrategy } from '@/auth/strategies'
 import { reasonOnDeactivate, withAudit } from '@/audit/hooks'
@@ -11,12 +11,14 @@ type UserExtras = { _pkSessionExp?: number }
 
 const adminOnly = { create: fieldRoles('pk-admin'), update: fieldRoles('pk-admin') }
 
-/** Fields only an Admin may change (Keycloak-synced identity, roles, scope link, active flag). */
-const ADMIN_FIELDS = ['email', 'name', 'roles', 'employee', 'phone', 'active', 'keycloakSub'] as const
+/**
+ * Fields only an Admin may change (Keycloak-synced identity, active flag, group admin). Roles and
+ * the employee link are per PT in `company-memberships` (ADR 0016 §2).
+ */
+const ADMIN_FIELDS = ['email', 'name', 'phone', 'active', 'keycloakSub', 'groupAdmin'] as const
 
 function norm(field: string, v: unknown): unknown {
-  if (field === 'roles') return Array.isArray(v) ? [...v].map(String).sort() : []
-  if (field === 'employee') return relId(v) ?? null
+  if (field === 'groupAdmin') return v === true
   if (field === 'email' && typeof v === 'string') return v.trim().toLowerCase()
   return v === undefined || v === '' ? null : v
 }
@@ -30,7 +32,7 @@ function norm(field: string, v: unknown): unknown {
  * collections/media/factory.ts) — never someone else's image. Admin keeps managing everyone.
  */
 export const selfProfileGuard: CollectionBeforeOperationHook = async ({ args, operation, overrideAccess, req }) => {
-  if (operation !== 'update' || overrideAccess || !req.user || hasRole(req, 'pk-admin')) return args
+  if (operation !== 'update' || overrideAccess || !req.user || hasRoleAny(req, 'pk-admin')) return args
   const a = args as { id?: number | string; data?: Record<string, unknown> }
   const data = a.data ?? {}
   const uid = userId(req)
@@ -49,15 +51,16 @@ export const selfProfileGuard: CollectionBeforeOperationHook = async ({ args, op
 }
 
 /**
- * Users (ADR 0003): identity + credentials live in Keycloak realm `drms`; this collection holds
- * the link (`keycloakSub`), the role mirror, scope data (employee link) and the active flag.
- * Admin C/R/U (synced to Keycloak, Keycloak-first), Owner R, everyone R self.
+ * Users (ADR 0003 as revised by ADR 0016 §2): identity + credentials live in Keycloak realm `drms`;
+ * this collection holds the link (`keycloakSub`), the active flag and the DB-only `groupAdmin`
+ * flag. Per-PT roles + the employee of each PT live in `company-memberships`.
+ * Admin C/R/U (identity synced to Keycloak, Keycloak-first), Owner R, everyone R self.
  */
 export const Users: CollectionConfig = withAudit(
   {
     slug: 'users',
     labels: { singular: 'Pengguna', plural: 'Pengguna' },
-    admin: { useAsTitle: 'email', group: 'Pengguna & Akses', defaultColumns: ['email', 'name', 'roles', 'employee', 'active'] },
+    admin: { useAsTitle: 'email', group: 'Pengguna & Akses', defaultColumns: ['email', 'name', 'active'] },
     auth: {
       // Keycloak-only login. No password/forgot/reset endpoints, no Payload JWT (spike a).
       disableLocalStrategy: true,
@@ -65,17 +68,18 @@ export const Users: CollectionConfig = withAudit(
     },
     access: {
       admin: ({ req }) => userRoles(req).some((r) => PANEL_ROLES.includes(r)),
-      read: byRole({
-        'pk-admin': true,
-        'pk-owner': true,
+      // ADR 0016 §5: Admin/Direktur see the accounts of THEIR PTs (+ not yet assigned ones); group admin all
+      read: byRoleAny({
+        'pk-admin': anyOf(ownUser('id'), usersOfMyCompanies('id', ['pk-admin', 'pk-owner'])),
+        'pk-owner': anyOf(ownUser('id'), usersOfMyCompanies('id', ['pk-admin', 'pk-owner'])),
         'pk-finance': ownUser('id'),
         'pk-pm': ownUser('id'),
         'pk-staff': ownUser('id'),
       }),
-      create: rolesAllowed('pk-admin'),
+      create: rolesAllowedAny('pk-admin'),
       // F2c: everyone may update their OWN row — field access limits that to `signature`.
-      update: byRole({
-        'pk-admin': true,
+      update: byRoleAny({
+        'pk-admin': anyOf(ownUser('id'), usersOfMyCompanies('id', ['pk-admin'])),
         'pk-owner': ownUser('id'),
         'pk-finance': ownUser('id'),
         'pk-pm': ownUser('id'),
@@ -111,16 +115,6 @@ export const Users: CollectionConfig = withAudit(
     fields: [
       { name: 'email', type: 'email', label: 'Email', required: true, unique: true, access: adminOnly },
       { name: 'name', type: 'text', label: 'Nama', maxLength: 128, access: adminOnly },
-      {
-        name: 'roles',
-        type: 'select',
-        label: 'Peran',
-        hasMany: true,
-        options: ROLES.map((r) => ({ label: ROLE_LABELS[r], value: r })),
-        access: { update: fieldRoles('pk-admin'), create: fieldRoles('pk-admin') },
-        admin: { description: 'Disinkronkan ke realm role Keycloak.' },
-      },
-      { name: 'employee', type: 'relationship', relationTo: 'employees', label: 'Karyawan', unique: true, access: adminOnly },
       { name: 'phone', type: 'text', label: 'No. HP', maxLength: 32, access: adminOnly },
       {
         name: 'signature',
@@ -142,11 +136,21 @@ export const Users: CollectionConfig = withAudit(
         admin: { readOnly: true, position: 'sidebar', description: 'Diisi otomatis dari Keycloak.' },
       },
       { name: 'active', type: 'checkbox', label: 'Aktif', defaultValue: true, index: true, access: adminOnly, admin: { position: 'sidebar' } },
+      // ADR 0016 §2 (DB only, never a Keycloak role): may create/deactivate PTs, edit the app-wide
+      // setting and every PT's memberships. Only a group admin grants it.
+      {
+        name: 'groupAdmin',
+        type: 'checkbox',
+        label: 'Admin grup (semua PT)',
+        defaultValue: false,
+        access: { create: ({ req }) => isGroupAdmin(req), update: ({ req }) => isGroupAdmin(req) },
+        admin: { position: 'sidebar', description: 'Mengelola daftar PT, setting aplikasi dan akses PT semua pengguna.' },
+      },
     ],
   },
   {
     docType: 'user',
     reasonRules: [reasonOnDeactivate],
-    actionFor: (c, op, ctx) => (op === 'update' && c.field === 'roles' ? (ctx.roleSync === true ? 'role_sync' : 'role_change') : undefined),
+    actionFor: (c, op) => (op === 'update' && c.field === 'groupAdmin' ? 'role_change' : undefined),
   },
 )

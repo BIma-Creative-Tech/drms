@@ -7,6 +7,7 @@ import { ADDENDUM_STATUS_LABELS, ADDENDUM_STATUSES } from '@/domain/addendum/rul
 import { rupiahField, uuidField } from '@/fields/common'
 
 import { ro } from './fields-f2'
+import { companyField, companyHook } from '@/fields/company'
 
 /** Read-only JSON without Monaco (CSP, config-guards.test.ts). */
 const jsonView = { readOnly: true, components: { Field: '@/components/ReadOnlyJson#ReadOnlyJson' } }
@@ -43,8 +44,10 @@ export const BudgetAddenda: CollectionConfig = withAudit(
       update: denyAll,
       delete: denyAll,
     },
+    hooks: { beforeChange: [companyHook('budget-addenda', { derive: [{ field: 'project', collection: 'projects' }], check: [{ field: 'approvalRule', collection: 'approval-rules' }] })] },
     fields: [
-      { name: 'docNo', type: 'text', label: 'No. addendum', unique: true, index: true, admin: ro },
+      companyField({ derived: true }),
+      { name: 'docNo', type: 'text', label: 'No. addendum', index: true, admin: ro },
       { name: 'project', type: 'relationship', relationTo: 'projects', label: 'Project', required: true, index: true, admin: ro },
       {
         name: 'status',

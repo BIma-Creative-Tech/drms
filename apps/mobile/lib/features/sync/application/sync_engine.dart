@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
 
+import 'package:drift/drift.dart' show Value;
 import 'package:uuid/uuid.dart';
 
 import '../../../core/db/app_database.dart';
@@ -10,6 +11,7 @@ import '../../../core/logging/log.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/time/device_clock.dart';
 import '../../../core/util/async_lock.dart';
+import '../../companies/data/company_backfill.dart';
 import '../../expense/data/draft_repository.dart';
 import '../../expense/data/expense_mappers.dart';
 import '../../expense/domain/draft.dart';
@@ -21,18 +23,34 @@ import '../domain/sync_models.dart';
 enum SyncRunOutcome { nothingToDo, offline, done, partial, serverUnsupported, notLoggedIn }
 
 class SyncRunResult {
-  const SyncRunResult(this.outcome, {this.applied = 0, this.rejected = 0, this.deferred = 0, this.conflicts = 0});
+  const SyncRunResult(
+    this.outcome, {
+    this.applied = 0,
+    this.rejected = 0,
+    this.deferred = 0,
+    this.conflicts = 0,
+    this.needsCompany = 0,
+  });
   final SyncRunOutcome outcome;
   final int applied;
   final int rejected;
   final int deferred;
   final int conflicts;
+
+  /// MC3: items held because they have no PT yet and the user has several PTs (never sent, never guessed).
+  final int needsCompany;
 }
 
 /// Sends the offline outbox: receipt photos first (`POST /media/receipts` → `media_id`), then JSON items in batches
 /// (`POST /sync/batch`), and applies the per-item result rules of ADR 0010:
 /// applied/duplicate → done; rejected → never retried, message shown; deferred → back-off;
 /// conflict → server wins, local version kept as "Salinan konflik".
+///
+/// MC3 (ADR 0016 §8, ADR 0010 MC revision): every item carries `company_id` = the PT stored on ITS row
+/// (never the PT switcher selection); batches are grouped per PT and sent without `X-Company-Ids` (the
+/// server processes each item under its own `company_id`). Rows queued before schema v3 (no PT) get the
+/// user's only PT, or are held until the user picks one (several PTs). `COMPANY_MISMATCH` /
+/// `COMPANY_NOT_ALLOWED` are final rejections; a batch 409 `COMPANY_REQUIRED` holds the PT-less items.
 class SyncEngine {
   SyncEngine({
     required this.outbox,
@@ -44,6 +62,7 @@ class SyncEngine {
     required this.lock,
     required this.uploadMedia,
     this.progress,
+    this.memberships,
     Random? random,
   }) : _random = random ?? Random();
 
@@ -62,7 +81,11 @@ class SyncEngine {
   final ProgressRepository? progress;
   final Random _random;
 
+  /// PT ids of the account (default: the cached `/me`); null = unknown / server before MC3.
+  final Future<List<int>?> Function(String sub)? memberships;
+
   static const _lastServerKey = 'sync:last_server';
+  static String _companyRequiredKey(String sub) => 'sync:company_required:$sub';
 
   Future<SyncRunResult> run(String? sub) {
     if (sub == null) return Future.value(const SyncRunResult(SyncRunOutcome.notLoggedIn));
@@ -71,8 +94,12 @@ class SyncEngine {
 
   Future<SyncRunResult> _run(String sub) async {
     final now = clock.now();
-    final due = await outbox.due(sub, now);
-    if (due.isEmpty) return const SyncRunResult(SyncRunOutcome.nothingToDo);
+    final queued = await outbox.due(sub, now);
+    if (queued.isEmpty) return const SyncRunResult(SyncRunOutcome.nothingToDo);
+
+    // 0) MC3: the PT of every item. Legacy rows (queued before schema v3) have none.
+    final (due, held) = await _withCompanies(sub, queued);
+    if (due.isEmpty) return SyncRunResult(SyncRunOutcome.partial, needsCompany: held);
 
     // 1) receipt photos → POST /media/receipts (media_id), then resolve the payloads
     final ready = <OutboxData>[];
@@ -118,16 +145,29 @@ class SyncEngine {
       payloads[item.opUuid] = resolved;
       ready.add(item);
     }
-    if (ready.isEmpty) return const SyncRunResult(SyncRunOutcome.partial);
+    if (ready.isEmpty) return SyncRunResult(SyncRunOutcome.partial, needsCompany: held);
 
-    // 2) batches
-    final plan = planBatches([for (final r in ready) OutboxRepository.toQueued(r, payloads[r.opUuid]!)]);
-    for (final o in plan.oversized) {
-      await outbox.setStatus(o.clientUuid, 'rejected', code: 'TOO_LARGE', message: 'Data terlalu besar untuk dikirim.');
+    // 2) batches, one PT per batch (queue order kept inside each PT; a draft's operations share its PT)
+    final byCompany = <int?, List<QueuedItem>>{};
+    for (final r in ready) {
+      byCompany.putIfAbsent(r.companyId, () => []).add(OutboxRepository.toQueued(r, payloads[r.opUuid]!));
     }
-    var applied = 0, rejected = 0, deferred = 0, conflicts = 0;
+    final batches = <List<QueuedItem>>[];
+    for (final group in byCompany.values) {
+      final plan = planBatches(group);
+      batches.addAll(plan.batches);
+      for (final o in plan.oversized) {
+        await outbox.setStatus(
+          o.clientUuid,
+          'rejected',
+          code: 'TOO_LARGE',
+          message: 'Data terlalu besar untuk dikirim.',
+        );
+      }
+    }
+    var applied = 0, rejected = 0, deferred = 0, conflicts = 0, needsCompany = held;
     final byUuid = {for (final r in ready) r.opUuid: r};
-    for (final batch in plan.batches) {
+    for (final batch in batches) {
       final BatchResponse res;
       try {
         res = await api.postBatch(
@@ -143,9 +183,20 @@ class SyncEngine {
           rejected: rejected,
           deferred: deferred,
           conflicts: conflicts,
+          needsCompany: needsCompany,
         );
       } on ProblemException catch (e) {
         final rows = [for (final q in batch) byUuid[q.clientUuid]!];
+        if (e.status == 409 && e.code == companyRequiredCode) {
+          // Nothing of this batch was processed: the account has several PTs and some item had no PT.
+          // Those wait for the user's choice; the others go again in the next run.
+          await db.kvPut(_companyRequiredKey(sub), '1');
+          for (final r in rows.where((r) => r.companyId == null)) {
+            await outbox.holdForCompany(r.opUuid, companyRequiredMessage);
+            needsCompany++;
+          }
+          continue;
+        }
         if (e.status == 404 || e.status == 405 || e.status == 501) {
           await _deferAll(rows, 'SYNC_UNAVAILABLE', 'Server belum mendukung sinkron offline.');
           return const SyncRunResult(SyncRunOutcome.serverUnsupported);
@@ -236,9 +287,47 @@ class SyncEngine {
         }
       }
     }
-    Log.i('sync: applied=$applied rejected=$rejected deferred=$deferred conflict=$conflicts');
-    final outcome = (rejected + deferred + conflicts) == 0 ? SyncRunOutcome.done : SyncRunOutcome.partial;
-    return SyncRunResult(outcome, applied: applied, rejected: rejected, deferred: deferred, conflicts: conflicts);
+    Log.i(
+      'sync: applied=$applied rejected=$rejected deferred=$deferred conflict=$conflicts needsCompany=$needsCompany',
+    );
+    final outcome = (rejected + deferred + conflicts + needsCompany) == 0
+        ? SyncRunOutcome.done
+        : SyncRunOutcome.partial;
+    return SyncRunResult(
+      outcome,
+      applied: applied,
+      rejected: rejected,
+      deferred: deferred,
+      conflicts: conflicts,
+      needsCompany: needsCompany,
+    );
+  }
+
+  /// Items that may be sent now + the number held for a PT choice. An item without PT is
+  /// - given the account's ONLY PT (stored on the item, its draft / report and every other PT-less row),
+  /// - held when the account has several PTs (or the server answered 409 `COMPANY_REQUIRED` before),
+  /// - sent without `company_id` only when no PT is known at all (server before MC3: nothing to choose).
+  Future<(List<OutboxData>, int)> _withCompanies(String sub, List<OutboxData> due) async {
+    if (due.every((r) => r.companyId != null)) return (due, 0);
+    final ids = await (memberships ?? (s) => cachedMembershipIds(db, s))(sub);
+    if (ids != null && ids.length == 1) {
+      final only = ids.single;
+      await CompanyBackfill(db).assignAll(sub, only);
+      return ([for (final r in due) r.companyId == null ? r.copyWith(companyId: Value(only)) : r], 0);
+    }
+    final mustChoose = (ids != null && ids.length > 1) || await db.kvGet(_companyRequiredKey(sub)) == '1';
+    if (!mustChoose) return (due, 0);
+    final out = <OutboxData>[];
+    var held = 0;
+    for (final r in due) {
+      if (r.companyId != null) {
+        out.add(r);
+      } else {
+        held++;
+        await outbox.holdForCompany(r.opUuid, companyRequiredMessage);
+      }
+    }
+    return (out, held);
   }
 
   Future<void> _markDraft(OutboxData row, DraftSyncState s, {String? error}) =>

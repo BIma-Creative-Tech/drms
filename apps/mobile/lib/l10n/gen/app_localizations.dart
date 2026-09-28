@@ -277,6 +277,30 @@ abstract class AppLocalizations {
   /// **'Lupa kata sandi? Hubungi Admin.'**
   String get loginForgotPassword;
 
+  /// No description provided for @loginTotpLabel.
+  ///
+  /// In id, this message translates to:
+  /// **'Kode autentikator (bila 2FA aktif)'**
+  String get loginTotpLabel;
+
+  /// No description provided for @loginTotpHelper.
+  ///
+  /// In id, this message translates to:
+  /// **'Isi 6 digit dari aplikasi autentikator hanya bila Anda mengaktifkan 2FA untuk akun ini. Tanpa 2FA, biarkan kosong.'**
+  String get loginTotpHelper;
+
+  /// No description provided for @loginTotpInvalidLength.
+  ///
+  /// In id, this message translates to:
+  /// **'Kode autentikator terdiri dari 6 digit.'**
+  String get loginTotpInvalidLength;
+
+  /// No description provided for @loginInvalidWithTotp.
+  ///
+  /// In id, this message translates to:
+  /// **'Email/username, kata sandi, atau kode autentikator salah. Gagal berulang kali dapat mengunci akun sementara; tunggu sebentar sebelum mencoba lagi.'**
+  String get loginInvalidWithTotp;
+
   /// No description provided for @updateRequiredTitle.
   ///
   /// In id, this message translates to:
@@ -312,6 +336,24 @@ abstract class AppLocalizations {
   /// In id, this message translates to:
   /// **'Versi baru tersedia ({version}).'**
   String updateAvailable(String version);
+
+  /// No description provided for @updateAvailableTap.
+  ///
+  /// In id, this message translates to:
+  /// **'Ketuk untuk melihat yang baru dan cara memperbarui.'**
+  String get updateAvailableTap;
+
+  /// No description provided for @updateHowTo.
+  ///
+  /// In id, this message translates to:
+  /// **'Pasang APK versi baru di atas aplikasi ini, tanpa menghapusnya. Data dan login tetap tersimpan.'**
+  String get updateHowTo;
+
+  /// No description provided for @releaseNotesTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Yang baru di versi {version}'**
+  String releaseNotesTitle(String version);
 
   /// No description provided for @navHome.
   ///
@@ -3198,6 +3240,138 @@ abstract class AppLocalizations {
   /// In id, this message translates to:
   /// **'Tersimpan.'**
   String get addendumDone;
+
+  /// No description provided for @companyAll.
+  ///
+  /// In id, this message translates to:
+  /// **'Semua PT'**
+  String get companyAll;
+
+  /// No description provided for @companyAllMine.
+  ///
+  /// In id, this message translates to:
+  /// **'Semua PT saya'**
+  String get companyAllMine;
+
+  /// No description provided for @companySwitcherTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Pilih PT'**
+  String get companySwitcherTitle;
+
+  /// No description provided for @companySwitcherHint.
+  ///
+  /// In id, this message translates to:
+  /// **'Daftar, persetujuan dan ringkasan mengikuti PT yang dipilih. Draft & antrean offline tetap tersimpan di PT masing-masing.'**
+  String get companySwitcherHint;
+
+  /// No description provided for @companySwitcherApply.
+  ///
+  /// In id, this message translates to:
+  /// **'Terapkan'**
+  String get companySwitcherApply;
+
+  /// No description provided for @companySwitcherNone.
+  ///
+  /// In id, this message translates to:
+  /// **'Pilih minimal satu PT.'**
+  String get companySwitcherNone;
+
+  /// No description provided for @companySwitcherTooltip.
+  ///
+  /// In id, this message translates to:
+  /// **'Ganti PT'**
+  String get companySwitcherTooltip;
+
+  /// No description provided for @companySwitcherMore.
+  ///
+  /// In id, this message translates to:
+  /// **'{code}+{more}'**
+  String companySwitcherMore(String code, int more);
+
+  /// No description provided for @companySwitcherApplied.
+  ///
+  /// In id, this message translates to:
+  /// **'Tampilan: {label}'**
+  String companySwitcherApplied(String label);
+
+  /// No description provided for @profileCompanies.
+  ///
+  /// In id, this message translates to:
+  /// **'PT aktif'**
+  String get profileCompanies;
+
+  /// No description provided for @profileCompanyRoles.
+  ///
+  /// In id, this message translates to:
+  /// **'{code} — {roles}'**
+  String profileCompanyRoles(String code, String roles);
+
+  /// No description provided for @companyPickTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Untuk PT mana?'**
+  String get companyPickTitle;
+
+  /// No description provided for @companyPickHint.
+  ///
+  /// In id, this message translates to:
+  /// **'Project, pusat biaya, kategori dan rekening diambil dari data PT ini.'**
+  String get companyPickHint;
+
+  /// No description provided for @companyPickNone.
+  ///
+  /// In id, this message translates to:
+  /// **'Anda tidak bisa membuat pengajuan di PT yang dipilih. Ganti PT di beranda.'**
+  String get companyPickNone;
+
+  /// No description provided for @draftCompany.
+  ///
+  /// In id, this message translates to:
+  /// **'PT'**
+  String get draftCompany;
+
+  /// No description provided for @companyNeedsChoiceBanner.
+  ///
+  /// In id, this message translates to:
+  /// **'{count} data offline belum punya PT — pilih PT agar bisa dikirim'**
+  String companyNeedsChoiceBanner(int count);
+
+  /// No description provided for @companyNeedsChoiceTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Pilih PT untuk data offline'**
+  String get companyNeedsChoiceTitle;
+
+  /// No description provided for @companyNeedsChoiceHint.
+  ///
+  /// In id, this message translates to:
+  /// **'Data ini dibuat sebelum aplikasi mendukung beberapa PT. Pilih PT yang benar untuk setiap data; data tidak dikirim sebelum PT dipilih.'**
+  String get companyNeedsChoiceHint;
+
+  /// No description provided for @companyNeedsChoiceAction.
+  ///
+  /// In id, this message translates to:
+  /// **'Pilih PT'**
+  String get companyNeedsChoiceAction;
+
+  /// No description provided for @companyAssigned.
+  ///
+  /// In id, this message translates to:
+  /// **'PT disimpan. Data akan dikirim.'**
+  String get companyAssigned;
+
+  /// No description provided for @lpjQueueTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'LPJ menunggu verifikasi'**
+  String get lpjQueueTitle;
+
+  /// No description provided for @lpjQueueCount.
+  ///
+  /// In id, this message translates to:
+  /// **'{count} LPJ'**
+  String lpjQueueCount(int count);
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

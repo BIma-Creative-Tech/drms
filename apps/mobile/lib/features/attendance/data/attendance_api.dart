@@ -10,15 +10,21 @@ class AttendanceApi {
   AttendanceApi(this.client);
   final ApiClient client;
 
-  /// US-09 own monthly recap.
-  Future<AttendanceRecap> me({String? month}) => client.run(
-    (d) => d.get<dynamic>('/attendance/me', queryParameters: {'month': ?month}),
+  /// US-09 own monthly recap. MC3: [company] = the PT whose own employee (one employee per PT); null =
+  /// the server default (first selected PT with an employee).
+  Future<AttendanceRecap> me({String? month, int? company}) => client.run(
+    (d) => d.get<dynamic>('/attendance/me', queryParameters: {'month': ?month, 'company': ?company}),
     (data) => AttendanceRecap.fromJson(data as Map<String, dynamic>),
   );
 
   /// Monthly recap of one employee (PM team, Admin/Direktur/Finance all).
   Future<AttendanceRecap> recap(int employeeId, {String? month}) => client.run(
-    (d) => d.get<dynamic>('/attendance/recap', queryParameters: {'employee_id': '$employeeId', 'month': ?month}),
+    (d) => d.get<dynamic>(
+      '/attendance/recap',
+      queryParameters: {'employee_id': '$employeeId', 'month': ?month},
+      // One employee (document class, MC3): independent of the PT switcher.
+      options: ApiClient.allCompanies(),
+    ),
     (data) => AttendanceRecap.fromJson(data as Map<String, dynamic>),
   );
 
@@ -38,14 +44,17 @@ class AttendanceApi {
     (d) => d.post<dynamic>(
       '/attendance/$attendanceId/correct',
       data: {'new_time': newTimeUtc, 'reason': reason.trim()},
-      options: Options(headers: {'Idempotency-Key': idempotencyKey}),
+      options: ApiClient.allCompanies(Options(headers: {'Idempotency-Key': idempotencyKey})),
     ),
     (_) {},
   );
 
   /// Selfie of a visible attendance (viewing another person's is audited on the server).
   Future<Uint8List> selfie(int attendanceId) => client.run(
-    (d) => d.get<dynamic>('/attendance/$attendanceId/selfie', options: Options(responseType: ResponseType.bytes)),
+    (d) => d.get<dynamic>(
+      '/attendance/$attendanceId/selfie',
+      options: ApiClient.allCompanies(Options(responseType: ResponseType.bytes)),
+    ),
     (data) => Uint8List.fromList(data as List<int>),
   );
 }

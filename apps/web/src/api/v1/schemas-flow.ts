@@ -1,5 +1,7 @@
 import { z } from 'zod'
 
+import { companyFilterParam } from './schemas'
+
 /**
  * /api/v1 contract for the F2a expense-request flow (T1–T4, T6–T8, period closing).
  * Money = integer Rupiah; business dates = 'YYYY-MM-DD' (company TZ); server timestamps ISO-8601 UTC.
@@ -168,6 +170,7 @@ export const ListQuery = z
     type: RequestTypeEnum.optional(),
     limit: z.coerce.number().int().min(1).max(100).default(50),
     cursor: z.string().max(64).optional(),
+    company: companyFilterParam,
   })
   .meta({ id: 'ExpenseRequestListQuery' })
 
@@ -190,6 +193,7 @@ export const ExpenseRequestListItem = z
     neededDate: z.string().nullable(),
     createdById: id.nullable(),
     updatedAt: z.string().nullable(),
+    companyId: id.nullable().meta({ description: 'MC3: PT of the request (label: GET /me companies[]).' }),
     openWarningFlags: z.number().int().optional(),
   })
   .meta({ id: 'ExpenseRequestListItem' })
@@ -475,6 +479,7 @@ export const CashEntry = z
     reversedById: id.nullable(),
     voidReason: z.string().nullable(),
     postedAt: z.string().nullable(),
+    companyId: id.nullable().meta({ description: 'MC3: PT of the entry.' }),
   })
   .meta({ id: 'CashEntry' })
 
@@ -487,6 +492,7 @@ export const CashListQuery = z
     costCenterId: z.coerce.number().int().positive().optional(),
     limit: z.coerce.number().int().min(1).max(100).default(50),
     cursor: z.string().max(64).optional(),
+    company: companyFilterParam,
   })
   .meta({ id: 'CashEntryListQuery' })
 
@@ -495,18 +501,52 @@ export const VoidResult = z.object({ original: CashEntry, reversal: CashEntry })
 export const Balances = z
   .object({
     asOf: z.string().nullable(),
-    items: z.array(z.object({ cashAccountId: id, name: z.string(), openingBalance: z.number().int(), totalIn: z.number().int(), totalOut: z.number().int(), balance: z.number().int() })),
+    items: z.array(z.object({ cashAccountId: id, companyId: id, name: z.string(), openingBalance: z.number().int(), totalIn: z.number().int(), totalOut: z.number().int(), balance: z.number().int() })),
   })
   .meta({ id: 'Balances' })
 
 export const PeriodCloseBody = z
-  .object({ period: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/), note: z.string().max(500).optional() })
+  .object({
+    period: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/),
+    note: z.string().max(500).optional(),
+    /** ADR 0016 §4: PT to close; required when the caller is Finance/Direktur in more than one selected PT. */
+    company: z.number().int().positive().optional(),
+  })
   .strict()
   .meta({ id: 'PeriodCloseBody' })
+
+/** MC2: atomic role-matrix save (all-or-nothing; one audit row per changed membership, reason required). */
+export const MembershipBatchBody = z
+  .object({
+    reason,
+    items: z
+      .array(
+        z
+          .object({
+            user: id,
+            company: id,
+            roles: z.array(z.enum(['pk-staff', 'pk-pm', 'pk-finance', 'pk-owner', 'pk-admin'])).max(5),
+            employee: id.nullable().optional().meta({ description: 'Employee of THIS PT (null = unlink; omitted = unchanged).' }),
+            active: z.boolean().optional(),
+          })
+          .strict(),
+      )
+      .min(1)
+      .max(200),
+  })
+  .strict()
+  .meta({ id: 'MembershipBatchBody' })
+
+export const MembershipBatchResult = z
+  .object({
+    items: z.array(z.object({ id, user: id, company: id, roles: z.array(z.string()), employee: id.nullable(), active: z.boolean(), created: z.boolean() })),
+  })
+  .meta({ id: 'MembershipBatchResult' })
 
 export const PeriodClosing = z
   .object({
     id,
+    companyId: id.nullable(),
     period: z.string(),
     status: z.enum(['closed', 'reopened']),
     note: z.string().nullable(),
@@ -517,7 +557,14 @@ export const PeriodClosing = z
     reopenReason: z.string().nullable(),
   })
   .meta({ id: 'PeriodClosing' })
-export const PeriodClosingList = z.object({ lockDate: z.string().nullable(), items: z.array(PeriodClosing) }).meta({ id: 'PeriodClosingList' })
+export const PeriodClosingList = z
+  .object({
+    lockDate: z.string().nullable(),
+    /** ADR 0016 §4: lock date per PT readable by the caller. */
+    lockDates: z.array(z.object({ companyId: id, lockDate: z.string().nullable() })),
+    items: z.array(PeriodClosing),
+  })
+  .meta({ id: 'PeriodClosingList' })
 
 export const TransferResult = z
   .object({
@@ -556,6 +603,7 @@ export const Notification = z
     docNo: z.string().nullable(),
     readAt: z.string().nullable(),
     createdAt: z.string(),
+    companyId: id.nullable().meta({ description: 'MC3: PT of the document the notification is about (null = app-wide).' }),
   })
   .meta({ id: 'Notification' })
 export const NotificationList = z
@@ -566,6 +614,7 @@ export const NotificationQuery = z
     unread: z.enum(['true', 'false']).optional().meta({ description: 'true = only unread.' }),
     limit: z.coerce.number().int().min(1).max(100).default(30),
     cursor: z.string().max(64).optional(),
+    company: companyFilterParam,
   })
   .meta({ id: 'NotificationQuery' })
 export const ReadAllResult = z.object({ updated: z.number().int() }).meta({ id: 'NotificationsReadAll' })
@@ -580,12 +629,44 @@ export const SignedMediaUrl = z
   .meta({ id: 'SignedMediaUrl' })
 export const PdfQuery = z.object({ variant: z.enum(['standard', 'internal']).optional().meta({ description: 'internal = with receipt validation flags (Finance/Owner/Admin).' }) }).meta({ id: 'PdfQuery' })
 
+/** MC2/MC3: short reference of a PT (queue rows). */
+export const CompanyRef = z.object({ id, shortCode: z.string(), name: z.string() }).meta({ id: 'CompanyRef' })
+
+/** `?company=` of GET endpoints without another query (queues). */
+export const CompanyFilterQuery = z.object({ company: companyFilterParam }).meta({ id: 'CompanyFilterQuery' })
+
+/** GET /lpj-queue (US-21, MC3-1). */
+export const LpjQueue = z
+  .object({
+    items: z.array(
+      z.object({
+        id,
+        company: CompanyRef.nullable(),
+        docNo: z.string().nullable(),
+        type: RequestTypeEnum,
+        typeLabel: z.string(),
+        status: RequestStatusEnum,
+        statusLabel: z.string(),
+        title: z.string(),
+        scope: z.string(),
+        requesters: z.string(),
+        grandTotal: rupiah,
+        approvedAmount: rupiah.nullable(),
+        neededDate: z.string().nullable(),
+        requestDate: z.string().nullable(),
+        transferredTotal: rupiah,
+      }),
+    ),
+  })
+  .meta({ id: 'LpjQueue' })
+
 export const ApprovalInbox = z
   .object({
     budgetWarnPct: z.number(),
     items: z.array(
       z.object({
         id,
+        company: CompanyRef.nullable().meta({ description: 'MC2/MC3: PT of the request.' }),
         docNo: z.string().nullable(),
         type: RequestTypeEnum,
         typeLabel: z.string(),

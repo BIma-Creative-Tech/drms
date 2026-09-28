@@ -11,7 +11,7 @@ import { resetRateLimits } from '@/lib/rate-limit'
 import { mediaPath } from '@/lib/media-files'
 import config from '@/payload.config'
 
-import { accessToken, auditRows, getTestPayload, http, installLocalJwks, registerDevice, sqlAs, sqlError, type TestUser } from './helpers'
+import { accessToken, auditRows, getTestPayload, http, installLocalJwks, registerDevice, sqlAs, sqlError, type TestUser, updateCompany } from './helpers'
 import { api, asUser, makeWorld, ORIGIN, sysCreate, type FlowUser, type World } from './flow-world'
 
 /**
@@ -85,8 +85,7 @@ beforeAll(async () => {
 beforeEach(() => resetRateLimits())
 
 afterAll(async () => {
-  const p = await getTestPayload()
-  await p.updateGlobal({ slug: 'company-settings', data: { syncProgressReportsEnabled: true }, overrideAccess: true /* SYSTEM-WRITE: fixture reset */ })
+  await updateCompany({ syncProgressReportsEnabled: true })
   resetAppConfigCache()
 })
 
@@ -387,13 +386,12 @@ describe('offline sync progress_report.draft_upsert (ADR 0010 rules)', () => {
     ).body.results as Array<{ status: string; errors: Array<{ code: string }> }>
     expect(results.map((r) => r.errors[0]?.code)).toEqual(['PROGRESS_DECREASED', 'WEIGHTS_INCOMPLETE', 'MEDIA_MISSING', 'VALIDATION', 'VALIDATION'])
     expect(results.every((r) => r.status === 'rejected')).toBe(true)
-    const p = await getTestPayload()
-    await p.updateGlobal({ slug: 'company-settings', data: { syncProgressReportsEnabled: false }, overrideAccess: true /* SYSTEM-WRITE: fixture */ })
+    await updateCompany({ syncProgressReportsEnabled: false })
     resetAppConfigCache()
     expect(((await http('GET', '/api/v1/app/config')).body as { features: { syncProgressReports: boolean } }).features.syncProgressReports).toBe(false)
     const off = await sync(pmMobile, [item({ project_id: w.project, stage_id: stageB, pct_after: 50, work: 'Dimatikan' })])
     expect(off.body.results[0]).toMatchObject({ status: 'rejected', errors: [{ code: 'FEATURE_DISABLED' }] })
-    await p.updateGlobal({ slug: 'company-settings', data: { syncProgressReportsEnabled: true }, overrideAccess: true /* SYSTEM-WRITE: fixture */ })
+    await updateCompany({ syncProgressReportsEnabled: true })
     resetAppConfigCache()
     const rej = await sqlAs('app', "SELECT new_value FROM audit_logs WHERE doc_type = 'progress_report' AND action = 'sync_offline' AND user_id = $1", [String(w.users.pm.id)])
     expect(JSON.stringify(rej.rows)).toContain('WEIGHTS_INCOMPLETE')

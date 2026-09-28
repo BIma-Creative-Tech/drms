@@ -1,6 +1,7 @@
 import type { OpenAPIRegistry, RouteConfig } from '@asteasolutions/zod-to-openapi'
 import { z } from 'zod'
 
+import { companyFilterParam } from './schemas'
 import * as D from './schemas-addendum'
 
 type Helpers = {
@@ -25,9 +26,9 @@ export function registerAddendumPaths(registry: OpenAPIRegistry, h: Helpers): vo
   registry.registerPath({
     method: 'get',
     path: '/budget-addenda/inbox',
-    summary: 'Addenda waiting for the caller: Direktur "Setujui" (step acknowledge) or Finance approval (step approve), with RAB impact',
+    summary: 'Addenda waiting for the caller: Direktur "Setujui" (step acknowledge) or Finance approval (step approve), with RAB impact; ?company= narrows (MC3)',
     security: h.security,
-    request: { headers: h.deviceHeader },
+    request: { headers: h.deviceHeader, query: z.object({ company: companyFilterParam }) },
     responses: h.res(200, 'Inbox', D.AddendumInbox, [401, 426]),
   })
   registry.registerPath({

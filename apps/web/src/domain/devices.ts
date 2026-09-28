@@ -1,6 +1,6 @@
 import { APIError, type PayloadRequest, type Where } from 'payload'
 
-import { hasRole, relId } from '@/access/roles'
+import { companiesWithRole, isGroupAdmin, relId } from '@/access/roles'
 import { getKeycloakAdmin } from '@/auth/keycloak-admin'
 import { writeAudit } from '@/audit/writer'
 
@@ -109,9 +109,28 @@ export async function registerDevice(req: PayloadRequest, input: RegisterInput, 
   return { device: created, created: true }
 }
 
-/** Who may revoke: Admin/Owner any device, everyone else only their own. */
-export function canRevoke(req: PayloadRequest, device: { user: unknown }): boolean {
-  return hasRole(req, 'pk-admin', 'pk-owner') || relId(device.user) === relId(req.user)
+/**
+ * Who may revoke: everyone their own device; Admin/Owner the devices of users who are members of a
+ * PT where the caller is Admin/Owner (ADR 0016 §5, same rule as the devices collection access), or
+ * of accounts without any membership; group admins any device.
+ */
+export async function canRevoke(req: PayloadRequest, device: { user: unknown }): Promise<boolean> {
+  const owner = relId(device.user)
+  if (owner !== undefined && owner === relId(req.user)) return true
+  if (isGroupAdmin(req)) return true
+  const mine = companiesWithRole(req, ['pk-admin', 'pk-owner'], { all: true })
+  if (mine.length === 0 || owner === undefined) return false
+  const theirs = await req.payload.find({
+    collection: 'company-memberships',
+    where: { user: { equals: owner } },
+    depth: 0,
+    pagination: false,
+    select: { company: true },
+    overrideAccess: true, // SYSTEM-READ: PTs of the device owner (revoke right)
+    req,
+  })
+  const pts = theirs.docs.map((d) => relId((d as { company?: unknown }).company)).filter((x): x is number => x !== undefined)
+  return pts.length === 0 || pts.some((c) => mine.includes(c))
 }
 
 /**
@@ -132,7 +151,7 @@ export async function revokeDevice(req: PayloadRequest, ref: string, reason: str
     req,
   })
   const device = found.docs[0] as DeviceDoc | undefined
-  if (!device || !canRevoke(req, device)) throw new APIError('Perangkat tidak ditemukan.', 404, null, true)
+  if (!device || !(await canRevoke(req, device))) throw new APIError('Perangkat tidak ditemukan.', 404, null, true)
   if (device.status !== 'active') return { device, alreadyRevoked: true }
   const updated = await req.payload.update({
     collection: 'devices',

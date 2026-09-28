@@ -1,13 +1,14 @@
 import { sql } from '@payloadcms/db-postgres'
 import type { PayloadRequest } from 'payload'
 
-import { relId } from '@/access/roles'
+import { hasRole, relId } from '@/access/roles'
 import { resolveScope } from '@/access/scope'
 import { haversineM, insideGeofence, localDateString, type AttendanceKind } from '@/domain/sync/attendance'
 import { getRequestTx } from '@/lib/tx'
 
 import { snapshotOf, type ScheduleSnapshot } from './schedule'
 import { effectiveRadiusM } from './calendar'
+import { settings, userOfEmployee as userOfEmployeeLink } from '@/domain/companies'
 
 /**
  * E6 — the ONE write path of `attendances` (sync items attendance.check_in / check_out / on_behalf,
@@ -34,7 +35,7 @@ const reject = (code: string, message: string, field?: string): never => {
 
 export type Location = { type: 'project'; id: number } | { type: 'cost_center'; id: number }
 
-type GeoDoc = { id: number; code?: string | null; name?: string | null; lat?: number | null; lng?: number | null; radiusM?: number | null; status?: string | null; active?: boolean | null }
+type GeoDoc = { id: number; company?: unknown; code?: string | null; name?: string | null; lat?: number | null; lng?: number | null; radiusM?: number | null; status?: string | null; active?: boolean | null }
 
 export type RecordInput = {
   kind: AttendanceKind
@@ -94,7 +95,7 @@ export async function scheduleOfEmployee(req: PayloadRequest, employee: number, 
   if (own) return own
   let defId = defaultScheduleId
   if (defId === undefined) {
-    const s = (await req.payload.findGlobal({ slug: 'company-settings', depth: 0, overrideAccess: true /* SYSTEM-READ: default schedule */, req })) as { defaultWorkSchedule?: unknown }
+    const s = await settings(req, relId((emp as { company?: unknown } | null)?.company))
     defId = relId(s.defaultWorkSchedule) ?? null
   }
   if (!defId) return null
@@ -102,18 +103,9 @@ export async function scheduleOfEmployee(req: PayloadRequest, employee: number, 
   return snapshotOf(doc as Record<string, unknown> | null)
 }
 
-/** Account linked to an employee (users.employee), or null. */
+/** Account linked to an employee (membership employee, ADR 0016 §2), or null. */
 export async function userOfEmployee(req: PayloadRequest, employee: number): Promise<number | null> {
-  const res = await req.payload.find({
-    collection: 'users',
-    where: { employee: { equals: employee } },
-    depth: 0,
-    limit: 1,
-    select: { email: true },
-    overrideAccess: true, // SYSTEM-READ: account of the attendance's employee
-    req,
-  })
-  return (res.docs[0]?.id as number | undefined) ?? null
+  return userOfEmployeeLink(req, employee)
 }
 
 async function loadLocation(req: PayloadRequest, loc: Location, field: string): Promise<GeoDoc> {
@@ -133,7 +125,7 @@ async function loadLocation(req: PayloadRequest, loc: Location, field: string): 
   }
   if (typeof doc.radiusM !== 'number') {
     // S3e (US-01, S-19): a point without its own radius uses the company default radius.
-    const s = (await req.payload.findGlobal({ slug: 'company-settings', depth: 0, overrideAccess: true /* SYSTEM-READ: default geofence radius */, req })) as { defaultGeofenceRadiusM?: number | null }
+    const s = await settings(req, relId((doc as { company?: unknown }).company))
     return { ...doc, radiusM: effectiveRadiusM(null, s.defaultGeofenceRadiusM) }
   }
   return doc
@@ -164,7 +156,10 @@ export async function recordAttendance(req: PayloadRequest, input: RecordInput):
   const localDate = localDateString(input.time, input.timeZone)
   if (input.source === 'pm') {
     // US-14: only for the PM's own team locations (the team scope of the CALLER).
-    const scope = await resolveScope(req)
+    // ADR 0016 §5: PM role + team scope IN THE LOCATION's PT
+    const company = relId((geo as { company?: unknown }).company)
+    if (!hasRole(req, 'pk-pm', company)) reject('FORBIDDEN', `Hanya untuk ${LABEL[input.location.type]} tim Anda.`, locField)
+    const scope = await resolveScope(req, company ?? null)
     const team = input.location.type === 'project' ? scope.teamProjects : scope.teamCostCenters
     if (!team.includes(input.location.id)) reject('FORBIDDEN', `Hanya untuk ${LABEL[input.location.type]} tim Anda.`, locField)
   }

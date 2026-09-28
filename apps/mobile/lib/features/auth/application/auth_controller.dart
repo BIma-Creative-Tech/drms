@@ -7,6 +7,8 @@ import '../../../app/providers.dart';
 import '../../../core/logging/log.dart';
 import '../../../core/logging/startup_trace.dart';
 import '../../../core/network/api_exception.dart';
+import '../../companies/application/company_selection.dart';
+import '../../companies/data/company_backfill.dart';
 import '../../expense/data/expense_mappers.dart';
 import '../data/oidc_client.dart';
 import '../data/password_login_client.dart';
@@ -46,9 +48,17 @@ final currentSubProvider = Provider<String?>((ref) {
   return s is AuthSignedIn ? s.sub : null;
 });
 
-final currentProfileProvider = Provider<UserProfile?>((ref) {
+/// The whole account as `/me` returned it (every PT membership) — PT switcher, profile screen.
+final accountProfileProvider = Provider<UserProfile?>((ref) {
   final s = ref.watch(authControllerProvider);
   return s is AuthSignedIn ? s.profile : null;
+});
+
+/// The profile narrowed to the PT switcher selection (MC3): roles / capabilities = union over the selected
+/// PTs (menus, home tiles); actions on one document use [UserProfile.forCompany] of its PT.
+final currentProfileProvider = Provider<UserProfile?>((ref) {
+  final p = ref.watch(accountProfileProvider);
+  return p?.scopedTo(ref.watch(companySelectionProvider));
 });
 
 class AuthController extends Notifier<AuthState> {
@@ -74,7 +84,7 @@ class AuthController extends Notifier<AuthState> {
     return const AuthStarting();
   }
 
-  static String _profileKey(String sub) => 'profile:$sub';
+  static String _profileKey(String sub) => profileCacheKey(sub);
 
   /// App start. With a cached profile the home screen is shown at once (tokens + profile known) and
   /// device registration + `/me` run in the background; only a first start without a cached profile
@@ -95,6 +105,7 @@ class AuthController extends Notifier<AuthState> {
     }
     final cached = await _cachedProfile(sub);
     if (cached != null) {
+      await _applyCompanies(sub, cached, restore: true);
       state = AuthSignedIn(profile: cached, sub: sub, fromCache: true);
       StartupTrace.mark('auth restore: signed in from cache');
       unawaited(_refreshInBackground(sub));
@@ -102,6 +113,7 @@ class AuthController extends Notifier<AuthState> {
     }
     try {
       final profile = await _loadProfileOnline(sub, register: true);
+      await _applyCompanies(sub, profile, restore: true);
       state = AuthSignedIn(profile: profile, sub: sub);
       StartupTrace.mark('auth restore: signed in online');
     } on NetworkException {
@@ -131,7 +143,10 @@ class AuthController extends Notifier<AuthState> {
     try {
       final profile = await _loadProfileOnline(sub, register: true);
       final s = state;
-      if (s is AuthSignedIn && s.sub == sub) state = AuthSignedIn(profile: profile, sub: sub);
+      if (s is AuthSignedIn && s.sub == sub) {
+        await _applyCompanies(sub, profile);
+        state = AuthSignedIn(profile: profile, sub: sub);
+      }
       StartupTrace.mark('auth: background profile refresh done');
     } on ApiException catch (e) {
       Log.i('auth: background refresh skipped (${e.runtimeType})');
@@ -147,6 +162,23 @@ class AuthController extends Notifier<AuthState> {
     final profile = userProfileFromJson(raw);
     unawaited(ref.read(syncEngineProvider).rememberServerTime(profile.serverTime));
     return profile;
+  }
+
+  /// MC3: PT selection of [sub] (restored at sign-in, narrowed after every `/me`) and the one-time PT
+  /// assignment of offline rows written before schema v3 (only when the user has exactly one PT; with
+  /// several PTs the rows wait for the user's choice — never guessed). Failures never block sign-in.
+  Future<void> _applyCompanies(String sub, UserProfile profile, {bool restore = false}) async {
+    try {
+      final selection = ref.read(companySelectionProvider.notifier);
+      if (restore) {
+        await selection.restore(sub, profile);
+      } else {
+        await selection.reconcile(sub, profile);
+      }
+      await CompanyBackfill(ref.read(databaseProvider)).assignSoleCompany(sub, profile);
+    } on Object catch (e) {
+      Log.w('auth: company selection / backfill failed', e);
+    }
   }
 
   /// Registers this install; a revoked install id (403) is replaced by a fresh one once.
@@ -189,9 +221,12 @@ class AuthController extends Notifier<AuthState> {
   Future<String?> login() => _guardedLogin(() => ref.read(oidcBrowserClientProvider).login());
 
   /// In-app login (`PK_LOGIN_MODE=password`, ADR 0012). The password is passed straight to the token
-  /// request and is never stored or logged.
-  Future<String?> loginWithPassword({required String username, required String password}) =>
-      _guardedLogin(() => ref.read(passwordLoginClientProvider).login(username: username.trim(), password: password));
+  /// request and is never stored or logged; so is the optional authenticator code [totp] (optional
+  /// self-service 2FA, ADR 0017), sent only when non-empty.
+  Future<String?> loginWithPassword({required String username, required String password, String? totp}) =>
+      _guardedLogin(
+        () => ref.read(passwordLoginClientProvider).login(username: username.trim(), password: password, totp: totp),
+      );
 
   Future<String?> _guardedLogin(Future<OidcTokens> Function() obtainTokens) async {
     if (_busy) return null;
@@ -203,6 +238,7 @@ class AuthController extends Notifier<AuthState> {
       final sub = await tm.sessionSub();
       if (sub == null) throw StateError('sub hilang dari token');
       final profile = await _loadProfileOnline(sub, register: true);
+      await _applyCompanies(sub, profile, restore: true);
       state = AuthSignedIn(profile: profile, sub: sub);
       return null;
     } on LoginCancelled {
@@ -230,6 +266,7 @@ class AuthController extends Notifier<AuthState> {
     if (s is! AuthSignedIn) return;
     try {
       final p = await _loadProfileOnline(s.sub, register: s.fromCache);
+      await _applyCompanies(s.sub, p);
       state = AuthSignedIn(profile: p, sub: s.sub);
     } on ApiException {
       // keep current
@@ -260,6 +297,7 @@ class AuthController extends Notifier<AuthState> {
     await _localStep('tokens', tm.clear);
     await _localStep('push', () => ref.read(pushServiceProvider).onLogout());
     await _localStep('install id', device.rotate);
+    ref.read(companySelectionProvider.notifier).clear();
     state = const AuthSignedOut();
     Log.i('auth: signed out in ${sw.elapsedMilliseconds} ms');
   }

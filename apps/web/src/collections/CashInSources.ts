@@ -4,6 +4,7 @@ import { denyAll } from '@/access/roles'
 import { byRole, rolesAllowed } from '@/access/policies'
 import { reasonOnDeactivate, withAudit } from '@/audit/hooks'
 import { activeField, codeField, uuidField } from '@/fields/common'
+import { companyField, companyHook } from '@/fields/company'
 
 /** Sumber kas masuk (Termin, DP klien, …). Finance C/R/U, Owner R/U, Admin C/R/U. */
 export const CashInSources: CollectionConfig = withAudit(
@@ -17,8 +18,10 @@ export const CashInSources: CollectionConfig = withAudit(
       update: byRole({ 'pk-admin': true, 'pk-finance': true, 'pk-owner': true }),
       delete: denyAll,
     },
+    hooks: { beforeChange: [companyHook('cash-in-sources')] },
     fields: [
-      codeField(),
+      companyField(),
+      codeField('Kode', 32, { perCompany: true }),
       { name: 'name', type: 'text', label: 'Nama', required: true, maxLength: 128 },
       { name: 'coaCode', type: 'text', label: 'Kode akun (COA)', maxLength: 32 },
       activeField(),

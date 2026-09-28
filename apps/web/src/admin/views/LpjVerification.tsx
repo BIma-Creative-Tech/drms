@@ -1,12 +1,15 @@
 import type { AdminViewServerProps } from 'payload'
 import React from 'react'
 
+import { relId } from '@/access/roles'
 import { detail } from '@/domain/expense/dto'
+import { officeQueueWhere } from '@/domain/expense/queues'
 import { SETTLEMENT_TYPE_LABELS } from '@/domain/expense/settlement-rules'
 import { withReqTransaction } from '@/lib/system-tx'
 
 import { ActionButton } from '../components/ActionButton'
 import { MoneyForm } from '../components/MoneyForm'
+import { accountsOf, PtChip, PtScopeNote, ptView } from './pt'
 import { Empty, Forbidden, Shell, TableScroll, allowed, badge, docLink, num, rp, table, td, th } from './shared'
 
 type Detail = Awaited<ReturnType<typeof detail>>
@@ -21,10 +24,12 @@ export async function LpjVerification(props: AdminViewServerProps) {
   const req = props.initPageResult.req
   if (!allowed(req, ['pk-finance', 'pk-owner'])) return <Forbidden props={props} title="Verifikasi LPJ" roles={['pk-finance', 'pk-owner']} />
   const finance = allowed(req, ['pk-finance'])
-  const { submitted, verified, accounts } = await withReqTransaction(req, async () => {
+  const pt = await ptView(req)
+  const { submitted, verified, accounts, companyOf } = await withReqTransaction(req, async () => {
     const res = await req.payload.find({
       collection: 'expense-requests',
-      where: { and: [{ type: { equals: 'advance' } }, { status: { in: ['lpj_submitted', 'lpj_verified'] } }] },
+      // MC2: PTs where the caller is Finance / Direktur only (mc2-contract §3)
+      where: officeQueueWhere(req, { and: [{ type: { equals: 'advance' } }, { status: { in: ['lpj_submitted', 'lpj_verified'] } }] }),
       sort: 'updatedAt',
       limit: 100,
       depth: 0,
@@ -34,20 +39,32 @@ export async function LpjVerification(props: AdminViewServerProps) {
     })
     const all: Detail[] = []
     for (const d of res.docs) all.push(await detail(req, d.id as number))
+    // MC2-4: PT per request (settlement forms offer only cash accounts of that PT)
+    const companyOf = new Map(res.docs.map((d) => [d.id as number, relId((d as { company?: unknown }).company) ?? null]))
     const acc = finance
-      ? (await req.payload.find({ collection: 'cash-accounts', where: { active: { not_equals: false } }, depth: 0, pagination: false, sort: 'name', user: req.user, overrideAccess: false, req })).docs.map((a) => ({ id: a.id as number, name: a.name as string }))
+      ? (await req.payload.find({ collection: 'cash-accounts', where: { active: { not_equals: false } }, depth: 0, pagination: false, sort: 'name', select: { name: true, company: true }, user: req.user, overrideAccess: false, req })).docs.map((a) => ({
+          id: a.id as number,
+          name: a.name as string,
+          company: relId((a as { company?: unknown }).company) ?? null,
+        }))
       : []
-    return { submitted: all.filter((d) => d.status === 'lpj_submitted'), verified: all.filter((d) => d.status === 'lpj_verified'), accounts: acc }
+    return { submitted: all.filter((d) => d.status === 'lpj_submitted'), verified: all.filter((d) => d.status === 'lpj_verified'), accounts: acc, companyOf }
   })
   const base = (id: number) => `/api/v1/expense-requests/${id}`
   return (
     <Shell props={props} title={`Verifikasi LPJ (${submitted.length + verified.length})`}>
+      <PtScopeNote pt={pt} />
       <h2>LPJ diajukan ({submitted.length})</h2>
       {submitted.length === 0 ? <Empty text="Tidak ada LPJ yang menunggu verifikasi." /> : null}
       {submitted.map((d) => (
         <section key={d.id} style={{ border: '1px solid var(--theme-elevation-150)', borderRadius: 4, padding: 12, marginBottom: 16 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
             <div>
+              {pt.multi ? (
+                <>
+                  <PtChip pt={pt.ref(companyOf.get(d.id))} />{' '}
+                </>
+              ) : null}
               <strong>{docLink(d.id, d.docNo ?? `#${d.id}`)}</strong> — {d.title} · LPJ {d.settlement?.docNo ?? ''} · kiriman ke-{d.settlement?.submitCount ?? 1}
               <div style={{ fontSize: 12 }}>Uraian penggunaan: {d.settlement?.usageNotes ?? '—'}</div>
             </div>
@@ -145,6 +162,11 @@ export async function LpjVerification(props: AdminViewServerProps) {
         return (
           <section key={d.id} style={{ border: '1px solid var(--theme-elevation-150)', borderRadius: 4, padding: 12, marginBottom: 16 }}>
             <div>
+              {pt.multi ? (
+                <>
+                  <PtChip pt={pt.ref(companyOf.get(d.id))} />{' '}
+                </>
+              ) : null}
               <strong>{docLink(d.id, d.docNo ?? `#${d.id}`)}</strong> — {d.title} · LPJ {s.docNo}
             </div>
             <div style={{ margin: '6px 0' }}>
@@ -156,7 +178,7 @@ export async function LpjVerification(props: AdminViewServerProps) {
                 <MoneyForm
                   url={`${base(d.id)}/settle`}
                   submitLabel="Transfer kekurangan & selesaikan"
-                  cashAccounts={accounts}
+                  cashAccounts={accountsOf(accounts, companyOf.get(d.id) ?? null)}
                   bankRef="required"
                   proof={{ kind: 'transfer-proofs', required: true }}
                   amountText={`Transfer ${rp(amount)} ke ${d.bank?.bankName ?? ''} ${d.bank?.accountNo ?? ''}`}
@@ -165,7 +187,7 @@ export async function LpjVerification(props: AdminViewServerProps) {
                 <MoneyForm
                   url={`${base(d.id)}/settle`}
                   submitLabel="Catat pengembalian & selesaikan"
-                  cashAccounts={accounts}
+                  cashAccounts={accountsOf(accounts, companyOf.get(d.id) ?? null)}
                   bankRef="none"
                   proof={{ kind: 'attachments', required: false }}
                   amountText={`Kas masuk ${rp(amount)} (Pengembalian LPJ)`}

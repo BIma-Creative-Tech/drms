@@ -1,7 +1,8 @@
 import { sql } from '@payloadcms/db-postgres'
 import type { PayloadRequest } from 'payload'
 
-import { relId, rolesOf, type Role } from '@/access/roles'
+import { relId, type Role } from '@/access/roles'
+import { contextCompanyId, membersWithRole, rolesOfUsersIn, usersOfEmployees } from '@/domain/companies'
 import { writeAudit } from '@/audit/writer'
 import { getRequestTx } from '@/lib/tx'
 
@@ -19,7 +20,8 @@ import { buildSnapshot, selectRule, type ApprovalSnapshot, type RuleInput } from
  * before E1 (PM acknowledger, F2e delegation) keep working unchanged at decision time.
  */
 export async function selectAndSnapshot(req: PayloadRequest, doc: RequestDoc): Promise<{ rule: RuleInput; snapshot: ApprovalSnapshot }> {
-  const rules = await loadActiveRules(req, 'expense_request')
+  const companyId = relId((doc as { company?: unknown }).company) ?? (await contextCompanyId(req))
+  const rules = await loadActiveRules(req, 'expense_request', companyId)
   const projectId = relId(doc.project) ?? null
   const costCenterId = relId(doc.costCenter) ?? null
   const rule = selectRule(rules, {
@@ -31,26 +33,27 @@ export async function selectAndSnapshot(req: PayloadRequest, doc: RequestDoc): P
   })
   if (!rule) fail(409, 'Tidak ada aturan approval yang berlaku untuk pengajuan ini (US-34). Hubungi Admin.')
 
-  const snapshot = await snapshotForRule(req, rule, await involvedUserIds(req, doc))
+  const snapshot = await snapshotForRule(req, rule, await involvedUserIds(req, doc), companyId)
   return { rule, snapshot }
 }
 
 /**
  * ADR 0013 snapshot of `rule` for a document whose requester/creator accounts are `excluded` (G1):
  * rule validity (legacy rules → 409), position plan (G1-2 skip rule), decision roles. Shared by
- * expense requests and budget addenda (E5).
+ * expense requests and budget addenda (E5). Position holders = members of the document's PT
+ * (`companyId`, ADR 0016 §5; the G1-2 skip rule counts holders of that PT only).
  */
-export async function snapshotForRule(req: PayloadRequest, rule: RuleInput, excluded: ReadonlySet<number>): Promise<ApprovalSnapshot> {
+export async function snapshotForRule(req: PayloadRequest, rule: RuleInput, excluded: ReadonlySet<number>, companyId: number): Promise<ApprovalSnapshot> {
   // ADR 0013: only rules of the Direktur → Finance model may be used for NEW submissions. A rule saved
   // before E1 (e.g. "Diketahui" by the PM) is refused here instead of being silently reinterpreted.
   const named = [...new Set([rule.acknowledgeUser, ...rule.steps.map((s) => s.approverUser)].filter((x): x is number => typeof x === 'number'))]
-  const namedUsers = await usersById(req, named)
+  const namedUsers = await rolesOfUsersIn(req, named, companyId)
   const ruleErr = ruleDecisionError(rule, (id) => namedUsers.get(id)?.roles)
   if (ruleErr) fail(409, `Aturan approval "${rule.name}" tidak sesuai alur Direktur → Finance (ADR 0013): ${ruleErr} Hubungi Admin.`)
 
   const holders = async (role: Role | null | undefined, user: number | null | undefined): Promise<number[]> => {
     if (user) return namedUsers.get(user)?.active ? [user] : []
-    return role ? activeUsersWithRole(req, role) : []
+    return role ? membersWithRole(req, role, companyId) : []
   }
   const ackHolders =
     rule.acknowledge === 'required'
@@ -76,11 +79,11 @@ export async function snapshotForRule(req: PayloadRequest, rule: RuleInput, excl
   return snapshot
 }
 
-/** Active `approval-rules` of one document type, mapped to the engine shape (SYSTEM-READ). */
-export async function loadActiveRules(req: PayloadRequest, docType: 'expense_request' | 'budget_addendum'): Promise<RuleInput[]> {
+/** Active `approval-rules` of one document type IN ONE PT, mapped to the engine shape (SYSTEM-READ). */
+export async function loadActiveRules(req: PayloadRequest, docType: 'expense_request' | 'budget_addendum', companyId: number): Promise<RuleInput[]> {
   const res = await req.payload.find({
     collection: 'approval-rules',
-    where: { and: [{ active: { equals: true } }, { docType: { equals: docType } }] },
+    where: { and: [{ active: { equals: true } }, { docType: { equals: docType } }, { company: { equals: companyId } }] },
     depth: 0,
     pagination: false,
     overrideAccess: true, // SYSTEM-READ: approval rules
@@ -112,38 +115,6 @@ export async function loadActiveRules(req: PayloadRequest, docType: 'expense_req
   }))
 }
 
-/** Active users holding `role` (SYSTEM-READ: decision position holders, ADR 0013). */
-export async function activeUsersWithRole(req: PayloadRequest, role: Role): Promise<number[]> {
-  const res = await req.payload.find({
-    collection: 'users',
-    where: { and: [{ roles: { in: [role] } }, { active: { equals: true } }] },
-    depth: 0,
-    pagination: false,
-    select: { email: true },
-    sort: 'id',
-    overrideAccess: true, // SYSTEM-READ: decision position holders (ADR 0013)
-    req,
-  })
-  return res.docs.map((d) => d.id as number)
-}
-
-/** Roles + active flag of users named in a rule (acknowledgeUser / approverUser). */
-export async function usersById(req: PayloadRequest, ids: number[]): Promise<Map<number, { roles: Role[]; active: boolean }>> {
-  const out = new Map<number, { roles: Role[]; active: boolean }>()
-  if (ids.length === 0) return out
-  const res = await req.payload.find({
-    collection: 'users',
-    where: { id: { in: ids } },
-    depth: 0,
-    pagination: false,
-    select: { roles: true, active: true },
-    overrideAccess: true, // SYSTEM-READ: named decision users of an approval rule (ADR 0013)
-    req,
-  })
-  for (const u of res.docs as unknown as Array<{ id: number; roles?: unknown; active?: boolean | null }>) out.set(u.id, { roles: rolesOf(u), active: u.active !== false })
-  return out
-}
-
 /** User ids of the creator and of every requester employee that has an account (G1, Q-08). */
 export async function involvedUserIds(req: PayloadRequest, doc: RequestDoc): Promise<Set<number>> {
   const out = new Set<number>()
@@ -151,15 +122,8 @@ export async function involvedUserIds(req: PayloadRequest, doc: RequestDoc): Pro
   if (creator !== undefined) out.add(creator)
   const emps = ids(doc.requesters)
   if (emps.length > 0) {
-    const users = await req.payload.find({
-      collection: 'users',
-      where: { employee: { in: emps } },
-      depth: 0,
-      pagination: false,
-      overrideAccess: true, // SYSTEM-READ: requester accounts (G1)
-      req,
-    })
-    for (const u of users.docs) out.add(u.id as number)
+    // requester accounts (G1): membership employee links (ADR 0016 §2)
+    for (const u of await usersOfEmployees(req, emps)) out.add(u)
   }
   return out
 }

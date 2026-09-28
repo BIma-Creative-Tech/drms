@@ -2,11 +2,10 @@ import { randomUUID } from 'node:crypto'
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
-import type { Role } from '@/access/roles'
 import { seed } from '@/seed/seed'
 import { parseUatUsers, seedUat, UAT_FIXTURE, type UatReport } from '@/seed/uat-seed'
 
-import { auditRows, getTestPayload, installFakeKeycloak, makeUser, webSessionCookie } from './helpers'
+import { auditRows, companyId, getTestPayload, installFakeKeycloak, makeUser, webSessionCookie, withContext } from './helpers'
 import { api, uploadMedia, type FlowUser } from './flow-world'
 
 /**
@@ -33,7 +32,10 @@ let kc: ReturnType<typeof installFakeKeycloak>
 
 async function one(collection: 'users' | 'employees' | 'cost-centers' | 'projects' | 'employee-bank-accounts' | 'banks' | 'expense-categories', field: string, value: unknown) {
   const p = await getTestPayload()
-  const r = await p.find({ collection, where: { [field]: { equals: value } }, limit: 1, depth: 0, overrideAccess: true /* SYSTEM-READ: test */ })
+  // ADR 0016: masters are per PT (the UAT runs in company #1 DRMS; codes repeat in other PTs)
+  const perPt = ['employees', 'cost-centers', 'projects', 'employee-bank-accounts', 'expense-categories'].includes(collection)
+  const where = perPt ? { and: [{ company: { equals: await companyId() } }, { [field]: { equals: value } }] } : { [field]: { equals: value } }
+  const r = await p.find({ collection, where, limit: 1, depth: 0, overrideAccess: true /* SYSTEM-READ: test */ })
   return r.docs[0] as unknown as Record<string, unknown> & { id: number }
 }
 
@@ -78,7 +80,11 @@ describe('UAT seed', () => {
     const pm = await one('users', 'email', 'pm.uji@proyekkas.test')
     const staff = await one('users', 'email', 'staff.uji@proyekkas.test')
     const staffEmp = await one('employees', 'code', 'UJI-STAFF')
-    expect(staff).toMatchObject({ name: 'Staff Uji', roles: ['pk-staff'], active: true, employee: staffEmp.id, keycloakSub: USERS[0]!.keycloakSub })
+    expect(staff).toMatchObject({ name: 'Staff Uji', active: true, keycloakSub: USERS[0]!.keycloakSub })
+    // ADR 0016: role + employee link = membership of company #1 (DRMS)
+    const m = (await p.find({ collection: 'company-memberships', where: { user: { equals: staff.id } }, depth: 0, overrideAccess: true /* SYSTEM-READ: test */ })).docs
+    expect(m).toHaveLength(1)
+    expect(m[0]).toMatchObject({ company: await companyId(), roles: ['pk-staff'], employee: staffEmp.id, active: true })
     expect(staffEmp.name).toBe('Staff Uji')
     for (const code of ['UJI-PM', 'UJI-FIN', 'UJI-OWN', 'UJI-FIN-2']) expect(await one('employees', 'code', code)).toBeDefined()
     expect(await one('projects', 'code', 'UJI-PRJ')).toMatchObject({ name: 'Proyek Uji', pm: pm.id, budget: 50_000_000, status: 'berjalan' })
@@ -113,7 +119,7 @@ describe('UAT seed', () => {
   it('Staff Uji can submit a request on OPS-PB; Direktur Uji approves ("Diketahui"), PM Uji cannot (ADR 0013), Finance Uji approves', async () => {
     const asFlow = async (email: string): Promise<FlowUser> => {
       const u = await one('users', 'email', email)
-      const f = { id: u.id, email, keycloakSub: '', roles: u.roles as Role[], employee: u.employee as number, collection: 'users', cookie: '', _strategy: 'oidcSession' } as FlowUser
+      const f = { ...(await withContext({ id: u.id as number, email, keycloakSub: '', collection: 'users' as const })), cookie: '', _strategy: 'oidcSession' } as FlowUser
       f.cookie = await webSessionCookie(f)
       const p = await getTestPayload()
       const sig = await uploadMedia('media-signatures', f) // the UAT user draws it in the app

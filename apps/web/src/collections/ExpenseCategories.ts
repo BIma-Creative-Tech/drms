@@ -1,9 +1,10 @@
 import type { CollectionConfig } from 'payload'
 
-import { anyRole, denyAll } from '@/access/roles'
-import { byRole, rolesAllowed } from '@/access/policies'
+import { denyAll } from '@/access/roles'
+import { byRole, rolesAllowed, anyMember } from '@/access/policies'
 import { reasonOnDeactivate, withAudit } from '@/audit/hooks'
 import { activeField, codeField, uuidField } from '@/fields/common'
+import { companyField, companyHook } from '@/fields/company'
 
 /**
  * Kategori pengeluaran (requirements v1.1 §6): COA mapping, default + allowed UoMs ("daftar
@@ -16,13 +17,15 @@ export const ExpenseCategories: CollectionConfig = withAudit(
     labels: { singular: 'Kategori pengeluaran', plural: 'Kategori pengeluaran' },
     admin: { useAsTitle: 'name', group: 'Master Data', defaultColumns: ['code', 'name', 'coaCode', 'requiresVehicle', 'active'] },
     access: {
-      read: anyRole,
+      read: anyMember,
       create: rolesAllowed('pk-admin', 'pk-finance'),
       update: byRole({ 'pk-admin': true, 'pk-finance': true, 'pk-owner': true }),
       delete: denyAll,
     },
+    hooks: { beforeChange: [companyHook('expense-categories')] },
     fields: [
-      codeField(),
+      companyField(),
+      codeField('Kode', 32, { perCompany: true }),
       { name: 'name', type: 'text', label: 'Nama', required: true, maxLength: 128 },
       { name: 'coaCode', type: 'text', label: 'Kode akun (COA)', maxLength: 32 },
       { name: 'defaultUom', type: 'relationship', relationTo: 'uoms', label: 'Satuan default' },

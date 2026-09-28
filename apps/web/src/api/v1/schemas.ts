@@ -37,33 +37,74 @@ export const ImageTargets = z
   })
   .meta({ id: 'ImageTargets' })
 
+export const Capabilities = z
+  .object({
+    approvalInbox: z.boolean().meta({ description: 'ADR 0013: holds pk-owner (label "Direktur") or pk-finance → show the approval inbox.' }),
+    teamMonitor: z.boolean().meta({ description: 'Holds pk-pm → team list/dashboard (monitoring only, no decisions).' }),
+    progressReportCreate: z.boolean().meta({ description: 'E4: holds pk-pm (team projects) or pk-owner (all) → may create progress reports.' }),
+  })
+  .meta({ id: 'Capabilities', description: 'UI hints for the APK (E1); the server guards stay authoritative.' })
+
+const EmployeeRef = z.object({ id: z.number().int(), code: z.string(), name: z.string() }).meta({ id: 'EmployeeRef' })
+
+export const MeCompany = z
+  .object({
+    id: z.number().int(),
+    code: z.string().meta({ description: 'PT short code ({COMPANY} token of document numbers), e.g. DRMS.' }),
+    name: z.string(),
+    timezone: z.string().meta({ description: 'IANA; this release: equals the server TZ for every PT (ADR 0016 §9).' }),
+    selected: z.boolean().meta({ description: 'In the effective selection of THIS request (X-Company-Ids / cookie ∩ memberships; default all).' }),
+    roles: z.array(RoleEnum).meta({ description: 'Roles IN this PT (company_memberships).' }),
+    employeeId: z.number().int().nullable().meta({ description: 'Employee record of the caller in this PT (ADR 0016 D1: one per PT).' }),
+    employee: EmployeeRef.nullable(),
+    capabilities: Capabilities,
+    settings: z
+      .object({
+        defaultGeofenceRadiusM: z.number().int(),
+        receiptRoundingTolerance: z.number().int(),
+        receiptMaxAgeDays: z.number().int(),
+        budgetWarnPct: z.number(),
+        syncExpenseDraftsEnabled: z.boolean(),
+        syncAttendanceEnabled: z.boolean(),
+        syncProgressReportsEnabled: z.boolean(),
+      })
+      .meta({ description: 'Per-PT settings the APK needs (feature flags are applied per item PT: sync FEATURE_DISABLED).' }),
+  })
+  .meta({ id: 'MeCompany' })
+
 export const Me = z
   .object({
     id: z.number().int(),
     email: z.string(),
     name: z.string().nullable(),
-    roles: z.array(RoleEnum),
-    capabilities: z
-      .object({
-        approvalInbox: z.boolean().meta({ description: 'ADR 0013: holds pk-owner (label "Direktur") or pk-finance → show the approval inbox.' }),
-        teamMonitor: z.boolean().meta({ description: 'Holds pk-pm → team list/dashboard (monitoring only, no decisions).' }),
-        progressReportCreate: z.boolean().meta({ description: 'E4: holds pk-pm (team projects) or pk-owner (all) → may create progress reports.' }),
-      })
-      .meta({ description: 'UI hints for the APK (E1); the server guards stay authoritative.' }),
-    employee: z.object({ id: z.number().int(), code: z.string(), name: z.string() }).nullable(),
+    roles: z.array(RoleEnum).meta({ description: 'DEPRECATED (MC3, kept for mobile-v0.2.0): union of the roles over the SELECTED PTs. Use companies[].roles.' }),
+    capabilities: Capabilities.meta({ description: 'DEPRECATED (MC3): derived from the top-level `roles` (union over the selected PTs). Use companies[].capabilities.' }),
+    employee: EmployeeRef.nullable().meta({ description: 'DEPRECATED (MC3): employee of the PT `legacyCompanyId`. Use companies[].employee.' }),
     authMethod: z.enum(['oidcSession', 'mobileBearer']),
     device: z.object({ id: z.number().int(), deviceId: z.string() }).nullable(),
-    settings: z.object({
-      companyName: z.string(),
-      shortCode: z.string(),
-      timezone: z.string(),
-      minAppVersion: z.string().nullable(),
-      offlineMaxAgeDays: z.number().int(),
-      defaultGeofenceRadiusM: z.number().int(),
-      receiptRoundingTolerance: z.number().int(),
-      receiptMaxAgeDays: z.number().int(),
-      imageTargets: ImageTargets,
-    }),
+    settings: z
+      .object({
+        companyName: z.string(),
+        shortCode: z.string(),
+        timezone: z.string(),
+        minAppVersion: z.string().nullable(),
+        offlineMaxAgeDays: z.number().int(),
+        defaultGeofenceRadiusM: z.number().int(),
+        receiptRoundingTolerance: z.number().int(),
+        receiptMaxAgeDays: z.number().int(),
+        imageTargets: ImageTargets,
+      })
+      .meta({ description: 'DEPRECATED (MC3): per-PT values of `legacyCompanyId` + app-wide values. Use companies[].settings + appSettings.' }),
+    companies: z.array(MeCompany).meta({ description: 'MC3: every active membership of the caller (active PTs), ascending id.' }),
+    activeCompanyIds: z.array(z.number().int()).meta({ description: 'MC3: effective selection of this request (ascending).' }),
+    legacyCompanyId: z
+      .number()
+      .int()
+      .nullable()
+      .meta({ description: 'MC3: PT of the deprecated single-PT fields = first selected membership (ascending id) with an employee, else the first selected one. One PT → that PT.' }),
+    appSettings: z
+      .object({ minAppVersion: z.string().nullable(), latestAppVersion: z.string().nullable(), offlineMaxAgeDays: z.number().int(), imageTargets: ImageTargets })
+      .meta({ description: 'MC3: app-wide settings (one APK for all PTs).' }),
     serverTime: z.string(),
   })
   .meta({ id: 'Me' })
@@ -81,8 +122,20 @@ export const MASTER_TYPES = [
   'work-schedules',
   'holidays',
   'team-assignments',
+  'vendors',
+  'cash-in-sources',
 ] as const
 export type MasterType = (typeof MASTER_TYPES)[number]
+
+/** ADR 0016 D2: masters shared by every PT (no `company`). */
+export const SHARED_MASTER_TYPES = ['uoms', 'banks', 'holidays'] as const satisfies readonly MasterType[]
+
+/** `?company=1,3` of list / queue endpoints (MC3-1): narrows the effective selection; a PT outside it → 403 COMPANY_NOT_ALLOWED. */
+export const companyFilterParam = z
+  .string()
+  .regex(/^[1-9]\d{0,8}(,[1-9]\d{0,8})*$/)
+  .optional()
+  .meta({ description: 'MC3: PT filter (comma separated ids). Only narrows the effective selection (X-Company-Ids / cookie ∩ memberships); a PT outside it → 403 COMPANY_NOT_ALLOWED.' })
 
 export const MastersQuery = z
   .object({
@@ -92,17 +145,31 @@ export const MastersQuery = z
       .optional()
       .meta({ description: `Comma separated subset of: ${MASTER_TYPES.join(', ')}. Default: all.` }),
     since: z.iso.datetime({ offset: true }).optional().meta({ description: 'Only records updated after this instant (delta sync).' }),
+    company: companyFilterParam,
   })
   .meta({ id: 'MastersQuery' })
 
-const MasterItem = z.record(z.string(), z.unknown()).meta({ id: 'MasterItem', description: 'Whitelisted fields per type (id, updatedAt, active, …)' })
+const MasterItem = z
+  .record(z.string(), z.unknown())
+  .meta({ id: 'MasterItem', description: 'Whitelisted fields per type (id, updatedAt, active, …) plus MC3 `company` (PT id; null for shared masters) and `shared` (true for banks, uoms, holidays).' })
 
 export const Masters = z
   .object({
     serverTime: z.string(),
+    companies: z
+      .array(
+        z.object({
+          id: z.number().int(),
+          code: z.string(),
+          defaultGeofenceRadiusM: z.number().int(),
+          version: z.string().meta({ description: 'Hash of this PT\'s items of the requested types in this answer (same types → same version = nothing changed).' }),
+        }),
+      )
+      .meta({ description: 'MC3: PTs covered by this answer (selection narrowed by ?company=), ascending id.' }),
+    sharedVersion: z.string().meta({ description: 'MC3: hash of the shared masters in this answer.' }),
     types: z.record(z.string(), z.object({ items: z.array(MasterItem), hasMore: z.boolean() })),
   })
-  .meta({ id: 'Masters' })
+  .meta({ id: 'Masters', description: 'Response header ETag (weak); send it back as If-None-Match → 304 without a body when nothing changed. Cache per PT: request with X-Company-Ids (or ?company=) = one PT.' })
 
 /**
  * Client-side integrity signals (ADR 0010 decision 10, QM-4): bypassable by root-hiding tools, so the

@@ -600,7 +600,9 @@ as List<DraftReceipt>,
 /// @nodoc
 mixin _$DraftRequest {
 
- String get clientUuid; RequestType get type; String get title; int? get projectId; int? get costCenterId; String? get neededDate; String? get notes; List<int> get requesterIds; int? get bankAccountId; List<DraftLine> get lines; int? get serverId; int? get serverRev; DraftSyncState get syncState; String? get lastError; DateTime? get updatedAt;
+ String get clientUuid; RequestType get type;/// MC3: PT of the draft (chosen when it is created; projects / cost centers / accounts come from that
+/// PT's masters). Null = draft written before the multi-PT update, not yet assigned.
+ int? get companyId; String get title; int? get projectId; int? get costCenterId; String? get neededDate; String? get notes; List<int> get requesterIds; int? get bankAccountId; List<DraftLine> get lines; int? get serverId; int? get serverRev; DraftSyncState get syncState; String? get lastError; DateTime? get updatedAt;
 /// Create a copy of DraftRequest
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -612,20 +614,20 @@ $DraftRequestCopyWith<DraftRequest> get copyWith => _$DraftRequestCopyWithImpl<D
 @override
 bool operator ==(Object other) {
   final _this = this as DraftRequest;
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is DraftRequest&&(identical(other.clientUuid, _this.clientUuid) || other.clientUuid == _this.clientUuid)&&(identical(other.type, _this.type) || other.type == _this.type)&&(identical(other.title, _this.title) || other.title == _this.title)&&(identical(other.projectId, _this.projectId) || other.projectId == _this.projectId)&&(identical(other.costCenterId, _this.costCenterId) || other.costCenterId == _this.costCenterId)&&(identical(other.neededDate, _this.neededDate) || other.neededDate == _this.neededDate)&&(identical(other.notes, _this.notes) || other.notes == _this.notes)&&const DeepCollectionEquality().equals(other.requesterIds, _this.requesterIds)&&(identical(other.bankAccountId, _this.bankAccountId) || other.bankAccountId == _this.bankAccountId)&&const DeepCollectionEquality().equals(other.lines, _this.lines)&&(identical(other.serverId, _this.serverId) || other.serverId == _this.serverId)&&(identical(other.serverRev, _this.serverRev) || other.serverRev == _this.serverRev)&&(identical(other.syncState, _this.syncState) || other.syncState == _this.syncState)&&(identical(other.lastError, _this.lastError) || other.lastError == _this.lastError)&&(identical(other.updatedAt, _this.updatedAt) || other.updatedAt == _this.updatedAt));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is DraftRequest&&(identical(other.clientUuid, _this.clientUuid) || other.clientUuid == _this.clientUuid)&&(identical(other.type, _this.type) || other.type == _this.type)&&(identical(other.companyId, _this.companyId) || other.companyId == _this.companyId)&&(identical(other.title, _this.title) || other.title == _this.title)&&(identical(other.projectId, _this.projectId) || other.projectId == _this.projectId)&&(identical(other.costCenterId, _this.costCenterId) || other.costCenterId == _this.costCenterId)&&(identical(other.neededDate, _this.neededDate) || other.neededDate == _this.neededDate)&&(identical(other.notes, _this.notes) || other.notes == _this.notes)&&const DeepCollectionEquality().equals(other.requesterIds, _this.requesterIds)&&(identical(other.bankAccountId, _this.bankAccountId) || other.bankAccountId == _this.bankAccountId)&&const DeepCollectionEquality().equals(other.lines, _this.lines)&&(identical(other.serverId, _this.serverId) || other.serverId == _this.serverId)&&(identical(other.serverRev, _this.serverRev) || other.serverRev == _this.serverRev)&&(identical(other.syncState, _this.syncState) || other.syncState == _this.syncState)&&(identical(other.lastError, _this.lastError) || other.lastError == _this.lastError)&&(identical(other.updatedAt, _this.updatedAt) || other.updatedAt == _this.updatedAt));
 }
 
 
 @override
 int get hashCode {
   final _this = this as DraftRequest;
-  return Object.hash(runtimeType,_this.clientUuid,_this.type,_this.title,_this.projectId,_this.costCenterId,_this.neededDate,_this.notes,const DeepCollectionEquality().hash(_this.requesterIds),_this.bankAccountId,const DeepCollectionEquality().hash(_this.lines),_this.serverId,_this.serverRev,_this.syncState,_this.lastError,_this.updatedAt);
+  return Object.hash(runtimeType,_this.clientUuid,_this.type,_this.companyId,_this.title,_this.projectId,_this.costCenterId,_this.neededDate,_this.notes,const DeepCollectionEquality().hash(_this.requesterIds),_this.bankAccountId,const DeepCollectionEquality().hash(_this.lines),_this.serverId,_this.serverRev,_this.syncState,_this.lastError,_this.updatedAt);
 }
 
 @override
 String toString() {
   final _this = this as DraftRequest;
-  return 'DraftRequest(clientUuid: ${_this.clientUuid}, type: ${_this.type}, title: ${_this.title}, projectId: ${_this.projectId}, costCenterId: ${_this.costCenterId}, neededDate: ${_this.neededDate}, notes: ${_this.notes}, requesterIds: ${_this.requesterIds}, bankAccountId: ${_this.bankAccountId}, lines: ${_this.lines}, serverId: ${_this.serverId}, serverRev: ${_this.serverRev}, syncState: ${_this.syncState}, lastError: ${_this.lastError}, updatedAt: ${_this.updatedAt})';
+  return 'DraftRequest(clientUuid: ${_this.clientUuid}, type: ${_this.type}, companyId: ${_this.companyId}, title: ${_this.title}, projectId: ${_this.projectId}, costCenterId: ${_this.costCenterId}, neededDate: ${_this.neededDate}, notes: ${_this.notes}, requesterIds: ${_this.requesterIds}, bankAccountId: ${_this.bankAccountId}, lines: ${_this.lines}, serverId: ${_this.serverId}, serverRev: ${_this.serverRev}, syncState: ${_this.syncState}, lastError: ${_this.lastError}, updatedAt: ${_this.updatedAt})';
 }
 
 
@@ -636,7 +638,7 @@ abstract mixin class $DraftRequestCopyWith<$Res>  {
   factory $DraftRequestCopyWith(DraftRequest value, $Res Function(DraftRequest) _then) = _$DraftRequestCopyWithImpl;
 @useResult
 $Res call({
- String clientUuid, RequestType type, String title, int? projectId, int? costCenterId, String? neededDate, String? notes, List<int> requesterIds, int? bankAccountId, List<DraftLine> lines, int? serverId, int? serverRev, DraftSyncState syncState, String? lastError, DateTime? updatedAt
+ String clientUuid, RequestType type, int? companyId, String title, int? projectId, int? costCenterId, String? neededDate, String? notes, List<int> requesterIds, int? bankAccountId, List<DraftLine> lines, int? serverId, int? serverRev, DraftSyncState syncState, String? lastError, DateTime? updatedAt
 });
 
 
@@ -653,11 +655,12 @@ class _$DraftRequestCopyWithImpl<$Res>
 
 /// Create a copy of DraftRequest
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? clientUuid = null,Object? type = null,Object? title = null,Object? projectId = freezed,Object? costCenterId = freezed,Object? neededDate = freezed,Object? notes = freezed,Object? requesterIds = null,Object? bankAccountId = freezed,Object? lines = null,Object? serverId = freezed,Object? serverRev = freezed,Object? syncState = null,Object? lastError = freezed,Object? updatedAt = freezed,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? clientUuid = null,Object? type = null,Object? companyId = freezed,Object? title = null,Object? projectId = freezed,Object? costCenterId = freezed,Object? neededDate = freezed,Object? notes = freezed,Object? requesterIds = null,Object? bankAccountId = freezed,Object? lines = null,Object? serverId = freezed,Object? serverRev = freezed,Object? syncState = null,Object? lastError = freezed,Object? updatedAt = freezed,}) {
   return _then(DraftRequest(
 clientUuid: null == clientUuid ? _self.clientUuid : clientUuid // ignore: cast_nullable_to_non_nullable
 as String,type: null == type ? _self.type : type // ignore: cast_nullable_to_non_nullable
-as RequestType,title: null == title ? _self.title : title // ignore: cast_nullable_to_non_nullable
+as RequestType,companyId: freezed == companyId ? _self.companyId : companyId // ignore: cast_nullable_to_non_nullable
+as int?,title: null == title ? _self.title : title // ignore: cast_nullable_to_non_nullable
 as String,projectId: freezed == projectId ? _self.projectId : projectId // ignore: cast_nullable_to_non_nullable
 as int?,costCenterId: freezed == costCenterId ? _self.costCenterId : costCenterId // ignore: cast_nullable_to_non_nullable
 as int?,neededDate: freezed == neededDate ? _self.neededDate : neededDate // ignore: cast_nullable_to_non_nullable
@@ -755,10 +758,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String clientUuid,  RequestType type,  String title,  int? projectId,  int? costCenterId,  String? neededDate,  String? notes,  List<int> requesterIds,  int? bankAccountId,  List<DraftLine> lines,  int? serverId,  int? serverRev,  DraftSyncState syncState,  String? lastError,  DateTime? updatedAt)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String clientUuid,  RequestType type,  int? companyId,  String title,  int? projectId,  int? costCenterId,  String? neededDate,  String? notes,  List<int> requesterIds,  int? bankAccountId,  List<DraftLine> lines,  int? serverId,  int? serverRev,  DraftSyncState syncState,  String? lastError,  DateTime? updatedAt)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _DraftRequest() when $default != null:
-return $default(_that.clientUuid,_that.type,_that.title,_that.projectId,_that.costCenterId,_that.neededDate,_that.notes,_that.requesterIds,_that.bankAccountId,_that.lines,_that.serverId,_that.serverRev,_that.syncState,_that.lastError,_that.updatedAt);case _:
+return $default(_that.clientUuid,_that.type,_that.companyId,_that.title,_that.projectId,_that.costCenterId,_that.neededDate,_that.notes,_that.requesterIds,_that.bankAccountId,_that.lines,_that.serverId,_that.serverRev,_that.syncState,_that.lastError,_that.updatedAt);case _:
   return orElse();
 
 }
@@ -776,10 +779,10 @@ return $default(_that.clientUuid,_that.type,_that.title,_that.projectId,_that.co
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String clientUuid,  RequestType type,  String title,  int? projectId,  int? costCenterId,  String? neededDate,  String? notes,  List<int> requesterIds,  int? bankAccountId,  List<DraftLine> lines,  int? serverId,  int? serverRev,  DraftSyncState syncState,  String? lastError,  DateTime? updatedAt)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String clientUuid,  RequestType type,  int? companyId,  String title,  int? projectId,  int? costCenterId,  String? neededDate,  String? notes,  List<int> requesterIds,  int? bankAccountId,  List<DraftLine> lines,  int? serverId,  int? serverRev,  DraftSyncState syncState,  String? lastError,  DateTime? updatedAt)  $default,) {final _that = this;
 switch (_that) {
 case _DraftRequest():
-return $default(_that.clientUuid,_that.type,_that.title,_that.projectId,_that.costCenterId,_that.neededDate,_that.notes,_that.requesterIds,_that.bankAccountId,_that.lines,_that.serverId,_that.serverRev,_that.syncState,_that.lastError,_that.updatedAt);case _:
+return $default(_that.clientUuid,_that.type,_that.companyId,_that.title,_that.projectId,_that.costCenterId,_that.neededDate,_that.notes,_that.requesterIds,_that.bankAccountId,_that.lines,_that.serverId,_that.serverRev,_that.syncState,_that.lastError,_that.updatedAt);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -796,10 +799,10 @@ return $default(_that.clientUuid,_that.type,_that.title,_that.projectId,_that.co
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String clientUuid,  RequestType type,  String title,  int? projectId,  int? costCenterId,  String? neededDate,  String? notes,  List<int> requesterIds,  int? bankAccountId,  List<DraftLine> lines,  int? serverId,  int? serverRev,  DraftSyncState syncState,  String? lastError,  DateTime? updatedAt)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String clientUuid,  RequestType type,  int? companyId,  String title,  int? projectId,  int? costCenterId,  String? neededDate,  String? notes,  List<int> requesterIds,  int? bankAccountId,  List<DraftLine> lines,  int? serverId,  int? serverRev,  DraftSyncState syncState,  String? lastError,  DateTime? updatedAt)?  $default,) {final _that = this;
 switch (_that) {
 case _DraftRequest() when $default != null:
-return $default(_that.clientUuid,_that.type,_that.title,_that.projectId,_that.costCenterId,_that.neededDate,_that.notes,_that.requesterIds,_that.bankAccountId,_that.lines,_that.serverId,_that.serverRev,_that.syncState,_that.lastError,_that.updatedAt);case _:
+return $default(_that.clientUuid,_that.type,_that.companyId,_that.title,_that.projectId,_that.costCenterId,_that.neededDate,_that.notes,_that.requesterIds,_that.bankAccountId,_that.lines,_that.serverId,_that.serverRev,_that.syncState,_that.lastError,_that.updatedAt);case _:
   return null;
 
 }
@@ -811,11 +814,14 @@ return $default(_that.clientUuid,_that.type,_that.title,_that.projectId,_that.co
 
 
 class _DraftRequest extends DraftRequest {
-  const _DraftRequest({required this.clientUuid, required this.type, this.title = '', this.projectId, this.costCenterId, this.neededDate, this.notes,  List<int> requesterIds = const [], this.bankAccountId,  List<DraftLine> lines = const [], this.serverId, this.serverRev, this.syncState = DraftSyncState.local, this.lastError, this.updatedAt}): _requesterIds = requesterIds,_lines = lines,super._();
+  const _DraftRequest({required this.clientUuid, required this.type, this.companyId, this.title = '', this.projectId, this.costCenterId, this.neededDate, this.notes,  List<int> requesterIds = const [], this.bankAccountId,  List<DraftLine> lines = const [], this.serverId, this.serverRev, this.syncState = DraftSyncState.local, this.lastError, this.updatedAt}): _requesterIds = requesterIds,_lines = lines,super._();
   
 
 @override final  String clientUuid;
 @override final  RequestType type;
+/// MC3: PT of the draft (chosen when it is created; projects / cost centers / accounts come from that
+/// PT's masters). Null = draft written before the multi-PT update, not yet assigned.
+@override final  int? companyId;
 @override@JsonKey() final  String title;
 @override final  int? projectId;
 @override final  int? costCenterId;
@@ -852,18 +858,18 @@ _$DraftRequestCopyWith<_DraftRequest> get copyWith => __$DraftRequestCopyWithImp
 
 @override
 bool operator ==(Object other) {
-    return identical(this, other) || (other.runtimeType == runtimeType&&other is _DraftRequest&&(identical(other.clientUuid, clientUuid) || other.clientUuid == clientUuid)&&(identical(other.type, type) || other.type == type)&&(identical(other.title, title) || other.title == title)&&(identical(other.projectId, projectId) || other.projectId == projectId)&&(identical(other.costCenterId, costCenterId) || other.costCenterId == costCenterId)&&(identical(other.neededDate, neededDate) || other.neededDate == neededDate)&&(identical(other.notes, notes) || other.notes == notes)&&const DeepCollectionEquality().equals(other.requesterIds, _requesterIds)&&(identical(other.bankAccountId, bankAccountId) || other.bankAccountId == bankAccountId)&&const DeepCollectionEquality().equals(other.lines, _lines)&&(identical(other.serverId, serverId) || other.serverId == serverId)&&(identical(other.serverRev, serverRev) || other.serverRev == serverRev)&&(identical(other.syncState, syncState) || other.syncState == syncState)&&(identical(other.lastError, lastError) || other.lastError == lastError)&&(identical(other.updatedAt, updatedAt) || other.updatedAt == updatedAt));
+    return identical(this, other) || (other.runtimeType == runtimeType&&other is _DraftRequest&&(identical(other.clientUuid, clientUuid) || other.clientUuid == clientUuid)&&(identical(other.type, type) || other.type == type)&&(identical(other.companyId, companyId) || other.companyId == companyId)&&(identical(other.title, title) || other.title == title)&&(identical(other.projectId, projectId) || other.projectId == projectId)&&(identical(other.costCenterId, costCenterId) || other.costCenterId == costCenterId)&&(identical(other.neededDate, neededDate) || other.neededDate == neededDate)&&(identical(other.notes, notes) || other.notes == notes)&&const DeepCollectionEquality().equals(other.requesterIds, _requesterIds)&&(identical(other.bankAccountId, bankAccountId) || other.bankAccountId == bankAccountId)&&const DeepCollectionEquality().equals(other.lines, _lines)&&(identical(other.serverId, serverId) || other.serverId == serverId)&&(identical(other.serverRev, serverRev) || other.serverRev == serverRev)&&(identical(other.syncState, syncState) || other.syncState == syncState)&&(identical(other.lastError, lastError) || other.lastError == lastError)&&(identical(other.updatedAt, updatedAt) || other.updatedAt == updatedAt));
 }
 
 
 @override
 int get hashCode {
-    return Object.hash(runtimeType,clientUuid,type,title,projectId,costCenterId,neededDate,notes,const DeepCollectionEquality().hash(_requesterIds),bankAccountId,const DeepCollectionEquality().hash(_lines),serverId,serverRev,syncState,lastError,updatedAt);
+    return Object.hash(runtimeType,clientUuid,type,companyId,title,projectId,costCenterId,neededDate,notes,const DeepCollectionEquality().hash(_requesterIds),bankAccountId,const DeepCollectionEquality().hash(_lines),serverId,serverRev,syncState,lastError,updatedAt);
 }
 
 @override
 String toString() {
-    return 'DraftRequest(clientUuid: $clientUuid, type: $type, title: $title, projectId: $projectId, costCenterId: $costCenterId, neededDate: $neededDate, notes: $notes, requesterIds: $requesterIds, bankAccountId: $bankAccountId, lines: $lines, serverId: $serverId, serverRev: $serverRev, syncState: $syncState, lastError: $lastError, updatedAt: $updatedAt)';
+    return 'DraftRequest(clientUuid: $clientUuid, type: $type, companyId: $companyId, title: $title, projectId: $projectId, costCenterId: $costCenterId, neededDate: $neededDate, notes: $notes, requesterIds: $requesterIds, bankAccountId: $bankAccountId, lines: $lines, serverId: $serverId, serverRev: $serverRev, syncState: $syncState, lastError: $lastError, updatedAt: $updatedAt)';
 }
 
 
@@ -874,7 +880,7 @@ abstract mixin class _$DraftRequestCopyWith<$Res> implements $DraftRequestCopyWi
   factory _$DraftRequestCopyWith(_DraftRequest value, $Res Function(_DraftRequest) _then) = __$DraftRequestCopyWithImpl;
 @override @useResult
 $Res call({
- String clientUuid, RequestType type, String title, int? projectId, int? costCenterId, String? neededDate, String? notes, List<int> requesterIds, int? bankAccountId, List<DraftLine> lines, int? serverId, int? serverRev, DraftSyncState syncState, String? lastError, DateTime? updatedAt
+ String clientUuid, RequestType type, int? companyId, String title, int? projectId, int? costCenterId, String? neededDate, String? notes, List<int> requesterIds, int? bankAccountId, List<DraftLine> lines, int? serverId, int? serverRev, DraftSyncState syncState, String? lastError, DateTime? updatedAt
 });
 
 
@@ -891,11 +897,12 @@ class __$DraftRequestCopyWithImpl<$Res>
 
 /// Create a copy of DraftRequest
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? clientUuid = null,Object? type = null,Object? title = null,Object? projectId = freezed,Object? costCenterId = freezed,Object? neededDate = freezed,Object? notes = freezed,Object? requesterIds = null,Object? bankAccountId = freezed,Object? lines = null,Object? serverId = freezed,Object? serverRev = freezed,Object? syncState = null,Object? lastError = freezed,Object? updatedAt = freezed,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? clientUuid = null,Object? type = null,Object? companyId = freezed,Object? title = null,Object? projectId = freezed,Object? costCenterId = freezed,Object? neededDate = freezed,Object? notes = freezed,Object? requesterIds = null,Object? bankAccountId = freezed,Object? lines = null,Object? serverId = freezed,Object? serverRev = freezed,Object? syncState = null,Object? lastError = freezed,Object? updatedAt = freezed,}) {
   return _then(_DraftRequest(
 clientUuid: null == clientUuid ? _self.clientUuid : clientUuid // ignore: cast_nullable_to_non_nullable
 as String,type: null == type ? _self.type : type // ignore: cast_nullable_to_non_nullable
-as RequestType,title: null == title ? _self.title : title // ignore: cast_nullable_to_non_nullable
+as RequestType,companyId: freezed == companyId ? _self.companyId : companyId // ignore: cast_nullable_to_non_nullable
+as int?,title: null == title ? _self.title : title // ignore: cast_nullable_to_non_nullable
 as String,projectId: freezed == projectId ? _self.projectId : projectId // ignore: cast_nullable_to_non_nullable
 as int?,costCenterId: freezed == costCenterId ? _self.costCenterId : costCenterId // ignore: cast_nullable_to_non_nullable
 as int?,neededDate: freezed == neededDate ? _self.neededDate : neededDate // ignore: cast_nullable_to_non_nullable

@@ -77,7 +77,7 @@ const worldRequests = () => Object.values(ids)
 describe('requestStatusCounts / requestTrendMonthly (K-13) scoping', () => {
   it('Owner/Finance (all) = the SQL rule over every request', async () => {
     const r = await asUser(w.users.owner, async (req) => requestStatusCounts(req, await officeScope(req)))
-    const sql = await sqlAs('app', "SELECT count(*)::int AS n FROM expense_requests WHERE status <> 'draft'")
+    const sql = await sqlAs('app', "SELECT count(*)::int AS n FROM expense_requests WHERE status <> 'draft' AND company_id = (SELECT id FROM companies WHERE short_code = 'DRMS')")
     expect(r.reduce((s, x) => s + x.count, 0)).toBe(sql.rows[0].n)
   })
 
@@ -136,7 +136,7 @@ describe('office-only ledger rows', () => {
     // same K-11 set and order in plain SQL (shared DB: other files queue requests too)
     const sql = await sqlAs(
       'app',
-      "SELECT id FROM expense_requests WHERE (type = 'advance' AND status = 'approved') OR (type = 'reimburse' AND status = 'receipts_verified') ORDER BY needed_date NULLS LAST, id LIMIT 50",
+      "SELECT id FROM expense_requests WHERE ((type = 'advance' AND status = 'approved') OR (type = 'reimburse' AND status = 'receipts_verified')) AND company_id = (SELECT id FROM companies WHERE short_code = 'DRMS') ORDER BY needed_date NULLS LAST, id LIMIT 50", // MC2: the Owner's PT (DRMS) only
     )
     expect(q.map((x) => x.id)).toEqual(sql.rows.map((r) => r.id))
     const all = await sqlAs('app', "SELECT count(*)::int AS n FROM expense_requests WHERE type = 'advance' AND status = 'approved' AND id = $1", [ids.approved])
@@ -152,12 +152,12 @@ describe('dashboards `viz` + API', () => {
     expect(o.viz.requestTrend).toHaveLength(6)
     expect(o.viz.disbursed).toHaveLength(6)
     expect(o.viz.balanceTrend.at(-1)!.balance).toBe(o.cash.total)
-    const sql = await sqlAs('app', "SELECT count(*)::int AS n FROM expense_requests WHERE status <> 'draft'")
+    const sql = await sqlAs('app', "SELECT count(*)::int AS n FROM expense_requests WHERE status <> 'draft' AND company_id = (SELECT id FROM companies WHERE short_code = 'DRMS')")
     expect(o.viz.pipeline.total).toBe(sql.rows[0].n)
     expect(o.viz.categories.items.length).toBeLessThanOrEqual(7)
     const f = await asUser(w.users.finance, (req) => financeDashboard(req))
     // top 6 of the K-11 set (shared DB: other files queue requests too)
-    const queued = await sqlAs('app', "SELECT id FROM expense_requests WHERE (type = 'advance' AND status = 'approved') OR (type = 'reimburse' AND status = 'receipts_verified')")
+    const queued = await sqlAs('app', "SELECT id FROM expense_requests WHERE ((type = 'advance' AND status = 'approved') OR (type = 'reimburse' AND status = 'receipts_verified')) AND company_id = (SELECT id FROM companies WHERE short_code = 'DRMS')")
     expect(f.viz.transferTop.length).toBe(Math.min(6, queued.rows.length))
     for (const x of f.viz.transferTop) expect(queued.rows.map((r) => r.id)).toContain(x.id)
   })

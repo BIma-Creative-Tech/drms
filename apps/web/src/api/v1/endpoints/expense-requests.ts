@@ -1,6 +1,6 @@
 import type { PayloadRequest, Where } from 'payload'
 
-import { hasRole, userId } from '@/access/roles'
+import { hasRole, membershipsOf, ownEmployees, relId, userId, type Role } from '@/access/roles'
 import { resolveScope } from '@/access/scope'
 import { writeAudit } from '@/audit/writer'
 import { actorContext, displayName, loadVisible, type RequestDoc } from '@/domain/expense/common'
@@ -13,7 +13,9 @@ import { recordTransfer, voidTransfer } from '@/domain/expense/transfers'
 import { acknowledge, approve, cancel, complete, reject, submit, withdraw } from '@/domain/expense/workflow'
 import { receiptsComplete, requestLpjRevision, reverseSettlement, settle, submitLpj, verifyLpj } from '@/domain/expense/lpj'
 import { requestHistory } from '@/domain/history'
-import { approvalInbox } from '@/domain/expense/queues'
+import { approvalInbox, lpjQueue, officeQueueWhere } from '@/domain/expense/queues'
+
+import { companyQuery } from '../company-query'
 
 import { HttpError, json, problem, v1 } from '../http'
 import {
@@ -69,19 +71,34 @@ export const listRequestsEndpoint = v1({
     const { scope, status, type, limit, cursor } = q.data
     const and: Where[] = []
     const uid = userId(req)!
-    const s = await resolveScope(req)
     if (scope === 'mine') {
+      // ADR 0016 D1: one employee per PT — "mine" = created by me or naming ANY of my employees
       const own: Where[] = [{ createdBy: { equals: uid } }]
-      if (s.employeeId !== null) own.push({ requesters: { in: [s.employeeId] } })
+      const emps = ownEmployees(req)
+      if (emps.length) own.push({ requesters: { in: emps } })
       and.push({ or: own })
     }
-    if (scope === 'team' && hasRole(req, 'pk-pm') && !hasRole(req, 'pk-finance', 'pk-owner', 'pk-admin')) {
-      const team: Where[] = []
-      if (s.teamProjects.length) team.push({ project: { in: s.teamProjects } })
-      if (s.teamCostCenters.length) team.push({ costCenter: { in: s.teamCostCenters } })
-      if (team.length === 0) return json({ items: [], nextCursor: null })
-      and.push({ or: team })
+    const members = membershipsOf(req.user)
+    if (scope === 'team' && members.some((m) => m.roles.includes('pk-pm'))) {
+      // per PT (ADR 0016 §5): office PTs in full, PM PTs team only, other PTs nothing
+      const office: Role[] = ['pk-finance', 'pk-owner', 'pk-admin']
+      const parts: Where[] = []
+      for (const m of members) {
+        if (m.roles.some((r) => office.includes(r))) parts.push({ company: { equals: m.company } })
+        else if (m.roles.includes('pk-pm')) {
+          const s = await resolveScope(req, m.company)
+          const team: Where[] = []
+          if (s.teamProjects.length) team.push({ project: { in: s.teamProjects } })
+          if (s.teamCostCenters.length) team.push({ costCenter: { in: s.teamCostCenters } })
+          if (team.length) parts.push({ and: [{ company: { equals: m.company } }, { or: team }] })
+        }
+      }
+      if (parts.length === 0) return json({ items: [], nextCursor: null })
+      and.push({ or: parts })
     }
+    // MC3: ?company= narrows the selection (never widens; foreign → 403 COMPANY_NOT_ALLOWED)
+    const companies = await companyQuery(req)
+    if (companies) and.push({ company: { in: companies } })
     if (scope === 'inbox') and.push({ status: { in: ['pending_ack', 'pending_approval'] } })
     if (status) and.push({ status: { in: status.split(',') } })
     if (type) and.push({ type: { equals: type } })
@@ -171,14 +188,20 @@ export const transferQueueEndpoint = v1({
   method: 'get',
   roles: ['pk-finance', 'pk-owner'],
   handler: async ({ req }) => {
+    const companies = await companyQuery(req)
     const res = await req.payload.find({
       collection: 'expense-requests',
-      where: {
-        or: [
-          { and: [{ type: { equals: 'advance' } }, { status: { equals: 'approved' } }] },
-          { and: [{ type: { equals: 'reimburse' } }, { status: { equals: 'receipts_verified' } }] },
-        ],
-      },
+      // MC2: only PTs where the caller is Finance / Direktur (not the team requests of a PM PT); MC3: ?company=
+      where: officeQueueWhere(
+        req,
+        {
+          or: [
+            { and: [{ type: { equals: 'advance' } }, { status: { equals: 'approved' } }] },
+            { and: [{ type: { equals: 'reimburse' } }, { status: { equals: 'receipts_verified' } }] },
+          ],
+        },
+        { companyIds: companies },
+      ),
       sort: 'neededDate',
       limit: 500,
       depth: 0,
@@ -208,7 +231,18 @@ export const approvalInboxEndpoint = v1({
   path: '/approvals/inbox',
   method: 'get',
   transactional: true, // budget figures use the request transaction handle
-  handler: async ({ req }) => json(await approvalInbox(req)),
+  handler: async ({ req }) => json(await approvalInbox(req, { companyIds: await companyQuery(req) })),
+})
+
+/**
+ * GET /lpj-queue[?company=] — US-21 LPJ verification list (Uang Muka "LPJ Diajukan" / "LPJ
+ * Terverifikasi") of the PTs where the caller is Finance / Direktur, with `company` refs (MC3-1).
+ */
+export const lpjQueueEndpoint = v1({
+  path: '/lpj-queue',
+  method: 'get',
+  roles: ['pk-finance', 'pk-owner'],
+  handler: async ({ req }) => json({ items: await lpjQueue(req, { companyIds: await companyQuery(req) }) }),
 })
 
 // ---------------------------------------------------------------- drafts
@@ -437,10 +471,13 @@ export const pdfEndpoint = v1({
     const q = PdfQuery.safeParse(Object.fromEntries(req.searchParams.entries()))
     if (!q.success) throw new HttpError(400, 'Bad Request', { detail: 'variant harus standard atau internal.' })
     const internal = q.data.variant === 'internal'
-    if (internal && !hasRole(req, 'pk-finance', 'pk-owner', 'pk-admin')) throw new HttpError(403, 'Forbidden', { detail: 'Salinan internal hanya untuk Finance/Direktur/Admin.' })
     const { buildPdfData } = await import('@/pdf/data')
     const data = await withReqTransaction(req, async () => {
       const doc = await loadVisible(req, id)
+      // ADR 0016 §5: the internal copy needs the office role IN THE DOCUMENT's PT
+      if (internal && !hasRole(req, ['pk-finance', 'pk-owner', 'pk-admin'], relId((doc as { company?: unknown }).company))) {
+        throw new HttpError(403, 'Forbidden', { detail: 'Salinan internal hanya untuk Finance/Direktur/Admin.' })
+      }
       if (doc.status === 'draft' || !doc.docNo) throw new HttpError(409, 'Conflict', { detail: 'PDF tersedia setelah pengajuan diajukan (bernomor).' })
       const built = await buildPdfData(req, id, { internal, printedBy: await displayName(req, userId(req)!) })
       await writeAudit(req, [
@@ -482,6 +519,7 @@ export const EXPENSE_ENDPOINTS = [
   historyEndpoint,
   transferQueueEndpoint,
   approvalInboxEndpoint,
+  lpjQueueEndpoint,
   submitEndpoint,
   withdrawEndpoint,
   cancelEndpoint,

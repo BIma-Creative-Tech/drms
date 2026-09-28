@@ -5,22 +5,24 @@ import { allocateDocNo } from '@/domain/numbering-db'
 import { DEFAULT_SEQUENCES, parseBusinessDate } from '@/domain/numbering'
 import { withSystemTransaction } from '@/lib/system-tx'
 
-import { getTestPayload, sqlAs } from './helpers'
+import { companyId, getTestPayload, sqlAs, updateCompany } from './helpers'
 
 /**
  * ADR 0007 §5 on the REQUEST transaction handle (getRequestTx = adapter.sessions[await
  * req.transactionID].db — internal Payload/Drizzle detail, pinned 3.90.1 → keep this test on every
  * Payload upgrade). F1 gate: 50 parallel submits → unique AND gapless; rollbacks burn no number.
  */
+let cid = 0 // company #1 DRMS (ADR 0016: counters and sequences are per PT)
 beforeAll(async () => {
   const p = await getTestPayload()
-  await p.updateGlobal({ slug: 'company-settings', data: { shortCode: 'DRMS' }, overrideAccess: true /* SYSTEM-WRITE: fixture */ })
+  cid = await companyId()
+  await updateCompany({ shortCode: 'DRMS' })
   for (const s of DEFAULT_SEQUENCES) {
     // other suites share the DB (one reset per run) → only create what is missing, force ADR defaults
-    const found = await p.find({ collection: 'document-sequences', where: { docType: { equals: s.docType } }, overrideAccess: true /* SYSTEM-READ */ })
+    const found = await p.find({ collection: 'document-sequences', where: { and: [{ company: { equals: cid } }, { docType: { equals: s.docType } }] }, overrideAccess: true /* SYSTEM-READ */ })
     const doc = found.docs[0]
     if (doc) await p.update({ collection: 'document-sequences', id: doc.id, data: { ...s, active: true, changeReason: 'test fixture' }, overrideAccess: true /* SYSTEM-WRITE: fixture */ })
-    else await p.create({ collection: 'document-sequences', data: { ...s, timezone: 'Asia/Makassar' }, overrideAccess: true /* SYSTEM-WRITE: fixture */ })
+    else await p.create({ collection: 'document-sequences', data: { ...s, company: cid, timezone: 'Asia/Makassar' }, overrideAccess: true /* SYSTEM-WRITE: fixture */ })
   }
 })
 
@@ -31,7 +33,7 @@ beforeAll(async () => {
  */
 let base = 229
 beforeAll(async () => {
-  const c = await sqlAs('app', "SELECT next_value FROM document_sequence_counters WHERE doc_type = 'expense_request' AND period_key = 'ALL'")
+  const c = await sqlAs('app', "SELECT next_value FROM document_sequence_counters WHERE company_id = $1 AND doc_type = 'expense_request' AND period_key = 'ALL'", [cid])
   base = c.rows[0]?.next_value ?? 229
 })
 
@@ -41,11 +43,11 @@ afterAll(async () => {
 
 describe('document numbering (ADR 0007)', () => {
   it('first PB number continues the paper series: 229/PB-DRMS/23/IX/2026 (number_issued audited in the same tx)', async () => {
-    const counter = await sqlAs('app', "SELECT count(*)::int AS n FROM document_sequence_counters WHERE doc_type = 'expense_request'")
+    const counter = await sqlAs('app', "SELECT count(*)::int AS n FROM document_sequence_counters WHERE company_id = $1 AND doc_type = 'expense_request'", [cid])
     if (counter.rows[0].n === 0) expect(base).toBe(229)
     const p = await getTestPayload()
     const res = await withSystemTransaction(p, null, async (req: PayloadRequest) => {
-      const a = await allocateDocNo(req, 'expense_request', { date: parseBusinessDate('2026-09-23'), docId: 'test-1' })
+      const a = await allocateDocNo(req, 'expense_request', { companyId: cid, date: parseBusinessDate('2026-09-23'), docId: 'test-1' })
       const r = await (await import('@/lib/tx')).getRequestTx(req)
       const tx = (await r.execute((await import('@payloadcms/db-postgres')).sql`SELECT txid_current()::text AS tx`)) as unknown as { rows: Array<{ tx: string }> }
       return { a, tx: tx.rows[0]!.tx }
@@ -59,11 +61,11 @@ describe('document numbering (ADR 0007)', () => {
     const p = await getTestPayload()
     await expect(
       withSystemTransaction(p, null, async (req) => {
-        await allocateDocNo(req, 'expense_request', { date: parseBusinessDate('2026-09-24') })
+        await allocateDocNo(req, 'expense_request', { companyId: cid, date: parseBusinessDate('2026-09-24') })
         throw new Error('simulated failure after allocation')
       }),
     ).rejects.toThrow('simulated failure')
-    const next = await withSystemTransaction(p, null, (req) => allocateDocNo(req, 'expense_request', { date: parseBusinessDate('2026-09-24') }))
+    const next = await withSystemTransaction(p, null, (req) => allocateDocNo(req, 'expense_request', { companyId: cid, date: parseBusinessDate('2026-09-24') }))
     expect(next.docNo).toBe(`${base + 1}/PB-DRMS/24/IX/2026`)
   })
 
@@ -72,7 +74,7 @@ describe('document numbering (ADR 0007)', () => {
     const results = await Promise.allSettled(
       Array.from({ length: 50 }, (_, i) =>
         withSystemTransaction(p, null, async (req) => {
-          const a = await allocateDocNo(req, 'expense_request', { date: parseBusinessDate('2026-09-25') })
+          const a = await allocateDocNo(req, 'expense_request', { companyId: cid, date: parseBusinessDate('2026-09-25') })
           await new Promise((r) => setTimeout(r, Math.random() * 20))
           if (i % 5 === 4) throw new Error('fail after allocation')
           return a.seq
@@ -88,13 +90,13 @@ describe('document numbering (ADR 0007)', () => {
     const sorted = [...ok].sort((a, b) => a - b)
     expect(sorted[0]).toBe(base + 2)
     expect(sorted[39]).toBe(base + 41) // gapless
-    const c = await sqlAs('app', "SELECT next_value FROM document_sequence_counters WHERE doc_type = 'expense_request' AND period_key = 'ALL'")
+    const c = await sqlAs('app', "SELECT next_value FROM document_sequence_counters WHERE company_id = $1 AND doc_type = 'expense_request' AND period_key = 'ALL'", [cid])
     expect(c.rows[0].next_value).toBe(base + 42)
   })
 
   it('50 purely parallel allocations all succeed, unique and gapless', async () => {
     const p = await getTestPayload()
-    const seqs = await Promise.all(Array.from({ length: 50 }, () => withSystemTransaction(p, null, async (req) => (await allocateDocNo(req, 'expense_request', { audit: false })).seq)))
+    const seqs = await Promise.all(Array.from({ length: 50 }, () => withSystemTransaction(p, null, async (req) => (await allocateDocNo(req, 'expense_request', { companyId: cid, audit: false })).seq)))
     const sorted = [...seqs].sort((a, b) => a - b)
     expect(new Set(seqs).size).toBe(50)
     expect(sorted[49]! - sorted[0]!).toBe(49)
@@ -104,8 +106,8 @@ describe('document numbering (ADR 0007)', () => {
   it('monthly reset per period for TRF/KK', async () => {
     const p = await getTestPayload()
     // periods no other test file uses (the F2a flow tests post transfers in 2026)
-    const a = await withSystemTransaction(p, null, (req) => allocateDocNo(req, 'transfer', { date: parseBusinessDate('2031-09-30') }))
-    const b = await withSystemTransaction(p, null, (req) => allocateDocNo(req, 'transfer', { date: parseBusinessDate('2031-10-01') }))
+    const a = await withSystemTransaction(p, null, (req) => allocateDocNo(req, 'transfer', { companyId: cid, date: parseBusinessDate('2031-09-30') }))
+    const b = await withSystemTransaction(p, null, (req) => allocateDocNo(req, 'transfer', { companyId: cid, date: parseBusinessDate('2031-10-01') }))
     expect([a.docNo, b.docNo]).toEqual(['TRF/3109/0001', 'TRF/3110/0001'])
   })
 
@@ -113,6 +115,6 @@ describe('document numbering (ADR 0007)', () => {
     const p = await getTestPayload()
     const { createLocalReq } = await import('payload')
     const req = await createLocalReq({}, p)
-    await expect(allocateDocNo(req, 'expense_request')).rejects.toThrow(/no active transaction/)
+    await expect(allocateDocNo(req, 'expense_request', { companyId: cid })).rejects.toThrow(/no active transaction/)
   })
 })

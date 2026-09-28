@@ -18,8 +18,7 @@ class ProgressDetailScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final t = AppLocalizations.of(context);
-    final zone = ref.watch(currentProfileProvider)?.timezone;
-    final canCreate = ref.watch(currentProfileProvider)?.canCreateProgress ?? false;
+    final profile = ref.watch(currentProfileProvider);
     final value = ref.watch(progressDetailProvider(id));
     return Scaffold(
       appBar: AppBar(title: Text(value.value?.docNo ?? t.progressDetailTitle)),
@@ -27,6 +26,10 @@ class ProgressDetailScreen extends ConsumerWidget {
         value: value,
         onRetry: () => ref.invalidate(progressDetailProvider(id)),
         data: (r) {
+          // MC3: time zone and edit right of the report's PT (roles IN that PT).
+          final inPt = profile?.forCompany(r.companyId);
+          final zone = inPt?.timezone;
+          final canCreate = inPt?.canCreateProgress ?? false;
           final theme = Theme.of(context);
           Widget row(String label, String text) => Padding(
             padding: const EdgeInsets.symmetric(vertical: 4),

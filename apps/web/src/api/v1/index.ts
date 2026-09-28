@@ -8,9 +8,11 @@ import { healthEndpoint, healthHeadEndpoint, readyEndpoint, readyHeadEndpoint } 
 import { CASH_ENDPOINTS } from './endpoints/cash'
 import { EXPENSE_ENDPOINTS } from './endpoints/expense-requests'
 import { mastersEndpoint } from './endpoints/masters'
+import { membershipBatchEndpoint } from './endpoints/memberships'
 import { mediaFileEndpoint, mediaSignedUrlEndpoint, uploadMediaEndpoint } from './endpoints/media'
 import { NOTIFICATION_ENDPOINTS } from './endpoints/notifications'
 import { meEndpoint } from './endpoints/me'
+import { meCompaniesEndpoint } from './endpoints/me-companies'
 import { openapiEndpoint } from './endpoints/openapi'
 import { PROGRESS_ENDPOINTS } from './endpoints/progress'
 import { REPORT_ENDPOINTS } from './endpoints/reports'
@@ -24,6 +26,8 @@ export const v1Endpoints: Endpoint[] = [
   readyEndpoint,
   readyHeadEndpoint,
   meEndpoint,
+  // MC2-4: web PT switcher (cookie pk-company-ids)
+  meCompaniesEndpoint,
   mastersEndpoint,
   registerDeviceEndpoint,
   revokeDeviceEndpoint,
@@ -32,6 +36,8 @@ export const v1Endpoints: Endpoint[] = [
   // F2a expense-request flow (T1–T4, T6–T8, period closing)
   ...EXPENSE_ENDPOINTS,
   ...CASH_ENDPOINTS,
+  // MC2: atomic role-matrix save
+  membershipBatchEndpoint,
   uploadMediaEndpoint,
   // F2b: scoped file download (APK), in-app notifications
   mediaFileEndpoint,

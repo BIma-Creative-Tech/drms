@@ -40,6 +40,7 @@ export function listItem(doc: RequestDoc & { project?: unknown; costCenter?: unk
     neededDate: doc.neededDate ?? null,
     createdById: relId(doc.createdBy) ?? null,
     updatedAt: doc.updatedAt ?? null,
+    companyId: relId((doc as { company?: unknown }).company) ?? null, // MC3: PT chip (labels: /me companies[])
     ...extra,
   }
 }
@@ -61,7 +62,8 @@ export async function detail(req: PayloadRequest, id: number) {
     currentLevel: doc.currentLevel,
   } as RequestDoc)
   const own = ctx.isCreator || ctx.isRequester
-  const fullBank = own || hasRole(req, 'pk-finance', 'pk-owner', 'pk-admin')
+  // ADR 0016 §5: the full account number for office roles OF THE DOCUMENT's PT only
+  const fullBank = own || hasRole(req, ['pk-finance', 'pk-owner', 'pk-admin'], relId((doc as { company?: unknown }).company))
   const approvals = await approvalsOf(req, id)
   const receipts = await receiptsOf(req, id)
   const flags = (

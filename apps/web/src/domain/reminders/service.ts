@@ -4,6 +4,7 @@ import type { Payload, PayloadRequest } from 'payload'
 import { notificationTemplate, pushEnabled } from '@/domain/notifications'
 import { lateProgressProjects, LATE_REPORT_EVENT, notifyLateProgressReport } from '@/domain/progress/reminders'
 import { projectBudgets } from '@/domain/reports/kpi'
+import { fromCompanies } from '@/domain/reports/scope'
 import { daysBetween } from '@/domain/reports/rules'
 import { statusLabel, type RequestStatus, type RequestType } from '@/domain/expense/types'
 import { formatRupiah } from '@/lib/money'
@@ -12,6 +13,7 @@ import { DEFAULT_TZ } from '@/lib/time'
 import { getRequestTx } from '@/lib/tx'
 
 import { companyClock, crossedThresholds, DEFAULT_TEXTS, fill, REMINDER_EVENTS, reminderSettingsOf, runDecision, type ReminderRule, type ReminderSettings } from './rules'
+import { activeCompanyIds, settingsOf } from '@/domain/companies'
 
 /**
  * E7 — daily scheduled reminders (M12, US-11; plan fase1-golive §E7). Job `dailyReminders` fires
@@ -28,14 +30,30 @@ import { companyClock, crossedThresholds, DEFAULT_TEXTS, fill, REMINDER_EVENTS, 
  * the job is re-run or forced. Recipients are ACTIVE users only; archived projects (and requests of
  * archived projects) produce nothing. Channels: in-app notification always (push status per
  * PUSH_FCM_ENABLED), email via the sendEmail queue when reminderEmailEnabled. Logs carry counts only.
+ *
+ * MC2 (ADR 0016 §7): one run PER ACTIVE PT with that PT's settings (hour, toggles, thresholds) and its
+ * own `reminder_runs (company_id, run_date)` row / advisory lock / transaction; subjects are the PT's
+ * documents, recipients hold the role IN THAT PT; notification rows carry the PT. A failing PT is
+ * logged and the others continue. The returned result aggregates the PTs (`companies` = per PT).
  */
 export type RuleSummary = { subjects: number; notified: number }
-export type ReminderRunResult = {
-  status: 'run' | 'disabled' | 'before_hour' | 'already_ran'
+export type ReminderRunStatus = 'run' | 'disabled' | 'before_hour' | 'already_ran' | 'failed'
+export type CompanyRunResult = {
+  companyId: number
+  status: ReminderRunStatus
   date: string
   hour: number
   rules: Partial<Record<ReminderRule, RuleSummary>>
   emails: number
+}
+export type ReminderRunResult = {
+  /** 'run' when at least one PT ran; else the status of the first PT (single-PT: unchanged semantics). */
+  status: Exclude<ReminderRunStatus, 'failed'> | 'failed'
+  date: string
+  hour: number
+  rules: Partial<Record<ReminderRule, RuleSummary>>
+  emails: number
+  companies: CompanyRunResult[]
 }
 
 type Row = Record<string, unknown>
@@ -57,8 +75,14 @@ async function activeOnly(req: PayloadRequest, userIds: Iterable<number>): Promi
   return r.map((x) => Number(x.id))
 }
 
-async function roleHolders(req: PayloadRequest, role: string): Promise<number[]> {
-  const r = await q<{ id: number }>(req, sql`SELECT DISTINCT u.id FROM users u JOIN users_roles ur ON ur.parent_id = u.id WHERE ur.value::text = ${role} AND coalesce(u.active, true) ORDER BY u.id`)
+/** Active holders of `role` IN `companyId` (ADR 0016 §5/§7: recipients of the subject's PT only). */
+async function roleHolders(req: PayloadRequest, role: string, companyId: number): Promise<number[]> {
+  const r = await q<{ id: number }>(
+    req,
+    sql`SELECT DISTINCT u.id FROM users u JOIN company_memberships m ON m.user_id = u.id AND coalesce(m.active, true) AND m.company_id = ${companyId}
+          JOIN company_memberships_roles mr ON mr.parent_id = m.id
+         WHERE mr.value::text = ${role} AND coalesce(u.active, true) ORDER BY u.id`,
+  )
   return r.map((x) => Number(x.id))
 }
 
@@ -68,7 +92,7 @@ async function requestPeople(req: PayloadRequest, requestId: number): Promise<nu
     req,
     sql`SELECT er.created_by_id AS id FROM expense_requests er WHERE er.id = ${requestId} AND er.created_by_id IS NOT NULL
         UNION
-        SELECT u.id FROM expense_requests_rels rr JOIN users u ON u.employee_id = rr.employees_id
+        SELECT m.user_id FROM expense_requests_rels rr JOIN company_memberships m ON m.employee_id = rr.employees_id
          WHERE rr.parent_id = ${requestId} AND rr.path = 'requesters'`,
   )
   return r.map((x) => Number(x.id))
@@ -88,11 +112,11 @@ async function claim(req: PayloadRequest, rule: ReminderRule, subject: string, p
 
 type Msg = { title: string; body: string; docType: string; docId: string; docNo: string | null }
 
-async function inApp(req: PayloadRequest, event: string, userIds: number[], m: Msg): Promise<void> {
+async function inApp(req: PayloadRequest, event: string, userIds: number[], m: Msg, companyId: number): Promise<void> {
   for (const uid of userIds) {
     await req.payload.create({
       collection: 'notifications',
-      data: { user: uid, event, title: m.title.slice(0, 160), body: m.body.slice(0, 1000), docType: m.docType, docId: m.docId, docNo: m.docNo, pushStatus: pushEnabled() ? 'pending' : 'skipped' } as never,
+      data: { user: uid, company: companyId, event, title: m.title.slice(0, 160), body: m.body.slice(0, 1000), docType: m.docType, docId: m.docId, docNo: m.docNo, pushStatus: pushEnabled() ? 'pending' : 'skipped' } as never,
       depth: 0,
       overrideAccess: true, // SYSTEM-WRITE: scheduled reminder (E7)
       req,
@@ -147,8 +171,8 @@ const LATE_TEXT = {
 
 async function lateProgress(run: Run) {
   const { req, s, date } = run
-  const owners = await roleHolders(req, 'pk-owner')
-  const late = await lateProgressProjects(req, { asOf: date, days: s.lateProgress.days, timezone: s.timeZone })
+  const owners = await roleHolders(req, 'pk-owner', s.companyId)
+  const late = await lateProgressProjects(req, { asOf: date, days: s.lateProgress.days, timezone: s.timeZone, companyId: s.companyId })
   const t = await notificationTemplate(req, LATE_REPORT_EVENT, LATE_TEXT)
   for (const p of late) {
     await run.deliver('late_progress', `project:${p.projectId}`, date, [...(p.pmUserId ? [p.pmUserId] : []), ...owners], async (userIds) => {
@@ -163,13 +187,13 @@ type ReqRow = { id: number; doc_no: string | null; title: string; type: RequestT
 
 async function lpjOverdue(run: Run) {
   const { req, s, date } = run
-  const finance = await roleHolders(req, 'pk-finance')
+  const finance = await roleHolders(req, 'pk-finance', s.companyId)
   const rows = await q<ReqRow>(
     req,
     sql`SELECT er.id, er.doc_no, er.title, er.type::text AS type, er.status::text AS status,
                (SELECT min(t.transfer_date) FROM transfers t WHERE t.request_id = er.id AND t.status = 'posted' AND t.kind = 'advance') AS since
           FROM expense_requests er LEFT JOIN projects p ON p.id = er.project_id
-         WHERE er.type = 'advance' AND er.status::text IN ('transferred', 'receipts_complete')
+         WHERE er.type = 'advance' AND er.status::text IN ('transferred', 'receipts_complete') AND er.company_id = ${s.companyId}
            AND (p.id IS NULL OR p.status::text <> 'arsip')
          ORDER BY er.id`,
   )
@@ -182,7 +206,7 @@ async function lpjOverdue(run: Run) {
     const people = await requestPeople(req, Number(r.id))
     await run.deliver('lpj_overdue', `request:${r.id}`, date, [...people, ...finance], async (userIds) => {
       const m: Msg = { title: fill(t.title, vars), body: fill(t.body, vars), docType: 'expense_request', docId: String(r.id), docNo: r.doc_no }
-      await inApp(req, REMINDER_EVENTS.lpj_overdue, userIds, m)
+      await inApp(req, REMINDER_EVENTS.lpj_overdue, userIds, m, s.companyId)
       return m
     })
   }
@@ -198,7 +222,7 @@ async function revisionPending(run: Run) {
                    WHERE a.doc_type = 'expense_request' AND a.doc_id = er.id::text AND a.action::text = 'status_change' AND a.status_to = er.status::text),
                  er.updated_at) AT TIME ZONE ${s.timeZone}, 'YYYY-MM-DD') AS since
           FROM expense_requests er LEFT JOIN projects p ON p.id = er.project_id
-         WHERE er.status::text IN ('receipt_revision', 'lpj_revision')
+         WHERE er.status::text IN ('receipt_revision', 'lpj_revision') AND er.company_id = ${s.companyId}
            AND (p.id IS NULL OR p.status::text <> 'arsip')
          ORDER BY er.id`,
   )
@@ -210,7 +234,7 @@ async function revisionPending(run: Run) {
     const vars = { docNo: r.doc_no ?? `#${r.id}`, title: r.title, days: String(days), since: r.since, status: statusLabel(r.type, r.status) }
     await run.deliver('revision_pending', `request:${r.id}`, date, await requestPeople(req, Number(r.id)), async (userIds) => {
       const m: Msg = { title: fill(t.title, vars), body: fill(t.body, vars), docType: 'expense_request', docId: String(r.id), docNo: r.doc_no }
-      await inApp(req, REMINDER_EVENTS.revision_pending, userIds, m)
+      await inApp(req, REMINDER_EVENTS.revision_pending, userIds, m, s.companyId)
       return m
     })
   }
@@ -218,9 +242,9 @@ async function revisionPending(run: Run) {
 
 async function budgetThreshold(run: Run) {
   const { req, s } = run
-  const office = [...(await roleHolders(req, 'pk-owner')), ...(await roleHolders(req, 'pk-finance'))]
-  const projects = await projectBudgets(req, { kind: 'all' }) // archived projects excluded (K-08)
-  const pms = new Map((await q<{ id: number; pm_id: number | null }>(req, sql`SELECT id, pm_id FROM projects`)).map((x) => [Number(x.id), x.pm_id === null ? null : Number(x.pm_id)]))
+  const office = [...(await roleHolders(req, 'pk-owner', s.companyId)), ...(await roleHolders(req, 'pk-finance', s.companyId))]
+  const projects = await projectBudgets(req, fromCompanies([{ company: s.companyId, kind: 'all' }])) // this PT; archived excluded (K-08)
+  const pms = new Map((await q<{ id: number; pm_id: number | null }>(req, sql`SELECT id, pm_id FROM projects WHERE company_id = ${s.companyId}`)).map((x) => [Number(x.id), x.pm_id === null ? null : Number(x.pm_id)]))
   const t = await notificationTemplate(req, REMINDER_EVENTS.budget_threshold, DEFAULT_TEXTS.budget_threshold)
   for (const p of projects) {
     const crossed = crossedThresholds(p.pct, s.budget.thresholds)
@@ -237,7 +261,7 @@ async function budgetThreshold(run: Run) {
       const vars = { code: p.code, name: p.name, threshold: String(th), pct: String(p.pct).replace('.', ','), committed: formatRupiah(p.committed), budget: formatRupiah(p.budget ?? 0) }
       const m: Msg = { title: fill(t.title, vars), body: fill(t.body, vars), docType: 'project', docId: String(p.id), docNo: p.code }
       userIds.sort((a, b) => a - b)
-      await inApp(req, REMINDER_EVENTS.budget_threshold, userIds, m)
+      await inApp(req, REMINDER_EVENTS.budget_threshold, userIds, m, s.companyId)
       await run.email(userIds, m)
     }
     const r = (run.rules.budget_threshold ??= { subjects: 0, notified: 0 })
@@ -248,43 +272,77 @@ async function budgetThreshold(run: Run) {
 
 // ---------------------------------------------------------------- run
 
-export async function reminderSettings(payload: Payload, req?: PayloadRequest): Promise<ReminderSettings> {
-  const s = (await payload.findGlobal({ slug: 'company-settings', depth: 0, overrideAccess: true /* SYSTEM-READ: reminder settings (job) */, req })) as unknown as Record<string, unknown>
+/** Reminder settings of one PT (default: company #1 — tests / single-PT callers). */
+export async function reminderSettings(payload: Payload, req?: PayloadRequest, companyId?: number | null): Promise<ReminderSettings> {
+  const s = (await settingsOf(payload, companyId ?? null, req)) as unknown as Record<string, unknown>
   return reminderSettingsOf(s, process.env.TZ || DEFAULT_TZ)
 }
 
-/**
- * One tick of the job. `now` = injectable clock (fake-clock tests); `force` ignores the hour and the
- * "already ran today" marker (deliveries stay de-duplicated) — tests and manual re-runs only.
- */
-export async function runDailyReminders(payload: Payload, opts: { now?: Date; force?: boolean } = {}): Promise<ReminderRunResult> {
-  const now = opts.now ?? new Date()
-  const s = await reminderSettings(payload)
+/** One PT's tick: own settings, own lock, own transaction, own `reminder_runs` row. */
+async function runCompany(payload: Payload, companyId: number, now: Date, force: boolean): Promise<CompanyRunResult> {
+  const s = await reminderSettings(payload, undefined, companyId)
   const { date, hour } = companyClock(now, s.timeZone)
-  const base: ReminderRunResult = { status: 'run', date, hour, rules: {}, emails: 0 }
+  const base: CompanyRunResult = { companyId, status: 'run', date, hour, rules: {}, emails: 0 }
   if (!s.enabled) return { ...base, status: 'disabled' }
-  if (!opts.force && hour < s.hour) return { ...base, status: 'before_hour' }
+  if (!force && hour < s.hour) return { ...base, status: 'before_hour' }
   return withSystemTransaction(
     payload,
     null,
     async (req) => {
       const tx = await getRequestTx(req)
-      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended('pk:daily-reminders', 0))`)
-      const ran = await q(req, sql`SELECT 1 FROM reminder_runs WHERE run_date = ${date}`)
-      const decision = opts.force ? 'run' : runDecision(s, hour, ran.length > 0)
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${`pk:daily-reminders:${companyId}`}, 0))`)
+      const ran = await q(req, sql`SELECT 1 FROM reminder_runs WHERE company_id = ${companyId} AND run_date = ${date}`)
+      const decision = force ? 'run' : runDecision(s, hour, ran.length > 0)
       if (decision !== 'run') return { ...base, status: decision }
       const run = new Run(req, s, date)
       if (s.lateProgress.enabled) await lateProgress(run)
       if (s.lpjOverdue.enabled) await lpjOverdue(run)
       if (s.revision.enabled) await revisionPending(run)
       if (s.budget.enabled) await budgetThreshold(run)
-      const result: ReminderRunResult = { ...base, rules: run.rules, emails: run.emails }
       await tx.execute(
-        sql`INSERT INTO reminder_runs (run_date, summary) VALUES (${date}, ${JSON.stringify({ rules: run.rules, emails: run.emails })}::jsonb)
-            ON CONFLICT (run_date) DO UPDATE SET summary = EXCLUDED.summary, finished_at = clock_timestamp()`,
+        sql`INSERT INTO reminder_runs (company_id, run_date, summary) VALUES (${companyId}, ${date}, ${JSON.stringify({ rules: run.rules, emails: run.emails })}::jsonb)
+            ON CONFLICT (company_id, run_date) DO UPDATE SET summary = EXCLUDED.summary, finished_at = clock_timestamp()`,
       )
-      return result
+      return { ...base, rules: run.rules, emails: run.emails }
     },
     { auditSource: 'job' },
   )
+}
+
+/**
+ * One tick of the job over every active PT (or `companyId` only). `now` = injectable clock
+ * (fake-clock tests); `force` ignores the hour and the "already ran today" marker (deliveries stay
+ * de-duplicated) — tests and manual re-runs only. A PT that fails is logged (status `failed`), the
+ * others still run (ADR 0016 §7).
+ */
+export async function runDailyReminders(payload: Payload, opts: { now?: Date; force?: boolean; companyId?: number } = {}): Promise<ReminderRunResult> {
+  const now = opts.now ?? new Date()
+  const ids = opts.companyId !== undefined ? [opts.companyId] : await activeCompanyIds(payload)
+  const companies: CompanyRunResult[] = []
+  for (const cid of ids) {
+    try {
+      companies.push(await runCompany(payload, cid, now, opts.force === true))
+    } catch (err) {
+      payload.logger.error({ msg: 'daily reminders failed for a PT', companyId: cid, err: (err as Error).message })
+      const { date, hour } = companyClock(now, process.env.TZ || DEFAULT_TZ)
+      companies.push({ companyId: cid, status: 'failed', date, hour, rules: {}, emails: 0 })
+    }
+  }
+  const first = companies[0]
+  const rules: Partial<Record<ReminderRule, RuleSummary>> = {}
+  for (const c of companies)
+    for (const [k, v] of Object.entries(c.rules) as Array<[ReminderRule, RuleSummary]>) {
+      const r = (rules[k] ??= { subjects: 0, notified: 0 })
+      r.subjects += v.subjects
+      r.notified += v.notified
+    }
+  const clock = companyClock(now, process.env.TZ || DEFAULT_TZ)
+  return {
+    status: companies.some((c) => c.status === 'run') ? 'run' : (first?.status ?? 'disabled'),
+    date: first?.date ?? clock.date,
+    hour: first?.hour ?? clock.hour,
+    rules,
+    emails: companies.reduce((a, c) => a + c.emails, 0),
+    companies,
+  }
 }

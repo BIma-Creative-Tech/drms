@@ -1,8 +1,10 @@
 import { addDataAndFileToRequest, APIError, ValidationError, type Endpoint, type PayloadRequest } from 'payload'
 import type { z } from 'zod'
 
-import { hasRole, type Role } from '@/access/roles'
+import { hasRoleAny, type Role } from '@/access/roles'
+import { COMPANY_DENIED_KEY } from '@/access/company-context'
 import { AUTH_FAILURE_KEY } from '@/auth/strategies'
+import { writeAuditDetached } from '@/audit/writer'
 import { claimKey, IDEMPOTENCY_KEY_RE, requestHash, storeResponse } from '@/lib/idempotency'
 import { requestMeta } from '@/lib/request-meta'
 import { takeToken } from '@/lib/rate-limit'
@@ -122,7 +124,15 @@ export function v1<B extends z.ZodType | undefined = undefined>(opts: V1Options<
             }
             return problem(401, 'Unauthorized')
           }
-          if (opts.roles && !hasRole(req, ...opts.roles)) return problem(403, 'Forbidden')
+          // ADR 0016 §5: `X-Company-Ids` naming a PT without an active membership → 403, audited.
+          if (req.context?.[COMPANY_DENIED_KEY] === true) {
+            await writeAuditDetached(req, [{ action: 'access_denied', docType: 'company', field: 'X-Company-Ids', reason: 'PT di luar keanggotaan' }])
+            return problem(403, 'Forbidden', { code: 'COMPANY_NOT_ALLOWED', detail: 'PT yang diminta bukan PT Anda.' })
+          }
+          // role in ANY selected PT (list endpoints); document mutations re-check the role in the
+          // document's PT inside the domain services (ADR 0016 §5). MC3-1 route table (class per
+          // route + evidence): docs/proyekkas/mc/mc3-progress.md, tests/integration/mc3-api.int.test.ts.
+          if (opts.roles && !hasRoleAny(req, ...opts.roles)) return problem(403, 'Forbidden')
           const meta = requestMeta(req)
           if (meta.source === 'apk') {
             const min = await minAppVersion(req)

@@ -57,6 +57,7 @@ describe('grants (least privilege)', () => {
     )
     expect(r.rows.map((x) => x.table_name)).toEqual([
       'approval_rules_steps',
+      'company_memberships_roles', // MC1: per-PT roles (hasMany rewritten on update)
       'expense_categories_rels',
       // F2a: Payload rewrites these children on every parent update; locked content is protected
       // by the deferred freeze check (content_hash), not by withholding DELETE.
@@ -72,7 +73,6 @@ describe('grants (least privilege)', () => {
       'payload_preferences_rels',
       'stage_templates_items',
       'sync_receipts', // F4: purge of expired sync results (30 days, ADR 0010)
-      'users_roles',
     ])
   })
 
@@ -107,7 +107,9 @@ describe('protected columns (OLD IS DISTINCT FROM NEW per column)', () => {
   })
 
   it('document_sequence_counters: next_value only increases, no delete', async () => {
-    await sqlAs('app', "INSERT INTO document_sequence_counters VALUES ('dbsec', 'ALL', 10)")
+    // ADR 0016: counters are per PT (company #1)
+    await sqlAs('app', "INSERT INTO document_sequence_counters (company_id, doc_type, period_key, next_value) VALUES ((SELECT min(id) FROM companies), 'dbsec', 'ALL', 10)")
+    expect((await sqlError('app', "UPDATE document_sequence_counters SET company_id = company_id + 1000 WHERE doc_type = 'dbsec'"))?.code).toBeDefined()
     expect((await sqlError('app', "UPDATE document_sequence_counters SET next_value = 9 WHERE doc_type = 'dbsec'"))?.message).toContain('may only increase')
     expect(await sqlError('app', "UPDATE document_sequence_counters SET next_value = 11 WHERE doc_type = 'dbsec'")).toBeNull()
     expect((await sqlError('app', "DELETE FROM document_sequence_counters WHERE doc_type = 'dbsec'"))?.code).toBe('42501')

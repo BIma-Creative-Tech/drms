@@ -11,6 +11,7 @@ import '../../expense/domain/expense_request.dart';
 import '../../expense/presentation/request_detail_screen.dart' show pct;
 import '../../addendum/presentation/addendum_providers.dart';
 import '../../addendum/presentation/addendum_screens.dart';
+import '../../companies/presentation/company_chip.dart';
 import '../application/inbox_providers.dart';
 
 /// Inbox label of the caller's step: the server's `stepLabel` (E1) wins; older servers get the local text.
@@ -34,6 +35,7 @@ class InboxScreen extends ConsumerWidget {
       body: RefreshIndicator(
         onRefresh: () {
           ref.invalidate(addendumInboxProvider);
+          ref.invalidate(lpjQueueProvider);
           return ref.refresh(inboxProvider.future);
         },
         child: AsyncBody(
@@ -44,6 +46,7 @@ class InboxScreen extends ConsumerWidget {
                   padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
                   children: [
                     const AddendumInboxSection(),
+                    const LpjQueueSection(),
                     Padding(
                       padding: const EdgeInsets.all(32),
                       child: Column(
@@ -59,7 +62,9 @@ class InboxScreen extends ConsumerWidget {
               : ListView.builder(
                   padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
                   itemCount: page.items.length + 1,
-                  itemBuilder: (_, i) => i == 0 ? const AddendumInboxSection() : InboxCard(item: page.items[i - 1]),
+                  itemBuilder: (_, i) => i == 0
+                      ? const Column(children: [AddendumInboxSection(), LpjQueueSection()])
+                      : InboxCard(item: page.items[i - 1]),
                 ),
         ),
       ),
@@ -91,6 +96,7 @@ class InboxCard extends StatelessWidget {
             children: [
               Row(
                 children: [
+                  CompanyChipLead(companyId: it.companyId),
                   Flexible(
                     child: Chip(
                       key: Key('inbox-step-${it.id}'),
@@ -165,6 +171,50 @@ class InboxCard extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// MC3 / US-21: LPJ waiting for Finance / Direktur (`GET /lpj-queue`), read-only list above the requests;
+/// the verification itself is done in the request detail (server `allowedActions`). Hidden when empty
+/// or when the queue cannot be loaded (the inbox itself stays usable).
+class LpjQueueSection extends ConsumerWidget {
+  const LpjQueueSection({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final t = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final items = ref.watch(lpjQueueProvider).value ?? const <ExpenseSummary>[];
+    if (items.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Column(
+        key: const Key('lpj-queue'),
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
+            child: Text('${t.lpjQueueTitle} · ${t.lpjQueueCount(items.length)}', style: theme.textTheme.titleMedium),
+          ),
+          for (final r in items)
+            Card(
+              margin: const EdgeInsets.only(bottom: 8),
+              child: ListTile(
+                key: Key('lpj-${r.id}'),
+                title: Row(
+                  children: [
+                    CompanyChipLead(companyId: r.companyId),
+                    Expanded(child: Text(r.title, overflow: TextOverflow.ellipsis)),
+                  ],
+                ),
+                subtitle: Text('${r.docNo ?? '-'} · ${r.statusLabel}'),
+                trailing: Text(formatRupiah(r.approvedAmount ?? r.grandTotal)),
+                onTap: () => context.push('/requests/${r.id}'),
+              ),
+            ),
+        ],
       ),
     );
   }

@@ -1,9 +1,9 @@
 import type { PayloadRequest } from 'payload'
 
-import { relId } from '@/access/roles'
 import { DEFAULT_TZ, localDateInTz } from '@/lib/time'
 
 import type { TimeVerdict } from './clock'
+import { displayEmployeeByUser } from '@/domain/companies'
 
 /**
  * Attendance helpers of the sync service (US-01/US-02, ADR 0010 decision 8). Pure helpers are
@@ -47,8 +47,11 @@ export function localDateString(instant: Date, timeZone: string = DEFAULT_TZ): s
   return `${d.year}-${two(d.month)}-${two(d.day)}`
 }
 
-/** Employee linked to the user account (users.employee), or undefined. */
-export async function employeeOfUser(req: PayloadRequest, uid: number): Promise<number | undefined> {
-  const u = await req.payload.findByID({ collection: 'users', id: uid, depth: 0, overrideAccess: true /* SYSTEM-READ: own employee link */, req, disableErrors: true })
-  return relId((u as { employee?: unknown } | null)?.employee)
+/**
+ * Employee linked to the user account (membership employee, ADR 0016 §2) in `companyId` when given
+ * (a person in two PTs has two employees — the sync service passes the location's PT), else the
+ * first membership with an employee; undefined when none.
+ */
+export async function employeeOfUser(req: PayloadRequest, uid: number, companyId?: number): Promise<number | undefined> {
+  return (await displayEmployeeByUser(req, [uid], companyId)).get(uid)
 }

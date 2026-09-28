@@ -1,10 +1,10 @@
 import { sql } from '@payloadcms/db-postgres'
 import type { PayloadRequest } from 'payload'
 
-import { hasRole, relId } from '@/access/roles'
+import { membershipsOf, relId, type Role } from '@/access/roles'
 import { resolveScope } from '@/access/scope'
 import { settings, today } from '@/domain/expense/common'
-import { idList, inList, type SQL } from '@/domain/reports/scope'
+import { companyScopeSql, idList, inList, type SQL } from '@/domain/reports/scope'
 import { DEFAULT_TZ } from '@/lib/time'
 import { getRequestTx } from '@/lib/tx'
 
@@ -18,32 +18,91 @@ import { parseSnapshot, snapshotOf, type ScheduleSnapshot } from './schedule'
  */
 
 /**
- * Attendance data scope (requirements v1.1 §4 "Absensi"): Admin R/U, Owner R all, Finance R (upah)
- * → all; PM → team projects/cost centers; Staff → own only (endpoints /attendance/me).
+ * Attendance data scope (requirements v1.1 §4 "Absensi") PER PT (ADR 0016 §5/§6): Admin R/U, Owner R,
+ * Finance R (upah) of a PT → every attendance of THAT PT; PM of a PT → the team projects/cost centers
+ * there; Staff → own only (endpoints /attendance/me).
+ * `parts` = one entry per PT (`all` = whole PT, else the team ids), each SQL predicate is
+ * `(x.company_id = <PT> AND …)`. The top-level kind/ids are a summary (UI hints). A literal WITHOUT
+ * `parts` is legacy: `all` matches nothing (fail closed), `team` keeps its (per-PT) ids.
  */
-export type AttScope = { kind: 'all' } | { kind: 'team'; projects: number[]; costCenters: number[] }
+export type AttPart = { company: number; all: boolean; projects: number[]; costCenters: number[] }
+export type AttScope = ({ kind: 'all' } | { kind: 'team'; projects: number[]; costCenters: number[] }) & { parts?: AttPart[] }
 
-export async function attendanceScope(req: PayloadRequest): Promise<AttScope | null> {
-  if (hasRole(req, 'pk-admin', 'pk-owner', 'pk-finance')) return { kind: 'all' }
-  if (hasRole(req, 'pk-pm')) {
-    const s = await resolveScope(req)
-    return { kind: 'team', projects: s.teamProjects, costCenters: s.teamCostCenters }
-  }
-  return null
+const OFFICE_ATT: readonly Role[] = ['pk-admin', 'pk-owner', 'pk-finance']
+
+/** Builds the summary AttScope from per-PT parts (null when nothing is in scope). */
+export function attScopeOf(parts: AttPart[]): AttScope | null {
+  if (parts.length === 0) return null
+  const list = [...parts].sort((a, b) => a.company - b.company)
+  if (list.some((p) => p.all)) return { kind: 'all', parts: list }
+  const u = (x: number[]) => [...new Set(x)].sort((a, b) => a - b)
+  return { kind: 'team', projects: u(list.flatMap((p) => p.projects)), costCenters: u(list.flatMap((p) => p.costCenters)), parts: list }
 }
 
-/** Row filter on a table alias with project_id / cost_center_id columns. */
+export async function attendanceScope(req: PayloadRequest): Promise<AttScope | null> {
+  const parts: AttPart[] = []
+  for (const m of membershipsOf(req.user)) {
+    if (m.roles.some((r) => OFFICE_ATT.includes(r))) parts.push({ company: m.company, all: true, projects: [], costCenters: [] })
+    else if (m.roles.includes('pk-pm')) {
+      const s = await resolveScope(req, m.company)
+      parts.push({ company: m.company, all: false, projects: s.teamProjects, costCenters: s.teamCostCenters })
+    }
+  }
+  return attScopeOf(parts)
+}
+
+/** PTs of the scope visible in full (office roles). */
+export const fullCompanies = (scope: AttScope): number[] => (scope.parts ?? []).filter((p) => p.all).map((p) => p.company)
+
+/**
+ * Narrows to one project / cost center PER PT (filters of the web views and the report): an office
+ * PT keeps the id bound to its company (`company_id = PT AND project_id = id` → an id of another PT
+ * matches nothing); a PM PT only when the id is in its team. The UI must use this, never build a
+ * company-less `{ kind: 'team' }` literal from a user-supplied id.
+ */
+export function narrowAttScope(scope: AttScope, projectId?: number, costCenterId?: number): AttScope {
+  if (!projectId && !costCenterId) return scope
+  if (!scope.parts) {
+    const t = scope.kind === 'team' ? scope : { projects: [] as number[], costCenters: [] as number[] }
+    return { kind: 'team', projects: projectId && t.projects.includes(projectId) ? [projectId] : [], costCenters: costCenterId && t.costCenters.includes(costCenterId) ? [costCenterId] : [] }
+  }
+  const parts = scope.parts.map((p) => ({
+    company: p.company,
+    all: false,
+    projects: projectId && (p.all || p.projects.includes(projectId)) ? [projectId] : [],
+    costCenters: costCenterId && (p.all || p.costCenters.includes(costCenterId)) ? [costCenterId] : [],
+  }))
+  return { kind: 'team', projects: projectId ? [projectId] : [], costCenters: costCenterId ? [costCenterId] : [], parts }
+}
+
+/**
+ * Narrows the scope to the PTs `companyIds` (UI PT filter of the attendance views): never widens,
+ * foreign ids are ignored. Empty / null = unchanged; nothing left = an empty scope (matches nothing).
+ */
+export function narrowAttToCompanies(scope: AttScope, companyIds?: readonly number[] | null): AttScope {
+  if (!companyIds?.length || !scope.parts) return scope
+  return attScopeOf(scope.parts.filter((p) => companyIds.includes(p.company))) ?? { kind: 'team', projects: [], costCenters: [], parts: [] }
+}
+
+/** Row filter on a table alias with company_id / project_id / cost_center_id columns. */
 export function locationScopeSql(scope: AttScope, alias: 'a' | 'ta'): SQL {
-  if (scope.kind === 'all') return sql`TRUE`
-  const p = alias === 'a' ? sql`a.project_id` : sql`ta.project_id`
-  const c = alias === 'a' ? sql`a.cost_center_id` : sql`ta.cost_center_id`
-  return sql`(${inList(p, scope.projects)} OR ${inList(c, scope.costCenters)})`
+  const col = (c: string) => sql.raw(`${alias}.${c}`)
+  const loc = (projects: number[], costCenters: number[]) => sql`(${inList(col('project_id'), projects)} OR ${inList(col('cost_center_id'), costCenters)})`
+  if (!scope.parts) return scope.kind === 'team' ? loc(scope.projects, scope.costCenters) : sql`FALSE`
+  const out = scope.parts.map((p) => (p.all ? sql`${col('company_id')} = ${p.company}` : sql`(${col('company_id')} = ${p.company} AND ${loc(p.projects, p.costCenters)})`))
+  return out.length ? sql`(${sql.join(out, sql` OR `)})` : sql`FALSE`
+}
+
+/** Employees of the office PTs of the scope (`e.company_id IN …`). */
+export function employeeCompanySql(scope: AttScope, col: SQL = sql`e.company_id`): SQL {
+  return companyScopeSql(col, fullCompanies(scope))
 }
 
 export type AttCtx = { today: string; timeZone: string; defaultScheduleId: number | null }
 
-export async function attendanceContext(req: PayloadRequest): Promise<AttCtx> {
-  const s = (await settings(req)) as { timezone?: string | null; defaultWorkSchedule?: unknown }
+/** Today / TZ / default schedule of `companyId` (default: the context PT). */
+export async function attendanceContext(req: PayloadRequest, companyId?: number | null): Promise<AttCtx> {
+  const s = (await settings(req, companyId)) as { timezone?: string | null; defaultWorkSchedule?: unknown }
   return { today: await today(req), timeZone: s.timezone || process.env.TZ || DEFAULT_TZ, defaultScheduleId: relId(s.defaultWorkSchedule) ?? null }
 }
 
@@ -137,7 +196,10 @@ type ScheduleRow = {
   sun: boolean | null
 }
 
-/** CURRENT schedule per employee (own, else company default) — for days without a check-in snapshot. */
+/**
+ * CURRENT schedule per employee (own, else the default schedule of the EMPLOYEE's PT; `defaultScheduleId`
+ * only when that PT has none set) — for days without a check-in snapshot (ADR 0016 §6).
+ */
 export async function currentSchedules(req: PayloadRequest, employeeIds: number[], defaultScheduleId: number | null): Promise<Map<number, ScheduleSnapshot | null>> {
   if (employeeIds.length === 0) return new Map()
   const r = await rows<ScheduleRow>(
@@ -146,7 +208,8 @@ export async function currentSchedules(req: PayloadRequest, employeeIds: number[
                ws.work_days_mon AS mon, ws.work_days_tue AS tue, ws.work_days_wed AS wed, ws.work_days_thu AS thu,
                ws.work_days_fri AS fri, ws.work_days_sat AS sat, ws.work_days_sun AS sun
         FROM employees e
-        LEFT JOIN work_schedules ws ON ws.id = coalesce(e.work_schedule_id, ${defaultScheduleId}::int)
+        JOIN companies co ON co.id = e.company_id
+        LEFT JOIN work_schedules ws ON ws.id = coalesce(e.work_schedule_id, co.default_work_schedule_id, ${defaultScheduleId}::int) AND ws.company_id = e.company_id
         WHERE e.id IN (${idList(employeeIds)})`,
   )
   return new Map(
@@ -167,15 +230,17 @@ export async function currentSchedules(req: PayloadRequest, employeeIds: number[
   )
 }
 
-export type EmployeeRef = { id: number; code: string; name: string; active: boolean }
+export type EmployeeRef = { id: number; companyId: number; code: string; name: string; active: boolean }
 
+/** Employee reference (callers check the scope / own employee before; `companyId` = its PT). */
 export async function employeeRef(req: PayloadRequest, id: number): Promise<EmployeeRef | null> {
-  const r = await rows<EmployeeRef>(req, sql`SELECT id, code, name, coalesce(active, true) AS active FROM employees WHERE id = ${id}`)
-  return r[0] ?? null
+  const r = await rows<EmployeeRef & { company_id: number }>(req, sql`SELECT id, company_id, code, name, coalesce(active, true) AS active FROM employees WHERE id = ${id}`)
+  return r[0] ? { id: Number(r[0].id), companyId: Number(r[0].company_id), code: r[0].code, name: r[0].name, active: r[0].active } : null
 }
 
 type MemberRow = {
   employee_id: number
+  company_id: number
   code: string
   name: string
   project_id: number | null
@@ -193,7 +258,7 @@ type MemberRow = {
 export async function teamMembers(req: PayloadRequest, scope: AttScope, fromDate: string, toDate: string = fromDate, employeeId?: number): Promise<TeamMember[]> {
   const r = await rows<MemberRow>(
     req,
-    sql`SELECT ta.employee_id, e.code, e.name, ta.project_id, p.code AS project_code, p.name AS project_name,
+    sql`SELECT ta.employee_id, e.company_id, e.code, e.name, ta.project_id, p.code AS project_code, p.name AS project_name,
                ta.cost_center_id, cc.code AS cc_code, cc.name AS cc_name
         FROM team_assignments ta
         JOIN employees e ON e.id = ta.employee_id
@@ -208,7 +273,7 @@ export async function teamMembers(req: PayloadRequest, scope: AttScope, fromDate
   )
   const by = new Map<number, TeamMember>()
   for (const x of r) {
-    const m = by.get(x.employee_id) ?? { employeeId: x.employee_id, code: x.code, name: x.name, locations: [] }
+    const m = by.get(x.employee_id) ?? { employeeId: x.employee_id, companyId: Number(x.company_id), code: x.code, name: x.name, locations: [] }
     const loc: LocationRef =
       x.project_id !== null
         ? { type: 'project', id: x.project_id, code: x.project_code ?? '', name: x.project_name ?? '' }

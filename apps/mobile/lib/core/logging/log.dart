@@ -5,14 +5,22 @@ import 'dart:developer' as developer;
 class Log {
   static bool verbose = false;
 
-  static void d(String msg) {
-    if (verbose) developer.log(redact(msg), name: 'pk', level: 500);
+  /// Test seam: receives every emitted (already redacted) line, e.g. to assert that no secret is logged.
+  static void Function(String line)? testSink;
+
+  static void _emit(String line, int level) {
+    testSink?.call(line);
+    developer.log(line, name: 'pk', level: level);
   }
 
-  static void i(String msg) => developer.log(redact(msg), name: 'pk', level: 800);
+  static void d(String msg) {
+    if (verbose) _emit(redact(msg), 500);
+  }
+
+  static void i(String msg) => _emit(redact(msg), 800);
 
   static void w(String msg, [Object? error]) =>
-      developer.log(redact('$msg${error == null ? '' : ' (${error.runtimeType})'}'), name: 'pk', level: 900);
+      _emit(redact('$msg${error == null ? '' : ' (${error.runtimeType})'}'), 900);
 
   static final _jwt = RegExp(r'eyJ[\w-]+\.[\w-]+\.[\w-]*');
   static final _bearer = RegExp(r'Bearer\s+\S+', caseSensitive: false);

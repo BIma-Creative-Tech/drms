@@ -1,7 +1,8 @@
 import { createRemoteJWKSet, jwtVerify, type JWTPayload, type JWTVerifyGetKey } from 'jose'
 import type { AuthStrategy, AuthStrategyResult, Payload } from 'payload'
 
-import { isRole, rolesOf } from '@/access/roles'
+import { attachCompanyContext, COMPANY_DENIED_KEY } from '@/access/company-context'
+import { isRole, LOGIN_ROLE } from '@/access/roles'
 import { getEnv } from '@/lib/env'
 
 import { hashSessionId, readCookie, sessionCookieName } from './cookies'
@@ -65,8 +66,11 @@ export const oidcSessionStrategy: AuthStrategy = {
     const s = found.docs[0]
     if (!s || s.revokedAt || new Date(s.expiresAt).getTime() <= Date.now()) return NONE
     const userId = typeof s.user === 'object' && s.user ? s.user.id : s.user
-    const user = await loadActiveUser(payload, { id: { equals: userId } })
-    if (!user) return NONE
+    const active = await loadActiveUser(payload, { id: { equals: userId } })
+    if (!active) return NONE
+    // ADR 0016 §5: per-PT roles from active memberships (DB only) + the PT selection.
+    const { user, denied } = await attachCompanyContext(payload, active, headers, { insecureCookie: env.AUTH_COOKIE_INSECURE })
+    if (denied && req?.context) req.context[COMPANY_DENIED_KEY] = true
     const extras: SessionUserExtras = {
       _pkSessionExp: Math.floor(new Date(s.expiresAt).getTime() / 1000),
       _pkSessionId: s.id,
@@ -116,10 +120,21 @@ export async function verifyMobileAccessToken(token: string): Promise<VerifiedAc
 }
 
 /**
+ * ADR 0016 §2 login gate: the token must carry the realm role `pk-user`. MC1 TRANSITION (until the
+ * infra change assigns `pk-user` to every account): any legacy `pk-*` realm role is accepted as the
+ * same "may log in" marker. Token roles are NEVER used as permissions — per-PT roles come from
+ * `company-memberships` only.
+ */
+export function tokenAllowsLogin(realmRoles: readonly string[] | undefined): boolean {
+  return (realmRoles ?? []).some((r) => r === LOGIN_ROLE || isRole(r))
+}
+
+/**
  * APK bearer tokens — ONLY on /api/v1/* (never generic /api/<slug>, never admin views, which call
  * strategies without `req`). Requires an ACTIVE device of this user (`X-Device-Id`), except for
- * POST /api/v1/devices/register. Effective roles = token realm roles ∩ roles stored in ProyekKas
- * (a role removed in the admin stops working before the ≤ 300 s token expires).
+ * POST /api/v1/devices/register. The token proves identity + `pk-user` (tokenAllowsLogin); the
+ * effective roles are the ACTIVE memberships in the DB (a role removed in the admin stops working
+ * on the next request).
  */
 export const mobileBearerStrategy: AuthStrategy = {
   name: 'mobileBearer',
@@ -136,10 +151,14 @@ export const mobileBearerStrategy: AuthStrategy = {
       payload.logger.info({ msg: 'mobileBearer rejected', reason: (err as Error).message })
       return NONE
     }
-    const user = await loadActiveUser(payload, { keycloakSub: { equals: claims.sub } })
-    if (!user) return NONE
-    const tokenRoles = (claims.realm_access?.roles ?? []).filter(isRole)
-    const roles = rolesOf(user).filter((r) => tokenRoles.includes(r))
+    if (!tokenAllowsLogin(claims.realm_access?.roles)) {
+      payload.logger.info({ msg: 'mobileBearer rejected', reason: 'no pk-user realm role' })
+      return NONE
+    }
+    const found = await loadActiveUser(payload, { keycloakSub: { equals: claims.sub } })
+    if (!found) return NONE
+    const { user, denied } = await attachCompanyContext(payload, found, headers, { insecureCookie: getEnv().AUTH_COOKIE_INSECURE })
+    if (denied && req.context) req.context[COMPANY_DENIED_KEY] = true
     const extras: SessionUserExtras = {
       _pkKc: { sid: claims.sid ?? null, azp: claims.azp, iss: claims.iss, exp: claims.exp },
     }
@@ -162,6 +181,6 @@ export const mobileBearerStrategy: AuthStrategy = {
       if (device && req.context) req.context[AUTH_FAILURE_KEY] = 'device_revoked'
       return NONE
     }
-    return { user: { ...user, roles, ...extras, collection: 'users', _strategy: 'mobileBearer' } }
+    return { user: { ...user, ...extras, collection: 'users', _strategy: 'mobileBearer' } }
   },
 }

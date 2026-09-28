@@ -14,6 +14,10 @@ part 'app_database.g.dart';
 class LocalDrafts extends Table {
   TextColumn get clientUuid => text()();
   TextColumn get userSub => text()();
+
+  /// MC3 (schema v3): PT of the draft. Null = written before v3 and not yet assigned ("needs PT" when
+  /// the user has several PTs; see `CompanyBackfill`). Lines and receipts belong to the draft's PT.
+  IntColumn get companyId => integer().nullable()();
   TextColumn get type => text()(); // advance | reimburse
   TextColumn get title => text().withDefault(const Constant(''))();
   IntColumn get projectId => integer().nullable()();
@@ -92,6 +96,9 @@ class MediaBlobs extends Table {
 class LocalProgressReports extends Table {
   TextColumn get clientUuid => text()();
   TextColumn get userSub => text()();
+
+  /// MC3 (schema v3): PT of the report (= PT of its project). Null = written before v3, not yet assigned.
+  IntColumn get companyId => integer().nullable()();
   IntColumn get projectId => integer()();
   TextColumn get projectLabel => text().withDefault(const Constant(''))();
   IntColumn get stageId => integer()();
@@ -138,6 +145,10 @@ class LocalProgressReports extends Table {
 class Outbox extends Table {
   TextColumn get opUuid => text()();
   TextColumn get userSub => text()();
+
+  /// MC3 (schema v3): PT of the item, sent as `company_id` (the item's own PT, never the switcher
+  /// selection). Null = queued before v3: assigned when the user has one PT, else held until chosen.
+  IntColumn get companyId => integer().nullable()();
   TextColumn get type => text()();
   TextColumn get targetUuid => text()();
   TextColumn get payloadJson => text()();
@@ -174,14 +185,22 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
     onCreate: (m) => m.createAll(),
     onUpgrade: (m, from, to) async {
       // v2 (E4): local progress reports. Additive; existing drafts/outbox rows stay untouched.
+      // (Created with the current columns, so v3's company_id is already part of it.)
       if (from < 2) await m.createTable(localProgressReports);
+      // v3 (MC3): company_id, nullable. Existing rows keep NULL here — the PT is only known after `/me`:
+      // one PT → assigned automatically, several PTs → the user chooses (never guessed; CompanyBackfill).
+      if (from < 3) {
+        await m.addColumn(localDrafts, localDrafts.companyId);
+        await m.addColumn(outbox, outbox.companyId);
+        if (from >= 2) await m.addColumn(localProgressReports, localProgressReports.companyId);
+      }
     },
     beforeOpen: (details) async {
       await customStatement('PRAGMA foreign_keys = ON');

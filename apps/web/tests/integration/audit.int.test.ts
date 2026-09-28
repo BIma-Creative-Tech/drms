@@ -4,7 +4,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { withSystemTransaction } from '@/lib/system-tx'
 import { MASTER_COLLECTIONS } from '@/payload.config'
 
-import { ALL_ROLES, auditRows, getTestPayload, makeUser, sqlAs, type TestUser } from './helpers'
+import { ALL_ROLES, auditRows, companyId, getTestPayload, makeUser, sqlAs, type TestUser } from './helpers'
 
 /**
  * F1 gate: "every master change produces audit rows" — for EVERY master collection: create +
@@ -101,9 +101,17 @@ describe('every master collection is audited (create + update, same transaction)
 
   it('company-settings (global) update is audited', async () => {
     const p = await getTestPayload()
-    await p.updateGlobal({ slug: 'company-settings', data: { lateReportDays: 4 }, user: admin, overrideAccess: false })
+    await p.updateGlobal({ slug: 'company-settings', data: { groupName: 'Grup Uji' }, user: admin, overrideAccess: false })
     const rows = await auditRows('company_settings', 'company-settings')
-    const row = rows.find((r) => r.field === 'lateReportDays')
+    const row = rows.find((r) => r.field === 'groupName')
+    expect(row?.new_value?.v).toBe('Grup Uji')
+  })
+
+  it('company (per-PT settings, ADR 0016 §1) update is audited', async () => {
+    const p = await getTestPayload()
+    const id = await companyId()
+    await p.update({ collection: 'companies', id, data: { lateReportDays: 4 }, user: admin, overrideAccess: false })
+    const row = (await auditRows('company', id)).find((r) => r.field === 'lateReportDays')
     expect(row?.new_value?.v).toBe(4)
   })
 })

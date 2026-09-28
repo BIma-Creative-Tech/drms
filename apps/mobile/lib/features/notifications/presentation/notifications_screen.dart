@@ -6,6 +6,7 @@ import '../../../core/format/dates.dart';
 import '../../../l10n/gen/app_localizations.dart';
 import '../../../shared/widgets/async_body.dart';
 import '../../auth/application/auth_controller.dart';
+import '../../companies/presentation/company_chip.dart';
 import '../application/notifications_providers.dart';
 import '../domain/app_notification.dart';
 import '../../../shared/icons/iconsax.dart';
@@ -98,7 +99,14 @@ class _Tile extends ConsumerWidget {
         n.unread ? Icons.markunread : Icons.drafts,
         color: n.unread ? Theme.of(context).colorScheme.primary : null,
       ),
-      title: Text(n.title, style: TextStyle(fontWeight: n.unread ? FontWeight.bold : FontWeight.normal)),
+      title: Row(
+        children: [
+          CompanyChipLead(companyId: n.companyId),
+          Expanded(
+            child: Text(n.title, style: TextStyle(fontWeight: n.unread ? FontWeight.bold : FontWeight.normal)),
+          ),
+        ],
+      ),
       subtitle: Text('${n.body}\n${formatServerDateTime(n.createdAt, zone: zone)}'),
       isThreeLine: true,
       onTap: () async {

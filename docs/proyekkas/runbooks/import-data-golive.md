@@ -213,6 +213,28 @@ mengakhiri sesinya sendiri (runbook `cabut-perangkat.md` §B).
   ada). Bila counter sudah ada dan lebih kecil, dinaikkan ke `nomor_pb_mulai` (audit `update` field `nextValue`).
   Counter **tidak pernah turun** (ADR 0007): bila nomor sudah melewati nilai itu → peringatan, tidak diubah.
 
+### 4.1 Beberapa PT dalam satu file (MC2-5, ADR 0016 §11)
+
+- **Sheet `Perusahaan`:** satu baris per PT yang datanya ada di file. PT yang sudah ada (dicocokkan lewat
+  `kode_pt` = `companies.shortCode`) **tidak diubah** — identitas PT diatur Admin grup di Master Perusahaan. PT baru
+  dibuat aktif lengkap dengan penomoran default (`document-sequences`) dan aturan approval default (seperti seed);
+  laporan dry-run menampilkan peringatan "PT baru … akan dibuat". PT nonaktif → error.
+- **Kolom `kode_pt`** (kolom pertama) di Kategori, Karyawan, Pengguna, Rekening, PusatBiaya, Project, Tahapan, RAB,
+  Kendaraan, Penugasan, AkunKas. Kode (karyawan, project, kategori, pusat biaya, nama akun kas) unik **per PT**.
+  Kosong = satu-satunya PT (hanya bila sheet Perusahaan berisi satu PT atau database punya tepat satu PT aktif);
+  selain itu error "kode_pt wajib diisi". Bank dan Satuan tetap bersama (tanpa PT); nomor polisi kendaraan unik
+  global (Q-61).
+- **Referensi dalam PT yang sama:** rekening → karyawan, tahapan/RAB → project, penugasan → karyawan/project/pusat
+  biaya, kendaraan → pusat biaya/project, Pengguna/AksesPT → karyawan. Referensi ke PT lain = error yang menyebut PT
+  tempat kode itu ada ("referensi lintas PT tidak diperbolehkan"). PM / penanggung jawab harus punya akses di PT baris
+  itu (DB trigger `pk_company_member`).
+- **Pengguna:** satu baris per orang; `peran` + `kode_karyawan` = akses di PT `kode_pt` baris itu. Akses di PT lain:
+  sheet **`AksesPT`** (username × kode_pt, peran boleh berbeda per PT, karyawan dari PT itu). Pengguna tanpa peran di
+  PT mana pun → peringatan.
+- **Cut-over per PT:** untuk setiap PT file itu — nomor PB pertama = `Perusahaan.nomor_pb_mulai` (kosong = nilai
+  sheet Pengaturan), tutup periode sebelum go-live di PT itu. Laporan: satu baris "Cut-over PT …" per PT.
+- Contoh fiktif dua PT: `docs/proyekkas/templates/drms-impor-golive-contoh-fiktif-2pt.xlsx`.
+
 ## 5. Mengubah data setelah impor
 
 - File boleh diimpor ulang kapan saja (idempoten); baris yang berubah diperbarui dengan alasan impor.

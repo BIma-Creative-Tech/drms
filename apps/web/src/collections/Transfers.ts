@@ -2,12 +2,13 @@ import type { CollectionConfig } from 'payload'
 
 import { RIWAYAT_TAB } from '@/admin/config'
 
-import { denyAll, hasRole } from '@/access/roles'
+import { denyAll } from '@/access/roles'
 import { reasonOnChange, withAudit } from '@/audit/hooks'
 import { byVisibleRequest, denyDeleteLogged } from '@/domain/expense/access'
 import { uuidField } from '@/fields/common'
 
 import { businessDateField, ro } from './fields-f2'
+import { companyField, companyHook } from '@/fields/company'
 
 /**
  * T3 Transfer / pencairan (requirements v1.1 §7 T3, US-20). Amount is COPIED server-side from the
@@ -22,14 +23,16 @@ export const Transfers: CollectionConfig = withAudit(
     labels: { singular: 'Transfer', plural: 'Transfer' },
     admin: { group: 'Keuangan', useAsTitle: 'docNo', defaultColumns: ['docNo', 'request', 'kind', 'amount', 'transferDate', 'status'], components: { views: { edit: RIWAYAT_TAB } } },
     access: {
-      // Finance/Owner/Admin all; requesters own; PM team (via the request scope).
-      read: async (args) => (hasRole(args.req, 'pk-finance', 'pk-owner', 'pk-admin') ? true : byVisibleRequest('request')(args)),
+      // Finance/Owner/Admin: all rows of their PTs; requesters own; PM team (via the request scope).
+      read: byVisibleRequest('request'),
       create: denyAll,
       update: denyAll,
       delete: denyDeleteLogged('transfer'),
     },
+    hooks: { beforeChange: [companyHook('transfers', { derive: [{ field: 'request', collection: 'expense-requests' }], check: [{ field: 'cashAccount', collection: 'cash-accounts' }, { field: 'cashEntry', collection: 'cash-entries' }] })] },
     fields: [
-      { name: 'docNo', type: 'text', label: 'Nomor', unique: true, index: true, admin: ro },
+      companyField({ derived: true }),
+      { name: 'docNo', type: 'text', label: 'Nomor', index: true, admin: ro },
       { name: 'request', type: 'relationship', relationTo: 'expense-requests', required: true, index: true, admin: ro },
       { name: 'kind', type: 'select', required: true, options: ['advance', 'reimburse', 'lpj_shortfall'].map((v) => ({ label: v, value: v })), admin: ro },
       { name: 'cashAccount', type: 'relationship', relationTo: 'cash-accounts', label: 'Akun kas sumber', required: true, admin: ro },

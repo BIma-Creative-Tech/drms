@@ -171,50 +171,79 @@ export const DEFAULT_SEED_DATA = {
 const code = z.string().trim().min(1).max(32)
 const name = z.string().trim().min(1).max(200)
 
-/** Shape of DEFAULT_SEED_DATA / the SEED_DATA_FILE JSON (strict: unknown keys are rejected). */
-export const SeedDataSchema = z
-  .strictObject({
-    company: z.strictObject({ name, shortCode: code, timezone: z.string().min(1) }),
-    uoms: z.array(z.strictObject({ code, name, category: name })),
-    categories: z.array(
-      z.strictObject({ code, name, defaultUom: code.optional(), allowed: z.array(code), requiresVehicle: z.boolean().optional() }),
-    ),
-    banks: z.array(z.strictObject({ code, name })),
-    cashInSources: z.array(z.strictObject({ code, name })),
-    cashAccounts: z.array(z.strictObject({ name, kind: z.enum(['cash', 'bank']) })),
-    costCenters: z.array(z.strictObject({ code, name, type: z.literal('operational') })),
-    vehicles: z.array(z.strictObject({ plateNo: z.string().trim().min(1).max(20), type: name, costCenter: code })),
-    employees: z.array(z.strictObject({ code, name, nickname: name.optional() })),
-    employeeBankAccounts: z.array(
-      z.strictObject({
-        employee: code,
-        bank: code,
-        accountNo: z.string().regex(/^[0-9]{5,20}$/, 'accountNo: digits only'),
-        accountHolder: name,
-        isDefault: z.boolean(),
-      }),
-    ),
+const companyShape = z.strictObject({ name, shortCode: z.string().trim().regex(/^[A-Z0-9]{2,16}$/, 'shortCode: A-Z/0-9, 2–16'), timezone: z.string().min(1) })
+const uomsShape = z.array(z.strictObject({ code, name, category: name }))
+const banksShape = z.array(z.strictObject({ code, name }))
+
+/** Per-PT masters (ADR 0016 §4): everything except the shared banks / UoM. */
+const companyMasters = {
+  categories: z.array(z.strictObject({ code, name, defaultUom: code.optional(), allowed: z.array(code), requiresVehicle: z.boolean().optional() })),
+  cashInSources: z.array(z.strictObject({ code, name })),
+  cashAccounts: z.array(z.strictObject({ name, kind: z.enum(['cash', 'bank']) })),
+  costCenters: z.array(z.strictObject({ code, name, type: z.literal('operational') })),
+  vehicles: z.array(z.strictObject({ plateNo: z.string().trim().min(1).max(20), type: name, costCenter: code })),
+  employees: z.array(z.strictObject({ code, name, nickname: name.optional() })),
+  employeeBankAccounts: z.array(
+    z.strictObject({
+      employee: code,
+      bank: code,
+      accountNo: z.string().regex(/^[0-9]{5,20}$/, 'accountNo: digits only'),
+      accountHolder: name,
+      isDefault: z.boolean(),
+    }),
+  ),
+}
+
+type RefCtx = { uoms: Set<string>; banks: Set<string> }
+type MastersIn = { categories: Array<{ defaultUom?: string; allowed: string[] }>; costCenters: Array<{ code: string }>; vehicles: Array<{ costCenter: string }>; employees: Array<{ code: string }>; employeeBankAccounts: Array<{ employee: string; bank: string }> }
+
+/** Cross-references must resolve inside the same file / PT (the seed looks them up by code). */
+function checkRefs(d: MastersIn, shared: RefCtx, ctx: z.RefinementCtx, prefix: (string | number)[]) {
+  const ccs = new Set(d.costCenters.map((x) => x.code))
+  const emps = new Set(d.employees.map((x) => x.code))
+  const bad = (path: (string | number)[], message: string) => ctx.addIssue({ code: 'custom', path: [...prefix, ...path], message })
+  d.categories.forEach((c, i) => {
+    if (c.defaultUom && !shared.uoms.has(c.defaultUom)) bad(['categories', i, 'defaultUom'], 'unknown UoM code')
+    c.allowed.forEach((a, j) => shared.uoms.has(a) || bad(['categories', i, 'allowed', j], 'unknown UoM code'))
   })
+  d.vehicles.forEach((v, i) => ccs.has(v.costCenter) || bad(['vehicles', i, 'costCenter'], 'unknown cost center code'))
+  d.employeeBankAccounts.forEach((a, i) => {
+    if (!emps.has(a.employee)) bad(['employeeBankAccounts', i, 'employee'], 'unknown employee code')
+    if (!shared.banks.has(a.bank)) bad(['employeeBankAccounts', i, 'bank'], 'unknown bank code')
+  })
+}
+
+/** Single-company shape (F1…S3; = DRMS). Strict: unknown keys are rejected. */
+export const SingleCompanySeedSchema = z
+  .strictObject({ company: companyShape, uoms: uomsShape, banks: banksShape, ...companyMasters })
+  .superRefine((d, ctx) => checkRefs(d, { uoms: new Set(d.uoms.map((u) => u.code)), banks: new Set(d.banks.map((b) => b.code)) }, ctx, []))
+
+/** Multi-company shape (ADR 0016): shared masters at the top, one block per PT (first = company #1). */
+export const MultiCompanySeedSchema = z
+  .strictObject({ uoms: uomsShape, banks: banksShape, companies: z.array(z.strictObject({ company: companyShape, ...companyMasters })).min(1) })
   .superRefine((d, ctx) => {
-    // Cross-references must resolve inside the same file (the seed looks them up by code).
-    const has = (list: { code: string }[]) => new Set(list.map((x) => x.code))
-    const uoms = has(d.uoms)
-    const banks = has(d.banks)
-    const ccs = has(d.costCenters)
-    const emps = has(d.employees)
-    const bad = (path: (string | number)[], message: string) => ctx.addIssue({ code: 'custom', path, message })
-    d.categories.forEach((c, i) => {
-      if (c.defaultUom && !uoms.has(c.defaultUom)) bad(['categories', i, 'defaultUom'], 'unknown UoM code')
-      c.allowed.forEach((a, j) => uoms.has(a) || bad(['categories', i, 'allowed', j], 'unknown UoM code'))
-    })
-    d.vehicles.forEach((v, i) => ccs.has(v.costCenter) || bad(['vehicles', i, 'costCenter'], 'unknown cost center code'))
-    d.employeeBankAccounts.forEach((a, i) => {
-      if (!emps.has(a.employee)) bad(['employeeBankAccounts', i, 'employee'], 'unknown employee code')
-      if (!banks.has(a.bank)) bad(['employeeBankAccounts', i, 'bank'], 'unknown bank code')
+    const shared = { uoms: new Set(d.uoms.map((u) => u.code)), banks: new Set(d.banks.map((b) => b.code)) }
+    const codes = new Set<string>()
+    d.companies.forEach((c, i) => {
+      if (codes.has(c.company.shortCode)) ctx.addIssue({ code: 'custom', path: ['companies', i, 'company', 'shortCode'], message: 'duplicate shortCode' })
+      codes.add(c.company.shortCode)
+      checkRefs(c, shared, ctx, ['companies', i])
     })
   })
 
+/** Either shape (SEED_DATA_FILE); the seed normalises both to `{ uoms, banks, companies[] }`. */
+export const SeedDataSchema = z.union([SingleCompanySeedSchema, MultiCompanySeedSchema])
+
 export type SeedData = z.infer<typeof SeedDataSchema>
+export type CompanySeed = z.infer<typeof MultiCompanySeedSchema>['companies'][number]
+export type NormalizedSeed = { uoms: SeedData['uoms']; banks: SeedData['banks']; companies: CompanySeed[] }
+
+/** Old single-company shape → `{ uoms, banks, companies: [DRMS block] }` (ADR 0016). */
+export function normalizeSeedData(d: SeedData): NormalizedSeed {
+  if ('companies' in d) return { uoms: d.uoms, banks: d.banks, companies: d.companies }
+  const { uoms, banks, ...rest } = d
+  return { uoms, banks, companies: [rest] }
+}
 
 /**
  * Returns the seed dataset: DEFAULT_SEED_DATA (fictional) unless `SEED_DATA_FILE` names a JSON file
@@ -229,7 +258,9 @@ export function loadSeedData(env: Record<string, string | undefined> = process.e
   } catch {
     throw new Error('SEED_DATA_FILE is not readable or not valid JSON')
   }
-  const r = SeedDataSchema.safeParse(raw)
+  // discriminate on `companies` (a union would hide the field errors behind one invalid_union issue)
+  const schema = raw && typeof raw === 'object' && 'companies' in raw ? MultiCompanySeedSchema : SingleCompanySeedSchema
+  const r = schema.safeParse(raw)
   if (!r.success) {
     const where = r.error.issues.map((i) => `${i.path.join('.') || '(root)'}: ${i.message}`).join('; ')
     throw new Error(`SEED_DATA_FILE does not match the seed schema — ${where}`)

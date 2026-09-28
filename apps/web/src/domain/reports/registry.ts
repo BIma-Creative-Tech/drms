@@ -27,7 +27,24 @@ import {
   type RequestFilter,
 } from './kpi'
 import { BUDGET_LABELS, dateRange, formatPct, lastDay, monthRange, periodLabel } from './rules'
-import { costCenterScopeSql, includesManualCash, projectScopeSql, requestScopeSql, type ReportScope, type SQL } from './scope'
+import { companyRefs } from '@/domain/companies'
+
+import {
+  auditScope,
+  costCenterScopeSql,
+  includesManualCash,
+  ledgerCompanies,
+  ledgerScopeSql,
+  masterScopeSql,
+  narrowToCompanies,
+  projectScopeSql,
+  requestScopeSql,
+  scopeCompanies,
+  fromCompanies,
+  type CompanyScope,
+  type ReportScope,
+  type SQL,
+} from './scope'
 
 /**
  * F3 report catalogue (wireframes.md §5.1): one definition per report drives the screen
@@ -39,9 +56,18 @@ import { costCenterScopeSql, includesManualCash, projectScopeSql, requestScopeSq
 export type ColType = 'text' | 'money' | 'int' | 'date' | 'datetime' | 'pct'
 export type Column = { key: string; label: string; type: ColType; primary?: boolean; width?: number }
 export type Cell = string | number | null
-export type TableRow = { cells: Record<string, Cell>; href?: string }
+/** `company` = PT of the row (MC2): drives the PT column + "Subtotal per PT" when the scope spans > 1 PT. */
+export type TableRow = { cells: Record<string, Cell>; href?: string; company?: number | null }
 export type Table = { key: string; title: string; columns: Column[]; rows: TableRow[]; totals?: Record<string, Cell | undefined>; empty?: string }
-export type ReportResult = { main: Table; extra: Table[]; notes: string[]; next: string | null; count: number }
+export type ReportResult = {
+  main: Table
+  extra: Table[]
+  notes: string[]
+  next: string | null
+  count: number
+  /** Paged reports: per-PT totals over ALL pages (cells keyed like `main`); others are summed from the rows. */
+  companyTotals?: Array<{ company: number; cells: Record<string, Cell> }>
+}
 export type Format = 'csv' | 'xlsx' | 'pdf'
 export type Option = { value: string; label: string }
 export type FilterField = { name: string; label: string; kind: 'date' | 'month' | 'select' | 'multiselect' | 'text'; options?: Option[]; value: string | string[] }
@@ -79,16 +105,55 @@ const statusesOf = (sp: URLSearchParams): RequestStatus[] => {
   return [...new Set(raw.filter((s): s is RequestStatus => (REQUEST_STATUSES as readonly string[]).includes(s) && s !== 'draft'))]
 }
 
-/** PM filters narrow the scope; an id outside the team scope → empty scope (never other data). */
+/**
+ * PM filters narrow the scope PER PT; an id outside the team scope → empty for that PT (never other
+ * data). An office (`all`) PT keeps the id as a one-project team — the SQL still carries
+ * `company_id = <that PT>`, so an id of another PT matches nothing. A legacy scope without
+ * companies stays fail-closed (`all` is never turned into an unscoped id filter).
+ */
 export function narrowScope(scope: ReportScope, projectId?: number, costCenterId?: number): ReportScope {
   if (!projectId && !costCenterId) return scope
   if (scope.kind === 'none' || scope.kind === 'own') return scope
-  const inTeam = (ids: number[], id: number) => scope.kind === 'all' || ids.includes(id)
-  const projects = projectId && inTeam(scope.kind === 'team' ? scope.projects : [], projectId) ? [projectId] : []
-  const costCenters = costCenterId && inTeam(scope.kind === 'team' ? scope.costCenters : [], costCenterId) ? [costCenterId] : []
-  // both given: a request has a project OR a cost center → both filters together match nothing
-  if (projectId && costCenterId) return { kind: 'team', projects: [], costCenters: [] }
-  return { kind: 'team', projects, costCenters }
+  if (!scope.companies) {
+    if (scope.kind !== 'team') return { kind: 'team', projects: [], costCenters: [] }
+    const projects = projectId && scope.projects.includes(projectId) ? [projectId] : []
+    const costCenters = costCenterId && scope.costCenters.includes(costCenterId) ? [costCenterId] : []
+    if (projectId && costCenterId) return { kind: 'team', projects: [], costCenters: [] }
+    return { kind: 'team', projects, costCenters }
+  }
+  const out: CompanyScope[] = scope.companies.map((c) => {
+    if (c.kind === 'own') return c
+    // both given: a request has a project OR a cost center → both filters together match nothing
+    if (projectId && costCenterId) return { company: c.company, kind: 'team', projects: [], costCenters: [] }
+    const ok = (ids: number[], id?: number) => id !== undefined && (c.kind === 'all' || ids.includes(id))
+    return {
+      company: c.company,
+      kind: 'team',
+      projects: ok(c.kind === 'team' ? c.projects : [], projectId) ? [projectId!] : [],
+      costCenters: ok(c.kind === 'team' ? c.costCenters : [], costCenterId) ? [costCenterId!] : [],
+    }
+  })
+  return fromCompanies(out)
+}
+
+/** Report parameter `pt` (repeatable or comma list of company ids): narrows the scope, never widens. */
+export const PT_PARAM = 'pt'
+export function ptParam(sp: URLSearchParams): number[] | null {
+  const ids = sp
+    .getAll(PT_PARAM)
+    .flatMap((v) => v.split(','))
+    .filter((v) => /^\d{1,9}$/.test(v.trim()))
+    .map((v) => Number(v.trim()))
+  return ids.length ? [...new Set(ids)] : null
+}
+export const effectiveScope = (scope: ReportScope, sp: URLSearchParams): ReportScope => narrowToCompanies(scope, ptParam(sp))
+
+/** Prefix of master labels when the scope spans more than one PT (`[CS1] `). */
+async function ptPrefix(req: PayloadRequest, scope: ReportScope): Promise<(companyId: unknown) => string> {
+  const ids = scopeCompanies(scope)
+  if (ids.length <= 1) return () => ''
+  const refs = new Map((await companyRefs(req, ids)).map((r) => [r.id, r.shortCode]))
+  return (c) => `[${refs.get(Number(c)) ?? c}] `
 }
 
 const fmtDate = (d: string) => `${d.slice(8, 10)}/${d.slice(5, 7)}/${d.slice(0, 4)}`
@@ -98,32 +163,40 @@ const qs = (params: Record<string, string | number | undefined>) =>
 // ---------------------------------------------------------------- filter option lists (scoped)
 
 async function projectOptions(req: PayloadRequest, scope: ReportScope): Promise<Option[]> {
-  const r = await rows(req, sql`SELECT p.id, p.code, p.name FROM projects p WHERE ${projectScopeSql(scope)} ORDER BY p.code`)
-  return r.map((x) => ({ value: String(x.id), label: `${x.code} ${x.name}` }))
+  const pre = await ptPrefix(req, scope)
+  const r = await rows(req, sql`SELECT p.id, p.company_id, p.code, p.name FROM projects p WHERE ${projectScopeSql(scope)} ORDER BY p.code, p.company_id`)
+  return r.map((x) => ({ value: String(x.id), label: `${pre(x.company_id)}${x.code} ${x.name}` }))
 }
 async function costCenterOptions(req: PayloadRequest, scope: ReportScope): Promise<Option[]> {
-  const r = await rows(req, sql`SELECT cc.id, cc.code, cc.name FROM cost_centers cc WHERE ${costCenterScopeSql(scope)} ORDER BY cc.code`)
-  return r.map((x) => ({ value: String(x.id), label: `${x.code} ${x.name}` }))
+  const pre = await ptPrefix(req, scope)
+  const r = await rows(req, sql`SELECT cc.id, cc.company_id, cc.code, cc.name FROM cost_centers cc WHERE ${costCenterScopeSql(scope)} ORDER BY cc.code, cc.company_id`)
+  return r.map((x) => ({ value: String(x.id), label: `${pre(x.company_id)}${x.code} ${x.name}` }))
 }
-async function categoryOptions(req: PayloadRequest): Promise<Option[]> {
-  const r = await rows(req, sql`SELECT id, code, name FROM expense_categories ORDER BY code`)
-  return r.map((x) => ({ value: String(x.id), label: `${x.code} ${x.name}` }))
+/** Categories of the scope's PTs (per PT: never merged across PTs). */
+async function categoryOptions(req: PayloadRequest, scope: ReportScope): Promise<Option[]> {
+  const pre = await ptPrefix(req, scope)
+  const r = await rows(req, sql`SELECT x.id, x.company_id, x.code, x.name FROM expense_categories x WHERE ${masterScopeSql(scope, 'x')} ORDER BY x.code, x.company_id`)
+  return r.map((x) => ({ value: String(x.id), label: `${pre(x.company_id)}${x.code} ${x.name}` }))
 }
-async function accountOptions(req: PayloadRequest): Promise<Option[]> {
-  const r = await rows(req, sql`SELECT id, name FROM cash_accounts ORDER BY name`)
-  return r.map((x) => ({ value: String(x.id), label: String(x.name) }))
+/** Cash accounts of the scope's LEDGER PTs (Finance/Owner). */
+async function accountOptions(req: PayloadRequest, scope: ReportScope): Promise<Option[]> {
+  const pre = await ptPrefix(req, scope)
+  const r = await rows(req, sql`SELECT a.id, a.company_id, a.name FROM cash_accounts a WHERE ${ledgerScopeSql(scope, 'a')} ORDER BY a.name, a.company_id`)
+  return r.map((x) => ({ value: String(x.id), label: `${pre(x.company_id)}${x.name}` }))
 }
-async function vehicleOptions(req: PayloadRequest): Promise<Option[]> {
-  const r = await rows(req, sql`SELECT id, coalesce(plate_display, plate_no) AS plate, type FROM vehicles ORDER BY 2`)
-  return r.map((x) => ({ value: String(x.id), label: `${x.plate} (${x.type})` }))
+async function vehicleOptions(req: PayloadRequest, scope: ReportScope): Promise<Option[]> {
+  const pre = await ptPrefix(req, scope)
+  const r = await rows(req, sql`SELECT v.id, v.company_id, coalesce(v.plate_display, v.plate_no) AS plate, v.type FROM vehicles v WHERE ${masterScopeSql(scope, 'v')} ORDER BY 3`)
+  return r.map((x) => ({ value: String(x.id), label: `${pre(x.company_id)}${x.plate} (${x.type})` }))
 }
 async function requesterOptions(req: PayloadRequest, scope: ReportScope): Promise<Option[]> {
+  const pre = await ptPrefix(req, scope)
   const r = await rows(
     req,
-    sql`SELECT DISTINCT e.id, e.code, e.name FROM expense_requests er JOIN expense_requests_rels rr ON rr.parent_id = er.id AND rr.path = 'requesters'
+    sql`SELECT DISTINCT e.id, e.company_id, e.code, e.name FROM expense_requests er JOIN expense_requests_rels rr ON rr.parent_id = er.id AND rr.path = 'requesters'
         JOIN employees e ON e.id = rr.employees_id WHERE ${requestScopeSql(scope)} ORDER BY e.name`,
   )
-  return r.map((x) => ({ value: String(x.id), label: `${x.name} (${x.code})` }))
+  return r.map((x) => ({ value: String(x.id), label: `${pre(x.company_id)}${x.name} (${x.code})` }))
 }
 
 const sel = (name: string, label: string, sp: URLSearchParams, options: Option[]): FilterField => ({ name, label, kind: 'select', options, value: sp.get(name) ?? '' })
@@ -168,11 +241,11 @@ const rekapKas: ReportDef = {
   formats: ['csv', 'xlsx', 'pdf'],
   paged: false,
   pageSize: 36,
-  async run(req, _scope, sp) {
+  async run(req, scope, sp) {
     const ctx = await reportContext(req)
     const m = monthRange(sp.get('dari'), sp.get('sampai'), ctx.today)
     const f = { from: m.from, to: m.to, accountId: idOf(sp, 'akun'), projectId: idOf(sp, 'project'), costCenterId: idOf(sp, 'pusat') }
-    const flows = await cashFlowMonthly(req, f, 'book')
+    const flows = await cashFlowMonthly(req, scope, f, 'book')
     const withBalance = !f.projectId && !f.costCenterId
     const columns: Column[] = [
       { key: 'bulan', label: 'Bulan', type: 'text', primary: true },
@@ -201,9 +274,9 @@ const rekapKas: ReportDef = {
       empty: 'Belum ada transaksi kas di rentang ini.',
     }
     const asOf = lastDay(m.to) < ctx.today ? lastDay(m.to) : ctx.today
-    const bal = await cashBalances(req, asOf, f.accountId)
+    const bal = await cashBalances(req, scope, asOf, f.accountId)
     const acc = visibleAccounts(bal.accounts)
-    const breakdown = await cashBreakdown(req, f)
+    const breakdown = await cashBreakdown(req, scope, f)
     const SRC: Record<string, string> = { transfer: 'Transfer pengajuan', settlement_refund: 'Pengembalian LPJ', manual: 'Manual', reversal: 'Jurnal balik (void)', opening: 'Saldo awal' }
     return {
       main,
@@ -216,7 +289,7 @@ const rekapKas: ReportDef = {
             { key: 'status', label: 'Status', type: 'text' },
             { key: 'saldo', label: 'Saldo (Rp)', type: 'money', primary: true },
           ],
-          rows: acc.map((a) => ({ cells: { akun: a.name, status: a.active ? 'aktif' : 'nonaktif', saldo: a.balance } })),
+          rows: acc.map((a) => ({ cells: { akun: a.name, status: a.active ? 'aktif' : 'nonaktif', saldo: a.balance }, company: a.companyId })),
           totals: { akun: 'TOTAL', saldo: acc.reduce((s, a) => s + a.balance, 0) },
           empty: 'Belum ada akun kas. Admin/Finance menambah di Master Data › Akun kas/bank.',
         },
@@ -243,15 +316,16 @@ const rekapKas: ReportDef = {
       count: flows.length,
     }
   },
-  async filters(req, _scope, sp) {
+  async filters(req, scope, sp) {
     const ctx = await reportContext(req)
     const m = monthRange(sp.get('dari'), sp.get('sampai'), ctx.today)
+    const ledger = ledgerOnly(scope)
     return [
       { name: 'dari', label: 'Dari bulan', kind: 'month', value: m.from },
       { name: 'sampai', label: 'Sampai bulan', kind: 'month', value: m.to },
-      sel('akun', 'Akun kas', sp, await accountOptions(req)),
-      sel('project', 'Project', sp, await projectOptions(req, { kind: 'all' })),
-      sel('pusat', 'Pusat biaya', sp, await costCenterOptions(req, { kind: 'all' })),
+      sel('akun', 'Akun kas', sp, await accountOptions(req, ledger)),
+      sel('project', 'Project', sp, await projectOptions(req, ledger)),
+      sel('pusat', 'Pusat biaya', sp, await costCenterOptions(req, ledger)),
     ]
   },
   fileStem(ctx, sp) {
@@ -265,9 +339,14 @@ const rekapKas: ReportDef = {
 const SOURCE_TYPES = ['transfer', 'settlement_refund', 'manual', 'reversal', 'opening'] as const
 const SOURCE_LABELS: Record<string, string> = { transfer: 'Transfer pengajuan', settlement_refund: 'Pengembalian LPJ', manual: 'Manual', reversal: 'Jurnal balik', opening: 'Saldo awal' }
 
-function ledgerWhere(sp: URLSearchParams, ctx: Ctx): SQL {
+/** Only the `all` PTs of a scope (cash ledger reports: Finance/Owner of the PT). */
+function ledgerOnly(scope: ReportScope): ReportScope {
+  return fromCompanies((scope.companies ?? []).filter((c) => c.kind === 'all'))
+}
+
+function ledgerWhere(scope: ReportScope, sp: URLSearchParams, ctx: Ctx): SQL {
   const r = dateRange(sp.get('dari'), sp.get('sampai'), ctx.today)
-  const w: SQL[] = [sql`ce.entry_date BETWEEN ${r.from} AND ${r.to}`]
+  const w: SQL[] = [sql`ce.entry_date BETWEEN ${r.from} AND ${r.to}`, ledgerScopeSql(scope)]
   const acc = idOf(sp, 'akun')
   if (acc) w.push(sql`ce.cash_account_id = ${acc}`)
   const arah = sp.get('arah')
@@ -292,14 +371,14 @@ const bukuKas: ReportDef = {
   formats: ['csv', 'xlsx'],
   paged: true,
   pageSize: 100,
-  async run(req, _scope, sp, page) {
+  async run(req, scope, sp, page) {
     const ctx = await reportContext(req)
-    const where = ledgerWhere(sp, ctx)
+    const where = ledgerWhere(scope, sp, ctx)
     const cur = page.cursor ? Buffer.from(page.cursor, 'base64url').toString('utf8').split('|') : null
     const after = cur && /^\d{4}-\d{2}-\d{2}$/.test(cur[0] ?? '') && /^\d{1,10}$/.test(cur[1] ?? '') ? sql`AND (ce.entry_date, ce.id) < (${cur[0]}, ${Number(cur[1])})` : sql``
     const r = await rows(
       req,
-      sql`SELECT ce.id, ce.entry_no, ce.entry_date, ce.direction::text AS direction, ce.amount::text AS amount, ce.source_type::text AS source_type, ce.status::text AS status,
+      sql`SELECT ce.id, ce.company_id, ce.entry_no, ce.entry_date, ce.direction::text AS direction, ce.amount::text AS amount, ce.source_type::text AS source_type, ce.status::text AS status,
             a.name AS account, coalesce(cat.code || ' ' || cat.name, src.name) AS kategori,
             coalesce(p.code || ' ' || p.name, cc.code || ' ' || cc.name) AS lingkup, coalesce(v.plate_display, v.plate_no) AS vehicle,
             er.doc_no AS request_no, er.id AS request_id, ce.description, ce.void_reason, orig.entry_no AS reversal_of
@@ -314,8 +393,10 @@ const bukuKas: ReportDef = {
     const list = r.slice(0, page.limit)
     const tot = await rows(
       req,
-      sql`SELECT count(*)::int AS n, coalesce(sum(ce.amount) FILTER (WHERE ce.direction = 'in'), 0)::text AS tin, coalesce(sum(ce.amount) FILTER (WHERE ce.direction = 'out'), 0)::text AS tout FROM cash_entries ce WHERE ${where}`,
+      sql`SELECT ce.company_id, count(*)::int AS n, coalesce(sum(ce.amount) FILTER (WHERE ce.direction = 'in'), 0)::text AS tin, coalesce(sum(ce.amount) FILTER (WHERE ce.direction = 'out'), 0)::text AS tout
+          FROM cash_entries ce WHERE ${where} GROUP BY ce.company_id ORDER BY ce.company_id`,
     )
+    const T = (k: 'n' | 'tin' | 'tout') => tot.reduce((a, x) => a + num(x[k]), 0)
     const last = list.at(-1)
     return {
       main: {
@@ -351,20 +432,23 @@ const bukuKas: ReportDef = {
             status: x.status === 'void' ? `void${x.void_reason ? `: ${x.void_reason}` : ''}` : 'posted',
           },
           href: x.request_id ? `/admin/collections/expense-requests/${x.request_id}` : `/admin/collections/cash-entries/${x.id}`,
+          company: num(x.company_id),
         })),
-        totals: { tanggal: 'TOTAL (semua halaman)', masuk: num(tot[0]?.tin), keluar: num(tot[0]?.tout) },
+        totals: { tanggal: 'TOTAL (semua halaman)', masuk: T('tin'), keluar: T('tout') },
         empty: 'Tidak ada data untuk filter ini.',
       },
       extra: [],
       notes: ['Nomor rekening tujuan tidak ditampilkan di laporan ini.'],
       next: r.length > page.limit && last ? Buffer.from(`${last.entry_date}|${last.id}`).toString('base64url') : null,
-      count: num(tot[0]?.n),
+      count: T('n'),
+      companyTotals: tot.map((x) => ({ company: num(x.company_id), cells: { masuk: num(x.tin), keluar: num(x.tout) } })),
     }
   },
-  async filters(req, _scope, sp) {
+  async filters(req, scope, sp) {
+    const ledger = ledgerOnly(scope)
     return [
       ...(await dateFields(req, sp)),
-      sel('akun', 'Akun kas', sp, await accountOptions(req)),
+      sel('akun', 'Akun kas', sp, await accountOptions(req, ledger)),
       sel('arah', 'Arah', sp, [
         { value: 'in', label: 'Masuk' },
         { value: 'out', label: 'Keluar' },
@@ -379,8 +463,8 @@ const bukuKas: ReportDef = {
         { value: 'posted', label: 'posted' },
         { value: 'void', label: 'void' },
       ]),
-      sel('project', 'Project', sp, await projectOptions(req, { kind: 'all' })),
-      sel('pusat', 'Pusat biaya', sp, await costCenterOptions(req, { kind: 'all' })),
+      sel('project', 'Project', sp, await projectOptions(req, ledger)),
+      sel('pusat', 'Pusat biaya', sp, await costCenterOptions(req, ledger)),
     ]
   },
   fileStem(ctx, sp) {
@@ -429,6 +513,7 @@ const pengeluaranKategori: ReportDef = {
             group === 'kategori' && /^\d+$/.test(i.key)
               ? `/admin/laporan/rekap-pengajuan?${qs({ dari: r.from, sampai: r.to, kategori: i.key, jenis: typeOf(sp), project: projectId, pusat: costCenterId })}`
               : undefined,
+          company: i.companyId,
         })),
         totals: { label: 'TOTAL', n: null, req: items.reduce((a, i) => a + i.fromRequests, 0), manual: items.reduce((a, i) => a + i.fromManual, 0), total, share: total > 0 ? 100 : 0 },
         empty: 'Tidak ada data untuk filter ini.',
@@ -459,7 +544,7 @@ const pengeluaranKategori: ReportDef = {
       sel('jenis', 'Jenis', sp, typeOptions),
       sel('project', 'Project', sp, await projectOptions(req, scope)),
       sel('pusat', 'Pusat biaya', sp, await costCenterOptions(req, scope)),
-      sel('kategori', 'Kategori', sp, await categoryOptions(req)),
+      sel('kategori', 'Kategori', sp, await categoryOptions(req, scope)),
     ]
   },
   fileStem(ctx, sp) {
@@ -538,6 +623,7 @@ const anggaranProject: ReportDef = {
             progressStatus: progress.get(p.id)?.toneLabel ?? '',
           },
           href: `/admin/laporan/anggaran-project?${qs({ project: p.id })}`,
+          company: p.companyId,
         })),
         totals: { project: 'TOTAL', rab: list.reduce((s, p) => s + (p.budget ?? 0), 0), komitmen: sum('committed'), dicairkan: sum('disbursedNet'), realisasi: sum('realized') },
         empty: scope.kind === 'team' ? 'Anda belum ditetapkan sebagai PM project mana pun. Hubungi Direktur/Admin.' : 'Belum ada project.',
@@ -631,6 +717,7 @@ const rekapPengajuan: ReportDef = {
             flag: x.openFlags,
           },
           href: `/admin/collections/expense-requests/${x.id}`,
+          company: x.companyId,
         })),
         totals: { nomor: `TOTAL ${summary.total.count} pengajuan`, grandTotal: summary.total.sum },
         empty: 'Tidak ada data untuk filter ini.',
@@ -656,13 +743,14 @@ const rekapPengajuan: ReportDef = {
             { key: 'n', label: 'Pengajuan', type: 'int' },
             { key: 's', label: 'Nominal baris (Rp)', type: 'money', primary: true },
           ],
-          rows: summary.byCategory.map((x) => ({ cells: { kategori: x.code ? `${x.code} ${x.name}` : x.name, n: x.count, s: x.sum } })),
+          rows: summary.byCategory.map((x) => ({ cells: { kategori: x.code ? `${x.code} ${x.name}` : x.name, n: x.count, s: x.sum }, company: x.companyId })),
           totals: { kategori: 'TOTAL', s: summary.byCategory.reduce((a, x) => a + x.sum, 0) },
         },
       ],
       notes: ['Draft tidak dihitung. Periode = tanggal pengajuan. Jumlah per kategori = pengajuan berbeda yang punya ≥ 1 baris kategori itu (bisa lebih dari total pengajuan).'],
       next: list.length > page.limit && last ? Buffer.from(String(last.id)).toString('base64url') : null,
       count: summary.total.count,
+      companyTotals: summary.byCompany.map((x) => ({ company: x.companyId, cells: { nomor: `${x.count} pengajuan`, grandTotal: x.sum } })),
     }
   },
   async filters(req, scope, sp) {
@@ -678,7 +766,7 @@ const rekapPengajuan: ReportDef = {
       },
       sel('project', 'Project', sp, await projectOptions(req, scope)),
       sel('pusat', 'Pusat biaya', sp, await costCenterOptions(req, scope)),
-      sel('kategori', 'Kategori', sp, await categoryOptions(req)),
+      sel('kategori', 'Kategori', sp, await categoryOptions(req, scope)),
       sel('pemohon', 'Pemohon', sp, await requesterOptions(req, scope)),
     ]
   },
@@ -732,6 +820,7 @@ const kelengkapan: ReportDef = {
             terlambat: a.overdue ? 'Ya' : 'Tidak',
           },
           href: `/admin/collections/expense-requests/${a.id}`,
+          company: a.companyId,
         })),
         totals: { nomor: 'TOTAL', nominal: s.withoutLpj.sum },
         empty: 'Semua uang muka sudah ber-LPJ. ✓',
@@ -807,6 +896,7 @@ const biayaKendaraan: ReportDef = {
             total: x.total,
             rincian: x.categories.map((c) => `${c.name} ${c.fromRequests + c.fromManual}`).join('; '),
           },
+          company: x.companyId,
         })),
         totals: { plat: 'TOTAL', pengajuan: v.vehicles.reduce((s, x) => s + x.fromRequests, 0), manual: v.vehicles.reduce((s, x) => s + x.fromManual, 0), total: v.vehicles.reduce((s, x) => s + x.total, 0) },
         empty: 'Tidak ada biaya kendaraan untuk filter ini.',
@@ -821,8 +911,8 @@ const biayaKendaraan: ReportDef = {
       count: v.vehicles.length,
     }
   },
-  async filters(req, _scope, sp) {
-    return [...(await dateFields(req, sp)), sel('kendaraan', 'Kendaraan', sp, await vehicleOptions(req)), sel('kategori', 'Kategori', sp, await categoryOptions(req))]
+  async filters(req, scope, sp) {
+    return [...(await dateFields(req, sp)), sel('kendaraan', 'Kendaraan', sp, await vehicleOptions(req, scope)), sel('kategori', 'Kategori', sp, await categoryOptions(req, scope))]
   },
   fileStem(ctx, sp) {
     const r = dateRange(sp.get('dari'), sp.get('sampai'), ctx.today)
@@ -843,9 +933,12 @@ const auditLog: ReportDef = {
   formats: ['csv', 'xlsx'],
   paged: true,
   pageSize: AUDIT_PAGE,
-  async run(req, _scope, sp, page) {
+  // MC2 (ADR 0016 §6): the PTs where the caller is Owner/Admin/Finance, never a caller-built literal.
+  scope: auditScope,
+  async run(req, scope, sp, page) {
     const ctx = await reportContext(req)
-    const f: AuditFilter = parseAuditFilter(sp, ctx.today)
+    const s = scope.companies ? scope : effectiveScope(await auditScope(req), sp)
+    const f: AuditFilter = { ...parseAuditFilter(sp, ctx.today), ...(await auditCompanies(req, s)) }
     const [p, count] = await inSequence(() => auditLogPage(req, f, page), () => auditLogCount(req, f))
     return {
       main: {
@@ -887,6 +980,7 @@ const auditLog: ReportDef = {
             requestId: x.requestId ?? '',
           },
           href: x.docType === 'expense_request' && x.docId && /^\d+$/.test(x.docId) ? `/admin/collections/expense-requests/${x.docId}/riwayat` : undefined,
+          company: x.companyId,
         })),
         empty: 'Tidak ada aktivitas untuk filter ini.',
       },
@@ -896,12 +990,13 @@ const auditLog: ReportDef = {
       count,
     }
   },
-  async filters(req, _scope, sp) {
+  async filters(req, scope, sp) {
     const ctx = await reportContext(req)
     const f = parseAuditFilter(sp, ctx.today)
     const { auditFilterOptions } = await import('./audit-log')
     const { AUDIT_ACTIONS } = await import('@/audit/writer')
-    const o = await auditFilterOptions(req)
+    const s = scope.companies ? scope : effectiveScope(await auditScope(req), sp)
+    const o = await auditFilterOptions(req, await auditCompanies(req, s))
     return [
       { name: 'dari', label: 'Dari', kind: 'date', value: f.from },
       { name: 'sampai', label: 'Sampai', kind: 'date', value: f.to },
@@ -928,13 +1023,96 @@ const auditLog: ReportDef = {
   },
 }
 
-export const REPORTS: ReportDef[] = [rekapKas, bukuKas, pengeluaranKategori, anggaranProject, rekapPengajuan, kelengkapan, biayaKendaraan, absensiReport]
-export const AUDIT_REPORT = auditLog
-export const ALL_REPORTS: ReportDef[] = [...REPORTS, auditLog]
+/**
+ * Audit-log PT filter (requirements v1.2 §5): rows of the scope's PTs; rows WITHOUT a PT (shared
+ * masters, accounts, system events) only for Admin/Owner of any selected PT (ADR 0016 §4).
+ */
+async function auditCompanies(req: PayloadRequest, scope: ReportScope): Promise<Pick<AuditFilter, 'companyIds' | 'includeUntagged'>> {
+  const { rolesIn } = await import('@/access/roles')
+  const ids = scopeCompanies(scope)
+  return { companyIds: ids, includeUntagged: ids.some((c) => rolesIn(req, c).some((r) => r === 'pk-admin' || r === 'pk-owner')) }
+}
+
+// ---------------------------------------------------------------- MC2: PT parameter, PT column, per-PT subtotals
+
+const SUBTOTAL_TYPES = new Set<ColType>(['money', 'int'])
+
+/**
+ * Consolidation (requirements v1.2 §5, ADR 0016 §6), applied to every report: the `pt` parameter
+ * narrows the scope; with > 1 PT in the (narrowed) scope every table whose rows carry a PT gets a
+ * leading `PT` column (short code) and the first such table a "Subtotal per PT" table (money/int
+ * columns summed per PT + TOTAL = Σ of the PTs). Paged reports supply `companyTotals` (all pages).
+ */
+async function consolidate(req: PayloadRequest, scope: ReportScope, res: ReportResult): Promise<ReportResult> {
+  const ids = scopeCompanies(scope)
+  if (ids.length <= 1) return res
+  const refs = await companyRefs(req, ids)
+  const code = new Map(refs.map((r) => [r.id, r.shortCode]))
+  const ptCol: Column = { key: 'pt', label: 'PT', type: 'text', primary: true, width: 8 }
+  const withPt = (t: Table): Table => {
+    if (t.rows.length === 0 || !t.rows.every((r) => r.company !== undefined)) return t
+    return { ...t, columns: [ptCol, ...t.columns], rows: t.rows.map((r) => ({ ...r, cells: { pt: r.company == null ? '—' : (code.get(r.company) ?? String(r.company)), ...r.cells } })) }
+  }
+  const tables = [res.main, ...res.extra]
+  const src = tables.find((t) => t.rows.length > 0 && t.rows.every((r) => typeof r.company === 'number'))
+  const extra = res.extra.map(withPt)
+  if (src) {
+    const cols = src.columns.filter((c) => SUBTOTAL_TYPES.has(c.type) && !c.key.startsWith('pct'))
+    const sums = new Map<number, Record<string, Cell>>(ids.map((c) => [c, {}]))
+    if (src === res.main && res.companyTotals) {
+      for (const t of res.companyTotals) sums.set(t.company, { ...t.cells })
+    } else {
+      for (const r of src.rows) {
+        const acc = sums.get(r.company as number) ?? {}
+        for (const c of cols) if (typeof r.cells[c.key] === 'number') acc[c.key] = ((acc[c.key] as number | undefined) ?? 0) + (r.cells[c.key] as number)
+        sums.set(r.company as number, acc)
+      }
+    }
+    const keys = [...new Set([...sums.values()].flatMap((v) => Object.keys(v)))]
+    const columns: Column[] = [ptCol, { key: 'nama', label: 'Nama PT', type: 'text' }, ...src.columns.filter((c) => keys.includes(c.key) && c.key !== 'pt')]
+    const total: Record<string, Cell> = { pt: 'TOTAL' }
+    for (const c of columns) if (SUBTOTAL_TYPES.has(c.type)) total[c.key] = [...sums.values()].reduce((a, v) => a + (typeof v[c.key] === 'number' ? (v[c.key] as number) : 0), 0)
+    extra.push({
+      key: 'subtotal-pt',
+      title: `Subtotal per PT — ${src.title}`,
+      columns,
+      rows: refs.map((r) => ({ cells: { pt: r.shortCode, nama: r.name, ...(sums.get(r.id) ?? {}) }, company: r.id })),
+      totals: total,
+    })
+  }
+  return { ...res, main: withPt(res.main), extra, notes: [...res.notes, `Laporan gabungan ${refs.map((r) => r.shortCode).join(', ')}: kolom PT per baris, subtotal per PT + total gabungan (IDR).`] }
+}
+
+/** PT filter field (multi) when the caller's scope spans > 1 PT; value = the `pt` parameter. */
+async function ptField(req: PayloadRequest, scope: ReportScope, sp: URLSearchParams): Promise<FilterField[]> {
+  const ids = scopeCompanies(scope)
+  if (ids.length <= 1) return []
+  const refs = await companyRefs(req, ids)
+  const chosen = (ptParam(sp) ?? []).filter((x) => ids.includes(x)).map(String)
+  return [{ name: PT_PARAM, label: 'PT', kind: 'multiselect', options: refs.map((r) => ({ value: String(r.id), label: `${r.shortCode} — ${r.name}` })), value: chosen }]
+}
+
+function withCompanies(def: ReportDef): ReportDef {
+  return {
+    ...def,
+    async run(req, scope, sp, page) {
+      const eff = effectiveScope(scope.companies || !def.scope ? scope : await def.scope(req), sp)
+      return consolidate(req, eff, await def.run(req, eff, sp, page))
+    },
+    async filters(req, scope, sp) {
+      const base = scope.companies || !def.scope ? scope : await def.scope(req)
+      return [...(await ptField(req, base, sp)), ...(await def.filters(req, effectiveScope(base, sp), sp))]
+    },
+  }
+}
+
+export const REPORTS: ReportDef[] = [rekapKas, bukuKas, pengeluaranKategori, anggaranProject, rekapPengajuan, kelengkapan, biayaKendaraan, absensiReport].map(withCompanies)
+export const AUDIT_REPORT = withCompanies(auditLog)
+export const ALL_REPORTS: ReportDef[] = [...REPORTS, AUDIT_REPORT]
 export const REPORT_CODES = ALL_REPORTS.map((r) => r.code)
 
 export function reportByCode(code: string): ReportDef | undefined {
   return ALL_REPORTS.find((r) => r.code === code)
 }
 
-export { formatPct, includesManualCash }
+export { formatPct, includesManualCash, ledgerCompanies }

@@ -1,6 +1,8 @@
 import type { PayloadRequest, Where } from 'payload'
 
-import { userId } from '@/access/roles'
+import { relId, userId } from '@/access/roles'
+
+import { companyQuery } from '../company-query'
 
 import { HttpError, json, v1 } from '../http'
 import { NotificationQuery } from '../schemas-flow'
@@ -10,7 +12,7 @@ import { NotificationQuery } from '../schemas-flow'
  * `POST /notifications/{id}/read`; ADR 0011 §3 fetch by uuid). Reads use the collection access
  * (own rows, overrideAccess:false); another user's notification is a 404.
  */
-type Row = { id: number; uuid: string; event: string; title: string; body: string; docType?: string | null; docId?: string | null; docNo?: string | null; readAt?: string | null; createdAt: string }
+type Row = { id: number; uuid: string; event: string; title: string; body: string; docType?: string | null; docId?: string | null; docNo?: string | null; readAt?: string | null; createdAt: string; company?: unknown }
 
 const dto = (n: Row) => ({
   id: n.id,
@@ -23,6 +25,7 @@ const dto = (n: Row) => ({
   docNo: n.docNo ?? null,
   readAt: n.readAt ?? null,
   createdAt: n.createdAt,
+  companyId: relId(n.company) ?? null, // MC3 (MC2: rows carry the PT of their document)
 })
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -59,6 +62,9 @@ export const listNotificationsEndpoint = v1({
     const { unread, limit, cursor } = q.data
     const and: Where[] = [{ user: { equals: userId(req)! } }]
     if (unread === 'true') and.push({ readAt: { exists: false } })
+    // MC3: own rows are never filtered by the selection (a notification is the user's); ?company= narrows
+    const companies = await companyQuery(req)
+    if (companies) and.push({ company: { in: companies } })
     if (cursor) {
       const n = Number(Buffer.from(cursor, 'base64url').toString('utf8'))
       if (!Number.isSafeInteger(n) || n <= 0) throw new HttpError(400, 'Bad Request', { detail: 'cursor tidak valid.' })

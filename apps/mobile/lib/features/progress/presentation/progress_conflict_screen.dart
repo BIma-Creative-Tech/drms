@@ -49,7 +49,8 @@ class _ProgressConflictScreenState extends ConsumerState<ProgressConflictScreen>
     if (reason == null || !mounted) return;
     setState(() => _busy = true);
     final online = ref.read(connectivityProvider);
-    final queue = ref.read(progressQueueEnabledProvider);
+    final pt = ref.read(openProgressDraftsProvider).value?.where((d) => d.clientUuid == widget.uuid).firstOrNull;
+    final queue = ref.read(progressQueueEnabledForProvider(pt?.companyId));
     try {
       await ref
           .read(progressServiceProvider)

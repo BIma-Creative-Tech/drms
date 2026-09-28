@@ -1,0 +1,61 @@
+# GitHub Release for a web release tag vX.Y.Z: body = the `## [X.Y.Z]` section of CHANGELOG.md (English,
+# technical, as written) + links. Fails when the section is missing. mobile-vX.Y.Z tags are handled by
+# mobile.yml job release-prod (user-facing notes from docs/release-notes/apk/). Images are built and pushed by
+# ci.yml; this workflow only writes the Release text. Actions pinned by commit SHA (same pins as ci.yml);
+# syntax checked with actionlint 1.7.12.
+name: release-notes
+
+on:
+  push:
+    # Same pattern as ci.yml; never matches mobile-v* (tag globs are anchored at the start).
+    tags: ["v*.*.*"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-notes-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  github-release:
+    name: GitHub Release from CHANGELOG.md
+    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '"ubuntu-24.04"') }}
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Extract the CHANGELOG section of the tag
+        run: |
+          v="${GITHUB_REF_NAME#v}"
+          [[ "$v" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::tag ${GITHUB_REF_NAME} is not vX.Y.Z"; exit 1; }
+          awk -v head="## [${v}]" '
+            index($0, head) == 1 { on = 1; next }
+            on && /^## \[/ { exit }
+            on { print }
+          ' CHANGELOG.md > "$RUNNER_TEMP/section.md"
+          grep -q '[^[:space:]]' "$RUNNER_TEMP/section.md" \
+            || { echo "::error::CHANGELOG.md has no (or an empty) '## [${v}]' section"; exit 1; }
+          {
+            cat "$RUNNER_TEMP/section.md"
+            echo
+            echo "---"
+            echo "Images: \`ghcr.io/${GITHUB_REPOSITORY_OWNER}/proyekkas-web:${v}\`, \`ghcr.io/${GITHUB_REPOSITORY_OWNER}/proyekkas-migrate:${v}\` (workflow ci)."
+            echo
+            echo "Full history: [CHANGELOG.md](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/blob/${GITHUB_REF_NAME}/CHANGELOG.md)"
+          } > "$RUNNER_TEMP/release-body.md"
+          cat "$RUNNER_TEMP/release-body.md"
+      - name: Create or update the Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          v="${GITHUB_REF_NAME#v}"
+          if gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1; then
+            gh release edit "$GITHUB_REF_NAME" --title "ProyekKas ${v}" --notes-file "$RUNNER_TEMP/release-body.md"
+          else
+            gh release create "$GITHUB_REF_NAME" --verify-tag --title "ProyekKas ${v}" \
+              --notes-file "$RUNNER_TEMP/release-body.md"
+          fi
+          echo "GitHub Release: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/releases/tag/${GITHUB_REF_NAME}" >> "$GITHUB_STEP_SUMMARY"

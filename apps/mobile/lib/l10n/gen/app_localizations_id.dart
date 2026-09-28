@@ -109,6 +109,20 @@ class AppLocalizationsId extends AppLocalizations {
   String get loginForgotPassword => 'Lupa kata sandi? Hubungi Admin.';
 
   @override
+  String get loginTotpLabel => 'Kode autentikator (bila 2FA aktif)';
+
+  @override
+  String get loginTotpHelper =>
+      'Isi 6 digit dari aplikasi autentikator hanya bila Anda mengaktifkan 2FA untuk akun ini. Tanpa 2FA, biarkan kosong.';
+
+  @override
+  String get loginTotpInvalidLength => 'Kode autentikator terdiri dari 6 digit.';
+
+  @override
+  String get loginInvalidWithTotp =>
+      'Email/username, kata sandi, atau kode autentikator salah. Gagal berulang kali dapat mengunci akun sementara; tunggu sebentar sebelum mencoba lagi.';
+
+  @override
   String get updateRequiredTitle => 'Perbarui aplikasi';
 
   @override
@@ -128,6 +142,18 @@ class AppLocalizationsId extends AppLocalizations {
   @override
   String updateAvailable(String version) {
     return 'Versi baru tersedia ($version).';
+  }
+
+  @override
+  String get updateAvailableTap => 'Ketuk untuk melihat yang baru dan cara memperbarui.';
+
+  @override
+  String get updateHowTo =>
+      'Pasang APK versi baru di atas aplikasi ini, tanpa menghapusnya. Data dan login tetap tersimpan.';
+
+  @override
+  String releaseNotesTitle(String version) {
+    return 'Yang baru di versi $version';
   }
 
   @override
@@ -1721,4 +1747,82 @@ class AppLocalizationsId extends AppLocalizations {
 
   @override
   String get addendumDone => 'Tersimpan.';
+
+  @override
+  String get companyAll => 'Semua PT';
+
+  @override
+  String get companyAllMine => 'Semua PT saya';
+
+  @override
+  String get companySwitcherTitle => 'Pilih PT';
+
+  @override
+  String get companySwitcherHint =>
+      'Daftar, persetujuan dan ringkasan mengikuti PT yang dipilih. Draft & antrean offline tetap tersimpan di PT masing-masing.';
+
+  @override
+  String get companySwitcherApply => 'Terapkan';
+
+  @override
+  String get companySwitcherNone => 'Pilih minimal satu PT.';
+
+  @override
+  String get companySwitcherTooltip => 'Ganti PT';
+
+  @override
+  String companySwitcherMore(String code, int more) {
+    return '$code+$more';
+  }
+
+  @override
+  String companySwitcherApplied(String label) {
+    return 'Tampilan: $label';
+  }
+
+  @override
+  String get profileCompanies => 'PT aktif';
+
+  @override
+  String profileCompanyRoles(String code, String roles) {
+    return '$code — $roles';
+  }
+
+  @override
+  String get companyPickTitle => 'Untuk PT mana?';
+
+  @override
+  String get companyPickHint => 'Project, pusat biaya, kategori dan rekening diambil dari data PT ini.';
+
+  @override
+  String get companyPickNone => 'Anda tidak bisa membuat pengajuan di PT yang dipilih. Ganti PT di beranda.';
+
+  @override
+  String get draftCompany => 'PT';
+
+  @override
+  String companyNeedsChoiceBanner(int count) {
+    return '$count data offline belum punya PT — pilih PT agar bisa dikirim';
+  }
+
+  @override
+  String get companyNeedsChoiceTitle => 'Pilih PT untuk data offline';
+
+  @override
+  String get companyNeedsChoiceHint =>
+      'Data ini dibuat sebelum aplikasi mendukung beberapa PT. Pilih PT yang benar untuk setiap data; data tidak dikirim sebelum PT dipilih.';
+
+  @override
+  String get companyNeedsChoiceAction => 'Pilih PT';
+
+  @override
+  String get companyAssigned => 'PT disimpan. Data akan dikirim.';
+
+  @override
+  String get lpjQueueTitle => 'LPJ menunggu verifikasi';
+
+  @override
+  String lpjQueueCount(int count) {
+    return '$count LPJ';
+  }
 }

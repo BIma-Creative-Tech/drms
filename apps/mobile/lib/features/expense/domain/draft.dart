@@ -64,6 +64,10 @@ abstract class DraftRequest with _$DraftRequest {
   const factory DraftRequest({
     required String clientUuid,
     required RequestType type,
+
+    /// MC3: PT of the draft (chosen when it is created; projects / cost centers / accounts come from that
+    /// PT's masters). Null = draft written before the multi-PT update, not yet assigned.
+    int? companyId,
     @Default('') String title,
     int? projectId,
     int? costCenterId,

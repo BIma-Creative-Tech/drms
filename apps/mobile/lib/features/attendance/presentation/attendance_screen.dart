@@ -11,11 +11,11 @@ import '../../../core/location/location_service.dart';
 import '../../../core/media/photo_compressor.dart';
 import '../../../l10n/gen/app_localizations.dart';
 import '../../../shared/widgets/async_body.dart';
-import '../../app_config/application/app_config_providers.dart';
 import '../../auth/application/auth_controller.dart';
 import '../../expense/data/draft_repository.dart';
 import '../../sync/application/sync_coordinator.dart';
 import '../../sync/domain/sync_models.dart';
+import '../../companies/presentation/company_chip.dart';
 import '../application/attendance_service.dart';
 import '../domain/attendance.dart';
 import 'attendance_widgets.dart';
@@ -149,13 +149,15 @@ class _CheckTabState extends ConsumerState<_CheckTab> {
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
-    final enabled = ref.watch(appConfigProvider).value?.syncAttendance ?? false;
     final sites = ref.watch(attendanceSitesProvider);
+    final profile = ref.watch(currentProfileProvider);
     return AsyncBody(
       value: sites,
       onRetry: () => ref.invalidate(attendanceSitesProvider),
       data: (list) {
         final site = list.where((s) => s.key == _siteKey).firstOrNull ?? list.firstOrNull;
+        // MC3: the flag of the location's PT.
+        final enabled = ref.watch(attendanceEnabledForProvider(site?.companyId));
         final ready = enabled && !_busy && site != null && site.hasGeofence;
         final d = _distance;
         final dist = d != null && site != null && d.site.key == site.key ? d : null;
@@ -179,6 +181,10 @@ class _CheckTabState extends ConsumerState<_CheckTab> {
                         children: [
                           Icon(s.kind == SiteKind.project ? Icons.apartment : Icons.business, size: 18),
                           const SizedBox(width: 8),
+                          if ((profile?.showCompanyChips ?? false) && s.companyId != null) ...[
+                            CompanyChip(companyId: s.companyId),
+                            const SizedBox(width: 6),
+                          ],
                           Expanded(child: Text(s.label, overflow: TextOverflow.ellipsis)),
                         ],
                       ),

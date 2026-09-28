@@ -11,7 +11,7 @@ import { formatAmount, pdfSafe } from './format'
  */
 export type PdfColumn = { label: string; type: 'text' | 'money' | 'int' | 'date' | 'datetime' | 'pct'; width: number }
 export type PdfTable = { title: string; columns: PdfColumn[]; rows: string[][]; totals?: string[] }
-export type ReportPdfData = { kop: string[]; title: string; meta: string[]; tables: PdfTable[]; notes: string[] }
+export type ReportPdfData = { kop: string[]; title: string; meta: string[]; tables: PdfTable[]; notes: string[]; /** MC2: PT list (PDF Subject metadata). */ subject?: string }
 
 const s = StyleSheet.create({
   page: { paddingTop: 24, paddingBottom: 32, paddingHorizontal: 24, fontFamily: 'Helvetica', fontSize: 8, color: '#000000' },
@@ -46,7 +46,7 @@ function Row({ cells, columns, style }: { cells: string[]; columns: PdfColumn[];
 
 export function ReportPdf({ d }: { d: ReportPdfData }) {
   return (
-    <Document title={pdfSafe(d.title)} author={pdfSafe(d.kop[0] ?? '')} creator="ProyekKas" producer="ProyekKas">
+    <Document title={pdfSafe(d.title)} author={pdfSafe(d.kop[0] ?? '')} subject={d.subject ? pdfSafe(d.subject) : undefined} creator="ProyekKas" producer="ProyekKas">
       <Page size="A4" orientation="landscape" style={s.page}>
         {d.kop.map((l, i) => (
           <Text key={i} style={i === 0 ? s.kopName : s.kopLine}>

@@ -14,6 +14,10 @@ String? _strN(Object? v) => v?.toString();
 List<dynamic> _list(Object? v) => v is List ? v : const [];
 Json? _map(Object? v) => v is Map<String, dynamic> ? v : null;
 
+/// MC3: PT of a list item / document — `companyId` (expense, cash, notifications, addenda, progress) or
+/// `company {id, shortCode, name}` (approval inbox, LPJ queue). Null from a server before MC3.
+int? companyIdOf(Json j) => _intN(j['companyId']) ?? _intN(_map(j['company'])?['id']) ?? _intN(j['company']);
+
 RefItem? refFromJson(Object? v) {
   final m = _map(v);
   if (m == null || _intN(m['id']) == null) return null;
@@ -41,13 +45,7 @@ UserProfile userProfileFromJson(Json j) {
     email: '${j['email'] ?? ''}',
     name: _strN(j['name']),
     roles: roles,
-    capabilities: caps == null
-        ? Capabilities.fromRoles(roles)
-        : Capabilities(
-            approvalInbox: caps['approvalInbox'] == true,
-            teamMonitor: caps['teamMonitor'] == true,
-            progressReportCreate: caps['progressReportCreate'] == true,
-          ),
+    capabilities: _capabilities(caps, roles),
     employee: emp == null
         ? null
         : Employee(id: _int(emp['id']), code: '${emp['code'] ?? ''}', name: '${emp['name'] ?? ''}'),
@@ -60,6 +58,46 @@ UserProfile userProfileFromJson(Json j) {
             jpegQuality: _int(targets['jpegQuality'], 80),
           ),
     serverTime: _strN(j['serverTime']),
+    companies: [
+      for (final c in _list(j['companies']))
+        if (_map(c) case final m? when _intN(m['id']) != null) companyMembershipFromJson(m),
+    ],
+  );
+}
+
+Capabilities _capabilities(Json? caps, Set<Role> roles) => caps == null
+    ? Capabilities.fromRoles(roles)
+    : Capabilities(
+        approvalInbox: caps['approvalInbox'] == true,
+        teamMonitor: caps['teamMonitor'] == true,
+        progressReportCreate: caps['progressReportCreate'] == true,
+      );
+
+/// `GET /me` `companies[]` item (openapi `MeCompany`, MC3).
+CompanyMembership companyMembershipFromJson(Json j) {
+  final roles = {for (final r in _list(j['roles'])) ?Role.fromCode('$r')};
+  final emp = _map(j['employee']);
+  final s = _map(j['settings']) ?? const {};
+  final empId = _intN(j['employeeId']);
+  return CompanyMembership(
+    id: _int(j['id']),
+    code: '${j['code'] ?? j['shortCode'] ?? '#${j['id']}'}',
+    name: '${j['name'] ?? ''}',
+    timezone: '${j['timezone'] ?? 'Asia/Makassar'}',
+    roles: roles,
+    employee: emp != null
+        ? Employee(id: _int(emp['id']), code: '${emp['code'] ?? ''}', name: '${emp['name'] ?? ''}')
+        : (empId == null ? null : Employee(id: empId, code: '', name: '')),
+    capabilities: _capabilities(_map(j['capabilities']), roles),
+    settings: CompanySettings(
+      defaultGeofenceRadiusM: _int(s['defaultGeofenceRadiusM'], 100),
+      receiptRoundingTolerance: _int(s['receiptRoundingTolerance']),
+      receiptMaxAgeDays: _int(s['receiptMaxAgeDays']),
+      budgetWarnPct: _dblN(s['budgetWarnPct']) ?? 85,
+      syncExpenseDraftsEnabled: s['syncExpenseDraftsEnabled'] != false,
+      syncAttendanceEnabled: s['syncAttendanceEnabled'] == true,
+      syncProgressReportsEnabled: s['syncProgressReportsEnabled'] == true,
+    ),
   );
 }
 
@@ -80,6 +118,7 @@ ExpenseSummary summaryFromJson(Json j) {
     neededDate: _strN(j['neededDate']),
     updatedAt: _strN(j['updatedAt']),
     openWarningFlags: _int(j['openWarningFlags']),
+    companyId: companyIdOf(j),
   );
 }
 
@@ -226,6 +265,7 @@ ExpenseDetail detailFromJson(Json j) {
     transferredTotal: _int(j['transferredTotal']),
     settlement: settlementFromJson(j['settlement']),
     allowedActions: {for (final a in _list(j['allowedActions'])) '$a'},
+    companyId: companyIdOf(j),
     rejectReason: _strN(j['rejectReason']),
     cancelReason: _strN(j['cancelReason']),
     submittedAt: _strN(j['submittedAt']),
@@ -305,6 +345,7 @@ InboxItem inboxItemFromJson(Json j) {
     budgetOverWarn: budget?['overWarn'] == true,
     warningFlags: _int(flags?['warning']),
     infoFlags: _int(flags?['info']),
+    companyId: companyIdOf(j),
   );
 }
 
@@ -397,6 +438,7 @@ DraftRequest draftFromServer(
 }) => DraftRequest(
   clientUuid: clientUuid,
   type: d.type,
+  companyId: d.companyId,
   title: d.title,
   projectId: d.project?.id,
   costCenterId: d.costCenter?.id,

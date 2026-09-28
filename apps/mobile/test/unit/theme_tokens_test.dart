@@ -35,7 +35,7 @@ void main() {
         final block = mode == 'light' ? sem.substring(lightAt, darkAt) : sem.substring(darkAt);
         final web = _hexPairs(block);
         final dart = (mode == 'light' ? PkTokens.light : PkTokens.dark).toMap().map((k, v) => MapEntry(k, _hex(v)));
-        expect(web.length, 22, reason: 'parser found every SemanticTokens key');
+        expect(web.length, 23, reason: 'parser found every SemanticTokens key');
         expect(dart, web);
       });
     }

@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
-import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:proyekkas/core/db/app_database.dart';
 import 'package:proyekkas/core/media/compress_plan.dart';
@@ -22,6 +21,7 @@ import 'package:proyekkas/features/sync/data/sync_api.dart';
 import 'package:proyekkas/features/sync/domain/sync_models.dart';
 
 import '../support/harness.dart';
+import '../support/schema_v2.dart';
 import '../support/mock_server.dart';
 import '../support/seed.dart';
 
@@ -483,23 +483,15 @@ void main() {
     expect(await drafts.media('prog-1'), isNotNull);
   });
 
-  test('database v1 → v2: local_progress_reports is created, existing rows untouched', () async {
-    final old = AppDatabase(
-      NativeDatabase.memory(
-        setup: (raw) {
-          if (raw.select('PRAGMA user_version').first.values.first == 0) {
-            raw.execute('CREATE TABLE kv_entries (key TEXT NOT NULL PRIMARY KEY, value TEXT NOT NULL)');
-            raw.execute("INSERT INTO kv_entries VALUES ('masters:x', '{}')");
-            raw.execute('PRAGMA user_version = 1');
-          }
-        },
-      ),
-    );
+  test('database v1 → v3: local_progress_reports is created (with company_id), existing rows untouched', () async {
+    final old = oldPhoneDb(1, (raw) => raw.execute("INSERT INTO kv_entries VALUES ('masters:x', '{}')"));
     addTearDown(old.close);
     expect(await old.kvGet('masters:x'), '{}');
     final r = ProgressRepository(old);
-    await r.save(sub, const ProgressDraft(clientUuid: 'u1', projectId: 7, stageId: 31, pctAfter: 10));
-    expect((await r.load(sub, 'u1'))!.pctAfter, 10);
-    expect(old.schemaVersion, 2);
+    await r.save(sub, const ProgressDraft(clientUuid: 'u1', companyId: 3, projectId: 7, stageId: 31, pctAfter: 10));
+    final loaded = (await r.load(sub, 'u1'))!;
+    expect(loaded.pctAfter, 10);
+    expect(loaded.companyId, 3);
+    expect(old.schemaVersion, 3);
   });
 }

@@ -4,7 +4,7 @@ import { createLocalJWKSet, exportJWK, generateKeyPair, SignJWT, type JWK } from
 import { getPayload, handleEndpoints, type Payload } from 'payload'
 import pg from 'pg'
 
-import type { Role } from '@/access/roles'
+import { withCompanyContext, type Membership, type Role } from '@/access/roles'
 import { setKeycloakAdmin, type KeycloakAdmin } from '@/auth/keycloak-admin'
 import { createWebSession } from '@/auth/sessions'
 import { setJwksForTests } from '@/auth/strategies'
@@ -71,25 +71,65 @@ export function installFakeKeycloak(): { calls: KcCall[]; users: Map<string, { e
       rec('executeActionsEmail', id, actions)
       throw new Error('SMTP not configured') // mirrors the realm today (runbook): must be non-fatal
     },
+    async listUserCredentials(id) {
+      rec('listUserCredentials', id)
+      return []
+    },
   }
   setKeycloakAdmin(fake)
   return { calls, users }
 }
 
-// ---- users per role (bootstrap path: existing Keycloak user linked by sub) ---------------------
-export type TestUser = { id: number; email: string; keycloakSub: string; roles: Role[]; employee?: number | null; collection: 'users' }
+// ---- companies + memberships (ADR 0016) ----------------------------------------------------------
+const companyIds = new Map<string, number>()
+/** Id of the company with `shortCode` (company #1 DRMS is created by migration *_mc1_companies). */
+export async function companyId(shortCode = 'DRMS'): Promise<number> {
+  const hit = companyIds.get(shortCode)
+  if (hit !== undefined) return hit
+  const p = await getTestPayload()
+  const r = await p.find({ collection: 'companies', where: { shortCode: { equals: shortCode } }, limit: 1, depth: 0, overrideAccess: true /* SYSTEM-READ: fixture */ })
+  const id = r.docs[0]?.id as number | undefined
+  if (id === undefined) throw new Error(`company ${shortCode} missing`)
+  companyIds.set(shortCode, id)
+  return id
+}
 
-export async function makeUser(roles: Role[], opts: { employee?: number; active?: boolean; label?: string } = {}): Promise<TestUser> {
+/** Creates (or replaces the roles of) the user's membership in `company`. */
+export async function addMembership(userId: number, company: number, roles: Role[], employee?: number | null): Promise<void> {
+  const p = await getTestPayload()
+  const found = await p.find({ collection: 'company-memberships', where: { and: [{ user: { equals: userId } }, { company: { equals: company } }] }, limit: 1, depth: 0, overrideAccess: true /* SYSTEM-READ: fixture */ })
+  const data = { user: userId, company, roles, employee: employee ?? null, active: true }
+  if (found.docs[0]) await p.update({ collection: 'company-memberships', id: found.docs[0].id, data, depth: 0, overrideAccess: true /* SYSTEM-WRITE: fixture */ })
+  else await p.create({ collection: 'company-memberships', data, depth: 0, overrideAccess: true /* SYSTEM-WRITE: fixture */ })
+}
+
+/** The user object access control sees (same as the auth strategies build): memberships + selection. */
+export async function withContext<T extends { id: number; groupAdmin?: boolean | null }>(user: T, selection: number[] | null = null): Promise<T & { roles: Role[]; employee: number | null }> {
+  const p = await getTestPayload()
+  const r = await p.find({ collection: 'company-memberships', where: { and: [{ user: { equals: user.id } }, { active: { equals: true } }] }, depth: 0, pagination: false, sort: 'company', overrideAccess: true /* SYSTEM-READ: fixture */ })
+  const ms: Membership[] = (r.docs as unknown as Array<{ company: number; roles?: Role[] | null; employee?: number | null }>).map((m) => ({ company: m.company, roles: m.roles ?? [], employee: m.employee ?? null }))
+  return withCompanyContext(user, ms, selection, user.groupAdmin === true)
+}
+
+// ---- users per role (bootstrap path: existing Keycloak user linked by sub) ---------------------
+export type TestUser = { id: number; email: string; keycloakSub: string; roles: Role[]; employee?: number | null; groupAdmin?: boolean | null; collection: 'users' }
+
+/**
+ * User with `roles` (+ `employee`) as its membership of company #1 DRMS (ADR 0016); Admins are also
+ * group admins (= the migration backfill of existing Admins).
+ */
+export async function makeUser(roles: Role[], opts: { employee?: number; active?: boolean; label?: string; company?: number; groupAdmin?: boolean } = {}): Promise<TestUser> {
   const p = await getTestPayload()
   const email = `${opts.label ?? roles.join('+') ?? 'user'}-${randomUUID().slice(0, 8)}@drms.test`.toLowerCase()
   const doc = await p.create({
     collection: 'users',
-    data: { email, keycloakSub: randomUUID(), roles, active: opts.active ?? true, employee: opts.employee },
+    data: { email, keycloakSub: randomUUID(), active: opts.active ?? true, groupAdmin: opts.groupAdmin ?? roles.includes('pk-admin') },
     depth: 0,
     overrideAccess: true, // SYSTEM-WRITE: test fixture (bootstrap path)
     context: { skipKeycloakSync: true },
   })
-  return { ...(doc as unknown as TestUser), collection: 'users' }
+  await addMembership(doc.id as number, opts.company ?? (await companyId()), roles, opts.employee)
+  return { ...(await withContext(doc as unknown as TestUser)), collection: 'users' }
 }
 
 // ---- HTTP through Payload's REST handler (same code path as the Next route) --------------------
@@ -119,7 +159,7 @@ export async function http(
 /** Real admin web session (web-sessions row + cookie), as created by /auth/callback. */
 export async function webSessionCookie(user: TestUser): Promise<string> {
   const p = await getTestPayload()
-  const s = await createWebSession(p, { id: user.id, roles: user.roles }, { keycloakSid: randomUUID() })
+  const s = await createWebSession(p, { id: user.id }, { keycloakSid: randomUUID() })
   return `pk_session=${s.id}`
 }
 
@@ -188,4 +228,15 @@ export async function sqlError(role: 'app' | 'owner' | 'ro', query: string, para
 export async function auditRows(docType: string, docId: string | number) {
   const r = await sqlAs('app', 'SELECT action, field, old_value, new_value, reason, source, user_id, tx_id::text AS tx_id, server_time FROM audit_logs WHERE doc_type = $1 AND doc_id = $2 ORDER BY id', [docType, String(docId)])
   return r.rows as Array<{ action: string; field: string | null; old_value: { v: unknown } | null; new_value: { v: unknown } | null; reason: string | null; source: string; user_id: string | null; tx_id: string; server_time: Date }>
+}
+
+// ---- per-PT settings (ADR 0016 §1: moved from the company-settings global to `companies`) --------
+export async function companySettingsDoc(shortCode = 'DRMS'): Promise<Record<string, unknown>> {
+  const p = await getTestPayload()
+  return (await p.findByID({ collection: 'companies', id: await companyId(shortCode), depth: 0, overrideAccess: true /* SYSTEM-READ: fixture */ })) as unknown as Record<string, unknown>
+}
+
+export async function updateCompany(data: Record<string, unknown>, shortCode = 'DRMS'): Promise<void> {
+  const p = await getTestPayload()
+  await p.update({ collection: 'companies', id: await companyId(shortCode), data: data as never, depth: 0, overrideAccess: true /* SYSTEM-WRITE: fixture */ })
 }

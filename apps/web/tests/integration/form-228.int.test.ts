@@ -16,7 +16,7 @@ import { submit } from '@/domain/expense/workflow'
 import { normalizePlate } from '@/domain/plates'
 import { FORM_228 } from '@/seed/form-fixture'
 
-import { getTestPayload, installFakeKeycloak, sqlAs } from './helpers'
+import { companyId, getTestPayload, installFakeKeycloak, sqlAs } from './helpers'
 import { api, asUser, makeFlowUser, png, upload, uploadMedia, type FlowUser } from './flow-world'
 import { DEFAULT_APPROVAL_RULES } from '@/seed/data'
 import { seed } from '@/seed/seed'
@@ -41,7 +41,9 @@ afterAll(async () => {
 
 async function idOf(collection: 'employees' | 'uoms' | 'expense-categories' | 'cost-centers' | 'vehicles' | 'employee-bank-accounts', field: string, value: string) {
   const p = await getTestPayload()
-  const r = await p.find({ collection, where: { [field]: { equals: value } }, limit: 1, depth: 0, overrideAccess: true /* SYSTEM-READ: fixture */ })
+  // ADR 0016: per-PT masters repeat their codes in other PTs → look up inside company #1 DRMS
+  const where = collection === 'uoms' || collection === 'vehicles' ? { [field]: { equals: value } } : { and: [{ company: { equals: await companyId() } }, { [field]: { equals: value } }] }
+  const r = await p.find({ collection, where, limit: 1, depth: 0, overrideAccess: true /* SYSTEM-READ: fixture */ })
   return r.docs[0]!.id as number
 }
 
@@ -63,7 +65,7 @@ beforeAll(async () => {
   m.cc = await idOf('cost-centers', 'code', FORM_228.costCenterCode)
   // The seeded default rule (ADR 0013: Diketahui = Direktur, then Finance, every amount) scoped to OPS-PB so that
   // generic rules created by other test files sharing the DB cannot win the tie.
-  const def = (await p.find({ collection: 'approval-rules', where: { name: { equals: DEFAULT_APPROVAL_RULES[0].name } }, limit: 1, depth: 0, overrideAccess: true /* SYSTEM-READ: fixture */ })).docs[0]!
+  const def = (await p.find({ collection: 'approval-rules', where: { and: [{ company: { equals: await companyId() } }, { name: { equals: DEFAULT_APPROVAL_RULES[0].name } }] }, limit: 1, depth: 0, overrideAccess: true /* SYSTEM-READ: fixture */ })).docs[0]!
   await p.create({
     collection: 'approval-rules',
     data: { ...DEFAULT_APPROVAL_RULES[0], steps: [...DEFAULT_APPROVAL_RULES[0].steps], name: 'Form 228 — default untuk OPS-PB', costCenter: m.cc, priority: 1 } as never,
@@ -192,7 +194,7 @@ describe('form 228/PB-DRMS/20/IX/2026 (F2 acceptance fixture)', () => {
     expect(v.body.statusLabel).toBe('Nota Terverifikasi (Antri Transfer)')
 
     const p = await getTestPayload()
-    const acct = (await p.find({ collection: 'cash-accounts', where: { name: { equals: 'Bank Operasional' } }, limit: 1, overrideAccess: true /* SYSTEM-READ */ })).docs[0]!.id
+    const acct = (await p.find({ collection: 'cash-accounts', where: { and: [{ company: { equals: await companyId() } }, { name: { equals: 'Bank Operasional' } }] }, limit: 1, overrideAccess: true /* SYSTEM-READ */ })).docs[0]!.id
     const proof = await upload('/api/v1/media/transfer-proofs', finance, await png(9100))
     expect(proof.status, JSON.stringify(proof.body)).toBe(201)
     const t = await api('POST', `/api/v1/expense-requests/${requestId}/transfer`, finance, { cashAccountId: acct, bankRef: 'MDR-228-001', proofMediaId: proof.body.id })

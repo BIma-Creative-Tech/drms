@@ -16,6 +16,7 @@ import {
 } from '@/domain/addendum/service'
 import { withReqTransaction } from '@/lib/system-tx'
 
+import { companyQuery } from '../company-query'
 import { HttpError, json, v1 } from '../http'
 import { AddendumCreate, AddendumDecision, AddendumListQuery, AddendumReason, AddendumReject, AddendumUpdate } from '../schemas-addendum'
 
@@ -49,8 +50,9 @@ export const listAddendaEndpoint = v1({
   handler: async ({ req }) => {
     const q = AddendumListQuery.safeParse(Object.fromEntries(req.searchParams.entries()))
     if (!q.success) throw new HttpError(400, 'Bad Request', { errors: q.error.issues.map((i) => ({ path: i.path.map(String).join('.'), message: i.message })) })
+    const companyIds = await companyQuery(req)
     const page = await withReqTransaction(req, () =>
-      listAddenda(req, { projectId: q.data.project, status: q.data.status, mine: q.data.mine !== undefined, limit: q.data.limit, after: decodeCursor(q.data.cursor) }),
+      listAddenda(req, { projectId: q.data.project, status: q.data.status, mine: q.data.mine !== undefined, limit: q.data.limit, after: decodeCursor(q.data.cursor), companyIds }),
     )
     return json({ items: page.items, nextCursor: page.nextCursor === null ? null : encodeCursor(page.nextCursor) })
   },
@@ -60,7 +62,10 @@ export const listAddendaEndpoint = v1({
 export const addendumInboxEndpoint = v1({
   path: '/budget-addenda/inbox',
   method: 'get',
-  handler: async ({ req }) => json(await withReqTransaction(req, () => addendumInbox(req))),
+  handler: async ({ req }) => {
+    const companyIds = await companyQuery(req)
+    return json(await withReqTransaction(req, () => addendumInbox(req, { companyIds })))
+  },
 })
 
 export const getAddendumEndpoint = v1({

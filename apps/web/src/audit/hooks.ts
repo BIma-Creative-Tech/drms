@@ -128,10 +128,12 @@ function checkReason(
   }
 }
 
+const relIdOf = (v: unknown): number | undefined => (typeof v === 'number' ? v : v && typeof v === 'object' && typeof (v as { id?: unknown }).id === 'number' ? (v as { id: number }).id : undefined)
+
 function rowsFor(
   changes: FieldChange[],
   operation: 'create' | 'update',
-  base: Pick<AuditRow, 'docType' | 'docId' | 'docNo' | 'reason'>,
+  base: Pick<AuditRow, 'docType' | 'docId' | 'docNo' | 'reason' | 'companyId'>,
   actionFor?: AuditOptions['actionFor'],
   context: Record<string, unknown> = {},
 ): AuditRow[] {
@@ -194,6 +196,8 @@ export function withAudit(collection: CollectionConfig, opts: AuditOptions): Col
       docId: String(doc.id),
       docNo: opts.docNo?.(doc),
       reason,
+      // ADR 0016 §4: rows of a per-PT document carry its PT (companies: the PT itself)
+      companyId: collection.slug === 'companies' ? (doc.id as number) : relIdOf((doc as { company?: unknown }).company),
     }, opts.actionFor, (context ?? {}) as Record<string, unknown>)
     await writeAudit(req, rows)
     return doc

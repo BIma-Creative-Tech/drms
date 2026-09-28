@@ -10,9 +10,10 @@ import '../../../core/format/dates.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../l10n/gen/app_localizations.dart';
 import '../../../shared/widgets/async_body.dart';
-import '../../app_config/application/app_config_providers.dart';
 import '../../auth/application/auth_controller.dart';
+import '../../companies/presentation/company_chip.dart';
 import '../application/attendance_providers.dart';
+import '../application/attendance_service.dart';
 import '../domain/attendance.dart';
 import '../domain/attendance_recap.dart';
 import 'recap_view.dart';
@@ -41,7 +42,7 @@ class _TeamTodayViewState extends ConsumerState<TeamTodayView> {
     final t = AppLocalizations.of(context);
     final value = ref.watch(teamTodayProvider(null));
     final profile = ref.watch(currentProfileProvider);
-    final attendanceOn = ref.watch(appConfigProvider).value?.syncAttendance ?? false;
+    final attendanceOn = ref.watch(attendanceEnabledAnyProvider);
     final canOnBehalf = (profile?.canAttendOnBehalf ?? false) && attendanceOn;
     return RefreshIndicator(
       onRefresh: () async => ref.invalidate(teamTodayProvider(null)),
@@ -126,9 +127,12 @@ class _MemberCard extends ConsumerWidget {
     final theme = Theme.of(context);
     final m = member;
     final v = memberStatusVisual(m.status, t, context.pk);
-    final profile = ref.watch(currentProfileProvider);
-    final attendanceOn = ref.watch(appConfigProvider).value?.syncAttendance ?? false;
-    final isSelf = profile?.employee?.id == m.employee.id;
+    // MC3: roles and the check-in flag of the member's PT; "self" = any of the user's employees.
+    final profile = ref.watch(currentProfileProvider)?.forCompany(m.companyId);
+    final attendanceOn = ref.watch(attendanceEnabledForProvider(m.companyId));
+    final isSelf =
+        (ref.watch(accountProfileProvider)?.employeeIds ?? const <int>{}).contains(m.employee.id) ||
+        profile?.employee?.id == m.employee.id;
     final canCorrect = (profile?.canCorrectAttendance ?? false) && !isSelf;
     final canOnBehalf =
         (profile?.canAttendOnBehalf ?? false) && attendanceOn && !isSelf && m.status != MemberStatus.selesai;
@@ -158,7 +162,12 @@ class _MemberCard extends ConsumerWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(m.employee.name, style: theme.textTheme.titleSmall),
+                        Row(
+                          children: [
+                            CompanyChipLead(companyId: m.companyId),
+                            Flexible(child: Text(m.employee.name, style: theme.textTheme.titleSmall)),
+                          ],
+                        ),
                         Text(
                           [
                             v.label,

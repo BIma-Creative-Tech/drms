@@ -2,7 +2,7 @@ import type { AdminViewServerProps, PayloadRequest } from 'payload'
 import Link from 'next/link'
 import React from 'react'
 
-import { hasRole } from '@/access/roles'
+import { hasRoleAny } from '@/access/roles'
 import { resolveScope } from '@/access/scope'
 import { StageEditor } from '@/admin/components/progress/StageEditor'
 import { listAddenda } from '@/domain/addendum/service'
@@ -17,6 +17,7 @@ import { DEFAULT_TZ } from '@/lib/time'
 
 import { ChartHover } from './ChartHover'
 import { Frame } from './frame'
+import { ptView } from './pt'
 import { Alert, dateId, dateTimeId, ProgressLegend, ProgressTable, ProgressTonePill, ProgressVsBudgetRows } from './progress-ui'
 import { Bento, Card, DashHead, DataTable, EmptyState, KpiRow, KpiTile, pctText, rp, StatusPill, TableView, type Col } from './viz'
 
@@ -55,15 +56,16 @@ async function tzOf(req: PayloadRequest): Promise<string> {
 
 export async function ProgressOverview(props: AdminViewServerProps) {
   const req = props.initPageResult.req
-  if (!hasRole(req, ...READERS)) return <Denied props={props} title="Progress project" />
+  if (!hasRoleAny(req, ...READERS)) return <Denied props={props} title="Progress project" />
   const sp = (props.searchParams ?? {}) as Record<string, string | undefined>
   const archived = sp.arsip === 'ya'
+  const pt = await ptView(req)
   const d = await withReqTransaction(req, async () => projectProgressVsBudget(req, await officeScope(req), { includeArchived: archived }))
   const rows = [...d.projects].sort((a, b) => (b.gap ?? -999) - (a.gap ?? -999) || a.code.localeCompare(b.code))
   const count = (t: ProjectProgress['tone']) => rows.filter((p) => p.tone === t).length
   const measured = rows.filter((p) => p.stagesComplete)
   const avg = measured.length ? measured.reduce((s, p) => s + p.progressPct, 0) / measured.length : null
-  const isPm = !hasRole(req, 'pk-owner', 'pk-finance')
+  const isPm = !hasRoleAny(req, 'pk-owner', 'pk-finance')
   return (
     <Frame props={props} name="progress">
       <ChartHover>
@@ -105,10 +107,10 @@ export async function ProgressOverview(props: AdminViewServerProps) {
             foot={`Selisih = % anggaran − % progress fisik. Ambang di pengaturan perusahaan (kuning > ${d.warnGapPct}%, merah > ${d.badGapPct}%). Project tanpa RAB atau tahapan belum 100% tidak dinilai.`}
           >
             {rows.length > 0 ? <ProgressLegend warn={d.warnGapPct} bad={d.badGapPct} /> : null}
-            <ProgressVsBudgetRows id="progress-vs-budget" rows={rows} hrefOf={(p) => projectHref(p.id)} empty={isPm ? 'Anda belum ditetapkan sebagai PM project mana pun.' : 'Belum ada project.'} />
+            <ProgressVsBudgetRows id="progress-vs-budget" rows={rows} hrefOf={(p) => projectHref(p.id)} empty={isPm ? 'Anda belum ditetapkan sebagai PM project mana pun.' : 'Belum ada project.'} pt={pt} />
             {rows.length > 0 ? (
               <TableView>
-                <ProgressTable rows={rows} hrefOf={(p) => projectHref(p.id)} />
+                <ProgressTable rows={rows} hrefOf={(p) => projectHref(p.id)} pt={pt} />
               </TableView>
             ) : null}
           </Card>
@@ -124,7 +126,7 @@ type StageRow = Awaited<ReturnType<typeof loadStageSet>>['stages'][number]
 
 export async function ProjectProgressView(props: AdminViewServerProps) {
   const req = props.initPageResult.req
-  if (!hasRole(req, ...READERS)) return <Denied props={props} title="Progress project" />
+  if (!hasRoleAny(req, ...READERS)) return <Denied props={props} title="Progress project" />
   const id = segmentId(props, 2)
   const d = await withReqTransaction(req, async () => {
     const project = id ? await requireVisibleProject(req, id).catch(() => null) : null
@@ -134,8 +136,8 @@ export async function ProjectProgressView(props: AdminViewServerProps) {
     const k09 = (await projectProgressVsBudget(req, await officeScope(req), { projectId: id, includeArchived: true })).projects[0]
     const reports = await listReports(req, { projectId: id, limit: 100 })
     const addenda = await listAddenda(req, { projectId: id, limit: 5 })
-    const teamPm = hasRole(req, 'pk-pm') && (await resolveScope(req)).teamProjects.includes(id)
-    const templates = hasRole(req, 'pk-owner')
+    const teamPm = hasRoleAny(req, 'pk-pm') && (await resolveScope(req)).teamProjects.includes(id)
+    const templates = hasRoleAny(req, 'pk-owner')
       ? ((await req.payload.find({ collection: 'stage-templates', where: { active: { equals: true } }, depth: 0, pagination: false, select: { name: true }, user: req.user, overrideAccess: false, req }).catch(() => ({ docs: [] }))).docs as Array<{ id: number; name: string }>)
       : []
     return { project: full, set, k09, reports: reports.items, addenda: addenda.items, teamPm, templates, tz: await tzOf(req) }
@@ -152,7 +154,7 @@ export async function ProjectProgressView(props: AdminViewServerProps) {
     )
   }
   const { project, set, k09, reports, addenda, teamPm, templates } = d
-  const owner = hasRole(req, 'pk-owner')
+  const owner = hasRoleAny(req, 'pk-owner')
   const canEdit = (owner || teamPm) && project.status !== 'arsip'
   const byStage = new Map<number, ReportDto[]>()
   for (const r of reports) byStage.set(r.stage.id, [...(byStage.get(r.stage.id) ?? []), r])
@@ -302,7 +304,7 @@ const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
 
 export async function ProgressReportList(props: AdminViewServerProps) {
   const req = props.initPageResult.req
-  if (!hasRole(req, ...READERS)) return <Denied props={props} title="Laporan progress" />
+  if (!hasRoleAny(req, ...READERS)) return <Denied props={props} title="Laporan progress" />
   const sp = (props.searchParams ?? {}) as Record<string, string | undefined>
   const num = (v: string | undefined) => (v && /^\d{1,10}$/.test(v) ? Number(v) : undefined)
   const q = { project: num(sp.project), stage: num(sp.tahap), from: sp.dari && DATE_RE.test(sp.dari) ? sp.dari : undefined, to: sp.sampai && DATE_RE.test(sp.sampai) ? sp.sampai : undefined, before: num(sp.sebelum) }
@@ -472,7 +474,7 @@ export async function ProgressReportList(props: AdminViewServerProps) {
 
 export async function ProgressReportDetail(props: AdminViewServerProps) {
   const req = props.initPageResult.req
-  if (!hasRole(req, ...READERS)) return <Denied props={props} title="Laporan progress" />
+  if (!hasRoleAny(req, ...READERS)) return <Denied props={props} title="Laporan progress" />
   const id = segmentId(props, 2)
   const d = await withReqTransaction(req, async () => {
     const doc = id ? await loadVisibleReport(req, id).catch(() => null) : null

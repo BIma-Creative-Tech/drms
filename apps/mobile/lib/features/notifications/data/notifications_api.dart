@@ -23,7 +23,9 @@ class NotificationsApi {
     },
   );
 
-  Future<void> markRead(int id) => client.run((d) => d.post<dynamic>('/notifications/$id/read'), (_) {});
+  /// One own row by id: independent of the PT switcher (MC3).
+  Future<void> markRead(int id) =>
+      client.run((d) => d.post<dynamic>('/notifications/$id/read', options: ApiClient.allCompanies()), (_) {});
 
   Future<void> markAllRead() => client.run((d) => d.post<dynamic>('/notifications/read-all'), (_) {});
 }

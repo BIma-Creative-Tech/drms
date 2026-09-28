@@ -8,9 +8,14 @@ import '../../../l10n/gen/app_localizations.dart';
 import '../../../shared/widgets/brand_mark.dart';
 import '../../../shared/widgets/module_tile.dart' show StagingBadge;
 import '../application/auth_controller.dart';
+import '../data/password_login_client.dart' show PasswordLoginError;
 
 /// Login. `PK_LOGIN_MODE=browser` (default): one button that opens the Keycloak page in a Custom Tab
 /// (AppAuth). `PK_LOGIN_MODE=password` (staging, ADR 0012): in-app username/password form, no browser.
+/// Optional 2FA (ADR 0017): Keycloak answers a missing/wrong authenticator code exactly like a wrong
+/// password, so after such a failure the form reveals the optional field "Kode autentikator (bila 2FA
+/// aktif)"; users without 2FA leave it empty (no `totp` is sent). The code is single-use: cleared after
+/// every attempt, never stored or logged.
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
 
@@ -26,13 +31,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _username = TextEditingController();
   final _password = TextEditingController();
   final _passwordFocus = FocusNode();
+  final _totp = TextEditingController();
+  final _totpFocus = FocusNode();
   bool _obscurePassword = true;
+  bool _showTotp = false;
 
   @override
   void dispose() {
     _username.dispose();
     _password.dispose();
     _passwordFocus.dispose();
+    _totp.dispose();
+    _totpFocus.dispose();
     super.dispose();
   }
 
@@ -66,17 +76,25 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       _busy = true;
       _error = null;
     });
+    final codeShown = _showTotp;
     final res = await ref
         .read(authControllerProvider.notifier)
-        .loginWithPassword(username: _username.text, password: _password.text);
+        .loginWithPassword(
+          username: _username.text,
+          password: _password.text,
+          totp: codeShown && _totp.text.isNotEmpty ? _totp.text : null,
+        );
     if (!mounted) return;
     // Let the platform password manager offer to save the credentials only after a successful login.
     if (res == null) TextInput.finishAutofillContext();
-    // The password never outlives the attempt, successful or not.
+    // The password and the (single-use) authenticator code never outlive the attempt.
     _password.clear();
+    _totp.clear();
+    final badCredentials = res == PasswordLoginError.invalidCredentials.message;
     setState(() {
       _busy = false;
-      _error = _messageFor(res, t);
+      _error = badCredentials && codeShown ? t.loginInvalidWithTotp : _messageFor(res, t);
+      if (badCredentials) _showTotp = true;
     });
   }
 
@@ -218,7 +236,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     enabled: !_busy,
                     obscureText: _obscurePassword,
                     keyboardType: TextInputType.visiblePassword,
-                    textInputAction: TextInputAction.done,
+                    textInputAction: _showTotp ? TextInputAction.next : TextInputAction.done,
                     autocorrect: false,
                     enableSuggestions: false,
                     autofillHints: const [AutofillHints.password],
@@ -234,9 +252,39 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     ),
                     validator: (v) => (v == null || v.isEmpty) ? t.loginPasswordRequired : null,
                     onFieldSubmitted: (_) {
-                      if (online) _submitPassword();
+                      if (_showTotp) {
+                        _totpFocus.requestFocus();
+                      } else if (online) {
+                        _submitPassword();
+                      }
                     },
                   ),
+                  if (_showTotp) ...[
+                    const SizedBox(height: 16),
+                    TextFormField(
+                      key: const Key('login-totp'),
+                      controller: _totp,
+                      focusNode: _totpFocus,
+                      enabled: !_busy,
+                      keyboardType: TextInputType.number,
+                      textInputAction: TextInputAction.done,
+                      autocorrect: false,
+                      enableSuggestions: false,
+                      maxLength: 6,
+                      autofillHints: const [AutofillHints.oneTimeCode],
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(6)],
+                      decoration: InputDecoration(
+                        labelText: t.loginTotpLabel,
+                        helperText: t.loginTotpHelper,
+                        helperMaxLines: 3,
+                        prefixIcon: const Icon(Icons.pin_outlined),
+                      ),
+                      validator: (v) => (v == null || v.isEmpty || v.length == 6) ? null : t.loginTotpInvalidLength,
+                      onFieldSubmitted: (_) {
+                        if (online) _submitPassword();
+                      },
+                    ),
+                  ],
                   if (_error != null) _errorText(context) else const SizedBox(height: 16),
                   _submitButton(t, online: online, onPressed: _submitPassword),
                   if (!online)

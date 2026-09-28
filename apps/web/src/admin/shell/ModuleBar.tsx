@@ -10,14 +10,18 @@ import React, { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef,
 import { Icon } from '@/admin/modules/Icon'
 import { activeHref, moduleForPath, profileHref, type ResolvedItem, type ResolvedModule, type ResolvedSection } from '@/admin/modules/registry'
 
+import type { SwitcherState } from './company-switcher'
+import { CompanySwitcher } from './CompanySwitcher'
 import { deriveCrumbs, type Crumb } from './crumbs'
 import type { NavUser } from './modules-server'
 
 /**
  * Odoo-style top bar (client). Left: launcher button (⊞ → /admin) + current module. Middle: the
  * module menu — an unlabelled section = plain links, a labelled section with several items = ▾
- * dropdown; the active entry carries an animated pill (motion layoutId). Right: bell (server node)
- * + avatar menu (profile & signature, light/dark theme, logout = the existing LogoutButton form).
+ * dropdown; the active entry carries an animated pill (motion layoutId). Right: PT switcher (MC2-4,
+ * ./CompanySwitcher.tsx), bell (server node)
+ * + avatar menu (profile & signature, account security / 2FA, light/dark theme, logout = the existing
+ * LogoutButton form).
  * Compact mode (≤ 768px OR the menu does not fit): ☰ opens a sheet with the whole module menu —
  * no horizontal scroll at 390px. Keyboard: ←/→/Home/End between top-level entries, ↓/Enter/Space
  * opens a dropdown, ↑/↓ inside, Esc closes and returns focus, visible focus rings (custom.scss),
@@ -25,7 +29,7 @@ import type { NavUser } from './modules-server'
  * Below the bar: the breadcrumb line (PageCrumbs) — only on pages that have crumbs.
  */
 
-type Props = { modules: ResolvedModule[]; user: NavUser; bell: React.ReactNode; logout: React.ReactNode }
+type Props = { modules: ResolvedModule[]; user: NavUser; companies?: SwitcherState; bell: React.ReactNode; logout: React.ReactNode }
 
 const EASE = [0.22, 1, 0.36, 1] as const
 const MENU_ANIM = {
@@ -220,6 +224,10 @@ function AvatarMenu({ user, logout, open, setOpen }: { user: NavUser; logout: Re
               <Icon name="userEdit" size={18} />
               <span className="pk-bar__label">Profil &amp; tanda tangan</span>
             </Link>
+            <Link href="/admin/keamanan-akun" className="pk-bar__menu-link" data-pk-nav-link="account-security" onClick={() => close(false)}>
+              <Icon name="shieldLock" size={18} />
+              <span className="pk-bar__label">Keamanan akun</span>
+            </Link>
             <button type="button" className="pk-bar__menu-link" onClick={() => setTheme(next)} data-pk-theme-toggle={next}>
               <Icon name={theme === 'dark' ? 'sun' : 'moon'} size={18} />
               <span className="pk-bar__label">{theme === 'dark' ? 'Tema terang' : 'Tema gelap'}</span>
@@ -384,7 +392,7 @@ function CrumbInner({ c }: { c: Crumb }) {
 
 // ------------------------------------------------------------------------------ bar
 
-export function ModuleBar({ modules, user, bell, logout }: Props) {
+export function ModuleBar({ modules, user, companies, bell, logout }: Props) {
   const pathname = usePathname() ?? '/admin'
   const modId = moduleForPath(pathname)
   const mod = useMemo(() => modules.find((m) => m.id === modId) ?? null, [modules, modId])
@@ -488,6 +496,7 @@ export function ModuleBar({ modules, user, bell, logout }: Props) {
         </div>
 
         <div className="pk-bar__end">
+          {companies ? <CompanySwitcher state={companies} compact={compact} open={openKey === 'company'} setOpen={(v) => setOpenKey(v ? 'company' : null)} /> : null}
           {bell}
           <AvatarMenu user={user} logout={logout} open={openKey === 'account'} setOpen={(v) => setOpenKey(v ? 'account' : null)} />
           {compact ? (

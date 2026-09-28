@@ -16,6 +16,8 @@ export const REMINDER_EVENTS: Record<ReminderRule, string> = {
 }
 
 export type ReminderSettings = {
+  /** PT of these settings (ADR 0016 §7; `reminder_runs` key). */
+  companyId: number
   enabled: boolean
   hour: number
   email: boolean
@@ -34,6 +36,7 @@ export function reminderSettingsOf(s: Record<string, unknown>, fallbackTz: strin
   const warn = typeof s.budgetWarnPct === 'number' && s.budgetWarnPct > 0 ? s.budgetWarnPct : 85
   const over = typeof s.budgetOverPct === 'number' && s.budgetOverPct > 0 ? s.budgetOverPct : 100
   return {
+    companyId: typeof s.companyId === 'number' ? s.companyId : typeof s.id === 'number' ? s.id : 0,
     enabled: bool(s.remindersEnabled, true),
     hour: int(s.reminderHour, 7, 0, 23),
     email: bool(s.reminderEmailEnabled, false),

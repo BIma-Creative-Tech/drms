@@ -14,7 +14,7 @@ import { buildSample } from '@/import/template'
 import { withSystemTransaction } from '@/lib/system-tx'
 
 import { api, makeFlowUser, type FlowUser } from './flow-world'
-import { auditRows, getTestPayload, sqlAs, sqlError } from './helpers'
+import { auditRows, companyId, getTestPayload, sqlAs, sqlError, updateCompany } from './helpers'
 
 /**
  * E11 go-live import against the throwaway DB. Test files share one DB (reset once per run), so the
@@ -53,21 +53,21 @@ const importAudits = () => count("SELECT count(*) AS n FROM audit_logs WHERE act
 
 beforeAll(async () => {
   const p = await getTestPayload()
-  await p.updateGlobal({ slug: 'company-settings', data: { shortCode: 'DRMS' }, overrideAccess: true /* SYSTEM-WRITE: fixture */ })
+  await updateCompany({ shortCode: 'DRMS' })
   for (const s of DEFAULT_SEQUENCES) {
-    const found = await p.find({ collection: 'document-sequences', where: { docType: { equals: s.docType } }, overrideAccess: true /* SYSTEM-READ */ })
+    const found = await p.find({ collection: 'document-sequences', where: { and: [{ company: { equals: await companyId() } }, { docType: { equals: s.docType } }] }, overrideAccess: true /* SYSTEM-READ */ })
     if (found.docs[0]) await p.update({ collection: 'document-sequences', id: found.docs[0].id, data: { ...s, active: true, changeReason: 'test fixture' }, overrideAccess: true /* SYSTEM-WRITE: fixture */ })
-    else await p.create({ collection: 'document-sequences', data: { ...s, timezone: 'Asia/Makassar' }, overrideAccess: true /* SYSTEM-WRITE: fixture */ })
+    else await p.create({ collection: 'document-sequences', data: { ...s, company: await companyId(), timezone: 'Asia/Makassar' }, overrideAccess: true /* SYSTEM-WRITE: fixture */ })
   }
-  const c = await sqlAs('app', "SELECT next_value FROM document_sequence_counters WHERE doc_type = 'expense_request' AND period_key = 'ALL'")
+  const c = await sqlAs('app', "SELECT next_value FROM document_sequence_counters WHERE company_id = $1 AND doc_type = 'expense_request' AND period_key = 'ALL'", [await companyId()])
   pbBefore = c.rows[0] ? Number(c.rows[0].next_value) : null
-  lockBefore = (await sqlAs('app', 'SELECT pk_cash_lock_date()::text AS d')).rows[0].d
+  lockBefore = (await sqlAs('app', 'SELECT pk_cash_lock_date($1::integer)::text AS d', [await companyId()])).rows[0].d // ADR 0016: lock date per PT
   finance = await makeFlowUser(['pk-finance'], 'impor-finance', null, { signature: false })
 })
 
 afterAll(async () => {
   const p = await getTestPayload()
-  const seq = await p.find({ collection: 'document-sequences', where: { docType: { equals: 'expense_request' } }, overrideAccess: true /* SYSTEM-READ */ })
+  const seq = await p.find({ collection: 'document-sequences', where: { and: [{ company: { equals: await companyId() } }, { docType: { equals: 'expense_request' } }] }, overrideAccess: true /* SYSTEM-READ */ })
   if (seq.docs[0]) await p.update({ collection: 'document-sequences', id: seq.docs[0].id, data: { startAt: 229, changeReason: 'uji impor selesai' }, overrideAccess: true /* SYSTEM-WRITE: restore */ })
   await p.destroy()
 })
@@ -125,9 +125,10 @@ describe('E11 go-live import (dry-run → commit → idempotent re-run)', () => 
       banks: 1,
       clients: 1,
     })
-    const candra = (await sqlAs('app', "SELECT id, keycloak_sub, employee_id FROM users WHERE email = 'candra@drms-contoh.test'")).rows[0]
+    const candra = (await sqlAs('app', "SELECT u.id, u.keycloak_sub, m.employee_id FROM users u LEFT JOIN company_memberships m ON m.user_id = u.id WHERE u.email = 'candra@drms-contoh.test'")).rows[0]
     expect(candra.keycloak_sub).toBe(subs.get('candra.contoh'))
-    const roles = (await sqlAs('app', 'SELECT value::text AS value FROM users_roles WHERE parent_id = $1', [candra.id])).rows.map((x) => x.value).sort()
+    // ADR 0016: roles + employee = membership of the PT
+    const roles = (await sqlAs('app', 'SELECT r.value::text AS value FROM company_memberships m JOIN company_memberships_roles r ON r.parent_id = m.id WHERE m.user_id = $1', [candra.id])).rows.map((x) => x.value).sort()
     expect(roles).toEqual(['pk-pm', 'pk-staff'])
     const prj = (await sqlAs('app', "SELECT pm_id, budget::bigint AS budget, lat, radius_m, status, start_date FROM projects WHERE code = 'CTH-PRJ-01'")).rows[0]
     expect(prj).toMatchObject({ pm_id: candra.id, budget: '250000000', status: 'berjalan' })
@@ -182,19 +183,21 @@ describe('E11 go-live import (dry-run → commit → idempotent re-run)', () => 
 
   it('first PB number after cut-over = 229/PB-DRMS/<DD>/<MM>/<YYYY> (counter continues if numbers were already issued)', async () => {
     const p = await getTestPayload()
-    const a = await withSystemTransaction(p, null, (req: PayloadRequest) => allocateDocNo(req, 'expense_request', { date: parseBusinessDate(GO_LIVE), docId: 'impor-golive-pb' }))
+    const cid = await companyId()
+    const a = await withSystemTransaction(p, null, (req: PayloadRequest) => allocateDocNo(req, 'expense_request', { companyId: cid, date: parseBusinessDate(GO_LIVE), docId: 'impor-golive-pb' }))
     const expected = pbBefore === null || pbBefore <= 229 ? 229 : pbBefore
     expect(a.docNo).toBe(`${expected}/PB-DRMS/01/II/2020`)
     if (pbBefore === null) expect(a.docNo).toBe('229/PB-DRMS/01/II/2020')
   })
 
   it('PB start is configurable in the workbook: counter raised (only upward), audited', async () => {
-    const cur = Number((await sqlAs('app', "SELECT next_value FROM document_sequence_counters WHERE doc_type = 'expense_request' AND period_key = 'ALL'")).rows[0].next_value)
+    const cur = Number((await sqlAs('app', "SELECT next_value FROM document_sequence_counters WHERE company_id = $1 AND doc_type = 'expense_request' AND period_key = 'ALL'", [await companyId()])).rows[0].next_value)
     const target = cur + 1000
     const r = await run('commit', buildSample({ settings: { ...settings, nomor_pb_mulai: target } }))
     expect(r.ok).toBe(true)
     expect(r.cutover).toMatchObject({ pbCounterBefore: cur, pbCounterAfter: target, firstPbNumber: `${target}/PB-DRMS/01/II/2020` })
-    const a = await withSystemTransaction(await getTestPayload(), null, (req) => allocateDocNo(req, 'expense_request', { date: parseBusinessDate('2020-02-03') }))
+    const cid = await companyId()
+    const a = await withSystemTransaction(await getTestPayload(), null, (req) => allocateDocNo(req, 'expense_request', { companyId: cid, date: parseBusinessDate('2020-02-03') }))
     expect(a.seq).toBe(target)
     const au = await sqlAs('app', "SELECT old_value, new_value FROM audit_logs WHERE doc_type = 'document_sequence' AND field = 'nextValue' ORDER BY id DESC LIMIT 1")
     expect(au.rows[0]).toEqual({ old_value: { v: cur }, new_value: { v: target } })
@@ -264,13 +267,15 @@ describe('E11 go-live import (dry-run → commit → idempotent re-run)', () => 
 describe('E11 opening balance lock + go-live date guard (ADR 0005 As implemented S3b)', () => {
   it('after a period on/after the opening date is closed, the opening balance is locked (hook 409, DB trigger, import dry-run error)', async () => {
     const p = await getTestPayload()
-    const acc = (await sqlAs('app', "SELECT id FROM cash_accounts WHERE name = 'Kas Kecil Contoh (FIKTIF)'")).rows[0].id
-    const closedLater = await count("SELECT count(*) AS n FROM period_closings WHERE status = 'closed' AND period >= '2020-02'")
+    const accRow = (await sqlAs('app', "SELECT id, company_id FROM cash_accounts WHERE name = 'Kas Kecil Contoh (FIKTIF)'")).rows[0]
+    const acc = accRow.id
+    // ADR 0016 §4: the lock is per PT — only a closing of the ACCOUNT's PT counts (mc2-isolation closes other PTs)
+    const closedLater = Number((await sqlAs('app', "SELECT count(*) AS n FROM period_closings WHERE status = 'closed' AND period >= '2020-02' AND company_id = $1", [accRow.company_id])).rows[0].n)
     if (closedLater === 0) {
       // before the close: Finance may still correct it (reason required)
       await p.update({ collection: 'cash-accounts', id: acc, data: { openingBalance: 5000001, changeReason: 'koreksi uji' }, overrideAccess: true /* SYSTEM-WRITE: test */ })
       await p.update({ collection: 'cash-accounts', id: acc, data: { openingBalance: 5000000, changeReason: 'koreksi uji kembali' }, overrideAccess: true /* SYSTEM-WRITE: test */ })
-      await withSystemTransaction(p, null, (req) => p.create({ collection: 'period-closings', data: { period: '2020-02', status: 'closed', note: 'uji kunci saldo awal' }, overrideAccess: true /* SYSTEM-WRITE: test */, req }))
+      await withSystemTransaction(p, null, (req) => p.create({ collection: 'period-closings', data: { company: accRow.company_id, period: '2020-02', status: 'closed', note: 'uji kunci saldo awal' }, overrideAccess: true /* SYSTEM-WRITE: test */, req }))
     } // else: another file (shared DB) already closed a month after the go-live date → already locked
     await expect(p.update({ collection: 'cash-accounts', id: acc, data: { openingBalance: 1, changeReason: 'tidak boleh' }, overrideAccess: true /* SYSTEM-WRITE: test */ })).rejects.toThrow(/Saldo awal terkunci: periode \d{4}-\d{2} sudah ditutup/)
     const db = await sqlError('app', 'UPDATE cash_accounts SET opening_balance = 1 WHERE id = $1', [acc])

@@ -13,7 +13,8 @@ name: ci
 on:
   push:
     # ci/ghcr-*: throwaway branches to test the GHCR publish (images tagged test-<sha7> only).
-    branches: [main, develop, "feat/**", "fix/**", "ci/ghcr-*"]
+    # feat/** and fix/** run via pull_request only (a push + PR used to run the whole pipeline twice).
+    branches: [main, develop, "ci/ghcr-*"]
     # Release tags vX.Y.Z → images X.Y.Z (prod). mobile-v* tags belong to mobile.yml.
     tags: ["v*.*.*"]
   pull_request:
@@ -33,14 +34,16 @@ env:
 jobs:
   verify:
     name: lint · typecheck · unit + coverage · openapi drift
-    runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '"ubuntu-24.04"') }}
+    timeout-minutes: 30 # self-hosted = 2 vCPU
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: npm
+          # GitHub cache on GitHub-hosted only; self-hosted: npm_config_cache is a persistent dir of the runner image.
+          cache: ${{ runner.environment == 'github-hosted' && 'npm' || '' }}
+          package-manager-cache: ${{ runner.environment == 'github-hosted' }}
       - run: npm ci --no-audit --no-fund
       - run: npm run lint
       - run: npm run typecheck
@@ -53,8 +56,8 @@ jobs:
 
   integration:
     name: integration (throwaway Postgres, migrations as owner, tests as app role)
-    runs-on: ubuntu-24.04
-    timeout-minutes: 25
+    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '"ubuntu-24.04"') }}
+    timeout-minutes: 40 # self-hosted = 2 vCPU
     services:
       postgres:
         image: postgres:16.15-bookworm@sha256:efedf3595f1d6f415c08568ba171029bf54052e754cc9f030e3f2412b21f3d67
@@ -68,7 +71,9 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: npm
+          # GitHub cache on GitHub-hosted only; self-hosted: npm_config_cache is a persistent dir of the runner image.
+          cache: ${{ runner.environment == 'github-hosted' && 'npm' || '' }}
+          package-manager-cache: ${{ runner.environment == 'github-hosted' }}
       - run: npm ci --no-audit --no-fund
       - name: Throwaway role passwords
         run: |
@@ -112,8 +117,8 @@ jobs:
 
   security:
     name: gitleaks · semgrep · trivy fs · hadolint
-    runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '"ubuntu-24.04"') }}
+    timeout-minutes: 30 # self-hosted = 2 vCPU
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -144,8 +149,8 @@ jobs:
   image:
     name: image build (runner + migrate) · trivy · GHCR push
     needs: [verify, integration, security]
-    runs-on: ubuntu-24.04
-    timeout-minutes: 45
+    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '"ubuntu-24.04"') }}
+    timeout-minutes: 75 # self-hosted = 2 vCPU; release tags build without cache
     permissions:
       contents: read
       packages: write # GHCR push with GITHUB_TOKEN (read-only on fork PRs; push steps are skipped there)
@@ -164,10 +169,11 @@ jobs:
         env:
           REF: ${{ github.ref }}
           EVENT: ${{ github.event_name }}
+          RUNNER_ENV: ${{ runner.environment }}
         run: |
           set -euo pipefail
           sha7="${GITHUB_SHA::7}"
-          pkg="$(node -p "require('./package.json').version")"
+          pkg="$(jq -r .version package.json)" # jq: node is not on PATH in the self-hosted runner image
           publish=false; tags=""; version="$pkg-dev-$sha7"
           if [[ "$EVENT" == "push" ]]; then
             case "$REF" in
@@ -185,6 +191,24 @@ jobs:
                 publish=true; tags="test-$sha7"; version="test-$sha7" ;;
             esac
           fi
+          # Build cache (plan 12 §4/§7): release tags vX.Y.Z → no cache at all (reproducible, no stale/poisoned layers).
+          # GitHub-hosted → type=gha. Self-hosted → none here; the buildx `docker` driver uses the runner's own dockerd
+          # layer cache (persistent /srv/ci/docker).
+          no_cache=false; gha=false
+          if [[ "$EVENT" == "push" && "$REF" == refs/tags/v* ]]; then no_cache=true
+          elif [[ "$RUNNER_ENV" == "github-hosted" ]]; then gha=true; fi
+          {
+            echo "no_cache=$no_cache"
+            for name in web migrate; do
+              other=migrate; [[ $name == migrate ]] && other=web
+              if [[ $gha == true ]]; then
+                printf '%s_cache_from<<EOF_CACHE\ntype=gha,scope=pk-%s\ntype=gha,scope=pk-%s\nEOF_CACHE\n' "$name" "$name" "$other"
+                echo "${name}_cache_to=type=gha,mode=max,scope=pk-$name"
+              else
+                echo "${name}_cache_from="; echo "${name}_cache_to="
+              fi
+            done
+          } >> "$GITHUB_OUTPUT"
           {
             echo "publish=$publish"
             echo "tags=$tags"
@@ -211,9 +235,35 @@ jobs:
               echo "EOF_LABELS"
             done
           } >> "$GITHUB_OUTPUT"
-          echo "publish=$publish tags=[$tags] version=$version"
+          echo "publish=$publish tags=[$tags] version=$version no_cache=$no_cache gha_cache=$gha runner=$RUNNER_ENV"
 
+      # Self-hosted, local-only builds: buildx `docker` driver = BuildKit of the job's own (inner) dockerd, its layer
+      # cache persists on the runner (needs the containerd image store, default for a fresh Docker 29 daemon).
+      # Publishing runs ALWAYS use docker-container: the docker driver cannot push-by-digest ("push-by-digest is
+      # currently not implemented for docker driver", infra plan 12 R10 F2, run 36409822758).
+      - name: Buildx driver
+        id: bx
+        env:
+          RUNNER_ENV: ${{ runner.environment }}
+          PUBLISH: ${{ steps.meta.outputs.publish }}
+        run: |
+          driver=docker-container
+          if [[ "$RUNNER_ENV" == "self-hosted" && "$PUBLISH" != "true" ]]; then
+            if docker info --format '{{json .DriverStatus}}' | grep -q 'io.containerd.snapshotter'; then
+              driver=docker
+            else
+              echo "::warning::inner dockerd without the containerd image store → buildx docker-container (no layer cache)"
+            fi
+          fi
+          echo "driver=$driver" | tee -a "$GITHUB_OUTPUT"
+      # Self-hosted (sysbox): buildkitd in docker-container would start every RUN step in a nested pid namespace, where
+      # sysbox-fs 0.7.1 leaks an unreaped helper → the build hangs forever (plan 12 R10, publishing run of 47ac6cd).
+      # --oci-worker-no-process-sandbox keeps RUN steps in buildkitd's own pid ns; the job container is already the
+      # sandbox. GitHub-hosted keeps the action's default flags.
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+        with:
+          driver: ${{ steps.bx.outputs.driver }}
+          buildkitd-flags: ${{ runner.environment == 'self-hosted' && '--oci-worker-no-process-sandbox' || '--allow-insecure-entitlement security.insecure --allow-insecure-entitlement network.host' }}
 
       # Build ONCE per target. Publishing runs push an UNTAGGED manifest (push-by-digest); Trivy scans exactly that
       # digest; only a passing digest gets tags (imagetools create). Nothing tagged is ever unscanned.
@@ -252,10 +302,9 @@ jobs:
           provenance: false
           tags: proyekkas-web:ci
           labels: ${{ steps.meta.outputs.web_labels }}
-          cache-from: |
-            type=gha,scope=pk-web
-            type=gha,scope=pk-migrate
-          cache-to: type=gha,mode=max,scope=pk-web
+          no-cache: ${{ steps.meta.outputs.no_cache == 'true' }}
+          cache-from: ${{ steps.meta.outputs.web_cache_from }}
+          cache-to: ${{ steps.meta.outputs.web_cache_to }}
       - name: Build migrate target → local
         if: steps.meta.outputs.publish != 'true'
         id: migrate-local
@@ -271,10 +320,9 @@ jobs:
           provenance: false
           tags: proyekkas-migrate:ci
           labels: ${{ steps.meta.outputs.migrate_labels }}
-          cache-from: |
-            type=gha,scope=pk-migrate
-            type=gha,scope=pk-web
-          cache-to: type=gha,mode=max,scope=pk-migrate
+          no-cache: ${{ steps.meta.outputs.no_cache == 'true' }}
+          cache-from: ${{ steps.meta.outputs.migrate_cache_from }}
+          cache-to: ${{ steps.meta.outputs.migrate_cache_to }}
 
       - name: Build web (runner target) → GHCR by digest (untagged) + SBOM + provenance
         if: steps.meta.outputs.publish == 'true'
@@ -291,10 +339,9 @@ jobs:
           sbom: true
           provenance: mode=max
           labels: ${{ steps.meta.outputs.web_labels }}
-          cache-from: |
-            type=gha,scope=pk-web
-            type=gha,scope=pk-migrate
-          cache-to: type=gha,mode=max,scope=pk-web
+          no-cache: ${{ steps.meta.outputs.no_cache == 'true' }}
+          cache-from: ${{ steps.meta.outputs.web_cache_from }}
+          cache-to: ${{ steps.meta.outputs.web_cache_to }}
       - name: Build migrate target → GHCR by digest (untagged) + SBOM + provenance
         if: steps.meta.outputs.publish == 'true'
         id: migrate-push
@@ -310,10 +357,9 @@ jobs:
           sbom: true
           provenance: mode=max
           labels: ${{ steps.meta.outputs.migrate_labels }}
-          cache-from: |
-            type=gha,scope=pk-migrate
-            type=gha,scope=pk-web
-          cache-to: type=gha,mode=max,scope=pk-migrate
+          no-cache: ${{ steps.meta.outputs.no_cache == 'true' }}
+          cache-from: ${{ steps.meta.outputs.migrate_cache_from }}
+          cache-to: ${{ steps.meta.outputs.migrate_cache_to }}
 
       - name: Scan targets
         id: scan
@@ -339,7 +385,10 @@ jobs:
           TRIVY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          mkdir -p "$RUNNER_TEMP/trivy-cache"
+          # Self-hosted: persistent TRIVY_CACHE_DIR from the runner image (outside _work — Trivy writes it as root,
+          # which the runner could not clean from _temp). GitHub-hosted: per-job dir as before.
+          tcache="${TRIVY_CACHE_DIR:-$RUNNER_TEMP/trivy-cache}"
+          mkdir -p "$tcache"
           {
             echo "### Trivy image scan (trivy 0.74.0)"
             echo "| image | CRITICAL fixable | CRITICAL unfixed | HIGH fixable | HIGH unfixed |"
@@ -349,7 +398,7 @@ jobs:
             ref="WEB_REF"; [[ $name == migrate ]] && ref="MIGRATE_REF"; img="${!ref}"
             out="$RUNNER_TEMP/trivy-$name.json"
             docker run --rm -e TRIVY_USERNAME -e TRIVY_PASSWORD \
-              -v /var/run/docker.sock:/var/run/docker.sock:ro -v "$RUNNER_TEMP/trivy-cache:/root/.cache/trivy" \
+              -v /var/run/docker.sock:/var/run/docker.sock:ro -v "$tcache:/root/.cache/trivy" \
               "$TRIVY_IMAGE" image --quiet --platform linux/amd64 --severity HIGH,CRITICAL --exit-code 0 --format json "$img" > "$out"
             jq -r '[.Results[]?.Vulnerabilities[]?] | "  \(length) HIGH/CRITICAL:", (.[] | "  \(.Severity) \(.PkgName) \(.InstalledVersion) \(.VulnerabilityID) fixed=\(.FixedVersion // "-")")' "$out"
             jq -r --arg img "$img" '[.Results[]?.Vulnerabilities[]?] as $v
@@ -364,9 +413,11 @@ jobs:
           TRIVY_USERNAME: ${{ github.actor }}
           TRIVY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          tcache="${TRIVY_CACHE_DIR:-$RUNNER_TEMP/trivy-cache}"
+          mkdir -p "$tcache"
           for img in "$WEB_REF" "$MIGRATE_REF"; do
             docker run --rm -e TRIVY_USERNAME -e TRIVY_PASSWORD \
-              -v /var/run/docker.sock:/var/run/docker.sock:ro -v "$RUNNER_TEMP/trivy-cache:/root/.cache/trivy" \
+              -v /var/run/docker.sock:/var/run/docker.sock:ro -v "$tcache:/root/.cache/trivy" \
               "$TRIVY_IMAGE" image --quiet --platform linux/amd64 --severity CRITICAL --exit-code 1 --ignore-unfixed "$img"
           done
 

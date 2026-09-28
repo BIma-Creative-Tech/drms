@@ -2,7 +2,8 @@ import { sql } from '@payloadcms/db-postgres'
 import { APIError, ValidationError, type PayloadRequest } from 'payload'
 import type { z } from 'zod'
 
-import { hasRole, relId, userId } from '@/access/roles'
+import { companyContextOf, employeeIn, hasRole, relId, userId, withCompanyContext, type CompanyContext, type Membership } from '@/access/roles'
+import { companyOf } from '@/domain/companies'
 import {
   SyncAttendancePayload,
   SyncDraftDeletePayload,
@@ -31,6 +32,18 @@ import { attendanceTimeOf, employeeOfUser } from './attendance'
 import { judgeTime, type TimeVerdict } from './clock'
 import { applyProgressReport, ProgressSyncReject } from './progress'
 
+/**
+ * MC3-1 (ADR 0016 §8): every item is processed under ITS PT = `company_id` of the item (new APK), or
+ * — for items WITHOUT `company_id` (released APK mobile-v0.2.0) — the caller's only active
+ * membership; a caller with several PTs gets 409 `COMPANY_REQUIRED` for such a batch (nothing
+ * processed, see processBatch). Per item: `company_id` must be an active membership of the caller
+ * (else `COMPANY_NOT_ALLOWED`), the PT derived server-side from the references (project / cost
+ * center / existing draft or report) must equal it (else `COMPANY_MISMATCH`); the domain services
+ * check the role IN that PT (progress: PM/Direktur, on-behalf: PM → `FORBIDDEN`). The request's read selection
+ * (`X-Company-Ids`) does not matter: the item runs with the selection narrowed to its PT (drafts
+ * without project/cost center get that PT), feature flags and the timezone are that PT's, the own
+ * employee is the membership employee of that PT. Idempotency (client_uuid) is unchanged.
+ */
 /**
  * POST /api/v1/sync/batch — offline queue replay (ADR 0010 "Sync contract").
  *
@@ -86,8 +99,76 @@ type Outcome = {
 
 type ItemCtx = { req: PayloadRequest; uid: number; item: SyncItemIn }
 
-/** Server switches + company timezone, read once per batch. */
+/** Server switches + company timezone of one PT (cached per batch). */
 type Features = { drafts: boolean; attendance: boolean; progress: boolean; timezone: string }
+
+async function featuresOf(req: PayloadRequest, companyId?: number | null): Promise<Features> {
+  const s = (await settings(req, companyId)) as { syncExpenseDraftsEnabled?: boolean | null; syncAttendanceEnabled?: boolean | null; syncProgressReportsEnabled?: boolean | null; timezone?: string | null }
+  return {
+    drafts: s.syncExpenseDraftsEnabled !== false,
+    attendance: s.syncAttendanceEnabled === true,
+    progress: s.syncProgressReportsEnabled !== false,
+    timezone: s.timezone || DEFAULT_TZ,
+  }
+}
+
+const posId = (v: unknown): number | undefined => (typeof v === 'number' && Number.isSafeInteger(v) && v > 0 ? v : undefined)
+
+/** PT of an item from its references (null = nothing to derive it from, e.g. an invalid payload). */
+export async function itemCompany(req: PayloadRequest, item: SyncItemIn): Promise<number | null> {
+  const p = (item.payload && typeof item.payload === 'object' ? item.payload : {}) as Record<string, unknown>
+  const pid = posId(p.project_id)
+  if (pid !== undefined) return (await companyOf(req, 'projects', pid)) ?? null
+  const cc = posId(p.cost_center_id)
+  if (cc !== undefined) return (await companyOf(req, 'cost-centers', cc)) ?? null
+  const byUuid = async (collection: 'expense-requests' | 'progress-reports', uuid: unknown): Promise<number | null> => {
+    if (typeof uuid !== 'string' || !/^[0-9a-f-]{36}$/i.test(uuid)) return null
+    const r = await req.payload.find({ collection, where: { clientUuid: { equals: uuid } }, depth: 0, limit: 1, pagination: false, overrideAccess: true /* SYSTEM-READ: PT of an offline id */, req })
+    return relId((r.docs[0] as { company?: unknown } | undefined)?.company) ?? null
+  }
+  if (item.type === 'expense_request.draft_upsert' || item.type === 'expense_request.draft_delete') {
+    const rid = posId(p.request_id)
+    if (rid !== undefined) return (await companyOf(req, 'expense-requests', rid)) ?? null
+    return byUuid('expense-requests', p.draft_client_uuid ?? (item.type === 'expense_request.draft_upsert' ? item.client_uuid : undefined))
+  }
+  if (item.type === 'progress_report.draft_upsert') {
+    const rid = posId(p.report_id)
+    if (rid !== undefined) return (await companyOf(req, 'progress-reports', rid)) ?? null
+    return byUuid('progress-reports', p.report_client_uuid ?? item.client_uuid)
+  }
+  return null
+}
+
+/** Request caches that depend on the read selection (cleared when an item narrows the selection). */
+const SELECTION_CACHES = ['pkScope', 'pkMediaOffice', 'pkVisibleRequestIds', 'pkVisibleProgressReportIds', 'pkVisibleAddendumIds', 'pkReportCtx', 'pkCompanyCtx']
+
+function clearSelectionCaches(req: PayloadRequest): void {
+  if (!req.context) return
+  for (const k of SELECTION_CACHES) delete req.context[k]
+}
+
+/**
+ * Runs `fn` with the request's read selection narrowed to `company` (ADR 0016 §8: the item is
+ * processed under its own PT, whatever `X-Company-Ids` said). `company` must be a membership.
+ */
+async function underCompany<T>(req: PayloadRequest, company: number, fn: () => Promise<T>): Promise<T> {
+  const original = req.user
+  const ctx = companyContextOf(original) as CompanyContext
+  clearSelectionCaches(req)
+  req.user = withCompanyContext(original as object, ctx.memberships, [company], ctx.groupAdmin) as unknown as PayloadRequest['user']
+  try {
+    return await fn()
+  } finally {
+    req.user = original
+    clearSelectionCaches(req)
+  }
+}
+
+/** PT an item is processed under: its `company_id`, else the only membership (legacy APK), else null. */
+function declaredCompany(item: SyncItemIn, memberships: readonly Membership[]): number | null {
+  if (typeof item.company_id === 'number') return item.company_id
+  return memberships.length === 1 ? memberships[0]!.company : null
+}
 
 const UNSUPPORTED: ReadonlySet<SyncItemType> = new Set<SyncItemType>([])
 const ATTENDANCE: ReadonlySet<SyncItemType> = new Set<SyncItemType>(['attendance.check_in', 'attendance.check_out', 'attendance.on_behalf'])
@@ -411,17 +492,20 @@ async function applyAttendance(c: ItemCtx, verdict: TimeVerdict, receivedAt: Dat
   const { req, uid, item } = c
   const onBehalf = item.type === 'attendance.on_behalf'
   const p = onBehalf ? parsePayload(SyncOnBehalfPayload, item.payload) : parsePayload(SyncAttendancePayload, item.payload)
-  const own = await employeeOfUser(req, uid)
+  // ADR 0016 D1: the caller's employee IN THE LOCATION's PT (one employee per PT)
+  const locCompany = await companyOf(req, p.project_id !== undefined ? 'projects' : 'cost-centers', p.project_id ?? p.cost_center_id!)
+  const own = locCompany !== undefined ? employeeIn(req, locCompany) : await employeeOfUser(req, uid)
   let employee: number
   let user: number | null
   if (onBehalf) {
     const ob = p as SyncOnBehalf
     // US-14: "diabsenkan oleh PM" — requirements §4 "Absensi": PM C (atas nama tim). Not an approval
     // (ADR 0013 covers expense decisions only), so the PM keeps this right.
-    if (!hasRole(req, 'pk-pm')) reject('FORBIDDEN', 'Hanya PM yang dapat mengabsenkan anggota tim.')
+    if (!hasRole(req, 'pk-pm', locCompany)) reject('FORBIDDEN', 'Hanya PM yang dapat mengabsenkan anggota tim.')
     if (own !== undefined && own === ob.employee_id) reject('FORBIDDEN', 'Absensi Anda sendiri dicatat lewat absen masuk/pulang biasa.', 'payload.employee_id')
-    const emp = (await req.payload.findByID({ collection: 'employees', id: ob.employee_id, depth: 0, overrideAccess: true /* SYSTEM-READ: target employee of on-behalf */, req, disableErrors: true })) as { active?: boolean | null } | null
+    const emp = (await req.payload.findByID({ collection: 'employees', id: ob.employee_id, depth: 0, overrideAccess: true /* SYSTEM-READ: target employee of on-behalf */, req, disableErrors: true })) as { active?: boolean | null; company?: unknown } | null
     if (!emp) reject('NOT_FOUND', 'Karyawan tidak ditemukan.', 'payload.employee_id')
+    if (relId(emp!.company) !== locCompany) reject('COMPANY_MISMATCH', 'Karyawan dan lokasi berada di PT yang berbeda.', 'payload.employee_id')
     if (emp!.active === false) reject('VALIDATION', 'Karyawan sudah nonaktif.', 'payload.employee_id')
     employee = ob.employee_id
     user = await userOfEmployee(req, employee)
@@ -480,7 +564,7 @@ async function lockItem(req: PayloadRequest, clientUuid: string): Promise<void> 
   await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${`sync:${clientUuid}`}, 0))`)
 }
 
-async function store(c: ItemCtx, batch: SyncBatchIn, deviceId: string, verdict: TimeVerdict, result: SyncResultOut): Promise<void> {
+async function store(c: ItemCtx, batch: SyncBatchIn, deviceId: string, verdict: TimeVerdict, result: SyncResultOut, companyId: number | null): Promise<void> {
   const { req, uid, item } = c
   const tx = await getRequestTx(req)
   await tx.execute(sql`
@@ -508,6 +592,7 @@ async function store(c: ItemCtx, batch: SyncBatchIn, deviceId: string, verdict: 
         errors: result.errors.map((e) => e.code),
       },
       deviceTime: item.device_time,
+      companyId, // MC3: audit row tagged with the item's PT
     },
   ])
 }
@@ -593,7 +678,7 @@ function duplicateOf(stored: StoredRow, uid: number, fallback: SyncResultOut): S
   return { ...stored.result, status: 'duplicate', original_status: stored.status }
 }
 
-async function processItem(req: PayloadRequest, batch: SyncBatchIn, deviceId: string, uid: number, item: SyncItemIn, features: Features): Promise<SyncResultOut> {
+async function processItem(req: PayloadRequest, batch: SyncBatchIn, deviceId: string, uid: number, item: SyncItemIn, memberships: readonly Membership[]): Promise<SyncResultOut> {
   const receivedAt = new Date()
   const verdict = judgeTime(item, batch.clock, receivedAt)
   const base = baseResult(item, receivedAt, verdict)
@@ -601,11 +686,27 @@ async function processItem(req: PayloadRequest, batch: SyncBatchIn, deviceId: st
     return { ...base, status: 'unsupported', errors: [{ code: 'UNSUPPORTED', message: 'Jenis data ini belum didukung server; tetap simpan di antrean.' }] }
   }
   const c: ItemCtx = { req, uid, item }
+  // processBatch refused legacy items of multi-PT callers (409), so `declared` is null only for a
+  // caller without any membership; such an item is rejected below.
+  const declared = declaredCompany(item, memberships)
+  const member = declared !== null && memberships.some((m) => m.company === declared)
+  const withPt: SyncResultOut = { ...base, company_id: member ? declared : null }
+  const run = <T,>(fn: () => Promise<T>): Promise<T> => (member ? underCompany(req, declared!, fn) : fn())
+  return run(() => processOwn(c, batch, deviceId, verdict, withPt, receivedAt, declared, member))
+}
+
+async function processOwn(c: ItemCtx, batch: SyncBatchIn, deviceId: string, verdict: TimeVerdict, base: SyncResultOut, receivedAt: Date, declared: number | null, member: boolean): Promise<SyncResultOut> {
+  const { req, uid, item } = c
   try {
     return await withReqTransaction(req, async () => {
       await lockItem(req, item.client_uuid)
       const stored = await readStored(req, item.client_uuid)
       if (stored) return duplicateOf(stored, uid, base)
+      // ADR 0016 §8 / MC3-1: the item's PT = company_id (membership), = the PT of its references
+      if (!member) reject('COMPANY_NOT_ALLOWED', 'PT data ini bukan PT Anda.', 'company_id')
+      const company = await itemCompany(req, item)
+      if (company !== null && company !== declared) reject('COMPANY_MISMATCH', 'Data ini milik PT lain dari company_id item ini.', typeof item.company_id === 'number' ? 'company_id' : 'payload')
+      const features = await featuresOf(req, declared!)
       const isAttendance = ATTENDANCE.has(item.type)
       const isProgress = item.type === 'progress_report.draft_upsert'
       if (isAttendance && !features.attendance) reject('FEATURE_DISABLED', 'Absensi dari aplikasi belum diaktifkan server (Setting perusahaan).')
@@ -624,7 +725,7 @@ async function processItem(req: PayloadRequest, batch: SyncBatchIn, deviceId: st
           server_copy: null,
           server_report: po.copy,
         }
-        await store(c, batch, deviceId, verdict, result)
+        await store(c, batch, deviceId, verdict, result, declared)
         return result
       }
       const out = isAttendance
@@ -641,7 +742,7 @@ async function processItem(req: PayloadRequest, batch: SyncBatchIn, deviceId: st
         errors: out.errors,
         server_copy: out.copy,
       }
-      await store(c, batch, deviceId, verdict, result)
+      await store(c, batch, deviceId, verdict, result, declared)
       return result
     })
   } catch (err) {
@@ -666,25 +767,31 @@ async function processItem(req: PayloadRequest, batch: SyncBatchIn, deviceId: st
       await lockItem(req, item.client_uuid)
       const stored = await readStored(req, item.client_uuid)
       if (stored) return duplicateOf(stored, uid, base)
-      await store(c, batch, deviceId, verdict, rejected)
+      await store(c, batch, deviceId, verdict, rejected, member ? declared : null)
       return rejected
     })
+  }
+}
+
+/** 409 of a batch with items WITHOUT `company_id` from a caller with ≠ 1 PT (MC3-1, released APK). */
+export class CompanyRequiredError extends Error {
+  constructor(readonly indexes: number[]) {
+    super('COMPANY_REQUIRED')
   }
 }
 
 export async function processBatch(req: PayloadRequest, batch: SyncBatchIn, deviceId: string) {
   const uid = userId(req)
   if (uid === undefined) throw new APIError('Unauthorized', 401)
-  const s = (await settings(req)) as { syncExpenseDraftsEnabled?: boolean | null; syncAttendanceEnabled?: boolean | null; syncProgressReportsEnabled?: boolean | null; timezone?: string | null }
-  const features: Features = {
-    drafts: s.syncExpenseDraftsEnabled !== false,
-    attendance: s.syncAttendanceEnabled === true,
-    progress: s.syncProgressReportsEnabled !== false,
-    timezone: s.timezone || DEFAULT_TZ,
+  const memberships = companyContextOf(req.user)?.memberships ?? []
+  // MC3-1: an item without company_id is only unambiguous for a caller with exactly one PT
+  if (memberships.length !== 1) {
+    const legacy = batch.items.flatMap((it, i) => (typeof it.company_id === 'number' ? [] : [i]))
+    if (legacy.length > 0) throw new CompanyRequiredError(legacy)
   }
   const results: SyncResultOut[] = []
   for (const item of batch.items) {
-    results.push(await processItem(req, batch, deviceId, uid, item, features))
+    results.push(await processItem(req, batch, deviceId, uid, item, memberships))
   }
   return { batch_id: batch.batch_id, server_time: new Date().toISOString(), results }
 }

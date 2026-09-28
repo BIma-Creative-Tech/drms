@@ -4,7 +4,8 @@ import { Readable } from 'node:stream'
 
 import type { CollectionSlug, PayloadRequest } from 'payload'
 
-import { relId, userId } from '@/access/roles'
+import { loadMemberships } from '@/access/company-context'
+import { relId, userId, withCompanyContext } from '@/access/roles'
 import { writeAudit, writeAuditDetached } from '@/audit/writer'
 import { visibleRequestIds } from '@/domain/expense/access'
 import { getEnv } from '@/lib/env'
@@ -214,7 +215,9 @@ async function authenticateSigned(req: PayloadRequest, t: { kind: string; id: nu
   })
   const user = found.docs[0]
   if (!user) throw new HttpError(403, 'Forbidden', { code: 'URL_INVALID', detail: 'Tautan file tidak valid.' })
-  req.user = { ...user, collection: 'users', _strategy: 'signedUrl' } as unknown as PayloadRequest['user']
+  // ADR 0016 §5: same company context as an interactive login (all memberships, no selection)
+  const withCtx = withCompanyContext(user, await loadMemberships(req.payload, user.id, req), null, (user as { groupAdmin?: boolean | null }).groupAdmin === true)
+  req.user = { ...withCtx, collection: 'users', _strategy: 'signedUrl' } as unknown as PayloadRequest['user']
 }
 
 /**

@@ -224,12 +224,25 @@
   **isolation test suite** (every per-PT collection + every `/api/v1` route with ids, 404 across PTs).
   **Gate:** isolation suite green; existing suites green on a two-PT fixture; migration up/down on a staging copy
   with row counts and balances equal before/after (US-MC-19).
+  > **Status 2026-09-28 (branch `feat/mc1-foundation`): MC1 implemented** — progress log `mc/mc1-progress.md`.
+  > MC1-1…MC1-6 done: companies, memberships, app-wide global, `groupAdmin`, `pk-user` login (legacy transition),
+  > `company_id NOT NULL` + per-PT uniques on 30 tables, per-PT access (`byRole`, scope, decision guards), cross-PT
+  > triggers, per-PT lock date and numbering, isolation suite `mc-isolation.int.test.ts`; migrations verified on a
+  > develop-head copy (counts/sums identical, down/up). **Infra request open:** realm role `pk-user` in `drms` /
+  > `drms-staging` assigned to every ProyekKas user (T-MC1-kc). Deviations: ADR 0016 "Implementation notes (MC1)".
 - **MC2 — Domain, reports, admin UI:** approval holders/notifications/queues per PT (ADR 0013 revision), jobs per PT,
   `ReportScope` per company + company predicates in all raw SQL, consolidated dashboards/reports/exports with PT
   breakdown + totals, letterheads per PT / group, admin: company master, role matrix, employee ↔ PT mapping, PT
   switcher in the module bar, `PT` column + filter in list views, import workbook with `kode_pt`.
   **Gate:** KPI reconciliation per PT and Σ PT = total (extends `f3-kpi-reconciliation`); US-MC-06…13, 15, 16, 18
   pass; browser check of switcher/matrix/consolidated screens at 1440 px and 390 px.
+  > **Status 2026-09-28 (branch `feat/mc2-integration` = `feat/mc2-backend` + `feat/mc2-admin-ui`): MC2 implemented** —
+  > progress log `mc/mc2-progress.md` (§Integration). Domain / reports / jobs / media / sync per PT, admin UI (switcher,
+  > company master, role matrix with atomic batch save, PT columns/filters, per-PT Kas + Tutup buku, Absensi PT filter,
+  > dashboard per-PT rows) and import `kode_pt`; every `TODO(mc2-contract)` closed. Gate evidence: Σ per PT = total
+  > (`mc2-isolation`, `mc2-integration`), isolation suites `mc-isolation` / `mc2-isolation` / `mc2-import` /
+  > `mc2-integration` green, visual check 1440 + 390 px light/dark. Moved on: "copy defaults from DRMS" on PT create
+  > (MC3/MC4 admin action), media-access performance with 3 PTs (MC4), `/me companies[]` + APK (MC3).
 - **MC3 — API + APK:** `X-Company-Ids`, `/me` `companies[]`, OpenAPI regenerated (`packages/api-contract`), APK PT
   switcher, per-PT capabilities, drift schema v3 (`companyId` on drafts/outbox/progress), per-PT master caches, sync per
   PT (`COMPANY_MISMATCH`). **Gate:** Flutter unit/widget tests + mock-backend flow with two PTs; phone test on staging

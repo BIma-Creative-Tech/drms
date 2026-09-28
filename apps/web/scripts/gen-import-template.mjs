@@ -1,6 +1,7 @@
 // Generates the go-live import workbooks (plan fase1-golive E11) from src/import/spec.ts:
 //   docs/proyekkas/templates/drms-impor-golive-template.xlsx  (blank client template)
 //   docs/proyekkas/templates/drms-impor-golive-contoh-fiktif.xlsx  (fictional sample, tests/training)
+//   docs/proyekkas/templates/drms-impor-golive-contoh-fiktif-2pt.xlsx  (fictional sample with two PTs, MC2-5)
 // Usage: node scripts/gen-import-template.mjs [--check]   (--check: exit 1 if a committed file differs)
 // The .xlsx output is deterministic (fixed zip timestamps), so --check is byte-exact.
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
@@ -26,10 +27,11 @@ try {
     tsconfig: path.join(root, 'tsconfig.json'),
     logLevel: 'warning',
   })
-  const { buildTemplate, buildSample } = await import(pathToFileURL(bundle).href)
+  const { buildTemplate, buildSample, buildSampleTwoPts } = await import(pathToFileURL(bundle).href)
   const targets = [
     [path.join(outDir, 'drms-impor-golive-template.xlsx'), Buffer.from(buildTemplate())],
     [path.join(outDir, 'drms-impor-golive-contoh-fiktif.xlsx'), Buffer.from(buildSample())],
+    [path.join(outDir, 'drms-impor-golive-contoh-fiktif-2pt.xlsx'), Buffer.from(buildSampleTwoPts())],
   ]
   if (process.argv.includes('--check')) {
     let drift = false

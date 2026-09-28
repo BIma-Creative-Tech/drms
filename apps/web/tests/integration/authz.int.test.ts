@@ -206,9 +206,13 @@ describe('update scopes and protected fields', () => {
     expect(upd.progressPct).toBe(0)
   })
 
-  it('users.roles can only be changed by admin (and admin changes go to Keycloak)', async () => {
+  it('roles (memberships) and groupAdmin can only be changed by an Admin (ADR 0016 §2)', async () => {
     const p = await getTestPayload()
-    await expect(p.update({ collection: 'users', id: users['pk-staff'].id, data: { roles: ['pk-admin'] }, user: users['pk-staff'], overrideAccess: false })).rejects.toMatchObject({ status: 403 })
-    await expect(p.update({ collection: 'users', id: users['pk-staff'].id, data: { roles: ['pk-admin'] }, user: users['pk-owner'], overrideAccess: false })).rejects.toMatchObject({ status: 403 })
+    await expect(p.update({ collection: 'users', id: users['pk-staff'].id, data: { groupAdmin: true }, user: users['pk-staff'], overrideAccess: false })).rejects.toMatchObject({ status: 403 })
+    await expect(p.update({ collection: 'users', id: users['pk-staff'].id, data: { groupAdmin: true }, user: users['pk-owner'], overrideAccess: false })).rejects.toMatchObject({ status: 403 })
+    const own = (await p.find({ collection: 'company-memberships', where: { user: { equals: users['pk-staff'].id } }, overrideAccess: true /* SYSTEM-READ: test */ })).docs[0]!
+    await expect(p.update({ collection: 'company-memberships', id: own.id, data: { roles: ['pk-admin'] }, user: users['pk-staff'], overrideAccess: false })).rejects.toMatchObject({ status: 403 })
+    await expect(p.update({ collection: 'company-memberships', id: own.id, data: { roles: ['pk-admin'] }, user: users['pk-owner'], overrideAccess: false })).rejects.toMatchObject({ status: 403 })
+    await expect(p.create({ collection: 'company-memberships', data: { user: users['pk-staff'].id, company: own.company, roles: ['pk-admin'] }, user: users['pk-staff'], overrideAccess: false })).rejects.toMatchObject({ status: 403 })
   })
 })

@@ -174,7 +174,8 @@ class RequestLifecycleActions extends ConsumerWidget {
     final t = AppLocalizations.of(context);
     final a = detail.allowedActions;
     final isDraft = detail.status == RequestStatus.draft;
-    final canEditHere = ref.watch(currentProfileProvider)?.canCreateRequests ?? false;
+    // MC3: the roles IN the request's PT (not the union of the selected PTs).
+    final canEditHere = ref.watch(currentProfileProvider)?.forCompany(detail.companyId).canCreateRequests ?? false;
     final buttons = <Widget>[
       if (isDraft && canEditHere && (a.contains('edit') || a.contains('submit')))
         OnlineOnlyButton(

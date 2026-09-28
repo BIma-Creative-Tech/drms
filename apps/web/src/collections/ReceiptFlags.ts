@@ -5,6 +5,7 @@ import { byVisibleRequest, denyDeleteLogged } from '@/domain/expense/access'
 import { FLAG_KINDS, FLAG_LABELS } from '@/domain/expense/types'
 
 import { ro } from './fields-f2'
+import { companyField, companyHook } from '@/fields/company'
 
 const jsonView = { readOnly: true, components: { Field: '@/components/ReadOnlyJson#ReadOnlyJson' } }
 
@@ -19,7 +20,9 @@ export const ReceiptFlags: CollectionConfig = {
   labels: { singular: 'Flag validasi nota', plural: 'Flag validasi nota' },
   admin: { group: 'Keuangan', defaultColumns: ['request', 'lineNo', 'kind', 'level', 'status', 'message'] },
   access: { read: byVisibleRequest('request'), create: denyAll, update: denyAll, delete: denyDeleteLogged('receipt_flag') },
+  hooks: { beforeChange: [companyHook('receipt-flags', { derive: [{ field: 'request', collection: 'expense-requests' }] })] },
   fields: [
+    companyField({ derived: true }),
     { name: 'request', type: 'relationship', relationTo: 'expense-requests', required: true, index: true, admin: ro },
     { name: 'key', type: 'text', required: true, index: true, admin: ro },
     { name: 'kind', type: 'select', required: true, options: FLAG_KINDS.map((k) => ({ label: FLAG_LABELS[k], value: k })), admin: ro },

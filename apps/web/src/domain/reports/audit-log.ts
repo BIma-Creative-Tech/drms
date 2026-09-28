@@ -6,7 +6,7 @@ import { addDays, isBusinessDate } from '@/domain/expense/types'
 
 import { inSequence, num, reportContext, rows } from './kpi'
 import { daysBetween } from './rules'
-import type { SQL } from './scope'
+import { companyScopeSql, type SQL } from './scope'
 
 /**
  * K-16 global audit log (requirements §8 "Tampilan log", wireframe §6): read-only view over
@@ -26,6 +26,13 @@ export type AuditFilter = {
   action?: AuditAction
   docNo?: string
   source?: (typeof AUDIT_SOURCES)[number]
+  /**
+   * MC2 (ADR 0016 §4/§6): PTs whose rows are shown (the caller's Owner/Admin/Finance PTs, narrowed
+   * by `pt`) — REQUIRED for a scoped read; absent = no tagged rows at all (fail closed).
+   */
+  companyIds?: number[]
+  /** Rows without a PT (shared masters, accounts, system) — Admin/Owner only. */
+  includeUntagged?: boolean
 }
 
 export function parseAuditFilter(sp: URLSearchParams, today: string): AuditFilter {
@@ -61,11 +68,14 @@ function where(f: AuditFilter, tz: string): SQL {
   // prefix match without LIKE wildcards from user input
   if (f.docNo) w.push(sql`left(a.doc_no, length(${f.docNo})) = ${f.docNo}`)
   if (f.source) w.push(sql`a.source = ${f.source}`)
+  const tagged = companyScopeSql(sql`a.company_id`, f.companyIds ?? [])
+  w.push(f.includeUntagged ? sql`(${tagged} OR a.company_id IS NULL)` : tagged)
   return sql.join(w, sql` AND `)
 }
 
 export type AuditRow = {
   id: number
+  companyId: number | null
   serverTime: string
   localTime: string
   userId: number | null
@@ -105,17 +115,20 @@ export async function auditLogPage(req: PayloadRequest, f: AuditFilter, page: { 
   const c = decodeCursor(page.cursor)
   const r = await rows(
     req,
-    sql`SELECT a.id, to_char(a.server_time AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS server_time,
+    sql`SELECT a.id, a.company_id, to_char(a.server_time AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS server_time,
           to_char(a.server_time AT TIME ZONE ${ctx.tz}, 'YYYY-MM-DD HH24:MI:SS') AS local_time,
           a.user_id, coalesce(e.name, u.name, u.email) AS user_name, a.user_roles, a.action::text AS action, a.doc_type, a.doc_id, a.doc_no,
           a.field, a.line_no, a.old_value, a.new_value, a.status_from, a.status_to, a.reason, a.source::text AS source, a.app_version,
           a.ip, a.device_id, a.request_id
-        FROM audit_logs a LEFT JOIN users u ON u.id = a.user_id LEFT JOIN employees e ON e.id = u.employee_id
+        FROM audit_logs a LEFT JOIN users u ON u.id = a.user_id
+          LEFT JOIN LATERAL (SELECT e1.name FROM company_memberships m JOIN employees e1 ON e1.id = m.employee_id WHERE m.user_id = u.id
+                             ORDER BY (m.company_id = a.company_id) DESC NULLS LAST, m.company_id LIMIT 1) e ON true
         WHERE ${where(f, ctx.tz)} ${c ? sql`AND (a.server_time, a.id) < (${c.t}::timestamptz, ${c.id})` : sql``}
         ORDER BY a.server_time DESC, a.id DESC LIMIT ${page.limit + 1}`,
   )
   const list: AuditRow[] = r.slice(0, page.limit).map((x) => ({
     id: num(x.id),
+    companyId: x.company_id === null || x.company_id === undefined ? null : num(x.company_id),
     serverTime: String(x.server_time),
     localTime: String(x.local_time),
     userId: x.user_id === null ? null : num(x.user_id),
@@ -154,11 +167,24 @@ export async function auditLogCount(req: PayloadRequest, f: AuditFilter): Promis
   return num(r[0]?.n)
 }
 
-/** Filter dropdowns: users that appear in the log, document types in use. */
-export async function auditFilterOptions(req: PayloadRequest) {
+/**
+ * Filter dropdowns: accounts of the PTs `f.companyIds` (membership; + accounts without membership for
+ * Admin/Owner), document types in use in those PTs' rows.
+ */
+export async function auditFilterOptions(req: PayloadRequest, f: Pick<AuditFilter, 'companyIds' | 'includeUntagged'>) {
+  const inPts = companyScopeSql(sql`m0.company_id`, f.companyIds ?? [])
+  const tagged = companyScopeSql(sql`a.company_id`, f.companyIds ?? [])
   const [users, types] = await inSequence(
-    () => rows(req, sql`SELECT u.id, coalesce(e.name, u.name, u.email) AS name FROM users u LEFT JOIN employees e ON e.id = u.employee_id ORDER BY 2`),
-    () => rows(req, sql`SELECT DISTINCT doc_type FROM audit_logs ORDER BY 1`),
+    () =>
+      rows(
+        req,
+        sql`SELECT u.id, coalesce(e.name, u.name, u.email) AS name FROM users u
+            LEFT JOIN LATERAL (SELECT e1.name FROM company_memberships m JOIN employees e1 ON e1.id = m.employee_id WHERE m.user_id = u.id ORDER BY m.company_id LIMIT 1) e ON true
+            WHERE EXISTS (SELECT 1 FROM company_memberships m0 WHERE m0.user_id = u.id AND ${inPts})
+               OR (${f.includeUntagged === true} AND NOT EXISTS (SELECT 1 FROM company_memberships m1 WHERE m1.user_id = u.id))
+            ORDER BY 2`,
+      ),
+    () => rows(req, sql`SELECT DISTINCT a.doc_type FROM audit_logs a WHERE ${f.includeUntagged ? sql`(${tagged} OR a.company_id IS NULL)` : tagged} ORDER BY 1`),
   )
   return {
     users: users.map((x) => ({ value: String(x.id), label: String(x.name) })),

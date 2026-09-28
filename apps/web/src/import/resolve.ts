@@ -3,7 +3,7 @@
  * for user rows (Keycloak link). Pure: the DB keys are loaded read-only by run.ts.
  */
 import type { ImportData, Issue } from './parse'
-import { SHEET_BY_KEY } from './spec'
+import { SHEET_BY_KEY, type SheetKey } from './spec'
 
 /**
  * Users without an email (Q-37: email optional) still need a unique `users.email` in ProyekKas → a
@@ -19,13 +19,20 @@ export function isPlaceholderEmail(email: string): boolean {
   return email.endsWith(`@${PLACEHOLDER_EMAIL_DOMAIN}`)
 }
 
+/** Per-PT natural keys already in the DB: PT short code → codes (MC2-5). */
+export type PtKeys = Map<string, Set<string>>
+
 export type DbKeys = {
-  employees: Set<string>
+  /** PT short code → id + active flag. */
+  companies: Map<string, { id: number; active: boolean }>
+  employees: PtKeys
   banks: Set<string>
   uoms: Set<string>
-  categories: Set<string>
-  costCenters: Set<string>
-  projects: Set<string>
+  categories: PtKeys
+  costCenters: PtKeys
+  projects: PtKeys
+  /** user id → PT codes with an ACTIVE membership (PM / cost-center manager must be a member there). */
+  membershipsByUser: Map<number, Set<string>>
   /** email → user */
   usersByEmail: Map<string, { id: number; sub: string | null; employee: number | null }>
   /** keycloakSub → user */
@@ -41,28 +48,112 @@ export type UserPlan = {
   id: number | null
 }
 
-export type ResolveResult = { issues: Issue[]; users: Map<string, UserPlan> }
+export type ResolveResult = { issues: Issue[]; users: Map<string, UserPlan>; defaultPt: string | null; pts: string[] }
 
 export function emptyDbKeys(): DbKeys {
   return {
-    employees: new Set(),
+    companies: new Map(),
+    employees: new Map(),
     banks: new Set(),
     uoms: new Set(),
-    categories: new Set(),
-    costCenters: new Set(),
-    projects: new Set(),
+    categories: new Map(),
+    costCenters: new Map(),
+    projects: new Map(),
+    membershipsByUser: new Map(),
     usersByEmail: new Map(),
     usersBySub: new Map(),
   }
 }
 
+/** Codes of one PT in a per-PT key map (created on demand — tests / DB loader). */
+export function ptSet(keys: PtKeys, pt: string): Set<string> {
+  let s = keys.get(pt)
+  if (!s) {
+    s = new Set()
+    keys.set(pt, s)
+  }
+  return s
+}
+
+/**
+ * The PT an empty `kode_pt` means (MC2-5): the only PT of sheet Perusahaan, else the only ACTIVE PT of
+ * the database; null when ambiguous (then every per-PT row must name its PT).
+ */
+export function defaultPtOf(data: Pick<ImportData, 'companies'>, db: Pick<DbKeys, 'companies'>): string | null {
+  if (data.companies.length === 1) return data.companies[0]!.code
+  if (data.companies.length > 1) return null
+  const active = [...db.companies].filter(([, c]) => c.active).map(([code]) => code)
+  return active.length === 1 ? active[0]! : null
+}
+
+/** Effective PT of a row. */
+export const ptOf = (row: { pt: string | null }, defaultPt: string | null): string | null => row.pt ?? defaultPt
+
 export function resolveReferences(data: ImportData, db: DbKeys, kcMap: ReadonlyMap<string, string>): ResolveResult {
   const issues: Issue[] = []
+  const defaultPt = defaultPtOf(data, db)
+  const knownPts = new Set([...data.companies.map((c) => c.code), ...db.companies.keys()])
+  const usedPts = new Set<string>()
+
+  // ---- PT of every per-PT row: known, active, and given when more than one PT exists
+  const ptCheck = (sheet: SheetKey, row: number, pt: string | null, column = 'kode_pt'): string | null => {
+    const eff = pt ?? defaultPt
+    const name = SHEET_BY_KEY[sheet].name
+    if (eff === null) {
+      issues.push({ level: 'error', sheet: name, row, column, message: 'kode_pt wajib diisi: file/database berisi lebih dari satu PT (atau belum ada PT).' })
+      return null
+    }
+    if (!knownPts.has(eff)) {
+      issues.push({ level: 'error', sheet: name, row, column, message: `PT "${eff}" tidak dikenal (sheet Perusahaan maupun database).` })
+      return null
+    }
+    const inDb = db.companies.get(eff)
+    if (inDb && !inDb.active && !data.companies.some((c) => c.code === eff)) {
+      issues.push({ level: 'error', sheet: name, row, column, message: `PT "${eff}" nonaktif — aktifkan dulu di Master Perusahaan.` })
+      return null
+    }
+    usedPts.add(eff)
+    return eff
+  }
+  for (const c of data.companies) {
+    const inDb = db.companies.get(c.code)
+    if (inDb && !inDb.active) issues.push({ level: 'error', sheet: SHEET_BY_KEY.perusahaan.name, row: c._row, column: 'kode_pt', message: `PT "${c.code}" sudah ada tetapi nonaktif — aktifkan dulu di Master Perusahaan.` })
+    else if (!inDb) issues.push({ level: 'warning', sheet: SHEET_BY_KEY.perusahaan.name, row: c._row, column: 'kode_pt', message: `PT baru "${c.code}" (${c.name}) akan dibuat, dengan penomoran dan aturan approval default.` })
+    usedPts.add(c.code)
+  }
+  const rowPt = new Map<object, string | null>()
+  const withPt = <T extends { _row: number; pt: string | null }>(sheet: SheetKey, rows: readonly T[]) => {
+    for (const r of rows) rowPt.set(r, ptCheck(sheet, r._row, r.pt))
+  }
+  withPt('kategori', data.categories)
+  withPt('karyawan', data.employees)
+  withPt('pengguna', data.users.filter((u) => u.roles.length > 0 || u.pt !== null))
+  withPt('rekening', data.bankAccounts)
+  withPt('pusatBiaya', data.costCenters)
+  withPt('project', data.projects)
+  withPt('tahapan', data.stages)
+  withPt('rab', data.budgetLines)
+  withPt('kendaraan', data.vehicles)
+  withPt('penugasan', data.assignments)
+  withPt('akunKas', data.cashAccounts)
+  for (const a of data.access) rowPt.set(a, ptCheck('aksesPt', a._row, a.pt))
+  const P = (row: object) => rowPt.get(row) ?? null
+
+  /** Per-PT pool: workbook rows of that PT + DB keys of that PT. */
+  const pool = (rows: ReadonlyArray<{ _row: number; pt: string | null }>, code: (r: never) => string, dbKeys: PtKeys) => {
+    const m = new Map<string, Set<string>>()
+    for (const r of rows) {
+      const pt = P(r)
+      if (pt) ptSet(m, pt).add(code(r as never))
+    }
+    for (const [pt, codes] of dbKeys) for (const c of codes) ptSet(m, pt).add(c)
+    return m
+  }
+  const employees = pool(data.employees, (e: { code: string }) => e.code, db.employees)
+  const categories = pool(data.categories, (c: { code: string }) => c.code, db.categories)
+  const costCenters = pool(data.costCenters, (c: { code: string }) => c.code, db.costCenters)
+  const projects = pool(data.projects, (p: { code: string }) => p.code, db.projects)
   const set = (wb: Iterable<string>, dbSet: Set<string>) => new Set([...wb, ...dbSet])
-  const employees = set(
-    data.employees.map((e) => e.code),
-    db.employees,
-  )
   const banks = set(
     data.banks.map((b) => b.code),
     db.banks,
@@ -71,47 +162,77 @@ export function resolveReferences(data: ImportData, db: DbKeys, kcMap: ReadonlyM
     data.uoms.map((u) => u.code),
     db.uoms,
   )
-  const categories = set(
-    data.categories.map((c) => c.code),
-    db.categories,
-  )
-  const costCenters = set(
-    data.costCenters.map((c) => c.code),
-    db.costCenters,
-  )
-  const projects = set(
-    data.projects.map((p) => p.code),
-    db.projects,
-  )
 
   const need = (sheet: keyof typeof SHEET_BY_KEY, row: number, column: string, value: string | null, pool: Set<string>, what: string, where: string) => {
     if (value !== null && !pool.has(value)) {
       issues.push({ level: 'error', sheet: SHEET_BY_KEY[sheet].name, row, column, message: `${what} "${value}" tidak ditemukan (sheet ${where} maupun database).` })
     }
   }
+  /** Per-PT reference: must exist IN THE ROW'S PT; a hit in another PT is named (cross-PT reference). */
+  const needIn = (sheet: SheetKey, rowObj: object, row: number, column: string, value: string | null, pools: Map<string, Set<string>>, what: string, where: string) => {
+    const pt = P(rowObj)
+    if (value === null || pt === null) return
+    if (pools.get(pt)?.has(value)) return
+    const elsewhere = [...pools].filter(([p, codes]) => p !== pt && codes.has(value)).map(([p]) => p)
+    issues.push({
+      level: 'error',
+      sheet: SHEET_BY_KEY[sheet].name,
+      row,
+      column,
+      message: elsewhere.length
+        ? `${what} "${value}" tidak ada di PT ${pt} (ada di PT ${elsewhere.join(', ')}) — referensi lintas PT tidak diperbolehkan.`
+        : `${what} "${value}" tidak ditemukan di PT ${pt} (sheet ${where} maupun database).`,
+    })
+  }
 
   for (const c of data.categories) {
     need('kategori', c._row, 'satuan_default', c.defaultUom, uoms, 'Satuan', 'Satuan')
     for (const u of c.allowedUoms) need('kategori', c._row, 'satuan_wajar', u, uoms, 'Satuan', 'Satuan')
   }
-  for (const u of data.users) need('pengguna', u._row, 'kode_karyawan', u.employeeCode, employees, 'Karyawan', 'Karyawan')
+  for (const u of data.users) needIn('pengguna', u, u._row, 'kode_karyawan', u.employeeCode, employees, 'Karyawan', 'Karyawan')
+  for (const a of data.access) needIn('aksesPt', a, a._row, 'kode_karyawan', a.employeeCode, employees, 'Karyawan', 'Karyawan')
   for (const a of data.bankAccounts) {
-    need('rekening', a._row, 'kode_karyawan', a.employeeCode, employees, 'Karyawan', 'Karyawan')
+    needIn('rekening', a, a._row, 'kode_karyawan', a.employeeCode, employees, 'Karyawan', 'Karyawan')
     need('rekening', a._row, 'kode_bank', a.bankCode, banks, 'Bank', 'Bank')
   }
-  for (const s of data.stages) need('tahapan', s._row, 'kode_project', s.projectCode, projects, 'Project', 'Project')
+  for (const s of data.stages) needIn('tahapan', s, s._row, 'kode_project', s.projectCode, projects, 'Project', 'Project')
   for (const b of data.budgetLines) {
-    need('rab', b._row, 'kode_project', b.projectCode, projects, 'Project', 'Project')
-    need('rab', b._row, 'kode_kategori', b.categoryCode, categories, 'Kategori', 'Kategori')
+    needIn('rab', b, b._row, 'kode_project', b.projectCode, projects, 'Project', 'Project')
+    needIn('rab', b, b._row, 'kode_kategori', b.categoryCode, categories, 'Kategori', 'Kategori')
   }
   for (const v of data.vehicles) {
-    need('kendaraan', v._row, 'kode_pusat_biaya', v.costCenterCode, costCenters, 'Pusat biaya', 'PusatBiaya')
-    need('kendaraan', v._row, 'kode_project', v.projectCode, projects, 'Project', 'Project')
+    needIn('kendaraan', v, v._row, 'kode_pusat_biaya', v.costCenterCode, costCenters, 'Pusat biaya', 'PusatBiaya')
+    needIn('kendaraan', v, v._row, 'kode_project', v.projectCode, projects, 'Project', 'Project')
   }
   for (const a of data.assignments) {
-    need('penugasan', a._row, 'kode_karyawan', a.employeeCode, employees, 'Karyawan', 'Karyawan')
-    need('penugasan', a._row, 'kode_project', a.projectCode, projects, 'Project', 'Project')
-    need('penugasan', a._row, 'kode_pusat_biaya', a.costCenterCode, costCenters, 'Pusat biaya', 'PusatBiaya')
+    needIn('penugasan', a, a._row, 'kode_karyawan', a.employeeCode, employees, 'Karyawan', 'Karyawan')
+    needIn('penugasan', a, a._row, 'kode_project', a.projectCode, projects, 'Project', 'Project')
+    needIn('penugasan', a, a._row, 'kode_pusat_biaya', a.costCenterCode, costCenters, 'Pusat biaya', 'PusatBiaya')
+  }
+  // one account per (user, PT): Pengguna row PT + AksesPT rows; one employee per account per PT
+  {
+    const seen = new Map<string, number>()
+    for (const u of data.users) if (u.roles.length > 0 && P(u)) seen.set(`${u.username}@${P(u)}`, u._row)
+    const empSeen = new Map<string, string>()
+    for (const u of data.users) if (u.employeeCode && P(u)) empSeen.set(`${P(u)}/${u.employeeCode}`, u.username)
+    const known = new Set(data.users.map((u) => u.username))
+    for (const a of data.access) {
+      const pt = P(a)
+      if (!known.has(a.username)) issues.push({ level: 'error', sheet: SHEET_BY_KEY.aksesPt.name, row: a._row, column: 'username', message: `Username "${a.username}" tidak ada di sheet Pengguna.` })
+      if (!pt) continue
+      const k = `${a.username}@${pt}`
+      if (seen.has(k)) issues.push({ level: 'error', sheet: SHEET_BY_KEY.aksesPt.name, row: a._row, column: 'kode_pt', message: `Akses "${a.username}" di PT ${pt} sudah ada (sheet Pengguna baris ${seen.get(k)}).` })
+      if (a.employeeCode) {
+        const other = empSeen.get(`${pt}/${a.employeeCode}`)
+        if (other && other !== a.username) issues.push({ level: 'error', sheet: SHEET_BY_KEY.aksesPt.name, row: a._row, column: 'kode_karyawan', message: `Karyawan ${a.employeeCode} (PT ${pt}) sudah terhubung ke akun ${other}.` })
+        empSeen.set(`${pt}/${a.employeeCode}`, a.username)
+      }
+    }
+    for (const u of data.users) {
+      if (u.roles.length === 0 && !data.access.some((a) => a.username === u.username)) {
+        issues.push({ level: 'warning', sheet: SHEET_BY_KEY.pengguna.name, row: u._row, column: 'peran', message: `"${u.username}" tanpa peran di PT mana pun: akun dibuat tetapi belum bisa memakai ProyekKas.` })
+      }
+    }
   }
   for (const a of data.cashAccounts) need('akunKas', a._row, 'kode_bank', a.bankCode, banks, 'Bank', 'Bank')
 
@@ -156,12 +277,25 @@ export function resolveReferences(data: ImportData, db: DbKeys, kcMap: ReadonlyM
     if (!users.has(username)) issues.push({ level: 'warning', sheet: sheetUsers, message: `Username "${username}" ada di file pemetaan Keycloak tetapi tidak ada di sheet Pengguna — diabaikan.` })
   }
 
-  // user references: username of the Pengguna sheet, or the email of an existing ProyekKas user
-  const userRef = (sheet: 'pusatBiaya' | 'project', row: number, column: string, ref: string | null, needRole?: string) => {
+  // PTs where each workbook user will hold a membership (Pengguna row PT + AksesPT)
+  const memberPts = new Map<string, Set<string>>()
+  // (a user deactivated by this file keeps its PM / manager links: the DB guard only checks new references)
+  for (const u of data.users) if (u.roles.length > 0 && P(u)) ptSet(memberPts, u.username).add(P(u)!)
+  for (const a of data.access) if (P(a)) ptSet(memberPts, a.username).add(P(a)!)
+
+  // user references: username of the Pengguna sheet, or the email of an existing ProyekKas user; the
+  // user must be an ACTIVE member of the row's PT (DB trigger pk_company_member, ADR 0016 §4)
+  const userRef = (sheet: 'pusatBiaya' | 'project', rowObj: object, row: number, column: string, ref: string | null, needRole?: string) => {
     if (ref === null) return
+    const pt = P(rowObj)
     if (ref.includes('@')) {
-      if (!db.usersByEmail.has(ref)) issues.push({ level: 'error', sheet: SHEET_BY_KEY[sheet].name, row, column, message: `Pengguna dengan email ${ref} tidak ditemukan di ProyekKas.` })
+      const existing = db.usersByEmail.get(ref)
+      if (!existing) issues.push({ level: 'error', sheet: SHEET_BY_KEY[sheet].name, row, column, message: `Pengguna dengan email ${ref} tidak ditemukan di ProyekKas.` })
+      else if (pt && !db.membershipsByUser.get(existing.id)?.has(pt)) issues.push({ level: 'error', sheet: SHEET_BY_KEY[sheet].name, row, column, message: `Pengguna ${ref} bukan anggota aktif PT ${pt}.` })
       return
+    }
+    if (pt && data.users.some((x) => x.username === ref) && !memberPts.get(ref)?.has(pt)) {
+      issues.push({ level: 'error', sheet: SHEET_BY_KEY[sheet].name, row, column, message: `"${ref}" tidak punya akses aktif di PT ${pt} (isi peran di sheet Pengguna/AksesPT untuk PT ini).` })
     }
     const plan = users.get(ref)
     if (!plan) {
@@ -172,14 +306,16 @@ export function resolveReferences(data: ImportData, db: DbKeys, kcMap: ReadonlyM
       issues.push({ level: 'warning', sheet: SHEET_BY_KEY[sheet].name, row, column, message: `"${ref}" belum punya akun Keycloak → ${column} dikosongkan dulu, terisi saat impor ulang dengan file pemetaan.` })
     }
     const u = data.users.find((x) => x.username === ref)
-    if (needRole && u && !u.roles.includes(needRole)) {
+    const rolesInPt = [...(u && P(u) === pt ? u.roles : []), ...data.access.filter((a) => a.username === ref && P(a) === pt).flatMap((a) => a.roles)]
+    if (needRole && u && !rolesInPt.includes(needRole)) {
       issues.push({ level: 'warning', sheet: SHEET_BY_KEY[sheet].name, row, column, message: `"${ref}" tidak berperan PM.` })
     }
   }
-  for (const c of data.costCenters) userRef('pusatBiaya', c._row, 'penanggung_jawab', c.manager)
-  for (const p of data.projects) userRef('project', p._row, 'pm', p.pm, 'pk-pm')
+  for (const c of data.costCenters) userRef('pusatBiaya', c, c._row, 'penanggung_jawab', c.manager)
+  for (const p of data.projects) userRef('project', p, p._row, 'pm', p.pm, 'pk-pm')
 
-  return { issues, users }
+  const pts = [...usedPts].filter((p) => knownPts.has(p)).sort()
+  return { issues, users, defaultPt, pts }
 }
 
 /** `--kc-map` file: CSV `username,id` (kcadm.sh `--fields username,id --format csv`, header optional) or JSON. */

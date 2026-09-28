@@ -2,6 +2,7 @@ import type { CollectionSlug, Payload, PayloadRequest, Where } from 'payload'
 import { z } from 'zod'
 
 import { relId, type Role } from '@/access/roles'
+import { firstActiveCompanyId } from '@/domain/companies'
 import { withSystemTransaction } from '@/lib/system-tx'
 
 /**
@@ -12,7 +13,8 @@ import { withSystemTransaction } from '@/lib/system-tx'
  * (one Staff, one PM, up to two Finance and two Direktur = `pk-owner`, ADR 0013)
  * (created by infra); nothing is written to Keycloak (context `skipKeycloakSync`). Every step is
  * idempotent (natural keys) and never overwrites data it did not create, except:
- * - an existing user (same keycloakSub) gets its missing UAT role added and, when unlinked, the UAT employee;
+ * - an existing user (same keycloakSub) gets its missing UAT role added to its company #1 membership and,
+ *   when unlinked, the UAT employee (ADR 0016: roles + employee link live in `company-memberships`);
  * - cost center OPS-PB gets manager = PM user ONLY when it has no manager yet.
  * All writes: Local API as the system actor (audit source=system), one transaction per step.
  */
@@ -114,10 +116,12 @@ export async function seedUat(payload: Payload, users: UatUser[]): Promise<UatRe
   const update = (req: PayloadRequest, collection: CollectionSlug, id: number, data: Record<string, unknown>) =>
     payload.update({ collection, id, data: data as never, depth: 0, overrideAccess: true /* SYSTEM-WRITE: UAT seed */, context: { skipKeycloakSync: true }, req })
 
-  // Prerequisites from the base seed.
+  // Prerequisites from the base seed (company #1 DRMS: the UAT runs in it, ADR 0016).
+  const companyId = await firstActiveCompanyId(payload)
+  const inPt = (w: Where): Where => ({ and: [{ company: { equals: companyId } }, w] })
   const pre = await step(async (req) => ({
     bank: (await findOne(req, 'banks', { code: { equals: UAT_FIXTURE.bankCode } }))?.id,
-    costCenter: await findOne(req, 'cost-centers', { code: { equals: UAT_FIXTURE.costCenterCode } }),
+    costCenter: await findOne(req, 'cost-centers', inPt({ code: { equals: UAT_FIXTURE.costCenterCode } })),
   }))
   if (pre.bank === undefined || !pre.costCenter) {
     throw new Error(`base seed missing: bank ${UAT_FIXTURE.bankCode} and cost center ${UAT_FIXTURE.costCenterCode} are required (run src/seed/index.ts first)`)
@@ -132,33 +136,47 @@ export async function seedUat(payload: Payload, users: UatUser[]): Promise<UatRe
     seenRole.set(u.role, nth)
     await step(async (req) => {
       const code = uatEmployeeCode(u.role, nth)
-      let emp = (await findOne(req, 'employees', { code: { equals: code } }))?.id
+      let emp = (await findOne(req, 'employees', inPt({ code: { equals: code } })))?.id
       if (emp === undefined) {
-        emp = await create(req, 'employees', { code, name: u.name, active: true })
+        emp = await create(req, 'employees', { company: companyId, code, name: u.name, active: true })
         tally('employees', 'created')
       } else tally('employees', 'skipped')
       if (nth === 1) empIds.set(u.role, emp)
 
+      // ADR 0016 §2: role + employee link = membership of company #1 (DRMS).
+      const membership = async (userId: number) => findOne(req, 'company-memberships', { and: [{ user: { equals: userId } }, { company: { equals: companyId } }] })
+      const empTaken = async (userId?: number) => {
+        const m = await findOne(req, 'company-memberships', { employee: { equals: emp } })
+        return !!m && relId(m.user) !== userId
+      }
       const bySub = await findOne(req, 'users', { keycloakSub: { equals: u.keycloakSub } })
       if (!bySub) {
         const byEmail = await findOne(req, 'users', { email: { equals: u.email } })
         if (byEmail) throw new Error(`users: ${u.role} email already belongs to another account (different keycloakSub) — fix manually`)
-        if (await findOne(req, 'users', { employee: { equals: emp } })) throw new Error(`employees: ${code} is already linked to another user — fix manually`)
-        const created = await create(req, 'users', { email: u.email, name: u.name, keycloakSub: u.keycloakSub, roles: [u.role], employee: emp, active: true })
+        if (await empTaken()) throw new Error(`employees: ${code} is already linked to another user — fix manually`)
+        const created = await create(req, 'users', { email: u.email, name: u.name, keycloakSub: u.keycloakSub, active: true })
+        await create(req, 'company-memberships', { user: created, company: companyId, roles: [u.role], employee: emp, active: true })
         if (nth === 1) userIds.set(u.role, created)
         tally('users', 'created')
         return
       }
       if (nth === 1) userIds.set(u.role, bySub.id)
-      const roles = Array.isArray(bySub.roles) ? (bySub.roles as string[]) : []
+      const m = await membership(bySub.id)
+      if (!m) {
+        if (await empTaken(bySub.id)) throw new Error(`employees: ${code} is already linked to another user — fix manually`)
+        await create(req, 'company-memberships', { user: bySub.id, company: companyId, roles: [u.role], employee: emp, active: true })
+        tally('users', 'linked')
+        return
+      }
+      const roles = Array.isArray(m.roles) ? (m.roles as string[]) : []
       const patch: Record<string, unknown> = {}
       if (!roles.includes(u.role)) patch.roles = [...roles, u.role]
-      if (relId(bySub.employee) === undefined) {
-        if (await findOne(req, 'users', { employee: { equals: emp } })) throw new Error(`employees: ${code} is already linked to another user — fix manually`)
+      if (relId(m.employee) === undefined) {
+        if (await empTaken(bySub.id)) throw new Error(`employees: ${code} is already linked to another user — fix manually`)
         patch.employee = emp
       }
       if (Object.keys(patch).length > 0) {
-        await update(req, 'users', bySub.id, patch)
+        await update(req, 'company-memberships', m.id, patch)
         tally('users', 'linked')
       } else tally('users', 'skipped')
     })
@@ -169,7 +187,7 @@ export async function seedUat(payload: Payload, users: UatUser[]): Promise<UatRe
 
   // 3: OPS-PB manager — only when empty (never overwrite a real manager).
   await step(async (req) => {
-    const cc = await findOne(req, 'cost-centers', { code: { equals: UAT_FIXTURE.costCenterCode } })
+    const cc = await findOne(req, 'cost-centers', inPt({ code: { equals: UAT_FIXTURE.costCenterCode } }))
     if (cc && relId(cc.manager) === undefined) {
       await update(req, 'cost-centers', cc.id, { manager: pmUser })
       tally('cost-centers.manager', 'linked')
@@ -195,13 +213,13 @@ export async function seedUat(payload: Payload, users: UatUser[]): Promise<UatRe
 
   // 5: fictional project + team assignments (Staff → project + OPS-PB; PM → project as pm).
   const project = await step(async (req) => {
-    const found = await findOne(req, 'projects', { code: { equals: UAT_FIXTURE.project.code } })
+    const found = await findOne(req, 'projects', inPt({ code: { equals: UAT_FIXTURE.project.code } }))
     if (found) {
       tally('projects', 'skipped')
       return found.id
     }
     const { code, name, budget, status } = UAT_FIXTURE.project
-    const id = await create(req, 'projects', { code, name, pm: pmUser, budget, status })
+    const id = await create(req, 'projects', { company: companyId, code, name, pm: pmUser, budget, status })
     tally('projects', 'created')
     return id
   })

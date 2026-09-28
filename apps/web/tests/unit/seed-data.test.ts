@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { DEFAULT_SEED_DATA, loadSeedData, SeedDataSchema } from '@/seed/data'
+import { DEFAULT_SEED_DATA, loadSeedData, normalizeSeedData, SeedDataSchema } from '@/seed/data'
 
 describe('seed data (SEED_DATA_FILE)', () => {
   it('default (fictional) data matches the schema', () => {
@@ -15,7 +15,7 @@ describe('seed data (SEED_DATA_FILE)', () => {
       expect(p).toBe('/run/secrets/seed_data')
       return JSON.stringify(custom)
     }
-    expect(loadSeedData({ SEED_DATA_FILE: '/run/secrets/seed_data' }, read).employees).toHaveLength(DEFAULT_SEED_DATA.employees.length + 1)
+    expect(normalizeSeedData(loadSeedData({ SEED_DATA_FILE: '/run/secrets/seed_data' }, read)).companies[0]!.employees).toHaveLength(DEFAULT_SEED_DATA.employees.length + 1)
   })
 
   it('rejects unreadable, non-JSON, wrong-shape and dangling references without echoing content', () => {
@@ -35,5 +35,26 @@ describe('seed data (SEED_DATA_FILE)', () => {
     expect(msg).not.toMatch(/12AB/)
     const badVeh = { ...DEFAULT_SEED_DATA, vehicles: [{ plateNo: 'DA 1 A', type: 'Hilux', costCenter: 'NOPE' }] }
     expect(() => loadSeedData(env, () => JSON.stringify(badVeh))).toThrow(/vehicles\.0\.costCenter/)
+  })
+
+  it('ADR 0016: the old single-company shape normalises to company #1; the companies[] shape seeds several PTs', () => {
+    const one = normalizeSeedData(DEFAULT_SEED_DATA)
+    expect(one.companies).toHaveLength(1)
+    expect(one.companies[0]!.company.shortCode).toBe('DRMS')
+    expect(one.uoms).toBe(DEFAULT_SEED_DATA.uoms)
+    const { uoms, banks, ...drms } = DEFAULT_SEED_DATA
+    const multi = {
+      uoms,
+      banks,
+      companies: [drms, { ...drms, company: { name: 'PT Contoh Satu', shortCode: 'CS1', timezone: 'Asia/Makassar' }, vehicles: [] }],
+    }
+    const env = { SEED_DATA_FILE: '/x.json' }
+    const parsed = normalizeSeedData(loadSeedData(env, () => JSON.stringify(multi)))
+    expect(parsed.companies.map((c) => c.company.shortCode)).toEqual(['DRMS', 'CS1'])
+    // references resolve per PT; duplicate short codes and dangling refs are named by path
+    const dup = { ...multi, companies: [drms, drms] }
+    expect(() => loadSeedData(env, () => JSON.stringify(dup))).toThrow(/companies\.1\.company\.shortCode: duplicate shortCode/)
+    const dangling = { ...multi, companies: [{ ...drms, vehicles: [{ plateNo: 'DA 1 A', type: 'Hilux', costCenter: 'NOPE' }] }] }
+    expect(() => loadSeedData(env, () => JSON.stringify(dangling))).toThrow(/companies\.0\.vehicles\.0\.costCenter/)
   })
 })

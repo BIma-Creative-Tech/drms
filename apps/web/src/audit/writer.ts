@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto'
 import { sql } from '@payloadcms/db-postgres'
 import { createLocalReq, type PayloadRequest } from 'payload'
 
-import { rolesOf } from '@/access/roles'
+import { rolesIn, rolesOf } from '@/access/roles'
 import { requestMeta } from '@/lib/request-meta'
 import { withReqTransaction } from '@/lib/system-tx'
 import { getRequestTx } from '@/lib/tx'
@@ -55,6 +55,10 @@ export const AUDIT_ACTIONS = [
   'retention_purge',
   // S3b / E11: go-live data import (one row per changed master + one summary row per run).
   'import',
+  // ADR 0017: optional self-service 2FA — a user turned TOTP on/off for their own account
+  // (Keycloak application-initiated action, outcome verified through the Admin API).
+  '2fa_enabled',
+  '2fa_disabled',
 ] as const
 export type AuditAction = (typeof AUDIT_ACTIONS)[number]
 
@@ -72,6 +76,8 @@ export type AuditRow = {
   reason?: string
   /** Device wall clock of an offline action (comparison only; server_time stays authoritative). */
   deviceTime?: string
+  /** PT of the document (ADR 0016 §4, nullable: logins, shared masters, app-wide settings). */
+  companyId?: number | null
 }
 
 type UserLike = { id?: unknown; roles?: unknown } | null | undefined
@@ -90,7 +96,7 @@ export async function writeAudit(req: PayloadRequest, rows: AuditRow[], user?: U
   const meta = requestMeta(req)
   const u = user === undefined ? (req.user as UserLike) : user
   const uid = typeof u?.id === 'number' ? u.id : typeof u?.id === 'string' && /^\d+$/.test(u.id) ? Number(u.id) : undefined
-  const roles = rolesOf(u).join(',')
+  const rolesAny = rolesOf(u).join(',')
   const eventId = randomUUID()
   for (const row of rows) {
     await req.payload.create({
@@ -112,7 +118,9 @@ export async function writeAudit(req: PayloadRequest, rows: AuditRow[], user?: U
         statusTo: row.statusTo,
         reason: row.reason,
         userId: uid,
-        userRoles: roles || undefined,
+        // actor roles IN the row's PT when known (ADR 0016), else in any selected PT
+        userRoles: (typeof row.companyId === 'number' ? rolesIn({ user: u } as never, row.companyId).join(',') : rolesAny) || undefined,
+        company: row.companyId ?? undefined,
         source: meta.source,
         appVersion: meta.appVersion,
         ip: meta.ip,

@@ -48,15 +48,19 @@ class FieldError {
 }
 
 class ProblemException extends ApiException {
-  const ProblemException({required this.status, this.title, this.detail, this.errors = const []});
+  const ProblemException({required this.status, this.title, this.detail, this.code, this.errors = const []});
 
   final int status;
+
+  /// Machine code of the problem (`code`, e.g. `COMPANY_NOT_ALLOWED`, `COMPANY_REQUIRED`), if any.
+  final String? code;
   final String? title;
   final String? detail;
   final List<FieldError> errors;
 
   @override
   String get message {
+    if (code == 'COMPANY_NOT_ALLOWED') return companyNotAllowedMessage;
     if (detail != null && detail!.trim().isNotEmpty) return detail!;
     if (errors.isNotEmpty) return errors.map((e) => e.message).join('\n');
     return switch (status) {
@@ -88,9 +92,14 @@ class ProblemException extends ApiException {
         status: status,
         title: body['title'] as String?,
         detail: body['detail'] as String?,
+        code: body['code'] is String ? body['code'] as String : null,
         errors: errs,
       );
     }
     return ProblemException(status: status);
   }
 }
+
+/// 403 `COMPANY_NOT_ALLOWED` of a read (MC3): the PT selection named a PT without membership.
+const companyNotAllowedMessage =
+    'Akses Anda ke salah satu PT yang dipilih sudah berubah. Pilihan PT dikembalikan ke "Semua PT"; muat ulang.';

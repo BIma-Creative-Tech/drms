@@ -5,6 +5,7 @@ import { anyOf, byRole, rolesAllowed } from '@/access/policies'
 import { inIds } from '@/access/scope'
 import { reasonOnDeactivate, withAudit } from '@/audit/hooks'
 import { activeField, codeField, odooRefField, uuidField } from '@/fields/common'
+import { companyField, companyHook } from '@/fields/company'
 
 /**
  * Pusat biaya / lokasi operasional (form item 9: "Ops Palangka Banjar" is not a project).
@@ -28,8 +29,10 @@ export const CostCenters: CollectionConfig = withAudit(
       update: byRole({ 'pk-admin': true, 'pk-owner': true }),
       delete: denyAll,
     },
+    hooks: { beforeChange: [companyHook('cost-centers', { check: [{ field: 'manager', collection: 'users', member: true }] })] },
     fields: [
-      codeField(),
+      companyField(),
+      codeField('Kode', 32, { perCompany: true }),
       { name: 'name', type: 'text', label: 'Nama', required: true, maxLength: 128 },
       {
         name: 'type',

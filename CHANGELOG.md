@@ -6,6 +6,277 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-09-29
+
+Multi-company (MC1–MC3, ADR 0016), optional self-service 2FA (ADR 0017), admin loading dots (0.4.2) and the
+self-hosted CI runner support. Database migrations are NOT backward compatible (rollback = restore the pre-deploy dump).
+
+### MC3 — APK (MC3-2, branch `feat/mc3-mobile`; ADR 0016 §8, ADR 0010 MC note, `docs/proyekkas/mc/mc3-progress.md` §APK)
+
+#### Added
+- **Profile per PT:** `GET /me` `companies[]` parsed (roles, employee, capabilities, settings incl. sync flags per PT);
+  menus and home tiles follow the union over the selected PTs, document actions the roles IN the document's PT.
+- **PT switcher** (home app bar + Profil "PT aktif"): "Semua PT" or any subset, stored per user, sent as
+  `X-Company-Ids`; one PT = static code. 403 `COMPANY_NOT_ALLOWED` resets the selection and reloads `/me`.
+- **Create in one PT:** new request asks the PT first when several are possible; progress reports and check-ins take
+  the PT of their project / location; pickers show that PT's masters only; check-in / progress queue flags per PT.
+- **PT chips** on requests, drafts, inbox, LPJ queue, notifications, addenda, progress reports, team attendance and
+  the send queue when more than one PT is shown; **LPJ queue** (`GET /lpj-queue`) in the Persetujuan inbox; own
+  attendance recap per PT (`/attendance/me?company=`).
+- **"Pilih PT untuk data offline"**: offline data from before the update, when the account has several PTs.
+
+#### Changed
+- drift schema **v3**: `company_id` on local drafts, progress reports and outbox; migration keeps every v2 row
+  (one PT → assigned, several PTs → held until chosen, never guessed).
+- Sync: every item sends its own row's `company_id`, one batch per PT, no `X-Company-Ids`; `COMPANY_MISMATCH` /
+  `COMPANY_NOT_ALLOWED` = final rejection with a clear Indonesian text; batch 409 `COMPANY_REQUIRED` holds PT-less
+  items without losing them.
+- Masters cache per user **and** PT with `ETag` / `If-None-Match` (304 keeps the cache).
+
+### MC3 — API (MC3-1, branch `feat/mc3-api`; ADR 0016 §5/§8, `docs/proyekkas/mc/mc3-progress.md`)
+
+#### Added
+- **`GET /api/v1/me` company context:** `companies[]` (every active membership: `code`, `name`, `timezone`,
+  `selected`, roles, `employeeId`/`employee`, capabilities and APK settings per PT), `activeCompanyIds`,
+  `legacyCompanyId`, app-wide `appSettings`.
+- **Masters per PT:** `company` + `shared` on every item (banks, UoM, holidays shared), default geofence radius of the
+  item's PT, `companies[].version` + `sharedVersion`, weak `ETag` with `If-None-Match` → 304, `?company=`; new types
+  `vendors`, `cash-in-sources`.
+- **`sync/batch` per-item `company_id`:** processed under that PT whatever `X-Company-Ids` says (flags, TZ, own
+  employee of that PT); codes `COMPANY_NOT_ALLOWED` / `COMPANY_MISMATCH` per item, `company_id` in results; items of
+  the released APK (no `company_id`) accepted for one-PT accounts, otherwise 409 `COMPANY_REQUIRED` for the batch.
+- **`?company=` PT filter** (subset of the selection, else 403 `COMPANY_NOT_ALLOWED`) on the approval inbox,
+  transfer queue, new `GET /api/v1/lpj-queue`, expense list, addenda list/inbox, progress reports, cash entries,
+  balances, period closings, notifications, attendance (`/attendance/me` per PT, team today).
+- `companyId` on expense list/detail, cash entries, notifications, addenda and progress reports; `company` ref on
+  approval inbox rows.
+- OpenAPI: reusable header parameter `X-Company-Ids` (`components.parameters.CompanyIds`) on every authenticated
+  path; contract regenerated (`packages/api-contract/openapi.json`).
+- Route table of all 91 `/api/v1` routes with a completeness test (`tests/integration/mc3-api.int.test.ts`,
+  `tests/unit/mc3-api.test.ts`).
+
+#### Deprecated
+- Top-level `roles`, `capabilities`, `employee`, `settings` of `GET /me` (kept for mobile-v0.2.0; one PT → unchanged
+  values; several PTs → union roles, employee/settings of `legacyCompanyId`).
+
+#### Security
+- `GET /api/v1/cash-accounts/balances?company=` returned the balances of any PT; `GET /api/v1/period-closings?company=`
+  the lock date of any PT — both now limited to the caller's selection (403 + audit otherwise).
+- `GET /me` `settings` no longer falls back to company #1 for a user who is not a member there.
+
+### Added
+- **MC1-1 — companies + per-PT memberships** (`apps/web`, branch `feat/mc1-foundation`, ADR 0016 §1–§2):
+  collections `companies` (identity + per-PT operational settings moved from the `company-settings` global; company
+  #1 = DRMS) and `company-memberships` (user × PT: roles, employee link, active; unique (user, PT) and (PT, employee));
+  `users.groupAdmin` (DB-only flag: companies, app-wide settings). Access context per request = active memberships
+  ∩ selection (`X-Company-Ids` header / `pk-company-ids` cookie); `hasRole(req, role, companyId)` requires the PT,
+  legacy "any selected PT" checks are `hasRoleAny` (MC2 review points). Approver pools, recipients, G1 requester
+  accounts and display names resolve through memberships. Migration `20260927_230033_mc1_companies` (backfill:
+  company #1 from the global, one membership per user from its former roles/employee, Admins → group admins;
+  down migration restores the single-company shape).
+
+- **MC1-2/MC1-3 — company column + access per PT** (ADR 0016 §4–§5): `company` on the 30 per-PT collections
+  (masters chosen on create — default = the caller's only PT; transactions derived from their parent by
+  `fields/company.ts` `companyHook` and, for raw inserts, the DB trigger `pk_company_from_parent`), nullable PT tag on
+  `notifications` / `audit-logs`. `byRole` is evaluated PER PT ("see all" = all rows of the PTs where the role is held;
+  scope rules AND-ed with their PT; `resolveScope` per PT), shared masters / per-user rows use `byRoleAny`; creates
+  are re-checked against the role in the resolved PT. Decision guards (approve, acknowledge, transfer, LPJ …) use
+  the caller's roles and employee IN THE DOCUMENT's PT; `X-Company-Ids` naming a foreign PT → 403
+  `COMPANY_NOT_ALLOWED` (audited `access_denied`). Codes/names/document numbers unique per PT. Migration
+  `20260927_234849_mc1_company_columns` (backfill → company #1, NOT NULL, per-PT unique indexes).
+- **MC1-4 — DB guards per PT** (migration `20260928_000100_mc1_security`): `company_id` immutable, cross-PT
+  references rejected by triggers (SQLSTATE 23514 `cross-company reference`: every per-PT FK pair, requester/line
+  child rows, PM / cost-center manager / named approvers need an active membership in the row's PT),
+  `pk_cash_lock_date(company_id)` in the transfer / cash-entry / opening-balance guards (closing PT A never locks
+  PT B), `closePeriod` / `reopenPeriod` per PT, `reminder_runs` keyed `(company_id, run_date)`.
+- **MC1-5 — numbering per PT** (migration `20260928_000200_mc1_numbering`): counters `(company_id, doc_type,
+  period_key)`, `{COMPANY}` = short code of the document's PT, DRMS counters continue (PB 229…), `shortCode`
+  immutable once a PT has numbered documents.
+- **Go-live import / LPJ refund per PT:** the import matches and creates per-PT masters inside its PT (MC1: first
+  active PT; `kode_pt` = MC2); the LPJ refund cash entry uses the "Pengembalian LPJ" source of the request's PT.
+- **MC1-6 — isolation suite** `tests/integration/mc-isolation.int.test.ts` (two PTs, per-PT reads/writes/approvals,
+  forged header/cookie, DB cross-PT guards, per-PT numbering and period lock) + unit tests `mc1-access.test.ts`.
+- **MC2 — multi-company domain, reports, jobs, admin UI and import** (branch `feat/mc2-integration` =
+  `feat/mc2-backend` + `feat/mc2-admin-ui`, ADR 0016 §5–§11, requirements v1.2 §5/§6; progress `mc/mc2-progress.md`):
+  - **Reports / KPI / exports per PT (MC2-2)** (ADR 0016 §6, requirements v1.2 §5/§6):
+    `ReportScope` = list of per-PT scopes built from the role IN each selected PT (`officeScope`, `roleScope`,
+    `auditScope`, `teamScope`, `ownScope`); every raw SQL carries a company predicate (`companyScopeSql`,
+    `ledgerScopeSql`, …; "all" = the caller's PTs for that role, a company-blind `{ kind: 'all' }` matches nothing);
+    the 8 formerly unscoped KPI functions take a scope. Reports: parameter `pt` (narrows only), PT column + "Subtotal
+    per PT" table when > 1 PT, master labels prefixed `[CS1]`, categories never merged across PTs. Dashboards: per-PT
+    breakdown (`byCompany`) next to every combined total. Exports/PDF: one PT → that PT's letterhead, several → the
+    group letterhead (`groupName`/`groupPdfHeader`, else "Laporan gabungan: …") + PT list; PDF Author/Subject
+    metadata. Audit-log report per PT (rows without PT: Admin/Owner only).
+  - **Domain services per PT (MC2-1):** approval inbox / transfer queue / LPJ queue (`lpjQueue`) consolidated with a
+    PT ref per item + optional PT filter; Kas balances / flows / period summaries limited to the Kas PTs of the
+    caller (`kasAccessIn`, `lockDates`), `POST /period-closings` `company` + `?company=` on reopen / list / balances
+    (400 "PT wajib dipilih" when ambiguous); attendance scope per PT (`AttScope.parts`, `narrowAttScope`), recap /
+    team today / corrections per employee PT, default schedule of the employee's PT; progress thresholds per project
+    PT; display names / PDF "Dibuat Oleh" = employee of the document's PT.
+  - **Jobs per active PT (MC2-3):** daily reminders (own hour/toggles, recipients holding the role IN that PT,
+    notifications tagged with the PT, `reminder_runs (company_id, run_date)`, one PT's failure logged), reimburse
+    auto-close (that PT's days), selfie retention (months/switch per PT, app-wide batch per run).
+  - **Media / sync:** office roles read media of their PTs only (all rows only when they hold the role in
+    every active PT); sync items are processed under the PT derived from their references — outside the
+    `X-Company-Ids` selection → rejected `COMPANY_MISMATCH`; feature flags / own employee of the item's PT.
+  - **Role matrix batch save:** `POST /api/v1/company-memberships/batch` — all-or-nothing, Admin of each item's PT
+    or group admin, reason → `role_change` audit rows; errors name the item (`errors[].path = items.<i>`).
+  - **PT switcher (MC2-4)** (ADR 0016 §5, wireframe `mc/wireframes.md` §1a):
+    module-bar control left of the bell (`admin/shell/CompanySwitcher.tsx`): one membership → the PT code as text;
+    several → dialog with "Semua PT saya" (tri-state) + one checkbox per PT (code, name, the user's roles there),
+    Terapkan / Batal, ≥ 1 PT, ↑/↓/Space/Esc, bottom sheet ≤ 768 px. New `POST /api/v1/me/companies` sets the HttpOnly
+    cookie `pk-company-ids` (`__Host-` on https; "Semua PT" = cookie cleared); a PT without membership → 403
+    `COMPANY_NOT_ALLOWED` (audited). OpenAPI regenerated.
+  - **Master Perusahaan + PT column/filter + employee ↔ PT (MC2-4)** (ADR 0016 §11, wireframes §3–§4): companies form
+    in tabs (Identitas / Operasional / Absensi & retensi / Pengingat & notifikasi), list Kode · Nama · Zona waktu ·
+    Anggota · Aktif · Dibuat; every list with a PT column (30 per-PT collections, memberships, notifications, audit
+    logs) shows the PT short-code chip first and, with more than one PT selected, PT filter chips above the table
+    (`admin/company-list.ts`). A chosen PT sits at the top of master forms; employee create requires the PT when
+    several PTs are selected; employee / project / cost-center / work-schedule pickers list only the document's PT.
+  - **Role matrix "Pengguna & akses PT" (MC2-4)** (`/admin/akses-pt`, wireframe §2): users × PTs, cell = membership
+    (role checkboxes, employee of that PT, add / deactivate), Admin of the PT or group admin, reason required, saved
+    in ONE atomic batch (a refused batch saves nothing and marks the failing cell), audit `role_change`, warnings for
+    a PT without active Direktur / Finance, mobile cards.
+  - **PT in custom views + dashboards (MC2-4):** approval inbox, transfer queue, LPJ verification and addendum list
+    show a PT column when more than one PT is selected; transfer / settlement forms offer only cash accounts of the
+    request's PT (transfer / void actions only for Finance OF that PT); Direktur / Finance / PM dashboard tiles show
+    per-PT rows under the combined totals (cash, waiting approvals, budget colours, completeness, transfer queue,
+    last closed period); K-09 progress rows carry a PT chip.
+  - **Kas + Tutup buku per PT:** balances with per-PT subtotal next to the combined total, PT filter + PT chip in the
+    book, edit / void and lock date per row PT; "Kas masuk/keluar" and "Tutup buku" act on ONE PT (PT chooser / tabs
+    when the caller holds the role in several), close / reopen always send `company` (a 400 "PT wajib dipilih" is
+    explained instead of echoed).
+  - **Absensi per PT:** PT filter on "Tim hari ini" and the monthly recap, project / cost-center filters bound to their
+    PT (`narrowAttScope`), PT chips on the grid and board (`TeamToday.members[].companyId`), option labels `[PT]`.
+  - **Reports view:** audit log uses `auditScope`; letterhead line of the effective PTs above the tables.
+  - **Go-live import per PT (MC2-5)** (`apps/web/src/import`, runbook §4.1): sheet `Perusahaan` (target PTs; existing
+    ones untouched, new ones created with default numbering + approval rules), `kode_pt` as first column of every
+    per-PT sheet (codes unique per PT; empty = the only PT), sheet `AksesPT` (roles per user per PT), validation of
+    unknown / inactive PTs and cross-PT references, cut-over per PT (PB start per PT). Template `MC2-5` regenerated,
+    new fictional two-PT sample `drms-impor-golive-contoh-fiktif-2pt.xlsx`.
+  - **Tests:** `tests/integration/mc2-isolation.int.test.ts` (3 PTs, users with different roles per PT: reports,
+    KPI, dashboards, exports/letterhead, queues, Kas, attendance, reminders, retention, media, sync) and the raw-SQL
+    company lint `tests/unit/mc2-sql-lint.test.ts`; `tests/integration/mc2-integration.int.test.ts` (2 PTs, different
+    roles per PT: switcher cookie × dashboards × queue × closing × role-matrix batch, Absensi filter regression),
+    `mc2-import`, unit `mc2-{admin-ui,switcher,role-matrix,import,integration}`. Contract backend ↔ UI:
+    `docs/proyekkas/mc/mc2-contract.md`.
+
+- **Seed:** `SEED_DATA_FILE` accepts the old single-company shape (→ company #1 DRMS) and a new
+  `{ uoms, banks, companies: [...] }` shape; every PT gets the default sequences and approval rules.
+
+- **Optional self-service 2FA (TOTP)** (branch `feat/2fa-self-service`, ADR 0017, user decision 2026-09-28): each
+  user turns 2FA on/off for their OWN account; nobody is forced.
+  - Web: page **"Keamanan akun"** (`/admin/keamanan-akun`, avatar menu) with status *2FA aktif / nonaktif / tidak
+    diketahui* + authenticator label/date, **Aktifkan 2FA** (Keycloak AIA `kc_action=CONFIGURE_TOTP`) and
+    **Nonaktifkan 2FA** with confirmation (AIA `delete_credential:<own id>`), both with `prompt=login`
+    (fresh password + code). `POST /auth/account-action` (same-origin, web session only, own credential only,
+    6 / 10 min / user); return leg in `/auth/callback` via its own `pk_aia_tx` cookie + state — no second web
+    session / `login` row; outcome verified via the Admin API (`listUserCredentials`, OTP metadata only); audit
+    `2fa_enabled` / `2fa_disabled` (migration `20260928_090000_two_factor_audit`: two enum values).
+  - APK (password mode): after a failed login the optional field **"Kode autentikator (bila 2FA aktif)"** appears
+    (6 digits, numeric keyboard, one-time-code autofill); the retry sends `totp`; empty → not sent; never logged.
+  - Tests: web unit + integration (Keycloak mocked), `tests/kc/two-factor.kc.test.ts` against a real throwaway
+    Keycloak 26.7.4 (`test-env/kc-setup.sh` gains a TEST-ONLY `proyekkas-web` client + user); mobile unit + widget.
+  - Docs: ADR 0017; revisions in ADR 0012, `plans/fase1-golive.md` G1-3, ASVS checklist 4.3.1 / G-01 (decided).
+- **Public APK download on the DRMS server** (`apps/web`, branch `feat/apk-download-page`; user decision 2026-09-27
+  "host on the DRMS server"): `GET /unduh` — a public page in Indonesian (web-starter tokens/fonts, light/dark, 390 px,
+  server component, `noindex`): version, size, publish date (WITA), big **Unduh APK** button, install/update steps,
+  SHA-256 of the file and of the signing certificate, "Hanya untuk karyawan PT DRMS". `GET|HEAD /unduh/proyekkas.apk`
+  — stable URL for Pengaturan → "URL unduh APK": streams the current release with
+  `application/vnd.android.package-archive`, `attachment; filename="ProyekKas-<version>.apk"`, `Content-Length`,
+  `Cache-Control: no-cache` + `ETag` (= SHA-256, 304 on match), `nosniff`, `X-Robots-Tag`; 404 with an Indonesian
+  message while nothing is published. No login; the `/admin` gate and CSP nonce proxy are unchanged (own root layout
+  in route group `(public)`, no Payload, no client components).
+  - Files live in the existing media volume under `${MEDIA_DIR}/app-release/` with a manifest `latest.json`
+    validated strictly by zod (`src/lib/app-release.ts`: fixed file-name pattern, path kept inside the directory,
+    size must match → a partial copy is never served).
+  - `apps/web/scripts/publish-apk.mjs` (Node built-ins only, shipped in the runner image): copies an APK, computes
+    SHA-256, writes `latest.json` atomically, keeps the current + 2 previous versions; refuses a different file under
+    an already published version. Runbook `docs/proyekkas/runbooks/rilis-apk.md` (one-shot `docker run --rm` with the
+    running web image + media volume; no running container is touched).
+  - Tests: `tests/unit/apk-download.test.ts` (manifest schema incl. traversal, route 404/200/HEAD/304, publish
+    retention, page markup). No new dependency.
+- **Release notes per version ("deskripsi rilis") in three places** (web + APK 0.2.1; user decision 2026-09-28):
+  - Source of truth for the APK: `docs/release-notes/apk/<X.Y.Z>.md` — short Indonesian bullets for field employees
+    (0.2.0 and 0.2.1 written; format rules in `docs/release-notes/README.md`). Must exist before the tag is pushed.
+  - **`/unduh`**: `scripts/publish-apk.mjs --notes <file.md>` stores the bullets as plain text `notes: string[]` in
+    `latest.json` (markdown bullets, continuation lines, title/blank lines ignored, inline markup reduced to text;
+    1–15 bullets × ≤ 300 chars, no control characters; a bad file fails before anything is copied). The zod manifest
+    schema accepts the optional field (older manifests stay valid); the page shows "Yang baru di versi X" as escaped
+    text. Retention unchanged. Runbook `rilis-apk.md` passes `--notes /in/notes.md`.
+  - **In the APK**: `GET /api/v1/app/config` gains optional `releaseNotes: string[]` — the manifest notes when the
+    published APK's version equals "Versi APK terbaru" (else omitted; cached with the settings for 60 s). OpenAPI
+    regenerated. APK: tolerant parsing (`AppConfig.releaseNotes`, ≤ 15 × ≤ 300), the home line "Versi baru tersedia"
+    became a tappable banner → sheet with "Yang baru di versi X", install hint and the download link (copy button as
+    before); the blocking "Perbarui aplikasi" screen shows the same list and scrolls when long. New ARB strings only.
+  - **GitHub Releases**: `mobile.yml` job `release-prod` fails before building when the notes file for the tag version
+    is missing, and after the APKs are verified creates/updates the Release of `mobile-vX.Y.Z` (body = notes file +
+    certificate SHA-256 + CHANGELOG link; assets = the three ABI APKs + `SHA256SUMS.txt`; job-level
+    `contents: write`, workflow default stays read). New workflow `release-notes.yml`: tag `vX.Y.Z` → Release with the
+    `## [X.Y.Z]` section of this file (fails when the section is missing).
+  - Tests: `tests/unit/apk-download.test.ts` (schema limits, markdown parsing, publish with/without notes,
+    `releaseNotesFor`, page escaping), `tests/integration/f4-mobile.int.test.ts` (app config `releaseNotes`),
+    APK `test/unit/misc_test.dart` + `test/widget/release_notes_test.dart`. No new dependency.
+
+### Changed
+- **Release APK on self-hosted**: release builds (R8 + obfuscation) get Gradle heap 2.5 GiB / metaspace 512 MiB
+  (`GRADLE_OPTS_RELEASE`; debug keeps 1.5 GiB) — `assembleStagingRelease` died after ~8 min with exit 1 and no kernel
+  OOM at 1.5–2 GiB. `tool/build_with_retry.sh` now prints a failure excerpt (FAILURE / What went wrong /
+  OutOfMemoryError / error:) and can keep the full log (`BUILD_LOG_KEEP`); the staging release log is uploaded on
+  failure (3 days).
+- **Trivy cache on self-hosted** uses the runner's persistent `TRIVY_CACHE_DIR` instead of `_temp` (root-owned files
+  there could not be cleaned by the runner); GitHub-hosted unchanged.
+- **Self-hosted image publish hang (plan 12 R10)**: buildkitd (docker-container) now runs with
+  `--oci-worker-no-process-sandbox` on self-hosted — RUN steps in a nested pid namespace hung forever under
+  sysbox-fs 0.7.1 (leaked unreaped helper). GitHub-hosted keeps the default buildkitd flags.
+- **Self-hosted runner fixes (infra plan 12 R10)**: APK jobs on self-hosted use Gradle heap 1.5 GiB, metaspace 384 MiB,
+  1 worker (F1: the 4 GiB cgroup OOM-killed Gradle during the staging APK build); publishing image builds always use
+  buildx `docker-container` because the `docker` driver cannot push-by-digest (F2); local-only builds keep `docker`.
+- **CI runner switchable + fewer runs** (GitHub Free minutes exhausted 2026-09-28; owner chose a self-hosted runner,
+  infra plan 12): every job's `runs-on` reads repo variable `CI_RUNS_ON` (deploy-prod: `DEPLOY_RUNS_ON`) as JSON, e.g.
+  `["self-hosted","linux","x64","drms"]`; unset = `ubuntu-24.04` as before, so switching back needs no code change.
+  `ci` / `mobile` no longer run on pushes to `feat/**`, `fix/**` (they run on the pull request; a push + PR used to
+  run everything twice). Staging APK artifacts kept 7 days (was 30), coverage 3 days (was 14) to stay under 500 MB.
+  **Self-hosted-ready (plan 12 R8):** on `runner.environment == 'self-hosted'` no GitHub cache (`actions/cache`,
+  `setup-node` npm cache) — the runner image's persistent `npm_config_cache` / `PUB_CACHE` / `GRADLE_USER_HOME` are
+  used; the Flutter tarball is kept in `/cache/flutter` (`FLUTTER_TARBALL_CACHE`) and sha256-checked on every use
+  (`apps/mobile/tool/ci_install_flutter.sh`); buildx `docker` driver without `type=gha` (GitHub-hosted keeps
+  `type=gha`); release tags `v*` build images with `no-cache`, `release-prod` APK with job-local pub/Gradle dirs;
+  APK jobs get `GRADLE_OPTS` for 4 GiB (no daemon, 2 workers, `-Xmx2g`, Kotlin in-process); mobile coverage
+  artifact on GitHub-hosted only (job summary line everywhere); staging release APK kept 3 days; timeouts raised
+  for 2 vCPU (verify/security 30, integration 40, mobile verify 45, image/APK 75 min); `ci` image job reads the
+  version with `jq` (no `node` on the runner PATH).
+- **`company-settings` global = app-wide only** (APK gate, device image targets, offline max age, selfie batch
+  size, new group letterhead `groupName`/`groupLogo`/`groupPdfHeader`); editable by the group admin only. Per-PT
+  settings (thresholds, reminders, sync flags, default schedule, retention) live on the company record.
+- **Login / Keycloak (ADR 0016 §2):** per-PT roles are DB-only; the web callback no longer syncs realm roles into
+  `users.roles` (removed), the APK bearer no longer intersects token roles; a login needs the realm role `pk-user` —
+  **MC1 transition:** any legacy `pk-*` realm role is accepted as the same login marker until the infra change
+  assigns `pk-user`. User create in the admin assigns only `pk-user` in Keycloak (fallback `pk-staff` marker while
+  the realm lacks `pk-user`); role edits never call Keycloak.
+
+### Security
+- **MC2 per-PT fixes of MC1 leftovers:** addendum decisions used the union of the caller's roles over the selected
+  PTs (Finance of PT A + PM of PT B could decide a PT B addendum) → roles IN the addendum's PT; manual cash
+  posting / edit / void checked only "Finance in any PT" → Finance of the account's / entry's PT (else 400/404);
+  internal PDF copy, full bank number in the request DTO, cash rows in the request history, device revoke,
+  attendance correction and PM on-behalf check-in now check the role in the document's PT.
+- **MC2 integration:** the Absensi recap built a company-less team scope from the query string — an office user of
+  PT A filtering by a project id of PT B saw B's attendance → `narrowAttScope` (filters stay inside each PT). The
+  Finance queues (transfer queue, LPJ verification, `GET /api/v1/transfer-queue`) listed the team requests of a PT
+  where the caller is only PM (with the bank snapshot) → limited to the PTs where the caller is Finance / Direktur.
+
+### Removed
+- `users.roles` and `users.employee` (replaced by `company-memberships`).
+
+### Fixed
+- **Mobile token parity** (`apps/mobile/lib/app/theme/tokens.dart`): the web token `primarySoft` added in 0.4.2
+  (loader dots) was missing on the Flutter side, so `test/unit/theme_tokens_test.dart` failed (22 ≠ 23 keys) and
+  the mobile workflow was red on develop. `PkTokens.primarySoft` added (light `#BFDBFE`, dark `#1E40AF`).
+- **CI semgrep red on develop** (`admin/views/AksesPt.tsx`, MC2 role matrix): five Local API reads passed their
+  access arguments through a spread (`...read`), which rule `payload-local-api-implicit-override-access` cannot see.
+  The arguments `user, overrideAccess: false, req, depth: 0` are now written literally in each call (same behaviour).
+
 ## [0.4.2] - 2026-09-28
 
 ### Added

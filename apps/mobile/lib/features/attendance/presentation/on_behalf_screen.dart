@@ -6,7 +6,6 @@ import '../../../core/location/location_service.dart';
 import '../../../core/media/photo_compressor.dart';
 import '../../../l10n/gen/app_localizations.dart';
 import '../../../shared/widgets/async_body.dart';
-import '../../app_config/application/app_config_providers.dart';
 import '../../auth/application/auth_controller.dart';
 import '../../expense/data/draft_repository.dart';
 import '../../sync/application/sync_coordinator.dart';
@@ -109,7 +108,6 @@ class _OnBehalfScreenState extends ConsumerState<OnBehalfScreen> {
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
-    final enabled = ref.watch(appConfigProvider).value?.syncAttendance ?? false;
     final candidates = ref.watch(onBehalfCandidatesProvider);
     return Scaffold(
       appBar: AppBar(title: Text(t.onBehalfTitle)),
@@ -119,6 +117,10 @@ class _OnBehalfScreenState extends ConsumerState<OnBehalfScreen> {
         data: (list) {
           final who = list.where((c) => c.employeeId == _employeeId).firstOrNull;
           final site = who?.sites.where((s) => s.key == _siteKey).firstOrNull ?? who?.sites.firstOrNull;
+          // MC3: the flag of the location's PT (any scoped PT before a location is known).
+          final enabled = site == null
+              ? ref.watch(attendanceEnabledAnyProvider)
+              : ref.watch(attendanceEnabledForProvider(site.companyId));
           return ListView(
             padding: const EdgeInsets.all(16),
             children: [

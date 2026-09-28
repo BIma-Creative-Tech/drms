@@ -85,6 +85,21 @@ sync item. Works offline; the server decides and stamps the time (ADR 0010 decis
   follow `allowedActions`. All writes online with an Idempotency-Key (server rate limit 30/min); the server uses the
   profile signature.
 
+## Multi-company (MC3-2, ADR 0016 §8)
+
+- `GET /me` `companies[]` = memberships with roles, employee, capabilities and settings **per PT**
+  (`UserProfile.companies`). The PT switcher (home app bar; Profil → "PT aktif") picks "Semua PT" or any subset; it is
+  stored per user in the encrypted DB (`company_selection:<sub>`) and sent as `X-Company-Ids` on list calls (none =
+  all PTs). Menus / tiles use the union of the roles in the selected PTs; buttons on one document use the roles IN
+  its PT (`UserProfile.forCompany`); document calls by id, media uploads, `/me` and `sync/batch` never send the header.
+  403 `COMPANY_NOT_ALLOWED` → selection back to "Semua PT" + `/me` reload.
+- A new draft / progress report / check-in belongs to ONE PT: asked first when the scope has several request PTs;
+  a report / check-in takes the PT of its project / location. Pickers read the masters cache of that PT
+  (`masters:<sub>:<pt>`, ETag / 304). PT chips (code) on lists when more than one PT is shown.
+- drift schema **v3**: nullable `company_id` on drafts, progress reports and outbox. Old rows: one PT → assigned
+  automatically; several PTs → kept, not sent, banner "… data offline belum punya PT" → choose per item.
+  Sync sends `company_id` of each row (one batch per PT); `COMPANY_MISMATCH` / `COMPANY_NOT_ALLOWED` are final.
+
 ## APK secret scan
 
 `tool/apk_secret_scan.sh <apk>…` (python3 + docker) unpacks the APK, dumps strings from dex / `libapp.so`, fails on
@@ -106,6 +121,14 @@ before a prod APK is handed out; until then the prod APK shows "Login langsung b
 cannot log in this way and must set their password on the web first. Rollback: build with
 `--dart-define=PK_LOGIN_MODE=browser` and turn Direct Access Grants off again. Token refresh is the same plain
 `refresh_token` grant in both modes (`TokenManager`).
+
+**Optional 2FA (ADR 0017):** users may enable an authenticator (TOTP) for their own account on the web
+("Keamanan akun"). The realm's direct grant flow then requires the code as form parameter `totp`
+(`direct-grant-validate-otp`). Keycloak 26.7.4 answers a missing or wrong code with the same
+`invalid_grant` "Invalid user credentials" as a wrong password, so after such an answer the form shows the
+optional field "Kode autentikator (bila 2FA aktif)" (6 digits, numeric keyboard, one-time-code autofill).
+Empty = no `totp` parameter (users without 2FA see no difference). The code is cleared after every attempt and
+never stored or logged. Browser mode shows Keycloak's own OTP page instead.
 
 ## OIDC redirect: App Link vs. fallback scheme (browser mode)
 
@@ -190,5 +213,14 @@ One-time setup (custodian 1 = client, custodian 2 = vendor; do it together, offl
    `ANDROID_KEY_ALIAS` (`proyekkas-prod`). Then delete the base64 text from the clipboard/shell history.
 4. Record the SHA-256 in the prod server env `ANDROID_APP_CERT_SHA256` (App Links) and, when push is enabled
    (ADR 0011, E8), in the Firebase Android app. The CI summary of every release shows the same value.
-5. Release: bump `version:` in `pubspec.yaml`, merge to `main`, push the tag `mobile-vX.Y.Z`, download
-   the artifact, `apksigner verify --print-certs` locally if desired, distribute the `arm64-v8a` APK.
+5. Release: bump `version:` in `pubspec.yaml`, **write the user-facing release notes
+   `docs/release-notes/apk/X.Y.Z.md`** (Indonesian bullets for field employees, rules in
+   `docs/release-notes/README.md`; the job fails before building without it), merge to `main`, push the tag
+   `mobile-vX.Y.Z`. The job creates the GitHub Release of the tag (notes + certificate SHA-256 + the three ABI APKs +
+   `SHA256SUMS.txt`); download the artifact (or the Release asset), `apksigner verify --print-certs` locally if
+   desired, distribute the `arm64-v8a` APK.
+6. Publish it on the DRMS server download page (infra Lead): `publish-apk.mjs --notes` (same notes file) into the prod
+   media volume →
+   `https://drms-kas.bimacreative.tech/unduh` / stable file URL `…/unduh/proyekkas.apk`, verify with `curl -I`, then
+   Pengaturan → **Versi APK terbaru** = X.Y.Z (and once: **URL unduh APK** = the stable file URL, so the app's update
+   screen links there). Steps: `docs/proyekkas/runbooks/rilis-apk.md`.

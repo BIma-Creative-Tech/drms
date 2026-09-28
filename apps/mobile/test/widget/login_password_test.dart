@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:proyekkas/core/config/app_env.dart';
 import 'package:proyekkas/features/auth/application/auth_controller.dart';
+import 'package:proyekkas/features/auth/data/password_login_client.dart' show PasswordLoginError;
 import 'package:proyekkas/features/auth/presentation/login_screen.dart';
 
 import '../support/widget_harness.dart';
@@ -22,12 +23,14 @@ const _passwordEnv = AppEnv(
 class _RecordingAuth extends FakeAuth {
   _RecordingAuth() : super(const AuthSignedOut());
   final attempts = <(String, String)>[];
+  final totps = <String?>[];
   int browserLogins = 0;
   Completer<String?> next = Completer<String?>();
 
   @override
-  Future<String?> loginWithPassword({required String username, required String password}) {
+  Future<String?> loginWithPassword({required String username, required String password, String? totp}) {
     attempts.add((username, password));
+    totps.add(totp);
     return next.future;
   }
 
@@ -140,6 +143,91 @@ void main() {
       expect(auth.attempts.last, ('doni', 'pw-2'));
       expect(find.byKey(const Key('login-error')), findsNothing);
       expect(tester.widget<EditableText>(_field('login-password')).controller.text, isEmpty);
+    });
+
+    testWidgets('optional 2FA: no code field until a wrong-credentials answer, then retry with the code', (
+      tester,
+    ) async {
+      await pumpLogin(tester);
+      expect(find.byKey(const Key('login-totp')), findsNothing, reason: 'users without 2FA see no change');
+
+      await tester.enterText(find.byKey(const Key('login-username')), 'doni');
+      await tester.enterText(find.byKey(const Key('login-password')), 'pw-1');
+      await tester.tap(find.byKey(const Key('login-button')));
+      await tester.pump();
+      expect(auth.totps.single, isNull);
+      auth.next.complete(PasswordLoginError.invalidCredentials.message);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Email/username atau kata sandi salah.'), findsOneWidget);
+      expect(find.byKey(const Key('login-totp')), findsOneWidget);
+      expect(find.text('Kode autentikator (bila 2FA aktif)'), findsOneWidget);
+      final code = tester.widget<EditableText>(_field('login-totp'));
+      expect(code.keyboardType, TextInputType.number);
+      expect(code.autofillHints, [AutofillHints.oneTimeCode]);
+
+      // digits only, max 6
+      await tester.enterText(find.byKey(const Key('login-totp')), '48a29137');
+      expect(tester.widget<EditableText>(_field('login-totp')).controller.text, '482913');
+
+      // wrong code → combined message, code cleared (single-use)
+      auth.next = Completer<String?>();
+      await tester.enterText(find.byKey(const Key('login-password')), 'pw-2');
+      await tester.tap(find.byKey(const Key('login-button')));
+      await tester.pump();
+      expect(auth.totps.last, '482913');
+      auth.next.complete(PasswordLoginError.invalidCredentials.message);
+      await tester.pumpAndSettle();
+      expect(find.textContaining('Email/username, kata sandi, atau kode autentikator salah.'), findsOneWidget);
+      expect(tester.widget<EditableText>(_field('login-totp')).controller.text, isEmpty);
+
+      // incomplete code → validation message, no attempt
+      await tester.enterText(find.byKey(const Key('login-password')), 'pw-3');
+      await tester.enterText(find.byKey(const Key('login-totp')), '123');
+      await tester.tap(find.byKey(const Key('login-button')));
+      await tester.pump();
+      expect(find.text('Kode autentikator terdiri dari 6 digit.'), findsOneWidget);
+      expect(auth.attempts, hasLength(2));
+
+      // success with a fresh code
+      auth.next = Completer<String?>();
+      await tester.enterText(find.byKey(const Key('login-totp')), '771204');
+      await tester.tap(find.byKey(const Key('login-button')));
+      await tester.pump();
+      expect(auth.attempts.last, ('doni', 'pw-3'));
+      expect(auth.totps.last, '771204');
+      auth.next.complete(null);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('login-error')), findsNothing);
+      expect(tester.widget<EditableText>(_field('login-totp')).controller.text, isEmpty);
+    });
+
+    testWidgets('code field shown but left empty → no totp sent', (tester) async {
+      await pumpLogin(tester);
+      await tester.enterText(find.byKey(const Key('login-username')), 'doni');
+      await tester.enterText(find.byKey(const Key('login-password')), 'pw-1');
+      await tester.tap(find.byKey(const Key('login-button')));
+      await tester.pump();
+      auth.next.complete(PasswordLoginError.invalidCredentials.message);
+      await tester.pumpAndSettle();
+      auth.next = Completer<String?>();
+      await tester.enterText(find.byKey(const Key('login-password')), 'pw-2');
+      await tester.tap(find.byKey(const Key('login-button')));
+      await tester.pump();
+      expect(auth.totps, [null, null]);
+      auth.next.complete(null);
+      await tester.pumpAndSettle();
+    });
+
+    testWidgets('other failures (e.g. network) do not reveal the code field', (tester) async {
+      await pumpLogin(tester);
+      await tester.enterText(find.byKey(const Key('login-username')), 'doni');
+      await tester.enterText(find.byKey(const Key('login-password')), 'pw-1');
+      await tester.tap(find.byKey(const Key('login-button')));
+      await tester.pump();
+      auth.next.complete('network');
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('login-totp')), findsNothing);
     });
 
     testWidgets('offline: Masuk disabled with the internet hint; session-ended notice shown', (tester) async {

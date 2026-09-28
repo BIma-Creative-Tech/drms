@@ -10,12 +10,22 @@ export const newIdemKey = (): string | undefined => (typeof crypto !== 'undefine
 
 export type Sent = { ok: boolean; status: number; data: unknown; error: string | null }
 
+/**
+ * MC2 (ADR 0016 §5, mc2-contract §0.3): a mutation must name its PT. The views always send it; if the
+ * server still answers 400 "PT wajib dipilih" (e.g. an old tab after the PT selection changed), say
+ * what to do instead of echoing the raw problem text.
+ */
+export function friendlyProblem(status: number, text: string): string {
+  if (status === 400 && /PT wajib dipilih/i.test(text)) return 'Anda memegang peran ini di lebih dari satu PT, jadi PT harus dipilih. Pilih PT di halaman ini (atau muat ulang halaman), lalu ulangi — belum ada yang disimpan.'
+  return text
+}
+
 export async function sendJson(method: 'POST' | 'PATCH', url: string, body: unknown, idempotencyKey?: string): Promise<Sent> {
   const headers: Record<string, string> = { 'Content-Type': 'application/json', Accept: 'application/json' }
   if (idempotencyKey) headers['Idempotency-Key'] = idempotencyKey
   const res = await fetch(url, { method, credentials: 'same-origin', headers, body: JSON.stringify(body ?? {}) })
   const data = await res.json().catch(() => null)
-  return { ok: res.ok, status: res.status, data, error: res.ok ? null : problemText(data, res.status) }
+  return { ok: res.ok, status: res.status, data, error: res.ok ? null : friendlyProblem(res.status, problemText(data, res.status)) }
 }
 
 /** Field errors of a problem+json body keyed by path (400 from Zod / domain `fail(…, errors)`). */

@@ -247,8 +247,12 @@ class TeamMember {
     this.onBehalf = false,
     this.corrected = false,
     this.locations = const [],
+    this.companyId,
   });
   final PersonRef employee;
+
+  /// MC3: PT of the employee (actions check the role IN that PT).
+  final int? companyId;
   final List<LocationRef> assigned;
   final MemberStatus status;
   final String? checkInLocal;
@@ -268,6 +272,7 @@ class TeamMember {
     onBehalf: j['onBehalf'] == true,
     corrected: j['corrected'] == true,
     locations: [for (final l in _list(j['locations'])) LocationDay.fromJson(_map(l))],
+    companyId: j['companyId'] is num ? (j['companyId'] as num).toInt() : null,
   );
 }
 

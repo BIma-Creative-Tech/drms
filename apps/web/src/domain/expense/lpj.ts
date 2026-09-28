@@ -115,7 +115,8 @@ export async function submitLpj(req: PayloadRequest, id: number, input: { usageN
   const transferred = raw.transferredTotal ?? 0
   const receiptsTotal = sum(active)
   let docNo = s.docNo ?? null
-  if (!docNo) docNo = (await allocateDocNo(req, 'settlement', { date: parseBusinessDate(await today(req)), docId: String(s.id) })).docNo
+  const companyId = relId((raw as { company?: unknown }).company)!
+  if (!docNo) docNo = (await allocateDocNo(req, 'settlement', { companyId, date: parseBusinessDate(await today(req, companyId)), docId: String(s.id) })).docNo
   await updateSettlement(req, s.id, {
     docNo,
     status: 'submitted',
@@ -206,7 +207,7 @@ export async function settle(req: PayloadRequest, id: number, input: SettleInput
   if (!isBusinessDate(date)) fail(400, 'Tanggal harus YYYY-MM-DD.')
   if (date > todayDate) fail(400, 'Tanggal tidak boleh di masa depan.')
   await assertAccount(req, input.cashAccountId)
-  const lock = await currentLockDate(req)
+  const lock = await currentLockDate(req, relId((raw as { company?: unknown }).company))
   if (lock && date <= lock) fail(409, `Periode ${date.slice(0, 7)} sudah ditutup (tutup buku s/d ${lock}).`)
   const lpjNo = s.docNo ?? ''
   const label = `${lpjNo} — ${raw.docNo ?? ''} ${raw.title}`.slice(0, 900)
@@ -218,7 +219,8 @@ export async function settle(req: PayloadRequest, id: number, input: SettleInput
   if (st.type === 'refund') {
     const source = await req.payload.find({
       collection: 'cash-in-sources',
-      where: { code: { equals: 'LPJ' } },
+      // ADR 0016: the "Pengembalian LPJ" source OF THE REQUEST's PT (seeded per PT)
+      where: { and: [{ company: { equals: relId((raw as { company?: unknown }).company) } }, { code: { equals: 'LPJ' } }] },
       limit: 1,
       depth: 0,
       overrideAccess: true, // SYSTEM-READ: master "Pengembalian LPJ" (seed/data.ts)
@@ -247,7 +249,7 @@ export async function settle(req: PayloadRequest, id: number, input: SettleInput
     if (!bankRef) fail(400, 'Nomor referensi bank wajib diisi untuk transfer kekurangan.', [{ path: 'bankRef', message: 'Wajib.' }])
     if (!input.proofMediaId) fail(400, 'Bukti transfer wajib untuk transfer kekurangan.', [{ path: 'proofMediaId', message: 'Wajib.' }])
     if (!raw.bankSnapshot?.accountNo) fail(409, 'Rekening tujuan belum tersimpan pada pengajuan.')
-    const { docNo } = await allocateDocNo(req, 'transfer', { date: parseBusinessDate(date) })
+    const { docNo } = await allocateDocNo(req, 'transfer', { companyId: relId((raw as { company?: unknown }).company)!, date: parseBusinessDate(date) })
     await claimMedia(req, 'media-transfer-proofs', input.proofMediaId, id)
     const transfer = (await req.payload.create({
       collection: 'transfers',
@@ -321,7 +323,7 @@ export async function reverseSettlement(req: PayloadRequest, id: number, reason:
     fail(409, 'LPJ ini selesai tanpa selisih; tidak ada kas masuk/transfer penyelesaian yang dapat dibatalkan.')
   }
   const raw = await loadRaw(req, id)
-  const lock = await currentLockDate(req)
+  const lock = await currentLockDate(req, relId((raw as { company?: unknown }).company))
   const closed = (date: string) =>
     fail(409, `Periode ${date.slice(0, 7)} sudah ditutup (tutup buku s/d ${lock}). Minta Direktur membuka kembali periode sebelum membatalkan penyelesaian.`)
   let transferredTotal = raw.transferredTotal ?? 0

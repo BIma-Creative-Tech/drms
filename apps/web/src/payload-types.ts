@@ -68,6 +68,8 @@ export interface Config {
   blocks: {};
   collections: {
     users: User;
+    companies: Company;
+    'company-memberships': CompanyMembership;
     employees: Employee;
     'employee-bank-accounts': EmployeeBankAccount;
     banks: Bank;
@@ -122,6 +124,8 @@ export interface Config {
   collectionsJoins: {};
   collectionsSelect: {
     users: UsersSelect<false> | UsersSelect<true>;
+    companies: CompaniesSelect<false> | CompaniesSelect<true>;
+    'company-memberships': CompanyMembershipsSelect<false> | CompanyMembershipsSelect<true>;
     employees: EmployeesSelect<false> | EmployeesSelect<true>;
     'employee-bank-accounts': EmployeeBankAccountsSelect<false> | EmployeeBankAccountsSelect<true>;
     banks: BanksSelect<false> | BanksSelect<true>;
@@ -231,11 +235,6 @@ export interface User {
   id: number;
   email: string;
   name?: string | null;
-  /**
-   * Disinkronkan ke realm role Keycloak.
-   */
-  roles?: ('pk-staff' | 'pk-pm' | 'pk-finance' | 'pk-owner' | 'pk-admin')[] | null;
-  employee?: (number | null) | Employee;
   phone?: string | null;
   /**
    * PNG tanda tangan Anda (latar putih/transparan). Dipakai otomatis saat mengirim/menyetujui pengajuan (US-43). Klik "Buat Baru" untuk mengunggah, lalu Simpan.
@@ -247,6 +246,10 @@ export interface User {
   keycloakSub?: string | null;
   active?: boolean | null;
   /**
+   * Mengelola daftar PT, setting aplikasi dan akses PT semua pengguna.
+   */
+  groupAdmin?: boolean | null;
+  /**
    * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
    */
   changeReason?: string | null;
@@ -256,21 +259,137 @@ export interface User {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "employees".
+ * via the `definition` "media-signatures".
  */
-export interface Employee {
+export interface MediaSignature {
   id: number;
-  code: string;
-  name: string;
-  nickname?: string | null;
-  position?: string | null;
-  phone?: string | null;
-  workSchedule?: (number | null) | WorkSchedule;
-  faceRefPhoto?: (number | null) | MediaSelfy;
+  uploadedBy?: (number | null) | User;
+  receivedAt?: string | null;
+  ownerDocType?: string | null;
+  ownerDocId?: string | null;
+  sha256Original?: string | null;
+  originalWidth?: number | null;
+  originalHeight?: number | null;
+  originalSize?: number | null;
+  capturedAt?: string | null;
   /**
-   * Referensi Odoo (diisi saat mirror, ADR 0009).
+   * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
    */
-  odooEmployeeRef?: string | null;
+  changeReason?: string | null;
+  updatedAt: string;
+  createdAt: string;
+  url?: string | null;
+  thumbnailURL?: string | null;
+  filename?: string | null;
+  mimeType?: string | null;
+  filesize?: number | null;
+  width?: number | null;
+  height?: number | null;
+  focalX?: number | null;
+  focalY?: number | null;
+}
+/**
+ * Satu baris per PT. Admin grup membuat dan menonaktifkan PT; Admin/Direktur PT itu mengubah identitas dan pengaturan operasionalnya.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "companies".
+ */
+export interface Company {
+  id: number;
+  /**
+   * Token {COMPANY} di nomor dokumen (mis. 1/PB-CS1/27/IX/2026): huruf besar/angka, 2–16 karakter. Terkunci setelah PT ini punya dokumen bernomor.
+   */
+  shortCode: string;
+  name: string;
+  legalName?: string | null;
+  /**
+   * PNG/JPG, dipakai di kop PDF dan ekspor PT ini.
+   */
+  logo?: (number | null) | MediaCompany;
+  /**
+   * Teks kop surat PDF PT ini (alamat, kontak).
+   */
+  pdfHeader?: string | null;
+  address?: string | null;
+  phone?: string | null;
+  /**
+   * Rilis ini: harus sama dengan zona waktu server (ADR 0016 §9, Q-59).
+   */
+  timezone: string;
+  /**
+   * Dipakai untuk absensi bila project/pusat biaya punya titik lokasi tetapi radiusnya kosong.
+   */
+  defaultGeofenceRadiusM: number;
+  lateReportDays: number;
+  budgetWarnPct: number;
+  budgetOverPct: number;
+  progressWarnGapPct: number;
+  progressBadGapPct: number;
+  receiptRoundingTolerance: number;
+  receiptMaxAgeDays: number;
+  reimburseAutoCloseDays: number;
+  /**
+   * Uang muka tanpa LPJ lebih lama dari ini tampil sebagai "LPJ terlambat" di dashboard/laporan.
+   */
+  lpjDueDays: number;
+  /**
+   * Nonaktif → item offline ditolak FEATURE_DISABLED (ADR 0010 rollback).
+   */
+  syncExpenseDraftsEnabled?: boolean | null;
+  /**
+   * Dipakai untuk karyawan tanpa jadwal sendiri. Kosong = keterlambatan tidak dihitung.
+   */
+  defaultWorkSchedule?: (number | null) | WorkSchedule;
+  /**
+   * E4: laporan progress harian + foto dari APK. Nonaktif → item laporan ditolak FEATURE_DISABLED (rollback).
+   */
+  syncProgressReportsEnabled?: boolean | null;
+  /**
+   * Absen masuk/pulang sendiri di project/pusat biaya yang ditugaskan (geofence, selfie, lokasi palsu ditolak) dan "diabsenkan PM". Nonaktif → item absensi ditolak FEATURE_DISABLED. Nyalakan di prod setelah checklist go-live.
+   */
+  syncAttendanceEnabled?: boolean | null;
+  /**
+   * Selfie lebih tua dari ini dihapus dari penyimpanan saat penghapusan otomatis aktif (data absensi tetap). Default 12 bulan; menunggu keputusan klien (Q-33).
+   */
+  selfieRetentionMonths: number;
+  /**
+   * Nonaktif = job hanya menghitung (dry run). Aktif = file selfie dihapus permanen setiap malam (02:30), tercatat di audit log.
+   */
+  selfieRetentionDeleteEnabled?: boolean | null;
+  /**
+   * Nonaktif = job pengingat tidak mengirim apa pun (rollback).
+   */
+  remindersEnabled?: boolean | null;
+  reminderHour: number;
+  /**
+   * Selain notifikasi in-app. Batas SMTP 30 email/jam per mailbox — aktifkan setelah alamat email pengguna benar.
+   */
+  reminderEmailEnabled?: boolean | null;
+  /**
+   * Batas hari = "Batas hari laporan progress terlambat".
+   */
+  reminderLateProgressEnabled?: boolean | null;
+  /**
+   * Batas hari = "Batas LPJ uang muka".
+   */
+  reminderLpjOverdueEnabled?: boolean | null;
+  reminderRevisionEnabled?: boolean | null;
+  reminderRevisionDays: number;
+  /**
+   * Ambang = "Ambang anggaran kuning" dan "merah" di atas; sekali per ambang per project.
+   */
+  reminderBudgetEnabled?: boolean | null;
+  /**
+   * Pemohon lain dan pembuat diberi tahu; pelaku aksi tidak diberi tahu tentang aksinya sendiri.
+   */
+  notifyRequesterStatusEnabled?: boolean | null;
+  /**
+   * Selain notifikasi in-app. Isi email tanpa nominal/nama pemohon. Batas SMTP 30 email/jam per mailbox.
+   */
+  approvalEmailEnabled?: boolean | null;
+  /**
+   * Hanya Admin grup yang dapat membuat atau menonaktifkan PT (alasan wajib).
+   */
   active?: boolean | null;
   uuid?: string | null;
   /**
@@ -282,10 +401,45 @@ export interface Employee {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "media-company".
+ */
+export interface MediaCompany {
+  id: number;
+  uploadedBy?: (number | null) | User;
+  receivedAt?: string | null;
+  ownerDocType?: string | null;
+  ownerDocId?: string | null;
+  sha256Original?: string | null;
+  originalWidth?: number | null;
+  originalHeight?: number | null;
+  originalSize?: number | null;
+  capturedAt?: string | null;
+  /**
+   * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
+   */
+  changeReason?: string | null;
+  updatedAt: string;
+  createdAt: string;
+  url?: string | null;
+  thumbnailURL?: string | null;
+  filename?: string | null;
+  mimeType?: string | null;
+  filesize?: number | null;
+  width?: number | null;
+  height?: number | null;
+  focalX?: number | null;
+  focalY?: number | null;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "work-schedules".
  */
 export interface WorkSchedule {
   id: number;
+  /**
+   * Wajib bila Anda memilih lebih dari satu PT di pemilih PT; tidak dapat diubah setelah dibuat.
+   */
+  company?: (number | null) | Company;
   name: string;
   startTime: string;
   endTime: string;
@@ -300,6 +454,54 @@ export interface WorkSchedule {
     sun?: boolean | null;
   };
   active?: boolean | null;
+  /**
+   * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
+   */
+  changeReason?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "company-memberships".
+ */
+export interface CompanyMembership {
+  id: number;
+  user: number | User;
+  company: number | Company;
+  employee?: (number | null) | Employee;
+  roles?: ('pk-staff' | 'pk-pm' | 'pk-finance' | 'pk-owner' | 'pk-admin')[] | null;
+  active?: boolean | null;
+  /**
+   * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
+   */
+  changeReason?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "employees".
+ */
+export interface Employee {
+  id: number;
+  /**
+   * PT tempat karyawan ini bekerja (1 data karyawan = 1 PT; orang yang bekerja di 2 PT punya 2 data karyawan). Tidak dapat diubah setelah dibuat.
+   */
+  company?: (number | null) | Company;
+  code: string;
+  name: string;
+  nickname?: string | null;
+  position?: string | null;
+  phone?: string | null;
+  workSchedule?: (number | null) | WorkSchedule;
+  faceRefPhoto?: (number | null) | MediaSelfy;
+  /**
+   * Referensi Odoo (diisi saat mirror, ADR 0009).
+   */
+  odooEmployeeRef?: string | null;
+  active?: boolean | null;
+  uuid?: string | null;
   /**
    * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
    */
@@ -341,41 +543,14 @@ export interface MediaSelfy {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "media-signatures".
- */
-export interface MediaSignature {
-  id: number;
-  uploadedBy?: (number | null) | User;
-  receivedAt?: string | null;
-  ownerDocType?: string | null;
-  ownerDocId?: string | null;
-  sha256Original?: string | null;
-  originalWidth?: number | null;
-  originalHeight?: number | null;
-  originalSize?: number | null;
-  capturedAt?: string | null;
-  /**
-   * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
-   */
-  changeReason?: string | null;
-  updatedAt: string;
-  createdAt: string;
-  url?: string | null;
-  thumbnailURL?: string | null;
-  filename?: string | null;
-  mimeType?: string | null;
-  filesize?: number | null;
-  width?: number | null;
-  height?: number | null;
-  focalX?: number | null;
-  focalY?: number | null;
-}
-/**
- * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "employee-bank-accounts".
  */
 export interface EmployeeBankAccount {
   id: number;
+  /**
+   * Mengikuti dokumen induk.
+   */
+  company?: (number | null) | Company;
   employee: number | Employee;
   bank: number | Bank;
   accountNo: string;
@@ -415,6 +590,10 @@ export interface Bank {
  */
 export interface Client {
   id: number;
+  /**
+   * Wajib bila Anda memilih lebih dari satu PT di pemilih PT; tidak dapat diubah setelah dibuat.
+   */
+  company?: (number | null) | Company;
   name: string;
   contact?: string | null;
   phone?: string | null;
@@ -438,6 +617,10 @@ export interface Client {
  */
 export interface Vendor {
   id: number;
+  /**
+   * Wajib bila Anda memilih lebih dari satu PT di pemilih PT; tidak dapat diubah setelah dibuat.
+   */
+  company?: (number | null) | Company;
   name: string;
   contact?: string | null;
   npwp?: string | null;
@@ -461,6 +644,10 @@ export interface Vendor {
  */
 export interface Project {
   id: number;
+  /**
+   * Wajib bila Anda memilih lebih dari satu PT di pemilih PT; tidak dapat diubah setelah dibuat.
+   */
+  company?: (number | null) | Company;
   code: string;
   name: string;
   client?: (number | null) | Client;
@@ -498,6 +685,10 @@ export interface Project {
  */
 export interface ProjectStage {
   id: number;
+  /**
+   * Mengikuti dokumen induk.
+   */
+  company?: (number | null) | Company;
   project: number | Project;
   name: string;
   weightPct?: number | null;
@@ -521,6 +712,10 @@ export interface ProjectStage {
  */
 export interface StageTemplate {
   id: number;
+  /**
+   * Wajib bila Anda memilih lebih dari satu PT di pemilih PT; tidak dapat diubah setelah dibuat.
+   */
+  company?: (number | null) | Company;
   name: string;
   items?:
     | {
@@ -544,6 +739,10 @@ export interface StageTemplate {
  */
 export interface BudgetLine {
   id: number;
+  /**
+   * Mengikuti dokumen induk.
+   */
+  company?: (number | null) | Company;
   project: number | Project;
   category: number | ExpenseCategory;
   amount: number;
@@ -560,6 +759,10 @@ export interface BudgetLine {
  */
 export interface ExpenseCategory {
   id: number;
+  /**
+   * Wajib bila Anda memilih lebih dari satu PT di pemilih PT; tidak dapat diubah setelah dibuat.
+   */
+  company?: (number | null) | Company;
   code: string;
   name: string;
   coaCode?: string | null;
@@ -606,6 +809,10 @@ export interface Uom {
  */
 export interface CashInSource {
   id: number;
+  /**
+   * Wajib bila Anda memilih lebih dari satu PT di pemilih PT; tidak dapat diubah setelah dibuat.
+   */
+  company?: (number | null) | Company;
   code: string;
   name: string;
   coaCode?: string | null;
@@ -624,6 +831,10 @@ export interface CashInSource {
  */
 export interface CashAccount {
   id: number;
+  /**
+   * Wajib bila Anda memilih lebih dari satu PT di pemilih PT; tidak dapat diubah setelah dibuat.
+   */
+  company?: (number | null) | Company;
   name: string;
   kind: 'cash' | 'bank';
   bank?: (number | null) | Bank;
@@ -650,6 +861,10 @@ export interface CashAccount {
  */
 export interface TeamAssignment {
   id: number;
+  /**
+   * Mengikuti dokumen induk.
+   */
+  company?: (number | null) | Company;
   employee: number | Employee;
   project?: (number | null) | Project;
   costCenter?: (number | null) | CostCenter;
@@ -669,6 +884,10 @@ export interface TeamAssignment {
  */
 export interface CostCenter {
   id: number;
+  /**
+   * Wajib bila Anda memilih lebih dari satu PT di pemilih PT; tidak dapat diubah setelah dibuat.
+   */
+  company?: (number | null) | Company;
   code: string;
   name: string;
   type: 'operational' | 'department';
@@ -713,6 +932,10 @@ export interface Holiday {
  */
 export interface ApprovalRule {
   id: number;
+  /**
+   * Wajib bila Anda memilih lebih dari satu PT di pemilih PT; tidak dapat diubah setelah dibuat.
+   */
+  company?: (number | null) | Company;
   name: string;
   docType: 'expense_request' | 'budget_addendum';
   requestType: 'any' | 'advance' | 'reimburse';
@@ -771,6 +994,10 @@ export interface NotificationTemplate {
  */
 export interface Vehicle {
   id: number;
+  /**
+   * Wajib bila Anda memilih lebih dari satu PT di pemilih PT; tidak dapat diubah setelah dibuat.
+   */
+  company?: (number | null) | Company;
   plateNo: string;
   plateDisplay?: string | null;
   /**
@@ -799,6 +1026,10 @@ export interface Vehicle {
  */
 export interface DocumentSequence {
   id: number;
+  /**
+   * Wajib bila Anda memilih lebih dari satu PT di pemilih PT; tidak dapat diubah setelah dibuat.
+   */
+  company?: (number | null) | Company;
   docType:
     | 'expense_request'
     | 'transfer'
@@ -834,6 +1065,10 @@ export interface DocumentSequence {
  */
 export interface ExpenseRequest {
   id: number;
+  /**
+   * Wajib bila Anda memilih lebih dari satu PT di pemilih PT; tidak dapat diubah setelah dibuat.
+   */
+  company?: (number | null) | Company;
   docNo?: string | null;
   type: 'advance' | 'reimburse';
   status:
@@ -975,6 +1210,10 @@ export interface MediaAttachment {
  */
 export interface ExpenseLineSnapshot {
   id: number;
+  /**
+   * Mengikuti dokumen induk.
+   */
+  company?: (number | null) | Company;
   request: number | ExpenseRequest;
   cycle: number;
   reason: 'submit' | 'approve' | 'receipts_resubmit';
@@ -999,6 +1238,10 @@ export interface ExpenseLineSnapshot {
  */
 export interface Approval {
   id: number;
+  /**
+   * Mengikuti dokumen induk.
+   */
+  company?: (number | null) | Company;
   docType: 'expense_request' | 'budget_addendum';
   request?: (number | null) | ExpenseRequest;
   addendum?: (number | null) | BudgetAddendum;
@@ -1031,6 +1274,10 @@ export interface Approval {
  */
 export interface BudgetAddendum {
   id: number;
+  /**
+   * Mengikuti dokumen induk.
+   */
+  company?: (number | null) | Company;
   docNo?: string | null;
   project: number | Project;
   status: 'draft' | 'pending_ack' | 'pending_approval' | 'approved' | 'rejected' | 'cancelled';
@@ -1074,6 +1321,10 @@ export interface BudgetAddendum {
  */
 export interface Receipt {
   id: number;
+  /**
+   * Mengikuti dokumen induk.
+   */
+  company?: (number | null) | Company;
   request: number | ExpenseRequest;
   lineId: string;
   lineNo?: number | null;
@@ -1151,6 +1402,10 @@ export interface MediaReceipt {
  */
 export interface ReceiptFlag {
   id: number;
+  /**
+   * Mengikuti dokumen induk.
+   */
+  company?: (number | null) | Company;
   request: number | ExpenseRequest;
   key: string;
   kind: 'amount_diff' | 'date_after_request' | 'date_too_old' | 'date_out_of_period' | 'uom_suspicious' | 'duplicate';
@@ -1183,6 +1438,10 @@ export interface ReceiptFlag {
  */
 export interface Transfer {
   id: number;
+  /**
+   * Mengikuti dokumen induk.
+   */
+  company?: (number | null) | Company;
   docNo?: string | null;
   request: number | ExpenseRequest;
   kind: 'advance' | 'reimburse' | 'lpj_shortfall';
@@ -1257,6 +1516,10 @@ export interface MediaTransferProof {
  */
 export interface CashEntry {
   id: number;
+  /**
+   * Mengikuti dokumen induk.
+   */
+  company?: (number | null) | Company;
   entryNo?: string | null;
   entryDate: string;
   period?: string | null;
@@ -1295,6 +1558,10 @@ export interface CashEntry {
  */
 export interface Settlement {
   id: number;
+  /**
+   * Mengikuti dokumen induk.
+   */
+  company?: (number | null) | Company;
   docNo?: string | null;
   request: number | ExpenseRequest;
   status: 'draft' | 'submitted' | 'revision' | 'verified' | 'settled';
@@ -1332,6 +1599,10 @@ export interface Settlement {
  */
 export interface PeriodClosing {
   id: number;
+  /**
+   * Wajib bila Anda memilih lebih dari satu PT di pemilih PT; tidak dapat diubah setelah dibuat.
+   */
+  company?: (number | null) | Company;
   period: string;
   status: 'closed' | 'reopened';
   note?: string | null;
@@ -1349,6 +1620,10 @@ export interface PeriodClosing {
  */
 export interface Attendance {
   id: number;
+  /**
+   * Mengikuti dokumen induk.
+   */
+  company?: (number | null) | Company;
   employee: number | Employee;
   user?: (number | null) | User;
   kind: 'check_in' | 'check_out';
@@ -1440,6 +1715,10 @@ export interface Device {
  */
 export interface AttendanceCorrection {
   id: number;
+  /**
+   * Mengikuti dokumen induk.
+   */
+  company?: (number | null) | Company;
   attendance: number | Attendance;
   employee: number | Employee;
   project?: (number | null) | Project;
@@ -1466,6 +1745,10 @@ export interface AttendanceCorrection {
  */
 export interface ProgressReport {
   id: number;
+  /**
+   * Mengikuti dokumen induk.
+   */
+  company?: (number | null) | Company;
   docNo?: string | null;
   project: number | Project;
   stage: number | ProjectStage;
@@ -1510,6 +1793,7 @@ export interface ProgressReport {
 export interface Notification {
   id: number;
   user: number | User;
+  company?: (number | null) | Company;
   event: string;
   title: string;
   body: string;
@@ -1590,7 +1874,9 @@ export interface AuditLog {
     | 'access_denied'
     | 'approval_skipped'
     | 'retention_purge'
-    | 'import';
+    | 'import'
+    | '2fa_enabled'
+    | '2fa_disabled';
   field?: string | null;
   lineNo?: number | null;
   oldValue?:
@@ -1615,6 +1901,7 @@ export interface AuditLog {
   statusTo?: string | null;
   reason?: string | null;
   userId?: number | null;
+  company?: (number | null) | Company;
   userRoles?: string | null;
   source?: ('web' | 'apk' | 'system' | 'job') | null;
   appVersion?: string | null;
@@ -1664,37 +1951,6 @@ export interface MediaProgressPhoto {
       filename?: string | null;
     };
   };
-}
-/**
- * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "media-company".
- */
-export interface MediaCompany {
-  id: number;
-  uploadedBy?: (number | null) | User;
-  receivedAt?: string | null;
-  ownerDocType?: string | null;
-  ownerDocId?: string | null;
-  sha256Original?: string | null;
-  originalWidth?: number | null;
-  originalHeight?: number | null;
-  originalSize?: number | null;
-  capturedAt?: string | null;
-  /**
-   * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
-   */
-  changeReason?: string | null;
-  updatedAt: string;
-  createdAt: string;
-  url?: string | null;
-  thumbnailURL?: string | null;
-  filename?: string | null;
-  mimeType?: string | null;
-  filesize?: number | null;
-  width?: number | null;
-  height?: number | null;
-  focalX?: number | null;
-  focalY?: number | null;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -1826,6 +2082,14 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'users';
         value: number | User;
+      } | null)
+    | ({
+        relationTo: 'companies';
+        value: number | Company;
+      } | null)
+    | ({
+        relationTo: 'company-memberships';
+        value: number | CompanyMembership;
       } | null)
     | ({
         relationTo: 'employees';
@@ -2036,11 +2300,69 @@ export interface PayloadMigration {
 export interface UsersSelect<T extends boolean = true> {
   email?: T;
   name?: T;
-  roles?: T;
-  employee?: T;
   phone?: T;
   signature?: T;
   keycloakSub?: T;
+  active?: T;
+  groupAdmin?: T;
+  changeReason?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "companies_select".
+ */
+export interface CompaniesSelect<T extends boolean = true> {
+  shortCode?: T;
+  name?: T;
+  legalName?: T;
+  logo?: T;
+  pdfHeader?: T;
+  address?: T;
+  phone?: T;
+  timezone?: T;
+  defaultGeofenceRadiusM?: T;
+  lateReportDays?: T;
+  budgetWarnPct?: T;
+  budgetOverPct?: T;
+  progressWarnGapPct?: T;
+  progressBadGapPct?: T;
+  receiptRoundingTolerance?: T;
+  receiptMaxAgeDays?: T;
+  reimburseAutoCloseDays?: T;
+  lpjDueDays?: T;
+  syncExpenseDraftsEnabled?: T;
+  defaultWorkSchedule?: T;
+  syncProgressReportsEnabled?: T;
+  syncAttendanceEnabled?: T;
+  selfieRetentionMonths?: T;
+  selfieRetentionDeleteEnabled?: T;
+  remindersEnabled?: T;
+  reminderHour?: T;
+  reminderEmailEnabled?: T;
+  reminderLateProgressEnabled?: T;
+  reminderLpjOverdueEnabled?: T;
+  reminderRevisionEnabled?: T;
+  reminderRevisionDays?: T;
+  reminderBudgetEnabled?: T;
+  notifyRequesterStatusEnabled?: T;
+  approvalEmailEnabled?: T;
+  active?: T;
+  uuid?: T;
+  changeReason?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "company-memberships_select".
+ */
+export interface CompanyMembershipsSelect<T extends boolean = true> {
+  user?: T;
+  company?: T;
+  employee?: T;
+  roles?: T;
   active?: T;
   changeReason?: T;
   updatedAt?: T;
@@ -2051,6 +2373,7 @@ export interface UsersSelect<T extends boolean = true> {
  * via the `definition` "employees_select".
  */
 export interface EmployeesSelect<T extends boolean = true> {
+  company?: T;
   code?: T;
   name?: T;
   nickname?: T;
@@ -2070,6 +2393,7 @@ export interface EmployeesSelect<T extends boolean = true> {
  * via the `definition` "employee-bank-accounts_select".
  */
 export interface EmployeeBankAccountsSelect<T extends boolean = true> {
+  company?: T;
   employee?: T;
   bank?: T;
   accountNo?: T;
@@ -2101,6 +2425,7 @@ export interface BanksSelect<T extends boolean = true> {
  * via the `definition` "clients_select".
  */
 export interface ClientsSelect<T extends boolean = true> {
+  company?: T;
   name?: T;
   contact?: T;
   phone?: T;
@@ -2117,6 +2442,7 @@ export interface ClientsSelect<T extends boolean = true> {
  * via the `definition` "vendors_select".
  */
 export interface VendorsSelect<T extends boolean = true> {
+  company?: T;
   name?: T;
   contact?: T;
   npwp?: T;
@@ -2133,6 +2459,7 @@ export interface VendorsSelect<T extends boolean = true> {
  * via the `definition` "projects_select".
  */
 export interface ProjectsSelect<T extends boolean = true> {
+  company?: T;
   code?: T;
   name?: T;
   client?: T;
@@ -2157,6 +2484,7 @@ export interface ProjectsSelect<T extends boolean = true> {
  * via the `definition` "project-stages_select".
  */
 export interface ProjectStagesSelect<T extends boolean = true> {
+  company?: T;
   project?: T;
   name?: T;
   weightPct?: T;
@@ -2173,6 +2501,7 @@ export interface ProjectStagesSelect<T extends boolean = true> {
  * via the `definition` "stage-templates_select".
  */
 export interface StageTemplatesSelect<T extends boolean = true> {
+  company?: T;
   name?: T;
   items?:
     | T
@@ -2192,6 +2521,7 @@ export interface StageTemplatesSelect<T extends boolean = true> {
  * via the `definition` "budget-lines_select".
  */
 export interface BudgetLinesSelect<T extends boolean = true> {
+  company?: T;
   project?: T;
   category?: T;
   amount?: T;
@@ -2204,6 +2534,7 @@ export interface BudgetLinesSelect<T extends boolean = true> {
  * via the `definition` "expense-categories_select".
  */
 export interface ExpenseCategoriesSelect<T extends boolean = true> {
+  company?: T;
   code?: T;
   name?: T;
   coaCode?: T;
@@ -2221,6 +2552,7 @@ export interface ExpenseCategoriesSelect<T extends boolean = true> {
  * via the `definition` "cash-in-sources_select".
  */
 export interface CashInSourcesSelect<T extends boolean = true> {
+  company?: T;
   code?: T;
   name?: T;
   coaCode?: T;
@@ -2235,6 +2567,7 @@ export interface CashInSourcesSelect<T extends boolean = true> {
  * via the `definition` "cash-accounts_select".
  */
 export interface CashAccountsSelect<T extends boolean = true> {
+  company?: T;
   name?: T;
   kind?: T;
   bank?: T;
@@ -2254,6 +2587,7 @@ export interface CashAccountsSelect<T extends boolean = true> {
  * via the `definition` "team-assignments_select".
  */
 export interface TeamAssignmentsSelect<T extends boolean = true> {
+  company?: T;
   employee?: T;
   project?: T;
   costCenter?: T;
@@ -2269,6 +2603,7 @@ export interface TeamAssignmentsSelect<T extends boolean = true> {
  * via the `definition` "work-schedules_select".
  */
 export interface WorkSchedulesSelect<T extends boolean = true> {
+  company?: T;
   name?: T;
   startTime?: T;
   endTime?: T;
@@ -2305,6 +2640,7 @@ export interface HolidaysSelect<T extends boolean = true> {
  * via the `definition` "approval-rules_select".
  */
 export interface ApprovalRulesSelect<T extends boolean = true> {
+  company?: T;
   name?: T;
   docType?: T;
   requestType?: T;
@@ -2367,6 +2703,7 @@ export interface UomsSelect<T extends boolean = true> {
  * via the `definition` "vehicles_select".
  */
 export interface VehiclesSelect<T extends boolean = true> {
+  company?: T;
   plateNo?: T;
   plateDisplay?: T;
   type?: T;
@@ -2385,6 +2722,7 @@ export interface VehiclesSelect<T extends boolean = true> {
  * via the `definition` "cost-centers_select".
  */
 export interface CostCentersSelect<T extends boolean = true> {
+  company?: T;
   code?: T;
   name?: T;
   type?: T;
@@ -2404,6 +2742,7 @@ export interface CostCentersSelect<T extends boolean = true> {
  * via the `definition` "document-sequences_select".
  */
 export interface DocumentSequencesSelect<T extends boolean = true> {
+  company?: T;
   docType?: T;
   docCode?: T;
   pattern?: T;
@@ -2421,6 +2760,7 @@ export interface DocumentSequencesSelect<T extends boolean = true> {
  * via the `definition` "expense-requests_select".
  */
 export interface ExpenseRequestsSelect<T extends boolean = true> {
+  company?: T;
   docNo?: T;
   type?: T;
   status?: T;
@@ -2482,6 +2822,7 @@ export interface ExpenseRequestsSelect<T extends boolean = true> {
  * via the `definition` "expense-line-snapshots_select".
  */
 export interface ExpenseLineSnapshotsSelect<T extends boolean = true> {
+  company?: T;
   request?: T;
   cycle?: T;
   reason?: T;
@@ -2497,6 +2838,7 @@ export interface ExpenseLineSnapshotsSelect<T extends boolean = true> {
  * via the `definition` "approvals_select".
  */
 export interface ApprovalsSelect<T extends boolean = true> {
+  company?: T;
   docType?: T;
   request?: T;
   addendum?: T;
@@ -2526,6 +2868,7 @@ export interface ApprovalsSelect<T extends boolean = true> {
  * via the `definition` "receipts_select".
  */
 export interface ReceiptsSelect<T extends boolean = true> {
+  company?: T;
   request?: T;
   lineId?: T;
   lineNo?: T;
@@ -2558,6 +2901,7 @@ export interface ReceiptsSelect<T extends boolean = true> {
  * via the `definition` "receipt-flags_select".
  */
 export interface ReceiptFlagsSelect<T extends boolean = true> {
+  company?: T;
   request?: T;
   key?: T;
   kind?: T;
@@ -2581,6 +2925,7 @@ export interface ReceiptFlagsSelect<T extends boolean = true> {
  * via the `definition` "transfers_select".
  */
 export interface TransfersSelect<T extends boolean = true> {
+  company?: T;
   docNo?: T;
   request?: T;
   kind?: T;
@@ -2612,6 +2957,7 @@ export interface TransfersSelect<T extends boolean = true> {
  * via the `definition` "settlements_select".
  */
 export interface SettlementsSelect<T extends boolean = true> {
+  company?: T;
   docNo?: T;
   request?: T;
   status?: T;
@@ -2645,6 +2991,7 @@ export interface SettlementsSelect<T extends boolean = true> {
  * via the `definition` "cash-entries_select".
  */
 export interface CashEntriesSelect<T extends boolean = true> {
+  company?: T;
   entryNo?: T;
   entryDate?: T;
   period?: T;
@@ -2679,6 +3026,7 @@ export interface CashEntriesSelect<T extends boolean = true> {
  * via the `definition` "period-closings_select".
  */
 export interface PeriodClosingsSelect<T extends boolean = true> {
+  company?: T;
   period?: T;
   status?: T;
   note?: T;
@@ -2695,6 +3043,7 @@ export interface PeriodClosingsSelect<T extends boolean = true> {
  * via the `definition` "attendances_select".
  */
 export interface AttendancesSelect<T extends boolean = true> {
+  company?: T;
   employee?: T;
   user?: T;
   kind?: T;
@@ -2728,6 +3077,7 @@ export interface AttendancesSelect<T extends boolean = true> {
  * via the `definition` "attendance-corrections_select".
  */
 export interface AttendanceCorrectionsSelect<T extends boolean = true> {
+  company?: T;
   attendance?: T;
   employee?: T;
   project?: T;
@@ -2748,6 +3098,7 @@ export interface AttendanceCorrectionsSelect<T extends boolean = true> {
  * via the `definition` "progress-reports_select".
  */
 export interface ProgressReportsSelect<T extends boolean = true> {
+  company?: T;
   docNo?: T;
   project?: T;
   stage?: T;
@@ -2779,6 +3130,7 @@ export interface ProgressReportsSelect<T extends boolean = true> {
  * via the `definition` "budget-addenda_select".
  */
 export interface BudgetAddendaSelect<T extends boolean = true> {
+  company?: T;
   docNo?: T;
   project?: T;
   status?: T;
@@ -2808,6 +3160,7 @@ export interface BudgetAddendaSelect<T extends boolean = true> {
  */
 export interface NotificationsSelect<T extends boolean = true> {
   user?: T;
+  company?: T;
   event?: T;
   title?: T;
   body?: T;
@@ -2891,6 +3244,7 @@ export interface AuditLogsSelect<T extends boolean = true> {
   statusTo?: T;
   reason?: T;
   userId?: T;
+  company?: T;
   userRoles?: T;
   source?: T;
   appVersion?: T;
@@ -3224,94 +3578,16 @@ export interface PayloadMigrationsSelect<T extends boolean = true> {
  */
 export interface CompanySetting {
   id: number;
-  name: string;
-  shortCode: string;
-  logo?: (number | null) | MediaCompany;
-  pdfHeader?: string | null;
-  address?: string | null;
-  phone?: string | null;
-  /**
-   * Proses server memakai env TZ (cron, tanggal bisnis); ubah keduanya bersamaan.
-   */
-  timezone: string;
-  /**
-   * Dipakai untuk absensi bila project/pusat biaya punya titik lokasi tetapi radiusnya kosong.
-   */
-  defaultGeofenceRadiusM: number;
-  lateReportDays: number;
-  budgetWarnPct: number;
-  budgetOverPct: number;
-  progressWarnGapPct: number;
-  progressBadGapPct: number;
-  receiptRoundingTolerance: number;
-  receiptMaxAgeDays: number;
-  reimburseAutoCloseDays: number;
-  /**
-   * Uang muka tanpa LPJ lebih lama dari ini tampil sebagai "LPJ terlambat" di dashboard/laporan.
-   */
-  lpjDueDays: number;
+  groupName?: string | null;
+  groupLogo?: (number | null) | MediaCompany;
+  groupPdfHeader?: string | null;
   minAppVersion?: string | null;
   latestAppVersion?: string | null;
   /**
    * https://… (APK side-load). Kosong = aplikasi menampilkan "hubungi admin".
    */
   appDownloadUrl?: string | null;
-  /**
-   * Nonaktif → item offline ditolak FEATURE_DISABLED (ADR 0010 rollback).
-   */
-  syncExpenseDraftsEnabled?: boolean | null;
-  /**
-   * Absen masuk/pulang sendiri di project/pusat biaya yang ditugaskan (geofence, selfie, lokasi palsu ditolak) dan "diabsenkan PM". Nonaktif → item absensi ditolak FEATURE_DISABLED. Nyalakan di prod setelah checklist go-live.
-   */
-  syncAttendanceEnabled?: boolean | null;
-  /**
-   * Dipakai untuk karyawan tanpa jadwal sendiri. Kosong = keterlambatan tidak dihitung.
-   */
-  defaultWorkSchedule?: (number | null) | WorkSchedule;
-  /**
-   * Selfie lebih tua dari ini dihapus dari penyimpanan saat penghapusan otomatis aktif (data absensi tetap). Default 12 bulan; menunggu keputusan klien (Q-33).
-   */
-  selfieRetentionMonths: number;
-  /**
-   * Nonaktif = job hanya menghitung (dry run). Aktif = file selfie dihapus permanen setiap malam (02:30), tercatat di audit log.
-   */
-  selfieRetentionDeleteEnabled?: boolean | null;
   selfieRetentionBatch: number;
-  /**
-   * E4: laporan progress harian + foto dari APK. Nonaktif → item laporan ditolak FEATURE_DISABLED (rollback).
-   */
-  syncProgressReportsEnabled?: boolean | null;
-  /**
-   * Nonaktif = job pengingat tidak mengirim apa pun (rollback).
-   */
-  remindersEnabled?: boolean | null;
-  reminderHour: number;
-  /**
-   * Selain notifikasi in-app. Batas SMTP 30 email/jam per mailbox — aktifkan setelah alamat email pengguna benar.
-   */
-  reminderEmailEnabled?: boolean | null;
-  /**
-   * Batas hari = "Batas hari laporan progress terlambat".
-   */
-  reminderLateProgressEnabled?: boolean | null;
-  /**
-   * Batas hari = "Batas LPJ uang muka".
-   */
-  reminderLpjOverdueEnabled?: boolean | null;
-  reminderRevisionEnabled?: boolean | null;
-  reminderRevisionDays: number;
-  /**
-   * Ambang = "Ambang anggaran kuning" dan "merah" di atas; sekali per ambang per project.
-   */
-  reminderBudgetEnabled?: boolean | null;
-  /**
-   * Pemohon lain dan pembuat diberi tahu; pelaku aksi tidak diberi tahu tentang aksinya sendiri.
-   */
-  notifyRequesterStatusEnabled?: boolean | null;
-  /**
-   * Selain notifikasi in-app. Isi email tanpa nominal/nama pemohon. Batas SMTP 30 email/jam per mailbox.
-   */
-  approvalEmailEnabled?: boolean | null;
   offlineMaxAgeDays: number;
   imageTargets: {
     receiptsMaxPx: number;
@@ -3350,43 +3626,13 @@ export interface PayloadJobsStat {
  * via the `definition` "company-settings_select".
  */
 export interface CompanySettingsSelect<T extends boolean = true> {
-  name?: T;
-  shortCode?: T;
-  logo?: T;
-  pdfHeader?: T;
-  address?: T;
-  phone?: T;
-  timezone?: T;
-  defaultGeofenceRadiusM?: T;
-  lateReportDays?: T;
-  budgetWarnPct?: T;
-  budgetOverPct?: T;
-  progressWarnGapPct?: T;
-  progressBadGapPct?: T;
-  receiptRoundingTolerance?: T;
-  receiptMaxAgeDays?: T;
-  reimburseAutoCloseDays?: T;
-  lpjDueDays?: T;
+  groupName?: T;
+  groupLogo?: T;
+  groupPdfHeader?: T;
   minAppVersion?: T;
   latestAppVersion?: T;
   appDownloadUrl?: T;
-  syncExpenseDraftsEnabled?: T;
-  syncAttendanceEnabled?: T;
-  defaultWorkSchedule?: T;
-  selfieRetentionMonths?: T;
-  selfieRetentionDeleteEnabled?: T;
   selfieRetentionBatch?: T;
-  syncProgressReportsEnabled?: T;
-  remindersEnabled?: T;
-  reminderHour?: T;
-  reminderEmailEnabled?: T;
-  reminderLateProgressEnabled?: T;
-  reminderLpjOverdueEnabled?: T;
-  reminderRevisionEnabled?: T;
-  reminderRevisionDays?: T;
-  reminderBudgetEnabled?: T;
-  notifyRequesterStatusEnabled?: T;
-  approvalEmailEnabled?: T;
   offlineMaxAgeDays?: T;
   imageTargets?:
     | T

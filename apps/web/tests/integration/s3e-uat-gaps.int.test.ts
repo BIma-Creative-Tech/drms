@@ -8,7 +8,7 @@ import { detail } from '@/domain/expense/dto'
 import { approvedByCaller } from '@/domain/expense/transfers'
 import { resetRateLimits } from '@/lib/rate-limit'
 
-import { auditRows, getTestPayload, sqlAs } from './helpers'
+import { auditRows, sqlAs, updateCompany } from './helpers'
 import { api, asUser, draftBody, makeWorld, png, upload, type FlowUser, type Res, type World } from './flow-world'
 
 /**
@@ -27,8 +27,7 @@ async function must(r: Promise<Res>, status = 200): Promise<Res['body']> {
 }
 
 async function settings(data: Record<string, unknown>) {
-  const p = await getTestPayload()
-  await p.updateGlobal({ slug: 'company-settings', data, overrideAccess: true /* SYSTEM-WRITE: fixture */ })
+  await updateCompany(data)
 }
 
 async function notes(user: FlowUser, docId: number) {

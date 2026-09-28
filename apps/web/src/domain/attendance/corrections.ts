@@ -1,7 +1,7 @@
 import { sql } from '@payloadcms/db-postgres'
 import { APIError, type PayloadRequest } from 'payload'
 
-import { hasRole, relId, userId } from '@/access/roles'
+import { hasRole, ownEmployees, relId, userId } from '@/access/roles'
 import { resolveScope } from '@/access/scope'
 import { writeAudit, writeAuditDetached } from '@/audit/writer'
 import { settings } from '@/domain/expense/common'
@@ -73,20 +73,22 @@ export async function correctAttendance(req: PayloadRequest, attendanceId: numbe
 
   const project = relId(att.project)
   const costCenter = relId(att.costCenter)
-  const ownEmployee = relId((req.user as { employee?: unknown } | null)?.employee)
-  const isOwn = relId(att.user) === uid || (ownEmployee !== undefined && relId(att.employee) === ownEmployee)
+  // ADR 0016 §5: every role check IN THE ATTENDANCE's PT (Admin of PT A is nobody in PT B)
+  const company = relId((att as { company?: unknown }).company)
+  const emps = ownEmployees(req)
+  const isOwn = relId(att.user) === uid || emps.includes(relId(att.employee) ?? -1)
   if (isOwn) await deny(req, attendanceId, 'Tidak dapat mengoreksi absensi Anda sendiri.')
-  if (!hasRole(req, 'pk-admin')) {
-    const scope = hasRole(req, 'pk-pm') ? await resolveScope(req) : null
+  if (!hasRole(req, 'pk-admin', company)) {
+    const scope = hasRole(req, 'pk-pm', company) ? await resolveScope(req, company ?? null) : null
     const inTeam = !!scope && ((project !== undefined && scope.teamProjects.includes(project)) || (costCenter !== undefined && scope.teamCostCenters.includes(costCenter)))
     if (!inTeam) {
-      // Readable (office roles) → 403 + audit; not readable at all (other team, staff) → 404, no existence leak.
-      if (hasRole(req, 'pk-owner', 'pk-finance')) await deny(req, attendanceId, 'Koreksi absensi hanya oleh PM tim atau Admin.')
+      // Readable (office roles of that PT) → 403 + audit; not readable at all (other team / PT, staff) → 404, no existence leak.
+      if (hasRole(req, ['pk-owner', 'pk-finance'], company)) await deny(req, attendanceId, 'Koreksi absensi hanya oleh PM tim atau Admin.')
       throw new APIError('Absensi tidak ditemukan.', 404, null, true)
     }
   }
 
-  const s = await settings(req)
+  const s = await settings(req, company)
   const tz = s.timezone || process.env.TZ || DEFAULT_TZ
   const newTime = new Date(newTimeIso)
   if (Number.isNaN(newTime.getTime())) throw new APIError('Jam baru tidak valid.', 400, null, true)

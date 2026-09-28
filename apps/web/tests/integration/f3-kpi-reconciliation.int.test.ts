@@ -18,6 +18,7 @@ import {
   vehicleCosts,
 } from '@/domain/reports/kpi'
 import { ExportRefused, prepareExport } from '@/domain/reports/export'
+import { officeScope } from '@/domain/reports/scope'
 import { addMonths, lastDay, periodRange } from '@/domain/reports/rules'
 import { resetRateLimits } from '@/lib/rate-limit'
 import config from '@/payload.config'
@@ -230,7 +231,7 @@ beforeAll(async () => {
   for (let i = 0; i < 6; i++) closedEntries.push((await manual(i % 2 ? 'in' : 'out', closedDate, amount(), i % 3 === 0 ? { costCenterId: w.costCenter } : {})).id)
   for (let i = 0; i < 4; i++) await drive('transferred', 'advance', { projectId: w.project, ack: w.users.owner }, { transferDate: addDays(closedDate, i) })
   for (let i = 0; i < 4; i++) await manual(i % 2 ? 'in' : 'out', `${addMonths(month, -2)}-10`, amount(), { vehicleId: w.vehicle, projectId: w.project })
-  closedK02a = await asUser(w.users.finance, (req) => cashFlowMonthly(req, { from: closedMonth, to: closedMonth }, 'book'))
+  closedK02a = await asUser(w.users.finance, async (req) => cashFlowMonthly(req, await officeScope(req), { from: closedMonth, to: closedMonth }, 'book'))
   await must(call('POST', '/api/v1/period-closings', w.users.finance, { period: closedMonth, note: 'F3 tutup buku uji' }), 201)
   // void in the closed month → reversal dated today (ADR 0005 §4)
   voidedClosed = closedEntries[1]!
@@ -327,7 +328,7 @@ describe('generated data set', () => {
 describe('K-01 saldo kas per akun', () => {
   it('= doc SQL and = GET /api/v1/cash-accounts/balances, for today and for each month end', async () => {
     for (const asOf of [today, lastDay(closedMonth), lastDay(addMonths(month, -1)), '2000-01-01']) {
-      const mine = await asFinance((req) => cashBalances(req, asOf))
+      const mine = await asFinance(async (req) => cashBalances(req, await officeScope(req), asOf))
       const doc = await sqlAs(
         'app',
         `SELECT a.id, (coalesce(a.opening_balance,0) + coalesce(sum(e.amount) FILTER (WHERE e.direction='in'),0) - coalesce(sum(e.amount) FILTER (WHERE e.direction='out'),0))::text AS balance
@@ -351,7 +352,7 @@ describe('K-01 saldo kas per akun', () => {
   it('dashboard hides an inactive account with balance 0', async () => {
     const d = await must(call('GET', '/api/v1/dashboard/owner', w.users.owner))
     expect(d.cash.accounts.map((a: { name: string }) => a.name)).not.toContain('F3 Nonaktif Nol')
-    const all = await asFinance((req) => cashBalances(req, today))
+    const all = await asFinance(async (req) => cashBalances(req, await officeScope(req), today))
     expect(d.cash.total).toBe(all.total)
   })
 })
@@ -362,7 +363,7 @@ describe('K-02 kas masuk/keluar per bulan', () => {
   it('K-02a (book) = doc SQL per month, per account and total; balance roll-forward = K-01 at month ends', async () => {
     const accounts = (await sqlAs('app', 'SELECT id FROM cash_accounts')).rows.map((x) => x.id as number)
     for (const acc of [undefined, ...accounts.slice(-3)]) {
-      const mine = await asFinance((req) => cashFlowMonthly(req, { ...range(), accountId: acc }, 'book'))
+      const mine = await asFinance(async (req) => cashFlowMonthly(req, await officeScope(req), { ...range(), accountId: acc }, 'book'))
       const doc = await sqlAs(
         'app',
         `SELECT period, sum(amount) FILTER (WHERE direction='in')::text AS masuk, sum(amount) FILTER (WHERE direction='out')::text AS keluar
@@ -378,17 +379,17 @@ describe('K-02 kas masuk/keluar per bulan', () => {
       // opening of P = K-01 at the end of P-1; closing of P = K-01 at the end of P
       for (const m of mine.filter((x) => x.masuk || x.keluar)) {
         const end = m.period === month ? today : lastDay(m.period)
-        const k01 = await asFinance((req) => cashBalances(req, end, acc))
+        const k01 = await asFinance(async (req) => cashBalances(req, await officeScope(req), end, acc))
         expect(m.closingBalance, m.period).toBe(k01.total)
-        const prev = await asFinance((req) => cashBalances(req, lastDay(addMonths(m.period, -1)), acc))
+        const prev = await asFinance(async (req) => cashBalances(req, await officeScope(req), lastDay(addMonths(m.period, -1)), acc))
         expect(m.openingBalance, m.period).toBe(prev.total)
       }
     }
   })
 
   it('K-02b (operational) = doc SQL; K-02a − K-02b per month = net of void/reversal rows of that month', async () => {
-    const a = await asFinance((req) => cashFlowMonthly(req, range(), 'book'))
-    const b = await asFinance((req) => cashFlowMonthly(req, range(), 'operational'))
+    const a = await asFinance(async (req) => cashFlowMonthly(req, await officeScope(req), range(), 'book'))
+    const b = await asFinance(async (req) => cashFlowMonthly(req, await officeScope(req), range(), 'operational'))
     const doc = await sqlAs(
       'app',
       `SELECT period, sum(amount) FILTER (WHERE direction='in')::text AS masuk, sum(amount) FILTER (WHERE direction='out')::text AS keluar
@@ -416,12 +417,12 @@ describe('K-02 kas masuk/keluar per bulan', () => {
   })
 
   it('closed month (case 4): K-02a of the closed month is unchanged by the later void; the reversal lands in the current month', async () => {
-    const after = await asFinance((req) => cashFlowMonthly(req, { from: closedMonth, to: closedMonth }, 'book'))
+    const after = await asFinance(async (req) => cashFlowMonthly(req, await officeScope(req), { from: closedMonth, to: closedMonth }, 'book'))
     expect(after[0]!.masuk).toBe(closedK02a[0]!.masuk)
     expect(after[0]!.keluar).toBe(closedK02a[0]!.keluar)
     const rev = await sqlAs('app', 'SELECT period FROM cash_entries WHERE reversal_of_id = $1', [voidedClosed])
     expect(rev.rows[0].period).toBe(month)
-    const op = await asFinance((req) => cashFlowMonthly(req, { from: closedMonth, to: closedMonth }, 'operational'))
+    const op = await asFinance(async (req) => cashFlowMonthly(req, await officeScope(req), { from: closedMonth, to: closedMonth }, 'operational'))
     expect(op[0]!.net).not.toBe(after[0]!.net) // K-02b of the old month changed (void excluded) — documented
   })
 })
@@ -442,8 +443,9 @@ describe('K-03/K-04/K-05/K-06 per request', () => {
     expect(doc.rows.length).toBeGreaterThanOrEqual(500)
     let checked = 0
     await asFinance(async (req) => {
+      const S = await officeScope(req)
       for (const x of doc.rows) {
-        const m = await requestMoney(req, x.id)
+        const m = await requestMoney(req, S, x.id)
         expect(m.disbursed, `k03 ${x.id}`).toBe(n(x.k03))
         expect(m.refund, `k04 ${x.id}`).toBe(n(x.k04))
         expect(m.net, `k05 ${x.id}`).toBe(n(x.ledger_net))
@@ -465,10 +467,10 @@ describe('K-03/K-04/K-05/K-06 per request', () => {
   })
 
   it('K-06 (1): Σ realisasi per category = Σ realisasi per request (K-17 realisasi, full range, no manual)', async () => {
-    const byCat = await asUser(w.users.pm, (req) => spending(req, { kind: 'all' }, { from: '2000-01-01', to: '2999-12-31', basis: 'realisasi', group: 'kategori', type: 'advance' }))
+    const byCat = await asFinance(async (req) => spending(req, await officeScope(req), { from: '2000-01-01', to: '2999-12-31', basis: 'realisasi', group: 'kategori', type: 'advance' }))
     const r = await sqlAs('app', "SELECT coalesce(sum(verified_receipts_total),0)::text AS s FROM expense_requests WHERE type='advance' AND status IN ('lpj_verified','completed')")
     expect(byCat.total).toBe(n(r.rows[0].s))
-    const rb = await asUser(w.users.pm, (req) => spending(req, { kind: 'all' }, { from: '2000-01-01', to: '2999-12-31', basis: 'realisasi', group: 'kategori', type: 'reimburse' }))
+    const rb = await asFinance(async (req) => spending(req, await officeScope(req), { from: '2000-01-01', to: '2999-12-31', basis: 'realisasi', group: 'kategori', type: 'reimburse' }))
     const r2 = await sqlAs('app', "SELECT coalesce(sum(approved_amount),0)::text AS s FROM expense_requests WHERE type='reimburse' AND status IN ('receipts_verified','transferred','completed')")
     expect(rb.total).toBe(n(r2.rows[0].s))
   })
@@ -476,7 +478,7 @@ describe('K-03/K-04/K-05/K-06 per request', () => {
 
 describe('K-07/K-08 anggaran project (Komitmen)', () => {
   it('committed per project = doc SQL; % = round(committed / budget × 100, 2); colour thresholds from settings', async () => {
-    const list = await asFinance((req) => projectBudgets(req, { kind: 'all' }, { includeArchived: true }))
+    const list = await asFinance(async (req) => projectBudgets(req, await officeScope(req), { includeArchived: true }))
     const doc = await sqlAs('app', `SELECT project_id, sum(grand_total)::text AS s FROM expense_requests WHERE status::text IN (${COMMITTED}) AND project_id IS NOT NULL GROUP BY project_id`)
     const exp = new Map(doc.rows.map((x) => [x.project_id, n(x.s)]))
     for (const p of list) {
@@ -499,14 +501,14 @@ describe('K-07/K-08 anggaran project (Komitmen)', () => {
 
   it('the approval screen shows the same basis (last decision budget_pct_after sample)', async () => {
     const r = await sqlAs('app', "SELECT a.budget_pct_after::float AS pct FROM approvals a JOIN expense_requests er ON er.id = a.request_id WHERE er.project_id = $1 AND a.decision = 'approved' ORDER BY a.id DESC LIMIT 1", [w.project])
-    const [p] = await asFinance((req) => projectBudgets(req, { kind: 'all' }, { projectId: w.project }))
+    const [p] = await asFinance(async (req) => projectBudgets(req, await officeScope(req), { projectId: w.project }))
     expect(r.rows[0].pct).toBeLessThanOrEqual(p!.pct! + 0.001) // committed only grows or stays after that decision
   })
 })
 
 describe('K-10 menunggu persetujuan / K-11 antrian transfer', () => {
   it('K-10 = doc SQL; "menunggu saya" = GET /api/v1/approvals/inbox', async () => {
-    const mine = await asFinance((req) => pendingApprovals(req, { kind: 'all' }))
+    const mine = await asFinance(async (req) => pendingApprovals(req, await officeScope(req)))
     const doc = await sqlAs('app', "SELECT status::text AS s, count(*)::int AS n, sum(grand_total)::text AS t FROM expense_requests WHERE status IN ('pending_ack','pending_approval') GROUP BY status")
     const by = Object.fromEntries(doc.rows.map((x) => [x.s, x]))
     expect(mine.pendingAck).toEqual({ count: n(by.pending_ack?.n), sum: n(by.pending_ack?.t) })
@@ -519,7 +521,7 @@ describe('K-10 menunggu persetujuan / K-11 antrian transfer', () => {
   })
 
   it('K-11 = GET /api/v1/transfer-queue (count and Σ approvedAmount)', async () => {
-    const q = await asFinance((req) => transferQueueSummary(req))
+    const q = await asFinance(async (req) => transferQueueSummary(req, await officeScope(req)))
     const apiQ = await must(call('GET', '/api/v1/transfer-queue', w.users.finance))
     expect(q.count).toBe(apiQ.items.length)
     expect(q.sum).toBe(apiQ.items.reduce((s: number, i: { approvedAmount: number }) => s + i.approvedAmount, 0))
@@ -531,7 +533,7 @@ describe('K-10 menunggu persetujuan / K-11 antrian transfer', () => {
 
 describe('K-12 kelengkapan nota/LPJ', () => {
   it('a…g = recount SQL; age from the first posted advance transfer; overdue > lpjDueDays (7)', async () => {
-    const s = await asFinance((req) => lpjSummary(req, { kind: 'all' }, '2000-01-01', '2999-12-31'))
+    const s = await asFinance(async (req) => lpjSummary(req, await officeScope(req), '2000-01-01', '2999-12-31'))
     const st = await sqlAs('app', "SELECT status::text AS s, count(*)::int AS n FROM expense_requests WHERE type='advance' GROUP BY status")
     const by = Object.fromEntries(st.rows.map((x) => [x.s, x.n]))
     expect(s.withoutLpj.count).toBe(n(by.transferred) + n(by.receipts_complete) + n(by.lpj_revision))
@@ -558,7 +560,7 @@ describe('K-12 kelengkapan nota/LPJ', () => {
   })
 
   it('lpjDueDays is a company setting (default 7)', async () => {
-    const r = await sqlAs('app', 'SELECT lpj_due_days::int AS d FROM company_settings')
+    const r = await sqlAs('app', 'SELECT lpj_due_days::int AS d FROM companies')
     expect(r.rows.every((x) => x.d === 7) || r.rows.length === 0).toBe(true)
   })
 })
@@ -566,7 +568,7 @@ describe('K-12 kelengkapan nota/LPJ', () => {
 describe('K-13 rekap pengajuan', () => {
   it('per status = doc SQL; Σ per category = Σ grand_total of the same requests', async () => {
     const f = { from: '2000-01-01', to: '2999-12-31' }
-    const s = await asFinance((req) => requestSummary(req, { kind: 'all' }, f))
+    const s = await asFinance(async (req) => requestSummary(req, await officeScope(req), f))
     // same filter as the report: non-draft with a request date in range (a draft cancelled before submit has none)
     const doc = await sqlAs('app', "SELECT status::text AS s, count(*)::int AS n FROM expense_requests WHERE status <> 'draft' AND request_date BETWEEN '2000-01-01' AND '2999-12-31' GROUP BY status")
     const by = new Map(doc.rows.map((x) => [x.s, x.n]))
@@ -594,7 +596,7 @@ describe('K-13 rekap pengajuan', () => {
 
 describe('K-14 biaya per kendaraan / K-15 pusat biaya / K-17 per kategori', () => {
   it('K-14 (a) per vehicle = doc SQL; form 228 BBM line 600.000 on the world vehicle (seed case 1)', async () => {
-    const v = await asFinance((req) => vehicleCosts(req, { kind: 'all' }, { from: '2000-01-01', to: '2999-12-31' }))
+    const v = await asFinance(async (req) => vehicleCosts(req, await officeScope(req), { from: '2000-01-01', to: '2999-12-31' }))
     const doc = await sqlAs(
       'app',
       "SELECT l.vehicle_id, sum(l.total)::text AS s FROM expense_requests_lines l JOIN expense_requests er ON er.id=l._parent_id WHERE l.vehicle_id IS NOT NULL AND er.status::text IN ('transferred','receipts_complete','lpj_submitted','lpj_revision','lpj_verified','completed') GROUP BY l.vehicle_id",
@@ -610,7 +612,7 @@ describe('K-14 biaya per kendaraan / K-15 pusat biaya / K-17 per kategori', () =
 
   it('K-15 per cost center and month = Σ out − Σ in of posted non-reversal ledger rows (every month with data)', async () => {
     for (const period of periodRange(addMonths(month, -3), month)) {
-      const list = await asFinance((req) => costCenterMonth(req, { kind: 'all' }, period))
+      const list = await asFinance(async (req) => costCenterMonth(req, await officeScope(req), period))
       const doc = await sqlAs(
         'app',
         "SELECT cost_center_id, sum(CASE direction WHEN 'out' THEN amount ELSE -amount END)::text AS s FROM cash_entries WHERE cost_center_id IS NOT NULL AND period=$1 AND status='posted' AND source_type<>'reversal' GROUP BY cost_center_id",
@@ -622,7 +624,7 @@ describe('K-14 biaya per kendaraan / K-15 pusat biaya / K-17 per kategori', () =
   })
 
   it('seed case 1 (form 228): K-03 = K-05 = 1.447.500; lines per category sum to 1.447.500', async () => {
-    const m = await asFinance((req) => requestMoney(req, form228Id))
+    const m = await asFinance(async (req) => requestMoney(req, await officeScope(req), form228Id))
     expect(m).toMatchObject({ disbursed: 1_447_500, refund: 0, net: 1_447_500, realized: 1_447_500 })
     const cats = await sqlAs('app', 'SELECT sum(total)::text AS s FROM expense_requests_lines WHERE _parent_id=$1', [form228Id])
     expect(n(cats.rows[0].s)).toBe(1_447_500)
@@ -634,7 +636,7 @@ describe('K-14 biaya per kendaraan / K-15 pusat biaya / K-17 per kategori', () =
       [`${month}-01`, lastDay(month)],
       [`${closedMonth}-01`, lastDay(closedMonth)],
     ] as const) {
-      const s = await asFinance((req) => spending(req, { kind: 'all' }, { from, to, basis: 'dicairkan', group: 'kategori' }))
+      const s = await asFinance(async (req) => spending(req, await officeScope(req), { from, to, basis: 'dicairkan', group: 'kategori' }))
       const doc = await sqlAs(
         'app',
         `SELECT (SELECT coalesce(sum(c.amount),0) FROM cash_entries c JOIN transfers t ON t.id=c.transfer_id WHERE c.source_type='transfer' AND c.status='posted' AND t.kind<>'lpj_shortfall' AND c.entry_date BETWEEN $1 AND $2)::text AS kk,
@@ -643,7 +645,7 @@ describe('K-14 biaya per kendaraan / K-15 pusat biaya / K-17 per kategori', () =
       )
       expect(s.total, `${from}..${to}`).toBe(n(doc.rows[0].kk) + n(doc.rows[0].man))
       expect(s.items.reduce((a, i) => a + i.fromManual, 0)).toBe(n(doc.rows[0].man))
-      const byScope = await asFinance((req) => spending(req, { kind: 'all' }, { from, to, basis: 'dicairkan', group: 'lingkup' }))
+      const byScope = await asFinance(async (req) => spending(req, await officeScope(req), { from, to, basis: 'dicairkan', group: 'lingkup' }))
       expect(byScope.total).toBe(s.total)
     }
   })

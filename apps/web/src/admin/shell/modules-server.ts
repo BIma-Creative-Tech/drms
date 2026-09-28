@@ -1,9 +1,11 @@
 import { getTranslation } from '@payloadcms/translations'
 import type { Payload, SanitizedPermissions, TypedUser, VisibleEntities } from 'payload'
 
-import { isStaffOnly, ROLE_LABELS, rolesOf, type Role } from '@/access/roles'
+import { companyContextOf, isStaffOnly, ROLE_LABELS, rolesOf, type Role } from '@/access/roles'
 import { resolveModules, type BadgeKey, type ResolvedModule } from '@/admin/modules/registry'
 import { TRANSFER_QUEUE_WHERE } from '@/domain/expense/types'
+
+import { normalizeSelection, type SwitcherState } from './company-switcher'
 
 /**
  * Server-side data of the Odoo-style navigation (ModuleNav bar + Launcher at /admin): visible
@@ -89,4 +91,34 @@ export async function loadModules({ payload, user, permissions, visibleEntities,
   }
   const badges = await loadBadges(payload, user)
   return resolveModules({ roles: rolesOf(user), staffOnly: isStaffOnly(user), canSee, labelOf, badges })
+}
+
+/**
+ * MC2-4 PT switcher data: the caller's ACTIVE memberships (in active PTs, from the per-request
+ * company context of the auth strategy) with code/name and the roles held there, plus the current
+ * selection. Empty options = no membership (no switcher).
+ */
+export async function loadSwitcher(payload: Pick<Payload, 'find'>, user: TypedUser): Promise<SwitcherState> {
+  const ctx = companyContextOf(user)
+  if (!ctx || ctx.memberships.length === 0) return { options: [], selected: [] }
+  const ids = ctx.memberships.map((m) => m.company)
+  let names = new Map<number, { shortCode: string; name: string }>()
+  try {
+    const res = await payload.find({
+      collection: 'companies',
+      where: { id: { in: ids } },
+      depth: 0,
+      pagination: false,
+      sort: 'shortCode',
+      select: { shortCode: true, name: true },
+      overrideAccess: true, // SYSTEM-READ: labels of the caller's own active memberships (context already resolved)
+    })
+    names = new Map(res.docs.map((d) => [d.id as number, { shortCode: String(d.shortCode ?? d.id), name: String(d.name ?? '') }]))
+  } catch {
+    // labels only — fall back to ids
+  }
+  const options = ctx.memberships
+    .map((m) => ({ id: m.company, shortCode: names.get(m.company)?.shortCode ?? `#${m.company}`, name: names.get(m.company)?.name ?? '', roles: m.roles.map((r) => ROLE_LABELS[r]) }))
+    .sort((a, b) => a.shortCode.localeCompare(b.shortCode) || a.id - b.id)
+  return { options, selected: normalizeSelection(options, ctx.selected) }
 }

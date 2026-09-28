@@ -31,8 +31,8 @@ class FakeProgressService extends Fake implements ProgressService {
   int photos = 0;
 
   @override
-  ProgressDraft newDraft({required int projectId, String projectLabel = '', required int stageId}) =>
-      ProgressDraft(clientUuid: 'new-uuid', projectId: projectId, stageId: stageId, pctAfter: 0);
+  ProgressDraft newDraft({required int projectId, String projectLabel = '', required int stageId, int? companyId}) =>
+      ProgressDraft(clientUuid: 'new-uuid', companyId: companyId, projectId: projectId, stageId: stageId, pctAfter: 0);
 
   @override
   Future<String> addPhoto(String sub, Uint8List raw) async => 'ph-${++photos}';

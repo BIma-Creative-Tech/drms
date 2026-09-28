@@ -65,14 +65,16 @@ class ProgressService {
 
   Future<Uint8List?> photoBytes(String uuid) async => (await drafts.media(uuid))?.bytes;
 
-  /// A new, empty report.
-  ProgressDraft newDraft({required int projectId, String projectLabel = '', required int stageId}) => ProgressDraft(
-    clientUuid: const Uuid().v7(),
-    projectId: projectId,
-    projectLabel: projectLabel,
-    stageId: stageId,
-    pctAfter: 0,
-  );
+  /// A new, empty report (MC3: in the PT of its project).
+  ProgressDraft newDraft({required int projectId, String projectLabel = '', required int stageId, int? companyId}) =>
+      ProgressDraft(
+        clientUuid: const Uuid().v7(),
+        companyId: companyId,
+        projectId: projectId,
+        projectLabel: projectLabel,
+        stageId: stageId,
+        pctAfter: 0,
+      );
 
   /// Local edit of a server report (only the reporter within 24 h; the server re-checks). An existing
   /// local edit of the same report is continued.
@@ -81,6 +83,7 @@ class ProgressService {
     if (existing != null) return existing;
     return ProgressDraft(
       clientUuid: r.clientUuid ?? const Uuid().v7(),
+      companyId: r.companyId,
       projectId: r.projectId,
       projectLabel: r.projectLabel,
       stageId: r.stageId,
@@ -113,6 +116,7 @@ class ProgressService {
             bootId: await clock.bootId(),
             offline: !online,
             baseRev: d.isEdit ? d.serverRev : null,
+            companyId: d.companyId,
           );
           return ProgressSaveOutcome.queued;
         }
@@ -148,7 +152,7 @@ class ProgressService {
         await api.update(d.serverId!, progressUpdateBody(d, ids), idempotencyKey: const Uuid().v7());
       } else {
         // Idempotency-Key = report uuid: a retry after a lost answer returns the stored report.
-        await api.create(progressCreateBody(d, ids), idempotencyKey: d.clientUuid);
+        await api.create(progressCreateBody(d, ids), idempotencyKey: d.clientUuid, companyId: d.companyId);
       }
     } on ProblemException catch (e) {
       if (e.status != 429 && e.status < 500) await repo.markRejected(d.clientUuid, e.message, code: 'HTTP_${e.status}');
@@ -177,6 +181,7 @@ class ProgressService {
     if (d == null || c == null) throw StateError('Tidak ada konflik untuk laporan ini');
     final rebased = ProgressDraft(
       clientUuid: d.clientUuid,
+      companyId: d.companyId,
       projectId: d.projectId,
       projectLabel: d.projectLabel,
       stageId: d.stageId,
@@ -205,6 +210,7 @@ class ProgressService {
 
   ProgressDraft _withState(ProgressDraft d, ProgressSyncState s, {bool? offline}) => ProgressDraft(
     clientUuid: d.clientUuid,
+    companyId: d.companyId,
     projectId: d.projectId,
     projectLabel: d.projectLabel,
     stageId: d.stageId,

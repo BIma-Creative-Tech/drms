@@ -44,6 +44,7 @@ class DraftRepository {
     return DraftRequest(
       clientUuid: row.clientUuid,
       type: RequestType.fromCode(row.type),
+      companyId: row.companyId,
       title: row.title,
       projectId: row.projectId,
       costCenterId: row.costCenterId,
@@ -103,6 +104,7 @@ class DraftRepository {
           LocalDraftsCompanion.insert(
             clientUuid: d.clientUuid,
             userSub: sub,
+            companyId: Value(d.companyId ?? existing?.companyId),
             type: d.type.code,
             title: Value(d.title),
             projectId: Value(d.projectId),

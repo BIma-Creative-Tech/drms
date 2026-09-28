@@ -4,6 +4,7 @@ import { denyAll } from '@/access/roles'
 import { byRole, rolesAllowed, teamProjects } from '@/access/policies'
 import { reasonOnAnyUpdate, withAudit } from '@/audit/hooks'
 import { rupiahField } from '@/fields/common'
+import { companyField, companyHook } from '@/fields/company'
 
 /** RAB per kategori (opsional). Owner C/R/U; Finance/Admin R; PM R team. Every change needs a reason. */
 export const BudgetLines: CollectionConfig = withAudit(
@@ -17,7 +18,9 @@ export const BudgetLines: CollectionConfig = withAudit(
       update: byRole({ 'pk-owner': true }),
       delete: denyAll,
     },
+    hooks: { beforeChange: [companyHook('budget-lines', { derive: [{ field: 'project', collection: 'projects' }], check: [{ field: 'category', collection: 'expense-categories' }] })] },
     fields: [
+      companyField({ derived: true }),
       { name: 'project', type: 'relationship', relationTo: 'projects', label: 'Project', required: true, index: true, access: { update: () => false } },
       { name: 'category', type: 'relationship', relationTo: 'expense-categories', label: 'Kategori', required: true, access: { update: () => false } },
       rupiahField('amount', 'Nominal (Rp)', { required: true }),

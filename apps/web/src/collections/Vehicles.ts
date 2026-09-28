@@ -1,10 +1,11 @@
 import type { CollectionConfig } from 'payload'
 
-import { anyRole, denyAll } from '@/access/roles'
-import { byRole, rolesAllowed } from '@/access/policies'
+import { denyAll } from '@/access/roles'
+import { byRole, rolesAllowed, anyMember } from '@/access/policies'
 import { reasonOnDeactivate, withAudit } from '@/audit/hooks'
 import { activeField, odooRefField, uuidField } from '@/fields/common'
 import { formatPlate, normalizePlate, PLATE_RE } from '@/domain/plates'
+import { companyField, companyHook } from '@/fields/company'
 
 /**
  * Kendaraan / unit (US-51): plate unique and normalised (`DA 1234 XY` → `DA1234XY`).
@@ -16,12 +17,12 @@ export const Vehicles: CollectionConfig = withAudit(
     labels: { singular: 'Kendaraan', plural: 'Kendaraan' },
     admin: { useAsTitle: 'plateDisplay', group: 'Master Data', defaultColumns: ['plateDisplay', 'type', 'brandModel', 'costCenter', 'active'] },
     access: {
-      read: anyRole,
+      read: anyMember,
       create: rolesAllowed('pk-admin'),
       update: byRole({ 'pk-admin': true, 'pk-owner': true }),
       delete: denyAll,
     },
-    hooks: {
+    hooks: { beforeChange: [companyHook('vehicles', { check: [{ field: 'project', collection: 'projects' }, { field: 'costCenter', collection: 'cost-centers' }] })],
       beforeValidate: [
         ({ data }) => {
           if (data && typeof data.plateNo === 'string') {
@@ -33,6 +34,7 @@ export const Vehicles: CollectionConfig = withAudit(
       ],
     },
     fields: [
+      companyField(),
       {
         name: 'plateNo',
         type: 'text',

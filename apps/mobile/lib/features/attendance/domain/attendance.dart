@@ -43,8 +43,12 @@ class ProjectSite {
     this.lng,
     this.radiusM,
     this.kind = SiteKind.project,
+    this.companyId,
   });
   final int id;
+
+  /// MC3: PT of the project / cost center; the attendance item is queued in this PT.
+  final int? companyId;
   final String label;
   final double? lat;
   final double? lng;
@@ -58,7 +62,15 @@ class ProjectSite {
 
   static ProjectSite fromMaster(MasterItem m, {SiteKind kind = SiteKind.project}) {
     double? d(String k) => (m.extra[k] as num?)?.toDouble();
-    return ProjectSite(id: m.id, label: m.label, lat: d('lat'), lng: d('lng'), radiusM: d('radiusM'), kind: kind);
+    return ProjectSite(
+      id: m.id,
+      label: m.label,
+      lat: d('lat'),
+      lng: d('lng'),
+      radiusM: d('radiusM'),
+      kind: kind,
+      companyId: m.companyId,
+    );
   }
 }
 

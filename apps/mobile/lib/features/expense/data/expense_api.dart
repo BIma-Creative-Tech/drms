@@ -31,8 +31,14 @@ class ExpenseApi {
   ExpenseApi(this.client);
   final ApiClient client;
 
-  Options _idem(String key) => Options(headers: {'Idempotency-Key': key});
+  /// Writes on ONE existing document: the server checks the role IN the document's PT, whatever the PT
+  /// switcher says (MC3) — no `X-Company-Ids`, so a document opened from a notification of another PT works.
+  Options _idem(String key) => ApiClient.allCompanies(Options(headers: {'Idempotency-Key': key}));
 
+  /// Reads of one document by id (same reason as [_idem]).
+  static Options get _doc => ApiClient.allCompanies();
+
+  /// Server list of the PT switcher selection (`X-Company-Ids`, MC3).
   Future<ExpensePage> list({String scope = 'mine', String? cursor, int limit = 30}) => client.run(
     (d) => d.get<dynamic>('/expense-requests', queryParameters: {'scope': scope, 'limit': limit, 'cursor': ?cursor}),
     (data) {
@@ -44,15 +50,24 @@ class ExpenseApi {
   );
 
   Future<ExpenseDetail> detail(int id) => client.run(
-    (d) => d.get<dynamic>('/expense-requests/$id'),
+    (d) => d.get<dynamic>('/expense-requests/$id', options: _doc),
     (data) => detailFromJson(data as Map<String, dynamic>),
   );
 
-  /// Create a server draft; `clientUuid` makes a retry return the existing draft.
-  Future<ExpenseDetail> create(Map<String, dynamic> body, {required String idempotencyKey}) => client.run(
-    (d) => d.post<dynamic>('/expense-requests', data: body, options: _idem(idempotencyKey)),
-    (data) => detailFromJson(data as Map<String, dynamic>),
-  );
+  /// Create a server draft; `clientUuid` makes a retry return the existing draft. MC3: the draft's PT
+  /// is sent as `X-Company-Ids` (the server derives it from the project / cost center, else the sole
+  /// selected PT); null = legacy draft of a single-PT account.
+  Future<ExpenseDetail> create(Map<String, dynamic> body, {required String idempotencyKey, int? companyId}) =>
+      client.run(
+        (d) => d.post<dynamic>(
+          '/expense-requests',
+          data: body,
+          options: companyId == null
+              ? Options(headers: {'Idempotency-Key': idempotencyKey})
+              : ApiClient.forCompany(companyId, Options(headers: {'Idempotency-Key': idempotencyKey})),
+        ),
+        (data) => detailFromJson(data as Map<String, dynamic>),
+      );
 
   /// Upload one compressed image (`POST /media/{kind}`, multipart field `file`) → media id.
   Future<int> uploadMedia(String kind, Uint8List bytes, {required String filename, String mime = 'image/jpeg'}) =>
@@ -62,6 +77,8 @@ class ExpenseApi {
           data: FormData.fromMap({
             'file': MultipartFile.fromBytes(bytes, filename: filename, contentType: DioMediaType.parse(mime)),
           }),
+          // Own upload (MC3 route class "own"): independent of the PT selection.
+          options: _doc,
         ),
         (data) => ((data as Map<String, dynamic>)['id'] as num).toInt(),
       );
@@ -136,7 +153,7 @@ class ExpenseApi {
 
   /// `GET …/history` — "Riwayat" (US-35), the same rows as the web Riwayat tab (`domain/history.ts`).
   Future<List<HistoryEntry>> history(int requestId) => client.run(
-    (d) => d.get<dynamic>('/expense-requests/$requestId/history'),
+    (d) => d.get<dynamic>('/expense-requests/$requestId/history', options: _doc),
     (data) => [
       for (final i in ((data as Map<String, dynamic>)['items'] as List<dynamic>? ?? const []))
         historyFromJson(i as Map<String, dynamic>),
@@ -148,7 +165,7 @@ class ExpenseApi {
     (d) => d.get<dynamic>(
       '/media/receipts/$imageId/file',
       queryParameters: {if (thumb) 'variant': 'thumb'},
-      options: Options(responseType: ResponseType.bytes),
+      options: ApiClient.allCompanies(Options(responseType: ResponseType.bytes)),
     ),
     (data) => Uint8List.fromList(data as List<int>),
   );

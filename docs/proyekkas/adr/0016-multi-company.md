@@ -1,7 +1,8 @@
 # ADR 0016 — Multi-company: several PTs in one ProyekKas deployment, per-PT roles, full consolidation
 
 - **Status:** proposed — design approved by the user 2026-09-27; final acceptance at the **MC0 gate** (client answers
-  Q-51…Q-61, `../open-questions-client.md` §L)
+  Q-51…Q-61, `../open-questions-client.md` §L). **MC1 implemented** on branch `feat/mc1-foundation` (2026-09-28) with
+  the deviations listed in "Implementation notes (MC1)" below.
 - **Date:** 2026-09-27
 - **Author:** Analyst (phase MC0, branch `docs/mc0-multi-company`, based on `develop` `74cf7f2`)
 - **Related:** ADR 0003 (auth, roles), 0005 (cash ledger, period closing), 0006 (audit, DB roles), 0007 (numbering),
@@ -309,8 +310,82 @@ separation) — forward fixes only.
 - `groupAdmin` flag (§2) and `vehicles.plate_no` staying global (§4) are Analyst additions — confirm at the MC0 gate.
 - Per-PT timezone beyond WITA (§9) only if Q-59 requires it.
 
+## Implementation notes (MC1, 2026-09-28)
+
+Implemented as designed (companies, memberships, `groupAdmin`, `company_id NOT NULL` on the 30 per-PT tables with
+backfill to company #1, per-PT uniques, counters `(company_id, doc_type, period_key)`, `pk_cash_lock_date(company_id)`,
+cross-PT triggers, per-PT `byRole` / `resolveScope`, decision guards on the document PT, `pk-user` login). Deviations:
+
+| # | Design | Implementation | Reason |
+|---|---|---|---|
+| 1 | Cookie `__Host-pk-companies` | `pk-company-ids` (`__Host-pk-company-ids` on https, same pattern as the session cookie) | name fixed by the MC1 task; the switcher that sets it is MC2 |
+| 2 | Header naming a foreign PT → 403 everywhere | `/api/v1` → 403 `COMPANY_NOT_ALLOWED` + `access_denied` audit; generic `/api/<slug>` uses the intersection (foreign ids ignored, empty = no rows) | auth strategies cannot answer 403 for Payload's own REST; the result never contains foreign rows |
+| 3 | Token must carry `pk-user` | MC1 transition: `pk-user` **or** any legacy `pk-*` realm role is the login marker (never a permission); user create assigns `pk-user`, falls back to `pk-staff` while the realm lacks `pk-user` (Keycloak 422) | the realm change is an infra request (see phase plan); logins must keep working until it is applied |
+| 4 | `company` required on per-PT masters | Payload field not `required` (DB `NOT NULL`); `companyHook` fills it (caller's only selected PT, or the only active PT for a system write, else 400 "PT wajib dipilih") | typed Local API calls (seed, import, fixtures) stay valid; same guarantee |
+| 5 | Composite uniques as Payload indexes | raw SQL unique indexes `<table>_company_<col>_key` (migration `*_mc1_company_columns`) | Payload names compound indexes by column list only (`company_code_idx` collides across tables) |
+| 6 | `users.roles` removed | removed as a column; `req.user.roles` / `req.user.employee` remain as DERIVED per-request values (union over the selected PTs) for UI hints and the MC2 transition; legacy checks renamed `hasRoleAny` | 60+ call sites (admin views, list endpoints) move to per-PT checks in MC2; no second source of truth |
+| 7 | Rows without PT (audit) → Admin/group admin only | office roles in any PT (as before) | domain audit rows are not tagged yet (MC2); keeps single-PT behaviour identical |
+| 8 | Users read by Admin/Direktur of the PT | users with a membership in those PTs **plus accounts without any membership** | onboarding: the Admin creates the account first, then the membership |
+| 9 | Jobs per PT | `reminder_runs` keyed `(company_id, run_date)`; the jobs still run company #1 only (MC2 loop) | MC2 scope |
+
+## Implementation notes (MC2 backend, 2026-09-28)
+
+Branch `feat/mc2-backend` (domain, reports, jobs, media, sync; the admin UI + import run in parallel on
+`feat/mc2-admin-ui`). Contract for the UI: `../mc/mc2-contract.md`; progress: `../mc/mc2-progress.md`.
+
+| # | Design | Implementation | Reason |
+|---|---|---|---|
+| 1 | `ReportScope` = `{ companies: CompanyScope[] }` | `{ kind (summary), …legacy team/own fields, companies }`; a literal WITHOUT `companies` is fail-closed (`all` → FALSE, team/own ids unchanged) | admin views (other branch) still build/read `scope.kind`; fail-closed keeps them safe until they adopt the builders |
+| 2 | Per-PT subtotal rows in reports | leading `PT` column + a separate "Subtotal per PT" table (Σ = total); paged reports get their per-PT totals from SQL | keeps the table model (CSV/XLSX/PDF) unchanged; no interleaved total rows in exports |
+| 3 | Dashboards per PT | each layout reads the PTs where the caller holds THAT role (Owner layout: `pk-owner` PTs, Finance: `pk-finance` PTs, PM: team per PM PT, Admin: `pk-admin` PTs); `byCompany` next to every combined total; Finance "last closed period" combined = the OLDEST of the PTs' latest | a Direktur of A who is Staff in B must not get B numbers on the Direktur home |
+| 4 | Media access follows the owning document (no company column) | office roles: all rows only when they hold the role in EVERY active PT (always with one PT); otherwise own uploads + files owned by requests / progress reports of their PTs, selfies of attendances of their PTs, signatures uploaded by members of their PTs (id lists, cached per request) | no migration; exact per-PT answer; performance to be measured with 3 PTs in MC4 |
+| 5 | Selfie retention per PT | selfies without attendance and selfies of INACTIVE PTs are handled by the first active PT's run; the app-wide batch caps one run across all PTs | every file belongs to exactly one run (UU PDP: nothing is kept forever) |
+| 6 | `COMPANY_MISMATCH` when the item PT ≠ header | item PT derived from project / cost center / existing draft or report; rejected when not in the EFFECTIVE selection (header ∩ memberships, default all memberships); on-behalf also when employee PT ≠ location PT | same rule for header and no-header requests; the DB triggers stay the last line |
+| 7 | Semgrep rule for raw `sql` without company helper | unit test `tests/unit/mc2-sql-lint.test.ts` (per function, per-PT tables, allow-list with reasons) | runs in the existing unit job (no new CI tool); fails on a new unscoped function |
+| 8 | Notification texts prefixed `[shortCode]` | not prefixed; rows carry `company` (reminders + late-progress now too) for the UI label | texts stay stable for the one-PT case and the APK; label = UI concern |
+| 9 | Group logo on consolidated PDFs | text letterhead only (name, header lines, PT list; Author/Subject metadata) | the report PDF had no logo before (F3); logo rendering is a UI/PDF follow-up |
+| 10 | "Gabungkan kategori berkode sama" [Usulan] | not implemented — categories are never merged across PTs | proposal only (requirements v1.2 §5) |
+
+MC1 leftovers fixed here (security): addendum decisions used the union of roles over the selected PTs; manual
+cash posting/edit/void checked "Finance in any PT"; internal PDF, full bank number in the DTO, cash rows in the
+request history, device revoke, attendance correction, PM on-behalf check-in — all now check the role in the
+document's PT.
+
+## Implementation notes (MC2 integration, 2026-09-28)
+
+Branch `feat/mc2-integration` = backend + admin UI merged, every `TODO(mc2-contract)` closed (see
+`../mc/mc2-progress.md` §Integration).
+
+| # | Design / contract | Implementation | Reason |
+|---|---|---|---|
+| 1 | UI builds scopes with the domain builders only (contract §0.1) | Absensi `narrow()` removed → `narrowAttScope`; new `narrowAttToCompanies` for the PT filter; audit-log view → `auditScope` | the company-less literal matched a project id of another PT (office user of A saw B's attendance) |
+| 2 | Queue rows = PTs where the caller's role grants read access (contract §3) | Finance queues (transfer queue, LPJ verification, their counts, `GET /api/v1/transfer-queue`) additionally limited to the PTs where the caller is Finance / Direktur (`officeQueueWhere`) | collection read access also returns the TEAM requests of a PT where the caller is only PM — with the unmasked bank snapshot of the queue row |
+| 3 | Closing names its PT | Tutup buku is one PT per screen (PT chooser / tabs), close / reopen always send `company`; a 400 "PT wajib dipilih" is shown as an instruction | ADR §4: closing PT A never locks PT B |
+| 4 | Role matrix save "tidak ada simpan sebagian" | one `POST /api/v1/company-memberships/batch` (Idempotency-Key); errors carry `errors[].path = items.<i>` so the UI marks the cell | per-cell REST calls could save half a matrix |
+| 5 | "Tim hari ini" rows | `TeamTodayRow.companyId` (+ OpenAPI `TeamToday.members[].companyId`) | PT chip on the board with > 1 PT |
+
+## Implementation notes (MC3-1 API, 2026-09-28)
+
+Branch `feat/mc3-api` (`/api/v1` for the multi-company APK; the APK itself is MC3-2). Contract, route table and the
+released-APK compatibility matrix: `../mc/mc3-progress.md` §API.
+
+| # | Design | Implementation | Reason |
+|---|---|---|---|
+| 1 | `/me` returns `companies[]` + app-wide settings | `companies[]` (every active membership: roles, employee, capabilities, per-PT settings, `selected`), `activeCompanyIds`, `appSettings`; the old single-PT fields stay, DEPRECATED: `roles`/`capabilities` = union over the selected PTs, `employee`/`settings` = `legacyCompanyId` (first selected membership with an employee, else the first) | mobile-v0.2.0 keeps working unchanged for one PT; the old `settings` fallback (company #1) could name a PT outside the memberships |
+| 2 | Outbox item synced "under its own PT (`X-Company-Ids` = that PT)" | each item carries `company_id` (snake_case like the envelope); the item is processed under it whatever the header says (selection narrowed to that PT per item); `COMPANY_NOT_ALLOWED` (not a membership) / `COMPANY_MISMATCH` (references of another PT) per item; results carry `company_id` | one batch may mix PTs; a project-less draft needs an explicit PT; the header is a read selection, not a write target |
+| 3 | Items of the released APK (no PT) | accepted only for an account with exactly one active PT; otherwise the whole batch → 409 `COMPANY_REQUIRED` (nothing processed) | an item without PT is ambiguous for several PTs; 409 makes the old APK keep the items queued with a clear message (no silent wrong-PT write) |
+| 4 | Masters per selected PT, caches per PT | `company` + `shared` on every item, per-PT default radius, `companies[].version` + `sharedVersion`, weak `ETag` / 304; `Cache-Control: private, no-store` kept | ETag lets the APK revalidate per PT without letting HTTP caches store master data |
+| 5 | Queue endpoints with PT filter | `?company=` on 12 list routes = subset of the selection, else 403 `COMPANY_NOT_ALLOWED` (audited; malformed 400); new `GET /lpj-queue` | same answer as a foreign header; never an empty "filter" that widens |
+| 6 | `X-Company-Ids` header component in OpenAPI | `components.parameters.CompanyIds` referenced by every authenticated path (`extendZodWithOpenApi` in the build-time generator only) | one definition for the Dart client |
+| 7 | Every `/api/v1` route checked | route table (91 routes: 6 public, 10 own, 20 selection, 47 document, 8 named-PT) enforced by a completeness test; fixed: `?company=` of `/cash-accounts/balances` (cross-PT balances) and `/period-closings` (lock date) were unchecked | isolation of every route, not only the reviewed ones |
+
 ## Revision history
 
+- **2026-09-28 (MC3-1 API):** implementation notes MC3-1 (1–7).
+- **2026-09-28 (MC2 integration):** implementation notes MC2 integration (1–5).
+
+- **2026-09-28 (MC2 backend):** implementation notes MC2 (deviations 1–10).
+- **2026-09-28 (MC1):** implementation notes added (deviations 1–9 above).
 - **2026-09-27 (MC0):** proposed; design approved by the user the same day; Analyst additions: `groupAdmin`,
   global vehicle plate, TZ = process TZ in MC1, `reminder_runs` per company, `period-closings/:period/reopen` needs a
   company parameter.

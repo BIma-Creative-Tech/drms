@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../app/providers.dart';
 import '../../../core/connectivity/connectivity_controller.dart';
@@ -8,6 +9,8 @@ import '../../../core/format/dates.dart';
 import '../../../l10n/gen/app_localizations.dart';
 import '../../../shared/widgets/async_body.dart';
 import '../../auth/application/auth_controller.dart';
+import '../../companies/presentation/company_chip.dart';
+import '../../companies/presentation/unassigned_screen.dart';
 import '../../expense/data/draft_repository.dart';
 import '../application/sync_coordinator.dart';
 import '../application/sync_engine.dart';
@@ -65,6 +68,7 @@ class QueueScreen extends ConsumerWidget {
                   color: bytes > DraftRepository.warnQueueBytes ? Theme.of(context).colorScheme.error : null,
                 ),
               ),
+              UnassignedBanner(onOpen: () => context.push('/companies/unassigned')),
               const SizedBox(height: 12),
               FilledButton.icon(
                 key: const Key('sync-now'),
@@ -96,9 +100,16 @@ class QueueScreen extends ConsumerWidget {
                       'pending' => Icons.schedule,
                       _ => Icons.error,
                     }),
-                    title: Text(
-                      '${SyncItemType.label(r.type)}'
-                      ' · ${statusLabel(r.status)}',
+                    title: Row(
+                      children: [
+                        CompanyChipLead(companyId: r.companyId, always: true),
+                        Expanded(
+                          child: Text(
+                            '${SyncItemType.label(r.type)}'
+                            ' · ${statusLabel(r.status)}',
+                          ),
+                        ),
+                      ],
                     ),
                     subtitle: Text(
                       [

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/config/app_env.dart';
@@ -14,7 +16,9 @@ import '../features/approvals/data/approvals_api.dart';
 import '../features/auth/data/oidc_client.dart';
 import '../features/auth/data/password_login_client.dart';
 import '../features/auth/data/profile_api.dart';
+import '../features/auth/application/auth_controller.dart';
 import '../features/auth/data/token_manager.dart';
+import '../features/companies/application/company_selection.dart';
 import '../features/expense/application/draft_service.dart';
 import '../features/expense/data/draft_repository.dart';
 import '../features/expense/data/expense_api.dart';
@@ -72,14 +76,23 @@ final tokenManagerProvider = Provider<TokenManager>(
 /// WorkManager scheduling (E3-b); no-op off Android (tests).
 final backgroundSchedulerProvider = Provider<BackgroundScheduler>((ref) => defaultBackgroundScheduler());
 
+/// Rebuilt when the PT switcher selection changes (MC3): every API provider and every server list that
+/// watches it re-loads for the new PT set.
 final apiClientProvider = Provider<ApiClient>((ref) {
   final env = ref.watch(appEnvProvider);
+  final companies = ref.watch(companyHeaderProvider);
   return ApiClient(
     baseUrl: env.apiV1,
     tokens: ref.watch(tokenManagerProvider),
     headers: ref.watch(deviceIdentityProvider),
     onReachability: (ok) => ref.read(connectivityProvider.notifier).reportServerReachable(ok),
     onUpgradeRequired: (min) => ref.read(upgradeRequiredProvider.notifier).set(min),
+    companyHeader: () => companies,
+    // A selected PT is no longer a membership: back to "Semua PT" and reload /me (memberships, roles).
+    onCompanyNotAllowed: () {
+      unawaited(ref.read(companySelectionProvider.notifier).reset());
+      unawaited(ref.read(authControllerProvider.notifier).refreshProfile());
+    },
   );
 });
 
@@ -94,6 +107,16 @@ final progressRepositoryProvider = Provider((ref) => ProgressRepository(ref.watc
 final progressApiProvider = Provider((ref) => ProgressApi(ref.watch(apiClientProvider)));
 final attendanceApiProvider = Provider((ref) => AttendanceApi(ref.watch(apiClientProvider)));
 final outboxRepositoryProvider = Provider((ref) => OutboxRepository(ref.watch(databaseProvider)));
+
+/// Bumped after every masters refresh: the cached-masters providers re-read the encrypted cache.
+final mastersRevisionProvider = NotifierProvider<MastersRevision, int>(MastersRevision.new);
+
+class MastersRevision extends Notifier<int> {
+  @override
+  int build() => 0;
+  void bump() => state++;
+}
+
 final mastersRepositoryProvider = Provider(
   (ref) => MastersRepository(ref.watch(apiClientProvider), ref.watch(databaseProvider)),
 );

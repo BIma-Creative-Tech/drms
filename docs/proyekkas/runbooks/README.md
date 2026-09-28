@@ -30,6 +30,7 @@
 | 7 | Data go-live (impor master, saldo awal, nomor PB mulai 229) | prod | E11 alat impor (dry-run → commit) | **menyusul** |
 | 8 | Monitoring & alert | semua | `/opt/infra/docs/03-operations/observability.md` (Uptime Kuma monitor staging sudah ada: runbook onboarding §Langkah 5) | staging tersedia, prod **menyusul** |
 | 9 | Keycloak realm `drms` (user, SMTP, brute-force) | semua | `/opt/infra/docs/03-operations/keycloak.md`, runbook onboarding §Langkah 3 | tersedia |
+| 10 | Menerbitkan APK di halaman unduh `/unduh` (tautan tetap `/unduh/proyekkas.apk`) | staging, prod | [`rilis-apk.md`](rilis-apk.md) | tersedia setelah rilis web berikutnya |
 
 ## 1. Deploy / upgrade
 
@@ -113,3 +114,4 @@ di-merge.
 | Tanggal | Perubahan |
 |---|---|
 | 2026-09-26 | Versi awal (E12). |
+| 2026-09-27 | Tambah #10 rilis APK ke `/unduh`. |

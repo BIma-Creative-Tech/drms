@@ -26,6 +26,16 @@ class ApprovalsApi {
     ], (m['budgetWarnPct'] as num?)?.toDouble() ?? 85);
   });
 
+  /// MC3 `GET /lpj-queue` (US-21): Uang Muka "LPJ Diajukan" / "LPJ Terverifikasi" of the PTs where the
+  /// caller is Finance / Direktur (PT switcher selection), each with its PT.
+  Future<List<ExpenseSummary>> lpjQueue() => client.run(
+    (d) => d.get<dynamic>('/lpj-queue'),
+    (data) => [
+      for (final i in ((data as Map<String, dynamic>)['items'] as List<dynamic>? ?? const []))
+        summaryFromJson(i as Map<String, dynamic>),
+    ],
+  );
+
   /// Signature drawn on screen → `media-signatures` id (PNG ≤ 800×300, ≤ 50 KB, requirements §9).
   Future<int> uploadSignature(Uint8List png) => client.run(
     (d) => d.post<dynamic>(
@@ -33,6 +43,7 @@ class ApprovalsApi {
       data: FormData.fromMap({
         'file': MultipartFile.fromBytes(png, filename: 'signature.png', contentType: DioMediaType.parse('image/png')),
       }),
+      options: ApiClient.allCompanies(),
     ),
     (data) => ((data as Map<String, dynamic>)['id'] as num).toInt(),
   );
@@ -58,7 +69,8 @@ class ApprovalsApi {
       (d) => d.post<dynamic>(
         '/expense-requests/$requestId/$path',
         data: body,
-        options: Options(headers: {'Idempotency-Key': idempotencyKey}),
+        // One document (MC3): the role IN its PT counts, not the PT switcher.
+        options: ApiClient.allCompanies(Options(headers: {'Idempotency-Key': idempotencyKey})),
       ),
       (data) => detailFromJson(data as Map<String, dynamic>),
     );

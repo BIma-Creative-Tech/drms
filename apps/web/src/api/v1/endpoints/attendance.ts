@@ -1,13 +1,14 @@
 import { createReadStream } from 'node:fs'
 import { Readable } from 'node:stream'
 
-import { relId, userId } from '@/access/roles'
+import { ownEmployees, relId, userId } from '@/access/roles'
 import { writeAudit } from '@/audit/writer'
 import { correctAttendance } from '@/domain/attendance/corrections'
 import { employeeRecap, myRecap, teamTodayFor } from '@/domain/attendance/service'
 import { fileSize, mediaPath } from '@/lib/media-files'
 import { withReqTransaction } from '@/lib/system-tx'
 
+import { companyQuery, singleCompanyQuery } from '../company-query'
 import { HttpError, json, v1 } from '../http'
 import { AttendanceCorrectBody, AttendanceMonthQuery, AttendanceRecapQuery, TeamTodayQuery } from '../schemas-attendance'
 
@@ -33,7 +34,9 @@ export const attendanceMeEndpoint = v1({
   handler: async ({ req }) => {
     const q = AttendanceMonthQuery.safeParse(params(req))
     if (!q.success) throw badQuery(q.error.issues)
-    return json(await withReqTransaction(req, () => myRecap(req, q.data.month)))
+    // MC3: ?company= = the PT of the own employee (one employee per PT); default = first selected PT with an employee
+    const company = await singleCompanyQuery(req)
+    return json(await withReqTransaction(req, () => myRecap(req, q.data.month, company)))
   },
 })
 
@@ -57,11 +60,13 @@ export const teamTodayEndpoint = v1({
   handler: async ({ req }) => {
     const q = TeamTodayQuery.safeParse(params(req))
     if (!q.success) throw badQuery(q.error.issues)
+    const companyIds = await companyQuery(req)
     const r = await withReqTransaction(req, () =>
       teamTodayFor(req, {
         date: q.data.date,
         projectId: q.data.project_id ? Number(q.data.project_id) : undefined,
         costCenterId: q.data.cost_center_id ? Number(q.data.cost_center_id) : undefined,
+        companyIds,
       }),
     )
     return json(r)
@@ -120,8 +125,9 @@ export const attendanceSelfieEndpoint = v1({
     // Missing file = removed by the retention job (Q-33) or never stored → 404 (the row stays).
     if (!file || size === null) throw new HttpError(404, 'Not Found', { detail: 'Selfie tidak tersedia (mungkin sudah melewati masa retensi).' })
     const uid = userId(req)
-    const ownEmployee = relId((req.user as { employee?: unknown } | null)?.employee)
-    const isOwn = relId(att.user) === uid || (ownEmployee !== undefined && relId(att.employee) === ownEmployee)
+    // MC3: own = the attendance of ANY of the caller's employees (one per PT), not only the first PT's
+    const attEmployee = relId(att.employee)
+    const isOwn = relId(att.user) === uid || (attEmployee !== undefined && ownEmployees(req).includes(attEmployee))
     if (!isOwn && shouldAudit(`${uid}:attendance-selfie:${id}`)) {
       await withReqTransaction(req, () => writeAudit(req, [{ action: 'view_sensitive', docType: 'attendance', docId: String(id), field: 'selfie' }]))
     }

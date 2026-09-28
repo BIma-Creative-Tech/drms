@@ -7,7 +7,7 @@ import { resetAppConfigCache } from '@/api/v1/endpoints/app'
 import { selfieRetentionPlan } from '@/domain/attendance/retention'
 import { resetRateLimits } from '@/lib/rate-limit'
 
-import { accessToken, auditRows, getTestPayload, http, installLocalJwks, registerDevice, sqlAs, sqlError, type TestUser } from './helpers'
+import { accessToken, auditRows, companySettingsDoc, getTestPayload, http, installLocalJwks, registerDevice, sqlAs, sqlError, type TestUser, updateCompany } from './helpers'
 import { api, makeWorld, sysCreate, type FlowUser, type World } from './flow-world'
 
 /**
@@ -82,8 +82,7 @@ async function fixtureRow(employee: number, user: number, kind: 'check_in' | 'ch
 }
 
 async function setAttendance(enabled: boolean) {
-  const p = await getTestPayload()
-  await p.updateGlobal({ slug: 'company-settings', data: { syncAttendanceEnabled: enabled }, overrideAccess: true /* SYSTEM-WRITE: fixture */ })
+  await updateCompany({ syncAttendanceEnabled: enabled })
   resetAppConfigCache()
 }
 
@@ -154,8 +153,7 @@ describe('cost-center geofence (Q-40) with syncAttendanceEnabled = true', () => 
 
 describe('company default radius (S3e, US-01, S-19)', () => {
   it('a point without its own radius uses company-settings.defaultGeofenceRadiusM (server check + masters)', async () => {
-    const p = await getTestPayload()
-    const s = (await p.findGlobal({ slug: 'company-settings', depth: 0, overrideAccess: true /* SYSTEM-READ: fixture */ })) as { defaultGeofenceRadiusM?: number }
+    const s = (await companySettingsDoc()) as { defaultGeofenceRadiusM?: number }
     const def = s.defaultGeofenceRadiusM ?? 100
     const cc = await sysCreate('cost-centers', { code: 'e6-CCDR', name: 'e6 Ops radius default', manager: w.users.pm.id, lat: OPS.lat, lng: OPS.lng })
     await sysCreate('team-assignments', { employee: w.emp.a, costCenter: cc, roleInProject: 'staff' })
@@ -445,12 +443,12 @@ describe('selfie viewer (Q-33) and retention (dry run)', () => {
     const later = await selfieRetentionPlan(p, new Date(Date.now() + 400 * 86_400_000))
     expect(later.candidates).toBe(total - 1)
     expect(later.sampleIds).not.toContain(face)
-    await p.updateGlobal({ slug: 'company-settings', data: { selfieRetentionMonths: 1 }, overrideAccess: true /* SYSTEM-WRITE: fixture */ })
+    await updateCompany({ selfieRetentionMonths: 1 })
     try {
       expect((await selfieRetentionPlan(p, new Date(Date.now() + 40 * 86_400_000))).months).toBe(1)
     } finally {
-      await p.updateGlobal({ slug: 'company-settings', data: { selfieRetentionMonths: 12 }, overrideAccess: true /* SYSTEM-WRITE: fixture */ })
+      await updateCompany({ selfieRetentionMonths: 12 })
     }
-    expect((await sqlError('app', 'UPDATE company_settings SET selfie_retention_months = 0'))?.code).toBe('23514')
+    expect((await sqlError('app', 'UPDATE companies SET selfie_retention_months = 0'))?.code).toBe('23514')
   })
 })

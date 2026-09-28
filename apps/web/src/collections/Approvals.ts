@@ -1,10 +1,11 @@
 import type { Access, CollectionConfig, Where } from 'payload'
 
-import { denyAll, hasRole } from '@/access/roles'
+import { denyAll } from '@/access/roles'
 import { visibleAddendumIds } from '@/domain/addendum/access'
 import { byVisibleRequest, denyDeleteLogged } from '@/domain/expense/access'
 import { inIds } from '@/access/scope'
 import { APPROVAL_DECISIONS, APPROVAL_POSITIONS } from '@/domain/expense/types'
+import { companyField, companyHook } from '@/fields/company'
 
 const ro = { readOnly: true }
 
@@ -21,7 +22,7 @@ const ro = { readOnly: true }
 const readAccess: Access = async (args) => {
   const { req } = args
   if (!req.user) return false
-  if (hasRole(req, 'pk-finance', 'pk-owner', 'pk-admin')) return true
+  // office roles: rows of their PTs (inside byVisibleRequest); others: visible requests / addenda
   const byRequest = await byVisibleRequest('request')(args)
   const byAddendum = inIds('addendum', await visibleAddendumIds(req))
   const or = [byRequest, byAddendum].filter((w): w is Where => typeof w === 'object' && w !== null)
@@ -35,7 +36,9 @@ export const Approvals: CollectionConfig = {
   admin: { group: 'Keuangan', defaultColumns: ['request', 'position', 'level', 'actorName', 'decision', 'decidedAt'] },
   access: { read: readAccess, create: denyAll, update: denyAll, delete: denyDeleteLogged('approval') },
   lockDocuments: false,
+  hooks: { beforeChange: [companyHook('approvals', { derive: [{ field: 'request', collection: 'expense-requests' }, { field: 'addendum', collection: 'budget-addenda' }] })] },
   fields: [
+    companyField({ derived: true }),
     { name: 'docType', type: 'select', required: true, defaultValue: 'expense_request', options: ['expense_request', 'budget_addendum'].map((v) => ({ label: v, value: v })), admin: ro },
     { name: 'request', type: 'relationship', relationTo: 'expense-requests', label: 'Pengajuan', index: true, admin: ro },
     { name: 'addendum', type: 'relationship', relationTo: 'budget-addenda', label: 'Addendum RAB', index: true, admin: ro },

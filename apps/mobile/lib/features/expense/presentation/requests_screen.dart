@@ -7,6 +7,7 @@ import '../../../core/format/rupiah.dart';
 import '../../../l10n/gen/app_localizations.dart';
 import '../../../shared/widgets/async_body.dart';
 import '../../auth/application/auth_controller.dart';
+import '../../companies/presentation/company_chip.dart';
 import '../../auth/domain/user_profile.dart';
 import '../application/expense_providers.dart';
 import '../domain/draft.dart';
@@ -93,7 +94,12 @@ class _DraftList extends ConsumerWidget {
                     d.syncState == DraftSyncState.synced ? Icons.cloud_done : Icons.phone_android,
                     color: warn ? Theme.of(context).colorScheme.error : null,
                   ),
-                  title: Text(d.title.isEmpty ? t.draftUntitled : d.title),
+                  title: Row(
+                    children: [
+                      CompanyChipLead(companyId: d.companyId, always: true),
+                      Expanded(child: Text(d.title.isEmpty ? t.draftUntitled : d.title)),
+                    ],
+                  ),
                   subtitle: Text(
                     '${d.type.label} · ${syncStateLabel(t, d.syncState)}'
                     '${d.lastError != null ? '\n${d.lastError}' : ''}',
@@ -155,7 +161,12 @@ class _SentList extends ConsumerWidget {
                   final r = s.items[i];
                   return ListTile(
                     key: Key('request-${r.id}'),
-                    title: Text(r.title),
+                    title: Row(
+                      children: [
+                        CompanyChipLead(companyId: r.companyId),
+                        Expanded(child: Text(r.title)),
+                      ],
+                    ),
                     subtitle: Text(
                       '${r.docNo ?? '-'} · ${r.typeLabel}\n${r.statusLabel}'
                       '${r.neededDate != null ? ' · ${formatDateOnly(r.neededDate)}' : ''}',

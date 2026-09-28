@@ -8,6 +8,7 @@ import { withReqTransaction } from '@/lib/system-tx'
 import { ActionButton } from '../components/ActionButton'
 import { ReviewDetails } from '../components/ReviewDetails'
 import { AddendumInboxSection } from './Addendum'
+import { itemCompany, PtChip, PtScopeNote, ptView } from './pt'
 import { Empty, Shell, TableScroll, badge, docLink, num, rp, table, td, th } from './shared'
 
 /**
@@ -20,6 +21,7 @@ import { Empty, Shell, TableScroll, badge, docLink, num, rp, table, td, th } fro
  */
 export async function ApprovalInbox(props: AdminViewServerProps) {
   const req = props.initPageResult.req
+  const pt = await ptView(req)
   const { items, budgetWarnPct, details } = await withReqTransaction(req, async () => {
     const inbox = await approvalInbox(req)
     // S3e (US-26/US-59, S-05): lines, receipts and per-line flags for each waiting request.
@@ -27,10 +29,12 @@ export async function ApprovalInbox(props: AdminViewServerProps) {
     for (const it of inbox.items) map.set(it.id, await detail(req, it.id))
     return { ...inbox, details: map }
   })
+  const cols = pt.multi ? 10 : 9
   return (
     <Shell props={props} title="Persetujuan">
+      <PtScopeNote pt={pt} />
       <p style={{ marginTop: 0 }}>
-        Pengajuan yang menunggu keputusan Anda. Merah = anggaran project sesudah disetujui melebihi {budgetWarnPct}%.
+        Pengajuan yang menunggu keputusan Anda. Merah = anggaran project sesudah disetujui melebihi {pt.multi ? 'ambang PT pengajuan' : `${budgetWarnPct}%`}.{pt.multi ? ' Keputusan selalu memakai peran Anda di PT dokumen.' : ''}
       </p>
       {items.length === 0 ? (
         <Empty text="Tidak ada pengajuan yang menunggu keputusan Anda." />
@@ -39,6 +43,7 @@ export async function ApprovalInbox(props: AdminViewServerProps) {
           <table style={table}>
             <thead>
               <tr>
+                {pt.multi ? <th style={th}>PT</th> : null}
                 <th style={th}>Nomor / Judul</th>
                 <th style={th}>Jenis</th>
                 <th style={th}>Project / Pusat biaya</th>
@@ -53,7 +58,12 @@ export async function ApprovalInbox(props: AdminViewServerProps) {
             <tbody>
               {items.map((r) => (
                 <React.Fragment key={r.id}>
-                <tr>
+                <tr data-pk-inbox-item={r.id}>
+                  {pt.multi ? (
+                    <td style={td}>
+                      <PtChip pt={pt.ref(itemCompany(r))} />
+                    </td>
+                  ) : null}
                   <td style={td}>
                     {docLink(r.id, r.docNo ?? `#${r.id}`)}
                     <div>{r.title}</div>
@@ -94,7 +104,7 @@ export async function ApprovalInbox(props: AdminViewServerProps) {
                 </tr>
                 {details.get(r.id) ? (
                   <tr>
-                    <td style={{ ...td, paddingTop: 0 }} colSpan={9}>
+                    <td style={{ ...td, paddingTop: 0 }} colSpan={cols}>
                       <details data-pk-inbox-details={r.id}>
                         <summary style={{ cursor: 'pointer', fontSize: 12 }}>
                           Rincian baris, nota &amp; flag ({details.get(r.id)!.lines.length} baris, {details.get(r.id)!.receipts.filter((x) => x.status !== 'removed').length} nota)

@@ -1,9 +1,10 @@
 import type { PayloadRequest, Where } from 'payload'
 
-import { hasRole, relId, userId } from '@/access/roles'
+import { hasRoleAny, relId, userId } from '@/access/roles'
 
 import { mayCreateReports } from './access'
 import { reportRev, type ReportDoc } from './reports'
+import { displayNames } from '@/domain/companies'
 
 /**
  * API shape of progress reports (/api/v1/progress-reports, schemas-progress.ts). Names of project,
@@ -28,11 +29,7 @@ async function names(req: PayloadRequest, docs: readonly ReportDoc[]): Promise<N
   }
   const u = ids('reporter')
   if (u.length) {
-    const r = await req.payload.find({ collection: 'users', where: { id: { in: u } }, depth: 1, pagination: false, select: { name: true, email: true, employee: true }, overrideAccess: true /* SYSTEM-READ: display names */, req })
-    for (const d of r.docs as Array<{ id: number; name?: string | null; email: string; employee?: { name?: string } | number | null }>) {
-      const emp = d.employee && typeof d.employee === 'object' ? d.employee.name : undefined
-      out.user.set(d.id, emp || d.name || d.email)
-    }
+    for (const [id, name] of await displayNames(req, u)) out.user.set(id, name)
   }
   return out
 }
@@ -72,6 +69,7 @@ export async function reportDtos(req: PayloadRequest, docs: readonly ReportDoc[]
     return {
       id: d.id,
       uuid: d.uuid ?? null,
+      companyId: relId((d as { company?: unknown }).company) ?? null, // MC3: PT chip
       docNo: d.docNo ?? null,
       project: { id: projectId, code: n.project.get(projectId)?.code ?? null, name: n.project.get(projectId)?.name ?? null },
       stage: { id: stageId, name: n.stage.get(stageId)?.name ?? null, weightPct: n.stage.get(stageId)?.weightPct ?? null },
@@ -111,12 +109,12 @@ export async function reportDto(req: PayloadRequest, d: ReportDoc): Promise<Repo
   return (await reportDtos(req, [d]))[0]!
 }
 
-export type ReportListFilter = { projectId?: number; stageId?: number; from?: string; to?: string; mine?: boolean; limit: number; after?: number }
+export type ReportListFilter = { projectId?: number; stageId?: number; from?: string; to?: string; mine?: boolean; limit: number; after?: number; companyIds?: readonly number[] }
 
 /** US-31: newest first, filter by project (and stage / date range), caller's read scope, cursor on id. */
 export async function listReports(req: PayloadRequest, f: ReportListFilter): Promise<{ items: ReportDto[]; nextCursor: number | null }> {
   // Roles without read access get an empty page (no query: a denied find kills an outer transaction).
-  if (!hasRole(req, 'pk-owner', 'pk-finance', 'pk-pm')) return { items: [], nextCursor: null }
+  if (!hasRoleAny(req, 'pk-owner', 'pk-finance', 'pk-pm')) return { items: [], nextCursor: null }
   const and: Where[] = []
   if (f.projectId !== undefined) and.push({ project: { equals: f.projectId } })
   if (f.stageId !== undefined) and.push({ stage: { equals: f.stageId } })
@@ -124,6 +122,7 @@ export async function listReports(req: PayloadRequest, f: ReportListFilter): Pro
   if (f.to) and.push({ reportDate: { less_than_equal: f.to } })
   if (f.mine) and.push({ reporter: { equals: userId(req) ?? -1 } })
   if (f.after !== undefined) and.push({ id: { less_than: f.after } })
+  if (f.companyIds?.length) and.push({ company: { in: [...f.companyIds] } }) // MC3: narrows only
   let docs: ReportDoc[] = []
   try {
     const res = await req.payload.find({

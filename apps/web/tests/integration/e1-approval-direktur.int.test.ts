@@ -44,7 +44,7 @@ async function submitted(creator: FlowUser = w.users.staffA, over: Record<string
 
 /** Temporarily deactivates every active holder of `role` except `keep` (restored afterwards). */
 async function onlyActive<T>(role: string, keep: number[], fn: () => Promise<T>): Promise<T> {
-  const r = await sqlAs('app', `SELECT u.id FROM users u JOIN users_roles r ON r.parent_id = u.id WHERE r.value = $1 AND u.active AND NOT (u.id = ANY($2::int[]))`, [role, keep])
+  const r = await sqlAs('app', `SELECT DISTINCT u.id FROM users u JOIN company_memberships m ON m.user_id = u.id AND coalesce(m.active, true) JOIN company_memberships_roles r ON r.parent_id = m.id WHERE r.value::text = $1 AND u.active AND NOT (u.id = ANY($2::int[]))`, [role, keep])
   const ids = r.rows.map((x) => x.id as number)
   if (ids.length) await sqlAs('app', 'UPDATE users SET active = false WHERE id = ANY($1::int[])', [ids])
   try {

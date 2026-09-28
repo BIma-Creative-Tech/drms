@@ -1,9 +1,14 @@
+import { createHash } from 'node:crypto'
+
 import type { CollectionSlug, PayloadRequest, Where } from 'payload'
 
+import { memberCompanies, relId } from '@/access/roles'
 import { withEffectiveRadius } from '@/domain/attendance/calendar'
+import { companyById } from '@/domain/companies'
 
-import { MASTER_TYPES, MastersQuery, type MasterType } from '../schemas'
-import { HttpError, json, problem, v1 } from '../http'
+import { companyQuery } from '../company-query'
+import { MASTER_TYPES, MastersQuery, SHARED_MASTER_TYPES, type MasterType } from '../schemas'
+import { HttpError, problem, v1 } from '../http'
 
 const LIMIT = 500
 
@@ -21,10 +26,17 @@ const MAP: Record<MasterType, { collection: CollectionSlug; fields: string[] }> 
   'work-schedules': { collection: 'work-schedules', fields: ['name', 'startTime', 'endTime', 'lateToleranceMin', 'workDays', 'active'] },
   holidays: { collection: 'holidays', fields: ['date', 'name'] },
   'team-assignments': { collection: 'team-assignments', fields: ['employee', 'project', 'costCenter', 'roleInProject', 'startDate', 'endDate'] },
+  // MC3-1: receipt vendor picker (vendor_id) and Kas "sumber kas masuk" — per PT, read access of the collection
+  vendors: { collection: 'vendors', fields: ['name', 'contact', 'active'] },
+  'cash-in-sources': { collection: 'cash-in-sources', fields: ['code', 'name', 'active'] },
 }
 
-function pick(doc: Record<string, unknown>, fields: string[]): Record<string, unknown> {
-  const out: Record<string, unknown> = { id: doc.id, uuid: doc.uuid ?? undefined, updatedAt: doc.updatedAt }
+const SHARED: ReadonlySet<MasterType> = new Set(SHARED_MASTER_TYPES)
+
+type Item = Record<string, unknown>
+
+function pick(doc: Record<string, unknown>, fields: string[], shared: boolean): Item {
+  const out: Item = { id: doc.id, uuid: doc.uuid ?? undefined, updatedAt: doc.updatedAt, company: shared ? null : (relId(doc.company) ?? null), shared }
   for (const f of fields) {
     const v = doc[f]
     out[f] = v === undefined ? null : v
@@ -32,23 +44,30 @@ function pick(doc: Record<string, unknown>, fields: string[]): Record<string, un
   return out
 }
 
-async function loadType(req: PayloadRequest, type: MasterType, since?: string) {
+async function loadType(req: PayloadRequest, type: MasterType, companies: number[], since?: string) {
   const { collection, fields } = MAP[type]
-  const where: Where | undefined = since ? { updatedAt: { greater_than: since } } : undefined
+  const shared = SHARED.has(type)
+  const and: Where[] = []
+  if (since) and.push({ updatedAt: { greater_than: since } })
+  // per-PT masters: the PTs of this request (selection, narrowed by ?company=) — the collection
+  // access applies on top (scope own/team/assigned/all per role IN each PT, ADR 0016 §5)
+  if (!shared) and.push({ company: { in: companies.length ? companies : [-1] } })
   try {
     const res = await req.payload.find({
       collection,
-      where,
+      where: { and },
       sort: 'updatedAt',
       limit: LIMIT,
       depth: 0,
       overrideAccess: false, // access control of the collection applies (scope own/team/assigned/all)
       req,
     })
-    let items = res.docs.map((d) => pick(d as unknown as Record<string, unknown>, fields))
+    let items = res.docs.map((d) => pick(d as unknown as Record<string, unknown>, fields, shared))
     if (type === 'projects' || type === 'cost-centers') {
-      const s = (await req.payload.findGlobal({ slug: 'company-settings', depth: 0, overrideAccess: true /* SYSTEM-READ: default geofence radius */, req })) as { defaultGeofenceRadiusM?: number | null }
-      items = items.map((i) => withEffectiveRadius(i, s.defaultGeofenceRadiusM))
+      // default geofence radius of EACH item's PT (ADR 0016 §1: per-PT setting)
+      const out: Item[] = []
+      for (const i of items) out.push(typeof i.company === 'number' ? withEffectiveRadius(i, (await companyById(req, i.company)).defaultGeofenceRadiusM) : i)
+      items = out
     }
     return { items, hasMore: res.hasNextPage }
   } catch (err) {
@@ -58,10 +77,28 @@ async function loadType(req: PayloadRequest, type: MasterType, since?: string) {
   }
 }
 
+const digest = (v: unknown) => createHash('sha256').update(JSON.stringify(v)).digest('hex')
+
+/** "W/\"a\", \"b\"" → ['a', 'b'] (weak/strong compare, RFC 9110 §13.1.2); `*` matches anything. */
+function etagMatches(header: string | null, etag: string): boolean {
+  if (!header) return false
+  const strip = (t: string) => t.trim().replace(/^W\//, '')
+  const want = strip(etag)
+  return header.split(',').some((t) => t.trim() === '*' || strip(t) === want)
+}
+
 /**
- * GET /api/v1/masters?types=a,b&since=ISO — master data for the APK (architecture §6.3), filtered
- * by each collection's read access for the caller. Deactivated rows are included (`active`) so
- * the APK can hide them; delta sync via `since` (ordered by updatedAt, ≤ 500 per type).
+ * GET /api/v1/masters?types=a,b&since=ISO&company=1,3 — master data for the APK (architecture
+ * §6.3, MC3-1 per PT), filtered by each collection's read access for the caller.
+ * - Per-PT masters come from the request's PTs (`X-Company-Ids` ∩ memberships, narrowed by
+ *   `?company=`); every item carries `company` (id) and `shared: false`. Shared masters (banks,
+ *   UoM, holidays — ADR 0016 D2) carry `company: null, shared: true`.
+ * - Projects / cost centers without an own radius get the default radius of THEIR PT.
+ * - `companies[]`: per requested PT its `version` (hash of that PT's items in this answer) and the
+ *   default radius; `sharedVersion` for the shared types — the APK caches per PT and refetches a PT
+ *   only when its version changed. The whole answer has an `ETag`; `If-None-Match` → 304.
+ * Deactivated rows are included (`active`) so the APK can hide them; delta via `since` (ordered by
+ * updatedAt, ≤ 500 per type).
  */
 export const mastersEndpoint = v1({
   path: '/masters',
@@ -70,14 +107,26 @@ export const mastersEndpoint = v1({
     const parsed = MastersQuery.safeParse({
       types: req.searchParams.get('types') ?? undefined,
       since: req.searchParams.get('since') ?? undefined,
+      company: req.searchParams.get('company') ?? undefined,
     })
     if (!parsed.success) return problem(400, 'Bad Request', { errors: parsed.error.issues.map((i) => ({ path: i.path.join('.'), message: i.message })) })
     const requested = parsed.data.types ? parsed.data.types.split(',') : [...MASTER_TYPES]
     const unknown = requested.filter((t) => !(MASTER_TYPES as readonly string[]).includes(t))
     if (unknown.length) throw new HttpError(400, 'Bad Request', { detail: `Unknown types: ${unknown.join(', ')}` })
-    const serverTime = new Date().toISOString()
-    const types: Record<string, { items: unknown[]; hasMore: boolean }> = {}
-    for (const t of new Set(requested) as Set<MasterType>) types[t] = await loadType(req, t, parsed.data.since)
-    return json({ serverTime, types })
+    const companies = (await companyQuery(req)) ?? [...memberCompanies(req)].sort((a, b) => a - b)
+    const types: Record<string, { items: Item[]; hasMore: boolean }> = {}
+    for (const t of new Set(requested) as Set<MasterType>) types[t] = await loadType(req, t, companies, parsed.data.since)
+    const perCompany = []
+    for (const id of companies) {
+      const c = await companyById(req, id)
+      const mine = Object.fromEntries(Object.entries(types).filter(([t]) => !SHARED.has(t as MasterType)).map(([t, v]) => [t, v.items.filter((i) => i.company === id)]))
+      perCompany.push({ id, code: c.shortCode, defaultGeofenceRadiusM: c.defaultGeofenceRadiusM, version: digest({ id, radius: c.defaultGeofenceRadiusM, mine }).slice(0, 20) })
+    }
+    const sharedVersion = digest(Object.entries(types).filter(([t]) => SHARED.has(t as MasterType))).slice(0, 20)
+    const body = { serverTime: new Date().toISOString(), companies: perCompany, sharedVersion, types }
+    const etag = `W/"m1-${digest({ companies: perCompany, sharedVersion, types: Object.keys(types).sort(), since: parsed.data.since ?? null }).slice(0, 32)}"`
+    const headers = { 'Cache-Control': 'private, no-store', ETag: etag, Vary: 'Authorization, Cookie, X-Company-Ids' }
+    if (etagMatches(req.headers.get('if-none-match'), etag)) return new Response(null, { status: 304, headers })
+    return Response.json(body, { status: 200, headers })
   },
 })

@@ -2,12 +2,12 @@ import type { AdminViewServerProps, PayloadRequest } from 'payload'
 import Link from 'next/link'
 import React from 'react'
 
-import { hasRole, ROLE_LABELS } from '@/access/roles'
+import { hasRoleAny, ROLE_LABELS } from '@/access/roles'
 import { writeAudit } from '@/audit/writer'
-import { PDF_MAX_ROWS } from '@/domain/reports/export'
+import { exportLetterhead, PDF_MAX_ROWS } from '@/domain/reports/export'
 import { reportContext } from '@/domain/reports/kpi'
 import { AUDIT_REPORT, REPORTS, reportByCode, type ReportDef } from '@/domain/reports/registry'
-import { officeScope, type ReportScope } from '@/domain/reports/scope'
+import { auditScope, officeScope, type ReportScope } from '@/domain/reports/scope'
 import { withReqTransaction } from '@/lib/system-tx'
 import { XLSX_MAX_ROWS, xlsxEnabled } from '@/lib/xlsx'
 import { formatServerTime } from '@/pdf/format'
@@ -34,7 +34,7 @@ const FORMAT_LABEL = { csv: 'CSV', xlsx: 'Excel (.xlsx)', pdf: 'PDF' } as const
 
 export async function ReportsIndex(props: AdminViewServerProps) {
   const req = props.initPageResult.req
-  const list = REPORTS.filter((r) => hasRole(req, ...r.roles))
+  const list = REPORTS.filter((r) => hasRoleAny(req, ...r.roles))
   return (
     <Shell props={props} title="Laporan">
       <F3Root name="laporan">
@@ -69,7 +69,7 @@ export async function ReportsIndex(props: AdminViewServerProps) {
             </table>
           </div>
         )}
-        {hasRole(req, ...AUDIT_REPORT.roles) ? (
+        {hasRoleAny(req, ...AUDIT_REPORT.roles) ? (
           <p>
             <Link href="/admin/audit-log">Audit Log →</Link>
           </p>
@@ -85,7 +85,7 @@ export async function ReportView(props: AdminViewServerProps) {
   const code = segments[1] ?? ''
   const def = reportByCode(code)
   if (!def || def.code === 'audit-log') return <Shell props={props} title="Laporan tidak ditemukan"><p><Link href="/admin/laporan">← Daftar laporan</Link></p></Shell>
-  if (!hasRole(req, ...def.roles)) return <Denied props={props} def={def} />
+  if (!hasRoleAny(req, ...def.roles)) return <Denied props={props} def={def} />
   const scope = def.scope ? await def.scope(req) : await officeScope(req)
   if (scope.kind === 'none') return <Denied props={props} def={def} />
   return <ReportPage props={props} def={def} scope={scope} base={`/admin/laporan/${def.code}`} />
@@ -93,13 +93,16 @@ export async function ReportView(props: AdminViewServerProps) {
 
 export async function AuditLogView(props: AdminViewServerProps) {
   const req = props.initPageResult.req
-  if (!hasRole(req, ...AUDIT_REPORT.roles)) return <Denied props={props} def={AUDIT_REPORT} />
+  if (!hasRoleAny(req, ...AUDIT_REPORT.roles)) return <Denied props={props} def={AUDIT_REPORT} />
   const sp = toSearchParams(props.searchParams)
   // K-16: opening the global audit log is itself recorded (new row, never a change).
   await withReqTransaction(req, () =>
     writeAudit(req, [{ action: 'export', docType: 'audit_log', docId: 'view', field: 'view', newValue: { filters: Object.fromEntries([...sp.entries()].slice(0, 20)) } }]),
   )
-  return <ReportPage props={props} def={AUDIT_REPORT} scope={{ kind: 'all' }} base="/admin/audit-log" />
+  // mc2-contract §0.1/§1: PTs where the caller is Owner/Admin/Finance (rows without PT: Admin/Owner only)
+  const scope = await auditScope(req)
+  if (scope.kind === 'none') return <Denied props={props} def={AUDIT_REPORT} />
+  return <ReportPage props={props} def={AUDIT_REPORT} scope={scope} base="/admin/audit-log" />
 }
 
 function Denied({ props, def }: { props: AdminViewServerProps; def: ReportDef }) {
@@ -115,12 +118,19 @@ async function ReportPage({ props, def, scope, base }: { props: AdminViewServerP
   const sp = toSearchParams(props.searchParams)
   const cursor = sp.get('cursor') ?? undefined
   const filterSp = new URLSearchParams([...sp.entries()].filter(([k]) => k !== 'cursor'))
-  let loaded: { res: Awaited<ReturnType<ReportDef['run']>>; fields: Awaited<ReturnType<ReportDef['filters']>>; ctx: Awaited<ReturnType<typeof reportContext>> } | null = null
+  let loaded: {
+    res: Awaited<ReturnType<ReportDef['run']>>
+    fields: Awaited<ReturnType<ReportDef['filters']>>
+    ctx: Awaited<ReturnType<typeof reportContext>>
+    kop: Awaited<ReturnType<typeof exportLetterhead>>
+  } | null = null
   try {
     loaded = await withReqTransaction(req, async () => ({
       res: await def.run(req, scope, sp, { cursor: cursor && /^[A-Za-z0-9_-]{1,200}$/.test(cursor) ? cursor : undefined, limit: def.pageSize }),
       fields: await def.filters(req, scope, filterSp),
       ctx: await reportContext(req),
+      // mc2-contract §1: letterhead of the effective PTs (the `pt` parameter narrows) — same as the exports
+      kop: await exportLetterhead(req, def, scope, filterSp),
     }))
   } catch (err) {
     req.payload.logger.error({ msg: 'report view failed', report: def.code, err: (err as Error).message })
@@ -149,6 +159,7 @@ function ReportBody({
   res,
   fields,
   ctx,
+  kop,
 }: {
   def: ReportDef
   scope: ReportScope
@@ -158,6 +169,7 @@ function ReportBody({
   res: Awaited<ReturnType<ReportDef['run']>>
   fields: Awaited<ReturnType<ReportDef['filters']>>
   ctx: Awaited<ReturnType<typeof reportContext>>
+  kop: Awaited<ReturnType<typeof exportLetterhead>>
 }) {
     const q = filterSp.toString()
     const rowCount = def.paged ? res.count : res.main.rows.length
@@ -165,6 +177,15 @@ function ReportBody({
     return (
       <>
         <FilterForm fields={fields} action={base} />
+        <p className="pk-note" data-pk-letterhead={kop.kind}>
+          {kop.kind === 'group' ? (
+            <>
+              {kop.name} · PT: {kop.companies.map((c) => c.shortCode).join(', ')}
+            </>
+          ) : (
+            kop.name
+          )}
+        </p>
         <div className="pk-actions" data-pk-exports>
           <span>Export:</span>
           {formats.map((f) => {

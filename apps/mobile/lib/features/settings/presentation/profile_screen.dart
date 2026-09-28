@@ -6,6 +6,8 @@ import '../../../app/theme_mode.dart';
 import '../../../l10n/gen/app_localizations.dart';
 import '../../../shared/icons/iconsax.dart';
 import '../../auth/application/auth_controller.dart';
+import '../../companies/application/company_selection.dart';
+import '../../companies/presentation/company_switcher.dart';
 import '../../sync/application/sync_coordinator.dart';
 import '../../sync/data/outbox_repository.dart';
 
@@ -71,6 +73,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
     final p = ref.watch(currentProfileProvider);
+    final account = ref.watch(accountProfileProvider);
     final device = ref.watch(deviceIdentityProvider);
     final push = ref.watch(pushServiceProvider);
     return Scaffold(
@@ -80,6 +83,20 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           if (p != null) ...[
             ListTile(leading: const Icon(Icons.person), title: Text(p.displayName), subtitle: Text(p.email)),
             ListTile(leading: const Icon(Icons.badge), title: Text(t.profileRoles), subtitle: Text(p.roleLabels)),
+            // MC3: every PT membership with its roles; several PTs → the switcher opens from here too.
+            if (account != null && account.companies.isNotEmpty)
+              ListTile(
+                key: const Key('profile-companies'),
+                leading: const Icon(Icons.business),
+                title: Text(t.profileCompanies),
+                subtitle: Text(
+                  [for (final c in account.companies) t.profileCompanyRoles(c.code, c.roleLabels)].join('\n'),
+                ),
+                trailing: account.isMultiCompany
+                    ? Text(companySelectionLabel(t, account, ref.watch(companySelectionProvider)))
+                    : null,
+                onTap: account.isMultiCompany ? () => showCompanySwitcherSheet(context) : null,
+              ),
             if (p.employee != null)
               ListTile(
                 leading: const Icon(Icons.work),

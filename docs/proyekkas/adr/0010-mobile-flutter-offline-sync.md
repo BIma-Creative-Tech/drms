@@ -647,3 +647,16 @@ repo (not the infra repo).
   (project / cost center / employee / existing draft) and rejects a mismatch with item status `rejected`,
   code `COMPANY_MISMATCH`; `sync_receipts` stay per user. Idempotency and ordering rules are unchanged.
 - One APK and one Firebase project for all PTs (Q-58); push payloads carry the PT short code for display.
+
+### Implementation note MC3-2 (APK, 2026-09-28)
+
+Where the implementation deviates from / refines the revision above (`../mc/mc3-progress.md` §APK):
+
+| # | Revision text | Implemented | Why |
+|---|---|---|---|
+| 1 | one batch per PT with `X-Company-Ids` = that PT | one batch per PT, **no** `X-Company-Ids`; every item carries `company_id` = the PT stored on its own row | MC3-1 contract: the server processes each item under its `company_id` whatever the header says; a header could only add a 403 for a stale selection |
+| 2 | PT switcher: one PT or "Semua PT" | "Semua PT" + a checkbox per PT (any subset; at least one) | lead decision for MC3-2 (the web switcher has the same model); one PT or all remain the common cases |
+| 3 | v3 adds `company_id` and fills it after `/me` | nullable `company_id` on `local_drafts`, `local_progress_reports`, `outbox` (lines / receipts / photos follow their draft / report). NULL rows: one PT → assigned after `/me` and again by the sync engine right before sending; several PTs → **held** (not sent, no attempt counted) and listed under "Pilih PT untuk data offline" until the user picks the PT — never guessed | "staging only" was not safe enough: a multi-PT tester upgrading with a queue would otherwise get 409 `COMPANY_REQUIRED` forever |
+| 4 | master caches keyed per `sub` and PT | `masters:<sub>:<pt>` = `{etag, version, types}`, one `GET /masters` per membership PT with `If-None-Match` (304 keeps); shared rows de-duplicated on read; the 0.2.x key `masters:<sub>` is only used when the server sends no PTs | contract §Masters |
+| 5 | — | `COMPANY_MISMATCH` / `COMPANY_NOT_ALLOWED` per item = final rejection with one Indonesian text for all item types; batch 409 `COMPANY_REQUIRED` holds the PT-less items and remembers that the server needs a PT (`sync:company_required:<sub>`) | per-item rules of this ADR unchanged otherwise (idempotency by `client_uuid`, order inside a PT) |
+

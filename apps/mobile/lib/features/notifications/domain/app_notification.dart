@@ -11,6 +11,7 @@ class AppNotification {
     this.docNo,
     this.readAt,
     required this.createdAt,
+    this.companyId,
   });
 
   final int id;
@@ -23,6 +24,9 @@ class AppNotification {
   final String? docNo;
   final String? readAt;
   final String createdAt;
+
+  /// MC3: PT of the event (`companyId`) — chip when several PTs are shown.
+  final int? companyId;
 
   bool get unread => readAt == null;
 
@@ -40,6 +44,7 @@ class AppNotification {
     docNo: j['docNo'] as String?,
     readAt: j['readAt'] as String?,
     createdAt: '${j['createdAt'] ?? ''}',
+    companyId: (j['companyId'] as num?)?.toInt(),
   );
 }
 

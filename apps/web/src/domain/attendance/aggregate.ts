@@ -179,10 +179,12 @@ export function summarize(days: DayRecap[], today: string): RecapSummary {
   }
 }
 
-export type TeamMember = { employeeId: number; code: string; name: string; locations: LocationRef[] }
+export type TeamMember = { employeeId: number; companyId?: number; code: string; name: string; locations: LocationRef[] }
 
 export type TeamTodayRow = {
   employee: { id: number; code: string; name: string }
+  /** PT of the employee (MC2, ADR 0016 §6). */
+  companyId: number | null
   assigned: LocationRef[]
   status: PresenceStatus
   checkIn: string | null
@@ -210,6 +212,7 @@ export function teamToday(args: {
     const status: PresenceStatus = day.status === 'selesai' ? 'selesai' : day.status === 'hadir' ? 'hadir' : 'belum_absen'
     return {
       employee: { id: m.employeeId, code: m.code, name: m.name },
+      companyId: m.companyId ?? null,
       assigned: m.locations,
       status,
       checkIn: day.checkIn,

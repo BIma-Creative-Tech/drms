@@ -20,6 +20,8 @@ import '../domain/request_status.dart';
 import 'line_editor_screen.dart';
 import 'requests_screen.dart' show syncStateLabel;
 import 'widgets/master_picker.dart';
+import '../../companies/presentation/company_chip.dart';
+import '../../companies/presentation/company_switcher.dart';
 
 final _draftLoadProvider = FutureProvider.autoDispose.family<DraftRequest?, String>((ref, uuid) async {
   final sub = ref.watch(currentSubProvider);
@@ -28,26 +30,82 @@ final _draftLoadProvider = FutureProvider.autoDispose.family<DraftRequest?, Stri
 });
 
 /// Route entry: `/drafts/new?type=…` or `/drafts/:uuid`.
-class DraftEditorRoute extends ConsumerWidget {
+///
+/// MC3: a draft belongs to ONE PT. New draft: the only PT of the scope in which the user may create
+/// requests, or the PT the user picks first (wireframe §1b); the pickers then show that PT's masters only.
+/// A draft written before the multi-PT update (no PT) of a multi-PT account asks for its PT before editing.
+class DraftEditorRoute extends ConsumerStatefulWidget {
   const DraftEditorRoute({super.key, this.uuid, this.type});
   final String? uuid;
   final RequestType? type;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final masters = ref.watch(mastersProvider);
-    if (uuid == null) {
-      final employeeId = ref.watch(currentProfileProvider)?.employee?.id;
-      final draft = ref
+  ConsumerState<DraftEditorRoute> createState() => _DraftEditorRouteState();
+}
+
+class _DraftEditorRouteState extends ConsumerState<DraftEditorRoute> {
+  int? _picked;
+  DraftRequest? _new;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
+    final profile = ref.watch(currentProfileProvider);
+    final multi = profile?.companies.isNotEmpty ?? false;
+    if (widget.uuid == null) {
+      int? company;
+      if (multi) {
+        final candidates = profile!.requestCompanies;
+        if (candidates.isEmpty) {
+          return Scaffold(
+            appBar: AppBar(title: Text(t.editorNewTitle)),
+            body: Padding(padding: const EdgeInsets.all(24), child: Text(t.companyPickNone)),
+          );
+        }
+        company = candidates.length == 1 ? candidates.single.id : _picked;
+        if (company == null) {
+          return CompanyChoiceScreen(
+            title: t.editorNewTitle,
+            candidates: candidates,
+            onPick: (c) => setState(() => _picked = c.id),
+          );
+        }
+      }
+      final employeeId = profile?.forCompany(company).employee?.id;
+      final draft = _new ??= ref
           .read(draftServiceProvider)
-          .newDraft(type ?? RequestType.reimburse, requesterIds: employeeId == null ? const [] : [employeeId]);
-      return _withMasters(masters, (m) => DraftEditorScreen(initial: draft, masters: m, isNew: true));
+          .newDraft(
+            widget.type ?? RequestType.reimburse,
+            requesterIds: employeeId == null ? const [] : [employeeId],
+            companyId: company,
+          );
+      return _withMasters(
+        ref.watch(mastersForCompanyProvider(draft.companyId)),
+        (m) => DraftEditorScreen(initial: draft, masters: m, isNew: true),
+      );
     }
     return AsyncBody(
-      value: ref.watch(_draftLoadProvider(uuid!)),
-      data: (d) => d == null
-          ? Scaffold(body: Center(child: Text(AppLocalizations.of(context).draftNotFound)))
-          : _withMasters(masters, (m) => DraftEditorScreen(initial: d, masters: m, isNew: false)),
+      value: ref.watch(_draftLoadProvider(widget.uuid!)),
+      data: (d) {
+        if (d == null) return Scaffold(body: Center(child: Text(t.draftNotFound)));
+        final account = ref.watch(accountProfileProvider);
+        var draft = d;
+        if (d.companyId == null && (account?.isMultiCompany ?? false)) {
+          if (_picked == null) {
+            return CompanyChoiceScreen(
+              title: t.editorEditTitle,
+              hint: t.companyNeedsChoiceHint,
+              candidates: account!.companies,
+              onPick: (c) => setState(() => _picked = c.id),
+            );
+          }
+          draft = d.copyWith(companyId: _picked);
+        }
+        return _withMasters(
+          ref.watch(mastersForCompanyProvider(draft.companyId)),
+          (m) => DraftEditorScreen(initial: draft, masters: m, isNew: false),
+        );
+      },
     );
   }
 
@@ -122,7 +180,13 @@ class _DraftEditorScreenState extends ConsumerState<DraftEditorScreen> {
       final online = ref.read(connectivityProvider);
       final saved = await ref
           .read(draftServiceProvider)
-          .save(sub, draft, online: online, timezone: ref.read(currentProfileProvider)?.timezone ?? 'Asia/Makassar');
+          // MC3: dates in the time zone of the draft's PT (all PTs are Asia/Makassar today, ADR 0016 §9).
+          .save(
+            sub,
+            draft,
+            online: online,
+            timezone: ref.read(currentProfileProvider)?.forCompany(draft.companyId).timezone ?? 'Asia/Makassar',
+          );
       _d = saved;
       ref.read(syncCoordinatorProvider.notifier).requestSync();
       if (mounted && !quiet) showSnack(context, online ? t.draftSaved : t.draftSavedQueued);
@@ -228,6 +292,24 @@ class _DraftEditorScreenState extends ConsumerState<DraftEditorScreen> {
               Padding(
                 padding: const EdgeInsets.only(bottom: 8),
                 child: Text('${syncStateLabel(t, _d.syncState)}${_d.lastError != null ? '\n${_d.lastError}' : ''}'),
+              ),
+            // MC3: the PT of this draft (fixed; the pickers below list that PT's data only).
+            if ((ref.watch(accountProfileProvider)?.isMultiCompany ?? false) && _d.companyId != null)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Row(
+                  children: [
+                    Text('${t.draftCompany}: ', style: Theme.of(context).textTheme.labelLarge),
+                    CompanyChip(key: const Key('draft-company'), companyId: _d.companyId, always: true),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        ref.watch(accountProfileProvider)?.company(_d.companyId)?.name ?? '',
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             Text(t.fieldType),
             const SizedBox(height: 4),

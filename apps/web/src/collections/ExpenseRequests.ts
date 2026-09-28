@@ -2,7 +2,7 @@ import { APIError, ValidationError, type CollectionAfterChangeHook, type Conditi
 
 import { RIWAYAT_TAB } from '@/admin/config'
 
-import { relId, rolesOf, userId } from '@/access/roles'
+import { employeeIn, relId, rolesOf, userId } from '@/access/roles'
 import { fieldNever, rolesAllowed } from '@/access/policies'
 import { normalizeValue, reasonOnChange, withAudit } from '@/audit/hooks'
 import { writeAudit, type AuditRow } from '@/audit/writer'
@@ -16,6 +16,7 @@ import { rupiahField, uuidField } from '@/fields/common'
 import { requestMeta } from '@/lib/request-meta'
 import { forceDeferredChecks } from '@/lib/system-tx'
 import { notifyCreated, notifyTransition } from '@/domain/notifications'
+import { companyField, companyHook, pickerSameCompany } from '@/fields/company'
 
 /**
  * T1 Pengajuan biaya (requirements v1.1 §7 T1; architecture §4.3, §5.1/§5.2).
@@ -57,7 +58,8 @@ const businessDate = (name: string, label: string, extra: Partial<Field> = {}): 
 /** Picker filter of `bankAccount` (S3e, US-44): active accounts of the requesters / the creator's employee. */
 export const bankAccountOptions = ({ data, user }: Pick<FilterOptionsProps, 'data' | 'user'>): false | Where => {
   const reqs = ids(((data ?? {}) as { requesters?: unknown[] | null }).requesters ?? null)
-  const emp = relId((user as { employee?: unknown } | null)?.employee)
+  const company = relId((data as { company?: unknown } | undefined)?.company)
+  const emp = company !== undefined ? employeeIn({ user } as never, company) : relId((user as { employee?: unknown } | null)?.employee)
   const owners = reqs.length > 0 ? reqs : emp !== undefined ? [emp] : []
   if (owners.length === 0) return false
   return { and: [{ employee: { in: owners } }, { active: { not_equals: false } }] }
@@ -102,8 +104,9 @@ const beforeChange: CollectionBeforeChangeHook = async ({ data, originalDoc, ope
       d.syncRev = 1
     }
     const reqs = Array.isArray(d.requesters) ? d.requesters : []
-    const emp = relId((req.user as { employee?: unknown } | null)?.employee)
-    if (reqs.length === 0 && emp !== undefined) d.requesters = [emp] // default: the creator's own employee
+    // default: the creator's own employee IN THE REQUEST's PT (company set by companyHook, ADR 0016)
+    const emp = employeeIn(req, relId(d.company))
+    if (reqs.length === 0 && emp !== undefined) d.requesters = [emp]
   }
 
   if (operation === 'update') {
@@ -238,9 +241,10 @@ export const ExpenseRequests: CollectionConfig = withAudit(
       update: requestUpdateAccess,
       delete: denyDeleteLogged('expense_request'),
     },
-    hooks: { beforeChange: [beforeChange], afterChange: [auditLines, notify] },
+    hooks: { beforeChange: [companyHook('expense-requests', { derive: [{ field: 'project', collection: 'projects' }, { field: 'costCenter', collection: 'cost-centers' }, { field: 'requesters', collection: 'employees' }], check: [{ field: 'bankAccount', collection: 'employee-bank-accounts' }, { field: 'approvalRule', collection: 'approval-rules' }, { field: 'resubmitOf', collection: 'expense-requests' }, { field: 'lines', collection: 'expense-categories', sub: 'category' }, { field: 'lines', collection: 'vehicles', sub: 'vehicle' }] }), beforeChange], afterChange: [auditLines, notify] },
     fields: [
-      { name: 'docNo', type: 'text', label: 'Nomor', unique: true, index: true, access: system, admin: { ...ro, position: 'sidebar' } },
+      companyField(),
+      { name: 'docNo', type: 'text', label: 'Nomor', index: true, access: system, admin: { ...ro, position: 'sidebar' } },
       // F2c: status timeline + next actor for everyone, requester actions for creator/requesters.
       { name: 'workflowPanel', type: 'ui', label: 'Status & aksi', admin: { components: { Field: '@/admin/components/WorkflowPanel#WorkflowPanel' } } },
       // M16 / US-46: "Cetak PDF" (audited API download); UI only, no column.
@@ -267,14 +271,14 @@ export const ExpenseRequests: CollectionConfig = withAudit(
         admin: { ...ro, position: 'sidebar' },
       },
       { name: 'title', type: 'text', label: 'Judul / subjek', required: true, maxLength: 200 },
-      { name: 'project', type: 'relationship', relationTo: 'projects', label: 'Project', index: true },
-      { name: 'costCenter', type: 'relationship', relationTo: 'cost-centers', label: 'Pusat biaya', index: true },
+      { name: 'project', type: 'relationship', relationTo: 'projects', label: 'Project', index: true, ...pickerSameCompany() },
+      { name: 'costCenter', type: 'relationship', relationTo: 'cost-centers', label: 'Pusat biaya', index: true, ...pickerSameCompany() },
       businessDate('requestDate', 'Tanggal pengajuan (server)', { access: system, admin: { ...ro, position: 'sidebar' } }),
       businessDate('neededDate', 'Tanggal dibutuhkan'),
       businessDate('periodFrom', 'Periode kegiatan dari (opsional, Q-04)'),
       businessDate('periodTo', 'Periode kegiatan sampai'),
       { name: 'notes', type: 'textarea', label: 'Keterangan', maxLength: 2000 },
-      { name: 'requesters', type: 'relationship', relationTo: 'employees', hasMany: true, label: 'Diajukan Oleh', admin: { isSortable: true } },
+      { name: 'requesters', type: 'relationship', relationTo: 'employees', hasMany: true, label: 'Diajukan Oleh', admin: { isSortable: true }, ...pickerSameCompany() },
       { name: 'createdBy', type: 'relationship', relationTo: 'users', label: 'Dibuat Oleh', index: true, access: system, admin: { ...ro, position: 'sidebar' } },
       {
         name: 'bankAccount',
