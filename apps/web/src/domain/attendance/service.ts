@@ -4,7 +4,7 @@ import { employeeIn, membershipsOf, relId } from '@/access/roles'
 import { firstDay, lastDay, PERIOD_RE } from '@/domain/reports/rules'
 
 import { recapRange, teamToday, type DayRecap, type RecapSummary, type TeamTodayRow } from './aggregate'
-import { attendanceContext, attendanceScope, currentSchedules, employeeRef, fullCompanies, loadFacts, loadHolidays, narrowAttScope, teamMembers, type AttScope } from './queries'
+import { attendanceContext, attendanceScope, currentSchedules, employeeRef, fullCompanies, loadFacts, loadHolidays, narrowAttScope, narrowAttToCompanies, teamMembers, type AttScope } from './queries'
 import type { ScheduleSnapshot } from './schedule'
 
 /**
@@ -88,9 +88,11 @@ export type TeamTodayResult = {
 }
 
 /** US-13: team presence for a date (default today; ≤ today). PM team, office roles all. */
-export async function teamTodayFor(req: PayloadRequest, q: { date?: string; projectId?: number; costCenterId?: number }): Promise<TeamTodayResult> {
+export async function teamTodayFor(req: PayloadRequest, q: { date?: string; projectId?: number; costCenterId?: number; companyIds?: readonly number[] }): Promise<TeamTodayResult> {
   let scope = await attendanceScope(req)
   if (!scope) throw new APIError('Forbidden', 403, null, true)
+  // MC2 UI PT filter: narrows to those PTs of the scope (never widens).
+  if (q.companyIds?.length) scope = narrowAttToCompanies(scope, q.companyIds)
   const kind = scope.kind
   const ctx = await attendanceContext(req)
   const date = q.date ?? ctx.today

@@ -17,6 +17,7 @@ import { DEFAULT_TZ } from '@/lib/time'
 
 import { ChartHover } from './ChartHover'
 import { Frame } from './frame'
+import { ptView } from './pt'
 import { Alert, dateId, dateTimeId, ProgressLegend, ProgressTable, ProgressTonePill, ProgressVsBudgetRows } from './progress-ui'
 import { Bento, Card, DashHead, DataTable, EmptyState, KpiRow, KpiTile, pctText, rp, StatusPill, TableView, type Col } from './viz'
 
@@ -58,6 +59,7 @@ export async function ProgressOverview(props: AdminViewServerProps) {
   if (!hasRoleAny(req, ...READERS)) return <Denied props={props} title="Progress project" />
   const sp = (props.searchParams ?? {}) as Record<string, string | undefined>
   const archived = sp.arsip === 'ya'
+  const pt = await ptView(req)
   const d = await withReqTransaction(req, async () => projectProgressVsBudget(req, await officeScope(req), { includeArchived: archived }))
   const rows = [...d.projects].sort((a, b) => (b.gap ?? -999) - (a.gap ?? -999) || a.code.localeCompare(b.code))
   const count = (t: ProjectProgress['tone']) => rows.filter((p) => p.tone === t).length
@@ -105,10 +107,10 @@ export async function ProgressOverview(props: AdminViewServerProps) {
             foot={`Selisih = % anggaran − % progress fisik. Ambang di pengaturan perusahaan (kuning > ${d.warnGapPct}%, merah > ${d.badGapPct}%). Project tanpa RAB atau tahapan belum 100% tidak dinilai.`}
           >
             {rows.length > 0 ? <ProgressLegend warn={d.warnGapPct} bad={d.badGapPct} /> : null}
-            <ProgressVsBudgetRows id="progress-vs-budget" rows={rows} hrefOf={(p) => projectHref(p.id)} empty={isPm ? 'Anda belum ditetapkan sebagai PM project mana pun.' : 'Belum ada project.'} />
+            <ProgressVsBudgetRows id="progress-vs-budget" rows={rows} hrefOf={(p) => projectHref(p.id)} empty={isPm ? 'Anda belum ditetapkan sebagai PM project mana pun.' : 'Belum ada project.'} pt={pt} />
             {rows.length > 0 ? (
               <TableView>
-                <ProgressTable rows={rows} hrefOf={(p) => projectHref(p.id)} />
+                <ProgressTable rows={rows} hrefOf={(p) => projectHref(p.id)} pt={pt} />
               </TableView>
             ) : null}
           </Card>

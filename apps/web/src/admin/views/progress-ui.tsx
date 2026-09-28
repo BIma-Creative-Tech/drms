@@ -5,6 +5,7 @@ import { MONTHS_SHORT } from '@/domain/reports/rules'
 import type { PillTone } from '@/domain/reports/viz'
 import type { ProjectProgress } from '@/domain/reports/progress'
 
+import { PtChip, type PtView } from './pt'
 import { EmptyState, pctText, rp, StatusPill } from './viz'
 
 /**
@@ -117,7 +118,7 @@ const w = (v: number | null) => `${Math.max(0, Math.min(100, v ?? 0))}%`
  * Paired bars per project on one 0–100 % axis: % anggaran terpakai vs progress fisik (K-09, US-12).
  * Values above 100 % are clamped visually; the exact number is always printed beside the bars.
  */
-export function ProgressVsBudgetRows({ id, rows, hrefOf, empty }: { id: string; rows: ProjectProgress[]; hrefOf?: (p: ProjectProgress) => string; empty: string }) {
+export function ProgressVsBudgetRows({ id, rows, hrefOf, empty, pt }: { id: string; rows: ProjectProgress[]; hrefOf?: (p: ProjectProgress) => string; empty: string; pt?: PtView }) {
   if (rows.length === 0) return <EmptyState text={empty} />
   return (
     <>
@@ -132,7 +133,9 @@ export function ProgressVsBudgetRows({ id, rows, hrefOf, empty }: { id: string; 
           const body = (
             <>
               <span className="l">
-                <span title={label}>{label}</span>
+                <span title={label}>
+                  {pt?.multi ? <PtChip pt={pt.ref(p.companyId)} /> : null} {label}
+                </span>
                 <small>{p.budget ? `RAB ${rp(p.budget)}` : 'Tanpa RAB'} · {p.reportCount} laporan{p.lastReportDate ? ` · terakhir ${dateId(p.lastReportDate)}` : ''}</small>
               </span>
               <span className="t" aria-hidden>
@@ -172,11 +175,12 @@ export function ProgressVsBudgetRows({ id, rows, hrefOf, empty }: { id: string; 
 }
 
 /** Table twin of the chart (every number, also for screen readers / print). */
-export function ProgressTable({ rows, hrefOf }: { rows: ProjectProgress[]; hrefOf?: (p: ProjectProgress) => string }) {
+export function ProgressTable({ rows, hrefOf, pt }: { rows: ProjectProgress[]; hrefOf?: (p: ProjectProgress) => string; pt?: PtView }) {
   return (
     <table className="pk-t" data-pk-table="progress-vs-budget">
       <thead>
         <tr>
+          {pt?.multi ? <th scope="col">PT</th> : null}
           <th scope="col">Project</th>
           <th scope="col" className="n">
             RAB
@@ -198,7 +202,12 @@ export function ProgressTable({ rows, hrefOf }: { rows: ProjectProgress[]; hrefO
       </thead>
       <tbody>
         {rows.map((p) => (
-          <tr key={p.id}>
+          <tr key={p.id} data-pk-company={p.companyId}>
+            {pt?.multi ? (
+              <td>
+                <PtChip pt={pt.ref(p.companyId)} />
+              </td>
+            ) : null}
             <td>{hrefOf ? <a href={hrefOf(p)}>{`${p.code} ${p.name}`}</a> : `${p.code} ${p.name}`}</td>
             <td className="n">{rp(p.budget)}</td>
             <td className="n">{rp(p.committed)}</td>
@@ -233,7 +242,7 @@ export function ProgressCell({ p }: { p: ProjectProgress | undefined }) {
  * largest K-09 gap first, paired bars + status, link to the full progress page. Replaces the
  * "(F5)" placeholder. Carries its own styles (the Beranda renders only VIZ_STYLE).
  */
-export function ProgressVsBudgetCard({ id, data, span = 12, i = 0, limit = 6, pm }: { id: string; data: { warnGapPct: number; badGapPct: number; projects: ProjectProgress[] }; span?: 6 | 7 | 8 | 12; i?: number; limit?: number; pm?: boolean }) {
+export function ProgressVsBudgetCard({ id, data, span = 12, i = 0, limit = 6, pm, pt }: { id: string; data: { warnGapPct: number; badGapPct: number; projects: ProjectProgress[] }; span?: 6 | 7 | 8 | 12; i?: number; limit?: number; pm?: boolean; pt?: PtView }) {
   const rows = [...data.projects].sort((a, b) => (b.gap ?? -999) - (a.gap ?? -999) || a.code.localeCompare(b.code))
   const flagged = rows.filter((p) => p.tone === 'bad' || p.tone === 'warn').length
   return (
@@ -250,12 +259,12 @@ export function ProgressVsBudgetCard({ id, data, span = 12, i = 0, limit = 6, pm
       </div>
       <div className="pk-card-b">
         {rows.length > 0 ? <ProgressLegend warn={data.warnGapPct} bad={data.badGapPct} /> : null}
-        <ProgressVsBudgetRows id={id} rows={rows.slice(0, limit)} hrefOf={(p) => `/admin/progress/project/${p.id}`} empty={pm ? 'Anda belum ditetapkan sebagai PM project mana pun.' : 'Belum ada project.'} />
+        <ProgressVsBudgetRows id={id} rows={rows.slice(0, limit)} hrefOf={(p) => `/admin/progress/project/${p.id}`} empty={pm ? 'Anda belum ditetapkan sebagai PM project mana pun.' : 'Belum ada project.'} pt={pt} />
         {rows.length > 0 ? (
           <details className="pk-tv">
             <summary>Tabel angka</summary>
             <div className="pk-tw">
-              <ProgressTable rows={rows} hrefOf={(p) => `/admin/progress/project/${p.id}`} />
+              <ProgressTable rows={rows} hrefOf={(p) => `/admin/progress/project/${p.id}`} pt={pt} />
             </div>
           </details>
         ) : null}

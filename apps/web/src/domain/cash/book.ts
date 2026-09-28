@@ -335,6 +335,8 @@ export async function periodSummaries(req: PayloadRequest, periods: string[], co
 
 export type VoidableTransfer = {
   transferId: number
+  /** PT of the request (MC2). */
+  companyId: number | null
   transferNo: string
   transferDate: string
   amount: number
@@ -356,12 +358,12 @@ export async function voidableTransfers(req: PayloadRequest, limit = 50): Promis
     where: { status: { equals: 'transferred' } },
     depth: 0,
     limit: 200,
-    select: { docNo: true, title: true, type: true },
+    select: { docNo: true, title: true, type: true, company: true },
     user: req.user,
     overrideAccess: false,
     req,
   })
-  const byId = new Map((reqs.docs as unknown as Array<{ id: number; docNo?: string | null; title?: string; type: 'advance' | 'reimburse' }>).map((d) => [d.id, d]))
+  const byId = new Map((reqs.docs as unknown as Array<{ id: number; docNo?: string | null; title?: string; type: 'advance' | 'reimburse'; company?: unknown }>).map((d) => [d.id, d]))
   if (byId.size === 0) return []
   const ts = await req.payload.find({
     collection: 'transfers',
@@ -379,6 +381,7 @@ export async function voidableTransfers(req: PayloadRequest, limit = 50): Promis
     return [
       {
         transferId: t.id as number,
+        companyId: relId(r.company) ?? null,
         transferNo: String(t.docNo ?? ''),
         transferDate: String(t.transferDate ?? ''),
         amount: Number(t.amount ?? 0),

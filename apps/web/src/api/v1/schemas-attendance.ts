@@ -115,6 +115,7 @@ export const TeamToday = z
     members: z.array(
       z.object({
         employee: z.object({ id, code: z.string(), name: z.string() }),
+        companyId: z.number().int().nullable().meta({ description: 'PT of the employee (MC2).' }),
         assigned: z.array(LocationRef),
         status: z.enum(['belum_absen', 'hadir', 'selesai']),
         checkIn: iso.nullable(),

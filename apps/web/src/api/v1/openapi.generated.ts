@@ -6099,6 +6099,13 @@ export const openapiDocument = {
                     "name"
                   ]
                 },
+                "companyId": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "description": "PT of the employee (MC2)."
+                },
                 "assigned": {
                   "type": "array",
                   "items": {
@@ -6157,6 +6164,7 @@ export const openapiDocument = {
               },
               "required": [
                 "employee",
+                "companyId",
                 "assigned",
                 "status",
                 "checkIn",

@@ -3,6 +3,7 @@ import React from 'react'
 
 import { relId } from '@/access/roles'
 import { detail } from '@/domain/expense/dto'
+import { officeQueueWhere } from '@/domain/expense/queues'
 import { SETTLEMENT_TYPE_LABELS } from '@/domain/expense/settlement-rules'
 import { withReqTransaction } from '@/lib/system-tx'
 
@@ -27,7 +28,8 @@ export async function LpjVerification(props: AdminViewServerProps) {
   const { submitted, verified, accounts, companyOf } = await withReqTransaction(req, async () => {
     const res = await req.payload.find({
       collection: 'expense-requests',
-      where: { and: [{ type: { equals: 'advance' } }, { status: { in: ['lpj_submitted', 'lpj_verified'] } }] },
+      // MC2: PTs where the caller is Finance / Direktur only (mc2-contract §3)
+      where: officeQueueWhere(req, { and: [{ type: { equals: 'advance' } }, { status: { in: ['lpj_submitted', 'lpj_verified'] } }] }),
       sort: 'updatedAt',
       limit: 100,
       depth: 0,

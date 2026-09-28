@@ -19,7 +19,7 @@ import { ChartHover } from './ChartHover'
 import { PageTemplate } from './frame'
 import { dateId, ProgressCell, ProgressVsBudgetCard } from './progress-ui'
 import { PtScopeNote, ptView } from './pt'
-import { PerPt, type PtRow } from './pt-breakdown'
+import { PerPt } from './pt-breakdown'
 import { BudgetBadge, F3Root } from './f3-ui'
 import {
   Bento,
@@ -588,9 +588,8 @@ function LatestProgressReports({ rows }: { rows: Awaited<ReturnType<typeof listR
 
 async function Owner({ req, months }: { req: PayloadRequest; months: 6 | 12 }) {
   const d = await withReqTransaction(req, () => ownerDashboard(req, { months }))
-  // MC2-4: per-PT rows of the backend payload (read defensively until mc2-contract lands)
+  // MC2: per-PT rows of the payload (`mc2-contract.md` §2, typed — Σ byCompany = combined total)
   const pt = await ptView(req)
-  const by = (o: unknown, k = 'byCompany'): unknown => (o && typeof o === 'object' ? (o as Record<string, unknown>)[k] : undefined)
   const k09 = await withReqTransaction(req, async () => projectProgressVsBudget(req, await officeScope(req)))
   const v = d.viz
   const bal = v.balanceTrend
@@ -620,7 +619,7 @@ async function Owner({ req, months }: { req: PayloadRequest; months: 6 | 12 }) {
             <p className="pk-kpi-x" data-pk-kpi="k02b-month">
               Bulan ini <b>+{rpShort(d.cash.monthIn)}</b> / <b>−{rpShort(d.cash.monthOut)}</b>
             </p>
-            <PerPt pt={pt} data={by(d.cash)} fmt={rpShort} label="Saldo kas" />
+            <PerPt pt={pt} rows={d.cash.byCompany} value={(r) => r.total} fmt={rpShort} label="Saldo kas" />
           </KpiTile>
           <KpiTile id="approvals" icon="clock" label="Pengajuan menunggu" value={`${a.count}`} title={`${a.count} pengajuan`} kpi="k10-count" href={statusList(WAITING)} more="Lihat pengajuan" i={1}>
             <p className="pk-kpi-x" data-pk-kpi="k10-sum">
@@ -642,7 +641,7 @@ async function Owner({ req, months }: { req: PayloadRequest; months: 6 | 12 }) {
             <p className="pk-kpi-x" data-pk-kpi="k10-mine">
               <b>{a.waitingForMe}</b> menunggu saya{a.oldestDays !== null ? ` · tertua ${a.oldestDays} hari` : ''}
             </p>
-            <PerPt pt={pt} data={by(a)} keys={['count', 'total']} label="Pengajuan menunggu" />
+            <PerPt pt={pt} rows={a.byCompany} value={(r) => r.count} label="Pengajuan menunggu" />
           </KpiTile>
           <KpiTile id="disbursed" icon="send" label="Pencairan bulan ini" value={rpShort(disb.net)} title={rp(disb.net)} kpi="k05-month" href="/admin/laporan/pengeluaran-kategori" more="Pengeluaran per kategori" i={2}>
             <p className="pk-kpi-x">{rp(disb.net)} dicairkan bersih</p>
@@ -667,7 +666,7 @@ async function Owner({ req, months }: { req: PayloadRequest; months: 6 | 12 }) {
               ) : null}
             </p>
             {/* per PT: colour counts with THAT PT's thresholds — no combined percentage (wireframe §5 rule 2) */}
-            <PerPt pt={pt} data={by(d.budget)} label="Project berjalan" render={(r: PtRow) => `${num(r.running)} berjalan · ${num(r.over)} merah · ${num(r.warn)} kuning`} />
+            <PerPt pt={pt} rows={d.budget.byCompany} value={(r) => r.running} label="Project berjalan" render={(r) => `${r.running} berjalan · ${r.over} merah · ${r.warn} kuning`} />
           </KpiTile>
         </KpiRow>
 
@@ -707,10 +706,10 @@ async function Owner({ req, months }: { req: PayloadRequest; months: 6 | 12 }) {
           <p className="pk-kpi-x" data-pk-kpi="k12f">
             <b>{d.completeness.openWarnings}</b> flag peringatan terbuka
           </p>
-          <PerPt pt={pt} data={by(d.completeness)} label="Kelengkapan LPJ" render={(r: PtRow) => `${num(r.ratioDone)}/${num(r.ratioTotal)} · ${num(r.overdue)} terlambat`} />
+          <PerPt pt={pt} rows={d.completeness.byCompany} label="Kelengkapan LPJ" render={(r) => `${r.ratioDone}/${r.ratioTotal} · ${r.overdue} terlambat`} />
         </Card>
 
-        <ProgressVsBudgetCard id="owner-progress" data={k09} i={11} />
+        <ProgressVsBudgetCard id="owner-progress" data={k09} i={11}  pt={pt} />
         <InboxCard id="owner-inbox" items={v.inbox} count={a.waitingForMe} span={6} i={11} />
         <RecentCashCard id="owner-recent-cash" rows={v.recentCash} span={6} i={12} />
 
@@ -757,6 +756,7 @@ async function Owner({ req, months }: { req: PayloadRequest; months: 6 | 12 }) {
           <p className="pk-kpi-x" style={{ marginTop: 8 }}>
             {d.transferQueue.overdue > 0 ? <StatusPill tone="warn" label={`${d.transferQueue.overdue} lewat tanggal dibutuhkan`} /> : <StatusPill tone="ok" label="Tidak ada yang lewat tanggal" />}
           </p>
+          <PerPt pt={pt} rows={d.transferQueue.byCompany} value={(r) => r.count} label="Antrian transfer" render={(r) => `${r.count} · ${rpShort(r.sum)}`} />
         </Card>
       </Bento>
     </>
@@ -768,7 +768,6 @@ async function Owner({ req, months }: { req: PayloadRequest; months: 6 | 12 }) {
 async function Finance({ req }: { req: PayloadRequest }) {
   const d = await withReqTransaction(req, () => financeDashboard(req))
   const pt = await ptView(req)
-  const extra = d as unknown as Record<string, unknown> // MC2 per-PT fields (mc2-contract), read defensively
   const k09 = await withReqTransaction(req, async () => projectProgressVsBudget(req, await officeScope(req)))
   const v = d.viz
   const flows = d.cashFlow.rows
@@ -789,7 +788,7 @@ async function Finance({ req }: { req: PayloadRequest }) {
             <p className="pk-kpi-x">{rp(d.cashTotal)}</p>
             {balPrev ? <Delta d={delta(d.cashTotal, balPrev.balance)} good="up" vs={`vs akhir ${short(balPrev.period)}`} /> : null}
             <Sparkline label="Saldo akhir bulan" values={v.balanceTrend.map((b) => ({ label: short(b.period), value: b.balance }))} />
-            <PerPt pt={pt} data={extra.cashByCompany} fmt={rpShort} label="Saldo kas" />
+            <PerPt pt={pt} rows={d.cashByCompany} value={(r) => r.total} fmt={rpShort} label="Saldo kas" />
           </KpiTile>
           <KpiTile id="transfer-queue" icon="send" label="Antrian transfer" value={`${d.transferQueue.count}`} title={`${d.transferQueue.count} pengajuan`} kpi="k11-count" href="/admin/antrian-transfer" more="Antrian Transfer" i={1}>
             <p className="pk-kpi-x">
@@ -798,6 +797,7 @@ async function Finance({ req }: { req: PayloadRequest }) {
             <p className="pk-kpi-x" data-pk-kpi="k11-overdue">
               {d.transferQueue.overdue > 0 ? <StatusPill tone="warn" label={`${d.transferQueue.overdue} lewat tanggal dibutuhkan`} /> : <StatusPill tone="ok" label="Tepat waktu" />}
             </p>
+            <PerPt pt={pt} rows={d.transferQueue.byCompany} value={(r) => r.count} label="Antrian transfer" render={(r) => `${r.count} · ${rpShort(r.sum)}`} />
           </KpiTile>
           <KpiTile id="lpj-verify" icon="check" label="Menunggu verifikasi" value={`${d.lpjToVerify + d.reimburseToVerify.count}`} title={`${d.lpjToVerify} LPJ, ${d.reimburseToVerify.count} nota reimburse`} href="/admin/verifikasi-lpj" more="Verifikasi LPJ" i={2}>
             <p className="pk-kpi-x" data-pk-kpi="k12c">
@@ -806,7 +806,7 @@ async function Finance({ req }: { req: PayloadRequest }) {
             <p className="pk-kpi-x" data-pk-kpi="k12e">
               <b>{d.reimburseToVerify.count}</b> nota reimburse · {d.reimburseToVerify.warnings} flag
             </p>
-            <PerPt pt={pt} data={extra.completenessByCompany} label="Menunggu verifikasi" render={(r: PtRow) => `${num(r.lpjToVerify)} LPJ · ${num(r.reimburseToVerify)} nota`} />
+            <PerPt pt={pt} rows={d.completenessByCompany} label="Menunggu verifikasi" render={(r) => `${r.lpjToVerify} LPJ · ${r.reimburseToVerify} nota`} />
           </KpiTile>
           <KpiTile id="month-in" icon="down" label={`Kas masuk ${short(cur.period)}`} value={rpShort(cur.masuk)} title={rp(cur.masuk)} kpi="k02a-in" href={rekapKasMonth(cur.period)} more="Rekap Kas" i={3}>
             <p className="pk-kpi-x">{rp(cur.masuk)}</p>
@@ -943,7 +943,7 @@ async function Finance({ req }: { req: PayloadRequest }) {
           </TableView>
         </Card>
 
-        <ProgressVsBudgetCard id="finance-progress" data={k09} i={12} />
+        <ProgressVsBudgetCard id="finance-progress" data={k09} i={12}  pt={pt} />
         <RecentCashCard id="finance-recent-cash" rows={v.recentCash} span={8} i={12} />
         <CategoryCard id="finance-categories" c={v.categories} span={4} i={13} sub="Dicairkan 6 bulan terakhir" />
 
@@ -957,6 +957,7 @@ async function Finance({ req }: { req: PayloadRequest }) {
               'Belum pernah tutup buku.'
             )}
           </p>
+          <PerPt pt={pt} rows={d.lastClosedByCompany} label="Tutup buku" render={(r) => r.period ?? 'belum pernah'} />
           <p className="pk-kpi-x">Bulan yang bisa ditutup: {d.nextClosable} (bulan lampau saja).</p>
         </Card>
         <Card id="quick" title="Aksi cepat" span={6} i={15}>
@@ -981,6 +982,7 @@ async function Finance({ req }: { req: PayloadRequest }) {
 
 async function Pm({ req }: { req: PayloadRequest }) {
   const d = await withReqTransaction(req, () => pmDashboard(req))
+  const pt = await ptView(req)
   const k09 = await withReqTransaction(req, async () => projectProgressVsBudget(req, await teamScope(req)))
   const latestReports = await withReqTransaction(req, async () => (await listReports(req, { projectId: undefined, limit: 5 })).items)
   const v = d.viz
@@ -1047,7 +1049,7 @@ async function Pm({ req }: { req: PayloadRequest }) {
           </KpiTile>
         </KpiRow>
 
-        <ProgressVsBudgetCard id="pm-progress" data={k09} i={4} pm />
+        <ProgressVsBudgetCard id="pm-progress" data={k09} i={4} pm  pt={pt} />
         <BudgetCard id="pm-budget" projects={d.projects} warnPct={v.warnPct} span={7} i={4} pm progress={progressMap(k09)} />
         <PipelineCard id="pm-pipeline" pipeline={v.pipeline} title="Status pengajuan tim" sub="Posisi pengajuan tim saat ini" span={5} i={5} />
 
@@ -1268,8 +1270,3 @@ export function DashboardPage(props: AdminViewServerProps) {
 }
 
 export default Dashboard
-
-/** Defensive number of a per-PT row field (MC2 payloads). */
-function num(v: unknown): string {
-  return typeof v === 'number' ? String(v) : '—'
-}

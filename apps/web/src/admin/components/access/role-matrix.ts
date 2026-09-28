@@ -71,7 +71,7 @@ export function isChanged(draft: CellDraft, stored: MatrixCell | undefined): boo
 
 export type Op =
   | { kind: 'create'; key: string; company: number; body: { user: number; company: number; roles: Role[]; employee: number | null; active: true } }
-  | { kind: 'update'; key: string; company: number; id: number; body: { roles: Role[]; employee: number | null; active: boolean } }
+  | { kind: 'update'; key: string; company: number; user: number; id: number; body: { roles: Role[]; employee: number | null; active: boolean } }
 
 /** REST operations for the pending drafts (create = POST, update = PATCH), in a stable order. */
 export function pendingOps(drafts: ReadonlyMap<string, CellDraft>, stored: ReadonlyMap<string, MatrixCell>): Op[] {
@@ -80,9 +80,38 @@ export function pendingOps(drafts: ReadonlyMap<string, CellDraft>, stored: Reado
     const s = stored.get(key)
     if (!isChanged(d, s)) continue
     if (!s || d.id === undefined) ops.push({ kind: 'create', key, company: d.company, body: { user: d.user, company: d.company, roles: sortRoles(d.roles), employee: d.employee, active: true } })
-    else ops.push({ kind: 'update', key, company: d.company, id: d.id, body: { roles: sortRoles(d.roles), employee: d.employee, active: d.active && d.roles.length > 0 } })
+    else ops.push({ kind: 'update', key, company: d.company, user: d.user, id: d.id, body: { roles: sortRoles(d.roles), employee: d.employee, active: d.active && d.roles.length > 0 } })
   }
   return ops
+}
+
+/** One item of `POST /api/v1/company-memberships/batch` (mc2-contract §8). */
+export type BatchItem = { user: number; company: number; roles: Role[]; employee: number | null; active: boolean }
+
+/** Body of the atomic batch save: every pending op, in `ops` order (the server answers per index). */
+export function batchBody(ops: readonly Op[], reason: string): { reason: string; items: BatchItem[] } {
+  return {
+    reason: reason.trim(),
+    items: ops.map((o) => (o.kind === 'create' ? { ...o.body } : { user: o.user, company: o.company, ...o.body })),
+  }
+}
+
+/**
+ * Server errors of a refused batch per cell key: `errors[].path = 'items.<i>'` → the i-th op's cell.
+ * Errors without an item path go to `general` (nothing was saved either way — all-or-nothing).
+ */
+export function batchErrors(data: unknown, ops: readonly Op[]): { cells: Map<string, string>; general: string[] } {
+  const errs = ((data ?? {}) as { errors?: Array<{ path?: unknown; message?: unknown }> }).errors ?? []
+  const cells = new Map<string, string>()
+  const general: string[] = []
+  for (const e of errs) {
+    const m = typeof e.path === 'string' ? /^items\.(\d+)/.exec(e.path) : null
+    const op = m ? ops[Number(m[1])] : undefined
+    const msg = typeof e.message === 'string' && e.message ? e.message : 'Ditolak.'
+    if (op) cells.set(op.key, cells.has(op.key) ? `${cells.get(op.key)}; ${msg}` : msg)
+    else general.push(typeof e.path === 'string' && e.path ? `${e.path}: ${msg}` : msg)
+  }
+  return { cells, general }
 }
 
 /** Ops outside the viewer's rights (the client refuses to send any of them: no partial save). */

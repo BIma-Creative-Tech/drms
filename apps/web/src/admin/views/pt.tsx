@@ -1,15 +1,14 @@
 import type { PayloadRequest } from 'payload'
 import React from 'react'
 
-import { companyContextOf, relId } from '@/access/roles'
+import { companyContextOf } from '@/access/roles'
 
 import { companyLabels, type CompanyLabel } from '../components/companies/labels'
 
 /**
  * PT column / badge of the custom admin views (MC2-4, wireframe §4 "Kolom PT … hanya tampil bila
- * pilihan > 1 PT"). Queue items of the backend (MC2-1, `mc2-contract.md`) carry `company { id,
- * shortCode, name }`; until every payload does, the views fall back to the `company` column of the
- * rows they already read (`requestCompanies`, caller's access).
+ * pilihan > 1 PT"). Queue items of the backend (MC2-1, `mc2-contract.md` §3) carry `company { id,
+ * shortCode, name }`; other rows (Kas book, attendance, K-09, voidable transfers) carry `companyId`.
  */
 export type PtRef = { id: number; shortCode: string; name?: string | null }
 
@@ -37,34 +36,12 @@ export async function ptView(req: PayloadRequest): Promise<PtView> {
   }
 }
 
-/** expense-request id → company id, read with the caller's access (fallback for items without `company`). */
-export async function requestCompanies(req: PayloadRequest, ids: readonly number[]): Promise<Map<number, number>> {
-  const uniq = [...new Set(ids)]
-  if (uniq.length === 0) return new Map()
-  const res = await req.payload.find({
-    collection: 'expense-requests',
-    where: { id: { in: uniq } },
-    depth: 0,
-    pagination: false,
-    select: { company: true },
-    user: req.user,
-    overrideAccess: false,
-    req,
-  })
-  const out = new Map<number, number>()
-  for (const d of res.docs as unknown as Array<{ id: number; company?: unknown }>) {
-    const c = relId(d.company)
-    if (c !== undefined) out.set(d.id, c)
-  }
-  return out
-}
-
-/** Company of a queue item: the backend `company` ref when present, else the fallback map. */
-export function itemCompany(item: { id: number; company?: unknown }, fallback: ReadonlyMap<number, number>): number | null {
+/** Company of a queue item / row: the backend `company` ref (`mc2-contract.md` §3) or a plain `companyId`. */
+export function itemCompany(item: { company?: { id: number } | number | null; companyId?: number | null }): number | null {
   const c = item.company
-  if (c && typeof c === 'object' && typeof (c as { id?: unknown }).id === 'number') return (c as { id: number }).id
+  if (c && typeof c === 'object') return c.id
   if (typeof c === 'number') return c
-  return fallback.get(item.id) ?? null
+  return typeof item.companyId === 'number' ? item.companyId : null
 }
 
 /** PT short-code chip (same look as the list column, custom.scss .pk-pt-chip). */

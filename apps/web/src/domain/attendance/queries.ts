@@ -75,6 +75,15 @@ export function narrowAttScope(scope: AttScope, projectId?: number, costCenterId
   return { kind: 'team', projects: projectId ? [projectId] : [], costCenters: costCenterId ? [costCenterId] : [], parts }
 }
 
+/**
+ * Narrows the scope to the PTs `companyIds` (UI PT filter of the attendance views): never widens,
+ * foreign ids are ignored. Empty / null = unchanged; nothing left = an empty scope (matches nothing).
+ */
+export function narrowAttToCompanies(scope: AttScope, companyIds?: readonly number[] | null): AttScope {
+  if (!companyIds?.length || !scope.parts) return scope
+  return attScopeOf(scope.parts.filter((p) => companyIds.includes(p.company))) ?? { kind: 'team', projects: [], costCenters: [], parts: [] }
+}
+
 /** Row filter on a table alias with company_id / project_id / cost_center_id columns. */
 export function locationScopeSql(scope: AttScope, alias: 'a' | 'ta'): SQL {
   const col = (c: string) => sql.raw(`${alias}.${c}`)

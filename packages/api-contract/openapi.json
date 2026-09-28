@@ -6098,6 +6098,13 @@
                     "name"
                   ]
                 },
+                "companyId": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "description": "PT of the employee (MC2)."
+                },
                 "assigned": {
                   "type": "array",
                   "items": {
@@ -6156,6 +6163,7 @@
               },
               "required": [
                 "employee",
+                "companyId",
                 "assigned",
                 "status",
                 "checkIn",

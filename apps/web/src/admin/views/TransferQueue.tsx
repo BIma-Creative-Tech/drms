@@ -1,7 +1,7 @@
 import type { AdminViewServerProps } from 'payload'
 import React from 'react'
 
-import { relId } from '@/access/roles'
+import { hasRole, relId } from '@/access/roles'
 import { voidableTransfers } from '@/domain/cash/book'
 import { transferQueue } from '@/domain/expense/queues'
 import { approvedByCaller } from '@/domain/expense/transfers'
@@ -11,7 +11,7 @@ import { ReasonAction } from '../components/kas/ReasonAction'
 import { KAS_STYLE } from '../components/kas/style'
 import { MoneyForm } from '../components/MoneyForm'
 import { ReimburseReceiptReview, loadReimburseReview } from '../components/ReimburseReceiptReview'
-import { accountsOf, itemCompany, PtChip, PtScopeNote, ptView, requestCompanies } from './pt'
+import { accountsOf, itemCompany, PtChip, PtScopeNote, ptView } from './pt'
 import { Empty, Forbidden, Shell, TableScroll, allowed, badge, docLink, num, rp, table, td, th } from './shared'
 
 /**
@@ -23,13 +23,12 @@ export async function TransferQueue(props: AdminViewServerProps) {
   const req = props.initPageResult.req
   if (!allowed(req, ['pk-finance', 'pk-owner'])) return <Forbidden props={props} title="Antrian Transfer" roles={['pk-finance', 'pk-owner']} />
   const pt = await ptView(req)
-  const { items, review, done, mine, companies } = await withReqTransaction(req, async () => {
+  const { items, review, done, mine } = await withReqTransaction(req, async () => {
     const q = await transferQueue(req)
     const done = await voidableTransfers(req)
-    // MC2-4: PT of every row (backend `company` ref, else the request's company column) — also picks
-    // the cash accounts offered in each transfer form (never an account of another PT).
-    const companies = await requestCompanies(req, [...q.filter((i) => !('company' in i)).map((i) => i.id), ...(pt.multi ? done.map((t) => t.requestId) : [])])
-    return { items: q, review: await loadReimburseReview(req), done, mine: await approvedByCaller(req, q.map((x) => x.id)), companies }
+    // MC2: every queue item carries its PT (`company`, mc2-contract §3) — it also picks the cash
+    // accounts offered in each transfer form (never an account of another PT).
+    return { items: q, review: await loadReimburseReview(req), done, mine: await approvedByCaller(req, q.map((x) => x.id)) }
   })
   const canTransfer = allowed(req, ['pk-finance'])
   const accounts = canTransfer
@@ -64,7 +63,7 @@ export async function TransferQueue(props: AdminViewServerProps) {
               <tr>
                 {pt.multi ? (
                   <td style={td} data-label="PT">
-                    <PtChip pt={pt.ref(itemCompany(r, companies))} />
+                    <PtChip pt={pt.ref(itemCompany(r))} />
                   </td>
                 ) : null}
                 <td style={td} data-label="Dibutuhkan">
@@ -88,7 +87,7 @@ export async function TransferQueue(props: AdminViewServerProps) {
                   {r.flags.warning + r.flags.info > 0 ? <span style={badge(r.flags.warning ? 'warn' : 'muted')}>{r.flags.warning + r.flags.info}</span> : '—'}
                 </td>
               </tr>
-              {canTransfer ? (
+              {canTransfer && hasRole(req, 'pk-finance', itemCompany(r)) ? (
                 <tr>
                   <td style={td} />
                   <td style={td} colSpan={pt.multi ? 6 : 5}>
@@ -101,7 +100,7 @@ export async function TransferQueue(props: AdminViewServerProps) {
                     <MoneyForm
                       url={`/api/v1/expense-requests/${r.id}/transfer`}
                       submitLabel="Catat transfer"
-                      cashAccounts={accountsOf(accounts, itemCompany(r, companies))}
+                      cashAccounts={accountsOf(accounts, itemCompany(r))}
                       bankRef="required"
                       proof={{ kind: 'transfer-proofs', required: true }}
                       amountText={`Transfer ${rp(r.approvedAmount)}`}
@@ -142,7 +141,7 @@ export async function TransferQueue(props: AdminViewServerProps) {
                 <tr key={t.transferId} data-pk-transfer={t.transferNo}>
                   {pt.multi ? (
                     <td style={td}>
-                      <PtChip pt={pt.ref(companies.get(t.requestId))} />
+                      <PtChip pt={pt.ref(t.companyId)} />
                     </td>
                   ) : null}
                   <td style={td}>{t.transferDate}</td>
@@ -155,6 +154,7 @@ export async function TransferQueue(props: AdminViewServerProps) {
                   <td style={num}>{rp(t.amount)}</td>
                   {canTransfer ? (
                     <td style={td}>
+                      {hasRole(req, 'pk-finance', t.companyId) ? (
                       <ReasonAction
                         url={`/api/v1/expense-requests/${t.requestId}/transfers/${t.transferId}/void`}
                         label="Void transfer"
@@ -168,6 +168,9 @@ export async function TransferQueue(props: AdminViewServerProps) {
                         confirmLabel="Void transfer"
                         testId={`void-transfer-${t.transferId}`}
                       />
+                      ) : (
+                        <span style={{ fontSize: 12 }}>Void: Finance PT ini</span>
+                      )}
                     </td>
                   ) : null}
                 </tr>

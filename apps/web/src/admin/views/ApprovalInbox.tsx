@@ -8,7 +8,7 @@ import { withReqTransaction } from '@/lib/system-tx'
 import { ActionButton } from '../components/ActionButton'
 import { ReviewDetails } from '../components/ReviewDetails'
 import { AddendumInboxSection } from './Addendum'
-import { itemCompany, PtChip, PtScopeNote, ptView, requestCompanies } from './pt'
+import { itemCompany, PtChip, PtScopeNote, ptView } from './pt'
 import { Empty, Shell, TableScroll, badge, docLink, num, rp, table, td, th } from './shared'
 
 /**
@@ -22,21 +22,19 @@ import { Empty, Shell, TableScroll, badge, docLink, num, rp, table, td, th } fro
 export async function ApprovalInbox(props: AdminViewServerProps) {
   const req = props.initPageResult.req
   const pt = await ptView(req)
-  const { items, budgetWarnPct, details, companies } = await withReqTransaction(req, async () => {
+  const { items, budgetWarnPct, details } = await withReqTransaction(req, async () => {
     const inbox = await approvalInbox(req)
     // S3e (US-26/US-59, S-05): lines, receipts and per-line flags for each waiting request.
     const map = new Map<number, Awaited<ReturnType<typeof detail>>>()
     for (const it of inbox.items) map.set(it.id, await detail(req, it.id))
-    // MC2-4: PT of each item (backend `company` ref, else the request's company column)
-    const companies = pt.multi ? await requestCompanies(req, inbox.items.filter((i) => !('company' in i)).map((i) => i.id)) : new Map<number, number>()
-    return { ...inbox, details: map, companies }
+    return { ...inbox, details: map }
   })
   const cols = pt.multi ? 10 : 9
   return (
     <Shell props={props} title="Persetujuan">
       <PtScopeNote pt={pt} />
       <p style={{ marginTop: 0 }}>
-        Pengajuan yang menunggu keputusan Anda. Merah = anggaran project sesudah disetujui melebihi {budgetWarnPct}%.{pt.multi ? ' Keputusan selalu memakai peran Anda di PT dokumen.' : ''}
+        Pengajuan yang menunggu keputusan Anda. Merah = anggaran project sesudah disetujui melebihi {pt.multi ? 'ambang PT pengajuan' : `${budgetWarnPct}%`}.{pt.multi ? ' Keputusan selalu memakai peran Anda di PT dokumen.' : ''}
       </p>
       {items.length === 0 ? (
         <Empty text="Tidak ada pengajuan yang menunggu keputusan Anda." />
@@ -63,7 +61,7 @@ export async function ApprovalInbox(props: AdminViewServerProps) {
                 <tr data-pk-inbox-item={r.id}>
                   {pt.multi ? (
                     <td style={td}>
-                      <PtChip pt={pt.ref(itemCompany(r, companies))} />
+                      <PtChip pt={pt.ref(itemCompany(r))} />
                     </td>
                   ) : null}
                   <td style={td}>

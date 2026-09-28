@@ -6,7 +6,7 @@ import { attendanceMonth } from '@/domain/reports/attendance-report'
 import { companyScopeSql, idList, inList } from '@/domain/reports/scope'
 import { getRequestTx } from '@/lib/tx'
 
-import { attendanceContext, attendanceScope, employeeCompanySql, fullCompanies, narrowAttScope, teamMembers, type AttScope } from './queries'
+import { attendanceContext, attendanceScope, employeeCompanySql, fullCompanies, narrowAttScope, narrowAttToCompanies, teamMembers, type AttScope } from './queries'
 
 /**
  * E6 web (S2) — read helpers of the admin views (/admin/absensi…). Same scope rules as the
@@ -20,25 +20,26 @@ async function rows<T = Row>(req: PayloadRequest, q: ReturnType<typeof sql>): Pr
   return ((await tx.execute(q)) as unknown as { rows: T[] }).rows
 }
 
-export type Opt = { id: number; label: string }
+/** Option of the attendance filters; `companyId` = PT of the employee / location (MC2 labels). */
+export type Opt = { id: number; label: string; companyId: number | null }
 
 /** Employees the caller may open a recap of (month): office all active + with attendance; PM team members. */
 export async function recapEmployees(req: PayloadRequest, scope: AttScope, from: string, to: string): Promise<Opt[]> {
-  const out = new Map<number, string>()
+  const out = new Map<number, { label: string; companyId: number | null }>()
   const teamParts = scope.parts?.filter((p) => !p.all) ?? []
   const team: AttScope | null = scope.parts ? (teamParts.length ? { kind: 'team', projects: [], costCenters: [], parts: teamParts } : null) : scope.kind === 'team' ? scope : null
-  if (team) for (const x of await teamMembers(req, team, from, to)) out.set(x.employeeId, `${x.name} (${x.code})`)
+  if (team) for (const x of await teamMembers(req, team, from, to)) out.set(x.employeeId, { label: `${x.name} (${x.code})`, companyId: x.companyId ?? null })
   if (fullCompanies(scope).length > 0) {
-    const r = await rows<{ id: number; code: string; name: string }>(
+    const r = await rows<{ id: number; code: string; name: string; company_id: number }>(
       req,
-      sql`SELECT e.id, e.code, e.name FROM employees e
+      sql`SELECT e.id, e.code, e.name, e.company_id FROM employees e
            WHERE ${employeeCompanySql(scope)}
              AND (coalesce(e.active, true) OR EXISTS (SELECT 1 FROM attendances a WHERE a.employee_id = e.id AND a.local_date BETWEEN ${from} AND ${to}))
            ORDER BY e.name, e.id`,
     )
-    for (const x of r) out.set(Number(x.id), `${x.name} (${x.code})`)
+    for (const x of r) out.set(Number(x.id), { label: `${x.name} (${x.code})`, companyId: Number(x.company_id) })
   }
-  return [...out.entries()].map(([id, label]) => ({ id, label })).sort((a, b) => a.label.localeCompare(b.label, 'id') || a.id - b.id)
+  return [...out.entries()].map(([id, v]) => ({ id, ...v })).sort((a, b) => a.label.localeCompare(b.label, 'id') || a.id - b.id)
 }
 
 /** Projects / cost centers of the scope (filters of "Tim hari ini" and the team grid). */
@@ -48,9 +49,10 @@ export async function scopeLocations(req: PayloadRequest, scope: AttScope): Prom
   const teamC = scope.parts ? scope.parts.filter((p) => !p.all).flatMap((p) => p.costCenters) : scope.kind === 'team' ? scope.costCenters : []
   const pw = sql`((${companyScopeSql(sql`p.company_id`, full)} AND p.status::text <> 'arsip') OR ${inList(sql`p.id`, teamP)})`
   const cw = sql`((${companyScopeSql(sql`cc.company_id`, full)} AND coalesce(cc.active, true)) OR ${inList(sql`cc.id`, teamC)})`
-  const p = await rows<{ id: number; code: string; name: string }>(req, sql`SELECT p.id, p.code, p.name FROM projects p WHERE ${pw} ORDER BY p.code`)
-  const c = await rows<{ id: number; code: string; name: string }>(req, sql`SELECT cc.id, cc.code, cc.name FROM cost_centers cc WHERE ${cw} ORDER BY cc.code`)
-  return { projects: p.map((x) => ({ id: Number(x.id), label: `${x.code} ${x.name}` })), costCenters: c.map((x) => ({ id: Number(x.id), label: `${x.code} ${x.name}` })) }
+  const p = await rows<{ id: number; code: string; name: string; company_id: number }>(req, sql`SELECT p.id, p.code, p.name, p.company_id FROM projects p WHERE ${pw} ORDER BY p.code`)
+  const c = await rows<{ id: number; code: string; name: string; company_id: number }>(req, sql`SELECT cc.id, cc.code, cc.name, cc.company_id FROM cost_centers cc WHERE ${cw} ORDER BY cc.code`)
+  const opt = (x: { id: number; code: string; name: string; company_id: number }) => ({ id: Number(x.id), label: `${x.code} ${x.name}`, companyId: Number(x.company_id) })
+  return { projects: p.map(opt), costCenters: c.map(opt) }
 }
 
 export type CorrectionRow = { id: number; attendanceId: number; kind: 'check_in' | 'check_out'; localDate: string; oldTime: string; newTime: string; reason: string; by: string; at: string }
@@ -103,4 +105,4 @@ export async function teamMonth(req: PayloadRequest, scope: AttScope, month: str
   return attendanceMonth(req, scope, month)
 }
 
-export { attendanceContext, attendanceScope, narrowAttScope, userId }
+export { attendanceContext, attendanceScope, narrowAttScope, narrowAttToCompanies, userId }

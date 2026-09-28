@@ -1,12 +1,15 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import React, { useMemo, useState } from 'react'
+import React, { useMemo, useRef, useState } from 'react'
 
 import { ROLES, ROLE_LABELS } from '@/access/roles'
 
 import { problemText } from '../ActionButton'
+import { newIdemKey } from '../kas/client'
 import {
+  batchBody,
+  batchErrors,
   canEditCompany,
   cellKey,
   coverageWarnings,
@@ -32,11 +35,11 @@ import {
 
 /**
  * Client part of the role matrix (/admin/akses-pt, wireframe §2). Edits are local drafts until
- * "Simpan" (reason required); then one REST call per changed cell: PATCH/POST
- * /api/company-memberships (+ `changeReason` → audit `role_change`). Cells outside the viewer's
- * rights are never sent (no partial save of forbidden cells); the server re-checks everything.
- * TODO(mc2-contract): one atomic batch endpoint ("tidak ada simpan sebagian") — until then a failed
- * cell keeps its draft + error while the others are saved.
+ * "Simpan" (reason required); then ONE call `POST /api/v1/company-memberships/batch` (mc2-contract §8,
+ * Idempotency-Key): all-or-nothing in one transaction ("tidak ada simpan sebagian"), audit
+ * `create` / `role_change` rows carry the reason. A refused batch saves nothing; the server's
+ * `errors[].path = items.<i>` marks the cell, every draft stays for correction. Cells outside the
+ * viewer's rights are refused client-side before anything is sent; the server re-checks everything.
  */
 type Props = {
   companies: MatrixCompany[]
@@ -57,6 +60,7 @@ export function RoleMatrix({ companies, users, cells, employees, activeUserIds, 
   const [busy, setBusy] = useState(false)
   const [errors, setErrors] = useState<Map<string, string>>(new Map())
   const [msg, setMsg] = useState<{ tone: 'ok' | 'bad'; text: string } | null>(null)
+  const idemKey = useRef<string | undefined>(undefined)
 
   const eff = useMemo(() => effectiveCells(stored, drafts), [stored, drafts])
   const ops = useMemo(() => pendingOps(drafts, stored), [drafts, stored])
@@ -65,8 +69,13 @@ export function RoleMatrix({ companies, users, cells, employees, activeUserIds, 
   const cols = companies.filter((c) => !hidden.has(c.id))
 
   const update = (key: string, next: CellDraft) => {
+    idemKey.current = undefined // a different body needs a new Idempotency-Key
     setDrafts((d) => new Map(d).set(key, next))
     setMsg(null)
+  }
+  const editReason = (v: string) => {
+    idemKey.current = undefined
+    setReason(v)
   }
   const reset = () => {
     setDrafts(new Map())
@@ -82,35 +91,33 @@ export function RoleMatrix({ companies, users, cells, employees, activeUserIds, 
     }
     setBusy(true)
     setMsg(null)
-    const failed = new Map<string, string>()
-    const remaining = new Map(drafts)
-    for (const op of ops) {
-      const url = op.kind === 'create' ? '/api/company-memberships?depth=0' : `/api/company-memberships/${op.id}?depth=0`
-      try {
-        const res = await fetch(url, {
-          method: op.kind === 'create' ? 'POST' : 'PATCH',
-          credentials: 'same-origin',
-          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-          body: JSON.stringify({ ...op.body, changeReason: reason.trim() }),
-        })
-        if (res.ok) remaining.delete(op.key)
-        else failed.set(op.key, payloadError(await res.json().catch(() => null), res.status))
-      } catch {
-        failed.set(op.key, 'Gagal menghubungi server.')
+    setErrors(new Map())
+    if (!idemKey.current) idemKey.current = newIdemKey()
+    try {
+      const headers: Record<string, string> = { 'Content-Type': 'application/json', Accept: 'application/json' }
+      if (idemKey.current) headers['Idempotency-Key'] = idemKey.current
+      const res = await fetch('/api/v1/company-memberships/batch', { method: 'POST', credentials: 'same-origin', headers, body: JSON.stringify(batchBody(ops, reason)) })
+      const data = await res.json().catch(() => null)
+      if (res.ok) {
+        idemKey.current = undefined
+        setDrafts(new Map())
+        setReason('')
+        setMsg({ tone: 'ok', text: `${ops.length} perubahan tersimpan.` })
+        router.refresh()
+      } else {
+        // all-or-nothing: nothing saved, every draft stays; a changed body next time needs a new key
+        idemKey.current = undefined
+        const { cells, general } = batchErrors(data, ops)
+        setErrors(cells)
+        const head = res.status === 403 ? 'Anda tidak berhak mengubah akses di salah satu PT.' : cells.size > 0 ? 'Periksa sel bertanda merah.' : problemText(data, res.status)
+        setMsg({ tone: 'bad', text: `Tidak ada yang disimpan — ${head}${general.length ? ` ${general.join('; ')}` : ''}` })
       }
+    } catch {
+      // network: same key on retry (the server replays a stored success, never saves twice)
+      setMsg({ tone: 'bad', text: 'Gagal menghubungi server. Coba lagi — permintaan yang sama tidak akan tercatat dua kali.' })
+    } finally {
+      setBusy(false)
     }
-    setErrors(failed)
-    setBusy(false)
-    const saved = ops.length - failed.size
-    if (failed.size === 0) {
-      setDrafts(new Map())
-      setReason('')
-      setMsg({ tone: 'ok', text: `${saved} perubahan tersimpan.` })
-    } else {
-      setDrafts(remaining)
-      setMsg({ tone: 'bad', text: `${saved} tersimpan, ${failed.size} gagal — lihat sel bertanda merah.` })
-    }
-    router.refresh()
   }
 
   if (companies.length === 0) {
@@ -219,7 +226,7 @@ export function RoleMatrix({ companies, users, cells, employees, activeUserIds, 
         </span>
         <label className="pk-rmx__reason">
           <span>Alasan (wajib)</span>
-          <input type="text" value={reason} onChange={(e) => setReason(e.target.value)} maxLength={300} placeholder="mis. mutasi tugas ke CS1" disabled={ops.length === 0 || busy} aria-invalid={ops.length > 0 && !reasonOk(reason)} data-pk-reason />
+          <input type="text" value={reason} onChange={(e) => editReason(e.target.value)} maxLength={300} placeholder="mis. mutasi tugas ke CS1" disabled={ops.length === 0 || busy} aria-invalid={ops.length > 0 && !reasonOk(reason)} data-pk-reason />
         </label>
         <button type="button" className="pk-btn primary" onClick={() => void save()} disabled={busy || ops.length === 0 || !reasonOk(reason) || dups.length > 0} data-pk-save>
           {busy ? 'Menyimpan…' : 'Simpan'}
@@ -237,14 +244,6 @@ export function RoleMatrix({ companies, users, cells, employees, activeUserIds, 
       </div>
     </div>
   )
-}
-
-function payloadError(data: unknown, status: number): string {
-  const p = (data ?? {}) as { errors?: Array<{ message?: string; data?: { errors?: Array<{ message?: string }> } }> }
-  const inner = p.errors?.flatMap((e) => e.data?.errors?.map((x) => x.message ?? '') ?? [e.message ?? '']).filter(Boolean) ?? []
-  if (inner.length) return inner.join('; ')
-  if (status === 403) return 'Anda tidak berhak mengubah akses di PT ini.'
-  return problemText(data, status)
 }
 
 function Cell({

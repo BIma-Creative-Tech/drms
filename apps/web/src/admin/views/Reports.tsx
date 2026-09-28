@@ -4,10 +4,10 @@ import React from 'react'
 
 import { hasRoleAny, ROLE_LABELS } from '@/access/roles'
 import { writeAudit } from '@/audit/writer'
-import { PDF_MAX_ROWS } from '@/domain/reports/export'
+import { exportLetterhead, PDF_MAX_ROWS } from '@/domain/reports/export'
 import { reportContext } from '@/domain/reports/kpi'
 import { AUDIT_REPORT, REPORTS, reportByCode, type ReportDef } from '@/domain/reports/registry'
-import { officeScope, type ReportScope } from '@/domain/reports/scope'
+import { auditScope, officeScope, type ReportScope } from '@/domain/reports/scope'
 import { withReqTransaction } from '@/lib/system-tx'
 import { XLSX_MAX_ROWS, xlsxEnabled } from '@/lib/xlsx'
 import { formatServerTime } from '@/pdf/format'
@@ -99,8 +99,10 @@ export async function AuditLogView(props: AdminViewServerProps) {
   await withReqTransaction(req, () =>
     writeAudit(req, [{ action: 'export', docType: 'audit_log', docId: 'view', field: 'view', newValue: { filters: Object.fromEntries([...sp.entries()].slice(0, 20)) } }]),
   )
-  // TODO(mc2-contract §0.1, after merging feat/mc2-backend): pass `await auditScope(req)` instead of the literal
-  return <ReportPage props={props} def={AUDIT_REPORT} scope={{ kind: 'all' }} base="/admin/audit-log" />
+  // mc2-contract §0.1/§1: PTs where the caller is Owner/Admin/Finance (rows without PT: Admin/Owner only)
+  const scope = await auditScope(req)
+  if (scope.kind === 'none') return <Denied props={props} def={AUDIT_REPORT} />
+  return <ReportPage props={props} def={AUDIT_REPORT} scope={scope} base="/admin/audit-log" />
 }
 
 function Denied({ props, def }: { props: AdminViewServerProps; def: ReportDef }) {
@@ -116,12 +118,19 @@ async function ReportPage({ props, def, scope, base }: { props: AdminViewServerP
   const sp = toSearchParams(props.searchParams)
   const cursor = sp.get('cursor') ?? undefined
   const filterSp = new URLSearchParams([...sp.entries()].filter(([k]) => k !== 'cursor'))
-  let loaded: { res: Awaited<ReturnType<ReportDef['run']>>; fields: Awaited<ReturnType<ReportDef['filters']>>; ctx: Awaited<ReturnType<typeof reportContext>> } | null = null
+  let loaded: {
+    res: Awaited<ReturnType<ReportDef['run']>>
+    fields: Awaited<ReturnType<ReportDef['filters']>>
+    ctx: Awaited<ReturnType<typeof reportContext>>
+    kop: Awaited<ReturnType<typeof exportLetterhead>>
+  } | null = null
   try {
     loaded = await withReqTransaction(req, async () => ({
       res: await def.run(req, scope, sp, { cursor: cursor && /^[A-Za-z0-9_-]{1,200}$/.test(cursor) ? cursor : undefined, limit: def.pageSize }),
       fields: await def.filters(req, scope, filterSp),
       ctx: await reportContext(req),
+      // mc2-contract §1: letterhead of the effective PTs (the `pt` parameter narrows) — same as the exports
+      kop: await exportLetterhead(req, def, scope, filterSp),
     }))
   } catch (err) {
     req.payload.logger.error({ msg: 'report view failed', report: def.code, err: (err as Error).message })
@@ -150,6 +159,7 @@ function ReportBody({
   res,
   fields,
   ctx,
+  kop,
 }: {
   def: ReportDef
   scope: ReportScope
@@ -159,6 +169,7 @@ function ReportBody({
   res: Awaited<ReturnType<ReportDef['run']>>
   fields: Awaited<ReturnType<ReportDef['filters']>>
   ctx: Awaited<ReturnType<typeof reportContext>>
+  kop: Awaited<ReturnType<typeof exportLetterhead>>
 }) {
     const q = filterSp.toString()
     const rowCount = def.paged ? res.count : res.main.rows.length
@@ -166,6 +177,15 @@ function ReportBody({
     return (
       <>
         <FilterForm fields={fields} action={base} />
+        <p className="pk-note" data-pk-letterhead={kop.kind}>
+          {kop.kind === 'group' ? (
+            <>
+              {kop.name} · PT: {kop.companies.map((c) => c.shortCode).join(', ')}
+            </>
+          ) : (
+            kop.name
+          )}
+        </p>
         <div className="pk-actions" data-pk-exports>
           <span>Export:</span>
           {formats.map((f) => {

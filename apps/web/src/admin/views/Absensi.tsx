@@ -9,10 +9,10 @@ import { CorrectionDialog, DefaultSchedule, GeofenceForm, HolidayAdd, ScheduleAs
 import { KAS_STYLE } from '@/admin/components/kas/style'
 import type { DayRecap, LocationDay, LocationRef, RecapSummary, TeamTodayRow } from '@/domain/attendance/aggregate'
 import { classCounts, classifyDay, DAY_CLASSES, LEGEND, minutesText, monthWeeks, offsetText, shiftMonth, type DayClass } from '@/domain/attendance/calendar'
-import { attendanceContext, attendanceScope, type AttScope } from '@/domain/attendance/queries'
+import { attendanceContext, attendanceScope, employeeRef, narrowAttScope, narrowAttToCompanies, type AttScope } from '@/domain/attendance/queries'
 import type { ScheduleSnapshot } from '@/domain/attendance/schedule'
 import { employeeRecap, myRecap, teamTodayFor, type MonthlyRecap, type TeamTodayResult } from '@/domain/attendance/service'
-import { correctionHistory, mayCorrect, recapEmployees, scopeLocations, selfieState, teamMonth, type CorrectionRow } from '@/domain/attendance/web'
+import { correctionHistory, mayCorrect, recapEmployees, scopeLocations, selfieState, teamMonth, type CorrectionRow, type Opt } from '@/domain/attendance/web'
 import { firstDay, lastDay, MONTHS_SHORT, PERIOD_RE, periodLabel } from '@/domain/reports/rules'
 import { withReqTransaction } from '@/lib/system-tx'
 import { tzOffsetMinutes } from '@/lib/time'
@@ -20,6 +20,7 @@ import { formatServerTime } from '@/pdf/format'
 
 import { ChartHover } from './ChartHover'
 import { F3Root } from './f3-ui'
+import { PtChip, ptView, type PtView } from './pt'
 import { Bento, Card, DashHead, DataTable, EmptyState, HBarList, KpiRow, KpiTile, StatusPill, TableView, VIZ_STYLE } from './viz'
 import { settings as companySettings } from '@/domain/companies'
 
@@ -147,6 +148,39 @@ const idParam = (sp: SP, k: string) => {
   return /^\d{1,10}$/.test(v) && Number(v) > 0 ? Number(v) : undefined
 }
 
+// ---------------------------------------------------------------- PT filter (MC2, ADR 0016 §6)
+
+/** PTs of the attendance scope that are in the switcher selection (the PT filter's choices). */
+const scopePts = (scope: AttScope | null, pt: PtView) => (scope?.parts ?? []).map((p) => p.company).filter((c) => pt.selected.includes(c))
+/** `?pt=` when it is one of `pts` (a foreign id is ignored — the scope narrows, never widens). */
+const ptParam = (sp: SP, pts: readonly number[]) => {
+  const v = idParam(sp, 'pt')
+  return v !== undefined && pts.includes(v) ? v : undefined
+}
+/** Filter options: only the chosen PT's, labels prefixed `[CS1]` while several PTs are shown. */
+function ptOptions<T extends { id: number; label: string; companyId: number | null }>(list: readonly T[], pt: PtView, chosen: number | undefined): T[] {
+  return list
+    .filter((o) => chosen === undefined || o.companyId === chosen)
+    .map((o) => (pt.multi && chosen === undefined && o.companyId !== null ? { ...o, label: `[${pt.ref(o.companyId)?.shortCode ?? o.companyId}] ${o.label}` } : o))
+}
+
+function PtSelect({ pt, pts, value }: { pt: PtView; pts: readonly number[]; value: number | undefined }) {
+  if (!pt.multi || pts.length < 2) return null
+  return (
+    <label>
+      PT
+      <select name="pt" defaultValue={value ? String(value) : ''} data-pk-pt-filter>
+        <option value="">Semua PT ({pts.map((c) => pt.ref(c)?.shortCode).join(', ')})</option>
+        {pts.map((c) => (
+          <option key={c} value={c}>
+            {pt.ref(c)?.shortCode} — {pt.ref(c)?.name ?? ''}
+          </option>
+        ))}
+      </select>
+    </label>
+  )
+}
+
 // ---------------------------------------------------------------- frame
 
 function Frame({ props, name, children }: { props: AdminViewServerProps; name: string; children: React.ReactNode }) {
@@ -227,13 +261,14 @@ function Failed({ props, name, title, err, req }: { props: AdminViewServerProps;
 
 // ---------------------------------------------------------------- Tim hari ini (US-13)
 
-function MemberCard({ m, tz, month }: { m: TeamTodayRow; tz: string; month: string }) {
+function MemberCard({ m, tz, month, pt }: { m: TeamTodayRow; tz: string; month: string; pt: PtView }) {
   const where = m.locations.length ? m.locations.map((l) => l.location) : m.assigned
   return (
     <li className="pk-mem" data-pk-member={m.employee.id} data-pk-member-status={m.status}>
       <div className="top">
         <Link href={`/admin/absensi/rekap?karyawan=${m.employee.id}&bulan=${month}`}>{m.employee.name}</Link>
         <small>{m.employee.code}</small>
+        {pt.multi ? <PtChip pt={pt.ref(m.companyId)} /> : null}
       </div>
       {m.status !== 'belum_absen' ? (
         <div className="tms">
@@ -262,20 +297,23 @@ function MemberCard({ m, tz, month }: { m: TeamTodayRow; tz: string; month: stri
 export async function AbsensiToday(props: AdminViewServerProps) {
   const req = props.initPageResult.req
   const sp = (props.searchParams ?? {}) as SP
-  let data: { scope: AttScope | null; r: TeamTodayResult | null; loc: { projects: Option[]; costCenters: Option[] }; today: string; lateCount: number } | null = null
+  const pt = await ptView(req)
+  let data: { scope: AttScope | null; r: TeamTodayResult | null; loc: { projects: Opt[]; costCenters: Opt[] }; today: string; lateCount: number; pts: number[]; chosen: number | undefined } | null = null
   try {
     data = await withReqTransaction(req, async () => {
       const scope = await attendanceScope(req)
       const ctx = await attendanceContext(req)
-      if (!scope) return { scope, r: null, loc: { projects: [], costCenters: [] }, today: ctx.today, lateCount: 0 }
+      const pts = scopePts(scope, pt)
+      const chosen = ptParam(sp, pts)
+      if (!scope) return { scope, r: null, loc: { projects: [], costCenters: [] }, today: ctx.today, lateCount: 0, pts, chosen }
       const date = /^\d{4}-\d{2}-\d{2}$/.test(one(sp, 'tanggal')) && one(sp, 'tanggal') <= ctx.today ? one(sp, 'tanggal') : ctx.today
-      const r = await teamTodayFor(req, { date, projectId: idParam(sp, 'project'), costCenterId: idParam(sp, 'pusat') })
-      return { scope, r, loc: await scopeLocations(req, scope), today: ctx.today, lateCount: r.members.filter((m) => m.lateMinutes > 0).length }
+      const r = await teamTodayFor(req, { date, projectId: idParam(sp, 'project'), costCenterId: idParam(sp, 'pusat'), companyIds: chosen ? [chosen] : undefined })
+      return { scope, r, loc: await scopeLocations(req, scope), today: ctx.today, lateCount: r.members.filter((m) => m.lateMinutes > 0).length, pts, chosen }
     })
   } catch (err) {
     return <Failed props={props} name="absensi-today" title="Absensi · Tim hari ini" err={err} req={req} />
   }
-  const { scope, r, loc, today, lateCount } = data
+  const { scope, r, loc, today, lateCount, pts, chosen } = data
   if (!scope || !r) {
     return (
       <Frame props={props} name="absensi-denied">
@@ -289,7 +327,7 @@ export async function AbsensiToday(props: AdminViewServerProps) {
   }
   const c = r.counts
   const month = r.date.slice(0, 7)
-  const filtered = Boolean(idParam(sp, 'project') || idParam(sp, 'pusat'))
+  const filtered = Boolean(idParam(sp, 'project') || idParam(sp, 'pusat') || chosen)
   const col = (key: 'belum_absen' | 'hadir' | 'selesai', title: string, note: string) => {
     const list = r.members.filter((m) => m.status === key)
     return (
@@ -305,7 +343,7 @@ export async function AbsensiToday(props: AdminViewServerProps) {
         ) : (
           <ul>
             {list.map((m) => (
-              <MemberCard key={m.employee.id} m={m} tz={r.timezone} month={month} />
+              <MemberCard key={m.employee.id} m={m} tz={r.timezone} month={month} pt={pt} />
             ))}
           </ul>
         )}
@@ -322,11 +360,12 @@ export async function AbsensiToday(props: AdminViewServerProps) {
           Tanggal
           <input type="date" name="tanggal" defaultValue={r.date} max={today} />
         </label>
+        <PtSelect pt={pt} pts={pts} value={chosen} />
         <label>
           Project
           <select name="project" defaultValue={String(idParam(sp, 'project') ?? '')}>
             <option value="">Semua project</option>
-            {loc.projects.map((o) => (
+            {ptOptions(loc.projects, pt, chosen).map((o) => (
               <option key={o.id} value={o.id}>
                 {o.label}
               </option>
@@ -337,7 +376,7 @@ export async function AbsensiToday(props: AdminViewServerProps) {
           Pusat biaya
           <select name="pusat" defaultValue={String(idParam(sp, 'pusat') ?? '')}>
             <option value="">Semua pusat biaya</option>
-            {loc.costCenters.map((o) => (
+            {ptOptions(loc.costCenters, pt, chosen).map((o) => (
               <option key={o.id} value={o.id}>
                 {o.label}
               </option>
@@ -528,34 +567,42 @@ function Stamp({ loc, kind, d, tz }: { loc: LocationDay; kind: 'checkIn' | 'chec
 }
 
 type RekapData = {
+  pt: PtView
+  pts: number[]
+  chosen: number | undefined
   scope: AttScope | null
   today: string
   tz: string
   month: string
-  employees: Option[]
+  employees: Opt[]
   recap: MonthlyRecap | null
   history: CorrectionRow[]
   selfies: Map<number, boolean>
   canCorrect: boolean
   own: boolean
   grid: Awaited<ReturnType<typeof teamMonth>> | null
-  loc: { projects: Option[]; costCenters: Option[] }
+  loc: { projects: Opt[]; costCenters: Opt[] }
 }
 
 export async function AbsensiRekap(props: AdminViewServerProps) {
   const req = props.initPageResult.req
   const sp = (props.searchParams ?? {}) as SP
+  const pt = await ptView(req)
   let d: RekapData
   try {
     d = await withReqTransaction(req, async (): Promise<RekapData> => {
-      const scope = await attendanceScope(req)
+      const full = await attendanceScope(req)
+      const pts = scopePts(full, pt)
+      const chosen = ptParam(sp, pts)
+      // MC2: the PT filter narrows the scope per PT (never widens; foreign ids ignored)
+      const scope = full && chosen ? narrowAttToCompanies(full, [chosen]) : full
       const ctx = await attendanceContext(req)
       const month = PERIOD_RE.test(one(sp, 'bulan')) && one(sp, 'bulan') <= ctx.today.slice(0, 7) ? one(sp, 'bulan') : ctx.today.slice(0, 7)
       const from = firstDay(month)
       const to = lastDay(month)
       const empId = idParam(sp, 'karyawan')
       const ownEmp = relId((req.user as { employee?: unknown } | null)?.employee)
-      const base = { scope, today: ctx.today, tz: ctx.timeZone, month, history: [], selfies: new Map<number, boolean>(), canCorrect: false, own: false, grid: null, loc: { projects: [], costCenters: [] } }
+      const base = { pt, pts, chosen, scope, today: ctx.today, tz: ctx.timeZone, month, history: [], selfies: new Map<number, boolean>(), canCorrect: false, own: false, grid: null, loc: { projects: [], costCenters: [] } }
       if (!scope) {
         // Staff: own recap only (US-09).
         const recap = ownEmp !== undefined ? await myRecap(req, month) : null
@@ -564,10 +611,12 @@ export async function AbsensiRekap(props: AdminViewServerProps) {
       }
       const employees = await recapEmployees(req, scope, from, to)
       if (empId === undefined) {
-        const narrowed = narrow(scope, idParam(sp, 'project'), idParam(sp, 'pusat'))
+        // mc2-contract §0.1: narrowAttScope keeps each PT's own ids — a project id of another PT matches nothing
+        const narrowed = narrowAttScope(scope, idParam(sp, 'project'), idParam(sp, 'pusat'))
         return { ...base, employees, recap: null, grid: await teamMonth(req, narrowed, month), loc: await scopeLocations(req, scope) }
       }
       const recap = await employeeRecap(req, empId, month)
+      const emp = await employeeRef(req, empId)
       const ids = recap.days.flatMap((x) => x.locations.flatMap((l) => [l.checkIn?.id, l.checkOut?.id])).filter((x): x is number => typeof x === 'number')
       return {
         ...base,
@@ -575,7 +624,7 @@ export async function AbsensiRekap(props: AdminViewServerProps) {
         recap,
         history: await correctionHistory(req, empId, from, to),
         selfies: await selfieState(req, ids),
-        canCorrect: mayCorrect(req, scope, empId),
+        canCorrect: mayCorrect(req, scope, empId, emp?.companyId),
         own: ownEmp === empId,
       }
     })
@@ -599,11 +648,12 @@ export async function AbsensiRekap(props: AdminViewServerProps) {
       <SubNav active="rekap" scope={d.scope} />
       {d.scope ? (
         <form className="pk-filter" method="get" action="/admin/absensi/rekap" role="search" aria-label="Pilih karyawan dan bulan" data-pk-filter="absensi-rekap">
+          <PtSelect pt={d.pt} pts={d.pts} value={d.chosen} />
           <label>
             Karyawan
             <select name="karyawan" defaultValue={String(idParam(sp, 'karyawan') ?? '')}>
               <option value="">— Seluruh tim (grid) —</option>
-              {d.employees.map((o) => (
+              {ptOptions(d.employees, d.pt, d.chosen).map((o) => (
                 <option key={o.id} value={o.id}>
                   {o.label}
                 </option>
@@ -620,7 +670,7 @@ export async function AbsensiRekap(props: AdminViewServerProps) {
                 Project
                 <select name="project" defaultValue={String(idParam(sp, 'project') ?? '')}>
                   <option value="">Semua</option>
-                  {d.loc.projects.map((o) => (
+                  {ptOptions(d.loc.projects, d.pt, d.chosen).map((o) => (
                     <option key={o.id} value={o.id}>
                       {o.label}
                     </option>
@@ -631,7 +681,7 @@ export async function AbsensiRekap(props: AdminViewServerProps) {
                 Pusat biaya
                 <select name="pusat" defaultValue={String(idParam(sp, 'pusat') ?? '')}>
                   <option value="">Semua</option>
-                  {d.loc.costCenters.map((o) => (
+                  {ptOptions(d.loc.costCenters, d.pt, d.chosen).map((o) => (
                     <option key={o.id} value={o.id}>
                       {o.label}
                     </option>
@@ -650,21 +700,9 @@ export async function AbsensiRekap(props: AdminViewServerProps) {
   )
 }
 
-// TODO(mc2-contract §0.1, after merging feat/mc2-backend): replace by `narrowAttScope(scope, projectId,
-// costCenterId)` — this company-less team scope matches a project id of ANOTHER PT for office users.
-function narrow(scope: AttScope, projectId?: number, costCenterId?: number): AttScope {
-  if (!projectId && !costCenterId) return scope
-  const ok = (ids: number[], id?: number) => id !== undefined && (scope.kind === 'all' || ids.includes(id))
-  return {
-    kind: 'team',
-    projects: ok(scope.kind === 'team' ? scope.projects : [], projectId) ? [projectId!] : [],
-    costCenters: ok(scope.kind === 'team' ? scope.costCenters : [], costCenterId) ? [costCenterId!] : [],
-  }
-}
-
 function monthHref(sp: SP, month: string): string {
   const q = new URLSearchParams()
-  for (const k of ['karyawan', 'project', 'pusat']) if (one(sp, k)) q.set(k, one(sp, k))
+  for (const k of ['karyawan', 'project', 'pusat', 'pt']) if (one(sp, k)) q.set(k, one(sp, k))
   q.set('bulan', month)
   return `/admin/absensi/rekap?${q.toString()}`
 }
@@ -857,6 +895,7 @@ function TeamGrid({ d, grid, sp }: { d: RekapData; grid: NonNullable<RekapData['
   const q = new URLSearchParams()
   if (idParam(sp, 'project')) q.set('project', String(idParam(sp, 'project')))
   if (idParam(sp, 'pusat')) q.set('pusat', String(idParam(sp, 'pusat')))
+  if (d.chosen) q.set('pt', String(d.chosen))
   q.set('bulan', d.month)
   const rows = grid.map((e) => {
     const by = new Map(e.days.map((x) => [x.date, x]))
@@ -925,6 +964,7 @@ function TeamGrid({ d, grid, sp }: { d: RekapData; grid: NonNullable<RekapData['
                       <td className="nm">
                         <a href={`/admin/absensi/rekap?karyawan=${e.id}&bulan=${d.month}`}>{e.name}</a>
                         <small>{e.code}</small>
+                        {d.pt.multi ? <PtChip pt={d.pt.ref(e.companyId)} /> : null}
                       </td>
                       {cls.map((v, i) => {
                         const date = dates[i]!
@@ -962,7 +1002,10 @@ function TeamGrid({ d, grid, sp }: { d: RekapData; grid: NonNullable<RekapData['
                 <tbody>
                   {grid.map((e) => (
                     <tr key={e.id}>
-                      <td>{e.name}</td>
+                      <td>
+                        {e.name}
+                        {d.pt.multi ? ` · ${d.pt.ref(e.companyId)?.shortCode ?? ''}` : ''}
+                      </td>
                       <td className="n">{e.summary.workingDays}</td>
                       <td className="n">{e.summary.presentDays}</td>
                       <td className="n">{e.summary.absentDays}</td>

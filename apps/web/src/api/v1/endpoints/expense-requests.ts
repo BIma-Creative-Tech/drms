@@ -13,7 +13,7 @@ import { recordTransfer, voidTransfer } from '@/domain/expense/transfers'
 import { acknowledge, approve, cancel, complete, reject, submit, withdraw } from '@/domain/expense/workflow'
 import { receiptsComplete, requestLpjRevision, reverseSettlement, settle, submitLpj, verifyLpj } from '@/domain/expense/lpj'
 import { requestHistory } from '@/domain/history'
-import { approvalInbox } from '@/domain/expense/queues'
+import { approvalInbox, officeQueueWhere } from '@/domain/expense/queues'
 
 import { HttpError, json, problem, v1 } from '../http'
 import {
@@ -185,12 +185,13 @@ export const transferQueueEndpoint = v1({
   handler: async ({ req }) => {
     const res = await req.payload.find({
       collection: 'expense-requests',
-      where: {
+      // MC2: only PTs where the caller is Finance / Direktur (not the team requests of a PM PT)
+      where: officeQueueWhere(req, {
         or: [
           { and: [{ type: { equals: 'advance' } }, { status: { equals: 'approved' } }] },
           { and: [{ type: { equals: 'reimburse' } }, { status: { equals: 'receipts_verified' } }] },
         ],
-      },
+      }),
       sort: 'neededDate',
       limit: 500,
       depth: 0,

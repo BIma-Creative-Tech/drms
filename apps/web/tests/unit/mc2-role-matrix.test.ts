@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  batchBody,
+  batchErrors,
   canEditCompany,
   canUseMatrix,
   cellKey,
@@ -88,7 +90,7 @@ describe('drafts → REST operations', () => {
 
   it('update = PATCH with roles/employee/active; unchanged drafts produce nothing', () => {
     const d = new Map([[cellKey(5, 2), toggleRole({ ...stored.get(cellKey(5, 2))! }, 'pk-finance')]])
-    expect(pendingOps(d, stored)).toEqual([{ kind: 'update', key: '5:2', company: 2, id: 40, body: { roles: ['pk-staff', 'pk-finance'], employee: 11, active: true } }])
+    expect(pendingOps(d, stored)).toEqual([{ kind: 'update', key: '5:2', company: 2, user: 5, id: 40, body: { roles: ['pk-staff', 'pk-finance'], employee: 11, active: true } }])
     const back = new Map([[cellKey(5, 2), toggleRole(toggleRole({ ...stored.get(cellKey(5, 2))! }, 'pk-pm'), 'pk-pm')]])
     expect(pendingOps(back, stored)).toEqual([])
     const unlink = new Map([[cellKey(5, 2), setEmployee({ ...stored.get(cellKey(5, 2))! }, null)]])
@@ -103,6 +105,33 @@ describe('drafts → REST operations', () => {
     expect(isChanged(newCell(9, 3), undefined)).toBe(false)
     const withRole = new Map([[cellKey(9, 3), setEmployee(toggleRole(newCell(9, 3), 'pk-finance'), 31)]])
     expect(pendingOps(withRole, stored)).toEqual([{ kind: 'create', key: '9:3', company: 3, body: { user: 9, company: 3, roles: ['pk-finance'], employee: 31, active: true } }])
+  })
+
+  it('batch body (mc2-contract §8): one item per op, in op order, reason trimmed', () => {
+    const d = new Map([
+      [cellKey(5, 2), toggleRole({ ...stored.get(cellKey(5, 2))! }, 'pk-finance')],
+      [cellKey(9, 3), toggleRole(newCell(9, 3), 'pk-staff')],
+    ])
+    const ops = pendingOps(d, stored)
+    expect(batchBody(ops, '  mutasi CS1 ')).toEqual({
+      reason: 'mutasi CS1',
+      items: [
+        { user: 5, company: 2, roles: ['pk-staff', 'pk-finance'], employee: 11, active: true },
+        { user: 9, company: 3, roles: ['pk-staff'], employee: null, active: true },
+      ],
+    })
+  })
+
+  it('batch errors: `items.<i>` marks the i-th cell, other errors stay general', () => {
+    const d = new Map([
+      [cellKey(5, 2), toggleRole({ ...stored.get(cellKey(5, 2))! }, 'pk-finance')],
+      [cellKey(9, 3), toggleRole(newCell(9, 3), 'pk-staff')],
+    ])
+    const ops = pendingOps(d, stored)
+    const r = batchErrors({ detail: 'Baris 2: Anda bukan Admin PT ini.', errors: [{ path: 'items.1', message: 'Anda bukan Admin PT ini.' }, { path: 'reason', message: 'Wajib.' }, { path: 'items.7', message: 'x' }] }, ops)
+    expect([...r.cells]).toEqual([['9:3', 'Anda bukan Admin PT ini.']])
+    expect(r.general).toEqual(['reason: Wajib.', 'items.7: x'])
+    expect(batchErrors(null, ops)).toEqual({ cells: new Map(), general: [] })
   })
 
   it('reason: at least 3 characters', () => {

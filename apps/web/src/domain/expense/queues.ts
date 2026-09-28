@@ -1,6 +1,6 @@
 import type { PayloadRequest, Where } from 'payload'
 
-import { relId } from '@/access/roles'
+import { companiesWithRole, relId, type Role } from '@/access/roles'
 import { companyRefs, type CompanyRef } from '@/domain/companies'
 
 import { actorContext, ids, projectCommitted, settings, type RequestDoc } from './common'
@@ -30,6 +30,20 @@ type Populated = Omit<RequestDoc, 'project' | 'costCenter' | 'requesters'> & {
 export type QueueFilter = { companyIds?: readonly number[] | null }
 
 const narrow = (where: Where, f?: QueueFilter): Where => (f?.companyIds?.length ? { and: [where, { company: { in: [...f.companyIds] } }] } : where)
+
+/** Roles of the Finance work queues (transfer queue, LPJ verification). */
+export const OFFICE_QUEUE_ROLES: readonly Role[] = ['pk-finance', 'pk-owner']
+
+/**
+ * Finance queues list only the selected PTs where the caller is Finance / Direktur (mc2-contract §3):
+ * collection read access alone would add the TEAM requests of a PT where the caller is only PM (with
+ * the unmasked bank snapshot of the queue row). System callers (no user) keep the plain filter.
+ */
+export function officeQueueWhere(req: PayloadRequest, where: Where, f?: QueueFilter): Where {
+  if (!req.user) return narrow(where, f)
+  const pts = companiesWithRole(req, OFFICE_QUEUE_ROLES)
+  return narrow({ and: [where, pts.length ? { company: { in: pts } } : { id: { equals: -1 } }] }, f)
+}
 
 async function findVisible(req: PayloadRequest, where: Where, sort: string, limit = 200): Promise<Populated[]> {
   try {
@@ -120,7 +134,7 @@ export async function approvalInbox(req: PayloadRequest, f?: QueueFilter) {
 
 /** US-19: transfer queue by needed date. */
 export async function transferQueue(req: PayloadRequest, f?: QueueFilter) {
-  const docs = await findVisible(req, narrow(TRANSFER_QUEUE_WHERE, f), 'neededDate', 500)
+  const docs = await findVisible(req, officeQueueWhere(req, TRANSFER_QUEUE_WHERE, f), 'neededDate', 500)
   const refs = await refsOf(req, docs)
   const items = []
   for (const d of docs) items.push({ ...base(d, refs), bank: d.bankSnapshot ?? null, flags: await flagCounts(req, d.id) })
@@ -132,7 +146,7 @@ export async function transferQueue(req: PayloadRequest, f?: QueueFilter) {
 export async function transferQueueCount(req: PayloadRequest, f?: QueueFilter): Promise<number> {
   const r = await req.payload.count({
     collection: 'expense-requests',
-    where: narrow(TRANSFER_QUEUE_WHERE, f),
+    where: officeQueueWhere(req, TRANSFER_QUEUE_WHERE, f),
     user: req.user,
     overrideAccess: false,
     req,
@@ -141,13 +155,13 @@ export async function transferQueueCount(req: PayloadRequest, f?: QueueFilter): 
 }
 
 export async function lpjQueueCount(req: PayloadRequest, f?: QueueFilter): Promise<number> {
-  const r = await req.payload.count({ collection: 'expense-requests', where: narrow({ status: { in: ['lpj_submitted', 'lpj_verified'] } }, f), user: req.user, overrideAccess: false, req })
+  const r = await req.payload.count({ collection: 'expense-requests', where: officeQueueWhere(req, { status: { in: ['lpj_submitted', 'lpj_verified'] } }, f), user: req.user, overrideAccess: false, req })
   return r.totalDocs
 }
 
 /** US-21 LPJ verification list (Uang Muka `lpj_submitted` / `lpj_verified`), consolidated with PT refs. */
 export async function lpjQueue(req: PayloadRequest, f?: QueueFilter) {
-  const docs = await findVisible(req, narrow({ and: [{ type: { equals: 'advance' } }, { status: { in: ['lpj_submitted', 'lpj_verified'] } }] }, f), 'updatedAt', 500)
+  const docs = await findVisible(req, officeQueueWhere(req, { and: [{ type: { equals: 'advance' } }, { status: { in: ['lpj_submitted', 'lpj_verified'] } }] }, f), 'updatedAt', 500)
   const refs = await refsOf(req, docs)
   return docs.map((d) => ({ ...base(d, refs), transferredTotal: (d as { transferredTotal?: number | null }).transferredTotal ?? 0 }))
 }
