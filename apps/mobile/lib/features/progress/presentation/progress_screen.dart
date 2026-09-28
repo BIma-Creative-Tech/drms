@@ -8,6 +8,7 @@ import '../../../l10n/gen/app_localizations.dart';
 import '../../../shared/widgets/async_body.dart';
 import '../../auth/application/auth_controller.dart';
 import '../../masters/domain/master_item.dart';
+import '../../companies/presentation/company_chip.dart';
 import '../application/progress_providers.dart';
 import '../domain/progress.dart';
 import 'widgets/progress_widgets.dart';
@@ -164,6 +165,7 @@ class _LocalCard extends ConsumerWidget {
             children: [
               Row(
                 children: [
+                  CompanyChipLead(companyId: d.companyId, always: true),
                   Expanded(
                     child: Text(
                       d.projectLabel.isEmpty ? '#${d.projectId}' : d.projectLabel,
@@ -226,9 +228,16 @@ class _ReportCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      [r.docNo ?? '', formatDateOnly(r.reportDate)].where((e) => e.isNotEmpty).join(' · '),
-                      style: theme.textTheme.labelMedium,
+                    Row(
+                      children: [
+                        CompanyChipLead(companyId: r.companyId),
+                        Expanded(
+                          child: Text(
+                            [r.docNo ?? '', formatDateOnly(r.reportDate)].where((e) => e.isNotEmpty).join(' · '),
+                            style: theme.textTheme.labelMedium,
+                          ),
+                        ),
+                      ],
                     ),
                     Text(r.projectLabel, style: theme.textTheme.titleSmall),
                     Text('${r.stageName ?? '-'} · ${fmtPct(r.pctBefore)} → ${fmtPct(r.pctAfter)}'),

@@ -28,6 +28,13 @@ final progressQueueEnabledProvider = Provider<bool>(
   (ref) => ref.watch(appConfigProvider).value?.syncProgressReports ?? false,
 );
 
+/// MC3: the queue flag of the report's PT (`companies[].settings.syncProgressReportsEnabled`); a PT that is
+/// unknown (server before MC3, legacy report) falls back to `/app/config`.
+final progressQueueEnabledForProvider = Provider.family<bool, int?>((ref, companyId) {
+  final c = ref.watch(accountProfileProvider)?.company(companyId);
+  return c?.settings.syncProgressReportsEnabled ?? ref.watch(progressQueueEnabledProvider);
+});
+
 /// Reports written on this phone that the server has not applied yet.
 final openProgressDraftsProvider = StreamProvider<List<ProgressDraft>>((ref) {
   final sub = ref.watch(currentSubProvider);
@@ -50,11 +57,15 @@ final projectProgressProvider = FutureProvider.autoDispose<ProjectProgressList>(
 );
 
 /// Projects the user may report on: the masters are access-filtered by the server (PM team projects,
-/// Direktur all); archived / finished projects are hidden.
+/// Direktur all); archived / finished projects are hidden. MC3: only projects of the selected PTs in
+/// which the user may create reports (capability per PT); the report takes the PT of its project.
 final progressProjectsProvider = FutureProvider<List<MasterItem>>((ref) async {
   final sub = ref.watch(currentSubProvider);
   if (sub == null) return const [];
-  final masters = await ref.watch(mastersRepositoryProvider).cached(sub);
+  ref.watch(mastersRevisionProvider);
+  final profile = ref.watch(currentProfileProvider);
+  final pts = profile == null || profile.companies.isEmpty ? null : profile.progressCompanies.map((c) => c.id).toSet();
+  final masters = await ref.watch(mastersRepositoryProvider).cached(sub, companyIds: pts);
   return [
     for (final p in masters[MasterTypes.projects] ?? const <MasterItem>[])
       if (p.extra['status'] != 'arsip' && p.extra['status'] != 'selesai') p,

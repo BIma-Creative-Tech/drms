@@ -9,8 +9,11 @@ class ProfileApi {
   Future<UserProfile> me() async => userProfileFromJson(await meRaw());
 
   /// Raw `/me` JSON (cached in the encrypted DB for offline start).
-  Future<Map<String, dynamic>> meRaw() =>
-      client.run((d) => d.get<dynamic>('/me'), (data) => data as Map<String, dynamic>);
+  Future<Map<String, dynamic>> meRaw() => client.run(
+    // MC3: all memberships (`companies[]`); the selection is applied on the phone (UserProfile.scopedTo).
+    (d) => d.get<dynamic>('/me', options: ApiClient.allCompanies()),
+    (data) => data as Map<String, dynamic>,
+  );
 
   /// `POST /api/v1/devices/register` (ADR 0003 §5). `deviceId` must equal `X-Device-Id`.
   Future<void> registerDevice({

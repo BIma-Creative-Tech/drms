@@ -29,6 +29,11 @@ final outboxCountsProvider = StreamProvider<OutboxCounts>((ref) {
   return ref.watch(outboxRepositoryProvider).watchCounts(sub);
 });
 
+/// Membership PT ids of the account as one comparable value ('' = none known).
+final _membershipKeyProvider = Provider<String>(
+  (ref) => (ref.watch(accountProfileProvider)?.companies.map((c) => c.id).toList() ?? const <int>[]).join(','),
+);
+
 class SyncCoordinator extends Notifier<SyncStatus> {
   StreamSubscription<void>? _online;
   StreamSubscription<void>? _background;
@@ -48,22 +53,32 @@ class SyncCoordinator extends Notifier<SyncStatus> {
         unawaited(
           scheduler.schedulePeriodic().then<void>((_) {}, onError: (Object e) => Log.w('bg-sync: schedule failed', e)),
         );
-        // Best effort: a 401/5xx here must not become an unhandled async error.
-        unawaited(
-          ref
-              .read(mastersRepositoryProvider)
-              .refresh(next)
-              .then<void>((_) {}, onError: (Object e) => Log.w('masters: refresh failed', e)),
-        );
+        _refreshMasters(next);
         requestSync();
       }
     }, fireImmediately: true);
+    // MC3: a membership added / removed on the server → masters of the new PT set (caches per PT).
+    ref.listen<String>(_membershipKeyProvider, (prev, next) {
+      final sub = ref.read(currentSubProvider);
+      if (prev != null && prev != next && sub != null) _refreshMasters(sub);
+    });
     ref.onDispose(() {
       _online?.cancel();
       _background?.cancel();
       _debounce?.cancel();
     });
     return const SyncStatus();
+  }
+
+  /// Best effort: a 401/5xx here must not become an unhandled async error. Every membership PT is cached
+  /// (not only the selected ones): drafts of any PT must work offline.
+  void _refreshMasters(String sub) {
+    final ids = ref.read(accountProfileProvider)?.companies.map((c) => c.id).toList();
+    unawaited(
+      ref.read(mastersRepositoryProvider).refresh(sub, companyIds: ids).then<void>((ok) {
+        if (ok && ref.mounted) ref.read(mastersRevisionProvider.notifier).bump();
+      }, onError: (Object e) => Log.w('masters: refresh failed', e)),
+    );
   }
 
   void _scheduleBackground() {

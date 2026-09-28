@@ -123,6 +123,7 @@ class QueuedItem {
     this.offline = true,
     this.baseRev,
     this.dependsOn = const [],
+    this.companyId,
   });
 
   final String clientUuid;
@@ -135,9 +136,14 @@ class QueuedItem {
   final int? baseRev;
   final List<String> dependsOn;
 
+  /// MC3: PT of this item (`company_id`); null only for a legacy item of a server / account without
+  /// PT context (the server then uses the only PT).
+  final int? companyId;
+
   Map<String, dynamic> toJson() => {
     'client_uuid': clientUuid,
     'type': type,
+    'company_id': ?companyId,
     'schema_version': 1,
     'offline': offline,
     'device_time': deviceTime,
@@ -171,6 +177,15 @@ class ClockInfo {
     'last_server_elapsed_ms': lastServerElapsedMs,
   };
 }
+
+/// MC3 codes: item `company_id` missing for a multi-PT account (batch 409 / local hold) and the per-item
+/// final rejections (never retried).
+const companyRequiredCode = 'COMPANY_REQUIRED';
+const companyMismatchCode = 'COMPANY_MISMATCH';
+const companyNotAllowedItemCode = 'COMPANY_NOT_ALLOWED';
+
+/// Shown on an item that waits for the user's PT choice (queued before the multi-PT update).
+const companyRequiredMessage = 'Pilih PT untuk data ini dulu (Antrean kirim → Pilih PT). Data belum dikirim.';
 
 /// Contract limits (ADR 0010 decision 14): ≤ 50 items and ≤ 256 KB JSON per batch.
 const maxBatchItems = 50;
@@ -227,6 +242,13 @@ const maxSyncAttempts = 20;
 String rejectionMessage(List<SyncError> errors, {String? type}) {
   if (errors.isEmpty) return 'Ditolak server.';
   final e = errors.first;
+  // MC3: final PT rejections get the same clear text for every item type (the server text is technical).
+  switch (e.code) {
+    case companyMismatchCode:
+      return 'PT data ini tidak sama dengan PT project/pusat biaya/karyawannya. Data tidak dikirim; buat ulang di PT yang benar.';
+    case companyNotAllowedItemCode:
+      return 'Anda sudah tidak terdaftar di PT data ini. Data tidak dikirim; hubungi Admin bila ini keliru.';
+  }
   if (type != null && (SyncItemType.isAttendance(type) || SyncItemType.isProgress(type))) {
     final m = e.message;
     if (m != null && m.isNotEmpty && e.code != 'MOCK_LOCATION') return m;

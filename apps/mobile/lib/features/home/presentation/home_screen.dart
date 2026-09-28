@@ -14,6 +14,9 @@ import '../../app_config/presentation/release_notes.dart';
 import '../../approvals/application/inbox_providers.dart';
 import '../../auth/application/auth_controller.dart';
 import '../../auth/domain/user_profile.dart';
+import '../../attendance/application/attendance_service.dart';
+import '../../companies/presentation/company_switcher.dart';
+import '../../companies/presentation/unassigned_screen.dart';
 import '../../dashboard/presentation/kpi_home.dart';
 import '../../expense/domain/request_status.dart';
 import '../../notifications/application/notifications_providers.dart';
@@ -36,7 +39,7 @@ class HomeScreen extends ConsumerWidget {
     final appConfig = ref.watch(appConfigProvider).value;
     final latest = appConfig?.latestAppVersion;
     final kind = profile.homeKind;
-    final attendanceOn = ref.watch(appConfigProvider).value?.syncAttendance ?? false;
+    final attendanceOn = ref.watch(attendanceEnabledAnyProvider);
     final openProgress = profile.canReadProgress ? (ref.watch(openProgressDraftsProvider).value?.length ?? 0) : 0;
     final expenseInbox = profile.hasApprovalInbox ? ref.watch(inboxProvider).value?.items.length : null;
     final addendumInbox = profile.hasApprovalInbox ? (ref.watch(addendumInboxProvider).value?.length ?? 0) : 0;
@@ -121,6 +124,8 @@ class HomeScreen extends ConsumerWidget {
       appBar: AppBar(
         title: Text(t.appTitle),
         actions: [
+          // MC3: PT switcher (static code with one PT, nothing before MC3).
+          const CompanySwitcherButton(),
           const NotificationBell(),
           if (!ref.watch(appEnvProvider).isProd)
             Padding(
@@ -143,7 +148,17 @@ class HomeScreen extends ConsumerWidget {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(16, 20, 16, 24),
           children: [
-            _Greeting(name: profile.displayName, roles: profile.roleLabels),
+            _Greeting(
+              name: profile.displayName,
+              // MC3 (wireframe §1b): "Direktur · DRMS   Finance · CS1" when the scope spans several PTs.
+              roles: profile.showCompanyChips
+                  ? [
+                      for (final c in profile.scopedCompanies)
+                        if (c.roles.isNotEmpty) '${c.roleLabels} · ${c.code}',
+                    ].join('   ')
+                  : profile.roleLabels,
+            ),
+            UnassignedBanner(onOpen: () => context.push('/companies/unassigned')),
             if (ref.watch(integrityReportProvider).value?.risky ?? false)
               Card(
                 key: const Key('integrity-warning'),

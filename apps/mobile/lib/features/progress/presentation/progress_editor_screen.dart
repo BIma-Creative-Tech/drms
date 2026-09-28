@@ -99,6 +99,9 @@ class _ProgressEditorScreenState extends ConsumerState<ProgressEditorScreen> {
   final _reason = TextEditingController();
   final _pctText = TextEditingController();
   int? _projectId;
+
+  /// MC3: PT of the report = PT of the chosen project (the project list shows the PT when several).
+  int? _companyId;
   String _projectLabel = '';
   int? _stageId;
   String _stageLabel = '';
@@ -120,6 +123,7 @@ class _ProgressEditorScreenState extends ConsumerState<ProgressEditorScreen> {
     _uuid = d?.clientUuid ?? ref.read(progressServiceProvider).newDraft(projectId: 0, stageId: 0).clientUuid;
     if (d != null) {
       _projectId = d.projectId;
+      _companyId = d.companyId;
       _projectLabel = d.projectLabel;
       _stageId = d.stageId;
       _stageLabel = d.stageLabel;
@@ -146,8 +150,15 @@ class _ProgressEditorScreenState extends ConsumerState<ProgressEditorScreen> {
 
   static String _fmtInput(double v) => fmtPct(v).replaceAll('%', '');
 
+  /// PT of the chosen project (a project passed by the route is looked up in the cached masters).
+  int? get _pt =>
+      _companyId ??
+      ref.read(progressProjectsProvider).value?.where((p) => p.id == _projectId).firstOrNull?.companyId ??
+      _base?.companyId;
+
   ProgressDraft _current() => ProgressDraft(
     clientUuid: _uuid,
+    companyId: _pt,
     projectId: _projectId ?? 0,
     projectLabel: _projectLabel,
     stageId: _stageId ?? 0,
@@ -217,7 +228,7 @@ class _ProgressEditorScreenState extends ConsumerState<ProgressEditorScreen> {
     setState(() => _errors = errors);
     if (errors.isNotEmpty) return;
     final online = ref.read(connectivityProvider);
-    final queue = ref.read(progressQueueEnabledProvider);
+    final queue = ref.read(progressQueueEnabledForProvider(d.companyId));
     setState(() => _busy = true);
     try {
       final outcome = await ref.read(progressServiceProvider).save(sub, d, online: online, queueEnabled: queue);
@@ -271,7 +282,8 @@ class _ProgressEditorScreenState extends ConsumerState<ProgressEditorScreen> {
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
     final projects = ref.watch(progressProjectsProvider);
-    final queue = ref.watch(progressQueueEnabledProvider);
+    final profile = ref.watch(currentProfileProvider);
+    final queue = ref.watch(progressQueueEnabledForProvider(_pt));
     final online = ref.watch(connectivityProvider);
     final stagesAsync = _projectId == null ? null : ref.watch(stageSetProvider(_projectId!));
     final stages = stagesAsync?.value;
@@ -297,9 +309,7 @@ class _ProgressEditorScreenState extends ConsumerState<ProgressEditorScreen> {
         children: [
           if (!queue) _Info(text: online ? t.progressOnlineOnlyNote : t.progressOnlineOnlyOffline, warn: !online),
           if (_isEdit && _base?.editableUntil != null)
-            _Info(
-              text: t.progressEditWindow(reportTime(_base!.editableUntil, ref.watch(currentProfileProvider)?.timezone)),
-            ),
+            _Info(text: t.progressEditWindow(reportTime(_base!.editableUntil, profile?.forCompany(_pt).timezone))),
           // 1. Project
           AsyncBody<List<MasterItem>>(
             value: projects,
@@ -317,13 +327,19 @@ class _ProgressEditorScreenState extends ConsumerState<ProgressEditorScreen> {
                 for (final p in list)
                   DropdownMenuItem(
                     value: p.id,
-                    child: Text(p.label, overflow: TextOverflow.ellipsis),
+                    child: Text(
+                      (profile?.showCompanyChips ?? false) && p.companyId != null
+                          ? '${profile!.companyCode(p.companyId)} · ${p.label}'
+                          : p.label,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
               ],
               onChanged: lockedPlace || _busy
                   ? null
                   : (v) => setState(() {
                       _projectId = v;
+                      _companyId = list.firstWhere((p) => p.id == v).companyId;
                       _projectLabel = list.firstWhere((p) => p.id == v).label;
                       _stageId = null;
                       _stageLabel = '';

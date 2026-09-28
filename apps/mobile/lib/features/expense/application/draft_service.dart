@@ -38,8 +38,8 @@ class DraftService {
 
   static const _uuid = Uuid();
 
-  DraftRequest newDraft(RequestType type, {List<int> requesterIds = const []}) =>
-      DraftRequest(clientUuid: _uuid.v7(), type: type, requesterIds: requesterIds);
+  DraftRequest newDraft(RequestType type, {List<int> requesterIds = const [], int? companyId}) =>
+      DraftRequest(clientUuid: _uuid.v7(), type: type, requesterIds: requesterIds, companyId: companyId);
 
   DraftLine newLine(int no) => DraftLine(clientUuid: _uuid.v7(), no: no);
 
@@ -68,6 +68,7 @@ class DraftService {
         bootId: await clock.bootId(),
         offline: !online,
         baseRev: toSave.serverRev,
+        companyId: toSave.companyId,
       );
     });
     return toSave;
@@ -88,6 +89,7 @@ class DraftService {
           elapsedMs: await clock.elapsedMs(),
           bootId: await clock.bootId(),
           offline: !online,
+          companyId: d.companyId,
         );
       }
       await drafts.softDelete(sub, d.clientUuid);
@@ -132,7 +134,11 @@ class DraftService {
           detail: 'Perubahan draft masih menunggu sinkron. Tekan "Kirim sekarang" lalu coba Ajukan lagi.',
         );
       } else {
-        detail = await api.create(draftToCreateBody(draft), idempotencyKey: draft.clientUuid);
+        detail = await api.create(
+          draftToCreateBody(draft),
+          idempotencyKey: draft.clientUuid,
+          companyId: draft.companyId,
+        );
         await drafts.setSyncState(draft.clientUuid, DraftSyncState.synced, serverId: detail.id);
         await outbox.supersede(sub, draft.clientUuid);
       }

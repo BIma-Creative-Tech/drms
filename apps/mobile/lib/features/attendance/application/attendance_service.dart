@@ -12,6 +12,7 @@ import '../../../core/location/location_service.dart';
 import '../../../core/media/compress_plan.dart';
 import '../../../core/media/photo_compressor.dart';
 import '../../../core/time/device_clock.dart';
+import '../../app_config/application/app_config_providers.dart';
 import '../../auth/application/auth_controller.dart';
 import '../../expense/data/draft_repository.dart';
 import '../../expense/presentation/camera_capture_screen.dart';
@@ -49,6 +50,8 @@ class AttendanceService {
       elapsedMs: await clock.elapsedMs(),
       bootId: await clock.bootId(),
       offline: !online,
+      // MC3: the PT of the chosen project / cost center (never the switcher selection).
+      companyId: site.companyId,
     );
   }
 
@@ -86,6 +89,7 @@ class AttendanceService {
       elapsedMs: await clock.elapsedMs(),
       bootId: await clock.bootId(),
       offline: !online,
+      companyId: site.companyId,
     );
   }
 }
@@ -133,7 +137,11 @@ final onBehalfCaptureProvider = Provider<LensCapture>(
 final attendanceSitesProvider = FutureProvider<List<ProjectSite>>((ref) async {
   final sub = ref.watch(currentSubProvider);
   if (sub == null) return const [];
-  final masters = await ref.watch(mastersRepositoryProvider).cached(sub);
+  ref.watch(mastersRevisionProvider);
+  // MC3: locations of the selected PTs (each carries its PT; the check-in is queued in that PT).
+  final profile = ref.watch(currentProfileProvider);
+  final scope = profile == null || profile.companies.isEmpty ? null : profile.scopedCompanies.map((c) => c.id);
+  final masters = await ref.watch(mastersRepositoryProvider).cached(sub, companyIds: scope);
   return [
     for (final m in masters[MasterTypes.projects] ?? const <MasterItem>[])
       if (m.extra['status'] != 'arsip') ProjectSite.fromMaster(m),
@@ -155,15 +163,21 @@ class OnBehalfCandidate {
 final onBehalfCandidatesProvider = FutureProvider<List<OnBehalfCandidate>>((ref) async {
   final sub = ref.watch(currentSubProvider);
   if (sub == null) return const [];
-  final own = ref.watch(currentProfileProvider)?.employee?.id;
-  final masters = await ref.watch(mastersRepositoryProvider).cached(sub);
-  final sites = await ref.watch(attendanceSitesProvider.future);
+  final profile = ref.watch(currentProfileProvider);
+  // MC3: the PM's own employee of EVERY PT is excluded; only locations of PTs where the user is PM.
+  final own = profile?.employeeIds ?? const <int>{};
+  final scope = profile == null || profile.companies.isEmpty ? null : profile.scopedCompanies.map((c) => c.id);
+  final masters = await ref.watch(mastersRepositoryProvider).cached(sub, companyIds: scope);
+  final sites = [
+    for (final s in await ref.watch(attendanceSitesProvider.future))
+      if (profile == null || profile.companies.isEmpty || profile.forCompany(s.companyId).canAttendOnBehalf) s,
+  ];
   final names = {for (final e in masters[MasterTypes.employees] ?? const <MasterItem>[]) e.id: e.label};
   final today = toYmd(DateTime.now());
   final byEmployee = <int, List<ProjectSite>>{};
   for (final a in masters[MasterTypes.teamAssignments] ?? const <MasterItem>[]) {
     final emp = (a.extra['employee'] as num?)?.toInt();
-    if (emp == null || emp == own) continue;
+    if (emp == null || own.contains(emp)) continue;
     String? day(Object? v) => v is String && v.length >= 10 ? v.substring(0, 10) : null;
     final start = day(a.extra['startDate']);
     final end = day(a.extra['endDate']);
@@ -187,6 +201,20 @@ final onBehalfCandidatesProvider = FutureProvider<List<OnBehalfCandidate>>((ref)
       OnBehalfCandidate(employeeId: e.key, name: names[e.key] ?? '#${e.key}', sites: e.value),
   ]..sort((a, b) => a.name.compareTo(b.name));
   return out;
+});
+
+/// MC3: own check-in / on-behalf allowed in PT [companyId] (`companies[].settings.syncAttendanceEnabled`);
+/// an unknown PT (server before MC3) falls back to `/app/config` `features.syncAttendance`.
+final attendanceEnabledForProvider = Provider.family<bool, int?>((ref, companyId) {
+  final c = ref.watch(accountProfileProvider)?.company(companyId);
+  return c?.settings.syncAttendanceEnabled ?? (ref.watch(appConfigProvider).value?.syncAttendance ?? false);
+});
+
+/// Check-in allowed in at least one PT of the switcher scope (home tile, team tab).
+final attendanceEnabledAnyProvider = Provider<bool>((ref) {
+  final p = ref.watch(currentProfileProvider);
+  if (p == null || p.companies.isEmpty) return ref.watch(appConfigProvider).value?.syncAttendance ?? false;
+  return p.scopedCompanies.any((c) => c.settings.syncAttendanceEnabled);
 });
 
 /// Latest attendance items of this user in the outbox (queued / sent / rejected).

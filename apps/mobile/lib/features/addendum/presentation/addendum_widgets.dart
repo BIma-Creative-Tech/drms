@@ -6,6 +6,7 @@ import '../../../core/format/rupiah.dart';
 import '../../../l10n/gen/app_localizations.dart';
 import '../../progress/domain/progress.dart' show fmtPct;
 import '../domain/addendum.dart';
+import '../../companies/presentation/company_chip.dart';
 
 /// Status chip: icon + label (never colour alone).
 class AddendumStatusChip extends StatelessWidget {
@@ -78,6 +79,7 @@ class AddendumCard extends StatelessWidget {
             children: [
               Row(
                 children: [
+                  CompanyChipLead(companyId: a.companyId),
                   Expanded(
                     child: Text(
                       [a.docNo ?? 'Draft', if (a.stepLabel != null && a.status.isOpen) a.stepLabel!].join(' · '),

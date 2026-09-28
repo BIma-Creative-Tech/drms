@@ -85,6 +85,21 @@ sync item. Works offline; the server decides and stamps the time (ADR 0010 decis
   follow `allowedActions`. All writes online with an Idempotency-Key (server rate limit 30/min); the server uses the
   profile signature.
 
+## Multi-company (MC3-2, ADR 0016 §8)
+
+- `GET /me` `companies[]` = memberships with roles, employee, capabilities and settings **per PT**
+  (`UserProfile.companies`). The PT switcher (home app bar; Profil → "PT aktif") picks "Semua PT" or any subset; it is
+  stored per user in the encrypted DB (`company_selection:<sub>`) and sent as `X-Company-Ids` on list calls (none =
+  all PTs). Menus / tiles use the union of the roles in the selected PTs; buttons on one document use the roles IN
+  its PT (`UserProfile.forCompany`); document calls by id, media uploads, `/me` and `sync/batch` never send the header.
+  403 `COMPANY_NOT_ALLOWED` → selection back to "Semua PT" + `/me` reload.
+- A new draft / progress report / check-in belongs to ONE PT: asked first when the scope has several request PTs;
+  a report / check-in takes the PT of its project / location. Pickers read the masters cache of that PT
+  (`masters:<sub>:<pt>`, ETag / 304). PT chips (code) on lists when more than one PT is shown.
+- drift schema **v3**: nullable `company_id` on drafts, progress reports and outbox. Old rows: one PT → assigned
+  automatically; several PTs → kept, not sent, banner "… data offline belum punya PT" → choose per item.
+  Sync sends `company_id` of each row (one batch per PT); `COMPANY_MISMATCH` / `COMPANY_NOT_ALLOWED` are final.
+
 ## APK secret scan
 
 `tool/apk_secret_scan.sh <apk>…` (python3 + docker) unpacks the APK, dumps strings from dex / `libapp.so`, fails on

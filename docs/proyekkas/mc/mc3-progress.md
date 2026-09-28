@@ -170,3 +170,85 @@ held with a clear message until the APK is updated).
   top-level `budgetWarnPct` of `GET /approvals/inbox` (items carry their own PT's `warnPct`), K-09 thresholds of
   `GET /projects/progress`, `GET /app/config` flags (public, no user). Settings values only, never rows.
 - `GET /masters` `hasMore` is per type across the requested PTs (≤ 500); request per PT for large masters.
+
+## APK (MC3-2) — branch `feat/mc3-mobile`
+
+Worktree `/opt/src/proyekkas-wt/mc3-mobile`, based on `6f6f8cf` (develop `bdcbeca` + MC3-1 API merged). Only
+`apps/mobile/**` + docs; the server was not changed (gaps below). The 0.2.1 release-notes / update banner of home
+(`home_screen.dart`, `app_config`) is untouched and still tested (`release_notes_test.dart`).
+
+### How to run (host has no Flutter)
+
+Container `pk-mc3m-flutter` (debian:bookworm-slim, worktree mounted at the same path, remove by exact name, never
+`docker … prune`); Flutter 3.47.5 from the official tarball, sha256 of `mobile.yml`, cached in the agent scratchpad.
+The CI `verify` job replicated: `flutter pub get --enforce-lockfile`; `dart run build_runner build
+--delete-conflicting-outputs` + `flutter gen-l10n` + no diff; `dart format --set-exit-if-changed` over the
+`git ls-files` list of `mobile.yml` (list built on the host: the worktree's git dir is outside the container);
+`flutter analyze --no-fatal-infos`; `flutter test --coverage` (the workflow has no coverage threshold). No APK built
+locally (CI builds them).
+
+### Status
+
+| WP | Status | Where |
+|---|---|---|
+| profile `companies[]`, scope union / per-PT roles | done | `auth/domain/user_profile.dart` (`CompanyMembership`, `CompanySettings`, `scopedTo`, `forCompany`), `expense_mappers.dart` `userProfileFromJson` |
+| PT switcher + `X-Company-Ids` + `COMPANY_NOT_ALLOWED` | done | `companies/application/company_selection.dart`, `companies/presentation/company_switcher.dart`, `core/network/api_client.dart` (`companyHeader`, `forCompany`, `allCompanies`, `onCompanyNotAllowed`), `app/providers.dart` |
+| drift v3 + old-data migration | done | `core/db/app_database.dart` (schema 3), `companies/data/company_backfill.dart`, `companies/presentation/unassigned_screen.dart` |
+| sync `company_id` per item | done | `sync/application/sync_engine.dart` (`_withCompanies`, per-PT batches, 409 `COMPANY_REQUIRED`), `sync/domain/sync_models.dart`, `sync/data/{outbox_repository,sync_api}.dart` |
+| masters per PT + ETag | done | `masters/data/masters_repository.dart`, `expense_providers.dart` (`mastersForCompanyProvider`) |
+| create flows in one PT | done | `draft_editor_screen.dart` (PT step), `progress_editor_screen.dart` (PT of the project, queue flag per PT), `attendance_service.dart` (PT of the location, flags per PT, on-behalf per PM PT) |
+| chips / `?company=` / LPJ queue / own recap per PT | done | `companies/presentation/company_chip.dart`; requests, drafts, inbox (+ `LpjQueueSection`, `GET /lpj-queue`), notifications, addenda, progress, team, queue; `attendance_api.dart` `me(company:)` + recap PT chips |
+| tests | done | `test/unit/mc3_multi_company_test.dart` (20), `test/widget/mc3_company_ui_test.dart` (7), `progress_sync_test` v1→v3 |
+
+### Behaviour
+
+- **Scope vs. action:** `currentProfileProvider` = `/me` narrowed to the selection (union of roles/capabilities →
+  tiles, tabs, home kind); `accountProfileProvider` = all memberships. Buttons on one document: server
+  `allowedActions` (already per PT) plus `forCompany(doc PT)` where the APK decides itself (edit draft, edit progress
+  report, team correction / on-behalf).
+- **Header rules:** list calls send the selection (none = "Semua PT"); document calls by id, media uploads, `/me` and
+  `sync/batch` send none; online create of a draft / progress report sends the record's PT; masters send one PT per
+  request. The API client is rebuilt when the selection changes, so every server list reloads.
+- **Sync:** `company_id` = the row's PT, batches grouped per PT (queue order kept inside a PT), idempotency by
+  `client_uuid` unchanged. Per-item `COMPANY_MISMATCH` / `COMPANY_NOT_ALLOWED` → `rejected` (never retried) with
+  "PT data ini tidak sama …" / "Anda sudah tidak terdaftar di PT data ini …". Batch 409 `COMPANY_REQUIRED` → the
+  PT-less items are held (flag `sync:company_required:<sub>`), the rest go in the next run.
+- **Flags per PT:** check-in, on-behalf and the progress queue use `companies[].settings.sync*Enabled` of the record's
+  PT (fallback `/app/config` when the server sends no PTs).
+
+### Migration of existing offline data (drift v2 → v3)
+
+1. `onUpgrade` adds nullable `company_id` to `local_drafts`, `outbox` and (when it exists already)
+   `local_progress_reports`; nothing else changes (payloads, `op_uuid`s, statuses, photos).
+2. After `/me` (cached or online): account with **one PT** → every NULL row of that user gets it
+   (`CompanyBackfill.assignSoleCompany`); the sync engine does the same from the cached `/me` right before sending
+   (background isolate too).
+3. **Several PTs** → nothing is guessed: the rows stay NULL, the engine holds their items (`pending`, no attempt,
+   note "Pilih PT untuk data ini dulu …"), home + queue show "N data offline belum punya PT" → "Pilih PT untuk data
+   offline" (one choice per draft / report / check-in; the whole draft or report incl. its queued items gets the PT).
+   Opening such a draft asks for its PT first. After the choice the items are sent with that `company_id`.
+4. Server before MC3 (no `companies[]`): items are sent without `company_id` exactly as in 0.2.x.
+
+### Result
+
+- Baseline (6f6f8cf): 375 tests. Now **402 tests passed** (`flutter test --coverage`), `flutter analyze` no issues,
+  `dart format` 0 changed (173 files), build_runner + gen-l10n no drift.
+
+### API gaps (not changed here — for MC4 / the API owner)
+
+1. `/dashboard/owner|finance|pm` have no per-PT breakdown (and embedded lists no `company`): the wireframe's "rows per
+   PT under the combined number" needs either `companies[]` in the answer or one call per PT. The APK shows the
+   combined numbers of the selection.
+2. `ExpenseRequestCreate` / `ProgressReportCreate` / `BudgetAddendumCreate` have no `company` body field: the APK
+   pins `X-Company-Ids` = the record's PT on online creates (the server derives the PT from the project / cost
+   center, else the sole selected PT) — works, but an explicit field would be clearer.
+3. `GET /app/config` flags are still company #1 (known, residual above); the APK uses `companies[].settings`.
+
+### Needs a real-phone E2E test
+
+- Upgrade mobile-v0.2.x → this build with a queued draft + progress report + check-in: (a) account with one PT →
+  sent under that PT; (b) account with two PTs → held, banner, choose PT, sent.
+- Switcher persistence across app restart / logout-login of two users on one phone; membership removed on the web
+  while a PT is selected (403 → back to "Semua PT").
+- Mixed-PT queue sent by WorkManager with the app closed; offline masters per PT (airplane mode, new draft in PT B).
+- Check-in at a location of a PT whose "Absensi dari APK" flag differs from the other PT.

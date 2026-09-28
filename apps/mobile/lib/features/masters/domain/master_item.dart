@@ -7,6 +7,13 @@ class MasterItem {
   final Map<String, dynamic> extra;
 
   bool get active => extra['active'] != false;
+
+  /// MC3: PT of the row (`company`); null for shared masters (`uoms`, `banks`, `holidays`) and from a
+  /// server before MC3.
+  int? get companyId => (extra['company'] as num?)?.toInt();
+
+  /// MC3: shared by every PT (`shared: true`).
+  bool get shared => extra['shared'] == true;
 }
 
 abstract final class MasterTypes {

@@ -31,6 +31,7 @@ class OutboxRepository {
     required String bootId,
     required bool offline,
     int? baseRev,
+    int? companyId,
     DateTime? now,
   }) => db.transaction(() async {
     final ts = now ?? DateTime.now();
@@ -53,7 +54,10 @@ class OutboxRepository {
           bootId: Value(bootId),
           offline: Value(offline),
           baseRev: Value(baseRev),
+          companyId: Value(companyId),
           nextAttemptAt: const Value(null),
+          lastErrorCode: const Value(null),
+          lastErrorMessage: const Value(null),
         ),
       );
       return pending.opUuid;
@@ -66,6 +70,7 @@ class OutboxRepository {
           OutboxCompanion.insert(
             opUuid: opUuid,
             userSub: sub,
+            companyId: Value(companyId),
             type: SyncItemType.expenseDraftUpsert,
             targetUuid: draftUuid,
             payloadJson: jsonEncode(payload(opUuid != draftUuid)),
@@ -94,6 +99,7 @@ class OutboxRepository {
     required int elapsedMs,
     required String bootId,
     required bool offline,
+    int? companyId,
   }) async {
     final opUuid = const Uuid().v7();
     await db
@@ -102,6 +108,7 @@ class OutboxRepository {
           OutboxCompanion.insert(
             opUuid: opUuid,
             userSub: sub,
+            companyId: Value(companyId),
             type: SyncItemType.expenseDraftDelete,
             targetUuid: draftUuid,
             payloadJson: jsonEncode(payload),
@@ -129,6 +136,7 @@ class OutboxRepository {
     required String bootId,
     required bool offline,
     int? baseRev,
+    int? companyId,
   }) => db.transaction(() async {
     final pending =
         await (db.select(db.outbox)..where(
@@ -149,6 +157,7 @@ class OutboxRepository {
           bootId: Value(bootId),
           offline: Value(offline),
           baseRev: Value(baseRev),
+          companyId: Value(companyId),
           status: const Value('pending'),
           attempts: const Value(0),
           nextAttemptAt: const Value(null),
@@ -166,6 +175,7 @@ class OutboxRepository {
           OutboxCompanion.insert(
             opUuid: opUuid,
             userSub: sub,
+            companyId: Value(companyId),
             type: SyncItemType.progressReportUpsert,
             targetUuid: reportUuid,
             payloadJson: jsonEncode(payload),
@@ -193,6 +203,7 @@ class OutboxRepository {
     required int elapsedMs,
     required String bootId,
     required bool offline,
+    int? companyId,
   }) async {
     final opUuid = const Uuid().v7();
     await db
@@ -201,6 +212,7 @@ class OutboxRepository {
           OutboxCompanion.insert(
             opUuid: opUuid,
             userSub: sub,
+            companyId: Value(companyId),
             type: type,
             targetUuid: opUuid,
             payloadJson: jsonEncode(payload),
@@ -269,6 +281,17 @@ class OutboxRepository {
         ),
       );
 
+  /// MC3: an item without PT of a user with several PTs is not sent (never guessed) until the user picks
+  /// the PT; not counted as an attempt. The note tells the queue screen why it waits.
+  Future<void> holdForCompany(String opUuid, String message) =>
+      (db.update(db.outbox)..where((t) => t.opUuid.equals(opUuid))).write(
+        OutboxCompanion(lastErrorCode: const Value(companyRequiredCode), lastErrorMessage: Value(message)),
+      );
+
+  /// MC3: the PT of an item is now known (single-PT user): stored on the item before it is sent.
+  Future<void> setCompany(String opUuid, int companyId) =>
+      (db.update(db.outbox)..where((t) => t.opUuid.equals(opUuid))).write(OutboxCompanion(companyId: Value(companyId)));
+
   /// Manual "Coba lagi" for items shown as "Gagal dikirim".
   Future<void> retryFailed(String sub) =>
       (db.update(db.outbox)..where((t) => t.userSub.equals(sub) & t.status.equals('failed'))).write(
@@ -316,5 +339,6 @@ class OutboxRepository {
     bootId: r.bootId,
     offline: r.offline,
     baseRev: r.baseRev,
+    companyId: r.companyId,
   );
 }

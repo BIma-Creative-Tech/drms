@@ -6,6 +6,8 @@ import '../../../core/format/dates.dart';
 import '../../../l10n/gen/app_localizations.dart';
 import '../../../shared/widgets/async_body.dart';
 import '../../dashboard/presentation/charts.dart' show periodLong;
+import '../../auth/application/auth_controller.dart';
+import '../../auth/domain/user_profile.dart';
 import '../application/attendance_providers.dart';
 import '../domain/attendance.dart';
 import '../domain/attendance_recap.dart';
@@ -74,6 +76,7 @@ class _RecapViewState extends ConsumerState<RecapView> {
               ),
             ],
           ),
+          if (widget.employeeId == null) const _OwnRecapCompanyPicker(),
           const SizedBox(height: 12),
           AsyncBody<AttendanceRecap>(
             value: value,
@@ -369,6 +372,40 @@ class DayDetailSheet extends StatelessWidget {
               ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// MC3: own recap of which PT (the user has one employee per PT) — shown only with employees in several
+/// selected PTs.
+class _OwnRecapCompanyPicker extends ConsumerWidget {
+  const _OwnRecapCompanyPicker();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final profile = ref.watch(currentProfileProvider);
+    final pts = [
+      for (final c in profile?.scopedCompanies ?? const <CompanyMembership>[])
+        if (c.employee != null) c,
+    ];
+    if (pts.length < 2) return const SizedBox.shrink();
+    final chosen = ref.watch(ownRecapCompanyProvider) ?? pts.first.id;
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 4,
+        children: [
+          for (final c in pts)
+            ChoiceChip(
+              key: Key('recap-pt-${c.id}'),
+              label: Text(c.code),
+              tooltip: c.name,
+              selected: c.id == chosen,
+              onSelected: (_) => ref.read(ownRecapCompanyProvider.notifier).set(c.id),
+            ),
+        ],
       ),
     );
   }

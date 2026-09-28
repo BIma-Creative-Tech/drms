@@ -1747,4 +1747,82 @@ class AppLocalizationsId extends AppLocalizations {
 
   @override
   String get addendumDone => 'Tersimpan.';
+
+  @override
+  String get companyAll => 'Semua PT';
+
+  @override
+  String get companyAllMine => 'Semua PT saya';
+
+  @override
+  String get companySwitcherTitle => 'Pilih PT';
+
+  @override
+  String get companySwitcherHint =>
+      'Daftar, persetujuan dan ringkasan mengikuti PT yang dipilih. Draft & antrean offline tetap tersimpan di PT masing-masing.';
+
+  @override
+  String get companySwitcherApply => 'Terapkan';
+
+  @override
+  String get companySwitcherNone => 'Pilih minimal satu PT.';
+
+  @override
+  String get companySwitcherTooltip => 'Ganti PT';
+
+  @override
+  String companySwitcherMore(String code, int more) {
+    return '$code+$more';
+  }
+
+  @override
+  String companySwitcherApplied(String label) {
+    return 'Tampilan: $label';
+  }
+
+  @override
+  String get profileCompanies => 'PT aktif';
+
+  @override
+  String profileCompanyRoles(String code, String roles) {
+    return '$code — $roles';
+  }
+
+  @override
+  String get companyPickTitle => 'Untuk PT mana?';
+
+  @override
+  String get companyPickHint => 'Project, pusat biaya, kategori dan rekening diambil dari data PT ini.';
+
+  @override
+  String get companyPickNone => 'Anda tidak bisa membuat pengajuan di PT yang dipilih. Ganti PT di beranda.';
+
+  @override
+  String get draftCompany => 'PT';
+
+  @override
+  String companyNeedsChoiceBanner(int count) {
+    return '$count data offline belum punya PT — pilih PT agar bisa dikirim';
+  }
+
+  @override
+  String get companyNeedsChoiceTitle => 'Pilih PT untuk data offline';
+
+  @override
+  String get companyNeedsChoiceHint =>
+      'Data ini dibuat sebelum aplikasi mendukung beberapa PT. Pilih PT yang benar untuk setiap data; data tidak dikirim sebelum PT dipilih.';
+
+  @override
+  String get companyNeedsChoiceAction => 'Pilih PT';
+
+  @override
+  String get companyAssigned => 'PT disimpan. Data akan dikirim.';
+
+  @override
+  String get lpjQueueTitle => 'LPJ menunggu verifikasi';
+
+  @override
+  String lpjQueueCount(int count) {
+    return '$count LPJ';
+  }
 }

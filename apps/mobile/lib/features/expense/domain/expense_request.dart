@@ -26,6 +26,9 @@ abstract class ExpenseSummary with _$ExpenseSummary {
     String? neededDate,
     String? updatedAt,
     @Default(0) int openWarningFlags,
+
+    /// MC3: PT of the request (`companyId`); null from a server before MC3.
+    int? companyId,
   }) = _ExpenseSummary;
 }
 
@@ -248,6 +251,9 @@ abstract class ExpenseDetail with _$ExpenseDetail {
     String? periodFrom,
     String? periodTo,
     int? bankAccountId,
+
+    /// MC3: PT of the request (`companyId`).
+    int? companyId,
   }) = _ExpenseDetail;
 }
 
@@ -274,6 +280,9 @@ abstract class InboxItem with _$InboxItem {
     @Default(false) bool budgetOverWarn,
     @Default(0) int warningFlags,
     @Default(0) int infoFlags,
+
+    /// MC3: PT of the request (`company.id`) — chip + role check of that PT.
+    int? companyId,
   }) = _InboxItem;
 }
 

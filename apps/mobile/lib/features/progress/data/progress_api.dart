@@ -10,10 +10,12 @@ class ProgressApi {
   ProgressApi(this.client);
   final ApiClient client;
 
-  Options _idem(String key) => Options(headers: {'Idempotency-Key': key});
+  /// Writes / reads of ONE report or project: role checked IN its PT by the server, independent of the PT
+  /// switcher (MC3) — no `X-Company-Ids`.
+  Options _idem(String key) => ApiClient.allCompanies(Options(headers: {'Idempotency-Key': key}));
 
   Future<ProjectStageSet> stages(int projectId) => client.run(
-    (d) => d.get<dynamic>('/projects/$projectId/stages'),
+    (d) => d.get<dynamic>('/projects/$projectId/stages', options: ApiClient.allCompanies()),
     (data) => ProjectStageSet.fromJson(data as Map<String, dynamic>),
   );
 
@@ -26,15 +28,21 @@ class ProgressApi {
   );
 
   Future<ProgressReport> detail(int id) => client.run(
-    (d) => d.get<dynamic>('/progress-reports/$id'),
+    (d) => d.get<dynamic>('/progress-reports/$id', options: ApiClient.allCompanies()),
     (data) => ProgressReport.fromJson(data as Map<String, dynamic>),
   );
 
-  /// Online create (flag `syncProgressReports` off). Replay with the same clientUuid → 200 existing.
-  Future<ProgressReport> create(Map<String, dynamic> body, {required String idempotencyKey}) => client.run(
-    (d) => d.post<dynamic>('/progress-reports', data: body, options: _idem(idempotencyKey)),
-    (data) => ProgressReport.fromJson(data as Map<String, dynamic>),
-  );
+  /// Online create (flag `syncProgressReports` off). Replay with the same clientUuid → 200 existing. MC3:
+  /// the report's PT as `X-Company-Ids` (the server derives it from the project and checks the role there).
+  Future<ProgressReport> create(Map<String, dynamic> body, {required String idempotencyKey, int? companyId}) =>
+      client.run(
+        (d) => d.post<dynamic>(
+          '/progress-reports',
+          data: body,
+          options: ApiClient.forCompany(companyId, Options(headers: {'Idempotency-Key': idempotencyKey})),
+        ),
+        (data) => ProgressReport.fromJson(data as Map<String, dynamic>),
+      );
 
   Future<ProgressReport> update(int id, Map<String, dynamic> body, {required String idempotencyKey}) => client.run(
     (d) => d.patch<dynamic>('/progress-reports/$id', data: body, options: _idem(idempotencyKey)),
@@ -51,7 +59,7 @@ class ProgressApi {
     (d) => d.get<dynamic>(
       '/media/progress-photos/$id/file',
       queryParameters: {if (thumb) 'variant': 'thumb'},
-      options: Options(responseType: ResponseType.bytes),
+      options: ApiClient.allCompanies(Options(responseType: ResponseType.bytes)),
     ),
     (data) => Uint8List.fromList(data as List<int>),
   );

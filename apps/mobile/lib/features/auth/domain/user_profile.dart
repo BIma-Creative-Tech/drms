@@ -66,7 +66,57 @@ abstract class ImageTargets with _$ImageTargets {
   const factory ImageTargets({@Default(2000) int receiptsMaxPx, @Default(80) int jpegQuality}) = _ImageTargets;
 }
 
+/// MC3: per-PT operational settings of `GET /api/v1/me` `companies[].settings` (openapi `MeCompany`).
+@freezed
+abstract class CompanySettings with _$CompanySettings {
+  const factory CompanySettings({
+    @Default(100) int defaultGeofenceRadiusM,
+    @Default(0) int receiptRoundingTolerance,
+    @Default(0) int receiptMaxAgeDays,
+    @Default(85) double budgetWarnPct,
+    @Default(true) bool syncExpenseDraftsEnabled,
+    @Default(false) bool syncAttendanceEnabled,
+    @Default(false) bool syncProgressReportsEnabled,
+  }) = _CompanySettings;
+}
+
+/// MC3 (ADR 0016 §8): one active membership of the user = one PT with its own roles, employee,
+/// capabilities and settings (`GET /api/v1/me` `companies[]`).
+@freezed
+abstract class CompanyMembership with _$CompanyMembership {
+  const CompanyMembership._();
+  const factory CompanyMembership({
+    required int id,
+
+    /// PT short code (e.g. `DRMS`), shown on chips.
+    required String code,
+    required String name,
+    @Default('Asia/Makassar') String timezone,
+    @Default(<Role>{}) Set<Role> roles,
+    Employee? employee,
+    @Default(Capabilities()) Capabilities capabilities,
+    @Default(CompanySettings()) CompanySettings settings,
+  }) = _CompanyMembership;
+
+  bool has(Role r) => roles.contains(r);
+
+  /// Same rule as [UserProfile.canCreateRequests], applied to the roles IN this PT.
+  bool get canCreateRequests => has(Role.staff) || has(Role.pm) || has(Role.admin);
+
+  /// "DRMS — Direktur, Finance" (switcher rows).
+  String get roleLabels => [
+    for (final r in Role.values)
+      if (has(r)) r.label,
+  ].join(', ');
+}
+
 /// `GET /api/v1/me` (openapi `Me`).
+///
+/// MC3: [companies] holds every active membership. The top-level [roles] / [capabilities] /
+/// [employee] / [timezone] describe the current **scope** (the PTs chosen in the PT switcher, see
+/// [scopedTo]): roles and capabilities are the union over the scope (navigation), employee and time
+/// zone come from the first PT of the scope that has an employee. Every action on a document checks
+/// the roles IN the document's PT ([forCompany]); the server re-checks anyway.
 @freezed
 abstract class UserProfile with _$UserProfile {
   const UserProfile._();
@@ -81,7 +131,77 @@ abstract class UserProfile with _$UserProfile {
     String? minAppVersion,
     @Default(ImageTargets()) ImageTargets imageTargets,
     String? serverTime,
+
+    /// MC3: every active membership (ascending id). Empty = server before MC3 (single-PT behaviour).
+    @Default(<CompanyMembership>[]) List<CompanyMembership> companies,
+
+    /// MC3: ids of the PTs the top-level fields were computed for ([scopedTo]); empty = not scoped.
+    @Default(<int>[]) List<int> scopeCompanyIds,
   }) = _UserProfile;
+
+  /// More than one active PT: the PT switcher and PT chips are shown, new data asks for its PT.
+  bool get isMultiCompany => companies.length > 1;
+
+  /// The PT with [id] among the memberships (null for an unknown / removed PT).
+  CompanyMembership? company(int? id) => id == null ? null : companies.where((c) => c.id == id).firstOrNull;
+
+  /// Short code of PT [id] for chips (`#id` when the PT is not (any more) a membership).
+  String companyCode(int? id) => company(id)?.code ?? (id == null ? '' : '#$id');
+
+  /// Memberships inside the current scope (all memberships when not scoped).
+  List<CompanyMembership> get scopedCompanies =>
+      scopeCompanyIds.isEmpty ? companies : companies.where((c) => scopeCompanyIds.contains(c.id)).toList();
+
+  /// Lists show a PT chip when the scope spans several PTs (wireframe §1b).
+  bool get showCompanyChips => scopedCompanies.length > 1;
+
+  /// Profile narrowed to the PTs [ids] (null or no overlap with the memberships = all PTs): roles and
+  /// capabilities = union over those PTs, employee / time zone of the first PT with an employee. A profile
+  /// without [companies] (server before MC3) is returned unchanged.
+  UserProfile scopedTo(Iterable<int>? ids) {
+    if (companies.isEmpty) return this;
+    final wanted = ids?.toSet();
+    var scope = wanted == null ? companies : companies.where((c) => wanted.contains(c.id)).toList();
+    if (scope.isEmpty) scope = companies;
+    final roles = {for (final c in scope) ...c.roles};
+    final primary = scope.where((c) => c.employee != null).firstOrNull ?? scope.first;
+    return copyWith(
+      roles: roles,
+      capabilities: Capabilities(
+        approvalInbox: scope.any((c) => c.capabilities.approvalInbox),
+        teamMonitor: scope.any((c) => c.capabilities.teamMonitor),
+        progressReportCreate: scope.any((c) => c.capabilities.progressReportCreate),
+      ),
+      employee: primary.employee,
+      timezone: primary.timezone,
+      scopeCompanyIds: [for (final c in scope) c.id],
+    );
+  }
+
+  /// Profile with the roles IN PT [companyId] only (action buttons of a document of that PT). An
+  /// unknown PT (not a membership) yields no roles; null (legacy data / server before MC3) = unchanged.
+  UserProfile forCompany(int? companyId) {
+    if (companies.isEmpty || companyId == null) return this;
+    final c = company(companyId);
+    if (c == null) {
+      return copyWith(roles: const {}, capabilities: const Capabilities(), employee: null, scopeCompanyIds: const []);
+    }
+    return scopedTo([companyId]);
+  }
+
+  /// PTs of the scope in which the user may create expense requests (Staff / PM / Admin there).
+  List<CompanyMembership> get requestCompanies => scopedCompanies.where((c) => c.canCreateRequests).toList();
+
+  /// PTs of the scope in which the user may create progress reports (capability per PT).
+  List<CompanyMembership> get progressCompanies =>
+      scopedCompanies.where((c) => c.capabilities.progressReportCreate).toList();
+
+  /// Every employee id of the user (one per PT, ADR 0016 D1) — "own" checks across PTs.
+  Set<int> get employeeIds => {
+    if (employee != null) employee!.id,
+    for (final c in companies)
+      if (c.employee != null) c.employee!.id,
+  };
 
   bool has(Role r) => roles.contains(r);
 

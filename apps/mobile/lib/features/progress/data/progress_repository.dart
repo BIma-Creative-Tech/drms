@@ -39,6 +39,7 @@ class ProgressRepository {
 
   ProgressDraft _toDraft(LocalProgressReport r) => ProgressDraft(
     clientUuid: r.clientUuid,
+    companyId: r.companyId,
     projectId: r.projectId,
     projectLabel: r.projectLabel,
     stageId: r.stageId,
@@ -79,6 +80,7 @@ class ProgressRepository {
               LocalProgressReportsCompanion.insert(
                 clientUuid: d.clientUuid,
                 userSub: sub,
+                companyId: Value(d.companyId ?? existing?.companyId),
                 projectId: d.projectId,
                 projectLabel: Value(d.projectLabel),
                 stageId: d.stageId,

@@ -1097,5 +1097,68 @@
   "addendumReject": "Tolak",
   "addendumCancel": "Batalkan addendum",
   "addendumConfirmBody": "Keputusan dicatat dengan nama dan tanda tangan profil Anda. Setelah persetujuan terakhir, RAB project bertambah.",
-  "addendumDone": "Tersimpan."
+  "addendumDone": "Tersimpan.",
+  "companyAll": "Semua PT",
+  "companyAllMine": "Semua PT saya",
+  "companySwitcherTitle": "Pilih PT",
+  "companySwitcherHint": "Daftar, persetujuan dan ringkasan mengikuti PT yang dipilih. Draft & antrean offline tetap tersimpan di PT masing-masing.",
+  "companySwitcherApply": "Terapkan",
+  "companySwitcherNone": "Pilih minimal satu PT.",
+  "companySwitcherTooltip": "Ganti PT",
+  "companySwitcherMore": "{code}+{more}",
+  "@companySwitcherMore": {
+    "placeholders": {
+      "code": {
+        "type": "String"
+      },
+      "more": {
+        "type": "int"
+      }
+    }
+  },
+  "companySwitcherApplied": "Tampilan: {label}",
+  "@companySwitcherApplied": {
+    "placeholders": {
+      "label": {
+        "type": "String"
+      }
+    }
+  },
+  "profileCompanies": "PT aktif",
+  "profileCompanyRoles": "{code} — {roles}",
+  "@profileCompanyRoles": {
+    "placeholders": {
+      "code": {
+        "type": "String"
+      },
+      "roles": {
+        "type": "String"
+      }
+    }
+  },
+  "companyPickTitle": "Untuk PT mana?",
+  "companyPickHint": "Project, pusat biaya, kategori dan rekening diambil dari data PT ini.",
+  "companyPickNone": "Anda tidak bisa membuat pengajuan di PT yang dipilih. Ganti PT di beranda.",
+  "draftCompany": "PT",
+  "companyNeedsChoiceBanner": "{count} data offline belum punya PT — pilih PT agar bisa dikirim",
+  "@companyNeedsChoiceBanner": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "companyNeedsChoiceTitle": "Pilih PT untuk data offline",
+  "companyNeedsChoiceHint": "Data ini dibuat sebelum aplikasi mendukung beberapa PT. Pilih PT yang benar untuk setiap data; data tidak dikirim sebelum PT dipilih.",
+  "companyNeedsChoiceAction": "Pilih PT",
+  "companyAssigned": "PT disimpan. Data akan dikirim.",
+  "lpjQueueTitle": "LPJ menunggu verifikasi",
+  "lpjQueueCount": "{count} LPJ",
+  "@lpjQueueCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  }
 }

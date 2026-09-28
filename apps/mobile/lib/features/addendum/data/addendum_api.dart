@@ -8,7 +8,8 @@ class AddendumApi {
   AddendumApi(this.client);
   final ApiClient client;
 
-  Options _idem(String key) => Options(headers: {'Idempotency-Key': key});
+  /// One addendum (MC3 document class): the role IN its PT counts, not the PT switcher.
+  Options _idem(String key) => ApiClient.allCompanies(Options(headers: {'Idempotency-Key': key}));
   Addendum _one(dynamic data) => Addendum.fromJson(data as Map<String, dynamic>);
 
   Future<AddendumPage> list({int? projectId, bool mine = false, String? cursor}) => client.run(
@@ -24,7 +25,8 @@ class AddendumApi {
     (data) => AddendumPage.fromJson(data as Map<String, dynamic>).items,
   );
 
-  Future<Addendum> detail(int id) => client.run((d) => d.get<dynamic>('/budget-addenda/$id'), _one);
+  Future<Addendum> detail(int id) =>
+      client.run((d) => d.get<dynamic>('/budget-addenda/$id', options: ApiClient.allCompanies()), _one);
 
   Future<Addendum> create({
     required int projectId,

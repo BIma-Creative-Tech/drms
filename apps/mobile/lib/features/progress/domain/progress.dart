@@ -135,6 +135,7 @@ class ProgressReport {
     this.rev = 1,
     this.clientUuid,
     this.createdAt,
+    this.companyId,
   });
 
   final int id;
@@ -167,6 +168,9 @@ class ProgressReport {
   final String? clientUuid;
   final String? createdAt;
 
+  /// MC3: PT of the report (`companyId`); null from a server before MC3.
+  final int? companyId;
+
   String get projectLabel => [projectCode, projectName].whereType<String>().where((e) => e.isNotEmpty).join(' — ');
 
   factory ProgressReport.fromJson(Json j) {
@@ -175,6 +179,7 @@ class ProgressReport {
     final r = _map(j['reporter']);
     return ProgressReport(
       id: _int(j['id']),
+      companyId: _intN(j['companyId']) ?? _intN(_map(j['company'])['id']),
       docNo: _strN(j['docNo']),
       projectId: _int(p['id']),
       projectCode: _strN(p['code']),
@@ -382,9 +387,13 @@ class ProgressDraft {
     this.conflictCopy,
     this.offline = false,
     this.updatedAt,
+    this.companyId,
   });
 
   final String clientUuid;
+
+  /// MC3: PT of the report (= PT of its project); null = written before the multi-PT update.
+  final int? companyId;
   final int projectId;
   final String projectLabel;
   final int stageId;
@@ -425,8 +434,10 @@ class ProgressDraft {
     List<String>? photoUuids,
     String? reason,
     ProgressSyncState? syncState,
+    int? companyId,
   }) => ProgressDraft(
     clientUuid: clientUuid,
+    companyId: companyId ?? this.companyId,
     projectId: projectId ?? this.projectId,
     projectLabel: projectLabel ?? this.projectLabel,
     stageId: stageId ?? this.stageId,

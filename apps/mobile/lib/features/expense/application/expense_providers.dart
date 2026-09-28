@@ -12,10 +12,23 @@ final openDraftsProvider = StreamProvider<List<DraftRequest>>((ref) {
   return ref.watch(draftRepositoryProvider).watchOpenDrafts(sub);
 });
 
+/// Cached masters of the PT switcher scope (MC3: union of the selected PTs + shared masters).
 final mastersProvider = FutureProvider<Map<String, List<MasterItem>>>((ref) async {
   final sub = ref.watch(currentSubProvider);
   if (sub == null) return const {};
-  return ref.watch(mastersRepositoryProvider).cached(sub);
+  ref.watch(mastersRevisionProvider);
+  final profile = ref.watch(currentProfileProvider);
+  final scope = profile == null || profile.companies.isEmpty ? null : profile.scopedCompanies.map((c) => c.id);
+  return ref.watch(mastersRepositoryProvider).cached(sub, companyIds: scope);
+});
+
+/// Cached masters of ONE PT (pickers of a draft / report of that PT). Null = no PT known (server before
+/// MC3 / legacy draft of a single-PT account): the whole cache, as before.
+final mastersForCompanyProvider = FutureProvider.family<Map<String, List<MasterItem>>, int?>((ref, companyId) async {
+  final sub = ref.watch(currentSubProvider);
+  if (sub == null) return const {};
+  ref.watch(mastersRevisionProvider);
+  return ref.watch(mastersRepositoryProvider).cached(sub, companyId: companyId);
 });
 
 final requestDetailProvider = FutureProvider.autoDispose.family<ExpenseDetail, int>(
@@ -38,6 +51,7 @@ class RequestList extends AsyncNotifier<RequestListState> {
 
   @override
   Future<RequestListState> build() async {
+    // The API client follows the PT switcher (X-Company-Ids): a new selection re-loads the list.
     final page = await ref.watch(expenseApiProvider).list(scope: scope);
     return RequestListState(items: page.items, nextCursor: page.nextCursor);
   }

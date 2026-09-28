@@ -3,6 +3,7 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../features/companies/presentation/unassigned_screen.dart';
 import '../features/addendum/presentation/addendum_screens.dart';
 import '../features/app_config/application/app_config_providers.dart';
 import '../features/app_config/domain/app_config.dart';
@@ -102,6 +103,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         ],
       ),
       GoRoute(path: '/notifications', builder: (_, _) => const NotificationsScreen()),
+      GoRoute(path: '/companies/unassigned', builder: (_, _) => const UnassignedScreen()),
       GoRoute(
         path: '/attendance',
         builder: (_, s) => AttendanceScreen(
