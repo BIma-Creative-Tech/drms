@@ -206,7 +206,7 @@ export async function settle(req: PayloadRequest, id: number, input: SettleInput
   if (!isBusinessDate(date)) fail(400, 'Tanggal harus YYYY-MM-DD.')
   if (date > todayDate) fail(400, 'Tanggal tidak boleh di masa depan.')
   await assertAccount(req, input.cashAccountId)
-  const lock = await currentLockDate(req)
+  const lock = await currentLockDate(req, relId((raw as { company?: unknown }).company))
   if (lock && date <= lock) fail(409, `Periode ${date.slice(0, 7)} sudah ditutup (tutup buku s/d ${lock}).`)
   const lpjNo = s.docNo ?? ''
   const label = `${lpjNo} — ${raw.docNo ?? ''} ${raw.title}`.slice(0, 900)
@@ -321,7 +321,7 @@ export async function reverseSettlement(req: PayloadRequest, id: number, reason:
     fail(409, 'LPJ ini selesai tanpa selisih; tidak ada kas masuk/transfer penyelesaian yang dapat dibatalkan.')
   }
   const raw = await loadRaw(req, id)
-  const lock = await currentLockDate(req)
+  const lock = await currentLockDate(req, relId((raw as { company?: unknown }).company))
   const closed = (date: string) =>
     fail(409, `Periode ${date.slice(0, 7)} sudah ditutup (tutup buku s/d ${lock}). Minta Direktur membuka kembali periode sebelum membatalkan penyelesaian.`)
   let transferredTotal = raw.transferredTotal ?? 0

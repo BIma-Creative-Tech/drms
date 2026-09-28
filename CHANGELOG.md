@@ -26,6 +26,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   the caller's roles and employee IN THE DOCUMENT's PT; `X-Company-Ids` naming a foreign PT → 403
   `COMPANY_NOT_ALLOWED` (audited `access_denied`). Codes/names/document numbers unique per PT. Migration
   `20260927_234849_mc1_company_columns` (backfill → company #1, NOT NULL, per-PT unique indexes).
+- **MC1-4 — DB guards per PT** (migration `20260928_000100_mc1_security`): `company_id` immutable, cross-PT
+  references rejected by triggers (SQLSTATE 23514 `cross-company reference`: every per-PT FK pair, requester/line
+  child rows, PM / cost-center manager / named approvers need an active membership in the row's PT),
+  `pk_cash_lock_date(company_id)` in the transfer / cash-entry / opening-balance guards (closing PT A never locks
+  PT B), `closePeriod` / `reopenPeriod` per PT, `reminder_runs` keyed `(company_id, run_date)`.
 - **Seed:** `SEED_DATA_FILE` accepts the old single-company shape (→ company #1 DRMS) and a new
   `{ uoms, banks, companies: [...] }` shape; every PT gets the default sequences and approval rules.
 

@@ -45,7 +45,7 @@ export async function recordTransfer(req: PayloadRequest, id: number, input: Tra
   if (!input.bankRef.trim()) fail(400, 'Nomor referensi bank wajib diisi.')
   if (!doc.bankSnapshot?.accountNo) fail(409, 'Rekening tujuan belum tersimpan pada pengajuan.')
   await assertAccount(req, input.cashAccountId)
-  const lock = await currentLockDate(req)
+  const lock = await currentLockDate(req, relId((doc as { company?: unknown }).company))
   if (lock && transferDate <= lock) fail(409, `Periode ${transferDate.slice(0, 7)} sudah ditutup (tutup buku s/d ${lock}).`)
 
   const { docNo } = await allocateDocNo(req, 'transfer', { date: parseBusinessDate(transferDate) })

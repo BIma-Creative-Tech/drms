@@ -519,10 +519,12 @@ async function runCutover(x: Exec, rep: MasterReport, issues: Issue[], reason: s
   const req = x.req
   const tx = await getRequestTx(req)
   const sheet = SHEET_BY_KEY.pengaturan.name
+  // MC2-5: per-PT cut-over (`kode_pt`); MC1 = the only / first active PT.
+  const pt = await companySettings(req)
   // (1) PB sequence: startAt (Q-17) — used when the counter row does not exist yet
   const { startAt: _default, ...dflt } = DEFAULT_SEQUENCES.find((d) => d.docType === 'expense_request')!
   const seq = await atRow(sheet, undefined, () =>
-    x.upsert('document-sequences', { docType: { equals: 'expense_request' } }, { startAt: s.pbStartAt, active: true }, { createOnly: { ...dflt, timezone: 'Asia/Makassar' } }),
+    x.upsert('document-sequences', { and: [{ company: { equals: pt.companyId } }, { docType: { equals: 'expense_request' } }] }, { startAt: s.pbStartAt, active: true }, { createOnly: { ...dflt, company: pt.companyId, timezone: 'Asia/Makassar' } }),
   )
   tally(rep, seq.action)
   const cfg = (await x.findOne('document-sequences', { id: { equals: seq.id } }))!
@@ -539,8 +541,7 @@ async function runCutover(x: Exec, rep: MasterReport, issues: Issue[], reason: s
   } else if (before !== null && before > s.pbStartAt) {
     issues.push({ level: 'warning', sheet, message: `Nomor PB sudah berjalan: nomor berikutnya ${before} (> ${s.pbStartAt}); counter tidak diubah (nomor tidak pernah mundur).` })
   }
-  // MC2-5: per-PT cut-over (`kode_pt`); MC1 = the only / first active PT.
-  const settings = await companySettings(req)
+  const settings = pt
   const firstPbNumber = formatDocNo(
     { pattern: String(cfg.pattern), padding: Number(cfg.padding ?? 0), docCode: (cfg.docCode as string) ?? undefined },
     Math.max(after ?? s.pbStartAt, s.pbStartAt),
@@ -553,8 +554,10 @@ async function runCutover(x: Exec, rep: MasterReport, issues: Issue[], reason: s
   let closeNote = 'tidak diminta (tutup_periode_sebelum_golive = Tidak)'
   if (s.closePrevPeriod) {
     const period = previousPeriod(s.goLiveDate)
-    const rows = await req.payload.find({ collection: 'period-closings', where: { period: { equals: period } }, depth: 0, pagination: false, overrideAccess: true /* SYSTEM-READ: cut-over */, req })
-    const lock = (await tx.execute(sql`SELECT pk_cash_lock_date()::text AS d`)) as unknown as { rows: Array<{ d: string | null }> }
+    // MC2-5: per PT (`kode_pt`); MC1 = the only / first active PT
+    const cid = settings.companyId
+    const rows = await req.payload.find({ collection: 'period-closings', where: { and: [{ company: { equals: cid } }, { period: { equals: period } }] }, depth: 0, pagination: false, overrideAccess: true /* SYSTEM-READ: cut-over */, req })
+    const lock = (await tx.execute(sql`SELECT pk_cash_lock_date(${cid}::integer)::text AS d`)) as unknown as { rows: Array<{ d: string | null }> }
     const lockDate = lock.rows[0]?.d ?? null
     if (rows.docs.some((d) => (d as { status?: string }).status === 'closed')) closeNote = `periode ${period} sudah ditutup`
     else if (rows.docs.length > 0) {
@@ -563,7 +566,7 @@ async function runCutover(x: Exec, rep: MasterReport, issues: Issue[], reason: s
     } else if (lockDate && lockDate >= periodEnd(period)) closeNote = `sudah terkunci s/d ${lockDate}`
     else {
       const doc = await atRow(sheet, undefined, () =>
-        req.payload.create({ collection: 'period-closings', data: { period, status: 'closed', note: `Cut-over go-live ${s.goLiveDate} (impor data)` } as never, depth: 0, overrideAccess: true /* SYSTEM-WRITE: cut-over period close */, req }),
+        req.payload.create({ collection: 'period-closings', data: { company: cid, period, status: 'closed', note: `Cut-over go-live ${s.goLiveDate} (impor data)` } as never, depth: 0, overrideAccess: true /* SYSTEM-WRITE: cut-over period close */, req }),
       )
       await writeAudit(req, [{ action: 'period_close', docType: 'period_closing', docId: String(doc.id), docNo: period, field: 'period', newValue: { period, lockDate: periodEnd(period) }, reason }])
       closedPeriod = period

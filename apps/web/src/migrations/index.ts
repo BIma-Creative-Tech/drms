@@ -23,6 +23,7 @@ import * as migration_20260926_133934_s3b_data_import from './20260926_133934_s3
 import * as migration_20260926_141606_s3e_uat_gap_fixes from './20260926_141606_s3e_uat_gap_fixes';
 import * as migration_20260927_230033_mc1_companies from './20260927_230033_mc1_companies';
 import * as migration_20260927_234849_mc1_company_columns from './20260927_234849_mc1_company_columns';
+import * as migration_20260928_000100_mc1_security from './20260928_000100_mc1_security';
 
 export const migrations = [
   {
@@ -149,5 +150,10 @@ export const migrations = [
     up: migration_20260927_234849_mc1_company_columns.up,
     down: migration_20260927_234849_mc1_company_columns.down,
     name: '20260927_234849_mc1_company_columns'
+  },
+  {
+    up: migration_20260928_000100_mc1_security.up,
+    down: migration_20260928_000100_mc1_security.down,
+    name: '20260928_000100_mc1_security'
   },
 ];

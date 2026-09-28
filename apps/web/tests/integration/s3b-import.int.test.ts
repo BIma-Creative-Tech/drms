@@ -14,7 +14,7 @@ import { buildSample } from '@/import/template'
 import { withSystemTransaction } from '@/lib/system-tx'
 
 import { api, makeFlowUser, type FlowUser } from './flow-world'
-import { auditRows, getTestPayload, sqlAs, sqlError, updateCompany } from './helpers'
+import { auditRows, companyId, getTestPayload, sqlAs, sqlError, updateCompany } from './helpers'
 
 /**
  * E11 go-live import against the throwaway DB. Test files share one DB (reset once per run), so the
@@ -61,7 +61,7 @@ beforeAll(async () => {
   }
   const c = await sqlAs('app', "SELECT next_value FROM document_sequence_counters WHERE doc_type = 'expense_request' AND period_key = 'ALL'")
   pbBefore = c.rows[0] ? Number(c.rows[0].next_value) : null
-  lockBefore = (await sqlAs('app', 'SELECT pk_cash_lock_date()::text AS d')).rows[0].d
+  lockBefore = (await sqlAs('app', 'SELECT pk_cash_lock_date($1::integer)::text AS d', [await companyId()])).rows[0].d // ADR 0016: lock date per PT
   finance = await makeFlowUser(['pk-finance'], 'impor-finance', null, { signature: false })
 })
 

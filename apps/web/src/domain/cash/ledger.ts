@@ -1,7 +1,8 @@
 import { sql } from '@payloadcms/db-postgres'
 import type { PayloadRequest } from 'payload'
 
-import { hasRoleAny, relId, userId } from '@/access/roles'
+import { hasRole, relId, userId } from '@/access/roles'
+import { companyOf, contextCompanyId } from '@/domain/companies'
 import { writeAudit } from '@/audit/writer'
 import { fail, today } from '@/domain/expense/common'
 import { claimMedia } from '@/domain/expense/receipts'
@@ -54,10 +55,15 @@ export type PostInput = {
   reversalOfId?: number | null
 }
 
-/** Lock date from the DB (same function the triggers use). */
-export async function currentLockDate(req: PayloadRequest): Promise<string | null> {
+/**
+ * Lock date of ONE PT from the DB (same function the triggers use; ADR 0016 §4: closing PT A never
+ * locks PT B). Without a company: the context PT (caller's only PT / company #1) — MC2: every caller
+ * passes the document's PT (Kas view, period list).
+ */
+export async function currentLockDate(req: PayloadRequest, companyId?: number | null): Promise<string | null> {
   const tx = await getRequestTx(req)
-  const r = (await tx.execute(sql`SELECT pk_cash_lock_date()::text AS d`)) as unknown as { rows: Array<{ d: string | null }> }
+  const cid = typeof companyId === 'number' ? companyId : await contextCompanyId(req)
+  const r = (await tx.execute(sql`SELECT pk_cash_lock_date(${cid}::integer)::text AS d`)) as unknown as { rows: Array<{ d: string | null }> }
   return r.rows[0]?.d ?? null
 }
 
@@ -74,7 +80,8 @@ export async function postEntry(req: PayloadRequest, input: PostInput): Promise<
   if (!isBusinessDate(input.entryDate)) fail(400, 'Tanggal harus YYYY-MM-DD.')
   if (!(Number.isSafeInteger(input.amount) && input.amount > 0)) fail(400, 'Nominal harus bilangan bulat Rupiah > 0.')
   if (input.projectId && input.costCenterId) fail(400, 'Pilih project ATAU pusat biaya.')
-  const lock = await currentLockDate(req)
+  const companyId = await companyOf(req, 'cash-accounts', input.cashAccountId)
+  const lock = await currentLockDate(req, companyId)
   if (lock && input.entryDate <= lock) fail(409, `Periode ${input.entryDate.slice(0, 7)} sudah ditutup (tutup buku s/d ${lock}).`)
   await assertAccount(req, input.cashAccountId)
   const { docNo } = await allocateDocNo(req, input.direction === 'in' ? 'cash_in' : 'cash_out', { date: parseBusinessDate(input.entryDate) })
@@ -160,7 +167,7 @@ export async function editManualEntry(req: PayloadRequest, id: number, patch: Ma
   const e = await loadEntry(req, id)
   if (e.sourceType !== 'manual') fail(409, 'Hanya transaksi kas manual yang dapat diedit.')
   if (e.status !== 'posted') fail(409, 'Transaksi sudah di-void.')
-  const lock = await currentLockDate(req)
+  const lock = await currentLockDate(req, relId((e as { company?: unknown }).company))
   if (lock && e.entryDate <= lock) fail(409, 'Periode transaksi sudah ditutup.')
   const merged = {
     project: patch.projectId !== undefined ? patch.projectId : relId(e.project),
@@ -215,7 +222,7 @@ export async function voidEntry(
   if (e.sourceType === 'settlement_refund' && !opts.viaSettlement) {
     fail(409, 'Kas masuk pengembalian LPJ di-void lewat "Batalkan penyelesaian" pada LPJ, bukan dari buku kas.')
   }
-  const lock = await currentLockDate(req)
+  const lock = await currentLockDate(req, relId((e as { company?: unknown }).company))
   const reversalDate = lock && e.entryDate <= lock ? await today(req) : e.entryDate
   const reversal = await postEntry(req, {
     direction: e.direction === 'in' ? 'out' : 'in',
@@ -265,39 +272,46 @@ export async function balances(req: PayloadRequest, asOf?: string) {
   })
 }
 
-/** Close a month (Finance/Direktur = pk-owner). Only past months; audited `period_close`. */
-export async function closePeriod(req: PayloadRequest, period: string, note?: string) {
+/**
+ * Close a month OF ONE PT (Finance/Direktur = pk-owner of that PT; ADR 0016 §4 — closing PT A
+ * never locks PT B). `companyId` default = the caller's only PT (MC3: `company` parameter of
+ * POST /period-closings). Only past months; audited `period_close`.
+ */
+export async function closePeriod(req: PayloadRequest, period: string, note?: string, companyId?: number) {
   if (!isPeriod(period)) fail(400, 'Periode harus YYYY-MM.')
-  if (period >= (await today(req)).slice(0, 7)) fail(409, 'Hanya bulan yang sudah lewat yang dapat ditutup.')
+  const company = companyId ?? (await contextCompanyId(req))
+  if (req.user && !hasRole(req, ['pk-finance', 'pk-owner'], company)) fail(403, 'Hanya Finance/Direktur PT ini yang dapat menutup buku.')
+  if (period >= (await today(req, company)).slice(0, 7)) fail(409, 'Hanya bulan yang sudah lewat yang dapat ditutup.')
   const tx = await getRequestTx(req)
   await tx.execute(sql`LOCK TABLE period_closings IN SHARE ROW EXCLUSIVE MODE`)
   const existing = await req.payload.count({
     collection: 'period-closings',
-    where: { and: [{ period: { equals: period } }, { status: { equals: 'closed' } }] },
+    where: { and: [{ company: { equals: company } }, { period: { equals: period } }, { status: { equals: 'closed' } }] },
     overrideAccess: true, // SYSTEM-READ: duplicate close check
     req,
   })
   if (existing.totalDocs > 0) fail(409, `Periode ${period} sudah ditutup.`)
   const doc = await req.payload.create({
     collection: 'period-closings',
-    data: { period, status: 'closed', note: note ?? null, closedBy: userId(req) } as never,
+    data: { company, period, status: 'closed', note: note ?? null, closedBy: userId(req) } as never,
     depth: 0,
     overrideAccess: true, // SYSTEM-WRITE: period close after role check
     req,
   })
-  await writeAudit(req, [{ action: 'period_close', docType: 'period_closing', docId: String(doc.id), docNo: period, field: 'period', newValue: { period, lockDate: periodEnd(period) }, reason: note }])
+  await writeAudit(req, [{ action: 'period_close', docType: 'period_closing', docId: String(doc.id), docNo: period, field: 'period', newValue: { period, lockDate: periodEnd(period) }, reason: note, companyId: company }])
   return doc
 }
 
 /** Re-open (Owner only = "Direktur" label, G1-1; reason required; ADR 0005 §6): only the LATEST closed period. */
-export async function reopenPeriod(req: PayloadRequest, period: string, reason: string) {
-  if (!hasRoleAny(req, 'pk-owner')) fail(403, 'Hanya Direktur yang dapat membuka kembali periode.')
+export async function reopenPeriod(req: PayloadRequest, period: string, reason: string, companyId?: number) {
+  const company = companyId ?? (await contextCompanyId(req))
+  if (!hasRole(req, 'pk-owner', company)) fail(403, 'Hanya Direktur yang dapat membuka kembali periode.')
   if (!isPeriod(period)) fail(400, 'Periode harus YYYY-MM.')
   const tx = await getRequestTx(req)
   await tx.execute(sql`LOCK TABLE period_closings IN SHARE ROW EXCLUSIVE MODE`)
   const res = await req.payload.find({
     collection: 'period-closings',
-    where: { status: { equals: 'closed' } },
+    where: { and: [{ company: { equals: company } }, { status: { equals: 'closed' } }] },
     sort: '-period',
     limit: 1,
     depth: 0,
@@ -314,6 +328,6 @@ export async function reopenPeriod(req: PayloadRequest, period: string, reason: 
     overrideAccess: true, // SYSTEM-WRITE: reopen after role check
     req,
   })
-  await writeAudit(req, [{ action: 'period_reopen', docType: 'period_closing', docId: String(latest.id), docNo: period, field: 'status', oldValue: 'closed', newValue: 'reopened', reason }])
+  await writeAudit(req, [{ action: 'period_reopen', docType: 'period_closing', docId: String(latest.id), docNo: period, field: 'status', oldValue: 'closed', newValue: 'reopened', reason, companyId: company }])
   return doc
 }

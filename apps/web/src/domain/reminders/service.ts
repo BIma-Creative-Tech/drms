@@ -279,7 +279,9 @@ export async function runDailyReminders(payload: Payload, opts: { now?: Date; fo
     async (req) => {
       const tx = await getRequestTx(req)
       await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended('pk:daily-reminders', 0))`)
-      const ran = await q(req, sql`SELECT 1 FROM reminder_runs WHERE run_date = ${date}`)
+      // ADR 0016 §7: one run per PT and day — MC1 runs company #1 only (MC2: loop over active PTs)
+      const cid = s.companyId
+      const ran = await q(req, sql`SELECT 1 FROM reminder_runs WHERE company_id = ${cid} AND run_date = ${date}`)
       const decision = opts.force ? 'run' : runDecision(s, hour, ran.length > 0)
       if (decision !== 'run') return { ...base, status: decision }
       const run = new Run(req, s, date)
@@ -289,8 +291,8 @@ export async function runDailyReminders(payload: Payload, opts: { now?: Date; fo
       if (s.budget.enabled) await budgetThreshold(run)
       const result: ReminderRunResult = { ...base, rules: run.rules, emails: run.emails }
       await tx.execute(
-        sql`INSERT INTO reminder_runs (run_date, summary) VALUES (${date}, ${JSON.stringify({ rules: run.rules, emails: run.emails })}::jsonb)
-            ON CONFLICT (run_date) DO UPDATE SET summary = EXCLUDED.summary, finished_at = clock_timestamp()`,
+        sql`INSERT INTO reminder_runs (company_id, run_date, summary) VALUES (${cid}, ${date}, ${JSON.stringify({ rules: run.rules, emails: run.emails })}::jsonb)
+            ON CONFLICT (company_id, run_date) DO UPDATE SET summary = EXCLUDED.summary, finished_at = clock_timestamp()`,
       )
       return result
     },
