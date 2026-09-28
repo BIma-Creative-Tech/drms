@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-09-29
+
+Multi-company (MC1–MC3, ADR 0016), optional self-service 2FA (ADR 0017), admin loading dots (0.4.2) and the
+self-hosted CI runner support. Database migrations are NOT backward compatible (rollback = restore the pre-deploy dump).
+
 ### MC3 — APK (MC3-2, branch `feat/mc3-mobile`; ADR 0016 §8, ADR 0010 MC note, `docs/proyekkas/mc/mc3-progress.md` §APK)
 
 #### Added
