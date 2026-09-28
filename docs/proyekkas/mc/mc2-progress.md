@@ -19,7 +19,7 @@ by exact name only, never `docker … prune`): `pk-mc2u-net`, `pk-mc2u-node` (no
 | UI-4 Employee ↔ PT, pickers per PT | done | PT at the top of master forms, required on employee create when ambiguous, 7 pickers filtered per PT |
 | UI-5 PT column + filter (lists, custom views) | done (Payload lists; inbox, transfer queue, LPJ, addendum); Kas/Absensi/Progress rows = backend TODO | `admin/company-list.ts` wrapper (33 collections), `views/pt.tsx` |
 | UI-6 Dashboards per PT | layout done, data from backend | `views/pt-breakdown.tsx`; Owner (cash, waiting, budget, completeness) + Finance (cash, verification) tiles read `byCompany` rows defensively |
-| UI-7 Import `kode_pt` (MC2-5) | open | |
+| UI-7 Import `kode_pt` (MC2-5) | done | sheets Perusahaan + AksesPT, `kode_pt` on 11 sheets, per-PT resolve + cut-over; `tests/unit/mc2-import.test.ts`, `tests/integration/mc2-import.int.test.ts`; templates regenerated (+ 2-PT sample) |
 
 ### UI-1 PT switcher (done)
 
@@ -93,6 +93,24 @@ by exact name only, never `docker … prune`): `pk-mc2u-net`, `pk-mc2u-node` (no
   never a combined %), completeness (`completeness.byCompany`); Finance: cash (`cashByCompany`), verification
   (`completenessByCompany`). Field names follow the feat/mc2-backend working copy (2026-09-28, uncommitted) and are
   read as `unknown` — the single-PT layout renders until the payload carries them.
+
+### UI-7 Import per PT (MC2-5, done)
+
+- `import/spec.ts`: sheet `Perusahaan` (kode_pt, nama, nama_legal, alamat, telepon, nomor_pb_mulai), sheet `AksesPT`
+  (username × kode_pt → peran, kode_karyawan, aktif), `kode_pt` (type `ptcode`, upper-cased, = `companies.shortCode`
+  rule) as FIRST column of Kategori, Karyawan, Pengguna, Rekening, PusatBiaya, Project, Tahapan, RAB, Kendaraan,
+  Penugasan, AkunKas; natural keys include the PT; `Pengguna.peran` optional (no role = no membership from that row).
+- `parse.ts`: duplicates checked inside a PT; stage weight sums per (PT, project). `resolve.ts`: `defaultPtOf` (only
+  PT of the sheet, else only active PT of the DB, else none → `kode_pt` required), unknown / inactive PT errors,
+  per-PT reference pools (workbook rows of that PT + DB keys of that PT), cross-PT references named ("ada di PT …"),
+  PM / manager must have access in the row's PT, AksesPT checks (unknown user, duplicate of the Pengguna PT,
+  employee already linked). `DbKeys` per PT (`PtKeys`) + companies + memberships per user.
+- `run.ts`: `Exec.use(row)` switches the per-PT scope (lookups, creates, cache keys per PT); master `perusahaan`
+  first (existing PT untouched, new PT + default sequences + approval rules); `aksesPt` after `pengguna`;
+  cut-over per PT (`cutovers[]`, PB start per PT); report one cut-over line per PT.
+- Template `MC2-5` regenerated (+ `drms-impor-golive-contoh-fiktif-2pt.xlsx`, fictional DRMS + CS1); the default
+  sample stays single-PT (DRMS rows with `kode_pt`) so the shared integration DB keeps one active PT.
+- Runbook `import-data-golive.md` §4.1.
 
 ## Open TODOs / notes (UI)
 

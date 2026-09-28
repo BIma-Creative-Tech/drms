@@ -74,6 +74,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   show a PT column when more than one PT is selected; transfer / settlement forms offer only cash accounts of the
   request's PT; Direktur / Finance dashboard tiles show per-PT rows under the combined totals (backend payload
   `byCompany`).
+- **MC2-5 — go-live import per PT** (`apps/web/src/import`, runbook §4.1): sheet `Perusahaan` (target PTs; existing
+  ones untouched, new ones created with default numbering + approval rules), `kode_pt` as first column of every
+  per-PT sheet (codes unique per PT; empty = the only PT), sheet `AksesPT` (roles per user per PT), validation of
+  unknown / inactive PTs and cross-PT references, cut-over per PT (PB start per PT). Template `MC2-5` regenerated,
+  new fictional two-PT sample `drms-impor-golive-contoh-fiktif-2pt.xlsx`.
 
 ### Changed
 - **`company-settings` global = app-wide only** (APK gate, device image targets, offline max age, selfie batch

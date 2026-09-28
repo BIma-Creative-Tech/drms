@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 
 import { parseWorkbook, parseMoney, parseDate, hasErrors } from '@/import/parse'
 import { keycloakCsv } from '@/import/report'
-import { effectiveEmail, emptyDbKeys, parseKcMap, PLACEHOLDER_EMAIL_DOMAIN, resolveReferences } from '@/import/resolve'
+import { effectiveEmail, emptyDbKeys, parseKcMap, PLACEHOLDER_EMAIL_DOMAIN, ptSet, resolveReferences } from '@/import/resolve'
 import { previousPeriod } from '@/import/run'
 import { SAMPLE } from '@/import/sample'
 import { SHEETS } from '@/import/spec'
@@ -181,7 +181,7 @@ describe('resolve (E11 import): references and Keycloak link plan', () => {
   it('unknown references are errors; workbook rows and DB keys both count', () => {
     const r = parseSample({ rows: { rab: [{ kode_project: 'CTH-PRJ-01', kode_kategori: 'NOPE', nominal: 1 }], rekening: [{ kode_karyawan: 'DB-EMP', kode_bank: 'BCA', no_rekening: '12345', atas_nama: 'X' }] } })
     const db = emptyDbKeys()
-    db.employees.add('DB-EMP')
+    ptSet(db.employees, 'DRMS').add('DB-EMP')
     const res = resolveReferences(r.data, db, new Map())
     expect(res.issues.filter((i) => i.level === 'error').map((i) => `${i.sheet}:${i.row}:${i.column}`)).toEqual(['RAB:2:kode_kategori'])
   })

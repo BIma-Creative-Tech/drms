@@ -9,7 +9,7 @@ import { geofenceError } from '@/domain/attendance/calendar'
 import { isBusinessDate } from '@/domain/expense/types'
 import { normalizePlate, PLATE_RE } from '@/domain/plates'
 
-import { SETTINGS, SHEETS, YA_TIDAK, type ColSpec, type SheetKey, type SheetSpec } from './spec'
+import { PT_CODE_RE, SETTINGS, SHEETS, YA_TIDAK, type ColSpec, type SheetKey, type SheetSpec } from './spec'
 import { excelSerialToDate, type CellValue, type ReadWorkbook } from './xlsx-io'
 
 export type Issue = { level: 'error' | 'warning'; sheet: string; row?: number; column?: string; message: string }
@@ -17,16 +17,24 @@ export type Rowed<T> = T & { _row: number }
 
 export type Settings = { goLiveDate: string; pbStartAt: number; closePrevPeriod: boolean }
 
+/** MC2-5: `pt` = kode_pt of the row (null = the only PT, resolved in resolve.ts `ptResolver`). */
+type Pt = { pt: string | null }
+
 export type ImportData = {
   settings: Settings | null
+  /** Sheet Perusahaan: target PTs (existing ones are matched, new ones created). */
+  companies: Rowed<{ code: string; name: string; legalName: string | null; address: string | null; phone: string | null; pbStartAt: number | null }>[]
+  /** Sheet AksesPT: memberships in further PTs (username × PT). */
+  access: Rowed<{ username: string; pt: string; roles: string[]; employeeCode: string | null; active: boolean }>[]
   banks: Rowed<{ code: string; name: string }>[]
   uoms: Rowed<{ code: string; name: string; category: string | null }>[]
-  categories: Rowed<{ code: string; name: string; coaCode: string | null; defaultUom: string | null; allowedUoms: string[]; requiresVehicle: boolean; active: boolean }>[]
-  employees: Rowed<{ code: string; name: string; nickname: string | null; position: string | null; phone: string | null; active: boolean }>[]
-  users: Rowed<{ username: string; email: string | null; name: string; employeeCode: string | null; roles: string[]; phone: string | null; active: boolean }>[]
-  bankAccounts: Rowed<{ employeeCode: string; bankCode: string; accountNo: string; accountHolder: string; isDefault: boolean; active: boolean }>[]
-  costCenters: Rowed<{ code: string; name: string; type: string; manager: string | null; lat: number | null; lng: number | null; radiusM: number | null; active: boolean }>[]
-  projects: Rowed<{
+  categories: Rowed<Pt & { code: string; name: string; coaCode: string | null; defaultUom: string | null; allowedUoms: string[]; requiresVehicle: boolean; active: boolean }>[]
+  employees: Rowed<Pt & { code: string; name: string; nickname: string | null; position: string | null; phone: string | null; active: boolean }>[]
+  users: Rowed<Pt & { username: string; email: string | null; name: string; employeeCode: string | null; roles: string[]; phone: string | null; active: boolean }>[]
+  bankAccounts: Rowed<Pt & { employeeCode: string; bankCode: string; accountNo: string; accountHolder: string; isDefault: boolean; active: boolean }>[]
+  costCenters: Rowed<Pt & { code: string; name: string; type: string; manager: string | null; lat: number | null; lng: number | null; radiusM: number | null; active: boolean }>[]
+  projects: Rowed<
+    Pt & {
     code: string
     name: string
     client: string | null
@@ -39,12 +47,13 @@ export type ImportData = {
     startDate: string | null
     targetDate: string | null
     status: string
-  }>[]
-  stages: Rowed<{ projectCode: string; sequence: number; name: string; weightPct: number }>[]
-  budgetLines: Rowed<{ projectCode: string; categoryCode: string; amount: number }>[]
-  vehicles: Rowed<{ plateNo: string; type: string; brandModel: string | null; costCenterCode: string | null; projectCode: string | null; active: boolean }>[]
-  assignments: Rowed<{ employeeCode: string; projectCode: string | null; costCenterCode: string | null; role: string; startDate: string | null; endDate: string | null }>[]
-  cashAccounts: Rowed<{ name: string; kind: 'cash' | 'bank'; bankCode: string | null; accountNo: string | null; accountHolder: string | null; openingBalance: number; odooJournalCode: string | null; active: boolean }>[]
+  }
+  >[]
+  stages: Rowed<Pt & { projectCode: string; sequence: number; name: string; weightPct: number }>[]
+  budgetLines: Rowed<Pt & { projectCode: string; categoryCode: string; amount: number }>[]
+  vehicles: Rowed<Pt & { plateNo: string; type: string; brandModel: string | null; costCenterCode: string | null; projectCode: string | null; active: boolean }>[]
+  assignments: Rowed<Pt & { employeeCode: string; projectCode: string | null; costCenterCode: string | null; role: string; startDate: string | null; endDate: string | null }>[]
+  cashAccounts: Rowed<Pt & { name: string; kind: 'cash' | 'bank'; bankCode: string | null; accountNo: string | null; accountHolder: string | null; openingBalance: number; odooJournalCode: string | null; active: boolean }>[]
   /** Sheets present in the file (absent sheet = master not touched). */
   present: SheetKey[]
 }
@@ -182,6 +191,10 @@ export function convertCell(col: ColSpec, v: CellValue, date1904 = false): Conv 
       const bad = parts.find((p) => !CODE_RE.test(p))
       return bad ? { ok: false, message: `Kode "${bad}" tidak valid.` } : { ok: true, value: [...new Set(parts)] }
     }
+    case 'ptcode': {
+      const s = str(v).toUpperCase()
+      return PT_CODE_RE.test(s) ? { ok: true, value: s } : { ok: false, message: `Kode PT "${str(v)}" tidak valid: huruf besar/angka, 2–16 karakter (mis. DRMS, CS1).` }
+    }
     case 'plate': {
       const p = normalizePlate(str(v))
       return PLATE_RE.test(p) ? { ok: true, value: p } : { ok: false, message: `Nomor polisi "${str(v)}" tidak valid (contoh: DA 1234 XY).` }
@@ -267,6 +280,8 @@ function dupCheck<T extends { _row: number }>(sheet: string, rows: T[], key: (r:
 }
 
 const S = (v: unknown) => (v === null || v === undefined ? null : (v as string))
+/** Natural key inside a PT ("CS1 / K-001"; the only-PT rows use "·"). */
+export const inPt = (pt: string | null, key: string) => `${pt ?? '·'} / ${key}`
 const N = (v: unknown) => (v === null || v === undefined ? null : (v as number))
 const B = (v: unknown, dflt = true) => (v === null || v === undefined ? dflt : (v as boolean))
 
@@ -311,6 +326,8 @@ function parseSettings(rows: CellValue[][], date1904: boolean, issues: Issue[]):
 export function emptyData(): ImportData {
   return {
     settings: null,
+    companies: [],
+    access: [],
     banks: [],
     uoms: [],
     categories: [],
@@ -357,6 +374,18 @@ export function parseWorkbook(wb: ReadWorkbook): ParseResult {
     if (!rows) continue
     const sheet = spec.name
     switch (spec.key) {
+      case 'perusahaan':
+        data.companies = rows.map((r) => ({
+          _row: r.row,
+          code: S(r.values.kode_pt)!,
+          name: S(r.values.nama)!,
+          legalName: S(r.values.nama_legal),
+          address: S(r.values.alamat),
+          phone: S(r.values.telepon),
+          pbStartAt: N(r.values.nomor_pb_mulai),
+        }))
+        dupCheck(sheet, data.companies, (r) => r.code, 'Kode PT', issues)
+        break
       case 'bank':
         data.banks = rows.map((r) => ({ _row: r.row, code: S(r.values.kode)!, name: S(r.values.nama)! }))
         dupCheck(sheet, data.banks, (r) => r.code, 'Kode bank', issues)
@@ -368,6 +397,7 @@ export function parseWorkbook(wb: ReadWorkbook): ParseResult {
       case 'kategori':
         data.categories = rows.map((r) => ({
           _row: r.row,
+          pt: S(r.values.kode_pt),
           code: S(r.values.kode)!,
           name: S(r.values.nama)!,
           coaCode: S(r.values.kode_coa),
@@ -376,7 +406,7 @@ export function parseWorkbook(wb: ReadWorkbook): ParseResult {
           requiresVehicle: B(r.values.perlu_kendaraan, false),
           active: B(r.values.aktif),
         }))
-        dupCheck(sheet, data.categories, (r) => r.code, 'Kode kategori', issues)
+        dupCheck(sheet, data.categories, (r) => inPt(r.pt, r.code), 'Kode kategori (PT / kode)', issues)
         for (const c of data.categories) {
           if (c.defaultUom && c.allowedUoms.length > 0 && !c.allowedUoms.includes(c.defaultUom)) {
             issues.push({ level: 'warning', sheet, row: c._row, column: 'satuan_default', message: `Satuan default ${c.defaultUom} tidak ada di satuan_wajar — ditambahkan otomatis.` })
@@ -387,6 +417,7 @@ export function parseWorkbook(wb: ReadWorkbook): ParseResult {
       case 'karyawan':
         data.employees = rows.map((r) => ({
           _row: r.row,
+          pt: S(r.values.kode_pt),
           code: S(r.values.kode)!,
           name: S(r.values.nama)!,
           nickname: S(r.values.nama_panggilan),
@@ -394,29 +425,43 @@ export function parseWorkbook(wb: ReadWorkbook): ParseResult {
           phone: S(r.values.no_hp),
           active: B(r.values.aktif),
         }))
-        dupCheck(sheet, data.employees, (r) => r.code, 'Kode karyawan', issues)
+        dupCheck(sheet, data.employees, (r) => inPt(r.pt, r.code), 'Kode karyawan (PT / kode)', issues)
         break
       case 'pengguna':
         data.users = rows.map((r) => ({
           _row: r.row,
+          pt: S(r.values.kode_pt),
           username: S(r.values.username)!,
           email: S(r.values.email),
           name: S(r.values.nama)!,
           employeeCode: S(r.values.kode_karyawan),
-          roles: r.values.peran as string[],
+          roles: (r.values.peran as string[] | null) ?? [],
           phone: S(r.values.no_hp),
           active: B(r.values.aktif),
         }))
         for (const u of data.users) {
           if (u.username.includes('@')) issues.push({ level: 'error', sheet, row: u._row, column: 'username', message: 'Username tidak boleh berupa email.' })
+          if (u.roles.length === 0 && u.employeeCode) issues.push({ level: 'error', sheet, row: u._row, column: 'peran', message: 'kode_karyawan diisi tanpa peran: isi peran di PT ini (atau pindahkan ke sheet AksesPT).' })
         }
         dupCheck(sheet, data.users, (r) => r.username, 'Username', issues)
         dupCheck(sheet, data.users, (r) => r.email, 'Email', issues)
-        dupCheck(sheet, data.users, (r) => r.employeeCode, 'Kode karyawan (satu karyawan = satu akun)', issues)
+        dupCheck(sheet, data.users, (r) => (r.employeeCode ? inPt(r.pt, r.employeeCode) : null), 'Kode karyawan (satu karyawan = satu akun per PT)', issues)
+        break
+      case 'aksesPt':
+        data.access = rows.map((r) => ({
+          _row: r.row,
+          username: S(r.values.username)!,
+          pt: S(r.values.kode_pt)!,
+          roles: r.values.peran as string[],
+          employeeCode: S(r.values.kode_karyawan),
+          active: B(r.values.aktif),
+        }))
+        dupCheck(sheet, data.access, (r) => inPt(r.pt, r.username), 'Akses (PT / username)', issues)
         break
       case 'rekening':
         data.bankAccounts = rows.map((r) => ({
           _row: r.row,
+          pt: S(r.values.kode_pt),
           employeeCode: S(r.values.kode_karyawan)!,
           bankCode: S(r.values.kode_bank)!,
           accountNo: S(r.values.no_rekening)!,
@@ -428,7 +473,7 @@ export function parseWorkbook(wb: ReadWorkbook): ParseResult {
         dupCheck(
           sheet,
           data.bankAccounts.filter((r) => r.isDefault),
-          (r) => r.employeeCode,
+          (r) => inPt(r.pt, r.employeeCode),
           'Rekening default karyawan',
           issues,
         )
@@ -436,6 +481,7 @@ export function parseWorkbook(wb: ReadWorkbook): ParseResult {
       case 'pusatBiaya':
         data.costCenters = rows.map((r) => ({
           _row: r.row,
+          pt: S(r.values.kode_pt),
           code: S(r.values.kode)!,
           name: S(r.values.nama)!,
           type: S(r.values.jenis) ?? 'operational',
@@ -445,7 +491,7 @@ export function parseWorkbook(wb: ReadWorkbook): ParseResult {
           radiusM: N(r.values.radius_m),
           active: B(r.values.aktif),
         }))
-        dupCheck(sheet, data.costCenters, (r) => r.code, 'Kode pusat biaya', issues)
+        dupCheck(sheet, data.costCenters, (r) => inPt(r.pt, r.code), 'Kode pusat biaya (PT / kode)', issues)
         for (const c of data.costCenters) {
           const g = geofenceError(c)
           if (g) issues.push({ level: 'error', sheet, row: c._row, column: 'latitude', message: g })
@@ -454,6 +500,7 @@ export function parseWorkbook(wb: ReadWorkbook): ParseResult {
       case 'project':
         data.projects = rows.map((r) => ({
           _row: r.row,
+          pt: S(r.values.kode_pt),
           code: S(r.values.kode)!,
           name: S(r.values.nama)!,
           client: S(r.values.klien),
@@ -467,7 +514,7 @@ export function parseWorkbook(wb: ReadWorkbook): ParseResult {
           targetDate: S(r.values.target_selesai),
           status: S(r.values.status) ?? 'berjalan',
         }))
-        dupCheck(sheet, data.projects, (r) => r.code, 'Kode project', issues)
+        dupCheck(sheet, data.projects, (r) => inPt(r.pt, r.code), 'Kode project (PT / kode)', issues)
         for (const p of data.projects) {
           const g = geofenceError(p)
           if (g) issues.push({ level: 'error', sheet, row: p._row, column: 'latitude', message: g })
@@ -477,14 +524,15 @@ export function parseWorkbook(wb: ReadWorkbook): ParseResult {
         }
         break
       case 'tahapan':
-        data.stages = rows.map((r) => ({ _row: r.row, projectCode: S(r.values.kode_project)!, sequence: N(r.values.urutan)!, name: S(r.values.nama)!, weightPct: N(r.values.bobot_persen)! }))
-        dupCheck(sheet, data.stages, (r) => `${r.projectCode} #${r.sequence}`, 'Tahapan (project + urutan)', issues)
+        data.stages = rows.map((r) => ({ _row: r.row, pt: S(r.values.kode_pt), projectCode: S(r.values.kode_project)!, sequence: N(r.values.urutan)!, name: S(r.values.nama)!, weightPct: N(r.values.bobot_persen)! }))
+        dupCheck(sheet, data.stages, (r) => inPt(r.pt, `${r.projectCode} #${r.sequence}`), 'Tahapan (PT / project + urutan)', issues)
         {
           const sums = new Map<string, { sum: number; row: number }>()
           for (const s of data.stages) {
-            const cur = sums.get(s.projectCode) ?? { sum: 0, row: s._row }
+            const k = s.pt ? `${s.projectCode} (${s.pt})` : s.projectCode
+            const cur = sums.get(k) ?? { sum: 0, row: s._row }
             cur.sum += s.weightPct
-            sums.set(s.projectCode, cur)
+            sums.set(k, cur)
           }
           for (const [code, { sum, row }] of sums) {
             if (Math.abs(sum - 100) > 0.005) issues.push({ level: 'error', sheet, row, column: 'bobot_persen', message: `Total bobot tahapan project ${code} = ${Math.round(sum * 100) / 100}% (harus tepat 100%).` })
@@ -492,12 +540,13 @@ export function parseWorkbook(wb: ReadWorkbook): ParseResult {
         }
         break
       case 'rab':
-        data.budgetLines = rows.map((r) => ({ _row: r.row, projectCode: S(r.values.kode_project)!, categoryCode: S(r.values.kode_kategori)!, amount: N(r.values.nominal)! }))
-        dupCheck(sheet, data.budgetLines, (r) => `${r.projectCode} / ${r.categoryCode}`, 'RAB (project + kategori)', issues)
+        data.budgetLines = rows.map((r) => ({ _row: r.row, pt: S(r.values.kode_pt), projectCode: S(r.values.kode_project)!, categoryCode: S(r.values.kode_kategori)!, amount: N(r.values.nominal)! }))
+        dupCheck(sheet, data.budgetLines, (r) => inPt(r.pt, `${r.projectCode} / ${r.categoryCode}`), 'RAB (PT / project + kategori)', issues)
         break
       case 'kendaraan':
         data.vehicles = rows.map((r) => ({
           _row: r.row,
+          pt: S(r.values.kode_pt),
           plateNo: S(r.values.no_polisi)!,
           type: S(r.values.jenis)!,
           brandModel: S(r.values.merek_model),
@@ -510,6 +559,7 @@ export function parseWorkbook(wb: ReadWorkbook): ParseResult {
       case 'penugasan':
         data.assignments = rows.map((r) => ({
           _row: r.row,
+          pt: S(r.values.kode_pt),
           employeeCode: S(r.values.kode_karyawan)!,
           projectCode: S(r.values.kode_project),
           costCenterCode: S(r.values.kode_pusat_biaya),
@@ -521,11 +571,12 @@ export function parseWorkbook(wb: ReadWorkbook): ParseResult {
           if ((a.projectCode === null) === (a.costCenterCode === null)) issues.push({ level: 'error', sheet, row: a._row, column: 'kode_project', message: 'Isi salah satu: kode_project ATAU kode_pusat_biaya.' })
           if (a.startDate && a.endDate && a.endDate < a.startDate) issues.push({ level: 'error', sheet, row: a._row, column: 'tanggal_selesai', message: 'Tanggal selesai sebelum tanggal mulai.' })
         }
-        dupCheck(sheet, data.assignments, (r) => `${r.employeeCode} → ${r.projectCode ?? r.costCenterCode}`, 'Penugasan (karyawan + project/pusat biaya)', issues)
+        dupCheck(sheet, data.assignments, (r) => inPt(r.pt, `${r.employeeCode} → ${r.projectCode ?? r.costCenterCode}`), 'Penugasan (PT / karyawan + project/pusat biaya)', issues)
         break
       case 'akunKas':
         data.cashAccounts = rows.map((r) => ({
           _row: r.row,
+          pt: S(r.values.kode_pt),
           name: S(r.values.nama)!,
           kind: S(r.values.jenis)! as 'cash' | 'bank',
           bankCode: S(r.values.kode_bank),
@@ -535,7 +586,7 @@ export function parseWorkbook(wb: ReadWorkbook): ParseResult {
           odooJournalCode: S(r.values.kode_jurnal_odoo),
           active: B(r.values.aktif),
         }))
-        dupCheck(sheet, data.cashAccounts, (r) => r.name.toLowerCase(), 'Nama akun', issues)
+        dupCheck(sheet, data.cashAccounts, (r) => inPt(r.pt, r.name.toLowerCase()), 'Nama akun (PT / nama)', issues)
         for (const a of data.cashAccounts) {
           if (a.kind === 'bank' && !a.bankCode) issues.push({ level: 'warning', sheet, row: a._row, column: 'kode_bank', message: 'Akun jenis Bank tanpa kode_bank.' })
         }
