@@ -385,7 +385,10 @@ jobs:
           TRIVY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          mkdir -p "$RUNNER_TEMP/trivy-cache"
+          # Self-hosted: persistent TRIVY_CACHE_DIR from the runner image (outside _work — Trivy writes it as root,
+          # which the runner could not clean from _temp). GitHub-hosted: per-job dir as before.
+          tcache="${TRIVY_CACHE_DIR:-$RUNNER_TEMP/trivy-cache}"
+          mkdir -p "$tcache"
           {
             echo "### Trivy image scan (trivy 0.74.0)"
             echo "| image | CRITICAL fixable | CRITICAL unfixed | HIGH fixable | HIGH unfixed |"
@@ -395,7 +398,7 @@ jobs:
             ref="WEB_REF"; [[ $name == migrate ]] && ref="MIGRATE_REF"; img="${!ref}"
             out="$RUNNER_TEMP/trivy-$name.json"
             docker run --rm -e TRIVY_USERNAME -e TRIVY_PASSWORD \
-              -v /var/run/docker.sock:/var/run/docker.sock:ro -v "$RUNNER_TEMP/trivy-cache:/root/.cache/trivy" \
+              -v /var/run/docker.sock:/var/run/docker.sock:ro -v "$tcache:/root/.cache/trivy" \
               "$TRIVY_IMAGE" image --quiet --platform linux/amd64 --severity HIGH,CRITICAL --exit-code 0 --format json "$img" > "$out"
             jq -r '[.Results[]?.Vulnerabilities[]?] | "  \(length) HIGH/CRITICAL:", (.[] | "  \(.Severity) \(.PkgName) \(.InstalledVersion) \(.VulnerabilityID) fixed=\(.FixedVersion // "-")")' "$out"
             jq -r --arg img "$img" '[.Results[]?.Vulnerabilities[]?] as $v
@@ -410,9 +413,11 @@ jobs:
           TRIVY_USERNAME: ${{ github.actor }}
           TRIVY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          tcache="${TRIVY_CACHE_DIR:-$RUNNER_TEMP/trivy-cache}"
+          mkdir -p "$tcache"
           for img in "$WEB_REF" "$MIGRATE_REF"; do
             docker run --rm -e TRIVY_USERNAME -e TRIVY_PASSWORD \
-              -v /var/run/docker.sock:/var/run/docker.sock:ro -v "$RUNNER_TEMP/trivy-cache:/root/.cache/trivy" \
+              -v /var/run/docker.sock:/var/run/docker.sock:ro -v "$tcache:/root/.cache/trivy" \
               "$TRIVY_IMAGE" image --quiet --platform linux/amd64 --severity CRITICAL --exit-code 1 --ignore-unfixed "$img"
           done
 

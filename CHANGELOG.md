@@ -214,6 +214,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
     APK `test/unit/misc_test.dart` + `test/widget/release_notes_test.dart`. No new dependency.
 
 ### Changed
+- **Trivy cache on self-hosted** uses the runner's persistent `TRIVY_CACHE_DIR` instead of `_temp` (root-owned files
+  there could not be cleaned by the runner); GitHub-hosted unchanged.
 - **Self-hosted image publish hang (plan 12 R10)**: buildkitd (docker-container) now runs with
   `--oci-worker-no-process-sandbox` on self-hosted — RUN steps in a nested pid namespace hung forever under
   sysbox-fs 0.7.1 (leaked unreaped helper). GitHub-hosted keeps the default buildkitd flags.
