@@ -1,7 +1,7 @@
 import type { CollectionConfig } from 'payload'
 
 import { denyAll } from '@/access/roles'
-import { byRole, rolesAllowed } from '@/access/policies'
+import { byRoleAny, rolesAllowedAny } from '@/access/policies'
 import { reasonOnDeactivate, withAudit } from '@/audit/hooks'
 import { activeField } from '@/fields/common'
 
@@ -12,9 +12,9 @@ export const NotificationTemplates: CollectionConfig = withAudit(
     labels: { singular: 'Template notifikasi', plural: 'Template notifikasi' },
     admin: { useAsTitle: 'event', group: 'Sistem', defaultColumns: ['event', 'title', 'channel', 'active'] },
     access: {
-      read: byRole({ 'pk-admin': true, 'pk-owner': true }),
-      create: rolesAllowed('pk-admin'),
-      update: byRole({ 'pk-admin': true }),
+      read: byRoleAny({ 'pk-admin': true, 'pk-owner': true }),
+      create: rolesAllowedAny('pk-admin'),
+      update: byRoleAny({ 'pk-admin': true }),
       delete: denyAll,
     },
     fields: [

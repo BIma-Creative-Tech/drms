@@ -9,6 +9,7 @@ import { denyDeleteLogged } from '@/domain/expense/access'
 import { uuidField } from '@/fields/common'
 
 import { businessDateField, ro } from './fields-f2'
+import { companyField, companyHook } from '@/fields/company'
 
 /**
  * T6/T7 Kas masuk / keluar — own single-entry cash book (ADR 0005). CLASS B: flat, no DELETE,
@@ -30,8 +31,10 @@ export const CashEntries: CollectionConfig = withAudit(
       update: denyAll,
       delete: denyDeleteLogged('cash_entry'),
     },
+    hooks: { beforeChange: [companyHook('cash-entries', { derive: [{ field: 'cashAccount', collection: 'cash-accounts' }], check: [{ field: 'category', collection: 'expense-categories' }, { field: 'cashInSource', collection: 'cash-in-sources' }, { field: 'project', collection: 'projects' }, { field: 'costCenter', collection: 'cost-centers' }, { field: 'vehicle', collection: 'vehicles' }, { field: 'expenseRequest', collection: 'expense-requests' }, { field: 'transfer', collection: 'transfers' }, { field: 'reversalOf', collection: 'cash-entries' }] })] },
     fields: [
-      { name: 'entryNo', type: 'text', label: 'Nomor', unique: true, index: true, admin: ro },
+      companyField({ derived: true }),
+      { name: 'entryNo', type: 'text', label: 'Nomor', index: true, admin: ro },
       businessDateField('entryDate', 'Tanggal', { required: true, index: true, admin: ro }),
       { name: 'period', type: 'text', label: 'Periode (YYYY-MM)', index: true, admin: ro },
       { name: 'direction', type: 'select', required: true, options: [{ label: 'Masuk', value: 'in' }, { label: 'Keluar', value: 'out' }], admin: ro },

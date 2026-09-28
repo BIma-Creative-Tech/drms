@@ -25,8 +25,7 @@ const membershipGuard: CollectionBeforeChangeHook = async ({ data, originalDoc, 
   const employee = relId(data.employee !== undefined ? data.employee : originalDoc?.employee)
   if (employee !== undefined) {
     const emp = await req.payload.findByID({ collection: 'employees', id: employee, depth: 0, overrideAccess: true /* SYSTEM-READ: same-PT check */, req, disableErrors: true })
-    const empCompany = relId((emp as { company?: unknown } | null)?.company)
-    if (!emp || (empCompany !== undefined && empCompany !== company)) {
+    if (!emp || relId((emp as { company?: unknown }).company) !== company) {
       throw new APIError('Karyawan harus dari PT yang sama dengan keanggotaan.', 400, null, true)
     }
   }
@@ -74,7 +73,10 @@ export const CompanyMemberships: CollectionConfig = withAudit(
         type: 'relationship',
         relationTo: 'employees',
         label: 'Karyawan di PT ini',
-        // C2 (MC1-2): filterOptions = employees of the membership's PT
+        filterOptions: ({ data }) => {
+          const c = relId((data as { company?: unknown } | undefined)?.company)
+          return c === undefined ? false : { company: { equals: c } }
+        },
       },
       {
         name: 'roles',

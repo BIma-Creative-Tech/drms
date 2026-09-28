@@ -6,6 +6,7 @@ import { reasonOnChange, reasonOnDeactivate, withAudit } from '@/audit/hooks'
 import { activeField, rupiahField, uuidField } from '@/fields/common'
 
 import { businessDateField } from './fields-f2'
+import { companyField, companyHook } from '@/fields/company'
 
 /**
  * S3b / E11 (ADR 0005 "As implemented (S3b)"): the opening balance is final once a period on or after
@@ -45,7 +46,7 @@ export const CashAccounts: CollectionConfig = withAudit(
     slug: 'cash-accounts',
     labels: { singular: 'Akun kas/bank', plural: 'Akun kas/bank' },
     admin: { useAsTitle: 'name', group: 'Keuangan', defaultColumns: ['name', 'kind', 'accountNo', 'active'] },
-    hooks: { beforeChange: [openingBalanceLock] },
+    hooks: { beforeChange: [companyHook('cash-accounts'), openingBalanceLock] },
     access: {
       read: byRole({ 'pk-admin': true, 'pk-finance': true, 'pk-owner': true }),
       create: rolesAllowed('pk-admin', 'pk-finance'),
@@ -53,7 +54,8 @@ export const CashAccounts: CollectionConfig = withAudit(
       delete: denyAll,
     },
     fields: [
-      { name: 'name', type: 'text', label: 'Nama akun', required: true, unique: true, maxLength: 128 },
+      companyField(),
+      { name: 'name', type: 'text', label: 'Nama akun', required: true, index: true, maxLength: 128 },
       {
         name: 'kind',
         type: 'select',

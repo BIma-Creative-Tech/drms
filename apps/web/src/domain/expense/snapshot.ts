@@ -83,7 +83,7 @@ export async function snapshotForRule(req: PayloadRequest, rule: RuleInput, excl
 export async function loadActiveRules(req: PayloadRequest, docType: 'expense_request' | 'budget_addendum', companyId: number): Promise<RuleInput[]> {
   const res = await req.payload.find({
     collection: 'approval-rules',
-    where: { and: [{ active: { equals: true } }, { docType: { equals: docType } }, /* C2-FILTER */ ...(companyId > 0 ? [] : [])] },
+    where: { and: [{ active: { equals: true } }, { docType: { equals: docType } }, { company: { equals: companyId } }] },
     depth: 0,
     pagination: false,
     overrideAccess: true, // SYSTEM-READ: approval rules

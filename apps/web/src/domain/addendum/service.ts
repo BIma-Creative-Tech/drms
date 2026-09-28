@@ -269,6 +269,7 @@ async function notify(req: PayloadRequest, doc: AddendumDoc, event: AddendumEven
         docType: 'budget_addendum',
         docId: String(doc.id),
         docNo: doc.docNo ?? null,
+        company: relId(doc.company) ?? null, // ADR 0016 §4
         pushStatus: pushEnabled() ? 'pending' : 'skipped',
       } as never,
       depth: 0,

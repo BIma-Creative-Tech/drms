@@ -1,10 +1,11 @@
 import type { CollectionConfig } from 'payload'
 
-import { anyRole, denyAll } from '@/access/roles'
-import { byRole, rolesAllowed } from '@/access/policies'
+import { denyAll } from '@/access/roles'
+import { byRole, rolesAllowed, anyMember } from '@/access/policies'
 import { reasonOnDeactivate, withAudit } from '@/audit/hooks'
 import { WEEKDAY_KEYS } from '@/domain/attendance/schedule'
 import { activeField } from '@/fields/common'
+import { companyField, companyHook } from '@/fields/company'
 
 const HHMM = /^([01][0-9]|2[0-3]):[0-5][0-9]$/
 const hhmm = (v: unknown) => (typeof v === 'string' && HHMM.test(v) ? true : 'Format jam HH:MM (00:00–23:59).')
@@ -24,13 +25,15 @@ export const WorkSchedules: CollectionConfig = withAudit(
     labels: { singular: 'Jadwal kerja', plural: 'Jadwal kerja' },
     admin: { useAsTitle: 'name', group: 'Master Data', defaultColumns: ['name', 'startTime', 'endTime', 'lateToleranceMin', 'active'] },
     access: {
-      read: anyRole,
+      read: anyMember,
       create: rolesAllowed('pk-admin'),
       update: byRole({ 'pk-admin': true, 'pk-owner': true }),
       delete: denyAll,
     },
+    hooks: { beforeChange: [companyHook('work-schedules')] },
     fields: [
-      { name: 'name', type: 'text', label: 'Nama', required: true, unique: true, maxLength: 64 },
+      companyField(),
+      { name: 'name', type: 'text', label: 'Nama', required: true, index: true, maxLength: 64 },
       { name: 'startTime', type: 'text', label: 'Jam masuk', required: true, validate: hhmm },
       {
         name: 'endTime',

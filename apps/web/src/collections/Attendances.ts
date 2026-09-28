@@ -5,6 +5,7 @@ import { anyOf, byRole, ownEmployee, ownUser, teamCostCenters, teamProjects } fr
 import { withAudit } from '@/audit/hooks'
 
 import { ro } from './fields-f2'
+import { companyField, companyHook } from '@/fields/company'
 
 /** Read-only JSON without Monaco (CSP, config-guards.test.ts). */
 const jsonView = { readOnly: true, components: { Field: '@/components/ReadOnlyJson#ReadOnlyJson' } }
@@ -47,7 +48,9 @@ export const Attendances: CollectionConfig = withAudit(
       update: denyAll,
       delete: denyAll,
     },
+    hooks: { beforeChange: [companyHook('attendances', { derive: [{ field: 'employee', collection: 'employees' }], check: [{ field: 'project', collection: 'projects' }, { field: 'costCenter', collection: 'cost-centers' }] })] },
     fields: [
+      companyField({ derived: true }),
       { name: 'employee', type: 'relationship', relationTo: 'employees', label: 'Karyawan', required: true, index: true, admin: ro },
       // E6: empty for "diabsenkan PM" of an employee without an account (US-14, Q-29).
       { name: 'user', type: 'relationship', relationTo: 'users', label: 'Akun', index: true, admin: ro },

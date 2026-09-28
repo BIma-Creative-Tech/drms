@@ -5,6 +5,7 @@ import { anyOf, byRole, ownEmployee, teamCostCenters, teamProjects } from '@/acc
 import { withAudit } from '@/audit/hooks'
 
 import { ro } from './fields-f2'
+import { companyField, companyHook } from '@/fields/company'
 
 const dt = { ...ro, date: { pickerAppearance: 'dayAndTime' as const } }
 
@@ -38,7 +39,9 @@ export const AttendanceCorrections: CollectionConfig = withAudit(
       update: denyAll,
       delete: denyAll,
     },
+    hooks: { beforeChange: [companyHook('attendance-corrections', { derive: [{ field: 'attendance', collection: 'attendances' }], check: [{ field: 'employee', collection: 'employees' }, { field: 'project', collection: 'projects' }, { field: 'costCenter', collection: 'cost-centers' }] })] },
     fields: [
+      companyField({ derived: true }),
       { name: 'attendance', type: 'relationship', relationTo: 'attendances', label: 'Absensi', required: true, index: true, admin: ro },
       { name: 'employee', type: 'relationship', relationTo: 'employees', label: 'Karyawan', required: true, index: true, admin: ro },
       { name: 'project', type: 'relationship', relationTo: 'projects', label: 'Project', index: true, admin: ro },

@@ -1,7 +1,7 @@
 import type { CollectionConfig } from 'payload'
 
 import { denyAll } from '@/access/roles'
-import { byRole, ownUser } from '@/access/policies'
+import { byRoleAny, ownUser } from '@/access/policies'
 import { uuidField } from '@/fields/common'
 
 import { ro } from './fields-f2'
@@ -19,7 +19,7 @@ export const Notifications: CollectionConfig = {
   labels: { singular: 'Notifikasi', plural: 'Notifikasi' },
   admin: { group: 'Sistem', useAsTitle: 'title', defaultColumns: ['user', 'event', 'title', 'docNo', 'readAt', 'createdAt'] },
   access: {
-    read: byRole({ 'pk-staff': ownUser('user'), 'pk-pm': ownUser('user'), 'pk-finance': ownUser('user'), 'pk-owner': ownUser('user'), 'pk-admin': ownUser('user') }),
+    read: byRoleAny({ 'pk-staff': ownUser('user'), 'pk-pm': ownUser('user'), 'pk-finance': ownUser('user'), 'pk-owner': ownUser('user'), 'pk-admin': ownUser('user') }),
     create: denyAll,
     update: denyAll,
     delete: denyAll,
@@ -27,6 +27,8 @@ export const Notifications: CollectionConfig = {
   lockDocuments: false,
   fields: [
     { name: 'user', type: 'relationship', relationTo: 'users', label: 'Penerima', required: true, index: true, admin: ro },
+    // ADR 0016 §4: PT of the document the notification is about (nullable; MC2: reminders set it too)
+    { name: 'company', type: 'relationship', relationTo: 'companies', label: 'PT', index: true, admin: ro },
     { name: 'event', type: 'text', label: 'Event', required: true, maxLength: 64, index: true, admin: ro },
     { name: 'title', type: 'text', label: 'Judul', required: true, maxLength: 160, admin: ro },
     { name: 'body', type: 'textarea', label: 'Isi', required: true, maxLength: 1000, admin: ro },

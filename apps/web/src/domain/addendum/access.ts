@@ -1,6 +1,7 @@
 import type { PayloadRequest } from 'payload'
 
-import { hasRoleAny, userId } from '@/access/roles'
+import { hasRole, hasRoleAny, userId } from '@/access/roles'
+import { companyOf } from '@/domain/companies'
 import { resolveScope } from '@/access/scope'
 
 /**
@@ -10,8 +11,10 @@ import { resolveScope } from '@/access/scope'
 
 /** PM of the project's team (pk-pm + team scope) — the only creator/submitter (US-18). */
 export async function isTeamPm(req: PayloadRequest, projectId: number): Promise<boolean> {
-  if (!hasRoleAny(req, 'pk-pm')) return false
-  return (await resolveScope(req)).teamProjects.includes(projectId)
+  // ADR 0016 §5: PM role and team scope IN THE PROJECT's PT
+  const company = await companyOf(req, 'projects', projectId)
+  if (!hasRole(req, 'pk-pm', company)) return false
+  return (await resolveScope(req, company ?? null)).teamProjects.includes(projectId)
 }
 
 /** Roles that can read addenda at all (Admin/Staff get an empty list, never a 403 inside a transaction). */

@@ -1,7 +1,7 @@
 import type { Access, Where } from 'payload'
 
 import { anyRole } from '@/access/roles'
-import { anyOf, byRole, ownUser, rolesAllowed, type Rule } from '@/access/policies'
+import { anyOf, byRoleAny, ownUser, rolesAllowedAny, type Rule } from '@/access/policies'
 import { visibleRequestIds } from '@/domain/expense/access'
 import { reportPhotoWhere } from '@/domain/progress/access'
 
@@ -22,7 +22,7 @@ const ownerRequestRule: Rule = async ({ req }) => {
   return where
 }
 
-const ownOrOffice: Access = byRole({
+const ownOrOffice: Access = byRoleAny({
   'pk-admin': true,
   'pk-owner': true,
   'pk-finance': true,
@@ -34,7 +34,7 @@ const ownOrOffice: Access = byRole({
  * F2a: files of business documents are also readable by everyone who may read the owning
  * expense request (owner link set by the domain service, immutable once set — DB trigger).
  */
-const ownerLinked: Access = byRole({
+const ownerLinked: Access = byRoleAny({
   'pk-admin': true,
   'pk-owner': true,
   'pk-finance': true,
@@ -47,7 +47,7 @@ const ownerLinked: Access = byRole({
  * owning progress report (PM team; owner link set by the report service, immutable — DB trigger).
  */
 const reportPhotoRule: Rule = async ({ req }) => reportPhotoWhere(req)
-const progressPhotoRead: Access = byRole({
+const progressPhotoRead: Access = byRoleAny({
   'pk-admin': true,
   'pk-owner': true,
   'pk-finance': true,
@@ -81,7 +81,7 @@ export const MediaReceipts = mediaCollection({
   resizeOptions: { width: 1600, height: 1600, fit: 'inside', withoutEnlargement: true },
   formatOptions: { format: 'jpeg', options: { quality: 82, mozjpeg: true } },
   imageSizes: [thumb],
-  access: { read: ownerLinked, create: rolesAllowed('pk-staff', 'pk-pm', 'pk-finance', 'pk-admin') },
+  access: { read: ownerLinked, create: rolesAllowedAny('pk-staff', 'pk-pm', 'pk-finance', 'pk-admin') },
 })
 
 export const MediaTransferProofs = mediaCollection({
@@ -93,7 +93,7 @@ export const MediaTransferProofs = mediaCollection({
   imageSizes: [thumbJpeg],
   maxBytesByMime: { 'application/pdf': 2 * 1024 * 1024 },
   disposition: 'attachment',
-  access: { read: ownerLinked, create: rolesAllowed('pk-finance') },
+  access: { read: ownerLinked, create: rolesAllowedAny('pk-finance') },
 })
 
 export const MediaSelfies = mediaCollection({
@@ -105,7 +105,7 @@ export const MediaSelfies = mediaCollection({
   // failed ("Invalid file type: 'image/webp'", same cause as the F2a thumbnail finding). JPEG also
   // keeps selfies embeddable in PDF recaps (@react-pdf: JPEG/PNG only).
   formatOptions: { format: 'jpeg', options: { quality: 75, mozjpeg: true } },
-  access: { read: ownOrOffice, create: rolesAllowed('pk-staff', 'pk-pm', 'pk-admin') },
+  access: { read: ownOrOffice, create: rolesAllowedAny('pk-staff', 'pk-pm', 'pk-admin') },
   // E6 S2 (Q-33): set by the selfieRetention job when the file was deleted from the volume. The row
   // stays as a tombstone (attendances.selfie_id is NOT NULL and append-only), without the image.
   extraFields: [{ name: 'removedAt', type: 'date', label: 'File dihapus (retensi)', index: true, access: { update: () => false }, admin: { readOnly: true } }],
@@ -120,7 +120,7 @@ export const MediaProgressPhotos = mediaCollection({
   formatOptions: { format: 'jpeg', options: { quality: 78, mozjpeg: true } },
   imageSizes: [thumbJpeg],
   // E4 (US-10): PM / Direktur upload; ≤ 5 per report (report service); EXIF/GPS stripped by re-encode.
-  access: { read: progressPhotoRead, create: rolesAllowed('pk-pm', 'pk-owner') },
+  access: { read: progressPhotoRead, create: rolesAllowedAny('pk-pm', 'pk-owner') },
 })
 
 export const MediaSignatures = mediaCollection({
@@ -141,7 +141,7 @@ export const MediaCompany = mediaCollection({
   resizeOptions: { width: 1024, height: 1024, fit: 'inside', withoutEnlargement: true },
   maxBytesByMime: { 'image/png': 2 * 1024 * 1024, 'image/jpeg': 2 * 1024 * 1024 },
   formatOptions: { format: 'png', options: { compressionLevel: 9 } },
-  access: { read: anyRole, create: rolesAllowed('pk-admin', 'pk-owner') },
+  access: { read: anyRole, create: rolesAllowedAny('pk-admin', 'pk-owner') },
 })
 
 export const MediaAttachments = mediaCollection({
@@ -153,7 +153,7 @@ export const MediaAttachments = mediaCollection({
   imageSizes: [thumbJpeg],
   maxBytesByMime: { 'application/pdf': 5 * 1024 * 1024 },
   disposition: 'attachment',
-  access: { read: ownerLinked, create: rolesAllowed('pk-staff', 'pk-pm', 'pk-finance', 'pk-admin') },
+  access: { read: ownerLinked, create: rolesAllowedAny('pk-staff', 'pk-pm', 'pk-finance', 'pk-admin') },
 })
 
 export const MEDIA_COLLECTIONS = [

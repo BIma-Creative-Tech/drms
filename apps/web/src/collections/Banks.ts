@@ -1,7 +1,7 @@
 import type { CollectionConfig } from 'payload'
 
 import { anyRole, denyAll } from '@/access/roles'
-import { byRole, rolesAllowed } from '@/access/policies'
+import { byRoleAny, rolesAllowedAny } from '@/access/policies'
 import { reasonOnDeactivate, withAudit } from '@/audit/hooks'
 import { activeField, codeField, uuidField } from '@/fields/common'
 
@@ -13,8 +13,8 @@ export const Banks: CollectionConfig = withAudit(
     admin: { useAsTitle: 'name', group: 'Master Data', defaultColumns: ['code', 'name', 'active'] },
     access: {
       read: anyRole,
-      create: rolesAllowed('pk-admin', 'pk-finance'),
-      update: byRole({ 'pk-admin': true, 'pk-finance': true, 'pk-owner': true }),
+      create: rolesAllowedAny('pk-admin', 'pk-finance'),
+      update: byRoleAny({ 'pk-admin': true, 'pk-finance': true, 'pk-owner': true }),
       delete: denyAll,
     },
     fields: [

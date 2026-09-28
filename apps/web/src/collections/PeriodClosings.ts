@@ -5,6 +5,7 @@ import { byRole } from '@/access/policies'
 import { denyDeleteLogged } from '@/domain/expense/access'
 
 import { ro } from './fields-f2'
+import { companyField, companyHook } from '@/fields/company'
 
 /**
  * Tutup buku bulanan (ADR 0005 §6, requirements §9 "Keuangan"). One row per close; re-open (Owner,
@@ -22,7 +23,9 @@ export const PeriodClosings: CollectionConfig = {
     update: denyAll,
     delete: denyDeleteLogged('period_closing'),
   },
+  hooks: { beforeChange: [companyHook('period-closings')] },
   fields: [
+    companyField(),
     { name: 'period', type: 'text', label: 'Periode (YYYY-MM)', required: true, index: true, admin: ro },
     { name: 'status', type: 'select', required: true, defaultValue: 'closed', options: [{ label: 'Ditutup', value: 'closed' }, { label: 'Dibuka kembali', value: 'reopened' }], admin: ro },
     { name: 'note', type: 'text', maxLength: 500, admin: ro },

@@ -4,6 +4,7 @@ import { denyAll } from '@/access/roles'
 import { byRole, rolesAllowed } from '@/access/policies'
 import { reasonOnDeactivate, withAudit } from '@/audit/hooks'
 import { activeField, odooRefField, uuidField } from '@/fields/common'
+import { companyField, companyHook } from '@/fields/company'
 
 /** Vendor (opsional; duplikat nota). Admin/Finance C/R/U, Owner R/U, PM R. */
 export const Vendors: CollectionConfig = withAudit(
@@ -17,7 +18,9 @@ export const Vendors: CollectionConfig = withAudit(
       update: byRole({ 'pk-admin': true, 'pk-finance': true, 'pk-owner': true }),
       delete: denyAll,
     },
+    hooks: { beforeChange: [companyHook('vendors')] },
     fields: [
+      companyField(),
       { name: 'name', type: 'text', label: 'Nama', required: true, maxLength: 160 },
       { name: 'contact', type: 'text', label: 'Kontak', maxLength: 128 },
       {

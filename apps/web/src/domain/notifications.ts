@@ -270,6 +270,7 @@ async function deliver(req: PayloadRequest, doc: Doc, events: Array<{ event: Not
           docType: 'expense_request',
           docId: String(doc.id),
           docNo: doc.docNo ?? null,
+          company: relId(doc.company) ?? null, // ADR 0016 §4 (PT label / filter)
           pushStatus: pushEnabled() ? 'pending' : 'skipped',
         } as never,
         depth: 0,

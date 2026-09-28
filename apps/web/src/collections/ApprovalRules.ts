@@ -7,6 +7,7 @@ import { reasonOnAnyUpdate, withAudit } from '@/audit/hooks'
 import { isDecisionRole, ruleDecisionError } from '@/domain/expense/decision'
 import { stepsError, type AckBy, type AckMode } from '@/domain/expense/rules'
 import { activeField, rupiahField } from '@/fields/common'
+import { companyField, companyHook } from '@/fields/company'
 
 const roleOptions = ROLES.map((r) => ({ label: ROLE_LABELS[r], value: r }))
 /** ADR 0013: only Direktur/Finance are offered for decision positions (the DB enum keeps every role). */
@@ -32,7 +33,7 @@ export const ApprovalRules: CollectionConfig = withAudit(
       delete: denyAll,
     },
     hooks: {
-      beforeChange: [
+      beforeChange: [companyHook('approval-rules', { check: [{ field: 'category', collection: 'expense-categories' }, { field: 'project', collection: 'projects' }, { field: 'costCenter', collection: 'cost-centers' }, { field: 'acknowledgeUser', collection: 'users', member: true }, { field: 'steps', collection: 'users', sub: 'approverUser', member: true }] }),
         async ({ data, originalDoc, req }) => {
           const min = (data.minAmount ?? originalDoc?.minAmount ?? 0) as number
           const max = (data.maxAmount ?? originalDoc?.maxAmount ?? null) as number | null
@@ -73,6 +74,7 @@ export const ApprovalRules: CollectionConfig = withAudit(
       ],
     },
     fields: [
+      companyField(),
       { name: 'name', type: 'text', label: 'Nama aturan', required: true, maxLength: 128 },
       {
         name: 'docType',

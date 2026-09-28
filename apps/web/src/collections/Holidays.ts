@@ -1,7 +1,7 @@
 import type { CollectionConfig } from 'payload'
 
 import { anyRole, denyAll } from '@/access/roles'
-import { byRole, rolesAllowed } from '@/access/policies'
+import { byRoleAny, rolesAllowedAny } from '@/access/policies'
 import { reasonOnAnyUpdate, withAudit } from '@/audit/hooks'
 
 /** Hari libur (rekap absensi). Admin C/R/U, Owner R/U, all R. Date = business date (YYYY-MM-DD). */
@@ -12,8 +12,8 @@ export const Holidays: CollectionConfig = withAudit(
     admin: { useAsTitle: 'name', group: 'Master Data', defaultColumns: ['date', 'name'] },
     access: {
       read: anyRole,
-      create: rolesAllowed('pk-admin'),
-      update: byRole({ 'pk-admin': true, 'pk-owner': true }),
+      create: rolesAllowedAny('pk-admin'),
+      update: byRoleAny({ 'pk-admin': true, 'pk-owner': true }),
       delete: denyAll,
     },
     fields: [

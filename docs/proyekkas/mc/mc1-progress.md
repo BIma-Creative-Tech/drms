@@ -24,8 +24,8 @@ data: `pg_dump` of a DB migrated to develop head and filled by the full integrat
 | WP | Status | Commit | Notes |
 |---|---|---|---|
 | MC1-1 collections, global shrink, users | done | (this commit) | unit 518/518, integration all 33 files green (C1 full run + reruns) |
-| MC1-2 company column + access per PT | open | — | |
-| MC1-3 access helpers + auth (rest) | open | — | parts needed by MC1-1 are in the MC1-1 commit |
+| MC1-2 company column + access per PT | done | (commit 2) | incl. MC1-3 remainder (selection, per-PT decision guards); integration 33 files / 437 + 1 skipped green |
+| MC1-3 access helpers + auth | done | commits 1 + 2 | split: context/auth in MC1-1, per-PT policies/guards in MC1-2 |
 | MC1-4 security migration (triggers, lock date, NOT NULL) | open | — | |
 | MC1-5 numbering per PT | open | — | |
 | MC1-6 isolation tests + seed shapes | open | — | |
@@ -56,11 +56,21 @@ data: `pg_dump` of a DB migrated to develop head and filled by the full integrat
   Verified on the develop-head snapshot: 1 company, 269 memberships, 275 role rows, 108 employee links,
   29 group admins; down → up round trip identical.
 
-## Open TODOs / notes for the next agent
+### MC1-2 (done)
 
-- C2 markers in code: `// C2-FILTER` in `domain/expense/snapshot.ts` (`loadActiveRules` company filter),
-  `CompanyMemberships.employee` filterOptions + strict same-PT employee check (needs `employees.company`),
-  `fields/company.ts` + new `policies.ts`/`scope.ts` drafts are in the agent scratchpad until MC1-2.
+- `fields/company.ts`: `companyField()` (not `required` at the Payload level — the hook always fills it; DB NOT NULL)
+  + `companyHook(slug, { derive, check })` (derive = parents the PT is copied from, check = further per-PT
+  references incl. `member` = user with an active membership in the PT; pending create-role check).
+- `access/policies.ts`: `byRole` per PT, `byRoleAny`, `rolesAllowed` (role in `data.company` / pending check),
+  `rolesAllowedAny`, `fieldRoles` (document PT), `anyMember`, `usersOfMyCompanies` (users/devices of the caller's PTs
+  + accounts without membership). `access/scope.ts`: `resolveScope(req, companyId | null)`.
+- Decision paths per PT: `actorContext` (roles + employee in the document PT), `byVisibleRequest` (office roles of
+  the PT), drafts (`validateContent`/create), addendum `isTeamPm`, progress `canReportOn`, stages, team assignments,
+  employee phone field, rule loading (`loadActiveRules(…, companyId)`), approver pools (`snapshotForRule(…, companyId)`).
+- Audit rows carry `company` (from the document; `companies` rows → their id), actor roles = roles in that PT.
+- Migration `20260927_234849_mc1_company_columns`: generated columns/FKs/indexes + backfill (user triggers disabled
+  for the one UPDATE), NOT NULL, per-PT unique indexes (`<table>_company_<col>_key`), derive triggers
+  (`<table>_00_company`, sorted first). Verified on the staging copy (637 requests, 475 cash entries → company #1).
 - `// MC2:` leak points are listed in the final section of this file (kept up to date per WP).
 
 ## `// MC2:` leak points (raw SQL / company-blind paths)

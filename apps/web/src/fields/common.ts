@@ -53,13 +53,18 @@ export function activeField(): CheckboxField {
   }
 }
 
-export function codeField(label = 'Kode', maxLength = 32): TextField {
+/**
+ * `code` of a master. Shared masters (banks, UoM): globally unique. Per-PT masters pass
+ * `{ perCompany: true }`: unique per (company_id, code) through a raw-SQL index of migration
+ * `*_mc1_company_columns` (ADR 0016 §4) — two PTs may use the same code.
+ */
+export function codeField(label = 'Kode', maxLength = 32, opts: { perCompany?: boolean } = {}): TextField {
   return {
     name: 'code',
     type: 'text',
     label,
     required: true,
-    unique: true,
+    unique: !opts.perCompany,
     index: true,
     maxLength,
     validate: (v: unknown) =>

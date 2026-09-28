@@ -116,12 +116,13 @@ export async function seedUat(payload: Payload, users: UatUser[]): Promise<UatRe
   const update = (req: PayloadRequest, collection: CollectionSlug, id: number, data: Record<string, unknown>) =>
     payload.update({ collection, id, data: data as never, depth: 0, overrideAccess: true /* SYSTEM-WRITE: UAT seed */, context: { skipKeycloakSync: true }, req })
 
-  // Prerequisites from the base seed.
+  // Prerequisites from the base seed (company #1 DRMS: the UAT runs in it, ADR 0016).
+  const companyId = await firstActiveCompanyId(payload)
+  const inPt = (w: Where): Where => ({ and: [{ company: { equals: companyId } }, w] })
   const pre = await step(async (req) => ({
     bank: (await findOne(req, 'banks', { code: { equals: UAT_FIXTURE.bankCode } }))?.id,
-    costCenter: await findOne(req, 'cost-centers', { code: { equals: UAT_FIXTURE.costCenterCode } }),
+    costCenter: await findOne(req, 'cost-centers', inPt({ code: { equals: UAT_FIXTURE.costCenterCode } })),
   }))
-  const companyId = await firstActiveCompanyId(payload)
   if (pre.bank === undefined || !pre.costCenter) {
     throw new Error(`base seed missing: bank ${UAT_FIXTURE.bankCode} and cost center ${UAT_FIXTURE.costCenterCode} are required (run src/seed/index.ts first)`)
   }
@@ -135,9 +136,9 @@ export async function seedUat(payload: Payload, users: UatUser[]): Promise<UatRe
     seenRole.set(u.role, nth)
     await step(async (req) => {
       const code = uatEmployeeCode(u.role, nth)
-      let emp = (await findOne(req, 'employees', { code: { equals: code } }))?.id
+      let emp = (await findOne(req, 'employees', inPt({ code: { equals: code } })))?.id
       if (emp === undefined) {
-        emp = await create(req, 'employees', { code, name: u.name, active: true })
+        emp = await create(req, 'employees', { company: companyId, code, name: u.name, active: true })
         tally('employees', 'created')
       } else tally('employees', 'skipped')
       if (nth === 1) empIds.set(u.role, emp)
@@ -186,7 +187,7 @@ export async function seedUat(payload: Payload, users: UatUser[]): Promise<UatRe
 
   // 3: OPS-PB manager — only when empty (never overwrite a real manager).
   await step(async (req) => {
-    const cc = await findOne(req, 'cost-centers', { code: { equals: UAT_FIXTURE.costCenterCode } })
+    const cc = await findOne(req, 'cost-centers', inPt({ code: { equals: UAT_FIXTURE.costCenterCode } }))
     if (cc && relId(cc.manager) === undefined) {
       await update(req, 'cost-centers', cc.id, { manager: pmUser })
       tally('cost-centers.manager', 'linked')
@@ -212,13 +213,13 @@ export async function seedUat(payload: Payload, users: UatUser[]): Promise<UatRe
 
   // 5: fictional project + team assignments (Staff → project + OPS-PB; PM → project as pm).
   const project = await step(async (req) => {
-    const found = await findOne(req, 'projects', { code: { equals: UAT_FIXTURE.project.code } })
+    const found = await findOne(req, 'projects', inPt({ code: { equals: UAT_FIXTURE.project.code } }))
     if (found) {
       tally('projects', 'skipped')
       return found.id
     }
     const { code, name, budget, status } = UAT_FIXTURE.project
-    const id = await create(req, 'projects', { code, name, pm: pmUser, budget, status })
+    const id = await create(req, 'projects', { company: companyId, code, name, pm: pmUser, budget, status })
     tally('projects', 'created')
     return id
   })

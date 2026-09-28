@@ -83,8 +83,11 @@ export async function makeWorld(tag: string) {
   installFakeKeycloak()
   await seed(p) // masters, sequences, default approval rules (idempotent)
   const code = (c: string) => `${tag}-${c}`
+  // ADR 0016: masters are per PT (codes repeat across PTs) — the world lives in company #1 DRMS
+  const drms = await companyId()
+  const shared = new Set<CollectionSlug>(['banks', 'uoms'])
   const ids = async (collection: CollectionSlug, field: string, value: string) =>
-    ((await p.find({ collection, where: { [field]: { equals: value } }, limit: 1, depth: 0, overrideAccess: true /* SYSTEM-READ: fixture */ })).docs[0]?.id as number)
+    ((await p.find({ collection, where: shared.has(collection) ? { [field]: { equals: value } } : { and: [{ company: { equals: drms } }, { [field]: { equals: value } }] }, limit: 1, depth: 0, overrideAccess: true /* SYSTEM-READ: fixture */ })).docs[0]?.id as number)
 
   const emp = {
     a: await sysCreate('employees', { code: code('A'), name: `${tag} Staff A` }),

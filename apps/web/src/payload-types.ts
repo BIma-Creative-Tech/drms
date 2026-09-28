@@ -425,6 +425,10 @@ export interface MediaCompany {
  */
 export interface WorkSchedule {
   id: number;
+  /**
+   * Wajib bila Anda anggota lebih dari satu PT; tidak dapat diubah setelah dibuat.
+   */
+  company?: (number | null) | Company;
   name: string;
   startTime: string;
   endTime: string;
@@ -470,6 +474,10 @@ export interface CompanyMembership {
  */
 export interface Employee {
   id: number;
+  /**
+   * Wajib bila Anda anggota lebih dari satu PT; tidak dapat diubah setelah dibuat.
+   */
+  company?: (number | null) | Company;
   code: string;
   name: string;
   nickname?: string | null;
@@ -528,6 +536,10 @@ export interface MediaSelfy {
  */
 export interface EmployeeBankAccount {
   id: number;
+  /**
+   * Mengikuti dokumen induk.
+   */
+  company?: (number | null) | Company;
   employee: number | Employee;
   bank: number | Bank;
   accountNo: string;
@@ -567,6 +579,10 @@ export interface Bank {
  */
 export interface Client {
   id: number;
+  /**
+   * Wajib bila Anda anggota lebih dari satu PT; tidak dapat diubah setelah dibuat.
+   */
+  company?: (number | null) | Company;
   name: string;
   contact?: string | null;
   phone?: string | null;
@@ -590,6 +606,10 @@ export interface Client {
  */
 export interface Vendor {
   id: number;
+  /**
+   * Wajib bila Anda anggota lebih dari satu PT; tidak dapat diubah setelah dibuat.
+   */
+  company?: (number | null) | Company;
   name: string;
   contact?: string | null;
   npwp?: string | null;
@@ -613,6 +633,10 @@ export interface Vendor {
  */
 export interface Project {
   id: number;
+  /**
+   * Wajib bila Anda anggota lebih dari satu PT; tidak dapat diubah setelah dibuat.
+   */
+  company?: (number | null) | Company;
   code: string;
   name: string;
   client?: (number | null) | Client;
@@ -650,6 +674,10 @@ export interface Project {
  */
 export interface ProjectStage {
   id: number;
+  /**
+   * Mengikuti dokumen induk.
+   */
+  company?: (number | null) | Company;
   project: number | Project;
   name: string;
   weightPct?: number | null;
@@ -673,6 +701,10 @@ export interface ProjectStage {
  */
 export interface StageTemplate {
   id: number;
+  /**
+   * Wajib bila Anda anggota lebih dari satu PT; tidak dapat diubah setelah dibuat.
+   */
+  company?: (number | null) | Company;
   name: string;
   items?:
     | {
@@ -696,6 +728,10 @@ export interface StageTemplate {
  */
 export interface BudgetLine {
   id: number;
+  /**
+   * Mengikuti dokumen induk.
+   */
+  company?: (number | null) | Company;
   project: number | Project;
   category: number | ExpenseCategory;
   amount: number;
@@ -712,6 +748,10 @@ export interface BudgetLine {
  */
 export interface ExpenseCategory {
   id: number;
+  /**
+   * Wajib bila Anda anggota lebih dari satu PT; tidak dapat diubah setelah dibuat.
+   */
+  company?: (number | null) | Company;
   code: string;
   name: string;
   coaCode?: string | null;
@@ -758,6 +798,10 @@ export interface Uom {
  */
 export interface CashInSource {
   id: number;
+  /**
+   * Wajib bila Anda anggota lebih dari satu PT; tidak dapat diubah setelah dibuat.
+   */
+  company?: (number | null) | Company;
   code: string;
   name: string;
   coaCode?: string | null;
@@ -776,6 +820,10 @@ export interface CashInSource {
  */
 export interface CashAccount {
   id: number;
+  /**
+   * Wajib bila Anda anggota lebih dari satu PT; tidak dapat diubah setelah dibuat.
+   */
+  company?: (number | null) | Company;
   name: string;
   kind: 'cash' | 'bank';
   bank?: (number | null) | Bank;
@@ -802,6 +850,10 @@ export interface CashAccount {
  */
 export interface TeamAssignment {
   id: number;
+  /**
+   * Mengikuti dokumen induk.
+   */
+  company?: (number | null) | Company;
   employee: number | Employee;
   project?: (number | null) | Project;
   costCenter?: (number | null) | CostCenter;
@@ -821,6 +873,10 @@ export interface TeamAssignment {
  */
 export interface CostCenter {
   id: number;
+  /**
+   * Wajib bila Anda anggota lebih dari satu PT; tidak dapat diubah setelah dibuat.
+   */
+  company?: (number | null) | Company;
   code: string;
   name: string;
   type: 'operational' | 'department';
@@ -865,6 +921,10 @@ export interface Holiday {
  */
 export interface ApprovalRule {
   id: number;
+  /**
+   * Wajib bila Anda anggota lebih dari satu PT; tidak dapat diubah setelah dibuat.
+   */
+  company?: (number | null) | Company;
   name: string;
   docType: 'expense_request' | 'budget_addendum';
   requestType: 'any' | 'advance' | 'reimburse';
@@ -923,6 +983,10 @@ export interface NotificationTemplate {
  */
 export interface Vehicle {
   id: number;
+  /**
+   * Wajib bila Anda anggota lebih dari satu PT; tidak dapat diubah setelah dibuat.
+   */
+  company?: (number | null) | Company;
   plateNo: string;
   plateDisplay?: string | null;
   /**
@@ -951,6 +1015,10 @@ export interface Vehicle {
  */
 export interface DocumentSequence {
   id: number;
+  /**
+   * Wajib bila Anda anggota lebih dari satu PT; tidak dapat diubah setelah dibuat.
+   */
+  company?: (number | null) | Company;
   docType:
     | 'expense_request'
     | 'transfer'
@@ -986,6 +1054,10 @@ export interface DocumentSequence {
  */
 export interface ExpenseRequest {
   id: number;
+  /**
+   * Wajib bila Anda anggota lebih dari satu PT; tidak dapat diubah setelah dibuat.
+   */
+  company?: (number | null) | Company;
   docNo?: string | null;
   type: 'advance' | 'reimburse';
   status:
@@ -1127,6 +1199,10 @@ export interface MediaAttachment {
  */
 export interface ExpenseLineSnapshot {
   id: number;
+  /**
+   * Mengikuti dokumen induk.
+   */
+  company?: (number | null) | Company;
   request: number | ExpenseRequest;
   cycle: number;
   reason: 'submit' | 'approve' | 'receipts_resubmit';
@@ -1151,6 +1227,10 @@ export interface ExpenseLineSnapshot {
  */
 export interface Approval {
   id: number;
+  /**
+   * Mengikuti dokumen induk.
+   */
+  company?: (number | null) | Company;
   docType: 'expense_request' | 'budget_addendum';
   request?: (number | null) | ExpenseRequest;
   addendum?: (number | null) | BudgetAddendum;
@@ -1183,6 +1263,10 @@ export interface Approval {
  */
 export interface BudgetAddendum {
   id: number;
+  /**
+   * Mengikuti dokumen induk.
+   */
+  company?: (number | null) | Company;
   docNo?: string | null;
   project: number | Project;
   status: 'draft' | 'pending_ack' | 'pending_approval' | 'approved' | 'rejected' | 'cancelled';
@@ -1226,6 +1310,10 @@ export interface BudgetAddendum {
  */
 export interface Receipt {
   id: number;
+  /**
+   * Mengikuti dokumen induk.
+   */
+  company?: (number | null) | Company;
   request: number | ExpenseRequest;
   lineId: string;
   lineNo?: number | null;
@@ -1303,6 +1391,10 @@ export interface MediaReceipt {
  */
 export interface ReceiptFlag {
   id: number;
+  /**
+   * Mengikuti dokumen induk.
+   */
+  company?: (number | null) | Company;
   request: number | ExpenseRequest;
   key: string;
   kind: 'amount_diff' | 'date_after_request' | 'date_too_old' | 'date_out_of_period' | 'uom_suspicious' | 'duplicate';
@@ -1335,6 +1427,10 @@ export interface ReceiptFlag {
  */
 export interface Transfer {
   id: number;
+  /**
+   * Mengikuti dokumen induk.
+   */
+  company?: (number | null) | Company;
   docNo?: string | null;
   request: number | ExpenseRequest;
   kind: 'advance' | 'reimburse' | 'lpj_shortfall';
@@ -1409,6 +1505,10 @@ export interface MediaTransferProof {
  */
 export interface CashEntry {
   id: number;
+  /**
+   * Mengikuti dokumen induk.
+   */
+  company?: (number | null) | Company;
   entryNo?: string | null;
   entryDate: string;
   period?: string | null;
@@ -1447,6 +1547,10 @@ export interface CashEntry {
  */
 export interface Settlement {
   id: number;
+  /**
+   * Mengikuti dokumen induk.
+   */
+  company?: (number | null) | Company;
   docNo?: string | null;
   request: number | ExpenseRequest;
   status: 'draft' | 'submitted' | 'revision' | 'verified' | 'settled';
@@ -1484,6 +1588,10 @@ export interface Settlement {
  */
 export interface PeriodClosing {
   id: number;
+  /**
+   * Wajib bila Anda anggota lebih dari satu PT; tidak dapat diubah setelah dibuat.
+   */
+  company?: (number | null) | Company;
   period: string;
   status: 'closed' | 'reopened';
   note?: string | null;
@@ -1501,6 +1609,10 @@ export interface PeriodClosing {
  */
 export interface Attendance {
   id: number;
+  /**
+   * Mengikuti dokumen induk.
+   */
+  company?: (number | null) | Company;
   employee: number | Employee;
   user?: (number | null) | User;
   kind: 'check_in' | 'check_out';
@@ -1592,6 +1704,10 @@ export interface Device {
  */
 export interface AttendanceCorrection {
   id: number;
+  /**
+   * Mengikuti dokumen induk.
+   */
+  company?: (number | null) | Company;
   attendance: number | Attendance;
   employee: number | Employee;
   project?: (number | null) | Project;
@@ -1618,6 +1734,10 @@ export interface AttendanceCorrection {
  */
 export interface ProgressReport {
   id: number;
+  /**
+   * Mengikuti dokumen induk.
+   */
+  company?: (number | null) | Company;
   docNo?: string | null;
   project: number | Project;
   stage: number | ProjectStage;
@@ -1662,6 +1782,7 @@ export interface ProgressReport {
 export interface Notification {
   id: number;
   user: number | User;
+  company?: (number | null) | Company;
   event: string;
   title: string;
   body: string;
@@ -1767,6 +1888,7 @@ export interface AuditLog {
   statusTo?: string | null;
   reason?: string | null;
   userId?: number | null;
+  company?: (number | null) | Company;
   userRoles?: string | null;
   source?: ('web' | 'apk' | 'system' | 'job') | null;
   appVersion?: string | null;
@@ -2238,6 +2360,7 @@ export interface CompanyMembershipsSelect<T extends boolean = true> {
  * via the `definition` "employees_select".
  */
 export interface EmployeesSelect<T extends boolean = true> {
+  company?: T;
   code?: T;
   name?: T;
   nickname?: T;
@@ -2257,6 +2380,7 @@ export interface EmployeesSelect<T extends boolean = true> {
  * via the `definition` "employee-bank-accounts_select".
  */
 export interface EmployeeBankAccountsSelect<T extends boolean = true> {
+  company?: T;
   employee?: T;
   bank?: T;
   accountNo?: T;
@@ -2288,6 +2412,7 @@ export interface BanksSelect<T extends boolean = true> {
  * via the `definition` "clients_select".
  */
 export interface ClientsSelect<T extends boolean = true> {
+  company?: T;
   name?: T;
   contact?: T;
   phone?: T;
@@ -2304,6 +2429,7 @@ export interface ClientsSelect<T extends boolean = true> {
  * via the `definition` "vendors_select".
  */
 export interface VendorsSelect<T extends boolean = true> {
+  company?: T;
   name?: T;
   contact?: T;
   npwp?: T;
@@ -2320,6 +2446,7 @@ export interface VendorsSelect<T extends boolean = true> {
  * via the `definition` "projects_select".
  */
 export interface ProjectsSelect<T extends boolean = true> {
+  company?: T;
   code?: T;
   name?: T;
   client?: T;
@@ -2344,6 +2471,7 @@ export interface ProjectsSelect<T extends boolean = true> {
  * via the `definition` "project-stages_select".
  */
 export interface ProjectStagesSelect<T extends boolean = true> {
+  company?: T;
   project?: T;
   name?: T;
   weightPct?: T;
@@ -2360,6 +2488,7 @@ export interface ProjectStagesSelect<T extends boolean = true> {
  * via the `definition` "stage-templates_select".
  */
 export interface StageTemplatesSelect<T extends boolean = true> {
+  company?: T;
   name?: T;
   items?:
     | T
@@ -2379,6 +2508,7 @@ export interface StageTemplatesSelect<T extends boolean = true> {
  * via the `definition` "budget-lines_select".
  */
 export interface BudgetLinesSelect<T extends boolean = true> {
+  company?: T;
   project?: T;
   category?: T;
   amount?: T;
@@ -2391,6 +2521,7 @@ export interface BudgetLinesSelect<T extends boolean = true> {
  * via the `definition` "expense-categories_select".
  */
 export interface ExpenseCategoriesSelect<T extends boolean = true> {
+  company?: T;
   code?: T;
   name?: T;
   coaCode?: T;
@@ -2408,6 +2539,7 @@ export interface ExpenseCategoriesSelect<T extends boolean = true> {
  * via the `definition` "cash-in-sources_select".
  */
 export interface CashInSourcesSelect<T extends boolean = true> {
+  company?: T;
   code?: T;
   name?: T;
   coaCode?: T;
@@ -2422,6 +2554,7 @@ export interface CashInSourcesSelect<T extends boolean = true> {
  * via the `definition` "cash-accounts_select".
  */
 export interface CashAccountsSelect<T extends boolean = true> {
+  company?: T;
   name?: T;
   kind?: T;
   bank?: T;
@@ -2441,6 +2574,7 @@ export interface CashAccountsSelect<T extends boolean = true> {
  * via the `definition` "team-assignments_select".
  */
 export interface TeamAssignmentsSelect<T extends boolean = true> {
+  company?: T;
   employee?: T;
   project?: T;
   costCenter?: T;
@@ -2456,6 +2590,7 @@ export interface TeamAssignmentsSelect<T extends boolean = true> {
  * via the `definition` "work-schedules_select".
  */
 export interface WorkSchedulesSelect<T extends boolean = true> {
+  company?: T;
   name?: T;
   startTime?: T;
   endTime?: T;
@@ -2492,6 +2627,7 @@ export interface HolidaysSelect<T extends boolean = true> {
  * via the `definition` "approval-rules_select".
  */
 export interface ApprovalRulesSelect<T extends boolean = true> {
+  company?: T;
   name?: T;
   docType?: T;
   requestType?: T;
@@ -2554,6 +2690,7 @@ export interface UomsSelect<T extends boolean = true> {
  * via the `definition` "vehicles_select".
  */
 export interface VehiclesSelect<T extends boolean = true> {
+  company?: T;
   plateNo?: T;
   plateDisplay?: T;
   type?: T;
@@ -2572,6 +2709,7 @@ export interface VehiclesSelect<T extends boolean = true> {
  * via the `definition` "cost-centers_select".
  */
 export interface CostCentersSelect<T extends boolean = true> {
+  company?: T;
   code?: T;
   name?: T;
   type?: T;
@@ -2591,6 +2729,7 @@ export interface CostCentersSelect<T extends boolean = true> {
  * via the `definition` "document-sequences_select".
  */
 export interface DocumentSequencesSelect<T extends boolean = true> {
+  company?: T;
   docType?: T;
   docCode?: T;
   pattern?: T;
@@ -2608,6 +2747,7 @@ export interface DocumentSequencesSelect<T extends boolean = true> {
  * via the `definition` "expense-requests_select".
  */
 export interface ExpenseRequestsSelect<T extends boolean = true> {
+  company?: T;
   docNo?: T;
   type?: T;
   status?: T;
@@ -2669,6 +2809,7 @@ export interface ExpenseRequestsSelect<T extends boolean = true> {
  * via the `definition` "expense-line-snapshots_select".
  */
 export interface ExpenseLineSnapshotsSelect<T extends boolean = true> {
+  company?: T;
   request?: T;
   cycle?: T;
   reason?: T;
@@ -2684,6 +2825,7 @@ export interface ExpenseLineSnapshotsSelect<T extends boolean = true> {
  * via the `definition` "approvals_select".
  */
 export interface ApprovalsSelect<T extends boolean = true> {
+  company?: T;
   docType?: T;
   request?: T;
   addendum?: T;
@@ -2713,6 +2855,7 @@ export interface ApprovalsSelect<T extends boolean = true> {
  * via the `definition` "receipts_select".
  */
 export interface ReceiptsSelect<T extends boolean = true> {
+  company?: T;
   request?: T;
   lineId?: T;
   lineNo?: T;
@@ -2745,6 +2888,7 @@ export interface ReceiptsSelect<T extends boolean = true> {
  * via the `definition` "receipt-flags_select".
  */
 export interface ReceiptFlagsSelect<T extends boolean = true> {
+  company?: T;
   request?: T;
   key?: T;
   kind?: T;
@@ -2768,6 +2912,7 @@ export interface ReceiptFlagsSelect<T extends boolean = true> {
  * via the `definition` "transfers_select".
  */
 export interface TransfersSelect<T extends boolean = true> {
+  company?: T;
   docNo?: T;
   request?: T;
   kind?: T;
@@ -2799,6 +2944,7 @@ export interface TransfersSelect<T extends boolean = true> {
  * via the `definition` "settlements_select".
  */
 export interface SettlementsSelect<T extends boolean = true> {
+  company?: T;
   docNo?: T;
   request?: T;
   status?: T;
@@ -2832,6 +2978,7 @@ export interface SettlementsSelect<T extends boolean = true> {
  * via the `definition` "cash-entries_select".
  */
 export interface CashEntriesSelect<T extends boolean = true> {
+  company?: T;
   entryNo?: T;
   entryDate?: T;
   period?: T;
@@ -2866,6 +3013,7 @@ export interface CashEntriesSelect<T extends boolean = true> {
  * via the `definition` "period-closings_select".
  */
 export interface PeriodClosingsSelect<T extends boolean = true> {
+  company?: T;
   period?: T;
   status?: T;
   note?: T;
@@ -2882,6 +3030,7 @@ export interface PeriodClosingsSelect<T extends boolean = true> {
  * via the `definition` "attendances_select".
  */
 export interface AttendancesSelect<T extends boolean = true> {
+  company?: T;
   employee?: T;
   user?: T;
   kind?: T;
@@ -2915,6 +3064,7 @@ export interface AttendancesSelect<T extends boolean = true> {
  * via the `definition` "attendance-corrections_select".
  */
 export interface AttendanceCorrectionsSelect<T extends boolean = true> {
+  company?: T;
   attendance?: T;
   employee?: T;
   project?: T;
@@ -2935,6 +3085,7 @@ export interface AttendanceCorrectionsSelect<T extends boolean = true> {
  * via the `definition` "progress-reports_select".
  */
 export interface ProgressReportsSelect<T extends boolean = true> {
+  company?: T;
   docNo?: T;
   project?: T;
   stage?: T;
@@ -2966,6 +3117,7 @@ export interface ProgressReportsSelect<T extends boolean = true> {
  * via the `definition` "budget-addenda_select".
  */
 export interface BudgetAddendaSelect<T extends boolean = true> {
+  company?: T;
   docNo?: T;
   project?: T;
   status?: T;
@@ -2995,6 +3147,7 @@ export interface BudgetAddendaSelect<T extends boolean = true> {
  */
 export interface NotificationsSelect<T extends boolean = true> {
   user?: T;
+  company?: T;
   event?: T;
   title?: T;
   body?: T;
@@ -3078,6 +3231,7 @@ export interface AuditLogsSelect<T extends boolean = true> {
   statusTo?: T;
   reason?: T;
   userId?: T;
+  company?: T;
   userRoles?: T;
   source?: T;
   appVersion?: T;

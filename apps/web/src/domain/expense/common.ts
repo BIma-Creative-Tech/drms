@@ -1,7 +1,7 @@
 import { sql } from '@payloadcms/db-postgres'
 import { APIError, type PayloadRequest } from 'payload'
 
-import { relId, userId, userRoles } from '@/access/roles'
+import { employeeIn, relId, rolesIn, userId, userRoles } from '@/access/roles'
 import { writeAuditDetached } from '@/audit/writer'
 import { displayNames, settings } from '@/domain/companies'
 import { DEFAULT_TZ, localDateInTz } from '@/lib/time'
@@ -145,8 +145,11 @@ export async function approvalsOf(req: PayloadRequest, requestId: number, cycle?
 
 export async function actorContext(req: PayloadRequest, doc: RequestDoc): Promise<ActorContext> {
   const uid = userId(req) ?? -1
-  const roles = userRoles(req)
-  const emp = relId((req.user as { employee?: unknown } | null)?.employee)
+  // ADR 0016 §5: every decision / transfer / verification is checked against the caller's roles IN
+  // THE DOCUMENT's PT (Finance in PT A is nobody in PT B), and "requester" = the caller's employee there.
+  const company = relId((doc as { company?: unknown }).company)
+  const roles = company !== undefined ? rolesIn(req, company) : userRoles(req)
+  const emp = company !== undefined ? employeeIn(req, company) : relId((req.user as { employee?: unknown } | null)?.employee)
   const cycle = doc.approvalCycle ?? 0
   const rows = cycle > 0 ? await approvalsOf(req, doc.id, cycle) : []
   const decisions = rows.filter((r) => r.decision !== 'signed')

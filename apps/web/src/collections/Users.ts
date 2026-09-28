@@ -1,7 +1,7 @@
 import { APIError, type CollectionBeforeOperationHook, type CollectionConfig } from 'payload'
 
 import { PANEL_ROLES, denyAll, hasRoleAny, isGroupAdmin, relId, userId, userRoles } from '@/access/roles'
-import { byRole, fieldRoles, ownUser, rolesAllowed } from '@/access/policies'
+import { anyOf, byRoleAny, fieldRoles, ownUser, rolesAllowedAny, usersOfMyCompanies } from '@/access/policies'
 import { revokeCurrentWebSession } from '@/auth/sessions'
 import { mobileBearerStrategy, oidcSessionStrategy } from '@/auth/strategies'
 import { reasonOnDeactivate, withAudit } from '@/audit/hooks'
@@ -68,17 +68,18 @@ export const Users: CollectionConfig = withAudit(
     },
     access: {
       admin: ({ req }) => userRoles(req).some((r) => PANEL_ROLES.includes(r)),
-      read: byRole({
-        'pk-admin': true,
-        'pk-owner': true,
+      // ADR 0016 §5: Admin/Direktur see the accounts of THEIR PTs (+ not yet assigned ones); group admin all
+      read: byRoleAny({
+        'pk-admin': anyOf(ownUser('id'), usersOfMyCompanies('id', ['pk-admin', 'pk-owner'])),
+        'pk-owner': anyOf(ownUser('id'), usersOfMyCompanies('id', ['pk-admin', 'pk-owner'])),
         'pk-finance': ownUser('id'),
         'pk-pm': ownUser('id'),
         'pk-staff': ownUser('id'),
       }),
-      create: rolesAllowed('pk-admin'),
+      create: rolesAllowedAny('pk-admin'),
       // F2c: everyone may update their OWN row — field access limits that to `signature`.
-      update: byRole({
-        'pk-admin': true,
+      update: byRoleAny({
+        'pk-admin': anyOf(ownUser('id'), usersOfMyCompanies('id', ['pk-admin'])),
         'pk-owner': ownUser('id'),
         'pk-finance': ownUser('id'),
         'pk-pm': ownUser('id'),

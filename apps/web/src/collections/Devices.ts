@@ -1,7 +1,7 @@
 import { APIError, type CollectionAfterChangeHook, type CollectionBeforeChangeHook, type CollectionConfig } from 'payload'
 
 import { denyAll, relId } from '@/access/roles'
-import { byRole, fieldRoles, ownUser } from '@/access/policies'
+import { anyOf, byRoleAny, fieldRoles, ownUser, usersOfMyCompanies } from '@/access/policies'
 import { reasonOnChange, withAudit } from '@/audit/hooks'
 import { writeAudit } from '@/audit/writer'
 import { endKeycloakDeviceSession } from '@/domain/devices'
@@ -47,15 +47,15 @@ export const Devices: CollectionConfig = withAudit(
     labels: { singular: 'Perangkat', plural: 'Perangkat' },
     admin: { useAsTitle: 'deviceId', group: 'Pengguna & Akses', defaultColumns: ['deviceId', 'user', 'model', 'appVersion', 'status', 'integrityRisk', 'lastSeenAt'] },
     access: {
-      read: byRole({
-        'pk-admin': true,
-        'pk-owner': true,
+      read: byRoleAny({
+        'pk-admin': anyOf(ownUser('user'), usersOfMyCompanies('user', ['pk-admin', 'pk-owner'])),
+        'pk-owner': anyOf(ownUser('user'), usersOfMyCompanies('user', ['pk-admin', 'pk-owner'])),
         'pk-finance': ownUser('user'),
         'pk-pm': ownUser('user'),
         'pk-staff': ownUser('user'),
       }),
       create: denyAll,
-      update: byRole({ 'pk-admin': true, 'pk-owner': true }),
+      update: byRoleAny({ 'pk-admin': usersOfMyCompanies('user', ['pk-admin', 'pk-owner']), 'pk-owner': usersOfMyCompanies('user', ['pk-admin', 'pk-owner']) }),
       delete: denyAll,
     },
     hooks: { beforeChange: [statusGuard], afterChange: [revokeEffects] },

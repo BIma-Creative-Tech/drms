@@ -4,6 +4,7 @@ import { denyAll } from '@/access/roles'
 import { byRole, rolesAllowed } from '@/access/policies'
 import { reasonOnDeactivate, withAudit } from '@/audit/hooks'
 import { activeField, percentField } from '@/fields/common'
+import { companyField, companyHook } from '@/fields/company'
 
 /**
  * Template tahapan (name + stages with weight/order). Mutable master → the `items` array child
@@ -20,8 +21,10 @@ export const StageTemplates: CollectionConfig = withAudit(
       update: byRole({ 'pk-admin': true, 'pk-owner': true }),
       delete: denyAll,
     },
+    hooks: { beforeChange: [companyHook('stage-templates')] },
     fields: [
-      { name: 'name', type: 'text', label: 'Nama template', required: true, unique: true, maxLength: 128 },
+      companyField(),
+      { name: 'name', type: 'text', label: 'Nama template', required: true, index: true, maxLength: 128 },
       {
         name: 'items',
         type: 'array',

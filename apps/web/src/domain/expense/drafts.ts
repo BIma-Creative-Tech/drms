@@ -1,6 +1,7 @@
 import type { CollectionSlug, PayloadRequest } from 'payload'
 
-import { hasRoleAny, relId, userId } from '@/access/roles'
+import { employeeIn, hasRole, hasRoleAny, relId, soleCompany, userId } from '@/access/roles'
+import { companyOf } from '@/domain/companies'
 import { resolveScope } from '@/access/scope'
 
 import { actorContext, fail, ids, loadRaw, loadVisible, requireAction, type RequestDoc } from './common'
@@ -68,6 +69,16 @@ async function activeIds(req: PayloadRequest, collection: CollectionSlug, wanted
 }
 
 /**
+ * PT of a draft (ADR 0016): the PT of its project / cost center, else the caller's only selected PT
+ * (a request without scope yet); undefined = ambiguous (the collection hook then asks for a PT).
+ */
+async function draftCompany(req: PayloadRequest, c: { projectId?: number | null; costCenterId?: number | null }): Promise<number | undefined> {
+  if (c.projectId) return companyOf(req, 'projects', c.projectId)
+  if (c.costCenterId) return companyOf(req, 'cost-centers', c.costCenterId)
+  return soleCompany(req)
+}
+
+/**
  * Header/line/master validation shared by create, update and submit (US-03, US-37, US-40, US-44,
  * US-53, G9, G10, Q-09, Q-11, Q-22). `forSubmit` adds completeness rules.
  */
@@ -88,7 +99,10 @@ export async function validateContent(
   opts: { forSubmit: boolean; creatorId: number },
 ): Promise<void> {
   const errors: Array<{ path: string; message: string }> = []
-  const office = hasRoleAny(req, ...OFFICE)
+  // ADR 0016 §5: roles, scope and own employee IN THE REQUEST's PT (from its project / cost center)
+  const company = await draftCompany(req, c)
+  const office = company !== undefined ? hasRole(req, OFFICE, company) : hasRoleAny(req, ...OFFICE)
+  const scope = () => resolveScope(req, company ?? null)
 
   if (c.projectId && c.costCenterId) errors.push({ path: 'projectId', message: 'Pilih project ATAU pusat biaya, tidak keduanya (US-53).' })
   if (opts.forSubmit && !c.projectId && !c.costCenterId) errors.push({ path: 'projectId', message: 'Project atau pusat biaya wajib diisi (US-53).' })
@@ -103,12 +117,12 @@ export async function validateContent(
     const p = await req.payload.findByID({ collection: 'projects', id: c.projectId, depth: 0, overrideAccess: true /* SYSTEM-READ: scope check */, req }).catch(() => null)
     if (!p) errors.push({ path: 'projectId', message: 'Project tidak ditemukan.' })
     else if (p.status === 'arsip' || p.status === 'selesai') errors.push({ path: 'projectId', message: 'Project sudah selesai/diarsipkan.' })
-    else if (!office && !(await resolveScope(req)).assignedProjects.includes(c.projectId)) fail(403, 'Project di luar penugasan Anda (G10).')
+    else if (!office && !(await scope()).assignedProjects.includes(c.projectId)) fail(403, 'Project di luar penugasan Anda (G10).')
   }
   if (c.costCenterId) {
     const cc = await req.payload.findByID({ collection: 'cost-centers', id: c.costCenterId, depth: 0, overrideAccess: true /* SYSTEM-READ: scope check */, req }).catch(() => null)
     if (!cc || cc.active === false) errors.push({ path: 'costCenterId', message: 'Pusat biaya tidak ditemukan atau nonaktif.' })
-    else if (!office && !(await resolveScope(req)).assignedCostCenters.includes(c.costCenterId)) fail(403, 'Pusat biaya di luar penugasan Anda (G10).')
+    else if (!office && !(await scope()).assignedCostCenters.includes(c.costCenterId)) fail(403, 'Pusat biaya di luar penugasan Anda (G10).')
   }
 
   // Requesters (US-40): ≥ 1 active employee; Staff/PM only for themselves (Q-09 default).
@@ -117,8 +131,8 @@ export async function validateContent(
   if (opts.forSubmit && uniq.length === 0) errors.push({ path: 'requesterIds', message: 'Minimal 1 pemohon (Diajukan Oleh).' })
   const activeEmp = await activeIds(req, 'employees', uniq)
   uniq.filter((e) => !activeEmp.has(e)).forEach((e) => errors.push({ path: 'requesterIds', message: `Karyawan #${e} tidak ditemukan atau nonaktif.` }))
-  if (!hasRoleAny(req, 'pk-admin', 'pk-finance')) {
-    const creatorEmp = relId((req.user as { employee?: unknown } | null)?.employee)
+  if (!(company !== undefined ? hasRole(req, ['pk-admin', 'pk-finance'], company) : hasRoleAny(req, 'pk-admin', 'pk-finance'))) {
+    const creatorEmp = company !== undefined ? employeeIn(req, company) : relId((req.user as { employee?: unknown } | null)?.employee)
     if (userId(req) === opts.creatorId && (creatorEmp === undefined || (uniq.length > 0 && !uniq.includes(creatorEmp)))) {
       fail(403, 'Hanya Admin/Finance yang boleh membuat pengajuan atas nama orang lain (Q-09).')
     }
@@ -214,7 +228,8 @@ export async function createDraft(req: PayloadRequest, input: DraftInput & { typ
       return { doc: existing, created: false }
     }
   }
-  const emp = relId((req.user as { employee?: unknown } | null)?.employee)
+  const company = await draftCompany(req, input)
+  const emp = company !== undefined ? employeeIn(req, company) : relId((req.user as { employee?: unknown } | null)?.employee)
   const requesterIds = input.requesterIds && input.requesterIds.length > 0 ? input.requesterIds : emp !== undefined ? [emp] : []
   const lines = input.lines ?? []
   await validateContent(req, { ...input, requesterIds, lines }, { forSubmit: false, creatorId: uid })

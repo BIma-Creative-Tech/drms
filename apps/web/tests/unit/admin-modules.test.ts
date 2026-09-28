@@ -3,7 +3,7 @@ import { createElement } from 'react'
 import { renderToString } from 'react-dom/server'
 import { beforeAll, describe, expect, it, vi } from 'vitest'
 
-import type { Role } from '@/access/roles'
+import { withCompanyContext, type Role } from '@/access/roles'
 import { activeHref, entityModuleMap, MODULES, moduleForPath, resolveModules, type ModuleId, type ResolvedModule } from '@/admin/modules/registry'
 import { deriveCrumbs, routeOf, type StepLike } from '@/admin/shell/crumbs'
 import { loadBadges, loadModules, navUser } from '@/admin/shell/modules-server'
@@ -48,7 +48,8 @@ function visibleFor(user: unknown) {
  */
 async function readPermissions(user: { id: number; roles: Role[] }) {
   const payload = new Proxy({}, { get: () => () => Promise.reject(new Error('no db in unit test')) })
-  const req = { user: { ...user, collection: 'users' }, payload, context: {} }
+  // ADR 0016: roles come from a membership (company #1) — same shape as the auth strategies build
+  const req = { user: withCompanyContext({ ...user, collection: 'users' }, [{ company: 1, roles: user.roles, employee: null }], null, user.roles.includes('pk-admin')), payload, context: {} }
   const out: { collections: Record<string, { read: boolean }>; globals: Record<string, { read: boolean }> } = { collections: {}, globals: {} }
   const check = async (fn: unknown) => {
     if (fn === undefined) return true
@@ -64,7 +65,7 @@ async function readPermissions(user: { id: number; roles: Role[] }) {
 }
 
 async function modulesFor(roles: Role[], badge = 0): Promise<ResolvedModule[]> {
-  const user = { id: 42, roles, collection: 'users', email: 'uji@contoh.test', name: 'Uji Coba' } as unknown as TypedUser
+  const user = withCompanyContext({ id: 42, collection: 'users', email: 'uji@contoh.test', name: 'Uji Coba' }, [{ company: 1, roles, employee: null }], null, roles.includes('pk-admin')) as unknown as TypedUser
   const payload = { config, count: async () => ({ totalDocs: badge }) } as unknown as Payload
   return loadModules({ payload, user, permissions: (await readPermissions({ id: 42, roles })) as never, visibleEntities: visibleFor(user) as never })
 }

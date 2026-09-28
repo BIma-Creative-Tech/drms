@@ -1,9 +1,10 @@
 import { APIError, type CollectionBeforeChangeHook, type CollectionConfig } from 'payload'
 
-import { denyAll, hasRoleAny, relId } from '@/access/roles'
+import { denyAll, hasRole, relId } from '@/access/roles'
 import { anyOf, byRole, rolesAllowed, teamCostCenters, teamProjects } from '@/access/policies'
 import { resolveScope } from '@/access/scope'
 import { reasonOnChange, withAudit } from '@/audit/hooks'
+import { companyField, companyHook } from '@/fields/company'
 
 /**
  * Penugasan tim: employee ↔ project XOR cost center (form item 9), role in project, period.
@@ -22,8 +23,10 @@ const guard: CollectionBeforeChangeHook = async ({ data, originalDoc, operation,
   if (start !== undefined && end !== undefined && end < start) {
     throw new APIError('Tanggal selesai tidak boleh sebelum tanggal mulai.', 400, null, true)
   }
-  if (req.user && !hasRoleAny(req, 'pk-admin', 'pk-owner') && hasRoleAny(req, 'pk-pm')) {
-    const scope = await resolveScope(req)
+  // ADR 0016 §5: roles + team scope IN THE ASSIGNMENT's PT (company set by companyHook, runs first)
+  const company = relId(merged.company)
+  if (req.user && !hasRole(req, ['pk-admin', 'pk-owner'], company) && hasRole(req, 'pk-pm', company)) {
+    const scope = await resolveScope(req, company ?? null)
     const inTeam =
       (project !== undefined && scope.teamProjects.includes(project)) ||
       (costCenter !== undefined && scope.teamCostCenters.includes(costCenter))
@@ -47,8 +50,9 @@ export const TeamAssignments: CollectionConfig = withAudit(
       update: byRole({ 'pk-admin': true, 'pk-owner': true, 'pk-pm': anyOf(teamProjects(), teamCostCenters()) }),
       delete: denyAll,
     },
-    hooks: { beforeChange: [guard] },
+    hooks: { beforeChange: [companyHook('team-assignments', { derive: [{ field: 'employee', collection: 'employees' }], check: [{ field: 'project', collection: 'projects' }, { field: 'costCenter', collection: 'cost-centers' }] }), guard] },
     fields: [
+      companyField({ derived: true }),
       { name: 'employee', type: 'relationship', relationTo: 'employees', label: 'Karyawan', required: true, index: true },
       { name: 'project', type: 'relationship', relationTo: 'projects', label: 'Project', index: true },
       { name: 'costCenter', type: 'relationship', relationTo: 'cost-centers', label: 'Pusat biaya', index: true },
