@@ -227,7 +227,7 @@ void main() {
     ('profile', {Role.staff}, '/profile', true, null),
     ('login', {Role.staff}, '/login', false, null),
   ];
-  // Release notes (web 0.4.2 `releaseNotes`): home banner, its sheet, and the blocking update screen.
+  // Release notes (`releaseNotes` from GET /app/config): home banner, its sheet, and the blocking update screen.
   const notes = [
     'Bisa masuk dengan kode Authenticator: ketuk "Pakai kode Authenticator" di layar masuk, lalu isi 6 angka dari aplikasi Authenticator di HP Anda.',
     'Pesan salah masuk lebih jelas: email/username, kata sandi, atau kode Authenticator salah.',

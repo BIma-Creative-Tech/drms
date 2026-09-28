@@ -27,7 +27,7 @@ class AppConfig {
   /// false (or an older server without the flag) reports are sent online only (POST /progress-reports).
   final bool syncProgressReports;
 
-  /// "Yang baru di versi [latestAppVersion]" — plain-text bullets (server ≥ web 0.4.2, only when the APK
+  /// "Yang baru di versi [latestAppVersion]" — plain-text bullets (server with the /unduh manifest, only when the APK
   /// published on /unduh is the latest version). Empty = nothing to show (older server, no notes).
   final List<String> releaseNotes;
 

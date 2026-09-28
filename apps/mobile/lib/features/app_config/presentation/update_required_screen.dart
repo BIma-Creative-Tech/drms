@@ -7,7 +7,7 @@ import '../application/app_config_providers.dart';
 import 'release_notes.dart';
 
 /// Blocking screen when the APK is below the minimum version (app config or HTTP 426). Shows the release
-/// notes of the latest version when the server sends them (`releaseNotes`, web ≥ 0.4.2).
+/// notes of the latest version when the server sends them (`releaseNotes`, web with the /unduh manifest).
 class UpdateRequiredScreen extends ConsumerWidget {
   const UpdateRequiredScreen({super.key});
 

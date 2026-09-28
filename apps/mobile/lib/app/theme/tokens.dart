@@ -41,6 +41,7 @@ class PkSemantic {
   final Color primary;
   final Color primaryHover;
   final Color primaryForeground;
+
   /// Pale primary (web `primarySoft`, loader dots / soft fills).
   final Color primarySoft;
   final Color accent;
