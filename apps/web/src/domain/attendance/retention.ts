@@ -9,7 +9,7 @@ import { withSystemTransaction } from '@/lib/system-tx'
 import { getRequestTx } from '@/lib/tx'
 
 import { retentionCutoff } from './schedule'
-import { settingsOf } from '@/domain/companies'
+import { activeCompanyIds, settingsOf } from '@/domain/companies'
 
 /**
  * E6 — selfie retention (Q-33, UU No. 27/2022 PDP; plan fase1-golive E6 "selfie > retensi terhapus
@@ -31,27 +31,43 @@ export type RetentionPlan = { months: number; cutoff: string; candidates: number
 
 export type RetentionSettings = { months: number; deleteEnabled: boolean; batch: number }
 
-export async function retentionSettings(payload: Payload, req?: PayloadRequest): Promise<RetentionSettings> {
-  // MC2: months/enabled per PT in the job loop (ADR 0016 §7); MC1 = company #1; batch is app-wide.
-  const s = await settingsOf(payload, null, req)
+/**
+ * Retention settings of ONE PT (ADR 0016 §7: months / delete switch per PT — the company is the UU PDP
+ * controller; the batch size is app-wide). Default: company #1.
+ */
+export async function retentionSettings(payload: Payload, req?: PayloadRequest, companyId?: number | null): Promise<RetentionSettings> {
+  const s = await settingsOf(payload, companyId ?? null, req)
   const months = typeof s.selfieRetentionMonths === 'number' && s.selfieRetentionMonths >= 1 ? s.selfieRetentionMonths : 12
   const batch = typeof s.selfieRetentionBatch === 'number' && s.selfieRetentionBatch >= 1 ? Math.min(2000, Math.floor(s.selfieRetentionBatch)) : 200
   return { months, deleteEnabled: s.selfieRetentionDeleteEnabled === true, batch }
 }
 
-const candidateWhere = (cutoff: Date) => sql`
+/**
+ * Candidates of PT `companyId`: selfies referenced by an attendance of that PT. The FIRST active PT
+ * (`withOrphans`) also takes selfies without attendance (uploaded, never used) and selfies of
+ * attendances of INACTIVE PTs — so every selfie belongs to exactly one run.
+ */
+const candidateWhere = (cutoff: Date, companyId: number, withOrphans: boolean) => sql`
   m.received_at < ${cutoff.toISOString()}::timestamptz
   AND m.removed_at IS NULL
-  AND NOT EXISTS (SELECT 1 FROM employees e WHERE e.face_ref_photo_id = m.id)`
+  AND NOT EXISTS (SELECT 1 FROM employees e WHERE e.face_ref_photo_id = m.id)
+  AND (EXISTS (SELECT 1 FROM attendances a WHERE a.selfie_id = m.id AND a.company_id = ${companyId})
+       OR (${withOrphans} AND NOT EXISTS (SELECT 1 FROM attendances a JOIN companies co ON co.id = a.company_id AND co.active WHERE a.selfie_id = m.id)))`
 
-export async function selfieRetentionPlan(payload: Payload, now: Date = new Date()): Promise<RetentionPlan> {
-  const { months } = await retentionSettings(payload)
+/** Active PTs (id order) — the first one also owns the orphans (see candidateWhere). */
+async function retentionCompanies(payload: Payload, companyId?: number): Promise<Array<{ id: number; orphans: boolean }>> {
+  const all = await activeCompanyIds(payload)
+  return (companyId !== undefined ? all.filter((c) => c === companyId) : all).map((id) => ({ id, orphans: id === all[0] }))
+}
+
+async function planOne(payload: Payload, now: Date, c: { id: number; orphans: boolean }): Promise<RetentionPlan> {
+  const { months } = await retentionSettings(payload, undefined, c.id)
   const cutoff = retentionCutoff(now, months)
   const res = (await payload.db.drizzle.execute(sql`
     SELECT count(*)::int AS n, min(m.received_at) AS oldest,
            (array_agg(m.id ORDER BY m.received_at, m.id))[1:20] AS sample
     FROM media_selfies m
-    WHERE ${candidateWhere(cutoff)}`)) as unknown as {
+    WHERE ${candidateWhere(cutoff, c.id, c.orphans)}`)) as unknown as {
     rows: Array<{ n: number; oldest: string | Date | null; sample: number[] | null }>
   }
   const r = res.rows[0] ?? { n: 0, oldest: null, sample: null }
@@ -61,6 +77,25 @@ export async function selfieRetentionPlan(payload: Payload, now: Date = new Date
     candidates: Number(r.n),
     oldestReceivedAt: r.oldest ? new Date(r.oldest).toISOString() : null,
     sampleIds: (r.sample ?? []).map(Number),
+  }
+}
+
+/**
+ * Dry-run plan over every active PT (or `companyId`); `months`/`cutoff` = those of the first PT, the
+ * counts are summed (`byCompany` = per PT).
+ */
+export async function selfieRetentionPlan(payload: Payload, now: Date = new Date(), companyId?: number): Promise<RetentionPlan & { byCompany: Array<{ companyId: number } & RetentionPlan> }> {
+  const byCompany: Array<{ companyId: number } & RetentionPlan> = []
+  for (const c of await retentionCompanies(payload, companyId)) byCompany.push({ companyId: c.id, ...(await planOne(payload, now, c)) })
+  const first = byCompany[0]
+  const oldest = byCompany.map((b) => b.oldestReceivedAt).filter((x): x is string => !!x).sort()[0] ?? null
+  return {
+    months: first?.months ?? 12,
+    cutoff: first?.cutoff ?? retentionCutoff(now, 12).toISOString(),
+    candidates: byCompany.reduce((a, b) => a + b.candidates, 0),
+    oldestReceivedAt: oldest,
+    sampleIds: byCompany.flatMap((b) => b.sampleIds).slice(0, 20),
+    byCompany,
   }
 }
 
@@ -88,18 +123,14 @@ async function removeFile(payload: Payload, filename: string | null): Promise<bo
   }
 }
 
-/**
- * One retention run (the daily job). `now` = injectable clock (fake-clock tests). Dry run unless the
- * company setting is on; `forceEnabled` overrides the switch (tests only).
- */
-export async function purgeExpiredSelfies(payload: Payload, opts: { now?: Date; forceEnabled?: boolean } = {}): Promise<PurgeResult> {
-  const now = opts.now ?? new Date()
-  const st = await retentionSettings(payload)
+/** One PT: dry run or delete up to `budget` files (the app-wide batch is shared by the PTs of a run). */
+async function purgeOne(payload: Payload, now: Date, c: { id: number; orphans: boolean }, forceEnabled: boolean | undefined, budget: number): Promise<PurgeResult & { batch: number }> {
+  const st = await retentionSettings(payload, undefined, c.id)
   const cutoff = retentionCutoff(now, st.months)
-  const enabled = opts.forceEnabled ?? st.deleteEnabled
-  if (!enabled) {
-    const plan = await selfieRetentionPlan(payload, now)
-    return { months: st.months, cutoff: plan.cutoff, dryRun: true, candidates: plan.candidates, deleted: 0, failed: 0, remaining: plan.candidates }
+  const enabled = forceEnabled ?? st.deleteEnabled
+  if (!enabled || budget <= 0) {
+    const plan = await planOne(payload, now, c)
+    return { months: st.months, cutoff: plan.cutoff, dryRun: !enabled, candidates: plan.candidates, deleted: 0, failed: 0, remaining: plan.candidates, batch: st.batch }
   }
   return withSystemTransaction(
     payload,
@@ -108,18 +139,18 @@ export async function purgeExpiredSelfies(payload: Payload, opts: { now?: Date; 
       const tx = await getRequestTx(req)
       // One retention run at a time (a second worker tick waits, then finds nothing left to do).
       await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended('pk:selfie-retention', 0))`)
-      const total = (await tx.execute(sql`SELECT count(*)::int AS n FROM media_selfies m WHERE ${candidateWhere(cutoff)}`)) as unknown as { rows: Array<{ n: number }> }
+      const total = (await tx.execute(sql`SELECT count(*)::int AS n FROM media_selfies m WHERE ${candidateWhere(cutoff, c.id, c.orphans)}`)) as unknown as { rows: Array<{ n: number }> }
       const candidates = Number(total.rows[0]?.n ?? 0)
       const pick = (await tx.execute(sql`
         SELECT m.id, m.filename FROM media_selfies m
-        WHERE ${candidateWhere(cutoff)}
+        WHERE ${candidateWhere(cutoff, c.id, c.orphans)}
         ORDER BY m.received_at, m.id
-        LIMIT ${st.batch}
+        LIMIT ${Math.min(st.batch, budget)}
         FOR UPDATE SKIP LOCKED`)) as unknown as { rows: Candidate[] }
       const done: number[] = []
       let failed = 0
-      for (const c of pick.rows) {
-        if (await removeFile(payload, c.filename)) done.push(Number(c.id))
+      for (const x of pick.rows) {
+        if (await removeFile(payload, x.filename)) done.push(Number(x.id))
         else failed++
       }
       if (done.length > 0) {
@@ -130,7 +161,7 @@ export async function purgeExpiredSelfies(payload: Payload, opts: { now?: Date; 
           )})`,
         )
       }
-      const result: PurgeResult = { months: st.months, cutoff: cutoff.toISOString(), dryRun: false, candidates, deleted: done.length, failed, remaining: candidates - done.length }
+      const result = { months: st.months, cutoff: cutoff.toISOString(), dryRun: false, candidates, deleted: done.length, failed, remaining: candidates - done.length, batch: st.batch }
       if (pick.rows.length > 0) {
         await writeAudit(req, [
           {
@@ -140,6 +171,7 @@ export async function purgeExpiredSelfies(payload: Payload, opts: { now?: Date; 
             field: 'file',
             newValue: { months: st.months, cutoff: result.cutoff, deleted: result.deleted, failed: result.failed, remaining: result.remaining, batch: st.batch },
             reason: `Retensi selfie ${st.months} bulan (Q-33)`,
+            companyId: c.id,
           },
         ])
       }
@@ -147,4 +179,35 @@ export async function purgeExpiredSelfies(payload: Payload, opts: { now?: Date; 
     },
     { auditSource: 'job' },
   )
+}
+
+/**
+ * One retention run (the daily job) over every active PT with that PT's months / switch (or
+ * `companyId` only). `now` = injectable clock (fake-clock tests); `forceEnabled` overrides the switch
+ * (tests only). The app-wide batch caps the files deleted per run across all PTs; a failing PT is
+ * logged, the others continue. The result sums the PTs (`months`/`cutoff` of the first PT).
+ */
+export async function purgeExpiredSelfies(payload: Payload, opts: { now?: Date; forceEnabled?: boolean; companyId?: number } = {}): Promise<PurgeResult> {
+  const now = opts.now ?? new Date()
+  const parts: PurgeResult[] = []
+  let budget: number | null = null
+  for (const c of await retentionCompanies(payload, opts.companyId)) {
+    try {
+      const r = await purgeOne(payload, now, c, opts.forceEnabled, budget ?? Number.MAX_SAFE_INTEGER)
+      budget = (budget ?? r.batch) - r.deleted - r.failed
+      parts.push(r)
+    } catch (err) {
+      payload.logger.error({ msg: 'selfie retention failed for a PT', companyId: c.id, err: (err as Error).message })
+    }
+  }
+  const first = parts[0]
+  return {
+    months: first?.months ?? 12,
+    cutoff: first?.cutoff ?? retentionCutoff(now, 12).toISOString(),
+    dryRun: parts.every((p) => p.dryRun),
+    candidates: parts.reduce((a, p) => a + p.candidates, 0),
+    deleted: parts.reduce((a, p) => a + p.deleted, 0),
+    failed: parts.reduce((a, p) => a + p.failed, 0),
+    remaining: parts.reduce((a, p) => a + p.remaining, 0),
+  }
 }

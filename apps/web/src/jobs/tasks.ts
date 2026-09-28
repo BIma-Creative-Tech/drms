@@ -84,6 +84,7 @@ export const sendEmailTask: TaskConfig<{
  * Reimburse auto-close (architecture §5.2 DT → SE "auto after N days", §11 jobs; setting
  * reimburseAutoCloseDays). Daily 01:15 in the process TZ (Asia/Makassar, see auditDailyAnchor).
  * Idempotent: only requests still "Ditransfer" whose latest transfer is ≥ N days old are closed.
+ * MC2 (ADR 0016 §7): one pass per active PT with that PT's N; a failing PT does not stop the others.
  */
 export const reimburseAutoCloseTask: TaskConfig<{
   input: Record<string, never>
@@ -105,6 +106,7 @@ export const reimburseAutoCloseTask: TaskConfig<{
  * OFF (default) = dry run (count only); ON = deletes at most selfieRetentionBatch selfie FILES older
  * than selfieRetentionMonths, marks the media rows removed and writes one `retention_purge` audit
  * row per run (domain/attendance/retention.ts). Attendance rows stay. Log = counts only (no ids/PII).
+ * MC2 (ADR 0016 §7): months / switch per PT (loop over the active PTs), the batch is app-wide per run.
  */
 export const selfieRetentionTask: TaskConfig<{
   input: Record<string, never>
@@ -130,6 +132,7 @@ export const selfieRetentionTask: TaskConfig<{
  * E7 daily reminders (M12, US-11): the worker queues this every hour (process TZ); the domain runs
  * ONE pass per business day at/after company-settings.reminderHour and de-duplicates every delivery
  * (domain/reminders/service.ts). Log = counts per rule only (no names/ids of recipients).
+ * MC2 (ADR 0016 §7): one run per active PT (own hour/toggles, `reminder_runs (company_id, run_date)`).
  */
 export const dailyRemindersTask: TaskConfig<{
   input: Record<string, never>
@@ -147,7 +150,7 @@ export const dailyRemindersTask: TaskConfig<{
   handler: async ({ req }) => {
     const r = await runDailyReminders(req.payload)
     const notified = Object.values(r.rules).reduce((s, x) => s + (x?.notified ?? 0), 0)
-    if (r.status === 'run') req.payload.logger.info({ msg: 'daily reminders', date: r.date, rules: r.rules, emails: r.emails })
+    if (r.status === 'run') req.payload.logger.info({ msg: 'daily reminders', date: r.date, rules: r.rules, emails: r.emails, companies: r.companies.map((c) => ({ companyId: c.companyId, status: c.status })) })
     return { output: { status: r.status, date: r.date, notified, emails: r.emails } }
   },
 }

@@ -25,24 +25,24 @@ const DEFAULT_TEXT = {
   body: 'Project {code} {name} belum punya laporan progress selama {days} hari (terakhir: {last}).',
 }
 
-export type LateProject = { projectId: number; code: string; name: string; pmUserId: number | null; lastReportDate: string | null; since: string; daysSince: number }
+export type LateProject = { projectId: number; companyId?: number; code: string; name: string; pmUserId: number | null; lastReportDate: string | null; since: string; daysSince: number }
 
-export async function lateProgressProjects(req: PayloadRequest, opts: { asOf: string; days: number; timezone?: string }): Promise<LateProject[]> {
+export async function lateProgressProjects(req: PayloadRequest, opts: { asOf: string; days: number; timezone?: string; companyId?: number }): Promise<LateProject[]> {
   const tz = opts.timezone ?? DEFAULT_TZ
   const tx = await getRequestTx(req)
   const r = (await tx.execute(sql`
-    SELECT p.id, p.code, p.name, p.pm_id,
+    SELECT p.id, p.company_id, p.code, p.name, p.pm_id,
            (SELECT max(r.report_date) FROM progress_reports r WHERE r.project_id = p.id) AS last_report,
            to_char(coalesce(p.start_date, p.created_at) AT TIME ZONE ${tz}, 'YYYY-MM-DD') AS started
       FROM projects p
-     WHERE p.status = 'berjalan'
-     ORDER BY p.code, p.id`)) as unknown as { rows: Array<{ id: number; code: string; name: string; pm_id: number | null; last_report: string | null; started: string }> }
+     WHERE p.status = 'berjalan' ${opts.companyId !== undefined ? sql`AND p.company_id = ${opts.companyId}` : sql``}
+     ORDER BY p.code, p.id`)) as unknown as { rows: Array<{ id: number; company_id: number; code: string; name: string; pm_id: number | null; last_report: string | null; started: string }> }
   const out: LateProject[] = []
   for (const x of r.rows) {
     const since = x.last_report ?? x.started
     const daysSince = daysBetweenDates(since, opts.asOf)
     if (daysSince >= opts.days) {
-      out.push({ projectId: Number(x.id), code: x.code, name: x.name, pmUserId: x.pm_id === null ? null : Number(x.pm_id), lastReportDate: x.last_report, since, daysSince })
+      out.push({ projectId: Number(x.id), companyId: Number(x.company_id), code: x.code, name: x.name, pmUserId: x.pm_id === null ? null : Number(x.pm_id), lastReportDate: x.last_report, since, daysSince })
     }
   }
   return out
@@ -62,6 +62,7 @@ export async function notifyLateProgressReport(req: PayloadRequest, project: Lat
       collection: 'notifications',
       data: {
         user: uid,
+        company: project.companyId ?? null, // ADR 0016 §4 (PT label / filter)
         event: LATE_REPORT_EVENT,
         title: render(t.title, project).slice(0, 160),
         body: render(t.body, project).slice(0, 1000),
