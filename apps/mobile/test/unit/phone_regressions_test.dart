@@ -92,7 +92,7 @@ class _PasswordClient implements PasswordLoginClient {
   int logouts = 0;
 
   @override
-  Future<OidcTokens> login({required String username, required String password}) async =>
+  Future<OidcTokens> login({required String username, required String password, String? totp}) async =>
       OidcTokens(accessToken: _jwt({'sub': 'u1', 'exp': 4102444800}), refreshToken: 'r1');
 
   @override

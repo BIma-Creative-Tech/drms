@@ -101,10 +101,10 @@ Seluruh login (password, TOTP, brute force, reset) ada di Keycloak; aplikasi mem
 | 2.5.1 | Secret pemulihan tidak dikirim cleartext | N/A | [KC] `resetPasswordAllowed false` (ADR 0003 §1) | Tidak ada reset mandiri. |
 | 2.5.2, 2.5.3 | Tanpa password hint / pertanyaan rahasia; tidak menampilkan password saat pemulihan | Terpenuhi | [KC] tidak dikonfigurasi; aplikasi tidak menyimpan password (`disableLocalStrategy`) | 2 nomor. |
 | 2.5.4 | Tidak ada akun default/bersama | Terpenuhi | `web/src/collections/Users.ts` (tanpa strategi lokal); admin pertama ditautkan lewat seed `SEED_ADMIN_KEYCLOAK_SUB` (ADR 0003 §6) | |
-| 2.5.5 | Notifikasi bila faktor autentikasi diganti | Celah | [KC] SMTP realm kosong (ADR 0003 §6) | Sama dengan 2.2.3 (mis. TOTP direset). |
+| 2.5.5 | Notifikasi bila faktor autentikasi diganti | Celah | [KC] SMTP realm kosong (ADR 0003 §6) | Sama dengan 2.2.3 (mis. TOTP direset). ADR 0017: perubahan 2FA swalayan tercatat di audit log (`2fa_enabled`/`2fa_disabled`), tetapi tanpa notifikasi ke user. |
 | 2.5.6 | Pemulihan password aman | Sebagian | [KC] reset oleh Admin dengan password sementara | Prosedur belum tertulis di runbook (E12). |
 | 2.7.1–2.7.4 | Autentikator out-of-band | N/A | — | 4 nomor. |
-| 2.8.1 | OTP berbasis waktu punya masa berlaku | Terpenuhi | [KC] TOTP bawaan Keycloak (required action `CONFIGURE_TOTP`, ADR 0003 §6) | |
+| 2.8.1 | OTP berbasis waktu punya masa berlaku | Terpenuhi | [KC] TOTP bawaan Keycloak (required action `CONFIGURE_TOTP`, ADR 0003 §6; swalayan ADR 0017) | Periode 30 s, look-ahead 1, kode tidak bisa dipakai ulang (diverifikasi `kc/two-factor.kc.test.ts`). |
 
 ### V3 — Manajemen sesi
 
@@ -133,7 +133,7 @@ Seluruh login (password, TOTP, brute force, reset) ada di Keycloak; aplikasi mem
 | 4.1.5 | Gagal secara aman | Terpenuhi | `byRole` → `false` bila tidak ada rule cocok; `v1()` → 500 generik; guard DB → 409; strategi → `{ user: null }` pada error | E9: 403 dicek sebelum 409 di `requireAction` (`web/src/domain/expense/common.ts`). |
 | 4.2.1 | Perlindungan IDOR / akses data | Terpenuhi | Scope own/team/assigned (`scope.ts`, `ownUser`, `teamProjects`); `mediaFileEndpoint` memakai `findByID(overrideAccess:false)`; `visibleRequestIds` | `int/authz.int.test.ts` "read scopes…"; `int/files.int.test.ts` "other user's receipt → 404…". E9: URL media bertanda tangan tetap cek akses ulang. |
 | 4.2.2 | Anti-CSRF | Terpenuhi | `oidcSessionStrategy`: metode unsafe dengan `Origin`/`Sec-Fetch-Site` asing → tidak terautentikasi; `SameSite=Lax`; logout hanya POST + cek `Origin` | `int/api.int.test.ts` "cross-origin POST is not authenticated". ZAP terautentikasi 2026-09-27: alert "Absence of Anti-CSRF Tokens" (form logout/edit) = false positive karena kontrol ini (`../qa/s3-e9-qa-report.md` §7.4). |
-| 4.3.1 | MFA untuk antarmuka administratif | Sebagian | [KC] required action `CONFIGURE_TOTP` dipakai pada akun admin bootstrap/UAT (ADR 0003 §6; UAT F2 memakai password + TOTP) | Aplikasi **tidak** menegakkan MFA (tidak ada cek `acr`/`amr`); bergantung pada setiap akun diberi TOTP. Usul: OTP wajib di realm untuk peran panel, atau cek `amr` di `auth/callback`. |
+| 4.3.1 | MFA untuk antarmuka administratif | Sebagian (deviasi diterima) | [KC] alur "Conditional 2FA"/"Conditional OTP" (web + APK) meminta kode dari setiap user yang mengaktifkan TOTP; **ADR 0017: 2FA opsional per user, swalayan** — halaman "Keamanan akun" (`web/src/auth/two-factor.ts`, `/auth/account-action`: AIA `CONFIGURE_TOTP` / `delete_credential` + `prompt=login`, POST same-origin, hanya kredensial milik sendiri, rate limit, audit `2fa_enabled`/`2fa_disabled`); APK mengirim `totp` | Keputusan user 2026-09-28: MFA **tidak** diwajibkan untuk peran mana pun (tidak ada cek `acr`/`amr`). `int/two-factor.int.test.ts`; `kc/two-factor.kc.test.ts` (Keycloak 26.7.4 nyata). |
 | 4.3.2 | Directory listing mati, metadata (.git) tidak terekspos | Terpenuhi | Next standalone tanpa listing; `.dockerignore` mengecualikan `.git`, `.env*`, `docs`; media di `/data/media` tidak disajikan statis | Diverifikasi E9 QA 2026-09-26: `/.git/HEAD`, `/.git/config`, `/.env`, `/package.json` → 403 (WAF), `/server.js` → 404, tanpa listing (`../qa/s3-e9-qa-report.md` §1.4). |
 
 ### V5 — Validasi, sanitasi, encoding
@@ -286,7 +286,7 @@ Catatan L2: event `login_failed` bersumber dari log event Keycloak (keputusan E9
 
 | # | Celah / Sebagian | ASVS | Pemilik | Prioritas | Usulan |
 |---|---|---|---|---|---|
-| G-01 | MFA admin tidak ditegakkan (bergantung TOTP per akun) | 4.3.1 | infra + user | **Tinggi** | Wajibkan OTP di realm `drms` untuk semua akun peran panel (atau semua user), atau cek `amr` di `web/src/app/(auth)/auth/callback/route.ts`. Keputusan user. |
+| G-01 | MFA admin tidak ditegakkan (bergantung TOTP per akun) | 4.3.1 | infra + user | ~~Tinggi~~ **Diputuskan** | **Keputusan user 2026-09-28 (ADR 0017): 2FA opsional per user, swalayan** (web "Keamanan akun" + kolom kode di APK); tidak ada penegakan per peran — risiko diterima. Sisa infra: verifikasi alur conditional OTP + `delete_credential` aktif di realm `drms`/`drms-staging`, SA tetap `view-users`. |
 | G-02 | Tidak ada cek password bocor; tidak ada meter kekuatan | 2.1.7, 2.1.8 | infra | Sedang | Tambah policy `passwordBlacklist` realm `drms`; meter (tema) opsional. |
 | G-03 | Aturan komposisi password (menyimpang ASVS) | 2.1.9 | user + infra | Rendah | Terima sebagai deviasi (kebijakan platform) dan catat di ADR 0003, atau ubah policy. |
 | G-04 | Tidak ada notifikasi perubahan kredensial/faktor; onboarding password sementara di luar sistem | 2.2.3, 2.5.5, 2.3.1 | infra | Sedang | SMTP realm + `execute-actions-email` (E10). |

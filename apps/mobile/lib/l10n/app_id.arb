@@ -45,6 +45,10 @@
   "loginShowPassword": "Tampilkan kata sandi",
   "loginHidePassword": "Sembunyikan kata sandi",
   "loginForgotPassword": "Lupa kata sandi? Hubungi Admin.",
+  "loginTotpLabel": "Kode autentikator (bila 2FA aktif)",
+  "loginTotpHelper": "Isi 6 digit dari aplikasi autentikator hanya bila Anda mengaktifkan 2FA untuk akun ini. Tanpa 2FA, biarkan kosong.",
+  "loginTotpInvalidLength": "Kode autentikator terdiri dari 6 digit.",
+  "loginInvalidWithTotp": "Email/username, kata sandi, atau kode autentikator salah. Gagal berulang kali dapat mengunci akun sementara; tunggu sebentar sebelum mencoba lagi.",
   "updateRequiredTitle": "Perbarui aplikasi",
   "updateRequiredBody": "Versi aplikasi ini ({current}) sudah tidak didukung. Versi minimal: {minimum}.",
   "@updateRequiredBody": {

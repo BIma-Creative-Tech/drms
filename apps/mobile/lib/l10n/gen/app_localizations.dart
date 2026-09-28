@@ -277,6 +277,30 @@ abstract class AppLocalizations {
   /// **'Lupa kata sandi? Hubungi Admin.'**
   String get loginForgotPassword;
 
+  /// No description provided for @loginTotpLabel.
+  ///
+  /// In id, this message translates to:
+  /// **'Kode autentikator (bila 2FA aktif)'**
+  String get loginTotpLabel;
+
+  /// No description provided for @loginTotpHelper.
+  ///
+  /// In id, this message translates to:
+  /// **'Isi 6 digit dari aplikasi autentikator hanya bila Anda mengaktifkan 2FA untuk akun ini. Tanpa 2FA, biarkan kosong.'**
+  String get loginTotpHelper;
+
+  /// No description provided for @loginTotpInvalidLength.
+  ///
+  /// In id, this message translates to:
+  /// **'Kode autentikator terdiri dari 6 digit.'**
+  String get loginTotpInvalidLength;
+
+  /// No description provided for @loginInvalidWithTotp.
+  ///
+  /// In id, this message translates to:
+  /// **'Email/username, kata sandi, atau kode autentikator salah. Gagal berulang kali dapat mengunci akun sementara; tunggu sebentar sebelum mencoba lagi.'**
+  String get loginInvalidWithTotp;
+
   /// No description provided for @updateRequiredTitle.
   ///
   /// In id, this message translates to:

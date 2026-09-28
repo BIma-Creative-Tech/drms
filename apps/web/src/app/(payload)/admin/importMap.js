@@ -32,6 +32,7 @@ import { AddendumList as AddendumList_06d7ee0480b4dc608c229f2cd74032b3 } from '@
 import { AddendumNew as AddendumNew_06d7ee0480b4dc608c229f2cd74032b3 } from '@/admin/views/Addendum'
 import { AddendumDetail as AddendumDetail_06d7ee0480b4dc608c229f2cd74032b3 } from '@/admin/views/Addendum'
 import { NotificationsView as NotificationsView_c3b608bcff53bfc6e9104ed1897a90d5 } from '@/admin/views/Notifikasi'
+import { KeamananAkunView as KeamananAkunView_6681b9a15a5eb31c998645ca38ba9da9 } from '@/admin/views/KeamananAkun'
 import { CollectionCards as CollectionCards_f9c02e79a4aed9a3924487c0cd4cafb1 } from '@payloadcms/next/rsc'
 
 /** @type import('payload').ImportMap */
@@ -70,5 +71,6 @@ export const importMap = {
   "@/admin/views/Addendum#AddendumNew": AddendumNew_06d7ee0480b4dc608c229f2cd74032b3,
   "@/admin/views/Addendum#AddendumDetail": AddendumDetail_06d7ee0480b4dc608c229f2cd74032b3,
   "@/admin/views/Notifikasi#NotificationsView": NotificationsView_c3b608bcff53bfc6e9104ed1897a90d5,
+  "@/admin/views/KeamananAkun#KeamananAkunView": KeamananAkunView_6681b9a15a5eb31c998645ca38ba9da9,
   "@payloadcms/next/rsc#CollectionCards": CollectionCards_f9c02e79a4aed9a3924487c0cd4cafb1
 }

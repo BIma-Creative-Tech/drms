@@ -98,7 +98,8 @@
 - Negative: the app handles the user's password (the risk RFC 9700 §2.4 describes). Password mode cannot do OTP /
   WebAuthn / required actions / identity brokering; users with a pending required action must use the web first.
   Users with OTP configured are expected to fail in the direct-grant flow (exact response **UNVERIFIED**; OTP was
-  removed for staging users).
+  removed for staging users). **Superseded by ADR 0017 (2026-09-28):** the direct grant accepts the code as form
+  parameter `totp`; the APK shows an optional code field after a failed login (verified live on Keycloak 26.7.4).
 - Two login code paths must be kept working and tested until the prod decision (F6).
 
 ## Security implications
@@ -141,6 +142,19 @@ None.
   longer holds for the APK config.
 - **Prerequisite (E10, infra):** Direct Access Grants on client `proyekkas-mobile` in realm `drms`, no OTP
   required action for APK users. Until then a prod APK answers "Login langsung belum diaktifkan di server".
+  *(2026-09-28, ADR 0017: "no OTP required action" means no **pending** `CONFIGURE_TOTP` at first login; users who
+  turn 2FA on themselves can log in to the APK with the extra code field.)*
 - The RFC 9700 / RFC 8252 deviation now applies to production too; the mitigations above (TLS only, no
   credential storage, brute-force lockout, refresh-token rotation) stay mandatory. Rollback unchanged (build with
   `PK_LOGIN_MODE=browser`, turn Direct Access Grants off in realm `drms`).
+
+## Revision 2026-09-28 — optional self-service 2FA (ADR 0017)
+
+- The "Password mode cannot do OTP" consequence no longer holds for TOTP: Keycloak's direct grant flow validates
+  a code sent as form parameter `totp` ("Direct Grant - Conditional OTP", only for users who configured OTP).
+- Keycloak 26.7.4 answers a missing, wrong or reused code exactly like a wrong password (`400 invalid_grant`,
+  "Invalid user credentials"; verified live), so the APK cannot detect that a code is needed: after a failed login
+  it shows the optional field **"Kode autentikator (bila 2FA aktif)"** and the retry sends `totp` when filled.
+  The code is never logged or stored; the field is cleared after each attempt (codes are single-use).
+- 2FA is optional per user and self-service on the web page "Keamanan akun"; WebAuthn / required actions /
+  brokering remain impossible in password mode.

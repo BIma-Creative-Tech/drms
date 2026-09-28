@@ -16,6 +16,7 @@ class PkSemantic {
     required this.primary,
     required this.primaryHover,
     required this.primaryForeground,
+    required this.primarySoft,
     required this.accent,
     required this.accentHover,
     required this.accentForeground,
@@ -40,6 +41,8 @@ class PkSemantic {
   final Color primary;
   final Color primaryHover;
   final Color primaryForeground;
+  /// Pale primary (web `primarySoft`, loader dots / soft fills).
+  final Color primarySoft;
   final Color accent;
   final Color accentHover;
   final Color accentForeground;
@@ -69,6 +72,7 @@ class PkSemantic {
     'primary': primary,
     'primaryHover': primaryHover,
     'primaryForeground': primaryForeground,
+    'primarySoft': primarySoft,
     'accent': accent,
     'accentHover': accentHover,
     'accentForeground': accentForeground,
@@ -96,6 +100,7 @@ abstract final class PkTokens {
     primary: Color(0xFF2563EB),
     primaryHover: Color(0xFF1D4ED8),
     primaryForeground: Color(0xFFFFFFFF),
+    primarySoft: Color(0xFFBFDBFE),
     accent: Color(0xFFEA580C),
     accentHover: Color(0xFFF97316),
     accentForeground: Color(0xFF000000),
@@ -121,6 +126,7 @@ abstract final class PkTokens {
     primary: Color(0xFF60A5FA),
     primaryHover: Color(0xFF93C5FD),
     primaryForeground: Color(0xFF0B1120),
+    primarySoft: Color(0xFF1E40AF),
     accent: Color(0xFFFB923C),
     accentHover: Color(0xFFFDBA74),
     accentForeground: Color(0xFF0B1120),

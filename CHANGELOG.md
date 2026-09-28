@@ -41,6 +41,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - **Seed:** `SEED_DATA_FILE` accepts the old single-company shape (→ company #1 DRMS) and a new
   `{ uoms, banks, companies: [...] }` shape; every PT gets the default sequences and approval rules.
 
+- **Optional self-service 2FA (TOTP)** (branch `feat/2fa-self-service`, ADR 0017, user decision 2026-09-28): each
+  user turns 2FA on/off for their OWN account; nobody is forced.
+  - Web: page **"Keamanan akun"** (`/admin/keamanan-akun`, avatar menu) with status *2FA aktif / nonaktif / tidak
+    diketahui* + authenticator label/date, **Aktifkan 2FA** (Keycloak AIA `kc_action=CONFIGURE_TOTP`) and
+    **Nonaktifkan 2FA** with confirmation (AIA `delete_credential:<own id>`), both with `prompt=login`
+    (fresh password + code). `POST /auth/account-action` (same-origin, web session only, own credential only,
+    6 / 10 min / user); return leg in `/auth/callback` via its own `pk_aia_tx` cookie + state — no second web
+    session / `login` row; outcome verified via the Admin API (`listUserCredentials`, OTP metadata only); audit
+    `2fa_enabled` / `2fa_disabled` (migration `20260928_090000_two_factor_audit`: two enum values).
+  - APK (password mode): after a failed login the optional field **"Kode autentikator (bila 2FA aktif)"** appears
+    (6 digits, numeric keyboard, one-time-code autofill); the retry sends `totp`; empty → not sent; never logged.
+  - Tests: web unit + integration (Keycloak mocked), `tests/kc/two-factor.kc.test.ts` against a real throwaway
+    Keycloak 26.7.4 (`test-env/kc-setup.sh` gains a TEST-ONLY `proyekkas-web` client + user); mobile unit + widget.
+  - Docs: ADR 0017; revisions in ADR 0012, `plans/fase1-golive.md` G1-3, ASVS checklist 4.3.1 / G-01 (decided).
+
 ### Changed
 - **`company-settings` global = app-wide only** (APK gate, device image targets, offline max age, selfie batch
   size, new group letterhead `groupName`/`groupLogo`/`groupPdfHeader`); editable by the group admin only. Per-PT
@@ -53,6 +68,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Removed
 - `users.roles` and `users.employee` (replaced by `company-memberships`).
+
+### Fixed
+- **Mobile token parity** (`apps/mobile/lib/app/theme/tokens.dart`): the web token `primarySoft` added in 0.4.2
+  (loader dots) was missing on the Flutter side, so `test/unit/theme_tokens_test.dart` failed (22 ≠ 23 keys) and
+  the mobile workflow was red on develop. `PkTokens.primarySoft` added (light `#BFDBFE`, dark `#1E40AF`).
 
 ## [0.4.2] - 2026-09-28
 

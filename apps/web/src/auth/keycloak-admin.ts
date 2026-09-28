@@ -29,7 +29,15 @@ export interface KeycloakAdmin {
   /** Deletes an online (offline=false) or offline session; false when it does not exist (404). */
   deleteSession(sid: string, offline: boolean): Promise<boolean>
   executeActionsEmail(id: string, actions: string[]): Promise<void>
+  /**
+   * Optional self-service 2FA (ADR 0017): the user's OTP credentials — metadata only (id, label,
+   * created). Never secretData/credentialData. Needs realm-management `view-users`.
+   */
+  listUserCredentials(id: string): Promise<OtpCredential[]>
 }
+
+/** Metadata of one OTP authenticator of a user (Keycloak CredentialRepresentation, type `otp`). */
+export type OtpCredential = { id: string; type: 'otp'; userLabel: string | null; createdDate: number | null }
 
 export class KeycloakAdminError extends Error {
   constructor(
@@ -177,7 +185,24 @@ export function createHttpKeycloakAdmin(cfg: {
     async executeActionsEmail(id, actions) {
       await call('PUT', `/users/${uid(id)}/execute-actions-email`, actions)
     },
+    async listUserCredentials(id) {
+      const list = (await (await call('GET', `/users/${uid(id)}/credentials`)).json()) as Array<Record<string, unknown>>
+      return toOtpCredentials(list)
+    },
   }
+}
+
+/** Keeps only OTP credentials and only their metadata (the representation also carries credentialData). */
+export function toOtpCredentials(list: unknown): OtpCredential[] {
+  if (!Array.isArray(list)) return []
+  return list
+    .filter((c): c is Record<string, unknown> => !!c && typeof c === 'object' && (c as Record<string, unknown>).type === 'otp' && typeof (c as Record<string, unknown>).id === 'string')
+    .map((c) => ({
+      id: c.id as string,
+      type: 'otp' as const,
+      userLabel: typeof c.userLabel === 'string' && c.userLabel.trim() ? c.userLabel.slice(0, 100) : null,
+      createdDate: typeof c.createdDate === 'number' && Number.isFinite(c.createdDate) ? c.createdDate : null,
+    }))
 }
 
 let override: KeycloakAdmin | null | undefined

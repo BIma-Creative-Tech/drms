@@ -109,6 +109,20 @@ class AppLocalizationsId extends AppLocalizations {
   String get loginForgotPassword => 'Lupa kata sandi? Hubungi Admin.';
 
   @override
+  String get loginTotpLabel => 'Kode autentikator (bila 2FA aktif)';
+
+  @override
+  String get loginTotpHelper =>
+      'Isi 6 digit dari aplikasi autentikator hanya bila Anda mengaktifkan 2FA untuk akun ini. Tanpa 2FA, biarkan kosong.';
+
+  @override
+  String get loginTotpInvalidLength => 'Kode autentikator terdiri dari 6 digit.';
+
+  @override
+  String get loginInvalidWithTotp =>
+      'Email/username, kata sandi, atau kode autentikator salah. Gagal berulang kali dapat mengunci akun sementara; tunggu sebentar sebelum mencoba lagi.';
+
+  @override
   String get updateRequiredTitle => 'Perbarui aplikasi';
 
   @override
