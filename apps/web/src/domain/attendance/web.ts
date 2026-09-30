@@ -1,7 +1,7 @@
 import { sql } from '@payloadcms/db-postgres'
 import type { PayloadRequest } from 'payload'
 
-import { hasRole, hasRoleAny, ownEmployees, relId, userId } from '@/access/roles'
+import { hasRole, ownEmployees, relId, userId } from '@/access/roles'
 import { attendanceMonth } from '@/domain/reports/attendance-report'
 import { companyScopeSql, idList, inList } from '@/domain/reports/scope'
 import { getRequestTx } from '@/lib/tx'
@@ -27,7 +27,7 @@ export type Opt = { id: number; label: string; companyId: number | null }
 export async function recapEmployees(req: PayloadRequest, scope: AttScope, from: string, to: string): Promise<Opt[]> {
   const out = new Map<number, { label: string; companyId: number | null }>()
   const teamParts = scope.parts?.filter((p) => !p.all) ?? []
-  const team: AttScope | null = scope.parts ? (teamParts.length ? { kind: 'team', projects: [], costCenters: [], parts: teamParts } : null) : scope.kind === 'team' ? scope : null
+  const team: AttScope | null = teamParts.length ? { kind: 'team', projects: [], costCenters: [], parts: teamParts } : null // legacy literal: nothing (MC4)
   if (team) for (const x of await teamMembers(req, team, from, to)) out.set(x.employeeId, { label: `${x.name} (${x.code})`, companyId: x.companyId ?? null })
   if (fullCompanies(scope).length > 0) {
     const r = await rows<{ id: number; code: string; name: string; company_id: number }>(
@@ -45,8 +45,8 @@ export async function recapEmployees(req: PayloadRequest, scope: AttScope, from:
 /** Projects / cost centers of the scope (filters of "Tim hari ini" and the team grid). */
 export async function scopeLocations(req: PayloadRequest, scope: AttScope): Promise<{ projects: Opt[]; costCenters: Opt[] }> {
   const full = fullCompanies(scope)
-  const teamP = scope.parts ? scope.parts.filter((p) => !p.all).flatMap((p) => p.projects) : scope.kind === 'team' ? scope.projects : []
-  const teamC = scope.parts ? scope.parts.filter((p) => !p.all).flatMap((p) => p.costCenters) : scope.kind === 'team' ? scope.costCenters : []
+  const teamP = (scope.parts ?? []).filter((p) => !p.all).flatMap((p) => p.projects) // legacy literal: nothing (MC4)
+  const teamC = (scope.parts ?? []).filter((p) => !p.all).flatMap((p) => p.costCenters)
   const pw = sql`((${companyScopeSql(sql`p.company_id`, full)} AND p.status::text <> 'arsip') OR ${inList(sql`p.id`, teamP)})`
   const cw = sql`((${companyScopeSql(sql`cc.company_id`, full)} AND coalesce(cc.active, true)) OR ${inList(sql`cc.id`, teamC)})`
   const p = await rows<{ id: number; code: string; name: string; company_id: number }>(req, sql`SELECT p.id, p.code, p.name, p.company_id FROM projects p WHERE ${pw} ORDER BY p.code`)
@@ -90,12 +90,12 @@ export async function selfieState(req: PayloadRequest, attendanceIds: number[]):
 /**
  * Can the caller correct (T10) attendance of `employeeId` (of PT `companyId`)? Mirrors corrections.ts
  * (server re-checks): never the own employee (any PT); Admin OF THE EMPLOYEE'S PT, or PM there with a
- * team scope. Without `companyId` (legacy UI hint): any PT of the scope.
+ * team scope. Without `companyId`: any PT of the scope. A scope without PT parts → false (MC4).
  */
 export function mayCorrect(req: PayloadRequest, scope: AttScope | null, employeeId: number, companyId?: number): boolean {
   if (!scope) return false
   if (ownEmployees(req).includes(employeeId) || relId((req.user as { employee?: unknown } | null)?.employee) === employeeId) return false
-  if (!scope.parts) return hasRoleAny(req, 'pk-admin') || (hasRoleAny(req, 'pk-pm') && scope.kind === 'team') // legacy literal (UI hint)
+  if (!scope.parts) return false // legacy literal without PT parts: fail closed (MC4)
   const pts = companyId !== undefined ? [companyId] : scope.parts.map((p) => p.company)
   return pts.some((c) => hasRole(req, 'pk-admin', c) || (hasRole(req, 'pk-pm', c) && scope.parts!.some((p) => p.company === c && !p.all)))
 }

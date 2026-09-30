@@ -39,8 +39,9 @@ describe('attendance scope narrowing per PT (mc2-contract §0.1/§5)', () => {
     expect(narrowAttToCompanies(s, [2]).kind).toBe('team')
     expect(narrowAttToCompanies(s, [3]).parts).toEqual([])
     expect(narrowAttToCompanies(s, []).parts).toEqual(s.parts)
+    // MC4: a company-blind literal is never passed through (empty scope, matches nothing)
     const legacy: AttScope = { kind: 'team', projects: [1], costCenters: [] }
-    expect(narrowAttToCompanies(legacy, [1])).toBe(legacy)
+    expect(narrowAttToCompanies(legacy, [1])).toEqual({ kind: 'team', projects: [], costCenters: [], parts: [] })
   })
 })
 

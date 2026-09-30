@@ -18,10 +18,11 @@ export type SQL = ReturnType<typeof sql>
  * Every SQL fragment below is `OR` over the companies of `(x.company_id = $c AND <kind predicate>)`;
  * an empty list is FALSE — "all" never means SQL `TRUE` any more (MC2-2).
  *
- * The top-level `kind` (+ the legacy team/own fields) is a SUMMARY for UI hints (strongest kind over
- * the companies; union of the team ids). A scope WITHOUT `companies` (legacy literal such as
- * `{ kind: 'all' }`) is company-blind and is treated fail-closed: `all` matches nothing; `team`/`own`
- * keep their id predicates (ids are per PT by construction). Build scopes with the functions below.
+ * The top-level `kind` (+ the team/own summary fields) is a SUMMARY for UI hints (strongest kind over
+ * the companies; union of the team ids). MC4: a scope WITHOUT `companies` (legacy literal such as
+ * `{ kind: 'all' }` or `{ kind: 'team', projects: [7] }`) is company-blind and matches NOTHING, whatever
+ * its kind (before MC4 `team`/`own` literals kept their id predicates). Build scopes with the
+ * functions below (`fromCompanies` / the role builders) — tests/unit/mc4-code.test.ts pins this.
  */
 export type CompanyScope =
   | { company: number; kind: 'all' }
@@ -56,13 +57,10 @@ export function fromCompanies(companies: CompanyScope[]): ReportScope {
   return { kind: 'none', companies: [] }
 }
 
-/** Legacy literal → pseudo company scopes (company null = no company predicate; `all` → none). */
-type Part = { company: number | null } & ({ kind: 'all' } | { kind: 'team'; projects: number[]; costCenters: number[] } | { kind: 'own'; userId: number; employeeId: number | null })
+type Part = CompanyScope
+/** Per-company parts; a legacy literal without `companies` → none (MC4: fail closed for EVERY kind). */
 function parts(s: ReportScope): Part[] {
-  if (s.companies) return s.companies
-  if (s.kind === 'team') return [{ company: null, kind: 'team', projects: s.projects, costCenters: s.costCenters }]
-  if (s.kind === 'own') return [{ company: null, kind: 'own', userId: s.userId, employeeId: s.employeeId }]
-  return [] // `all` without companies: fail closed (never SQL TRUE)
+  return s.companies ?? []
 }
 
 /** Company ids covered by the scope (any kind). */
@@ -175,7 +173,7 @@ function orCompanies(s: ReportScope, companyCol: SQL, pred: (p: Part) => SQL | n
   for (const p of parts(s)) {
     const x = pred(p)
     if (!x) continue
-    out.push(p.company === null ? sql`(${x})` : sql`(${companyCol} = ${p.company} AND ${x})`)
+    out.push(sql`(${companyCol} = ${p.company} AND ${x})`)
   }
   return out.length ? sql`(${sql.join(out, sql` OR `)})` : sql`FALSE`
 }
