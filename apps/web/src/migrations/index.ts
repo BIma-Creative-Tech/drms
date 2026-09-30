@@ -26,6 +26,7 @@ import * as migration_20260927_234849_mc1_company_columns from './20260927_23484
 import * as migration_20260928_000100_mc1_security from './20260928_000100_mc1_security';
 import * as migration_20260928_000200_mc1_numbering from './20260928_000200_mc1_numbering';
 import * as migration_20260928_090000_two_factor_audit from './20260928_090000_two_factor_audit';
+import * as migration_20260930_120000_mc4_list_company_column from './20260930_120000_mc4_list_company_column';
 
 export const migrations = [
   {
@@ -167,5 +168,10 @@ export const migrations = [
     up: migration_20260928_090000_two_factor_audit.up,
     down: migration_20260928_090000_two_factor_audit.down,
     name: '20260928_090000_two_factor_audit',
+  },
+  {
+    up: migration_20260930_120000_mc4_list_company_column.up,
+    down: migration_20260930_120000_mc4_list_company_column.down,
+    name: '20260930_120000_mc4_list_company_column',
   },
 ];
