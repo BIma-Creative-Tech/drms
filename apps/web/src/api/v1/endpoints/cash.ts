@@ -5,6 +5,7 @@ import { balances, closePeriod, createManualEntry, currentLockDate, editManualEn
 
 import { companyQuery, singleCompanyQuery } from '../company-query'
 import { HttpError, json, v1 } from '../http'
+import { withNamedCompany } from '../named-company'
 import { CashEntryCreate, CashEntryUpdate, CashListQuery, PeriodCloseBody, ReasonBody } from '../schemas-flow'
 
 /** US-23 / US-24 / ADR 0005 — Finance writes; Finance/Direktur (pk-owner)/Admin read (requirements §4 "Kas & bank"). */
@@ -92,8 +93,17 @@ export const createCashEndpoint = v1({
   transactional: true,
   idempotent: true,
   handler: async ({ req, body }) => {
-    const e = await createManualEntry(req, body)
-    return json(await reload(req, e.id), 201)
+    const { company, ...input } = body
+    // MC4: optional body `company` = the cash account's PT; Finance IN that PT
+    const refs = [
+      { collection: 'cash-accounts', id: input.cashAccountId, path: 'cashAccountId' },
+      { collection: 'projects', id: input.projectId, path: 'projectId' },
+      { collection: 'cost-centers', id: input.costCenterId, path: 'costCenterId' },
+    ] as const
+    return withNamedCompany(req, company, { roles: ['pk-finance'], refs: [...refs] }, async () => {
+      const e = await createManualEntry(req, input)
+      return json(await reload(req, e.id), 201)
+    })
   },
 })
 

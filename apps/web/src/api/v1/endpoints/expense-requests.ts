@@ -18,6 +18,7 @@ import { approvalInbox, lpjQueue, officeQueueWhere } from '@/domain/expense/queu
 import { companyQuery } from '../company-query'
 
 import { HttpError, json, problem, v1 } from '../http'
+import { withNamedCompany } from '../named-company'
 import {
   EmptyBody,
   ExpenseRequestCreate,
@@ -255,8 +256,18 @@ export const createRequestEndpoint = v1({
   transactional: true,
   idempotent: true,
   handler: async ({ req, body }) => {
-    const { doc, created } = await createDraft(req, body)
-    return ok(req, doc.id, created ? 201 : 200)
+    const { company, ...input } = body
+    // MC4: optional body `company` (ADR 0016 §5) — roles = collection create access of expense-requests
+    // (the answer is built under the same PT, so a PT outside the header selection still reads back)
+    return withNamedCompany(
+      req,
+      company,
+      { roles: ['pk-staff', 'pk-pm', 'pk-admin', 'pk-finance'], refs: [{ collection: 'projects', id: input.projectId, path: 'projectId' }, { collection: 'cost-centers', id: input.costCenterId, path: 'costCenterId' }] },
+      async () => {
+        const { doc, created } = await createDraft(req, input)
+        return ok(req, doc.id, created ? 201 : 200)
+      },
+    )
   },
 })
 

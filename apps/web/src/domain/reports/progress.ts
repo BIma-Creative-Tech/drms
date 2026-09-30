@@ -34,6 +34,9 @@ export type ProjectProgress = {
   toneLabel: string
   lastReportDate: string | null
   reportCount: number
+  /** MC4: colour thresholds of THIS project's PT (the top-level values are the context PT's). */
+  warnGapPct: number
+  badGapPct: number
 }
 
 export async function projectProgressVsBudget(req: PayloadRequest, scope: ReportScope, opts: { projectId?: number; includeArchived?: boolean } = {}): Promise<{ warnGapPct: number; badGapPct: number; asOf: string; projects: ProjectProgress[] }> {
@@ -42,7 +45,8 @@ export async function projectProgressVsBudget(req: PayloadRequest, scope: Report
   const warn = Number(s.progressWarnGapPct ?? 0)
   const bad = Number(s.progressBadGapPct ?? 8)
   const budgets = await projectBudgets(req, scope, opts)
-  // MC2: colour thresholds of each project's PT (ADR 0016 §1 per-PT settings); top-level = context PT.
+  // MC2: colour thresholds of each project's PT (ADR 0016 §1 per-PT settings); top-level = context PT
+  // (MC4: the caller's only / lowest selected PT — a display default; every row carries its own).
   const gaps = new Map<number, { warn: number; bad: number }>()
   for (const cid of new Set(budgets.map((b) => b.companyId))) {
     const cs = (await settings(req, cid)) as { progressWarnGapPct?: number | null; progressBadGapPct?: number | null }
@@ -89,6 +93,8 @@ export async function projectProgressVsBudget(req: PayloadRequest, scope: Report
         toneLabel: b.pct === null ? 'Tanpa RAB' : !stagesComplete ? 'Tahapan belum 100%' : PROGRESS_LABELS[tone],
         lastReportDate: x?.last_report ? String(x.last_report) : null,
         reportCount: num(x?.reports),
+        warnGapPct: g.warn,
+        badGapPct: g.bad,
       }
     }),
   }

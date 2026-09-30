@@ -9,6 +9,7 @@ import { withReqTransaction } from '@/lib/system-tx'
 
 import { companyQuery } from '../company-query'
 import { HttpError, json, v1 } from '../http'
+import { withNamedCompany } from '../named-company'
 import { ProgressReportCreate, ProgressReportListQuery, ProgressReportUpdate, ProjectProgressQuery, StageSetBody } from '../schemas-progress'
 
 /** Architecture §6.5: mutations 30/min per user (same bucket size as submit/approve). */
@@ -110,7 +111,9 @@ export const createReportEndpoint = v1({
   transactional: true,
   idempotent: true,
   handler: async ({ req, body }) => {
-    const { doc, created } = await createReport(req, {
+    // MC4: optional body `company` = the project's PT; Direktur / PM IN that PT
+    return withNamedCompany(req, body.company, { roles: ['pk-pm', 'pk-owner'], refs: [{ collection: 'projects', id: body.projectId, path: 'projectId' }] }, async () => {
+      const { doc, created } = await createReport(req, {
       projectId: body.projectId,
       stageId: body.stageId,
       pctAfter: body.pctAfter,
@@ -118,8 +121,9 @@ export const createReportEndpoint = v1({
       issues: body.issues ?? null,
       photoIds: body.photoIds ?? [],
       clientUuid: body.clientUuid ?? null,
+      })
+      return json(await reportDto(req, doc), created ? 201 : 200)
     })
-    return json(await reportDto(req, doc), created ? 201 : 200)
   },
 })
 

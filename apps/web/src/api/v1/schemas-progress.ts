@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-import { companyFilterParam } from './schemas'
+import { companyFilterParam, createCompanyField } from './schemas'
 
 /**
  * /api/v1 contract for E4: project stages (G11 editor), progress reports (T11, US-10/US-31) and the
@@ -57,6 +57,7 @@ export const StageSet = z
 
 export const ProgressReportCreate = z
   .object({
+    company: createCompanyField,
     projectId: id,
     stageId: id,
     pctAfter: pct.meta({ description: 'Stage progress after this report (%); never below the current stage %.' }),
@@ -149,6 +150,7 @@ export const ProjectProgressQuery = z
 export const ProjectProgressItem = z
   .object({
     id,
+    companyId: id.meta({ description: 'MC2: PT of the project.' }),
     code: z.string(),
     name: z.string(),
     status: z.string(),
@@ -164,9 +166,16 @@ export const ProjectProgressItem = z
     toneLabel: z.string(),
     lastReportDate: z.string().nullable(),
     reportCount: z.number().int(),
+    warnGapPct: z.number().meta({ description: 'MC4: yellow threshold of THIS project\'s PT (companies.progressWarnGapPct).' }),
+    badGapPct: z.number().meta({ description: 'MC4: red threshold of THIS project\'s PT (companies.progressBadGapPct).' }),
   })
   .meta({ id: 'ProjectProgressItem' })
 
 export const ProjectProgressList = z
-  .object({ asOf: z.string(), warnGapPct: z.number(), badGapPct: z.number(), projects: z.array(ProjectProgressItem) })
+  .object({
+    asOf: z.string(),
+    warnGapPct: z.number().meta({ description: 'Display default = the caller\'s only / lowest selected PT. Each project uses its own PT\'s thresholds (projects[].warnGapPct / badGapPct).' }),
+    badGapPct: z.number().meta({ description: 'Display default (see warnGapPct).' }),
+    projects: z.array(ProjectProgressItem),
+  })
   .meta({ id: 'ProjectProgressList' })

@@ -2171,6 +2171,11 @@ export const openapiDocument = {
           "type": {
             "$ref": "#/components/schemas/RequestType"
           },
+          "company": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "description": "MC4: explicit PT (companies id) of the new record. Must be one of your PTs where you hold the role this create needs (else 403 COMPANY_NOT_ALLOWED) and the PT of the referenced project / cost center / cash account (else 400 COMPANY_MISMATCH). Omitted = derived from the references, else your only selected PT (unchanged behaviour of APK 0.2.x / 0.3.0)."
+          },
           "title": {
             "type": "string",
             "minLength": 1,
@@ -3163,6 +3168,11 @@ export const openapiDocument = {
               "out"
             ]
           },
+          "company": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "description": "MC4: explicit PT (companies id) of the new record. Must be one of your PTs where you hold the role this create needs (else 403 COMPANY_NOT_ALLOWED) and the PT of the referenced project / cost center / cash account (else 400 COMPANY_MISMATCH). Omitted = derived from the references, else your only selected PT (unchanged behaviour of APK 0.2.x / 0.3.0)."
+          },
           "entryDate": {
             "type": "string",
             "pattern": "^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$"
@@ -3819,7 +3829,8 @@ export const openapiDocument = {
         "type": "object",
         "properties": {
           "budgetWarnPct": {
-            "type": "number"
+            "type": "number",
+            "description": "Display default = the caller's only / lowest selected PT (MC4). Each item carries its own PT's threshold (items[].budget.warnPct)."
           },
           "items": {
             "type": "array",
@@ -3953,13 +3964,18 @@ export const openapiDocument = {
                     },
                     "overWarn": {
                       "type": "boolean"
+                    },
+                    "warnPct": {
+                      "type": "number",
+                      "description": "MC2: budgetWarnPct of the request's PT (overWarn = pctAfter > warnPct)."
                     }
                   },
                   "required": [
                     "basis",
                     "pctBefore",
                     "pctAfter",
-                    "overWarn"
+                    "overWarn",
+                    "warnPct"
                   ]
                 },
                 "flags": {
@@ -4192,7 +4208,7 @@ export const openapiDocument = {
           },
           "timezone": {
             "type": "string",
-            "description": "Company display timezone (IANA)."
+            "description": "Display timezone (IANA) — the server timezone every PT uses (ADR 0016 §9)."
           },
           "serverTime": {
             "type": "string"
@@ -4216,13 +4232,16 @@ export const openapiDocument = {
                 "description": "false until FCM is configured (ADR 0011) — poll GET /notifications instead."
               },
               "syncExpenseDrafts": {
-                "type": "boolean"
+                "type": "boolean",
+                "description": "MC4: true when at least one active PT allows it (per-PT value: GET /me companies[].settings.syncExpenseDraftsEnabled)."
               },
               "syncAttendance": {
-                "type": "boolean"
+                "type": "boolean",
+                "description": "MC4: true when at least one active PT allows it (per-PT value: GET /me companies[].settings.syncAttendanceEnabled)."
               },
               "syncProgressReports": {
-                "type": "boolean"
+                "type": "boolean",
+                "description": "MC4: true when at least one active PT allows it (per-PT value: GET /me companies[].settings.syncProgressReportsEnabled)."
               }
             },
             "required": [
@@ -4230,7 +4249,8 @@ export const openapiDocument = {
               "syncExpenseDrafts",
               "syncAttendance",
               "syncProgressReports"
-            ]
+            ],
+            "description": "Public, unauthenticated hints (no PT is known before login). With several PTs each flag is the OR over the active PTs; the server still enforces the flag of the item's PT on every sync item (FEATURE_DISABLED). Clients that know the user read GET /me companies[].settings instead."
           },
           "sync": {
             "type": "object",
@@ -5441,10 +5461,12 @@ export const openapiDocument = {
             "type": "string"
           },
           "warnGapPct": {
-            "type": "number"
+            "type": "number",
+            "description": "Display default = the caller's only / lowest selected PT. Each project uses its own PT's thresholds (projects[].warnGapPct / badGapPct)."
           },
           "badGapPct": {
-            "type": "number"
+            "type": "number",
+            "description": "Display default (see warnGapPct)."
           },
           "projects": {
             "type": "array",
@@ -5466,6 +5488,11 @@ export const openapiDocument = {
           "id": {
             "type": "integer",
             "exclusiveMinimum": 0
+          },
+          "companyId": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "description": "MC2: PT of the project."
           },
           "code": {
             "type": "string"
@@ -5540,10 +5567,19 @@ export const openapiDocument = {
           },
           "reportCount": {
             "type": "integer"
+          },
+          "warnGapPct": {
+            "type": "number",
+            "description": "MC4: yellow threshold of THIS project's PT (companies.progressWarnGapPct)."
+          },
+          "badGapPct": {
+            "type": "number",
+            "description": "MC4: red threshold of THIS project's PT (companies.progressBadGapPct)."
           }
         },
         "required": [
           "id",
+          "companyId",
           "code",
           "name",
           "status",
@@ -5558,7 +5594,9 @@ export const openapiDocument = {
           "tone",
           "toneLabel",
           "lastReportDate",
-          "reportCount"
+          "reportCount",
+          "warnGapPct",
+          "badGapPct"
         ]
       },
       "ProjectStageSet": {
@@ -5976,6 +6014,11 @@ export const openapiDocument = {
       "ProgressReportCreate": {
         "type": "object",
         "properties": {
+          "company": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "description": "MC4: explicit PT (companies id) of the new record. Must be one of your PTs where you hold the role this create needs (else 403 COMPANY_NOT_ALLOWED) and the PT of the referenced project / cost center / cash account (else 400 COMPANY_MISMATCH). Omitted = derived from the references, else your only selected PT (unchanged behaviour of APK 0.2.x / 0.3.0)."
+          },
           "projectId": {
             "type": "integer",
             "exclusiveMinimum": 0
@@ -7580,6 +7623,11 @@ export const openapiDocument = {
       "BudgetAddendumCreate": {
         "type": "object",
         "properties": {
+          "company": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "description": "MC4: explicit PT (companies id) of the new record. Must be one of your PTs where you hold the role this create needs (else 403 COMPANY_NOT_ALLOWED) and the PT of the referenced project / cost center / cash account (else 400 COMPANY_MISMATCH). Omitted = derived from the references, else your only selected PT (unchanged behaviour of APK 0.2.x / 0.3.0)."
+          },
           "projectId": {
             "type": "integer",
             "exclusiveMinimum": 0
@@ -16139,6 +16187,29 @@ export const openapiDocument = {
                     "month": {
                       "type": "string"
                     },
+                    "companies": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer"
+                          },
+                          "shortCode": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "shortCode",
+                          "name"
+                        ]
+                      },
+                      "description": "MC2: PTs covered by this layout = the selected PTs where the caller holds the layout's role."
+                    },
                     "cash": {
                       "type": "object",
                       "properties": {
@@ -16154,6 +16225,10 @@ export const openapiDocument = {
                               "id": {
                                 "type": "integer"
                               },
+                              "companyId": {
+                                "type": "integer",
+                                "description": "PT (companies id); label from `companies[]` / GET /me companies[]."
+                              },
                               "name": {
                                 "type": "string"
                               },
@@ -16167,6 +16242,7 @@ export const openapiDocument = {
                             },
                             "required": [
                               "id",
+                              "companyId",
                               "name",
                               "active",
                               "balance"
@@ -16180,13 +16256,44 @@ export const openapiDocument = {
                         "monthOut": {
                           "type": "integer",
                           "description": "Rupiah (integer)"
+                        },
+                        "byCompany": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "companyId": {
+                                "type": "integer",
+                                "description": "PT (companies id); label from `companies[]` / GET /me companies[]."
+                              },
+                              "total": {
+                                "type": "integer",
+                                "description": "Rupiah (integer)"
+                              },
+                              "monthIn": {
+                                "type": "integer",
+                                "description": "Rupiah (integer)"
+                              },
+                              "monthOut": {
+                                "type": "integer",
+                                "description": "Rupiah (integer)"
+                              }
+                            },
+                            "required": [
+                              "companyId",
+                              "total",
+                              "monthIn",
+                              "monthOut"
+                            ]
+                          }
                         }
                       },
                       "required": [
                         "total",
                         "accounts",
                         "monthIn",
-                        "monthOut"
+                        "monthOut",
+                        "byCompany"
                       ]
                     },
                     "budget": {
@@ -16206,6 +16313,41 @@ export const openapiDocument = {
                         },
                         "none": {
                           "type": "integer"
+                        },
+                        "byCompany": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "companyId": {
+                                "type": "integer",
+                                "description": "PT (companies id); label from `companies[]` / GET /me companies[]."
+                              },
+                              "running": {
+                                "type": "integer"
+                              },
+                              "over": {
+                                "type": "integer"
+                              },
+                              "warn": {
+                                "type": "integer"
+                              },
+                              "ok": {
+                                "type": "integer"
+                              },
+                              "none": {
+                                "type": "integer"
+                              }
+                            },
+                            "required": [
+                              "companyId",
+                              "running",
+                              "over",
+                              "warn",
+                              "ok",
+                              "none"
+                            ]
+                          }
                         }
                       },
                       "required": [
@@ -16213,7 +16355,8 @@ export const openapiDocument = {
                         "over",
                         "warn",
                         "ok",
-                        "none"
+                        "none",
+                        "byCompany"
                       ]
                     },
                     "completeness": {
@@ -16236,6 +16379,49 @@ export const openapiDocument = {
                         },
                         "openWarnings": {
                           "type": "integer"
+                        },
+                        "byCompany": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "companyId": {
+                                "type": "integer",
+                                "description": "PT (companies id); label from `companies[]` / GET /me companies[]."
+                              },
+                              "ratioDone": {
+                                "type": "integer"
+                              },
+                              "ratioTotal": {
+                                "type": "integer"
+                              },
+                              "withoutLpj": {
+                                "type": "integer"
+                              },
+                              "overdue": {
+                                "type": "integer"
+                              },
+                              "lpjToVerify": {
+                                "type": "integer"
+                              },
+                              "reimburseToVerify": {
+                                "type": "integer"
+                              },
+                              "openWarnings": {
+                                "type": "integer"
+                              }
+                            },
+                            "required": [
+                              "companyId",
+                              "ratioDone",
+                              "ratioTotal",
+                              "withoutLpj",
+                              "overdue",
+                              "lpjToVerify",
+                              "reimburseToVerify",
+                              "openWarnings"
+                            ]
+                          }
                         }
                       },
                       "required": [
@@ -16244,7 +16430,8 @@ export const openapiDocument = {
                         "withoutLpj",
                         "overdue",
                         "reimburseToVerify",
-                        "openWarnings"
+                        "openWarnings",
+                        "byCompany"
                       ]
                     },
                     "approvals": {
@@ -16297,6 +16484,49 @@ export const openapiDocument = {
                             "count",
                             "sum"
                           ]
+                        },
+                        "byCompany": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "companyId": {
+                                "type": "integer",
+                                "description": "PT (companies id); label from `companies[]` / GET /me companies[]."
+                              },
+                              "count": {
+                                "type": "integer"
+                              },
+                              "sum": {
+                                "type": "integer",
+                                "description": "Rupiah (integer)"
+                              }
+                            },
+                            "required": [
+                              "companyId",
+                              "count",
+                              "sum"
+                            ]
+                          }
+                        },
+                        "waitingForMeByCompany": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "companyId": {
+                                "type": "integer",
+                                "description": "PT (companies id); label from `companies[]` / GET /me companies[]."
+                              },
+                              "total": {
+                                "type": "integer"
+                              }
+                            },
+                            "required": [
+                              "companyId",
+                              "total"
+                            ]
+                          }
                         }
                       },
                       "required": [
@@ -16305,7 +16535,9 @@ export const openapiDocument = {
                         "waitingForMe",
                         "oldestDays",
                         "pendingAck",
-                        "pendingApproval"
+                        "pendingApproval",
+                        "byCompany",
+                        "waitingForMeByCompany"
                       ]
                     },
                     "cashFlow": {
@@ -16362,6 +16594,10 @@ export const openapiDocument = {
                         "properties": {
                           "id": {
                             "type": "integer"
+                          },
+                          "companyId": {
+                            "type": "integer",
+                            "description": "PT (companies id); label from `companies[]` / GET /me companies[]."
                           },
                           "code": {
                             "type": "string"
@@ -16428,6 +16664,7 @@ export const openapiDocument = {
                         },
                         "required": [
                           "id",
+                          "companyId",
                           "code",
                           "name",
                           "status",
@@ -16450,6 +16687,10 @@ export const openapiDocument = {
                         "properties": {
                           "id": {
                             "type": "integer"
+                          },
+                          "companyId": {
+                            "type": "integer",
+                            "description": "PT (companies id); label from `companies[]` / GET /me companies[]."
                           },
                           "code": {
                             "type": "string"
@@ -16476,6 +16717,7 @@ export const openapiDocument = {
                         },
                         "required": [
                           "id",
+                          "companyId",
                           "code",
                           "name",
                           "fromRequests",
@@ -16503,6 +16745,30 @@ export const openapiDocument = {
                         },
                         "reimburseToVerifyWarnings": {
                           "type": "integer"
+                        },
+                        "byCompany": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "companyId": {
+                                "type": "integer",
+                                "description": "PT (companies id); label from `companies[]` / GET /me companies[]."
+                              },
+                              "count": {
+                                "type": "integer"
+                              },
+                              "sum": {
+                                "type": "integer",
+                                "description": "Rupiah (integer)"
+                              }
+                            },
+                            "required": [
+                              "companyId",
+                              "count",
+                              "sum"
+                            ]
+                          }
                         }
                       },
                       "required": [
@@ -16510,7 +16776,8 @@ export const openapiDocument = {
                         "sum",
                         "overdue",
                         "reimburseToVerify",
-                        "reimburseToVerifyWarnings"
+                        "reimburseToVerifyWarnings",
+                        "byCompany"
                       ]
                     },
                     "viz": {
@@ -16763,6 +17030,10 @@ export const openapiDocument = {
                               "id": {
                                 "type": "integer"
                               },
+                              "companyId": {
+                                "type": "integer",
+                                "description": "PT (companies id); label from `companies[]` / GET /me companies[]."
+                              },
                               "entryNo": {
                                 "type": [
                                   "string",
@@ -16814,6 +17085,7 @@ export const openapiDocument = {
                             },
                             "required": [
                               "id",
+                              "companyId",
                               "entryNo",
                               "entryDate",
                               "direction",
@@ -16834,6 +17106,29 @@ export const openapiDocument = {
                             "properties": {
                               "id": {
                                 "type": "integer"
+                              },
+                              "company": {
+                                "type": [
+                                  "object",
+                                  "null"
+                                ],
+                                "properties": {
+                                  "id": {
+                                    "type": "integer"
+                                  },
+                                  "shortCode": {
+                                    "type": "string"
+                                  },
+                                  "name": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "id",
+                                  "shortCode",
+                                  "name"
+                                ],
+                                "description": "MC2: PT of the request."
                               },
                               "docNo": {
                                 "type": [
@@ -16886,6 +17181,7 @@ export const openapiDocument = {
                             },
                             "required": [
                               "id",
+                              "company",
                               "docNo",
                               "title",
                               "type",
@@ -16902,7 +17198,27 @@ export const openapiDocument = {
                         },
                         "warnPct": {
                           "type": "number",
-                          "description": "company-settings.budgetWarnPct (K-08 Waspada threshold)"
+                          "description": "K-08 Waspada threshold of the caller's only / lowest selected PT (display default; per PT: warnPctByCompany)."
+                        },
+                        "warnPctByCompany": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "companyId": {
+                                "type": "integer",
+                                "description": "PT (companies id); label from `companies[]` / GET /me companies[]."
+                              },
+                              "warnPct": {
+                                "type": "number"
+                              }
+                            },
+                            "required": [
+                              "companyId",
+                              "warnPct"
+                            ]
+                          },
+                          "description": "MC4: K-08 Waspada threshold per PT (companies.budgetWarnPct); projects[].tone already uses its own PT."
                         }
                       },
                       "required": [
@@ -16914,13 +17230,15 @@ export const openapiDocument = {
                         "budgetTotals",
                         "recentCash",
                         "inbox",
-                        "warnPct"
+                        "warnPct",
+                        "warnPctByCompany"
                       ]
                     }
                   },
                   "required": [
                     "asOf",
                     "month",
+                    "companies",
                     "cash",
                     "budget",
                     "completeness",
@@ -17029,6 +17347,29 @@ export const openapiDocument = {
                     "month": {
                       "type": "string"
                     },
+                    "companies": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer"
+                          },
+                          "shortCode": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "shortCode",
+                          "name"
+                        ]
+                      },
+                      "description": "MC2: PTs covered by this layout = the selected PTs where the caller holds the layout's role."
+                    },
                     "transferQueue": {
                       "type": "object",
                       "properties": {
@@ -17047,6 +17388,30 @@ export const openapiDocument = {
                         },
                         "reimburseToVerifyWarnings": {
                           "type": "integer"
+                        },
+                        "byCompany": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "companyId": {
+                                "type": "integer",
+                                "description": "PT (companies id); label from `companies[]` / GET /me companies[]."
+                              },
+                              "count": {
+                                "type": "integer"
+                              },
+                              "sum": {
+                                "type": "integer",
+                                "description": "Rupiah (integer)"
+                              }
+                            },
+                            "required": [
+                              "companyId",
+                              "count",
+                              "sum"
+                            ]
+                          }
                         }
                       },
                       "required": [
@@ -17054,7 +17419,8 @@ export const openapiDocument = {
                         "sum",
                         "overdue",
                         "reimburseToVerify",
-                        "reimburseToVerifyWarnings"
+                        "reimburseToVerifyWarnings",
+                        "byCompany"
                       ]
                     },
                     "reimburseToVerify": {
@@ -17096,6 +17462,49 @@ export const openapiDocument = {
                         "shortfall"
                       ]
                     },
+                    "completenessByCompany": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "companyId": {
+                            "type": "integer",
+                            "description": "PT (companies id); label from `companies[]` / GET /me companies[]."
+                          },
+                          "ratioDone": {
+                            "type": "integer"
+                          },
+                          "ratioTotal": {
+                            "type": "integer"
+                          },
+                          "withoutLpj": {
+                            "type": "integer"
+                          },
+                          "overdue": {
+                            "type": "integer"
+                          },
+                          "lpjToVerify": {
+                            "type": "integer"
+                          },
+                          "reimburseToVerify": {
+                            "type": "integer"
+                          },
+                          "openWarnings": {
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "companyId",
+                          "ratioDone",
+                          "ratioTotal",
+                          "withoutLpj",
+                          "overdue",
+                          "lpjToVerify",
+                          "reimburseToVerify",
+                          "openWarnings"
+                        ]
+                      }
+                    },
                     "accounts": {
                       "type": "array",
                       "items": {
@@ -17103,6 +17512,10 @@ export const openapiDocument = {
                         "properties": {
                           "id": {
                             "type": "integer"
+                          },
+                          "companyId": {
+                            "type": "integer",
+                            "description": "PT (companies id); label from `companies[]` / GET /me companies[]."
                           },
                           "name": {
                             "type": "string"
@@ -17125,6 +17538,7 @@ export const openapiDocument = {
                         },
                         "required": [
                           "id",
+                          "companyId",
                           "name",
                           "active",
                           "balance",
@@ -17137,6 +17551,26 @@ export const openapiDocument = {
                       "type": "integer",
                       "description": "Rupiah (integer)"
                     },
+                    "cashByCompany": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "companyId": {
+                            "type": "integer",
+                            "description": "PT (companies id); label from `companies[]` / GET /me companies[]."
+                          },
+                          "total": {
+                            "type": "integer",
+                            "description": "Rupiah (integer)"
+                          }
+                        },
+                        "required": [
+                          "companyId",
+                          "total"
+                        ]
+                      }
+                    },
                     "advancesWithoutLpj": {
                       "type": "array",
                       "items": {
@@ -17144,6 +17578,10 @@ export const openapiDocument = {
                         "properties": {
                           "id": {
                             "type": "integer"
+                          },
+                          "companyId": {
+                            "type": "integer",
+                            "description": "PT (companies id); label from `companies[]` / GET /me companies[]."
                           },
                           "docNo": {
                             "type": [
@@ -17186,6 +17624,7 @@ export const openapiDocument = {
                         },
                         "required": [
                           "id",
+                          "companyId",
                           "docNo",
                           "title",
                           "requesters",
@@ -17252,7 +17691,30 @@ export const openapiDocument = {
                       "type": [
                         "string",
                         "null"
-                      ]
+                      ],
+                      "description": "MC2: the OLDEST of the PTs' latest closed periods (null when one PT never closed)."
+                    },
+                    "lastClosedByCompany": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "companyId": {
+                            "type": "integer",
+                            "description": "PT (companies id); label from `companies[]` / GET /me companies[]."
+                          },
+                          "period": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "companyId",
+                          "period"
+                        ]
+                      }
                     },
                     "nextClosable": {
                       "type": "string"
@@ -17457,6 +17919,10 @@ export const openapiDocument = {
                               "id": {
                                 "type": "integer"
                               },
+                              "companyId": {
+                                "type": "integer",
+                                "description": "PT (companies id); label from `companies[]` / GET /me companies[]."
+                              },
                               "entryNo": {
                                 "type": [
                                   "string",
@@ -17508,6 +17974,7 @@ export const openapiDocument = {
                             },
                             "required": [
                               "id",
+                              "companyId",
                               "entryNo",
                               "entryDate",
                               "direction",
@@ -17528,6 +17995,10 @@ export const openapiDocument = {
                             "properties": {
                               "id": {
                                 "type": "integer"
+                              },
+                              "companyId": {
+                                "type": "integer",
+                                "description": "PT (companies id); label from `companies[]` / GET /me companies[]."
                               },
                               "docNo": {
                                 "type": [
@@ -17567,6 +18038,7 @@ export const openapiDocument = {
                             },
                             "required": [
                               "id",
+                              "companyId",
                               "docNo",
                               "title",
                               "type",
@@ -17592,16 +18064,20 @@ export const openapiDocument = {
                   "required": [
                     "asOf",
                     "month",
+                    "companies",
                     "transferQueue",
                     "reimburseToVerify",
                     "lpjToVerify",
                     "lpjToSettle",
+                    "completenessByCompany",
                     "accounts",
                     "cashTotal",
+                    "cashByCompany",
                     "advancesWithoutLpj",
                     "lpjDueDays",
                     "cashFlow",
                     "lastClosedPeriod",
+                    "lastClosedByCompany",
                     "nextClosable",
                     "viz"
                   ]
@@ -17703,6 +18179,29 @@ export const openapiDocument = {
                     "month": {
                       "type": "string"
                     },
+                    "companies": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer"
+                          },
+                          "shortCode": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "shortCode",
+                          "name"
+                        ]
+                      },
+                      "description": "MC2: PTs covered by this layout = the selected PTs where the caller holds the layout's role."
+                    },
                     "hasScope": {
                       "type": "boolean"
                     },
@@ -17735,6 +18234,10 @@ export const openapiDocument = {
                             "properties": {
                               "id": {
                                 "type": "integer"
+                              },
+                              "companyId": {
+                                "type": "integer",
+                                "description": "PT (companies id); label from `companies[]` / GET /me companies[]."
                               },
                               "docNo": {
                                 "type": [
@@ -17787,6 +18290,7 @@ export const openapiDocument = {
                             },
                             "required": [
                               "id",
+                              "companyId",
                               "docNo",
                               "title",
                               "type",
@@ -17830,6 +18334,34 @@ export const openapiDocument = {
                         "waiting"
                       ]
                     },
+                    "teamMonthByCompany": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "companyId": {
+                            "type": "integer",
+                            "description": "PT (companies id); label from `companies[]` / GET /me companies[]."
+                          },
+                          "count": {
+                            "type": "integer"
+                          },
+                          "sum": {
+                            "type": "integer",
+                            "description": "Rupiah (integer)"
+                          },
+                          "waiting": {
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "companyId",
+                          "count",
+                          "sum",
+                          "waiting"
+                        ]
+                      }
+                    },
                     "lpj": {
                       "type": "object",
                       "properties": {
@@ -17856,6 +18388,10 @@ export const openapiDocument = {
                         "properties": {
                           "id": {
                             "type": "integer"
+                          },
+                          "companyId": {
+                            "type": "integer",
+                            "description": "PT (companies id); label from `companies[]` / GET /me companies[]."
                           },
                           "code": {
                             "type": "string"
@@ -17922,6 +18458,7 @@ export const openapiDocument = {
                         },
                         "required": [
                           "id",
+                          "companyId",
                           "code",
                           "name",
                           "status",
@@ -17944,6 +18481,10 @@ export const openapiDocument = {
                         "properties": {
                           "id": {
                             "type": "integer"
+                          },
+                          "companyId": {
+                            "type": "integer",
+                            "description": "PT (companies id); label from `companies[]` / GET /me companies[]."
                           },
                           "code": {
                             "type": "string"
@@ -17970,6 +18511,7 @@ export const openapiDocument = {
                         },
                         "required": [
                           "id",
+                          "companyId",
                           "code",
                           "name",
                           "fromRequests",
@@ -17986,6 +18528,10 @@ export const openapiDocument = {
                         "properties": {
                           "id": {
                             "type": "integer"
+                          },
+                          "companyId": {
+                            "type": "integer",
+                            "description": "PT (companies id); label from `companies[]` / GET /me companies[]."
                           },
                           "docNo": {
                             "type": [
@@ -18047,6 +18593,7 @@ export const openapiDocument = {
                         },
                         "required": [
                           "id",
+                          "companyId",
                           "docNo",
                           "requestDate",
                           "type",
@@ -18311,6 +18858,29 @@ export const openapiDocument = {
                               "id": {
                                 "type": "integer"
                               },
+                              "company": {
+                                "type": [
+                                  "object",
+                                  "null"
+                                ],
+                                "properties": {
+                                  "id": {
+                                    "type": "integer"
+                                  },
+                                  "shortCode": {
+                                    "type": "string"
+                                  },
+                                  "name": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "id",
+                                  "shortCode",
+                                  "name"
+                                ],
+                                "description": "MC2: PT of the request."
+                              },
                               "docNo": {
                                 "type": [
                                   "string",
@@ -18362,6 +18932,7 @@ export const openapiDocument = {
                             },
                             "required": [
                               "id",
+                              "company",
                               "docNo",
                               "title",
                               "type",
@@ -18377,7 +18948,28 @@ export const openapiDocument = {
                           }
                         },
                         "warnPct": {
-                          "type": "number"
+                          "type": "number",
+                          "description": "Display default (see OwnerDashboard.viz.warnPct)."
+                        },
+                        "warnPctByCompany": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "companyId": {
+                                "type": "integer",
+                                "description": "PT (companies id); label from `companies[]` / GET /me companies[]."
+                              },
+                              "warnPct": {
+                                "type": "number"
+                              }
+                            },
+                            "required": [
+                              "companyId",
+                              "warnPct"
+                            ]
+                          },
+                          "description": "MC4: K-08 Waspada threshold per PT (companies.budgetWarnPct); projects[].tone already uses its own PT."
                         }
                       },
                       "required": [
@@ -18386,17 +18978,20 @@ export const openapiDocument = {
                         "categories",
                         "budgetTotals",
                         "inbox",
-                        "warnPct"
+                        "warnPct",
+                        "warnPctByCompany"
                       ]
                     }
                   },
                   "required": [
                     "asOf",
                     "month",
+                    "companies",
                     "hasScope",
                     "waitingForMe",
                     "teamWaiting",
                     "teamMonth",
+                    "teamMonthByCompany",
                     "lpj",
                     "projects",
                     "costCenters",
@@ -18497,6 +19092,29 @@ export const openapiDocument = {
                 "schema": {
                   "type": "object",
                   "properties": {
+                    "companies": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer"
+                          },
+                          "shortCode": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "shortCode",
+                          "name"
+                        ]
+                      },
+                      "description": "MC2: PTs covered by this layout = the selected PTs where the caller holds the layout's role."
+                    },
                     "gaps": {
                       "type": "object",
                       "properties": {
@@ -18508,12 +19126,40 @@ export const openapiDocument = {
                         },
                         "costCentersWithoutManager": {
                           "type": "integer"
+                        },
+                        "byCompany": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "companyId": {
+                                "type": "integer",
+                                "description": "PT (companies id); label from `companies[]` / GET /me companies[]."
+                              },
+                              "usersIncomplete": {
+                                "type": "integer"
+                              },
+                              "projectsWithoutPm": {
+                                "type": "integer"
+                              },
+                              "costCentersWithoutManager": {
+                                "type": "integer"
+                              }
+                            },
+                            "required": [
+                              "companyId",
+                              "usersIncomplete",
+                              "projectsWithoutPm",
+                              "costCentersWithoutManager"
+                            ]
+                          }
                         }
                       },
                       "required": [
                         "usersIncomplete",
                         "projectsWithoutPm",
-                        "costCentersWithoutManager"
+                        "costCentersWithoutManager",
+                        "byCompany"
                       ]
                     },
                     "latestAudit": {
@@ -18525,6 +19171,7 @@ export const openapiDocument = {
                     }
                   },
                   "required": [
+                    "companies",
                     "gaps",
                     "latestAudit"
                   ]
@@ -18620,6 +19267,29 @@ export const openapiDocument = {
                 "schema": {
                   "type": "object",
                   "properties": {
+                    "companies": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer"
+                          },
+                          "shortCode": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "shortCode",
+                          "name"
+                        ]
+                      },
+                      "description": "MC2: PTs covered by this layout = the selected PTs where the caller holds the layout's role."
+                    },
                     "actions": {
                       "type": "array",
                       "items": {
@@ -18627,6 +19297,10 @@ export const openapiDocument = {
                         "properties": {
                           "id": {
                             "type": "integer"
+                          },
+                          "companyId": {
+                            "type": "integer",
+                            "description": "PT (companies id); label from `companies[]` / GET /me companies[]."
                           },
                           "docNo": {
                             "type": [
@@ -18657,6 +19331,7 @@ export const openapiDocument = {
                         },
                         "required": [
                           "id",
+                          "companyId",
                           "docNo",
                           "title",
                           "type",
@@ -18674,6 +19349,10 @@ export const openapiDocument = {
                           "id": {
                             "type": "integer"
                           },
+                          "companyId": {
+                            "type": "integer",
+                            "description": "PT (companies id); label from `companies[]` / GET /me companies[]."
+                          },
                           "docNo": {
                             "type": [
                               "string",
@@ -18703,6 +19382,7 @@ export const openapiDocument = {
                         },
                         "required": [
                           "id",
+                          "companyId",
                           "docNo",
                           "title",
                           "type",
@@ -18844,6 +19524,7 @@ export const openapiDocument = {
                     }
                   },
                   "required": [
+                    "companies",
                     "actions",
                     "latest",
                     "month",

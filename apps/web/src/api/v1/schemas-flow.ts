@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-import { companyFilterParam } from './schemas'
+import { companyFilterParam, createCompanyField } from './schemas'
 
 /**
  * /api/v1 contract for the F2a expense-request flow (T1–T4, T6–T8, period closing).
@@ -108,6 +108,7 @@ const draftFields = {
 export const ExpenseRequestCreate = z
   .object({
     type: RequestTypeEnum,
+    company: createCompanyField,
     ...draftFields,
     clientUuid: z.uuid().optional().meta({ description: 'APK offline id; a retry with the same value returns the existing draft.' }),
   })
@@ -429,6 +430,7 @@ export const MediaUploaded = z
 export const CashEntryCreate = z
   .object({
     direction: z.enum(['in', 'out']),
+    company: createCompanyField,
     entryDate: businessDate.optional(),
     cashAccountId: id,
     amount: rupiahPos,
@@ -662,7 +664,7 @@ export const LpjQueue = z
 
 export const ApprovalInbox = z
   .object({
-    budgetWarnPct: z.number(),
+    budgetWarnPct: z.number().meta({ description: 'Display default = the caller\'s only / lowest selected PT (MC4). Each item carries its own PT\'s threshold (items[].budget.warnPct).' }),
     items: z.array(
       z.object({
         id,
@@ -683,7 +685,13 @@ export const ApprovalInbox = z
         level: z.number().int().nullable(),
         stepLabel: z.string().meta({ description: 'ADR 0013: "Persetujuan Direktur (Diketahui)" | "Approval level n" (legacy PM step: "Diketahui Oleh").' }),
         decisionFlow: z.boolean().meta({ description: 'ADR 0013 Direktur → Finance request (acknowledge = the Direktur approval, button "Setujui"); false = pre-E1 snapshot.' }),
-        budget: z.object({ basis: z.enum(['project', 'none']), pctBefore: z.number().nullable(), pctAfter: z.number().nullable(), overWarn: z.boolean() }),
+        budget: z.object({
+          basis: z.enum(['project', 'none']),
+          pctBefore: z.number().nullable(),
+          pctAfter: z.number().nullable(),
+          overWarn: z.boolean(),
+          warnPct: z.number().meta({ description: 'MC2: budgetWarnPct of the request\'s PT (overWarn = pctAfter > warnPct).' }),
+        }),
         flags: z.object({ warning: z.number().int(), info: z.number().int() }),
       }),
     ),

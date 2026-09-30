@@ -18,6 +18,7 @@ import { withReqTransaction } from '@/lib/system-tx'
 
 import { companyQuery } from '../company-query'
 import { HttpError, json, v1 } from '../http'
+import { withNamedCompany } from '../named-company'
 import { AddendumCreate, AddendumDecision, AddendumListQuery, AddendumReason, AddendumReject, AddendumUpdate } from '../schemas-addendum'
 
 /**
@@ -85,7 +86,11 @@ export const createAddendumEndpoint = v1({
   rateLimit: WRITE_LIMIT,
   transactional: true,
   idempotent: true,
-  handler: async ({ req, body }) => detail(req, await createAddendum(req, { projectId: body.projectId, addition: body.addition, reason: body.reason, submit: body.submit === true }), 201),
+  // MC4: optional body `company` = the project's PT; PM IN that PT (team check in the service)
+  handler: async ({ req, body }) =>
+    withNamedCompany(req, body.company, { roles: ['pk-pm'], refs: [{ collection: 'projects', id: body.projectId, path: 'projectId' }] }, async () =>
+      detail(req, await createAddendum(req, { projectId: body.projectId, addition: body.addition, reason: body.reason, submit: body.submit === true }), 201),
+    ),
 })
 
 export const updateAddendumEndpoint = v1({

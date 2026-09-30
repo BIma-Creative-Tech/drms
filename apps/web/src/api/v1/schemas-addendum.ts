@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-import { companyFilterParam } from './schemas'
+import { companyFilterParam, createCompanyField } from './schemas'
 
 import { ADDENDUM_ACTIONS, ADDENDUM_STATUSES, MAX_ADDITION } from '@/domain/addendum/rules'
 
@@ -14,6 +14,7 @@ const reason = z.string({ error: 'Alasan wajib diisi.' }).trim().min(3, 'Alasan 
 
 export const AddendumCreate = z
   .object({
+    company: createCompanyField,
     projectId: id,
     addition: z.number().int().positive().max(MAX_ADDITION).meta({ description: 'Tambahan RAB (Rp, > 0).' }),
     reason: reason.meta({ description: 'Alasan addendum (wajib).' }),
