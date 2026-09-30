@@ -11,7 +11,9 @@ import React from 'react'
  * Built-in Helvetica (PDF standard font, WinAnsi — covers Indonesian Latin text; ADR 0008 §6
  * fallback): no font file to ship or license, least RAM. All text is server data (no HTML).
  */
-export type PdfImage = { data: Buffer; format: 'jpg' | 'png' }
+import type { PdfImage } from './images'
+
+export type { PdfImage }
 
 export type PdfSignature = {
   label: 'Diajukan Oleh' | 'Dibuat Oleh' | 'Diketahui Oleh' | 'Approval'
