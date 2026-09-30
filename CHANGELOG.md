@@ -14,6 +14,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   the overrides once Payload ships the patched versions. Remaining audit: 6 moderate + 1 low, all needing a Payload
   downgrade (`npm audit fix --force` → 3.85.1) — not applied.
 
+### APK mobile-v0.3.0 (tag `mobile-v0.3.0`, pubspec `0.3.0`)
+
+First APK release since `mobile-v0.2.0`; ships the APK parts of 0.5.0 that were never released: multi-company
+(MC3-2: PT switcher, per-PT masters/capabilities, drift schema v3 with `company_id` on the offline queue), the optional
+authenticator code on password login (ADR 0017) and the release-notes sheet on the update banner/screen. Release notes
+`docs/release-notes/apk/0.3.0.md` replace the never-tagged `0.2.1.md`. **Requires web ≥ v0.5.0** (`/me`
+`companies[]`) — publish on `/unduh` only after that deploy (runbook `rilis-apk.md` Prasyarat); do not raise the
+minimum APK version yet (0.2.x keeps working for single-PT accounts).
+
 ## [0.5.0] - 2026-09-29
 
 Multi-company (MC1–MC3, ADR 0016), optional self-service 2FA (ADR 0017), admin loading dots (0.4.2) and the
