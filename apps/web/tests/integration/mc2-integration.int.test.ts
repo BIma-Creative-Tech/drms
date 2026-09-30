@@ -125,10 +125,11 @@ describe('MC2 integration — Absensi filters are bound to the PT (mc2-contract 
     const month = (await asUser(fin, (req) => today(req))).slice(0, 7)
     const scope = (await asUser(fin, (req) => attendanceScope(req)))!
     expect(scope.parts).toEqual([{ company: A, all: true, projects: [], costCenters: [] }])
-    // before the fix the view built this company-less literal from the query string:
+    // before the fix the view built this company-less literal from the query string; MC4: the
+    // domain no longer honours a literal without PT parts at all (it matches nothing)
     const legacy: AttScope = { kind: 'team', projects: [X.projectB], costCenters: [] }
     const leaked = await asUser(fin, (req) => teamMonth(req, legacy, month))
-    expect(leaked.map((e) => e.id), 'regression witness: the literal is company-blind').toContain(X.empB)
+    expect(leaked, 'MC4: a company-blind literal matches nothing').toEqual([])
     // the view now narrows with narrowAttScope → the PT A predicate stays
     const grid = await asUser(fin, (req) => teamMonth(req, narrowAttScope(scope, X.projectB), month))
     expect(grid).toEqual([])

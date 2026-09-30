@@ -23,6 +23,7 @@ import type { CollectionSlug, Payload, PayloadRequest, Where } from 'payload'
 import { writeAudit } from '@/audit/writer'
 import { settings as companySettings } from '@/domain/companies'
 import { periodEnd } from '@/domain/cash/periods'
+import { SKIP_COMPANY_DEFAULTS } from '@/domain/company-defaults'
 import { DEFAULT_SEQUENCES, formatDocNo, parseBusinessDate, periodKey, type ResetPolicy } from '@/domain/numbering'
 import { CTX_STAGE_EDITOR, projectStages, recalcProjectProgress } from '@/domain/progress/recalc'
 import { DEFAULT_APPROVAL_RULES } from '@/seed/data'
@@ -327,6 +328,8 @@ const MASTERS: Array<{ key: SheetKey; rows: (d: ImportData) => number; run: Mast
             data: { shortCode: c.code, name: c.name, legalName: c.legalName, address: c.address, phone: c.phone, timezone: process.env.TZ || DEFAULT_TZ, active: true } as never,
             depth: 0,
             overrideAccess: true, // SYSTEM-WRITE: go-live import (new PT)
+            // the import applies the built-in defaults below (+ `nomor_pb_mulai`), not a copy of DRMS
+            context: { [SKIP_COMPANY_DEFAULTS]: true },
             req: x.req,
           })
           const id = doc.id as number

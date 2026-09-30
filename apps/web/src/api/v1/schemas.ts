@@ -137,6 +137,21 @@ export const companyFilterParam = z
   .optional()
   .meta({ description: 'MC3: PT filter (comma separated ids). Only narrows the effective selection (X-Company-Ids / cookie ∩ memberships); a PT outside it → 403 COMPANY_NOT_ALLOWED.' })
 
+/**
+ * MC4 (ADR 0016 §5): optional explicit PT of a create body. Must be an active membership holding the
+ * role the create needs IN that PT (else 403 COMPANY_NOT_ALLOWED) and equal the PT of the referenced
+ * project / cost center / cash account (else 400 COMPANY_MISMATCH). Absent = PT derived as before.
+ */
+export const createCompanyField = z
+  .number()
+  .int()
+  .positive()
+  .optional()
+  .meta({
+    description:
+      'MC4: explicit PT (companies id) of the new record. Must be one of your PTs where you hold the role this create needs (else 403 COMPANY_NOT_ALLOWED) and the PT of the referenced project / cost center / cash account (else 400 COMPANY_MISMATCH). Omitted = derived from the references, else your only selected PT (unchanged behaviour of APK 0.2.x / 0.3.0).',
+  })
+
 export const MastersQuery = z
   .object({
     types: z

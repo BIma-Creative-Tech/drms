@@ -22,8 +22,8 @@ import { parseSnapshot, snapshotOf, type ScheduleSnapshot } from './schedule'
  * Finance R (upah) of a PT → every attendance of THAT PT; PM of a PT → the team projects/cost centers
  * there; Staff → own only (endpoints /attendance/me).
  * `parts` = one entry per PT (`all` = whole PT, else the team ids), each SQL predicate is
- * `(x.company_id = <PT> AND …)`. The top-level kind/ids are a summary (UI hints). A literal WITHOUT
- * `parts` is legacy: `all` matches nothing (fail closed), `team` keeps its (per-PT) ids.
+ * `(x.company_id = <PT> AND …)`. The top-level kind/ids are a summary (UI hints). MC4: a literal
+ * WITHOUT `parts` is legacy and matches NOTHING (fail closed for `all` AND `team`).
  */
 export type AttPart = { company: number; all: boolean; projects: number[]; costCenters: number[] }
 export type AttScope = ({ kind: 'all' } | { kind: 'team'; projects: number[]; costCenters: number[] }) & { parts?: AttPart[] }
@@ -62,10 +62,7 @@ export const fullCompanies = (scope: AttScope): number[] => (scope.parts ?? []).
  */
 export function narrowAttScope(scope: AttScope, projectId?: number, costCenterId?: number): AttScope {
   if (!projectId && !costCenterId) return scope
-  if (!scope.parts) {
-    const t = scope.kind === 'team' ? scope : { projects: [] as number[], costCenters: [] as number[] }
-    return { kind: 'team', projects: projectId && t.projects.includes(projectId) ? [projectId] : [], costCenters: costCenterId && t.costCenters.includes(costCenterId) ? [costCenterId] : [] }
-  }
+  if (!scope.parts) return { kind: 'team', projects: [], costCenters: [], parts: [] } // legacy literal: fail closed (MC4)
   const parts = scope.parts.map((p) => ({
     company: p.company,
     all: false,
@@ -80,7 +77,8 @@ export function narrowAttScope(scope: AttScope, projectId?: number, costCenterId
  * foreign ids are ignored. Empty / null = unchanged; nothing left = an empty scope (matches nothing).
  */
 export function narrowAttToCompanies(scope: AttScope, companyIds?: readonly number[] | null): AttScope {
-  if (!companyIds?.length || !scope.parts) return scope
+  if (!scope.parts) return { kind: 'team', projects: [], costCenters: [], parts: [] } // legacy literal: fail closed (MC4)
+  if (!companyIds?.length) return scope
   return attScopeOf(scope.parts.filter((p) => companyIds.includes(p.company))) ?? { kind: 'team', projects: [], costCenters: [], parts: [] }
 }
 
@@ -88,7 +86,7 @@ export function narrowAttToCompanies(scope: AttScope, companyIds?: readonly numb
 export function locationScopeSql(scope: AttScope, alias: 'a' | 'ta'): SQL {
   const col = (c: string) => sql.raw(`${alias}.${c}`)
   const loc = (projects: number[], costCenters: number[]) => sql`(${inList(col('project_id'), projects)} OR ${inList(col('cost_center_id'), costCenters)})`
-  if (!scope.parts) return scope.kind === 'team' ? loc(scope.projects, scope.costCenters) : sql`FALSE`
+  if (!scope.parts) return sql`FALSE` // legacy literal without PT parts: fail closed (MC4)
   const out = scope.parts.map((p) => (p.all ? sql`${col('company_id')} = ${p.company}` : sql`(${col('company_id')} = ${p.company} AND ${loc(p.projects, p.costCenters)})`))
   return out.length ? sql`(${sql.join(out, sql` OR `)})` : sql`FALSE`
 }

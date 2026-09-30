@@ -10,6 +10,20 @@ Conventions:
 - **Test type**: unit (service/hook logic), API (HTTP-level incl. negative authz tests), e2e (Playwright web / Flutter integration), manual (UAT/visual).
 - Any mapping marked **TBD-architecture** depends on a decision the architecture/ADR agent owns.
 
+**MC4 code gaps (2026-09-30, branch `feat/mc4-code-gaps`):**
+
+| US | MC4 status | Evidence |
+|---|---|---|
+| US-MC-01 | "copy defaults from DRMS" on PT create done: sequences (start 1), copyable approval rules, default work schedule, settings still at default; source selectable ("Salin dari PT"), opt-out; idempotent; audited in the create transaction; PT Admin cannot create a PT | `mc4-code.int.test.ts` (MC4-1), `mc4-code.test.ts` (setting fields, virtual fields) |
+| US-MC-05 | `GET /app/config` flags = OR over active PTs (no PT data on the public endpoint); per-PT truth `GET /me companies[].settings` | `mc4-code.int.test.ts` (MC4-3), `mc4-code.test.ts` (`publicFlags`) |
+| US-MC-07 | optional body `company` on the 4 `/api/v1` creates: role IN that PT (403 `COMPANY_NOT_ALLOWED`, audited), references of another PT → 400 `COMPANY_MISMATCH`; released APK bodies unchanged | `mc4-code.int.test.ts` (MC4-2), `mc4-code.test.ts` (schemas) |
+| US-MC-10 | dashboards: per-PT fields documented for the APK (`companies`, `byCompany`, `companyId`, `viz.warnPctByCompany`), responses validated against the schemas | `mc4-code.int.test.ts` (extra), `mc4-code.test.ts` (OpenAPI) |
+| US-MC-11 | report PDF letterhead logo (PT logo; group logo on consolidated reports) | `mc4-code.int.test.ts` (MC4-4), `mc4-code.test.ts` (ReportPdf image) |
+| US-MC-12 | inbox / K-09 thresholds per item/row; no company #1 fallback for non-members | `mc4-code.int.test.ts` (extra) |
+| US-MC-13 | PT column shown to users with saved list columns (migration `20260930_120000_mc4_list_company_column`) | `mc4-code.int.test.ts` (extra d), `mc4-code.test.ts` (slug list = PT collections) |
+| US-MC-14 | company-blind scope literals match nothing for every kind (reports + attendance) | `mc4-code.test.ts` (SQL FALSE), updated `mc2-integration`, `s2b`, `f3-kpi-reconciliation`, `f3-reports`, `e6-attendance` tests |
+| US-MC-18 | notification templates (app-wide): create/update group admin only, PT Admin / Direktur read — default decision, owner may override | `mc4-code.int.test.ts` (MC4-5), `mc4-code.test.ts`, `authz.int.test.ts` (matrix unchanged: test Admins are group admins) |
+
 | US | Module | Roles | Payload collections | API | Screen | Phase | Test type |
 |---|---|---|---|---|---|---|---|
 | US-01 | M11 | Staff | `attendances`, `projects`, `cost-centers` (geofence Q-40), `work-schedules`, `media-selfies`, `devices`, `audit-logs` | `POST /api/v1/sync/batch` items `attendance.check_in` / `attendance.check_out` (payload `project_id` XOR `cost_center_id`); `POST /api/v1/media/selfies` — **E6 backend done** (`domain/attendance/record.ts`) | APK | F4b slice + E6 (API) / E6-APK S2 | unit `e6-attendance.test.ts`, `f4b-mobile.test.ts`; API `f4b-attendance.int.test.ts`, `e6-attendance.int.test.ts` (cost-center geofence, distance in rejection); e2e APK; manual (mock location) |
@@ -162,7 +176,7 @@ migration = Direktur ("Diketahui" = approval) → Finance level 1 (Sprint S2 dec
 
 ## MC — Multi-company (ADR 0016, `requirements-v1.2.md`, added 2026-09-27)
 
-Status: **MC1 + MC2 implemented** (MC1 `feat/mc1-foundation`; MC2 `feat/mc2-integration`, 2026-09-28; progress `mc/mc1-progress.md`, `mc/mc2-progress.md`) — MC3/MC4 planned.
+Status: **MC1 + MC2 + MC3 implemented** (MC1 `feat/mc1-foundation`; MC2 `feat/mc2-integration`, 2026-09-28; MC3 `feat/mc3-api` / `feat/mc3-mobile`; progress `mc/mc1-progress.md`, `mc/mc2-progress.md`, `mc/mc3-progress.md`); **MC4 code gaps** on `feat/mc4-code-gaps` (2026-09-30, `mc/mc4-progress.md`) — MC4 QA planned.
 Phase = MC sub-phase of `phase-plan.md`. "Isolation" = a user of PT A only gets 404 for PT B ids; "cross-PT" = DB
 trigger rejects the row.
 
@@ -205,7 +219,7 @@ trigger rejects the row.
 
 | US | Module | Roles | Payload collections | API | Screen | Phase | Test type |
 |---|---|---|---|---|---|---|---|
-| US-MC-01 | M14 | Admin grup (`users.groupAdmin`), Admin/Direktur (own PT, R/U) | `companies` (new), `company-settings` (slimmed), `media-company`, `document-sequences`, `approval-rules`, `work-schedules` (defaults copied on create), `audit-logs` | Payload REST `/api/companies` (admin) | web admin (collection "Perusahaan") | MC1 (model) / MC2 (UI, copy defaults) | unit (shortCode format, immutable after numbered docs); API (non-group-admin create → 403); integration (new PT gets 7 sequences + default rule) |
+| US-MC-01 | M14 | Admin grup (`users.groupAdmin`), Admin/Direktur (own PT, R/U) | `companies` (new), `company-settings` (slimmed), `media-company`, `document-sequences`, `approval-rules`, `work-schedules` (defaults copied on create), `audit-logs` | Payload REST `/api/companies` (admin) | web admin (collection "Perusahaan") | MC1 (model) / MC2 (UI) / MC4 (copy defaults) | unit (shortCode format, immutable after numbered docs); API (non-group-admin create → 403); integration (new PT gets 7 sequences + default rule) |
 | US-MC-02 | M01, M14 | Admin (per PT), Admin grup | `company-memberships` (new), `users` (`roles` removed, `groupAdmin`), `audit-logs` | Payload REST `/api/company-memberships`; `GET/PUT /api/v1/admin/memberships?company=` (proposed, matrix save) | web custom view `/admin/akses-pt` (matrix) | MC1 (model/access) / MC2 (UI) | API (Admin of PT A edits PT B → 403 + `access_denied`); integration (role removed → next request denied); Keycloak mock (only `pk-user` assigned) |
 | US-MC-03 | M14, M01 | Admin (per PT) | `employees` (`company` required), `company-memberships.employee`, `employee-bank-accounts` | Payload REST | web admin (Karyawan form, membership form) | MC1 | DB (membership employee of other PT → cross-PT error); API (one employee → two users → unique violation 409) |
 | US-MC-04 | M01 | all panel roles | `company-memberships`, `web-sessions` | `POST /api/v1/me/companies` (proposed; sets `__Host-pk-companies`) | web module bar switcher | MC1 (context) / MC2 (UI) | API (cookie with foreign id → 403; no cookie → all memberships); e2e (switch → lists change) |

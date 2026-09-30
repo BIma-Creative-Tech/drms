@@ -61,14 +61,16 @@ describe('periods (C2/C3)', () => {
 
 describe('scope narrowing (C5: empty scope = nothing, PM filters intersected)', () => {
   it('office: filter becomes a one-id scope; PM: out-of-team id → empty', () => {
-    // MC2: a company-blind `all` literal stays fail-closed; per-PT scopes bind the id to each PT
-    expect(narrowScope({ kind: 'all' }, 7)).toEqual({ kind: 'team', projects: [], costCenters: [] })
+    // MC2: per-PT scopes bind the id to each PT; MC4: a company-blind literal (any kind) → empty scope
+    expect(narrowScope({ kind: 'all' }, 7)).toEqual({ kind: 'none', companies: [] })
+    expect(narrowScope({ kind: 'team', projects: [1, 2], costCenters: [5] }, 2)).toEqual({ kind: 'none', companies: [] })
     expect(narrowScope({ kind: 'all', companies: [{ company: 3, kind: 'all' }] }, 7).companies).toEqual([{ company: 3, kind: 'team', projects: [7], costCenters: [] }])
-    expect(narrowScope({ kind: 'team', projects: [1, 2], costCenters: [5] }, 2)).toEqual({ kind: 'team', projects: [2], costCenters: [] })
-    expect(narrowScope({ kind: 'team', projects: [1, 2], costCenters: [5] }, 9)).toEqual({ kind: 'team', projects: [], costCenters: [] })
-    expect(narrowScope({ kind: 'team', projects: [1], costCenters: [5] }, undefined, 5)).toEqual({ kind: 'team', projects: [], costCenters: [5] })
-    expect(narrowScope({ kind: 'all' }, 1, 5)).toEqual({ kind: 'team', projects: [], costCenters: [] })
-    expect(narrowScope({ kind: 'all' })).toEqual({ kind: 'all' })
+    const team = (projects: number[], costCenters: number[]) => ({ kind: 'team' as const, projects, costCenters, companies: [{ company: 1, kind: 'team' as const, projects, costCenters }] })
+    expect(narrowScope(team([1, 2], [5]), 2).companies).toEqual([{ company: 1, kind: 'team', projects: [2], costCenters: [] }])
+    expect(narrowScope(team([1, 2], [5]), 9).companies).toEqual([{ company: 1, kind: 'team', projects: [], costCenters: [] }])
+    expect(narrowScope(team([1], [5]), undefined, 5).companies).toEqual([{ company: 1, kind: 'team', projects: [], costCenters: [5] }])
+    expect(narrowScope({ kind: 'all', companies: [{ company: 3, kind: 'all' }] }, 1, 5).companies).toEqual([{ company: 3, kind: 'team', projects: [], costCenters: [] }])
+    expect(narrowScope({ kind: 'all' })).toEqual({ kind: 'all' }) // no filter: unchanged (and still matches nothing, see mc4-code.test.ts)
   })
 })
 

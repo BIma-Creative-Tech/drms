@@ -20,6 +20,40 @@ pre-deploy dump). Also carries the APK `mobile-v0.3.0` release files (pubspec, n
   the overrides once Payload ships the patched versions. Remaining audit: 6 moderate + 1 low, all needing a Payload
   downgrade (`npm audit fix --force` → 3.85.1) — not applied.
 
+### MC4 — code gaps (branch `feat/mc4-code-gaps`; ADR 0016 "Implementation notes (MC4)", `docs/proyekkas/mc/mc4-progress.md`)
+
+Web/API only (no APK change). Migration: `20260930_120000_mc4_list_company_column` (data only, preferences).
+
+#### Added
+- **Copy defaults on PT create (US-MC-01):** a PT created by the group admin gets, in the same transaction, the
+  document sequences (every doc type of the source PT, `startAt` 1), the approval rules without per-PT references
+  (rules naming a project / category / cost center / user, or refused by today's rule checks, are skipped and
+  reported), the default work schedule and the per-PT settings still at their default — from PT #1 (DRMS) or the
+  PT chosen in "Salin dari PT"; "Salin default saat dibuat" off = bare PT. Idempotent (create-only by natural key),
+  audited (rows + one summary `defaultsCopied` row). Seed and go-live import keep their built-in defaults.
+- **Optional body `company`** on `POST /api/v1/expense-requests`, `/progress-reports`, `/budget-addenda`,
+  `/cash-entries`: must be a membership with the role the create needs IN that PT (else 403
+  `COMPANY_NOT_ALLOWED`, audited) and the PT of the referenced project / cost center / cash account (else 400
+  `COMPANY_MISMATCH`); the create runs under that PT. Absent = unchanged (APK 0.2.x / 0.3.0).
+- **Report PDF logo:** the letterhead logo (PT logo; group logo on a consolidated report) is drawn left of the kop
+  (JPEG/PNG ≤ 3 MiB, same image guard as the document PDF, ADR 0008).
+- **Per-PT fields documented for the APK** (`/dashboard/*`: `companies`, every `byCompany` row, `companyId` on
+  embedded rows, `viz.warnPctByCompany`; approval inbox `items[].budget.warnPct`; K-09 rows `companyId`,
+  `warnGapPct`, `badGapPct`) — additive; OpenAPI regenerated.
+
+#### Changed
+- `GET /api/v1/app/config` (public): the three sync feature flags are the OR over the ACTIVE PTs (was company #1);
+  `timezone` = the server timezone every PT uses. One PT = identical answer. Per-PT truth: `GET /me`
+  `companies[].settings`; the server keeps enforcing the item's PT flag (`FEATURE_DISABLED`).
+- Notification templates are app-wide: create/update = group admin only (was: Admin of any PT); PT Admin /
+  Direktur keep read access (default decision, the owner may override).
+- Settings without a document (inbox `budgetWarnPct`, K-09 top-level thresholds, dashboard `viz.warnPct`, lock date
+  / today fallbacks) use the caller's only / LOWEST selected PT instead of company #1 (which could be a PT the caller
+  is not a member of); every item / row carries its own PT's value.
+- Scope literals without PT parts (`{ kind: 'team', projects }`, `{ kind: 'own' }`, `{ kind: 'all' }`) now match
+  nothing in every report / attendance query (was: `all` only).
+- Saved list-column preferences that never named the PT column get it prepended once (migration above).
+
 ### APK mobile-v0.3.0 (tag `mobile-v0.3.0`, pubspec `0.3.0`)
 
 First APK release since `mobile-v0.2.0`; ships the APK parts of 0.5.0 that were never released: multi-company

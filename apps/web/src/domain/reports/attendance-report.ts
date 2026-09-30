@@ -30,19 +30,15 @@ function monthOf(sp: URLSearchParams, today: string): string {
 
 /**
  * Report scope → attendance scope PER PT (office PTs in full, PM PTs team only), narrowed by the
- * project / cost-center filter (narrowAttScope: ids bound to their PT). A legacy scope without
- * companies keeps the old id semantics (`all` → nothing, fail closed).
+ * project / cost-center filter (narrowAttScope: ids bound to their PT). MC4: a legacy scope without
+ * companies → an empty scope (matches nothing, whatever its kind).
  */
 export function attendanceReportScope(scope: ReportScope, projectId?: number, costCenterId?: number): AttScope {
-  const base: AttScope = scope.companies
-    ? (attScopeOf(scope.companies.filter((c) => c.kind !== 'own').map((c) => (c.kind === 'all' ? { company: c.company, all: true, projects: [], costCenters: [] } : { company: c.company, all: false, projects: c.kind === 'team' ? c.projects : [], costCenters: c.kind === 'team' ? c.costCenters : [] }))) ?? { kind: 'team', projects: [], costCenters: [], parts: [] })
-    : scope.kind === 'all'
-      ? { kind: 'all' }
-      : scope.kind === 'team'
-        ? { kind: 'team', projects: scope.projects, costCenters: scope.costCenters }
-        : { kind: 'team', projects: [], costCenters: [] }
+  const none: AttScope = { kind: 'team', projects: [], costCenters: [], parts: [] }
+  if (!scope.companies) return none // legacy company-blind literal: fail closed (MC4)
+  const base: AttScope =
+    attScopeOf(scope.companies.filter((c) => c.kind !== 'own').map((c) => (c.kind === 'all' ? { company: c.company, all: true, projects: [], costCenters: [] } : { company: c.company, all: false, projects: c.kind === 'team' ? c.projects : [], costCenters: c.kind === 'team' ? c.costCenters : [] }))) ?? none
   if (!projectId && !costCenterId) return base
-  if (!base.parts && base.kind === 'all') return { kind: 'team', projects: [], costCenters: [] } // legacy company-blind literal: fail closed
   return narrowAttScope(base, projectId, costCenterId)
 }
 

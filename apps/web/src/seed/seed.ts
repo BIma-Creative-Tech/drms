@@ -1,6 +1,7 @@
 import type { CollectionSlug, Payload, PayloadRequest, Where } from 'payload'
 import sharp from 'sharp'
 
+import { SKIP_COMPANY_DEFAULTS } from '@/domain/company-defaults'
 import { DEFAULT_SEQUENCES } from '@/domain/numbering'
 import { normalizePlate } from '@/domain/plates'
 import { withSystemTransaction } from '@/lib/system-tx'
@@ -168,6 +169,8 @@ async function ensureCompany(payload: Payload, c: CompanySeed['company'], tally:
           data: { name: c.name, legalName: c.name, shortCode: c.shortCode, timezone: c.timezone, active: true } as never,
           depth: 0,
           overrideAccess: true, // SYSTEM-WRITE: seed
+          // the seed applies its own built-in defaults per PT (seedCompany), not a copy of DRMS
+          context: { [SKIP_COMPANY_DEFAULTS]: true },
           req,
         })) as unknown as { id: number }
         tally('companies', true)

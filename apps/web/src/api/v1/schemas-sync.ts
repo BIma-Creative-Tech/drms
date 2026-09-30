@@ -371,15 +371,20 @@ export const AppConfig = z
       }),
     updateRequired: z.boolean().nullable().meta({ description: 'Only with ?version=.' }),
     updateAvailable: z.boolean().nullable().meta({ description: 'Only with ?version=.' }),
-    timezone: z.string().meta({ description: 'Company display timezone (IANA).' }),
+    timezone: z.string().meta({ description: 'Display timezone (IANA) — the server timezone every PT uses (ADR 0016 §9).' }),
     serverTime: z.string(),
     android: z.object({ packageName: z.string() }),
-    features: z.object({
-      pushEnabled: z.boolean().meta({ description: 'false until FCM is configured (ADR 0011) — poll GET /notifications instead.' }),
-      syncExpenseDrafts: z.boolean(),
-      syncAttendance: z.boolean(),
-      syncProgressReports: z.boolean(),
-    }),
+    features: z
+      .object({
+        pushEnabled: z.boolean().meta({ description: 'false until FCM is configured (ADR 0011) — poll GET /notifications instead.' }),
+        syncExpenseDrafts: z.boolean().meta({ description: 'MC4: true when at least one active PT allows it (per-PT value: GET /me companies[].settings.syncExpenseDraftsEnabled).' }),
+        syncAttendance: z.boolean().meta({ description: 'MC4: true when at least one active PT allows it (per-PT value: GET /me companies[].settings.syncAttendanceEnabled).' }),
+        syncProgressReports: z.boolean().meta({ description: 'MC4: true when at least one active PT allows it (per-PT value: GET /me companies[].settings.syncProgressReportsEnabled).' }),
+      })
+      .meta({
+        description:
+          'Public, unauthenticated hints (no PT is known before login). With several PTs each flag is the OR over the active PTs; the server still enforces the flag of the item\'s PT on every sync item (FEATURE_DISABLED). Clients that know the user read GET /me companies[].settings instead.',
+      }),
     sync: z.object({ maxItemsPerBatch: z.number().int(), maxBatchBytes: z.number().int(), rateLimitPerMinute: z.number().int() }),
   })
   .meta({ id: 'AppConfig' })

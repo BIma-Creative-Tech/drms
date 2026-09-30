@@ -24,6 +24,8 @@ const row = (over: Partial<ProjectProgress> = {}): ProjectProgress => ({
   toneLabel: 'Anggaran mendahului progress',
   lastReportDate: '2026-09-20',
   reportCount: 4,
+  warnGapPct: 0,
+  badGapPct: 8,
   ...over,
 })
 

@@ -2,7 +2,8 @@ import { sql } from '@payloadcms/db-postgres'
 import { APIError, ValidationError, type PayloadRequest } from 'payload'
 import type { z } from 'zod'
 
-import { companyContextOf, employeeIn, hasRole, relId, userId, withCompanyContext, type CompanyContext, type Membership } from '@/access/roles'
+import { runUnderCompany } from '@/access/company-context'
+import { companyContextOf, employeeIn, hasRole, relId, userId, type Membership } from '@/access/roles'
 import { companyOf } from '@/domain/companies'
 import {
   SyncAttendancePayload,
@@ -137,31 +138,6 @@ export async function itemCompany(req: PayloadRequest, item: SyncItemIn): Promis
     return byUuid('progress-reports', p.report_client_uuid ?? item.client_uuid)
   }
   return null
-}
-
-/** Request caches that depend on the read selection (cleared when an item narrows the selection). */
-const SELECTION_CACHES = ['pkScope', 'pkMediaOffice', 'pkVisibleRequestIds', 'pkVisibleProgressReportIds', 'pkVisibleAddendumIds', 'pkReportCtx', 'pkCompanyCtx']
-
-function clearSelectionCaches(req: PayloadRequest): void {
-  if (!req.context) return
-  for (const k of SELECTION_CACHES) delete req.context[k]
-}
-
-/**
- * Runs `fn` with the request's read selection narrowed to `company` (ADR 0016 §8: the item is
- * processed under its own PT, whatever `X-Company-Ids` said). `company` must be a membership.
- */
-async function underCompany<T>(req: PayloadRequest, company: number, fn: () => Promise<T>): Promise<T> {
-  const original = req.user
-  const ctx = companyContextOf(original) as CompanyContext
-  clearSelectionCaches(req)
-  req.user = withCompanyContext(original as object, ctx.memberships, [company], ctx.groupAdmin) as unknown as PayloadRequest['user']
-  try {
-    return await fn()
-  } finally {
-    req.user = original
-    clearSelectionCaches(req)
-  }
 }
 
 /** PT an item is processed under: its `company_id`, else the only membership (legacy APK), else null. */
@@ -691,7 +667,7 @@ async function processItem(req: PayloadRequest, batch: SyncBatchIn, deviceId: st
   const declared = declaredCompany(item, memberships)
   const member = declared !== null && memberships.some((m) => m.company === declared)
   const withPt: SyncResultOut = { ...base, company_id: member ? declared : null }
-  const run = <T,>(fn: () => Promise<T>): Promise<T> => (member ? underCompany(req, declared!, fn) : fn())
+  const run = <T,>(fn: () => Promise<T>): Promise<T> => (member ? runUnderCompany(req, declared!, fn) : fn())
   return run(() => processOwn(c, batch, deviceId, verdict, withPt, receivedAt, declared, member))
 }
 

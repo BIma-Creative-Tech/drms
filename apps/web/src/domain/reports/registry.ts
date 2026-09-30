@@ -109,18 +109,12 @@ const statusesOf = (sp: URLSearchParams): RequestStatus[] => {
  * PM filters narrow the scope PER PT; an id outside the team scope → empty for that PT (never other
  * data). An office (`all`) PT keeps the id as a one-project team — the SQL still carries
  * `company_id = <that PT>`, so an id of another PT matches nothing. A legacy scope without
- * companies stays fail-closed (`all` is never turned into an unscoped id filter).
+ * companies → an empty scope (MC4: fail closed for every kind).
  */
 export function narrowScope(scope: ReportScope, projectId?: number, costCenterId?: number): ReportScope {
   if (!projectId && !costCenterId) return scope
   if (scope.kind === 'none' || scope.kind === 'own') return scope
-  if (!scope.companies) {
-    if (scope.kind !== 'team') return { kind: 'team', projects: [], costCenters: [] }
-    const projects = projectId && scope.projects.includes(projectId) ? [projectId] : []
-    const costCenters = costCenterId && scope.costCenters.includes(costCenterId) ? [costCenterId] : []
-    if (projectId && costCenterId) return { kind: 'team', projects: [], costCenters: [] }
-    return { kind: 'team', projects, costCenters }
-  }
+  if (!scope.companies) return { kind: 'none', companies: [] } // legacy literal: fail closed (MC4)
   const out: CompanyScope[] = scope.companies.map((c) => {
     if (c.kind === 'own') return c
     // both given: a request has a project OR a cost center → both filters together match nothing

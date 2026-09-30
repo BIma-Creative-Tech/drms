@@ -5,7 +5,8 @@ import type { CollectionConfig, Field } from 'payload'
  * view of EVERY collection that carries a top-level `company` relationship (the 30 per-PT
  * collections, memberships, and the PT-tagged notifications / audit logs). Applied once in
  * payload.config.ts, so a new per-PT collection gets it automatically (unit test guards the set):
- * - `company` first in `defaultColumns` (users with saved column preferences keep theirs);
+ * - `company` first in `defaultColumns` (saved column preferences that predate the PT column get it
+ *   prepended once by migration `20260930_120000_mc4_list_company_column`, MC4);
  * - list cell = PT short-code chip (`CompanyCell`, full name in the tooltip);
  * - `beforeListTable` = PT chips (`CompanyListFilter`) that narrow the list WITHIN the switcher
  *   selection (`where[company][equals]`); rows stay filtered by access control either way.

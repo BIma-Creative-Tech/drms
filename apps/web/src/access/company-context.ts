@@ -111,3 +111,31 @@ export function assertCompanyAccess(req: Pick<PayloadRequest, 'user'>, companyId
     typeof companyId === 'number' && !!c && (roles ? hasRole(req, roles, companyId) : c.memberships.some((m) => m.company === companyId))
   if (!ok) throw new APIError('Tidak ditemukan.', 404, null, true)
 }
+
+/** Request caches that depend on the read selection (cleared when the selection is narrowed). */
+export const SELECTION_CACHES = ['pkScope', 'pkMediaOffice', 'pkVisibleRequestIds', 'pkVisibleProgressReportIds', 'pkVisibleAddendumIds', 'pkReportCtx', 'pkCompanyCtx'] as const
+
+function clearSelectionCaches(req: PayloadRequest): void {
+  if (!req.context) return
+  for (const k of SELECTION_CACHES) delete req.context[k]
+}
+
+/**
+ * Runs `fn` with the request's read selection narrowed to `company` (ADR 0016 §5/§8): a sync item
+ * with `company_id` (MC3-1) or a create with an explicit body `company` (MC4) is processed under its
+ * own PT whatever `X-Company-Ids` / the cookie said. `company` MUST already be checked to be an active
+ * membership of the caller (the narrowed selection is always ⊆ the memberships anyway).
+ */
+export async function runUnderCompany<T>(req: PayloadRequest, company: number, fn: () => Promise<T>): Promise<T> {
+  const original = req.user
+  const ctx = companyContextOf(original)
+  if (!ctx) return fn()
+  clearSelectionCaches(req)
+  req.user = withCompanyContext(original as object, ctx.memberships, [company], ctx.groupAdmin) as unknown as PayloadRequest['user']
+  try {
+    return await fn()
+  } finally {
+    req.user = original
+    clearSelectionCaches(req)
+  }
+}

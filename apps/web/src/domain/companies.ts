@@ -1,6 +1,6 @@
 import { APIError, type Payload, type PayloadRequest } from 'payload'
 
-import { isRole, relId, soleCompany, type Role } from '@/access/roles'
+import { isRole, memberCompanies, relId, soleCompany, type Role } from '@/access/roles'
 import type { Company, CompanySetting } from '@/payload-types'
 
 /**
@@ -66,11 +66,15 @@ export async function activeCompanyIds(payload: Payload, req?: PayloadRequest): 
 
 /**
  * PT whose settings apply when the caller has no document at hand: the caller's only selected PT,
- * else company #1. Domain callers pass the document's PT (`settings(req, company)`); remaining
- * company-less callers are UI/context hints (MC2 review, see docs/proyekkas/mc/mc2-progress.md).
+ * else the LOWEST-id selected PT of the caller (MC4: before, company #1 — which could be a PT the
+ * caller is not a member of), else (system / no membership) company #1. Domain callers pass the
+ * document's PT (`settings(req, company)`); remaining company-less callers are display defaults
+ * next to per-item / per-row / per-PT values (MC4 review: inbox `budgetWarnPct`, K-09 thresholds,
+ * dashboard `warnPct` — see docs/proyekkas/mc/mc4-progress.md).
  */
 export async function contextCompanyId(req: PayloadRequest): Promise<number> {
-  return soleCompany(req) ?? firstActiveCompanyId(req.payload, req)
+  const sel = memberCompanies(req)
+  return soleCompany(req) ?? (sel.length > 0 ? Math.min(...sel) : firstActiveCompanyId(req.payload, req))
 }
 
 /**

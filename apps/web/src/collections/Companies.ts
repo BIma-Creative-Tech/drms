@@ -1,9 +1,10 @@
 import { sql } from '@payloadcms/db-postgres'
-import { APIError, type CollectionBeforeChangeHook, type CollectionConfig, type Field, type FieldAccess } from 'payload'
+import { APIError, type CollectionAfterChangeHook, type CollectionBeforeChangeHook, type CollectionConfig, type Field, type FieldAccess } from 'payload'
 
-import { companiesWithRole, denyAll, isGroupAdmin, memberCompanies } from '@/access/roles'
+import { companiesWithRole, denyAll, isGroupAdmin, memberCompanies, relId } from '@/access/roles'
 import { reasonOnDeactivate, withAudit } from '@/audit/hooks'
 import { percentField, rupiahField, uuidField } from '@/fields/common'
+import { copyCompanyDefaults, SKIP_COMPANY_DEFAULTS } from '@/domain/company-defaults'
 import { DEFAULT_TZ, isValidTimeZone } from '@/lib/time'
 
 const intField = (name: string, label: string, def: number, min: number, max: number) => ({
@@ -46,6 +47,34 @@ const shortCodeGuard: CollectionBeforeChangeHook = async ({ data, originalDoc, o
     throw new APIError('Kode singkat tidak dapat diubah: PT ini sudah punya dokumen bernomor.', 409, null, true)
   }
   return data
+}
+
+/** req.context key: the create's "copy defaults" choice (virtual fields, read before they are dropped). */
+const COPY_DEFAULTS_CTX = 'pkCopyDefaults'
+
+/** Virtual create-only fields → context (the DB write drops virtual fields). */
+const captureCopyDefaults: CollectionBeforeChangeHook = ({ data, operation, req }) => {
+  if (operation !== 'create') return data
+  const d = data as { copyDefaults?: unknown; copyDefaultsFrom?: unknown }
+  req.context[COPY_DEFAULTS_CTX] = { enabled: d.copyDefaults !== false, from: relId(d.copyDefaultsFrom) ?? null }
+  delete d.copyDefaults
+  delete d.copyDefaultsFrom
+  return data
+}
+
+/**
+ * MC4 (US-MC-01, wireframe §3 "Saat dibuat (sekali)"): a PT created by the group admin gets the
+ * default numbering, approval rules, work schedule and settings of the source PT (#1 DRMS unless
+ * "Salin dari PT" names another) IN THE SAME TRANSACTION — a PT never exists without numbering.
+ * Seed and go-live import apply their own built-in defaults (`SKIP_COMPANY_DEFAULTS`).
+ */
+const copyDefaultsOnCreate: CollectionAfterChangeHook = async ({ doc, operation, req }) => {
+  if (operation !== 'create' || req.context[SKIP_COMPANY_DEFAULTS] === true) return doc
+  const choice = req.context[COPY_DEFAULTS_CTX] as { enabled: boolean; from: number | null } | undefined
+  delete req.context[COPY_DEFAULTS_CTX]
+  if (choice && !choice.enabled) return doc
+  await copyCompanyDefaults(req, doc.id as number, { from: choice?.from ?? null })
+  return doc
 }
 
 /** Per-PT identity + operational settings (moved from the `company-settings` global, ADR 0016 §1). */
@@ -235,7 +264,7 @@ export const Companies: CollectionConfig = withAudit(
       update: ({ req }) => (isGroupAdmin(req) ? true : { id: { in: companiesWithRole(req, ['pk-admin', 'pk-owner'], { all: true }) } }),
       delete: denyAll,
     },
-    hooks: { beforeChange: [shortCodeGuard] },
+    hooks: { beforeChange: [shortCodeGuard, captureCopyDefaults], afterChange: [copyDefaultsOnCreate] },
     fields: [
       // MC2-4 (wireframe §3): tabs = the groups moved from "Setting perusahaan" (unnamed tabs: no schema change)
       {
@@ -298,6 +327,29 @@ export const Companies: CollectionConfig = withAudit(
         index: true,
         access: groupAdminOnly,
         admin: { position: 'sidebar', description: 'Hanya Admin grup yang dapat membuat atau menonaktifkan PT (alasan wajib).', components: { Cell: '@/admin/components/companies/ActiveCell#ActiveCell' } },
+      },
+      // MC4 (US-MC-01, wireframe §3): create-only choice, never stored (virtual)
+      {
+        name: 'copyDefaults',
+        type: 'checkbox',
+        label: 'Salin default saat dibuat',
+        defaultValue: true,
+        virtual: true,
+        access: { create: ({ req }) => isGroupAdmin(req), update: () => false, read: () => false },
+        admin: {
+          position: 'sidebar',
+          condition: (data) => !data?.id,
+          description: 'Sekali saat PT dibuat: penomoran dokumen (mulai dari 1), aturan approval tanpa user/project tertentu, jadwal kerja default, dan pengaturan operasional yang masih default.',
+        },
+      },
+      {
+        name: 'copyDefaultsFrom',
+        type: 'relationship',
+        relationTo: 'companies',
+        label: 'Salin dari PT',
+        virtual: true,
+        access: { create: ({ req }) => isGroupAdmin(req), update: () => false, read: () => false },
+        admin: { position: 'sidebar', condition: (data) => !data?.id && data?.copyDefaults !== false, description: 'Kosong = PT #1 (DRMS).' },
       },
       // list-only column (MC2-4): active members of the PT
       { name: 'memberCount', type: 'ui', label: 'Anggota', admin: { disableListColumn: false, components: { Cell: '@/admin/components/companies/MemberCountCell#MemberCountCell' } } },
