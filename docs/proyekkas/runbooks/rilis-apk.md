@@ -37,6 +37,11 @@
   sertifikat diverifikasi `apksigner` di CI). SHA-256 sertifikat prod:
   `E3:09:A8:92:AE:7F:EB:C2:62:98:EA:4E:60:3F:6A:38:50:86:E5:AA:FF:47:9B:4F:A9:1D:70:18:01:17:02:53`
   (sama dengan `ANDROID_APP_CERT_SHA256` prod dan ringkasan job CI).
+- **Versi web minimum untuk APK:** APK ≥ **0.3.0** (multi-PT, ADR 0016) membaca `GET /api/v1/me` `companies[]` dan
+  hanya boleh diterbitkan bila web di lingkungan tujuan sudah **≥ v0.5.0** (cek `docker inspect -f '{{.Config.Image}}'
+  drms-pk-web`). Pada web lebih lama APK 0.3.0 tidak menampilkan PT mana pun untuk membuat pengajuan/laporan.
+  **Versi APK minimum** jangan dinaikkan ke 0.3.0 sebelum semua HP bisa memperbarui; APK 0.2.x tetap berjalan untuk
+  akun dengan satu PT.
 - Staging memakai APK **staging** (artefak `proyekkas-staging-release-apk`, sertifikat staging) — jangan menerbitkan
   APK prod di staging atau sebaliknya.
 
@@ -142,3 +147,4 @@ rm -rf "$D"
 |---|---|
 | 2026-09-27 | Versi awal (halaman `/unduh` + skrip `publish-apk.mjs`). |
 | 2026-09-28 | Deskripsi rilis: `--notes` dari `docs/release-notes/apk/<V>.md` → `/unduh` + `releaseNotes` untuk APK. |
+| 2026-09-30 | Prasyarat: APK ≥ 0.3.0 hanya di lingkungan dengan web ≥ v0.5.0. |
