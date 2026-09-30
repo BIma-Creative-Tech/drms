@@ -391,6 +391,14 @@ export interface Company {
    * Hanya Admin grup yang dapat membuat atau menonaktifkan PT (alasan wajib).
    */
   active?: boolean | null;
+  /**
+   * Sekali saat PT dibuat: penomoran dokumen (mulai dari 1), aturan approval tanpa user/project tertentu, jadwal kerja default, dan pengaturan operasional yang masih default.
+   */
+  copyDefaults?: boolean | null;
+  /**
+   * Kosong = PT #1 (DRMS).
+   */
+  copyDefaultsFrom?: (number | null) | Company;
   uuid?: string | null;
   /**
    * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
@@ -971,6 +979,8 @@ export interface ApprovalRule {
   createdAt: string;
 }
 /**
+ * Berlaku untuk semua PT. Hanya Admin grup yang dapat membuat atau mengubah template; Admin/Direktur PT dapat melihat.
+ *
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "notification-templates".
  */
@@ -2349,6 +2359,8 @@ export interface CompaniesSelect<T extends boolean = true> {
   notifyRequesterStatusEnabled?: T;
   approvalEmailEnabled?: T;
   active?: T;
+  copyDefaults?: T;
+  copyDefaultsFrom?: T;
   uuid?: T;
   changeReason?: T;
   updatedAt?: T;
