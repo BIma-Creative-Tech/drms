@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-09-30
+
+Security patch on top of 0.5.0 (no migrations, no API change): npm audit high findings in `undici` and `nodemailer`
+fixed with root `overrides`. Deploy this instead of 0.5.0 (same database migrations as 0.5.0; rollback = restore the
+pre-deploy dump). Also carries the APK `mobile-v0.3.0` release files (pubspec, notes, runbook).
+
 ### Security
 - **npm audit (high) fixed with root `overrides`** — `payload` 3.90.1/3.90.2 pins `undici` 7.29.0 (GHSA-rfgv-xxqx-mfg5,
   GHSA-w293-vg96-wgc3 high + 8 moderate/low, patched in 7.29.1) and `@payloadcms/email-nodemailer` takes
