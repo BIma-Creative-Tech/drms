@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Security
+- **npm audit (high) fixed with root `overrides`** — `payload` 3.90.1/3.90.2 pins `undici` 7.29.0 (GHSA-rfgv-xxqx-mfg5,
+  GHSA-w293-vg96-wgc3 high + 8 moderate/low, patched in 7.29.1) and `@payloadcms/email-nodemailer` takes
+  `nodemailer` ^9.1.1 (GHSA-v53p-9fqp-m79j high, GHSA-g57g-f23g-4646; patched in 10.0.9). Overrides: `undici` 7.29.1,
+  `nodemailer` 10.0.10 (10.x only drops Node < 20; newest versions respecting `.npmrc` `min-release-age=7`). Remove
+  the overrides once Payload ships the patched versions. Remaining audit: 6 moderate + 1 low, all needing a Payload
+  downgrade (`npm audit fix --force` → 3.85.1) — not applied.
+
 ### APK mobile-v0.3.0 (tag `mobile-v0.3.0`, pubspec `0.3.0`)
 
 First APK release since `mobile-v0.2.0`; ships the APK parts of 0.5.0 that were never released: multi-company
