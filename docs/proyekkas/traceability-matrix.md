@@ -162,7 +162,7 @@ migration = Direktur ("Diketahui" = approval) → Finance level 1 (Sprint S2 dec
 
 ## MC — Multi-company (ADR 0016, `requirements-v1.2.md`, added 2026-09-27)
 
-Status: **MC1 + MC2 implemented** (MC1 `feat/mc1-foundation`; MC2 `feat/mc2-integration`, 2026-09-28; progress `mc/mc1-progress.md`, `mc/mc2-progress.md`) — MC3/MC4 planned.
+Status (updated 2026-09-30): **MC1 + MC2 + MC3 implemented** (MC1 `feat/mc1-foundation`; MC2 `feat/mc2-integration`, 2026-09-28; MC3 API `6f6f8cf` + APK `00014a1` on `develop`; released in web v0.5.0; progress `mc/mc1-progress.md`, `mc/mc2-progress.md`, `mc/mc3-progress.md`) — MC4 (QA + staging UAT) in progress.
 Phase = MC sub-phase of `phase-plan.md`. "Isolation" = a user of PT A only gets 404 for PT B ids; "cross-PT" = DB
 trigger rejects the row.
 

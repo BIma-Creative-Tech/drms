@@ -9,6 +9,17 @@ Badge merah di menu = jumlah pekerjaan menunggu.
 
 ![TODO screenshot: Beranda web Finance](img/finance-beranda.png)
 
+### Bila Anda Finance di lebih dari satu PT
+
+- Pilih PT lewat tombol PT di bar atas (**Semua PT** / **PT: …**, lihat [Hal umum](README.md#hal-umum-untuk-semua-peran)).
+  Antrian hanya berisi PT tempat Anda Finance/Direktur.
+- Bila lebih dari satu PT tampil: **Persetujuan**, **Antrian Transfer** dan **Verifikasi LPJ** punya kolom/tanda
+  **PT** di tiap baris dan tulisan **Menampilkan PT: …** di atas tabel.
+- **Dashboard Finance:** angka besar = gabungan PT tempat Anda Finance; di bawahnya rincian per PT (saldo kas,
+  antrian transfer jumlah · nominal, menunggu verifikasi LPJ/nota, tutup buku terakhir). Nama akun kas diberi awalan
+  `[KODE PT]`.
+- Satu transaksi (transfer, kas, tutup buku) selalu milik **satu** PT; pilihan akun kas hanya berisi akun PT itu.
+
 ## 1. Approval pengajuan
 
 Urutan: **Direktur** menyetujui dulu ("Diketahui"), baru pengajuan masuk ke Anda.
@@ -24,6 +35,7 @@ Urutan: **Direktur** menyetujui dulu ("Diketahui"), baru pengajuan masuk ke Anda
   di layar** → Konfirmasi.
 - Anda tidak bisa memutuskan pengajuan yang Anda buat/ajukan sendiri; bila Anda satu-satunya Finance, posisi
   Approval otomatis dilewati dan tercatat "(tidak berlaku — pemohon)".
+- Beberapa PT: keputusan memakai peran Anda **di PT pengajuan**; warna merah Dampak anggaran memakai ambang PT itu.
 
 ## 2. Reimburse: verifikasi nota
 
@@ -67,7 +79,8 @@ Catatan: kas masuk pengembalian LPJ tidak bisa di-void; bila salah, laporkan ke 
 
 ## 5. Kas masuk / keluar manual
 
-**Kas** → **↓ Kas masuk** atau **↑ Kas keluar** → isi Tanggal, Akun kas, Nominal, Sumber (masuk) / Kategori biaya
+**Keuangan → Kas → Buku kas** (halaman **Kas**) → **↓ Kas masuk** atau **↑ Kas keluar** → (bila Anda Finance di
+beberapa PT: kartu **Pilih PT** → klik PT transaksi ini) → isi Tanggal, Akun kas, Nominal, Sumber (masuk) / Kategori biaya
 (keluar), Project atau Pusat biaya (opsional), Kendaraan (opsional), **Keterangan**, Bukti (opsional) → Simpan.
 Nomor `KM/…` atau `KK/…` terbit dan saldo langsung berubah.
 
@@ -82,11 +95,19 @@ Nomor `KM/…` atau `KK/…` terbit dan saldo langsung berubah.
 **Tutup buku** → bulan lalu → **Tutup buku**. Setelah ditutup, transaksi di bulan itu terkunci. Membuka kembali
 hanya **Direktur**. Langkah lengkap: [runbook tutup buku](../runbooks/tutup-buku.md).
 
+**Tutup buku per PT:** satu layar = satu PT. Bila Anda Finance di beberapa PT, halaman **Tutup buku** menampilkan
+kartu **Pilih PT** (dengan "terkunci s/d …" per PT) → klik PT → tutup bulannya. Pindah PT lewat tombol **PT:** di atas
+halaman. Menutup buku satu PT **tidak** mengunci PT lain — ulangi untuk setiap PT.
+
 ## 7. Laporan
 
 **Laporan**: Rekap Kas · Buku Kas · Pengeluaran per Kategori · Anggaran Project · Rekap Pengajuan · Kelengkapan
 Nota/LPJ · Biaya per Kendaraan · Laporan Absensi. Atur filter → unduh **CSV**, **Excel (.xlsx)** atau **PDF**
 (Excel maks. 10.000 baris, PDF maks. 500 baris). **Audit Log** untuk menelusuri siapa melakukan apa.
+
+**Laporan beberapa PT:** filter **PT** (hanya muncul bila Anda punya akses ke lebih dari satu PT) mempersempit
+laporan. Bila lebih dari satu PT masuk laporan: kolom **PT** di setiap baris dan tabel **Subtotal per PT** (+ baris
+TOTAL). **Kop** laporan dan file unduhan: satu PT = kop PT itu; beberapa PT = kop grup (diatur Admin grup) + daftar PT.
 
 ## 8. Lain-lain
 

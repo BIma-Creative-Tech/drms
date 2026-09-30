@@ -28,7 +28,10 @@ Sebelum mulai: unggah **tanda tangan** sekali di web (**Profil & tanda tangan**)
 - Lupa absen/jam salah: minta **PM** mengoreksi (Anda tidak bisa mengoreksi sendiri).
 
 **Rekap bulanan:** Absensi → tab **Rekap** → geser bulan → ketuk tanggal untuk rincian (jam masuk/pulang, terlambat).
-Di web: **Rekap absensi saya**.
+Bila Anda karyawan di lebih dari satu PT, pilih kode PT (mis. **DRMS** / **CS1**) di atas rekap. Di web: **Rekap
+absensi saya**.
+
+Absen memakai PT dari lokasi yang Anda pilih — tidak perlu memilih PT sendiri.
 
 ## 2. Mengajukan dana (APK)
 
@@ -39,7 +42,9 @@ Pilih jenisnya dulu:
 | **Uang Muka** | Butuh uang **sebelum** belanja | Diunggah **setelah** uang ditransfer, lalu kirim LPJ |
 | **Reimburse** | Sudah bayar **dengan uang sendiri** | **Wajib** dilampirkan saat mengajukan (tiap baris minimal 1 nota) |
 
-1. Beranda → **Ajukan Uang Muka** atau **Ajukan Reimburse**.
+1. Beranda → **Ajukan Uang Muka** atau **Ajukan Reimburse**. Bila Anda bekerja di lebih dari satu PT, muncul
+   **Untuk PT mana?** → ketuk PT tempat biaya ini dibebankan. Di editor tertulis **PT: …**. (Pesan "Anda tidak bisa
+   membuat pengajuan di PT yang dipilih. Ganti PT di beranda." = ubah pilihan PT di Beranda dulu.)
 2. Isi **Judul**, pilih **Project** *atau* **Pusat biaya** (salah satu saja), **Tanggal dibutuhkan**.
 3. **Diajukan oleh**: nama Anda sudah terisi. Bila pengajuan untuk beberapa orang, tekan **Pilih…** dan tambahkan.
 4. **Rekening tujuan**: pilih rekening salah satu pemohon (di web daftar juga hanya berisi rekening pemohon; bila
@@ -51,7 +56,9 @@ Pilih jenisnya dulu:
 
 ![TODO screenshot: editor pengajuan dengan baris item dan Total (pratinjau)](img/staff-editor.png)
 
-Setelah diajukan, nomor dokumen terbit (mis. `229/PB-DRMS/01/X/2026`) dan status **Menunggu Diketahui (Direktur)**.
+Setelah diajukan, nomor dokumen terbit (mis. `229/PB-DRMS/01/X/2026`; kode di tengah = kode PT, tiap PT punya
+nomor urut sendiri) dan status **Menunggu Diketahui (Direktur)**. Yang memutuskan adalah Direktur dan Finance **di PT
+pengajuan itu**.
 Pantau di **Pengajuan Saya** atau lonceng. Pemohon lain yang Anda cantumkan diberi tahu saat pengajuan dibuat atas
 namanya, diajukan, dan ditarik kembali; di web lonceng **Notifikasi** ada di bar atas, kanan.
 
@@ -86,7 +93,8 @@ Nota & LPJ hanya bisa dikirim saat online.
 
 Menu Anda: **Daftar pengajuan**, **Rekap absensi saya**, **+ Buat pengajuan**, **Profil & tanda tangan**.
 Di web Anda juga bisa **Cetak PDF Pengajuan Biaya** (tombol di samping kanan pengajuan yang sudah bernomor) —
-PDF tidak tersedia di APK.
+PDF tidak tersedia di APK. Kop dan logo PDF mengikuti PT pengajuan. Di web, form **+ Buat pengajuan** punya kolom
+**PT** di atas — wajib dipilih bila pemilih PT Anda berisi lebih dari satu PT, dan tidak bisa diubah setelah dibuat.
 
 ## Pertanyaan umum
 
