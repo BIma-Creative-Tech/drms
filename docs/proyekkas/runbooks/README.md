@@ -25,7 +25,7 @@
 | 3b | Restore drill ProyekKas (RTO ≤ 4 jam) | staging → DB uji | [`../qa/s3-e9-qa-report.md`](../qa/s3-e9-qa-report.md) §3 (langkah & perintah §3.1) | **dijalankan 2026-09-26: PASS** (RTO 6,1 s; baris, sequence & sha256 media cocok); ulangi di prod setelah go-live (§3.3 R-2) |
 | 4 | Rotasi kunci & rahasia | semua | [`rotasi-kunci.md`](rotasi-kunci.md) (indeks per rahasia, menautkan runbook infra) | tersedia sebagian |
 | 5 | Pencabutan perangkat / user hilang HP / karyawan keluar | aplikasi | [`cabut-perangkat.md`](cabut-perangkat.md) | tersedia |
-| 6 | Tutup buku bulanan & buka kembali | aplikasi | [`tutup-buku.md`](tutup-buku.md); tutup buku **per PT**: [panduan Finance](../guides/finance.md) §6 | tersedia (runbook masih tanpa bagian per PT, lihat §6) |
+| 6 | Tutup buku bulanan & buka kembali | aplikasi | [`tutup-buku.md`](tutup-buku.md) (per PT, buka kembali oleh Direktur PT itu, §C cut-over) | tersedia |
 | 7 | Data go-live (impor master, saldo awal, nomor PB mulai 229, beberapa PT) | staging, prod | [`import-data-golive.md`](import-data-golive.md) (dry-run → commit, §3.5 langkah Keycloak, §4.1 beberapa PT dengan `kode_pt`) | tersedia |
 | 8 | Monitoring & alert | semua | `/opt/infra/docs/03-operations/observability.md` (Uptime Kuma monitor staging sudah ada: runbook onboarding §Langkah 5) | staging tersedia; prod **belum diverifikasi** |
 | 9 | Keycloak realm `drms` (user, SMTP, brute-force; reset 2FA pengguna: ADR 0017 §Recovery) | semua | `/opt/infra/docs/03-operations/keycloak.md`, runbook onboarding §Langkah 3 | tersedia |
@@ -112,9 +112,9 @@ Lihat [`cabut-perangkat.md`](cabut-perangkat.md).
 
 Lihat [`tutup-buku.md`](tutup-buku.md). Sejak web 0.5.0 tutup buku berlaku **per PT** (satu layar = satu PT; menutup
 PT A tidak mengunci PT B; Finance/Direktur di beberapa PT memilih PT di kartu **Pilih PT**) — lihat
-[panduan Finance](../guides/finance.md) §6. Runbook `tutup-buku.md` (basis `c468bbe`) belum memuat hal ini dan masih
-menyebut menu lama "Alur kerja → Tutup buku" serta §C cut-over "menyusul" (cut-over kini di
-[`import-data-golive.md`](import-data-golive.md) §4).
+[panduan Finance](../guides/finance.md) §6. Menu: **Keuangan → Tutup buku ▾ → Tutup buku**; buka kembali hanya oleh
+Direktur PT itu; cut-over (saldo awal per tanggal go-live, kunci saldo awal setelah periode pertama ditutup) di
+`tutup-buku.md` §C dan [`import-data-golive.md`](import-data-golive.md) §4/§6.
 
 ## 7. Data go-live
 
@@ -131,4 +131,4 @@ per PT. Contoh fiktif dua PT: `docs/proyekkas/templates/drms-impor-golive-contoh
 |---|---|
 | 2026-09-26 | Versi awal (E12). |
 | 2026-09-27 | Tambah #10 rilis APK ke `/unduh`. |
-| 2026-09-30 | Basis `5415f45`: deploy/rollback prod → `ci-ghcr.md`; restore drill E9 (PASS) → laporan QA; impor go-live → `import-data-golive.md` (termasuk beberapa PT); setting per PT (Perusahaan) vs Setting aplikasi; #11 CI/GHCR; catatan tutup buku per PT. |
+| 2026-09-30 | Basis `5415f45`: deploy/rollback prod → `ci-ghcr.md`; restore drill E9 (PASS) → laporan QA; impor go-live → `import-data-golive.md` (termasuk beberapa PT); setting per PT (Perusahaan) vs Setting aplikasi; #11 CI/GHCR; catatan tutup buku per PT. `tutup-buku.md` diperbarui (per PT, menu, §C cut-over). |

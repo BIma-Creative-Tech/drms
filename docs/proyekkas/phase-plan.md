@@ -283,8 +283,8 @@
   >   admin loading dots. DB migrations are not backward compatible (rollback = restore the pre-deploy dump).
   > - **v0.5.1 security patch prepared** on `release/v0.5.1` (`e4764b4`: `undici` 7.29.1 + `nodemailer` 10.0.10
   >   overrides, `CHANGELOG.md` [Unreleased] Security); not tagged.
-  > - **Prod still on 0.4.1**, waiting for the owner's go for the upgrade (Lead status; the running prod image is
-  >   **belum diverifikasi** from this repo).
+  > - **Prod still on 0.4.1**, waiting for the owner's go for the upgrade — diverifikasi Lead 2026-09-30 (docker ps):
+  >   `drms-pk-web` / `drms-pk-worker` run `ghcr.io/bctech-adm/proyekkas-web:0.4.1`; staging runs `0.4.2-stg-197226b`.
 - **Dependencies:** develop `74cf7f2` (Fase 1 S0–S3 merged); infra-engineer for the `pk-user` realm role
   (`drms`, `drms-staging`); client answers §L for seeds/import (not for code).
 - **Agents / estimate (ESTIMATE, pd):**
