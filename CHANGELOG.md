@@ -6,6 +6,35 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### APK 0.3.1 (branch `feat/mobile-0.3.1-ux`, pubspec `0.3.1+1`; not tagged yet)
+
+APK-only UX fixes from the module check; no server change needed (web ≥ 0.5.1 / MC4 API). Release notes
+`docs/release-notes/apk/0.3.1.md`.
+
+#### Added
+- **Notification tap routing** for every document type the server writes (`AppNotification.route`, same mapping as
+  the web `notificationHref`): `budget_addendum` (addendum.*) → `/addenda/:id`; `project` +
+  `progress.late_report` → `/progress?project=:id` (reports filtered to that project); other `project` events
+  (`reminder.budget_threshold`) → `/progress?tab=projects`; `progress_report` → `/progress/report/:id`;
+  `attendance` → `/attendance` (team tab without own attendance); `expense_request` unchanged. Progress targets
+  only for PM / Direktur / Finance; unknown types or non-numeric ids stay non-tappable (read rows without a target
+  have no tap action; routable rows show a chevron).
+- **Edit an addendum draft** (`PATCH /api/v1/budget-addenda/{id}`, `BudgetAddendumUpdate`: `addition`, `reason`; the
+  project stays fixed): "Ubah draft" on the detail only when `allowedActions` contains `edit`; route
+  `/addenda/:id/edit` reuses the create form prefilled, "Simpan perubahan" and — when `submit` is also allowed —
+  "Simpan & ajukan" (PATCH then submit). One Idempotency-Key per PATCH body (the server answers 422 to a reused key
+  with another body). A non-editable addendum shows a notice instead of the form.
+- **Finance home: US-12 "Progress fisik vs anggaran"** card (`ProjectProgressSummary`, `GET /projects/progress`
+  allows `pk-finance`), as on the web Finance Beranda; shown for every role with `canReadProgress`.
+- **Per-PT dashboard breakdown** ("Per PT" card under the KPI totals) when `/dashboard/*` `companies[]` has ≥ 2 PTs:
+  Direktur `cash.byCompany` + `approvals.byCompany`, Finance `cashByCompany` + `transferQueue.byCompany`, PM
+  `teamMonthByCompany`.
+
+#### Changed
+- PM "Absenkan anggota tim" stays visible but disabled with the line "Absen atas nama belum bisa: absensi dari
+  aplikasi belum diaktifkan Admin (Setting perusahaan)." when `syncAttendanceEnabled` is off for every PT in scope
+  (was: hidden silently).
+
 ## [0.5.1] - 2026-09-30
 
 Security patch on top of 0.5.0 (no migrations, no API change): npm audit high findings in `undici` and `nodemailer`
