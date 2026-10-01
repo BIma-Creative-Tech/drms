@@ -316,6 +316,62 @@ Map<String, dynamic> pmDashboardJson({bool hasScope = true}) => {
   },
 };
 
+/// MC4: the same dashboards covering two PTs (DRMS id 1, CS1 id 2) with the per-PT fields of openapi.
+const twoCompaniesJson = [
+  {'id': 1, 'shortCode': 'DRMS', 'name': 'PT DRMS Contoh'},
+  {'id': 2, 'shortCode': 'CS1', 'name': 'PT Cabang Satu'},
+];
+
+Map<String, dynamic> direkturDashboardTwoPtJson() {
+  final j = direkturDashboardJson();
+  return {
+    ...j,
+    'companies': twoCompaniesJson,
+    'cash': {
+      ...(j['cash'] as Map<String, dynamic>),
+      'byCompany': [
+        {'companyId': 1, 'total': 100000000, 'monthIn': 30000000, 'monthOut': 10000000},
+        {'companyId': 2, 'total': 52500000, 'monthIn': 10000000, 'monthOut': 2500000},
+      ],
+    },
+    'approvals': {
+      ...(j['approvals'] as Map<String, dynamic>),
+      'byCompany': [
+        {'companyId': 1, 'count': 2, 'sum': 5000000},
+        {'companyId': 2, 'count': 1, 'sum': 2250000},
+      ],
+    },
+  };
+}
+
+Map<String, dynamic> financeDashboardTwoPtJson() {
+  final j = financeDashboardJson();
+  return {
+    ...j,
+    'companies': twoCompaniesJson,
+    'cashByCompany': [
+      {'companyId': 1, 'total': 60000000},
+      {'companyId': 2, 'total': 38000000},
+    ],
+    'transferQueue': {
+      ...(j['transferQueue'] as Map<String, dynamic>),
+      'byCompany': [
+        {'companyId': 1, 'count': 3, 'sum': 7000000},
+        {'companyId': 2, 'count': 1, 'sum': 1200000},
+      ],
+    },
+  };
+}
+
+Map<String, dynamic> pmDashboardTwoPtJson() => {
+  ...pmDashboardJson(),
+  'companies': twoCompaniesJson,
+  'teamMonthByCompany': [
+    {'companyId': 1, 'count': 4, 'sum': 12000000, 'waiting': 1},
+    // CS1 without a row (no team requests this month) → zeros
+  ],
+};
+
 Map<String, dynamic> historyJson() => {
   'items': [
     {

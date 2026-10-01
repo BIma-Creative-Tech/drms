@@ -128,6 +128,45 @@ void main() {
       expect(find.byKey(const Key('home-new-advance')), findsNothing);
     });
 
+    testWidgets('MC4: per-PT breakdown under the KPI totals when the dashboard spans two PTs', (tester) async {
+      await pumpScreen(
+        tester,
+        const Scaffold(
+          body: SingleChildScrollView(child: Column(children: [DirekturKpis(), FinanceKpis(), PmTeamKpis()])),
+        ),
+        auth: signedIn({Role.owner, Role.finance, Role.pm}),
+        overrides: [
+          direkturDashboardProvider.overrideWith(
+            (ref) async => DirekturDashboard.fromJson(direkturDashboardTwoPtJson()),
+          ),
+          financeDashboardProvider.overrideWith((ref) async => FinanceDashboard.fromJson(financeDashboardTwoPtJson())),
+          pmDashboardProvider.overrideWith((ref) async => PmDashboard.fromJson(pmDashboardTwoPtJson())),
+        ],
+      );
+      expect(find.byKey(const Key('kpi-by-company')), findsNWidgets(3));
+      expect(find.text('Per PT'), findsNWidgets(3));
+      expect(find.text('Kas Rp 100 jt'), findsOneWidget);
+      expect(find.text('2 menunggu · Rp 5 jt'), findsOneWidget);
+      expect(find.text('Kas Rp 38 jt'), findsOneWidget);
+      expect(find.text('3 antri transfer · Rp 7 jt'), findsOneWidget);
+      expect(find.text('4 pengajuan · Rp 12 jt'), findsOneWidget);
+      expect(find.text('0 pengajuan · Rp 0'), findsOneWidget);
+      expect(find.text('CS1'), findsNWidgets(3));
+    });
+
+    testWidgets('one PT: no per-PT breakdown', (tester) async {
+      await pumpScreen(
+        tester,
+        const Scaffold(body: SingleChildScrollView(child: FinanceKpis())),
+        auth: signedIn({Role.finance}),
+        overrides: [
+          financeDashboardProvider.overrideWith((ref) async => FinanceDashboard.fromJson(financeDashboardJson())),
+        ],
+      );
+      expect(find.byKey(const Key('kpi-finance')), findsOneWidget);
+      expect(find.byKey(const Key('kpi-by-company')), findsNothing);
+    });
+
     testWidgets('PM home: no inbox, team monitor instead', (tester) async {
       await pumpScreen(
         tester,

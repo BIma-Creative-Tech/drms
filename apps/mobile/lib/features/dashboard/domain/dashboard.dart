@@ -51,6 +51,49 @@ class BudgetTotals {
   }
 }
 
+/// One PT of a multi-PT dashboard (MC2/MC4 per-PT fields, joined by `companyId`). Label = `companies[].shortCode`.
+class CompanySplit {
+  const CompanySplit({
+    required this.companyId,
+    required this.code,
+    this.cash,
+    this.count = 0,
+    this.sum = 0,
+    this.waiting,
+  });
+  final int companyId;
+  final String code;
+
+  /// Cash balance of the PT (Direktur `cash.byCompany[].total`, Finance `cashByCompany[].total`); null for PM.
+  final int? cash;
+
+  /// Direktur: waiting approvals; Finance: transfer queue; PM: team requests this month.
+  final int count;
+  final int sum;
+
+  /// PM only: team requests waiting for approval.
+  final int? waiting;
+}
+
+/// Per-PT rows in the order of `companies[]`; empty unless the payload covers ≥ 2 PTs (one PT = the totals).
+List<CompanySplit> _splits(Object? companies, {Object? cash, Object? counts}) {
+  final cos = _l(companies);
+  if (cos.length < 2) return const [];
+  Json byId(Object? rows, int id) => _l(rows).firstWhere((r) => _iN(r['companyId']) == id, orElse: () => const {});
+  return [
+    for (final c in cos)
+      if (_iN(c['id']) case final id?)
+        CompanySplit(
+          companyId: id,
+          code: '${c['shortCode'] ?? c['name'] ?? '#$id'}',
+          cash: cash == null ? null : _i(byId(cash, id)['total']),
+          count: _i(byId(counts, id)['count']),
+          sum: _i(byId(counts, id)['sum']),
+          waiting: _iN(byId(counts, id)['waiting']),
+        ),
+  ];
+}
+
 /// Web `share()`: percentage with one decimal, null without a whole.
 double? share(int part, int whole) => whole <= 0 ? null : (part / whole * 1000).round() / 10;
 
@@ -74,6 +117,7 @@ class DirekturDashboard {
     required this.budgetWarn,
     required this.cashFlow,
     required this.transferQueueCount,
+    this.byCompany = const [],
   });
 
   final String asOf;
@@ -93,6 +137,9 @@ class DirekturDashboard {
   final int budgetWarn;
   final List<CashFlowPoint> cashFlow;
   final int transferQueueCount;
+
+  /// Per PT: cash total + waiting approvals (count/sum).
+  final List<CompanySplit> byCompany;
 
   static DirekturDashboard fromJson(Json j) {
     final cash = _m(j['cash']);
@@ -117,6 +164,7 @@ class DirekturDashboard {
       budgetWarn: _i(budget['warn']),
       cashFlow: _cashFlow(j['cashFlow']),
       transferQueueCount: _i(_m(j['transferQueue'])['count']),
+      byCompany: _splits(j['companies'], cash: cash['byCompany'], counts: a['byCompany']),
     );
   }
 }
@@ -135,6 +183,7 @@ class FinanceDashboard {
     required this.advancesOverdue,
     required this.balanceTrend,
     required this.cashFlow,
+    this.byCompany = const [],
   });
 
   final String asOf;
@@ -148,6 +197,9 @@ class FinanceDashboard {
   final int advancesOverdue;
   final List<TrendPoint> balanceTrend;
   final List<CashFlowPoint> cashFlow;
+
+  /// Per PT: cash total + transfer queue (count/sum).
+  final List<CompanySplit> byCompany;
 
   static FinanceDashboard fromJson(Json j) {
     final q = _m(j['transferQueue']);
@@ -163,6 +215,7 @@ class FinanceDashboard {
       advancesOverdue: _l(j['advancesWithoutLpj']).where((a) => a['overdue'] == true).length,
       balanceTrend: _trend(_m(j['viz'])['balanceTrend'], 'balance'),
       cashFlow: _cashFlow(j['cashFlow']),
+      byCompany: _splits(j['companies'], cash: j['cashByCompany'], counts: q['byCompany']),
     );
   }
 }
@@ -179,6 +232,7 @@ class PmDashboard {
     required this.lpjOverdue,
     required this.requestTrend,
     required this.budgetTotals,
+    this.byCompany = const [],
   });
 
   final String asOf;
@@ -190,6 +244,9 @@ class PmDashboard {
   final int lpjOverdue;
   final List<TrendPoint> requestTrend;
   final BudgetTotals budgetTotals;
+
+  /// Per PT: team requests this month (count/sum/waiting).
+  final List<CompanySplit> byCompany;
 
   static PmDashboard fromJson(Json j) {
     final team = _m(j['teamMonth']);
@@ -205,6 +262,7 @@ class PmDashboard {
       lpjOverdue: _i(lpj['overdue']),
       requestTrend: _trend(viz['requestTrend'], 'count'),
       budgetTotals: BudgetTotals.fromJson(viz['budgetTotals']),
+      byCompany: _splits(j['companies'], counts: j['teamMonthByCompany']),
     );
   }
 }

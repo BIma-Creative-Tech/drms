@@ -539,6 +539,48 @@
     }
   },
   "kpiTeamTrend": "Tren jumlah pengajuan tim",
+  "kpiPerCompanyTitle": "Per PT",
+  "kpiSplitCash": "Kas {amount}",
+  "@kpiSplitCash": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "kpiSplitWaiting": "{count} menunggu · {amount}",
+  "@kpiSplitWaiting": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "kpiSplitTransfer": "{count} antri transfer · {amount}",
+  "@kpiSplitTransfer": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "kpiSplitTeam": "{count} pengajuan · {amount}",
+  "@kpiSplitTeam": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
   "kpiTeamLpj": "Uang muka tim belum LPJ",
   "kpiLpjOverdue": "{count} terlambat",
   "@kpiLpjOverdue": {

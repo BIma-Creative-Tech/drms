@@ -1969,6 +1969,36 @@ abstract class AppLocalizations {
   /// **'Tren jumlah pengajuan tim'**
   String get kpiTeamTrend;
 
+  /// No description provided for @kpiPerCompanyTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Per PT'**
+  String get kpiPerCompanyTitle;
+
+  /// No description provided for @kpiSplitCash.
+  ///
+  /// In id, this message translates to:
+  /// **'Kas {amount}'**
+  String kpiSplitCash(String amount);
+
+  /// No description provided for @kpiSplitWaiting.
+  ///
+  /// In id, this message translates to:
+  /// **'{count} menunggu · {amount}'**
+  String kpiSplitWaiting(int count, String amount);
+
+  /// No description provided for @kpiSplitTransfer.
+  ///
+  /// In id, this message translates to:
+  /// **'{count} antri transfer · {amount}'**
+  String kpiSplitTransfer(int count, String amount);
+
+  /// No description provided for @kpiSplitTeam.
+  ///
+  /// In id, this message translates to:
+  /// **'{count} pengajuan · {amount}'**
+  String kpiSplitTeam(int count, String amount);
+
   /// No description provided for @kpiTeamLpj.
   ///
   /// In id, this message translates to:
