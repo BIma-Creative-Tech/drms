@@ -2383,6 +2383,12 @@ abstract class AppLocalizations {
   /// **'Absenkan anggota tim'**
   String get onBehalfAction;
 
+  /// No description provided for @onBehalfDisabled.
+  ///
+  /// In id, this message translates to:
+  /// **'Absen atas nama belum bisa: absensi dari aplikasi belum diaktifkan Admin (Setting perusahaan).'**
+  String get onBehalfDisabled;
+
   /// No description provided for @onBehalfTitle.
   ///
   /// In id, this message translates to:

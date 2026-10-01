@@ -724,6 +724,7 @@
   "teamOnBehalfTag": "Oleh PM",
   "teamCorrectedTag": "Dikoreksi",
   "onBehalfAction": "Absenkan anggota tim",
+  "onBehalfDisabled": "Absen atas nama belum bisa: absensi dari aplikasi belum diaktifkan Admin (Setting perusahaan).",
   "onBehalfTitle": "Diabsenkan PM",
   "onBehalfIntro": "Untuk anggota tim yang tidak bisa absen sendiri. Lokasi diambil dari HP Anda, foto karyawan diambil dengan kamera HP Anda. Nama Anda dan alasannya tercatat.",
   "onBehalfNoTeam": "Belum ada anggota tim yang ditugaskan hari ini (data tim dari server; tarik ulang di Beranda saat online).",

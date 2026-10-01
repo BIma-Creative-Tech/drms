@@ -1276,6 +1276,10 @@ class AppLocalizationsId extends AppLocalizations {
   String get onBehalfCamera => 'Kamera untuk foto karyawan';
 
   @override
+  String get onBehalfDisabled =>
+      'Absen atas nama belum bisa: absensi dari aplikasi belum diaktifkan Admin (Setting perusahaan).';
+
+  @override
   String get lensBack => 'Belakang';
 
   @override
