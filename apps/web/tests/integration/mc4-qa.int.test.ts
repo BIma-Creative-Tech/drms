@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 
-import type { CollectionSlug } from 'payload'
+import type { CollectionSlug, Payload } from 'payload'
+import sharp from 'sharp'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { resetRateLimits } from '@/lib/rate-limit'
@@ -27,6 +28,11 @@ import { addMembership, companyId, getTestPayload, installFakeKeycloak, makeUser
  *   /api/audit-logs, report `audit-log`, admin dashboard) → PT B amounts, descriptions and doc numbers
  *   readable by the Admin / Direktur of PT A.
  *
+ * QA-MC4-04 — reading ONE media file (GET /api/v1/media/…/file, signed URL, Payload static file) as an
+ *   office user who holds the role in a SUBSET of the active PTs loaded the ids of EVERY owner document
+ *   of those PTs (all attendances / requests / reports, pagination off) to build the access Where. Local
+ *   estimate, 3 PTs × 1 year: 3.6–4 s and > 400 MiB per selfie → V8 heap OOM of the 256 MiB web heap.
+ *
  * PTs: A = #1 DRMS, B = fictional "PT Contoh QA" (CQA), deactivated in afterAll.
  */
 let A = 0
@@ -42,6 +48,7 @@ let sharedAB: TestUser
 let onlyA: TestUser
 let staffB: FlowUser
 let ownerB: FlowUser
+let financeB: FlowUser
 
 const call = async (method: string, path: string, user: FlowUser, body?: unknown, headers: Record<string, string> = {}): Promise<Res> => {
   resetRateLimits()
@@ -96,7 +103,7 @@ beforeAll(async () => {
   X.accStaffB = await sysCreate('employee-bank-accounts', { employee: X.empStaffB, bank: X.bank, accountNo: `93${Date.now() % 1e8}`, accountHolder: 'Staff Contoh QA', isDefault: true })
   staffB = await makeFlowUser(['pk-staff'], 'qa-staff-b', X.empStaffB, { company: B })
   ownerB = await makeFlowUser(['pk-owner'], 'qa-owner-b', null, { company: B, signature: false })
-  await makeFlowUser(['pk-finance'], 'qa-fin-b', null, { company: B, signature: false })
+  financeB = await makeFlowUser(['pk-finance'], 'qa-fin-b', null, { company: B, signature: false })
   const body = { type: 'advance', title: 'QA rahasia PT B', projectId: X.projectB, requesterIds: [X.empStaffB], bankAccountId: X.accStaffB, neededDate: '2026-10-30', lines: [{ description: 'Material rahasia PT B', total: 4_321_000, categoryId: X.catB }] }
   const d = await call('POST', '/api/v1/expense-requests', staffB, body, key())
   expect(d.status, JSON.stringify(d.body).slice(0, 300)).toBe(201)
@@ -200,5 +207,91 @@ describe('QA-MC4-03: audit rows of PT B are not shown to the Admin / Direktur of
     const rest = await call('GET', `/api/audit-logs?limit=0&depth=0&where[docId][equals]=${X.reqB}&where[docType][equals]=expense_request`, ownerB)
     expect(rest.status).toBe(200)
     expect(rest.body.totalDocs).toBeGreaterThan(5)
+  })
+})
+
+describe('QA-MC4-04: one media file is authorised against its own owner document, not PT-wide id lists', () => {
+  const PT_WIDE = new Set(['attendances', 'expense-requests', 'progress-reports'])
+  let p: Payload
+  const jpeg = (n: number) => sharp({ create: { width: 64, height: 64, channels: 3, background: { r: n % 256, g: 40, b: 90 } } }).jpeg().toBuffer()
+  async function selfieAttendance(company: number, employee: number, project: number, user: FlowUser | TestUser, day: string): Promise<number> {
+    const bytes = await jpeg(company * 7 + Number(day.slice(-2)))
+    const media = await p.create({ collection: 'media-selfies', data: {}, file: { data: bytes, mimetype: 'image/jpeg', name: 's.jpg', size: bytes.length }, user, depth: 0, overrideAccess: true /* SYSTEM-WRITE: fixture */ })
+    await sysCreate('attendances', {
+      employee, user: user.id, kind: 'check_in', project, localDate: day, attendanceTime: `${day}T00:30:00.000Z`, receivedAt: `${day}T00:30:01.000Z`,
+      timeTrust: 'server', lat: -3.32, lng: 114.59, distanceM: 5, selfie: media.id, clientUuid: randomUUID(), company,
+    })
+    return media.id as number
+  }
+  /** Runs `fn` and returns the PT-wide id-list loads (unlimited find, pagination off, on owner collections) it caused. */
+  async function ptWideLoads(fn: () => Promise<void>): Promise<string[]> {
+    const seen: string[] = []
+    const orig = p.find.bind(p)
+    p.find = (async (a: Parameters<Payload['find']>[0]) => {
+      if (a.pagination === false && a.limit === undefined && PT_WIDE.has(a.collection as string)) seen.push(a.collection as string)
+      return orig(a)
+    }) as Payload['find']
+    try {
+      await fn()
+    } finally {
+      p.find = orig
+    }
+    return seen
+  }
+
+  beforeAll(async () => {
+    p = await getTestPayload()
+    X.empStaffA = await sysCreate('employees', { company: A, code: 'QA-A3', name: 'Staff A QA' })
+    X.projectA = await sysCreate('projects', { company: A, code: 'QA-PA', name: 'Proyek A QA', budget: 1_000_000, status: 'berjalan' })
+    X.selfieA = await selfieAttendance(A, X.empStaffA!, X.projectA!, onlyA, '2026-09-01')
+    X.selfieB = await selfieAttendance(B, X.empStaffB!, X.projectB!, staffB, '2026-09-02')
+    const bytes = await jpeg(77)
+    const rcpt = await p.create({ collection: 'media-receipts', data: {}, file: { data: bytes, mimetype: 'image/jpeg', name: 'n.jpg', size: bytes.length }, user: staffB, depth: 0, overrideAccess: true /* SYSTEM-WRITE: fixture */ })
+    X.receiptB = rcpt.id as number
+    await sqlAs('owner', "UPDATE media_receipts SET owner_doc_type = 'expense_request', owner_doc_id = $1 WHERE id = $2", [String(X.reqB), X.receiptB])
+  })
+
+  it('Finance of A (A and B active): selfie of A → 200, of B → 404, without loading PT-wide id lists', async () => {
+    let a = 0
+    let b = 0
+    const loads = await ptWideLoads(async () => {
+      a = (await call('GET', `/api/v1/media/selfies/${X.selfieA}/file`, finA)).status
+      b = (await call('GET', `/api/v1/media/selfies/${X.selfieB}/file`, finA)).status
+    })
+    expect([a, b]).toEqual([200, 404])
+    expect(loads).toEqual([])
+  })
+
+  it('receipt of a PT B request: Finance of B → 200, Finance of A → 404, signed URL of B, without PT-wide id lists', async () => {
+    let fb = 0
+    let fa = 0
+    let signed = 0
+    const loads = await ptWideLoads(async () => {
+      fb = (await call('GET', `/api/v1/media/receipts/${X.receiptB}/file`, financeB)).status
+      fa = (await call('GET', `/api/v1/media/receipts/${X.receiptB}/file`, finA)).status
+      const s = await call('GET', `/api/v1/media/receipts/${X.receiptB}/signed-url`, financeB)
+      signed = (await call('GET', s.body.url as string, finA)).status // a URL minted for B's Finance, used by anyone
+    })
+    expect([fb, fa, signed]).toEqual([200, 404, 200])
+    expect(loads).toEqual([])
+  })
+
+  it('Payload static file by name follows the same per-row answer', async () => {
+    const name = String((await sqlAs('app', 'SELECT filename FROM media_receipts WHERE id = $1', [X.receiptB])).rows[0]?.filename)
+    let fb = 0
+    let fa = 0
+    const loads = await ptWideLoads(async () => {
+      fb = (await call('GET', `/api/media-receipts/file/${name}`, financeB)).status
+      fa = (await call('GET', `/api/media-receipts/file/${name}`, finA)).status
+    })
+    expect(fb).toBe(200)
+    expect([403, 404]).toContain(fa)
+    expect(loads).toEqual([])
+  })
+
+  it('control: the media LIST keeps the per-PT rules (Finance of A lists no B receipt)', async () => {
+    const r = await call('GET', '/api/media-receipts?limit=500&depth=0', finA)
+    expect(r.status).toBe(200)
+    expect((r.body.docs as Array<{ id: number }>).map((d) => d.id)).not.toContain(X.receiptB)
   })
 })
