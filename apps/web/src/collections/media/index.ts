@@ -16,10 +16,67 @@ import { mediaCollection } from './factory'
  * Read access until the owning business documents exist (F2): Finance/Owner/Admin all, others
  * only what they uploaded themselves. F2 replaces this with owner-document-derived Where rules.
  */
+/**
+ * MC4 QA (QA-MC4-04, ADR 0016 MC2 note 4 measured with 3 PTs): reading ONE media row (findByID —
+ * GET /api/v1/media/…/file, signed URLs — or a Payload static file by name) used to build the id lists
+ * of EVERY owner document of the caller's PTs (1 year × 3 PTs: 31 200 attendances → 3.6–4 s and
+ * > 400 MiB per selfie request, V8 heap OOM = web process crash at the 256 MiB heap of ADR 0002).
+ * For a single row the rules below are evaluated against that row's owner document only ("focus"):
+ * same answers, O(1) queries. Lists (no id / filename) keep the id-list rules.
+ */
+type Focus = { id: number; ownerDocType: string | null; ownerDocId: string | null }
+const FOCUS = 'pkMediaFocus'
+const focusOf = (req: PayloadRequest): Focus | undefined => req.context?.[FOCUS] as Focus | undefined
+
+/** `[id]` when the caller may read owner document `id` (caller's own access), else []. */
+async function visibleOwner(req: PayloadRequest, collection: 'expense-requests' | 'progress-reports', id: string | null): Promise<string[]> {
+  if (!id || !/^\d{1,10}$/.test(id)) return []
+  const res = await req.payload
+    .find({ collection, where: { id: { equals: Number(id) } }, depth: 0, limit: 1, pagination: false, select: { updatedAt: true }, user: req.user, overrideAccess: false, req })
+    .catch((err: { status?: number }) => {
+      if (err.status === 403) return { docs: [] }
+      throw err
+    })
+  return res.docs.length > 0 ? [id] : []
+}
+
+function focused(slug: CollectionSlug, inner: Access, thumbs: boolean): Access {
+  return async (args) => {
+    const { req } = args
+    const rawId = args.id
+    const filename = (args as { isReadingStaticFile?: boolean }).isReadingStaticFile ? (args.data as { filename?: unknown } | undefined)?.filename : undefined
+    let where: Where | null = null
+    if (rawId !== undefined && rawId !== null && /^\d{1,10}$/.test(String(rawId))) where = { id: { equals: Number(rawId) } }
+    else if (typeof filename === 'string' && filename.length > 0) where = thumbs ? { or: [{ filename: { equals: filename } }, { 'sizes.thumb.filename': { equals: filename } }] } : { filename: { equals: filename } }
+    if (!where || focusOf(req)) return inner(args)
+    const row = (
+      await req.payload.find({
+        collection: slug,
+        where,
+        depth: 0,
+        limit: 1,
+        pagination: false,
+        select: { ownerDocType: true, ownerDocId: true } as never,
+        overrideAccess: true, // SYSTEM-READ: owner link of the ONE row being read; access is then decided for that row only
+        req,
+      })
+    ).docs[0] as { id: number; ownerDocType?: string | null; ownerDocId?: string | null } | undefined
+    if (!row) return false
+    req.context ??= {}
+    req.context[FOCUS] = { id: row.id, ownerDocType: row.ownerDocType ?? null, ownerDocId: row.ownerDocId ?? null } satisfies Focus
+    try {
+      return await inner(args)
+    } finally {
+      delete req.context[FOCUS]
+    }
+  }
+}
+
 const ownerRequestRule: Rule = async ({ req }) => {
-  const ids = await visibleRequestIds(req)
+  const f = focusOf(req)
+  const ids = f ? (f.ownerDocType === 'expense_request' ? await visibleOwner(req, 'expense-requests', f.ownerDocId) : []) : (await visibleRequestIds(req)).map(String)
   if (ids.length === 0) return false
-  const where: Where = { and: [{ ownerDocType: { equals: 'expense_request' } }, { ownerDocId: { in: ids.map(String) } }] }
+  const where: Where = { and: [{ ownerDocType: { equals: 'expense_request' } }, { ownerDocId: { in: ids } }] }
   return where
 }
 
@@ -48,6 +105,24 @@ async function officeScope(req: PayloadRequest): Promise<OfficeScope> {
 
 /** Ids (as text) of `collection` rows of the PTs `companyIds` (SYSTEM-READ, cached per request). */
 async function idsOfCompanies(req: PayloadRequest, collection: CollectionSlug, companyIds: number[], field = 'id'): Promise<string[]> {
+  const f = focusOf(req)
+  if (f && collection !== 'company-memberships') {
+    // one row: is ITS owner document (request / report) or ITS attendance in one of `companyIds`?
+    const one: Where | null =
+      field === 'selfie' ? { selfie: { equals: f.id } } : f.ownerDocId && /^\d{1,10}$/.test(f.ownerDocId) ? { id: { equals: Number(f.ownerDocId) } } : null
+    if (!one) return []
+    const hit = await req.payload.find({
+      collection,
+      where: { and: [one, { company: { in: companyIds } }] } as Where,
+      depth: 0,
+      limit: 1,
+      pagination: false,
+      select: { updatedAt: true },
+      overrideAccess: true, // SYSTEM-READ: owner document of the ONE media row being read (media access)
+      req,
+    })
+    return hit.docs.length === 0 ? [] : [field === 'selfie' ? String(f.id) : f.ownerDocId!]
+  }
   const key = `pkMediaIds:${collection}:${field}:${companyIds.join(',')}`
   req.context ??= {}
   const hit = req.context[key] as string[] | undefined
@@ -117,7 +192,12 @@ const ownerLinked: Access = byRoleAny({
  * everyone who may read the owning progress report (PM team; owner link set by the report service,
  * immutable — DB trigger).
  */
-const reportPhotoRule: Rule = async ({ req }) => reportPhotoWhere(req)
+const reportPhotoRule: Rule = async ({ req }) => {
+  const f = focusOf(req)
+  if (!f) return reportPhotoWhere(req)
+  const ids = f.ownerDocType === 'progress_report' ? await visibleOwner(req, 'progress-reports', f.ownerDocId) : []
+  return ids.length ? { and: [{ ownerDocType: { equals: 'progress_report' } }, { ownerDocId: { in: ids } }] } : false
+}
 const progressPhotoRead: Access = byRoleAny({
   'pk-admin': anyOf(officeReports, reportPhotoRule),
   'pk-owner': anyOf(officeReports, reportPhotoRule),
@@ -152,7 +232,7 @@ export const MediaReceipts = mediaCollection({
   resizeOptions: { width: 1600, height: 1600, fit: 'inside', withoutEnlargement: true },
   formatOptions: { format: 'jpeg', options: { quality: 82, mozjpeg: true } },
   imageSizes: [thumb],
-  access: { read: ownerLinked, create: rolesAllowedAny('pk-staff', 'pk-pm', 'pk-finance', 'pk-admin') },
+  access: { read: focused('media-receipts', ownerLinked, true), create: rolesAllowedAny('pk-staff', 'pk-pm', 'pk-finance', 'pk-admin') },
 })
 
 export const MediaTransferProofs = mediaCollection({
@@ -164,7 +244,7 @@ export const MediaTransferProofs = mediaCollection({
   imageSizes: [thumbJpeg],
   maxBytesByMime: { 'application/pdf': 2 * 1024 * 1024 },
   disposition: 'attachment',
-  access: { read: ownerLinked, create: rolesAllowedAny('pk-finance') },
+  access: { read: focused('media-transfer-proofs', ownerLinked, true), create: rolesAllowedAny('pk-finance') },
 })
 
 export const MediaSelfies = mediaCollection({
@@ -176,7 +256,7 @@ export const MediaSelfies = mediaCollection({
   // failed ("Invalid file type: 'image/webp'", same cause as the F2a thumbnail finding). JPEG also
   // keeps selfies embeddable in PDF recaps (@react-pdf: JPEG/PNG only).
   formatOptions: { format: 'jpeg', options: { quality: 75, mozjpeg: true } },
-  access: { read: ownOrOffice, create: rolesAllowedAny('pk-staff', 'pk-pm', 'pk-admin') },
+  access: { read: focused('media-selfies', ownOrOffice, false), create: rolesAllowedAny('pk-staff', 'pk-pm', 'pk-admin') },
   // E6 S2 (Q-33): set by the selfieRetention job when the file was deleted from the volume. The row
   // stays as a tombstone (attendances.selfie_id is NOT NULL and append-only), without the image.
   extraFields: [{ name: 'removedAt', type: 'date', label: 'File dihapus (retensi)', index: true, access: { update: () => false }, admin: { readOnly: true } }],
@@ -191,7 +271,7 @@ export const MediaProgressPhotos = mediaCollection({
   formatOptions: { format: 'jpeg', options: { quality: 78, mozjpeg: true } },
   imageSizes: [thumbJpeg],
   // E4 (US-10): PM / Direktur upload; ≤ 5 per report (report service); EXIF/GPS stripped by re-encode.
-  access: { read: progressPhotoRead, create: rolesAllowedAny('pk-pm', 'pk-owner') },
+  access: { read: focused('media-progress-photos', progressPhotoRead, true), create: rolesAllowedAny('pk-pm', 'pk-owner') },
 })
 
 export const MediaSignatures = mediaCollection({
@@ -224,7 +304,7 @@ export const MediaAttachments = mediaCollection({
   imageSizes: [thumbJpeg],
   maxBytesByMime: { 'application/pdf': 5 * 1024 * 1024 },
   disposition: 'attachment',
-  access: { read: ownerLinked, create: rolesAllowedAny('pk-staff', 'pk-pm', 'pk-finance', 'pk-admin') },
+  access: { read: focused('media-attachments', ownerLinked, true), create: rolesAllowedAny('pk-staff', 'pk-pm', 'pk-finance', 'pk-admin') },
 })
 
 export const MEDIA_COLLECTIONS = [
