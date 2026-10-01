@@ -289,6 +289,18 @@ describe('QA-MC4-04: one media file is authorised against its own owner document
     expect(loads).toEqual([])
   })
 
+  it('media LIST of an office user in a subset of PTs: same per-PT answer, id lists not loaded through Payload documents', async () => {
+    let ids: number[] = []
+    const loads = await ptWideLoads(async () => {
+      const r = await call('GET', '/api/media-selfies?limit=500&depth=0', finA)
+      expect(r.status).toBe(200)
+      ids = (r.body.docs as Array<{ id: number }>).map((d) => d.id)
+    })
+    expect(ids).toContain(X.selfieA)
+    expect(ids).not.toContain(X.selfieB)
+    expect(loads).toEqual([]) // 1 year × 3 PTs: 31 200 attendance documents = 1.7–2.5 s, ~300 MiB heap per list request
+  })
+
   it('control: the media LIST keeps the per-PT rules (Finance of A lists no B receipt)', async () => {
     const r = await call('GET', '/api/media-receipts?limit=500&depth=0', finA)
     expect(r.status).toBe(200)
