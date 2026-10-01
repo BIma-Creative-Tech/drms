@@ -1,3 +1,4 @@
+import { sql, type PostgresAdapter } from '@payloadcms/db-postgres'
 import type { Access, CollectionSlug, PayloadRequest, Where } from 'payload'
 
 import { anyRole, companiesWithRole, type Role } from '@/access/roles'
@@ -127,18 +128,29 @@ async function idsOfCompanies(req: PayloadRequest, collection: CollectionSlug, c
   req.context ??= {}
   const hit = req.context[key] as string[] | undefined
   if (hit) return hit
-  const res = await req.payload.find({
-    collection,
-    where: { company: { in: companyIds } } as Where,
-    depth: 0,
-    pagination: false,
-    select: field === 'id' ? { updatedAt: true } : { [field]: true },
-    overrideAccess: true, // SYSTEM-READ: owner documents of the caller's office PTs (media access)
-    req,
-  })
-  const out = res.docs.map((d) => (field === 'id' ? d.id : (d as Record<string, unknown>)[field])).filter((v) => v !== null && v !== undefined).map(String)
+  // QA-MC4-04: plain ids by SQL (was payload.find of every owner DOCUMENT: 31 200 attendances for
+  // 2 PTs × 1 year = 1.7–2.5 s and ~300 MiB heap per list request). Company predicate = the PTs above.
+  const query = ID_LIST_SQL[`${collection}:${field}`]
+  if (!query || companyIds.length === 0) return []
+  const out = (await idRows(req, query(companyIds))).map((r) => r.v).filter((v): v is string => v !== null)
   req.context[key] = out
   return out
+}
+
+const ptList = (ids: number[]) => sql.join(ids.map((c) => sql`${c}`), sql`, `)
+const ID_LIST_SQL: Record<string, (ids: number[]) => ReturnType<typeof sql>> = {
+  'expense-requests:id': (ids) => sql`SELECT id::text AS v FROM expense_requests WHERE company_id IN (${ptList(ids)})`,
+  'progress-reports:id': (ids) => sql`SELECT id::text AS v FROM progress_reports WHERE company_id IN (${ptList(ids)})`,
+  'attendances:selfie': (ids) => sql`SELECT selfie_id::text AS v FROM attendances WHERE company_id IN (${ptList(ids)})`,
+  'company-memberships:user': (ids) => sql`SELECT DISTINCT user_id::text AS v FROM company_memberships WHERE company_id IN (${ptList(ids)})`,
+}
+
+/** Rows of a read on the request's transaction when there is one (sees its own writes), else the pool. */
+async function idRows(req: PayloadRequest, query: ReturnType<typeof sql>): Promise<Array<{ v: string | null }>> {
+  const adapter = req.payload.db as unknown as PostgresAdapter
+  const txId = req.transactionID ? await req.transactionID : undefined
+  const db = (txId !== undefined ? adapter.sessions[String(txId)]?.db : undefined) ?? adapter.drizzle
+  return ((await db.execute(query)) as unknown as { rows: Array<{ v: string | null }> }).rows
 }
 
 /** Office rule of one media collection (true when office in every active PT). */
