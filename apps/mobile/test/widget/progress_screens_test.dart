@@ -4,8 +4,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:proyekkas/app/providers.dart';
 import 'package:proyekkas/core/network/api_exception.dart';
+import 'package:proyekkas/features/addendum/domain/addendum.dart';
+import 'package:proyekkas/features/addendum/presentation/addendum_providers.dart';
 import 'package:proyekkas/features/app_config/application/app_config_providers.dart';
 import 'package:proyekkas/features/app_config/domain/app_config.dart';
+import 'package:proyekkas/features/approvals/application/inbox_providers.dart';
 import 'package:proyekkas/features/auth/application/auth_controller.dart';
 import 'package:proyekkas/features/auth/domain/user_profile.dart';
 import 'package:proyekkas/features/dashboard/presentation/kpi_home.dart';
@@ -392,6 +395,10 @@ void main() {
         appConfigProvider.overrideWith((ref) async => const AppConfig(syncAttendance: false)),
         integrityReportProvider.overrideWith((ref) async => null),
         pmDashboardProvider.overrideWith((ref) async => throw const NetworkException()),
+        financeDashboardProvider.overrideWith((ref) async => throw const NetworkException()),
+        direkturDashboardProvider.overrideWith((ref) async => throw const NetworkException()),
+        inboxProvider.overrideWith((ref) async => throw const NetworkException()),
+        addendumInboxProvider.overrideWith((ref) async => const <Addendum>[]),
       ],
     );
 
@@ -408,6 +415,17 @@ void main() {
       expect(find.text('1 laporan belum terkirim'), findsOneWidget);
       expect(find.byKey(const Key('home-project-progress')), findsOneWidget);
       expect(find.byKey(const Key('project-progress-7')), findsOneWidget);
+    });
+
+    testWidgets('Finance: US-12 "Progress fisik vs anggaran" card like the web Finance Beranda', (tester) async {
+      await pumpHome(tester, {Role.finance});
+      expect(find.byKey(const Key('home-project-progress')), findsOneWidget);
+      expect(find.byKey(const Key('project-progress-7')), findsOneWidget);
+    });
+
+    testWidgets('Direktur keeps the card', (tester) async {
+      await pumpHome(tester, {Role.owner});
+      expect(find.byKey(const Key('home-project-progress')), findsOneWidget);
     });
   });
 }
