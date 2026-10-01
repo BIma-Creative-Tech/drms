@@ -1,7 +1,7 @@
-import { APIError, type CollectionBeforeOperationHook, type CollectionConfig } from 'payload'
+import { APIError, type CollectionBeforeOperationHook, type CollectionConfig, type Where } from 'payload'
 
-import { PANEL_ROLES, denyAll, hasRoleAny, isGroupAdmin, relId, userId, userRoles } from '@/access/roles'
-import { anyOf, byRoleAny, fieldRoles, ownUser, rolesAllowedAny, usersOfMyCompanies } from '@/access/policies'
+import { PANEL_ROLES, companiesWithRole, denyAll, hasRoleAny, isGroupAdmin, relId, userId, userRoles } from '@/access/roles'
+import { anyOf, byRoleAny, fieldRoles, ownUser, rolesAllowedAny, usersOfMyCompanies, type Rule } from '@/access/policies'
 import { revokeCurrentWebSession } from '@/auth/sessions'
 import { mobileBearerStrategy, oidcSessionStrategy } from '@/auth/strategies'
 import { reasonOnDeactivate, withAudit } from '@/audit/hooks'
@@ -51,6 +51,41 @@ export const selfProfileGuard: CollectionBeforeOperationHook = async ({ args, op
 }
 
 /**
+ * Accounts a PT Admin may CHANGE (identity is cross-PT: email/name/active reach Keycloak and every PT
+ * of the person). MC4 QA finding QA-MC4-02: `usersOfMyCompanies` let an Admin of PT A update anyone
+ * with a membership in A — including people also active in PT B and group admins (an Admin may add
+ * any account to A first) → cross-PT lock-out / takeover. Now: accounts whose ACTIVE memberships are
+ * ALL in PTs where the caller is Admin (any PT of the caller, not only the read selection), plus
+ * accounts without a membership (onboarding) — never a group admin. Group admins manage everyone.
+ */
+const usersOnlyInMyAdminCompanies: Rule = async ({ req }) => {
+  if (isGroupAdmin(req)) return true
+  const mine = companiesWithRole(req, ['pk-admin'], { all: true })
+  if (mine.length === 0) return false
+  const rows = await req.payload.find({
+    collection: 'company-memberships',
+    where: { active: { equals: true } },
+    depth: 0,
+    pagination: false,
+    select: { user: true, company: true },
+    overrideAccess: true, // SYSTEM-READ: access rule (which accounts belong ONLY to the caller's Admin PTs)
+    req,
+  })
+  const any = new Set<number>()
+  const foreign = new Set<number>()
+  for (const m of rows.docs as unknown as Array<{ user: unknown; company: unknown }>) {
+    const u = relId(m.user)
+    if (u === undefined) continue
+    any.add(u)
+    if (!mine.includes(relId(m.company) ?? -1)) foreign.add(u)
+  }
+  const managed = [...any].filter((u) => !foreign.has(u))
+  const or: Where[] = [any.size > 0 ? { id: { not_in: [...any] } } : { id: { exists: true } }]
+  if (managed.length > 0) or.push({ id: { in: managed } })
+  return { and: [{ or: [{ groupAdmin: { equals: false } }, { groupAdmin: { exists: false } }] }, { or }] }
+}
+
+/**
  * Users (ADR 0003 as revised by ADR 0016 §2): identity + credentials live in Keycloak realm `drms`;
  * this collection holds the link (`keycloakSub`), the active flag and the DB-only `groupAdmin`
  * flag. Per-PT roles + the employee of each PT live in `company-memberships`.
@@ -79,7 +114,7 @@ export const Users: CollectionConfig = withAudit(
       create: rolesAllowedAny('pk-admin'),
       // F2c: everyone may update their OWN row — field access limits that to `signature`.
       update: byRoleAny({
-        'pk-admin': anyOf(ownUser('id'), usersOfMyCompanies('id', ['pk-admin'])),
+        'pk-admin': anyOf(ownUser('id'), usersOnlyInMyAdminCompanies),
         'pk-owner': ownUser('id'),
         'pk-finance': ownUser('id'),
         'pk-pm': ownUser('id'),
