@@ -136,7 +136,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/progress',
-        builder: (_, s) => ProgressScreen(initialTab: s.uri.queryParameters['tab'] == 'projects' ? 1 : 0),
+        builder: (_, s) => ProgressScreen(
+          initialTab: s.uri.queryParameters['tab'] == 'projects' ? 1 : 0,
+          initialProject: int.tryParse(s.uri.queryParameters['project'] ?? ''),
+        ),
         routes: [
           GoRoute(
             path: 'new',

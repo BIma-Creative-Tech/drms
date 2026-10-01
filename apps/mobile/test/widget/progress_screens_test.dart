@@ -143,6 +143,40 @@ void main() {
       expect(find.byKey(const Key('progress-new')), findsOneWidget);
     });
 
+    Future<List<int?>> pumpFiltered(WidgetTester tester, int project) async {
+      final asked = <int?>[];
+      await pumpScreen(
+        tester,
+        ProgressScreen(initialProject: project),
+        auth: _as({Role.pm}),
+        stubProgress: false,
+        overrides: [
+          openProgressDraftsProvider.overrideWith((ref) => Stream.value(const <ProgressDraft>[])),
+          progressReportsProvider.overrideWith((ref, p) async {
+            asked.add(p);
+            return const ProgressReportPage(items: []);
+          }),
+          progressProjectsProvider.overrideWith(
+            (ref) async => const [..._projects, MasterItem(8, 'P-08 — Kantor Contoh', code: 'P-08')],
+          ),
+          projectProgressProvider.overrideWith((ref) async => ProjectProgressList.fromJson(projectProgressJson())),
+        ],
+      );
+      return asked;
+    }
+
+    testWidgets('opened from a late-progress notification: reports filtered to that project', (tester) async {
+      final asked = await pumpFiltered(tester, 8);
+      expect(asked, [8]);
+      expect(find.text('P-08 — Kantor Contoh'), findsOneWidget, reason: 'the filter shows the project');
+    });
+
+    testWidgets('notification project outside the picker list: filter kept as #id (no dropdown crash)', (tester) async {
+      final asked = await pumpFiltered(tester, 99);
+      expect(asked, [99]);
+      expect(find.text('#99'), findsOneWidget);
+    });
+
     testWidgets('Finance reads only (no "Laporan baru"); project tab: physical vs budget with tone label', (
       tester,
     ) async {
