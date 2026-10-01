@@ -1027,6 +1027,12 @@
   "addendumSaveDraft": "Simpan sebagai draft",
   "addendumSubmitted": "Addendum diajukan. Menunggu Direktur.",
   "addendumSavedDraft": "Draft addendum tersimpan.",
+  "addendumEdit": "Ubah draft",
+  "addendumEditTitle": "Ubah draft addendum",
+  "addendumSaveChanges": "Simpan perubahan",
+  "addendumSaveAndSubmit": "Simpan & ajukan",
+  "addendumEdited": "Perubahan draft addendum tersimpan.",
+  "addendumNotEditable": "Addendum ini sudah tidak bisa diubah (bukan Draft lagi atau bukan milik Anda).",
   "addendumRabBeforeAfter": "RAB {before} → {after}",
   "@addendumRabBeforeAfter": {
     "placeholders": {

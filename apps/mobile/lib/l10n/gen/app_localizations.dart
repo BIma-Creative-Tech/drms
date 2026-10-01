@@ -3145,6 +3145,42 @@ abstract class AppLocalizations {
   /// **'Draft addendum tersimpan.'**
   String get addendumSavedDraft;
 
+  /// No description provided for @addendumEdit.
+  ///
+  /// In id, this message translates to:
+  /// **'Ubah draft'**
+  String get addendumEdit;
+
+  /// No description provided for @addendumEditTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Ubah draft addendum'**
+  String get addendumEditTitle;
+
+  /// No description provided for @addendumSaveChanges.
+  ///
+  /// In id, this message translates to:
+  /// **'Simpan perubahan'**
+  String get addendumSaveChanges;
+
+  /// No description provided for @addendumSaveAndSubmit.
+  ///
+  /// In id, this message translates to:
+  /// **'Simpan & ajukan'**
+  String get addendumSaveAndSubmit;
+
+  /// No description provided for @addendumEdited.
+  ///
+  /// In id, this message translates to:
+  /// **'Perubahan draft addendum tersimpan.'**
+  String get addendumEdited;
+
+  /// No description provided for @addendumNotEditable.
+  ///
+  /// In id, this message translates to:
+  /// **'Addendum ini sudah tidak bisa diubah (bukan Draft lagi atau bukan milik Anda).'**
+  String get addendumNotEditable;
+
   /// No description provided for @addendumRabBeforeAfter.
   ///
   /// In id, this message translates to:

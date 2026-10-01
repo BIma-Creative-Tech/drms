@@ -131,6 +131,12 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: ':id',
             builder: (_, s) => AddendumDetailScreen(id: int.tryParse(s.pathParameters['id'] ?? '') ?? 0),
+            routes: [
+              GoRoute(
+                path: 'edit',
+                builder: (_, s) => AddendumEditRoute(id: int.tryParse(s.pathParameters['id'] ?? '') ?? 0),
+              ),
+            ],
           ),
         ],
       ),

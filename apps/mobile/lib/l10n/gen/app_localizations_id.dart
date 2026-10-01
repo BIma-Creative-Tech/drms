@@ -1712,6 +1712,24 @@ class AppLocalizationsId extends AppLocalizations {
   }
 
   @override
+  String get addendumEdit => 'Ubah draft';
+
+  @override
+  String get addendumEditTitle => 'Ubah draft addendum';
+
+  @override
+  String get addendumSaveChanges => 'Simpan perubahan';
+
+  @override
+  String get addendumSaveAndSubmit => 'Simpan & ajukan';
+
+  @override
+  String get addendumEdited => 'Perubahan draft addendum tersimpan.';
+
+  @override
+  String get addendumNotEditable => 'Addendum ini sudah tidak bisa diubah (bukan Draft lagi atau bukan milik Anda).';
+
+  @override
   String addendumBy(String name) {
     return 'Diajukan oleh $name';
   }
