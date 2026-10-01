@@ -1018,6 +1018,29 @@ class AppLocalizationsId extends AppLocalizations {
   String get kpiTeamTrend => 'Tren jumlah pengajuan tim';
 
   @override
+  String get kpiPerCompanyTitle => 'Per PT';
+
+  @override
+  String kpiSplitCash(String amount) {
+    return 'Kas $amount';
+  }
+
+  @override
+  String kpiSplitWaiting(int count, String amount) {
+    return '$count menunggu · $amount';
+  }
+
+  @override
+  String kpiSplitTransfer(int count, String amount) {
+    return '$count antri transfer · $amount';
+  }
+
+  @override
+  String kpiSplitTeam(int count, String amount) {
+    return '$count pengajuan · $amount';
+  }
+
+  @override
   String get kpiTeamLpj => 'Uang muka tim belum LPJ';
 
   @override
@@ -1251,6 +1274,10 @@ class AppLocalizationsId extends AppLocalizations {
 
   @override
   String get onBehalfAction => 'Absenkan anggota tim';
+
+  @override
+  String get onBehalfDisabled =>
+      'Absen atas nama belum bisa: absensi dari aplikasi belum diaktifkan Admin (Setting perusahaan).';
 
   @override
   String get onBehalfTitle => 'Diabsenkan PM';
@@ -1681,6 +1708,24 @@ class AppLocalizationsId extends AppLocalizations {
 
   @override
   String get addendumSavedDraft => 'Draft addendum tersimpan.';
+
+  @override
+  String get addendumEdit => 'Ubah draft';
+
+  @override
+  String get addendumEditTitle => 'Ubah draft addendum';
+
+  @override
+  String get addendumSaveChanges => 'Simpan perubahan';
+
+  @override
+  String get addendumSaveAndSubmit => 'Simpan & ajukan';
+
+  @override
+  String get addendumEdited => 'Perubahan draft addendum tersimpan.';
+
+  @override
+  String get addendumNotEditable => 'Addendum ini sudah tidak bisa diubah (bukan Draft lagi atau bukan milik Anda).';
 
   @override
   String addendumRabBeforeAfter(String before, String after) {

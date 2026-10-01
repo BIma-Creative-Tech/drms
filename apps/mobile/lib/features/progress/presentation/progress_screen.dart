@@ -16,15 +16,18 @@ import 'widgets/progress_widgets.dart';
 /// E4 hub (US-10/12/31): "Laporan" = reports waiting on this phone + the server list (newest first,
 /// filter per project); "Project" = progress fisik vs anggaran per project (PM team, Direktur/Finance all).
 class ProgressScreen extends ConsumerStatefulWidget {
-  const ProgressScreen({super.key, this.initialTab = 0});
+  const ProgressScreen({super.key, this.initialTab = 0, this.initialProject});
   final int initialTab;
+
+  /// Reports tab filtered to this project (notification "laporan progress terlambat").
+  final int? initialProject;
 
   @override
   ConsumerState<ProgressScreen> createState() => _ProgressScreenState();
 }
 
 class _ProgressScreenState extends ConsumerState<ProgressScreen> {
-  int? _projectFilter;
+  late int? _projectFilter = widget.initialProject;
 
   @override
   Widget build(BuildContext context) {
@@ -103,6 +106,9 @@ class _ReportsTab extends ConsumerWidget {
               items: [
                 DropdownMenuItem<int?>(value: null, child: Text(t.progressFilterAll)),
                 for (final p in projects) DropdownMenuItem<int?>(value: p.id, child: Text(p.label)),
+                // Opened from a notification for a project outside the picker list: keep the filter visible.
+                if (projectFilter != null && !projects.any((p) => p.id == projectFilter))
+                  DropdownMenuItem<int?>(value: projectFilter, child: Text('#$projectFilter')),
               ],
               onChanged: onFilter,
             ),

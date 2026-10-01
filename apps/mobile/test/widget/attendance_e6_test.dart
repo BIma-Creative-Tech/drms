@@ -217,11 +217,32 @@ void main() {
       expect(find.text('Koreksi absensi tersimpan.'), findsOneWidget);
     });
 
-    testWidgets('flag off: no on-behalf actions, corrections stay available (online endpoint)', (tester) async {
+    testWidgets('flag off: "Absenkan" disabled with the reason, corrections stay available (online endpoint)', (
+      tester,
+    ) async {
       await pumpTeam(tester, attendanceOn: false);
       expect(find.byKey(const Key('team-absenkan-44')), findsNothing);
-      expect(find.byKey(const Key('team-on-behalf')), findsNothing);
+      final button = find.byKey(const Key('team-on-behalf'));
+      expect(button, findsOneWidget);
+      expect(tester.widget<ButtonStyleButton>(button).onPressed, isNull);
+      expect(find.byKey(const Key('team-on-behalf-disabled')), findsOneWidget);
+      expect(
+        find.text('Absen atas nama belum bisa: absensi dari aplikasi belum diaktifkan Admin (Setting perusahaan).'),
+        findsOneWidget,
+      );
       expect(find.byKey(const Key('team-correct-9101')), findsOneWidget);
+    });
+
+    testWidgets('flag on: "Absenkan" enabled, no disabled notice', (tester) async {
+      await pumpTeam(tester);
+      expect(tester.widget<ButtonStyleButton>(find.byKey(const Key('team-on-behalf'))).onPressed, isNotNull);
+      expect(find.byKey(const Key('team-on-behalf-disabled')), findsNothing);
+    });
+
+    testWidgets('Finance (no on-behalf right): neither the button nor the notice, flag on or off', (tester) async {
+      await pumpTeam(tester, roles: {Role.finance}, attendanceOn: false);
+      expect(find.byKey(const Key('team-on-behalf')), findsNothing);
+      expect(find.byKey(const Key('team-on-behalf-disabled')), findsNothing);
     });
 
     testWidgets('Finance sees the team but has no PM actions', (tester) async {

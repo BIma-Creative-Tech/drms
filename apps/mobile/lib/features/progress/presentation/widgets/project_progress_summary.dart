@@ -7,7 +7,7 @@ import '../../application/progress_providers.dart';
 import '../../domain/progress.dart';
 import 'progress_widgets.dart';
 
-/// Home card for PM / Direktur (US-12, K-09): the projects that need attention first (largest gap between
+/// Home card for PM / Direktur / Finance (US-12, K-09): the projects that need attention first (largest gap between
 /// budget used and physical progress), up to 3; "Lihat semua" opens the project tab. Hidden offline /
 /// on error (the home stays usable).
 class ProjectProgressSummary extends ConsumerWidget {

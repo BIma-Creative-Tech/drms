@@ -116,7 +116,7 @@ class KpiGrid extends StatelessWidget {
 }
 
 class _SectionCard extends StatelessWidget {
-  const _SectionCard({required this.title, required this.child, this.subtitle});
+  const _SectionCard({super.key, required this.title, required this.child, this.subtitle});
   final String title;
   final String? subtitle;
   final Widget child;
@@ -139,6 +139,54 @@ class _SectionCard extends StatelessWidget {
             child,
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// MC4: compact per-PT breakdown under the KPI totals when the dashboard covers several PTs
+/// (one line per PT: short code, main figure, secondary figure). Nothing for a single PT.
+class CompanySplitCard extends StatelessWidget {
+  const CompanySplitCard({super.key, required this.rows, required this.primary, required this.secondary});
+  final List<CompanySplit> rows;
+  final String Function(CompanySplit) primary;
+  final String Function(CompanySplit) secondary;
+
+  @override
+  Widget build(BuildContext context) {
+    if (rows.isEmpty) return const SizedBox.shrink();
+    final theme = Theme.of(context);
+    return _SectionCard(
+      key: const Key('kpi-by-company'),
+      title: AppLocalizations.of(context).kpiPerCompanyTitle,
+      child: Column(
+        children: [
+          for (final r in rows)
+            Padding(
+              key: Key('kpi-company-${r.companyId}'),
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SizedBox(
+                    width: 64,
+                    child: Text(
+                      r.code,
+                      style: theme.textTheme.labelLarge?.copyWith(
+                        color: theme.colorScheme.primary,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  Expanded(child: Text(primary(r), style: theme.textTheme.bodyMedium)),
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: Text(secondary(r), textAlign: TextAlign.end, style: theme.textTheme.bodySmall),
+                  ),
+                ],
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -232,6 +280,11 @@ class DirekturKpis extends ConsumerWidget {
               ),
             ],
           ),
+          CompanySplitCard(
+            rows: d.byCompany,
+            primary: (r) => t.kpiSplitCash(formatRupiahShort(r.cash ?? 0)),
+            secondary: (r) => t.kpiSplitWaiting(r.count, formatRupiahShort(r.sum)),
+          ),
           if (d.cashFlow.isNotEmpty)
             _SectionCard(
               title: t.kpiCashFlowTitle,
@@ -300,6 +353,11 @@ class FinanceKpis extends ConsumerWidget {
               ),
             ],
           ),
+          CompanySplitCard(
+            rows: d.byCompany,
+            primary: (r) => t.kpiSplitCash(formatRupiahShort(r.cash ?? 0)),
+            secondary: (r) => t.kpiSplitTransfer(r.count, formatRupiahShort(r.sum)),
+          ),
           if (cur != null)
             _SectionCard(
               title: t.kpiCashFlowTitle,
@@ -330,7 +388,7 @@ class PmTeamKpis extends ConsumerWidget {
         );
       }
       final bt = d.budgetTotals;
-      return KpiGrid(
+      final grid = KpiGrid(
         key: const Key('kpi-pm'),
         children: [
           KpiCard(
@@ -361,6 +419,18 @@ class PmTeamKpis extends ConsumerWidget {
             value: pctText(share(bt.realized, bt.budget)),
             lines: [_small(context, t.kpiOfBudget(formatRupiahShort(bt.realized), formatRupiahShort(bt.budget)))],
             footer: Meter(value: bt.realized, max: bt.budget),
+          ),
+        ],
+      );
+      if (d.byCompany.isEmpty) return grid;
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          grid,
+          CompanySplitCard(
+            rows: d.byCompany,
+            primary: (r) => t.kpiSplitTeam(r.count, formatRupiahShort(r.sum)),
+            secondary: (r) => t.kpiTeamWaiting(r.waiting ?? 0),
           ),
         ],
       );

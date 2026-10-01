@@ -41,7 +41,24 @@ class FakeAddendumApi extends Fake implements AddendumApi {
     calls.add('create:$projectId:$addition:$submit');
     return Addendum.fromJson(addendumJson());
   }
+
+  @override
+  Future<Addendum> update(int id, {int? addition, String? reason, required String idempotencyKey}) async {
+    calls.add('update:$id:$addition:$reason');
+    keys.add(idempotencyKey);
+    return Addendum.fromJson(_draft);
+  }
+
+  @override
+  Future<Addendum> submit(int id, {required String idempotencyKey}) async {
+    calls.add('submit:$id');
+    return Addendum.fromJson(addendumJson());
+  }
+
+  final keys = <String>[];
 }
+
+final _draft = addendumJson(status: 'draft', step: null, actions: ['edit', 'submit', 'cancel']);
 
 AuthSignedIn _as(Set<Role> roles) => AuthSignedIn(profile: profile(roles), sub: 'user-sub-1');
 
@@ -151,5 +168,108 @@ void main() {
     await tester.tap(find.text('Ajukan'));
     await tester.pump();
     expect(api.calls, ['create:7:250000000:true']);
+  });
+
+  group('edit a Draft (PATCH, allowedActions edit)', () {
+    testWidgets('detail: "Ubah draft" only when the server allows edit', (tester) async {
+      await pumpScreen(
+        tester,
+        const AddendumDetailScreen(id: 61),
+        auth: _as({Role.pm}),
+        overrides: [addendumDetailProvider.overrideWith((ref, id) async => Addendum.fromJson(_draft))],
+      );
+      expect(find.byKey(const Key('addendum-action-edit')), findsOneWidget);
+      expect(find.text('Ubah draft'), findsOneWidget);
+      expect(find.byKey(const Key('addendum-action-submit')), findsOneWidget);
+    });
+
+    testWidgets('detail: no edit button without the edit action', (tester) async {
+      await pumpScreen(
+        tester,
+        const AddendumDetailScreen(id: 61),
+        auth: _as({Role.pm}),
+        overrides: [
+          addendumDetailProvider.overrideWith(
+            (ref, id) async => Addendum.fromJson(addendumJson(status: 'draft', step: null, actions: ['cancel'])),
+          ),
+        ],
+      );
+      expect(find.byKey(const Key('addendum-action-edit')), findsNothing);
+    });
+
+    testWidgets('form prefilled, project fixed; "Simpan perubahan" PATCHes nominal + alasan', (tester) async {
+      final api = FakeAddendumApi();
+      await pumpScreen(
+        tester,
+        const AddendumEditRoute(id: 61),
+        auth: _as({Role.pm}),
+        overrides: [
+          addendumApiProvider.overrideWithValue(api),
+          addendumDetailProvider.overrideWith((ref, id) async => Addendum.fromJson(_draft)),
+        ],
+      );
+      expect(find.text('Ubah draft addendum'), findsOneWidget);
+      expect(find.byKey(const Key('addendum-project-fixed')), findsOneWidget);
+      expect(find.byKey(const Key('addendum-project')), findsNothing);
+      expect(find.text('P-07 — Gudang Contoh'), findsOneWidget);
+      expect(find.text('250.000.000'), findsOneWidget);
+      expect(find.text('Simpan & ajukan'), findsOneWidget);
+      await tester.enterText(find.byKey(const Key('addendum-amount')), '0');
+      await tester.tap(find.text('Simpan perubahan'));
+      await tester.pumpAndSettle();
+      expect(find.text('Tambahan RAB harus lebih dari Rp 0.'), findsOneWidget);
+      expect(api.calls, isEmpty);
+      await tester.enterText(find.byKey(const Key('addendum-amount')), '300.000.000');
+      await tester.enterText(find.byKey(const Key('addendum-reason')), 'Tanah lunak, tambah tiang');
+      await tester.tap(find.text('Simpan perubahan'));
+      await tester.pumpAndSettle();
+      expect(api.calls, ['update:61:300000000:Tanah lunak, tambah tiang']);
+      // Retry with the same body → same Idempotency-Key; another body → a new key (server: 422 on reuse).
+      await tester.tap(find.text('Simpan perubahan'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byKey(const Key('addendum-reason')), 'Tanah lunak, tambah 4 tiang');
+      await tester.tap(find.text('Simpan perubahan'));
+      await tester.pumpAndSettle();
+      expect(api.keys, hasLength(3));
+      expect(api.keys[1], api.keys[0]);
+      expect(api.keys[2], isNot(api.keys[0]));
+    });
+
+    testWidgets('"Simpan & ajukan" = PATCH then submit', (tester) async {
+      final api = FakeAddendumApi();
+      await pumpScreen(
+        tester,
+        AddendumCreateScreen(initial: Addendum.fromJson(_draft)),
+        auth: _as({Role.pm}),
+        overrides: [addendumApiProvider.overrideWithValue(api)],
+      );
+      await tester.tap(find.text('Simpan & ajukan'));
+      await tester.pumpAndSettle();
+      expect(api.calls, ['update:61:250000000:Tambahan pondasi karena tanah lunak', 'submit:61']);
+    });
+
+    testWidgets('no submit action → only "Simpan perubahan"', (tester) async {
+      await pumpScreen(
+        tester,
+        AddendumCreateScreen(
+          initial: Addendum.fromJson(addendumJson(status: 'draft', step: null, actions: ['edit'])),
+        ),
+        auth: _as({Role.pm}),
+        overrides: [addendumApiProvider.overrideWithValue(FakeAddendumApi())],
+      );
+      expect(find.text('Simpan & ajukan'), findsNothing);
+      expect(find.text('Simpan perubahan'), findsOneWidget);
+    });
+
+    testWidgets('edit route of an addendum that is no longer a Draft → notice, no form', (tester) async {
+      await pumpScreen(
+        tester,
+        const AddendumEditRoute(id: 61),
+        auth: _as({Role.pm}),
+        overrides: [addendumDetailProvider.overrideWith((ref, id) async => Addendum.fromJson(addendumJson()))],
+      );
+      expect(find.byKey(const Key('addendum-not-editable')), findsOneWidget);
+      expect(find.byKey(const Key('addendum-amount')), findsNothing);
+    });
   });
 }

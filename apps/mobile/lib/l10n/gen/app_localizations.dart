@@ -1969,6 +1969,36 @@ abstract class AppLocalizations {
   /// **'Tren jumlah pengajuan tim'**
   String get kpiTeamTrend;
 
+  /// No description provided for @kpiPerCompanyTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Per PT'**
+  String get kpiPerCompanyTitle;
+
+  /// No description provided for @kpiSplitCash.
+  ///
+  /// In id, this message translates to:
+  /// **'Kas {amount}'**
+  String kpiSplitCash(String amount);
+
+  /// No description provided for @kpiSplitWaiting.
+  ///
+  /// In id, this message translates to:
+  /// **'{count} menunggu · {amount}'**
+  String kpiSplitWaiting(int count, String amount);
+
+  /// No description provided for @kpiSplitTransfer.
+  ///
+  /// In id, this message translates to:
+  /// **'{count} antri transfer · {amount}'**
+  String kpiSplitTransfer(int count, String amount);
+
+  /// No description provided for @kpiSplitTeam.
+  ///
+  /// In id, this message translates to:
+  /// **'{count} pengajuan · {amount}'**
+  String kpiSplitTeam(int count, String amount);
+
   /// No description provided for @kpiTeamLpj.
   ///
   /// In id, this message translates to:
@@ -2382,6 +2412,12 @@ abstract class AppLocalizations {
   /// In id, this message translates to:
   /// **'Absenkan anggota tim'**
   String get onBehalfAction;
+
+  /// No description provided for @onBehalfDisabled.
+  ///
+  /// In id, this message translates to:
+  /// **'Absen atas nama belum bisa: absensi dari aplikasi belum diaktifkan Admin (Setting perusahaan).'**
+  String get onBehalfDisabled;
 
   /// No description provided for @onBehalfTitle.
   ///
@@ -3138,6 +3174,42 @@ abstract class AppLocalizations {
   /// In id, this message translates to:
   /// **'Draft addendum tersimpan.'**
   String get addendumSavedDraft;
+
+  /// No description provided for @addendumEdit.
+  ///
+  /// In id, this message translates to:
+  /// **'Ubah draft'**
+  String get addendumEdit;
+
+  /// No description provided for @addendumEditTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Ubah draft addendum'**
+  String get addendumEditTitle;
+
+  /// No description provided for @addendumSaveChanges.
+  ///
+  /// In id, this message translates to:
+  /// **'Simpan perubahan'**
+  String get addendumSaveChanges;
+
+  /// No description provided for @addendumSaveAndSubmit.
+  ///
+  /// In id, this message translates to:
+  /// **'Simpan & ajukan'**
+  String get addendumSaveAndSubmit;
+
+  /// No description provided for @addendumEdited.
+  ///
+  /// In id, this message translates to:
+  /// **'Perubahan draft addendum tersimpan.'**
+  String get addendumEdited;
+
+  /// No description provided for @addendumNotEditable.
+  ///
+  /// In id, this message translates to:
+  /// **'Addendum ini sudah tidak bisa diubah (bukan Draft lagi atau bukan milik Anda).'**
+  String get addendumNotEditable;
 
   /// No description provided for @addendumRabBeforeAfter.
   ///
