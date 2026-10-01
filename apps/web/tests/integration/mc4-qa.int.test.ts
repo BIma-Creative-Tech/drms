@@ -22,6 +22,11 @@ import { addMembership, companyId, getTestPayload, installFakeKeycloak, makeUser
  *   also members of another PT, including a group admin (after adding them to A with a membership, or
  *   when the group admin has no membership at all) → cross-PT account takeover / lock-out.
  *
+ * QA-MC4-03 — audit rows of per-PT documents written without a PT tag (request lines, signatures, PDF
+ *   export, …) and every untagged row were shown to the Admin / Direktur of ANY PT (REST
+ *   /api/audit-logs, report `audit-log`, admin dashboard) → PT B amounts, descriptions and doc numbers
+ *   readable by the Admin / Direktur of PT A.
+ *
  * PTs: A = #1 DRMS, B = fictional "PT Contoh QA" (CQA), deactivated in afterAll.
  */
 let A = 0
@@ -35,11 +40,14 @@ let groupAdminB: TestUser
 let groupAdminNoPt: TestUser
 let sharedAB: TestUser
 let onlyA: TestUser
+let staffB: FlowUser
+let ownerB: FlowUser
 
-const call = async (method: string, path: string, user: FlowUser, body?: unknown): Promise<Res> => {
+const call = async (method: string, path: string, user: FlowUser, body?: unknown, headers: Record<string, string> = {}): Promise<Res> => {
   resetRateLimits()
-  return api(method, path, user, body)
+  return api(method, path, user, body, headers)
 }
+const key = () => ({ 'Idempotency-Key': randomUUID() })
 const count = async (q: string, params: unknown[]) => Number((await sqlAs('app', q, params)).rows[0]?.n ?? 0)
 
 beforeAll(async () => {
@@ -81,6 +89,21 @@ beforeAll(async () => {
     context: { skipKeycloakSync: true },
   })
   groupAdminNoPt = { ...(ga as unknown as TestUser), roles: [], collection: 'users' }
+
+  // QA-MC4-03: a submitted request of PT B (+ its PDF) by a B-only staff member
+  X.empStaffB = await sysCreate('employees', { company: B, code: 'QA-B3', name: 'Staff Contoh QA' })
+  await sysCreate('team-assignments', { employee: X.empStaffB, project: X.projectB, roleInProject: 'staff' })
+  X.accStaffB = await sysCreate('employee-bank-accounts', { employee: X.empStaffB, bank: X.bank, accountNo: `93${Date.now() % 1e8}`, accountHolder: 'Staff Contoh QA', isDefault: true })
+  staffB = await makeFlowUser(['pk-staff'], 'qa-staff-b', X.empStaffB, { company: B })
+  ownerB = await makeFlowUser(['pk-owner'], 'qa-owner-b', null, { company: B, signature: false })
+  await makeFlowUser(['pk-finance'], 'qa-fin-b', null, { company: B, signature: false })
+  const body = { type: 'advance', title: 'QA rahasia PT B', projectId: X.projectB, requesterIds: [X.empStaffB], bankAccountId: X.accStaffB, neededDate: '2026-10-30', lines: [{ description: 'Material rahasia PT B', total: 4_321_000, categoryId: X.catB }] }
+  const d = await call('POST', '/api/v1/expense-requests', staffB, body, key())
+  expect(d.status, JSON.stringify(d.body).slice(0, 300)).toBe(201)
+  X.reqB = d.body.id as number
+  const sub = await call('POST', `/api/v1/expense-requests/${X.reqB}/submit`, staffB, {}, key())
+  expect(sub.status, JSON.stringify(sub.body).slice(0, 300)).toBe(200)
+  expect((await call('GET', `/api/v1/expense-requests/${X.reqB}/pdf`, staffB)).status).toBe(200)
 })
 
 afterAll(async () => {
@@ -148,5 +171,34 @@ describe('QA-MC4-02: a PT Admin cannot change accounts that also belong to anoth
     const r = await call('PATCH', `/api/users/${onlyA.id}`, adminA, { name: 'Nama baru QA' })
     expect(r.status, JSON.stringify(r.body).slice(0, 300)).toBe(200)
     expect(await name(onlyA.id)).toBe('Nama baru QA')
+  })
+})
+
+describe('QA-MC4-03: audit rows of PT B are not shown to the Admin / Direktur of PT A', () => {
+  const docNoB = async () => String((await sqlAs('app', 'SELECT doc_no FROM expense_requests WHERE id = $1', [X.reqB])).rows[0]?.doc_no)
+
+  it('every audit row of the PT B request (lines, signatures, PDF export) carries PT B', async () => {
+    const rows = (await sqlAs('app', "SELECT action::text AS action, field, company_id FROM audit_logs WHERE doc_type = 'expense_request' AND doc_id = $1", [String(X.reqB)])).rows
+    expect(rows.length).toBeGreaterThan(5)
+    expect(rows.filter((r) => r.company_id !== B).map((r) => `${r.action}/${r.field}`)).toEqual([])
+  })
+
+  it('REST /api/audit-logs and the audit-log report of the Admin / Direktur of A contain nothing of PT B', async () => {
+    for (const u of [adminA, ownerA]) {
+      const rest = await call('GET', `/api/audit-logs?limit=0&depth=0&where[docId][equals]=${X.reqB}&where[docType][equals]=expense_request`, u)
+      expect(rest.status).toBe(200)
+      expect(rest.body.totalDocs, u.email).toBe(0)
+      const byStaffB = await call('GET', `/api/audit-logs?limit=0&depth=0&where[userId][equals]=${staffB.id}`, u)
+      expect(byStaffB.body.totalDocs, `${u.email}: untagged rows of a PT B user`).toBe(0)
+      const rep = await call('GET', '/api/v1/reports/audit-log?dari=2026-01-01&sampai=2026-12-31', u)
+      expect(rep.status).toBe(200)
+      expect(JSON.stringify(rep.body)).not.toContain(await docNoB())
+    }
+  })
+
+  it('control: the Direktur of B still sees the rows of the B request', async () => {
+    const rest = await call('GET', `/api/audit-logs?limit=0&depth=0&where[docId][equals]=${X.reqB}&where[docType][equals]=expense_request`, ownerB)
+    expect(rest.status).toBe(200)
+    expect(rest.body.totalDocs).toBeGreaterThan(5)
   })
 })
