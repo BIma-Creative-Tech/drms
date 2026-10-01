@@ -83,6 +83,42 @@ export type AuditRow = {
 type UserLike = { id?: unknown; roles?: unknown } | null | undefined
 
 /**
+ * MC4 QA (QA-MC4-03): `docType` → per-PT table whose row id is the `docId`. A row about such a
+ * document written WITHOUT `companyId` (domain call sites: request lines, signatures, PDF export,
+ * flags, decisions, corrections …) gets the document's PT, so it is shown to the office roles of THAT
+ * PT only (untagged rows are visible beyond one PT). Constant fragments, no user input reaches them.
+ */
+const PER_PT_DOC_TABLES: Record<string, ReturnType<typeof sql>> = {
+  expense_request: sql`expense_requests`,
+  budget_addendum: sql`budget_addenda`,
+  progress_report: sql`progress_reports`,
+  settlement: sql`settlements`,
+  transfer: sql`transfers`,
+  receipt: sql`receipts`,
+  attendance: sql`attendances`,
+  attendance_correction: sql`attendance_corrections`,
+  cash_entry: sql`cash_entries`,
+  period_closing: sql`period_closings`,
+  project: sql`projects`,
+  project_stage: sql`project_stages`,
+  team_assignment: sql`team_assignments`,
+  employee: sql`employees`,
+  employee_bank_account: sql`employee_bank_accounts`,
+}
+
+async function derivedCompany(tx: Awaited<ReturnType<typeof getRequestTx>>, row: AuditRow, cache: Map<string, number | null>): Promise<number | null | undefined> {
+  if (row.companyId !== undefined) return row.companyId
+  const table = PER_PT_DOC_TABLES[row.docType]
+  if (!table || !row.docId || !/^\d{1,10}$/.test(row.docId)) return undefined
+  const k = `${row.docType}:${row.docId}`
+  if (!cache.has(k)) {
+    const r = (await tx.execute(sql`SELECT company_id FROM ${table} WHERE id = ${Number(row.docId)}`)) as unknown as { rows: Array<{ company_id: number | null }> }
+    cache.set(k, r.rows[0]?.company_id ?? null)
+  }
+  return cache.get(k) ?? undefined
+}
+
+/**
  * Writes audit rows through Payload in the SAME transaction as the business change (`req`),
  * ADR 0006 §4. Requires an active transaction: without one each row would commit on its own
  * and a failing business write could leave orphan audit rows (or the reverse).
@@ -98,7 +134,9 @@ export async function writeAudit(req: PayloadRequest, rows: AuditRow[], user?: U
   const uid = typeof u?.id === 'number' ? u.id : typeof u?.id === 'string' && /^\d+$/.test(u.id) ? Number(u.id) : undefined
   const rolesAny = rolesOf(u).join(',')
   const eventId = randomUUID()
-  for (const row of rows) {
+  const companies = new Map<string, number | null>()
+  for (const given of rows) {
+    const row: AuditRow = { ...given, companyId: await derivedCompany(tx, given, companies) }
     await req.payload.create({
       collection: 'audit-logs',
       data: {

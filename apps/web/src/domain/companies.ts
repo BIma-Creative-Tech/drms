@@ -1,6 +1,6 @@
 import { APIError, type Payload, type PayloadRequest } from 'payload'
 
-import { isRole, memberCompanies, relId, soleCompany, type Role } from '@/access/roles'
+import { companiesWithRole, isGroupAdmin, isRole, memberCompanies, relId, soleCompany, type Role } from '@/access/roles'
 import type { Company, CompanySetting } from '@/payload-types'
 
 /**
@@ -62,6 +62,19 @@ export async function activeCompanyIds(payload: Payload, req?: PayloadRequest): 
     ...(req ? { req } : {}),
   })
   return res.docs.map((d) => d.id as number)
+}
+
+/**
+ * Audit rows WITHOUT a PT (logins, accounts, uploads, shared masters, app-wide settings, and per-PT
+ * rows written before MC4 QA tagged them): only for group admins and for callers who are Admin or
+ * Direktur in EVERY active PT — i.e. unchanged for a single-PT deployment. MC4 QA finding QA-MC4-03:
+ * before, the Admin / Direktur of ANY PT read them (PT B request lines, signatures, exports, users).
+ */
+export async function mayReadUntaggedAudit(req: PayloadRequest): Promise<boolean> {
+  if (isGroupAdmin(req)) return true
+  const mine = companiesWithRole(req, ['pk-admin', 'pk-owner'], { all: true })
+  if (mine.length === 0) return false
+  return (await activeCompanyIds(req.payload, req)).every((c) => mine.includes(c))
 }
 
 /**

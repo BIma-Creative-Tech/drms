@@ -1,8 +1,9 @@
 import type { CollectionConfig, Field, Where } from 'payload'
 
-import { denyAll, hasRoleAny, isGroupAdmin } from '@/access/roles'
+import { denyAll, hasRoleAny } from '@/access/roles'
 import { byRole } from '@/access/policies'
 import { AUDIT_ACTIONS } from '@/audit/writer'
+import { mayReadUntaggedAudit } from '@/domain/companies'
 
 const ro = { readOnly: true }
 const jsonView = { readOnly: true, components: { Field: '@/components/ReadOnlyJson#ReadOnlyJson' } }
@@ -59,13 +60,14 @@ export const AuditLogs: CollectionConfig = {
   },
   access: {
     // ADR 0016 / requirements v1.2 §5: rows of a PT → office roles of THAT PT; rows without PT
-    // (logins, shared masters, app-wide settings) → Admin / Direktur of any PT and group admins (MC2:
-    // no longer Finance — same rule as the audit-log report).
+    // (logins, shared masters, app-wide settings) → group admins and the Admin / Direktur of EVERY
+    // active PT (MC4 QA: was "of any PT"; same rule as the audit-log report).
     read: async (args) => {
       if (!hasRoleAny(args.req, 'pk-admin', 'pk-owner', 'pk-finance')) return false
       const perPt = await byRole({ 'pk-admin': true, 'pk-owner': true, 'pk-finance': true })(args)
       if (perPt === true) return true
-      const untagged: Where | null = hasRoleAny(args.req, 'pk-admin', 'pk-owner') || isGroupAdmin(args.req) ? { company: { exists: false } } : null
+      // QA-MC4-03: untagged rows only for group admins / Admin-Direktur of EVERY active PT
+      const untagged: Where | null = (await mayReadUntaggedAudit(args.req)) ? { company: { exists: false } } : null
       if (!untagged) return perPt
       return perPt ? { or: [perPt as Where, untagged] } : untagged
     },

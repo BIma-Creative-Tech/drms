@@ -1019,12 +1019,15 @@ const auditLog: ReportDef = {
 
 /**
  * Audit-log PT filter (requirements v1.2 §5): rows of the scope's PTs; rows WITHOUT a PT (shared
- * masters, accounts, system events) only for Admin/Owner of any selected PT (ADR 0016 §4).
+ * masters, accounts, system events) only for Admin/Owner of a selected PT who may read untagged rows
+ * at all (`mayReadUntaggedAudit`: group admin / Admin-Direktur of every active PT — MC4 QA).
  */
 async function auditCompanies(req: PayloadRequest, scope: ReportScope): Promise<Pick<AuditFilter, 'companyIds' | 'includeUntagged'>> {
   const { rolesIn } = await import('@/access/roles')
   const ids = scopeCompanies(scope)
-  return { companyIds: ids, includeUntagged: ids.some((c) => rolesIn(req, c).some((r) => r === 'pk-admin' || r === 'pk-owner')) }
+  const { mayReadUntaggedAudit } = await import('@/domain/companies')
+  // QA-MC4-03: rows without PT only for group admins / Admin-Direktur of EVERY active PT
+  return { companyIds: ids, includeUntagged: ids.some((c) => rolesIn(req, c).some((r) => r === 'pk-admin' || r === 'pk-owner')) && (await mayReadUntaggedAudit(req)) }
 }
 
 // ---------------------------------------------------------------- MC2: PT parameter, PT column, per-PT subtotals
