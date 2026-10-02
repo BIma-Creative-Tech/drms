@@ -42,12 +42,12 @@ Baseline before any change (`f9d0f92`): integration **40 files / 528 + 1 skipped
 | QA-MC4-06 | MEDIUM | `domain/expense/receipts.ts:389` `duplicateHits` | Duplicate-receipt detection searches all PTs. A flag on a PT A request names the PT B doc number (`flags.ts:144`) and links `relatedRequest` to B; this also works as an oracle ("does B hold this receipt?") | **fixed** (owner decision 2026-10-02) on `feat/mc4-pt-scope-rule` (§11) |
 | QA-MC4-07 | MEDIUM (perf) | media LIST rules (admin lists, upload population, `/api/<media>?…`) | They still use id lists: 0.5–1.7 s per list after the fix. A Postgres bind limit of 65 535 parameters will break them once one office user's PTs exceed about 65 k attendances (about 2 years at Q-34 × 2 PTs) | **fixed** on `feat/mc4-pt-scope-rule`: `ownerCompany` column + migration (§11) |
 | QA-MC4-08 | LOW | `domain/progress/stages.ts:43` `templateStages` | `PUT /api/v1/projects/{A}/stages {templateId: <B template>}` copies PT B's stage names and weights into A and returns them. Confirmed by probe (200) | **fixed** (§11) |
-| QA-MC4-09 | LOW | `domain/expense/drafts.ts:75-78,104,134-139` | The on-behalf check (Q-09) uses a role from another PT on a draft without a project (Admin in A + Staff in B → a draft for B employees). Submit or a body `company` rejects it later. Code review only | open |
+| QA-MC4-09 | LOW | `domain/expense/drafts.ts:75-78,104,134-139` | The on-behalf check (Q-09) uses a role from another PT on a draft without a project (Admin in A + Staff in B → a draft for B employees). Submit or a body `company` rejects it later. Code review only | **fixed** (§11, `fix/mc4-qa-open-items`) |
 | QA-MC4-10 | LOW | `drafts.ts:65,117,123,145`, `cash/ledger.ts:98` (+ `transfers.ts:47`, `lpj.ts:209`), `progress/guards.ts:29` | Validation messages answer before the PT check, so they work as oracles for other PTs: the project/cost-center archived or finished state, which B employee owns bank account Y, **PT B's lock date** (settle with a B cash account → 409 "tutup buku s/d …"), project/stage `progressPct = X`. Writes are blocked by the hooks and triggers | **fixed** (§11) |
 | QA-MC4-11 | LOW | `collections/media/index.ts` `MediaCompany` read = `anyRole` | Logos of all PTs are readable by any user (the ADR says "members of that PT") | **fixed** (§11) |
 | QA-MC4-12 | LOW | `media/index.ts` `officeSignatures`, `domain/devices.ts:123` `canRevoke` | Inactive memberships still count: office users of A read signatures of former members, and Admin/Owner of A can revoke the device of someone who now works only in B | **fixed** (§11) |
-| QA-MC4-13 | LOW (tooling) | `tests/unit/mc2-sql-lint.test.ts` | The lint does not scan `domain/expense|progress|addendum|sync`, misses 7 per-PT tables, and `company_id\s*(=|IN)` also accepts join conditions (`ws.company_id = e.company_id`) | partial: `domain/expense/receipts.ts` scanned (§11); rest open |
-| QA-MC4-14 | INFO | various | `attachmentIds` on drafts: uploader not checked (no read impact). `employees.faceRefPhoto`: PT not checked. Sync replays return a stored result for 30 days after a PT is lost. `/me` without a membership shows the name of PT #1. Notifications of a PT the user left stay readable (own rows). `?pt=` / `?company=` / the period-closing fallback narrow silently. `lockRequest` row-locks before the visibility check (no data). `displayNames` falls back to an employee name from another PT. Existence-only oracles (sync `COMPANY_MISMATCH` vs `NOT_FOUND`, body-company `COMPANY_MISMATCH`, addendum 404 vs 403, REST "cross-company reference"). | partial: `/me` and notifications fixed (§11); rest noted |
+| QA-MC4-13 | LOW (tooling) | `tests/unit/mc2-sql-lint.test.ts` | The lint does not scan `domain/expense|progress|addendum|sync`, misses 7 per-PT tables, and `company_id\s*(=|IN)` also accepts join conditions (`ws.company_id = e.company_id`) | **fixed** (§11, `fix/mc4-qa-open-items`) |
+| QA-MC4-14 | INFO | various | `attachmentIds` on drafts: uploader not checked (no read impact). `employees.faceRefPhoto`: PT not checked. Sync replays return a stored result for 30 days after a PT is lost. `/me` without a membership shows the name of PT #1. Notifications of a PT the user left stay readable (own rows). `?pt=` / `?company=` / the period-closing fallback narrow silently. `lockRequest` row-locks before the visibility check (no data). `displayNames` falls back to an employee name from another PT. Existence-only oracles (sync `COMPANY_MISMATCH` vs `NOT_FOUND`, body-company `COMPANY_MISMATCH`, addendum 404 vs 403, REST "cross-company reference"). | **fixed / accepted** (§11): `/me`, notifications, `faceRefPhoto`, `displayNames`, `?pt=` (+ period-closing view), the sync / body-company / addendum oracles fixed; the rest accepted with reasons |
 
 There is no CRITICAL. Areas checked and found OK are listed in §4.
 
@@ -105,10 +105,10 @@ There is no CRITICAL. Areas checked and found OK are listed in §4.
 | QA-MC4-06 | Decide whether duplicate detection is group-wide. If yes, redact the other PT's doc number and do not link `relatedRequest` across PTs; if no, add `e.company_id = <request PT>`. | owner + nextjs |
 | QA-MC4-07 | Add a `company_id` column to the owner-linked media tables (receipts, transfer proofs, attachments, progress photos, selfies), backfilled from the owner document / attendance and set when the link is made. The office rule then becomes `company IN (…)`. This removes the 65 535-parameter ceiling. | nextjs (migration) |
 | QA-MC4-08 | `templateStages`: require `template.company = project.company`, else return the same 400. | nextjs |
-| QA-MC4-09 | Evaluate the Q-09 on-behalf role in the derived PT (that of the requesters / employees). | nextjs |
+| QA-MC4-09 | Evaluate the Q-09 on-behalf role in the derived PT (that of the requesters / employees). **Done** (§11). | nextjs |
 | QA-MC4-10 | Run the PT/scope check before validation in `validateContent`, `activeIds` and `assertAccount` (pass the expected company), and return 404 for other PTs. `progressWriteGuard`: check access before comparing values. | nextjs |
 | QA-MC4-11 / 12 | `media-company` read → members of that PT (or keep public and record the decision). Filter memberships on `active` in `officeSignatures` / `canRevoke`. | nextjs |
-| QA-MC4-13 | Extend `mc2-sql-lint` (scope, tables, bound-parameter rule), see §7. | nextjs / qa |
+| QA-MC4-13 | Extend `mc2-sql-lint` (scope, tables, bound-parameter rule), see §7. **Done** (§11). | nextjs / qa |
 
 ## 4. Checked and OK (coverage)
 
@@ -337,7 +337,7 @@ consolidated over those PTs only; group admin unchanged (ADR 0016 §2); mutation
 | QA-MC4-07 | **fixed** | `owner_company_id` on the five owner-linked media tables, derived by DB triggers (client values replaced), backfilled by the migration; office rule `ownerCompany IN (…)`; the "visible owner" id lists leave out the office PTs (also for receipt / flag / approval / transfer REST lists). |
 | QA-MC4-08 / 10 / 11 / 12 | **fixed** | Template of the project's PT only; draft references, cash account and `progressPct` of an unmapped PT answered like missing ones; logos for members of the PT; ACTIVE memberships only for signatures / device revoke. |
 | QA-MC4-14 (part) | **fixed** | `/me` without membership names no PT; notifications of a PT the user left are hidden. |
-| QA-MC4-09 | open | mutation check (on-behalf role from another PT); outside the read rule, rejected later by submit / body `company`. |
+| QA-MC4-09 | **fixed** (`fix/mc4-qa-open-items`) | see "Follow-up — open items" below |
 
 **Tests:** `tests/integration/mc4-scope.int.test.ts` (21: 1-PT user, 2-PT user over A + B, 2-PT user vs unmapped C →
 404 / 403 / no flag, deactivated PT, duplicate-flag visibility per viewer, LOW findings); `tests/unit/mc4-scope.test.ts`
@@ -351,4 +351,43 @@ tagged; up again → 0.27 s, identical checksum (idempotent); `receipt_flags_gua
 on that copy (no HTTP, not 1:1 comparable with §5.2): `media-selfies` list 22–37 ms (31 200 rows visible) and
 `media-receipts` 23–33 ms for Finance PT 1+2 (§5.2 after `b8d70c1`: 1.3 s / 1.7 s over HTTP); a list page is one
 `owner_company_id IN (1, 2)` predicate instead of 31 200 bind parameters.
+
+### 11.1 Follow-up — open items (branch `fix/mc4-qa-open-items`, 2026-10-02)
+
+Branch `fix/mc4-qa-open-items`, based on `develop` `bff95ac`. ADR 0016 "Scope rule" notes 9–11. No migration, and
+the APK 0.3.x is unaffected: `apps/mobile/lib` keys on `COMPANY_REQUIRED`, `COMPANY_MISMATCH`,
+`COMPANY_NOT_ALLOWED`, `NOT_FOUND` and the HTTP status. Every rejected sync item is final, and no code string was
+added, removed or renamed.
+
+| ID | Status | Fix / reason |
+|---|---|---|
+| QA-MC4-09 | **fixed** | `validateContent` checks Q-09 "Admin/Finance for others" with the role in **every derived PT**: the PT of the project / cost center and of each requester (requesters of an unmapped PT count as missing). Admin of A + Staff of B → 403 for a draft for B employees, with or without a B project, and when an update swaps the requesters to B. The failing test was written first (201 before the fix). |
+| QA-MC4-13 | **fixed** | `mc2-sql-lint`: scans the whole of `domain/expense|progress|addendum|sync`; adds `approvals`, `budget_addenda`, `project_stages`, `attendance_corrections`, `employee_bank_accounts`, `company_memberships` and `document_sequence_counters` (and `UPDATE <table>`). A company predicate counts only as a **helper call** (`…ScopeSql(`, `ptSql(`, `candidateWhere(` …) or a **bound parameter** (`company_id = ${…}`, `IN (${…})`, `= ANY(${…})`). A join condition does not count, which a self-test asserts. The rule is checked per function, not per table (a per-table rule would need SQL alias resolution). Allow-list: 17 entries with reasons, 0 false positives. 7 old entries that were no longer needed were removed, 7 new BOUND / lock functions were added (`lockRequest`, `projectCommitted`, `duplicateHits`, `writeSnapshot`, `approvedByCaller`, `lockProject`, `lockAddendum`), and a new test fails on any entry that is no longer needed. |
+| QA-MC4-14 `faceRefPhoto` | **fixed** | A newly set photo must be a selfie whose `ownerCompany` is the employee's PT, or the caller's own unlinked upload. Anything else gets the same 400 as a missing id. This also stops another PT's selfie from being kept out of selfie retention. |
+| QA-MC4-14 `displayNames` | **fixed** | The fallback looks only at memberships in the document's PT and the viewer's mapped PTs, else the account name. Riwayat gets the request's PT. The audit-log report and its user filter use only employees of the PTs shown (SQL `LATERAL`). The unused `USER_DISPLAY_EMPLOYEE_SQL` (first membership of any PT) was removed. |
+| QA-MC4-14 `?pt=` / `?company=` / period-closing fallback | **fixed** | `?company=` already gave 403. A report `pt` outside the selection → 403 `COMPANY_NOT_ALLOWED`, audited (JSON and downloads, shared `assertSelectedCompanies`). The panel views Laporan, Audit Log, Kas, Catat kas, **Tutup buku** (the period-closing fallback), Absensi hari ini and Rekap absensi show a denial instead of silently narrowing. A selected PT where the caller lacks the right is still ignored (never widens). |
+| QA-MC4-14 sync `COMPANY_MISMATCH` vs `NOT_FOUND` | **fixed** | `COMPANY_MISMATCH` only when the referenced PT is mapped to the caller. A reference in an unmapped PT runs on like a missing id: a draft gets the same `VALIDATION` "Project tidak ditemukan"; an attendance location (`loadLocation`) and an on-behalf employee get `NOT_FOUND`; a request id gets `NOT_FOUND`. `mc3-api` "released APK item referencing another PT" now expects the missing-project answer. |
+| QA-MC4-14 body-company `COMPANY_MISMATCH` | **fixed** | `withNamedCompany` raises `COMPANY_MISMATCH` only for a reference in a mapped PT and leaves an unmapped one to the service, which answers it like a missing one. Manual cash entries now check project / cost center / category / source / vehicle (a missing id was a **500** from the foreign key; now 400 like an unmapped one). |
+| QA-MC4-14 addendum 404 vs 403 | **fixed** | `createAddendum`: a project of an unmapped PT → 404 `NOT_FOUND` (was 403 `FORBIDDEN`, audited), with or without a body `company`. |
+| QA-MC4-14 `attachmentIds` uploader | accepted | Not a read: a request's `attachments` relation does not set the media owner link (`claimMedia` / `ownerCompany`), so the file stays readable only under its own owner rules. Same conclusion as the QA. |
+| QA-MC4-14 sync replay after a PT is lost | accepted | The replay returns the caller's own stored result for their own `client_uuid` (ADR 0010 idempotency, 30 days). It carries no data of another user, and new items of that PT are refused `COMPANY_NOT_ALLOWED`. |
+| QA-MC4-14 `lockRequest` before the visibility check | accepted | The lock returns no data, and the request is answered 404 right after. Checking visibility first would let the state change between the check and the lock. What is left is a timing difference under concurrent writes only. |
+| QA-MC4-14 REST "cross-company reference" | accepted | This is the generic Payload REST create / update in the admin panel by office roles: the company hook / DB trigger answer for a reference of another PT, while a missing id is a foreign-key error. Making them identical needs an existence check for every per-PT relationship in `companyHook`, which is not cheap. The `/api/v1` paths (drafts, cash, addenda, progress, sync) are consistent now. |
+
+**Tests:** `tests/integration/mc4-open-items.int.test.ts` (12). Each one failed before its fix (10 failed on `develop`
+`bff95ac`; the cash test found the 500); the controls and the "mapped mismatch keeps `COMPANY_MISMATCH`" checks
+pass. `tests/unit/mc2-sql-lint.test.ts` (5) and `tests/unit/mc4-scope.test.ts` (+1, `foreignPtParam`). Updated
+expectations: `mc2-isolation` (foreign `pt` → 403) and `mc3-api` (unmapped reference = missing project).
+
+**Checks (CI replica, local throwaway containers `pk-mc4fix-*`):**
+
+| Check | Result |
+|---|---|
+| `npm run lint` | 0 warnings |
+| `npm run typecheck` | clean |
+| `npm run test:coverage` | 46 files / 657 tests green (gate met) |
+| `npm run check:openapi` | up to date: regenerated; the report `pt` parameter is documented and the `COMPANY_MISMATCH` / body `company` descriptions were updated, with no shape change |
+| `TZ=Asia/Makassar npm run test:int` | 43 files / 577 passed + 1 skipped |
+| `npm audit --omit=dev --audit-level=high` | exit 0 |
+| semgrep 1.177.0, CI command | 0 findings |
 
