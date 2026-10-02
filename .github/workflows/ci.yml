@@ -287,9 +287,10 @@ jobs:
             fi
           done
 
-      - name: Build web (runner target) → local
+      - name: Build web (runner target) → local (attempt 1)
         if: steps.meta.outputs.publish != 'true'
-        id: web-local
+        id: web-local-1
+        continue-on-error: true # transient registry/network errors (Docker Hub blip 2026-10-02) → one retry below
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         env:
           SOURCE_DATE_EPOCH: ${{ steps.meta.outputs.epoch }}
@@ -305,9 +306,52 @@ jobs:
           no-cache: ${{ steps.meta.outputs.no_cache == 'true' }}
           cache-from: ${{ steps.meta.outputs.web_cache_from }}
           cache-to: ${{ steps.meta.outputs.web_cache_to }}
-      - name: Build migrate target → local
+      - name: Back off before retrying web (local)
+        if: ${{ steps.web-local-1.outcome == 'failure' }}
+        run: sleep 45
+      - name: Build web (runner target) → local (attempt 2)
+        if: ${{ steps.web-local-1.outcome == 'failure' }}
+        id: web-local-2
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        env:
+          SOURCE_DATE_EPOCH: ${{ steps.meta.outputs.epoch }}
+        with:
+          context: .
+          file: apps/web/Dockerfile
+          target: runner
+          platforms: linux/amd64
+          load: true
+          provenance: false
+          tags: proyekkas-web:ci
+          labels: ${{ steps.meta.outputs.web_labels }}
+          no-cache: ${{ steps.meta.outputs.no_cache == 'true' }}
+          cache-from: ${{ steps.meta.outputs.web_cache_from }}
+          cache-to: ${{ steps.meta.outputs.web_cache_to }}
+      - name: Build migrate target → local (attempt 1)
         if: steps.meta.outputs.publish != 'true'
-        id: migrate-local
+        id: migrate-local-1
+        continue-on-error: true # transient registry/network errors (Docker Hub blip 2026-10-02) → one retry below
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        env:
+          SOURCE_DATE_EPOCH: ${{ steps.meta.outputs.epoch }}
+        with:
+          context: .
+          file: apps/web/Dockerfile
+          target: migrate
+          platforms: linux/amd64
+          load: true
+          provenance: false
+          tags: proyekkas-migrate:ci
+          labels: ${{ steps.meta.outputs.migrate_labels }}
+          no-cache: ${{ steps.meta.outputs.no_cache == 'true' }}
+          cache-from: ${{ steps.meta.outputs.migrate_cache_from }}
+          cache-to: ${{ steps.meta.outputs.migrate_cache_to }}
+      - name: Back off before retrying migrate (local)
+        if: ${{ steps.migrate-local-1.outcome == 'failure' }}
+        run: sleep 45
+      - name: Build migrate target → local (attempt 2)
+        if: ${{ steps.migrate-local-1.outcome == 'failure' }}
+        id: migrate-local-2
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         env:
           SOURCE_DATE_EPOCH: ${{ steps.meta.outputs.epoch }}
@@ -324,9 +368,10 @@ jobs:
           cache-from: ${{ steps.meta.outputs.migrate_cache_from }}
           cache-to: ${{ steps.meta.outputs.migrate_cache_to }}
 
-      - name: Build web (runner target) → GHCR by digest (untagged) + SBOM + provenance
+      - name: Build web (runner target) → GHCR by digest (untagged) + SBOM + provenance (attempt 1)
         if: steps.meta.outputs.publish == 'true'
-        id: web-push
+        id: web-push-1
+        continue-on-error: true # transient registry/network errors (Docker Hub blip 2026-10-02) → one retry below
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         env:
           SOURCE_DATE_EPOCH: ${{ steps.meta.outputs.epoch }}
@@ -342,9 +387,52 @@ jobs:
           no-cache: ${{ steps.meta.outputs.no_cache == 'true' }}
           cache-from: ${{ steps.meta.outputs.web_cache_from }}
           cache-to: ${{ steps.meta.outputs.web_cache_to }}
-      - name: Build migrate target → GHCR by digest (untagged) + SBOM + provenance
+      - name: Back off before retrying web (push)
+        if: ${{ steps.web-push-1.outcome == 'failure' }}
+        run: sleep 45
+      - name: Build web (runner target) → GHCR by digest (untagged) + SBOM + provenance (attempt 2)
+        if: ${{ steps.web-push-1.outcome == 'failure' }}
+        id: web-push-2
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        env:
+          SOURCE_DATE_EPOCH: ${{ steps.meta.outputs.epoch }}
+        with:
+          context: .
+          file: apps/web/Dockerfile
+          target: runner
+          platforms: linux/amd64
+          outputs: type=image,name=${{ env.WEB_IMAGE }},push-by-digest=true,name-canonical=true,push=true
+          sbom: true
+          provenance: mode=max
+          labels: ${{ steps.meta.outputs.web_labels }}
+          no-cache: ${{ steps.meta.outputs.no_cache == 'true' }}
+          cache-from: ${{ steps.meta.outputs.web_cache_from }}
+          cache-to: ${{ steps.meta.outputs.web_cache_to }}
+      - name: Build migrate target → GHCR by digest (untagged) + SBOM + provenance (attempt 1)
         if: steps.meta.outputs.publish == 'true'
-        id: migrate-push
+        id: migrate-push-1
+        continue-on-error: true # transient registry/network errors (Docker Hub blip 2026-10-02) → one retry below
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        env:
+          SOURCE_DATE_EPOCH: ${{ steps.meta.outputs.epoch }}
+        with:
+          context: .
+          file: apps/web/Dockerfile
+          target: migrate
+          platforms: linux/amd64
+          outputs: type=image,name=${{ env.MIGRATE_IMAGE }},push-by-digest=true,name-canonical=true,push=true
+          sbom: true
+          provenance: mode=max
+          labels: ${{ steps.meta.outputs.migrate_labels }}
+          no-cache: ${{ steps.meta.outputs.no_cache == 'true' }}
+          cache-from: ${{ steps.meta.outputs.migrate_cache_from }}
+          cache-to: ${{ steps.meta.outputs.migrate_cache_to }}
+      - name: Back off before retrying migrate (push)
+        if: ${{ steps.migrate-push-1.outcome == 'failure' }}
+        run: sleep 45
+      - name: Build migrate target → GHCR by digest (untagged) + SBOM + provenance (attempt 2)
+        if: ${{ steps.migrate-push-1.outcome == 'failure' }}
+        id: migrate-push-2
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         env:
           SOURCE_DATE_EPOCH: ${{ steps.meta.outputs.epoch }}
@@ -365,8 +453,8 @@ jobs:
         id: scan
         env:
           PUBLISH: ${{ steps.meta.outputs.publish }}
-          WEB_DIGEST: ${{ steps.web-push.outputs.digest }}
-          MIGRATE_DIGEST: ${{ steps.migrate-push.outputs.digest }}
+          WEB_DIGEST: ${{ steps.web-push-1.outputs.digest || steps.web-push-2.outputs.digest }}
+          MIGRATE_DIGEST: ${{ steps.migrate-push-1.outputs.digest || steps.migrate-push-2.outputs.digest }}
         run: |
           set -euo pipefail
           if [[ "$PUBLISH" == "true" ]]; then
@@ -438,8 +526,8 @@ jobs:
         if: steps.meta.outputs.publish == 'true'
         env:
           TAGS: ${{ steps.meta.outputs.tags }}
-          WEB_DIGEST: ${{ steps.web-push.outputs.digest }}
-          MIGRATE_DIGEST: ${{ steps.migrate-push.outputs.digest }}
+          WEB_DIGEST: ${{ steps.web-push-1.outputs.digest || steps.web-push-2.outputs.digest }}
+          MIGRATE_DIGEST: ${{ steps.migrate-push-1.outputs.digest || steps.migrate-push-2.outputs.digest }}
         run: |
           set -euo pipefail
           t="${TAGS%% *}"
