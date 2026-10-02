@@ -44,6 +44,15 @@ export function Forbidden({ props, title, roles }: { props: AdminViewServerProps
   )
 }
 
+/** QA-MC4-14: `?pt=` names a PT outside the caller's selection (`foreignPtParam`, pt.tsx). */
+export function PtNotAllowed({ props, title }: { props: AdminViewServerProps; title: string }) {
+  return (
+    <Shell props={props} title={title}>
+      <p data-pk-denied="pt">PT yang diminta bukan PT Anda (atau tidak termasuk PT yang dipilih di pemilih PT).</p>
+    </Shell>
+  )
+}
+
 export function allowed(req: PayloadRequest, roles: Role[]): boolean {
   return hasRoleAny(req, ...roles)
 }

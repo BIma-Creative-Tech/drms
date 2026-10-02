@@ -4,6 +4,7 @@ import type { PayloadRequest } from 'payload'
 import { describe, expect, it } from 'vitest'
 
 import { mappedCompanies, withCompanyContext } from '@/access/roles'
+import { foreignPtParam } from '@/admin/views/pt'
 import { auditRowVisible, flagVisibleSql, flagVisibleWhere, mayViewFlag, SHARED_FLAG_WHERE, withFlagVisibility } from '@/domain/expense/flag-visibility'
 import { computeFlags, type FlagInput } from '@/domain/expense/flags'
 
@@ -85,5 +86,17 @@ describe('QA-MC4-06 duplicate flags: visibility per viewer', () => {
     expect(auditRowVisible(reqOf([1]), { action: 'flag_raised', newValue: { level: 'warning', message: 'x' } })).toBe(true)
     expect(auditRowVisible(reqOf([1]), { action: 'flag_reviewed', newValue: { status: 'reviewed', relatedCompanyId: 2 } })).toBe(false)
     expect(auditRowVisible(reqOf([1]), { action: 'update', newValue: { relatedCompanyId: 2 } })).toBe(true)
+  })
+})
+
+describe('QA-MC4-14: foreignPtParam (panel views answer a foreign ?pt= with a denial)', () => {
+  it('true when any id is outside the selection; malformed / absent → false (nothing to deny)', () => {
+    const req = reqOf([1, 3], [3])
+    expect(foreignPtParam(req, undefined)).toBe(false)
+    expect(foreignPtParam(req, { pt: '3' })).toBe(false)
+    expect(foreignPtParam(req, { pt: '1' })).toBe(true) // mapped but not selected (same as /api/v1 ?company=)
+    expect(foreignPtParam(req, { pt: ['3', '2'] })).toBe(true)
+    expect(foreignPtParam(req, { pt: '3,9' })).toBe(true)
+    expect(foreignPtParam(req, { pt: 'abc' })).toBe(false)
   })
 })

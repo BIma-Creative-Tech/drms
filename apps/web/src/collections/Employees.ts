@@ -1,12 +1,34 @@
-import { ValidationError, type CollectionConfig } from 'payload'
+import { ValidationError, type CollectionBeforeChangeHook, type CollectionConfig } from 'payload'
 import { relationship } from 'payload/shared'
 
-import { denyAll, hasRole, ownEmployees, relId } from '@/access/roles'
+import { denyAll, hasRole, ownEmployees, relId, userId } from '@/access/roles'
 import { byRole, rolesAllowed, anyMember } from '@/access/policies'
 import { reasonOnDeactivate, withAudit } from '@/audit/hooks'
 import { activeField, codeField, odooRefField, uuidField } from '@/fields/common'
 
 import { companyField, companyHook, pickerSameCompany, requireCompanyWhenAmbiguous } from '@/fields/company'
+
+/**
+ * QA-MC4-14: a NEWLY set face reference photo must be a selfie of the employee's PT — one whose
+ * `ownerCompany` (DB-derived from its attendance, QA-MC4-07) is that PT, or a not yet linked upload of
+ * the caller (the admin panel uploads the photo first). Another PT's selfie, someone else's unlinked
+ * upload and a missing id get the same 400 (no existence oracle). System writes (no user) are trusted.
+ */
+const faceRefSamePt: CollectionBeforeChangeHook = async ({ data, originalDoc, req }) => {
+  const d = data as { faceRefPhoto?: unknown; company?: unknown }
+  if (!req.user || !('faceRefPhoto' in d)) return data
+  const id = relId(d.faceRefPhoto)
+  if (id === undefined || id === relId((originalDoc as { faceRefPhoto?: unknown } | undefined)?.faceRefPhoto)) return data
+  const company = relId(d.company) ?? relId((originalDoc as { company?: unknown } | undefined)?.company)
+  const m = (await req.payload.findByID({ collection: 'media-selfies', id, depth: 0, overrideAccess: true /* SYSTEM-READ: PT + uploader of the photo being linked */, req, disableErrors: true })) as {
+    ownerCompany?: unknown
+    uploadedBy?: unknown
+  } | null
+  const owner = relId(m?.ownerCompany)
+  const ok = !!m && (owner !== undefined ? owner === company : relId(m.uploadedBy) === userId(req))
+  if (!ok) throw new ValidationError({ collection: 'employees', errors: [{ path: 'faceRefPhoto', message: 'Foto wajah tidak ditemukan (harus selfie PT karyawan ini atau unggahan Anda sendiri).' }], req })
+  return data
+}
 
 /**
  * Karyawan / staff, one row per PT (ADR 0016 D1). An employee without a user account can still be a
@@ -34,7 +56,7 @@ export const Employees: CollectionConfig = withAudit(
           return data
         },
       ],
-      beforeChange: [companyHook('employees', { check: [{ field: 'workSchedule', collection: 'work-schedules' }] })],
+      beforeChange: [companyHook('employees', { check: [{ field: 'workSchedule', collection: 'work-schedules' }] }), faceRefSamePt],
     },
     fields: [
       {

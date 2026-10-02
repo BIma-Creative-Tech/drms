@@ -167,11 +167,36 @@ export type ManualInput = {
   proofId?: number | null
 }
 
+const MANUAL_REFS = [
+  ['projectId', 'projects', 'Project tidak ditemukan.'],
+  ['costCenterId', 'cost-centers', 'Pusat biaya tidak ditemukan.'],
+  ['categoryId', 'expense-categories', 'Kategori tidak ditemukan.'],
+  ['cashInSourceId', 'cash-in-sources', 'Sumber kas masuk tidak ditemukan.'],
+  ['vehicleId', 'vehicles', 'Kendaraan tidak ditemukan.'],
+] as const
+
+/**
+ * QA-MC4-14 (scope rule): references of a manual entry — a missing id (was a 500 from the foreign key)
+ * and one of a PT the caller is not mapped to get the same 400. A reference of another MAPPED PT is
+ * still refused by the company hook / DB trigger ("cross-company reference").
+ */
+async function assertManualRefs(req: PayloadRequest, input: Partial<Record<(typeof MANUAL_REFS)[number][0], number | null | undefined>>): Promise<void> {
+  const mapped = mappedCompanies(req)
+  for (const [key, collection, message] of MANUAL_REFS) {
+    const id = input[key]
+    if (typeof id !== 'number') continue
+    const doc = (await req.payload.findByID({ collection, id, depth: 0, overrideAccess: true /* SYSTEM-READ: existence + PT of a reference */, req, disableErrors: true })) as { company?: unknown } | null
+    const company = relId(doc?.company)
+    if (!doc || (mapped !== null && company !== undefined && !mapped.includes(company))) fail(400, message, [{ path: key, message }])
+  }
+}
+
 /** US-23: manual cash in/out (Finance): amount, description, account, category/source required. */
 export async function createManualEntry(req: PayloadRequest, input: ManualInput): Promise<CashEntryDoc> {
   if (input.direction === 'out' && !input.categoryId) fail(400, 'Kategori wajib untuk kas keluar.', [{ path: 'categoryId', message: 'Wajib.' }])
   if (input.direction === 'in' && !input.cashInSourceId) fail(400, 'Sumber wajib untuk kas masuk.', [{ path: 'cashInSourceId', message: 'Wajib.' }])
   if (!input.description.trim()) fail(400, 'Keterangan wajib diisi.')
+  await assertManualRefs(req, input)
   const entryDate = input.entryDate ?? (await today(req))
   if (entryDate > (await today(req))) fail(400, 'Tanggal tidak boleh di masa depan.')
   // E2 fix: the proof is set on INSERT. Attaching it with a follow-up update (previous code) hit
@@ -213,6 +238,7 @@ export async function editManualEntry(req: PayloadRequest, id: number, patch: Ma
     costCenter: patch.costCenterId !== undefined ? patch.costCenterId : relId(e.costCenter),
   }
   if (merged.project && merged.costCenter) fail(400, 'Pilih project ATAU pusat biaya.')
+  await assertManualRefs(req, patch)
   const data: Record<string, unknown> = {}
   if (patch.description !== undefined) data.description = patch.description.trim()
   if (patch.categoryId !== undefined) data.category = patch.categoryId

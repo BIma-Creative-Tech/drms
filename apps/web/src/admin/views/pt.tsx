@@ -1,7 +1,7 @@
 import type { PayloadRequest } from 'payload'
 import React from 'react'
 
-import { companyContextOf } from '@/access/roles'
+import { companyContextOf, memberCompanies } from '@/access/roles'
 
 import { companyLabels, type CompanyLabel } from '../components/companies/labels'
 
@@ -72,4 +72,21 @@ export function PtScopeNote({ pt }: { pt: PtView }) {
 /** Cash accounts of one PT (transfer / settlement forms must never offer an account of another PT). */
 export function accountsOf<T extends { company: number | null }>(accounts: readonly T[], company: number | null): T[] {
   return company === null ? [...accounts] : accounts.filter((a) => a.company === company)
+}
+
+/**
+ * QA-MC4-14: `?pt=` (repeatable / comma list) names a PT outside the caller's selection (switcher ∩
+ * active memberships). The /api/v1 reports answer 403 COMPANY_NOT_ALLOWED; the panel views show
+ * `PtNotAllowed` (shared.tsx) instead of silently narrowing the page to nothing.
+ */
+export function foreignPtParam(req: PayloadRequest, sp: Record<string, string | string[] | undefined> | undefined): boolean {
+  const raw = sp?.pt
+  const ids = (Array.isArray(raw) ? raw : raw === undefined ? [] : [raw])
+    .flatMap((v) => String(v).split(','))
+    .map((v) => v.trim())
+    .filter((v) => /^\d{1,9}$/.test(v))
+    .map(Number)
+  if (ids.length === 0) return false
+  const selected = memberCompanies(req)
+  return ids.some((id) => !selected.includes(id))
 }

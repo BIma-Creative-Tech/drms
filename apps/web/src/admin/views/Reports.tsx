@@ -13,7 +13,8 @@ import { XLSX_MAX_ROWS, xlsxEnabled } from '@/lib/xlsx'
 import { formatServerTime } from '@/pdf/format'
 
 import { Empty, F3Root, FilterForm, ReportTable } from './f3-ui'
-import { Shell } from './shared'
+import { foreignPtParam } from './pt'
+import { PtNotAllowed, Shell } from './shared'
 
 /**
  * F3 "Laporan" (wireframes §5) and the global "Audit Log" (§6): custom root views (wrapped in the
@@ -86,6 +87,7 @@ export async function ReportView(props: AdminViewServerProps) {
   const def = reportByCode(code)
   if (!def || def.code === 'audit-log') return <Shell props={props} title="Laporan tidak ditemukan"><p><Link href="/admin/laporan">← Daftar laporan</Link></p></Shell>
   if (!hasRoleAny(req, ...def.roles)) return <Denied props={props} def={def} />
+  if (foreignPtParam(req, props.searchParams)) return <PtNotAllowed props={props} title={def.title} />
   const scope = def.scope ? await def.scope(req) : await officeScope(req)
   if (scope.kind === 'none') return <Denied props={props} def={def} />
   return <ReportPage props={props} def={def} scope={scope} base={`/admin/laporan/${def.code}`} />
@@ -94,6 +96,7 @@ export async function ReportView(props: AdminViewServerProps) {
 export async function AuditLogView(props: AdminViewServerProps) {
   const req = props.initPageResult.req
   if (!hasRoleAny(req, ...AUDIT_REPORT.roles)) return <Denied props={props} def={AUDIT_REPORT} />
+  if (foreignPtParam(req, props.searchParams)) return <PtNotAllowed props={props} title={AUDIT_REPORT.title} />
   const sp = toSearchParams(props.searchParams)
   // K-16: opening the global audit log is itself recorded (new row, never a change).
   await withReqTransaction(req, () =>

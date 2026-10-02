@@ -18,12 +18,21 @@ export async function companyQuery(req: PayloadRequest, name = 'company'): Promi
   const ids = parseCompanyIds(raw)
   if (ids === 'invalid') throw new HttpError(400, 'Bad Request', { detail: `${name} harus daftar id PT (mis. 1,3).`, errors: [{ path: name, message: 'id PT tidak valid.' }] })
   if (ids === null || ids.length === 0) return undefined
+  await assertSelectedCompanies(req, ids, name)
+  return ids.sort((a, b) => a - b)
+}
+
+/**
+ * Every id must be in the request's selection (`X-Company-Ids` / cookie ∩ active memberships), else 403
+ * `COMPANY_NOT_ALLOWED` (audited). Shared by `?company=` and the report parameter `?pt=` (QA-MC4-14:
+ * a foreign `pt` used to narrow the report silently to nothing).
+ */
+export async function assertSelectedCompanies(req: PayloadRequest, ids: readonly number[], name: string): Promise<void> {
   const selected = memberCompanies(req)
   if (ids.some((id) => !selected.includes(id))) {
-    await writeAuditDetached(req, [{ action: 'access_denied', docType: 'company', field: name, reason: 'PT di luar pilihan/keanggotaan (filter ?company=)' }])
+    await writeAuditDetached(req, [{ action: 'access_denied', docType: 'company', field: name, reason: `PT di luar pilihan/keanggotaan (filter ?${name}=)` }])
     throw new HttpError(403, 'Forbidden', { code: 'COMPANY_NOT_ALLOWED', detail: 'PT yang diminta bukan PT Anda (atau tidak termasuk PT yang dipilih).' })
   }
-  return ids.sort((a, b) => a - b)
 }
 
 /** Single-PT variant (`?company=3`): more than one id → 400. */

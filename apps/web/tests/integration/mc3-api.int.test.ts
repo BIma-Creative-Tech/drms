@@ -596,8 +596,13 @@ describe('MC3 — sync/batch per item PT', () => {
     expect(one.status).toBe(200)
     const first = ((one.body as Body).results as Body[])[0]!
     expect([first.status, first.company_id]).toEqual(['applied', A])
-    // …and a released-APK item referencing another PT is still COMPANY_MISMATCH
+    // …and a released-APK item referencing a PT the user is NOT mapped to is answered like a missing
+    // project (QA-MC4-14, scope rule: was COMPANY_MISMATCH = an existence oracle; still a final rejection)
     const foreign = await sync(s, [draftItem({ kind: 'advance', title: 'MC3 asing', project_id: X.projectC, requester_ids: [w.emp.a], bank_account_id: w.accA, lines: [{ description: 'x', total: 10_000 }] })])
-    expect(((foreign.body as Body).results as Body[])[0]!.errors.map((e: Body) => e.code)).toEqual(['COMPANY_MISMATCH'])
+    const missing = await sync(s, [draftItem({ kind: 'advance', title: 'MC3 hilang', project_id: 999_999_999, requester_ids: [w.emp.a], bank_account_id: w.accA, lines: [{ description: 'x', total: 10_000 }] })])
+    const errs = (r: typeof foreign) => ((r.body as Body).results as Body[])[0]!.errors.map((e: Body) => [e.code, e.field, e.message])
+    expect(((foreign.body as Body).results as Body[])[0]!.status).toBe('rejected')
+    expect(errs(foreign)).toEqual(errs(missing))
+    expect(errs(foreign).map((e: unknown[]) => e[0])).not.toContain('COMPANY_MISMATCH')
   })
 })
