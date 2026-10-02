@@ -557,12 +557,16 @@ test('MC4 UAT API suite', { concurrency: false, timeout: 45 * 60_000 }, async (t
     const h = await A.dir.v1('GET', '/reports/rekap-pengajuan', { headers: { 'X-Company-Ids': String(DRMS) } })
     st(h, 403)
     assert.equal(h.body.code, 'COMPANY_NOT_ALLOWED')
-    const p = st(await A.dir.v1('GET', `/reports/rekap-pengajuan?pt=${DRMS}`), [200, 403])
-    if (p && p.main) {
-      assert.equal(p.main.rows.length, 0, 'no rows')
-      assert.ok(!(p.companies ?? []).some((c) => c.id === DRMS))
-      return '?pt=<foreign> answers 200 with 0 rows (silent narrowing by design, not 403)'
+    // develop bff95ac: 200 with 0 rows (silent narrowing); from fix/mc4-qa-open-items (QA-MC4-14): 403 COMPANY_NOT_ALLOWED
+    const r = await A.dir.v1('GET', `/reports/rekap-pengajuan?pt=${DRMS}`)
+    const p = st(r, [200, 403])
+    if (r.status === 403) {
+      assert.equal(r.body.code, 'COMPANY_NOT_ALLOWED')
+      return '?pt=<foreign> answers 403 COMPANY_NOT_ALLOWED (QA-MC4-14 fix)'
     }
+    assert.equal(p.main.rows.length, 0, 'no rows')
+    assert.ok(!(p.companies ?? []).some((c) => c.id === DRMS))
+    return '?pt=<foreign> answers 200 with 0 rows (server before the QA-MC4-14 fix)'
   })
   await kase(t, 'REP-04', 'US-MC-11', 'exports: consolidated CSV has a PT column; single-PT PDF/XLSX download', async () => {
     const csv = await A.andi.v1('GET', '/reports/rekap-pengajuan/csv', { raw: true })
