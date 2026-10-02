@@ -186,10 +186,9 @@ class HomeScreen extends ConsumerWidget {
               _SectionTitle(kind == HomeKind.pm || kind == HomeKind.staff ? t.kpiTeamTitle : t.kpiSummaryTitle),
               kpis,
             ],
-            if (profile.has(Role.pm) || profile.has(Role.owner)) ...[
-              const SizedBox(height: 20),
-              const ProjectProgressSummary(),
-            ],
+            // US-12 "Progress fisik vs anggaran": PM (team), Direktur and Finance (all; same card as the web
+            // Finance Beranda). `GET /projects/progress` allows pk-finance / pk-owner / pk-pm.
+            if (profile.canReadProgress) ...[const SizedBox(height: 20), const ProjectProgressSummary()],
           ],
         ),
       ),

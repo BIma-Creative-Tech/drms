@@ -43,6 +43,17 @@ class AddendumApi {
     _one,
   );
 
+  /// `PATCH /budget-addenda/{id}` — edit a Draft (creator PM; server `allowedActions` contains `edit`).
+  /// Body `BudgetAddendumUpdate`: only the fields that are given (project stays fixed).
+  Future<Addendum> update(int id, {int? addition, String? reason, required String idempotencyKey}) => client.run(
+    (d) => d.patch<dynamic>(
+      '/budget-addenda/$id',
+      data: {'addition': ?addition, if (reason != null) 'reason': reason.trim()},
+      options: _idem(idempotencyKey),
+    ),
+    _one,
+  );
+
   Future<Addendum> submit(int id, {required String idempotencyKey}) =>
       client.run((d) => d.post<dynamic>('/budget-addenda/$id/submit', options: _idem(idempotencyKey)), _one);
 

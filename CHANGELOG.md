@@ -33,19 +33,46 @@ rows locally).
   lists (65 535 bind-parameter cap). Cash-entry attachments are now readable by the office roles of that PT.
 - Receipt flags carry `relatedCompany` (PT of the related request when it is another PT).
 
-## [0.5.1] - 2026-09-30
+### MC4 — QA security fixes (branch `docs/mc4-qa`; report `docs/proyekkas/qa/mc4-qa-report.md`)
 
-Security patch on top of 0.5.0 (no migrations, no API change): npm audit high findings in `undici` and `nodemailer`
-fixed with root `overrides`. Deploy this instead of 0.5.0 (same database migrations as 0.5.0; rollback = restore the
-pre-deploy dump). Also carries the APK `mobile-v0.3.0` release files (pubspec, notes, runbook).
+#### Security
+- **QA-MC4-01 (HIGH):** REST creates that name a `company` in the body re-check the create role in the derived PT
+  (Finance/Admin of PT A could create bank accounts, team assignments or budget lines in PT B).
+- **QA-MC4-02 (HIGH):** a PT Admin may only change accounts that belong solely to PTs where they are Admin (no
+  rename / deactivate / e-mail change of users of other PTs or of group admins).
+- **QA-MC4-03 (HIGH):** per-PT document audit rows are tagged with their PT; rows without PT only for users with an
+  office role in every PT (Admin/Direktur of PT A no longer read PT B's audit rows).
+- **QA-MC4-04 (HIGH):** single media file access is decided on the row's own owner document and office id lists load
+  via SQL (opening one selfie no longer exhausts the web heap for a multi-PT Finance user).
 
-### Security
-- **npm audit (high) fixed with root `overrides`** — `payload` 3.90.1/3.90.2 pins `undici` 7.29.0 (GHSA-rfgv-xxqx-mfg5,
-  GHSA-w293-vg96-wgc3 high + 8 moderate/low, patched in 7.29.1) and `@payloadcms/email-nodemailer` takes
-  `nodemailer` ^9.1.1 (GHSA-v53p-9fqp-m79j high, GHSA-g57g-f23g-4646; patched in 10.0.9). Overrides: `undici` 7.29.1,
-  `nodemailer` 10.0.10 (10.x only drops Node < 20; newest versions respecting `.npmrc` `min-release-age=7`). Remove
-  the overrides once Payload ships the patched versions. Remaining audit: 6 moderate + 1 low, all needing a Payload
-  downgrade (`npm audit fix --force` → 3.85.1) — not applied.
+### APK 0.3.1 (branch `feat/mobile-0.3.1-ux`, pubspec `0.3.1+1`; not tagged yet)
+
+APK-only UX fixes from the module check; no server change needed (web ≥ 0.5.1 / MC4 API). Release notes
+`docs/release-notes/apk/0.3.1.md`.
+
+#### Added
+- **Notification tap routing** for every document type the server writes (`AppNotification.route`, same mapping as
+  the web `notificationHref`): `budget_addendum` (addendum.*) → `/addenda/:id`; `project` +
+  `progress.late_report` → `/progress?project=:id` (reports filtered to that project); other `project` events
+  (`reminder.budget_threshold`) → `/progress?tab=projects`; `progress_report` → `/progress/report/:id`;
+  `attendance` → `/attendance` (team tab without own attendance); `expense_request` unchanged. Progress targets
+  only for PM / Direktur / Finance; unknown types or non-numeric ids stay non-tappable (read rows without a target
+  have no tap action; routable rows show a chevron).
+- **Edit an addendum draft** (`PATCH /api/v1/budget-addenda/{id}`, `BudgetAddendumUpdate`: `addition`, `reason`; the
+  project stays fixed): "Ubah draft" on the detail only when `allowedActions` contains `edit`; route
+  `/addenda/:id/edit` reuses the create form prefilled, "Simpan perubahan" and — when `submit` is also allowed —
+  "Simpan & ajukan" (PATCH then submit). One Idempotency-Key per PATCH body (the server answers 422 to a reused key
+  with another body). A non-editable addendum shows a notice instead of the form.
+- **Finance home: US-12 "Progress fisik vs anggaran"** card (`ProjectProgressSummary`, `GET /projects/progress`
+  allows `pk-finance`), as on the web Finance Beranda; shown for every role with `canReadProgress`.
+- **Per-PT dashboard breakdown** ("Per PT" card under the KPI totals) when `/dashboard/*` `companies[]` has ≥ 2 PTs:
+  Direktur `cash.byCompany` + `approvals.byCompany`, Finance `cashByCompany` + `transferQueue.byCompany`, PM
+  `teamMonthByCompany`.
+
+#### Changed
+- PM "Absenkan anggota tim" stays visible but disabled with the line "Absen atas nama belum bisa: absensi dari
+  aplikasi belum diaktifkan Admin (Setting perusahaan)." when `syncAttendanceEnabled` is off for every PT in scope
+  (was: hidden silently).
 
 ### MC4 — code gaps (branch `feat/mc4-code-gaps`; ADR 0016 "Implementation notes (MC4)", `docs/proyekkas/mc/mc4-progress.md`)
 
@@ -80,6 +107,20 @@ Web/API only (no APK change). Migration: `20260930_120000_mc4_list_company_colum
 - Scope literals without PT parts (`{ kind: 'team', projects }`, `{ kind: 'own' }`, `{ kind: 'all' }`) now match
   nothing in every report / attendance query (was: `all` only).
 - Saved list-column preferences that never named the PT column get it prepended once (migration above).
+
+## [0.5.1] - 2026-09-30
+
+Security patch on top of 0.5.0 (no migrations, no API change): npm audit high findings in `undici` and `nodemailer`
+fixed with root `overrides`. Deploy this instead of 0.5.0 (same database migrations as 0.5.0; rollback = restore the
+pre-deploy dump). Also carries the APK `mobile-v0.3.0` release files (pubspec, notes, runbook).
+
+### Security
+- **npm audit (high) fixed with root `overrides`** — `payload` 3.90.1/3.90.2 pins `undici` 7.29.0 (GHSA-rfgv-xxqx-mfg5,
+  GHSA-w293-vg96-wgc3 high + 8 moderate/low, patched in 7.29.1) and `@payloadcms/email-nodemailer` takes
+  `nodemailer` ^9.1.1 (GHSA-v53p-9fqp-m79j high, GHSA-g57g-f23g-4646; patched in 10.0.9). Overrides: `undici` 7.29.1,
+  `nodemailer` 10.0.10 (10.x only drops Node < 20; newest versions respecting `.npmrc` `min-release-age=7`). Remove
+  the overrides once Payload ships the patched versions. Remaining audit: 6 moderate + 1 low, all needing a Payload
+  downgrade (`npm audit fix --force` → 3.85.1) — not applied.
 
 ### APK mobile-v0.3.0 (tag `mobile-v0.3.0`, pubspec `0.3.0`)
 
