@@ -180,6 +180,14 @@ describe('MC4 extra (d) — saved list columns get the PT column once (migration
       expect(f?.access?.read?.({ req: req(false) }), name).toBe(false)
     }
   })
+
+  it('companies: copy-defaults fields are editable in the create form (virtual ⇒ readOnly unless admin.readOnly: false; UAT UI-CO)', () => {
+    const companies = config.collections.find((c) => c.slug === 'companies')!
+    for (const name of ['copyDefaults', 'copyDefaultsFrom']) {
+      const f = (companies.flattenedFields as Array<{ name: string; admin?: { readOnly?: boolean } }>).find((x) => x.name === name)
+      expect(f?.admin?.readOnly, name).toBe(false)
+    }
+  })
 })
 
 describe('MC4 item 4 — report PDF letterhead logo', () => {

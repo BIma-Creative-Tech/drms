@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### MC4 — staging UAT fixes (2026-10-02, `docs/proyekkas/uat/mc4/` run on staging `3dd8a96`)
+- **UI-CO (copy defaults in the company form):** after the MC4-02 read fix the two fields were visible but
+  **disabled** — Payload makes `virtual` fields `admin.readOnly` by default (`fields/config/sanitize.js`); both now set
+  `admin.readOnly: false` (unit test). The API path was already fine (the UAT fixture created PT CS1 with copied
+  defaults).
+
 ### MC4 — QA open items (branch `fix/mc4-qa-open-items`; report `docs/proyekkas/qa/mc4-qa-report.md` §11)
 
 Closes QA-MC4-09, QA-MC4-13 and the read-rule parts of QA-MC4-14 under the PT scope rule. Web/API only, no
