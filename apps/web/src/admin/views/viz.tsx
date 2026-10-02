@@ -136,7 +136,8 @@ html[data-theme='dark'] .pk-f3 {
 .pk-f3 .pk-bullet .v { font-size: 12px; text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
 @container (max-width: 460px) { .pk-f3 .pk-bullet { grid-template-columns: minmax(0, 1fr) auto; } .pk-f3 .pk-bullet .t { grid-column: 1 / -1; grid-row: 2; } }
 /* tables */
-.pk-f3 .pk-tw { position: relative; overflow-x: auto; margin: 0 -18px; padding: 0 18px; }
+.pk-f3 .pk-tw { position: relative; overflow-x: auto; margin: 0 calc(-1 * var(--pk-tw-bleed, 0px)); padding: 0 var(--pk-tw-bleed, 0px); }
+.pk-f3 .pk-card { --pk-tw-bleed: 18px; } /* bleed to the card edge only inside a card (its padding); elsewhere no negative margin → no page overflow at 390 px (MC4-03) */
 .pk-f3 table.pk-t { width: 100%; border-collapse: collapse; font-size: 13px; }
 .pk-f3 .pk-t th { text-align: left; font-size: 12px; font-weight: 600; color: var(--pk-muted-fg); padding: 8px 10px; border-bottom: 1px solid var(--pk-border); white-space: nowrap; }
 .pk-f3 .pk-t th[aria-sort] { color: var(--pk-fg); }

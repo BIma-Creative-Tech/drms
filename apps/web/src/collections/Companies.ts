@@ -335,7 +335,7 @@ export const Companies: CollectionConfig = withAudit(
         label: 'Salin default saat dibuat',
         defaultValue: true,
         virtual: true,
-        access: { create: ({ req }) => isGroupAdmin(req), update: () => false, read: () => false },
+        access: { create: ({ req }) => isGroupAdmin(req), update: () => false, read: ({ req }) => isGroupAdmin(req) }, // read: Payload hides unreadable fields in the create form (MC4-02)
         admin: {
           position: 'sidebar',
           condition: (data) => !data?.id,
@@ -348,7 +348,7 @@ export const Companies: CollectionConfig = withAudit(
         relationTo: 'companies',
         label: 'Salin dari PT',
         virtual: true,
-        access: { create: ({ req }) => isGroupAdmin(req), update: () => false, read: () => false },
+        access: { create: ({ req }) => isGroupAdmin(req), update: () => false, read: ({ req }) => isGroupAdmin(req) }, // read: Payload hides unreadable fields in the create form (MC4-02)
         admin: { position: 'sidebar', condition: (data) => !data?.id && data?.copyDefaults !== false, description: 'Kosong = PT #1 (DRMS).' },
       },
       // list-only column (MC2-4): active members of the PT

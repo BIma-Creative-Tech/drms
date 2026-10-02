@@ -170,6 +170,16 @@ describe('MC4 extra (d) — saved list columns get the PT column once (migration
     }
     expect(flat).toContain('copyDefaultsFrom')
   })
+
+  it('companies: copy-defaults fields are readable by the group admin only (else hidden in the create form, MC4-02)', () => {
+    const companies = config.collections.find((c) => c.slug === 'companies')!
+    const req = (groupAdmin: boolean) => ({ user: withCompanyContext({ id: 1 }, [{ company: 1, roles: ['pk-admin'], employee: null }], null, groupAdmin) }) as unknown as PayloadRequest
+    for (const name of ['copyDefaults', 'copyDefaultsFrom']) {
+      const f = (companies.flattenedFields as Array<{ name: string; access?: { read?: (a: { req: PayloadRequest }) => boolean } }>).find((x) => x.name === name)
+      expect(f?.access?.read?.({ req: req(true) }), name).toBe(true)
+      expect(f?.access?.read?.({ req: req(false) }), name).toBe(false)
+    }
+  })
 })
 
 describe('MC4 item 4 — report PDF letterhead logo', () => {

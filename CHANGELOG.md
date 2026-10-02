@@ -44,6 +44,12 @@ migration. The APK 0.3.x keeps working: no error code was added, removed or rena
 - OpenAPI: the report query parameter `pt` is documented; the descriptions of `COMPANY_MISMATCH` and the body
   `company` were updated (no shape change).
 
+#### Fixed (found by the MC4 UAT suite, local run 2026-10-02)
+- **MC4-02:** "Salin default saat dibuat" / "Salin dari PT" were never shown on the company create form (field
+  `read: () => false` → Payload hides the field); now readable by the group admin only.
+- **MC4-03:** 2 px horizontal page overflow at 390 px on `/admin/persetujuan`: the table wrapper `.pk-tw` bleeds to
+  the card edge only inside a `.pk-card` (`--pk-tw-bleed`), no negative margin elsewhere.
+
 ### MC4 — PT scope rule (owner decision 2026-10-02; branch `feat/mc4-pt-scope-rule`, ADR 0016 "Implementation notes — Scope rule")
 
 Read and search scope = the PTs a user is mapped to (active memberships): one PT → that PT only; several → the
