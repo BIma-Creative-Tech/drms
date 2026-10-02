@@ -23,6 +23,10 @@ baru juga muncul di lonceng **Notifikasi** (bar atas, kanan) dan — bila Admin 
 
 ![TODO screenshot: kartu Menunggu Persetujuan APK dengan Dampak anggaran](img/direktur-inbox.png)
 
+- **Direktur di lebih dari satu PT:** yang masuk ke Anda hanya pengajuan dari PT tempat Anda Direktur. Bila lebih dari
+  satu PT tampil (tombol PT di bar atas web / di Beranda APK), setiap baris diberi kode PT (web: kolom **PT** +
+  tulisan **Menampilkan PT: …**). Keputusan selalu memakai peran Anda **di PT pengajuan**, dan warna merah Dampak
+  anggaran memakai ambang PT itu.
 - Anda tidak bisa menyetujui pengajuan di mana Anda tercantum sebagai pemohon. Bila Anda satu-satunya Direktur,
   langkah "Diketahui" dilewati otomatis dan tercatat "(tidak berlaku — pemohon)".
 - Bila Anda berhalangan, semua pengajuan tertahan. Sepakati pengganti dengan Admin (aturan approval) sebelum cuti.
@@ -39,6 +43,10 @@ Setelah Anda, Finance juga menyetujui; RAB project bertambah otomatis dan tercat
 - **Web Beranda:** Saldo kas total, Pengajuan menunggu, Pencairan bulan ini, Realisasi vs anggaran; grafik **Arus
   kas bulanan** (pilih 12 atau 6 bulan), status pengajuan, realisasi vs RAB per project, kelengkapan nota/LPJ,
   saldo per akun. Klik kartu untuk rinciannya. Rentang tanggal bebas: **Laporan → Rekap Kas**.
+- **Beberapa PT:** angka besar = gabungan PT tempat Anda Direktur; di bawahnya rincian per PT (saldo kas, pengajuan
+  menunggu, project berjalan · merah · kuning, kelengkapan LPJ, antrian transfer). Warna anggaran dihitung dengan
+  ambang **masing-masing PT** (tidak ada persentase gabungan). Nama akun kas diberi awalan `[KODE PT]`. Ingin melihat
+  satu PT saja: ubah pilihan di tombol PT.
 - **HP Beranda "Ringkasan":** angka yang sama; ketuk bulan di grafik untuk melihat kas masuk/keluar.
 - **Progress fisik vs anggaran:** web **Progress project** / HP Beranda. Merah = anggaran terpakai jauh mendahului
   progress fisik.
@@ -47,7 +55,8 @@ Setelah Anda, Finance juga menyetujui; RAB project bertambah otomatis dan tercat
 
 ## 4. Project dan tahapan (web)
 
-1. **Proyek → Project** → tombol buat baru: kode, nama, klien, **Project Manager**, **RAB**, status, titik lokasi
+1. **Proyek → Project** → tombol buat baru: **PT** (paling atas; wajib bila pemilih PT berisi lebih dari satu PT,
+   tidak bisa diubah setelah dibuat; PM harus punya akses di PT itu), kode, nama, klien, **Project Manager**, **RAB**, status, titik lokasi
    (Latitude/Longitude dari Google Maps) dan **Radius geofence** untuk absensi.
 2. **Progress project** → project → **Editor tahapan** → **+ Tambah tahapan** atau **Mulai dari template tahapan** →
    atur bobot hingga **✓ sudah 100%** → **Simpan tahapan**.
@@ -63,7 +72,10 @@ klik foto untuk ukuran penuh. Anda juga boleh membuat laporan dari HP (sama sepe
 
 - **Kas** (baca saja) dan **Laporan** (Rekap Kas, Pengeluaran per Kategori, Anggaran Project, Biaya per Kendaraan,
   dll.) dengan unduh Excel/PDF.
-- **Tutup buku → Buka kembali**: hanya Anda, hanya periode tertutup terakhir, alasan wajib. Lihat
+- **Laporan beberapa PT:** filter **PT** mempersempit laporan; bila lebih dari satu PT masuk: kolom **PT** per baris
+  dan tabel **Subtotal per PT** + TOTAL. Kop: satu PT = kop PT itu; beberapa PT = kop grup + daftar PT.
+- **Tutup buku → Buka kembali**: hanya Anda, hanya periode tertutup terakhir, alasan wajib. Tutup buku berlaku
+  **per PT**: bila Anda Direktur di beberapa PT, pilih PT dulu di kartu **Pilih PT**. Lihat
   [runbook tutup buku](../runbooks/tutup-buku.md) §B.
 - **Audit Log**: siapa melakukan apa, kapan, dari perangkat apa.
 
