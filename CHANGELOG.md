@@ -50,6 +50,14 @@ migration. The APK 0.3.x keeps working: no error code was added, removed or rena
 - **MC4-03:** 2 px horizontal page overflow at 390 px on `/admin/persetujuan`: the table wrapper `.pk-tw` bleeds to
   the card edge only inside a `.pk-card` (`--pk-tw-bleed`), no negative margin elsewhere.
 
+### CI — Trivy image scan: retry, IPv4 only
+- `ci.yml` job `image`: the Trivy report and gate run through `.github/scripts/trivy-image.sh` — 3 attempts with
+  back-off (0 / 30 / 90 s) for network errors, the container started with IPv6 disabled (Go then skips AAAA records;
+  falls back to a normal run if the daemon refuses the sysctl). The gate now uses `--exit-code 3` for "fixable
+  CRITICAL found", which is never retried, and `set -euo pipefail` (a failing first image used to be masked by the
+  second). Cause: develop `3dd8a96` (2026-10-02) failed in the gate fetching a GHCR blob from
+  `pkg-containers.githubusercontent.com` ("dial tcp [2606:50c0:…]:443: connect: network is unreachable").
+
 ### CI — image build retry
 - `ci.yml` job `image`: each buildx step (web/migrate, local and push-by-digest) runs once with
   `continue-on-error`, then after a 45 s back-off one retry; later steps take the digest of whichever attempt
