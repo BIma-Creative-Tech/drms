@@ -50,6 +50,13 @@ migration. The APK 0.3.x keeps working: no error code was added, removed or rena
 - **MC4-03:** 2 px horizontal page overflow at 390 px on `/admin/persetujuan`: the table wrapper `.pk-tw` bleeds to
   the card edge only inside a `.pk-card` (`--pk-tw-bleed`), no negative margin elsewhere.
 
+### CI — image build retry
+- `ci.yml` job `image`: each buildx step (web/migrate, local and push-by-digest) runs once with
+  `continue-on-error`, then after a 45 s back-off one retry; later steps take the digest of whichever attempt
+  succeeded. Cause: develop `bff95ac` (2026-10-02) failed resolving `docker.io/docker/dockerfile:1` during a transient
+  Docker Hub outage on the self-hosted runner (IPv4 blip; the runner network has no IPv6). The BuildKit cache makes
+  the retry cheap; a second failure still fails the job.
+
 ### MC4 — PT scope rule (owner decision 2026-10-02; branch `feat/mc4-pt-scope-rule`, ADR 0016 "Implementation notes — Scope rule")
 
 Read and search scope = the PTs a user is mapped to (active memberships): one PT → that PT only; several → the
