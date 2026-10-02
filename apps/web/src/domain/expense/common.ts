@@ -9,6 +9,7 @@ import { getRequestTx } from '@/lib/tx'
 
 import { allowedActions, FINANCE_SELF_GUARDED, mayPerform, targets, type Action, type ActorContext } from './state'
 import { lacksDecisionRole } from './decision'
+import { SHARED_FLAG_WHERE } from './flag-visibility'
 import { matchesAcknowledger, matchesStep, type ApprovalSnapshot } from './rules'
 import { BUDGET_COMMITTED, type RequestStatus, type RequestType } from './types'
 
@@ -283,7 +284,8 @@ export async function projectCommitted(req: PayloadRequest, projectId: number, e
 export async function openFlagCount(req: PayloadRequest, requestId: number): Promise<number> {
   const r = await req.payload.count({
     collection: 'receipt-flags',
-    where: { and: [{ request: { equals: requestId } }, { status: { equals: 'open' } }] },
+    // QA-MC4-06: the stored number is read by everyone who reads the request → cross-PT duplicates excluded
+    where: { and: [{ request: { equals: requestId } }, { status: { equals: 'open' } }, SHARED_FLAG_WHERE] },
     overrideAccess: true, // SYSTEM-READ: flag count for decisions
     req,
   })

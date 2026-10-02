@@ -1,6 +1,6 @@
 import { APIError, type Payload, type PayloadRequest } from 'payload'
 
-import { isRole, memberCompanies, relId, soleCompany, type Role } from '@/access/roles'
+import { companiesWithRole, isGroupAdmin, isRole, memberCompanies, relId, soleCompany, type Role } from '@/access/roles'
 import type { Company, CompanySetting } from '@/payload-types'
 
 /**
@@ -62,6 +62,40 @@ export async function activeCompanyIds(payload: Payload, req?: PayloadRequest): 
     ...(req ? { req } : {}),
   })
   return res.docs.map((d) => d.id as number)
+}
+
+/**
+ * EVERY company id, active or not (QA-MC4-05, scope rule 2026-10-02): "holds the role in every PT"
+ * shortcuts must count a deactivated PT too — its data stays readable only by users mapped to it
+ * (and memberships of an inactive PT are never part of a company context, see `loadMemberships`).
+ */
+export async function allCompanyIds(payload: Payload, req?: PayloadRequest): Promise<number[]> {
+  const res = await payload.find({
+    collection: 'companies',
+    sort: 'id',
+    depth: 0,
+    pagination: false,
+    select: { shortCode: true },
+    overrideAccess: true, // SYSTEM-READ: every company (scope shortcuts)
+    ...(req ? { req } : {}),
+  })
+  return res.docs.map((d) => d.id as number)
+}
+
+/**
+ * Audit rows WITHOUT a PT (logins, accounts, uploads, shared masters, app-wide settings, and per-PT
+ * rows written before MC4 QA tagged them): only for group admins and for callers who are Admin or
+ * Direktur in EVERY PT — i.e. unchanged for a single-PT deployment. MC4 QA finding QA-MC4-03:
+ * before, the Admin / Direktur of ANY PT read them (PT B request lines, signatures, exports, users).
+ * Scope rule 2026-10-02: "every PT" includes DEACTIVATED PTs (nobody is mapped to one, so then only
+ * group admins read them) — untagged rows also hold cross-PT duplicate flags (QA-MC4-06), which must
+ * reach only people mapped to both PTs.
+ */
+export async function mayReadUntaggedAudit(req: PayloadRequest): Promise<boolean> {
+  if (isGroupAdmin(req)) return true
+  const mine = companiesWithRole(req, ['pk-admin', 'pk-owner'], { all: true })
+  if (mine.length === 0) return false
+  return (await allCompanyIds(req.payload, req)).every((c) => mine.includes(c))
 }
 
 /**

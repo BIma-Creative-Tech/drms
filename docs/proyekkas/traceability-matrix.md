@@ -176,7 +176,7 @@ migration = Direktur ("Diketahui" = approval) → Finance level 1 (Sprint S2 dec
 
 ## MC — Multi-company (ADR 0016, `requirements-v1.2.md`, added 2026-09-27)
 
-Status: **MC1 + MC2 + MC3 implemented** (MC1 `feat/mc1-foundation`; MC2 `feat/mc2-integration`, 2026-09-28; MC3 `feat/mc3-api` / `feat/mc3-mobile`; progress `mc/mc1-progress.md`, `mc/mc2-progress.md`, `mc/mc3-progress.md`); **MC4 code gaps** on `feat/mc4-code-gaps` (2026-09-30, `mc/mc4-progress.md`) — MC4 QA planned.
+Status (updated 2026-10-02): **MC1 + MC2 + MC3 implemented** (MC1 `feat/mc1-foundation`; MC2 `feat/mc2-integration`, 2026-09-28; MC3 API `6f6f8cf` + APK `00014a1` on `develop`; released in web v0.5.0; progress `mc/mc1-progress.md`, `mc/mc2-progress.md`, `mc/mc3-progress.md`); **MC4 code gaps** on `develop` (PR #9, `mc/mc4-progress.md`), **MC4 QA** (`qa/mc4-qa-report.md`, 4 HIGH fixed) and the **PT scope rule** (owner decision 2026-10-02) on `feat/mc4-pt-scope-rule` — MC4 staging UAT pending (blocked: group-admin test account, Keycloak `pk-user` scope MC4-01).
 Phase = MC sub-phase of `phase-plan.md`. "Isolation" = a user of PT A only gets 404 for PT B ids; "cross-PT" = DB
 trigger rejects the row.
 

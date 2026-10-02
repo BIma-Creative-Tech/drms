@@ -16,6 +16,9 @@ Anda juga bisa mengajukan dana untuk diri sendiri (lihat [panduan Staff](staff.m
   terlama dulu). Juga kartu pengajuan tim bulan ini, LPJ tim, realisasi anggaran, dan menu **Keuangan → Pengajuan
   biaya**. Buka pengajuan untuk melihat baris, foto nota, dan flag per baris (bagian **Rincian untuk pemeriksa**).
 - Anda hanya melihat project/pusat biaya yang Anda pegang.
+- **PM di lebih dari satu PT:** peran PM berlaku per PT. Daftar mengikuti pilihan PT (web: tombol PT di bar atas;
+  APK: tombol PT di Beranda — lihat [Hal umum](README.md#hal-umum-untuk-semua-peran)); bila lebih dari satu PT tampil,
+  tiap baris diberi kode PT.
 
 ## 2. Laporan progress harian (APK)
 
@@ -33,6 +36,7 @@ Anda juga bisa mengajukan dana untuk diri sendiri (lihat [panduan Staff](staff.m
 - Laporan ditolak karena bobot tahapan belum 100%: atur bobot di web (§4).
 - **Konflik** (laporan juga diedit di web): pilih **Kirim versi HP (dengan alasan)** atau **Pakai versi server**.
 - Laporan hanya dibuat dari APK. Di web Anda bisa membaca semua laporan tim (**Laporan progress**).
+- Laporan progress otomatis masuk ke PT project yang dipilih — tidak perlu memilih PT.
 
 **Progress vs anggaran:** Laporan progress → tab **Project**, atau web **Progress project**. Hijau = sesuai;
 kuning = perlu perhatian; merah = anggaran terpakai mendahului progress lebih dari 8 poin.
@@ -67,6 +71,7 @@ Butuh internet. Hanya untuk project yang Anda pegang dan sudah punya RAB.
 ## 6. Laporan & pengingat
 
 - Web **Laporan**: Anggaran Project, Pengeluaran per Kategori, Rekap Pengajuan, Kelengkapan Nota/LPJ, Biaya per
-  Kendaraan, Laporan Absensi — untuk project tim Anda; unduh Excel/CSV/PDF.
+  Kendaraan, Laporan Absensi — untuk project tim Anda; unduh Excel/CSV/PDF. Bila Anda PM di beberapa PT, filter
+  **PT** mempersempit laporan; lebih dari satu PT = kolom **PT** + tabel subtotal per PT.
 - Pengingat otomatis (lonceng): project Anda belum ada laporan progress beberapa hari, atau anggaran melewati ambang.
   Di web, lonceng **Notifikasi** ada di bar atas, kanan (angka = belum dibaca).

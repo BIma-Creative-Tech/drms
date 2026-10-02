@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto'
+
 import { NextRequest } from 'next/server'
 import { handleEndpoints } from 'payload'
 import sharp from 'sharp'
@@ -11,7 +13,7 @@ import { signedMediaPath, signingKeys, signMedia } from '@/lib/signed-url'
 import config from '@/payload.config'
 
 import { auditRows, getTestPayload, sqlAs, sqlError } from './helpers'
-import { api, draftBody, makeWorld, ORIGIN, png, upload, type FlowUser, type Res, type World } from './flow-world'
+import { api, draftBody, makeWorld, ORIGIN, png, sysCreate, upload, type FlowUser, type Res, type World } from './flow-world'
 
 /**
  * E9 hardening (plan fase1-golive §E9) through /api/v1:
@@ -187,6 +189,12 @@ describe('signed media URLs (ADR 0004 §4)', () => {
     const s = await must(upload('/api/v1/media/selfies', w.users.staffA, jpeg, 'image/jpeg'), 201)
     expect((await get(`/api/v1/media/selfies/${s.id}/file`, w.users.staffA)).status).toBe(200)
     expect((await get(`/api/v1/media/selfies/${s.id}/file`, w.users.staffB)).status).toBe(404)
+    // MC4 scope rule (QA-MC4-05/07): office roles read the selfies of THEIR PTs' attendances; an
+    // unlinked upload has no PT (only the uploader, or an office holder in every PT incl. inactive ones)
+    await sysCreate('attendances', {
+      employee: w.emp.a, user: w.users.staffA.id, kind: 'check_in', project: w.project, localDate: '2026-08-03', attendanceTime: '2026-08-03T00:30:00.000Z',
+      receivedAt: '2026-08-03T00:30:01.000Z', timeTrust: 'server', lat: -3.32, lng: 114.59, distanceM: 5, selfie: s.id, clientUuid: randomUUID(),
+    })
     const fin = await get(`/api/v1/media/selfies/${s.id}/file`, w.users.finance)
     expect(fin.status).toBe(200)
     expect(fin.headers.get('content-type')).toBe('image/jpeg')

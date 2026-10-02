@@ -6,6 +6,7 @@ import { writeAudit } from '@/audit/writer'
 import { getRequestTx } from '@/lib/tx'
 
 import { actorContext, fail, ids, loadRaw, loadVisible, requireAction, requireActionAudited, settings, today, updateRequest, type RequestDoc } from './common'
+import { mayViewFlag, withFlagVisibility } from './flag-visibility'
 import { computeFlags, normalizeReceiptNo, normalizeVendor, type DuplicateHit, type FlagCategory, type FlagSpec } from './flags'
 import { grandTotal } from './lines'
 import { auditSkipped, selectAndSnapshot, writeSnapshot } from './snapshot'
@@ -355,7 +356,8 @@ export async function verifyAllReceipts(req: PayloadRequest, requestId: number) 
   await assertEveryLineHasReceipt(req, raw)
   const open = await req.payload.count({
     collection: 'receipt-flags',
-    where: { and: [{ request: { equals: requestId } }, { status: { equals: 'open' } }, { level: { equals: 'warning' } }] },
+    // QA-MC4-06: a cross-PT duplicate the caller may not see does not exist for them (no oracle)
+    where: withFlagVisibility(req, { and: [{ request: { equals: requestId } }, { status: { equals: 'open' } }, { level: { equals: 'warning' } }] }),
     overrideAccess: true, // SYSTEM-READ: open warnings
     req,
   })
@@ -369,8 +371,8 @@ export async function reviewFlag(req: PayloadRequest, requestId: number, flagId:
   await requireActionAudited(req, await actorContext(req, doc), 'review_flag', doc)
   const f = (await req.payload
     .findByID({ collection: 'receipt-flags', id: flagId, depth: 0, overrideAccess: true /* SYSTEM-READ: belongs-to check below */, req })
-    .catch(() => null)) as (FlagDoc & { request: unknown }) | null
-  if (!f || relId(f.request) !== requestId) fail(404, 'Flag tidak ditemukan.')
+    .catch(() => null)) as (FlagDoc & { request: unknown; relatedCompany?: unknown }) | null
+  if (!f || relId(f.request) !== requestId || !mayViewFlag(req, f)) fail(404, 'Flag tidak ditemukan.')
   if (f.status !== 'open') fail(409, 'Flag tidak terbuka.')
   const updated = await req.payload.update({
     collection: 'receipt-flags',
@@ -380,12 +382,25 @@ export async function reviewFlag(req: PayloadRequest, requestId: number, flagId:
     overrideAccess: true, // SYSTEM-WRITE: review after guard
     req,
   })
+  const related = relId(f.relatedCompany)
   await writeAudit(req, [
-    { action: 'flag_reviewed', docType: 'expense_request', docId: String(requestId), docNo: doc.docNo ?? undefined, field: f.kind, oldValue: 'open', newValue: 'reviewed', reason: note },
+    related === undefined
+      ? { action: 'flag_reviewed', docType: 'expense_request', docId: String(requestId), docNo: doc.docNo ?? undefined, field: f.kind, oldValue: 'open', newValue: 'reviewed', reason: note }
+      : // QA-MC4-06: cross-PT duplicate → untagged row + relatedCompanyId (see recomputeFlags)
+        { action: 'flag_reviewed', docType: 'expense_request', docId: String(requestId), docNo: doc.docNo ?? undefined, field: f.kind, oldValue: 'open', newValue: { status: 'reviewed', relatedCompanyId: related }, reason: note, companyId: null },
   ])
   return updated
 }
 
+/**
+ * US-50 duplicate search (QA-MC4-06, owner decision 2026-10-02 = ADR 0016 "Scope rule"): per receipt,
+ * other ACTIVE receipts of active requests in the request's OWN PT or in a PT the receipt's UPLOADER
+ * (`receipts.created_by`) is mapped to (active membership in an active PT). A single-PT uploader is
+ * matched against that PT only; a multi-PT uploader against their PTs only — never an unmapped PT,
+ * so the flag is no oracle for one. The scope depends on the receipt, not on who triggers the
+ * recompute (submit / edit / resubmit by someone else gives the same flags). Imported receipts
+ * without an uploader → own PT only.
+ */
 async function duplicateHits(req: PayloadRequest, requestId: number): Promise<DuplicateHit[]> {
   const tx = await getRequestTx(req)
   const inactive = sql.join(
@@ -394,6 +409,7 @@ async function duplicateHits(req: PayloadRequest, requestId: number): Promise<Du
   )
   const r = (await tx.execute(sql`
     SELECT r.id AS rid, o.request_id AS other, e.doc_no AS doc_no,
+           CASE WHEN e.company_id <> r.company_id THEN e.company_id END AS other_company,
            CASE WHEN r.image_sha256 IS NOT NULL AND o.image_sha256 = r.image_sha256 THEN 'image' ELSE 'fields' END AS via
     FROM receipts r
     JOIN receipts o ON o.id <> r.id AND o.request_id <> r.request_id
@@ -403,8 +419,19 @@ async function duplicateHits(req: PayloadRequest, requestId: number): Promise<Du
     WHERE r.request_id = ${requestId}
       AND r.status::text IN ('pending', 'valid') AND o.status::text IN ('pending', 'valid')
       AND e.status::text NOT IN (${inactive})
-    ORDER BY r.id, o.request_id`)) as unknown as { rows: Array<{ rid: number; other: number; doc_no: string | null; via: 'image' | 'fields' }> }
-  return r.rows.map((x) => ({ receiptId: Number(x.rid), otherRequestId: Number(x.other), otherDocNo: x.doc_no, via: x.via }))
+      AND (e.company_id = r.company_id
+           OR e.company_id IN (SELECT m.company_id FROM company_memberships m JOIN companies c ON c.id = m.company_id
+                               WHERE m.user_id = r.created_by_id AND m.active AND c.active))
+    ORDER BY r.id, o.request_id`)) as unknown as {
+    rows: Array<{ rid: number; other: number; doc_no: string | null; other_company: number | null; via: 'image' | 'fields' }>
+  }
+  return r.rows.map((x) => ({
+    receiptId: Number(x.rid),
+    otherRequestId: Number(x.other),
+    otherDocNo: x.doc_no,
+    via: x.via,
+    otherCompanyId: x.other_company === null ? null : Number(x.other_company),
+  }))
 }
 
 /**
@@ -500,6 +527,7 @@ export async function recomputeFlags(req: PayloadRequest, requestId: number): Pr
         lineNo: w.lineNo,
         receipt: w.receiptId ?? null,
         relatedRequest: w.relatedRequestId ?? null,
+        relatedCompany: w.relatedCompanyId ?? null,
         message: w.message,
         detail: w.detail,
         status: 'open',
@@ -520,7 +548,10 @@ export async function recomputeFlags(req: PayloadRequest, requestId: number): Pr
         docNo: doc.docNo ?? undefined,
         field: w.kind,
         lineNo: w.lineNo,
-        newValue: { level: w.level, message: w.message },
+        newValue: { level: w.level, message: w.message, ...(w.relatedCompanyId !== undefined ? { relatedCompanyId: w.relatedCompanyId } : {}) },
+        // QA-MC4-06: a cross-PT duplicate names a request of another PT → row WITHOUT a PT (group admins /
+        // Admin-Direktur of every PT only); the request's "Riwayat" hides it from viewers not mapped to it
+        ...(w.relatedCompanyId !== undefined ? { companyId: null } : {}),
       })),
     )
   }

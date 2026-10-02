@@ -29,16 +29,21 @@ const CTX_IDS = 'pkVisibleProgressReportIds'
 /**
  * Ids of progress reports the caller may read, via the collection read access (overrideAccess:false),
  * cached per request. Used by the photo read access (media-progress-photos owned by a report).
+ * `exceptCompanies`: see `visibleRequestIds` (QA-MC4-07).
  */
-export async function visibleReportIds(req: PayloadRequest): Promise<number[]> {
+export async function visibleReportIds(req: PayloadRequest, opts: { exceptCompanies?: readonly number[] } = {}): Promise<number[]> {
   const uid = userId(req)
   if (uid === undefined) return []
-  const cached = req.context?.[CTX_IDS] as { uid: number; ids: number[] } | undefined
-  if (cached && cached.uid === uid) return cached.ids
+  const except = [...new Set(opts.exceptCompanies ?? [])].sort((a, b) => a - b)
+  const k = except.join(',')
+  const cached = req.context?.[CTX_IDS] as { uid: number; byExcept: Record<string, number[]> } | undefined
+  const hit = cached && cached.uid === uid ? cached.byExcept[k] : undefined
+  if (hit) return hit
   let ids: number[] = []
   try {
     const res = await req.payload.find({
       collection: 'progress-reports',
+      ...(except.length > 0 ? { where: { company: { not_in: except } } } : {}),
       depth: 0,
       pagination: false,
       select: { docNo: true },
@@ -50,13 +55,13 @@ export async function visibleReportIds(req: PayloadRequest): Promise<number[]> {
   } catch (err) {
     if ((err as { status?: number }).status !== 403) throw err
   }
-  req.context[CTX_IDS] = { uid, ids }
+  req.context[CTX_IDS] = { uid, byExcept: { ...(cached && cached.uid === uid ? cached.byExcept : {}), [k]: ids } }
   return ids
 }
 
-/** Read rule for photos owned by a readable report. */
-export async function reportPhotoWhere(req: PayloadRequest): Promise<Where | false> {
-  const ids = await visibleReportIds(req)
+/** Read rule for photos owned by a readable report (outside `exceptCompanies`, see above). */
+export async function reportPhotoWhere(req: PayloadRequest, opts: { exceptCompanies?: readonly number[] } = {}): Promise<Where | false> {
+  const ids = await visibleReportIds(req, opts)
   if (ids.length === 0) return false
   return { and: [{ ownerDocType: { equals: 'progress_report' } }, { ownerDocId: { in: ids.map(String) } }] }
 }

@@ -1,7 +1,7 @@
 import type { PayloadRequest } from 'payload'
 
 import { companiesWithRole, rolesIn } from '@/access/roles'
-import { companyRefs } from '@/domain/companies'
+import { companyRefs, mayReadUntaggedAudit } from '@/domain/companies'
 import { approvalInbox } from '@/domain/expense/queues'
 
 import { auditLogPage } from './audit-log'
@@ -340,7 +340,7 @@ export async function staffDashboard(req: PayloadRequest) {
 export async function adminDashboard(req: PayloadRequest) {
   const ctx = await reportContext(req)
   const pts = companiesWithRole(req, ['pk-admin'])
-  const includeUntagged = pts.some((c) => rolesIn(req, c).includes('pk-admin'))
+  const includeUntagged = pts.some((c) => rolesIn(req, c).includes('pk-admin')) && (await mayReadUntaggedAudit(req)) // QA-MC4-03
   const [gaps, audit, companies] = await inSequence(
     () => masterGaps(req, pts),
     () => auditLogPage(req, { from: addDaysSafe(ctx.today, -30), to: ctx.today, companyIds: pts, includeUntagged }, { limit: 20 }),

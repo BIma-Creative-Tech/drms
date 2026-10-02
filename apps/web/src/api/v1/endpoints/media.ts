@@ -7,7 +7,6 @@ import type { CollectionSlug, PayloadRequest } from 'payload'
 import { loadMemberships } from '@/access/company-context'
 import { relId, userId, withCompanyContext } from '@/access/roles'
 import { writeAudit, writeAuditDetached } from '@/audit/writer'
-import { visibleRequestIds } from '@/domain/expense/access'
 import { getEnv } from '@/lib/env'
 import { ImageQueueFullError, withImageSlot } from '@/lib/image-queue'
 import { fileSize, mediaPath } from '@/lib/media-files'
@@ -143,8 +142,14 @@ async function signatureOnVisibleRequest(req: PayloadRequest, mediaId: number): 
   })
   const reqIds = rows.docs.map((d) => relId((d as { request?: unknown }).request)).filter((x): x is number => x !== undefined)
   if (reqIds.length === 0) return false
-  const visible = await visibleRequestIds(req)
-  return reqIds.some((x) => visible.includes(x))
+  // QA-MC4-07: those requests only (was: every visible request id of the caller)
+  const visible = await req.payload
+    .find({ collection: 'expense-requests', where: { id: { in: reqIds } }, depth: 0, limit: 1, pagination: false, select: { status: true }, user: req.user, overrideAccess: false, req })
+    .catch((err: { status?: number }) => {
+      if (err.status === 403) return { docs: [] }
+      throw err
+    })
+  return visible.docs.length > 0
 }
 
 /**

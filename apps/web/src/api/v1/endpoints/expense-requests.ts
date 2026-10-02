@@ -6,6 +6,7 @@ import { writeAudit } from '@/audit/writer'
 import { actorContext, displayName, loadVisible, type RequestDoc } from '@/domain/expense/common'
 import { withReqTransaction } from '@/lib/system-tx'
 import { createDraft, resubmitAsDraft, updateDraft } from '@/domain/expense/drafts'
+import { withFlagVisibility } from '@/domain/expense/flag-visibility'
 import { detail, listItem } from '@/domain/expense/dto'
 import { addReceipt, editReceipt, rejectReceipt, removeReceipt, resubmitReceipts, reviewFlag, verifyAllReceipts, verifyReceipt } from '@/domain/expense/receipts'
 import { allowedActions } from '@/domain/expense/state'
@@ -214,7 +215,7 @@ export const transferQueueEndpoint = v1({
     for (const d of res.docs as unknown as RequestDoc[]) {
       const flags = await req.payload.count({
         collection: 'receipt-flags',
-        where: { and: [{ request: { equals: d.id } }, { status: { equals: 'open' } }] },
+        where: withFlagVisibility(req, { and: [{ request: { equals: d.id } }, { status: { equals: 'open' } }] }), // QA-MC4-06
         overrideAccess: true, // SYSTEM-READ: open flag count (US-19 column)
         req,
       })

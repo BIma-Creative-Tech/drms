@@ -12,7 +12,7 @@ import { describe, expect, it } from 'vitest'
  * A NEW raw-SQL function without a company predicate fails this test.
  */
 const ROOT = path.resolve(__dirname, '../../src')
-const SCAN = ['domain/reports', 'domain/reminders', 'domain/attendance', 'domain/cash', 'domain/expense/auto-close.ts', 'domain/progress/reminders.ts']
+const SCAN = ['domain/reports', 'domain/reminders', 'domain/attendance', 'domain/cash', 'domain/expense/auto-close.ts', 'domain/expense/receipts.ts', 'domain/progress/reminders.ts'] // receipts: duplicateHits (QA-MC4-06)
 
 const PER_PT_TABLES = [
   'expense_requests', 'cash_entries', 'cash_accounts', 'projects', 'cost_centers', 'attendances', 'employees', 'team_assignments', 'transfers',

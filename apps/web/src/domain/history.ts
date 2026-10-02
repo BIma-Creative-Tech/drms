@@ -3,6 +3,7 @@ import type { PayloadRequest, Where } from 'payload'
 import { hasRole } from '@/access/roles'
 import { companyOf } from '@/domain/companies'
 import { displayNames } from '@/domain/companies'
+import { auditRowVisible } from '@/domain/expense/flag-visibility'
 
 /**
  * "Riwayat" (US-35, requirements v1.1 §8 "Tampilan log"): audit rows of a document — who (user +
@@ -60,9 +61,11 @@ export async function historyRows(req: PayloadRequest, targets: Array<{ docType:
     overrideAccess: true, // SYSTEM-READ: history of documents the caller may read (checked by the caller)
     req,
   })
-  const userIds = [...new Set(res.docs.map((a) => a.userId).filter((x): x is number => typeof x === 'number'))]
+  // QA-MC4-06: flag rows of a cross-PT duplicate only for viewers mapped to the other request's PT
+  const docs = res.docs.filter((a) => auditRowVisible(req, { action: String(a.action), newValue: unwrapAudit(a.newValue) }))
+  const userIds = [...new Set(docs.map((a) => a.userId).filter((x): x is number => typeof x === 'number'))]
   const names = await displayNames(req, userIds, { emailFallback: false })
-  return res.docs.map((a) => ({
+  return docs.map((a) => ({
     id: a.id as number,
     serverTime: (a.serverTime as string) ?? '',
     docType: a.docType as string,

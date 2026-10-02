@@ -19,17 +19,29 @@ export function progressWriteGuard(slug: CollectionSlug): CollectionBeforeOperat
   return async ({ args, operation, req }) => {
     if (operation !== 'create' && operation !== 'update') return args
     if (req.context?.[CTX_PROGRESS_WRITE]) return args
-    const a = args as { data?: Record<string, unknown>; id?: number | string }
+    const a = args as { data?: Record<string, unknown>; id?: number | string; overrideAccess?: boolean }
     const data = a.data
     if (!data || !('progressPct' in data) || data.progressPct === undefined || data.progressPct === null) return args
     const wanted = Number(data.progressPct)
     let current = 0
     if (operation === 'update') {
       if (a.id === undefined) throw new APIError('Progress hanya berubah lewat laporan progress.', 403, null, true)
-      const doc = (await req.payload.findByID({ collection: slug, id: a.id, depth: 0, overrideAccess: true /* SYSTEM-READ: compare the stored value */, req, disableErrors: true })) as {
+      // QA-MC4-10 (scope rule 2026-10-02): an HTTP caller compares against a row it may READ — else the
+      // 403 below vs. Payload's own 404 answered "is progressPct of this PT B project = X?"
+      const asCaller = a.overrideAccess !== true && !!req.user
+      const doc = (await req.payload.findByID({
+        collection: slug,
+        id: a.id,
+        depth: 0,
+        user: asCaller ? req.user : undefined,
+        overrideAccess: !asCaller, // SYSTEM-READ only for system writes (no HTTP caller): compare the stored value
+        req,
+        disableErrors: true,
+      })) as {
         progressPct?: number | null
       } | null
-      current = Number(doc?.progressPct ?? 0)
+      if (!doc) return args // not readable / missing → Payload's update access answers (404/403)
+      current = Number(doc.progressPct ?? 0)
     }
     if (!Number.isFinite(wanted) || round2(wanted) !== round2(current)) {
       throw new APIError('Progress hanya berubah lewat laporan progress (bukan diedit langsung).', 403, null, true)

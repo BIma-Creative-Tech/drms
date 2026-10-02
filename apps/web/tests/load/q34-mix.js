@@ -9,6 +9,8 @@
 //                      FIELD_USERS='[{"u":"lt-field-01","p":"…"}, …]'            (30 akun pk-staff, 1 akun per VU)
 //                      OFFICE_USERS='[{"u":"lt-office-01","p":"…","r":"finance"}, …]'  (r = finance|owner|pm)
 //                      PROJECT_ID, LAT, LNG (project uji beban PRJ-LT-E9 + titik geofence)
+//                    MC4 (3 PT): entri akun boleh membawa "pid" (project milik PT akun itu) — menggantikan
+//                    PROJECT_ID untuk VU tersebut; tanpa "pid" perilaku sama seperti E9.
 //                    Campuran (keputusan Lead 2026-09-27, opsi b — hanya PM/Direktur yang boleh lapor progress):
 //                      lapangan (Staff): /me, /masters, selfie + check-in/check-out (sync), nota foto 1600 px +
 //                                        draft Reimburse lalu draft_delete (dibatalkan), daftar pengajuan, /dashboard/me
@@ -164,7 +166,7 @@ function login(pool) {
   const tok = tokenReq({ grant_type: 'password', client_id: 'proyekkas-mobile', username: u.u, password: u.p, scope: 'openid' })
   if (!tok) return null
   const deviceId = uuid()
-  const s = { ...tok, deviceId, user: u.u, role: u.r || 'staff' }
+  const s = { ...tok, deviceId, user: u.u, role: u.r || 'staff', pid: Number(u.pid || PROJECT_ID) }
   const r = http.post(`${BASE}/api/v1/devices/register`, JSON.stringify({ deviceId, platform: 'android', model: 'k6-loadtest', appVersion: APP_VERSION }), { headers: hdr(s, true), tags: { name: 'device_register' } })
   rec('device_register', r, [200, 201])
   console.log(`login ${exec.scenario.name} vu=${idx} user=${u.u} role=${s.role}`)
@@ -245,19 +247,19 @@ export function fieldAuth() {
   rec('me', http.get(`${BASE}/api/v1/me`, { headers: hdr(s), tags: { name: 'me' } }), [200])
   if (exec.vu.iterationInScenario % 3 === 0) rec('masters', http.get(`${BASE}/api/v1/masters`, { headers: hdr(s), tags: { name: 'masters' } }), [200])
   think(3, 8)
-  if (Math.random() < 0.45 && PROJECT_ID) {
+  if (Math.random() < 0.45 && s.pid) {
     // Absensi: selfie 720 px lalu check-in / check-out (sharp resize di web).
     const mid = upload(s, 'selfies', SELFIE, 'selfie.jpg', 'upload_selfie')
     const type = attendanceStep % 2 === 0 ? 'attendance.check_in' : 'attendance.check_out'
     attendanceStep++
-    if (mid) sync(s, [syncItem(type, { project_id: PROJECT_ID, lat: LAT, lng: LNG, accuracy_m: 8, is_mocked: false, selfie_media_id: mid, camera_lens: 'front' })], 'checkin')
+    if (mid) sync(s, [syncItem(type, { project_id: s.pid, lat: LAT, lng: LNG, accuracy_m: 8, is_mocked: false, selfie_media_id: mid, camera_lens: 'front' })], 'checkin')
   } else {
     // Nota foto 1600 px + draft Reimburse (1 baris, 1 nota) lalu dibatalkan (draft_delete) di batch yang sama.
     const rid = upload(s, 'receipts', PHOTO, 'nota.jpg', 'upload_receipt')
     const cu = uuid()
     const line = { client_uuid: uuid(), description: 'Konsumsi uji beban (lump sum)', total: 50000 }
     if (rid) line.receipts = [{ client_uuid: uuid(), vendor_name: 'Warung Uji Beban', receipt_date: today(), amount: 50000, media_id: rid }]
-    const up = syncItem('expense_request.draft_upsert', { kind: 'reimburse', title: 'Uji beban k6 E9 (fiktif)', project_id: PROJECT_ID || null, lines: [line] })
+    const up = syncItem('expense_request.draft_upsert', { kind: 'reimburse', title: 'Uji beban k6 E9 (fiktif)', project_id: s.pid || null, lines: [line] })
     up.client_uuid = cu
     sync(s, [up, { ...syncItem('expense_request.draft_delete', { draft_client_uuid: cu, reason: 'Data uji beban k6 E9' }), depends_on: [cu] }], 'expense_draft')
     think(2, 5)
@@ -268,7 +270,7 @@ export function fieldAuth() {
 }
 
 function progressReport(s) {
-  const st = http.get(`${BASE}/api/v1/projects/${PROJECT_ID}/stages`, { headers: hdr(s), tags: { name: 'stages' } })
+  const st = http.get(`${BASE}/api/v1/projects/${s.pid}/stages`, { headers: hdr(s), tags: { name: 'stages' } })
   if (!rec('stages', st, [200])) return
   const open = (st.json('stages') || []).filter((x) => Number(x.progressPct ?? 0) < 100)
   if (!open.length) return
@@ -277,7 +279,7 @@ function progressReport(s) {
   const ids = []
   const n = 1 + Math.floor(Math.random() * 3)
   for (let i = 0; i < n; i++) { const id = upload(s, 'progress-photos', PHOTO, `progress-${i}.jpg`, 'upload_photo'); if (id) ids.push(id); think(1, 3) }
-  const body = { projectId: PROJECT_ID, stageId: stg.id, pctAfter: pct, work: 'Uji beban k6 E9 (data fiktif)', photoIds: ids, clientUuid: uuid() }
+  const body = { projectId: s.pid, stageId: stg.id, pctAfter: pct, work: 'Uji beban k6 E9 (data fiktif)', photoIds: ids, clientUuid: uuid() }
   const r = http.post(`${BASE}/api/v1/progress-reports`, JSON.stringify(body), { headers: hdr(s, true, { 'Idempotency-Key': uuid() }), tags: { name: 'progress_report' } })
   // 409 PROGRESS_DECREASED = balapan dua pelapor pada tahapan yang sama (bukan error beban).
   if (rec('progress_report', r, [200, 201, 409]) && r.status !== 409) progressCreated.add(1)
@@ -301,7 +303,7 @@ export function officeAuth() {
   } else {
     rec('projects_progress', http.get(`${BASE}/api/v1/projects/progress`, { headers: hdr(s), tags: { name: 'projects_progress' } }), [200])
     think(3, 8)
-    if (PROJECT_ID && Math.random() < 0.6) progressReport(s)
+    if (s.pid && Math.random() < 0.6) progressReport(s)
   }
   think(15, 30)
 }

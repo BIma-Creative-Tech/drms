@@ -6,6 +6,45 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### MC4 — PT scope rule (owner decision 2026-10-02; branch `feat/mc4-pt-scope-rule`, ADR 0016 "Implementation notes — Scope rule")
+
+Read and search scope = the PTs a user is mapped to (active memberships): one PT → that PT only; several → the
+consolidated data of those PTs, never another PT. Group admin unchanged; mutations stay single-PT. Web/API only.
+Migration: `20261002_080000_mc4_scope_rule` (schema + backfill, idempotent, down migration; ~12 s for 74 400 media
+rows locally).
+
+#### Security
+- **Duplicate receipts (QA-MC4-06):** the check compares a receipt only with requests in the request's PT and the
+  PTs its uploader is mapped to. A hit in another PT is shown (with its number and link) only to users mapped to that
+  PT; everyone else sees nothing of it — counts, the "Verifikasi semua nota" gate, the internal PDF, reports, REST,
+  Riwayat and the audit log follow the same rule (audit rows of such a flag carry no PT).
+- **Deactivated PT (QA-MC4-05):** files of a deactivated PT are no longer readable by the office users of the other
+  PTs; the "office in every PT" shortcut (media) and the "rows without PT" audit rule count inactive PTs too (with a
+  deactivated PT, only group admins read audit rows without PT).
+- **Oracles (QA-MC4-08/10):** a stage template, project, cost center, bank account, category, cash account or
+  `progressPct` of a PT the caller is not mapped to is answered like a missing one (no lock date, no state, no
+  template copy).
+- PT logos only for members of that PT (+ group logo); signatures and device revoke count active memberships only;
+  notifications about a PT the user left are hidden; `/me` without membership no longer shows PT #1.
+
+#### Changed
+- **Media lists (QA-MC4-07):** new derived column `ownerCompany` on receipt / transfer-proof / attachment /
+  progress-photo / selfie media (set by DB triggers, backfilled); office access is `ownerCompany IN (…)` instead of id
+  lists (65 535 bind-parameter cap). Cash-entry attachments are now readable by the office roles of that PT.
+- Receipt flags carry `relatedCompany` (PT of the related request when it is another PT).
+
+### MC4 — QA security fixes (branch `docs/mc4-qa`; report `docs/proyekkas/qa/mc4-qa-report.md`)
+
+#### Security
+- **QA-MC4-01 (HIGH):** REST creates that name a `company` in the body re-check the create role in the derived PT
+  (Finance/Admin of PT A could create bank accounts, team assignments or budget lines in PT B).
+- **QA-MC4-02 (HIGH):** a PT Admin may only change accounts that belong solely to PTs where they are Admin (no
+  rename / deactivate / e-mail change of users of other PTs or of group admins).
+- **QA-MC4-03 (HIGH):** per-PT document audit rows are tagged with their PT; rows without PT only for users with an
+  office role in every PT (Admin/Direktur of PT A no longer read PT B's audit rows).
+- **QA-MC4-04 (HIGH):** single media file access is decided on the row's own owner document and office id lists load
+  via SQL (opening one selfie no longer exhausts the web heap for a multi-PT Finance user).
+
 ### APK 0.3.1 (branch `feat/mobile-0.3.1-ux`, pubspec `0.3.1+1`; not tagged yet)
 
 APK-only UX fixes from the module check; no server change needed (web ≥ 0.5.1 / MC4 API). Release notes
@@ -34,20 +73,6 @@ APK-only UX fixes from the module check; no server change needed (web ≥ 0.5.1 
 - PM "Absenkan anggota tim" stays visible but disabled with the line "Absen atas nama belum bisa: absensi dari
   aplikasi belum diaktifkan Admin (Setting perusahaan)." when `syncAttendanceEnabled` is off for every PT in scope
   (was: hidden silently).
-
-## [0.5.1] - 2026-09-30
-
-Security patch on top of 0.5.0 (no migrations, no API change): npm audit high findings in `undici` and `nodemailer`
-fixed with root `overrides`. Deploy this instead of 0.5.0 (same database migrations as 0.5.0; rollback = restore the
-pre-deploy dump). Also carries the APK `mobile-v0.3.0` release files (pubspec, notes, runbook).
-
-### Security
-- **npm audit (high) fixed with root `overrides`** — `payload` 3.90.1/3.90.2 pins `undici` 7.29.0 (GHSA-rfgv-xxqx-mfg5,
-  GHSA-w293-vg96-wgc3 high + 8 moderate/low, patched in 7.29.1) and `@payloadcms/email-nodemailer` takes
-  `nodemailer` ^9.1.1 (GHSA-v53p-9fqp-m79j high, GHSA-g57g-f23g-4646; patched in 10.0.9). Overrides: `undici` 7.29.1,
-  `nodemailer` 10.0.10 (10.x only drops Node < 20; newest versions respecting `.npmrc` `min-release-age=7`). Remove
-  the overrides once Payload ships the patched versions. Remaining audit: 6 moderate + 1 low, all needing a Payload
-  downgrade (`npm audit fix --force` → 3.85.1) — not applied.
 
 ### MC4 — code gaps (branch `feat/mc4-code-gaps`; ADR 0016 "Implementation notes (MC4)", `docs/proyekkas/mc/mc4-progress.md`)
 
@@ -82,6 +107,20 @@ Web/API only (no APK change). Migration: `20260930_120000_mc4_list_company_colum
 - Scope literals without PT parts (`{ kind: 'team', projects }`, `{ kind: 'own' }`, `{ kind: 'all' }`) now match
   nothing in every report / attendance query (was: `all` only).
 - Saved list-column preferences that never named the PT column get it prepended once (migration above).
+
+## [0.5.1] - 2026-09-30
+
+Security patch on top of 0.5.0 (no migrations, no API change): npm audit high findings in `undici` and `nodemailer`
+fixed with root `overrides`. Deploy this instead of 0.5.0 (same database migrations as 0.5.0; rollback = restore the
+pre-deploy dump). Also carries the APK `mobile-v0.3.0` release files (pubspec, notes, runbook).
+
+### Security
+- **npm audit (high) fixed with root `overrides`** — `payload` 3.90.1/3.90.2 pins `undici` 7.29.0 (GHSA-rfgv-xxqx-mfg5,
+  GHSA-w293-vg96-wgc3 high + 8 moderate/low, patched in 7.29.1) and `@payloadcms/email-nodemailer` takes
+  `nodemailer` ^9.1.1 (GHSA-v53p-9fqp-m79j high, GHSA-g57g-f23g-4646; patched in 10.0.9). Overrides: `undici` 7.29.1,
+  `nodemailer` 10.0.10 (10.x only drops Node < 20; newest versions respecting `.npmrc` `min-release-age=7`). Remove
+  the overrides once Payload ships the patched versions. Remaining audit: 6 moderate + 1 low, all needing a Payload
+  downgrade (`npm audit fix --force` → 3.85.1) — not applied.
 
 ### APK mobile-v0.3.0 (tag `mobile-v0.3.0`, pubspec `0.3.0`)
 

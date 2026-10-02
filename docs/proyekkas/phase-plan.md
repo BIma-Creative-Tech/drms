@@ -1,6 +1,6 @@
 # ProyekKas — Phase plan F0–F7
 
-- **Status:** accepted (user, GATE F0 2026-09-23); phase **MC (multi-company)** added 2026-09-27 before go-live (ADR 0016, proposed — MC0 gate); F1 status updated 2026-09-23 (spike gate passed; foundation on staging); F2 status updated 2026-09-24 (F2a–F2e done and deployed to staging `e9c07ab`; UAT run 4 56/59 PASS; **F2 ready for gate**) · **Date:** 2026-09-23 · **Author:** Analyst/Architect (Phase 0)
+- **Status:** accepted (user, GATE F0 2026-09-23); phase **MC (multi-company)** added 2026-09-27 before go-live (ADR 0016, proposed — MC0 gate); F1 status updated 2026-09-23 (spike gate passed; foundation on staging); F2 status updated 2026-09-24 (F2a–F2e done and deployed to staging `e9c07ab`; UAT run 4 56/59 PASS; **F2 ready for gate**); dated status blocks 2026-09-30 in F3, F4, MC (MC3, MC4, releases) · **Date:** 2026-09-23 · **Author:** Analyst/Architect (Phase 0)
 - **Basis:** `architecture.md`, ADR 0001–0008 (this folder), ADR 0009–0011 (other agent), requirements v1.0
   (+ v1.1 in parallel), `/opt/infra/CLAUDE.md` §1 (workflow: stop and report at the end of every phase, wait
   for user approval), §5 (Definition of Done).
@@ -171,6 +171,14 @@
 - **Acceptance gate:** numbers reconcile with ledger SQL on seed + generated data; exports open in Excel
   (id-ID locale) correctly; PM sees only team projects.
 
+> **Status 2026-09-30 — F3 gate**
+> - **F3 complete on staging 2026-09-24.** Evidence in the repo: design `f3/*` approved by the user 2026-09-24
+>   (all defaults Q-F3-1…8), dashboards / 7 reports / audit-log view / CSV-XLSX-PDF exports in `CHANGELOG.md` [0.3.0],
+>   KPI reconciliation `tests/integration/f3-kpi-reconciliation.int.test.ts`, F3 UAT fix "Anggaran Project with a
+>   project filter" (`f3-report-filters.int.test.ts`).
+> - **UAT: 31 PASS** as reported by the Lead — the F3 UAT report itself is not in this repo → the count is
+>   **belum diverifikasi** from the repo.
+
 ### F4 — Android APK (Flutter)
 - **Scope:** login (AppAuth/PKCE, ADR 0003/0010), device registration, role home screens, expense
   requests with lines + camera receipts (device compression), owner approval inbox with signature,
@@ -193,6 +201,15 @@
   the phone, in-app notifications, minimal attendance check-in/out (offline, behind a company setting), APK secret
   scan in CI. Blocked: FCM push (Firebase project, Q-44). Gate test on a physical phone pending (needs a staging
   redeploy with 3 additive migrations).
+
+> **Status 2026-09-30 — F4**
+> - **Code complete** (Lead status; APK scope of Fase 1 E3 + MC3 merged to `develop`, head `5415f45`). FCM push
+>   stays gated off (`PUSH_FCM_ENABLED=false`, ADR 0011, Q-44).
+> - **Physical-phone gate: still pending** (no phone-test result recorded in the repo).
+> - **APK `mobile-v0.3.0` being prepared:** `apps/mobile/pubspec.yaml` `0.3.0+1` (commit `bdb5fa7`, merged by PR #6 → `5415f45`),
+>   release notes `docs/release-notes/apk/0.3.0.md`, `CHANGELOG.md` [Unreleased] "APK mobile-v0.3.0" (multi-company,
+>   optional authenticator code, release-notes sheet). Tag `mobile-v0.3.0` **not created yet**; publish on `/unduh`
+>   only after web ≥ v0.5.0 runs in the target environment (`runbooks/rilis-apk.md` Prasyarat).
 
 ### F5 — Project, progress, attendance, reports
 - **Scope:** projects & stages (weights = 100 %, templates, archive), progress reports (≤ 5 photos,
@@ -247,10 +264,27 @@
   switcher, per-PT capabilities, drift schema v3 (`companyId` on drafts/outbox/progress), per-PT master caches, sync per
   PT (`COMPANY_MISMATCH`). **Gate:** Flutter unit/widget tests + mock-backend flow with two PTs; phone test on staging
   (create in CS1, approve in DRMS, offline draft in each PT synced to its own PT).
+  > **Status 2026-09-30: MC3 done** — MC3-1 API merged `6f6f8cf` (`feat/mc3-api`), MC3-2 APK `b8cdc5c` + docs `00014a1`
+  > (`feat/mc3-mobile`) on `develop`; progress log `mc/mc3-progress.md`. Released in web **v0.5.0** (`CHANGELOG.md`
+  > [0.5.0] "MC3 — API" / "MC3 — APK"); the APK part ships as `mobile-v0.3.0` (F4 block above). The staging phone test
+  > of this gate is **belum diverifikasi** (no result in the repo).
 - **MC4 — QA + staging UAT:** security review (IDOR, header spoofing, raw SQL, SYSTEM-READ inventory), ZAP rerun, load
   test with 3 PTs (E9 targets), restore drill unchanged, staging UAT with a fictional second PT (`CS1`), user guides
   (Admin: PT + role matrix; all roles: PT switcher), runbook import updated, CHANGELOG/version.
   **Gate:** 0 HIGH/CRITICAL; UAT MC scripts pass; user approves → Fase 1 S4 continues.
+  > **Status 2026-09-30: MC4 in progress** — code gaps on branch `feat/mc4-code-gaps` (open items recorded in
+  > `mc/mc2-progress.md` include "copy defaults from DRMS" when a PT is created in the admin UI and the media-access
+  > performance check with 3 PTs; the branch's exact scope is not in the repo yet); staging UAT with the fictional second PT
+  > **`CS1`** (branch `docs/mc4-staging-uat`); user guides and runbook index on `docs/mc4-guides`. All three branches
+  > start at `develop` `5415f45`; no MC4 result is merged yet.
+  >
+  > **Releases (2026-09-30):**
+  > - **v0.5.0 tagged** (tag `v0.5.0` → `b30f7c0`, `CHANGELOG.md` [0.5.0] 2026-09-29): MC1–MC3, optional 2FA (ADR 0017),
+  >   admin loading dots. DB migrations are not backward compatible (rollback = restore the pre-deploy dump).
+  > - **v0.5.1 security patch prepared** on `release/v0.5.1` (`e4764b4`: `undici` 7.29.1 + `nodemailer` 10.0.10
+  >   overrides, `CHANGELOG.md` [Unreleased] Security); not tagged.
+  > - **Prod still on 0.4.1**, waiting for the owner's go for the upgrade — diverifikasi Lead 2026-09-30 (docker ps):
+  >   `drms-pk-web` / `drms-pk-worker` run `ghcr.io/bctech-adm/proyekkas-web:0.4.1`; staging runs `0.4.2-stg-197226b`.
 - **Dependencies:** develop `74cf7f2` (Fase 1 S0–S3 merged); infra-engineer for the `pk-user` realm role
   (`drms`, `drms-staging`); client answers §L for seeds/import (not for code).
 - **Agents / estimate (ESTIMATE, pd):**
