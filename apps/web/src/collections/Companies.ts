@@ -338,6 +338,7 @@ export const Companies: CollectionConfig = withAudit(
         access: { create: ({ req }) => isGroupAdmin(req), update: () => false, read: ({ req }) => isGroupAdmin(req) }, // read: Payload hides unreadable fields in the create form (MC4-02)
         admin: {
           position: 'sidebar',
+          readOnly: false, // Payload makes `virtual` fields readOnly by default (sanitize.js) → disabled in the create form (UAT UI-CO)
           condition: (data) => !data?.id,
           description: 'Sekali saat PT dibuat: penomoran dokumen (mulai dari 1), aturan approval tanpa user/project tertentu, jadwal kerja default, dan pengaturan operasional yang masih default.',
         },
@@ -349,7 +350,7 @@ export const Companies: CollectionConfig = withAudit(
         label: 'Salin dari PT',
         virtual: true,
         access: { create: ({ req }) => isGroupAdmin(req), update: () => false, read: ({ req }) => isGroupAdmin(req) }, // read: Payload hides unreadable fields in the create form (MC4-02)
-        admin: { position: 'sidebar', condition: (data) => !data?.id && data?.copyDefaults !== false, description: 'Kosong = PT #1 (DRMS).' },
+        admin: { position: 'sidebar', readOnly: false /* virtual → readOnly by default, see copyDefaults */, condition: (data) => !data?.id && data?.copyDefaults !== false, description: 'Kosong = PT #1 (DRMS).' },
       },
       // list-only column (MC2-4): active members of the PT
       { name: 'memberCount', type: 'ui', label: 'Anggota', admin: { disableListColumn: false, components: { Cell: '@/admin/components/companies/MemberCountCell#MemberCountCell' } } },
