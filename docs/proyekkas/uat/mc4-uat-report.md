@@ -104,6 +104,10 @@ as an infra job); employees `CS1-UJI-*`, project `PRJ-CS1-UJI-01`, cost centre `
 | ID | Severity | Summary | Status |
 |---|---|---|---|
 | MC4-01 | High | `pk-user` missing from the `proyekkas-mobile` / `proyekkas-web` scope mappings → `pk-user`-only accounts cannot log in | open → infra-lead |
+| MC4-04 | High | AUD-02 (staging run 2026-10-02): historic audit rows of DRMS documents carry no PT (8 428 of 8 524 `expense_request` rows), so Rina (Direktur DRMS + Finance CS1) reads none of them once CS1 exists | fixed on `fix/mc4-audit-backfill` (migration `20261003_090000_mc4_audit_company_backfill`, `../qa/mc4-qa-report.md` §11.2); re-run AUD-02 after the deploy |
+
+The staging AUD-02 failure (MC4-04) is fixed by branch `fix/mc4-audit-backfill`: its migration tags the historic
+audit rows with their document's PT.
 
 ## 6. Remaining MC4 items
 

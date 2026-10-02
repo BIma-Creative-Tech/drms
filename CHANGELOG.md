@@ -6,6 +6,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### MC4 — UAT defect MC4-04: PT tag for historic audit rows (branch `fix/mc4-audit-backfill`; report `docs/proyekkas/qa/mc4-qa-report.md` §11.2)
+
+Found by the staging UAT, case AUD-02. Migration `20261003_090000_mc4_audit_company_backfill` (idempotent, down =
+no-op; 1.5 s for ~10 000 rows locally). APK unaffected.
+
+#### Fixed
+- **Audit trail of older documents (MC4-04):** audit rows written before the QA-MC4-03 fix had no PT, so once a
+  second PT existed a Direktur / Admin of DRMS without a role in that PT no longer saw them (audit-log list, report,
+  REST). The migration gives every such row the PT of its document: requests, receipts, transfers, LPJ, cash
+  entries, addenda, progress reports, attendance, masters, sequences, approval rules, memberships, the PT itself and
+  owner-linked media; old number rows without a document id by their unique number. Rows of deleted documents,
+  app-wide rows (logins, users, devices, reports, import) and cross-PT duplicate flags stay without PT.
+- The audit writer derives the PT for the same doc types, so new rows of masters, sequences (import cut-over) and
+  media are tagged too.
+
+#### Changed
+- Append-only rule: the migration disables `audit_logs_no_update` for its own UPDATEs only (owner, one transaction,
+  ADR 0006 §6) and records one `schema_maintenance` audit row with the counts.
+
 ### MC4 — QA open items (branch `fix/mc4-qa-open-items`; report `docs/proyekkas/qa/mc4-qa-report.md` §11)
 
 Closes QA-MC4-09, QA-MC4-13 and the read-rule parts of QA-MC4-14 under the PT scope rule. Web/API only, no

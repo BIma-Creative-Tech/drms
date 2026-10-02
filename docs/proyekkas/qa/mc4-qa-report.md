@@ -391,3 +391,51 @@ expectations: `mc2-isolation` (foreign `pt` → 403) and `mc3-api` (unmapped ref
 | `npm audit --omit=dev --audit-level=high` | exit 0 |
 | semgrep 1.177.0, CI command | 0 findings |
 
+
+### 11.2 Follow-up — UAT defect MC4-04 (case AUD-02), branch `fix/mc4-audit-backfill` (2026-10-03)
+
+Found by the staging UAT run of 2026-10-02, case **AUD-02** (`uat/mc4/api-suite.mjs`, US-MC-18): the control step
+"Rina (Direktur DRMS) reads the audit rows of a DRMS request" got 0 rows. ADR 0016 "Scope rule" note 12.
+
+| ID | Severity | Finding | Status / fix |
+|---|---|---|---|
+| MC4-04 | **High** | QA-MC4-03 (`74ba23b`) made the writer tag per-PT rows, but no migration tagged the HISTORIC rows (staging: 8 428 of 8 524 `expense_request` rows had `company_id` NULL). Untagged rows are readable only by group admins and the Admin / Direktur of every PT, so with a second PT a Direktur / Admin of DRMS without an office role there (Direktur DRMS + Finance CS1, DRMS-only users) lost the older DRMS audit trail in REST `/api/audit-logs`, the audit-log report and the admin list. ("Riwayat" was not affected: it reads the rows of a readable document without the audit row rule.) Prod would hit the same as soon as a second PT is created. | **fixed**: migration `20261003_090000_mc4_audit_company_backfill` tags every untagged row of a per-PT doc type with its document's PT (34 doc types by `doc_id`, incl. receipts, transfers, settlements, cash entries, masters, sequences, approval rules, memberships, the PT itself and owner-linked media; old `number_issued` rows without `doc_id` by their unique doc number). Rows whose document is gone, app-wide doc types and cross-PT duplicate flags (NULL on purpose) stay NULL. Writer gap closed too: the same map now drives the writer (the import cut-over `document_sequence` row and media rows were still written without PT). |
+
+**Append-only handling (ADR 0006 §2/§6):** `audit_logs_no_update` rejects every UPDATE (owner included) and honours
+no session setting, so the migration — as the owner, inside its own transaction — disables only that trigger for
+the UPDATEs and re-enables it (the MC1 backfill pattern); `audit_logs_company_protect` stays on (only NULL tags are
+filled); a rollback restores the trigger with the data. One `schema_maintenance` audit row records the counts. No
+hash chain exists (ADR 0006 §5 deferred); the daily anchor covers count + max id only, so `company_id` is in no
+digest. Idempotent (only NULL rows are candidates; nothing to tag → the trigger is not touched). Down = no-op.
+
+**Tests:** `tests/integration/mc4-audit-backfill.int.test.ts` (7): untagged historic rows inserted as the owner
+for 11 per-PT doc types + 7 rows that must stay NULL; before the backfill Rina (Direktur A + Finance B) reads 0 of
+them (the defect), after it every tag matches, Rina reads all A rows and the B row, a B-only Direktur only the B row;
+trigger enabled again and UPDATE / DELETE still 42501; re-run idempotent (same checksum, no second maintenance
+row); down = no-op, up after down unchanged; the current writer tags `document_sequence`, `approval_rule`,
+`media_receipts` rows and leaves `user` untagged. `tests/unit/mc4-audit-backfill.test.ts` (5): the writer map
+equals the set of audited per-PT collections (+ `period_closing`), the migration map equals the writer map,
+app-wide doc types are absent.
+
+**Migration on a seeded copy** (local throwaway DB = `pk_test` after the full integration suite, 2+ PTs, all doc
+types; + 9 968 historic untagged rows shaped like staging: 8 428 `expense_request`, 1 190 other per-PT rows, 50
+rows of deleted documents, 300 `web_session`; `audit_logs` 83 888 rows, 17 764 untagged), run through
+`payload migrate` as the owner: **migration body 1.53 s** (wall time of the `payload migrate` process 10.2 s, mostly
+Node / Payload start-up); 9 760 rows tagged (`expense_request` 8 428, `receipt` 300, `media_receipts` 180,
+`attendance` 150, `cash_entry` 150, `transfer` 120, `project` 100, `employee` 100, `settlement` 80, `progress_report`
+60, `budget_addendum` 40, `approval_rule` 30, `media_selfies` 22, `media_transfer_proofs` 22); 0 wrong PTs, 0
+orphan or app-wide rows tagged; left NULL: rows without a document id (`access_denied` on `company` / create
+attempts) and unlinked media uploads. Re-run: 0.63 s body, 0 rows changed, identical checksum,
+`audit_logs_no_update` enabled (`O`).
+
+**Checks (CI replica, local throwaway containers `pk-mc4audit-*`):**
+
+| Check | Result |
+|---|---|
+| `npm run lint` | 0 warnings |
+| `npm run typecheck` | clean |
+| `npm run test:coverage` | 47 files / 663 tests green (gate met) |
+| `npm run check:openapi` | up to date |
+| `TZ=Asia/Makassar npm run test:int` | 44 files / 584 passed + 1 skipped |
+| `npm audit --omit=dev --audit-level=high` | exit 0 |
+| semgrep 1.177.0, CI command | 0 findings |
