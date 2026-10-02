@@ -694,7 +694,7 @@ async function runCutover(x: Exec, rep: MasterReport, issues: Issue[], reason: s
   if (before !== null && before < s.pbStartAt) {
     // only upward (DB trigger pk_counter_monotonic) — "set next value" of ADR 0007 §1, audited
     await tx.execute(sql`UPDATE document_sequence_counters SET next_value = ${s.pbStartAt} WHERE company_id = ${pt.companyId} AND doc_type = 'expense_request' AND period_key = ${key}`)
-    await writeAudit(req, [{ action: 'update', docType: 'document_sequence', docId: String(seq.id), field: 'nextValue', oldValue: before, newValue: s.pbStartAt, reason }])
+    await writeAudit(req, [{ action: 'update', docType: 'document_sequence', docId: String(seq.id), field: 'nextValue', oldValue: before, newValue: s.pbStartAt, reason, companyId: pt.companyId }])
     after = s.pbStartAt
     rep.updated++
   } else if (before !== null && before > s.pbStartAt) {
