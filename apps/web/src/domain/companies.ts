@@ -1,6 +1,6 @@
 import { APIError, type Payload, type PayloadRequest } from 'payload'
 
-import { companiesWithRole, isGroupAdmin, isRole, memberCompanies, relId, soleCompany, type Role } from '@/access/roles'
+import { companiesWithRole, isGroupAdmin, isRole, mappedCompanies, memberCompanies, relId, soleCompany, type Role } from '@/access/roles'
 import type { Company, CompanySetting } from '@/payload-types'
 
 /**
@@ -266,12 +266,12 @@ export async function employeeOfUser(req: PayloadRequest, userId: number, compan
  * Display employee per user — names in history/DTOs/PDF: the membership employee of `preferCompany`
  * (the document's PT) when there is one, else the first membership (lowest PT id) with an employee.
  */
-export async function displayEmployeeByUser(req: PayloadRequest, userIds: number[], preferCompany?: number | null): Promise<Map<number, number>> {
+export async function displayEmployeeByUser(req: PayloadRequest, userIds: number[], preferCompany?: number | null, within?: readonly number[] | null): Promise<Map<number, number>> {
   const out = new Map<number, number>()
   if (userIds.length === 0) return out
   const res = await req.payload.find({
     collection: 'company-memberships',
-    where: { user: { in: userIds } },
+    where: within ? { and: [{ user: { in: userIds } }, { company: { in: [...within] } }] } : { user: { in: userIds } },
     depth: 0,
     pagination: false,
     sort: 'company',
@@ -300,7 +300,8 @@ export async function companyOf(req: PayloadRequest, collection: string, id: num
 /**
  * Display name per user: the employee name of its membership in `opts.companyId` (the document's PT,
  * ADR 0016 D1), else of its first membership (lowest PT id) that links an employee, else the account
- * name, else the email.
+ * name, else the email. QA-MC4-14 (scope rule 2026-10-02): the fallback only looks at memberships in
+ * PTs the VIEWER is mapped to (+ the document's PT) — an employee name of another PT is never shown.
  */
 export async function displayNames(req: PayloadRequest, userIds: number[], opts: { emailFallback?: boolean; companyId?: number | null } = {}): Promise<Map<number, string>> {
   const out = new Map<number, string>()
@@ -316,7 +317,7 @@ export async function displayNames(req: PayloadRequest, userIds: number[], opts:
       overrideAccess: true, // SYSTEM-READ: display names
       req,
     }),
-    displayEmployeeByUser(req, ids, opts.companyId),
+    displayEmployeeByUser(req, ids, opts.companyId, nameScope(req, opts.companyId)),
   ])
   const empIds = [...new Set(empByUser.values())]
   const emps = empIds.length
@@ -330,5 +331,9 @@ export async function displayNames(req: PayloadRequest, userIds: number[], opts:
   return out
 }
 
-/** SQL fragment: display name of `users u` via its first membership employee (raw-SQL reports). */
-export const USER_DISPLAY_EMPLOYEE_SQL = `(SELECT e.name FROM company_memberships m JOIN employees e ON e.id = m.employee_id WHERE m.user_id = u.id ORDER BY m.company_id LIMIT 1)`
+/** PTs whose employee names a viewer may see: the mapped PTs + the document's PT; null = no limit (system). */
+function nameScope(req: PayloadRequest, companyId?: number | null): number[] | null {
+  const mapped = mappedCompanies(req)
+  if (mapped === null) return null
+  return typeof companyId === 'number' && !mapped.includes(companyId) ? [...mapped, companyId] : mapped
+}

@@ -37,7 +37,8 @@ import { formatServerTime } from '@/pdf/format'
 
 import { ChartHover } from './ChartHover'
 import { F3Root } from './f3-ui'
-import { PtChip, ptView, type PtView } from './pt'
+import { foreignPtParam, PtChip, ptView, type PtView } from './pt'
+import { PtNotAllowed } from './shared'
 import { PerPt } from './pt-breakdown'
 import { Bento, Card, DashHead, DataTable, EmptyState, KpiRow, KpiTile, rp, rpShort, StatusPill, VIZ_STYLE, type Col } from './viz'
 
@@ -97,7 +98,7 @@ const SR: React.CSSProperties = { position: 'absolute', width: 1, height: 1, ove
 // ---------------------------------------------------------------- PT (MC2, ADR 0016 §4 — Kas and closing are per PT)
 
 type SP = Record<string, string | string[] | undefined>
-/** `?pt=` when it is one of `allowed` (a foreign / unknown id is ignored — never widens). */
+/** `?pt=` when it is one of `allowed` (a selected PT without that right is ignored — never widens; a foreign PT → PtNotAllowed). */
 function ptParam(sp: SP, allowed: readonly number[]): number | undefined {
   const v = typeof sp.pt === 'string' && /^\d{1,10}$/.test(sp.pt) ? Number(sp.pt) : undefined
   return v !== undefined && allowed.includes(v) ? v : undefined
@@ -213,10 +214,11 @@ export async function KasBook(props: AdminViewServerProps) {
   // mc2-contract §4: PT sets per right (selected PTs where the caller is Finance / Direktur)
   const acc = kasAccessIn(req)
   if (acc.view.length === 0) return <Denied props={props} title="Kas" roles="Finance dan Direktur" />
+  if (foreignPtParam(req, props.searchParams)) return <PtNotAllowed props={props} title="Kas" />
   const pt = await ptView(req)
   const sp = (props.searchParams ?? {}) as SP
   const q = parseBookQuery(sp)
-  if (q.pt !== undefined && !acc.view.includes(q.pt)) delete q.pt // foreign PT → ignored (never widens)
+  if (q.pt !== undefined && !acc.view.includes(q.pt)) delete q.pt // a selected PT without Kas rights → ignored (never widens); foreign → PtNotAllowed above
   const multi = acc.view.length > 1
   const shown = q.pt !== undefined ? [q.pt] : acc.view
   const canWrite = acc.write.some((c) => shown.includes(c))
@@ -591,6 +593,7 @@ export async function KasNew(props: AdminViewServerProps) {
   const req = props.initPageResult.req
   const acc = kasAccessIn(req)
   if (acc.write.length === 0) return <Denied props={props} title="Catat kas" roles="Finance" />
+  if (foreignPtParam(req, props.searchParams)) return <PtNotAllowed props={props} title="Catat kas" />
   const sp = (props.searchParams ?? {}) as SP
   const arah = sp.arah === 'keluar' ? 'keluar' : 'masuk'
   const pt = await ptView(req)
@@ -729,6 +732,7 @@ export async function TutupBuku(props: AdminViewServerProps) {
   const req = props.initPageResult.req
   const acc = kasAccessIn(req)
   if (acc.close.length === 0) return <Denied props={props} title="Tutup buku" roles="Finance dan Direktur" />
+  if (foreignPtParam(req, props.searchParams)) return <PtNotAllowed props={props} title="Tutup buku" />
   const pt = await ptView(req)
   const sp = (props.searchParams ?? {}) as SP
   const company = onePt(sp, acc.close)

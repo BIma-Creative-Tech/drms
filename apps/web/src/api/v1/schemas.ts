@@ -141,6 +141,7 @@ export const companyFilterParam = z
  * MC4 (ADR 0016 §5): optional explicit PT of a create body. Must be an active membership holding the
  * role the create needs IN that PT (else 403 COMPANY_NOT_ALLOWED) and equal the PT of the referenced
  * project / cost center / cash account (else 400 COMPANY_MISMATCH). Absent = PT derived as before.
+ * QA-MC4-14: a reference in a PT the caller is not mapped to is answered like a missing one.
  */
 export const createCompanyField = z
   .number()
@@ -149,7 +150,7 @@ export const createCompanyField = z
   .optional()
   .meta({
     description:
-      'MC4: explicit PT (companies id) of the new record. Must be one of your PTs where you hold the role this create needs (else 403 COMPANY_NOT_ALLOWED) and the PT of the referenced project / cost center / cash account (else 400 COMPANY_MISMATCH). Omitted = derived from the references, else your only selected PT (unchanged behaviour of APK 0.2.x / 0.3.0).',
+      'MC4: explicit PT (companies id) of the new record. Must be one of your PTs where you hold the role this create needs (else 403 COMPANY_NOT_ALLOWED) and the PT of the referenced project / cost center / cash account (else 400 COMPANY_MISMATCH; a reference in a PT you are not mapped to is answered like a missing one). Omitted = derived from the references, else your only selected PT (unchanged behaviour of APK 0.2.x / 0.3.0).',
   })
 
 export const MastersQuery = z

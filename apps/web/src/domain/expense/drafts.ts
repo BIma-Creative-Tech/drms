@@ -74,6 +74,25 @@ async function activeIds(req: PayloadRequest, collection: CollectionSlug, wanted
 }
 
 /**
+ * Active employees among `wanted` → their PT. Only employees of PTs the caller is mapped to (QA-MC4-10):
+ * one of another PT is reported like a missing one.
+ */
+async function activeEmployees(req: PayloadRequest, wanted: number[]): Promise<Map<number, number>> {
+  if (wanted.length === 0) return new Map()
+  const mapped = mappedCompanies(req)
+  const res = await req.payload.find({
+    collection: 'employees',
+    where: { and: [{ id: { in: wanted } }, { active: { not_equals: false } }, ...(mapped !== null ? [{ company: { in: mapped } }] : [])] },
+    depth: 0,
+    pagination: false,
+    select: { company: true },
+    overrideAccess: true, // SYSTEM-READ: requester validation (PTs filtered to the caller's mapping)
+    req,
+  })
+  return new Map(res.docs.map((d) => [d.id as number, relId((d as { company?: unknown }).company) ?? -1]))
+}
+
+/**
  * PT of a draft (ADR 0016): the PT of its project / cost center, else the caller's only selected PT
  * (a request without scope yet); undefined = ambiguous (the collection hook then asks for a PT).
  */
@@ -140,10 +159,16 @@ export async function validateContent(
   const uniq = [...new Set(c.requesterIds)]
   if (uniq.length !== c.requesterIds.length) errors.push({ path: 'requesterIds', message: 'Pemohon tidak boleh ganda.' })
   if (opts.forSubmit && uniq.length === 0) errors.push({ path: 'requesterIds', message: 'Minimal 1 pemohon (Diajukan Oleh).' })
-  const activeEmp = await activeIds(req, 'employees', uniq)
+  const activeEmp = await activeEmployees(req, uniq)
   uniq.filter((e) => !activeEmp.has(e)).forEach((e) => errors.push({ path: 'requesterIds', message: `Karyawan #${e} tidak ditemukan atau nonaktif.` }))
-  if (!(company !== undefined ? hasRole(req, ['pk-admin', 'pk-finance'], company) : hasRoleAny(req, 'pk-admin', 'pk-finance'))) {
-    const creatorEmp = company !== undefined ? employeeIn(req, company) : relId((req.user as { employee?: unknown } | null)?.employee)
+  // QA-MC4-09: "Admin/Finance for others" needs that role IN THE DERIVED PT(s) = the PT of the project /
+  // cost center and of every requester (the collection hook derives the document's PT from them), never
+  // a role held in another PT. No derivable PT (no reference yet) → the role in any selected PT, as before.
+  const derived = [...new Set([...(company !== undefined ? [company] : []), ...activeEmp.values()])]
+  const onBehalf = derived.length > 0 ? derived.every((pt) => hasRole(req, ['pk-admin', 'pk-finance'], pt)) : hasRoleAny(req, 'pk-admin', 'pk-finance')
+  if (!onBehalf) {
+    const own = company ?? (derived.length === 1 ? derived[0] : undefined)
+    const creatorEmp = own !== undefined ? employeeIn(req, own) : relId((req.user as { employee?: unknown } | null)?.employee)
     if (userId(req) === opts.creatorId && (creatorEmp === undefined || (uniq.length > 0 && !uniq.includes(creatorEmp)))) {
       fail(403, 'Hanya Admin/Finance yang boleh membuat pengajuan atas nama orang lain (Q-09).')
     }

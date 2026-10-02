@@ -1,7 +1,7 @@
 import { sql } from '@payloadcms/db-postgres'
 import type { PayloadRequest } from 'payload'
 
-import { hasRole, relId } from '@/access/roles'
+import { hasRole, mappedCompanies, relId } from '@/access/roles'
 import { resolveScope } from '@/access/scope'
 import { haversineM, insideGeofence, localDateString, type AttendanceKind } from '@/domain/sync/attendance'
 import { getRequestTx } from '@/lib/tx'
@@ -117,7 +117,11 @@ async function loadLocation(req: PayloadRequest, loc: Location, field: string): 
     req,
     disableErrors: true,
   })) as GeoDoc | null
-  if (!doc) return reject('NOT_FOUND', loc.type === 'project' ? 'Project tidak ditemukan.' : 'Pusat biaya tidak ditemukan.', field)
+  // QA-MC4-14 (scope rule): a location of a PT the caller is not mapped to = a missing one
+  const mapped = mappedCompanies(req)
+  if (!doc || (mapped !== null && !mapped.includes(relId((doc as { company?: unknown }).company) ?? -1))) {
+    return reject('NOT_FOUND', loc.type === 'project' ? 'Project tidak ditemukan.' : 'Pusat biaya tidak ditemukan.', field)
+  }
   if (loc.type === 'project' && doc.status === 'arsip') reject('VALIDATION', 'Project sudah diarsipkan.', field)
   if (loc.type === 'cost_center' && doc.active === false) reject('VALIDATION', 'Pusat biaya sudah dinonaktifkan.', field)
   if (typeof doc.lat !== 'number' || typeof doc.lng !== 'number') {

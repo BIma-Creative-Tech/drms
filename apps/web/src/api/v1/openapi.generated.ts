@@ -2174,7 +2174,7 @@ export const openapiDocument = {
           "company": {
             "type": "integer",
             "exclusiveMinimum": 0,
-            "description": "MC4: explicit PT (companies id) of the new record. Must be one of your PTs where you hold the role this create needs (else 403 COMPANY_NOT_ALLOWED) and the PT of the referenced project / cost center / cash account (else 400 COMPANY_MISMATCH). Omitted = derived from the references, else your only selected PT (unchanged behaviour of APK 0.2.x / 0.3.0)."
+            "description": "MC4: explicit PT (companies id) of the new record. Must be one of your PTs where you hold the role this create needs (else 403 COMPANY_NOT_ALLOWED) and the PT of the referenced project / cost center / cash account (else 400 COMPANY_MISMATCH; a reference in a PT you are not mapped to is answered like a missing one). Omitted = derived from the references, else your only selected PT (unchanged behaviour of APK 0.2.x / 0.3.0)."
           },
           "title": {
             "type": "string",
@@ -3171,7 +3171,7 @@ export const openapiDocument = {
           "company": {
             "type": "integer",
             "exclusiveMinimum": 0,
-            "description": "MC4: explicit PT (companies id) of the new record. Must be one of your PTs where you hold the role this create needs (else 403 COMPANY_NOT_ALLOWED) and the PT of the referenced project / cost center / cash account (else 400 COMPANY_MISMATCH). Omitted = derived from the references, else your only selected PT (unchanged behaviour of APK 0.2.x / 0.3.0)."
+            "description": "MC4: explicit PT (companies id) of the new record. Must be one of your PTs where you hold the role this create needs (else 403 COMPANY_NOT_ALLOWED) and the PT of the referenced project / cost center / cash account (else 400 COMPANY_MISMATCH; a reference in a PT you are not mapped to is answered like a missing one). Omitted = derived from the references, else your only selected PT (unchanged behaviour of APK 0.2.x / 0.3.0)."
           },
           "entryDate": {
             "type": "string",
@@ -4377,7 +4377,7 @@ export const openapiDocument = {
               "properties": {
                 "code": {
                   "type": "string",
-                  "description": "VALIDATION, NOT_EDITABLE, STALE_REV (conflict), NOT_FOUND, FORBIDDEN, MEDIA_MISSING, CLIENT_UUID_CONFLICT, COMPANY_NOT_ALLOWED (MC3: company_id is not an active membership of the caller), COMPANY_MISMATCH (MC3: the PT derived from the item references ≠ company_id — or ≠ the only PT of a caller without company_id), FEATURE_DISABLED, DEPENDENCY_FAILED, DEPENDENCY_PENDING, STATE_CONFLICT, INTEGRITY, UNSUPPORTED, INTERNAL; attendance: MOCK_LOCATION, OUTSIDE_GEOFENCE, NOT_ASSIGNED, NO_GEOFENCE, ALREADY_CHECKED_IN, NO_CHECK_IN, ALREADY_CHECKED_OUT (on_behalf also FORBIDDEN: not a PM / not a team location / own attendance); progress reports: WEIGHTS_INCOMPLETE, PROGRESS_DECREASED, PHOTO_LIMIT, MEDIA_IN_USE."
+                  "description": "VALIDATION, NOT_EDITABLE, STALE_REV (conflict), NOT_FOUND, FORBIDDEN, MEDIA_MISSING, CLIENT_UUID_CONFLICT, COMPANY_NOT_ALLOWED (MC3: company_id is not an active membership of the caller), COMPANY_MISMATCH (MC3: the PT derived from the item references ≠ company_id — or ≠ the only PT of a caller without company_id; only for a PT the caller is mapped to — a reference in another PT is answered like a missing one, QA-MC4-14), FEATURE_DISABLED, DEPENDENCY_FAILED, DEPENDENCY_PENDING, STATE_CONFLICT, INTEGRITY, UNSUPPORTED, INTERNAL; attendance: MOCK_LOCATION, OUTSIDE_GEOFENCE, NOT_ASSIGNED, NO_GEOFENCE, ALREADY_CHECKED_IN, NO_CHECK_IN, ALREADY_CHECKED_OUT (on_behalf also FORBIDDEN: not a PM / not a team location / own attendance); progress reports: WEIGHTS_INCOMPLETE, PROGRESS_DECREASED, PHOTO_LIMIT, MEDIA_IN_USE."
                 },
                 "field": {
                   "type": "string"
@@ -6017,7 +6017,7 @@ export const openapiDocument = {
           "company": {
             "type": "integer",
             "exclusiveMinimum": 0,
-            "description": "MC4: explicit PT (companies id) of the new record. Must be one of your PTs where you hold the role this create needs (else 403 COMPANY_NOT_ALLOWED) and the PT of the referenced project / cost center / cash account (else 400 COMPANY_MISMATCH). Omitted = derived from the references, else your only selected PT (unchanged behaviour of APK 0.2.x / 0.3.0)."
+            "description": "MC4: explicit PT (companies id) of the new record. Must be one of your PTs where you hold the role this create needs (else 403 COMPANY_NOT_ALLOWED) and the PT of the referenced project / cost center / cash account (else 400 COMPANY_MISMATCH; a reference in a PT you are not mapped to is answered like a missing one). Omitted = derived from the references, else your only selected PT (unchanged behaviour of APK 0.2.x / 0.3.0)."
           },
           "projectId": {
             "type": "integer",
@@ -7626,7 +7626,7 @@ export const openapiDocument = {
           "company": {
             "type": "integer",
             "exclusiveMinimum": 0,
-            "description": "MC4: explicit PT (companies id) of the new record. Must be one of your PTs where you hold the role this create needs (else 403 COMPANY_NOT_ALLOWED) and the PT of the referenced project / cost center / cash account (else 400 COMPANY_MISMATCH). Omitted = derived from the references, else your only selected PT (unchanged behaviour of APK 0.2.x / 0.3.0)."
+            "description": "MC4: explicit PT (companies id) of the new record. Must be one of your PTs where you hold the role this create needs (else 403 COMPANY_NOT_ALLOWED) and the PT of the referenced project / cost center / cash account (else 400 COMPANY_MISMATCH; a reference in a PT you are not mapped to is answered like a missing one). Omitted = derived from the references, else your only selected PT (unchanged behaviour of APK 0.2.x / 0.3.0)."
           },
           "projectId": {
             "type": "integer",
@@ -15089,7 +15089,7 @@ export const openapiDocument = {
     "/sync/batch": {
       "post": {
         "summary": "APK offline queue replay (bearer + registered device = device_id). Items in order, one transaction each; always 200 with one result per item (applied | duplicate | rejected | conflict | deferred | unsupported). Rate limit 12/min.",
-        "description": "Item types: expense_request.draft_upsert (payload SyncDraftUpsertPayload), expense_request.draft_delete (payload SyncDraftDeletePayload), attendance.check_in / attendance.check_out (payload SyncAttendancePayload: project_id OR cost_center_id; selfie first with POST /media/selfies; company-settings.syncAttendanceEnabled, else rejected FEATURE_DISABLED; rejection codes MOCK_LOCATION, OUTSIDE_GEOFENCE, NOT_ASSIGNED, NO_GEOFENCE, ALREADY_CHECKED_IN, NO_CHECK_IN, ALREADY_CHECKED_OUT, MEDIA_MISSING, FORBIDDEN), attendance.on_behalf (payload SyncOnBehalfPayload, US-14: PM only, team location, not own, reason required; GPS + photo from the PM phone); progress_report.draft_upsert (payload SyncProgressReportPayload; photos first with POST /media/progress-photos, ≤ 5; new report = PM of a team project or Direktur; edit = reporter within 24 h with base_rev + reason, else conflict/NOT_EDITABLE with server_report; company-settings.syncProgressReportsEnabled, else FEATURE_DISABLED; codes WEIGHTS_INCOMPLETE, PROGRESS_DECREASED, PHOTO_LIMIT, MEDIA_IN_USE, MEDIA_MISSING, FORBIDDEN). Receipt images are uploaded first with POST /media/receipts and referenced by media_id. Replaying a client_uuid returns the stored result as duplicate. Edits of an existing draft need base_rev = server rev, else conflict + server_copy (server wins). MC3 (ADR 0016 §8): every item carries company_id (an active membership) and is processed under that PT whatever X-Company-Ids says (feature flags, timezone, own employee of that PT); the PT derived from the references must match (else rejected COMPANY_MISMATCH; a foreign company_id → COMPANY_NOT_ALLOWED). Items WITHOUT company_id (released APK ≤ 0.2.x) are accepted only for an account with exactly one PT; otherwise the whole batch answers 409 code COMPANY_REQUIRED (errors[].path = items.<i>.company_id, nothing processed).",
+        "description": "Item types: expense_request.draft_upsert (payload SyncDraftUpsertPayload), expense_request.draft_delete (payload SyncDraftDeletePayload), attendance.check_in / attendance.check_out (payload SyncAttendancePayload: project_id OR cost_center_id; selfie first with POST /media/selfies; company-settings.syncAttendanceEnabled, else rejected FEATURE_DISABLED; rejection codes MOCK_LOCATION, OUTSIDE_GEOFENCE, NOT_ASSIGNED, NO_GEOFENCE, ALREADY_CHECKED_IN, NO_CHECK_IN, ALREADY_CHECKED_OUT, MEDIA_MISSING, FORBIDDEN), attendance.on_behalf (payload SyncOnBehalfPayload, US-14: PM only, team location, not own, reason required; GPS + photo from the PM phone); progress_report.draft_upsert (payload SyncProgressReportPayload; photos first with POST /media/progress-photos, ≤ 5; new report = PM of a team project or Direktur; edit = reporter within 24 h with base_rev + reason, else conflict/NOT_EDITABLE with server_report; company-settings.syncProgressReportsEnabled, else FEATURE_DISABLED; codes WEIGHTS_INCOMPLETE, PROGRESS_DECREASED, PHOTO_LIMIT, MEDIA_IN_USE, MEDIA_MISSING, FORBIDDEN). Receipt images are uploaded first with POST /media/receipts and referenced by media_id. Replaying a client_uuid returns the stored result as duplicate. Edits of an existing draft need base_rev = server rev, else conflict + server_copy (server wins). MC3 (ADR 0016 §8): every item carries company_id (an active membership) and is processed under that PT whatever X-Company-Ids says (feature flags, timezone, own employee of that PT); the PT derived from the references must match (else rejected COMPANY_MISMATCH; a reference in a PT the caller is not mapped to is answered like a missing one; a foreign company_id → COMPANY_NOT_ALLOWED). Items WITHOUT company_id (released APK ≤ 0.2.x) are accepted only for an account with exactly one PT; otherwise the whole batch answers 409 code COMPANY_REQUIRED (errors[].path = items.<i>.company_id, nothing processed).",
         "security": [
           {
             "bearer": []
@@ -19773,6 +19773,16 @@ export const openapiDocument = {
           {
             "schema": {
               "type": "string",
+              "description": "MC2: PT filter (company ids, repeatable or comma list) — narrows the scope; a PT outside the caller's selection → 403 code COMPANY_NOT_ALLOWED (QA-MC4-14)"
+            },
+            "required": false,
+            "description": "MC2: PT filter (company ids, repeatable or comma list) — narrows the scope; a PT outside the caller's selection → 403 code COMPANY_NOT_ALLOWED (QA-MC4-14)",
+            "name": "pt",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
               "format": "uuid",
               "description": "Registered install id (APK)."
             },
@@ -20327,6 +20337,16 @@ export const openapiDocument = {
             "required": false,
             "description": "YYYY-MM (absensi; default current month)",
             "name": "bulan",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "MC2: PT filter (company ids, repeatable or comma list) — narrows the scope; a PT outside the caller's selection → 403 code COMPANY_NOT_ALLOWED (QA-MC4-14)"
+            },
+            "required": false,
+            "description": "MC2: PT filter (company ids, repeatable or comma list) — narrows the scope; a PT outside the caller's selection → 403 code COMPANY_NOT_ALLOWED (QA-MC4-14)",
+            "name": "pt",
             "in": "query"
           },
           {

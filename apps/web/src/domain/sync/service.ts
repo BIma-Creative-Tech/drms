@@ -3,7 +3,7 @@ import { APIError, ValidationError, type PayloadRequest } from 'payload'
 import type { z } from 'zod'
 
 import { runUnderCompany } from '@/access/company-context'
-import { companyContextOf, employeeIn, hasRole, relId, userId, type Membership } from '@/access/roles'
+import { companyContextOf, employeeIn, hasRole, mappedCompanies, relId, userId, type Membership } from '@/access/roles'
 import { companyOf } from '@/domain/companies'
 import {
   SyncAttendancePayload,
@@ -138,6 +138,12 @@ export async function itemCompany(req: PayloadRequest, item: SyncItemIn): Promis
     return byUuid('progress-reports', p.report_client_uuid ?? item.client_uuid)
   }
   return null
+}
+
+/** PT the caller is mapped to (system requests: every PT). */
+function isMapped(req: PayloadRequest, company: number | undefined): boolean {
+  const mapped = mappedCompanies(req)
+  return mapped === null || (company !== undefined && mapped.includes(company))
 }
 
 /** PT an item is processed under: its `company_id`, else the only membership (legacy APK), else null. */
@@ -469,7 +475,9 @@ async function applyAttendance(c: ItemCtx, verdict: TimeVerdict, receivedAt: Dat
   const onBehalf = item.type === 'attendance.on_behalf'
   const p = onBehalf ? parsePayload(SyncOnBehalfPayload, item.payload) : parsePayload(SyncAttendancePayload, item.payload)
   // ADR 0016 D1: the caller's employee IN THE LOCATION's PT (one employee per PT)
-  const locCompany = await companyOf(req, p.project_id !== undefined ? 'projects' : 'cost-centers', p.project_id ?? p.cost_center_id!)
+  // QA-MC4-14: a location of an unmapped PT is treated like a missing one (recordAttendance → NOT_FOUND)
+  const locRaw = await companyOf(req, p.project_id !== undefined ? 'projects' : 'cost-centers', p.project_id ?? p.cost_center_id!)
+  const locCompany = isMapped(req, locRaw) ? locRaw : undefined
   const own = locCompany !== undefined ? employeeIn(req, locCompany) : await employeeOfUser(req, uid)
   let employee: number
   let user: number | null
@@ -480,7 +488,7 @@ async function applyAttendance(c: ItemCtx, verdict: TimeVerdict, receivedAt: Dat
     if (!hasRole(req, 'pk-pm', locCompany)) reject('FORBIDDEN', 'Hanya PM yang dapat mengabsenkan anggota tim.')
     if (own !== undefined && own === ob.employee_id) reject('FORBIDDEN', 'Absensi Anda sendiri dicatat lewat absen masuk/pulang biasa.', 'payload.employee_id')
     const emp = (await req.payload.findByID({ collection: 'employees', id: ob.employee_id, depth: 0, overrideAccess: true /* SYSTEM-READ: target employee of on-behalf */, req, disableErrors: true })) as { active?: boolean | null; company?: unknown } | null
-    if (!emp) reject('NOT_FOUND', 'Karyawan tidak ditemukan.', 'payload.employee_id')
+    if (!emp || !isMapped(req, relId(emp.company))) reject('NOT_FOUND', 'Karyawan tidak ditemukan.', 'payload.employee_id')
     if (relId(emp!.company) !== locCompany) reject('COMPANY_MISMATCH', 'Karyawan dan lokasi berada di PT yang berbeda.', 'payload.employee_id')
     if (emp!.active === false) reject('VALIDATION', 'Karyawan sudah nonaktif.', 'payload.employee_id')
     employee = ob.employee_id
@@ -681,7 +689,9 @@ async function processOwn(c: ItemCtx, batch: SyncBatchIn, deviceId: string, verd
       // ADR 0016 §8 / MC3-1: the item's PT = company_id (membership), = the PT of its references
       if (!member) reject('COMPANY_NOT_ALLOWED', 'PT data ini bukan PT Anda.', 'company_id')
       const company = await itemCompany(req, item)
-      if (company !== null && company !== declared) reject('COMPANY_MISMATCH', 'Data ini milik PT lain dari company_id item ini.', typeof item.company_id === 'number' ? 'company_id' : 'payload')
+      // QA-MC4-14 (scope rule): COMPANY_MISMATCH only for a reference in a PT the caller is MAPPED to; a
+      // reference of an unmapped PT runs on and is answered exactly like a missing one (no existence oracle)
+      if (company !== null && company !== declared && isMapped(req, company)) reject('COMPANY_MISMATCH', 'Data ini milik PT lain dari company_id item ini.', typeof item.company_id === 'number' ? 'company_id' : 'payload')
       const features = await featuresOf(req, declared!)
       const isAttendance = ATTENDANCE.has(item.type)
       const isProgress = item.type === 'progress_report.draft_upsert'

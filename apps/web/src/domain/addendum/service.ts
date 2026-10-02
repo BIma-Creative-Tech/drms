@@ -1,7 +1,7 @@
 import { sql } from '@payloadcms/db-postgres'
 import { APIError, type PayloadRequest, type Where } from 'payload'
 
-import { companiesWithRole, hasRoleAny, relId, rolesIn, userId, userRoles, type Role } from '@/access/roles'
+import { companiesWithRole, hasRoleAny, mappedCompanies, relId, rolesIn, userId, userRoles, type Role } from '@/access/roles'
 import { resolveScope } from '@/access/scope'
 import { writeAudit, writeAuditDetached } from '@/audit/writer'
 import { displayName, projectCommitted, resolveSignature, today, type Signature } from '@/domain/expense/common'
@@ -315,6 +315,9 @@ export async function createAddendum(req: PayloadRequest, input: AddendumInput):
   const uid = userId(req)
   if (uid === undefined) fail(401, 'FORBIDDEN', 'Unauthorized')
   const project = await loadProject(req, input.projectId)
+  // QA-MC4-14 (scope rule): a project of a PT the caller is not mapped to = a missing one (was 403 → existence oracle)
+  const mapped = mappedCompanies(req)
+  if (mapped !== null && !mapped.includes(relId((project as { company?: unknown }).company) ?? -1)) fail(404, 'NOT_FOUND', 'Project tidak ditemukan.', 'projectId')
   if (!(await isTeamPm(req, input.projectId))) await deniedCreate(req, input.projectId)
   checkInput(input)
   checkProjectOpen(project)

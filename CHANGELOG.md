@@ -6,6 +6,50 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### MC4 — QA open items (branch `fix/mc4-qa-open-items`; report `docs/proyekkas/qa/mc4-qa-report.md` §11)
+
+Closes QA-MC4-09, QA-MC4-13 and the read-rule parts of QA-MC4-14 under the PT scope rule. Web/API only, no
+migration. The APK 0.3.x keeps working: no error code was added, removed or renamed.
+
+#### Security
+- **On-behalf drafts (QA-MC4-09):** "Admin/Finance may create a request for others" (Q-09) now needs that role in
+  the PT of the request. That PT comes from the project or cost center and from every requester. A role in another
+  PT no longer counts: for example, Admin of PT A + Staff of PT B → 403 for a draft for PT B employees.
+- **Existence oracles (QA-MC4-14):** a reference in a PT the caller is not mapped to now gets the same answer as a
+  missing one:
+  - sync items: no `COMPANY_MISMATCH`; attendance locations and on-behalf employees → `NOT_FOUND`; drafts → the
+    usual validation error;
+  - a create with a body `company`;
+  - a new addendum: 404 instead of 403;
+  - manual cash entries: a missing project / cost center / category / source / vehicle is now a 400 (was a 500).
+
+  `COMPANY_MISMATCH` stays for a mismatch between two PTs the caller is mapped to.
+- **`?pt=` (QA-MC4-14):** a PT outside the caller's selection now gets 403 `COMPANY_NOT_ALLOWED` in the
+  `/api/v1/reports` JSON and downloads (it used to narrow silently to an empty report). The panel views Laporan,
+  Audit Log, Kas, Catat kas, Tutup buku, Absensi and Rekap absensi show a denial instead.
+- **Display names (QA-MC4-14):** names in Riwayat, request DTOs, PDFs and the audit-log report and its filter come
+  from the document's PT or from a PT the viewer is mapped to, else the account name. They never show an employee
+  name from another PT.
+- **Face reference photo (QA-MC4-14):** `employees.faceRefPhoto` takes only a selfie of the employee's PT, or the
+  caller's own upload that is not linked yet. Any other selfie, or a missing id, gets the same 400.
+
+#### Changed
+- `mc2-sql-lint` (QA-MC4-13) now:
+  - scans all of `domain/expense|progress|addendum|sync`;
+  - knows 7 more per-PT tables;
+  - accepts a company predicate only when it is a helper call or a bound parameter (`company_id = ${…}`,
+    `IN (${…})`, `= ANY(${…})`), not a join condition.
+
+  Its allow-list has 17 entries, each with a reason, and the test fails on an entry that is no longer needed.
+- OpenAPI: the report query parameter `pt` is documented; the descriptions of `COMPANY_MISMATCH` and the body
+  `company` were updated (no shape change).
+
+#### Fixed (found by the MC4 UAT suite, local run 2026-10-02)
+- **MC4-02:** "Salin default saat dibuat" / "Salin dari PT" were never shown on the company create form (field
+  `read: () => false` → Payload hides the field); now readable by the group admin only.
+- **MC4-03:** 2 px horizontal page overflow at 390 px on `/admin/persetujuan`: the table wrapper `.pk-tw` bleeds to
+  the card edge only inside a `.pk-card` (`--pk-tw-bleed`), no negative margin elsewhere.
+
 ### CI — image build retry
 - `ci.yml` job `image`: each buildx step (web/migrate, local and push-by-digest) runs once with
   `continue-on-error`, then after a 45 s back-off one retry; later steps take the digest of whichever attempt

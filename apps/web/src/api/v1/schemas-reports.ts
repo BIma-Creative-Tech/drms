@@ -330,5 +330,6 @@ export const ReportQuery = z
     nodok: z.string().optional(),
     sumber: z.string().optional(),
     bulan: z.string().optional().meta({ description: 'YYYY-MM (absensi; default current month)' }),
+    pt: z.string().optional().meta({ description: 'MC2: PT filter (company ids, repeatable or comma list) — narrows the scope; a PT outside the caller\'s selection → 403 code COMPANY_NOT_ALLOWED (QA-MC4-14)' }),
   })
   .meta({ description: 'Same filters as the web report page; PM filters are intersected with the team scope.' })
