@@ -25,6 +25,12 @@ no-op; 1.5 s for ~10 000 rows locally). APK unaffected.
 - Append-only rule: the migration disables `audit_logs_no_update` for its own UPDATEs only (owner, one transaction,
   ADR 0006 §6) and records one `schema_maintenance` audit row with the counts.
 
+### MC4 — staging UAT fixes (2026-10-02, `docs/proyekkas/uat/mc4/` run on staging `3dd8a96`)
+- **UI-CO (copy defaults in the company form):** after the MC4-02 read fix the two fields were visible but
+  **disabled** — Payload makes `virtual` fields `admin.readOnly` by default (`fields/config/sanitize.js`); both now set
+  `admin.readOnly: false` (unit test). The API path was already fine (the UAT fixture created PT CS1 with copied
+  defaults).
+
 ### MC4 — QA open items (branch `fix/mc4-qa-open-items`; report `docs/proyekkas/qa/mc4-qa-report.md` §11)
 
 Closes QA-MC4-09, QA-MC4-13 and the read-rule parts of QA-MC4-14 under the PT scope rule. Web/API only, no
@@ -68,6 +74,14 @@ migration. The APK 0.3.x keeps working: no error code was added, removed or rena
   `read: () => false` → Payload hides the field); now readable by the group admin only.
 - **MC4-03:** 2 px horizontal page overflow at 390 px on `/admin/persetujuan`: the table wrapper `.pk-tw` bleeds to
   the card edge only inside a `.pk-card` (`--pk-tw-bleed`), no negative margin elsewhere.
+
+### CI — Trivy image scan: retry, IPv4 only
+- `ci.yml` job `image`: the Trivy report and gate run through `.github/scripts/trivy-image.sh` — 3 attempts with
+  back-off (0 / 30 / 90 s) for network errors, the container started with IPv6 disabled (Go then skips AAAA records;
+  falls back to a normal run if the daemon refuses the sysctl). The gate now uses `--exit-code 3` for "fixable
+  CRITICAL found", which is never retried, and `set -euo pipefail` (a failing first image used to be masked by the
+  second). Cause: develop `3dd8a96` (2026-10-02) failed in the gate fetching a GHCR blob from
+  `pkg-containers.githubusercontent.com` ("dial tcp [2606:50c0:…]:443: connect: network is unreachable").
 
 ### CI — image build retry
 - `ci.yml` job `image`: each buildx step (web/migrate, local and push-by-digest) runs once with
