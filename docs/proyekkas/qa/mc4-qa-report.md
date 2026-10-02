@@ -38,16 +38,16 @@ Baseline before any change (`f9d0f92`): integration **40 files / 528 + 1 skipped
 | QA-MC4-02 | **HIGH** | `collections/Users.ts:81` update access (`usersOfMyCompanies`) | The Admin of PT A can rename, deactivate or change the e-mail (synced to Keycloak) of accounts that also belong to PT B, including group admins | **fixed** `87906f8` (test `96702e5`) |
 | QA-MC4-03 | **HIGH** | `audit/writer.ts`, `collections/AuditLogs.ts:68`, `domain/reports/registry.ts:1024`, `dashboards.ts:343` | Audit rows of PT B documents written without a PT, and all untagged rows, are readable by the Admin / Direktur of any PT. This exposes request lines with amounts and descriptions, signatures, PDF exports and doc numbers | **fixed** `74ba23b` (test `ff03b4e`) |
 | QA-MC4-04 | **HIGH** (availability) | `collections/media/index.ts:37-85` office media rules | Reading one media file as an office user in a subset of the PTs loads every attendance / request / report of those PTs. With 3 PTs × 1 year this is 3.6–4 s and more than 400 MiB per selfie, which ends in a heap OOM crash of the whole web process | **fixed** `8f07103` + `b8d70c1` (tests `6bcb8d4`, `c3e35e5`) |
-| QA-MC4-05 | MEDIUM | `collections/media/index.ts` `officeScope` (`all = active.every(...)`) | Once PT B is **deactivated**, the office users of the remaining PTs read every media row, B's included | open → nextjs |
-| QA-MC4-06 | MEDIUM | `domain/expense/receipts.ts:389` `duplicateHits` | Duplicate-receipt detection searches all PTs. A flag on a PT A request names the PT B doc number (`flags.ts:144`) and links `relatedRequest` to B; this also works as an oracle ("does B hold this receipt?") | open → owner decision + nextjs |
-| QA-MC4-07 | MEDIUM (perf) | media LIST rules (admin lists, upload population, `/api/<media>?…`) | They still use id lists: 0.5–1.7 s per list after the fix. A Postgres bind limit of 65 535 parameters will break them once one office user's PTs exceed about 65 k attendances (about 2 years at Q-34 × 2 PTs) | open → nextjs (company column on media, as already planned in mc4-progress §Open) |
-| QA-MC4-08 | LOW | `domain/progress/stages.ts:43` `templateStages` | `PUT /api/v1/projects/{A}/stages {templateId: <B template>}` copies PT B's stage names and weights into A and returns them. Confirmed by probe (200) | open |
+| QA-MC4-05 | MEDIUM | `collections/media/index.ts` `officeScope` (`all = active.every(...)`) | Once PT B is **deactivated**, the office users of the remaining PTs read every media row, B's included | **fixed** on `feat/mc4-pt-scope-rule` (§11) |
+| QA-MC4-06 | MEDIUM | `domain/expense/receipts.ts:389` `duplicateHits` | Duplicate-receipt detection searches all PTs. A flag on a PT A request names the PT B doc number (`flags.ts:144`) and links `relatedRequest` to B; this also works as an oracle ("does B hold this receipt?") | **fixed** (owner decision 2026-10-02) on `feat/mc4-pt-scope-rule` (§11) |
+| QA-MC4-07 | MEDIUM (perf) | media LIST rules (admin lists, upload population, `/api/<media>?…`) | They still use id lists: 0.5–1.7 s per list after the fix. A Postgres bind limit of 65 535 parameters will break them once one office user's PTs exceed about 65 k attendances (about 2 years at Q-34 × 2 PTs) | **fixed** on `feat/mc4-pt-scope-rule`: `ownerCompany` column + migration (§11) |
+| QA-MC4-08 | LOW | `domain/progress/stages.ts:43` `templateStages` | `PUT /api/v1/projects/{A}/stages {templateId: <B template>}` copies PT B's stage names and weights into A and returns them. Confirmed by probe (200) | **fixed** (§11) |
 | QA-MC4-09 | LOW | `domain/expense/drafts.ts:75-78,104,134-139` | The on-behalf check (Q-09) uses a role from another PT on a draft without a project (Admin in A + Staff in B → a draft for B employees). Submit or a body `company` rejects it later. Code review only | open |
-| QA-MC4-10 | LOW | `drafts.ts:65,117,123,145`, `cash/ledger.ts:98` (+ `transfers.ts:47`, `lpj.ts:209`), `progress/guards.ts:29` | Validation messages answer before the PT check, so they work as oracles for other PTs: the project/cost-center archived or finished state, which B employee owns bank account Y, **PT B's lock date** (settle with a B cash account → 409 "tutup buku s/d …"), project/stage `progressPct = X`. Writes are blocked by the hooks and triggers | open |
-| QA-MC4-11 | LOW | `collections/media/index.ts` `MediaCompany` read = `anyRole` | Logos of all PTs are readable by any user (the ADR says "members of that PT") | open |
-| QA-MC4-12 | LOW | `media/index.ts` `officeSignatures`, `domain/devices.ts:123` `canRevoke` | Inactive memberships still count: office users of A read signatures of former members, and Admin/Owner of A can revoke the device of someone who now works only in B | open |
-| QA-MC4-13 | LOW (tooling) | `tests/unit/mc2-sql-lint.test.ts` | The lint does not scan `domain/expense|progress|addendum|sync`, misses 7 per-PT tables, and `company_id\s*(=|IN)` also accepts join conditions (`ws.company_id = e.company_id`) | open → §7 |
-| QA-MC4-14 | INFO | various | `attachmentIds` on drafts: uploader not checked (no read impact). `employees.faceRefPhoto`: PT not checked. Sync replays return a stored result for 30 days after a PT is lost. `/me` without a membership shows the name of PT #1. Notifications of a PT the user left stay readable (own rows). `?pt=` / `?company=` / the period-closing fallback narrow silently. `lockRequest` row-locks before the visibility check (no data). `displayNames` falls back to an employee name from another PT. Existence-only oracles (sync `COMPANY_MISMATCH` vs `NOT_FOUND`, body-company `COMPANY_MISMATCH`, addendum 404 vs 403, REST "cross-company reference"). | noted |
+| QA-MC4-10 | LOW | `drafts.ts:65,117,123,145`, `cash/ledger.ts:98` (+ `transfers.ts:47`, `lpj.ts:209`), `progress/guards.ts:29` | Validation messages answer before the PT check, so they work as oracles for other PTs: the project/cost-center archived or finished state, which B employee owns bank account Y, **PT B's lock date** (settle with a B cash account → 409 "tutup buku s/d …"), project/stage `progressPct = X`. Writes are blocked by the hooks and triggers | **fixed** (§11) |
+| QA-MC4-11 | LOW | `collections/media/index.ts` `MediaCompany` read = `anyRole` | Logos of all PTs are readable by any user (the ADR says "members of that PT") | **fixed** (§11) |
+| QA-MC4-12 | LOW | `media/index.ts` `officeSignatures`, `domain/devices.ts:123` `canRevoke` | Inactive memberships still count: office users of A read signatures of former members, and Admin/Owner of A can revoke the device of someone who now works only in B | **fixed** (§11) |
+| QA-MC4-13 | LOW (tooling) | `tests/unit/mc2-sql-lint.test.ts` | The lint does not scan `domain/expense|progress|addendum|sync`, misses 7 per-PT tables, and `company_id\s*(=|IN)` also accepts join conditions (`ws.company_id = e.company_id`) | partial: `domain/expense/receipts.ts` scanned (§11); rest open |
+| QA-MC4-14 | INFO | various | `attachmentIds` on drafts: uploader not checked (no read impact). `employees.faceRefPhoto`: PT not checked. Sync replays return a stored result for 30 days after a PT is lost. `/me` without a membership shows the name of PT #1. Notifications of a PT the user left stay readable (own rows). `?pt=` / `?company=` / the period-closing fallback narrow silently. `lockRequest` row-locks before the visibility check (no data). `displayNames` falls back to an employee name from another PT. Existence-only oracles (sync `COMPANY_MISMATCH` vs `NOT_FOUND`, body-company `COMPANY_MISMATCH`, addendum 404 vs 403, REST "cross-company reference"). | partial: `/me` and notifications fixed (§11); rest noted |
 
 There is no CRITICAL. Areas checked and found OK are listed in §4.
 
@@ -323,3 +323,32 @@ There are no migrations, no new dependencies and no OpenAPI changes, and `apps/m
   scratchpad (mode 600) and were never printed or committed.
 - No staging/prod/Keycloak/infra access.
 - Committed test tooling (local only): `tests/integration/mc4-qa.int.test.ts`; `tests/load/mc4/{seed-3pt.ts,bulk-3pt.sql,fake-idp.mjs,media-3pt.js}` (each refuses or is documented as throwaway-only: `pk_perf*` DB guard, fake IdP never deployed); `tests/load/q34-mix.js` (optional `pid`).
+
+## 11. Follow-up — PT scope rule (owner decision 2026-10-02)
+
+**Decision:** read and search scope = the PTs a user is MAPPED to (active memberships in active PTs); ≥ 2 PTs =
+consolidated over those PTs only; group admin unchanged (ADR 0016 §2); mutations single-PT. Implemented on
+`feat/mc4-pt-scope-rule` (ADR 0016 "Implementation notes — Scope rule"), migration `20261002_080000_mc4_scope_rule`.
+
+| ID | Status | Fix |
+|---|---|---|
+| QA-MC4-06 | **fixed** | Search per receipt over the request's PT + the PTs the **uploader** is mapped to. A cross-PT hit is stored with `related_company_id` and shown **only** to viewers mapped to that PT; everyone else sees **nothing** of it (chosen over a neutral "possible duplicate" text, which would still tell a viewer of PT A only that another PT holds the receipt). Applied to the request detail, internal PDF, REST, inbox / transfer-queue / KPI counts, the verify-all gate, the review endpoint (404), Riwayat and the audit rows (written without PT). Stored `approvals.openFlags` counts same-PT flags only. |
+| QA-MC4-05 | **fixed** | The office "every PT" shortcut compares with ALL companies (active or not); untagged audit rows follow the same rule. |
+| QA-MC4-07 | **fixed** | `owner_company_id` on the five owner-linked media tables, derived by DB triggers (client values replaced), backfilled by the migration; office rule `ownerCompany IN (…)`; the "visible owner" id lists leave out the office PTs (also for receipt / flag / approval / transfer REST lists). |
+| QA-MC4-08 / 10 / 11 / 12 | **fixed** | Template of the project's PT only; draft references, cash account and `progressPct` of an unmapped PT answered like missing ones; logos for members of the PT; ACTIVE memberships only for signatures / device revoke. |
+| QA-MC4-14 (part) | **fixed** | `/me` without membership names no PT; notifications of a PT the user left are hidden. |
+| QA-MC4-09 | open | mutation check (on-behalf role from another PT); outside the read rule, rejected later by submit / body `company`. |
+
+**Tests:** `tests/integration/mc4-scope.int.test.ts` (21: 1-PT user, 2-PT user over A + B, 2-PT user vs unmapped C →
+404 / 403 / no flag, deactivated PT, duplicate-flag visibility per viewer, LOW findings); `tests/unit/mc4-scope.test.ts`
+(7). The QA-MC4-05 test fails on the old rule (200 instead of 404) and passes with the fix. `e9-hardening` selfie test:
+the selfie is now linked to an attendance (an unlinked upload has no PT).
+
+**Migration check on a seeded copy** (local throwaway DB, `seed-3pt.ts` + `bulk-3pt.sql` = 3 PTs × 1 year, 74 400
+media rows with `owner_company_id` empty as before the migration, plus 6 synthetic duplicate flags): down → columns
+gone; up → backfill **12.1 s**, 0 rows with a wrong PT (receipts, progress photos, selfies, flags), 4 cross-PT flags
+tagged; up again → 0.27 s, identical checksum (idempotent); `receipt_flags_guard` re-enabled. Local API timings
+on that copy (no HTTP, not 1:1 comparable with §5.2): `media-selfies` list 22–37 ms (31 200 rows visible) and
+`media-receipts` 23–33 ms for Finance PT 1+2 (§5.2 after `b8d70c1`: 1.3 s / 1.7 s over HTTP); a list page is one
+`owner_company_id IN (1, 2)` predicate instead of 31 200 bind parameters.
+

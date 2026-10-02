@@ -6,6 +6,33 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### MC4 — PT scope rule (owner decision 2026-10-02; branch `feat/mc4-pt-scope-rule`, ADR 0016 "Implementation notes — Scope rule")
+
+Read and search scope = the PTs a user is mapped to (active memberships): one PT → that PT only; several → the
+consolidated data of those PTs, never another PT. Group admin unchanged; mutations stay single-PT. Web/API only.
+Migration: `20261002_080000_mc4_scope_rule` (schema + backfill, idempotent, down migration; ~12 s for 74 400 media
+rows locally).
+
+#### Security
+- **Duplicate receipts (QA-MC4-06):** the check compares a receipt only with requests in the request's PT and the
+  PTs its uploader is mapped to. A hit in another PT is shown (with its number and link) only to users mapped to that
+  PT; everyone else sees nothing of it — counts, the "Verifikasi semua nota" gate, the internal PDF, reports, REST,
+  Riwayat and the audit log follow the same rule (audit rows of such a flag carry no PT).
+- **Deactivated PT (QA-MC4-05):** files of a deactivated PT are no longer readable by the office users of the other
+  PTs; the "office in every PT" shortcut (media) and the "rows without PT" audit rule count inactive PTs too (with a
+  deactivated PT, only group admins read audit rows without PT).
+- **Oracles (QA-MC4-08/10):** a stage template, project, cost center, bank account, category, cash account or
+  `progressPct` of a PT the caller is not mapped to is answered like a missing one (no lock date, no state, no
+  template copy).
+- PT logos only for members of that PT (+ group logo); signatures and device revoke count active memberships only;
+  notifications about a PT the user left are hidden; `/me` without membership no longer shows PT #1.
+
+#### Changed
+- **Media lists (QA-MC4-07):** new derived column `ownerCompany` on receipt / transfer-proof / attachment /
+  progress-photo / selfie media (set by DB triggers, backfilled); office access is `ownerCompany IN (…)` instead of id
+  lists (65 535 bind-parameter cap). Cash-entry attachments are now readable by the office roles of that PT.
+- Receipt flags carry `relatedCompany` (PT of the related request when it is another PT).
+
 ## [0.5.1] - 2026-09-30
 
 Security patch on top of 0.5.0 (no migrations, no API change): npm audit high findings in `undici` and `nodemailer`

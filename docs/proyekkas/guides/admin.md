@@ -124,3 +124,14 @@ notifikasi "Pengajuan atas nama Anda" (dan saat diajukan/ditarik); karyawan tanp
 ## 9. Audit Log
 
 **Audit Log** (atau **Sistem → Audit log**): filter tanggal, user, jenis dokumen, aksi → unduh (maks. 31 hari).
+
+## Aturan cakupan PT (keputusan pemilik 2026-10-02)
+
+Setiap pengguna hanya melihat dan mencari data PT tempat ia **terdaftar** (punya akses PT aktif di matriks akses).
+Terdaftar di 1 PT → hanya data PT itu; terdaftar di 2 PT atau lebih → data gabungan PT-PT itu saja, tidak pernah PT
+lain. Membuat, menyetujui dan membayar tetap selalu di satu PT. Akibatnya: cek **nota ganda** hanya membandingkan
+dengan pengajuan di PT tempat pengunggah nota terdaftar, dan flag nota ganda yang menunjuk pengajuan PT lain (beserta
+nomornya) hanya tampil bagi pengguna yang juga terdaftar di PT itu — pengguna lain tidak melihat flag itu sama
+sekali; file dan logo sebuah PT hanya untuk anggota PT itu, dan file PT yang dinonaktifkan tidak terbuka bagi pengguna
+PT lain. Admin grup tetap memegang wewenangnya (membuat/menonaktifkan PT, setting aplikasi, akses semua pengguna, audit
+log tanpa PT).

@@ -398,8 +398,31 @@ Branch `feat/mc4-code-gaps` (web/API only). Evidence: `../mc/mc4-progress.md`; t
 
 Not done (MC4 QA): media-access performance with 3 PTs (MC2 note 4) — see `../mc/mc4-progress.md` §Open.
 
+## Implementation notes — Scope rule (owner decision 2026-10-02)
+
+**Rule (binding, confirms §5):** the read and search scope of a user = the PTs the user is **mapped** to (active
+memberships in active PTs). Mapped to one PT → that PT only; mapped to several → the consolidated data of THOSE PTs,
+never an unmapped PT. Group admins keep the powers of §2 (companies, app-wide settings, memberships / accounts,
+untagged audit rows) and get no new data reads. Mutations stay single-PT (unchanged). The PT switcher selection
+(`X-Company-Ids` / cookie) still only narrows lists; "may this person learn a fact of PT X at all" is decided on the
+mapping (`access/roles.ts` `mappedCompanies`). Branch `feat/mc4-pt-scope-rule`; closes QA-MC4-05/06/07
+(`../qa/mc4-qa-report.md`); tests `tests/integration/mc4-scope.int.test.ts`, `tests/unit/mc4-scope.test.ts`.
+Migration `20261002_080000_mc4_scope_rule`.
+
+| # | Area | Implementation | Reason |
+|---|---|---|---|
+| 1 | Duplicate-receipt search (QA-MC4-06) | `duplicateHits`: per receipt, other active receipts in the request's own PT **or** a PT the receipt's **uploader** (`receipts.created_by`) is mapped to. Imported receipts without an uploader → own PT only | the scope depends on the receipt, not on who triggers the recompute (submit / edit / resubmit by someone else give the same flags); an unmapped PT is never searched, so the flag is no existence oracle for it |
+| 2 | Duplicate-flag display | a hit in another PT is stored with `receipt_flags.related_company_id`; such a flag is shown **only** to viewers mapped to that PT (detail DTO, internal PDF, REST `receipt-flags`, inbox / transfer-queue counts, KPI SQL counts, Finance "verify all" gate, review endpoint 404, "Riwayat"). **Everyone else sees nothing of it — no neutral "possible duplicate" text.** `approvals.openFlags` (stored, read by every reader of the request) counts flags without `related_company_id` only. Audit rows of such a flag (`flag_raised` / `flag_reviewed`) are written WITHOUT a PT, with `relatedCompanyId` in `newValue` | every reader of a PT A request is mapped to A; a neutral text they cannot resolve would still tell a viewer mapped only to A that PT X holds the same receipt. "Nothing" is the only option that leaks nothing outside the viewer's mapped PTs. Consequence: a Finance mapped only to A verifies receipts without that flag; a Finance mapped to both PTs must review it |
+| 3 | Rows without PT (audit) | `mayReadUntaggedAudit`: group admin, or Admin / Direktur of **every PT, active or not** (was: every active PT) | untagged rows now also hold cross-PT duplicate flags; nobody is mapped to a deactivated PT, so after a deactivation only group admins read untagged rows |
+| 4 | Media of a deactivated PT (QA-MC4-05) | the office "every PT" shortcut compares with ALL companies (`allCompanyIds`). Memberships of an inactive PT are never part of a company context, so its files are readable by nobody but their uploaders while they are still mapped somewhere; group admins get no media read | same rule as data rows of an inactive PT |
+| 5 | Media lists (QA-MC4-07) | `ownerCompany` (`owner_company_id`) on the five owner-linked media tables, **derived by DB triggers** (`pk_media_owner_company` from the owner link → request / progress report / cash entry; selfies from their earliest attendance, `pk_attendance_selfie_company` after the attendance insert); a written value is always replaced. Office rule = `ownerCompany IN (office PTs)` (+ own uploads); the "visible owner" id lists (`visibleRequestIds` / `visibleReportIds`, also used by `byVisibleRequest` for receipts, flags, approvals, transfers …) leave out the office PTs. Backfill in the migration (idempotent) | removes the `id IN (…)` lists of every owner document (65 535 bind-parameter cap per statement). Office rule unchanged in effect, except cash-entry attachments, now readable by the office roles of that cash entry's PT (before: every-PT office holders only) |
+| 6 | QA-MC4-08 / 10 (oracles) | stage template must be of the project's PT; draft validation answers a project / cost center / bank account / category / employee / vehicle of an unmapped PT like a missing one; the cash account is checked against the document's PT before any lock date (`assertAccount(req, id, company)`); `progressWriteGuard` compares only rows the HTTP caller can read | each answered with a PT B fact (template content, archived state, lock date, `progressPct`) |
+| 7 | QA-MC4-11 / 12, notifications, `/me` | `media-company`: logos of the caller's mapped PTs + the group logo (group admin: all); signature readers and device revoke count ACTIVE memberships only; notifications about a PT the user is no longer mapped to are hidden (rows without PT stay); `/me` without any membership names no PT (`settings.companyName` = "") | reads of PTs the user is not (any more) mapped to |
+| 8 | Already compliant (evidence) | `X-Company-Ids` / cookie = selection ∩ memberships, foreign header → 403 `COMPANY_NOT_ALLOWED` (`mc-isolation` "selection"); lists / pickers = collection access per PT (`mc-isolation` "every per-PT collection over REST"); reports, dashboards, exports, queues (`mc2-isolation`); 91 `/api/v1` routes (`mc3-api` route table); audit per PT (`mc4-qa` QA-MC4-03) | unchanged |
+
 ## Revision history
 
+- **2026-10-02 (scope rule):** implementation notes "Scope rule (owner decision 2026-10-02)" (1–8).
 - **2026-09-30 (MC4 code gaps):** implementation notes MC4 (1–9).
 - **2026-09-28 (MC3-1 API):** implementation notes MC3-1 (1–7).
 - **2026-09-28 (MC2 integration):** implementation notes MC2 integration (1–5).
