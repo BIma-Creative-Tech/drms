@@ -7,6 +7,7 @@ import { displayUnitPrice } from './lines'
 import { budgetImpact, type ApprovalSnapshot } from './rules'
 import { allowedActions } from './state'
 import { REQUEST_TYPE_LABELS, statusLabel, FLAG_LABELS, type FlagKind } from './types'
+import { withFlagVisibility } from './flag-visibility'
 import { receiptsOf } from './receipts'
 import { settlementOfRequest } from './lpj'
 import { SETTLEMENT_STATUS_LABELS } from './settlement-rules'
@@ -69,7 +70,8 @@ export async function detail(req: PayloadRequest, id: number) {
   const flags = (
     await req.payload.find({
       collection: 'receipt-flags',
-      where: { and: [{ request: { equals: id } }, { status: { not_equals: 'resolved' } }] },
+      // QA-MC4-06: a cross-PT duplicate only for viewers mapped to the other request's PT
+      where: withFlagVisibility(req, { and: [{ request: { equals: id } }, { status: { not_equals: 'resolved' } }] }),
       depth: 0,
       pagination: false,
       sort: 'id',

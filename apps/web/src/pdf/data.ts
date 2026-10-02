@@ -4,6 +4,7 @@ import { relId } from '@/access/roles'
 import { approvalsOf, settings, type ApprovalRow, type RequestDoc } from '@/domain/expense/common'
 import { displayNames } from '@/domain/companies'
 import { SKIPPED_LABEL } from '@/domain/expense/decision'
+import { withFlagVisibility } from '@/domain/expense/flag-visibility'
 import { displayUnitPrice } from '@/domain/expense/lines'
 import { receiptsOf } from '@/domain/expense/receipts'
 import { FLAG_LABELS, REQUEST_TYPE_LABELS, statusLabel, type FlagKind } from '@/domain/expense/types'
@@ -97,7 +98,8 @@ export async function buildPdfData(req: PayloadRequest, requestId: number, opts:
     ? ((
         await req.payload.find({
           collection: 'receipt-flags',
-          where: { and: [{ request: { equals: requestId } }, { status: { not_equals: 'resolved' } }] },
+          // QA-MC4-06: a cross-PT duplicate only for viewers mapped to the other request's PT
+          where: withFlagVisibility(req, { and: [{ request: { equals: requestId } }, { status: { not_equals: 'resolved' } }] }),
           depth: 0,
           pagination: false,
           overrideAccess: true, // SYSTEM-READ: internal variant (Finance/Owner/Admin only, checked by the endpoint)

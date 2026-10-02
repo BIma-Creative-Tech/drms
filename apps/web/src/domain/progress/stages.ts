@@ -39,12 +39,17 @@ export async function requireVisibleProject(req: PayloadRequest, projectId: numb
   return p!
 }
 
-async function templateStages(req: PayloadRequest, templateId: number): Promise<StageInput[]> {
-  const t = (await req.payload.findByID({ collection: 'stage-templates', id: templateId, depth: 0, overrideAccess: true /* SYSTEM-READ: master template */, req, disableErrors: true })) as {
+/**
+ * Stage template of the PROJECT's PT (QA-MC4-08, scope rule 2026-10-02): a template of another PT is
+ * answered exactly like a missing one — it was copied into the project and returned before.
+ */
+async function templateStages(req: PayloadRequest, templateId: number, companyId: number | undefined): Promise<StageInput[]> {
+  const t = (await req.payload.findByID({ collection: 'stage-templates', id: templateId, depth: 0, overrideAccess: true /* SYSTEM-READ: master template, PT checked below */, req, disableErrors: true })) as {
     active?: boolean | null
+    company?: unknown
     items?: Array<{ name: string; weightPct: number; sequence: number }> | null
   } | null
-  if (!t || t.active === false) fail(400, 'VALIDATION', 'Template tahapan tidak ditemukan atau nonaktif.', 'templateId')
+  if (!t || t.active === false || relId(t.company) !== companyId) fail(400, 'VALIDATION', 'Template tahapan tidak ditemukan atau nonaktif.', 'templateId')
   return (t!.items ?? []).map((i) => ({ name: i.name, weightPct: Number(i.weightPct), sequence: Number(i.sequence) }))
 }
 
@@ -64,7 +69,7 @@ export async function saveStageSet(req: PayloadRequest, projectId: number, body:
   if (body.templateId !== undefined) {
     if (body.stages !== undefined) fail(400, 'VALIDATION', 'Isi stages ATAU templateId, tidak keduanya.', 'templateId')
     if (existing.length > 0) fail(409, 'STATE_CONFLICT', 'Template hanya dapat dipakai pada project tanpa tahapan.', 'templateId')
-    input = await templateStages(req, body.templateId)
+    input = await templateStages(req, body.templateId, company)
   } else {
     input = body.stages ?? []
   }

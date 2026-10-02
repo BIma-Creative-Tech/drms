@@ -133,6 +133,20 @@ export function memberCompanies(req: ReqLike, opts: { all?: boolean } = {}): num
   return membershipsOf(req.user, opts).map((m) => m.company)
 }
 
+/**
+ * PT scope rule (owner decision 2026-10-02, ADR 0016 "Scope rule"): the PTs the caller is MAPPED to
+ * = every ACTIVE membership in an ACTIVE PT, independent of the PT switcher selection (the selection
+ * narrows lists; it never decides whether a person may learn a fact of a PT at all). A user mapped to
+ * one PT reads/searches that PT only; mapped to several, those PTs only — never an unmapped one.
+ * `null` = no user (system / job request): callers apply no per-viewer filter. A user object without
+ * a company context maps to nothing (fail closed).
+ */
+export function mappedCompanies(req: ReqLike): number[] | null {
+  if (!req.user) return null
+  const c = companyContextOf(req.user)
+  return c ? c.memberships.map((m) => m.company) : []
+}
+
 /** Employee of the caller in `companyId` (membership link), or undefined. */
 export function employeeIn(req: ReqLike, companyId: number | null | undefined): number | undefined {
   if (typeof companyId !== 'number') return undefined

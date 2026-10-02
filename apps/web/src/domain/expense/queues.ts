@@ -5,6 +5,7 @@ import { companyRefs, type CompanyRef } from '@/domain/companies'
 
 import { actorContext, ids, projectCommitted, settings, type RequestDoc } from './common'
 import { isDecisionSnapshot } from './decision'
+import { withFlagVisibility } from './flag-visibility'
 import { budgetImpact } from './rules'
 import { allowedActions } from './state'
 import { REQUEST_TYPE_LABELS, statusLabel, TRANSFER_QUEUE_WHERE } from './types'
@@ -58,7 +59,7 @@ async function findVisible(req: PayloadRequest, where: Where, sort: string, limi
 async function flagCounts(req: PayloadRequest, requestId: number) {
   const res = await req.payload.find({
     collection: 'receipt-flags',
-    where: { and: [{ request: { equals: requestId } }, { status: { equals: 'open' } }] },
+    where: withFlagVisibility(req, { and: [{ request: { equals: requestId } }, { status: { equals: 'open' } }] }), // QA-MC4-06
     depth: 0,
     pagination: false,
     select: { level: true },

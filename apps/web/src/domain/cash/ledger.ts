@@ -1,7 +1,7 @@
 import { sql } from '@payloadcms/db-postgres'
 import type { PayloadRequest } from 'payload'
 
-import { companiesWithRole, hasRole, relId, userId, type Role } from '@/access/roles'
+import { companiesWithRole, hasRole, mappedCompanies, relId, userId, type Role } from '@/access/roles'
 import { companyOf, contextCompanyId } from '@/domain/companies'
 import { writeAudit } from '@/audit/writer'
 import { fail, today } from '@/domain/expense/common'
@@ -94,9 +94,15 @@ function closingCompany(req: PayloadRequest, companyId: number | undefined, role
   fail(400, 'PT wajib dipilih.', [{ path: 'company', message: 'Pilih PT yang ditutup bukunya.' }])
 }
 
-export async function assertAccount(req: PayloadRequest, id: number) {
-  const a = await req.payload.findByID({ collection: 'cash-accounts', id, depth: 0, overrideAccess: true /* SYSTEM-READ: account check */, req }).catch(() => null)
-  if (!a || a.active === false) fail(400, 'Akun kas tidak ditemukan atau nonaktif.', [{ path: 'cashAccountId', message: 'Akun kas tidak valid.' }])
+/**
+ * The cash account must exist, be active and — when the flow knows its PT (`companyId` = the
+ * document's PT) — belong to that PT. QA-MC4-10 (scope rule 2026-10-02): a cash account of another PT
+ * is answered like a missing one BEFORE any lock-date check (a B account used to answer with PT B's
+ * closing date: "tutup buku s/d …").
+ */
+export async function assertAccount(req: PayloadRequest, id: number, companyId?: number) {
+  const a = await req.payload.findByID({ collection: 'cash-accounts', id, depth: 0, overrideAccess: true /* SYSTEM-READ: account check, PT compared below */, req }).catch(() => null)
+  if (!a || a.active === false || (companyId !== undefined && relId(a.company) !== companyId)) fail(400, 'Akun kas tidak ditemukan atau nonaktif.', [{ path: 'cashAccountId', message: 'Akun kas tidak valid.' }])
 }
 
 /**
@@ -111,10 +117,12 @@ export async function postEntry(req: PayloadRequest, input: PostInput): Promise<
   // ADR 0016 §5 (MC2 fix): a manual posting needs Finance IN THE ACCOUNT's PT (the endpoint only
   // checks "Finance in any PT"); other source types are posted by flows already checked per PT.
   if (req.user && input.sourceType === 'manual' && !hasRole(req, 'pk-finance', companyId)) fail(400, 'Akun kas tidak ditemukan atau nonaktif.', [{ path: 'cashAccountId', message: 'Akun kas tidak valid.' }])
+  // QA-MC4-10: account (and its PT) first — the lock date of a PT the caller is not mapped to is never answered
+  const mapped = mappedCompanies(req)
+  if (companyId === undefined || (mapped !== null && !mapped.includes(companyId))) fail(400, 'Akun kas tidak ditemukan atau nonaktif.', [{ path: 'cashAccountId', message: 'Akun kas tidak valid.' }])
+  await assertAccount(req, input.cashAccountId)
   const lock = await currentLockDate(req, companyId)
   if (lock && input.entryDate <= lock) fail(409, `Periode ${input.entryDate.slice(0, 7)} sudah ditutup (tutup buku s/d ${lock}).`)
-  await assertAccount(req, input.cashAccountId)
-  if (companyId === undefined) fail(400, 'Akun kas tidak ditemukan atau nonaktif.')
   const { docNo } = await allocateDocNo(req, input.direction === 'in' ? 'cash_in' : 'cash_out', { companyId: companyId!, date: parseBusinessDate(input.entryDate) })
   const doc = await req.payload.create({
     collection: 'cash-entries',

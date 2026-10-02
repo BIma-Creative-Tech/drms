@@ -60,6 +60,13 @@ export type MediaSpec = {
   extraFields?: Field[]
   /** Content-Disposition for served files (PDFs: attachment). */
   disposition?: 'inline' | 'attachment'
+  /**
+   * QA-MC4-07: `ownerCompany` = PT of the owning document (request / progress report / cash entry via
+   * the owner link, selfies via their attendance). Set ONLY by the DB triggers of migration
+   * `*_mc4_scope_rule` (any written value is replaced), so office read rules are `ownerCompany IN (…)`
+   * instead of id lists (Postgres caps a statement at 65 535 bind parameters).
+   */
+  ownerCompany?: boolean
 }
 
 /**
@@ -175,6 +182,19 @@ export function mediaCollection(spec: MediaSpec): CollectionConfig {
         { name: 'originalHeight', type: 'number', access: never, admin: readOnly },
         { name: 'originalSize', type: 'number', access: never, admin: readOnly },
         { name: 'capturedAt', type: 'date', label: 'Waktu foto (perangkat)', access: never },
+        ...(spec.ownerCompany
+          ? [
+              {
+                name: 'ownerCompany',
+                type: 'relationship',
+                relationTo: 'companies',
+                label: 'PT dokumen pemilik',
+                index: true,
+                access: { create: () => false, update: () => false },
+                admin: readOnly,
+              } satisfies Field,
+            ]
+          : []),
         ...(spec.extraFields ?? []),
       ],
     },

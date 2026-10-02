@@ -2,6 +2,7 @@ import type { PayloadRequest } from 'payload'
 
 import { companyContextOf, membershipsOf, userRoles, type Membership, type Role } from '@/access/roles'
 import { appSettings, companyById, settings } from '@/domain/companies'
+import { DEFAULT_TZ } from '@/lib/time'
 
 import { json, v1 } from '../http'
 
@@ -105,7 +106,12 @@ export const meEndpoint = v1({
       })
     }
     const legacyEmployeeId = selected.find((m) => m.company === legacyCompanyId)?.employee ?? null
-    const s = await settings(req, legacyCompanyId)
+    // Scope rule 2026-10-02 (QA-MC4-14): without any membership the deprecated `settings` carry NO PT
+    // (was: company #1's name and policy values) — the Companies field defaults instead
+    const s =
+      legacyCompanyId !== null
+        ? await settings(req, legacyCompanyId)
+        : { ...app, name: '', shortCode: '', timezone: DEFAULT_TZ, defaultGeofenceRadiusM: 100, receiptRoundingTolerance: 1000, receiptMaxAgeDays: 30 }
     const roles = userRoles(req)
     const imageTargets = {
       receiptsMaxPx: app.imageTargets?.receiptsMaxPx ?? 1600,

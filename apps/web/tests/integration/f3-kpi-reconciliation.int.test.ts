@@ -332,8 +332,8 @@ describe('K-01 saldo kas per akun', () => {
       const doc = await sqlAs(
         'app',
         `SELECT a.id, (coalesce(a.opening_balance,0) + coalesce(sum(e.amount) FILTER (WHERE e.direction='in'),0) - coalesce(sum(e.amount) FILTER (WHERE e.direction='out'),0))::text AS balance
-         FROM cash_accounts a LEFT JOIN cash_entries e ON e.cash_account_id=a.id AND e.entry_date <= $1 GROUP BY a.id`,
-        [asOf],
+         FROM cash_accounts a LEFT JOIN cash_entries e ON e.cash_account_id=a.id AND e.entry_date <= $1 WHERE a.company_id = $2 GROUP BY a.id`,
+        [asOf, await companyId()], // MC4: the Finance of this world is Finance of PT #1 only (other suites add PTs)
       )
       const exp = new Map(doc.rows.map((x) => [x.id, n(x.balance)]))
       expect(mine.accounts.length).toBe(exp.size)
@@ -550,7 +550,12 @@ describe('K-12 kelengkapan nota/LPJ', () => {
     expect(s.overdue.count).toBeGreaterThan(0) // the transfers dated 3 months ago
     const e = await sqlAs('app', "SELECT count(*)::int AS n FROM expense_requests WHERE type='reimburse' AND status='approved'")
     expect(s.reimburseToVerify).toBe(e.rows[0].n)
-    const f = await sqlAs('app', "SELECT count(*)::int AS n FROM receipt_flags f JOIN expense_requests er ON er.id=f.request_id WHERE f.status='open' AND f.level='warning' AND er.status NOT IN ('cancelled','rejected')")
+    // MC4: PT #1 only; a cross-PT duplicate flag is not visible to a Finance of PT #1 only (scope rule 2026-10-02)
+    const f = await sqlAs(
+      'app',
+      "SELECT count(*)::int AS n FROM receipt_flags f JOIN expense_requests er ON er.id=f.request_id WHERE f.status='open' AND f.level='warning' AND er.status NOT IN ('cancelled','rejected') AND er.company_id = $1 AND f.related_company_id IS NULL",
+      [await companyId()],
+    )
     expect(s.openWarnings).toBe(f.rows[0].n)
     const g = await sqlAs(
       'app',

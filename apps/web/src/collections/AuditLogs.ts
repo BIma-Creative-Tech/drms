@@ -61,12 +61,12 @@ export const AuditLogs: CollectionConfig = {
   access: {
     // ADR 0016 / requirements v1.2 §5: rows of a PT → office roles of THAT PT; rows without PT
     // (logins, shared masters, app-wide settings) → group admins and the Admin / Direktur of EVERY
-    // active PT (MC4 QA: was "of any PT"; same rule as the audit-log report).
+    // PT, active or not (MC4 QA: was "of any PT"; same rule as the audit-log report).
     read: async (args) => {
       if (!hasRoleAny(args.req, 'pk-admin', 'pk-owner', 'pk-finance')) return false
       const perPt = await byRole({ 'pk-admin': true, 'pk-owner': true, 'pk-finance': true })(args)
       if (perPt === true) return true
-      // QA-MC4-03: untagged rows only for group admins / Admin-Direktur of EVERY active PT
+      // QA-MC4-03: untagged rows only for group admins / Admin-Direktur of EVERY PT (active or not, scope rule 2026-10-02)
       const untagged: Where | null = (await mayReadUntaggedAudit(args.req)) ? { company: { exists: false } } : null
       if (!untagged) return perPt
       return perPt ? { or: [perPt as Where, untagged] } : untagged
