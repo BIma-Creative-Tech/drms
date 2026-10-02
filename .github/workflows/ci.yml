@@ -485,9 +485,8 @@ jobs:
           for name in web migrate; do
             ref="WEB_REF"; [[ $name == migrate ]] && ref="MIGRATE_REF"; img="${!ref}"
             out="$RUNNER_TEMP/trivy-$name.json"
-            docker run --rm -e TRIVY_USERNAME -e TRIVY_PASSWORD \
-              -v /var/run/docker.sock:/var/run/docker.sock:ro -v "$tcache:/root/.cache/trivy" \
-              "$TRIVY_IMAGE" image --quiet --platform linux/amd64 --severity HIGH,CRITICAL --exit-code 0 --format json "$img" > "$out"
+            tcache="$tcache" .github/scripts/trivy-image.sh \
+              image --quiet --platform linux/amd64 --severity HIGH,CRITICAL --exit-code 0 --format json "$img" > "$out"
             jq -r '[.Results[]?.Vulnerabilities[]?] | "  \(length) HIGH/CRITICAL:", (.[] | "  \(.Severity) \(.PkgName) \(.InstalledVersion) \(.VulnerabilityID) fixed=\(.FixedVersion // "-")")' "$out"
             jq -r --arg img "$img" '[.Results[]?.Vulnerabilities[]?] as $v
               | def n(s; f): [$v[] | select(.Severity == s and ((.FixedVersion // "") != "") == f)] | length;
@@ -501,12 +500,13 @@ jobs:
           TRIVY_USERNAME: ${{ github.actor }}
           TRIVY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          set -euo pipefail # a failing first image must fail the step (the loop used to continue)
           tcache="${TRIVY_CACHE_DIR:-$RUNNER_TEMP/trivy-cache}"
           mkdir -p "$tcache"
+          # exit 3 = fixable CRITICAL found (fails the job, never retried); network errors retried in the script
           for img in "$WEB_REF" "$MIGRATE_REF"; do
-            docker run --rm -e TRIVY_USERNAME -e TRIVY_PASSWORD \
-              -v /var/run/docker.sock:/var/run/docker.sock:ro -v "$tcache:/root/.cache/trivy" \
-              "$TRIVY_IMAGE" image --quiet --platform linux/amd64 --severity CRITICAL --exit-code 1 --ignore-unfixed "$img"
+            tcache="$tcache" .github/scripts/trivy-image.sh \
+              image --quiet --platform linux/amd64 --severity CRITICAL --exit-code 3 --ignore-unfixed "$img"
           done
 
       - name: Tag the scanned digests
