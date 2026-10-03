@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Security — npm audit (high): `braces` via `sass`
+- New advisory GHSA-vfj7-8cjw-p6xm (`braces` ≤ 3.0.3, stack-exhaustion DoS; **no patched release**) reached the prod
+  tree through `@payloadcms/next` 3.90.1 → `sass` 1.77.4 → `chokidar` 3 → `braces`, failing CI `npm audit` on develop
+  `e49e533` (2026-10-03). Root override `sass` 1.105.0 (released 2026-09-22, respects `min-release-age=7`; uses
+  `chokidar` 5 without `braces`). `npm audit --omit=dev --audit-level=high` passes (7 moderate remain); `next build`
+  compiles the Payload admin SCSS unchanged (no deprecation output). Remove the override when Payload bumps `sass`.
+
 ### MC4 — UAT defect MC4-04: PT tag for historic audit rows (branch `fix/mc4-audit-backfill`; report `docs/proyekkas/qa/mc4-qa-report.md` §11.2)
 
 Found by the staging UAT, case AUD-02. Migration `20261003_090000_mc4_audit_company_backfill` (idempotent, down =
