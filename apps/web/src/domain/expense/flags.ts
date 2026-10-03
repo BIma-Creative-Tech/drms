@@ -13,7 +13,11 @@ import { addDays, type FlagKind, type FlagLevel, type RequestType } from './type
 export type FlagLine = { id: string; lineNo: number; total: number; uom?: number | null; category?: number | null }
 export type FlagReceipt = { id: number; lineId: string; receiptDate: string; amount: number }
 export type FlagCategory = { id: number; name: string; allowedUoms: number[] }
-export type DuplicateHit = { receiptId: number; otherRequestId: number; otherDocNo: string | null; via: 'fields' | 'image' }
+/**
+ * A match in another active request. `otherCompanyId` = PT of that request when it is NOT the PT of
+ * the request being checked (cross-PT hit, QA-MC4-06), else null.
+ */
+export type DuplicateHit = { receiptId: number; otherRequestId: number; otherDocNo: string | null; via: 'fields' | 'image'; otherCompanyId?: number | null }
 
 export type FlagInput = {
   type: RequestType
@@ -43,6 +47,8 @@ export type FlagSpec = {
   lineNo: number
   receiptId?: number
   relatedRequestId?: number
+  /** Cross-PT duplicate: PT of the related request (the flag is shown only to users mapped to it). */
+  relatedCompanyId?: number
   message: string
   detail: Record<string, unknown>
 }
@@ -141,6 +147,7 @@ export function computeFlags(input: FlagInput): FlagSpec[] {
       lineNo: line.lineNo,
       receiptId: r.id,
       relatedRequestId: d.otherRequestId,
+      ...(typeof d.otherCompanyId === 'number' ? { relatedCompanyId: d.otherCompanyId } : {}),
       message: `Nota sudah dipakai di pengajuan ${d.otherDocNo ?? `#${d.otherRequestId}`} (${d.via === 'image' ? 'foto identik' : 'nomor + toko + nominal sama'}).`,
       detail: { otherRequestId: d.otherRequestId, otherDocNo: d.otherDocNo, via: d.via },
     })

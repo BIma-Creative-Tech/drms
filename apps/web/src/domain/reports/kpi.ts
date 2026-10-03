@@ -3,6 +3,7 @@ import type { PayloadRequest } from 'payload'
 
 import { BUDGET_COMMITTED, type RequestStatus, type RequestType } from '@/domain/expense/types'
 import { settings, today } from '@/domain/expense/common'
+import { flagVisibleSql } from '@/domain/expense/flag-visibility'
 import { DEFAULT_TZ } from '@/lib/time'
 import { getRequestTx } from '@/lib/tx'
 
@@ -463,7 +464,8 @@ export async function transferQueueSummary(req: PayloadRequest, scope: ReportSco
           count(*) FILTER (WHERE q AND er.needed_date < ${ctx.today})::int AS overdue,
           count(*) FILTER (WHERE er.type = 'reimburse' AND er.status = 'approved')::int AS to_verify,
           (SELECT count(*) FROM receipt_flags f JOIN expense_requests r2 ON r2.id = f.request_id
-            WHERE f.status = 'open' AND f.level = 'warning' AND r2.type = 'reimburse' AND r2.status = 'approved' AND ${companyScopeSql(sql`r2.company_id`, pts)})::int AS to_verify_flags
+            WHERE f.status = 'open' AND f.level = 'warning' AND r2.type = 'reimburse' AND r2.status = 'approved' AND ${companyScopeSql(sql`r2.company_id`, pts)}
+              AND ${flagVisibleSql(req, sql`f.related_company_id`)})::int AS to_verify_flags
         FROM (SELECT er.*, ((er.type = 'advance' AND er.status = 'approved') OR (er.type = 'reimburse' AND er.status = 'receipts_verified')) AS q
               FROM expense_requests er WHERE ${companyScopeSql(sql`er.company_id`, pts)}) er`,
   )
@@ -535,7 +537,8 @@ export async function lpjSummary(req: PayloadRequest, scope: ReportScope, from: 
           (SELECT coalesce(-sum(s.difference) FILTER (WHERE s.difference < 0), 0) FROM settlements s JOIN expense_requests er ON er.id = s.request_id
             WHERE s.status = 'verified' AND er.status = 'lpj_verified' AND ${requestScopeSql(scope)})::text AS d_shortfall,
           (SELECT count(*) FROM receipt_flags f JOIN expense_requests er ON er.id = f.request_id
-            WHERE f.status = 'open' AND f.level = 'warning' AND er.status NOT IN ('cancelled', 'rejected') AND ${requestScopeSql(scope)})::int AS f,
+            WHERE f.status = 'open' AND f.level = 'warning' AND er.status NOT IN ('cancelled', 'rejected') AND ${requestScopeSql(scope)}
+              AND ${flagVisibleSql(req, sql`f.related_company_id`)})::int AS f,
           (SELECT count(*) FROM expense_requests er WHERE er.type = 'advance' AND ${requestScopeSql(scope)}
              AND (SELECT min(t.transfer_date) FROM transfers t WHERE t.request_id = er.id AND t.status = 'posted' AND t.kind = 'advance') BETWEEN ${from} AND ${to})::int AS g_total,
           (SELECT count(*) FROM expense_requests er WHERE er.type = 'advance' AND er.status::text IN (${textList(ADVANCE_WITH_LPJ)}) AND ${requestScopeSql(scope)}
@@ -605,7 +608,7 @@ export async function requestRows(req: PayloadRequest, scope: ReportScope, f: Re
     sql`SELECT er.id, er.company_id, er.doc_no, er.request_date, er.type::text AS type, er.title, er.status::text AS status,
           coalesce(er.grand_total, 0)::text AS gt, er.approved_amount::text AS aa,
           ${DISBURSED}::text AS d, ${REFUND}::text AS rf, (${REALIZED})::text AS rl,
-          (SELECT count(*) FROM receipt_flags f WHERE f.request_id = er.id AND f.status = 'open')::int AS flags,
+          (SELECT count(*) FROM receipt_flags f WHERE f.request_id = er.id AND f.status = 'open' AND ${flagVisibleSql(req, sql`f.related_company_id`)})::int AS flags,
           coalesce((SELECT string_agg(e.name, ', ' ORDER BY rr."order") FROM expense_requests_rels rr JOIN employees e ON e.id = rr.employees_id
                     WHERE rr.parent_id = er.id AND rr.path = 'requesters'), '') AS requesters,
           coalesce(p.code || ' ' || p.name, cc.code || ' ' || cc.name, '') AS scope_name

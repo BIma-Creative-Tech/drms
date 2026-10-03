@@ -131,12 +131,21 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: ':id',
             builder: (_, s) => AddendumDetailScreen(id: int.tryParse(s.pathParameters['id'] ?? '') ?? 0),
+            routes: [
+              GoRoute(
+                path: 'edit',
+                builder: (_, s) => AddendumEditRoute(id: int.tryParse(s.pathParameters['id'] ?? '') ?? 0),
+              ),
+            ],
           ),
         ],
       ),
       GoRoute(
         path: '/progress',
-        builder: (_, s) => ProgressScreen(initialTab: s.uri.queryParameters['tab'] == 'projects' ? 1 : 0),
+        builder: (_, s) => ProgressScreen(
+          initialTab: s.uri.queryParameters['tab'] == 'projects' ? 1 : 0,
+          initialProject: int.tryParse(s.uri.queryParameters['project'] ?? ''),
+        ),
         routes: [
           GoRoute(
             path: 'new',

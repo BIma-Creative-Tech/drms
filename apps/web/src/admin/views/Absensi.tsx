@@ -20,7 +20,8 @@ import { formatServerTime } from '@/pdf/format'
 
 import { ChartHover } from './ChartHover'
 import { F3Root } from './f3-ui'
-import { PtChip, ptView, type PtView } from './pt'
+import { foreignPtParam, PtChip, ptView, type PtView } from './pt'
+import { PtNotAllowed } from './shared'
 import { Bento, Card, DashHead, DataTable, EmptyState, HBarList, KpiRow, KpiTile, StatusPill, TableView, VIZ_STYLE } from './viz'
 import { settings as companySettings } from '@/domain/companies'
 
@@ -152,7 +153,7 @@ const idParam = (sp: SP, k: string) => {
 
 /** PTs of the attendance scope that are in the switcher selection (the PT filter's choices). */
 const scopePts = (scope: AttScope | null, pt: PtView) => (scope?.parts ?? []).map((p) => p.company).filter((c) => pt.selected.includes(c))
-/** `?pt=` when it is one of `pts` (a foreign id is ignored — the scope narrows, never widens). */
+/** `?pt=` when it is one of `pts` (a selected PT outside the attendance scope is ignored — never widens; a foreign PT → PtNotAllowed). */
 const ptParam = (sp: SP, pts: readonly number[]) => {
   const v = idParam(sp, 'pt')
   return v !== undefined && pts.includes(v) ? v : undefined
@@ -297,6 +298,7 @@ function MemberCard({ m, tz, month, pt }: { m: TeamTodayRow; tz: string; month: 
 export async function AbsensiToday(props: AdminViewServerProps) {
   const req = props.initPageResult.req
   const sp = (props.searchParams ?? {}) as SP
+  if (foreignPtParam(req, props.searchParams)) return <PtNotAllowed props={props} title="Absensi hari ini" />
   const pt = await ptView(req)
   let data: { scope: AttScope | null; r: TeamTodayResult | null; loc: { projects: Opt[]; costCenters: Opt[] }; today: string; lateCount: number; pts: number[]; chosen: number | undefined } | null = null
   try {
@@ -587,6 +589,7 @@ type RekapData = {
 export async function AbsensiRekap(props: AdminViewServerProps) {
   const req = props.initPageResult.req
   const sp = (props.searchParams ?? {}) as SP
+  if (foreignPtParam(req, props.searchParams)) return <PtNotAllowed props={props} title="Rekap absensi" />
   const pt = await ptView(req)
   let d: RekapData
   try {
@@ -594,7 +597,7 @@ export async function AbsensiRekap(props: AdminViewServerProps) {
       const full = await attendanceScope(req)
       const pts = scopePts(full, pt)
       const chosen = ptParam(sp, pts)
-      // MC2: the PT filter narrows the scope per PT (never widens; foreign ids ignored)
+      // MC2: the PT filter narrows the scope per PT (never widens; foreign ids → PtNotAllowed, QA-MC4-14)
       const scope = full && chosen ? narrowAttToCompanies(full, [chosen]) : full
       const ctx = await attendanceContext(req)
       const month = PERIOD_RE.test(one(sp, 'bulan')) && one(sp, 'bulan') <= ctx.today.slice(0, 7) ? one(sp, 'bulan') : ctx.today.slice(0, 7)

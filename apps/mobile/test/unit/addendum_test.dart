@@ -82,4 +82,22 @@ void main() {
     expect(jsonDecode(seen['cancel']!.$2), {'reason': 'Salah project'});
     expect(seen['submit']!.$1, 'k6');
   });
+
+  test('edit a Draft: PATCH /budget-addenda/{id} with only the given fields + Idempotency-Key', () async {
+    final server = await MockServer.start();
+    addTearDown(server.close);
+    final api = AddendumApi(testClient(server.base, StaticTokens()));
+    final seen = <(String?, String)>[];
+    server.on('PATCH', '/api/v1/budget-addenda/61', (req, body) {
+      seen.add((req.headers.value('idempotency-key'), body));
+      return (200, addendumJson(status: 'draft', step: null, actions: ['edit', 'submit', 'cancel']));
+    });
+    final a = await api.update(61, addition: 300000000, reason: ' Tanah lunak, tambah tiang ', idempotencyKey: 'k7');
+    expect(a.status, AddendumStatus.draft);
+    expect(a.allowedActions, containsAll([AddendumAction.edit, AddendumAction.submit]));
+    expect(seen.single.$1, 'k7');
+    expect(jsonDecode(seen.single.$2), {'addition': 300000000, 'reason': 'Tanah lunak, tambah tiang'});
+    await api.update(61, reason: 'Hanya alasan', idempotencyKey: 'k8');
+    expect(jsonDecode(seen.last.$2), {'reason': 'Hanya alasan'});
+  });
 }

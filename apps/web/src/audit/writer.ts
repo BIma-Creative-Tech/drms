@@ -83,6 +83,70 @@ export type AuditRow = {
 type UserLike = { id?: unknown; roles?: unknown } | null | undefined
 
 /**
+ * MC4 QA (QA-MC4-03) + UAT MC4-04: `docType` → [per-PT table whose row id is the `docId`, column holding that
+ * row's PT]. A row about such a document written WITHOUT `companyId` (domain call sites: request lines,
+ * signatures, PDF export, flags, decisions, corrections, the import cut-over …) gets the document's PT, so it
+ * is shown to the office roles of THAT PT only (untagged rows are visible beyond one PT). Covers every per-PT
+ * collection audited by `withAudit` (the hook tags those rows from `doc.company` already), `company` (the PT
+ * itself) and the five owner-linked media collections (`owner_company_id`, derived by DB triggers).
+ * App-wide doc types (user, device, web_session, users, company_settings, report, import, audit_log, banks,
+ * UoM, notification templates, signatures, logos) are deliberately absent. Constant identifiers, no user input
+ * reaches them. The backfill migration `20261003_090000_mc4_audit_company_backfill` holds a frozen copy of
+ * this map (a test keeps the two equal).
+ */
+export const PER_PT_DOC_TYPES: Readonly<Record<string, readonly [table: string, column: string]>> = {
+  expense_request: ['expense_requests', 'company_id'],
+  budget_addendum: ['budget_addenda', 'company_id'],
+  progress_report: ['progress_reports', 'company_id'],
+  settlement: ['settlements', 'company_id'],
+  transfer: ['transfers', 'company_id'],
+  receipt: ['receipts', 'company_id'],
+  attendance: ['attendances', 'company_id'],
+  attendance_correction: ['attendance_corrections', 'company_id'],
+  cash_entry: ['cash_entries', 'company_id'],
+  period_closing: ['period_closings', 'company_id'],
+  project: ['projects', 'company_id'],
+  project_stage: ['project_stages', 'company_id'],
+  team_assignment: ['team_assignments', 'company_id'],
+  employee: ['employees', 'company_id'],
+  employee_bank_account: ['employee_bank_accounts', 'company_id'],
+  // UAT MC4-04: the remaining per-PT collections (masters / configuration) and the PT itself
+  budget_line: ['budget_lines', 'company_id'],
+  client: ['clients', 'company_id'],
+  vendor: ['vendors', 'company_id'],
+  stage_template: ['stage_templates', 'company_id'],
+  expense_category: ['expense_categories', 'company_id'],
+  cash_in_source: ['cash_in_sources', 'company_id'],
+  cash_account: ['cash_accounts', 'company_id'],
+  work_schedule: ['work_schedules', 'company_id'],
+  approval_rule: ['approval_rules', 'company_id'],
+  vehicle: ['vehicles', 'company_id'],
+  cost_center: ['cost_centers', 'company_id'],
+  document_sequence: ['document_sequences', 'company_id'],
+  company_membership: ['company_memberships', 'company_id'],
+  company: ['companies', 'id'],
+  // owner-linked media (QA-MC4-07 `ownerCompany`): uploads, `view_sensitive`, signed-URL `access_denied`
+  media_receipts: ['media_receipts', 'owner_company_id'],
+  media_transfer_proofs: ['media_transfer_proofs', 'owner_company_id'],
+  media_selfies: ['media_selfies', 'owner_company_id'],
+  media_progress_photos: ['media_progress_photos', 'owner_company_id'],
+  media_attachments: ['media_attachments', 'owner_company_id'],
+}
+
+async function derivedCompany(tx: Awaited<ReturnType<typeof getRequestTx>>, row: AuditRow, cache: Map<string, number | null>): Promise<number | null | undefined> {
+  if (row.companyId !== undefined) return row.companyId
+  const target = Object.hasOwn(PER_PT_DOC_TYPES, row.docType) ? PER_PT_DOC_TYPES[row.docType] : undefined
+  if (!target || !row.docId || !/^\d{1,9}$/.test(row.docId)) return undefined
+  const k = `${row.docType}:${row.docId}`
+  if (!cache.has(k)) {
+    const [table, column] = target
+    const r = (await tx.execute(sql`SELECT ${sql.identifier(column)} AS company_id FROM ${sql.identifier(table)} WHERE id = ${Number(row.docId)}`)) as unknown as { rows: Array<{ company_id: number | null }> }
+    cache.set(k, r.rows[0]?.company_id ?? null)
+  }
+  return cache.get(k) ?? undefined
+}
+
+/**
  * Writes audit rows through Payload in the SAME transaction as the business change (`req`),
  * ADR 0006 §4. Requires an active transaction: without one each row would commit on its own
  * and a failing business write could leave orphan audit rows (or the reverse).
@@ -98,7 +162,9 @@ export async function writeAudit(req: PayloadRequest, rows: AuditRow[], user?: U
   const uid = typeof u?.id === 'number' ? u.id : typeof u?.id === 'string' && /^\d+$/.test(u.id) ? Number(u.id) : undefined
   const rolesAny = rolesOf(u).join(',')
   const eventId = randomUUID()
-  for (const row of rows) {
+  const companies = new Map<string, number | null>()
+  for (const given of rows) {
+    const row: AuditRow = { ...given, companyId: await derivedCompany(tx, given, companies) }
     await req.payload.create({
       collection: 'audit-logs',
       data: {

@@ -67,8 +67,8 @@ export function byRoleAny(rules: Partial<Record<Role, Rule>>): Access {
 
 /**
  * Create access (boolean only): with `data.company` the role must be held IN that PT; without it
- * (derived-company collections, or the admin "may I create?" probe) in any selected PT — the
- * company hook (`fields/company.ts`) re-checks the role in the resolved PT before the write.
+ * (derived-company collections, or the admin "may I create?" probe) in any selected PT — in BOTH
+ * cases the company hook (`fields/company.ts`) re-checks the role in the resolved PT before the write.
  */
 /** `req.context` key: roles a create must hold in the PT resolved by the company hook. */
 export const PENDING_CREATE_ROLES = 'pkCreateRoles'
@@ -76,10 +76,12 @@ export const PENDING_CREATE_ROLES = 'pkCreateRoles'
 export function rolesAllowed(...roles: Role[]): Access {
   return ({ req, data }) => {
     const c = relId((data as { company?: unknown } | undefined)?.company)
-    if (c !== undefined) return hasRole(req, roles, c)
-    if (!hasRoleAny(req, ...roles)) return false
+    if (c !== undefined ? !hasRole(req, roles, c) : !hasRoleAny(req, ...roles)) return false
+    // ALWAYS re-checked in the PT the company hook resolves (fields/company.ts): on a DERIVED-company
+    // collection the body `company` is dropped by field access and the PT comes from the parent, so a
+    // role in the named PT proves nothing (MC4 QA finding QA-MC4-01).
     req.context ??= {}
-    req.context[PENDING_CREATE_ROLES] = roles // consumed by the company hook (fields/company.ts)
+    req.context[PENDING_CREATE_ROLES] = roles
     return true
   }
 }

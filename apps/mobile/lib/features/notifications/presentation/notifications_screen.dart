@@ -32,7 +32,8 @@ class NotificationBell extends ConsumerWidget {
   }
 }
 
-/// In-app notifications (server texts, Bahasa Indonesia). Tap → mark read → request detail.
+/// In-app notifications (server texts, Bahasa Indonesia). Tap → mark read → the document's screen
+/// ([AppNotification.route]); rows without a target only mark read.
 class NotificationsScreen extends ConsumerWidget {
   const NotificationsScreen({super.key});
 
@@ -93,6 +94,11 @@ class _Tile extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final profile = ref.watch(currentProfileProvider);
+    final route = n.route(
+      canReadProgress: profile?.canReadProgress ?? false,
+      ownAttendance: profile?.hasOwnAttendance ?? true,
+    );
     return ListTile(
       key: Key('notification-${n.id}'),
       leading: Icon(
@@ -109,18 +115,21 @@ class _Tile extends ConsumerWidget {
       ),
       subtitle: Text('${n.body}\n${formatServerDateTime(n.createdAt, zone: zone)}'),
       isThreeLine: true,
-      onTap: () async {
-        if (n.unread) {
-          try {
-            await ref.read(notificationsApiProvider).markRead(n.id);
-          } on Object {
-            // Reading still works offline-first: the row stays unread until the next refresh.
-          }
-          ref.invalidate(notificationsProvider);
-        }
-        final id = n.requestId;
-        if (id != null && context.mounted) await GoRouter.maybeOf(context)?.push('/requests/$id');
-      },
+      trailing: route == null ? null : const Icon(Icons.chevron_right),
+      // Unknown document types only mark read; a read row without a target is not tappable.
+      onTap: !n.unread && route == null
+          ? null
+          : () async {
+              if (n.unread) {
+                try {
+                  await ref.read(notificationsApiProvider).markRead(n.id);
+                } on Object {
+                  // Reading still works offline-first: the row stays unread until the next refresh.
+                }
+                ref.invalidate(notificationsProvider);
+              }
+              if (route != null && context.mounted) await GoRouter.maybeOf(context)?.push(route);
+            },
     );
   }
 }

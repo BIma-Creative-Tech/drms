@@ -6,6 +6,199 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Security — npm audit (high): `braces` via `sass`
+- New advisory GHSA-vfj7-8cjw-p6xm (`braces` ≤ 3.0.3, stack-exhaustion DoS; **no patched release**) reached the prod
+  tree through `@payloadcms/next` 3.90.1 → `sass` 1.77.4 → `chokidar` 3 → `braces`, failing CI `npm audit` on develop
+  `e49e533` (2026-10-03). Root override `sass` 1.105.0 (released 2026-09-22, respects `min-release-age=7`; uses
+  `chokidar` 5 without `braces`). `npm audit --omit=dev --audit-level=high` passes (7 moderate remain); `next build`
+  compiles the Payload admin SCSS unchanged (no deprecation output). Remove the override when Payload bumps `sass`.
+
+### MC4 — UAT defect MC4-04: PT tag for historic audit rows (branch `fix/mc4-audit-backfill`; report `docs/proyekkas/qa/mc4-qa-report.md` §11.2)
+
+Found by the staging UAT, case AUD-02. Migration `20261003_090000_mc4_audit_company_backfill` (idempotent, down =
+no-op; 1.5 s for ~10 000 rows locally). APK unaffected.
+
+#### Fixed
+- **Audit trail of older documents (MC4-04):** audit rows written before the QA-MC4-03 fix had no PT, so once a
+  second PT existed a Direktur / Admin of DRMS without a role in that PT no longer saw them (audit-log list, report,
+  REST). The migration gives every such row the PT of its document: requests, receipts, transfers, LPJ, cash
+  entries, addenda, progress reports, attendance, masters, sequences, approval rules, memberships, the PT itself and
+  owner-linked media; old number rows without a document id by their unique number. Rows of deleted documents,
+  app-wide rows (logins, users, devices, reports, import) and cross-PT duplicate flags stay without PT.
+- The audit writer derives the PT for the same doc types, so new rows of masters, sequences (import cut-over) and
+  media are tagged too.
+
+#### Changed
+- Append-only rule: the migration disables `audit_logs_no_update` for its own UPDATEs only (owner, one transaction,
+  ADR 0006 §6) and records one `schema_maintenance` audit row with the counts.
+
+### MC4 — staging UAT fixes (2026-10-02, `docs/proyekkas/uat/mc4/` run on staging `3dd8a96`)
+- **UI-CO (copy defaults in the company form):** after the MC4-02 read fix the two fields were visible but
+  **disabled** — Payload makes `virtual` fields `admin.readOnly` by default (`fields/config/sanitize.js`); both now set
+  `admin.readOnly: false` (unit test). The API path was already fine (the UAT fixture created PT CS1 with copied
+  defaults).
+
+### MC4 — QA open items (branch `fix/mc4-qa-open-items`; report `docs/proyekkas/qa/mc4-qa-report.md` §11)
+
+Closes QA-MC4-09, QA-MC4-13 and the read-rule parts of QA-MC4-14 under the PT scope rule. Web/API only, no
+migration. The APK 0.3.x keeps working: no error code was added, removed or renamed.
+
+#### Security
+- **On-behalf drafts (QA-MC4-09):** "Admin/Finance may create a request for others" (Q-09) now needs that role in
+  the PT of the request. That PT comes from the project or cost center and from every requester. A role in another
+  PT no longer counts: for example, Admin of PT A + Staff of PT B → 403 for a draft for PT B employees.
+- **Existence oracles (QA-MC4-14):** a reference in a PT the caller is not mapped to now gets the same answer as a
+  missing one:
+  - sync items: no `COMPANY_MISMATCH`; attendance locations and on-behalf employees → `NOT_FOUND`; drafts → the
+    usual validation error;
+  - a create with a body `company`;
+  - a new addendum: 404 instead of 403;
+  - manual cash entries: a missing project / cost center / category / source / vehicle is now a 400 (was a 500).
+
+  `COMPANY_MISMATCH` stays for a mismatch between two PTs the caller is mapped to.
+- **`?pt=` (QA-MC4-14):** a PT outside the caller's selection now gets 403 `COMPANY_NOT_ALLOWED` in the
+  `/api/v1/reports` JSON and downloads (it used to narrow silently to an empty report). The panel views Laporan,
+  Audit Log, Kas, Catat kas, Tutup buku, Absensi and Rekap absensi show a denial instead.
+- **Display names (QA-MC4-14):** names in Riwayat, request DTOs, PDFs and the audit-log report and its filter come
+  from the document's PT or from a PT the viewer is mapped to, else the account name. They never show an employee
+  name from another PT.
+- **Face reference photo (QA-MC4-14):** `employees.faceRefPhoto` takes only a selfie of the employee's PT, or the
+  caller's own upload that is not linked yet. Any other selfie, or a missing id, gets the same 400.
+
+#### Changed
+- `mc2-sql-lint` (QA-MC4-13) now:
+  - scans all of `domain/expense|progress|addendum|sync`;
+  - knows 7 more per-PT tables;
+  - accepts a company predicate only when it is a helper call or a bound parameter (`company_id = ${…}`,
+    `IN (${…})`, `= ANY(${…})`), not a join condition.
+
+  Its allow-list has 17 entries, each with a reason, and the test fails on an entry that is no longer needed.
+- OpenAPI: the report query parameter `pt` is documented; the descriptions of `COMPANY_MISMATCH` and the body
+  `company` were updated (no shape change).
+
+#### Fixed (found by the MC4 UAT suite, local run 2026-10-02)
+- **MC4-02:** "Salin default saat dibuat" / "Salin dari PT" were never shown on the company create form (field
+  `read: () => false` → Payload hides the field); now readable by the group admin only.
+- **MC4-03:** 2 px horizontal page overflow at 390 px on `/admin/persetujuan`: the table wrapper `.pk-tw` bleeds to
+  the card edge only inside a `.pk-card` (`--pk-tw-bleed`), no negative margin elsewhere.
+
+### CI — Trivy image scan: retry, IPv4 only
+- `ci.yml` job `image`: the Trivy report and gate run through `.github/scripts/trivy-image.sh` — 3 attempts with
+  back-off (0 / 30 / 90 s) for network errors, the container started with IPv6 disabled (Go then skips AAAA records;
+  falls back to a normal run if the daemon refuses the sysctl). The gate now uses `--exit-code 3` for "fixable
+  CRITICAL found", which is never retried, and `set -euo pipefail` (a failing first image used to be masked by the
+  second). Cause: develop `3dd8a96` (2026-10-02) failed in the gate fetching a GHCR blob from
+  `pkg-containers.githubusercontent.com` ("dial tcp [2606:50c0:…]:443: connect: network is unreachable").
+
+### CI — image build retry
+- `ci.yml` job `image`: each buildx step (web/migrate, local and push-by-digest) runs once with
+  `continue-on-error`, then after a 45 s back-off one retry; later steps take the digest of whichever attempt
+  succeeded. Cause: develop `bff95ac` (2026-10-02) failed resolving `docker.io/docker/dockerfile:1` during a transient
+  Docker Hub outage on the self-hosted runner (IPv4 blip; the runner network has no IPv6). The BuildKit cache makes
+  the retry cheap; a second failure still fails the job.
+
+### MC4 — PT scope rule (owner decision 2026-10-02; branch `feat/mc4-pt-scope-rule`, ADR 0016 "Implementation notes — Scope rule")
+
+Read and search scope = the PTs a user is mapped to (active memberships): one PT → that PT only; several → the
+consolidated data of those PTs, never another PT. Group admin unchanged; mutations stay single-PT. Web/API only.
+Migration: `20261002_080000_mc4_scope_rule` (schema + backfill, idempotent, down migration; ~12 s for 74 400 media
+rows locally).
+
+#### Security
+- **Duplicate receipts (QA-MC4-06):** the check compares a receipt only with requests in the request's PT and the
+  PTs its uploader is mapped to. A hit in another PT is shown (with its number and link) only to users mapped to that
+  PT; everyone else sees nothing of it — counts, the "Verifikasi semua nota" gate, the internal PDF, reports, REST,
+  Riwayat and the audit log follow the same rule (audit rows of such a flag carry no PT).
+- **Deactivated PT (QA-MC4-05):** files of a deactivated PT are no longer readable by the office users of the other
+  PTs; the "office in every PT" shortcut (media) and the "rows without PT" audit rule count inactive PTs too (with a
+  deactivated PT, only group admins read audit rows without PT).
+- **Oracles (QA-MC4-08/10):** a stage template, project, cost center, bank account, category, cash account or
+  `progressPct` of a PT the caller is not mapped to is answered like a missing one (no lock date, no state, no
+  template copy).
+- PT logos only for members of that PT (+ group logo); signatures and device revoke count active memberships only;
+  notifications about a PT the user left are hidden; `/me` without membership no longer shows PT #1.
+
+#### Changed
+- **Media lists (QA-MC4-07):** new derived column `ownerCompany` on receipt / transfer-proof / attachment /
+  progress-photo / selfie media (set by DB triggers, backfilled); office access is `ownerCompany IN (…)` instead of id
+  lists (65 535 bind-parameter cap). Cash-entry attachments are now readable by the office roles of that PT.
+- Receipt flags carry `relatedCompany` (PT of the related request when it is another PT).
+
+### MC4 — QA security fixes (branch `docs/mc4-qa`; report `docs/proyekkas/qa/mc4-qa-report.md`)
+
+#### Security
+- **QA-MC4-01 (HIGH):** REST creates that name a `company` in the body re-check the create role in the derived PT
+  (Finance/Admin of PT A could create bank accounts, team assignments or budget lines in PT B).
+- **QA-MC4-02 (HIGH):** a PT Admin may only change accounts that belong solely to PTs where they are Admin (no
+  rename / deactivate / e-mail change of users of other PTs or of group admins).
+- **QA-MC4-03 (HIGH):** per-PT document audit rows are tagged with their PT; rows without PT only for users with an
+  office role in every PT (Admin/Direktur of PT A no longer read PT B's audit rows).
+- **QA-MC4-04 (HIGH):** single media file access is decided on the row's own owner document and office id lists load
+  via SQL (opening one selfie no longer exhausts the web heap for a multi-PT Finance user).
+
+### APK 0.3.1 (branch `feat/mobile-0.3.1-ux`, pubspec `0.3.1+1`; not tagged yet)
+
+APK-only UX fixes from the module check; no server change needed (web ≥ 0.5.1 / MC4 API). Release notes
+`docs/release-notes/apk/0.3.1.md`.
+
+#### Added
+- **Notification tap routing** for every document type the server writes (`AppNotification.route`, same mapping as
+  the web `notificationHref`): `budget_addendum` (addendum.*) → `/addenda/:id`; `project` +
+  `progress.late_report` → `/progress?project=:id` (reports filtered to that project); other `project` events
+  (`reminder.budget_threshold`) → `/progress?tab=projects`; `progress_report` → `/progress/report/:id`;
+  `attendance` → `/attendance` (team tab without own attendance); `expense_request` unchanged. Progress targets
+  only for PM / Direktur / Finance; unknown types or non-numeric ids stay non-tappable (read rows without a target
+  have no tap action; routable rows show a chevron).
+- **Edit an addendum draft** (`PATCH /api/v1/budget-addenda/{id}`, `BudgetAddendumUpdate`: `addition`, `reason`; the
+  project stays fixed): "Ubah draft" on the detail only when `allowedActions` contains `edit`; route
+  `/addenda/:id/edit` reuses the create form prefilled, "Simpan perubahan" and — when `submit` is also allowed —
+  "Simpan & ajukan" (PATCH then submit). One Idempotency-Key per PATCH body (the server answers 422 to a reused key
+  with another body). A non-editable addendum shows a notice instead of the form.
+- **Finance home: US-12 "Progress fisik vs anggaran"** card (`ProjectProgressSummary`, `GET /projects/progress`
+  allows `pk-finance`), as on the web Finance Beranda; shown for every role with `canReadProgress`.
+- **Per-PT dashboard breakdown** ("Per PT" card under the KPI totals) when `/dashboard/*` `companies[]` has ≥ 2 PTs:
+  Direktur `cash.byCompany` + `approvals.byCompany`, Finance `cashByCompany` + `transferQueue.byCompany`, PM
+  `teamMonthByCompany`.
+
+#### Changed
+- PM "Absenkan anggota tim" stays visible but disabled with the line "Absen atas nama belum bisa: absensi dari
+  aplikasi belum diaktifkan Admin (Setting perusahaan)." when `syncAttendanceEnabled` is off for every PT in scope
+  (was: hidden silently).
+
+### MC4 — code gaps (branch `feat/mc4-code-gaps`; ADR 0016 "Implementation notes (MC4)", `docs/proyekkas/mc/mc4-progress.md`)
+
+Web/API only (no APK change). Migration: `20260930_120000_mc4_list_company_column` (data only, preferences).
+
+#### Added
+- **Copy defaults on PT create (US-MC-01):** a PT created by the group admin gets, in the same transaction, the
+  document sequences (every doc type of the source PT, `startAt` 1), the approval rules without per-PT references
+  (rules naming a project / category / cost center / user, or refused by today's rule checks, are skipped and
+  reported), the default work schedule and the per-PT settings still at their default — from PT #1 (DRMS) or the
+  PT chosen in "Salin dari PT"; "Salin default saat dibuat" off = bare PT. Idempotent (create-only by natural key),
+  audited (rows + one summary `defaultsCopied` row). Seed and go-live import keep their built-in defaults.
+- **Optional body `company`** on `POST /api/v1/expense-requests`, `/progress-reports`, `/budget-addenda`,
+  `/cash-entries`: must be a membership with the role the create needs IN that PT (else 403
+  `COMPANY_NOT_ALLOWED`, audited) and the PT of the referenced project / cost center / cash account (else 400
+  `COMPANY_MISMATCH`); the create runs under that PT. Absent = unchanged (APK 0.2.x / 0.3.0).
+- **Report PDF logo:** the letterhead logo (PT logo; group logo on a consolidated report) is drawn left of the kop
+  (JPEG/PNG ≤ 3 MiB, same image guard as the document PDF, ADR 0008).
+- **Per-PT fields documented for the APK** (`/dashboard/*`: `companies`, every `byCompany` row, `companyId` on
+  embedded rows, `viz.warnPctByCompany`; approval inbox `items[].budget.warnPct`; K-09 rows `companyId`,
+  `warnGapPct`, `badGapPct`) — additive; OpenAPI regenerated.
+
+#### Changed
+- `GET /api/v1/app/config` (public): the three sync feature flags are the OR over the ACTIVE PTs (was company #1);
+  `timezone` = the server timezone every PT uses. One PT = identical answer. Per-PT truth: `GET /me`
+  `companies[].settings`; the server keeps enforcing the item's PT flag (`FEATURE_DISABLED`).
+- Notification templates are app-wide: create/update = group admin only (was: Admin of any PT); PT Admin /
+  Direktur keep read access (default decision, the owner may override).
+- Settings without a document (inbox `budgetWarnPct`, K-09 top-level thresholds, dashboard `viz.warnPct`, lock date
+  / today fallbacks) use the caller's only / LOWEST selected PT instead of company #1 (which could be a PT the caller
+  is not a member of); every item / row carries its own PT's value.
+- Scope literals without PT parts (`{ kind: 'team', projects }`, `{ kind: 'own' }`, `{ kind: 'all' }`) now match
+  nothing in every report / attendance query (was: `all` only).
+- Saved list-column preferences that never named the PT column get it prepended once (migration above).
+
 ## [0.5.1] - 2026-09-30
 
 Security patch on top of 0.5.0 (no migrations, no API change): npm audit high findings in `undici` and `nodemailer`

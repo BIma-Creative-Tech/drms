@@ -1,6 +1,6 @@
-import type { CollectionConfig } from 'payload'
+import type { CollectionConfig, Where } from 'payload'
 
-import { denyAll } from '@/access/roles'
+import { denyAll, mappedCompanies } from '@/access/roles'
 import { byRoleAny, ownUser } from '@/access/policies'
 import { uuidField } from '@/fields/common'
 
@@ -19,7 +19,15 @@ export const Notifications: CollectionConfig = {
   labels: { singular: 'Notifikasi', plural: 'Notifikasi' },
   admin: { group: 'Sistem', useAsTitle: 'title', defaultColumns: ['user', 'event', 'title', 'docNo', 'readAt', 'createdAt'] },
   access: {
-    read: byRoleAny({ 'pk-staff': ownUser('user'), 'pk-pm': ownUser('user'), 'pk-finance': ownUser('user'), 'pk-owner': ownUser('user'), 'pk-admin': ownUser('user') }),
+    // Own rows only; scope rule 2026-10-02 (QA-MC4-14): rows about a PT the user is no longer mapped
+    // to (membership ended / PT deactivated) are not readable any more; rows without a PT stay.
+    read: async (args) => {
+      const own = await byRoleAny({ 'pk-staff': ownUser('user'), 'pk-pm': ownUser('user'), 'pk-finance': ownUser('user'), 'pk-owner': ownUser('user'), 'pk-admin': ownUser('user') })(args)
+      if (own === false) return false
+      const mapped = mappedCompanies(args.req) ?? []
+      const pt: Where = { or: [{ company: { exists: false } }, ...(mapped.length ? [{ company: { in: mapped } }] : [])] }
+      return own === true ? pt : { and: [own, pt] }
+    },
     create: denyAll,
     update: denyAll,
     delete: denyAll,

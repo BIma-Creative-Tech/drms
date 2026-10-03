@@ -211,6 +211,31 @@ void main() {
       expect(PmDashboard.fromJson(const {}).teamCount, 0, reason: 'tolerant parsing');
     });
 
+    test('MC4 per-PT split: joined by companyId in companies[] order; none for one PT', () {
+      final o = DirekturDashboard.fromJson(direkturDashboardTwoPtJson()).byCompany;
+      expect(o.map((r) => r.code), ['DRMS', 'CS1']);
+      expect(o.map((r) => r.cash), [100000000, 52500000]);
+      expect(o.map((r) => (r.count, r.sum)), [(2, 5000000), (1, 2250000)]);
+
+      final f = FinanceDashboard.fromJson(financeDashboardTwoPtJson()).byCompany;
+      expect(f.map((r) => r.cash), [60000000, 38000000]);
+      expect(f.map((r) => (r.count, r.sum)), [(3, 7000000), (1, 1200000)]);
+
+      final pm = PmDashboard.fromJson(pmDashboardTwoPtJson()).byCompany;
+      expect(pm.map((r) => (r.code, r.count, r.sum, r.waiting)), [('DRMS', 4, 12000000, 1), ('CS1', 0, 0, null)]);
+      expect(pm.first.cash, isNull);
+
+      expect(DirekturDashboard.fromJson(direkturDashboardJson()).byCompany, isEmpty, reason: 'pre-MC2 payload');
+      expect(
+        FinanceDashboard.fromJson({
+          ...financeDashboardTwoPtJson(),
+          'companies': [twoCompaniesJson.first],
+        }).byCompany,
+        isEmpty,
+        reason: 'one PT = the totals already',
+      );
+    });
+
     test('short rupiah matches the web (rules.ts shortRupiah)', () {
       expect(formatRupiahShort(152500000), 'Rp 152,5 jt');
       expect(formatRupiahShort(2000000000), 'Rp 2 M');

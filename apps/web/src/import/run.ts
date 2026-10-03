@@ -23,6 +23,7 @@ import type { CollectionSlug, Payload, PayloadRequest, Where } from 'payload'
 import { writeAudit } from '@/audit/writer'
 import { settings as companySettings } from '@/domain/companies'
 import { periodEnd } from '@/domain/cash/periods'
+import { SKIP_COMPANY_DEFAULTS } from '@/domain/company-defaults'
 import { DEFAULT_SEQUENCES, formatDocNo, parseBusinessDate, periodKey, type ResetPolicy } from '@/domain/numbering'
 import { CTX_STAGE_EDITOR, projectStages, recalcProjectProgress } from '@/domain/progress/recalc'
 import { DEFAULT_APPROVAL_RULES } from '@/seed/data'
@@ -327,6 +328,8 @@ const MASTERS: Array<{ key: SheetKey; rows: (d: ImportData) => number; run: Mast
             data: { shortCode: c.code, name: c.name, legalName: c.legalName, address: c.address, phone: c.phone, timezone: process.env.TZ || DEFAULT_TZ, active: true } as never,
             depth: 0,
             overrideAccess: true, // SYSTEM-WRITE: go-live import (new PT)
+            // the import applies the built-in defaults below (+ `nomor_pb_mulai`), not a copy of DRMS
+            context: { [SKIP_COMPANY_DEFAULTS]: true },
             req: x.req,
           })
           const id = doc.id as number
@@ -691,7 +694,7 @@ async function runCutover(x: Exec, rep: MasterReport, issues: Issue[], reason: s
   if (before !== null && before < s.pbStartAt) {
     // only upward (DB trigger pk_counter_monotonic) — "set next value" of ADR 0007 §1, audited
     await tx.execute(sql`UPDATE document_sequence_counters SET next_value = ${s.pbStartAt} WHERE company_id = ${pt.companyId} AND doc_type = 'expense_request' AND period_key = ${key}`)
-    await writeAudit(req, [{ action: 'update', docType: 'document_sequence', docId: String(seq.id), field: 'nextValue', oldValue: before, newValue: s.pbStartAt, reason }])
+    await writeAudit(req, [{ action: 'update', docType: 'document_sequence', docId: String(seq.id), field: 'nextValue', oldValue: before, newValue: s.pbStartAt, reason, companyId: pt.companyId }])
     after = s.pbStartAt
     rep.updated++
   } else if (before !== null && before > s.pbStartAt) {

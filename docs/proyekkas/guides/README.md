@@ -1,6 +1,6 @@
 # Panduan Pengguna ProyekKas
 
-Panduan singkat per peran untuk karyawan PT DRMS. Pilih sesuai peran Anda:
+Panduan singkat per peran untuk karyawan PT DRMS (dan PT lain dalam grup yang memakai ProyekKas). Pilih sesuai peran Anda:
 
 | Peran | Panduan | Dipakai terutama di |
 |---|---|---|
@@ -21,10 +21,42 @@ Satu orang bisa punya lebih dari satu peran; baca semua panduan yang sesuai.
 Keuangan, Absensi, Laporan, …) — hanya modul yang boleh Anda buka. Klik modul → menunya ada di **bar atas**; tombol
 **⊞** kembali ke layar modul; di HP menu dibuka dengan **☰**. Ringkasan per peran ada di modul **Dashboard**.
 
-**Aplikasi Android:** pasang APK yang dibagikan Admin. Buka → **Masuk ke ProyekKas** → isi **Email atau username** dan
+**Aplikasi Android:** unduh dari halaman **`/unduh`** di alamat web (mis. `https://drms-kas.bimacreative.tech/unduh`;
+uji coba: `https://drms-kas.staging.bimacreative.tech/unduh`) → **Unduh APK** → buka file → bila diminta, ketuk
+**Setelan** → aktifkan **Izinkan dari sumber ini** → **Instal** → **Buka**. Bila muncul peringatan Play Protect:
+**Detail lainnya → Tetap instal**. Buka aplikasi → **Masuk ke ProyekKas** → isi **Email atau username** dan
 **Kata sandi** → **Masuk**. Login pertama butuh internet. Lupa kata sandi: hubungi Admin.
 
+**Versi baru:** bila ada versi baru, Beranda APK menampilkan **"Versi baru tersedia (…)"**. Ketuk untuk melihat
+**"Yang baru di versi …"** dan cara memperbarui: pasang APK versi baru **di atas** aplikasi lama, **tanpa menghapusnya**
+— data dan login tetap tersimpan. Bila versi di HP sudah terlalu lama, aplikasi menampilkan layar **Perbarui
+aplikasi** dan tidak bisa dipakai sampai diperbarui.
+
 ![TODO screenshot: layar Masuk APK dan tombol SSO web](img/umum-login.png)
+
+**Pilih PT (bila Anda bekerja di lebih dari satu PT):** satu akun bisa punya peran di beberapa PT grup.
+- **Web:** tombol PT di bar atas, kiri lonceng: **Semua PT**, **PT: DRMS**, atau **PT: DRMS +1**. Klik → kotak
+  **Tampilkan data PT** → centang **Semua PT saya** atau PT tertentu → **Terapkan** (minimal satu PT). Daftar,
+  antrian, dasbor dan laporan mengikuti PT yang dicentang. Membuat dan menyetujui dokumen selalu mengikuti **PT
+  dokumen itu**. Bila Anda hanya di satu PT, yang tampil hanya kode PT (tidak ada pilihan).
+- **APK:** tombol PT di kanan atas **Beranda** (mis. **Semua PT** atau **DRMS**) → lembar **Pilih PT** → centang →
+  **Terapkan**. Daftar PT dan peran Anda di tiap PT ada di **Profil → PT aktif**.
+- **Membuat pengajuan di APK** saat beberapa PT mungkin: aplikasi bertanya **"Untuk PT mana?"** lebih dulu. Project,
+  pusat biaya, kategori dan rekening yang muncul diambil dari PT itu. (Absen dan laporan progress otomatis memakai PT
+  lokasi/project yang dipilih.)
+- **Data offline lama:** bila muncul **"… data offline belum punya PT — pilih PT agar bisa dikirim"** (di Beranda
+  atau Antrean), ketuk → layar **Pilih PT untuk data offline** → **Pilih PT** untuk setiap data. Data tidak dikirim
+  sebelum PT dipilih.
+- Bila lebih dari satu PT tampil, daftar dan antrian memberi **tanda kode PT** (mis. `DRMS`, `CS1`) pada setiap baris.
+
+**Keamanan akun — 2FA (pilihan):** Anda boleh menambah kode 6 digit dari aplikasi autentikator di HP (mis. Google
+Authenticator, Microsoft Authenticator, FreeOTP) supaya kata sandi yang bocor saja tidak cukup untuk masuk.
+- **Menyalakan (web):** menu akun (lingkaran inisial) → **Keamanan akun** → **Aktifkan 2FA** → login ulang → pindai
+  kode QR di halaman login → masukkan kode 6 digit dan beri nama perangkat (mis. "HP pribadi").
+- **Mematikan (web):** **Keamanan akun** → **Nonaktifkan 2FA** → **Ya, nonaktifkan** → login ulang.
+- **Di APK:** bila 2FA aktif, login pertama dengan kata sandi saja akan ditolak; setelah itu muncul kolom
+  **Kode autentikator (bila 2FA aktif)** — isi 6 digit dari aplikasi autentikator, lalu **Masuk** lagi.
+- HP atau aplikasi autentikator hilang: hubungi Admin untuk mereset 2FA. Setiap perubahan 2FA tercatat di audit log.
 
 **Tanda tangan:** sebelum mengajukan atau menyetujui apa pun, unggah gambar tanda tangan Anda **sekali** di web:
 menu akun (lingkaran inisial di kanan atas) → **Profil & tanda tangan** → unggah gambar PNG (tanda tangan di kertas putih, difoto/dipindai). Tanpa tanda
@@ -69,4 +101,8 @@ perangkat apa.
 
 - Gambar: taruh di `guides/img/` dengan nama sesuai penanda `![TODO screenshot: …](img/…)`; ambil dari staging
   dengan akun uji fiktif (jangan data asli).
-- Panduan mengikuti perilaku aplikasi pada `develop` @ `c468bbe` (2026-09-26). Perbarui bila UAT mengubah perilaku.
+- Panduan mengikuti perilaku aplikasi pada `develop` @ `5415f45` (2026-09-30): web **0.5.0** (multi-PT, 2FA pilihan)
+  dan APK **0.3.0** (versi pubspec; tag `mobile-v0.3.0` belum dibuat pada tanggal ini). Label diperiksa terhadap
+  `apps/web/src/admin/**` dan `apps/mobile/lib/l10n/app_id.arb`. Perbarui bila UAT mengubah perilaku.
+- APK 0.3.0 butuh web ≥ 0.5.0 (`CHANGELOG.md`, bagian APK mobile-v0.3.0). Pemilih PT, kolom kode autentikator dan
+  catatan rilis di banner APK hanya ada setelah APK 0.3.0 terpasang.

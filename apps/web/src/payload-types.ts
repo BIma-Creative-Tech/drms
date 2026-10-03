@@ -391,6 +391,14 @@ export interface Company {
    * Hanya Admin grup yang dapat membuat atau menonaktifkan PT (alasan wajib).
    */
   active?: boolean | null;
+  /**
+   * Sekali saat PT dibuat: penomoran dokumen (mulai dari 1), aturan approval tanpa user/project tertentu, jadwal kerja default, dan pengaturan operasional yang masih default.
+   */
+  copyDefaults?: boolean | null;
+  /**
+   * Kosong = PT #1 (DRMS).
+   */
+  copyDefaultsFrom?: (number | null) | Company;
   uuid?: string | null;
   /**
    * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
@@ -524,6 +532,7 @@ export interface MediaSelfy {
   originalHeight?: number | null;
   originalSize?: number | null;
   capturedAt?: string | null;
+  ownerCompany?: (number | null) | Company;
   removedAt?: string | null;
   /**
    * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
@@ -971,6 +980,8 @@ export interface ApprovalRule {
   createdAt: string;
 }
 /**
+ * Berlaku untuk semua PT. Hanya Admin grup yang dapat membuat atau mengubah template; Admin/Direktur PT dapat melihat.
+ *
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "notification-templates".
  */
@@ -1178,6 +1189,7 @@ export interface MediaAttachment {
   originalHeight?: number | null;
   originalSize?: number | null;
   capturedAt?: string | null;
+  ownerCompany?: (number | null) | Company;
   /**
    * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
    */
@@ -1370,6 +1382,7 @@ export interface MediaReceipt {
   originalHeight?: number | null;
   originalSize?: number | null;
   capturedAt?: string | null;
+  ownerCompany?: (number | null) | Company;
   /**
    * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
    */
@@ -1414,6 +1427,7 @@ export interface ReceiptFlag {
   lineNo?: number | null;
   receipt?: (number | null) | Receipt;
   relatedRequest?: (number | null) | ExpenseRequest;
+  relatedCompany?: (number | null) | Company;
   message: string;
   detail?:
     | {
@@ -1484,6 +1498,7 @@ export interface MediaTransferProof {
   originalHeight?: number | null;
   originalSize?: number | null;
   capturedAt?: string | null;
+  ownerCompany?: (number | null) | Company;
   /**
    * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
    */
@@ -1926,6 +1941,7 @@ export interface MediaProgressPhoto {
   originalHeight?: number | null;
   originalSize?: number | null;
   capturedAt?: string | null;
+  ownerCompany?: (number | null) | Company;
   /**
    * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
    */
@@ -2349,6 +2365,8 @@ export interface CompaniesSelect<T extends boolean = true> {
   notifyRequesterStatusEnabled?: T;
   approvalEmailEnabled?: T;
   active?: T;
+  copyDefaults?: T;
+  copyDefaultsFrom?: T;
   uuid?: T;
   changeReason?: T;
   updatedAt?: T;
@@ -2910,6 +2928,7 @@ export interface ReceiptFlagsSelect<T extends boolean = true> {
   lineNo?: T;
   receipt?: T;
   relatedRequest?: T;
+  relatedCompany?: T;
   message?: T;
   detail?: T;
   status?: T;
@@ -3268,6 +3287,7 @@ export interface MediaReceiptsSelect<T extends boolean = true> {
   originalHeight?: T;
   originalSize?: T;
   capturedAt?: T;
+  ownerCompany?: T;
   changeReason?: T;
   updatedAt?: T;
   createdAt?: T;
@@ -3309,6 +3329,7 @@ export interface MediaTransferProofsSelect<T extends boolean = true> {
   originalHeight?: T;
   originalSize?: T;
   capturedAt?: T;
+  ownerCompany?: T;
   changeReason?: T;
   updatedAt?: T;
   createdAt?: T;
@@ -3350,6 +3371,7 @@ export interface MediaSelfiesSelect<T extends boolean = true> {
   originalHeight?: T;
   originalSize?: T;
   capturedAt?: T;
+  ownerCompany?: T;
   removedAt?: T;
   changeReason?: T;
   updatedAt?: T;
@@ -3378,6 +3400,7 @@ export interface MediaProgressPhotosSelect<T extends boolean = true> {
   originalHeight?: T;
   originalSize?: T;
   capturedAt?: T;
+  ownerCompany?: T;
   changeReason?: T;
   updatedAt?: T;
   createdAt?: T;
@@ -3473,6 +3496,7 @@ export interface MediaAttachmentsSelect<T extends boolean = true> {
   originalHeight?: T;
   originalSize?: T;
   capturedAt?: T;
+  ownerCompany?: T;
   changeReason?: T;
   updatedAt?: T;
   createdAt?: T;

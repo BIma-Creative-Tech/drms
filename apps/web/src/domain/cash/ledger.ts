@@ -1,7 +1,7 @@
 import { sql } from '@payloadcms/db-postgres'
 import type { PayloadRequest } from 'payload'
 
-import { companiesWithRole, hasRole, relId, userId, type Role } from '@/access/roles'
+import { companiesWithRole, hasRole, mappedCompanies, relId, userId, type Role } from '@/access/roles'
 import { companyOf, contextCompanyId } from '@/domain/companies'
 import { writeAudit } from '@/audit/writer'
 import { fail, today } from '@/domain/expense/common'
@@ -94,9 +94,15 @@ function closingCompany(req: PayloadRequest, companyId: number | undefined, role
   fail(400, 'PT wajib dipilih.', [{ path: 'company', message: 'Pilih PT yang ditutup bukunya.' }])
 }
 
-export async function assertAccount(req: PayloadRequest, id: number) {
-  const a = await req.payload.findByID({ collection: 'cash-accounts', id, depth: 0, overrideAccess: true /* SYSTEM-READ: account check */, req }).catch(() => null)
-  if (!a || a.active === false) fail(400, 'Akun kas tidak ditemukan atau nonaktif.', [{ path: 'cashAccountId', message: 'Akun kas tidak valid.' }])
+/**
+ * The cash account must exist, be active and — when the flow knows its PT (`companyId` = the
+ * document's PT) — belong to that PT. QA-MC4-10 (scope rule 2026-10-02): a cash account of another PT
+ * is answered like a missing one BEFORE any lock-date check (a B account used to answer with PT B's
+ * closing date: "tutup buku s/d …").
+ */
+export async function assertAccount(req: PayloadRequest, id: number, companyId?: number) {
+  const a = await req.payload.findByID({ collection: 'cash-accounts', id, depth: 0, overrideAccess: true /* SYSTEM-READ: account check, PT compared below */, req }).catch(() => null)
+  if (!a || a.active === false || (companyId !== undefined && relId(a.company) !== companyId)) fail(400, 'Akun kas tidak ditemukan atau nonaktif.', [{ path: 'cashAccountId', message: 'Akun kas tidak valid.' }])
 }
 
 /**
@@ -111,10 +117,12 @@ export async function postEntry(req: PayloadRequest, input: PostInput): Promise<
   // ADR 0016 §5 (MC2 fix): a manual posting needs Finance IN THE ACCOUNT's PT (the endpoint only
   // checks "Finance in any PT"); other source types are posted by flows already checked per PT.
   if (req.user && input.sourceType === 'manual' && !hasRole(req, 'pk-finance', companyId)) fail(400, 'Akun kas tidak ditemukan atau nonaktif.', [{ path: 'cashAccountId', message: 'Akun kas tidak valid.' }])
+  // QA-MC4-10: account (and its PT) first — the lock date of a PT the caller is not mapped to is never answered
+  const mapped = mappedCompanies(req)
+  if (companyId === undefined || (mapped !== null && !mapped.includes(companyId))) fail(400, 'Akun kas tidak ditemukan atau nonaktif.', [{ path: 'cashAccountId', message: 'Akun kas tidak valid.' }])
+  await assertAccount(req, input.cashAccountId)
   const lock = await currentLockDate(req, companyId)
   if (lock && input.entryDate <= lock) fail(409, `Periode ${input.entryDate.slice(0, 7)} sudah ditutup (tutup buku s/d ${lock}).`)
-  await assertAccount(req, input.cashAccountId)
-  if (companyId === undefined) fail(400, 'Akun kas tidak ditemukan atau nonaktif.')
   const { docNo } = await allocateDocNo(req, input.direction === 'in' ? 'cash_in' : 'cash_out', { companyId: companyId!, date: parseBusinessDate(input.entryDate) })
   const doc = await req.payload.create({
     collection: 'cash-entries',
@@ -159,11 +167,36 @@ export type ManualInput = {
   proofId?: number | null
 }
 
+const MANUAL_REFS = [
+  ['projectId', 'projects', 'Project tidak ditemukan.'],
+  ['costCenterId', 'cost-centers', 'Pusat biaya tidak ditemukan.'],
+  ['categoryId', 'expense-categories', 'Kategori tidak ditemukan.'],
+  ['cashInSourceId', 'cash-in-sources', 'Sumber kas masuk tidak ditemukan.'],
+  ['vehicleId', 'vehicles', 'Kendaraan tidak ditemukan.'],
+] as const
+
+/**
+ * QA-MC4-14 (scope rule): references of a manual entry — a missing id (was a 500 from the foreign key)
+ * and one of a PT the caller is not mapped to get the same 400. A reference of another MAPPED PT is
+ * still refused by the company hook / DB trigger ("cross-company reference").
+ */
+async function assertManualRefs(req: PayloadRequest, input: Partial<Record<(typeof MANUAL_REFS)[number][0], number | null | undefined>>): Promise<void> {
+  const mapped = mappedCompanies(req)
+  for (const [key, collection, message] of MANUAL_REFS) {
+    const id = input[key]
+    if (typeof id !== 'number') continue
+    const doc = (await req.payload.findByID({ collection, id, depth: 0, overrideAccess: true /* SYSTEM-READ: existence + PT of a reference */, req, disableErrors: true })) as { company?: unknown } | null
+    const company = relId(doc?.company)
+    if (!doc || (mapped !== null && company !== undefined && !mapped.includes(company))) fail(400, message, [{ path: key, message }])
+  }
+}
+
 /** US-23: manual cash in/out (Finance): amount, description, account, category/source required. */
 export async function createManualEntry(req: PayloadRequest, input: ManualInput): Promise<CashEntryDoc> {
   if (input.direction === 'out' && !input.categoryId) fail(400, 'Kategori wajib untuk kas keluar.', [{ path: 'categoryId', message: 'Wajib.' }])
   if (input.direction === 'in' && !input.cashInSourceId) fail(400, 'Sumber wajib untuk kas masuk.', [{ path: 'cashInSourceId', message: 'Wajib.' }])
   if (!input.description.trim()) fail(400, 'Keterangan wajib diisi.')
+  await assertManualRefs(req, input)
   const entryDate = input.entryDate ?? (await today(req))
   if (entryDate > (await today(req))) fail(400, 'Tanggal tidak boleh di masa depan.')
   // E2 fix: the proof is set on INSERT. Attaching it with a follow-up update (previous code) hit
@@ -205,6 +238,7 @@ export async function editManualEntry(req: PayloadRequest, id: number, patch: Ma
     costCenter: patch.costCenterId !== undefined ? patch.costCenterId : relId(e.costCenter),
   }
   if (merged.project && merged.costCenter) fail(400, 'Pilih project ATAU pusat biaya.')
+  await assertManualRefs(req, patch)
   const data: Record<string, unknown> = {}
   if (patch.description !== undefined) data.description = patch.description.trim()
   if (patch.categoryId !== undefined) data.category = patch.categoryId

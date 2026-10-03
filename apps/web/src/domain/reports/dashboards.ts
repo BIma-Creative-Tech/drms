@@ -1,7 +1,7 @@
 import type { PayloadRequest } from 'payload'
 
 import { companiesWithRole, rolesIn } from '@/access/roles'
-import { companyRefs } from '@/domain/companies'
+import { companyRefs, mayReadUntaggedAudit } from '@/domain/companies'
 import { approvalInbox } from '@/domain/expense/queues'
 
 import { auditLogPage } from './audit-log'
@@ -13,6 +13,7 @@ import {
   costCenterMonth,
   disbursedMonthly,
   byCompany,
+  companyCtx,
   inSequence,
   lastClosedPeriod,
   lpjSummary,
@@ -75,6 +76,16 @@ async function waitingForMe(req: PayloadRequest, top = 6) {
       overWarn: i.budget.overWarn,
     })),
   }
+}
+
+/**
+ * MC4: K-08 "Waspada" threshold per PT of the layout (the top-level `viz.warnPct` stays the context
+ * PT's value for released clients; project tones are already computed with the project's PT).
+ */
+async function warnPctByCompany(req: PayloadRequest, companyIds: readonly number[]) {
+  const out: Array<{ companyId: number; warnPct: number }> = []
+  for (const c of companyIds) out.push({ companyId: c, warnPct: (await companyCtx(req, c)).budgetWarnPct })
+  return out
 }
 
 /** Categories of K-17 (Dicairkan) in [from, to], top 6 + "Lainnya" (chart "Komposisi biaya"). */
@@ -210,6 +221,7 @@ export async function ownerDashboard(req: PayloadRequest, opts: { months?: numbe
       recentCash: recent,
       inbox: mine.items,
       warnPct: ctx.budgetWarnPct,
+      warnPctByCompany: await warnPctByCompany(req, pts),
     },
   }
 }
@@ -299,7 +311,15 @@ export async function pmDashboard(req: PayloadRequest) {
     latest,
     attendance: { available: false as const, phase: 'F5' },
     progressReports: { available: false as const, phase: 'F5' },
-    viz: { requestTrend: trend, pipeline: pipelineFromStatus(statuses), categories, budgetTotals: budgetTotals(projects), inbox: mine.items, warnPct: ctx.budgetWarnPct },
+    viz: {
+      requestTrend: trend,
+      pipeline: pipelineFromStatus(statuses),
+      categories,
+      budgetTotals: budgetTotals(projects),
+      inbox: mine.items,
+      warnPct: ctx.budgetWarnPct,
+      warnPctByCompany: await warnPctByCompany(req, pts),
+    },
   }
 }
 
@@ -320,7 +340,7 @@ export async function staffDashboard(req: PayloadRequest) {
 export async function adminDashboard(req: PayloadRequest) {
   const ctx = await reportContext(req)
   const pts = companiesWithRole(req, ['pk-admin'])
-  const includeUntagged = pts.some((c) => rolesIn(req, c).includes('pk-admin'))
+  const includeUntagged = pts.some((c) => rolesIn(req, c).includes('pk-admin')) && (await mayReadUntaggedAudit(req)) // QA-MC4-03
   const [gaps, audit, companies] = await inSequence(
     () => masterGaps(req, pts),
     () => auditLogPage(req, { from: addDaysSafe(ctx.today, -30), to: ctx.today, companyIds: pts, includeUntagged }, { limit: 20 }),

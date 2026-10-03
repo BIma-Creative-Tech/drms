@@ -1,8 +1,11 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:proyekkas/core/network/api_client.dart';
 import 'package:proyekkas/features/app_config/presentation/update_required_screen.dart';
+import 'package:proyekkas/features/auth/application/auth_controller.dart';
+import 'package:proyekkas/features/auth/domain/user_profile.dart';
 import 'package:proyekkas/features/notifications/application/notifications_providers.dart';
 import 'package:proyekkas/features/notifications/data/notifications_api.dart';
 import 'package:proyekkas/features/notifications/domain/app_notification.dart';
@@ -80,6 +83,84 @@ void main() {
     expect(n.unread, isTrue);
     expect(n.requestId, 42);
     expect(AppNotification.fromJson({..._n(4), 'docType': 'settlement'}).requestId, isNull);
+  });
+
+  group('tap routing (doc types the server emits)', () {
+    String? route(String? docType, String? docId, {String event = 'x', bool progress = true, bool own = true}) =>
+        AppNotification.fromJson({..._n(5), 'event': event, 'docType': docType, 'docId': docId})
+            .route(canReadProgress: progress, ownAttendance: own);
+
+    test('expense request (expense.*, reminder.lpj_overdue / revision_pending) → request detail', () {
+      expect(route('expense_request', '42', event: 'expense.approved'), '/requests/42');
+      expect(route('expense_request', '42', event: 'reminder.lpj_overdue'), '/requests/42');
+    });
+
+    test('budget addendum (addendum.*) → addendum detail', () {
+      expect(route('budget_addendum', '61', event: 'addendum.pending_ack'), '/addenda/61');
+      expect(route('budget_addendum', '61', event: 'addendum.rejected'), '/addenda/61');
+    });
+
+    test('project: late progress report → that project\'s reports; budget threshold → progress vs budget', () {
+      expect(route('project', '7', event: 'progress.late_report'), '/progress?project=7');
+      expect(route('project', '7', event: 'reminder.budget_threshold'), '/progress?tab=projects');
+      expect(route('project', '7', event: 'progress.late_report', progress: false), isNull);
+    });
+
+    test('progress report → report detail', () {
+      expect(route('progress_report', '501'), '/progress/report/501');
+      expect(route('progress_report', '501', progress: false), isNull);
+    });
+
+    test('attendance → attendance (team tab without own attendance)', () {
+      expect(route('attendance', null), '/attendance');
+      expect(route('attendance', '9', own: false), '/attendance?tab=team');
+    });
+
+    test('unknown type, missing or non-numeric id → not tappable', () {
+      expect(route('settlement', '4'), isNull);
+      expect(route(null, null), isNull);
+      expect(route('expense_request', null), isNull);
+      expect(route('budget_addendum', 'abc'), isNull);
+      expect(route('project', '1/../2'), isNull);
+    });
+  });
+
+  testWidgets('tap an addendum notification → /addenda/:id; unknown read row is not tappable', (tester) async {
+    adapter.respond = (c) => c.method == 'GET'
+        ? (
+            200,
+            {
+              'items': [
+                {..._n(21), 'event': 'addendum.pending_ack', 'docType': 'budget_addendum', 'docId': '61'},
+                {..._n(22, readAt: '2026-09-21T01:00:00Z', title: 'Info lain'), 'docType': 'settlement'},
+              ],
+              'unreadCount': 1,
+              'nextCursor': null,
+            },
+          )
+        : (200, {'updated': 1});
+    final router = GoRouter(
+      routes: [
+        GoRoute(path: '/', builder: (_, _) => const NotificationsScreen()),
+        GoRoute(path: '/addenda/:id', builder: (_, s) => Text('addendum ${s.pathParameters['id']}')),
+      ],
+    );
+    addTearDown(router.dispose);
+    await pumpScreen(
+      tester,
+      Router.withConfig(config: router),
+      auth: AuthSignedIn(profile: profile({Role.owner}), sub: 'user-sub-1'),
+      overrides: [notificationsApiProvider.overrideWithValue(api)],
+    );
+    expect(tester.widget<ListTile>(find.byKey(const Key('notification-22'))).onTap, isNull);
+    expect(
+      find.descendant(of: find.byKey(const Key('notification-21')), matching: find.byIcon(Icons.chevron_right)),
+      findsOneWidget,
+    );
+    await tester.tap(find.byKey(const Key('notification-21')));
+    await tester.pumpAndSettle();
+    expect(find.text('addendum 61'), findsOneWidget);
+    expect(adapter.calls.map((c) => '${c.method} ${c.uri.path}'), contains('POST /api/v1/notifications/21/read'));
   });
 
   testWidgets('update required screen: current vs minimum version, contact admin without a link', (tester) async {

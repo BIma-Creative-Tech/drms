@@ -3,6 +3,7 @@ import type { PayloadRequest, Where } from 'payload'
 import { hasRole } from '@/access/roles'
 import { companyOf } from '@/domain/companies'
 import { displayNames } from '@/domain/companies'
+import { auditRowVisible } from '@/domain/expense/flag-visibility'
 
 /**
  * "Riwayat" (US-35, requirements v1.1 §8 "Tampilan log"): audit rows of a document — who (user +
@@ -48,7 +49,7 @@ async function idsOf(req: PayloadRequest, collection: 'receipts' | 'transfers' |
   return res.docs.map((d) => String(d.id))
 }
 
-export async function historyRows(req: PayloadRequest, targets: Array<{ docType: string; ids: string[] }>, limit = 2000): Promise<HistoryRow[]> {
+export async function historyRows(req: PayloadRequest, targets: Array<{ docType: string; ids: string[] }>, limit = 2000, companyId?: number | null): Promise<HistoryRow[]> {
   const or: Where[] = targets.filter((t) => t.ids.length > 0).map((t): Where => ({ and: [{ docType: { equals: t.docType } } as Where, { docId: { in: t.ids } } as Where] }))
   if (or.length === 0) return []
   const res = await req.payload.find({
@@ -60,9 +61,11 @@ export async function historyRows(req: PayloadRequest, targets: Array<{ docType:
     overrideAccess: true, // SYSTEM-READ: history of documents the caller may read (checked by the caller)
     req,
   })
-  const userIds = [...new Set(res.docs.map((a) => a.userId).filter((x): x is number => typeof x === 'number'))]
-  const names = await displayNames(req, userIds, { emailFallback: false })
-  return res.docs.map((a) => ({
+  // QA-MC4-06: flag rows of a cross-PT duplicate only for viewers mapped to the other request's PT
+  const docs = res.docs.filter((a) => auditRowVisible(req, { action: String(a.action), newValue: unwrapAudit(a.newValue) }))
+  const userIds = [...new Set(docs.map((a) => a.userId).filter((x): x is number => typeof x === 'number'))]
+  const names = await displayNames(req, userIds, { emailFallback: false, companyId })
+  return docs.map((a) => ({
     id: a.id as number,
     serverTime: (a.serverTime as string) ?? '',
     docType: a.docType as string,
@@ -98,5 +101,5 @@ export async function requestHistory(req: PayloadRequest, requestId: number): Pr
   if (hasRole(req, ['pk-finance', 'pk-owner', 'pk-admin'], company)) {
     targets.push({ docType: 'cash_entry', ids: await idsOf(req, 'cash-entries', 'expenseRequest', requestId) })
   }
-  return historyRows(req, targets)
+  return historyRows(req, targets, undefined, company)
 }

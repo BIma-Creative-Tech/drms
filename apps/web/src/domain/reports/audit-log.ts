@@ -113,6 +113,8 @@ function decodeCursor(c: string | undefined): { t: string; id: number } | null {
 export async function auditLogPage(req: PayloadRequest, f: AuditFilter, page: { cursor?: string; limit: number }): Promise<{ rows: AuditRow[]; next: string | null }> {
   const ctx = await reportContext(req)
   const c = decodeCursor(page.cursor)
+  // user name: the employee of the row's PT, else of another PT SHOWN to the caller (QA-MC4-14: never
+  // the employee name of a PT outside `f.companyIds`), else the account name / email
   const r = await rows(
     req,
     sql`SELECT a.id, a.company_id, to_char(a.server_time AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS server_time,
@@ -121,7 +123,8 @@ export async function auditLogPage(req: PayloadRequest, f: AuditFilter, page: { 
           a.field, a.line_no, a.old_value, a.new_value, a.status_from, a.status_to, a.reason, a.source::text AS source, a.app_version,
           a.ip, a.device_id, a.request_id
         FROM audit_logs a LEFT JOIN users u ON u.id = a.user_id
-          LEFT JOIN LATERAL (SELECT e1.name FROM company_memberships m JOIN employees e1 ON e1.id = m.employee_id WHERE m.user_id = u.id
+          LEFT JOIN LATERAL (SELECT e1.name FROM company_memberships m JOIN employees e1 ON e1.id = m.employee_id
+                              WHERE m.user_id = u.id AND ${companyScopeSql(sql`m.company_id`, f.companyIds ?? [])}
                              ORDER BY (m.company_id = a.company_id) DESC NULLS LAST, m.company_id LIMIT 1) e ON true
         WHERE ${where(f, ctx.tz)} ${c ? sql`AND (a.server_time, a.id) < (${c.t}::timestamptz, ${c.id})` : sql``}
         ORDER BY a.server_time DESC, a.id DESC LIMIT ${page.limit + 1}`,
@@ -174,12 +177,14 @@ export async function auditLogCount(req: PayloadRequest, f: AuditFilter): Promis
 export async function auditFilterOptions(req: PayloadRequest, f: Pick<AuditFilter, 'companyIds' | 'includeUntagged'>) {
   const inPts = companyScopeSql(sql`m0.company_id`, f.companyIds ?? [])
   const tagged = companyScopeSql(sql`a.company_id`, f.companyIds ?? [])
+  // QA-MC4-14: a user's employee name only from the PTs shown (never an employee of another PT)
+  const names = companyScopeSql(sql`m.company_id`, f.companyIds ?? [])
   const [users, types] = await inSequence(
     () =>
       rows(
         req,
         sql`SELECT u.id, coalesce(e.name, u.name, u.email) AS name FROM users u
-            LEFT JOIN LATERAL (SELECT e1.name FROM company_memberships m JOIN employees e1 ON e1.id = m.employee_id WHERE m.user_id = u.id ORDER BY m.company_id LIMIT 1) e ON true
+            LEFT JOIN LATERAL (SELECT e1.name FROM company_memberships m JOIN employees e1 ON e1.id = m.employee_id WHERE m.user_id = u.id AND ${names} ORDER BY m.company_id LIMIT 1) e ON true
             WHERE EXISTS (SELECT 1 FROM company_memberships m0 WHERE m0.user_id = u.id AND ${inPts})
                OR (${f.includeUntagged === true} AND NOT EXISTS (SELECT 1 FROM company_memberships m1 WHERE m1.user_id = u.id))
             ORDER BY 2`,

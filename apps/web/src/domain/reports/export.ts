@@ -204,8 +204,10 @@ export async function xlsxBuffer(p: PreparedExport): Promise<Buffer> {
   return withHeavySlot(() => writeXlsx([main, ...extra]))
 }
 
-export async function pdfBuffer(_req: PayloadRequest, p: PreparedExport): Promise<Buffer> {
+export async function pdfBuffer(req: PayloadRequest, p: PreparedExport): Promise<Buffer> {
   // ADR 0016 §6: one PT → its letterhead; > 1 PT → group letterhead (groupName/groupPdfHeader) + PT list.
+  // MC4: + the letterhead logo (PT logo / group logo, `media-company`); same image guard as the
+  // document PDF (ADR 0008 §2: JPEG/PNG, ≤ 3 MiB, else text only).
   const kop = [p.letterhead.name, ...p.letterhead.lines].map((l) => l.trim()).filter(Boolean).slice(0, 5)
   const toPdf = (t: Table) => {
     const weights = t.columns.map((c) => (c.type === 'text' ? (c.width ?? 18) : 11))
@@ -217,9 +219,10 @@ export async function pdfBuffer(_req: PayloadRequest, p: PreparedExport): Promis
       totals: t.totals ? t.columns.map((c) => cellText(t.totals![c.key] ?? null, c.type)) : undefined,
     }
   }
-  const { renderReportPdf } = await import('@/pdf/report-render')
+  const [{ renderReportPdf }, { loadImage }] = await Promise.all([import('@/pdf/report-render'), import('@/pdf/images')])
   const subject = `PT: ${p.letterhead.companies.map((c) => c.shortCode).join(', ')}`
-  return renderReportPdf({ kop, subject, title: p.def.title, meta: p.title.slice(2), tables: [toPdf(p.first.main), ...p.first.extra.map(toPdf)], notes: p.first.notes })
+  const logo = await loadImage(req, 'media-company', p.letterhead.logo ?? undefined)
+  return renderReportPdf({ kop, subject, logo, title: p.def.title, meta: p.title.slice(2), tables: [toPdf(p.first.main), ...p.first.extra.map(toPdf)], notes: p.first.notes })
 }
 
 export function downloadHeaders(p: Pick<PreparedExport, 'format' | 'filename'>, length?: number): Headers {

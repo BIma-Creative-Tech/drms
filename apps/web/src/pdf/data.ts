@@ -1,42 +1,21 @@
-import { readFile } from 'node:fs/promises'
-
-import type { CollectionSlug, PayloadRequest } from 'payload'
+import type { PayloadRequest } from 'payload'
 
 import { relId } from '@/access/roles'
 import { approvalsOf, settings, type ApprovalRow, type RequestDoc } from '@/domain/expense/common'
 import { displayNames } from '@/domain/companies'
 import { SKIPPED_LABEL } from '@/domain/expense/decision'
+import { withFlagVisibility } from '@/domain/expense/flag-visibility'
 import { displayUnitPrice } from '@/domain/expense/lines'
 import { receiptsOf } from '@/domain/expense/receipts'
 import { FLAG_LABELS, REQUEST_TYPE_LABELS, statusLabel, type FlagKind } from '@/domain/expense/types'
 import { DEFAULT_TZ } from '@/lib/time'
-import { mediaPath } from '@/lib/media-files'
 
 import { formatAmount, formatDateLong, formatDateShort, formatQty, formatRupiah, formatServerTime, pdfSafe, subtitleOf } from './format'
+import { loadImage, MAX_RECEIPT_IMAGES } from './images'
 import type { PdfData, PdfImage, PdfReceipt, PdfSignature } from './PengajuanBiaya'
 
-/** Images larger than this are skipped (RAM guard; stored receipts are ≤ 2000 px JPEG ≈ 0.5 MB). */
-const MAX_IMAGE_BYTES = 3 * 1024 * 1024
-/** ADR 0008 §2: ≤ 12 receipt images per on-demand PDF (more → worker batch job, later phase). */
-export const MAX_RECEIPT_IMAGES = 12
+export { MAX_RECEIPT_IMAGES }
 
-type MediaRow = { id: number; filename?: string | null; mimeType?: string | null; filesize?: number | null }
-
-async function loadImage(req: PayloadRequest, collection: CollectionSlug, id: number | undefined): Promise<PdfImage | null> {
-  if (!id) return null
-  const m = (await req.payload.findByID({ collection, id, depth: 0, overrideAccess: true /* SYSTEM-READ: image of a document the caller may read */, req }).catch(() => null)) as MediaRow | null
-  if (!m) return null
-  const format = m.mimeType === 'image/jpeg' ? 'jpg' : m.mimeType === 'image/png' ? 'png' : null
-  if (!format) return null // WebP/PDF cannot be embedded (@react-pdf/image: JPEG/PNG/SVG only)
-  if ((m.filesize ?? 0) > MAX_IMAGE_BYTES) return null
-  const p = mediaPath(req.payload, collection, m.filename)
-  if (!p) return null
-  try {
-    return { data: await readFile(p), format }
-  } catch {
-    return null
-  }
-}
 
 /** Latest cycle's signature rows per position (US-46: unsigned positions stay empty). */
 function latestCycle(rows: ApprovalRow[]): ApprovalRow[] {
@@ -119,7 +98,8 @@ export async function buildPdfData(req: PayloadRequest, requestId: number, opts:
     ? ((
         await req.payload.find({
           collection: 'receipt-flags',
-          where: { and: [{ request: { equals: requestId } }, { status: { not_equals: 'resolved' } }] },
+          // QA-MC4-06: a cross-PT duplicate only for viewers mapped to the other request's PT
+          where: withFlagVisibility(req, { and: [{ request: { equals: requestId } }, { status: { not_equals: 'resolved' } }] }),
           depth: 0,
           pagination: false,
           overrideAccess: true, // SYSTEM-READ: internal variant (Finance/Owner/Admin only, checked by the endpoint)

@@ -2170,6 +2170,11 @@
           "type": {
             "$ref": "#/components/schemas/RequestType"
           },
+          "company": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "description": "MC4: explicit PT (companies id) of the new record. Must be one of your PTs where you hold the role this create needs (else 403 COMPANY_NOT_ALLOWED) and the PT of the referenced project / cost center / cash account (else 400 COMPANY_MISMATCH; a reference in a PT you are not mapped to is answered like a missing one). Omitted = derived from the references, else your only selected PT (unchanged behaviour of APK 0.2.x / 0.3.0)."
+          },
           "title": {
             "type": "string",
             "minLength": 1,
@@ -3162,6 +3167,11 @@
               "out"
             ]
           },
+          "company": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "description": "MC4: explicit PT (companies id) of the new record. Must be one of your PTs where you hold the role this create needs (else 403 COMPANY_NOT_ALLOWED) and the PT of the referenced project / cost center / cash account (else 400 COMPANY_MISMATCH; a reference in a PT you are not mapped to is answered like a missing one). Omitted = derived from the references, else your only selected PT (unchanged behaviour of APK 0.2.x / 0.3.0)."
+          },
           "entryDate": {
             "type": "string",
             "pattern": "^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$"
@@ -3818,7 +3828,8 @@
         "type": "object",
         "properties": {
           "budgetWarnPct": {
-            "type": "number"
+            "type": "number",
+            "description": "Display default = the caller's only / lowest selected PT (MC4). Each item carries its own PT's threshold (items[].budget.warnPct)."
           },
           "items": {
             "type": "array",
@@ -3952,13 +3963,18 @@
                     },
                     "overWarn": {
                       "type": "boolean"
+                    },
+                    "warnPct": {
+                      "type": "number",
+                      "description": "MC2: budgetWarnPct of the request's PT (overWarn = pctAfter > warnPct)."
                     }
                   },
                   "required": [
                     "basis",
                     "pctBefore",
                     "pctAfter",
-                    "overWarn"
+                    "overWarn",
+                    "warnPct"
                   ]
                 },
                 "flags": {
@@ -4191,7 +4207,7 @@
           },
           "timezone": {
             "type": "string",
-            "description": "Company display timezone (IANA)."
+            "description": "Display timezone (IANA) — the server timezone every PT uses (ADR 0016 §9)."
           },
           "serverTime": {
             "type": "string"
@@ -4215,13 +4231,16 @@
                 "description": "false until FCM is configured (ADR 0011) — poll GET /notifications instead."
               },
               "syncExpenseDrafts": {
-                "type": "boolean"
+                "type": "boolean",
+                "description": "MC4: true when at least one active PT allows it (per-PT value: GET /me companies[].settings.syncExpenseDraftsEnabled)."
               },
               "syncAttendance": {
-                "type": "boolean"
+                "type": "boolean",
+                "description": "MC4: true when at least one active PT allows it (per-PT value: GET /me companies[].settings.syncAttendanceEnabled)."
               },
               "syncProgressReports": {
-                "type": "boolean"
+                "type": "boolean",
+                "description": "MC4: true when at least one active PT allows it (per-PT value: GET /me companies[].settings.syncProgressReportsEnabled)."
               }
             },
             "required": [
@@ -4229,7 +4248,8 @@
               "syncExpenseDrafts",
               "syncAttendance",
               "syncProgressReports"
-            ]
+            ],
+            "description": "Public, unauthenticated hints (no PT is known before login). With several PTs each flag is the OR over the active PTs; the server still enforces the flag of the item's PT on every sync item (FEATURE_DISABLED). Clients that know the user read GET /me companies[].settings instead."
           },
           "sync": {
             "type": "object",
@@ -4356,7 +4376,7 @@
               "properties": {
                 "code": {
                   "type": "string",
-                  "description": "VALIDATION, NOT_EDITABLE, STALE_REV (conflict), NOT_FOUND, FORBIDDEN, MEDIA_MISSING, CLIENT_UUID_CONFLICT, COMPANY_NOT_ALLOWED (MC3: company_id is not an active membership of the caller), COMPANY_MISMATCH (MC3: the PT derived from the item references ≠ company_id — or ≠ the only PT of a caller without company_id), FEATURE_DISABLED, DEPENDENCY_FAILED, DEPENDENCY_PENDING, STATE_CONFLICT, INTEGRITY, UNSUPPORTED, INTERNAL; attendance: MOCK_LOCATION, OUTSIDE_GEOFENCE, NOT_ASSIGNED, NO_GEOFENCE, ALREADY_CHECKED_IN, NO_CHECK_IN, ALREADY_CHECKED_OUT (on_behalf also FORBIDDEN: not a PM / not a team location / own attendance); progress reports: WEIGHTS_INCOMPLETE, PROGRESS_DECREASED, PHOTO_LIMIT, MEDIA_IN_USE."
+                  "description": "VALIDATION, NOT_EDITABLE, STALE_REV (conflict), NOT_FOUND, FORBIDDEN, MEDIA_MISSING, CLIENT_UUID_CONFLICT, COMPANY_NOT_ALLOWED (MC3: company_id is not an active membership of the caller), COMPANY_MISMATCH (MC3: the PT derived from the item references ≠ company_id — or ≠ the only PT of a caller without company_id; only for a PT the caller is mapped to — a reference in another PT is answered like a missing one, QA-MC4-14), FEATURE_DISABLED, DEPENDENCY_FAILED, DEPENDENCY_PENDING, STATE_CONFLICT, INTEGRITY, UNSUPPORTED, INTERNAL; attendance: MOCK_LOCATION, OUTSIDE_GEOFENCE, NOT_ASSIGNED, NO_GEOFENCE, ALREADY_CHECKED_IN, NO_CHECK_IN, ALREADY_CHECKED_OUT (on_behalf also FORBIDDEN: not a PM / not a team location / own attendance); progress reports: WEIGHTS_INCOMPLETE, PROGRESS_DECREASED, PHOTO_LIMIT, MEDIA_IN_USE."
                 },
                 "field": {
                   "type": "string"
@@ -5440,10 +5460,12 @@
             "type": "string"
           },
           "warnGapPct": {
-            "type": "number"
+            "type": "number",
+            "description": "Display default = the caller's only / lowest selected PT. Each project uses its own PT's thresholds (projects[].warnGapPct / badGapPct)."
           },
           "badGapPct": {
-            "type": "number"
+            "type": "number",
+            "description": "Display default (see warnGapPct)."
           },
           "projects": {
             "type": "array",
@@ -5465,6 +5487,11 @@
           "id": {
             "type": "integer",
             "exclusiveMinimum": 0
+          },
+          "companyId": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "description": "MC2: PT of the project."
           },
           "code": {
             "type": "string"
@@ -5539,10 +5566,19 @@
           },
           "reportCount": {
             "type": "integer"
+          },
+          "warnGapPct": {
+            "type": "number",
+            "description": "MC4: yellow threshold of THIS project's PT (companies.progressWarnGapPct)."
+          },
+          "badGapPct": {
+            "type": "number",
+            "description": "MC4: red threshold of THIS project's PT (companies.progressBadGapPct)."
           }
         },
         "required": [
           "id",
+          "companyId",
           "code",
           "name",
           "status",
@@ -5557,7 +5593,9 @@
           "tone",
           "toneLabel",
           "lastReportDate",
-          "reportCount"
+          "reportCount",
+          "warnGapPct",
+          "badGapPct"
         ]
       },
       "ProjectStageSet": {
@@ -5975,6 +6013,11 @@
       "ProgressReportCreate": {
         "type": "object",
         "properties": {
+          "company": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "description": "MC4: explicit PT (companies id) of the new record. Must be one of your PTs where you hold the role this create needs (else 403 COMPANY_NOT_ALLOWED) and the PT of the referenced project / cost center / cash account (else 400 COMPANY_MISMATCH; a reference in a PT you are not mapped to is answered like a missing one). Omitted = derived from the references, else your only selected PT (unchanged behaviour of APK 0.2.x / 0.3.0)."
+          },
           "projectId": {
             "type": "integer",
             "exclusiveMinimum": 0
@@ -7579,6 +7622,11 @@
       "BudgetAddendumCreate": {
         "type": "object",
         "properties": {
+          "company": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "description": "MC4: explicit PT (companies id) of the new record. Must be one of your PTs where you hold the role this create needs (else 403 COMPANY_NOT_ALLOWED) and the PT of the referenced project / cost center / cash account (else 400 COMPANY_MISMATCH; a reference in a PT you are not mapped to is answered like a missing one). Omitted = derived from the references, else your only selected PT (unchanged behaviour of APK 0.2.x / 0.3.0)."
+          },
           "projectId": {
             "type": "integer",
             "exclusiveMinimum": 0
@@ -15040,7 +15088,7 @@
     "/sync/batch": {
       "post": {
         "summary": "APK offline queue replay (bearer + registered device = device_id). Items in order, one transaction each; always 200 with one result per item (applied | duplicate | rejected | conflict | deferred | unsupported). Rate limit 12/min.",
-        "description": "Item types: expense_request.draft_upsert (payload SyncDraftUpsertPayload), expense_request.draft_delete (payload SyncDraftDeletePayload), attendance.check_in / attendance.check_out (payload SyncAttendancePayload: project_id OR cost_center_id; selfie first with POST /media/selfies; company-settings.syncAttendanceEnabled, else rejected FEATURE_DISABLED; rejection codes MOCK_LOCATION, OUTSIDE_GEOFENCE, NOT_ASSIGNED, NO_GEOFENCE, ALREADY_CHECKED_IN, NO_CHECK_IN, ALREADY_CHECKED_OUT, MEDIA_MISSING, FORBIDDEN), attendance.on_behalf (payload SyncOnBehalfPayload, US-14: PM only, team location, not own, reason required; GPS + photo from the PM phone); progress_report.draft_upsert (payload SyncProgressReportPayload; photos first with POST /media/progress-photos, ≤ 5; new report = PM of a team project or Direktur; edit = reporter within 24 h with base_rev + reason, else conflict/NOT_EDITABLE with server_report; company-settings.syncProgressReportsEnabled, else FEATURE_DISABLED; codes WEIGHTS_INCOMPLETE, PROGRESS_DECREASED, PHOTO_LIMIT, MEDIA_IN_USE, MEDIA_MISSING, FORBIDDEN). Receipt images are uploaded first with POST /media/receipts and referenced by media_id. Replaying a client_uuid returns the stored result as duplicate. Edits of an existing draft need base_rev = server rev, else conflict + server_copy (server wins). MC3 (ADR 0016 §8): every item carries company_id (an active membership) and is processed under that PT whatever X-Company-Ids says (feature flags, timezone, own employee of that PT); the PT derived from the references must match (else rejected COMPANY_MISMATCH; a foreign company_id → COMPANY_NOT_ALLOWED). Items WITHOUT company_id (released APK ≤ 0.2.x) are accepted only for an account with exactly one PT; otherwise the whole batch answers 409 code COMPANY_REQUIRED (errors[].path = items.<i>.company_id, nothing processed).",
+        "description": "Item types: expense_request.draft_upsert (payload SyncDraftUpsertPayload), expense_request.draft_delete (payload SyncDraftDeletePayload), attendance.check_in / attendance.check_out (payload SyncAttendancePayload: project_id OR cost_center_id; selfie first with POST /media/selfies; company-settings.syncAttendanceEnabled, else rejected FEATURE_DISABLED; rejection codes MOCK_LOCATION, OUTSIDE_GEOFENCE, NOT_ASSIGNED, NO_GEOFENCE, ALREADY_CHECKED_IN, NO_CHECK_IN, ALREADY_CHECKED_OUT, MEDIA_MISSING, FORBIDDEN), attendance.on_behalf (payload SyncOnBehalfPayload, US-14: PM only, team location, not own, reason required; GPS + photo from the PM phone); progress_report.draft_upsert (payload SyncProgressReportPayload; photos first with POST /media/progress-photos, ≤ 5; new report = PM of a team project or Direktur; edit = reporter within 24 h with base_rev + reason, else conflict/NOT_EDITABLE with server_report; company-settings.syncProgressReportsEnabled, else FEATURE_DISABLED; codes WEIGHTS_INCOMPLETE, PROGRESS_DECREASED, PHOTO_LIMIT, MEDIA_IN_USE, MEDIA_MISSING, FORBIDDEN). Receipt images are uploaded first with POST /media/receipts and referenced by media_id. Replaying a client_uuid returns the stored result as duplicate. Edits of an existing draft need base_rev = server rev, else conflict + server_copy (server wins). MC3 (ADR 0016 §8): every item carries company_id (an active membership) and is processed under that PT whatever X-Company-Ids says (feature flags, timezone, own employee of that PT); the PT derived from the references must match (else rejected COMPANY_MISMATCH; a reference in a PT the caller is not mapped to is answered like a missing one; a foreign company_id → COMPANY_NOT_ALLOWED). Items WITHOUT company_id (released APK ≤ 0.2.x) are accepted only for an account with exactly one PT; otherwise the whole batch answers 409 code COMPANY_REQUIRED (errors[].path = items.<i>.company_id, nothing processed).",
         "security": [
           {
             "bearer": []
@@ -16138,6 +16186,29 @@
                     "month": {
                       "type": "string"
                     },
+                    "companies": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer"
+                          },
+                          "shortCode": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "shortCode",
+                          "name"
+                        ]
+                      },
+                      "description": "MC2: PTs covered by this layout = the selected PTs where the caller holds the layout's role."
+                    },
                     "cash": {
                       "type": "object",
                       "properties": {
@@ -16153,6 +16224,10 @@
                               "id": {
                                 "type": "integer"
                               },
+                              "companyId": {
+                                "type": "integer",
+                                "description": "PT (companies id); label from `companies[]` / GET /me companies[]."
+                              },
                               "name": {
                                 "type": "string"
                               },
@@ -16166,6 +16241,7 @@
                             },
                             "required": [
                               "id",
+                              "companyId",
                               "name",
                               "active",
                               "balance"
@@ -16179,13 +16255,44 @@
                         "monthOut": {
                           "type": "integer",
                           "description": "Rupiah (integer)"
+                        },
+                        "byCompany": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "companyId": {
+                                "type": "integer",
+                                "description": "PT (companies id); label from `companies[]` / GET /me companies[]."
+                              },
+                              "total": {
+                                "type": "integer",
+                                "description": "Rupiah (integer)"
+                              },
+                              "monthIn": {
+                                "type": "integer",
+                                "description": "Rupiah (integer)"
+                              },
+                              "monthOut": {
+                                "type": "integer",
+                                "description": "Rupiah (integer)"
+                              }
+                            },
+                            "required": [
+                              "companyId",
+                              "total",
+                              "monthIn",
+                              "monthOut"
+                            ]
+                          }
                         }
                       },
                       "required": [
                         "total",
                         "accounts",
                         "monthIn",
-                        "monthOut"
+                        "monthOut",
+                        "byCompany"
                       ]
                     },
                     "budget": {
@@ -16205,6 +16312,41 @@
                         },
                         "none": {
                           "type": "integer"
+                        },
+                        "byCompany": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "companyId": {
+                                "type": "integer",
+                                "description": "PT (companies id); label from `companies[]` / GET /me companies[]."
+                              },
+                              "running": {
+                                "type": "integer"
+                              },
+                              "over": {
+                                "type": "integer"
+                              },
+                              "warn": {
+                                "type": "integer"
+                              },
+                              "ok": {
+                                "type": "integer"
+                              },
+                              "none": {
+                                "type": "integer"
+                              }
+                            },
+                            "required": [
+                              "companyId",
+                              "running",
+                              "over",
+                              "warn",
+                              "ok",
+                              "none"
+                            ]
+                          }
                         }
                       },
                       "required": [
@@ -16212,7 +16354,8 @@
                         "over",
                         "warn",
                         "ok",
-                        "none"
+                        "none",
+                        "byCompany"
                       ]
                     },
                     "completeness": {
@@ -16235,6 +16378,49 @@
                         },
                         "openWarnings": {
                           "type": "integer"
+                        },
+                        "byCompany": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "companyId": {
+                                "type": "integer",
+                                "description": "PT (companies id); label from `companies[]` / GET /me companies[]."
+                              },
+                              "ratioDone": {
+                                "type": "integer"
+                              },
+                              "ratioTotal": {
+                                "type": "integer"
+                              },
+                              "withoutLpj": {
+                                "type": "integer"
+                              },
+                              "overdue": {
+                                "type": "integer"
+                              },
+                              "lpjToVerify": {
+                                "type": "integer"
+                              },
+                              "reimburseToVerify": {
+                                "type": "integer"
+                              },
+                              "openWarnings": {
+                                "type": "integer"
+                              }
+                            },
+                            "required": [
+                              "companyId",
+                              "ratioDone",
+                              "ratioTotal",
+                              "withoutLpj",
+                              "overdue",
+                              "lpjToVerify",
+                              "reimburseToVerify",
+                              "openWarnings"
+                            ]
+                          }
                         }
                       },
                       "required": [
@@ -16243,7 +16429,8 @@
                         "withoutLpj",
                         "overdue",
                         "reimburseToVerify",
-                        "openWarnings"
+                        "openWarnings",
+                        "byCompany"
                       ]
                     },
                     "approvals": {
@@ -16296,6 +16483,49 @@
                             "count",
                             "sum"
                           ]
+                        },
+                        "byCompany": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "companyId": {
+                                "type": "integer",
+                                "description": "PT (companies id); label from `companies[]` / GET /me companies[]."
+                              },
+                              "count": {
+                                "type": "integer"
+                              },
+                              "sum": {
+                                "type": "integer",
+                                "description": "Rupiah (integer)"
+                              }
+                            },
+                            "required": [
+                              "companyId",
+                              "count",
+                              "sum"
+                            ]
+                          }
+                        },
+                        "waitingForMeByCompany": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "companyId": {
+                                "type": "integer",
+                                "description": "PT (companies id); label from `companies[]` / GET /me companies[]."
+                              },
+                              "total": {
+                                "type": "integer"
+                              }
+                            },
+                            "required": [
+                              "companyId",
+                              "total"
+                            ]
+                          }
                         }
                       },
                       "required": [
@@ -16304,7 +16534,9 @@
                         "waitingForMe",
                         "oldestDays",
                         "pendingAck",
-                        "pendingApproval"
+                        "pendingApproval",
+                        "byCompany",
+                        "waitingForMeByCompany"
                       ]
                     },
                     "cashFlow": {
@@ -16361,6 +16593,10 @@
                         "properties": {
                           "id": {
                             "type": "integer"
+                          },
+                          "companyId": {
+                            "type": "integer",
+                            "description": "PT (companies id); label from `companies[]` / GET /me companies[]."
                           },
                           "code": {
                             "type": "string"
@@ -16427,6 +16663,7 @@
                         },
                         "required": [
                           "id",
+                          "companyId",
                           "code",
                           "name",
                           "status",
@@ -16449,6 +16686,10 @@
                         "properties": {
                           "id": {
                             "type": "integer"
+                          },
+                          "companyId": {
+                            "type": "integer",
+                            "description": "PT (companies id); label from `companies[]` / GET /me companies[]."
                           },
                           "code": {
                             "type": "string"
@@ -16475,6 +16716,7 @@
                         },
                         "required": [
                           "id",
+                          "companyId",
                           "code",
                           "name",
                           "fromRequests",
@@ -16502,6 +16744,30 @@
                         },
                         "reimburseToVerifyWarnings": {
                           "type": "integer"
+                        },
+                        "byCompany": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "companyId": {
+                                "type": "integer",
+                                "description": "PT (companies id); label from `companies[]` / GET /me companies[]."
+                              },
+                              "count": {
+                                "type": "integer"
+                              },
+                              "sum": {
+                                "type": "integer",
+                                "description": "Rupiah (integer)"
+                              }
+                            },
+                            "required": [
+                              "companyId",
+                              "count",
+                              "sum"
+                            ]
+                          }
                         }
                       },
                       "required": [
@@ -16509,7 +16775,8 @@
                         "sum",
                         "overdue",
                         "reimburseToVerify",
-                        "reimburseToVerifyWarnings"
+                        "reimburseToVerifyWarnings",
+                        "byCompany"
                       ]
                     },
                     "viz": {
@@ -16762,6 +17029,10 @@
                               "id": {
                                 "type": "integer"
                               },
+                              "companyId": {
+                                "type": "integer",
+                                "description": "PT (companies id); label from `companies[]` / GET /me companies[]."
+                              },
                               "entryNo": {
                                 "type": [
                                   "string",
@@ -16813,6 +17084,7 @@
                             },
                             "required": [
                               "id",
+                              "companyId",
                               "entryNo",
                               "entryDate",
                               "direction",
@@ -16833,6 +17105,29 @@
                             "properties": {
                               "id": {
                                 "type": "integer"
+                              },
+                              "company": {
+                                "type": [
+                                  "object",
+                                  "null"
+                                ],
+                                "properties": {
+                                  "id": {
+                                    "type": "integer"
+                                  },
+                                  "shortCode": {
+                                    "type": "string"
+                                  },
+                                  "name": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "id",
+                                  "shortCode",
+                                  "name"
+                                ],
+                                "description": "MC2: PT of the request."
                               },
                               "docNo": {
                                 "type": [
@@ -16885,6 +17180,7 @@
                             },
                             "required": [
                               "id",
+                              "company",
                               "docNo",
                               "title",
                               "type",
@@ -16901,7 +17197,27 @@
                         },
                         "warnPct": {
                           "type": "number",
-                          "description": "company-settings.budgetWarnPct (K-08 Waspada threshold)"
+                          "description": "K-08 Waspada threshold of the caller's only / lowest selected PT (display default; per PT: warnPctByCompany)."
+                        },
+                        "warnPctByCompany": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "companyId": {
+                                "type": "integer",
+                                "description": "PT (companies id); label from `companies[]` / GET /me companies[]."
+                              },
+                              "warnPct": {
+                                "type": "number"
+                              }
+                            },
+                            "required": [
+                              "companyId",
+                              "warnPct"
+                            ]
+                          },
+                          "description": "MC4: K-08 Waspada threshold per PT (companies.budgetWarnPct); projects[].tone already uses its own PT."
                         }
                       },
                       "required": [
@@ -16913,13 +17229,15 @@
                         "budgetTotals",
                         "recentCash",
                         "inbox",
-                        "warnPct"
+                        "warnPct",
+                        "warnPctByCompany"
                       ]
                     }
                   },
                   "required": [
                     "asOf",
                     "month",
+                    "companies",
                     "cash",
                     "budget",
                     "completeness",
@@ -17028,6 +17346,29 @@
                     "month": {
                       "type": "string"
                     },
+                    "companies": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer"
+                          },
+                          "shortCode": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "shortCode",
+                          "name"
+                        ]
+                      },
+                      "description": "MC2: PTs covered by this layout = the selected PTs where the caller holds the layout's role."
+                    },
                     "transferQueue": {
                       "type": "object",
                       "properties": {
@@ -17046,6 +17387,30 @@
                         },
                         "reimburseToVerifyWarnings": {
                           "type": "integer"
+                        },
+                        "byCompany": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "companyId": {
+                                "type": "integer",
+                                "description": "PT (companies id); label from `companies[]` / GET /me companies[]."
+                              },
+                              "count": {
+                                "type": "integer"
+                              },
+                              "sum": {
+                                "type": "integer",
+                                "description": "Rupiah (integer)"
+                              }
+                            },
+                            "required": [
+                              "companyId",
+                              "count",
+                              "sum"
+                            ]
+                          }
                         }
                       },
                       "required": [
@@ -17053,7 +17418,8 @@
                         "sum",
                         "overdue",
                         "reimburseToVerify",
-                        "reimburseToVerifyWarnings"
+                        "reimburseToVerifyWarnings",
+                        "byCompany"
                       ]
                     },
                     "reimburseToVerify": {
@@ -17095,6 +17461,49 @@
                         "shortfall"
                       ]
                     },
+                    "completenessByCompany": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "companyId": {
+                            "type": "integer",
+                            "description": "PT (companies id); label from `companies[]` / GET /me companies[]."
+                          },
+                          "ratioDone": {
+                            "type": "integer"
+                          },
+                          "ratioTotal": {
+                            "type": "integer"
+                          },
+                          "withoutLpj": {
+                            "type": "integer"
+                          },
+                          "overdue": {
+                            "type": "integer"
+                          },
+                          "lpjToVerify": {
+                            "type": "integer"
+                          },
+                          "reimburseToVerify": {
+                            "type": "integer"
+                          },
+                          "openWarnings": {
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "companyId",
+                          "ratioDone",
+                          "ratioTotal",
+                          "withoutLpj",
+                          "overdue",
+                          "lpjToVerify",
+                          "reimburseToVerify",
+                          "openWarnings"
+                        ]
+                      }
+                    },
                     "accounts": {
                       "type": "array",
                       "items": {
@@ -17102,6 +17511,10 @@
                         "properties": {
                           "id": {
                             "type": "integer"
+                          },
+                          "companyId": {
+                            "type": "integer",
+                            "description": "PT (companies id); label from `companies[]` / GET /me companies[]."
                           },
                           "name": {
                             "type": "string"
@@ -17124,6 +17537,7 @@
                         },
                         "required": [
                           "id",
+                          "companyId",
                           "name",
                           "active",
                           "balance",
@@ -17136,6 +17550,26 @@
                       "type": "integer",
                       "description": "Rupiah (integer)"
                     },
+                    "cashByCompany": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "companyId": {
+                            "type": "integer",
+                            "description": "PT (companies id); label from `companies[]` / GET /me companies[]."
+                          },
+                          "total": {
+                            "type": "integer",
+                            "description": "Rupiah (integer)"
+                          }
+                        },
+                        "required": [
+                          "companyId",
+                          "total"
+                        ]
+                      }
+                    },
                     "advancesWithoutLpj": {
                       "type": "array",
                       "items": {
@@ -17143,6 +17577,10 @@
                         "properties": {
                           "id": {
                             "type": "integer"
+                          },
+                          "companyId": {
+                            "type": "integer",
+                            "description": "PT (companies id); label from `companies[]` / GET /me companies[]."
                           },
                           "docNo": {
                             "type": [
@@ -17185,6 +17623,7 @@
                         },
                         "required": [
                           "id",
+                          "companyId",
                           "docNo",
                           "title",
                           "requesters",
@@ -17251,7 +17690,30 @@
                       "type": [
                         "string",
                         "null"
-                      ]
+                      ],
+                      "description": "MC2: the OLDEST of the PTs' latest closed periods (null when one PT never closed)."
+                    },
+                    "lastClosedByCompany": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "companyId": {
+                            "type": "integer",
+                            "description": "PT (companies id); label from `companies[]` / GET /me companies[]."
+                          },
+                          "period": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "companyId",
+                          "period"
+                        ]
+                      }
                     },
                     "nextClosable": {
                       "type": "string"
@@ -17456,6 +17918,10 @@
                               "id": {
                                 "type": "integer"
                               },
+                              "companyId": {
+                                "type": "integer",
+                                "description": "PT (companies id); label from `companies[]` / GET /me companies[]."
+                              },
                               "entryNo": {
                                 "type": [
                                   "string",
@@ -17507,6 +17973,7 @@
                             },
                             "required": [
                               "id",
+                              "companyId",
                               "entryNo",
                               "entryDate",
                               "direction",
@@ -17527,6 +17994,10 @@
                             "properties": {
                               "id": {
                                 "type": "integer"
+                              },
+                              "companyId": {
+                                "type": "integer",
+                                "description": "PT (companies id); label from `companies[]` / GET /me companies[]."
                               },
                               "docNo": {
                                 "type": [
@@ -17566,6 +18037,7 @@
                             },
                             "required": [
                               "id",
+                              "companyId",
                               "docNo",
                               "title",
                               "type",
@@ -17591,16 +18063,20 @@
                   "required": [
                     "asOf",
                     "month",
+                    "companies",
                     "transferQueue",
                     "reimburseToVerify",
                     "lpjToVerify",
                     "lpjToSettle",
+                    "completenessByCompany",
                     "accounts",
                     "cashTotal",
+                    "cashByCompany",
                     "advancesWithoutLpj",
                     "lpjDueDays",
                     "cashFlow",
                     "lastClosedPeriod",
+                    "lastClosedByCompany",
                     "nextClosable",
                     "viz"
                   ]
@@ -17702,6 +18178,29 @@
                     "month": {
                       "type": "string"
                     },
+                    "companies": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer"
+                          },
+                          "shortCode": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "shortCode",
+                          "name"
+                        ]
+                      },
+                      "description": "MC2: PTs covered by this layout = the selected PTs where the caller holds the layout's role."
+                    },
                     "hasScope": {
                       "type": "boolean"
                     },
@@ -17734,6 +18233,10 @@
                             "properties": {
                               "id": {
                                 "type": "integer"
+                              },
+                              "companyId": {
+                                "type": "integer",
+                                "description": "PT (companies id); label from `companies[]` / GET /me companies[]."
                               },
                               "docNo": {
                                 "type": [
@@ -17786,6 +18289,7 @@
                             },
                             "required": [
                               "id",
+                              "companyId",
                               "docNo",
                               "title",
                               "type",
@@ -17829,6 +18333,34 @@
                         "waiting"
                       ]
                     },
+                    "teamMonthByCompany": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "companyId": {
+                            "type": "integer",
+                            "description": "PT (companies id); label from `companies[]` / GET /me companies[]."
+                          },
+                          "count": {
+                            "type": "integer"
+                          },
+                          "sum": {
+                            "type": "integer",
+                            "description": "Rupiah (integer)"
+                          },
+                          "waiting": {
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "companyId",
+                          "count",
+                          "sum",
+                          "waiting"
+                        ]
+                      }
+                    },
                     "lpj": {
                       "type": "object",
                       "properties": {
@@ -17855,6 +18387,10 @@
                         "properties": {
                           "id": {
                             "type": "integer"
+                          },
+                          "companyId": {
+                            "type": "integer",
+                            "description": "PT (companies id); label from `companies[]` / GET /me companies[]."
                           },
                           "code": {
                             "type": "string"
@@ -17921,6 +18457,7 @@
                         },
                         "required": [
                           "id",
+                          "companyId",
                           "code",
                           "name",
                           "status",
@@ -17943,6 +18480,10 @@
                         "properties": {
                           "id": {
                             "type": "integer"
+                          },
+                          "companyId": {
+                            "type": "integer",
+                            "description": "PT (companies id); label from `companies[]` / GET /me companies[]."
                           },
                           "code": {
                             "type": "string"
@@ -17969,6 +18510,7 @@
                         },
                         "required": [
                           "id",
+                          "companyId",
                           "code",
                           "name",
                           "fromRequests",
@@ -17985,6 +18527,10 @@
                         "properties": {
                           "id": {
                             "type": "integer"
+                          },
+                          "companyId": {
+                            "type": "integer",
+                            "description": "PT (companies id); label from `companies[]` / GET /me companies[]."
                           },
                           "docNo": {
                             "type": [
@@ -18046,6 +18592,7 @@
                         },
                         "required": [
                           "id",
+                          "companyId",
                           "docNo",
                           "requestDate",
                           "type",
@@ -18310,6 +18857,29 @@
                               "id": {
                                 "type": "integer"
                               },
+                              "company": {
+                                "type": [
+                                  "object",
+                                  "null"
+                                ],
+                                "properties": {
+                                  "id": {
+                                    "type": "integer"
+                                  },
+                                  "shortCode": {
+                                    "type": "string"
+                                  },
+                                  "name": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "id",
+                                  "shortCode",
+                                  "name"
+                                ],
+                                "description": "MC2: PT of the request."
+                              },
                               "docNo": {
                                 "type": [
                                   "string",
@@ -18361,6 +18931,7 @@
                             },
                             "required": [
                               "id",
+                              "company",
                               "docNo",
                               "title",
                               "type",
@@ -18376,7 +18947,28 @@
                           }
                         },
                         "warnPct": {
-                          "type": "number"
+                          "type": "number",
+                          "description": "Display default (see OwnerDashboard.viz.warnPct)."
+                        },
+                        "warnPctByCompany": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "companyId": {
+                                "type": "integer",
+                                "description": "PT (companies id); label from `companies[]` / GET /me companies[]."
+                              },
+                              "warnPct": {
+                                "type": "number"
+                              }
+                            },
+                            "required": [
+                              "companyId",
+                              "warnPct"
+                            ]
+                          },
+                          "description": "MC4: K-08 Waspada threshold per PT (companies.budgetWarnPct); projects[].tone already uses its own PT."
                         }
                       },
                       "required": [
@@ -18385,17 +18977,20 @@
                         "categories",
                         "budgetTotals",
                         "inbox",
-                        "warnPct"
+                        "warnPct",
+                        "warnPctByCompany"
                       ]
                     }
                   },
                   "required": [
                     "asOf",
                     "month",
+                    "companies",
                     "hasScope",
                     "waitingForMe",
                     "teamWaiting",
                     "teamMonth",
+                    "teamMonthByCompany",
                     "lpj",
                     "projects",
                     "costCenters",
@@ -18496,6 +19091,29 @@
                 "schema": {
                   "type": "object",
                   "properties": {
+                    "companies": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer"
+                          },
+                          "shortCode": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "shortCode",
+                          "name"
+                        ]
+                      },
+                      "description": "MC2: PTs covered by this layout = the selected PTs where the caller holds the layout's role."
+                    },
                     "gaps": {
                       "type": "object",
                       "properties": {
@@ -18507,12 +19125,40 @@
                         },
                         "costCentersWithoutManager": {
                           "type": "integer"
+                        },
+                        "byCompany": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "companyId": {
+                                "type": "integer",
+                                "description": "PT (companies id); label from `companies[]` / GET /me companies[]."
+                              },
+                              "usersIncomplete": {
+                                "type": "integer"
+                              },
+                              "projectsWithoutPm": {
+                                "type": "integer"
+                              },
+                              "costCentersWithoutManager": {
+                                "type": "integer"
+                              }
+                            },
+                            "required": [
+                              "companyId",
+                              "usersIncomplete",
+                              "projectsWithoutPm",
+                              "costCentersWithoutManager"
+                            ]
+                          }
                         }
                       },
                       "required": [
                         "usersIncomplete",
                         "projectsWithoutPm",
-                        "costCentersWithoutManager"
+                        "costCentersWithoutManager",
+                        "byCompany"
                       ]
                     },
                     "latestAudit": {
@@ -18524,6 +19170,7 @@
                     }
                   },
                   "required": [
+                    "companies",
                     "gaps",
                     "latestAudit"
                   ]
@@ -18619,6 +19266,29 @@
                 "schema": {
                   "type": "object",
                   "properties": {
+                    "companies": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer"
+                          },
+                          "shortCode": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "shortCode",
+                          "name"
+                        ]
+                      },
+                      "description": "MC2: PTs covered by this layout = the selected PTs where the caller holds the layout's role."
+                    },
                     "actions": {
                       "type": "array",
                       "items": {
@@ -18626,6 +19296,10 @@
                         "properties": {
                           "id": {
                             "type": "integer"
+                          },
+                          "companyId": {
+                            "type": "integer",
+                            "description": "PT (companies id); label from `companies[]` / GET /me companies[]."
                           },
                           "docNo": {
                             "type": [
@@ -18656,6 +19330,7 @@
                         },
                         "required": [
                           "id",
+                          "companyId",
                           "docNo",
                           "title",
                           "type",
@@ -18673,6 +19348,10 @@
                           "id": {
                             "type": "integer"
                           },
+                          "companyId": {
+                            "type": "integer",
+                            "description": "PT (companies id); label from `companies[]` / GET /me companies[]."
+                          },
                           "docNo": {
                             "type": [
                               "string",
@@ -18702,6 +19381,7 @@
                         },
                         "required": [
                           "id",
+                          "companyId",
                           "docNo",
                           "title",
                           "type",
@@ -18843,6 +19523,7 @@
                     }
                   },
                   "required": [
+                    "companies",
                     "actions",
                     "latest",
                     "month",
@@ -19086,6 +19767,16 @@
             "required": false,
             "description": "YYYY-MM (absensi; default current month)",
             "name": "bulan",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "MC2: PT filter (company ids, repeatable or comma list) — narrows the scope; a PT outside the caller's selection → 403 code COMPANY_NOT_ALLOWED (QA-MC4-14)"
+            },
+            "required": false,
+            "description": "MC2: PT filter (company ids, repeatable or comma list) — narrows the scope; a PT outside the caller's selection → 403 code COMPANY_NOT_ALLOWED (QA-MC4-14)",
+            "name": "pt",
             "in": "query"
           },
           {
@@ -19645,6 +20336,16 @@
             "required": false,
             "description": "YYYY-MM (absensi; default current month)",
             "name": "bulan",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "MC2: PT filter (company ids, repeatable or comma list) — narrows the scope; a PT outside the caller's selection → 403 code COMPANY_NOT_ALLOWED (QA-MC4-14)"
+            },
+            "required": false,
+            "description": "MC2: PT filter (company ids, repeatable or comma list) — narrows the scope; a PT outside the caller's selection → 403 code COMPANY_NOT_ALLOWED (QA-MC4-14)",
+            "name": "pt",
             "in": "query"
           },
           {

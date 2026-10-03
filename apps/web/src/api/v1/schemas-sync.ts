@@ -334,7 +334,7 @@ export const SyncResult = z
     flags: z.array(z.string()).meta({ description: 'OFFLINE, CLOCK_SKEW, CLIENT_TOTAL_MISMATCH, ALREADY_CANCELLED, DEVICE_TIME_ONLY.' }),
     errors: z.array(
       z.object({
-        code: z.string().meta({ description: 'VALIDATION, NOT_EDITABLE, STALE_REV (conflict), NOT_FOUND, FORBIDDEN, MEDIA_MISSING, CLIENT_UUID_CONFLICT, COMPANY_NOT_ALLOWED (MC3: company_id is not an active membership of the caller), COMPANY_MISMATCH (MC3: the PT derived from the item references ≠ company_id — or ≠ the only PT of a caller without company_id), FEATURE_DISABLED, DEPENDENCY_FAILED, DEPENDENCY_PENDING, STATE_CONFLICT, INTEGRITY, UNSUPPORTED, INTERNAL; attendance: MOCK_LOCATION, OUTSIDE_GEOFENCE, NOT_ASSIGNED, NO_GEOFENCE, ALREADY_CHECKED_IN, NO_CHECK_IN, ALREADY_CHECKED_OUT (on_behalf also FORBIDDEN: not a PM / not a team location / own attendance); progress reports: WEIGHTS_INCOMPLETE, PROGRESS_DECREASED, PHOTO_LIMIT, MEDIA_IN_USE.' }),
+        code: z.string().meta({ description: 'VALIDATION, NOT_EDITABLE, STALE_REV (conflict), NOT_FOUND, FORBIDDEN, MEDIA_MISSING, CLIENT_UUID_CONFLICT, COMPANY_NOT_ALLOWED (MC3: company_id is not an active membership of the caller), COMPANY_MISMATCH (MC3: the PT derived from the item references ≠ company_id — or ≠ the only PT of a caller without company_id; only for a PT the caller is mapped to — a reference in another PT is answered like a missing one, QA-MC4-14), FEATURE_DISABLED, DEPENDENCY_FAILED, DEPENDENCY_PENDING, STATE_CONFLICT, INTEGRITY, UNSUPPORTED, INTERNAL; attendance: MOCK_LOCATION, OUTSIDE_GEOFENCE, NOT_ASSIGNED, NO_GEOFENCE, ALREADY_CHECKED_IN, NO_CHECK_IN, ALREADY_CHECKED_OUT (on_behalf also FORBIDDEN: not a PM / not a team location / own attendance); progress reports: WEIGHTS_INCOMPLETE, PROGRESS_DECREASED, PHOTO_LIMIT, MEDIA_IN_USE.' }),
         field: z.string().optional(),
         message: z.string(),
       }),
@@ -371,15 +371,20 @@ export const AppConfig = z
       }),
     updateRequired: z.boolean().nullable().meta({ description: 'Only with ?version=.' }),
     updateAvailable: z.boolean().nullable().meta({ description: 'Only with ?version=.' }),
-    timezone: z.string().meta({ description: 'Company display timezone (IANA).' }),
+    timezone: z.string().meta({ description: 'Display timezone (IANA) — the server timezone every PT uses (ADR 0016 §9).' }),
     serverTime: z.string(),
     android: z.object({ packageName: z.string() }),
-    features: z.object({
-      pushEnabled: z.boolean().meta({ description: 'false until FCM is configured (ADR 0011) — poll GET /notifications instead.' }),
-      syncExpenseDrafts: z.boolean(),
-      syncAttendance: z.boolean(),
-      syncProgressReports: z.boolean(),
-    }),
+    features: z
+      .object({
+        pushEnabled: z.boolean().meta({ description: 'false until FCM is configured (ADR 0011) — poll GET /notifications instead.' }),
+        syncExpenseDrafts: z.boolean().meta({ description: 'MC4: true when at least one active PT allows it (per-PT value: GET /me companies[].settings.syncExpenseDraftsEnabled).' }),
+        syncAttendance: z.boolean().meta({ description: 'MC4: true when at least one active PT allows it (per-PT value: GET /me companies[].settings.syncAttendanceEnabled).' }),
+        syncProgressReports: z.boolean().meta({ description: 'MC4: true when at least one active PT allows it (per-PT value: GET /me companies[].settings.syncProgressReportsEnabled).' }),
+      })
+      .meta({
+        description:
+          'Public, unauthenticated hints (no PT is known before login). With several PTs each flag is the OR over the active PTs; the server still enforces the flag of the item\'s PT on every sync item (FEATURE_DISABLED). Clients that know the user read GET /me companies[].settings instead.',
+      }),
     sync: z.object({ maxItemsPerBatch: z.number().int(), maxBatchBytes: z.number().int(), rateLimitPerMinute: z.number().int() }),
   })
   .meta({ id: 'AppConfig' })

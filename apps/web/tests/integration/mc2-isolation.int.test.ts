@@ -294,9 +294,9 @@ describe('MC2 — reports: PT parameter, PT column, subtotal per PT', () => {
     const pc = await ok(api('GET', `/api/v1/reports/rekap-pengajuan?dari=2000-01-01&sampai=2999-12-31&pt=${C}`, group))
     expect(pc.companies.map((c: { id: number }) => c.id)).toEqual([C])
     expect(pc.main.columns[0].key).not.toBe('pt')
-    // a foreign PT in `pt` never widens: B for group → nothing
-    const foreign = await ok(api('GET', `/api/v1/reports/rekap-pengajuan?dari=2000-01-01&sampai=2999-12-31&pt=${B}`, group))
-    expect(foreign.count).toBe(0)
+    // a foreign PT in `pt` never widens: B for group → 403 COMPANY_NOT_ALLOWED (QA-MC4-14; was 200 with nothing)
+    const foreign = await api('GET', `/api/v1/reports/rekap-pengajuan?dari=2000-01-01&sampai=2999-12-31&pt=${B}`, group)
+    expect([foreign.status, (foreign.body as { code?: string }).code]).toEqual([403, 'COMPANY_NOT_ALLOWED'])
   })
 
   it('dual: anggaran-project = A projects + B team project; rekap-kas (Finance) = A ledger only', async () => {

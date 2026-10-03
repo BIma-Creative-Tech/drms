@@ -4,12 +4,13 @@ import { hasRoleAny } from '@/access/roles'
 import { adminDashboard, financeDashboard, ownerDashboard, pmDashboard, staffDashboard } from '@/domain/reports/dashboards'
 import { csvStream, downloadHeaders, ExportRefused, pdfBuffer, prepareExport, xlsxBuffer } from '@/domain/reports/export'
 import { companyRefs } from '@/domain/companies'
-import { effectiveScope, reportByCode, type Format, type ReportDef } from '@/domain/reports/registry'
+import { effectiveScope, PT_PARAM, ptParam, reportByCode, type Format, type ReportDef } from '@/domain/reports/registry'
 import { officeScope, scopeCompanies, type ReportScope } from '@/domain/reports/scope'
 import { BusyError } from '@/lib/heavy-gate'
 import { withReqTransaction } from '@/lib/system-tx'
 import { xlsxEnabled } from '@/lib/xlsx'
 
+import { assertSelectedCompanies } from '../company-query'
 import { HttpError, json, problem, v1 } from '../http'
 
 /**
@@ -20,7 +21,7 @@ import { HttpError, json, problem, v1 } from '../http'
  * Scope: Finance/Owner all, PM team (filters intersected), Staff/Admin no office reports; the
  * global audit log (`audit-log`) for Owner/Admin/Finance (Q-F3-4). Reads run in one transaction.
  * MC2 (ADR 0016 §6): the scope is per PT (role IN each selected PT); query `pt` (repeatable / comma
- * list) narrows it further; the JSON carries `companies` (PTs covered) — > 1 PT adds a PT column and
+ * list) narrows it further (a PT outside the selection → 403 COMPANY_NOT_ALLOWED, QA-MC4-14); the JSON carries `companies` (PTs covered) — > 1 PT adds a PT column and
  * a "Subtotal per PT" table; exports use the PT / group letterhead.
  */
 const READ_LIMIT: [number, number] = [60, 60_000]
@@ -41,11 +42,13 @@ export const pmDashboardEndpoint = dashboard('pm', ['pk-pm'], (req) => pmDashboa
 export const adminDashboardEndpoint = dashboard('admin', ['pk-admin'], (req) => adminDashboard(req))
 export const meDashboardEndpoint = dashboard('me', undefined, (req) => staffDashboard(req))
 
-/** Report + caller scope, or 404 (unknown code) / 403 (role). */
+/** Report + caller scope, or 404 (unknown code) / 403 (role; a `pt` outside the caller's PTs, QA-MC4-14). */
 export async function resolveReport(req: PayloadRequest, code: string | undefined): Promise<{ def: ReportDef; scope: ReportScope }> {
   const def = code ? reportByCode(code) : undefined
   if (!def) throw new HttpError(404, 'Not Found')
   if (!hasRoleAny(req, ...def.roles)) throw new HttpError(403, 'Forbidden', { detail: 'Laporan ini tidak tersedia untuk peran Anda.' })
+  const pts = req.searchParams ? ptParam(req.searchParams) : null
+  if (pts) await assertSelectedCompanies(req, pts, PT_PARAM)
   const scope: ReportScope = def.scope ? await def.scope(req) : await officeScope(req)
   if (scope.kind === 'none') throw new HttpError(403, 'Forbidden')
   return { def, scope }

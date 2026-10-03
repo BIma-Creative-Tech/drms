@@ -120,9 +120,11 @@ export async function canRevoke(req: PayloadRequest, device: { user: unknown }):
   if (isGroupAdmin(req)) return true
   const mine = companiesWithRole(req, ['pk-admin', 'pk-owner'], { all: true })
   if (mine.length === 0 || owner === undefined) return false
+  // QA-MC4-12 (scope rule 2026-10-02): ACTIVE memberships only — a former member of my PT who now
+  // works only in PT B is no longer "of my PT"
   const theirs = await req.payload.find({
     collection: 'company-memberships',
-    where: { user: { equals: owner } },
+    where: { and: [{ user: { equals: owner } }, { active: { equals: true } }] },
     depth: 0,
     pagination: false,
     select: { company: true },

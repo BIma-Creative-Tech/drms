@@ -6,6 +6,7 @@ import { writeAudit } from '@/audit/writer'
 import { actorContext, displayName, loadVisible, type RequestDoc } from '@/domain/expense/common'
 import { withReqTransaction } from '@/lib/system-tx'
 import { createDraft, resubmitAsDraft, updateDraft } from '@/domain/expense/drafts'
+import { withFlagVisibility } from '@/domain/expense/flag-visibility'
 import { detail, listItem } from '@/domain/expense/dto'
 import { addReceipt, editReceipt, rejectReceipt, removeReceipt, resubmitReceipts, reviewFlag, verifyAllReceipts, verifyReceipt } from '@/domain/expense/receipts'
 import { allowedActions } from '@/domain/expense/state'
@@ -18,6 +19,7 @@ import { approvalInbox, lpjQueue, officeQueueWhere } from '@/domain/expense/queu
 import { companyQuery } from '../company-query'
 
 import { HttpError, json, problem, v1 } from '../http'
+import { withNamedCompany } from '../named-company'
 import {
   EmptyBody,
   ExpenseRequestCreate,
@@ -213,7 +215,7 @@ export const transferQueueEndpoint = v1({
     for (const d of res.docs as unknown as RequestDoc[]) {
       const flags = await req.payload.count({
         collection: 'receipt-flags',
-        where: { and: [{ request: { equals: d.id } }, { status: { equals: 'open' } }] },
+        where: withFlagVisibility(req, { and: [{ request: { equals: d.id } }, { status: { equals: 'open' } }] }), // QA-MC4-06
         overrideAccess: true, // SYSTEM-READ: open flag count (US-19 column)
         req,
       })
@@ -255,8 +257,18 @@ export const createRequestEndpoint = v1({
   transactional: true,
   idempotent: true,
   handler: async ({ req, body }) => {
-    const { doc, created } = await createDraft(req, body)
-    return ok(req, doc.id, created ? 201 : 200)
+    const { company, ...input } = body
+    // MC4: optional body `company` (ADR 0016 §5) — roles = collection create access of expense-requests
+    // (the answer is built under the same PT, so a PT outside the header selection still reads back)
+    return withNamedCompany(
+      req,
+      company,
+      { roles: ['pk-staff', 'pk-pm', 'pk-admin', 'pk-finance'], refs: [{ collection: 'projects', id: input.projectId, path: 'projectId' }, { collection: 'cost-centers', id: input.costCenterId, path: 'costCenterId' }] },
+      async () => {
+        const { doc, created } = await createDraft(req, input)
+        return ok(req, doc.id, created ? 201 : 200)
+      },
+    )
   },
 })
 

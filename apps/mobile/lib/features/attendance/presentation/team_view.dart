@@ -43,7 +43,8 @@ class _TeamTodayViewState extends ConsumerState<TeamTodayView> {
     final value = ref.watch(teamTodayProvider(null));
     final profile = ref.watch(currentProfileProvider);
     final attendanceOn = ref.watch(attendanceEnabledAnyProvider);
-    final canOnBehalf = (profile?.canAttendOnBehalf ?? false) && attendanceOn;
+    final pmOnBehalf = profile?.canAttendOnBehalf ?? false;
+    final canOnBehalf = pmOnBehalf && attendanceOn;
     return RefreshIndicator(
       onRefresh: () async => ref.invalidate(teamTodayProvider(null)),
       child: AsyncBody<TeamToday>(
@@ -91,14 +92,29 @@ class _TeamTodayViewState extends ConsumerState<TeamTodayView> {
                     ),
                 ],
               ),
-              if (canOnBehalf) ...[
+              if (pmOnBehalf) ...[
                 const SizedBox(height: 12),
+                // Flag "Absensi dari APK" off for the PT(s): the button stays visible but disabled, with the
+                // reason, instead of disappearing (the server would reject an on-behalf check-in anyway).
                 OutlinedButton.icon(
                   key: const Key('team-on-behalf'),
-                  onPressed: () => context.push('/attendance/on-behalf'),
+                  onPressed: canOnBehalf ? () => context.push('/attendance/on-behalf') : null,
                   icon: const Icon(Icons.how_to_reg),
                   label: Text(t.onBehalfAction),
                 ),
+                if (!attendanceOn)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 6),
+                    child: Row(
+                      key: const Key('team-on-behalf-disabled'),
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(Icons.info_outline, size: 16, color: Theme.of(context).colorScheme.outline),
+                        const SizedBox(width: 6),
+                        Expanded(child: Text(t.onBehalfDisabled, style: Theme.of(context).textTheme.bodySmall)),
+                      ],
+                    ),
+                  ),
               ],
               const SizedBox(height: 12),
               if (members.isEmpty)

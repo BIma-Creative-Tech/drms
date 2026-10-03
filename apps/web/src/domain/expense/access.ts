@@ -54,16 +54,24 @@ const CTX_IDS = 'pkVisibleRequestIds'
 /**
  * Ids of requests the caller may read, via the collection's own read access (overrideAccess:false),
  * cached per request. Used by satellites (approvals, receipts, flags, transfers, snapshots, media).
+ * `exceptCompanies` (QA-MC4-07): leave out requests of those PTs — callers pass the PTs whose rows they
+ * already grant with a `company IN (…)` predicate (office roles), so the id list holds only the few
+ * requests readable through another role (own / team) instead of every request of the office PTs
+ * (Postgres caps a statement at 65 535 bind parameters).
  */
-export async function visibleRequestIds(req: PayloadRequest): Promise<number[]> {
-  const cached = req.context?.[CTX_IDS] as { uid: number; ids: number[] } | undefined
+export async function visibleRequestIds(req: PayloadRequest, opts: { exceptCompanies?: readonly number[] } = {}): Promise<number[]> {
   const uid = userId(req)
   if (uid === undefined) return []
-  if (cached && cached.uid === uid) return cached.ids
+  const except = [...new Set(opts.exceptCompanies ?? [])].sort((a, b) => a - b)
+  const k = except.join(',')
+  const cached = req.context?.[CTX_IDS] as { uid: number; byExcept: Record<string, number[]> } | undefined
+  const hit = cached && cached.uid === uid ? cached.byExcept[k] : undefined
+  if (hit) return hit
   let ids: number[] = []
   try {
     const res = await req.payload.find({
       collection: 'expense-requests',
+      ...(except.length > 0 ? { where: { company: { not_in: except } } } : {}),
       depth: 0,
       pagination: false,
       select: { status: true },
@@ -75,20 +83,20 @@ export async function visibleRequestIds(req: PayloadRequest): Promise<number[]> 
   } catch (err) {
     if ((err as { status?: number }).status !== 403) throw err
   }
-  req.context[CTX_IDS] = { uid, ids }
+  req.context[CTX_IDS] = { uid, byExcept: { ...(cached && cached.uid === uid ? cached.byExcept : {}), [k]: ids } }
   return ids
 }
 
 /**
  * Satellite read access (ADR 0016 §5): office roles see every row OF THE PTs where they hold the
  * role (satellites carry `company`, derived from the request); everyone else only rows of visible
- * requests.
+ * requests (QA-MC4-07: outside those office PTs — already covered by the `company` predicate).
  */
 export function byVisibleRequest(field = 'request'): Access {
   return async ({ req }) => {
     if (!req.user) return false
     const office = companiesWithRole(req, ['pk-finance', 'pk-owner', 'pk-admin'])
-    const own = inIds(field, await visibleRequestIds(req))
+    const own = inIds(field, await visibleRequestIds(req, { exceptCompanies: office }))
     const all: Where | false = office.length > 0 ? { company: { in: office } } : false
     const or = [all, own].filter((w): w is Where => w !== false)
     return or.length === 0 ? false : or.length === 1 ? (or[0] as Where) : { or }

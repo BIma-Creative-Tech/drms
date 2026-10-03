@@ -18,12 +18,12 @@ import {
   vehicleCosts,
 } from '@/domain/reports/kpi'
 import { ExportRefused, prepareExport } from '@/domain/reports/export'
-import { officeScope } from '@/domain/reports/scope'
+import { fromCompanies, officeScope } from '@/domain/reports/scope'
 import { addMonths, lastDay, periodRange } from '@/domain/reports/rules'
 import { resetRateLimits } from '@/lib/rate-limit'
 import config from '@/payload.config'
 
-import { getTestPayload, sqlAs } from './helpers'
+import { companyId, getTestPayload, sqlAs } from './helpers'
 import { api, asUser, makeWorld, ORIGIN, png, sysCreate, upload, type FlowUser, type Res, type World } from './flow-world'
 
 /**
@@ -332,8 +332,8 @@ describe('K-01 saldo kas per akun', () => {
       const doc = await sqlAs(
         'app',
         `SELECT a.id, (coalesce(a.opening_balance,0) + coalesce(sum(e.amount) FILTER (WHERE e.direction='in'),0) - coalesce(sum(e.amount) FILTER (WHERE e.direction='out'),0))::text AS balance
-         FROM cash_accounts a LEFT JOIN cash_entries e ON e.cash_account_id=a.id AND e.entry_date <= $1 GROUP BY a.id`,
-        [asOf],
+         FROM cash_accounts a LEFT JOIN cash_entries e ON e.cash_account_id=a.id AND e.entry_date <= $1 WHERE a.company_id = $2 GROUP BY a.id`,
+        [asOf, await companyId()], // MC4: the Finance of this world is Finance of PT #1 only (other suites add PTs)
       )
       const exp = new Map(doc.rows.map((x) => [x.id, n(x.balance)]))
       expect(mine.accounts.length).toBe(exp.size)
@@ -550,7 +550,12 @@ describe('K-12 kelengkapan nota/LPJ', () => {
     expect(s.overdue.count).toBeGreaterThan(0) // the transfers dated 3 months ago
     const e = await sqlAs('app', "SELECT count(*)::int AS n FROM expense_requests WHERE type='reimburse' AND status='approved'")
     expect(s.reimburseToVerify).toBe(e.rows[0].n)
-    const f = await sqlAs('app', "SELECT count(*)::int AS n FROM receipt_flags f JOIN expense_requests er ON er.id=f.request_id WHERE f.status='open' AND f.level='warning' AND er.status NOT IN ('cancelled','rejected')")
+    // MC4: PT #1 only; a cross-PT duplicate flag is not visible to a Finance of PT #1 only (scope rule 2026-10-02)
+    const f = await sqlAs(
+      'app',
+      "SELECT count(*)::int AS n FROM receipt_flags f JOIN expense_requests er ON er.id=f.request_id WHERE f.status='open' AND f.level='warning' AND er.status NOT IN ('cancelled','rejected') AND er.company_id = $1 AND f.related_company_id IS NULL",
+      [await companyId()],
+    )
     expect(s.openWarnings).toBe(f.rows[0].n)
     const g = await sqlAs(
       'app',
@@ -604,7 +609,9 @@ describe('K-14 biaya per kendaraan / K-15 pusat biaya / K-17 per kategori', () =
     for (const x of doc.rows) expect(v.vehicles.find((y) => y.id === x.vehicle_id)?.fromRequests, `vehicle ${x.vehicle_id}`).toBe(n(x.s))
     const man = await sqlAs('app', "SELECT vehicle_id, sum(amount)::text AS s FROM cash_entries WHERE vehicle_id IS NOT NULL AND source_type='manual' AND direction='out' AND status='posted' GROUP BY vehicle_id")
     for (const x of man.rows) expect(v.vehicles.find((y) => y.id === x.vehicle_id)?.fromManual).toBe(n(x.s))
-    const form = await asFinance((req) => vehicleCosts(req, { kind: 'team', projects: [], costCenters: [w.costCenter] }, { from: today, to: today, vehicleId: w.vehicle }))
+    // MC4: scopes are per PT (a company-blind literal matches nothing)
+    const ccScope = fromCompanies([{ company: await companyId(), kind: 'team', projects: [], costCenters: [w.costCenter] }])
+    const form = await asFinance((req) => vehicleCosts(req, ccScope, { from: today, to: today, vehicleId: w.vehicle }))
     const own228 = await sqlAs('app', `SELECT sum(l.total)::text AS s FROM expense_requests_lines l WHERE l._parent_id = $1 AND l.vehicle_id = $2`, [form228Id, w.vehicle])
     expect(n(own228.rows[0].s)).toBe(600_000)
     expect(form.vehicles[0]!.fromRequests).toBeGreaterThanOrEqual(600_000)
@@ -704,7 +711,8 @@ describe('scope (C5, kpi §3 case 5): PM sees only the team; Staff/Admin no offi
     expect(csv.status).toBe(200)
     for (const no of otherNos) expect(csv.text).not.toContain(no)
     // numbers of the team scope = SQL restricted to the team ids
-    const team = await asUser(w.users.pm, async (req) => requestSummary(req, { kind: 'team', projects: [w.project], costCenters: [w.costCenter] }, { from: '2000-01-01', to: '2999-12-31' }))
+    const teamScope = fromCompanies([{ company: await companyId(), kind: 'team', projects: [w.project], costCenters: [w.costCenter] }]) // MC4: per-PT scope
+    const team = await asUser(w.users.pm, async (req) => requestSummary(req, teamScope, { from: '2000-01-01', to: '2999-12-31' }))
     const sql = await sqlAs('app', "SELECT count(*)::int AS n FROM expense_requests WHERE status <> 'draft' AND request_date IS NOT NULL AND (project_id=$1 OR cost_center_id=$2)", [w.project, w.costCenter])
     expect(team.total.count).toBe(sql.rows[0].n)
     // PM: no manual cash in K-17 / K-14, no cash reports

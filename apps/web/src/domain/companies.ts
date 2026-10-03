@@ -1,6 +1,6 @@
 import { APIError, type Payload, type PayloadRequest } from 'payload'
 
-import { isRole, relId, soleCompany, type Role } from '@/access/roles'
+import { companiesWithRole, isGroupAdmin, isRole, mappedCompanies, memberCompanies, relId, soleCompany, type Role } from '@/access/roles'
 import type { Company, CompanySetting } from '@/payload-types'
 
 /**
@@ -65,12 +65,50 @@ export async function activeCompanyIds(payload: Payload, req?: PayloadRequest): 
 }
 
 /**
+ * EVERY company id, active or not (QA-MC4-05, scope rule 2026-10-02): "holds the role in every PT"
+ * shortcuts must count a deactivated PT too — its data stays readable only by users mapped to it
+ * (and memberships of an inactive PT are never part of a company context, see `loadMemberships`).
+ */
+export async function allCompanyIds(payload: Payload, req?: PayloadRequest): Promise<number[]> {
+  const res = await payload.find({
+    collection: 'companies',
+    sort: 'id',
+    depth: 0,
+    pagination: false,
+    select: { shortCode: true },
+    overrideAccess: true, // SYSTEM-READ: every company (scope shortcuts)
+    ...(req ? { req } : {}),
+  })
+  return res.docs.map((d) => d.id as number)
+}
+
+/**
+ * Audit rows WITHOUT a PT (logins, accounts, uploads, shared masters, app-wide settings, and per-PT
+ * rows written before MC4 QA tagged them): only for group admins and for callers who are Admin or
+ * Direktur in EVERY PT — i.e. unchanged for a single-PT deployment. MC4 QA finding QA-MC4-03:
+ * before, the Admin / Direktur of ANY PT read them (PT B request lines, signatures, exports, users).
+ * Scope rule 2026-10-02: "every PT" includes DEACTIVATED PTs (nobody is mapped to one, so then only
+ * group admins read them) — untagged rows also hold cross-PT duplicate flags (QA-MC4-06), which must
+ * reach only people mapped to both PTs.
+ */
+export async function mayReadUntaggedAudit(req: PayloadRequest): Promise<boolean> {
+  if (isGroupAdmin(req)) return true
+  const mine = companiesWithRole(req, ['pk-admin', 'pk-owner'], { all: true })
+  if (mine.length === 0) return false
+  return (await allCompanyIds(req.payload, req)).every((c) => mine.includes(c))
+}
+
+/**
  * PT whose settings apply when the caller has no document at hand: the caller's only selected PT,
- * else company #1. Domain callers pass the document's PT (`settings(req, company)`); remaining
- * company-less callers are UI/context hints (MC2 review, see docs/proyekkas/mc/mc2-progress.md).
+ * else the LOWEST-id selected PT of the caller (MC4: before, company #1 — which could be a PT the
+ * caller is not a member of), else (system / no membership) company #1. Domain callers pass the
+ * document's PT (`settings(req, company)`); remaining company-less callers are display defaults
+ * next to per-item / per-row / per-PT values (MC4 review: inbox `budgetWarnPct`, K-09 thresholds,
+ * dashboard `warnPct` — see docs/proyekkas/mc/mc4-progress.md).
  */
 export async function contextCompanyId(req: PayloadRequest): Promise<number> {
-  return soleCompany(req) ?? firstActiveCompanyId(req.payload, req)
+  const sel = memberCompanies(req)
+  return soleCompany(req) ?? (sel.length > 0 ? Math.min(...sel) : firstActiveCompanyId(req.payload, req))
 }
 
 /**
@@ -228,12 +266,12 @@ export async function employeeOfUser(req: PayloadRequest, userId: number, compan
  * Display employee per user — names in history/DTOs/PDF: the membership employee of `preferCompany`
  * (the document's PT) when there is one, else the first membership (lowest PT id) with an employee.
  */
-export async function displayEmployeeByUser(req: PayloadRequest, userIds: number[], preferCompany?: number | null): Promise<Map<number, number>> {
+export async function displayEmployeeByUser(req: PayloadRequest, userIds: number[], preferCompany?: number | null, within?: readonly number[] | null): Promise<Map<number, number>> {
   const out = new Map<number, number>()
   if (userIds.length === 0) return out
   const res = await req.payload.find({
     collection: 'company-memberships',
-    where: { user: { in: userIds } },
+    where: within ? { and: [{ user: { in: userIds } }, { company: { in: [...within] } }] } : { user: { in: userIds } },
     depth: 0,
     pagination: false,
     sort: 'company',
@@ -262,7 +300,8 @@ export async function companyOf(req: PayloadRequest, collection: string, id: num
 /**
  * Display name per user: the employee name of its membership in `opts.companyId` (the document's PT,
  * ADR 0016 D1), else of its first membership (lowest PT id) that links an employee, else the account
- * name, else the email.
+ * name, else the email. QA-MC4-14 (scope rule 2026-10-02): the fallback only looks at memberships in
+ * PTs the VIEWER is mapped to (+ the document's PT) — an employee name of another PT is never shown.
  */
 export async function displayNames(req: PayloadRequest, userIds: number[], opts: { emailFallback?: boolean; companyId?: number | null } = {}): Promise<Map<number, string>> {
   const out = new Map<number, string>()
@@ -278,7 +317,7 @@ export async function displayNames(req: PayloadRequest, userIds: number[], opts:
       overrideAccess: true, // SYSTEM-READ: display names
       req,
     }),
-    displayEmployeeByUser(req, ids, opts.companyId),
+    displayEmployeeByUser(req, ids, opts.companyId, nameScope(req, opts.companyId)),
   ])
   const empIds = [...new Set(empByUser.values())]
   const emps = empIds.length
@@ -292,5 +331,9 @@ export async function displayNames(req: PayloadRequest, userIds: number[], opts:
   return out
 }
 
-/** SQL fragment: display name of `users u` via its first membership employee (raw-SQL reports). */
-export const USER_DISPLAY_EMPLOYEE_SQL = `(SELECT e.name FROM company_memberships m JOIN employees e ON e.id = m.employee_id WHERE m.user_id = u.id ORDER BY m.company_id LIMIT 1)`
+/** PTs whose employee names a viewer may see: the mapped PTs + the document's PT; null = no limit (system). */
+function nameScope(req: PayloadRequest, companyId?: number | null): number[] | null {
+  const mapped = mappedCompanies(req)
+  if (mapped === null) return null
+  return typeof companyId === 'number' && !mapped.includes(companyId) ? [...mapped, companyId] : mapped
+}

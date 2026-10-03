@@ -2,6 +2,7 @@ import type { CollectionConfig } from 'payload'
 
 import { denyAll } from '@/access/roles'
 import { byVisibleRequest, denyDeleteLogged } from '@/domain/expense/access'
+import { flagVisibleWhere } from '@/domain/expense/flag-visibility'
 import { FLAG_KINDS, FLAG_LABELS } from '@/domain/expense/types'
 
 import { ro } from './fields-f2'
@@ -14,12 +15,25 @@ const jsonView = { readOnly: true, components: { Field: '@/components/ReadOnlyJs
  * Finance, never blocking. Recomputed by the service: new → `open` (audit flag_raised), condition
  * gone → `resolved`, Finance marks warnings `reviewed` (audit flag_reviewed, optional note).
  * `info` flags need no action. CLASS B: flat, no DELETE, identity columns immutable (trigger).
+ * QA-MC4-06 (owner decision 2026-10-02, ADR 0016 "Scope rule"): a duplicate flag whose related request
+ * is in ANOTHER PT carries `relatedCompany` and is readable only by users mapped to that PT
+ * (`domain/expense/flag-visibility.ts`).
  */
 export const ReceiptFlags: CollectionConfig = {
   slug: 'receipt-flags',
   labels: { singular: 'Flag validasi nota', plural: 'Flag validasi nota' },
   admin: { group: 'Keuangan', defaultColumns: ['request', 'lineNo', 'kind', 'level', 'status', 'message'] },
-  access: { read: byVisibleRequest('request'), create: denyAll, update: denyAll, delete: denyDeleteLogged('receipt_flag') },
+  access: {
+    read: async (args) => {
+      const base = await byVisibleRequest('request')(args)
+      const v = flagVisibleWhere(args.req)
+      if (base === false || !v) return base
+      return base === true ? v : { and: [base, v] }
+    },
+    create: denyAll,
+    update: denyAll,
+    delete: denyDeleteLogged('receipt_flag'),
+  },
   hooks: { beforeChange: [companyHook('receipt-flags', { derive: [{ field: 'request', collection: 'expense-requests' }] })] },
   fields: [
     companyField({ derived: true }),
@@ -31,6 +45,8 @@ export const ReceiptFlags: CollectionConfig = {
     { name: 'lineNo', type: 'number', admin: ro },
     { name: 'receipt', type: 'relationship', relationTo: 'receipts', admin: ro },
     { name: 'relatedRequest', type: 'relationship', relationTo: 'expense-requests', label: 'Pengajuan terkait (nota ganda)', admin: ro },
+    // QA-MC4-06: PT of `relatedRequest` when it is NOT this request's PT (cross-PT duplicate); empty otherwise
+    { name: 'relatedCompany', type: 'relationship', relationTo: 'companies', label: 'PT pengajuan terkait (lintas PT)', index: true, admin: ro },
     { name: 'message', type: 'text', required: true, admin: ro },
     { name: 'detail', type: 'json', admin: jsonView },
     {

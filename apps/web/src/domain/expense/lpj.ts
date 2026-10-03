@@ -206,7 +206,7 @@ export async function settle(req: PayloadRequest, id: number, input: SettleInput
   const date = input.date ?? todayDate
   if (!isBusinessDate(date)) fail(400, 'Tanggal harus YYYY-MM-DD.')
   if (date > todayDate) fail(400, 'Tanggal tidak boleh di masa depan.')
-  await assertAccount(req, input.cashAccountId)
+  await assertAccount(req, input.cashAccountId, relId((raw as { company?: unknown }).company)) // QA-MC4-10: account of the request's PT
   const lock = await currentLockDate(req, relId((raw as { company?: unknown }).company))
   if (lock && date <= lock) fail(409, `Periode ${date.slice(0, 7)} sudah ditutup (tutup buku s/d ${lock}).`)
   const lpjNo = s.docNo ?? ''

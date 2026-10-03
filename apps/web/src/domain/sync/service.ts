@@ -2,7 +2,8 @@ import { sql } from '@payloadcms/db-postgres'
 import { APIError, ValidationError, type PayloadRequest } from 'payload'
 import type { z } from 'zod'
 
-import { companyContextOf, employeeIn, hasRole, relId, userId, withCompanyContext, type CompanyContext, type Membership } from '@/access/roles'
+import { runUnderCompany } from '@/access/company-context'
+import { companyContextOf, employeeIn, hasRole, mappedCompanies, relId, userId, type Membership } from '@/access/roles'
 import { companyOf } from '@/domain/companies'
 import {
   SyncAttendancePayload,
@@ -139,29 +140,10 @@ export async function itemCompany(req: PayloadRequest, item: SyncItemIn): Promis
   return null
 }
 
-/** Request caches that depend on the read selection (cleared when an item narrows the selection). */
-const SELECTION_CACHES = ['pkScope', 'pkMediaOffice', 'pkVisibleRequestIds', 'pkVisibleProgressReportIds', 'pkVisibleAddendumIds', 'pkReportCtx', 'pkCompanyCtx']
-
-function clearSelectionCaches(req: PayloadRequest): void {
-  if (!req.context) return
-  for (const k of SELECTION_CACHES) delete req.context[k]
-}
-
-/**
- * Runs `fn` with the request's read selection narrowed to `company` (ADR 0016 §8: the item is
- * processed under its own PT, whatever `X-Company-Ids` said). `company` must be a membership.
- */
-async function underCompany<T>(req: PayloadRequest, company: number, fn: () => Promise<T>): Promise<T> {
-  const original = req.user
-  const ctx = companyContextOf(original) as CompanyContext
-  clearSelectionCaches(req)
-  req.user = withCompanyContext(original as object, ctx.memberships, [company], ctx.groupAdmin) as unknown as PayloadRequest['user']
-  try {
-    return await fn()
-  } finally {
-    req.user = original
-    clearSelectionCaches(req)
-  }
+/** PT the caller is mapped to (system requests: every PT). */
+function isMapped(req: PayloadRequest, company: number | undefined): boolean {
+  const mapped = mappedCompanies(req)
+  return mapped === null || (company !== undefined && mapped.includes(company))
 }
 
 /** PT an item is processed under: its `company_id`, else the only membership (legacy APK), else null. */
@@ -493,7 +475,9 @@ async function applyAttendance(c: ItemCtx, verdict: TimeVerdict, receivedAt: Dat
   const onBehalf = item.type === 'attendance.on_behalf'
   const p = onBehalf ? parsePayload(SyncOnBehalfPayload, item.payload) : parsePayload(SyncAttendancePayload, item.payload)
   // ADR 0016 D1: the caller's employee IN THE LOCATION's PT (one employee per PT)
-  const locCompany = await companyOf(req, p.project_id !== undefined ? 'projects' : 'cost-centers', p.project_id ?? p.cost_center_id!)
+  // QA-MC4-14: a location of an unmapped PT is treated like a missing one (recordAttendance → NOT_FOUND)
+  const locRaw = await companyOf(req, p.project_id !== undefined ? 'projects' : 'cost-centers', p.project_id ?? p.cost_center_id!)
+  const locCompany = isMapped(req, locRaw) ? locRaw : undefined
   const own = locCompany !== undefined ? employeeIn(req, locCompany) : await employeeOfUser(req, uid)
   let employee: number
   let user: number | null
@@ -504,7 +488,7 @@ async function applyAttendance(c: ItemCtx, verdict: TimeVerdict, receivedAt: Dat
     if (!hasRole(req, 'pk-pm', locCompany)) reject('FORBIDDEN', 'Hanya PM yang dapat mengabsenkan anggota tim.')
     if (own !== undefined && own === ob.employee_id) reject('FORBIDDEN', 'Absensi Anda sendiri dicatat lewat absen masuk/pulang biasa.', 'payload.employee_id')
     const emp = (await req.payload.findByID({ collection: 'employees', id: ob.employee_id, depth: 0, overrideAccess: true /* SYSTEM-READ: target employee of on-behalf */, req, disableErrors: true })) as { active?: boolean | null; company?: unknown } | null
-    if (!emp) reject('NOT_FOUND', 'Karyawan tidak ditemukan.', 'payload.employee_id')
+    if (!emp || !isMapped(req, relId(emp.company))) reject('NOT_FOUND', 'Karyawan tidak ditemukan.', 'payload.employee_id')
     if (relId(emp!.company) !== locCompany) reject('COMPANY_MISMATCH', 'Karyawan dan lokasi berada di PT yang berbeda.', 'payload.employee_id')
     if (emp!.active === false) reject('VALIDATION', 'Karyawan sudah nonaktif.', 'payload.employee_id')
     employee = ob.employee_id
@@ -691,7 +675,7 @@ async function processItem(req: PayloadRequest, batch: SyncBatchIn, deviceId: st
   const declared = declaredCompany(item, memberships)
   const member = declared !== null && memberships.some((m) => m.company === declared)
   const withPt: SyncResultOut = { ...base, company_id: member ? declared : null }
-  const run = <T,>(fn: () => Promise<T>): Promise<T> => (member ? underCompany(req, declared!, fn) : fn())
+  const run = <T,>(fn: () => Promise<T>): Promise<T> => (member ? runUnderCompany(req, declared!, fn) : fn())
   return run(() => processOwn(c, batch, deviceId, verdict, withPt, receivedAt, declared, member))
 }
 
@@ -705,7 +689,9 @@ async function processOwn(c: ItemCtx, batch: SyncBatchIn, deviceId: string, verd
       // ADR 0016 §8 / MC3-1: the item's PT = company_id (membership), = the PT of its references
       if (!member) reject('COMPANY_NOT_ALLOWED', 'PT data ini bukan PT Anda.', 'company_id')
       const company = await itemCompany(req, item)
-      if (company !== null && company !== declared) reject('COMPANY_MISMATCH', 'Data ini milik PT lain dari company_id item ini.', typeof item.company_id === 'number' ? 'company_id' : 'payload')
+      // QA-MC4-14 (scope rule): COMPANY_MISMATCH only for a reference in a PT the caller is MAPPED to; a
+      // reference of an unmapped PT runs on and is answered exactly like a missing one (no existence oracle)
+      if (company !== null && company !== declared && isMapped(req, company)) reject('COMPANY_MISMATCH', 'Data ini milik PT lain dari company_id item ini.', typeof item.company_id === 'number' ? 'company_id' : 'payload')
       const features = await featuresOf(req, declared!)
       const isAttendance = ATTENDANCE.has(item.type)
       const isProgress = item.type === 'progress_report.draft_upsert'

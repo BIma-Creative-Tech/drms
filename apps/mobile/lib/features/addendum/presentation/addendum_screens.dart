@@ -80,22 +80,72 @@ class AddendumListScreen extends ConsumerWidget {
   }
 }
 
+/// `/addenda/:id/edit`: loads the addendum and opens the form in edit mode while the server still allows
+/// `edit` (Draft, creator PM); otherwise a notice (e.g. it was submitted from the web meanwhile).
+class AddendumEditRoute extends ConsumerStatefulWidget {
+  const AddendumEditRoute({super.key, required this.id});
+  final int id;
+
+  @override
+  ConsumerState<AddendumEditRoute> createState() => _AddendumEditRouteState();
+}
+
+class _AddendumEditRouteState extends ConsumerState<AddendumEditRoute> {
+  /// First editable snapshot: the form keeps it while saving refreshes the detail (no flash of the notice).
+  Addendum? _editable;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
+    final id = widget.id;
+    if (_editable case final a?) return AddendumCreateScreen(initial: a);
+    final value = ref.watch(addendumDetailProvider(id));
+    final a = value.value;
+    if (a != null && a.allowedActions.contains(AddendumAction.edit)) {
+      _editable = a;
+      return AddendumCreateScreen(initial: a);
+    }
+    return Scaffold(
+      appBar: AppBar(title: Text(t.addendumEditTitle)),
+      body: AsyncBody<Addendum>(
+        value: value,
+        onRetry: () => ref.invalidate(addendumDetailProvider(id)),
+        data: (_) => Padding(
+          padding: const EdgeInsets.all(24),
+          child: Text(t.addendumNotEditable, key: const Key('addendum-not-editable')),
+        ),
+      ),
+    );
+  }
+}
+
 /// US-18: PM creates an addendum for a team project (online only; Draft or "Ajukan" at once).
+/// With [initial] (a Draft whose `allowedActions` contain `edit`) the same form edits it:
+/// `PATCH /budget-addenda/{id}` (nominal + alasan; the project stays fixed), optionally followed by "Ajukan".
 class AddendumCreateScreen extends ConsumerStatefulWidget {
-  const AddendumCreateScreen({super.key});
+  const AddendumCreateScreen({super.key, this.initial});
+  final Addendum? initial;
 
   @override
   ConsumerState<AddendumCreateScreen> createState() => _AddendumCreateScreenState();
 }
 
 class _AddendumCreateScreenState extends ConsumerState<AddendumCreateScreen> {
-  final _amount = TextEditingController();
-  final _reason = TextEditingController();
+  late final _amount = TextEditingController(
+    text: widget.initial == null ? '' : formatRupiah(widget.initial!.addition).replaceFirst('Rp ', ''),
+  );
+  late final _reason = TextEditingController(text: widget.initial?.reason ?? '');
   final _key = const Uuid().v7();
-  int? _projectId;
+  late int? _projectId = widget.initial?.projectId;
   Map<String, String> _errors = const {};
   bool _busy = false;
   String? _error;
+
+  /// Edit: one Idempotency-Key per PATCH body (the server answers 422 to a reused key with another body).
+  final Map<String, String> _patchKeys = {};
+  final _submitKey = const Uuid().v7();
+
+  bool get _editing => widget.initial != null;
 
   @override
   void dispose() {
@@ -113,6 +163,7 @@ class _AddendumCreateScreenState extends ConsumerState<AddendumCreateScreen> {
       _error = null;
     });
     if (errors.isNotEmpty) return;
+    if (_editing) return _saveEdit(addition: addition!, submit: submit);
     setState(() => _busy = true);
     try {
       final a = await ref
@@ -140,36 +191,73 @@ class _AddendumCreateScreenState extends ConsumerState<AddendumCreateScreen> {
     }
   }
 
+  Future<void> _saveEdit({required int addition, required bool submit}) async {
+    final t = AppLocalizations.of(context);
+    final a = widget.initial!;
+    final api = ref.read(addendumApiProvider);
+    final reason = _reason.text.trim();
+    setState(() => _busy = true);
+    try {
+      final key = _patchKeys.putIfAbsent('$addition|$reason', () => const Uuid().v7());
+      await api.update(a.id, addition: addition, reason: reason, idempotencyKey: key);
+      if (submit) await api.submit(a.id, idempotencyKey: _submitKey);
+      ref.invalidate(addendumDetailProvider(a.id));
+      ref.invalidate(addendumListProvider);
+      if (!mounted) return;
+      showSnack(context, submit ? t.addendumSubmitted : t.addendumEdited);
+      final router = GoRouter.maybeOf(context);
+      if (router != null && router.canPop()) {
+        router.pop();
+      } else {
+        await Navigator.of(context).maybePop();
+      }
+    } on ApiException catch (e) {
+      if (mounted) setState(() => _error = e.message);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
+    final initial = widget.initial;
     final projects = ref.watch(progressProjectsProvider);
+    // Edit: "Ajukan" only when the server also allows submit on this Draft.
+    final canSubmit = initial == null || initial.allowedActions.contains(AddendumAction.submit);
     return Scaffold(
-      appBar: AppBar(title: Text(t.addendumNewTitle)),
+      appBar: AppBar(title: Text(initial == null ? t.addendumNewTitle : t.addendumEditTitle)),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          AsyncBody<List<MasterItem>>(
-            value: projects,
-            data: (list) => DropdownButtonFormField<int>(
-              key: const Key('addendum-project'),
-              initialValue: _projectId,
-              isExpanded: true,
-              decoration: InputDecoration(
-                labelText: t.progressProject,
-                prefixIcon: const Icon(Icons.apartment),
-                errorText: _errors['project'],
+          if (initial != null)
+            InputDecorator(
+              key: const Key('addendum-project-fixed'),
+              decoration: InputDecoration(labelText: t.progressProject, prefixIcon: const Icon(Icons.apartment)),
+              child: Text(initial.projectLabel.isEmpty ? '#${initial.projectId}' : initial.projectLabel),
+            )
+          else
+            AsyncBody<List<MasterItem>>(
+              value: projects,
+              data: (list) => DropdownButtonFormField<int>(
+                key: const Key('addendum-project'),
+                initialValue: _projectId,
+                isExpanded: true,
+                decoration: InputDecoration(
+                  labelText: t.progressProject,
+                  prefixIcon: const Icon(Icons.apartment),
+                  errorText: _errors['project'],
+                ),
+                items: [
+                  for (final p in list)
+                    DropdownMenuItem(
+                      value: p.id,
+                      child: Text(p.label, overflow: TextOverflow.ellipsis),
+                    ),
+                ],
+                onChanged: _busy ? null : (v) => setState(() => _projectId = v),
               ),
-              items: [
-                for (final p in list)
-                  DropdownMenuItem(
-                    value: p.id,
-                    child: Text(p.label, overflow: TextOverflow.ellipsis),
-                  ),
-              ],
-              onChanged: _busy ? null : (v) => setState(() => _projectId = v),
             ),
-          ),
           const SizedBox(height: 16),
           TextField(
             key: const Key('addendum-amount'),
@@ -195,16 +283,18 @@ class _AddendumCreateScreenState extends ConsumerState<AddendumCreateScreen> {
               padding: const EdgeInsets.only(bottom: 8),
               child: Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
             ),
-          OnlineOnlyButton(
-            key: const Key('addendum-submit'),
-            label: t.addendumSubmit,
-            icon: Icons.send,
-            onPressed: _busy ? null : () => _save(submit: true),
-          ),
-          const SizedBox(height: 12),
+          if (canSubmit) ...[
+            OnlineOnlyButton(
+              key: const Key('addendum-submit'),
+              label: initial == null ? t.addendumSubmit : t.addendumSaveAndSubmit,
+              icon: Icons.send,
+              onPressed: _busy ? null : () => _save(submit: true),
+            ),
+            const SizedBox(height: 12),
+          ],
           OnlineOnlyButton(
             key: const Key('addendum-draft'),
-            label: t.addendumSaveDraft,
+            label: initial == null ? t.addendumSaveDraft : t.addendumSaveChanges,
             icon: Icons.save_outlined,
             outlined: true,
             onPressed: _busy ? null : () => _save(submit: false),
@@ -232,6 +322,11 @@ class _AddendumDetailScreenState extends ConsumerState<AddendumDetailScreen> {
 
   Future<void> _run(AddendumAction action) async {
     final t = AppLocalizations.of(context);
+    if (action == AddendumAction.edit) {
+      await GoRouter.maybeOf(context)?.push('/addenda/${widget.id}/edit');
+      ref.invalidate(addendumDetailProvider(widget.id));
+      return;
+    }
     String? reason;
     if (action == AddendumAction.reject || action == AddendumAction.cancel) {
       reason = await showDialog<String>(
@@ -266,7 +361,8 @@ class _AddendumDetailScreenState extends ConsumerState<AddendumDetailScreen> {
         AddendumAction.approve => api.approve(widget.id, idempotencyKey: key),
         AddendumAction.reject => api.reject(widget.id, reason: reason!, idempotencyKey: key),
         AddendumAction.cancel => api.cancel(widget.id, reason: reason!, idempotencyKey: key),
-        AddendumAction.submit || AddendumAction.edit => api.submit(widget.id, idempotencyKey: key),
+        AddendumAction.submit => api.submit(widget.id, idempotencyKey: key),
+        AddendumAction.edit => throw StateError('edit opens the form'),
       };
       ref.invalidate(addendumDetailProvider(widget.id));
       ref.invalidate(addendumInboxProvider);
@@ -352,6 +448,8 @@ class _AddendumDetailScreenState extends ConsumerState<AddendumDetailScreen> {
               if (acts.contains(AddendumAction.approve))
                 _action(AddendumAction.approve, t.addendumApprove, Icons.task_alt),
               if (acts.contains(AddendumAction.submit)) _action(AddendumAction.submit, t.addendumSubmit, Icons.send),
+              if (acts.contains(AddendumAction.edit))
+                _action(AddendumAction.edit, t.addendumEdit, Icons.edit_outlined, outlined: true),
               if (acts.contains(AddendumAction.reject))
                 _action(AddendumAction.reject, t.addendumReject, Icons.cancel, danger: true),
               if (acts.contains(AddendumAction.cancel))

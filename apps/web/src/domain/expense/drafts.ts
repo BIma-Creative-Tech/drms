@@ -1,6 +1,6 @@
 import type { CollectionSlug, PayloadRequest } from 'payload'
 
-import { employeeIn, hasRole, hasRoleAny, relId, soleCompany, userId } from '@/access/roles'
+import { employeeIn, hasRole, hasRoleAny, mappedCompanies, relId, soleCompany, userId } from '@/access/roles'
 import { companyOf } from '@/domain/companies'
 import { resolveScope } from '@/access/scope'
 
@@ -55,11 +55,16 @@ async function validated<T>(req: PayloadRequest, fn: () => Promise<T>): Promise<
   }
 }
 
-async function activeIds(req: PayloadRequest, collection: CollectionSlug, wanted: number[]): Promise<Set<number>> {
+/**
+ * Active master ids among `wanted`. Per-PT masters (`perPt`): only rows of the PTs the caller is mapped
+ * to (QA-MC4-10, scope rule 2026-10-02) — a row of another PT is reported like a missing one.
+ */
+async function activeIds(req: PayloadRequest, collection: CollectionSlug, wanted: number[], perPt = true): Promise<Set<number>> {
   if (wanted.length === 0) return new Set()
+  const mapped = perPt ? mappedCompanies(req) : null
   const res = await req.payload.find({
     collection,
-    where: { and: [{ id: { in: wanted } }, { active: { not_equals: false } }] },
+    where: { and: [{ id: { in: wanted } }, { active: { not_equals: false } }, ...(mapped !== null ? [{ company: { in: mapped } }] : [])] },
     depth: 0,
     pagination: false,
     overrideAccess: true, // SYSTEM-READ: master validation
@@ -69,13 +74,38 @@ async function activeIds(req: PayloadRequest, collection: CollectionSlug, wanted
 }
 
 /**
+ * Active employees among `wanted` → their PT. Only employees of PTs the caller is mapped to (QA-MC4-10):
+ * one of another PT is reported like a missing one.
+ */
+async function activeEmployees(req: PayloadRequest, wanted: number[]): Promise<Map<number, number>> {
+  if (wanted.length === 0) return new Map()
+  const mapped = mappedCompanies(req)
+  const res = await req.payload.find({
+    collection: 'employees',
+    where: { and: [{ id: { in: wanted } }, { active: { not_equals: false } }, ...(mapped !== null ? [{ company: { in: mapped } }] : [])] },
+    depth: 0,
+    pagination: false,
+    select: { company: true },
+    overrideAccess: true, // SYSTEM-READ: requester validation (PTs filtered to the caller's mapping)
+    req,
+  })
+  return new Map(res.docs.map((d) => [d.id as number, relId((d as { company?: unknown }).company) ?? -1]))
+}
+
+/**
  * PT of a draft (ADR 0016): the PT of its project / cost center, else the caller's only selected PT
  * (a request without scope yet); undefined = ambiguous (the collection hook then asks for a PT).
  */
 async function draftCompany(req: PayloadRequest, c: { projectId?: number | null; costCenterId?: number | null }): Promise<number | undefined> {
-  if (c.projectId) return companyOf(req, 'projects', c.projectId)
-  if (c.costCenterId) return companyOf(req, 'cost-centers', c.costCenterId)
-  return soleCompany(req)
+  const raw = c.projectId ? await companyOf(req, 'projects', c.projectId) : c.costCenterId ? await companyOf(req, 'cost-centers', c.costCenterId) : soleCompany(req)
+  // QA-MC4-10: a project / cost center of a PT the caller is not mapped to behaves like a missing one
+  return isForeign(req, raw) ? undefined : raw
+}
+
+/** PT outside the caller's mapping (system requests: never). */
+function isForeign(req: PayloadRequest, company: number | undefined): boolean {
+  const mapped = mappedCompanies(req)
+  return company !== undefined && mapped !== null && !mapped.includes(company)
 }
 
 /**
@@ -115,13 +145,13 @@ export async function validateContent(
   // G10: project / cost center in the caller's scope (office roles: any active one).
   if (c.projectId) {
     const p = await req.payload.findByID({ collection: 'projects', id: c.projectId, depth: 0, overrideAccess: true /* SYSTEM-READ: scope check */, req }).catch(() => null)
-    if (!p) errors.push({ path: 'projectId', message: 'Project tidak ditemukan.' })
+    if (!p || isForeign(req, relId(p.company) ?? -1)) errors.push({ path: 'projectId', message: 'Project tidak ditemukan.' })
     else if (p.status === 'arsip' || p.status === 'selesai') errors.push({ path: 'projectId', message: 'Project sudah selesai/diarsipkan.' })
     else if (!office && !(await scope()).assignedProjects.includes(c.projectId)) fail(403, 'Project di luar penugasan Anda (G10).')
   }
   if (c.costCenterId) {
     const cc = await req.payload.findByID({ collection: 'cost-centers', id: c.costCenterId, depth: 0, overrideAccess: true /* SYSTEM-READ: scope check */, req }).catch(() => null)
-    if (!cc || cc.active === false) errors.push({ path: 'costCenterId', message: 'Pusat biaya tidak ditemukan atau nonaktif.' })
+    if (!cc || cc.active === false || isForeign(req, relId(cc.company) ?? -1)) errors.push({ path: 'costCenterId', message: 'Pusat biaya tidak ditemukan atau nonaktif.' })
     else if (!office && !(await scope()).assignedCostCenters.includes(c.costCenterId)) fail(403, 'Pusat biaya di luar penugasan Anda (G10).')
   }
 
@@ -129,10 +159,16 @@ export async function validateContent(
   const uniq = [...new Set(c.requesterIds)]
   if (uniq.length !== c.requesterIds.length) errors.push({ path: 'requesterIds', message: 'Pemohon tidak boleh ganda.' })
   if (opts.forSubmit && uniq.length === 0) errors.push({ path: 'requesterIds', message: 'Minimal 1 pemohon (Diajukan Oleh).' })
-  const activeEmp = await activeIds(req, 'employees', uniq)
+  const activeEmp = await activeEmployees(req, uniq)
   uniq.filter((e) => !activeEmp.has(e)).forEach((e) => errors.push({ path: 'requesterIds', message: `Karyawan #${e} tidak ditemukan atau nonaktif.` }))
-  if (!(company !== undefined ? hasRole(req, ['pk-admin', 'pk-finance'], company) : hasRoleAny(req, 'pk-admin', 'pk-finance'))) {
-    const creatorEmp = company !== undefined ? employeeIn(req, company) : relId((req.user as { employee?: unknown } | null)?.employee)
+  // QA-MC4-09: "Admin/Finance for others" needs that role IN THE DERIVED PT(s) = the PT of the project /
+  // cost center and of every requester (the collection hook derives the document's PT from them), never
+  // a role held in another PT. No derivable PT (no reference yet) → the role in any selected PT, as before.
+  const derived = [...new Set([...(company !== undefined ? [company] : []), ...activeEmp.values()])]
+  const onBehalf = derived.length > 0 ? derived.every((pt) => hasRole(req, ['pk-admin', 'pk-finance'], pt)) : hasRoleAny(req, 'pk-admin', 'pk-finance')
+  if (!onBehalf) {
+    const own = company ?? (derived.length === 1 ? derived[0] : undefined)
+    const creatorEmp = own !== undefined ? employeeIn(req, own) : relId((req.user as { employee?: unknown } | null)?.employee)
     if (userId(req) === opts.creatorId && (creatorEmp === undefined || (uniq.length > 0 && !uniq.includes(creatorEmp)))) {
       fail(403, 'Hanya Admin/Finance yang boleh membuat pengajuan atas nama orang lain (Q-09).')
     }
@@ -144,7 +180,7 @@ export async function validateContent(
     const acc = await req.payload
       .findByID({ collection: 'employee-bank-accounts', id: c.bankAccountId, depth: 0, overrideAccess: true /* SYSTEM-READ: G9 */, req })
       .catch(() => null)
-    if (!acc || acc.active === false) errors.push({ path: 'bankAccountId', message: 'Rekening tidak ditemukan atau nonaktif.' })
+    if (!acc || acc.active === false || isForeign(req, relId(acc.company) ?? -1)) errors.push({ path: 'bankAccountId', message: 'Rekening tidak ditemukan atau nonaktif.' })
     else if (!uniq.includes(relId(acc.employee) ?? -1)) errors.push({ path: 'bankAccountId', message: 'Rekening harus milik salah satu pemohon (Q-11).' })
   }
 
@@ -157,7 +193,7 @@ export async function validateContent(
   const catIds = [...new Set(c.lines.map((l) => l.categoryId).filter((x): x is number => !!x))]
   const uomIds = [...new Set(c.lines.map((l) => l.uomId).filter((x): x is number => !!x))]
   const vehIds = [...new Set(c.lines.map((l) => l.vehicleId).filter((x): x is number => !!x))]
-  const [cats, uoms, vehs] = await Promise.all([activeIds(req, 'expense-categories', catIds), activeIds(req, 'uoms', uomIds), activeIds(req, 'vehicles', vehIds)])
+  const [cats, uoms, vehs] = await Promise.all([activeIds(req, 'expense-categories', catIds), activeIds(req, 'uoms', uomIds, false), activeIds(req, 'vehicles', vehIds)])
   let needsVehicle = new Set<number>()
   if (opts.forSubmit && catIds.length > 0) {
     const res = await req.payload.find({
