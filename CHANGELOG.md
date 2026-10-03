@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### CI — unit test hook timeout
+- `apps/web/vitest.config.ts`: `hookTimeout` 60 s (was the 10 s default). Suites that import the full Payload config in
+  `beforeAll` (e.g. `admin-modules`) failed as a whole file under load on the 2-vCPU runner (develop `5fe21fa`
+  verify, 2026-10-03; passes alone in 5 s). Test timeouts unchanged.
+
 ### Security — npm audit (high): `braces` via `sass`
 - New advisory GHSA-vfj7-8cjw-p6xm (`braces` ≤ 3.0.3, stack-exhaustion DoS; **no patched release**) reached the prod
   tree through `@payloadcms/next` 3.90.1 → `sass` 1.77.4 → `chokidar` 3 → `braces`, failing CI `npm audit` on develop
