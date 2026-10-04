@@ -91,6 +91,7 @@ jobs:
             END { printf "Mobile line coverage: %d / %d lines (%.1f%%)\n", lh, lf, (lf ? 100 * lh / lf : 0) }' \
             coverage/lcov.info | tee -a "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        continue-on-error: true # kuota storage artifact (Free 500 MB) penuh tidak boleh menggagalkan build/rilis; APK prod tetap di GitHub Release
         if: runner.environment == 'github-hosted'
         with:
           name: mobile-coverage
@@ -149,6 +150,7 @@ jobs:
       - name: Static secret scan of the debug APK (F4 gate "no secrets in APK")
         run: SCAN_DIR="$RUNNER_TEMP/apk-scan-debug" tool/apk_secret_scan.sh build/app/outputs/flutter-apk/app-staging-debug.apk
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        continue-on-error: true # kuota storage artifact (Free 500 MB) penuh tidak boleh menggagalkan build/rilis; APK prod tetap di GitHub Release
         with:
           name: proyekkas-staging-debug-apk
           path: apps/mobile/build/app/outputs/flutter-apk/app-staging-debug.apk
@@ -188,6 +190,7 @@ jobs:
       - name: Upload the release build log (failure diagnostics, 3 days)
         if: failure() && env.HAS_STAGING_KEY == 'true'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        continue-on-error: true # kuota storage artifact (Free 500 MB) penuh tidak boleh menggagalkan build/rilis; APK prod tetap di GitHub Release
         with:
           name: build-release-staging-log
           path: ${{ runner.temp }}/build-release-staging.log
@@ -197,6 +200,7 @@ jobs:
         if: env.HAS_STAGING_KEY == 'true'
         run: SCAN_DIR="$RUNNER_TEMP/apk-scan-release" tool/apk_secret_scan.sh build/app/outputs/flutter-apk/app-*-staging-release.apk
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        continue-on-error: true # kuota storage artifact (Free 500 MB) penuh tidak boleh menggagalkan build/rilis; APK prod tetap di GitHub Release
         if: env.HAS_STAGING_KEY == 'true'
         with:
           name: proyekkas-staging-release-apk
@@ -321,7 +325,14 @@ jobs:
           done
       - name: Static secret scan of the release APKs (gitleaks + trivy + deny-list, tool/apk_secret_scan.sh)
         run: SCAN_DIR="$RUNNER_TEMP/apk-scan-prod" tool/apk_secret_scan.sh build/app/outputs/flutter-apk/app-*-prod-release.apk
+      - name: Simpan simbol obfuscation di cache runner self-hosted (cadangan bila kuota artifact penuh)
+        if: runner.environment == 'self-hosted'
+        working-directory: apps/mobile
+        run: |
+          dest="/cache/release-symbols/${GITHUB_REF_NAME}"
+          mkdir -p "$dest" && cp -a build/symbols/. "$dest/" && echo "::notice::simbol tersimpan di runner: ${dest} (host /srv/ci/cache/release-symbols)"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        continue-on-error: true # kuota storage artifact (Free 500 MB) penuh tidak boleh menggagalkan build/rilis; APK prod tetap di GitHub Release
         with:
           name: proyekkas-prod-release-apk
           path: |
