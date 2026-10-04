@@ -6,6 +6,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### APK mobile-v0.3.2 (tag `mobile-v0.3.2`, pubspec `0.3.2+1`)
+
+Republish of 0.3.1 with identical app code: the `mobile-v0.3.1` `release-prod` job stopped at `upload-artifact`
+(GitHub Free plan Actions storage quota hit, 2026-10-04) before it created the GitHub Release, so 0.3.1 was never
+published. Release notes `docs/release-notes/apk/0.3.2.md` (= 0.3.1 items).
+
+#### Changed
+- CI (`mobile.yml`): every `actions/upload-artifact` step is `continue-on-error` — a full artifact quota no longer fails a
+  build or a release; the production APKs are published as GitHub Release assets, which do not count against the
+  Actions storage quota.
+- `release-prod` on the self-hosted runner also copies the obfuscation symbols to the runner cache
+  (`/cache/release-symbols/<tag>`, host `/srv/ci/cache/release-symbols`) so they survive when the artifact upload fails.
+
 ## [0.6.0] - 2026-10-04
 
 MC4 — multi-company hardening and the owner's PT scope rule (2026-10-02: read/search scope = the PTs a user is mapped
