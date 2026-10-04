@@ -228,8 +228,10 @@ for (const vp of VIEWPORTS) {
         check(await p.isChecked('#field-copyDefaults'), 'copyDefaults ticked by default')
         check(await visible('Salin dari PT'), '"Salin dari PT" visible while ticked')
         await p.click('#field-copyDefaults')
-        await p.waitForTimeout(400)
-        check(!(await visible('Salin dari PT')), '"Salin dari PT" hidden when unticked')
+        // Payload 3 re-evaluates admin.condition via a debounced server form-state request → poll up to 5 s
+        let hidden = false
+        for (let i = 0; i < 25 && !hidden; i++) { await p.waitForTimeout(200); hidden = !(await visible('Salin dari PT')) }
+        check(hidden, '"Salin dari PT" hidden when unticked')
         overflowCheck(await layoutOk(p), 'company form')
       } finally {
         await ctx.close() // never submitted

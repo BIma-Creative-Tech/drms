@@ -7,8 +7,31 @@
   `/opt/infra/backups/proyekkas/pk_drms_stg-20260930-204234-pre-mc4-uat.dump`.
 - **Data rule:** staging holds REAL client data (never reset). The UAT only ADDS fictional data
   (`*.uji@proyekkas.test`, PT "CS1"); no existing record is modified or deleted; no raw SQL writes.
-- **Status of this run:** **BLOCKED at fixture setup (step 1)** — see §2. No application data was created yet;
-  no US-MC test was executed against staging, so every US-MC row is NOT TESTED (§4).
+- **Status (final, 2026-10-04):** **PASS** — automated suite `docs/proyekkas/uat/mc4/` on staging `0.5.1-stg-5fe21fa`:
+  API **68/68 PASS** (incl. optional SCP-06), browser **19/19 PASS**. See §0. The 2026-09-30 attempt below (§1–§3) was
+  blocked by B-1 / MC4-01; both were resolved on 2026-10-02.
+
+## 0. Final staging run (2026-10-02 → 2026-10-04)
+
+| Step | Build | Result |
+|---|---|---|
+| Prerequisites | — | MC4-01 fixed by infra-lead (owner-approved) in `drms-staging` + `drms` (`pk-user` in the scope mappings of `proyekkas-web` / `proyekkas-mobile`; infra `fe01694`); B-1: `admin.uji` created as group admin via the staging seed bootstrap (owner-approved), its seed-added DRMS Admin membership deactivated at once (owner condition) |
+| Fixture (`fixture.mjs apply`) | `3dd8a96` | PT CS1 id 2 with copied defaults (7 sequences from 1, 3 approval rules), users 112–116, employees 115–117, memberships 42–49 |
+| API run 1 | `3dd8a96` | 66 PASS · **1 FAIL (AUD-02 → MC4-04)** · 1 SKIP |
+| Browser run 1 | `3dd8a96` | 15 PASS · **4 FAIL (UI-CO: copy-defaults fields disabled)** |
+| Fixes | `5fe21fa` | MC4-04 audit backfill (`20261003_090000_mc4_audit_company_backfill`, staging: 3.05 s, 8 422 `expense_request` rows + 24 other doc types tagged); UI-CO `admin.readOnly: false` on the virtual fields (PR #18) |
+| API run 2 (+ `UAT_DEACTIVATE_PT=1`) | `5fe21fa` | **68 PASS · 0 FAIL · 0 SKIP** |
+| Browser run 2 | `5fe21fa` | **19 PASS** (the first re-run failed UI-CO only on the check's 400 ms wait; Payload re-evaluates `admin.condition` through a debounced form-state request → the check now polls ≤ 5 s) |
+| Cleanup (`cleanup --commit`) | `5fe21fa` | project archived; CS1 masters, employees, bank accounts, 7 memberships (incl. rina/andi DRMS), users 112–116 and PT CS1 deactivated (Keycloak accounts disabled by users-sync). Nothing deleted |
+
+**Left for the owner:** `admin.uji@proyekkas.test` (user 111) is still a **group admin** with no membership. It cannot
+deactivate itself (the `active` / `groupAdmin` fields need an Admin role in an ACTIVE PT, and CS1 is inactive), and
+re-granting DRMS Admin would break the owner's condition. Owner, with the own admin account on staging: Pengguna →
+`admin.uji@proyekkas.test` → untick **Admin grup (semua PT)** → untick **Aktif** → Simpan.
+
+**Observation (no defect):** after the backfill some per-PT audit rows stay without PT because their source document
+no longer exists (staging: `media_selfies` 3 267, `attendance` 297, `media_receipts` 11, `expense_request` 6). Such
+rows are readable by group admins only — no leak; to be checked against selfie retention / E9 load-test data.
 
 ## 1. Method (planned, unchanged)
 
@@ -96,25 +119,23 @@ as an infra job); employees `CS1-UJI-*`, project `PRJ-CS1-UJI-01`, cost centre `
 
 | US | Result | Note |
 |---|---|---|
-| US-MC-01 … US-MC-19 | NOT TESTED | blocked by B-1 (no PT CS1, no fictional app accounts). |
-| (login of a new account, ADR 0016 §2 / US-MC-02 "akun baru mendapat `pk-user`") | **FAIL** | MC4-01 (§2 B-2): the role is granted but never reaches the token. |
+| US-MC-01 … US-MC-19 + scope rule | **PASS** (2026-10-04) | API 68/68 and browser 19/19 on `5fe21fa` — per-case table in the run output (`api-results.md`, `ui-results.md`, kept outside git) and §0. |
+| (login of a new account, ADR 0016 §2 / US-MC-02 "akun baru mendapat `pk-user`") | **PASS** (2026-10-02) | MC4-01 fixed; tokens carry `pk-user`. |
 
 ## 5. Defects
 
 | ID | Severity | Summary | Status |
 |---|---|---|---|
-| MC4-01 | High | `pk-user` missing from the `proyekkas-mobile` / `proyekkas-web` scope mappings → `pk-user`-only accounts cannot log in | open → infra-lead |
-| MC4-04 | High | AUD-02 (staging run 2026-10-02): historic audit rows of DRMS documents carry no PT (8 428 of 8 524 `expense_request` rows), so Rina (Direktur DRMS + Finance CS1) reads none of them once CS1 exists | fixed on `fix/mc4-audit-backfill` (migration `20261003_090000_mc4_audit_company_backfill`, `../qa/mc4-qa-report.md` §11.2); re-run AUD-02 after the deploy |
+| MC4-01 | High | `pk-user` missing from the `proyekkas-mobile` / `proyekkas-web` scope mappings → `pk-user`-only accounts cannot log in | **fixed** 2026-10-02 (infra-lead, both realms, infra `fe01694`) |
+| MC4-04 | High | AUD-02 (staging run 2026-10-02): historic audit rows of DRMS documents carry no PT (8 428 of 8 524 `expense_request` rows), so Rina (Direktur DRMS + Finance CS1) reads none of them once CS1 exists | fixed on `fix/mc4-audit-backfill` (migration `20261003_090000_mc4_audit_company_backfill`, `../qa/mc4-qa-report.md` §11.2); AUD-02 **PASS** on `5fe21fa` (2026-10-04) |
 
 The staging AUD-02 failure (MC4-04) is fixed by branch `fix/mc4-audit-backfill`: its migration tags the historic
 audit rows with their document's PT.
 
 ## 6. Remaining MC4 items
 
-- This UAT after B-1 / B-2 (API isolation sweep, spoofing, per-PT numbering, CS1 approval flow + Rina case, queues,
-  dashboards Σ, reports `pt`, per-PT closing, audit per PT, sync `COMPANY_MISMATCH`, `/me companies[]`, Playwright
-  1440/390 light/dark, IDOR/header/cookie pass).
+- ~~This UAT~~ — done 2026-10-04 (§0). Owner: deactivate `admin.uji` (§0).
 - ZAP baseline rerun against staging (not run in this task).
 - 3-PT load test (NFR "konsolidasi 3 PT p95 < 2 s"; media-access performance, ADR 0016 MC2 note 4) — not run here.
 - APK phone test (MC3 APK, PT switcher, per-PT outbox) on a real device.
-- Prod check of MC4-01 (`drms` scope mappings) before any account is onboarded on v0.5.0.
+- ~~Prod check of MC4-01~~ — scope mapping fixed in `drms` 2026-10-02 (verified via Admin REST by infra-lead).
