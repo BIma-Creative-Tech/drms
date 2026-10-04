@@ -11,6 +11,10 @@ export default defineConfig({
   test: {
     include: ['tests/unit/**/*.test.ts'],
     environment: 'node',
+    // Several suites import the full Payload config in beforeAll (seconds of module loading). On the 2-vCPU
+    // self-hosted runner under the coverage run that exceeded the 10 s default and failed a whole file
+    // (admin-modules, develop 5fe21fa, 2026-10-03) → generous hook timeout; test timeouts unchanged.
+    hookTimeout: 60_000,
     /**
      * E9: unit-test coverage gate (`npm run test:coverage`, CI job verify). Scope = server-side
      * TypeScript under src/ (generated files, migrations, seed data and React views excluded:
