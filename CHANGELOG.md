@@ -6,6 +6,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-10-04
+
+MC4 — multi-company hardening and the owner's PT scope rule (2026-10-02: read/search scope = the PTs a user is mapped
+to), verified by the automated staging UAT (`docs/proyekkas/uat/mc4-uat-report.md`: API 68/68, browser 19/19 on
+`5fe21fa`). Includes the MC4 code gaps (copy defaults on PT create, optional body `company`, per-PT flags and
+thresholds), the MC4 QA security fixes (4 HIGH + open items), the historic audit PT backfill (MC4-04), npm audit
+overrides (`undici`, `nodemailer`, `sass`) and CI hardening. Also carries the APK `mobile-v0.3.1` release files.
+
+**Database migrations** (run by `migrate`, not backward compatible → rollback = restore the pre-deploy dump):
+`20260930_120000_mc4_list_company_column` (data only), `20261002_080000_mc4_scope_rule` (media `ownerCompany` +
+triggers + backfill), `20261003_090000_mc4_audit_company_backfill` (historic audit rows tagged with their PT).
+**Keycloak prerequisite:** realm role `pk-user` in the scope mappings of `proyekkas-web` / `proyekkas-mobile`
+(done in `drms` and `drms-staging` 2026-10-02, infra `fe01694`); every prod user needs `pk-user`.
+
 ### CI — unit test hook timeout
 - `apps/web/vitest.config.ts`: `hookTimeout` 60 s (was the 10 s default). Suites that import the full Payload config in
   `beforeAll` (e.g. `admin-modules`) failed as a whole file under load on the 2-vCPU runner (develop `5fe21fa`
@@ -141,7 +155,7 @@ rows locally).
 - **QA-MC4-04 (HIGH):** single media file access is decided on the row's own owner document and office id lists load
   via SQL (opening one selfie no longer exhausts the web heap for a multi-PT Finance user).
 
-### APK 0.3.1 (branch `feat/mobile-0.3.1-ux`, pubspec `0.3.1+1`; not tagged yet)
+### APK mobile-v0.3.1 (tag `mobile-v0.3.1`, pubspec `0.3.1+1`)
 
 APK-only UX fixes from the module check; no server change needed (web ≥ 0.5.1 / MC4 API). Release notes
 `docs/release-notes/apk/0.3.1.md`.
