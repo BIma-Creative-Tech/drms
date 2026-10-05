@@ -4,3 +4,6 @@
 # False positive (generic-api-key): fictional Keycloak user UUIDs of the UAT test accounts in a unit-test fixture.
 9a8fe9a0699fe868cacde5846afbe146fc7216ca:apps/web/tests/unit/uat-seed.test.ts:generic-api-key:7
 9a8fe9a0699fe868cacde5846afbe146fc7216ca:apps/web/tests/unit/uat-seed.test.ts:generic-api-key:8
+# False positive (generic-api-key): fictional Idempotency-Key UUID literals in a Flutter unit test (privacy ack, ADR 0018).
+423655ea527564c3900d2b06a299ab4ba92fbf74:apps/mobile/test/unit/privacy_test.dart:generic-api-key:222
+423655ea527564c3900d2b06a299ab4ba92fbf74:apps/mobile/test/unit/privacy_test.dart:generic-api-key:232
