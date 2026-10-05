@@ -84,6 +84,12 @@ Urutan: **Karyawan** → **Pengguna** → **akses PT** (peran + karyawan per PT)
 - Pastikan **setiap PT** selalu punya **minimal satu Direktur dan satu Finance aktif** selain pemohon, agar pengajuan
   bisa diputuskan.
 - **Data akses PT** (`Pengguna & Akses → Data akses PT`) = daftar mentah isi matriks, untuk pencarian/pemeriksaan.
+- **Pemberitahuan privasi (Q-46):** daftar **Pengguna** punya kolom **Privasi dibaca (versi/tanggal)**: `v1 · 05/10/26
+  10.12` = sudah dibaca, **Belum** = belum pernah, `(terbaru vN)` = membaca versi lama. Hanya pengguna sendiri yang bisa
+  mengisinya (tombol **Saya mengerti** di web/APK); di form pengguna kolomnya hanya-baca. Tiap konfirmasi tercatat di
+  **Audit Log** (aksi `privacy_ack`). Teks pemberitahuan ada di halaman publik **`/privasi`**; isinya diubah tim teknis
+  dari dokumen HR/legal (bukan dari panel). Pengguna yang belum membaca: absensi APK terkunci; di web tampil
+  pemberitahuan yang harus dikonfirmasi sebelum memakai panel.
 
 ## 2. Perangkat (HP hilang)
 
@@ -154,8 +160,8 @@ Hal penting per PT yang harus Anda atur sebelum go-live:
 |---|---|---|
 | Absensi & retensi | **Absensi dari APK (termasuk offline) aktif** | Nyalakan (default mati) |
 | Operasional | **Laporan progress dari APK (termasuk offline) aktif** | Nyala |
-| Absensi & retensi | **Retensi selfie absensi (bulan)** | 12 (Q-33) |
-| Absensi & retensi | **Hapus otomatis selfie melewati retensi (aktif)** | Nyalakan (default mati = hanya menghitung) |
+| Absensi & retensi | **Retensi selfie absensi (bulan)** | **6** (keputusan owner 2026-10-05, Q-33; sama dengan pemberitahuan privasi). PT yang masih bernilai default lama 12 sudah diubah otomatis ke 6 (tercatat di Audit Log); nilai yang pernah diubah sengaja tidak disentuh — periksa. Nilai lain dari 6 = pemberitahuan privasi harus diperbarui |
+| Absensi & retensi | **Hapus otomatis selfie melewati retensi (aktif)** | **Keputusan owner/Direktur** — default mati (job hanya menghitung). Bila dinyalakan, selfie lebih tua dari retensi dihapus permanen setiap malam (02.30), tercatat di audit log |
 | Operasional | **Toleransi pembulatan nota per baris (Rp)** | 1.000 |
 | Operasional | **Radius geofence default (m)** | 100 — dipakai untuk lokasi yang punya titik tetapi radiusnya kosong |
 | Pengingat & notifikasi | **Pengingat terjadwal**: Pengingat aktif, Jam kirim, batas hari, ambang anggaran, Juga kirim email | Sesuai kesepakatan |

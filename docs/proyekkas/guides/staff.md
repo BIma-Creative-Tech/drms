@@ -9,6 +9,9 @@ Sebelum mulai: unggah **tanda tangan** sekali di web (**Profil & tanda tangan**)
 
 ## 1. Absen masuk dan pulang (APK)
 
+0. Pertama kali (APK 0.3.3+): baca **Pemberitahuan privasi** lalu tekan **Saya mengerti**. Sebelum itu tab **Absen**
+   menampilkan *"Absensi (selfie dan lokasi) belum bisa dipakai…"* dan tombol absen mati — ketuk **Baca pemberitahuan
+   privasi**. Tanpa sinyal: konfirmasi dikirim otomatis saat online; tunggu sampai terkirim.
 1. Datang ke lokasi project atau kantor/pusat biaya. Nyalakan **GPS**.
 2. Beranda → **Absensi** → tab **Absen** → pilih lokasi (ikon gedung = pusat biaya).
 3. Tekan **Cek jarak ke lokasi**. Harus tertulis **"Di dalam area absen"**.

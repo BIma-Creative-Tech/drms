@@ -59,6 +59,8 @@ export const AUDIT_ACTIONS = [
   // (Keycloak application-initiated action, outcome verified through the Admin API).
   '2fa_enabled',
   '2fa_disabled',
+  // ADR 0018 (Q-46, ASVS 8.3.3): a user acknowledged the employee privacy notice ("Saya mengerti", web or APK).
+  'privacy_ack',
 ] as const
 export type AuditAction = (typeof AUDIT_ACTIONS)[number]
 

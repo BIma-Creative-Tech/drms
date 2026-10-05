@@ -1,3 +1,4 @@
+import { PrivacyAckCell as PrivacyAckCell_87f32a89e993851f00f0d5bd9ac879da } from '@/admin/components/users/PrivacyAckCell'
 import { ActiveCell as ActiveCell_5b572f69f0b2c658d322ad3e65563a49 } from '@/admin/components/companies/ActiveCell'
 import { MemberCountCell as MemberCountCell_0560bc1409d80e4fbd9f8971b0f4bccb } from '@/admin/components/companies/MemberCountCell'
 import { CompanyCell as CompanyCell_a3ad1a52c7c805d12e2b4c793adf9c6d } from '@/admin/components/companies/CompanyCell'
@@ -42,6 +43,7 @@ import { CollectionCards as CollectionCards_f9c02e79a4aed9a3924487c0cd4cafb1 } f
 
 /** @type import('payload').ImportMap */
 export const importMap = {
+  "@/admin/components/users/PrivacyAckCell#PrivacyAckCell": PrivacyAckCell_87f32a89e993851f00f0d5bd9ac879da,
   "@/admin/components/companies/ActiveCell#ActiveCell": ActiveCell_5b572f69f0b2c658d322ad3e65563a49,
   "@/admin/components/companies/MemberCountCell#MemberCountCell": MemberCountCell_0560bc1409d80e4fbd9f8971b0f4bccb,
   "@/admin/components/companies/CompanyCell#CompanyCell": CompanyCell_a3ad1a52c7c805d12e2b4c793adf9c6d,

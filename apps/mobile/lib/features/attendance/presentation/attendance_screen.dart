@@ -16,6 +16,9 @@ import '../../expense/data/draft_repository.dart';
 import '../../sync/application/sync_coordinator.dart';
 import '../../sync/domain/sync_models.dart';
 import '../../companies/presentation/company_chip.dart';
+import '../../privacy/application/privacy_providers.dart';
+import '../../privacy/domain/privacy.dart';
+import '../../privacy/presentation/privacy_notice_screen.dart';
 import '../application/attendance_service.dart';
 import '../domain/attendance.dart';
 import 'attendance_widgets.dart';
@@ -125,6 +128,11 @@ class _CheckTabState extends ConsumerState<_CheckTab> {
     final t = AppLocalizations.of(context);
     final sub = ref.read(currentSubProvider);
     if (sub == null) return;
+    // ADR 0018: no GPS, no camera, nothing queued before the privacy notice is acknowledged on the server.
+    if (ref.read(attendanceBlockedByPrivacyProvider)) {
+      showSnack(context, t.privacyAttendanceBlocked);
+      return;
+    }
     setState(() => _busy = true);
     try {
       final fix = await _locate(site);
@@ -137,6 +145,8 @@ class _CheckTabState extends ConsumerState<_CheckTab> {
           .record(sub: sub, kind: kind, site: site, fix: fix, rawSelfie: raw, online: online);
       ref.read(syncCoordinatorProvider.notifier).requestSync(delay: Duration.zero);
       if (mounted) showSnack(context, online ? t.attendanceSavedOnline : t.attendanceSavedOffline);
+    } on PrivacyNoticeRequiredException {
+      if (mounted) showSnack(context, t.privacyAttendanceBlocked);
     } on PhotoTooLargeException catch (e) {
       if (mounted) showSnack(context, e.message);
     } on QueueFullException catch (e) {
@@ -158,12 +168,15 @@ class _CheckTabState extends ConsumerState<_CheckTab> {
         final site = list.where((s) => s.key == _siteKey).firstOrNull ?? list.firstOrNull;
         // MC3: the flag of the location's PT.
         final enabled = ref.watch(attendanceEnabledForProvider(site?.companyId));
-        final ready = enabled && !_busy && site != null && site.hasGeofence;
+        // ADR 0018: blocked until the current privacy notice is acknowledged (selfie + GPS)
+        final privacyBlocked = ref.watch(attendanceBlockedByPrivacyProvider);
+        final ready = enabled && !privacyBlocked && !_busy && site != null && site.hasGeofence;
         final d = _distance;
         final dist = d != null && site != null && d.site.key == site.key ? d : null;
         return ListView(
           padding: const EdgeInsets.all(16),
           children: [
+            if (privacyBlocked) const PrivacyAttendanceBlock(from: 'attendance'),
             if (!enabled) InfoCard(text: t.attendanceDisabled, error: true),
             if (list.isEmpty)
               InfoCard(text: t.attendanceNoProjects, error: true)
@@ -211,7 +224,9 @@ class _CheckTabState extends ConsumerState<_CheckTab> {
               if (dist != null) DistanceCard(site: dist.site, distanceM: dist.distanceM, accuracyM: dist.accuracyM),
               OutlinedButton.icon(
                 key: const Key('attendance-check-distance'),
-                onPressed: !_busy && site != null && site.hasGeofence ? () => _checkDistance(site) : null,
+                onPressed: !_busy && !privacyBlocked && site != null && site.hasGeofence
+                    ? () => _checkDistance(site)
+                    : null,
                 icon: const Icon(Icons.my_location),
                 label: Text(t.attendanceCheckDistance),
               ),

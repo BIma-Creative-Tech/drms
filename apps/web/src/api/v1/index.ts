@@ -14,6 +14,7 @@ import { NOTIFICATION_ENDPOINTS } from './endpoints/notifications'
 import { meEndpoint } from './endpoints/me'
 import { meCompaniesEndpoint } from './endpoints/me-companies'
 import { openapiEndpoint } from './endpoints/openapi'
+import { privacyAckEndpoint, privacyNoticeEndpoint } from './endpoints/privacy'
 import { PROGRESS_ENDPOINTS } from './endpoints/progress'
 import { REPORT_ENDPOINTS } from './endpoints/reports'
 import { appConfigEndpoint } from './endpoints/app'
@@ -54,4 +55,7 @@ export const v1Endpoints: Endpoint[] = [
   ...PROGRESS_ENDPOINTS,
   // E5: budget addenda (T12, US-18/US-30) — web + APK approve
   ...ADDENDUM_ENDPOINTS,
+  // Q-46 / ASVS 8.3.3 (ADR 0018): employee privacy notice (public) + own acknowledgement
+  privacyNoticeEndpoint,
+  privacyAckEndpoint,
 ]

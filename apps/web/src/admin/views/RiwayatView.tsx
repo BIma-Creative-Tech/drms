@@ -31,6 +31,7 @@ const ACTION_LABELS: Record<string, string> = {
   acknowledge_delegated: 'Diketahui dilimpahkan',
   access_denied: 'aksi ditolak (hak akses)',
   approval_skipped: 'posisi dilewati (tidak berlaku — pemohon)',
+  privacy_ack: 'pemberitahuan privasi dibaca',
 }
 
 const DOC_LABELS: Record<string, string> = { expense_request: 'Pengajuan', receipt: 'Nota', transfer: 'Transfer', settlement: 'LPJ', cash_entry: 'Kas' }

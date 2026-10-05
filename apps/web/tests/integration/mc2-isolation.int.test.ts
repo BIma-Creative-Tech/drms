@@ -449,7 +449,7 @@ describe('MC2 — jobs loop per PT with that PT settings', () => {
     for (const c of all.companies.filter((x) => x.companyId !== A)) expect(c.status, `PT ${c.companyId}`).toBe('run')
   })
 
-  it('selfie retention: months per PT (C = 1 month, A = 12) — a C selfie is a C candidate only', async () => {
+  it('selfie retention: months per PT (C = 1 month, A = 6 = default since Q-33) — a C selfie is a C candidate only', async () => {
     const p = await getTestPayload()
     await p.update({ collection: 'companies', id: C, data: { selfieRetentionMonths: 1 } as never, overrideAccess: true /* SYSTEM-WRITE: fixture */ })
     const jpeg = await sharp({ create: { width: 64, height: 64, channels: 3, background: { r: 10, g: 20, b: 30 } } }).jpeg().toBuffer()
@@ -464,7 +464,7 @@ describe('MC2 — jobs loop per PT with that PT settings', () => {
     const byPt = new Map(plan.byCompany.map((b) => [b.companyId, b]))
     expect(byPt.get(C)!.months).toBe(1)
     expect(byPt.get(C)!.sampleIds).toContain(selfie.id)
-    expect(byPt.get(A)!.months).toBe(12)
+    expect(byPt.get(A)!.months).toBe(6)
     expect(byPt.get(A)!.sampleIds).not.toContain(selfie.id)
   })
 })

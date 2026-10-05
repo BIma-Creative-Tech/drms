@@ -1209,5 +1209,42 @@
         "type": "int"
       }
     }
-  }
+  },
+  "privacyTitle": "Pemberitahuan privasi",
+  "privacyIntro": "Baca bagaimana data Anda (termasuk selfie dan lokasi saat absen) dipakai dan disimpan.",
+  "privacyAcknowledge": "Saya mengerti",
+  "privacyLater": "Nanti",
+  "privacyLaterHint": "Absensi tetap terkunci sampai Anda menekan \"Saya mengerti\". Pemberitahuan ini muncul lagi saat aplikasi dibuka berikutnya.",
+  "privacySending": "Mengirim…",
+  "privacyAckDone": "Terima kasih. Pemberitahuan privasi sudah tercatat dibaca.",
+  "privacyAckOffline": "Belum terkirim: tidak ada koneksi. Dikirim ulang otomatis saat online — absensi tetap terkunci sampai terkirim.",
+  "privacyAckVersionChanged": "Pemberitahuan privasi sudah diperbarui. Bacalah versi terbaru lalu tekan \"Saya mengerti\" lagi.",
+  "privacyAckUnavailable": "Server belum mendukung pemberitahuan privasi. Tidak ada yang perlu dikonfirmasi.",
+  "privacyRetry": "Coba lagi",
+  "privacyContinue": "Lanjut",
+  "privacyClose": "Tutup",
+  "privacyNotAvailable": "Pemberitahuan privasi belum tersedia di server ini.",
+  "privacyNoticeOffline": "Pemberitahuan privasi belum tersimpan di HP ini. Sambungkan ke internet untuk membacanya.",
+  "privacyAcknowledgedOn": "Sudah Anda baca (versi {version}, {date}).",
+  "@privacyAcknowledgedOn": {
+    "placeholders": {
+      "version": {
+        "type": "int"
+      },
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "privacyNotAcknowledged": "Belum Anda baca — absensi terkunci.",
+  "privacyOutdated": "Ada versi baru (versi {version}) — baca dan tekan \"Saya mengerti\".",
+  "@privacyOutdated": {
+    "placeholders": {
+      "version": {
+        "type": "int"
+      }
+    }
+  },
+  "privacyAttendanceBlocked": "Absensi (selfie dan lokasi) belum bisa dipakai. Baca pemberitahuan privasi lalu tekan \"Saya mengerti\".",
+  "privacyRead": "Baca pemberitahuan privasi"
 }

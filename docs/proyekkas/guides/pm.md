@@ -47,6 +47,9 @@ kuning = perlu perhatian; merah = anggaran terpakai mendahului progress lebih da
 - **Mengabsenkan anggota tanpa HP (APK saja):** Tim → **Absenkan anggota tim** → pilih karyawan dan lokasi →
   isi **alasan** → foto karyawan dengan kamera **belakang**. Tercatat "Oleh PM". Anda tidak bisa mengabsenkan diri
   sendiri.
+- **Pemberitahuan privasi (APK 0.3.3+):** absen sendiri **dan** mengabsenkan anggota terkunci sampai **Anda** menekan
+  **Saya mengerti** pada pemberitahuan privasi (layar penuh setelah masuk, atau **Profil → Pemberitahuan privasi**).
+  Minta anggota tim tanpa HP membaca halaman **`/privasi`** (atau tunjukkan dari HP Anda) sebelum Anda mengabsenkannya.
 - **Koreksi jam:** APK Tim → ketuk jam **Masuk/Pulang** anggota, atau web **Absensi → Rekap bulanan → Koreksi jam
   masuk/pulang**. **Alasan wajib**; jam lama dan baru tercatat. Koreksi butuh internet.
 

@@ -1,13 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../app/providers.dart';
 import '../../../app/theme_mode.dart';
+import '../../../core/format/dates.dart';
 import '../../../l10n/gen/app_localizations.dart';
 import '../../../shared/icons/iconsax.dart';
 import '../../auth/application/auth_controller.dart';
 import '../../companies/application/company_selection.dart';
 import '../../companies/presentation/company_switcher.dart';
+import '../../privacy/domain/privacy.dart';
+import '../../privacy/presentation/privacy_notice_screen.dart';
 import '../../sync/application/sync_coordinator.dart';
 import '../../sync/data/outbox_repository.dart';
 
@@ -115,6 +119,15 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             subtitle: Text(device.deviceId.substring(0, 8)),
           ),
           if (!push.available) ListTile(leading: const Icon(Icons.notifications_off), title: Text(t.pushDisabled)),
+          // ADR 0018 (Q-46): re-read the employee privacy notice; status = the server's acknowledgement
+          ListTile(
+            key: const Key('profile-privacy'),
+            leading: const Icon(Icons.privacy_tip_outlined),
+            title: Text(t.privacyTitle),
+            subtitle: Text(_privacySubtitle(t, account?.privacy, account?.timezone)),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => context.push('$privacyRoute?from=profile'),
+          ),
           const Divider(),
           const _AppearanceSetting(),
           const Divider(),
@@ -134,6 +147,15 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     );
   }
 }
+
+String _privacySubtitle(AppLocalizations t, PrivacyStatus? s, String? zone) => switch (privacyGateOf(s)) {
+  PrivacyGate.notAvailable => t.privacyIntro,
+  PrivacyGate.acknowledged => t.privacyAcknowledgedOn(
+    s!.ackVersion ?? s.currentVersion,
+    formatServerDateTime(s.ackAt, zone: zone),
+  ),
+  PrivacyGate.required => s!.ackVersion == null ? t.privacyNotAcknowledged : t.privacyOutdated(s.currentVersion),
+};
 
 /// Profil → Tampilan: follow the phone (default), light or dark (ADR 0015). Stored on this phone only.
 class _AppearanceSetting extends ConsumerWidget {

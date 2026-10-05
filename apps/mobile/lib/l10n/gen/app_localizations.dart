@@ -3444,6 +3444,126 @@ abstract class AppLocalizations {
   /// In id, this message translates to:
   /// **'{count} LPJ'**
   String lpjQueueCount(int count);
+
+  /// No description provided for @privacyTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Pemberitahuan privasi'**
+  String get privacyTitle;
+
+  /// No description provided for @privacyIntro.
+  ///
+  /// In id, this message translates to:
+  /// **'Baca bagaimana data Anda (termasuk selfie dan lokasi saat absen) dipakai dan disimpan.'**
+  String get privacyIntro;
+
+  /// No description provided for @privacyAcknowledge.
+  ///
+  /// In id, this message translates to:
+  /// **'Saya mengerti'**
+  String get privacyAcknowledge;
+
+  /// No description provided for @privacyLater.
+  ///
+  /// In id, this message translates to:
+  /// **'Nanti'**
+  String get privacyLater;
+
+  /// No description provided for @privacyLaterHint.
+  ///
+  /// In id, this message translates to:
+  /// **'Absensi tetap terkunci sampai Anda menekan \"Saya mengerti\". Pemberitahuan ini muncul lagi saat aplikasi dibuka berikutnya.'**
+  String get privacyLaterHint;
+
+  /// No description provided for @privacySending.
+  ///
+  /// In id, this message translates to:
+  /// **'Mengirim…'**
+  String get privacySending;
+
+  /// No description provided for @privacyAckDone.
+  ///
+  /// In id, this message translates to:
+  /// **'Terima kasih. Pemberitahuan privasi sudah tercatat dibaca.'**
+  String get privacyAckDone;
+
+  /// No description provided for @privacyAckOffline.
+  ///
+  /// In id, this message translates to:
+  /// **'Belum terkirim: tidak ada koneksi. Dikirim ulang otomatis saat online — absensi tetap terkunci sampai terkirim.'**
+  String get privacyAckOffline;
+
+  /// No description provided for @privacyAckVersionChanged.
+  ///
+  /// In id, this message translates to:
+  /// **'Pemberitahuan privasi sudah diperbarui. Bacalah versi terbaru lalu tekan \"Saya mengerti\" lagi.'**
+  String get privacyAckVersionChanged;
+
+  /// No description provided for @privacyAckUnavailable.
+  ///
+  /// In id, this message translates to:
+  /// **'Server belum mendukung pemberitahuan privasi. Tidak ada yang perlu dikonfirmasi.'**
+  String get privacyAckUnavailable;
+
+  /// No description provided for @privacyRetry.
+  ///
+  /// In id, this message translates to:
+  /// **'Coba lagi'**
+  String get privacyRetry;
+
+  /// No description provided for @privacyContinue.
+  ///
+  /// In id, this message translates to:
+  /// **'Lanjut'**
+  String get privacyContinue;
+
+  /// No description provided for @privacyClose.
+  ///
+  /// In id, this message translates to:
+  /// **'Tutup'**
+  String get privacyClose;
+
+  /// No description provided for @privacyNotAvailable.
+  ///
+  /// In id, this message translates to:
+  /// **'Pemberitahuan privasi belum tersedia di server ini.'**
+  String get privacyNotAvailable;
+
+  /// No description provided for @privacyNoticeOffline.
+  ///
+  /// In id, this message translates to:
+  /// **'Pemberitahuan privasi belum tersimpan di HP ini. Sambungkan ke internet untuk membacanya.'**
+  String get privacyNoticeOffline;
+
+  /// No description provided for @privacyAcknowledgedOn.
+  ///
+  /// In id, this message translates to:
+  /// **'Sudah Anda baca (versi {version}, {date}).'**
+  String privacyAcknowledgedOn(int version, String date);
+
+  /// No description provided for @privacyNotAcknowledged.
+  ///
+  /// In id, this message translates to:
+  /// **'Belum Anda baca — absensi terkunci.'**
+  String get privacyNotAcknowledged;
+
+  /// No description provided for @privacyOutdated.
+  ///
+  /// In id, this message translates to:
+  /// **'Ada versi baru (versi {version}) — baca dan tekan \"Saya mengerti\".'**
+  String privacyOutdated(int version);
+
+  /// No description provided for @privacyAttendanceBlocked.
+  ///
+  /// In id, this message translates to:
+  /// **'Absensi (selfie dan lokasi) belum bisa dipakai. Baca pemberitahuan privasi lalu tekan \"Saya mengerti\".'**
+  String get privacyAttendanceBlocked;
+
+  /// No description provided for @privacyRead.
+  ///
+  /// In id, this message translates to:
+  /// **'Baca pemberitahuan privasi'**
+  String get privacyRead;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

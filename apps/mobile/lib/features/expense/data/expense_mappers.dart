@@ -1,4 +1,5 @@
 import '../../auth/domain/user_profile.dart';
+import '../../privacy/domain/privacy.dart';
 import '../domain/draft.dart';
 import '../domain/expense_request.dart';
 import '../domain/request_status.dart';
@@ -62,6 +63,8 @@ UserProfile userProfileFromJson(Json j) {
       for (final c in _list(j['companies']))
         if (_map(c) case final m? when _intN(m['id']) != null) companyMembershipFromJson(m),
     ],
+    // ADR 0018: absent on servers before the privacy notice (→ null = nothing is blocked)
+    privacy: PrivacyStatus.fromJson(j['privacy']),
   );
 }
 

@@ -16,7 +16,8 @@
     "test:coverage": "npm run test:coverage -w apps/web",
     "test:int": "npm run test:int -w apps/web",
     "build": "npm run build -w apps/web",
-    "check:openapi": "npm run check:openapi -w apps/web"
+    "check:openapi": "npm run check:openapi -w apps/web",
+    "check:privacy-notice": "npm run check:privacy-notice -w apps/web"
   },
   "overrides": {
     "nodemailer": "10.0.10",

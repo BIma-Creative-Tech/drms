@@ -17,6 +17,8 @@ import '../../auth/application/auth_controller.dart';
 import '../../expense/data/draft_repository.dart';
 import '../../expense/presentation/camera_capture_screen.dart';
 import '../../masters/domain/master_item.dart';
+import '../../privacy/application/privacy_providers.dart';
+import '../../privacy/domain/privacy.dart';
 import '../../sync/data/outbox_repository.dart';
 import '../../sync/domain/sync_models.dart';
 import '../domain/attendance.dart';
@@ -24,11 +26,25 @@ import '../domain/attendance.dart';
 /// Queues own check-in/out: selfie compressed on the device (720 px, ≤ 150 KB, EXIF dropped) and kept
 /// encrypted in the local DB, then one outbox item (works without signal; ADR 0010 decisions 5/7).
 class AttendanceService {
-  AttendanceService({required this.drafts, required this.outbox, required this.clock, required this.compressor});
+  AttendanceService({
+    required this.drafts,
+    required this.outbox,
+    required this.clock,
+    required this.compressor,
+    this.privacyBlocked,
+  });
   final DraftRepository drafts;
   final OutboxRepository outbox;
   final DeviceClock clock;
   final PhotoCompressor compressor;
+
+  /// ADR 0018: true while the current privacy notice is not acknowledged on the server → nothing is recorded
+  /// ([PrivacyNoticeRequiredException]); the screens already disable the buttons and never open the camera.
+  final bool Function()? privacyBlocked;
+
+  void _checkPrivacy() {
+    if (privacyBlocked?.call() ?? false) throw const PrivacyNoticeRequiredException();
+  }
 
   Future<String> record({
     required String sub,
@@ -38,6 +54,7 @@ class AttendanceService {
     required Uint8List rawSelfie,
     required bool online,
   }) async {
+    _checkPrivacy();
     final photo = await compressor.compress(rawSelfie, PhotoTarget.selfie);
     final selfieUuid = const Uuid().v7();
     await drafts.addMedia(sub, uuid: selfieUuid, kind: 'selfie', bytes: photo.bytes, sha256: photo.sha256Hex);
@@ -69,6 +86,7 @@ class AttendanceService {
     required String reason,
     required bool online,
   }) async {
+    _checkPrivacy();
     final photo = await compressor.compress(rawPhoto, PhotoTarget.selfie);
     final photoUuid = const Uuid().v7();
     await drafts.addMedia(sub, uuid: photoUuid, kind: 'selfie', bytes: photo.bytes, sha256: photo.sha256Hex);
@@ -100,6 +118,7 @@ final attendanceServiceProvider = Provider(
     outbox: ref.watch(outboxRepositoryProvider),
     clock: ref.watch(deviceClockProvider),
     compressor: ref.watch(photoCompressorProvider),
+    privacyBlocked: () => ref.read(attendanceBlockedByPrivacyProvider),
   ),
 );
 

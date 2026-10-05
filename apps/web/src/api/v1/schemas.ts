@@ -1,5 +1,7 @@
 import { z } from 'zod'
 
+import { PrivacyStatus } from './schemas-privacy'
+
 /**
  * /api/v1 contract (zod → OpenAPI 3.1 via @asteasolutions/zod-to-openapi, architecture §6.4).
  * Schema names come from zod `.meta({ id })` (supported since zod-to-openapi v8 / zod 4, README).
@@ -105,6 +107,7 @@ export const Me = z
     appSettings: z
       .object({ minAppVersion: z.string().nullable(), latestAppVersion: z.string().nullable(), offlineMaxAgeDays: z.number().int(), imageTargets: ImageTargets })
       .meta({ description: 'MC3: app-wide settings (one APK for all PTs).' }),
+    privacy: PrivacyStatus,
     serverTime: z.string(),
   })
   .meta({ id: 'Me' })

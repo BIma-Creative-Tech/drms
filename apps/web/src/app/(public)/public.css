@@ -162,3 +162,27 @@
   .pk-pub__main { padding-top: 3rem; }
   .pk-pub__card { padding: 1.5rem; }
 }
+
+/* /privasi (employee privacy notice, rendered from the markdown AST by src/legal/PrivacyNoticeBody.tsx) */
+.pk-pub__main--wide { max-width: 48rem; }
+.pk-pub__footer { margin: 1.5rem 0 0; text-align: center; font-size: 0.9375rem; }
+.pk-pub__footer a,
+.pk-pub .pk-privacy a { color: var(--primary); }
+.pk-pub .pk-privacy h2,
+.pk-pub .pk-privacy h3 {
+  margin: 1.5rem 0 0.5rem;
+  font-family: var(--font-brand-heading), system-ui, sans-serif;
+  font-size: 1.125rem;
+}
+.pk-pub .pk-privacy > :first-child { margin-top: 0; }
+.pk-pub .pk-privacy p,
+.pk-pub .pk-privacy ul,
+.pk-pub .pk-privacy ol { margin: 0 0 0.75rem; }
+.pk-pub .pk-privacy ul,
+.pk-pub .pk-privacy ol { padding-left: 1.25rem; }
+.pk-pub .pk-privacy li { margin-bottom: 0.375rem; }
+.pk-pub .pk-privacy__table { overflow-x: auto; margin: 0 0 0.75rem; }
+.pk-pub .pk-privacy table { width: 100%; border-collapse: collapse; font-size: 0.9375rem; }
+.pk-pub .pk-privacy th,
+.pk-pub .pk-privacy td { padding: 0.5rem; border: 1px solid var(--border); text-align: left; vertical-align: top; }
+.pk-pub .pk-privacy th { background: var(--muted); }

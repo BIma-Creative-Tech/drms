@@ -35,12 +35,14 @@ laporan `docs/proyekkas/qa/s3-e9-qa-report.md`. Baris yang dulu bertanda "verifi
 
 | Status | Jumlah persyaratan L1 |
 |---|---|
-| Terpenuhi | 82 |
+| Terpenuhi | 83 |
 | Sebagian | 23 |
-| Celah | 9 |
+| Celah | 8 |
 | N/A | 13 |
 | **Total nomor L1 dinilai** | **127** |
 | Terpenuhi (E9) — kontrol tambahan, lihat §3 | 4 (tidak menambah total; memperkuat nomor yang sudah dihitung) |
+
+Pembaruan 2026-10-05: 8.3.3 Celah → Terpenuhi (pemberitahuan privasi, ADR 0018).
 
 Catatan hitung: baris yang mengelompokkan beberapa nomor ASVS dihitung per nomor. V1 tidak punya persyaratan L1 di
 ASVS 4.0.3 (semua L2/L3) sehingga tidak dihitung. Celah **HIGH/CRITICAL: tidak ada** berdasarkan pembacaan kode; celah
@@ -193,7 +195,7 @@ Catatan L2: event `login_failed` bersumber dari log event Keycloak (keputusan E9
 | 8.2.3 | Data klien dibersihkan setelah sesi berakhir | Sebagian | Cookie dihapus saat logout (`Max-Age=0`) | Tanpa `Clear-Site-Data`; pembersihan data APK saat logout tidak dinilai di dokumen ini. |
 | 8.3.1 | Data sensitif di body/header, bukan query string | Terpenuhi | Token di header; body JSON | `sig` URL media (E9) bukan data sensitif. |
 | 8.3.2 | User dapat mengekspor/menghapus datanya | Celah | — | Sistem internal dengan kewajiban retensi keuangan; butuh keputusan user (UU PDP) apa yang berlaku. |
-| 8.3.3 | Bahasa jelas tentang pengumpulan data pribadi | Celah | — | Selfie, GPS absensi, rekening karyawan dikumpulkan; belum ada pemberitahuan privasi di web/APK. |
+| 8.3.3 | Bahasa jelas tentang pengumpulan data pribadi | Terpenuhi (2026-10-05) | Pemberitahuan privasi karyawan `docs/proyekkas/legal/pemberitahuan-privasi.md` (satu sumber, di-bundle saat build: `apps/web/scripts/gen-privacy-notice.mjs`, drift dicek CI); halaman publik `/privasi` (ditautkan dari login web dan `/unduh`); `GET /api/v1/privacy-notice`; interstitial wajib di admin + layar penuh APK 0.3.3 (absensi terkunci sampai "Saya mengerti"); persetujuan per versi tersimpan di `users.privacyAckVersion/privacyAckAt` + audit `privacy_ack` (ADR 0018; `unit/privacy-notice.test.ts`, `int/privacy-notice.int.test.ts`) | Pengumpulan selfie + lokasi disetujui owner 2026-10-05 (Q-46); retensi selfie 6 bulan (Q-33). Teks masih **draf v1**: kata final + kontak PIC menunggu HR/legal DRMS (perubahan teks = naikkan "Versi" bila semua harus membaca ulang). |
 | 8.3.4 | Data sensitif teridentifikasi + kebijakan | Sebagian | ADR 0006 (kelas audit A), `view_sensitive` untuk bukti transfer (`mediaFileEndpoint`), retensi selfie (`retention_purge`, Q-33) | Belum ada inventaris data pribadi formal. |
 
 ### V9 — Komunikasi
@@ -291,7 +293,7 @@ Catatan L2: event `login_failed` bersumber dari log event Keycloak (keputusan E9
 | G-03 | Aturan komposisi password (menyimpang ASVS) | 2.1.9 | user + infra | Rendah | Terima sebagai deviasi (kebijakan platform) dan catat di ADR 0003, atau ubah policy. |
 | G-04 | Tidak ada notifikasi perubahan kredensial/faktor; onboarding password sementara di luar sistem | 2.2.3, 2.5.5, 2.3.1 | infra | Sedang | SMTP realm + `execute-actions-email` (E10). |
 | G-05 | Tidak ada pemindaian antivirus upload (PDF disimpan apa adanya) | 12.4.2 | nextjs + infra | Sedang | ClamAV (sidecar) untuk PDF, atau terima risiko tercatat di ADR 0004. |
-| G-06 | Hak subjek data & pemberitahuan privasi (selfie, GPS, rekening) | 8.3.2, 8.3.3, 8.3.4 | user | Sedang | Keputusan UU PDP; teks pemberitahuan di layar login web/APK; inventaris data pribadi. |
+| G-06 | Hak subjek data & pemberitahuan privasi (selfie, GPS, rekening) | 8.3.2, 8.3.3, 8.3.4 | user | Sedang | **8.3.3 ditutup 2026-10-05** (ADR 0018: pemberitahuan privasi di `/privasi`, web dan APK, persetujuan per versi + audit; owner menyetujui pengumpulan selfie + lokasi, retensi selfie 6 bulan). Sisa: teks final dari HR/legal DRMS; 8.3.2 (ekspor/hapus data atas permintaan — saat ini lewat kontak di pemberitahuan, proses manual) dan 8.3.4 (inventaris data pribadi formal). |
 | G-07 | TLS cipher/versi & HSTS tidak terbukti di repo | 9.1.2, 9.1.3, 14.4.5 | qa + infra | Sedang | `testssl.sh` + ZAP pada host prod; catat nilai HSTS di architecture §3.3. **E9 QA (staging):** TLS 1.2/1.3 saja, tetapi suite CBC/non-PFS diterima (M-2); HSTS 7 hari tanpa `includeSubDomains` (M-1) → infra: `tls.options` + `stsSeconds` ≥ 180 hari untuk prod. |
 | G-08 | Anti-cache REST generik | 8.2.1 | nextjs | Rendah | **E9 QA:** HTML admin sudah `no-store`; REST generik `/api/<slug>` tanpa `Cache-Control` (M-3) → tambah `Cache-Control: no-store` untuk `/api/:path*` di `next.config.ts`. |
 | G-09 | Pembaruan dependensi tidak otomatis; HIGH Trivy tidak menggagalkan | 14.2.1 | nextjs | Sedang | Renovate/Dependabot; `trivy --severity HIGH,CRITICAL` (dengan `.trivyignore` terdokumentasi). |

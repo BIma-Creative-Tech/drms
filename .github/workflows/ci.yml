@@ -51,6 +51,9 @@ jobs:
       - run: npm run test:coverage
       - name: OpenAPI contract up to date (packages/api-contract/openapi.json)
         run: npm run check:openapi
+      # ADR 0018: the app bundles docs/proyekkas/legal/pemberitahuan-privasi.md (docs/ is not in the image context)
+      - name: Privacy notice bundle up to date (src/legal/privacy-notice.generated.ts)
+        run: npm run check:privacy-notice
       - name: npm audit (high+)
         run: npm audit --omit=dev --audit-level=high
 

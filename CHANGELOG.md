@@ -6,6 +6,49 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Employee privacy notice (Q-46, ASVS 8.3.3 / G-06, ADR 0018) + selfie retention 6 months (Q-33) — web + APK 0.3.3
+
+Owner decisions 2026-10-05: collecting selfie + location at attendance is approved and employees must be shown the
+notice (Q-46); attendance selfies are kept 6 months (Q-33). The notice text is draft v1
+(`docs/proyekkas/legal/pemberitahuan-privasi.md`, wording + contact still awaiting DRMS HR/legal) and is the single
+source: nothing else carries its wording.
+
+**Database migrations** (run by `migrate`; additive — APK 0.3.2 and the previous web image keep working):
+`20261005_090000_privacy_notice` (schema, snapshot `.json`: `users.privacy_ack_version` / `privacy_ack_at` + CHECK
+`users_privacy_ack_pair` + trigger `users_privacy_ack_guard` (no withdraw / lower / re-date), audit action
+`privacy_ack`, `companies.selfie_retention_months` DEFAULT 6, Users list column added to saved list preferences),
+`20261005_090100_selfie_retention_6m` (data only: PTs still at the untouched old default 12 → 6, one `update` audit
+row per PT, idempotent; values an Admin/Direktur set deliberately — audit trail — are kept; the delete switch is not
+touched).
+
+#### Added
+- Web/API: the notice is bundled at build time (`scripts/gen-privacy-notice.mjs` → `src/legal/privacy-notice.generated.ts`,
+  `npm run gen:privacy-notice`; CI step `check:privacy-notice` fails on drift) and rendered by a minimal safe markdown
+  renderer (`src/legal/markdown.ts`: escaped text, attribute-less tags only; React renders the AST, no
+  `dangerouslySetInnerHTML`; no new dependency). Version = the integer of the "Versi" line (`PRIVACY_NOTICE_VERSION`).
+- Public page `/privasi` (noindex like `/unduh`), linked from the web login page and `/unduh`.
+- `GET /api/v1/privacy-notice` (public): `{ version, title, html, markdown }`; `GET /api/v1/me` → `privacy:
+  { currentVersion, ackVersion, ackAt }`; `POST /api/v1/me/privacy-ack { version }` (own account, Idempotency-Key
+  required from the APK, 409 `PRIVACY_VERSION_MISMATCH` unless `version` = current, audited `privacy_ack`, re-ack =
+  `alreadyAcknowledged` without a new row). OpenAPI regenerated; route table: `GET /privacy-notice` public,
+  `POST /me/privacy-ack` own.
+- Admin: non-dismissable interstitial over every admin page until the current version is acknowledged ("Saya
+  mengerti"); Users list column "Privasi dibaca (versi/tanggal)"; fields read-only in the user form.
+- APK 0.3.3 (pubspec `0.3.3+1`, release notes `docs/release-notes/apk/0.3.3.md`): full-screen notice after login / at
+  every start while not acknowledged ("Saya mengerti" / "Nanti" = this app run only), rendered from the API markdown
+  and cached in the encrypted DB for offline reading; attendance (own check-in/out, on-behalf, selfie capture,
+  distance check) blocked with an Indonesian message until the server has the acknowledgement; offline the
+  acknowledgement is retried with the same Idempotency-Key when the server is reachable again (never assumed
+  locally); Profile → "Pemberitahuan privasi". A server without the feature (no `privacy` in `/me`, 404) blocks
+  nothing.
+
+#### Changed
+- `companies.selfieRetentionMonths` default 12 → **6** (field description names Q-33 / owner decision 2026-10-05); the
+  retention job fallback follows (`SELFIE_RETENTION_DEFAULT_MONTHS`). A unit test keeps the notice §4 and the default
+  equal. `selfieRetentionDeleteEnabled` stays off by default (owner switch).
+- Docs: Q-33 / Q-46 answered (`open-questions-client.md`), ASVS 8.3.3 Celah → Terpenuhi, G-06 narrowed to 8.3.2 /
+  8.3.4 + final wording, guides (README, staff, PM, admin), ADR 0018.
+
 ### APK mobile-v0.3.2 (tag `mobile-v0.3.2`, pubspec `0.3.2+1`)
 
 Republish of 0.3.1 with identical app code: the `mobile-v0.3.1` `release-prod` job stopped at `upload-artifact`

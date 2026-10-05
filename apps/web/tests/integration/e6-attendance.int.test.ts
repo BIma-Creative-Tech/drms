@@ -432,10 +432,10 @@ describe('selfie viewer (Q-33) and retention (dry run)', () => {
     expect(views.map((v) => v.user_id).sort()).toEqual([String(w.users.pm.id), String(w.users.finance.id)].sort())
   })
 
-  it('retention plan: nothing before 12 months; with a clock 13 months ahead every selfie except face reference photos', async () => {
+  it('retention plan (default 6 months, Q-33 2026-10-05): nothing yet; with a clock 13 months ahead every selfie except face reference photos', async () => {
     const p = await getTestPayload()
     const now = await selfieRetentionPlan(p)
-    expect(now).toMatchObject({ months: 12, candidates: 0 })
+    expect(now).toMatchObject({ months: 6, candidates: 0 })
     const face = (await sqlAs('app', 'SELECT id FROM media_selfies ORDER BY id LIMIT 1')).rows[0].id
     await p.update({ collection: 'employees', id: w.emp.admin, data: { faceRefPhoto: face }, overrideAccess: true /* SYSTEM-WRITE: fixture */ })
     // removed_at: s2b-attendance-web-reminders may have purged selfies first (file order is not fixed)
@@ -447,7 +447,7 @@ describe('selfie viewer (Q-33) and retention (dry run)', () => {
     try {
       expect((await selfieRetentionPlan(p, new Date(Date.now() + 40 * 86_400_000))).months).toBe(1)
     } finally {
-      await updateCompany({ selfieRetentionMonths: 12 })
+      await updateCompany({ selfieRetentionMonths: 6 })
     }
     expect((await sqlError('app', 'UPDATE companies SET selfie_retention_months = 0'))?.code).toBe('23514')
   })

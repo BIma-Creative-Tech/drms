@@ -1870,4 +1870,74 @@ class AppLocalizationsId extends AppLocalizations {
   String lpjQueueCount(int count) {
     return '$count LPJ';
   }
+
+  @override
+  String get privacyTitle => 'Pemberitahuan privasi';
+
+  @override
+  String get privacyIntro => 'Baca bagaimana data Anda (termasuk selfie dan lokasi saat absen) dipakai dan disimpan.';
+
+  @override
+  String get privacyAcknowledge => 'Saya mengerti';
+
+  @override
+  String get privacyLater => 'Nanti';
+
+  @override
+  String get privacyLaterHint =>
+      'Absensi tetap terkunci sampai Anda menekan \"Saya mengerti\". Pemberitahuan ini muncul lagi saat aplikasi dibuka berikutnya.';
+
+  @override
+  String get privacySending => 'Mengirim…';
+
+  @override
+  String get privacyAckDone => 'Terima kasih. Pemberitahuan privasi sudah tercatat dibaca.';
+
+  @override
+  String get privacyAckOffline =>
+      'Belum terkirim: tidak ada koneksi. Dikirim ulang otomatis saat online — absensi tetap terkunci sampai terkirim.';
+
+  @override
+  String get privacyAckVersionChanged =>
+      'Pemberitahuan privasi sudah diperbarui. Bacalah versi terbaru lalu tekan \"Saya mengerti\" lagi.';
+
+  @override
+  String get privacyAckUnavailable =>
+      'Server belum mendukung pemberitahuan privasi. Tidak ada yang perlu dikonfirmasi.';
+
+  @override
+  String get privacyRetry => 'Coba lagi';
+
+  @override
+  String get privacyContinue => 'Lanjut';
+
+  @override
+  String get privacyClose => 'Tutup';
+
+  @override
+  String get privacyNotAvailable => 'Pemberitahuan privasi belum tersedia di server ini.';
+
+  @override
+  String get privacyNoticeOffline =>
+      'Pemberitahuan privasi belum tersimpan di HP ini. Sambungkan ke internet untuk membacanya.';
+
+  @override
+  String privacyAcknowledgedOn(int version, String date) {
+    return 'Sudah Anda baca (versi $version, $date).';
+  }
+
+  @override
+  String get privacyNotAcknowledged => 'Belum Anda baca — absensi terkunci.';
+
+  @override
+  String privacyOutdated(int version) {
+    return 'Ada versi baru (versi $version) — baca dan tekan \"Saya mengerti\".';
+  }
+
+  @override
+  String get privacyAttendanceBlocked =>
+      'Absensi (selfie dan lokasi) belum bisa dipakai. Baca pemberitahuan privasi lalu tekan \"Saya mengerti\".';
+
+  @override
+  String get privacyRead => 'Baca pemberitahuan privasi';
 }
