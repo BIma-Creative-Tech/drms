@@ -90,6 +90,11 @@ Urutan: **Karyawan** → **Pengguna** → **akses PT** (peran + karyawan per PT)
   **Audit Log** (aksi `privacy_ack`). Teks pemberitahuan ada di halaman publik **`/privasi`**; isinya diubah tim teknis
   dari dokumen HR/legal (bukan dari panel). Pengguna yang belum membaca: absensi APK terkunci; di web tampil
   pemberitahuan yang harus dikonfirmasi sebelum memakai panel.
+- **Penegakan di server:** naikkan **Versi APK minimum** ke **0.3.3** → absensi tanpa persetujuan ditolak (absen
+  masuk/pulang, unggah selfie, dan absen oleh PM — yang dicek PM-nya), kode `PRIVACY_ACK_REQUIRED`, tercatat di
+  **Audit Log** sebagai `access_denied`. Di bawah 0.3.3 atau kosong: tidak ada penolakan (APK 0.3.2 tetap jalan). Naikkan
+  baru setelah semua HP memakai APK 0.3.3 — HP versi lama juga terkunci oleh versi minimum. Koreksi absensi oleh
+  PM/Admin tidak terpengaruh.
 
 ## 2. Perangkat (HP hilang)
 
@@ -177,7 +182,7 @@ Hal penting per PT yang harus Anda atur sebelum go-live:
 
 | Setting | Nilai |
 |---|---|
-| **Versi APK minimum / terbaru, URL unduh APK** | Isi saat rilis APK baru (minimum yang terlalu tinggi mengunci semua HP) |
+| **Versi APK minimum / terbaru, URL unduh APK** | Isi saat rilis APK baru (minimum yang terlalu tinggi mengunci semua HP). Minimum **≥ 0.3.3** = absensi tanpa persetujuan pemberitahuan privasi ditolak server (§1) |
 | **Target resize foto di perangkat → Nota** | 1600 px (spesifikasi §9) |
 | **Nama grup (kop laporan konsolidasi)**, **Logo grup**, **Kop PDF grup** | Kop laporan/ekspor yang memuat lebih dari satu PT |
 | Maks. selfie dihapus per malam, Umur maksimal sesi offline APK (hari) | Biarkan default kecuali diminta tim teknis |

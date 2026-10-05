@@ -50,6 +50,30 @@
 - **Final HR/legal wording is published as version 2**: everybody (including those who acknowledged v1) is asked
   again. Version 1 = this text, approved by the owner, effective 5 Oct 2026; contact PIC: Rivaldo AK.
 
+## Implementation note — server-side enforcement (owner decision 2026-10-05)
+
+- **Switch = the app-wide setting "Versi APK minimum"** (`company-settings.minAppVersion`, the same value as the 426
+  gate, 60 s process cache in `src/lib/app-min-version.ts`). Enforcement is ON when it parses as strict `x.y.z` and is
+  ≥ `0.3.3` (numeric per part: `0.3.10` > `0.3.3`); unset, empty or unreadable (`0.3`, `0.3.3-beta`, garbage) = OFF.
+  No separate flag: raising the minimum to 0.3.3 already locks out every APK without the notice screen.
+- **Refused while ON and `privacyAckVersion` < current version** (`src/legal/privacy-enforcement.ts`, a fresh DB read
+  of the acting user):
+  - `POST /api/v1/sync/batch` items `attendance.check_in` / `check_out` / `on_behalf` → `rejected` with
+    `PRIVACY_ACK_REQUIRED` (stored in `sync_receipts` like every rejection: final, a replay answers `duplicate`). For
+    `on_behalf` the **acting PM** must have acknowledged; the employee's own account is not checked (may have none).
+  - Selfie capture: `POST /api/v1/media/selfies` → 403 problem `code: PRIVACY_ACK_REQUIRED` (before the image is
+    queued/stored), and the generic Payload REST create of `media-selfies` (collection `createGuard`) → 403.
+  - Each refusal writes one `access_denied` audit row in its own transaction: reason `PRIVACY_ACK_REQUIRED`,
+    `new_value {currentVersion, ackVersion, minAppVersion}`, doc type `attendance` (field = item type, PT = item PT)
+    or `media_selfies` (field `upload`, app-wide).
+- **Not affected:** reads, `/me`, the acknowledgement endpoint itself, other sync item types, web admin, and T10
+  corrections by PM/Admin (no selfie/location capture).
+- **APK 0.3.3** blocks attendance locally first, so the code only arrives when the phone's cached `/me` is stale (e.g.
+  a new notice version). It maps it to a fixed Indonesian text (`privacyAckRequiredMessage`), never retries the item
+  (selfie 403 = final rejection too) and reloads `/me`, which brings the notice screen back.
+- Tests: `tests/unit/privacy-enforcement.test.ts`, `tests/integration/privacy-enforcement.int.test.ts`,
+  `apps/mobile/test/unit/privacy_enforcement_test.dart`.
+
 ## Consequences
 
 - Changing the text = edit the markdown, `npm run gen:privacy-notice`, commit both, release the web; bump "Versi"
