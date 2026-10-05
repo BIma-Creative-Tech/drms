@@ -24,6 +24,8 @@ import '../features/expense/presentation/requests_screen.dart';
 import '../features/home/presentation/home_screen.dart';
 import '../features/home/presentation/home_shell.dart';
 import '../features/notifications/presentation/notifications_screen.dart';
+import '../features/privacy/application/privacy_providers.dart';
+import '../features/privacy/presentation/privacy_notice_screen.dart';
 import '../features/progress/presentation/progress_conflict_screen.dart';
 import '../features/progress/presentation/progress_detail_screen.dart';
 import '../features/progress/presentation/progress_editor_screen.dart';
@@ -36,12 +38,21 @@ import 'route_error_screen.dart';
 /// `/app/config` is NOT awaited: it loads in the background and the update gate redirects whenever it
 /// resolves (the server enforces the minimum version with 426 anyway), so a slow network never holds
 /// the splash screen.
-String? redirectFor({required String location, required AuthState auth, required VersionGate gate}) {
+/// ADR 0018: [privacyPrompt] (current privacy notice not acknowledged, not postponed in this app run) shows the
+/// full-screen notice instead of the home screen — after login, at a (cached) start, and when a background `/me`
+/// reveals a new notice version while the home screen is open. Other screens stay reachable.
+String? redirectFor({
+  required String location,
+  required AuthState auth,
+  required VersionGate gate,
+  bool privacyPrompt = false,
+}) {
   if (gate == VersionGate.updateRequired) return location == '/update' ? null : '/update';
   if (location == '/update') return '/splash';
   if (auth is AuthStarting) return location == '/splash' ? null : '/splash';
   if (auth is AuthSignedOut) return location == '/login' ? null : '/login';
-  if (location == '/login' || location == '/splash') return '/home';
+  if (location == '/login' || location == '/splash') return privacyPrompt ? privacyRoute : '/home';
+  if (privacyPrompt && location == '/home') return privacyRoute;
   return null;
 }
 
@@ -50,6 +61,7 @@ final routerProvider = Provider<GoRouter>((ref) {
   ref.listen(authControllerProvider, (_, _) => refresh.value++);
   ref.listen(versionGateProvider, (_, _) => refresh.value++);
   ref.listen(appConfigProvider, (_, _) => refresh.value++); // also starts the background fetch
+  ref.listen(privacyPromptProvider, (_, _) => refresh.value++);
   ref.onDispose(refresh.dispose);
 
   final router = GoRouter(
@@ -59,6 +71,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       location: state.matchedLocation,
       auth: ref.read(authControllerProvider),
       gate: ref.read(versionGateProvider),
+      privacyPrompt: ref.read(privacyPromptProvider),
     ),
     // Unknown location (e.g. an unexpected deep link or notification target) → a visible Indonesian
     // error with a way home instead of go_router's default English page (WIP fix/mobile-login-redirect).
@@ -67,6 +80,11 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/splash', builder: (_, _) => const SplashScreen()),
       GoRoute(path: '/login', builder: (_, _) => const LoginScreen()),
       GoRoute(path: '/update', builder: (_, _) => const UpdateRequiredScreen()),
+      // ADR 0018: privacy notice — start-up prompt (no `from`) or opened from profile / attendance (`?from=…`)
+      GoRoute(
+        path: privacyRoute,
+        builder: (_, s) => PrivacyNoticeScreen(pushed: s.uri.queryParameters['from'] != null),
+      ),
       StatefulShellRoute.indexedStack(
         builder: (_, _, shell) => HomeShell(shell: shell),
         branches: [

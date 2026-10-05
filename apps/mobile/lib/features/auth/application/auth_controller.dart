@@ -273,6 +273,33 @@ class AuthController extends Notifier<AuthState> {
     }
   }
 
+  /// ADR 0018: the SERVER confirmed the privacy-notice acknowledgement (`POST /me/privacy-ack` answer) — applied to
+  /// the signed-in profile and to the cached `/me` (next offline start), then `/me` is reloaded in the background.
+  /// Never called without a server answer: the phone does not record an acknowledgement on its own.
+  Future<void> applyPrivacyAck({required int version, required String ackAt}) async {
+    final s = state;
+    if (s is! AuthSignedIn) return;
+    final current = s.profile.privacy;
+    if (current == null) return;
+    final next = current.acknowledge(version, ackAt);
+    state = AuthSignedIn(
+      profile: s.profile.copyWith(privacy: next),
+      sub: s.sub,
+      fromCache: s.fromCache,
+    );
+    try {
+      final db = ref.read(databaseProvider);
+      final raw = await db.kvGetJson(_profileKey(s.sub));
+      if (raw != null) {
+        raw['privacy'] = next.toJson();
+        await db.kvPut(_profileKey(s.sub), jsonEncode(raw));
+      }
+    } on Object catch (e) {
+      Log.w('auth: cached profile (privacy) not updated', e);
+    }
+    unawaited(refreshProfile());
+  }
+
   /// Logout. ALWAYS ends in [AuthSignedOut] — offline, when Keycloak or the API hangs or fails, or
   /// when a Keystore call throws:
   /// 1. best effort, at most [logoutNetworkBudget] in total: revoke this device server-side (also

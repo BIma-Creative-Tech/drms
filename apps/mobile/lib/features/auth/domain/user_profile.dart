@@ -1,5 +1,7 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
 
+import '../../privacy/domain/privacy.dart';
+
 part 'user_profile.freezed.dart';
 
 enum Role {
@@ -137,6 +139,9 @@ abstract class UserProfile with _$UserProfile {
 
     /// MC3: ids of the PTs the top-level fields were computed for ([scopedTo]); empty = not scoped.
     @Default(<int>[]) List<int> scopeCompanyIds,
+
+    /// ADR 0018: privacy-notice acknowledgement (`/me` `privacy`); null = server without the feature.
+    PrivacyStatus? privacy,
   }) = _UserProfile;
 
   /// More than one active PT: the PT switcher and PT chips are shown, new data asks for its PT.

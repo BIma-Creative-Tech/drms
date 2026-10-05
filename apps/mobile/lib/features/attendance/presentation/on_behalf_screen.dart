@@ -8,6 +8,9 @@ import '../../../l10n/gen/app_localizations.dart';
 import '../../../shared/widgets/async_body.dart';
 import '../../auth/application/auth_controller.dart';
 import '../../expense/data/draft_repository.dart';
+import '../../privacy/application/privacy_providers.dart';
+import '../../privacy/domain/privacy.dart';
+import '../../privacy/presentation/privacy_notice_screen.dart';
 import '../../sync/application/sync_coordinator.dart';
 import '../application/attendance_service.dart';
 import '../domain/attendance.dart';
@@ -47,6 +50,11 @@ class _OnBehalfScreenState extends ConsumerState<OnBehalfScreen> {
     final t = AppLocalizations.of(context);
     final sub = ref.read(currentSubProvider);
     if (sub == null) return;
+    // ADR 0018: the PM's own acknowledgement gates on-behalf attendance (GPS of the PM's phone + a photo).
+    if (ref.read(attendanceBlockedByPrivacyProvider)) {
+      showSnack(context, t.privacyAttendanceBlocked);
+      return;
+    }
     final reason = _reason.text.trim();
     if (reason.length < 3) {
       setState(() => _reasonError = t.reasonTooShort);
@@ -96,6 +104,8 @@ class _OnBehalfScreenState extends ConsumerState<OnBehalfScreen> {
         _notice = e.message;
         _noticeError = true;
       });
+    } on PrivacyNoticeRequiredException {
+      if (mounted) showSnack(context, t.privacyAttendanceBlocked);
     } on PhotoTooLargeException catch (e) {
       if (mounted) showSnack(context, e.message);
     } on QueueFullException catch (e) {
@@ -121,9 +131,11 @@ class _OnBehalfScreenState extends ConsumerState<OnBehalfScreen> {
           final enabled = site == null
               ? ref.watch(attendanceEnabledAnyProvider)
               : ref.watch(attendanceEnabledForProvider(site.companyId));
+          final privacyBlocked = ref.watch(attendanceBlockedByPrivacyProvider);
           return ListView(
             padding: const EdgeInsets.all(16),
             children: [
+              if (privacyBlocked) const PrivacyAttendanceBlock(from: 'on-behalf'),
               if (!enabled) InfoCard(text: t.attendanceDisabled, error: true),
               InfoCard(text: t.onBehalfIntro),
               if (list.isEmpty) InfoCard(text: t.onBehalfNoTeam, error: true),
@@ -202,7 +214,7 @@ class _OnBehalfScreenState extends ConsumerState<OnBehalfScreen> {
               const SizedBox(height: 16),
               FilledButton.icon(
                 key: const Key('on-behalf-submit'),
-                onPressed: enabled && !_busy && who != null && site != null && site.hasGeofence
+                onPressed: enabled && !privacyBlocked && !_busy && who != null && site != null && site.hasGeofence
                     ? () => _record(who, site)
                     : null,
                 icon: _busy
