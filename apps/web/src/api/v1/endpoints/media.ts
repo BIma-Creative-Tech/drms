@@ -7,6 +7,7 @@ import type { CollectionSlug, PayloadRequest } from 'payload'
 import { loadMemberships } from '@/access/company-context'
 import { relId, userId, withCompanyContext } from '@/access/roles'
 import { writeAudit, writeAuditDetached } from '@/audit/writer'
+import { auditPrivacyDenied, PRIVACY_ACK_REQUIRED, PRIVACY_ACK_REQUIRED_DETAIL, PRIVACY_CHECKED_KEY, privacyAckCheck } from '@/legal/privacy-enforcement'
 import { getEnv } from '@/lib/env'
 import { ImageQueueFullError, withImageSlot } from '@/lib/image-queue'
 import { fileSize, mediaPath } from '@/lib/media-files'
@@ -25,6 +26,23 @@ const COLLECTION: Record<string, CollectionSlug> = {
   selfies: 'media-selfies',
   // E4 progress photos (1600 px JPEG, EXIF/GPS stripped; ≤ 5 per report — ADR 0004, US-10).
   'progress-photos': 'media-progress-photos',
+}
+
+/**
+ * ADR 0018 (owner 2026-10-05): while "Versi APK minimum" ≥ 0.3.3, a selfie (attendance capture) of a caller who has
+ * not acknowledged the current privacy notice → 403 `PRIVACY_ACK_REQUIRED` (audited `access_denied`), before the
+ * image is queued or stored. Marks the request so the collection guard does not check again.
+ */
+async function refuseSelfieWithoutPrivacyAck(req: PayloadRequest): Promise<void> {
+  const uid = userId(req)
+  if (uid === undefined) throw new HttpError(401, 'Unauthorized')
+  const check = await privacyAckCheck(req, uid)
+  if (check.required) {
+    await auditPrivacyDenied(req, check, { docType: 'media_selfies', field: 'upload', companyId: null })
+    throw new HttpError(403, 'Forbidden', { code: PRIVACY_ACK_REQUIRED, detail: PRIVACY_ACK_REQUIRED_DETAIL })
+  }
+  req.context ??= {}
+  req.context[PRIVACY_CHECKED_KEY] = true
 }
 
 /**
@@ -47,6 +65,7 @@ export const uploadMediaEndpoint = v1({
     if (!kind.success) throw new HttpError(404, 'Not Found')
     const file = req.file
     if (!file?.data?.length) throw new HttpError(400, 'Bad Request', { detail: 'Field "file" wajib (multipart/form-data).' })
+    if (kind.data === 'selfies') await refuseSelfieWithoutPrivacyAck(req)
     const create = () =>
       withReqTransaction(req, () =>
         req.payload.create({

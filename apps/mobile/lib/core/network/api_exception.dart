@@ -61,6 +61,7 @@ class ProblemException extends ApiException {
   @override
   String get message {
     if (code == 'COMPANY_NOT_ALLOWED') return companyNotAllowedMessage;
+    if (code == privacyAckRequiredCode) return privacyAckRequiredMessage;
     if (detail != null && detail!.trim().isNotEmpty) return detail!;
     if (errors.isNotEmpty) return errors.map((e) => e.message).join('\n');
     return switch (status) {
@@ -103,3 +104,12 @@ class ProblemException extends ApiException {
 /// 403 `COMPANY_NOT_ALLOWED` of a read (MC3): the PT selection named a PT without membership.
 const companyNotAllowedMessage =
     'Akses Anda ke salah satu PT yang dipilih sudah berubah. Pilihan PT dikembalikan ke "Semua PT"; muat ulang.';
+
+/// ADR 0018 (owner 2026-10-05): the server refuses attendance captures (selfie upload `403`, sync item `rejected`)
+/// while the minimum APK version is ≥ 0.3.3 and the current privacy notice is not acknowledged. The app normally
+/// blocks attendance itself before that; this reaches it e.g. when a new notice version was published while the
+/// phone still had the old acknowledgement cached. The app reloads `/me`, which brings the notice screen back.
+const privacyAckRequiredCode = 'PRIVACY_ACK_REQUIRED';
+const privacyAckRequiredMessage =
+    'Absensi ditolak server: pemberitahuan privasi terbaru belum Anda setujui. Buka Profil → Pemberitahuan privasi, '
+    'tekan "Saya mengerti", lalu absen ulang.';

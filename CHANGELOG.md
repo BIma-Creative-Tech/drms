@@ -41,6 +41,13 @@ touched).
   acknowledgement is retried with the same Idempotency-Key when the server is reachable again (never assumed
   locally); Profile → "Pemberitahuan privasi". A server without the feature (no `privacy` in `/me`, 404) blocks
   nothing.
+- Server-side enforcement (owner decision 2026-10-05, ADR 0018 implementation note): while the app setting "Versi APK
+  minimum" is ≥ 0.3.3 (strict `x.y.z`, numeric compare; unset/unreadable = off), attendance captures of a user without
+  an acknowledgement of the current notice are refused `PRIVACY_ACK_REQUIRED` — sync items `attendance.check_in` /
+  `check_out` / `on_behalf` (acting PM) as a final per-item rejection, `POST /api/v1/media/selfies` and the Payload
+  REST create of `media-selfies` as 403 — each audited `access_denied` (reason `PRIVACY_ACK_REQUIRED`). Below 0.3.3
+  nothing changes (APK 0.3.2 keeps working); corrections by PM/Admin are not affected. OpenAPI documents the code.
+  APK 0.3.3 maps the code to a clear Indonesian message, never retries it and reloads `/me` (notice screen).
 
 #### Changed
 - `companies.selfieRetentionMonths` default 12 → **6** (field description names Q-33 / owner decision 2026-10-05); the

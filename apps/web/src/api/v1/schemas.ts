@@ -14,7 +14,7 @@ export const Problem = z
     detail: z.string().optional(),
     errors: z.array(z.object({ path: z.string(), message: z.string() })).optional(),
     minAppVersion: z.string().optional(),
-    code: z.string().optional().meta({ description: 'Machine-readable reason. 401 DEVICE_REVOKED = the token is valid but X-Device-Id was revoked/marked lost: the APK ends the session without a refresh.' }),
+    code: z.string().optional().meta({ description: 'Machine-readable reason. 401 DEVICE_REVOKED = the token is valid but X-Device-Id was revoked/marked lost: the APK ends the session without a refresh. 403 PRIVACY_ACK_REQUIRED = attendance capture (selfie upload) while company-settings.minAppVersion ≥ 0.3.3 and the caller has not acknowledged the current privacy notice (ADR 0018): show the notice, POST /me/privacy-ack, then capture again.' }),
   })
   .meta({ id: 'Problem', description: 'RFC 9457 problem details' })
 

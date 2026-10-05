@@ -5,6 +5,7 @@ import { hasRoleAny, type Role } from '@/access/roles'
 import { COMPANY_DENIED_KEY } from '@/access/company-context'
 import { AUTH_FAILURE_KEY } from '@/auth/strategies'
 import { writeAuditDetached } from '@/audit/writer'
+import { cachedMinAppVersion, resetMinVersionCache } from '@/lib/app-min-version'
 import { claimKey, IDEMPOTENCY_KEY_RE, requestHash, storeResponse } from '@/lib/idempotency'
 import { requestMeta } from '@/lib/request-meta'
 import { takeToken } from '@/lib/rate-limit'
@@ -52,17 +53,8 @@ export function compareVersions(a: string, b: string): number {
   return 0
 }
 
-let minVersionCache: { value: string | null; at: number } | undefined
-/** Test seam. */
-export function resetMinVersionCache(): void {
-  minVersionCache = undefined
-}
-async function minAppVersion(req: PayloadRequest): Promise<string | null> {
-  if (minVersionCache && Date.now() - minVersionCache.at < 60_000) return minVersionCache.value
-  const s = await req.payload.findGlobal({ slug: 'company-settings', depth: 0, overrideAccess: true /* SYSTEM-READ */, req })
-  minVersionCache = { value: s.minAppVersion || null, at: Date.now() }
-  return minVersionCache.value
-}
+/** Test seam (the cache lives in lib/app-min-version, shared with the privacy enforcement of ADR 0018). */
+export { resetMinVersionCache }
 
 export type V1Options<B extends z.ZodType | undefined> = {
   path: string
@@ -135,7 +127,7 @@ export function v1<B extends z.ZodType | undefined = undefined>(opts: V1Options<
           if (opts.roles && !hasRoleAny(req, ...opts.roles)) return problem(403, 'Forbidden')
           const meta = requestMeta(req)
           if (meta.source === 'apk') {
-            const min = await minAppVersion(req)
+            const min = await cachedMinAppVersion(req)
             const have = req.headers.get('x-app-version')
             if (min && (!have || compareVersions(have, min) < 0)) {
               return problem(426, 'Upgrade Required', { minAppVersion: min })
