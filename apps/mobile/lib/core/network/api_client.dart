@@ -49,6 +49,7 @@ class ApiClient {
     this.onUpgradeRequired,
     this.companyHeader,
     this.onCompanyNotAllowed,
+    this.onPrivacyAckRequired,
   }) : dio =
            dio ??
            Dio(
@@ -75,6 +76,10 @@ class ApiClient {
   /// MC3: 403 `COMPANY_NOT_ALLOWED` (a selected PT is no longer a membership): refresh `/me`, reset
   /// the selection. The failing call still throws.
   final void Function()? onCompanyNotAllowed;
+
+  /// ADR 0018: 403 `PRIVACY_ACK_REQUIRED` (attendance capture without the current privacy acknowledgement):
+  /// reload `/me` so the privacy gate (notice screen, attendance lock) reflects the server. The call still throws.
+  final void Function()? onPrivacyAckRequired;
 
   static const _noAuth = 'pk.noAuth';
   static const _company = 'pk.company';
@@ -154,6 +159,7 @@ class ApiClient {
     if (status == 403) {
       final body = res.data;
       if (body is Map<String, dynamic> && body['code'] == companyNotAllowedCode) onCompanyNotAllowed?.call();
+      if (body is Map<String, dynamic> && body['code'] == privacyAckRequiredCode) onPrivacyAckRequired?.call();
     }
     if (status == 426) {
       final body = res.data;

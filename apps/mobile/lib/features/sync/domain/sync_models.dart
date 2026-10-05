@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'dart:math';
 
+import '../../../core/network/api_exception.dart';
+
 /// Item types of the sync contract (ADR 0010 "Sync contract", schema_version 1): drafts (F4a), own
 /// attendance check-in/out (F4b), PM on-behalf attendance (E6, US-14) and progress reports (E4, US-10).
 abstract final class SyncItemType {
@@ -248,6 +250,8 @@ String rejectionMessage(List<SyncError> errors, {String? type}) {
       return 'PT data ini tidak sama dengan PT project/pusat biaya/karyawannya. Data tidak dikirim; buat ulang di PT yang benar.';
     case companyNotAllowedItemCode:
       return 'Anda sudah tidak terdaftar di PT data ini. Data tidak dikirim; hubungi Admin bila ini keliru.';
+    case privacyAckRequiredCode:
+      return privacyAckRequiredMessage;
   }
   if (type != null && (SyncItemType.isAttendance(type) || SyncItemType.isProgress(type))) {
     final m = e.message;

@@ -107,6 +107,8 @@ class SyncCoordinator extends Notifier<SyncStatus> {
     try {
       final r = await ref.read(syncEngineProvider).run(sub);
       state = SyncStatus(last: r, serverUnsupported: r.outcome == SyncRunOutcome.serverUnsupported);
+      // ADR 0018: attendance refused PRIVACY_ACK_REQUIRED → reload /me (privacy gate: notice screen, attendance lock).
+      if (r.privacyAckRequired) unawaited(ref.read(authControllerProvider.notifier).refreshProfile());
       if (r.outcome == SyncRunOutcome.offline || r.deferred > 0) _scheduleBackground();
       return r;
     } on Object catch (e) {

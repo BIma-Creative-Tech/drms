@@ -30,6 +30,7 @@ class SyncRunResult {
     this.deferred = 0,
     this.conflicts = 0,
     this.needsCompany = 0,
+    this.privacyAckRequired = false,
   });
   final SyncRunOutcome outcome;
   final int applied;
@@ -39,6 +40,10 @@ class SyncRunResult {
 
   /// MC3: items held because they have no PT yet and the user has several PTs (never sent, never guessed).
   final int needsCompany;
+
+  /// ADR 0018: the server refused an attendance capture `PRIVACY_ACK_REQUIRED` (final rejection). The foreground
+  /// coordinator reloads `/me`, which brings the privacy notice back.
+  final bool privacyAckRequired;
 }
 
 /// Sends the offline outbox: receipt photos first (`POST /media/receipts` → `media_id`), then JSON items in batches
@@ -102,6 +107,7 @@ class SyncEngine {
     if (due.isEmpty) return SyncRunResult(SyncRunOutcome.partial, needsCompany: held);
 
     // 1) receipt photos → POST /media/receipts (media_id), then resolve the payloads
+    var privacyAck = false;
     final ready = <OutboxData>[];
     final payloads = <String, Map<String, dynamic>>{};
     for (final item in due) {
@@ -122,7 +128,12 @@ class SyncEngine {
         } on NetworkException {
           return const SyncRunResult(SyncRunOutcome.offline);
         } on ProblemException catch (e) {
-          if (e.status == 413 || e.status == 400) {
+          if (e.status == 403 && e.code == privacyAckRequiredCode) {
+            // ADR 0018: selfie refused until the current privacy notice is acknowledged — final, like the item would be.
+            privacyAck = true;
+            await outbox.setStatus(item.opUuid, 'rejected', code: privacyAckRequiredCode, message: e.message);
+            await _markRejected(item, e.message, code: privacyAckRequiredCode);
+          } else if (e.status == 413 || e.status == 400) {
             await outbox.setStatus(item.opUuid, 'rejected', code: 'MEDIA_${e.status}', message: e.message);
             await _markRejected(item, e.message, code: 'MEDIA_${e.status}');
           } else {
@@ -145,7 +156,7 @@ class SyncEngine {
       payloads[item.opUuid] = resolved;
       ready.add(item);
     }
-    if (ready.isEmpty) return SyncRunResult(SyncRunOutcome.partial, needsCompany: held);
+    if (ready.isEmpty) return SyncRunResult(SyncRunOutcome.partial, needsCompany: held, privacyAckRequired: privacyAck);
 
     // 2) batches, one PT per batch (queue order kept inside each PT; a draft's operations share its PT)
     final byCompany = <int?, List<QueuedItem>>{};
@@ -184,6 +195,7 @@ class SyncEngine {
           deferred: deferred,
           conflicts: conflicts,
           needsCompany: needsCompany,
+          privacyAckRequired: privacyAck,
         );
       } on ProblemException catch (e) {
         final rows = [for (final q in batch) byUuid[q.clientUuid]!];
@@ -257,6 +269,7 @@ class SyncEngine {
             );
           case SyncItemStatus.rejected:
             rejected++;
+            if (r.errors.firstOrNull?.code == privacyAckRequiredCode) privacyAck = true;
             final msg = rejectionMessage(r.errors, type: row.type);
             await outbox.setStatus(row.opUuid, 'rejected', code: r.errors.firstOrNull?.code, message: msg);
             await _markDraft(row, DraftSyncState.rejected, error: msg);
@@ -300,6 +313,7 @@ class SyncEngine {
       deferred: deferred,
       conflicts: conflicts,
       needsCompany: needsCompany,
+      privacyAckRequired: privacyAck,
     );
   }
 

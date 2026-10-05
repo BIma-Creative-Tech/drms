@@ -93,6 +93,8 @@ final apiClientProvider = Provider<ApiClient>((ref) {
       unawaited(ref.read(companySelectionProvider.notifier).reset());
       unawaited(ref.read(authControllerProvider.notifier).refreshProfile());
     },
+    // ADR 0018: the server wants the current privacy acknowledgement first → reload /me (notice screen comes back).
+    onPrivacyAckRequired: () => unawaited(ref.read(authControllerProvider.notifier).refreshProfile()),
   );
 });
 
