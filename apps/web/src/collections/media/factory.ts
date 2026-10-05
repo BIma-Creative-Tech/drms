@@ -9,6 +9,7 @@ import {
   type CollectionConfig,
   type Field,
   type ImageSize,
+  type PayloadRequest,
   type UploadConfig,
 } from 'payload'
 import sharp from 'sharp'
@@ -67,6 +68,11 @@ export type MediaSpec = {
    * instead of id lists (Postgres caps a statement at 65 535 bind parameters).
    */
   ownerCompany?: boolean
+  /**
+   * Extra refusal of a create, run before any file processing (throws a public APIError). ADR 0018: selfies are
+   * refused while the uploader has not acknowledged the current privacy notice (enforcement on).
+   */
+  createGuard?: (req: PayloadRequest) => Promise<void>
 }
 
 /**
@@ -98,6 +104,7 @@ export function mediaCollection(spec: MediaSpec): CollectionConfig {
     if (operation !== 'create' && operation !== 'update') return args
     const a = args as { data?: Record<string, unknown> }
     assertNoRemoteSource({ operation, data: a.data, hasFile: Boolean(req.file?.data?.length || req.file?.tempFilePath) })
+    if (operation === 'create' && spec.createGuard) await spec.createGuard(req)
     if (operation !== 'create' || !req.file) return args
     // E9 P-1: generic REST uploads (admin panel) are not queued as a whole job; refuse them early
     // while the image queue is saturated (the /api/v1 upload endpoint queues whole jobs itself).

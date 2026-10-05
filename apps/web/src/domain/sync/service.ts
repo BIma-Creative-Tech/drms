@@ -23,6 +23,7 @@ import { ids, loadRaw, loadVisible, lockRequest, settings, type RequestDoc } fro
 import { createDraft, updateDraft, type DraftInput, type LineInputApi } from '@/domain/expense/drafts'
 import { addReceipt, editReceipt } from '@/domain/expense/receipts'
 import { cancel } from '@/domain/expense/workflow'
+import { auditPrivacyDenied, PRIVACY_ACK_REQUIRED, PRIVACY_ACK_REQUIRED_DETAIL, privacyAckCheck } from '@/legal/privacy-enforcement'
 import { withReqTransaction } from '@/lib/system-tx'
 import { DEFAULT_TZ } from '@/lib/time'
 import { getRequestTx } from '@/lib/tx'
@@ -65,6 +66,8 @@ import { applyProgressReport, ProgressSyncReject } from './progress'
  *   domain/attendance/record.ts): assigned project/cost center with a geofence, inside radius
  *   (+ capped GPS accuracy), not mocked, selfie uploaded by the caller, one check-in and one
  *   check-out per employee/location/local date; on-behalf = PM of the team location only (US-14).
+ *   ADR 0018: while "Versi APK minimum" ≥ 0.3.3 the caller (on-behalf: the PM) must have acknowledged the
+ *   current privacy notice, else `rejected PRIVACY_ACK_REQUIRED` (final, audited access_denied).
  * - Progress reports (E4, company-settings.syncProgressReportsEnabled): `progress_report.draft_upsert`
  *   creates a report through the same domain service as POST /api/v1/progress-reports, or edits one
  *   (reporter, ≤ 24 h, base_rev = server rev else conflict + server_report) — ./progress.ts.
@@ -533,6 +536,18 @@ async function applyAttendance(c: ItemCtx, verdict: TimeVerdict, receivedAt: Dat
   }
 }
 
+/**
+ * ADR 0018 (owner 2026-10-05): while "Versi APK minimum" ≥ 0.3.3, an attendance capture (own check-in/out, and
+ * on-behalf: the acting PM) of a user without the current privacy acknowledgement is rejected
+ * `PRIVACY_ACK_REQUIRED` — a final rejection (stored, never retried); the attempt is audited `access_denied`.
+ */
+async function refuseWithoutPrivacyAck(c: ItemCtx, companyId: number | null): Promise<void> {
+  const check = await privacyAckCheck(c.req, c.uid)
+  if (!check.required) return
+  await auditPrivacyDenied(c.req, check, { docType: 'attendance', field: c.item.type, companyId })
+  reject(PRIVACY_ACK_REQUIRED, PRIVACY_ACK_REQUIRED_DETAIL)
+}
+
 // ------------------------------------------------------------------------------------ storage
 
 type StoredRow = { user_id: number; status: 'applied' | 'rejected' | 'conflict'; result: SyncResultOut }
@@ -698,6 +713,7 @@ async function processOwn(c: ItemCtx, batch: SyncBatchIn, deviceId: string, verd
       if (isAttendance && !features.attendance) reject('FEATURE_DISABLED', 'Absensi dari aplikasi belum diaktifkan server (Setting perusahaan).')
       if (isProgress && !features.progress) reject('FEATURE_DISABLED', 'Laporan progress dari aplikasi sedang dinonaktifkan server (Setting perusahaan).')
       if (!isAttendance && !isProgress && !features.drafts) reject('FEATURE_DISABLED', 'Sinkronisasi draft pengajuan sedang dinonaktifkan server.')
+      if (isAttendance) await refuseWithoutPrivacyAck(c, declared)
       await checkDependencies(req, uid, item)
       if (isProgress) {
         const po = await applyProgressReport(c, verdict, receivedAt)

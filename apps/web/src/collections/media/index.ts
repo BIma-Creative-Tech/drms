@@ -6,6 +6,7 @@ import { anyOf, byRoleAny, ownUser, rolesAllowedAny, type Rule } from '@/access/
 import { allCompanyIds } from '@/domain/companies'
 import { visibleRequestIds } from '@/domain/expense/access'
 import { reportPhotoWhere } from '@/domain/progress/access'
+import { assertSelfieUploadAllowed } from '@/legal/privacy-enforcement'
 
 import { mediaCollection } from './factory'
 
@@ -286,6 +287,9 @@ export const MediaSelfies = mediaCollection({
   formatOptions: { format: 'jpeg', options: { quality: 75, mozjpeg: true } },
   ownerCompany: true,
   access: { read: focused('media-selfies', ownOrOffice, false), create: rolesAllowedAny('pk-staff', 'pk-pm', 'pk-admin') },
+  // ADR 0018 (owner 2026-10-05): no selfie of an uploader without the current privacy acknowledgement while
+  // "Versi APK minimum" ≥ 0.3.3 (403 PRIVACY_ACK_REQUIRED, audited access_denied).
+  createGuard: assertSelfieUploadAllowed,
   // E6 S2 (Q-33): set by the selfieRetention job when the file was deleted from the volume. The row
   // stays as a tombstone (attendances.selfie_id is NOT NULL and append-only), without the image.
   extraFields: [{ name: 'removedAt', type: 'date', label: 'File dihapus (retensi)', index: true, access: { update: () => false }, admin: { readOnly: true } }],
