@@ -40,15 +40,15 @@
 8. **Compatibility:** APK ≤ 0.3.2 ignores the new `/me` field and is not gated by the server. APK 0.3.3 against a server
    without the feature (`/me` without `privacy`, 404 on the endpoints) blocks nothing.
 
-## Not decided here (open, owner)
+## Owner decisions (2026-10-05)
 
-- **Server-side enforcement:** the server does not refuse attendance from an unacknowledged user (that would break the
-  released APK 0.3.2). Once 0.3.3 is the minimum APK version, `sync/batch` could refuse attendance items without an
-  acknowledgement.
-- **Web-only users** (office roles that never use the APK) are gated by the web interstitial too; whether they must
-  acknowledge at all is an owner question.
-- **Effective date / final wording:** set by HR/legal in the markdown; publishing the final text as version 1 or 2
-  (re-ask everybody who acknowledged the draft) is an owner/HR decision.
+- **Web-only users must acknowledge too** (office roles without attendance): the web interstitial stays mandatory —
+  their account, bank and signature data are processed as well.
+- **Server-side enforcement — yes, once 0.3.3 is the minimum APK version:** while the app setting "Versi APK minimum"
+  is ≥ 0.3.3, attendance writes (check-in/out, on-behalf) of a user without an acknowledgement of the current version
+  are refused (`PRIVACY_ACK_REQUIRED`); below that, older APKs keep working.
+- **Final HR/legal wording is published as version 2**: everybody (including those who acknowledged v1) is asked
+  again. Version 1 = this text, approved by the owner, effective 5 Oct 2026; contact PIC: Rivaldo AK.
 
 ## Consequences
 

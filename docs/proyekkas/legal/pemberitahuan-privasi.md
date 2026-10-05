@@ -1,6 +1,6 @@
 # Pemberitahuan Privasi Karyawan — Aplikasi ProyekKas
 
-- **Versi:** 1 (DRAF — menunggu persetujuan HR/legal PT DRMS, Q-46) · **Berlaku sejak:** [tanggal disetujui]
+- **Versi:** 1 (disetujui pemilik 2026-10-05, Q-46; tinjauan HR/legal PT DRMS menyusul — perubahan terbit sebagai versi 2) · **Berlaku sejak:** 5 Oktober 2026
 - **Pengendali data:** PT Double Rezki Makmur Sejahtera (DRMS) beserta PT lain dalam grup yang memakai ProyekKas
 - **Dasar hukum:** Undang-Undang No. 27 Tahun 2022 tentang Pelindungan Data Pribadi (UU PDP)
 
@@ -66,7 +66,7 @@ Permintaan diajukan ke kontak di bawah dan dijawab paling lambat sesuai ketentua
 
 ## 8. Kontak
 
-**[Nama PIC HR/Data Pribadi PT DRMS]** · **[email]** · **[telepon]**
+**Rivaldo AK** (PIC Data Pribadi) · **rivaldoalvaero@gmail.com** · **0821-1248-3501**
 
 Dengan menekan **"Saya mengerti"** di aplikasi, Anda menyatakan telah membaca pemberitahuan ini. Bila isinya
 berubah, aplikasi akan meminta Anda membacanya kembali.
