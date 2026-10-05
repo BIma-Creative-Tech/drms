@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### CI — security job: retry semgrep / trivy fs on network errors
+- `ci.yml` job `security`: semgrep and `trivy fs` run through `.github/scripts/retry-net.sh` (3 attempts, back-off
+  0 / 30 / 90 s). A findings result is returned at once and never retried (semgrep exit 1 with `--error`; trivy fs now
+  `--exit-code 3`). Cause: tag `v0.6.1` (2026-10-06) failed resolving `semgrep.dev` (`[Errno -3] Try again`) inside the
+  runner's nested container; the earlier `v0.6.0` tag run failed in the same job.
+
 ## [0.6.1] - 2026-10-05
 
 Employee privacy notice (UU PDP; Q-46, ADR 0018) with a versioned acknowledgement on the web and in APK 0.3.3,

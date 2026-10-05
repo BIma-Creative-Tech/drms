@@ -132,17 +132,21 @@ jobs:
           zricethezav/gitleaks:v8.30.1@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f
           git --no-banner --redact --exit-code 1 /repo
       - name: semgrep (OWASP + TypeScript + project rules)
+        # exit 1 = findings (--error, never retried); exit 2 = error, e.g. registry/DNS (retried, .github/scripts/retry-net.sh)
         run: >-
+          .github/scripts/retry-net.sh 1
           docker run --rm -v "$PWD:/src" -w /src
           semgrep/semgrep:1.177.0@sha256:acaac22ffc7b7cc5926de0751b223bce0b2491c33d18422fa72f632c78d81198
           semgrep scan --error --metrics=off
           --config p/owasp-top-ten --config p/typescript --config .semgrep/proyekkas.yml
           --exclude node_modules --exclude docs
       - name: trivy fs (vulns, secrets, misconfig — fail on CRITICAL)
+        # exit 3 = CRITICAL found (never retried); other errors such as the DB download are retried
         run: >-
+          .github/scripts/retry-net.sh 3
           docker run --rm -v "$PWD:/src" -w /src
           aquasec/trivy:0.74.0@sha256:62b1e65e8869bc4b4c6aa4fa2b21595256c7c2f6018a9d9ad61caf87187c1969
-          fs --scanners vuln,secret,misconfig --severity CRITICAL --exit-code 1 --skip-dirs docs .
+          fs --scanners vuln,secret,misconfig --severity CRITICAL --exit-code 3 --skip-dirs docs .
       - name: hadolint
         run: >-
           docker run --rm -i
