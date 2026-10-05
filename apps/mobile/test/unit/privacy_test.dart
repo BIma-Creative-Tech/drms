@@ -105,6 +105,9 @@ class _NoCompressor implements PhotoCompressor {
   }
 }
 
+/// Fictional Idempotency-Key for the ack request (not a secret; see .gitleaksignore for the old literal).
+const testIdemKey = 'test-idempotency-key-privacy-ack';
+
 void main() {
   // several independent in-memory databases per test (one per container) — no shared executor
   setUpAll(() => driftRuntimeOptions.dontWarnAboutMultipleDatabases = true);
@@ -219,7 +222,7 @@ void main() {
 
     test('404 (server before ADR 0018) = no notice / no endpoint — never an error', () async {
       expect(await api.notice(), isNull);
-      expect(await api.acknowledge(1, idempotencyKey: '0b5e5d7a-6f3c-4f7e-9d2a-1c3b4a5d6e7f'), isNull);
+      expect(await api.acknowledge(1, idempotencyKey: testIdemKey), isNull);
     });
 
     test('notice is public (no Authorization); ack carries Idempotency-Key + version', () async {
@@ -229,12 +232,12 @@ void main() {
       final n = await api.notice();
       expect(n?.version, 1);
       expect(adapter.calls.last.headers.containsKey('Authorization'), isFalse);
-      final r = await api.acknowledge(1, idempotencyKey: '0b5e5d7a-6f3c-4f7e-9d2a-1c3b4a5d6e7f');
+      final r = await api.acknowledge(1, idempotencyKey: testIdemKey);
       expect(r?.ackAt, '2026-10-05T02:00:00.000Z');
       final call = adapter.calls.last;
       expect(call.method, 'POST');
       expect(call.uri.path, '/api/v1/me/privacy-ack');
-      expect(call.headers['Idempotency-Key'], '0b5e5d7a-6f3c-4f7e-9d2a-1c3b4a5d6e7f');
+      expect(call.headers['Idempotency-Key'], testIdemKey);
       expect(call.headers['Authorization'], 'Bearer access-1');
     });
 
