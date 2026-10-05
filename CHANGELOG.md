@@ -6,7 +6,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
-### Employee privacy notice (Q-46, ASVS 8.3.3 / G-06, ADR 0018) + selfie retention 6 months (Q-33) — web + APK 0.3.3
+## [0.6.1] - 2026-10-05
+
+Employee privacy notice (UU PDP; Q-46, ADR 0018) with a versioned acknowledgement on the web and in APK 0.3.3,
+server-side attendance enforcement once "Versi APK minimum" ≥ 0.3.3, selfie retention 6 months (Q-33), and the CI fix
+for the full GitHub Actions artifact quota (APK 0.3.2). Notice v1 effective 5 Oct 2026, contact PIC Rivaldo AK.
+
+**Database migrations** (run by `migrate`; rollback = restore the pre-deploy dump): `20261005_090000_privacy_notice`
+(users `privacy_ack_version` / `privacy_ack_at` + guard, audit action `privacy_ack`, retention default 6),
+`20261005_090100_selfie_retention_6m` (12 → 6 only for PTs whose value was never changed; audited).
+**After the deploy (owner):** every user sees the notice once; raise "Versi APK minimum" to 0.3.3 only after the
+APK 0.3.3 is on `/unduh` and the field phones are updated; switch on "Hapus otomatis selfie" when ready.
+
+### Employee privacy notice (Q-46, ASVS 8.3.3 / G-06, ADR 0018) + selfie retention 6 months (Q-33) — web + APK mobile-v0.3.3
 
 Owner decisions 2026-10-05: collecting selfie + location at attendance is approved and employees must be shown the
 notice (Q-46); attendance selfies are kept 6 months (Q-33). The notice text is draft v1
