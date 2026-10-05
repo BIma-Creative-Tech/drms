@@ -90,15 +90,15 @@ processed or stored.
 `companyId` (expense list/detail, transfer queue, cash entries, notifications, addenda, progress reports) or
 `company {id, shortCode, name}` (approval inbox, LPJ queue). Labels: `GET /me companies[]`.
 
-### Route table (91 routes incl. 2 HEAD; 90 before MC3 + `GET /lpj-queue`)
+### Route table (93 routes incl. 2 HEAD; 90 before MC3 + `GET /lpj-queue`; + 2 privacy-notice routes, ADR 0018)
 
 Classes (source of truth + completeness check: `ROUTE_CLASSES` in `tests/integration/mc3-api.int.test.ts` — a new
 route without a class fails CI):
 
 | Class | Rule | # | Routes |
 |---|---|---|---|
-| public | no company data | 6 | `GET/HEAD /health`, `GET/HEAD /health/ready`, `GET /app/config`, `GET /openapi.json` |
-| own | caller's own profile / rows only | 10 | `GET /me`, `POST /me/companies`, `POST /devices/register`, `POST /admin/test-email`, `POST /media/:kind`, `GET /notifications`, `POST /notifications/read-all`, `GET /notifications/:id`, `POST /notifications/:id/read`, `GET /attendance/me` |
+| public | no company data | 7 | `GET/HEAD /health`, `GET/HEAD /health/ready`, `GET /app/config`, `GET /openapi.json`, `GET /privacy-notice` |
+| own | caller's own profile / rows only | 11 | `GET /me`, `POST /me/companies`, `POST /me/privacy-ack`, `POST /devices/register`, `POST /admin/test-email`, `POST /media/:kind`, `GET /notifications`, `POST /notifications/read-all`, `GET /notifications/:id`, `POST /notifications/:id/read`, `GET /attendance/me` |
 | selection (a) | rows of selection ∩ memberships, role per PT (collection access `byRole` per PT / per-PT scopes); `?company=` narrows | 20 | `GET /masters`, `/expense-requests`, `/transfer-queue`, `/approvals/inbox`, `/lpj-queue`, `/cash-entries`, `/cash-accounts/balances`, `/period-closings`, `/dashboard/{owner,finance,pm,admin,me}`, `/reports/:code`, `/reports/:code/:format`, `/attendance/team-today`, `/projects/progress`, `/progress-reports`, `/budget-addenda`, `/budget-addenda/inbox` |
 | document (b) | one document read within the selection (out-of-PT → 404), action checked against the role IN the document's PT | 47 | `GET/PATCH /expense-requests/:id`, `…/history`, `…/pdf`, the 23 `POST /expense-requests/:id/…` actions + `PATCH …/receipts/:rid`, `PATCH /cash-entries/:id`, `POST /cash-entries/:id/void`, `POST /devices/:id/revoke`, `GET /media/:collection/:id/{file,signed-url}`, `GET /attendance/recap`, `POST /attendance/:id/correct`, `GET /attendance/:id/selfie`, `GET/PUT /projects/:id/stages`, `GET/PATCH /progress-reports/:id`, `GET/PATCH /budget-addenda/:id` + 5 actions |
 | named-pt (b) | the PT is named by the request (body `company`, `?company=`, sync `company_id`, or derived from the referenced project / cash account) and checked against membership + role IN that PT | 8 | `POST /expense-requests`, `/cash-entries`, `/period-closings`, `/period-closings/:period/reopen`, `/company-memberships/batch`, `/progress-reports`, `/budget-addenda`, `/sync/batch` |

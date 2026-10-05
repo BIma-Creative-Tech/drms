@@ -8,6 +8,7 @@ import { mediaPath } from '@/lib/media-files'
 import { withSystemTransaction } from '@/lib/system-tx'
 import { getRequestTx } from '@/lib/tx'
 
+import { SELFIE_RETENTION_DEFAULT_MONTHS } from './retention-policy'
 import { retentionCutoff } from './schedule'
 import { activeCompanyIds, settingsOf } from '@/domain/companies'
 
@@ -37,7 +38,7 @@ export type RetentionSettings = { months: number; deleteEnabled: boolean; batch:
  */
 export async function retentionSettings(payload: Payload, req?: PayloadRequest, companyId?: number | null): Promise<RetentionSettings> {
   const s = await settingsOf(payload, companyId ?? null, req)
-  const months = typeof s.selfieRetentionMonths === 'number' && s.selfieRetentionMonths >= 1 ? s.selfieRetentionMonths : 12
+  const months = typeof s.selfieRetentionMonths === 'number' && s.selfieRetentionMonths >= 1 ? s.selfieRetentionMonths : SELFIE_RETENTION_DEFAULT_MONTHS
   const batch = typeof s.selfieRetentionBatch === 'number' && s.selfieRetentionBatch >= 1 ? Math.min(2000, Math.floor(s.selfieRetentionBatch)) : 200
   return { months, deleteEnabled: s.selfieRetentionDeleteEnabled === true, batch }
 }

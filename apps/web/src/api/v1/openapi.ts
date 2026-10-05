@@ -6,6 +6,7 @@ import { registerAttendancePaths } from './openapi-attendance'
 import { registerCompanyPaths } from './openapi-companies'
 import { Device, DeviceRegister, DeviceRevoke, Health, Masters, MastersQuery, Me, Problem, Ready, TestEmailQueued } from './schemas'
 import * as F from './schemas-flow'
+import { PrivacyAck, PrivacyAckBody, PrivacyNotice } from './schemas-privacy'
 import * as P from './schemas-progress'
 import * as R from './schemas-reports'
 import * as S from './schemas-sync'
@@ -95,6 +96,29 @@ export function buildOpenApiDocument(version: string) {
     security,
     request: { headers: deviceHeader },
     responses: { 200: { description: 'Profile', content: { 'application/json': { schema: Me } } }, ...problemResponses(401, 426) },
+  })
+  // Q-46 / ASVS 8.3.3 (ADR 0018): employee privacy notice + acknowledgement
+  registry.registerPath({
+    method: 'get',
+    path: '/privacy-notice',
+    summary: 'Employee privacy notice (public, cacheable 5 min): version, title, safe HTML, markdown — bundled at build time',
+    responses: { 200: { description: 'Notice', content: { 'application/json': { schema: PrivacyNotice } } } },
+  })
+  registry.registerPath({
+    method: 'post',
+    path: '/me/privacy-ack',
+    summary: 'Acknowledge the CURRENT privacy notice (own account; version must equal the current one, else 409 PRIVACY_VERSION_MISMATCH); audited privacy_ack',
+    security,
+    request: {
+      headers: deviceHeader.extend({
+        'Idempotency-Key': z.uuid().optional().meta({ description: 'Required from the APK; a retry with the same key and body returns the stored response.' }),
+      }),
+      body: { content: { 'application/json': { schema: PrivacyAckBody } } },
+    },
+    responses: {
+      200: { description: 'Acknowledged (or already acknowledged: unchanged)', content: { 'application/json': { schema: PrivacyAck } } },
+      ...problemResponses(400, 401, 409, 422, 426, 429),
+    },
   })
   registry.registerPath({
     method: 'get',

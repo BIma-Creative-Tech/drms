@@ -294,8 +294,10 @@ const ROUTE_CLASSES: Record<string, RouteClass> = {
   'HEAD /health/ready': 'public',
   'GET /app/config': 'public',
   'GET /openapi.json': 'public',
+  'GET /privacy-notice': 'public', // ADR 0018: the bundled notice text, no user data
   'GET /me': 'own',
   'POST /me/companies': 'own',
+  'POST /me/privacy-ack': 'own', // ADR 0018: the caller's own acknowledgement
   'POST /devices/register': 'own',
   'POST /admin/test-email': 'own',
   'POST /media/:kind': 'own',

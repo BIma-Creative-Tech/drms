@@ -95,7 +95,8 @@ export const Users: CollectionConfig = withAudit(
   {
     slug: 'users',
     labels: { singular: 'Pengguna', plural: 'Pengguna' },
-    admin: { useAsTitle: 'email', group: 'Pengguna & Akses', defaultColumns: ['email', 'name', 'active'] },
+    // Privacy notice (Q-46, ADR 0018): column "Privasi dibaca (versi/tanggal)" for Admins.
+    admin: { useAsTitle: 'email', group: 'Pengguna & Akses', defaultColumns: ['email', 'name', 'active', 'privacyAck'] },
     auth: {
       // Keycloak-only login. No password/forgot/reset endpoints, no Payload JWT (spike a).
       disableLocalStrategy: true,
@@ -180,6 +181,30 @@ export const Users: CollectionConfig = withAudit(
         defaultValue: false,
         access: { create: ({ req }) => isGroupAdmin(req), update: ({ req }) => isGroupAdmin(req) },
         admin: { position: 'sidebar', description: 'Mengelola daftar PT, setting aplikasi dan akses PT semua pengguna.' },
+      },
+      // Q-46 / ASVS 8.3.3 (ADR 0018): acknowledgement of the employee privacy notice. Read-only everywhere; set ONLY
+      // by POST /api/v1/me/privacy-ack (own account, audited `privacy_ack`); the DB keeps it monotonic.
+      {
+        name: 'privacyAckVersion',
+        type: 'number',
+        label: 'Versi pemberitahuan privasi yang dibaca',
+        min: 1,
+        access: { create: () => false, update: () => false },
+        admin: { readOnly: true, position: 'sidebar', step: 1, description: 'Diisi saat pengguna menekan "Saya mengerti" di web/aplikasi.' },
+      },
+      {
+        name: 'privacyAckAt',
+        type: 'date',
+        label: 'Pemberitahuan privasi dibaca pada',
+        access: { create: () => false, update: () => false },
+        admin: { readOnly: true, position: 'sidebar', date: { pickerAppearance: 'dayAndTime' } },
+      },
+      // list-only column: "v1 · 05/10/2026 10.12" / "Belum" / outdated version
+      {
+        name: 'privacyAck',
+        type: 'ui',
+        label: 'Privasi dibaca (versi/tanggal)',
+        admin: { disableListColumn: false, components: { Cell: '@/admin/components/users/PrivacyAckCell#PrivacyAckCell' } },
       },
     ],
   },

@@ -10,6 +10,8 @@
     "dev": "next dev",
     "gen:openapi": "node scripts/gen-openapi.mjs",
     "check:openapi": "node scripts/gen-openapi.mjs --check",
+    "gen:privacy-notice": "node scripts/gen-privacy-notice.mjs",
+    "check:privacy-notice": "node scripts/gen-privacy-notice.mjs --check",
     "gen:import-template": "node scripts/gen-import-template.mjs",
     "check:import-template": "node scripts/gen-import-template.mjs --check",
     "build": "npm run gen:openapi && next build --webpack && npm run build:worker",

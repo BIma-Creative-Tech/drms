@@ -2,6 +2,7 @@ import type { Payload, SanitizedPermissions, TypedUser, VisibleEntities } from '
 import React from 'react'
 
 import { NotificationBell } from '@/admin/components/NotificationBell'
+import { PrivacyGate } from '@/admin/components/privacy/PrivacyGate'
 import { LogoutButton } from '@/components/LogoutButton'
 
 import { ModuleBar } from './ModuleBar'
@@ -14,6 +15,7 @@ import { loadModules, loadSwitcher, navUser } from './modules-server'
  * the left sidebar by the Odoo-style top bar: the server computes the visible modules, badges and
  * the bell, the client ModuleBar resolves the active module from the pathname and renders the menu.
  * Replacing Nav drops before/afterNavLinks and the default logout slot → bell + logout live here.
+ * Also hosts the privacy-notice gate (ADR 0018): this is the one server component on every admin page.
  */
 type Props = {
   payload: Payload
@@ -26,7 +28,13 @@ type Props = {
 export async function ModuleNav({ payload, user, permissions, visibleEntities, i18n }: Props) {
   if (!payload?.config || !user) return null
   const [modules, companies] = await Promise.all([loadModules({ payload, user, permissions, visibleEntities, i18n }), loadSwitcher(payload, user)])
-  return <ModuleBar modules={modules} user={navUser(user)} companies={companies} bell={<NotificationBell payload={payload} user={user} />} logout={<LogoutButton />} />
+  return (
+    <>
+      <ModuleBar modules={modules} user={navUser(user)} companies={companies} bell={<NotificationBell payload={payload} user={user} />} logout={<LogoutButton />} />
+      {/* ADR 0018 (Q-46): non-dismissable privacy-notice interstitial until the current version is acknowledged */}
+      <PrivacyGate user={user as { privacyAckVersion?: unknown }} />
+    </>
+  )
 }
 
 export default ModuleNav

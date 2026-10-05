@@ -7,7 +7,7 @@ import { themeCssVariables } from '@/theme/tokens'
 import './public.css'
 
 /**
- * Root layout of the PUBLIC pages (route group `(public)`, currently only `/unduh`): no Payload,
+ * Root layout of the PUBLIC pages (route group `(public)`: `/unduh`, `/privasi`): no Payload,
  * no session, no client components. Same web-starter tokens/fonts as the admin
  * (`(payload)/layout.tsx`): colour tokens as CSS variables on <html>, self-hosted next/font files.
  * Not indexed (robots meta here + X-Robots-Tag in next.config.ts): pages for DRMS employees only.

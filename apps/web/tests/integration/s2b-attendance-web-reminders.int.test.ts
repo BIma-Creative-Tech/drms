@@ -94,7 +94,7 @@ describe('selfie retention job (fake clock)', () => {
     const p = await getTestPayload()
     const now = new Date(Date.now() + 400 * 86_400_000) // ≈ 13 months later
     const r = await purgeExpiredSelfies(p, { now })
-    expect(r).toMatchObject({ dryRun: true, deleted: 0, months: 12 })
+    expect(r).toMatchObject({ dryRun: true, deleted: 0, months: 6 }) // Q-33 (owner 2026-10-05): default 6 months
     expect(r.candidates).toBeGreaterThanOrEqual(12)
     expect(existsSync(await fileOf(selfies[0]!))).toBe(true)
     // "today" is inside the retention period → not a candidate
@@ -129,7 +129,7 @@ describe('selfie retention job (fake clock)', () => {
     // audit: one retention_purge row per run, counts only, source job
     const audit = await sqlAs('app', "SELECT new_value, source, user_id FROM audit_logs WHERE action = 'retention_purge' ORDER BY id")
     expect(audit.rows.length).toBeGreaterThanOrEqual(2)
-    expect(audit.rows[0]).toMatchObject({ source: 'job', user_id: null, new_value: { v: expect.objectContaining({ months: 12, deleted: 10, batch: 10 }) } })
+    expect(audit.rows[0]).toMatchObject({ source: 'job', user_id: null, new_value: { v: expect.objectContaining({ months: 6, deleted: 10, batch: 10 }) } })
     expect(JSON.stringify(audit.rows[0].new_value)).not.toMatch(/filename|jpg/)
     // idempotent: nothing left
     expect(await purgeExpiredSelfies(p, { now })).toMatchObject({ candidates: 0, deleted: 0 })

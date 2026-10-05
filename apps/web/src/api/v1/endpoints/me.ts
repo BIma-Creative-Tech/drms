@@ -2,6 +2,7 @@ import type { PayloadRequest } from 'payload'
 
 import { companyContextOf, membershipsOf, userRoles, type Membership, type Role } from '@/access/roles'
 import { appSettings, companyById, settings } from '@/domain/companies'
+import { privacyStatusOf } from '@/legal/privacy-notice'
 import { DEFAULT_TZ } from '@/lib/time'
 
 import { json, v1 } from '../http'
@@ -10,6 +11,8 @@ type UserShape = {
   id: number
   email: string
   name?: string | null
+  privacyAckVersion?: number | null
+  privacyAckAt?: string | null
   _strategy?: 'oidcSession' | 'mobileBearer'
   _pkDevice?: { id: number; deviceId: string }
 }
@@ -67,6 +70,7 @@ async function employeeRefs(req: PayloadRequest, ids: number[]): Promise<Map<num
  *   memberships; default all). `appSettings` = app-wide values (one APK for all PTs).
  * - Deprecated (kept for mobile-v0.2.0): `roles` / `capabilities` = union over the SELECTED PTs
  *   (unchanged), `employee` / `settings` = the PT `legacyCompanyId` (see legacyCompanyOf).
+ * - `privacy` (ADR 0018): current privacy-notice version + the caller's acknowledgement (version, time).
  */
 export const meEndpoint = v1({
   path: '/me',
@@ -149,6 +153,8 @@ export const meEndpoint = v1({
         offlineMaxAgeDays: app.offlineMaxAgeDays,
         imageTargets,
       },
+      // ADR 0018 (Q-46): acknowledgement of the employee privacy notice. Additive — APK ≤ 0.3.2 ignores it.
+      privacy: privacyStatusOf(u),
       serverTime: new Date().toISOString(),
     })
   },

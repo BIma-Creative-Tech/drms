@@ -4,6 +4,7 @@ import { APIError, type CollectionAfterChangeHook, type CollectionBeforeChangeHo
 import { companiesWithRole, denyAll, isGroupAdmin, memberCompanies, relId } from '@/access/roles'
 import { reasonOnDeactivate, withAudit } from '@/audit/hooks'
 import { percentField, rupiahField, uuidField } from '@/fields/common'
+import { SELFIE_RETENTION_DEFAULT_MONTHS } from '@/domain/attendance/retention-policy'
 import { copyCompanyDefaults, SKIP_COMPANY_DEFAULTS } from '@/domain/company-defaults'
 import { DEFAULT_TZ, isValidTimeZone } from '@/lib/time'
 
@@ -133,10 +134,14 @@ export const COMPANY_SETTING_FIELDS: Field[] = [
     filterOptions: ({ id }) => (id ? { company: { equals: id } } : false),
     admin: { description: 'Dipakai untuk karyawan tanpa jadwal sendiri. Kosong = keterlambatan tidak dihitung.' },
   },
-  // E6 (Q-33, UU PDP): selfie retention per PT (the batch size stays app-wide in the global).
+  // E6 (Q-33, UU PDP): selfie retention per PT (the batch size stays app-wide in the global). Default 6 months =
+  // owner decision 2026-10-05 (migration 20261005_090100_selfie_retention_6m moved untouched PTs from 12 to 6).
   {
-    ...intField('selfieRetentionMonths', 'Retensi selfie absensi (bulan)', 12, 1, 120),
-    admin: { description: 'Selfie lebih tua dari ini dihapus dari penyimpanan saat penghapusan otomatis aktif (data absensi tetap). Default 12 bulan; menunggu keputusan klien (Q-33).' },
+    ...intField('selfieRetentionMonths', 'Retensi selfie absensi (bulan)', SELFIE_RETENTION_DEFAULT_MONTHS, 1, 120),
+    admin: {
+      description:
+        'Selfie lebih tua dari ini dihapus dari penyimpanan saat penghapusan otomatis aktif (data absensi tetap). Default 6 bulan = keputusan owner 2026-10-05 (Q-33), sama dengan pemberitahuan privasi karyawan; nilai lain berarti pemberitahuan harus diperbarui.',
+    },
   },
   {
     name: 'selfieRetentionDeleteEnabled',

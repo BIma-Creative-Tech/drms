@@ -250,6 +250,11 @@ export interface User {
    */
   groupAdmin?: boolean | null;
   /**
+   * Diisi saat pengguna menekan "Saya mengerti" di web/aplikasi.
+   */
+  privacyAckVersion?: number | null;
+  privacyAckAt?: string | null;
+  /**
    * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
    */
   changeReason?: string | null;
@@ -349,7 +354,7 @@ export interface Company {
    */
   syncAttendanceEnabled?: boolean | null;
   /**
-   * Selfie lebih tua dari ini dihapus dari penyimpanan saat penghapusan otomatis aktif (data absensi tetap). Default 12 bulan; menunggu keputusan klien (Q-33).
+   * Selfie lebih tua dari ini dihapus dari penyimpanan saat penghapusan otomatis aktif (data absensi tetap). Default 6 bulan = keputusan owner 2026-10-05 (Q-33), sama dengan pemberitahuan privasi karyawan; nilai lain berarti pemberitahuan harus diperbarui.
    */
   selfieRetentionMonths: number;
   /**
@@ -1891,7 +1896,8 @@ export interface AuditLog {
     | 'retention_purge'
     | 'import'
     | '2fa_enabled'
-    | '2fa_disabled';
+    | '2fa_disabled'
+    | 'privacy_ack';
   field?: string | null;
   lineNo?: number | null;
   oldValue?:
@@ -2321,6 +2327,8 @@ export interface UsersSelect<T extends boolean = true> {
   keycloakSub?: T;
   active?: T;
   groupAdmin?: T;
+  privacyAckVersion?: T;
+  privacyAckAt?: T;
   changeReason?: T;
   updatedAt?: T;
   createdAt?: T;

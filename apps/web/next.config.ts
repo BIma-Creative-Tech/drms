@@ -56,6 +56,8 @@ const nextConfig: NextConfig = {
       // Public APK download page + file (src/app/(public)/unduh): for DRMS employees only, never indexed.
       // `:path*` also matches `/unduh` itself.
       { source: '/unduh/:path*', headers: [{ key: 'X-Robots-Tag', value: 'noindex, nofollow' }] },
+      // Employee privacy notice (src/app/(public)/privasi): public, for DRMS employees, never indexed.
+      { source: '/privasi', headers: [{ key: 'X-Robots-Tag', value: 'noindex, nofollow' }] },
     ]
   },
 }
