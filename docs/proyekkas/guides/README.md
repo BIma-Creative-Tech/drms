@@ -27,6 +27,16 @@ uji coba: `https://drms-kas.staging.bimacreative.tech/unduh`) → **Unduh APK** 
 **Detail lainnya → Tetap instal**. Buka aplikasi → **Masuk ke ProyekKas** → isi **Email atau username** dan
 **Kata sandi** → **Masuk**. Login pertama butuh internet. Lupa kata sandi: hubungi Admin.
 
+**Pemberitahuan privasi:** menjelaskan data apa yang dicatat (termasuk **selfie** dan **lokasi** saat absen), untuk apa,
+siapa yang bisa melihat, berapa lama disimpan (selfie **6 bulan**) dan hak Anda. Bisa dibaca tanpa login di halaman
+**`/privasi`** (tautan **Pemberitahuan privasi** di bawah tombol masuk web dan di halaman `/unduh`). Saat pertama
+masuk (dan setiap kali isinya berubah versi) Anda diminta membacanya dan menekan **Saya mengerti**:
+- **Web:** pemberitahuan tampil di atas semua halaman admin dan tidak bisa ditutup sebelum **Saya mengerti**.
+- **APK (0.3.3+):** tampil layar penuh setelah masuk. **Nanti** menunda sampai aplikasi dibuka lagi, tetapi
+  **Absensi** (absen masuk/pulang, selfie, absen oleh PM) terkunci sampai Anda menekan **Saya mengerti**. Tanpa
+  sinyal, konfirmasi dikirim otomatis saat online kembali — absensi tetap terkunci sampai terkirim. Baca ulang di
+  **Profil → Pemberitahuan privasi**.
+
 **Versi baru:** bila ada versi baru, Beranda APK menampilkan **"Versi baru tersedia (…)"**. Ketuk untuk melihat
 **"Yang baru di versi …"** dan cara memperbarui: pasang APK versi baru **di atas** aplikasi lama, **tanpa menghapusnya**
 — data dan login tetap tersimpan. Bila versi di HP sudah terlalu lama, aplikasi menampilkan layar **Perbarui
