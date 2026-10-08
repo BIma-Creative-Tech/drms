@@ -2107,3 +2107,29 @@ $pk-modules: dashboard, persetujuan, proyek, keuangan, absensi, laporan, penggun
     }
   }
 }
+
+// ---- QA-29: expense-request detail at 390 px — 48 px horizontal page overflow -------------------
+// The workflow / requester panels render inside Payload's document form: a <select> is as wide as its
+// longest option ("1. Uraian … — Rp 1.250.000"), file inputs and long numbers/e-mails do not wrap.
+// Keep every control and text inside the field column; wide tables already scroll in their own box.
+@layer payload {
+  [data-pk-panel] {
+    min-width: 0;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+
+    :is(select, input, textarea) {
+      max-width: 100%;
+      min-width: 0;
+    }
+
+    label {
+      min-width: 0;
+      max-width: 100%;
+    }
+
+    table {
+      overflow-wrap: normal;
+    }
+  }
+}

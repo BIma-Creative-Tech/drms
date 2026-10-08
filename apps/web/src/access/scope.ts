@@ -126,7 +126,15 @@ export async function resolveScope(req: PayloadRequest, companyId: number | null
   return scope
 }
 
-/** `{ field: { in: ids } }`, or `false` when there is nothing in scope (never an empty IN). */
-export function inIds(field: string, ids: readonly number[]): Where | false {
-  return ids.length > 0 ? { [field]: { in: [...ids] } } : false
+/**
+ * A `Where` no row matches (ids are serial, never 0). QA-28: a role that HAS a scoped read rule but
+ * nothing in scope (staff without assignments, PM without a team) reads an EMPTY list — `false` made
+ * Payload answer 403, which broke relationship pickers (e.g. "Pusat biaya" on the staff request form
+ * → 403 on /api/cost-centers). Roles without any rule are still refused (403) by `byRole`.
+ */
+export const NO_ROWS: Where = { id: { equals: 0 } }
+
+/** `{ field: { in: ids } }`, or `NO_ROWS` when there is nothing in scope (never an empty IN). */
+export function inIds(field: string, ids: readonly number[]): Where {
+  return ids.length > 0 ? { [field]: { in: [...ids] } } : NO_ROWS
 }

@@ -6,6 +6,7 @@ import { revokeCurrentWebSession } from '@/auth/sessions'
 import { mobileBearerStrategy, oidcSessionStrategy } from '@/auth/strategies'
 import { reasonOnDeactivate, withAudit } from '@/audit/hooks'
 import { compensateKeycloak, deactivationAfterChange, keycloakSyncBeforeChange } from '@/domain/users-sync'
+import { displayNameField, displayNameQuery } from '@/fields/users'
 
 type UserExtras = { _pkSessionExp?: number }
 
@@ -96,7 +97,9 @@ export const Users: CollectionConfig = withAudit(
     slug: 'users',
     labels: { singular: 'Pengguna', plural: 'Pengguna' },
     // Privacy notice (Q-46, ADR 0018): column "Privasi dibaca (versi/tanggal)" for Admins.
-    admin: { useAsTitle: 'email', group: 'Pengguna & Akses', defaultColumns: ['email', 'name', 'active', 'privacyAck'] },
+    // QA-16: pickers/labels show the name with the email as secondary (virtual `displayName`);
+    // list search over the stored name + email.
+    admin: { useAsTitle: 'displayName', listSearchableFields: ['name', 'email'], group: 'Pengguna & Akses', defaultColumns: ['email', 'name', 'active', 'privacyAck'] },
     auth: {
       // Keycloak-only login. No password/forgot/reset endpoints, no Payload JWT (spike a).
       disableLocalStrategy: true,
@@ -124,7 +127,7 @@ export const Users: CollectionConfig = withAudit(
       delete: denyAll,
     },
     hooks: {
-      beforeOperation: [selfProfileGuard],
+      beforeOperation: [displayNameQuery, selfProfileGuard],
       beforeChange: [keycloakSyncBeforeChange],
       afterChange: [deactivationAfterChange],
       afterError: [async ({ req }) => compensateKeycloak(req)],
@@ -152,6 +155,7 @@ export const Users: CollectionConfig = withAudit(
       { name: 'email', type: 'email', label: 'Email', required: true, unique: true, access: adminOnly },
       { name: 'name', type: 'text', label: 'Nama', maxLength: 128, access: adminOnly },
       { name: 'phone', type: 'text', label: 'No. HP', maxLength: 32, access: adminOnly },
+      displayNameField(),
       {
         name: 'signature',
         type: 'upload',
@@ -159,7 +163,7 @@ export const Users: CollectionConfig = withAudit(
         label: 'Tanda tangan',
         admin: {
           description:
-            'PNG tanda tangan Anda (latar putih/transparan). Dipakai otomatis saat mengirim/menyetujui pengajuan (US-43). Klik "Buat Baru" untuk mengunggah, lalu Simpan.',
+            'PNG tanda tangan Anda (latar putih/transparan). Dipakai otomatis saat mengirim/menyetujui pengajuan. Klik "Buat Baru" untuk mengunggah, lalu Simpan.',
         },
       },
       {

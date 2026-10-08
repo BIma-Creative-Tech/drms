@@ -130,7 +130,8 @@ describe('drafts → REST operations', () => {
     const ops = pendingOps(d, stored)
     const r = batchErrors({ detail: 'Baris 2: Anda bukan Admin PT ini.', errors: [{ path: 'items.1', message: 'Anda bukan Admin PT ini.' }, { path: 'reason', message: 'Wajib.' }, { path: 'items.7', message: 'x' }] }, ops)
     expect([...r.cells]).toEqual([['9:3', 'Anda bukan Admin PT ini.']])
-    expect(r.general).toEqual(['reason: Wajib.', 'items.7: x'])
+    // QA-21: labels instead of raw paths
+    expect(r.general).toEqual(['Alasan: Wajib.', 'Baris 8: x'])
     expect(batchErrors(null, ops)).toEqual({ cells: new Map(), general: [] })
   })
 

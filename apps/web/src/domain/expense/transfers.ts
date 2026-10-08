@@ -88,7 +88,7 @@ export async function recordTransfer(req: PayloadRequest, id: number, input: Tra
   const doc = await loadRaw(req, id)
   const approved = doc.approvedAmount ?? 0
   if (input.amount !== undefined && input.amount !== approved) {
-    fail(409, 'Nominal transfer harus sama dengan nominal yang disetujui; Finance tidak dapat mengubah nominal (G3).')
+    fail(409, 'Nominal transfer harus sama dengan nominal yang disetujui; Finance tidak dapat mengubah nominal.')
   }
   const todayDate = await today(req)
   const transferDate = input.transferDate ?? todayDate

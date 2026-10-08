@@ -1,5 +1,4 @@
 import {
-  ValidationError,
   type CollectionAfterChangeHook,
   type CollectionBeforeChangeHook,
   type CollectionConfig,
@@ -13,6 +12,7 @@ import {
 import { changeReasonField, CHANGE_REASON } from '@/fields/common'
 
 import { writeAudit, type AuditAction, type AuditRow } from './writer'
+import { validationError } from '@/lib/validation'
 
 /** Top-level data field names (walks unnamed row/collapsible/tabs containers; skips virtual/ui). */
 export function dataFieldNames(fields: readonly Field[]): string[] {
@@ -124,7 +124,7 @@ function checkReason(
   if (reason && reason.length >= 3) return
   for (const rule of rules) {
     const message = rule(args)
-    if (message) throw new ValidationError({ ...where, errors: [{ path: CHANGE_REASON, message }], req })
+    if (message) throw validationError(req, where, [{ path: CHANGE_REASON, message }])
   }
 }
 

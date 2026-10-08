@@ -1,11 +1,12 @@
 import type { CollectionConfig } from 'payload'
 
 import { denyAll } from '@/access/roles'
-import { anyOf, byRole, rolesAllowed } from '@/access/policies'
+import { byRole, rolesAllowed } from '@/access/policies'
 import { inIds } from '@/access/scope'
 import { reasonOnDeactivate, withAudit } from '@/audit/hooks'
 import { activeField, codeField, odooRefField, uuidField } from '@/fields/common'
 import { companyField, companyHook } from '@/fields/company'
+import { userPicker } from '@/fields/users'
 
 /**
  * Pusat biaya / lokasi operasional (form item 9: "Ops Palangka Banjar" is not a project).
@@ -22,7 +23,7 @@ export const CostCenters: CollectionConfig = withAudit(
         'pk-admin': true,
         'pk-owner': true,
         'pk-finance': true,
-        'pk-pm': anyOf(async ({ scope }) => inIds('id', (await scope()).teamCostCenters)),
+        'pk-pm': async ({ scope }) => inIds('id', (await scope()).teamCostCenters),
         'pk-staff': async ({ scope }) => inIds('id', (await scope()).assignedCostCenters),
       }),
       create: rolesAllowed('pk-admin', 'pk-owner'),
@@ -45,7 +46,8 @@ export const CostCenters: CollectionConfig = withAudit(
           { label: 'Departemen', value: 'department' },
         ],
       },
-      { name: 'manager', type: 'relationship', relationTo: 'users', label: 'Penanggung jawab', index: true },
+      // QA-16: active members of the cost center's PT, shown by name
+      { name: 'manager', type: 'relationship', relationTo: 'users', label: 'Penanggung jawab', index: true, ...userPicker() },
       // E6 / Q-40: optional geofence of an operational location (absensi di pusat biaya). No point =
       // attendance at this cost center is refused (NO_GEOFENCE), like a project without a point.
       // S3e: a point without radius uses company-settings.defaultGeofenceRadiusM.

@@ -18,8 +18,14 @@ Satu orang bisa punya lebih dari satu peran; baca semua panduan yang sesuai.
 `https://drms-kas.staging.bimacreative.tech/admin`. Klik **Masuk dengan akun DRMS (SSO)**.
 
 **Panel web = layar modul:** setelah masuk, `/admin` menampilkan kotak modul (Dashboard, Persetujuan, Proyek,
-Keuangan, Absensi, Laporan, …) — hanya modul yang boleh Anda buka. Klik modul → menunya ada di **bar atas**; tombol
+Keuangan, Absensi, Laporan, …) — hanya modul yang bisa Anda pakai. Klik modul → menunya ada di **bar atas**; tombol
 **⊞** kembali ke layar modul; di HP menu dibuka dengan **☰**. Ringkasan per peran ada di modul **Dashboard**.
+Profil & tanda tangan ada di menu akun (inisial nama), notifikasi di **lonceng** — keduanya selalu di bar atas.
+Membuka halaman yang bukan untuk peran Anda menampilkan **"Anda tidak memiliki akses ke halaman ini."** dengan
+tautan **← Kembali ke beranda**. Ringkasan hak akses per peran: [admin.md](admin.md#hak-akses-per-peran--perubahan-2026-10-08-laporan-qa-keputusan-pemilik).
+
+**Dialog konfirmasi:** tombol seperti **Tolak**, **Tarik kembali**, **Batalkan**, **Minta revisi** membuka kotak
+dialog aplikasi. Alasan wajib minimal 3 karakter; bila kurang, pesan tampil di kotak itu dan kotak tetap terbuka.
 
 **Aplikasi Android:** unduh dari halaman **`/unduh`** di alamat web (mis. `https://drms-kas.bimacreative.tech/unduh`;
 uji coba: `https://drms-kas.staging.bimacreative.tech/unduh`) → **Unduh APK** → buka file → bila diminta, ketuk

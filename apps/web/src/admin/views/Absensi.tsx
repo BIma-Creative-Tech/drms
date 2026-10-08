@@ -24,6 +24,7 @@ import { foreignPtParam, PtChip, ptView, type PtView } from './pt'
 import { PtNotAllowed } from './shared'
 import { Bento, Card, DashHead, DataTable, EmptyState, HBarList, KpiRow, KpiTile, StatusPill, TableView, VIZ_STYLE } from './viz'
 import { settings as companySettings } from '@/domain/companies'
+import { NoAccess } from './NoAccess'
 
 /**
  * E6 web (plan fase1-golive E6, S2; US-09/13/14/15, Q-30/33/40): admin views of the attendance
@@ -318,13 +319,14 @@ export async function AbsensiToday(props: AdminViewServerProps) {
   const { scope, r, loc, today, lateCount, pts, chosen } = data
   if (!scope || !r) {
     return (
-      <Frame props={props} name="absensi-denied">
-        <DashHead title="Absensi" />
-        <SubNav active="today" scope={null} />
-        <Alert tone="info" attr="denied">
-          &quot;Tim hari ini&quot; untuk PM, Finance, Direktur dan Admin. Rekap absensi Anda sendiri ada di <Link href="/admin/absensi/rekap">Rekap saya</Link>.
-        </Alert>
-      </Frame>
+      <NoAccess
+        props={props}
+        hint={
+          <>
+            Rekap absensi Anda sendiri ada di <Link href="/admin/absensi/rekap">Rekap saya</Link>.
+          </>
+        }
+      />
     )
   }
   const c = r.counts
@@ -1051,13 +1053,7 @@ export async function AbsensiJadwal(props: AdminViewServerProps) {
   const scope = await withReqTransaction(req, () => attendanceScope(req)).catch(() => null)
   if (!scope) {
     return (
-      <Frame props={props} name="absensi-denied">
-        <DashHead title="Jadwal & hari libur" />
-        <SubNav active="jadwal" scope={null} />
-        <Alert tone="info" attr="denied">
-          Halaman ini untuk PM, Finance, Direktur dan Admin.
-        </Alert>
-      </Frame>
+      <NoAccess props={props} />
     )
   }
   const canWrite = hasRoleAny(req, 'pk-admin', 'pk-owner') // collection update access: Admin + Owner (Direktur)

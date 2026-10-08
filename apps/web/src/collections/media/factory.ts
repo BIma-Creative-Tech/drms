@@ -152,6 +152,9 @@ export function mediaCollection(spec: MediaSpec): CollectionConfig {
   }
 
   const readOnly = { readOnly: true }
+  // QA-29: technical/server fields are hidden in the upload drawer / create form (nothing to fill in)
+  // and shown read-only in the sidebar of a saved file.
+  const technical = { readOnly: true, position: 'sidebar' as const, condition: (data: { id?: unknown } | undefined) => data?.id !== undefined && data?.id !== null }
   const never = { update: () => false }
 
   return withAudit(
@@ -180,15 +183,15 @@ export function mediaCollection(spec: MediaSpec): CollectionConfig {
       },
       hooks: { beforeOperation: [beforeOperation], beforeChange: [stamp] },
       fields: [
-        { name: 'uploadedBy', type: 'relationship', relationTo: 'users', label: 'Diunggah oleh', index: true, access: never, admin: readOnly },
-        { name: 'receivedAt', type: 'date', label: 'Diterima server', access: never, admin: readOnly },
-        { name: 'ownerDocType', type: 'text', label: 'Jenis dokumen pemilik', index: true, access: never, admin: readOnly },
-        { name: 'ownerDocId', type: 'text', label: 'ID dokumen pemilik', index: true, access: never, admin: readOnly },
-        { name: 'sha256Original', type: 'text', label: 'SHA-256 file asli', index: true, access: never, admin: readOnly },
-        { name: 'originalWidth', type: 'number', access: never, admin: readOnly },
-        { name: 'originalHeight', type: 'number', access: never, admin: readOnly },
-        { name: 'originalSize', type: 'number', access: never, admin: readOnly },
-        { name: 'capturedAt', type: 'date', label: 'Waktu foto (perangkat)', access: never },
+        { name: 'uploadedBy', type: 'relationship', relationTo: 'users', label: 'Diunggah oleh', index: true, access: never, admin: technical },
+        { name: 'receivedAt', type: 'date', label: 'Diterima server', access: never, admin: { ...technical, date: { pickerAppearance: 'dayAndTime' } } },
+        { name: 'ownerDocType', type: 'text', label: 'Jenis dokumen pemilik', index: true, access: never, admin: technical },
+        { name: 'ownerDocId', type: 'text', label: 'ID dokumen pemilik', index: true, access: never, admin: technical },
+        { name: 'sha256Original', type: 'text', label: 'SHA-256 file asli', index: true, access: never, admin: technical },
+        { name: 'originalWidth', type: 'number', label: 'Lebar asli (px)', access: never, admin: technical },
+        { name: 'originalHeight', type: 'number', label: 'Tinggi asli (px)', access: never, admin: technical },
+        { name: 'originalSize', type: 'number', label: 'Ukuran asli (byte)', access: never, admin: technical },
+        { name: 'capturedAt', type: 'date', label: 'Waktu foto (perangkat)', access: never, admin: { ...technical, date: { pickerAppearance: 'dayAndTime' } } },
         ...(spec.ownerCompany
           ? [
               {

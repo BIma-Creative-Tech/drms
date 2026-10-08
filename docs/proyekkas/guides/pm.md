@@ -63,6 +63,8 @@ kuning = perlu perhatian; merah = anggaran terpakai mendahului progress lebih da
 
 ## 4. Project, tahapan, penugasan (web)
 
+- **Data project** (nama, alamat, RAB, status, titik lokasi) **hanya bisa dibaca** oleh PM (keputusan pemilik
+  2026-10-08); perubahan diminta ke Direktur. RAB berubah lewat **Addendum RAB**, progress lewat laporan progress.
 - **Tahapan:** **Progress project** → pilih project → **Editor tahapan**. PM boleh mengubah **nama, urutan, bobot**
   (total harus 100%, alasan wajib saat bobot berubah). Menambah/menonaktifkan tahapan dan membuat project: Direktur.
 - **Penugasan tim:** **Proyek → Penugasan tim** → tambah karyawan ke project/pusat biaya Anda (tanggal mulai).

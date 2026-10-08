@@ -1,8 +1,9 @@
-import { APIError, ValidationError, type CollectionBeforeChangeHook, type CollectionSlug, type PayloadRequest, type RelationshipField } from 'payload'
+import { APIError, type CollectionBeforeChangeHook, type CollectionSlug, type PayloadRequest, type RelationshipField } from 'payload'
 
 import { PENDING_CREATE_ROLES } from '@/access/policies'
 import { hasRole, relId, soleCompany, type Role } from '@/access/roles'
 import { defaultCompanyForWrite } from '@/domain/companies'
+import { validationError } from '@/lib/validation'
 
 /**
  * ADR 0016 §4: every per-PT collection carries `company` (DB `company_id NOT NULL`, immutable).
@@ -95,12 +96,12 @@ export function companyHook(slug: CollectionSlug, opts: { derive?: CompanyRef[];
         for (const id of ids) {
           const c = map.get(id)
           if (c === undefined) continue
-          if (derived !== undefined && derived !== c) throw new ValidationError({ collection: slug, errors: [{ path: ref.field, message: CROSS_COMPANY_MESSAGE }], req })
+          if (derived !== undefined && derived !== c) throw validationError(req, { collection: slug }, [{ path: ref.field, message: CROSS_COMPANY_MESSAGE }])
           derived = c
         }
       }
       if (given !== undefined && derived !== undefined && given !== derived) {
-        throw new ValidationError({ collection: slug, errors: [{ path: 'company', message: CROSS_COMPANY_MESSAGE }], req })
+        throw validationError(req, { collection: slug }, [{ path: 'company', message: CROSS_COMPANY_MESSAGE }])
       }
       company = derived ?? given ?? (await defaultCompanyForWrite(req))
       d.company = company
@@ -122,13 +123,13 @@ export function companyHook(slug: CollectionSlug, opts: { derive?: CompanyRef[];
       if (ref.member) {
         const ok = await activeMembers(req, fresh, company)
         if (fresh.some((id) => !ok.has(id))) {
-          throw new ValidationError({ collection: slug, errors: [{ path: ref.sub ? `${ref.field}` : ref.field, message: 'Pengguna harus anggota aktif PT ini.' }], req })
+          throw validationError(req, { collection: slug }, [{ path: ref.sub ? `${ref.field}` : ref.field, message: 'Pengguna harus anggota aktif PT ini.' }])
         }
         continue
       }
       const map = await companiesOf(req, ref.collection, fresh)
       if (fresh.some((id) => map.has(id) && map.get(id) !== company)) {
-        throw new ValidationError({ collection: slug, errors: [{ path: ref.field, message: CROSS_COMPANY_MESSAGE }], req })
+        throw validationError(req, { collection: slug }, [{ path: ref.field, message: CROSS_COMPANY_MESSAGE }])
       }
     }
     return data

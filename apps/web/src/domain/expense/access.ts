@@ -2,7 +2,7 @@ import type { Access, PayloadRequest, Where } from 'payload'
 
 import { companiesWithRole, relId, userId } from '@/access/roles'
 import { anyOf, byRole, type Rule } from '@/access/policies'
-import { inIds } from '@/access/scope'
+import { inIds, NO_ROWS } from '@/access/scope'
 import { writeAuditDetached } from '@/audit/writer'
 
 /**
@@ -23,8 +23,8 @@ const ownRequest: Rule = async ({ req, scope }) => {
 
 const teamRequests: Rule = async ({ scope }) => {
   const s = await scope()
-  const or = [inIds('project', s.teamProjects), inIds('costCenter', s.teamCostCenters)].filter((w): w is Where => w !== false)
-  return or.length === 0 ? false : or.length === 1 ? (or[0] as Where) : { or }
+  const or = [inIds('project', s.teamProjects), inIds('costCenter', s.teamCostCenters)].filter((w) => w !== NO_ROWS)
+  return or.length === 0 ? NO_ROWS : or.length === 1 ? (or[0] as Where) : { or }
 }
 
 /** Q-23 (usulan default): assigned staff see the requests of their cost centers. */

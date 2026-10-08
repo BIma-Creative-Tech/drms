@@ -6,6 +6,8 @@ import React from 'react'
 import { hasRoleAny, type Role } from '@/access/roles'
 import { formatRupiah } from '@/lib/money'
 
+import { NoAccess } from './NoAccess'
+
 export { TableScroll } from '../components/TableScroll'
 
 /**
@@ -36,12 +38,9 @@ export function Shell({ props, title, children }: { props: AdminViewServerProps;
   )
 }
 
-export function Forbidden({ props, title, roles }: { props: AdminViewServerProps; title: string; roles: Role[] }) {
-  return (
-    <Shell props={props} title={title}>
-      <p>Halaman ini hanya untuk peran: {roles.join(', ')}.</p>
-    </Shell>
-  )
+/** QA-20(c): the uniform no-access page (title/roles kept for the call sites, never shown). */
+export function Forbidden({ props }: { props: AdminViewServerProps; title?: string; roles?: Role[] }) {
+  return <NoAccess props={props} />
 }
 
 /** QA-MC4-14: `?pt=` names a PT outside the caller's selection (`foreignPtParam`, pt.tsx). */

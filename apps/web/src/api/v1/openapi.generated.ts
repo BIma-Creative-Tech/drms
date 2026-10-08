@@ -3564,6 +3564,14 @@ export const openapiDocument = {
               "null"
             ],
             "exclusiveMinimum": 0
+          },
+          "proofId": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "exclusiveMinimum": 0,
+            "description": "QA-31 (ADR 0005 §5): add or replace the proof (media-attachments id uploaded by the caller); null removes it."
           }
         },
         "required": [

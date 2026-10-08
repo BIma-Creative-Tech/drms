@@ -222,9 +222,10 @@ describe('module launcher + /admin/dashboard', () => {
     expect(mods.map((m) => m.id)).toEqual(expect.arrayContaining(['dashboard', 'keuangan', 'laporan', 'sistem']))
   })
 
-  it('staff-only: Dashboard, Keuangan (own requests/receipts), Absensi saya, profile, notifications', async () => {
+  it('staff-only: Dashboard, Keuangan (own requests/receipts), Absensi saya (profile + notifications: top bar)', async () => {
     const { mods } = await modulesOf(w.users.staffA)
-    expect(mods.map((m) => m.id).sort()).toEqual(['absensi', 'dashboard', 'keuangan', 'pengguna', 'sistem'])
+    // QA-20(c): "Pengguna & Akses" (own profile only) and "Sistem" (own notifications only) are not offered
+    expect(mods.map((m) => m.id).sort()).toEqual(['absensi', 'dashboard', 'keuangan'])
     expect(mods.every((m) => m.badge === 0)).toBe(true)
   })
 
