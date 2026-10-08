@@ -157,11 +157,14 @@ export function byCompany<T extends { companyId: number }>(list: readonly T[], v
 /**
  * K-01: opening + Σ in − Σ out over ALL rows (posted, void, reversal) with entry_date ≤ asOf, per
  * account of the scope's LEDGER PTs (Finance/Owner of the PT). `total` = Σ over those PTs.
+ * QA-14: the opening balance counts only from its `opening_balance_date` on (an inflow on that date;
+ * accounts without a date: always) — before go-live the account holds 0.
  */
 export async function cashBalances(req: PayloadRequest, scope: ReportScope, asOf: string, accountId?: number): Promise<{ accounts: AccountBalance[]; total: number; byCompany: Array<{ companyId: number; total: number }> }> {
   const r = await rows(
     req,
-    sql`SELECT a.id, a.company_id, a.name, a.kind::text AS kind, coalesce(a.active, true) AS active, coalesce(a.opening_balance, 0)::text AS opening,
+    sql`SELECT a.id, a.company_id, a.name, a.kind::text AS kind, coalesce(a.active, true) AS active,
+          (CASE WHEN a.opening_balance_date IS NULL OR a.opening_balance_date <= ${asOf} THEN coalesce(a.opening_balance, 0) ELSE 0 END)::text AS opening,
           coalesce(sum(e.amount) FILTER (WHERE e.direction = 'in'), 0)::text AS tin,
           coalesce(sum(e.amount) FILTER (WHERE e.direction = 'out'), 0)::text AS tout
         FROM cash_accounts a
@@ -185,7 +188,21 @@ export const visibleAccounts = (list: AccountBalance[]) => list.filter((a) => a.
 
 export type FlowMode = 'book' | 'operational'
 export type FlowFilter = { from: string; to: string; accountId?: number; projectId?: number; costCenterId?: number }
-export type FlowRow = { period: string; masuk: number; keluar: number; net: number; koreksi: number; openingBalance: number | null; closingBalance: number | null }
+export type FlowRow = {
+  period: string
+  masuk: number
+  keluar: number
+  net: number
+  koreksi: number
+  openingBalance: number | null
+  /**
+   * QA-14: opening balances of accounts whose `openingBalanceDate` falls in this month (go-live), added to
+   * the running balance like an inflow on that date — closing = opening + saldoAwalAkun + net. 0 in every
+   * other month (and without balances: project / cost-center filter, operational mode).
+   */
+  saldoAwalAkun: number
+  closingBalance: number | null
+}
 
 /**
  * K-02a (book, `mode='book'`): every row incl. voided originals and their reversals; `koreksi` = net
@@ -210,22 +227,35 @@ export async function cashFlowMonthly(req: PayloadRequest, scope: ReportScope, f
   const byPeriod = new Map(r.map((x) => [String(x.period), x]))
   const withBalance = mode === 'book' && !f.projectId && !f.costCenterId
   let running: number | null = null
+  const golive = new Map<string, number>()
   if (withBalance) {
+    const acct = f.accountId ? sql`a.id = ${f.accountId}` : sql`TRUE`
+    // QA-14: opening balances count from their date on — dated before the range → in the start balance;
+    // dated inside it → added in that month (saldoAwalAkun); dated after it → not at all. NULL date → always.
     const o = await rows(
       req,
-      sql`SELECT (SELECT coalesce(sum(a.opening_balance), 0) FROM cash_accounts a WHERE ${ledgerScopeSql(scope, 'a')} AND ${f.accountId ? sql`a.id = ${f.accountId}` : sql`TRUE`})::text AS opening,
+      sql`SELECT (SELECT coalesce(sum(a.opening_balance), 0) FROM cash_accounts a WHERE ${ledgerScopeSql(scope, 'a')} AND ${acct}
+                  AND (a.opening_balance_date IS NULL OR a.opening_balance_date < ${firstDay(f.from)}))::text AS opening,
             (SELECT coalesce(sum(CASE WHEN ce.direction = 'in' THEN ce.amount ELSE -ce.amount END), 0) FROM cash_entries ce
               WHERE ce.entry_date < ${firstDay(f.from)} AND ${ledgerScopeSql(scope)} AND ${f.accountId ? sql`ce.cash_account_id = ${f.accountId}` : sql`TRUE`})::text AS before`,
     )
     running = num(o[0]?.opening) + num(o[0]?.before)
+    const g = await rows(
+      req,
+      sql`SELECT substr(a.opening_balance_date, 1, 7) AS period, coalesce(sum(a.opening_balance), 0)::text AS amount FROM cash_accounts a
+          WHERE ${ledgerScopeSql(scope, 'a')} AND ${acct} AND a.opening_balance_date >= ${firstDay(f.from)} AND a.opening_balance_date <= ${lastDay(f.to)}
+          GROUP BY 1`,
+    )
+    for (const x of g) golive.set(String(x.period), num(x.amount))
   }
   return periodRange(f.from, f.to).map((period) => {
     const x = byPeriod.get(period)
     const masuk = num(x?.masuk)
     const keluar = num(x?.keluar)
     const openingBalance = running
-    if (running !== null) running += masuk - keluar
-    return { period, masuk, keluar, net: masuk - keluar, koreksi: mode === 'book' ? num(x?.koreksi) : 0, openingBalance, closingBalance: running }
+    const saldoAwalAkun = golive.get(period) ?? 0
+    if (running !== null) running += saldoAwalAkun + masuk - keluar
+    return { period, masuk, keluar, net: masuk - keluar, koreksi: mode === 'book' ? num(x?.koreksi) : 0, openingBalance, saldoAwalAkun, closingBalance: running }
   })
 }
 

@@ -2205,6 +2205,172 @@ export const openapiDocument = {
               "string",
               "null"
             ]
+          },
+          "shortfallApproval": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "approvedAmount": {
+                "type": "integer"
+              },
+              "tolerancePct": {
+                "type": "number",
+                "description": "companies.shortfallTolerancePct of the request PT (default 10)."
+              },
+              "limit": {
+                "type": "integer",
+                "description": "approved + ⌊approved × tolerance / 100⌋: highest total transfer without re-approval."
+              },
+              "totalAfter": {
+                "type": "integer",
+                "description": "Transferred total after paying the shortfall."
+              },
+              "aboveTolerance": {
+                "type": "boolean"
+              },
+              "settleAllowed": {
+                "type": [
+                  "boolean",
+                  "null"
+                ],
+                "description": "LPJ verified: may the shortfall be paid now (within tolerance or approved)? null when not verified."
+              },
+              "status": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "enum": [
+                  "pending_ack",
+                  "pending_approval",
+                  "approved",
+                  "rejected",
+                  null
+                ]
+              },
+              "statusLabel": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "amount": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "description": "Total transfer the (last) re-approval is about."
+              },
+              "cycle": {
+                "type": "integer"
+              },
+              "level": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "note": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "rejectReason": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "allowedActions": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "acknowledge",
+                    "approve",
+                    "reject"
+                  ]
+                },
+                "description": "UI hint for the caller; the server re-checks."
+              },
+              "decisions": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "cycle": {
+                      "type": "integer"
+                    },
+                    "position": {
+                      "type": "string",
+                      "enum": [
+                        "diketahui",
+                        "approval"
+                      ]
+                    },
+                    "level": {
+                      "type": "integer"
+                    },
+                    "actorName": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "decision": {
+                      "type": "string",
+                      "enum": [
+                        "acknowledged",
+                        "approved",
+                        "rejected"
+                      ]
+                    },
+                    "reason": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "decidedAt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "cycle",
+                    "position",
+                    "level",
+                    "actorName",
+                    "decision",
+                    "reason",
+                    "decidedAt"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "approvedAmount",
+              "tolerancePct",
+              "limit",
+              "totalAfter",
+              "aboveTolerance",
+              "settleAllowed",
+              "status",
+              "statusLabel",
+              "amount",
+              "cycle",
+              "level",
+              "note",
+              "rejectReason",
+              "allowedActions",
+              "decisions"
+            ],
+            "description": "QA-06 / ADR 0019 (Finance/Direktur of the PT only; null otherwise or without a shortfall): shortfall vs approved + tolerance and its re-approval."
           }
         },
         "required": [
@@ -2873,6 +3039,14 @@ export const openapiDocument = {
             "minimum": 1,
             "maximum": 10000000000000,
             "description": "Optional echo; must equal the approved amount (Finance cannot change it, G3)."
+          },
+          "confirmOverdraft": {
+            "type": "boolean",
+            "description": "QA-04: confirm that this cash-out may make the cash account balance negative (else 409 CASH_OVERDRAFT_CONFIRM_REQUIRED with balance/after); audited overdraft_confirmed."
+          },
+          "confirmUnverifiedAccount": {
+            "type": "boolean",
+            "description": "QA-17: confirm a transfer to a bank account with verificationStatus ≠ verified (else 409 BANK_ACCOUNT_UNVERIFIED_CONFIRM_REQUIRED); audited bank_unverified_confirmed."
           }
         },
         "required": [
@@ -3329,6 +3503,10 @@ export const openapiDocument = {
             ],
             "exclusiveMinimum": 0,
             "description": "media-attachments id (optional, US-23)."
+          },
+          "confirmOverdraft": {
+            "type": "boolean",
+            "description": "QA-04: confirm that this cash-out may make the cash account balance negative (else 409 CASH_OVERDRAFT_CONFIRM_REQUIRED with balance/after); audited overdraft_confirmed."
           }
         },
         "required": [
@@ -3846,6 +4024,14 @@ export const openapiDocument = {
             "minimum": 1,
             "maximum": 10000000000000,
             "description": "Optional echo; must equal the server-computed |difference|."
+          },
+          "confirmOverdraft": {
+            "type": "boolean",
+            "description": "QA-04: confirm that this cash-out may make the cash account balance negative (else 409 CASH_OVERDRAFT_CONFIRM_REQUIRED with balance/after); audited overdraft_confirmed."
+          },
+          "confirmUnverifiedAccount": {
+            "type": "boolean",
+            "description": "QA-17: confirm a transfer to a bank account with verificationStatus ≠ verified (else 409 BANK_ACCOUNT_UNVERIFIED_CONFIRM_REQUIRED); audited bank_unverified_confirmed."
           }
         },
         "required": [
@@ -7855,6 +8041,153 @@ export const openapiDocument = {
           "companyIds"
         ],
         "additionalProperties": false
+      },
+      "ShortfallApprovalRequestBody": {
+        "type": "object",
+        "properties": {
+          "note": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 1000,
+            "description": "Why the receipts exceed the approved amount (shown to the deciders)."
+          }
+        },
+        "required": [
+          "note"
+        ],
+        "additionalProperties": false
+      },
+      "ShortfallDecisionBody": {
+        "type": "object",
+        "properties": {
+          "signatureMediaId": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "exclusiveMinimum": 0,
+            "description": "Captured signature (own media-signatures upload); default = profile signature (required to approve)."
+          }
+        },
+        "additionalProperties": false
+      },
+      "ShortfallRejectBody": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 1000
+          },
+          "signatureMediaId": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "exclusiveMinimum": 0
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "additionalProperties": false
+      },
+      "ShortfallInbox": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "requestId": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                "companyId": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "exclusiveMinimum": 0
+                },
+                "docNo": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "title": {
+                  "type": "string"
+                },
+                "lpjNo": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "settlementId": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                "step": {
+                  "type": "string",
+                  "enum": [
+                    "acknowledge",
+                    "approve"
+                  ]
+                },
+                "stepLabel": {
+                  "type": "string"
+                },
+                "approvedAmount": {
+                  "type": "integer"
+                },
+                "transferredTotal": {
+                  "type": "integer"
+                },
+                "shortfall": {
+                  "type": "integer"
+                },
+                "totalAfter": {
+                  "type": "integer"
+                },
+                "tolerancePct": {
+                  "type": "number"
+                },
+                "limit": {
+                  "type": "integer"
+                },
+                "note": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "requestId",
+                "companyId",
+                "docNo",
+                "title",
+                "lpjNo",
+                "settlementId",
+                "step",
+                "stepLabel",
+                "approvedAmount",
+                "transferredTotal",
+                "shortfall",
+                "totalAfter",
+                "tolerancePct",
+                "limit",
+                "note"
+              ]
+            }
+          }
+        },
+        "required": [
+          "items"
+        ]
       }
     },
     "parameters": {
@@ -11686,7 +12019,7 @@ export const openapiDocument = {
     },
     "/expense-requests/{id}/transfer": {
       "post": {
-        "summary": "Finance: record the transfer (amount = approved amount, proof, bank ref) → KK posted",
+        "summary": "Finance: record the transfer (amount = approved amount, proof, bank ref) → KK posted. QA-17: destination account not verified → 409 code BANK_ACCOUNT_UNVERIFIED_CONFIRM_REQUIRED (bankAccountId, verificationStatus, bankName, accountNo, accountHolder) unless confirmUnverifiedAccount (audited bank_unverified_confirmed); QA-04: cash account balance would go below 0 → 409 code CASH_OVERDRAFT_CONFIRM_REQUIRED (cashAccountId, balance, after) unless confirmOverdraft (audited overdraft_confirmed); QA-05: date before the account opening-balance date → 400",
         "security": [
           {
             "bearer": []
@@ -12492,7 +12825,7 @@ export const openapiDocument = {
         }
       },
       "post": {
-        "summary": "Finance: manual cash in/out (US-23); closed period → 409 (DB-enforced)",
+        "summary": "Finance: manual cash in/out (US-23); closed period → 409 (DB-enforced). QA-05: date before the account opening-balance date → 400 (errors[].path entryDate). QA-04: cash-out that makes the balance < 0 → 409 code CASH_OVERDRAFT_CONFIRM_REQUIRED (cashAccountId, balance, after) unless confirmOverdraft: true (audited overdraft_confirmed)",
         "security": [
           {
             "bearer": []
@@ -12883,7 +13216,7 @@ export const openapiDocument = {
     },
     "/cash-accounts/balances": {
       "get": {
-        "summary": "Finance/Direktur (pk-owner): balance per cash account (opening + in − out) of the selected PTs where the caller is Finance/Direktur; ?company= narrows (outside the selection → 403 COMPANY_NOT_ALLOWED)",
+        "summary": "Finance/Direktur (pk-owner): balance per cash account (opening — QA-14: only from its openingBalanceDate on — + in − out) of the selected PTs where the caller is Finance/Direktur; ?company= narrows (outside the selection → 403 COMPANY_NOT_ALLOWED)",
         "security": [
           {
             "bearer": []
@@ -13192,7 +13525,7 @@ export const openapiDocument = {
         }
       },
       "post": {
-        "summary": "Finance/Direktur (pk-owner): close a past month (DB rejects postings dated ≤ lock date)",
+        "summary": "Finance/Direktur (pk-owner): close a past month (DB rejects postings dated ≤ lock date); QA-30: a month before the earliest opening-balance date of the PT cash accounts → 400",
         "security": [
           {
             "bearer": []
@@ -14052,7 +14385,7 @@ export const openapiDocument = {
     },
     "/expense-requests/{id}/settle": {
       "post": {
-        "summary": "Finance: settle the verified LPJ — surplus → KM \"Pengembalian LPJ\", shortfall → transfer + KK (bank ref + proof) → Selesai",
+        "summary": "Finance: settle the verified LPJ — surplus → KM \"Pengembalian LPJ\", shortfall → transfer + KK (bank ref + proof) → Selesai. QA-06 / ADR 0019: total transfer above approved × (1 + shortfallTolerancePct/100) without an approved shortfall re-approval → 409 code SHORTFALL_REAPPROVAL_REQUIRED (approvedAmount, transferredTotal, tolerancePct, limit, shortfallApprovalStatus); shortfall transfer: same 409 confirmations as /transfer (BANK_ACCOUNT_UNVERIFIED_CONFIRM_REQUIRED, CASH_OVERDRAFT_CONFIRM_REQUIRED)",
         "security": [
           {
             "bearer": []
@@ -22801,6 +23134,634 @@ export const openapiDocument = {
             }
           },
           "429": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/expense-requests/{id}/lpj/shortfall-approval": {
+      "post": {
+        "summary": "Finance (not requester/creator): ask the re-approval of the NEW total of a verified LPJ whose shortfall exceeds approved + tolerance — approval rule of the request for that total (ADR 0013: Direktur \"Diketahui\" → Finance); within tolerance / running / already approved → 409",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d+$"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": false,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422."
+            },
+            "required": false,
+            "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422.",
+            "name": "Idempotency-Key",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ShortfallApprovalRequestBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Request detail (settlement.shortfallApproval updated)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExpenseRequestDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/expense-requests/{id}/lpj/shortfall-approval/acknowledge": {
+      "post": {
+        "summary": "Direktur: approve the shortfall (\"Diketahui\", signature required); G1/G2 as request decisions",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d+$"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": false,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422."
+            },
+            "required": false,
+            "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422.",
+            "name": "Idempotency-Key",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ShortfallDecisionBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Request detail (settlement.shortfallApproval updated)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExpenseRequestDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/expense-requests/{id}/lpj/shortfall-approval/approve": {
+      "post": {
+        "summary": "Finance level of the snapshot: approve the shortfall (signature required); last level → approved, settle allowed",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d+$"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": false,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422."
+            },
+            "required": false,
+            "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422.",
+            "name": "Idempotency-Key",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ShortfallDecisionBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Request detail (settlement.shortfallApproval updated)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExpenseRequestDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/expense-requests/{id}/lpj/shortfall-approval/reject": {
+      "post": {
+        "summary": "Direktur / Finance step: reject the shortfall (reason required); settle stays refused",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d+$"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": false,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422."
+            },
+            "required": false,
+            "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422.",
+            "name": "Idempotency-Key",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ShortfallRejectBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Request detail (settlement.shortfallApproval updated)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExpenseRequestDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/lpj-shortfall-approvals/inbox": {
+      "get": {
+        "summary": "LPJ shortfall re-approvals waiting for the caller (Direktur \"Diketahui\" / Finance level); ?company= narrows",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9]\\d{0,8}(,[1-9]\\d{0,8})*$",
+              "description": "MC3: PT filter (comma separated ids). Only narrows the effective selection (X-Company-Ids / cookie ∩ memberships); a PT outside it → 403 COMPANY_NOT_ALLOWED."
+            },
+            "required": false,
+            "description": "MC3: PT filter (comma separated ids). Only narrows the effective selection (X-Company-Ids / cookie ∩ memberships); a PT outside it → 403 COMPANY_NOT_ALLOWED.",
+            "name": "company",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Inbox",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShortfallInbox"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
             "description": "Problem",
             "content": {
               "application/problem+json": {

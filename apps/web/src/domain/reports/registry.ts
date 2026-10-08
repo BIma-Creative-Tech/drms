@@ -241,9 +241,12 @@ const rekapKas: ReportDef = {
     const f = { from: m.from, to: m.to, accountId: idOf(sp, 'akun'), projectId: idOf(sp, 'project'), costCenterId: idOf(sp, 'pusat') }
     const flows = await cashFlowMonthly(req, scope, f, 'book')
     const withBalance = !f.projectId && !f.costCenterId
+    // QA-14: an account going live inside the range adds its opening balance in that month (own column)
+    const golive = withBalance && flows.some((x) => x.saldoAwalAkun !== 0)
     const columns: Column[] = [
       { key: 'bulan', label: 'Bulan', type: 'text', primary: true },
       ...(withBalance ? [{ key: 'awal', label: 'Saldo awal (Rp)', type: 'money' as const }] : []),
+      ...(golive ? [{ key: 'golive', label: 'Saldo awal akun baru (Rp)', type: 'money' as const }] : []),
       { key: 'masuk', label: 'Masuk (Rp)', type: 'money' },
       { key: 'keluar', label: 'Keluar (Rp)', type: 'money' },
       { key: 'selisih', label: 'Selisih (Rp)', type: 'money', primary: true },
@@ -255,7 +258,7 @@ const rekapKas: ReportDef = {
       title: 'Arus kas per bulan (K-02a, semua baris termasuk void dan jurnal balik)',
       columns,
       rows: flows.map((x) => ({
-        cells: { bulan: periodLabel(x.period), awal: x.openingBalance, masuk: x.masuk, keluar: x.keluar, selisih: x.net, koreksi: x.koreksi, akhir: x.closingBalance },
+        cells: { bulan: periodLabel(x.period), awal: x.openingBalance, ...(golive ? { golive: x.saldoAwalAkun } : {}), masuk: x.masuk, keluar: x.keluar, selisih: x.net, koreksi: x.koreksi, akhir: x.closingBalance },
         href: `/admin/laporan/buku-kas?${qs({ dari: `${x.period}-01`, sampai: lastDay(x.period), akun: f.accountId, project: f.projectId, pusat: f.costCenterId })}`,
       })),
       totals: {

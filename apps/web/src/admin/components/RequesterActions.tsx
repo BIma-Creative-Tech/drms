@@ -1,6 +1,8 @@
 'use client'
 import React, { useRef, useState, useSyncExternalStore } from 'react'
 
+import { parseRupiah } from '@/lib/rupiah-input'
+
 import { postJson, problemText } from './ActionButton'
 import { TableScroll } from './TableScroll'
 
@@ -171,10 +173,13 @@ function ReceiptForm({ requestId, lines }: { requestId: number; lines: Requester
       if (!image || image.size === 0) throw new Error('Foto nota wajib diunggah.')
       const vendorName = text('vendorName')
       const receiptDate = text('receiptDate')
-      const amount = Number(text('amount').replace(/[^\d]/g, ''))
+      // QA-03: shared Rupiah rules — "1.000,50" / "-5000" are refused with a message, never stripped
+      const parsed = parseRupiah(text('amount'))
       if (!vendorName) throw new Error('Vendor / toko wajib diisi.')
       if (!/^\d{4}-\d{2}-\d{2}$/.test(receiptDate)) throw new Error('Tanggal nota wajib diisi.')
-      if (!Number.isSafeInteger(amount) || amount <= 0) throw new Error('Nominal harus angka Rupiah > 0.')
+      if (parsed.error) throw new Error(`Nominal: ${parsed.error}`)
+      if (parsed.value === null) throw new Error('Nominal harus angka Rupiah > 0.')
+      const amount = parsed.value
       const imageId = await uploadReceiptImage(image)
       await post(`${base(requestId)}/receipts`, { lineId: text('lineId'), receiptNo: text('receiptNo') || null, vendorName, receiptDate, amount, imageId })
       flashAndGo('Nota tersimpan. Periksa flag validasi pada daftar nota (bila ada).')
@@ -209,7 +214,7 @@ function ReceiptForm({ requestId, lines }: { requestId: number; lines: Requester
       </label>
       <label style={field}>
         Nominal tercetak (Rp)
-        <input type="text" data-f="amount" inputMode="numeric" placeholder="150000" />
+        <input type="text" data-f="amount" inputMode="numeric" placeholder="150.000" />
       </label>
       <button type="button" className={btn(true)} style={{ margin: 0 }} disabled={busy} onClick={onSubmit} data-pk-action="add-receipt">
         {busy ? 'Mengunggah…' : 'Upload nota'}

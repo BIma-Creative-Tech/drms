@@ -149,9 +149,9 @@ beforeAll(async () => {
     [X.empDewiB, X.projectB],
   ] as const)
     await sysCreate('team-assignments', { employee: emp, project, roleInProject: 'staff' })
-  X.accB = await sysCreate('employee-bank-accounts', { employee: X.empB, bank, accountNo: `71${Date.now() % 1e8}`, accountHolder: 'Staf Contoh Dua', isDefault: true })
-  X.accC = await sysCreate('employee-bank-accounts', { employee: X.empC, bank, accountNo: `72${Date.now() % 1e8}`, accountHolder: 'Staf Contoh Tiga', isDefault: true })
-  X.accDewiB = await sysCreate('employee-bank-accounts', { employee: X.empDewiB, bank, accountNo: `73${Date.now() % 1e8}`, accountHolder: 'Dewi', isDefault: true })
+  X.accB = await sysCreate('employee-bank-accounts', { employee: X.empB, bank, accountNo: `71${Date.now() % 1e8}`, accountHolder: 'Staf Contoh Dua', isDefault: true, verificationStatus: 'verified' })
+  X.accC = await sysCreate('employee-bank-accounts', { employee: X.empC, bank, accountNo: `72${Date.now() % 1e8}`, accountHolder: 'Staf Contoh Tiga', isDefault: true, verificationStatus: 'verified' })
+  X.accDewiB = await sysCreate('employee-bank-accounts', { employee: X.empDewiB, bank, accountNo: `73${Date.now() % 1e8}`, accountHolder: 'Dewi', isDefault: true, verificationStatus: 'verified' })
   X.cashB = await sysCreate('cash-accounts', { company: B, name: 'MC2 Kas Contoh Dua', kind: 'bank', openingBalance: 20_000_000 })
   X.cashC = await sysCreate('cash-accounts', { company: C, name: 'MC2 Kas Contoh Tiga', kind: 'bank', openingBalance: 7_000_000 })
 

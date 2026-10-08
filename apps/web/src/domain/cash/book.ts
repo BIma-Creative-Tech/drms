@@ -3,6 +3,7 @@ import type { PayloadRequest, Where } from 'payload'
 import { z } from 'zod'
 
 import { companiesWithRole, relId, rolesOf, type Role } from '@/access/roles'
+import { parseRupiah } from '@/lib/rupiah-input'
 import { getRequestTx } from '@/lib/tx'
 
 import type { CashEntryDoc } from './ledger'
@@ -128,19 +129,22 @@ function shift(period: string, delta: number): string {
 /**
  * Months that can be closed now (ledger.ts closePeriod: past months only; the lock date moves
  * forward): after the lock month up to last month, oldest first, at most `max` (no lock yet →
- * the last `max` months).
+ * the last `max` months). QA-30: never before `booksStart` (earliest opening-balance date of the PT's
+ * cash accounts, ledger.ts booksStartDate) — the server refuses those months too.
  */
-export function closablePeriods(today: string, lockDate: string | null, max = 12): string[] {
+export function closablePeriods(today: string, lockDate: string | null, max = 12, booksStart: string | null = null): string[] {
   const last = shift(monthOf(today), -1)
-  const first = lockDate ? shift(monthOf(lockDate), 1) : shift(last, -(max - 1))
+  let first = lockDate ? shift(monthOf(lockDate), 1) : shift(last, -(max - 1))
+  if (booksStart && monthOf(booksStart) > first) first = monthOf(booksStart)
   const out: string[] = []
   for (let p = first; p <= last && out.length < max; p = shift(p, 1)) out.push(p)
   return out
 }
 
-/** Last `n` periods ending with the current month, newest first. */
-export function recentPeriods(today: string, n = 12): string[] {
-  return Array.from({ length: n }, (_, i) => shift(monthOf(today), -i))
+/** Last `n` periods ending with the current month, newest first; QA-30: none before `booksStart`. */
+export function recentPeriods(today: string, n = 12, booksStart: string | null = null): string[] {
+  const all = Array.from({ length: n }, (_, i) => shift(monthOf(today), -i))
+  return booksStart ? all.filter((p) => p >= monthOf(booksStart) || p === monthOf(today)) : all
 }
 
 export type PeriodState = 'closed' | 'open' | 'current'
@@ -157,17 +161,18 @@ export function minPostingDate(lockDate: string | null): string | null {
   return d.toISOString().slice(0, 10)
 }
 
-/** Digits of a Rupiah text field ("Rp 1.250.000" → 1250000); null when empty/invalid. */
+/**
+ * Rupiah text field ("Rp 1.250.000" → 1250000); null when empty/invalid. QA-03/QA-12: no longer strips
+ * every non-digit ("1.000,50" was 100050, "-5000" was 5000) — same rules as lib/rupiah-input.
+ */
 export function parseRupiahInput(v: string): number | null {
-  const digits = v.replace(/[^\d]/g, '')
-  if (!digits || digits.length > 13) return null
-  const n = Number(digits)
-  return Number.isSafeInteger(n) && n > 0 ? n : null
+  const r = parseRupiah(v)
+  return r.error ? null : r.value
 }
 
 // ---------------------------------------------------------------- DB reads
 
-export type Option = { id: number; label: string; active: boolean; companyId: number | null }
+export type Option = { id: number; label: string; active: boolean; companyId: number | null; openingDate?: string | null }
 export type Lookups = {
   accounts: Option[]
   projects: Option[]
@@ -196,7 +201,8 @@ export async function cashLookups(req: PayloadRequest): Promise<Lookups> {
     all(req, 'vehicles', 'plateNo'),
   ])
   return {
-    accounts: accounts.map((d) => ({ id: d.id as number, companyId: cid(d), label: String(d.name ?? ''), active: d.active !== false })),
+    // QA-05: the form's date `min` follows the picked account's opening-balance (go-live) date
+    accounts: accounts.map((d) => ({ id: d.id as number, companyId: cid(d), label: String(d.name ?? ''), active: d.active !== false, openingDate: (d.openingBalanceDate as string | null | undefined) ?? null })),
     projects: projects.map((d) => ({ id: d.id as number, companyId: cid(d), label: codeName(d), active: d.status !== 'selesai' && d.status !== 'arsip' })),
     costCenters: costCenters.map((d) => ({ id: d.id as number, companyId: cid(d), label: codeName(d), active: d.active !== false })),
     categories: categories.map((d) => ({ id: d.id as number, companyId: cid(d), label: codeName(d), active: d.active !== false, requiresVehicle: d.requiresVehicle === true })),
@@ -311,24 +317,40 @@ export async function accountFlows(req: PayloadRequest, period: string, companyI
   return new Map(rows.map((r) => [Number(r.key), { n: r.n, tin: r.tin, tout: r.tout }]))
 }
 
+export type PeriodSummary = {
+  /** All rows of the month (posted, void, reversal). */
+  n: number
+  /** QA-30 (K-02b rule): Σ in / Σ out WITHOUT void pairs (`status='posted' AND source_type<>'reversal'`). */
+  tin: number
+  tout: number
+  /** Voided originals in the month. */
+  voids: number
+  /** Rows of void pairs (voided originals + reversal rows) dated in the month and their net (in − out). */
+  nKoreksi: number
+  koreksi: number
+}
+
 /**
- * Per period: number of rows, Σ in, Σ out, voided rows (Tutup buku overview) of the Kas PTs — pass
- * ONE `companyId` for the per-PT closing screen (closing is always one PT, ADR 0016 §4).
+ * Per period (Tutup buku overview) of the Kas PTs — pass ONE `companyId` for the per-PT closing
+ * screen (closing is always one PT, ADR 0016 §4). QA-30: Masuk/Keluar are net of void pairs (K-02b),
+ * the void pairs are reported separately (`koreksi`, `nKoreksi`) — book net = tin − tout + koreksi.
  */
-export async function periodSummaries(req: PayloadRequest, periods: string[], companyIds?: readonly number[]): Promise<Map<string, { n: number; tin: number; tout: number; voids: number }>> {
+export async function periodSummaries(req: PayloadRequest, periods: string[], companyIds?: readonly number[]): Promise<Map<string, PeriodSummary>> {
   const valid = periods.filter(isPeriod)
   if (valid.length === 0) return new Map()
   const tx = await getRequestTx(req)
   const r = (await tx.execute(sql`
     SELECT period AS k, count(*)::int AS n,
-           coalesce(sum(CASE WHEN direction = 'in' THEN amount ELSE 0 END), 0)::text AS tin,
-           coalesce(sum(CASE WHEN direction = 'out' THEN amount ELSE 0 END), 0)::text AS tout,
-           count(*) FILTER (WHERE status = 'void')::int AS voids
+           coalesce(sum(amount) FILTER (WHERE direction = 'in' AND status = 'posted' AND source_type <> 'reversal'), 0)::text AS tin,
+           coalesce(sum(amount) FILTER (WHERE direction = 'out' AND status = 'posted' AND source_type <> 'reversal'), 0)::text AS tout,
+           count(*) FILTER (WHERE status = 'void')::int AS voids,
+           count(*) FILTER (WHERE status = 'void' OR source_type = 'reversal')::int AS nk,
+           coalesce(sum(CASE WHEN direction = 'in' THEN amount ELSE -amount END) FILTER (WHERE status = 'void' OR source_type = 'reversal'), 0)::text AS koreksi
     FROM cash_entries WHERE ${ptSql(pts(req, companyIds))} AND period IN (${sql.join(
       valid.map((p) => sql`${p}`),
       sql`, `,
-    )}) GROUP BY period`)) as unknown as { rows: Array<{ k: string; n: number; tin: string; tout: string; voids: number }> }
-  return new Map(r.rows.map((x) => [x.k, { n: Number(x.n), tin: Number(x.tin), tout: Number(x.tout), voids: Number(x.voids) }]))
+    )}) GROUP BY period`)) as unknown as { rows: Array<{ k: string; n: number; tin: string; tout: string; voids: number; nk: number; koreksi: string }> }
+  return new Map(r.rows.map((x) => [x.k, { n: Number(x.n), tin: Number(x.tin), tout: Number(x.tout), voids: Number(x.voids), nKoreksi: Number(x.nk), koreksi: Number(x.koreksi) }]))
 }
 
 // ---------------------------------------------------------------- transfer void (T8) list

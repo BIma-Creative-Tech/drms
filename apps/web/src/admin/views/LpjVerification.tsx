@@ -8,7 +8,9 @@ import { SETTLEMENT_TYPE_LABELS } from '@/domain/expense/settlement-rules'
 import { withReqTransaction } from '@/lib/system-tx'
 
 import { ActionButton } from '../components/ActionButton'
+import { KAS_STYLE } from '../components/kas/style'
 import { MoneyForm } from '../components/MoneyForm'
+import { ShortfallPanel } from '../components/ShortfallPanel'
 import { accountsOf, PtChip, PtScopeNote, ptView } from './pt'
 import { Empty, Forbidden, Shell, TableScroll, allowed, badge, docLink, num, rp, table, td, th } from './shared'
 
@@ -173,7 +175,10 @@ export async function LpjVerification(props: AdminViewServerProps) {
               Ditransfer {rp(s.transferredTotal)} · Nota terverifikasi {rp(s.verifiedReceiptsTotal)} · Selisih {rp(s.difference)} —{' '}
               <strong>{s.settlementType ? SETTLEMENT_TYPE_LABELS[s.settlementType] : '—'}</strong>
             </div>
-            {finance && d.allowedActions.includes('settle') ? (
+            {/* QA-06 / ADR 0019: above approved + tolerance → re-approval first (Finance asks; Direktur → Finance decide) */}
+            {s.settlementType === 'shortfall' && s.shortfallApproval && s.shortfallApproval.settleAllowed === false ? (
+              <ShortfallPanel requestId={d.id} sa={s.shortfallApproval} canRequest={finance && d.allowedActions.includes('settle')} />
+            ) : finance && d.allowedActions.includes('settle') ? (
               s.settlementType === 'shortfall' ? (
                 <MoneyForm
                   url={`${base(d.id)}/settle`}
@@ -197,6 +202,7 @@ export async function LpjVerification(props: AdminViewServerProps) {
           </section>
         )
       })}
+      <style>{KAS_STYLE}</style>
     </Shell>
   )
 }

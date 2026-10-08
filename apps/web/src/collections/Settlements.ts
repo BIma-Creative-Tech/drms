@@ -5,7 +5,7 @@ import { RIWAYAT_TAB } from '@/admin/config'
 import { denyAll } from '@/access/roles'
 import { reasonOnChange, withAudit } from '@/audit/hooks'
 import { byVisibleRequest, denyDeleteLogged } from '@/domain/expense/access'
-import { SETTLEMENT_STATUSES, SETTLEMENT_STATUS_LABELS } from '@/domain/expense/settlement-rules'
+import { SETTLEMENT_STATUSES, SETTLEMENT_STATUS_LABELS, SHORTFALL_APPROVAL_LABELS, SHORTFALL_APPROVAL_STATUSES } from '@/domain/expense/settlement-rules'
 import { uuidField } from '@/fields/common'
 
 import { ro } from './fields-f2'
@@ -85,13 +85,29 @@ export const Settlements: CollectionConfig = withAudit(
       { name: 'lastReversedAt', type: 'date', label: 'Penyelesaian terakhir dibatalkan (server)', admin: { ...ro, date: { pickerAppearance: 'dayAndTime' } } },
       { name: 'lastReversedBy', type: 'relationship', relationTo: 'users', label: 'Dibatalkan oleh', admin: ro },
       { name: 'lastReversalReason', type: 'textarea', label: 'Alasan pembatalan penyelesaian', maxLength: 1000, admin: ro },
+      // QA-06 / ADR 0019 — shortfall above approved + tolerance: re-approval of the new total through the
+      // ADR 0013 engine (Direktur "Diketahui" → Finance), decision rows in `approvals` (docType
+      // expense_shortfall, `settlement`). DB guard: these columns change only while the LPJ is verified.
+      {
+        name: 'shortfallApprovalStatus',
+        type: 'select',
+        label: 'Persetujuan kekurangan',
+        options: SHORTFALL_APPROVAL_STATUSES.map((v) => ({ label: SHORTFALL_APPROVAL_LABELS[v], value: v })),
+        admin: ro,
+      },
+      { name: 'shortfallApprovalCycle', type: 'number', label: 'Siklus persetujuan kekurangan', defaultValue: 0, admin: ro },
+      { name: 'shortfallApprovalLevel', type: 'number', label: 'Level persetujuan kekurangan', admin: ro },
+      { name: 'shortfallApprovalAmount', type: 'number', label: 'Total transfer yang dimintakan persetujuan (Rp)', admin: ro },
+      { name: 'shortfallApprovalSnapshot', type: 'json', label: 'Aturan approval kekurangan (snapshot)', admin: { readOnly: true, components: { Field: '@/components/ReadOnlyJson#ReadOnlyJson' } } },
+      { name: 'shortfallApprovalNote', type: 'textarea', label: 'Alasan pengajuan kekurangan (Finance)', maxLength: 1000, admin: ro },
+      { name: 'shortfallRejectReason', type: 'textarea', label: 'Alasan penolakan kekurangan', maxLength: 1000, admin: ro },
       uuidField(),
     ],
   },
   {
     docType: 'settlement',
     docNo: (d) => (typeof d.docNo === 'string' ? d.docNo : undefined),
-    exclude: ['submitCount', 'reversalCount'],
+    exclude: ['submitCount', 'reversalCount', 'shortfallApprovalSnapshot'],
     reasonRules: [reasonOnChange(['financeNotes'], 'Catatan revisi wajib diisi (G7).')],
     actionFor: (c) => (c.field === 'status' ? 'status_change' : undefined),
   },

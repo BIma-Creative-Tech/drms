@@ -116,8 +116,9 @@ export async function makeWorld(tag: string) {
     await sysCreate('team-assignments', { employee: e, costCenter, roleInProject: 'staff' })
   }
   const bank = await ids('banks', 'code', 'MANDIRI')
-  const accA = await sysCreate('employee-bank-accounts', { employee: emp.a, bank, accountNo: `9${Date.now() % 1e9}1`, accountHolder: `${tag} Staff A`, isDefault: true })
-  const accB = await sysCreate('employee-bank-accounts', { employee: emp.b, bank, accountNo: `9${Date.now() % 1e9}2`, accountHolder: `${tag} Staff B`, isDefault: true })
+  // QA-17: world accounts are verified (a transfer to an unverified account asks for a confirmation)
+  const accA = await sysCreate('employee-bank-accounts', { employee: emp.a, bank, accountNo: `9${Date.now() % 1e9}1`, accountHolder: `${tag} Staff A`, isDefault: true, verificationStatus: 'verified' })
+  const accB = await sysCreate('employee-bank-accounts', { employee: emp.b, bank, accountNo: `9${Date.now() % 1e9}2`, accountHolder: `${tag} Staff B`, isDefault: true, verificationStatus: 'verified' })
   const cashAccount = await sysCreate('cash-accounts', { name: `${tag} Kas`, kind: 'bank', openingBalance: 50_000_000 })
   const cat = {
     bbm: await ids('expense-categories', 'code', 'BBM'),

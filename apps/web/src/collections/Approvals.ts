@@ -18,6 +18,9 @@ const ro = { readOnly: true }
  * Written only by the domain service (create access false).
  * E5 (T12): rows of budget addenda carry docType `budget_addendum` + `addendum` (no `request`); a DB
  * CHECK keeps exactly one owner per docType and the G1 trigger reads the addendum's creator.
+ * QA-06 / ADR 0019: rows of an LPJ shortfall re-approval carry docType `expense_shortfall` + `settlement`
+ * (no `request` — the request's own approval cycles stay untouched); G1 = requester/creator of the
+ * settlement's request. Office roles read them through the `company` predicate of byVisibleRequest.
  */
 const readAccess: Access = async (args) => {
   const { req } = args
@@ -36,12 +39,13 @@ export const Approvals: CollectionConfig = {
   admin: { group: 'Keuangan', defaultColumns: ['request', 'position', 'level', 'actorName', 'decision', 'decidedAt'] },
   access: { read: readAccess, create: denyAll, update: denyAll, delete: denyDeleteLogged('approval') },
   lockDocuments: false,
-  hooks: { beforeChange: [companyHook('approvals', { derive: [{ field: 'request', collection: 'expense-requests' }, { field: 'addendum', collection: 'budget-addenda' }] })] },
+  hooks: { beforeChange: [companyHook('approvals', { derive: [{ field: 'request', collection: 'expense-requests' }, { field: 'addendum', collection: 'budget-addenda' }, { field: 'settlement', collection: 'settlements' }] })] },
   fields: [
     companyField({ derived: true }),
-    { name: 'docType', type: 'select', required: true, defaultValue: 'expense_request', options: ['expense_request', 'budget_addendum'].map((v) => ({ label: v, value: v })), admin: ro },
+    { name: 'docType', type: 'select', required: true, defaultValue: 'expense_request', options: ['expense_request', 'budget_addendum', 'expense_shortfall'].map((v) => ({ label: v, value: v })), admin: ro },
     { name: 'request', type: 'relationship', relationTo: 'expense-requests', label: 'Pengajuan', index: true, admin: ro },
     { name: 'addendum', type: 'relationship', relationTo: 'budget-addenda', label: 'Addendum RAB', index: true, admin: ro },
+    { name: 'settlement', type: 'relationship', relationTo: 'settlements', label: 'LPJ (persetujuan kekurangan)', index: true, admin: ro },
     { name: 'cycle', type: 'number', label: 'Siklus', required: true, admin: ro },
     { name: 'position', type: 'select', label: 'Posisi', required: true, options: APPROVAL_POSITIONS.map((v) => ({ label: v, value: v })), admin: ro },
     { name: 'level', type: 'number', label: 'Level', required: true, defaultValue: 0, admin: ro },

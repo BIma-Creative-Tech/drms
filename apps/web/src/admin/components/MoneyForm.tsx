@@ -1,13 +1,16 @@
 'use client'
 import { useRouter } from 'next/navigation'
-import React, { useState } from 'react'
+import React, { useRef, useState } from 'react'
 
 import { postJson, problemText } from './ActionButton'
+import { OverrideDialog, overridePromptOf, type OverridePrompt } from './kas/OverrideDialog'
 
 /**
  * Finance forms of the transfer queue (T3, US-20) and the LPJ settlement (T5, US-22): cash account,
  * optional date, bank reference and proof upload (multipart to /api/v1/media/{kind} first, then the
  * action with the returned id). Amounts are never entered: the server copies/computes them (G3).
+ * QA 2026-10-08: a 409 asking for confirmation (unverified destination account QA-17, balance below 0
+ * QA-04) opens the app dialog; "Tetap simpan" re-sends the same body + flag (the proof is not re-uploaded).
  */
 export type MoneyFormProps = {
   url: string
@@ -31,6 +34,24 @@ export function MoneyForm({ url, submitLabel, cashAccounts, bankRef, proof, amou
   const router = useRouter()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [prompt, setPrompt] = useState<OverridePrompt | null>(null)
+  const pending = useRef<Record<string, unknown> | null>(null)
+  const send = async (body: Record<string, unknown>) => {
+    const r = await postJson(url, body)
+    if (r.ok) {
+      setPrompt(null)
+      router.refresh()
+      return
+    }
+    const p = overridePromptOf(r.status, r.data)
+    if (p) {
+      pending.current = body
+      setPrompt(p)
+      return
+    }
+    setPrompt(null)
+    setError(problemText(r.data, r.status))
+  }
   const onSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setError(null)
@@ -44,10 +65,20 @@ export function MoneyForm({ url, submitLabel, cashAccounts, bankRef, proof, amou
       const file = f.get('proof')
       if (proof && file instanceof File && file.size > 0) body.proofMediaId = await uploadProof(proof.kind, file)
       else if (proof?.required) throw new Error('Bukti wajib diunggah.')
-      const r = await postJson(url, body)
-      if (!r.ok) setError(problemText(r.data, r.status))
-      else router.refresh()
+      await send(body)
     } catch (err) {
+      setError((err as Error).message || 'Gagal.')
+    } finally {
+      setBusy(false)
+    }
+  }
+  const confirm = async () => {
+    if (!prompt || !pending.current) return
+    setBusy(true)
+    try {
+      await send({ ...pending.current, [prompt.flag]: true })
+    } catch (err) {
+      setPrompt(null)
       setError((err as Error).message || 'Gagal.')
     } finally {
       setBusy(false)
@@ -55,6 +86,7 @@ export function MoneyForm({ url, submitLabel, cashAccounts, bankRef, proof, amou
   }
   const field: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 2, fontSize: 12 }
   return (
+    <>
     <form onSubmit={onSubmit} style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'flex-end' }}>
       <strong style={{ alignSelf: 'center' }}>{amountText}</strong>
       <label style={field}>
@@ -86,8 +118,18 @@ export function MoneyForm({ url, submitLabel, cashAccounts, bankRef, proof, amou
       <button type="submit" className="btn btn--style-primary btn--size-small" style={{ margin: 0 }} disabled={busy}>
         {busy ? 'Memproses…' : submitLabel}
       </button>
-      {error ? <span style={{ color: 'var(--theme-error-500)', fontSize: 12, width: '100%' }}>{error}</span> : null}
+      {error ? <span style={{ color: 'var(--theme-error-500)', fontSize: 12, width: '100%' }} role="alert">{error}</span> : null}
     </form>
+    <OverrideDialog
+      prompt={prompt}
+      busy={busy}
+      onConfirm={() => void confirm()}
+      onCancel={() => {
+        setPrompt(null)
+        setError('Belum disimpan — konfirmasi dibatalkan.')
+      }}
+    />
+    </>
   )
 }
 
