@@ -41,6 +41,7 @@ import { foreignPtParam, PtChip, ptView, type PtView } from './pt'
 import { PtNotAllowed } from './shared'
 import { PerPt } from './pt-breakdown'
 import { Bento, Card, DashHead, DataTable, EmptyState, KpiRow, KpiTile, rp, rpShort, StatusPill, VIZ_STYLE, type Col } from './viz'
+import { NoAccess } from './NoAccess'
 
 /**
  * E2 (fase1-golive §E2, US-23/US-24, ADR 0005): web "Kas" for Finance — buku kas with filters,
@@ -193,16 +194,9 @@ function Frame({ props, name, children }: { props: AdminViewServerProps; name: s
   )
 }
 
-function Denied({ props, title, roles }: { props: AdminViewServerProps; title: string; roles: string }) {
-  return (
-    <Frame props={props} name="kas-denied">
-      <DashHead title={title} />
-      <div className="pk-alert bad" data-pk-denied>
-        <b aria-hidden>!</b>
-        <p>Halaman ini hanya untuk {roles}.</p>
-      </div>
-    </Frame>
-  )
+/** QA-20(c): uniform no-access page (title/roles kept for the call sites, never shown). */
+function Denied({ props }: { props: AdminViewServerProps; title?: string; roles?: string }) {
+  return <NoAccess props={props} />
 }
 
 const labelOf = (list: Array<{ id: number; label: string }>, id: number | null) => (id === null ? null : (list.find((x) => x.id === id)?.label ?? `#${id}`))
@@ -668,7 +662,7 @@ export async function KasEdit(props: AdminViewServerProps) {
   const editable = canEdit(e, lockDate)
   return (
     <Frame props={props} name="kas-ubah">
-      <DashHead title={`Edit ${e.entryNo}`} note="Hanya keterangan, sumber/kategori, pembebanan dan kendaraan. Alasan wajib.">
+      <DashHead title={`Edit ${e.entryNo}`} note="Keterangan, sumber/kategori, pembebanan, kendaraan dan bukti. Tanggal, akun dan nominal terkunci. Alasan wajib.">
         {back}
       </DashHead>
       {editable ? (
@@ -694,6 +688,7 @@ export async function KasEdit(props: AdminViewServerProps) {
                 projectId: relId(e.project) ?? null,
                 costCenterId: relId(e.costCenter) ?? null,
                 vehicleId: relId(e.vehicle) ?? null,
+                proofId: relId((e as { proof?: unknown }).proof) ?? null,
               }}
             />
           </Card>

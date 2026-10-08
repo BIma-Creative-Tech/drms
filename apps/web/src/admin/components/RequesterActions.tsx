@@ -1,7 +1,10 @@
 'use client'
 import React, { useRef, useState, useSyncExternalStore } from 'react'
 
-import { postJson, problemText } from './ActionButton'
+import { formatRupiah } from '@/lib/money'
+
+import { ActionDialog } from './ActionDialog'
+import { postJson, problemText, promptLabel } from './ActionButton'
 import { TableScroll } from './TableScroll'
 
 /**
@@ -65,7 +68,8 @@ function readFlashOnce(): string | null {
   return flashOnce
 }
 const noSubscribe = () => () => {}
-const rp = (v: number | null | undefined) => (v === null || v === undefined ? '—' : `Rp ${v.toLocaleString('id-ID')}`)
+// QA-25: same text on the server and in every browser (Intl/ICU grouping differed → hydration #418)
+const rp = (v: number | null | undefined) => (v === null || v === undefined ? '—' : formatRupiah(v))
 const idemKey = () => (typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : undefined)
 
 function flashAndGo(text: string, href?: string) {
@@ -115,26 +119,43 @@ async function post(url: string, body: unknown): Promise<Record<string, unknown>
   return (r.data ?? {}) as Record<string, unknown>
 }
 
-/** One button; optional required reason (≥ 3 chars, G7) or confirmation. */
+/**
+ * One button; optional required reason (≥ 3 chars, G7) or confirmation — QA-22/QA-23: in the app
+ * dialog (inline validation, stays open on a short reason or a server error), never prompt/confirm/alert.
+ */
 function Act(props: { label: string; url: string; success: string; primary?: boolean; reason?: string; confirm?: string; gotoNew?: boolean; testId: string }) {
   const { busy, error, run } = useAction()
-  const onClick = () => {
-    let body: Record<string, unknown> = {}
-    if (props.reason) {
-      const v = window.prompt(props.reason)
-      if (v === null) return
-      if (v.trim().length < 3) {
-        window.alert('Alasan wajib diisi (minimal 3 karakter).')
-        return
-      }
-      body = { reason: v.trim() }
-    } else if (props.confirm && !window.confirm(props.confirm)) return
-    void run(async () => {
-      const data = await post(props.url, body)
-      const newId = typeof data.id === 'number' ? data.id : undefined
-      flashAndGo(props.success, props.gotoNew && newId ? `/admin/collections/expense-requests/${newId}` : undefined)
-    })
+  const key = useRef<string | undefined>(undefined)
+  const done = (data: Record<string, unknown>) => {
+    const newId = typeof data.id === 'number' ? data.id : undefined
+    flashAndGo(props.success, props.gotoNew && newId ? `/admin/collections/expense-requests/${newId}` : undefined)
   }
+  if (props.reason || props.confirm) {
+    return (
+      <span style={{ display: 'inline-flex', flexDirection: 'column', gap: 4, marginRight: 6, marginBottom: 6 }}>
+        <ActionDialog
+          label={props.label}
+          title={props.label}
+          description={props.confirm}
+          confirmLabel={props.label}
+          field={props.reason ? { label: promptLabel(props.reason), minLength: 3 } : undefined}
+          rotateKey={() => {
+            key.current = idemKey()
+          }}
+          onConfirm={async (v) => {
+            const r = await postJson(props.url, props.reason ? { reason: v } : {}, { idempotencyKey: key.current })
+            if (!r.ok) return problemText(r.data, r.status)
+            done((r.data ?? {}) as Record<string, unknown>)
+            return null
+          }}
+          buttonClassName={btn(props.primary)}
+          danger={Boolean(props.reason)}
+          testId={props.testId}
+        />
+      </span>
+    )
+  }
+  const onClick = () => void run(async () => done(await post(props.url, {})))
   return (
     <span style={{ display: 'inline-flex', flexDirection: 'column', gap: 4, marginRight: 6, marginBottom: 6 }}>
       <button type="button" className={btn(props.primary)} style={{ margin: 0 }} disabled={busy} onClick={onClick} data-pk-action={props.testId}>
@@ -313,7 +334,7 @@ export function RequesterActions(p: RequesterActionsProps) {
 
       {showReceipts ? (
         <section style={box} data-pk-section="receipts">
-          <strong>Nota {p.type === 'reimburse' ? '(wajib per baris sebelum kirim, US-38)' : '(setelah dana ditransfer)'}</strong>
+          <strong>Nota {p.type === 'reimburse' ? '(wajib per baris sebelum kirim)' : '(setelah dana ditransfer)'}</strong>
           {p.receipts.length === 0 ? <div style={{ marginTop: 6 }}>Belum ada nota.</div> : null}
           {p.receipts.length > 0 ? (
             <TableScroll label="Nota">

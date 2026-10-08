@@ -31,7 +31,7 @@ export async function selectAndSnapshot(req: PayloadRequest, doc: RequestDoc): P
     projectId,
     costCenterId,
   })
-  if (!rule) fail(409, 'Tidak ada aturan approval yang berlaku untuk pengajuan ini (US-34). Hubungi Admin.')
+  if (!rule) fail(409, 'Tidak ada aturan approval yang berlaku untuk pengajuan ini. Hubungi Admin.')
 
   const snapshot = await snapshotForRule(req, rule, await involvedUserIds(req, doc), companyId)
   return { rule, snapshot }
@@ -49,7 +49,7 @@ export async function snapshotForRule(req: PayloadRequest, rule: RuleInput, excl
   const named = [...new Set([rule.acknowledgeUser, ...rule.steps.map((s) => s.approverUser)].filter((x): x is number => typeof x === 'number'))]
   const namedUsers = await rolesOfUsersIn(req, named, companyId)
   const ruleErr = ruleDecisionError(rule, (id) => namedUsers.get(id)?.roles)
-  if (ruleErr) fail(409, `Aturan approval "${rule.name}" tidak sesuai alur Direktur → Finance (ADR 0013): ${ruleErr} Hubungi Admin.`)
+  if (ruleErr) fail(409, `Aturan approval "${rule.name}" tidak sesuai alur Direktur → Finance: ${ruleErr} Hubungi Admin.`)
 
   const holders = async (role: Role | null | undefined, user: number | null | undefined): Promise<number[]> => {
     if (user) return namedUsers.get(user)?.active ? [user] : []

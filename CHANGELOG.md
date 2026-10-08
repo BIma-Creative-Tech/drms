@@ -6,6 +6,61 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### QA report 2026-10-08 — hak akses & UX (branch `fix/qa-rbac-ux`)
+
+Owner decisions 2026-10-08 on the role matrix (QA-20) plus the UX tickets QA-16, QA-21–QA-25, QA-28, QA-29, QA-31.
+No database migration; the REST/`/api/v1` contracts only gain `CashEntryUpdate.proofId` (additive, OpenAPI regenerated).
+
+#### Changed — access (QA-20, QA-28)
+- **PM is read-only on projects** (`collections/Projects.ts`): update access = Direktur of the project's PT only. A
+  PATCH that CHANGES a field by anyone else who can read the project (PM, Finance, Admin) → **403 naming the fields**
+  ("Anda tidak berhak mengubah: Nama project, Alamat. Hanya Direktur …", `errors[].path` per field) instead of a
+  silent 200 (`access/field-guard.ts` `readOnlyFieldsGuard`, beforeOperation). Callers who cannot read the project get
+  the normal 403/404 (no field names, no existence leak). The admin form is read-only for the PM (no Save).
+- **Direktur is read-only on users**: verified (integration test) — only an Admin of the user's PTs or a group admin
+  edits accounts; the Direktur keeps editing only the own signature (profile).
+- **Admin reads `budget-addenda` and `progress-reports`** (was 403); create/update stay closed (domain service only).
+- **Empty scope = empty list, not 403** (`access/scope.ts`): `inIds` / `ownEmployee` return a no-row `Where`
+  (`NO_ROWS`) instead of `false`. Staff without assignments opening the request form no longer gets 403 on
+  `/api/cost-centers` (QA-28); a PM without a team sees an empty project list. Roles WITHOUT a rule are still refused.
+  `companies` update access returns `false` (not an empty `IN`) for callers without an Admin/Direktur PT.
+
+#### Changed — navigation and "no access" (QA-20(c), QA-24)
+- Module launcher/bar show only modules a role can **use**, derived from Payload permissions: a module of only
+  personal shortcuts (own profile, own notifications — both already in the top bar) is hidden (Staff: Pengguna & Akses,
+  Sistem; PM: Sistem); **Master Data** and **Pengaturan** need create/update on at least one of their entities (PM:
+  hidden; Finance: Pengaturan hidden).
+- One **"Anda tidak memiliki akses ke halaman ini."** page with a back link for every custom view (Kas, Tutup buku,
+  Antrian Transfer, Verifikasi LPJ, Laporan, Audit Log, Addendum, Progress, Absensi, Akses PT) — no role codes.
+- Payload's unauthorized view replaced (`admin.components.views.unauthorized`); a logged-in caller without create
+  access on `/admin/collections/<slug>/create` is redirected there instead of Payload's hard-coded "Tidak sah, Anda
+  harus masuk…" (`src/admin/denied-create.ts`, called from the admin page). The REST 401 text is unchanged.
+
+#### Changed — pickers and messages (QA-16, QA-21, QA-22, QA-23)
+- User pickers show **"Nama · email"** (virtual `users.displayName` = `useAsTitle`; picker select/search mapped to
+  `name`/`email`). `projects.pm` lists only **active PMs of the project's PT**; `cost-centers.manager` active members of
+  the PT; approval-rule users active Direktur/Finance of the PT.
+- Error texts: field paths shown as form labels ("Uraian penggunaan dana: Wajib diisi") or dropped; no `HTTP 403`;
+  no `US-xx` / `ADR` / `G-x` / `Q-x` codes in user-facing domain messages (signature: no more `signatureMediaId`);
+  every `ValidationError` passes `req.t` + field labels ("Isian berikut tidak valid: Alasan perubahan" instead of
+  "The following field is invalid: changeReason"); duplicate per-PT `code` checked before the insert ("Kode … sudah
+  dipakai di PT ini", path `code`, not "company_id code").
+- `window.prompt/confirm/alert` replaced by the app dialog (`ActionDialog`, same look as Void/Addendum): approval
+  inbox, LPJ verification, reimburse receipt review, requester actions (submit, withdraw, cancel, resubmit, receipts,
+  complete, delete receipt). A reason shorter than 3 characters shows "… wajib diisi (minimal 3 karakter)." and the
+  dialog stays open; server errors stay in the dialog.
+
+#### Fixed — display (QA-25, QA-29, QA-31)
+- React hydration #418 on the expense-request detail: read-only server timestamps (`submittedAt`, `decidedAt`, …)
+  render as fixed company-TZ text ("8 Okt 2026 14:30 WITA") in form and list; requester panel Rupiah via
+  `formatRupiah` (no locale-dependent `toLocaleString`).
+- Admin date format `d MMM yyyy HH:mm`; boolean list cells "Aktif/Nonaktif" / "Ya/Tidak" (was "benar/salah");
+  technical media fields (SHA-256, original width/height/size, uploader, owner) hidden while uploading, read-only in
+  the sidebar of a saved file; requester/workflow panel controls never exceed the column at 390 px.
+- Kas edit (ADR 0005 §5): same layout as "Catat kas" — date, account and amount shown **locked**; the **proof can be
+  added or replaced** (`PATCH /api/v1/cash-entries/{id}` `proofId`, own unclaimed upload, audited with the reason).
+- Employee create form shows **No. HP** for Admin/Direktur/Finance/PM.
+
 ## [0.6.1] - 2026-10-05
 
 Employee privacy notice (UU PDP; Q-46, ADR 0018) with a versioned acknowledgement on the web and in APK 0.3.3,

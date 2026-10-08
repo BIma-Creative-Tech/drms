@@ -1,6 +1,8 @@
 import { randomUUID } from 'node:crypto'
 
-import type { CheckboxField, NumberField, TextField } from 'payload'
+import type { CheckboxField, CollectionSlug, NumberField, PayloadRequest, TextField, Where } from 'payload'
+
+import { relId } from '@/access/roles'
 
 export const CHANGE_REASON = 'changeReason'
 
@@ -67,9 +69,37 @@ export function codeField(label = 'Kode', maxLength = 32, opts: { perCompany?: b
     unique: !opts.perCompany,
     index: true,
     maxLength,
-    validate: (v: unknown) =>
-      typeof v === 'string' && /^[A-Za-z0-9._/-]{1,64}$/.test(v) ? true : 'Kode hanya huruf, angka, titik, garis bawah, garis miring atau minus.',
+    validate: async (v: unknown, args: { req?: PayloadRequest; data?: unknown; id?: number | string; collectionSlug?: string }) => {
+      if (!(typeof v === 'string' && /^[A-Za-z0-9._/-]{1,64}$/.test(v))) return 'Kode hanya huruf, angka, titik, garis bawah, garis miring atau minus.'
+      if (!opts.perCompany) return true
+      return (await codeTakenInCompany(v, args)) ? `Kode "${v}" sudah dipakai di PT ini. Pilih kode lain.` : true
+    },
   }
+}
+
+/**
+ * QA-21: per-PT unique code checked BEFORE the insert — the raw (company_id, code) index otherwise
+ * surfaces as "Isian berikut tidak valid: company_id, code". The PT is known here: collection
+ * beforeChange hooks (companyHook) run before field validation in Payload 3. Unknown PT / no request
+ * (e.g. the admin form before a PT is chosen) → no check; the DB index stays the final guard.
+ */
+async function codeTakenInCompany(code: string, args: { req?: PayloadRequest; data?: unknown; id?: number | string; collectionSlug?: string }): Promise<boolean> {
+  const { req, id, collectionSlug } = args
+  const company = relId((args.data as { company?: unknown } | undefined)?.company)
+  if (!req?.payload || !collectionSlug || company === undefined) return false
+  const and: Where[] = [{ company: { equals: company } }, { code: { equals: code } }]
+  if (id !== undefined && id !== null && id !== '') and.push({ id: { not_equals: id } })
+  const res = await req.payload.find({
+    collection: collectionSlug as CollectionSlug,
+    where: { and },
+    limit: 1,
+    depth: 0,
+    pagination: false,
+    select: { code: true } as never,
+    overrideAccess: true, // SYSTEM-READ: uniqueness of the code within the PT (no row data returned to the caller)
+    req,
+  })
+  return res.docs.length > 0
 }
 
 /** Integer Rupiah (architecture §4.1): Postgres numeric ↔ JS number, must be a safe integer ≥ 0. */
@@ -105,6 +135,6 @@ export function odooRefField(name: string, label: string): TextField {
     type: 'text',
     label,
     maxLength: 128,
-    admin: { position: 'sidebar', description: 'Referensi Odoo (diisi saat mirror, ADR 0009).' },
+    admin: { position: 'sidebar', description: 'Referensi Odoo (diisi otomatis saat sinkronisasi ke Odoo).' },
   }
 }

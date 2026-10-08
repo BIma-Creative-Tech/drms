@@ -218,7 +218,7 @@ export async function requireActionAudited(req: PayloadRequest, ctx: ActorContex
         reason: 'hanya Direktur/Finance yang memberi keputusan (ADR 0013; PM hanya memantau)',
       },
     ])
-    fail(403, 'Hanya Direktur atau Finance yang dapat menyetujui atau menolak pengajuan (ADR 0013). PM hanya memantau.')
+    fail(403, 'Hanya Direktur atau Finance yang dapat menyetujui atau menolak pengajuan. PM hanya memantau.')
   }
   try {
     requireAction(ctx, action)

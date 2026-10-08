@@ -20,6 +20,7 @@ import { Frame } from './frame'
 import { Alert, dateTimeId } from './progress-ui'
 import { PtChip, ptView } from './pt'
 import { Bento, Card, DashHead, DataTable, EmptyState, KpiRow, KpiTile, pctText, rp, rpShort, StatusPill, VIZ_STYLE, type Col } from './viz'
+import { NoAccess } from './NoAccess'
 
 /**
  * E5 web (T12, US-18/US-30): Addendum RAB list (filters status/project), new/draft form (PM of the
@@ -32,15 +33,9 @@ export const addendumHref = (id: number) => `/admin/addendum/detail/${id}`
 
 export const ADDENDUM_TONE: Record<AddendumStatus, PillTone> = { draft: 'none', pending_ack: 'wait', pending_approval: 'progress', approved: 'ok', rejected: 'bad', cancelled: 'none' }
 
-function Denied({ props, title }: { props: AdminViewServerProps; title: string }) {
-  return (
-    <Frame props={props} name="addendum-denied">
-      <DashHead title={title} />
-      <Alert tone="bad" attr="denied">
-        <p>Halaman ini hanya untuk PM, Direktur dan Finance.</p>
-      </Alert>
-    </Frame>
-  )
+/** QA-20(c): uniform no-access page. */
+function Denied({ props }: { props: AdminViewServerProps; title?: string }) {
+  return <NoAccess props={props} />
 }
 
 // ================================================================ list

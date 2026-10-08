@@ -7,6 +7,7 @@ import { companyContextOf, isRole, relId, type Role } from '@/access/roles'
 import { RoleMatrix } from '../components/access/RoleMatrix'
 import { canUseMatrix, matrixColumns, type MatrixCell, type MatrixCompany, type MatrixEmployee, type MatrixUser, type Viewer } from '../components/access/role-matrix'
 import { Frame } from './frame'
+import { NoAccess } from './NoAccess'
 
 /**
  * "Pengguna & akses PT" — role matrix (MC2-4, ADR 0016 §2/§11, wireframe mc/wireframes.md §2):
@@ -38,16 +39,7 @@ export async function AksesPtView(props: AdminViewServerProps) {
     groupAdmin: ctx?.groupAdmin === true,
     adminOf: (ctx?.memberships ?? []).filter((m) => m.roles.includes('pk-admin')).map((m) => m.company),
   }
-  if (!canUseMatrix(viewer)) {
-    return (
-      <Frame props={props} name="akses-pt">
-        <div className="pk-rm">
-          <h1>Pengguna &amp; akses PT</h1>
-          <p>Halaman ini hanya untuk Admin PT dan Admin grup.</p>
-        </div>
-      </Frame>
-    )
-  }
+  if (!canUseMatrix(viewer)) return <NoAccess props={props} /> // QA-20(c): uniform no-access page
   const sp = props.searchParams ?? {}
   const q = one(sp.q as string | string[] | undefined).trim().slice(0, 80)
   const withInactive = one(sp.nonaktif as string | string[] | undefined) === '1'

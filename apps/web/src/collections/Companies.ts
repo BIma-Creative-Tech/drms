@@ -266,7 +266,13 @@ export const Companies: CollectionConfig = withAudit(
     access: {
       read: ({ req }) => (isGroupAdmin(req) ? true : { id: { in: memberCompanies(req, { all: true }) } }),
       create: ({ req }) => isGroupAdmin(req),
-      update: ({ req }) => (isGroupAdmin(req) ? true : { id: { in: companiesWithRole(req, ['pk-admin', 'pk-owner'], { all: true }) } }),
+      // QA-20(c): no Admin/Direktur PT → false (an empty `id IN ()` Where still counted as "may update"
+      // in the admin permissions and showed the Pengaturan module to PM/Finance/Staff)
+      update: ({ req }) => {
+        if (isGroupAdmin(req)) return true
+        const ids = companiesWithRole(req, ['pk-admin', 'pk-owner'], { all: true })
+        return ids.length > 0 ? { id: { in: ids } } : false
+      },
       delete: denyAll,
     },
     hooks: { beforeChange: [shortCodeGuard, captureCopyDefaults], afterChange: [copyDefaultsOnCreate] },

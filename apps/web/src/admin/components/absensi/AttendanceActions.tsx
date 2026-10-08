@@ -3,6 +3,7 @@ import { useRouter } from 'next/navigation'
 import React, { useId, useRef, useState } from 'react'
 
 import { geofenceError } from '@/domain/attendance/calendar'
+import { errorLine } from '@/lib/field-labels'
 
 import { newIdemKey, sendJson } from '../kas/client'
 
@@ -219,9 +220,10 @@ export function SelfieButton({ attendanceId, label, available, own }: { attendan
 /** Message of a Payload REST error body ({ errors: [{ message, data: { errors: [{ path, message }] } }] }). */
 export function payloadError(data: unknown, status: number): string {
   const errs = ((data ?? {}) as { errors?: Array<{ message?: string; data?: { errors?: Array<{ path?: string; message?: string }> } }> }).errors ?? []
-  const inner = errs.flatMap((e) => e.data?.errors ?? []).map((e) => `${e.path ? `${e.path}: ` : ''}${e.message ?? ''}`)
+  // QA-21: field label (or nothing), never the raw path
+  const inner = errs.flatMap((e) => e.data?.errors ?? []).map((e) => errorLine(e))
   const text = inner.length ? inner.join('; ') : errs.map((e) => e.message).filter(Boolean).join('; ')
-  return text || (status === 403 ? 'Anda tidak berhak mengubah data ini.' : `Gagal menyimpan (HTTP ${status}).`)
+  return text || (status === 403 ? 'Anda tidak berhak mengubah data ini.' : 'Gagal menyimpan. Periksa isian lalu coba lagi.')
 }
 
 async function rest(method: 'POST' | 'PATCH', url: string, body: unknown): Promise<{ ok: boolean; error: string | null }> {

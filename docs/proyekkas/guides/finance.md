@@ -84,7 +84,9 @@ beberapa PT: kartu **Pilih PT** → klik PT transaksi ini) → isi Tanggal, Akun
 (keluar), Project atau Pusat biaya (opsional), Kendaraan (opsional), **Keterangan**, Bukti (opsional) → Simpan.
 Nomor `KM/…` atau `KK/…` terbit dan saldo langsung berubah.
 
-- **Ubah:** hanya kas manual di periode terbuka; alasan wajib; nominal/tanggal/akun tidak bisa diubah → pakai void.
+- **Ubah:** hanya kas manual di periode terbuka; alasan wajib. Halaman ubah memakai tata letak yang sama dengan
+  catat kas: tanggal, akun dan nominal tampil **terkunci** (koreksi → void lalu catat ulang); **bukti** bisa ditambah
+  atau diganti (**Lihat bukti saat ini** → pilih file baru).
 - **Void:** tombol **Void** + alasan → baris asli bertanda *Void* dan muncul *Jurnal balik*. Kas dari transfer
   dibatalkan lewat **Void transfer**.
 

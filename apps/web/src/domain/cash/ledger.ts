@@ -221,6 +221,8 @@ export type ManualEdit = {
   projectId?: number | null
   costCenterId?: number | null
   vehicleId?: number | null
+  /** QA-31 (ADR 0005 §5: proof is descriptive): add / replace / remove (null) the proof. */
+  proofId?: number | null
 }
 
 /**
@@ -246,6 +248,12 @@ export async function editManualEntry(req: PayloadRequest, id: number, patch: Ma
   if (patch.projectId !== undefined) data.project = patch.projectId
   if (patch.costCenterId !== undefined) data.costCenter = patch.costCenterId
   if (patch.vehicleId !== undefined) data.vehicle = patch.vehicleId
+  if (patch.proofId !== undefined) {
+    // same ownership rule as on create: the caller's own, unclaimed upload (checked before the write:
+    // an unknown id is a 400, not a foreign-key 500)
+    if (patch.proofId !== null && patch.proofId !== relId(e.proof)) await claimMedia(req, 'media-attachments', patch.proofId, id, { ownerType: 'cash_entry' })
+    data.proof = patch.proofId
+  }
   req.context.auditReason = reason
   return (await req.payload.update({
     collection: 'cash-entries',

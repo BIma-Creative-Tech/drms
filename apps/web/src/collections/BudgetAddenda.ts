@@ -14,7 +14,7 @@ const jsonView = { readOnly: true, components: { Field: '@/components/ReadOnlyJs
 
 /**
  * T12 Addendum RAB (`ADD/YYMM/####`, US-18/US-30, requirements §4 "Addendum RAB": Staff —, PM C team,
- * Finance R, Direktur A, Admin —; architecture §5.4). Written ONLY by the domain service
+ * Finance R, Direktur A, Admin R (QA-20(d)); architecture §5.4). Written ONLY by the domain service
  * (`domain/addendum/service.ts`, /api/v1/budget-addenda) — HTTP create/update/delete are closed.
  * Approval through the ADR 0013 engine (`approval-rules` docType `budget_addendum`, snapshotted at
  * submit); decisions are `approvals` rows (docType `budget_addendum`). On the final approval the
@@ -35,7 +35,9 @@ export const BudgetAddenda: CollectionConfig = withAudit(
     },
     defaultSort: '-id',
     access: {
+      // QA-20(d) (owner decision 2026-10-08): Admin reads every row of its PTs (read-only)
       read: byRole({
+        'pk-admin': true,
         'pk-owner': true,
         'pk-finance': true,
         'pk-pm': anyOf(teamProjects('project'), ownUser('createdBy')),

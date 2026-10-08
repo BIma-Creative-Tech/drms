@@ -199,8 +199,8 @@ async function requireAction(req: PayloadRequest, doc: AddendumDoc, action: Adde
   }
   // E9 (UAT 5.2 rule): authorization failures (403) are answered BEFORE state conflicts (409) — a
   // caller who may never take this action does not learn the document's state.
-  if (decision && ctx.lacksDecisionRole) fail(403, 'FORBIDDEN', 'Hanya Direktur atau Finance yang dapat menyetujui atau menolak addendum RAB (ADR 0013). PM hanya memantau.')
-  if (decision && ctx.isCreator) fail(403, 'FORBIDDEN', 'Pengaju tidak dapat memutuskan addendumnya sendiri (G1).')
+  if (decision && ctx.lacksDecisionRole) fail(403, 'FORBIDDEN', 'Hanya Direktur atau Finance yang dapat menyetujui atau menolak addendum RAB. PM hanya memantau.')
+  if (decision && ctx.isCreator) fail(403, 'FORBIDDEN', 'Pengaju tidak dapat memutuskan addendumnya sendiri.')
   if (!decision && !ctx.isCreator) fail(403, 'FORBIDDEN', 'Hanya pengaju yang dapat mengubah, mengajukan atau membatalkan addendum ini.')
   if (!statusOk) fail(409, 'STATE_CONFLICT', `Aksi tidak dapat dilakukan pada status addendum saat ini (${ADDENDUM_STATUS_LABELS[doc.status]}).`)
   if (action === 'cancel' && ctx.isCreator && ctx.hasDecision) fail(409, 'STATE_CONFLICT', 'Addendum yang sudah diputuskan sebagian tidak dapat dibatalkan.')

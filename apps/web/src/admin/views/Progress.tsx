@@ -20,6 +20,7 @@ import { Frame } from './frame'
 import { ptView } from './pt'
 import { Alert, dateId, dateTimeId, ProgressLegend, ProgressTable, ProgressTonePill, ProgressVsBudgetRows } from './progress-ui'
 import { Bento, Card, DashHead, DataTable, EmptyState, KpiRow, KpiTile, pctText, rp, StatusPill, TableView, type Col } from './viz'
+import { NoAccess } from './NoAccess'
 
 /**
  * E4 web (plan fase1-golive §E4, US-10/US-12/US-29/US-31): project progress overview (K-09
@@ -32,15 +33,9 @@ const READERS = ['pk-owner', 'pk-finance', 'pk-pm'] as const
 const projectHref = (id: number) => `/admin/progress/project/${id}`
 const reportHref = (id: number) => `/admin/progress/laporan/${id}`
 
-function Denied({ props, title }: { props: AdminViewServerProps; title: string }) {
-  return (
-    <Frame props={props} name="progress-denied">
-      <DashHead title={title} />
-      <Alert tone="bad" attr="denied">
-        <p>Halaman ini hanya untuk Direktur, Finance dan PM.</p>
-      </Alert>
-    </Frame>
-  )
+/** QA-20(c): uniform no-access page. */
+function Denied({ props }: { props: AdminViewServerProps; title?: string }) {
+  return <NoAccess props={props} />
 }
 
 const segmentId = (props: AdminViewServerProps, index: number): number => {

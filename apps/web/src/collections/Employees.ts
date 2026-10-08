@@ -1,12 +1,13 @@
-import { ValidationError, type CollectionBeforeChangeHook, type CollectionConfig } from 'payload'
+import { type CollectionBeforeChangeHook, type CollectionConfig } from 'payload'
 import { relationship } from 'payload/shared'
 
-import { denyAll, hasRole, ownEmployees, relId, userId } from '@/access/roles'
+import { denyAll, hasRole, hasRoleAny, ownEmployees, relId, userId, type Role } from '@/access/roles'
 import { byRole, rolesAllowed, anyMember } from '@/access/policies'
 import { reasonOnDeactivate, withAudit } from '@/audit/hooks'
 import { activeField, codeField, odooRefField, uuidField } from '@/fields/common'
 
 import { companyField, companyHook, pickerSameCompany, requireCompanyWhenAmbiguous } from '@/fields/company'
+import { validationError } from '@/lib/validation'
 
 /**
  * QA-MC4-14: a NEWLY set face reference photo must be a selfie of the employee's PT — one whose
@@ -14,6 +15,9 @@ import { companyField, companyHook, pickerSameCompany, requireCompanyWhenAmbiguo
  * the caller (the admin panel uploads the photo first). Another PT's selfie, someone else's unlinked
  * upload and a missing id get the same 400 (no existence oracle). System writes (no user) are trusted.
  */
+/** Roles that read an employee's phone number (No. HP). */
+const PHONE_READERS: Role[] = ['pk-admin', 'pk-owner', 'pk-finance', 'pk-pm']
+
 const faceRefSamePt: CollectionBeforeChangeHook = async ({ data, originalDoc, req }) => {
   const d = data as { faceRefPhoto?: unknown; company?: unknown }
   if (!req.user || !('faceRefPhoto' in d)) return data
@@ -26,7 +30,7 @@ const faceRefSamePt: CollectionBeforeChangeHook = async ({ data, originalDoc, re
   } | null
   const owner = relId(m?.ownerCompany)
   const ok = !!m && (owner !== undefined ? owner === company : relId(m.uploadedBy) === userId(req))
-  if (!ok) throw new ValidationError({ collection: 'employees', errors: [{ path: 'faceRefPhoto', message: 'Foto wajah tidak ditemukan (harus selfie PT karyawan ini atau unggahan Anda sendiri).' }], req })
+  if (!ok) throw validationError(req, { collection: 'employees' }, [{ path: 'faceRefPhoto', message: 'Foto wajah tidak ditemukan (harus selfie PT karyawan ini atau unggahan Anda sendiri).' }])
   return data
 }
 
@@ -52,7 +56,7 @@ export const Employees: CollectionConfig = withAudit(
       beforeValidate: [
         ({ data, operation, req }) => {
           const msg = requireCompanyWhenAmbiguous(data?.company, { operation, req })
-          if (msg !== true) throw new ValidationError({ collection: 'employees', errors: [{ path: 'company', message: msg }], req })
+          if (msg !== true) throw validationError(req, { collection: 'employees' }, [{ path: 'company', message: msg }])
           return data
         },
       ],
@@ -78,10 +82,14 @@ export const Employees: CollectionConfig = withAudit(
         label: 'No. HP',
         maxLength: 32,
         access: {
-          // office roles / PM of the employee's PT, or the employee themself (ADR 0016 §5)
-          read: ({ req, doc }) =>
-            hasRole(req, ['pk-admin', 'pk-owner', 'pk-finance', 'pk-pm'], relId((doc as { company?: unknown } | undefined)?.company)) ||
-            ownEmployees(req).includes(relId((doc as { id?: unknown } | undefined)?.id) ?? -1),
+          // office roles / PM of the employee's PT, or the employee themself (ADR 0016 §5). QA-31: the
+          // create form has no document yet → the office roles in any selected PT (the company hook
+          // still checks the create role in the resolved PT).
+          read: ({ req, doc }) => {
+            const d = doc as { id?: unknown; company?: unknown } | undefined
+            if (d?.id === undefined) return hasRoleAny(req, ...PHONE_READERS) // no document yet (create form / permission probe)
+            return hasRole(req, PHONE_READERS, relId(d.company)) || ownEmployees(req).includes(relId(d.id) ?? -1)
+          },
         },
       },
       // E6: jadwal kerja karyawan (kosong = jadwal default di Setting perusahaan).

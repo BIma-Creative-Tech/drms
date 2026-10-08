@@ -89,8 +89,14 @@ export async function loadModules({ payload, user, permissions, visibleEntities,
     const perms = kind === 'collection' ? permissions?.collections : permissions?.globals
     return Boolean((perms as Record<string, { read?: unknown } | undefined> | undefined)?.[slug]?.read)
   }
+  // QA-20(c): create/update permission (a `Where` counts: some rows of the caller's PTs) for `manage` modules
+  const canManage = (kind: 'collection' | 'global', slug: string): boolean => {
+    if (!canSee(kind, slug)) return false
+    const perms = (kind === 'collection' ? permissions?.collections : permissions?.globals) as Record<string, { create?: unknown; update?: unknown } | undefined> | undefined
+    return Boolean(perms?.[slug]?.create || perms?.[slug]?.update)
+  }
   const badges = await loadBadges(payload, user)
-  return resolveModules({ roles: rolesOf(user), staffOnly: isStaffOnly(user), canSee, labelOf, badges })
+  return resolveModules({ roles: rolesOf(user), staffOnly: isStaffOnly(user), canSee, canManage, labelOf, badges })
 }
 
 /**

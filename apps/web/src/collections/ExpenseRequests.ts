@@ -1,4 +1,4 @@
-import { APIError, ValidationError, type CollectionAfterChangeHook, type Condition, type CollectionBeforeChangeHook, type CollectionConfig, type Field, type FilterOptionsProps, type PayloadRequest, type Where } from 'payload'
+import { APIError, type CollectionAfterChangeHook, type Condition, type CollectionBeforeChangeHook, type CollectionConfig, type Field, type FilterOptionsProps, type PayloadRequest, type Where } from 'payload'
 
 import { RIWAYAT_TAB } from '@/admin/config'
 
@@ -17,6 +17,7 @@ import { requestMeta } from '@/lib/request-meta'
 import { forceDeferredChecks } from '@/lib/system-tx'
 import { notifyCreated, notifyTransition } from '@/domain/notifications'
 import { companyField, companyHook, pickerSameCompany } from '@/fields/company'
+import { validationError } from '@/lib/validation'
 
 /**
  * T1 Pengajuan biaya (requirements v1.1 §7 T1; architecture §4.3, §5.1/§5.2).
@@ -134,12 +135,12 @@ const beforeChange: CollectionBeforeChangeHook = async ({ data, originalDoc, ope
   const project = relId(d.project !== undefined ? d.project : prev.project)
   const costCenter = relId(d.costCenter !== undefined ? d.costCenter : prev.costCenter)
   if (project !== undefined && costCenter !== undefined) {
-    throw new ValidationError({ collection: 'expense-requests', errors: [{ path: 'project', message: 'Pilih project ATAU pusat biaya, tidak keduanya (US-53).' }], req })
+    throw validationError(req, { collection: 'expense-requests' }, [{ path: 'project', message: 'Pilih project ATAU pusat biaya, tidak keduanya.' }])
   }
 
   const lines = (d.lines ?? prev.lines ?? []) as LineInput[]
   const errors = validateLines(lines, { forSubmit: false })
-  if (errors.length > 0) throw new ValidationError({ collection: 'expense-requests', errors, req })
+  if (errors.length > 0) throw validationError(req, { collection: 'expense-requests' }, errors)
   d.grandTotal = grandTotal(lines) // server-computed; any client value is ignored (US-03)
 
   // S3e (US-44): the admin form leaves the account empty → default account of the first requester.
@@ -181,7 +182,11 @@ const beforeChange: CollectionBeforeChangeHook = async ({ data, originalDoc, ope
       // API field names → form field paths so the admin form marks the right inputs.
       const path = (p: string) =>
         p.replace(/^projectId$/, 'project').replace(/^costCenterId$/, 'costCenter').replace(/^requesterIds$/, 'requesters').replace(/^bankAccountId$/, 'bankAccount').replace(/\.(uom|category|vehicle)Id$/, '.$1')
-      throw new ValidationError({ collection: 'expense-requests', errors: list.map((x) => ({ path: path(x.path), message: x.message })), req })
+      throw validationError(
+        req,
+        { collection: 'expense-requests' },
+        list.map((x) => ({ path: path(x.path), message: x.message })),
+      )
     }
   }
   return data

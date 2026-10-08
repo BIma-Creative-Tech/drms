@@ -134,8 +134,8 @@ export async function validateContent(
   const office = company !== undefined ? hasRole(req, OFFICE, company) : hasRoleAny(req, ...OFFICE)
   const scope = () => resolveScope(req, company ?? null)
 
-  if (c.projectId && c.costCenterId) errors.push({ path: 'projectId', message: 'Pilih project ATAU pusat biaya, tidak keduanya (US-53).' })
-  if (opts.forSubmit && !c.projectId && !c.costCenterId) errors.push({ path: 'projectId', message: 'Project atau pusat biaya wajib diisi (US-53).' })
+  if (c.projectId && c.costCenterId) errors.push({ path: 'projectId', message: 'Pilih project ATAU pusat biaya, tidak keduanya.' })
+  if (opts.forSubmit && !c.projectId && !c.costCenterId) errors.push({ path: 'projectId', message: 'Project atau pusat biaya wajib diisi.' })
   if (opts.forSubmit && !(c.title ?? '').trim()) errors.push({ path: 'title', message: 'Judul wajib diisi.' })
   for (const f of ['neededDate', 'periodFrom', 'periodTo'] as const) {
     if (c[f] && !isBusinessDate(c[f])) errors.push({ path: f, message: 'Tanggal harus YYYY-MM-DD.' })
@@ -147,12 +147,12 @@ export async function validateContent(
     const p = await req.payload.findByID({ collection: 'projects', id: c.projectId, depth: 0, overrideAccess: true /* SYSTEM-READ: scope check */, req }).catch(() => null)
     if (!p || isForeign(req, relId(p.company) ?? -1)) errors.push({ path: 'projectId', message: 'Project tidak ditemukan.' })
     else if (p.status === 'arsip' || p.status === 'selesai') errors.push({ path: 'projectId', message: 'Project sudah selesai/diarsipkan.' })
-    else if (!office && !(await scope()).assignedProjects.includes(c.projectId)) fail(403, 'Project di luar penugasan Anda (G10).')
+    else if (!office && !(await scope()).assignedProjects.includes(c.projectId)) fail(403, 'Project di luar penugasan Anda.')
   }
   if (c.costCenterId) {
     const cc = await req.payload.findByID({ collection: 'cost-centers', id: c.costCenterId, depth: 0, overrideAccess: true /* SYSTEM-READ: scope check */, req }).catch(() => null)
     if (!cc || cc.active === false || isForeign(req, relId(cc.company) ?? -1)) errors.push({ path: 'costCenterId', message: 'Pusat biaya tidak ditemukan atau nonaktif.' })
-    else if (!office && !(await scope()).assignedCostCenters.includes(c.costCenterId)) fail(403, 'Pusat biaya di luar penugasan Anda (G10).')
+    else if (!office && !(await scope()).assignedCostCenters.includes(c.costCenterId)) fail(403, 'Pusat biaya di luar penugasan Anda.')
   }
 
   // Requesters (US-40): ≥ 1 active employee; Staff/PM only for themselves (Q-09 default).
@@ -170,7 +170,7 @@ export async function validateContent(
     const own = company ?? (derived.length === 1 ? derived[0] : undefined)
     const creatorEmp = own !== undefined ? employeeIn(req, own) : relId((req.user as { employee?: unknown } | null)?.employee)
     if (userId(req) === opts.creatorId && (creatorEmp === undefined || (uniq.length > 0 && !uniq.includes(creatorEmp)))) {
-      fail(403, 'Hanya Admin/Finance yang boleh membuat pengajuan atas nama orang lain (Q-09).')
+      fail(403, 'Hanya Admin/Finance yang boleh membuat pengajuan atas nama orang lain.')
     }
   }
 
@@ -181,7 +181,7 @@ export async function validateContent(
       .findByID({ collection: 'employee-bank-accounts', id: c.bankAccountId, depth: 0, overrideAccess: true /* SYSTEM-READ: G9 */, req })
       .catch(() => null)
     if (!acc || acc.active === false || isForeign(req, relId(acc.company) ?? -1)) errors.push({ path: 'bankAccountId', message: 'Rekening tidak ditemukan atau nonaktif.' })
-    else if (!uniq.includes(relId(acc.employee) ?? -1)) errors.push({ path: 'bankAccountId', message: 'Rekening harus milik salah satu pemohon (Q-11).' })
+    else if (!uniq.includes(relId(acc.employee) ?? -1)) errors.push({ path: 'bankAccountId', message: 'Rekening harus milik salah satu pemohon.' })
   }
 
   // Lines (US-37) + masters.
@@ -211,7 +211,7 @@ export async function validateContent(
     if (l.uomId && !uoms.has(l.uomId)) errors.push({ path: `lines.${i}.uomId`, message: 'Satuan tidak ditemukan atau nonaktif.' })
     if (l.vehicleId && !vehs.has(l.vehicleId)) errors.push({ path: `lines.${i}.vehicleId`, message: 'Kendaraan tidak ditemukan atau nonaktif.' })
     if (l.categoryId && needsVehicle.has(l.categoryId) && !l.vehicleId) {
-      errors.push({ path: `lines.${i}.vehicleId`, message: 'Kategori ini wajib ditautkan ke kendaraan (Q-22).' })
+      errors.push({ path: `lines.${i}.vehicleId`, message: 'Kategori ini wajib ditautkan ke kendaraan.' })
     }
   })
   if (errors.length > 0) fail(400, 'Data pengajuan tidak valid.', errors)

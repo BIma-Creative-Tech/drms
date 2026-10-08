@@ -236,8 +236,9 @@ export interface User {
   email: string;
   name?: string | null;
   phone?: string | null;
+  displayName?: string | null;
   /**
-   * PNG tanda tangan Anda (latar putih/transparan). Dipakai otomatis saat mengirim/menyetujui pengajuan (US-43). Klik "Buat Baru" untuk mengunggah, lalu Simpan.
+   * PNG tanda tangan Anda (latar putih/transparan). Dipakai otomatis saat mengirim/menyetujui pengajuan. Klik "Buat Baru" untuk mengunggah, lalu Simpan.
    */
   signature?: (number | null) | MediaSignature;
   /**
@@ -510,7 +511,7 @@ export interface Employee {
   workSchedule?: (number | null) | WorkSchedule;
   faceRefPhoto?: (number | null) | MediaSelfy;
   /**
-   * Referensi Odoo (diisi saat mirror, ADR 0009).
+   * Referensi Odoo (diisi otomatis saat sinkronisasi ke Odoo).
    */
   odooEmployeeRef?: string | null;
   active?: boolean | null;
@@ -613,7 +614,7 @@ export interface Client {
   phone?: string | null;
   address?: string | null;
   /**
-   * Referensi Odoo (diisi saat mirror, ADR 0009).
+   * Referensi Odoo (diisi otomatis saat sinkronisasi ke Odoo).
    */
   odooPartnerRef?: string | null;
   active?: boolean | null;
@@ -640,7 +641,7 @@ export interface Vendor {
   npwp?: string | null;
   address?: string | null;
   /**
-   * Referensi Odoo (diisi saat mirror, ADR 0009).
+   * Referensi Odoo (diisi otomatis saat sinkronisasi ke Odoo).
    */
   odooPartnerRef?: string | null;
   active?: boolean | null;
@@ -682,7 +683,7 @@ export interface Project {
    */
   progressPct?: number | null;
   /**
-   * Referensi Odoo (diisi saat mirror, ADR 0009).
+   * Referensi Odoo (diisi otomatis saat sinkronisasi ke Odoo).
    */
   odooAnalyticRef?: string | null;
   uuid?: string | null;
@@ -805,7 +806,7 @@ export interface Uom {
    */
   category?: string | null;
   /**
-   * Referensi Odoo (diisi saat mirror, ADR 0009).
+   * Referensi Odoo (diisi otomatis saat sinkronisasi ke Odoo).
    */
   odooUomRef?: string | null;
   active?: boolean | null;
@@ -913,7 +914,7 @@ export interface CostCenter {
    */
   radiusM?: number | null;
   /**
-   * Referensi Odoo (diisi saat mirror, ADR 0009).
+   * Referensi Odoo (diisi otomatis saat sinkronisasi ke Odoo).
    */
   odooAnalyticRef?: string | null;
   active?: boolean | null;
@@ -1024,7 +1025,7 @@ export interface Vehicle {
   costCenter?: (number | null) | CostCenter;
   project?: (number | null) | Project;
   /**
-   * Referensi Odoo (diisi saat mirror, ADR 0009).
+   * Referensi Odoo (diisi otomatis saat sinkronisasi ke Odoo).
    */
   odooFleetRef?: string | null;
   active?: boolean | null;
@@ -2323,6 +2324,7 @@ export interface UsersSelect<T extends boolean = true> {
   email?: T;
   name?: T;
   phone?: T;
+  displayName?: T;
   signature?: T;
   keycloakSub?: T;
   active?: T;

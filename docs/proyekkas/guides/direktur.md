@@ -61,7 +61,10 @@ Setelah Anda, Finance juga menyetujui; RAB project bertambah otomatis dan tercat
 2. **Progress project** → project → **Editor tahapan** → **+ Tambah tahapan** atau **Mulai dari template tahapan** →
    atur bobot hingga **✓ sudah 100%** → **Simpan tahapan**.
 3. Mengubah RAB, bobot, atau mengarsipkan project wajib alasan. Project tidak bisa dihapus — pakai status **Arsip**.
-4. Progress fisik hanya berubah lewat laporan progress PM (tidak bisa diketik langsung).
+   Hanya Direktur yang mengubah data project; PM hanya membaca. Pilihan **Project Manager** berisi PM aktif PT itu
+   (nama · email).
+4. **Pengguna:** Direktur bisa melihat akun di PT-nya tetapi **tidak mengubahnya** — perubahan akun lewat Admin PT.
+5. Progress fisik hanya berubah lewat laporan progress PM (tidak bisa diketik langsung).
 
 ## 5. Laporan progress
 

@@ -454,6 +454,7 @@ export const CashEntryUpdate = z
     projectId: id.nullable().optional(),
     costCenterId: id.nullable().optional(),
     vehicleId: id.nullable().optional(),
+    proofId: id.nullable().optional().meta({ description: 'QA-31 (ADR 0005 §5): add or replace the proof (media-attachments id uploaded by the caller); null removes it.' }),
   })
   .strict()
   .meta({ id: 'CashEntryUpdate', description: 'Manual entries of an open period only; amount/date/account changes = void + new entry.' })

@@ -2,7 +2,7 @@ import type { AdminViewServerProps, PayloadRequest } from 'payload'
 import Link from 'next/link'
 import React from 'react'
 
-import { hasRoleAny, ROLE_LABELS } from '@/access/roles'
+import { hasRoleAny } from '@/access/roles'
 import { writeAudit } from '@/audit/writer'
 import { exportLetterhead, PDF_MAX_ROWS } from '@/domain/reports/export'
 import { reportContext } from '@/domain/reports/kpi'
@@ -15,6 +15,7 @@ import { formatServerTime } from '@/pdf/format'
 import { Empty, F3Root, FilterForm, ReportTable } from './f3-ui'
 import { foreignPtParam } from './pt'
 import { PtNotAllowed, Shell } from './shared'
+import { NoAccess } from './NoAccess'
 
 /**
  * F3 "Laporan" (wireframes §5) and the global "Audit Log" (§6): custom root views (wrapped in the
@@ -108,12 +109,9 @@ export async function AuditLogView(props: AdminViewServerProps) {
   return <ReportPage props={props} def={AUDIT_REPORT} scope={scope} base="/admin/audit-log" />
 }
 
-function Denied({ props, def }: { props: AdminViewServerProps; def: ReportDef }) {
-  return (
-    <Shell props={props} title={def.title}>
-      <p data-pk-denied={def.code}>Halaman ini hanya untuk peran: {def.roles.map((r) => ROLE_LABELS[r]).join(', ')}.</p>
-    </Shell>
-  )
+/** QA-20(c): uniform no-access page (no role list). */
+function Denied({ props }: { props: AdminViewServerProps; def?: ReportDef }) {
+  return <NoAccess props={props} />
 }
 
 async function ReportPage({ props, def, scope, base }: { props: AdminViewServerProps; def: ReportDef; scope: ReportScope; base: string }) {

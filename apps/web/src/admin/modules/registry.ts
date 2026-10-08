@@ -35,11 +35,13 @@ export type BadgeKey = 'transfers' | 'lpj'
 
 /** An entity list/edit route or a custom admin view (href relative to /admin). */
 export type ModuleItem =
-  | { collection: string; label?: string; navKey?: string }
-  | { global: string; label?: string; navKey?: string }
+  | { collection: string; label?: string; navKey?: string; personal?: true }
+  | { global: string; label?: string; navKey?: string; personal?: true }
   | {
       view: string
       label: string
+      /** QA-20(c): own-data shortcut that the top bar already offers (see `personal` below). */
+      personal?: true
       /** Any of these roles (omitted = every panel role). */
       roles?: readonly Role[]
       badge?: BadgeKey
@@ -60,6 +62,12 @@ export type ModuleDef = {
   hint: string
   /** Deeper custom-view routes (/kas/baru, /laporan/<kode>, …) resolve to the module of their parent view. */
   sections: readonly ModuleSection[]
+  /**
+   * QA-20(c): a configuration module (master data, settings) — shown only to callers who may CREATE
+   * or UPDATE at least one of its entities (Payload permissions). Read-only reference data is still
+   * reachable from the pickers that use it; a tile that only opens read-only lists is noise.
+   */
+  manage?: true
 }
 
 /** ADR 0013: decisions + cash = Direktur (pk-owner) / Finance. */
@@ -180,7 +188,8 @@ export const MODULES: readonly ModuleDef[] = [
         items: [
           // MC2-4: role matrix user × PT (Admin of a PT / group admin; the view re-checks)
           { view: '/akses-pt', label: 'Akses PT (matriks)', roles: ['pk-admin'], navKey: 'akses-pt' },
-          { collection: 'users' },
+          // own profile = avatar menu "Profil & tanda tangan" (profileHref)
+          { collection: 'users', personal: true },
           { collection: 'company-memberships', label: 'Data akses PT' },
           { collection: 'employees' },
           { collection: 'employee-bank-accounts' },
@@ -194,6 +203,7 @@ export const MODULES: readonly ModuleDef[] = [
     label: 'Master Data',
     icon: 'master',
     hint: 'Bank, satuan, vendor',
+    manage: true,
     sections: [{ items: [{ collection: 'banks' }, { collection: 'uoms' }, { collection: 'expense-categories' }, { collection: 'vehicles' }, { collection: 'vendors' }] }],
   },
   {
@@ -220,6 +230,7 @@ export const MODULES: readonly ModuleDef[] = [
     label: 'Pengaturan',
     icon: 'settings',
     hint: 'Perusahaan & aturan',
+    manage: true,
     sections: [{ items: [{ collection: 'companies' }, { global: 'company-settings' }, { collection: 'approval-rules' }, { collection: 'notification-templates' }, { collection: 'document-sequences' }] }],
   },
   {
@@ -232,8 +243,9 @@ export const MODULES: readonly ModuleDef[] = [
         items: [
           { view: '/audit-log', label: 'Audit Log', roles: OFFICE_ADMIN, navKey: 'audit-log' },
           { collection: 'audit-logs', label: 'Data audit log' },
-          { view: '/notifikasi', label: 'Notifikasi saya', navKey: 'notifikasi-saya' },
-          { collection: 'notifications', label: 'Data notifikasi' },
+          // own notifications = the bell in the top bar
+          { view: '/notifikasi', label: 'Notifikasi saya', navKey: 'notifikasi-saya', personal: true },
+          { collection: 'notifications', label: 'Data notifikasi', personal: true },
         ],
       },
     ],
@@ -334,6 +346,8 @@ export type VisibilityInput = {
   staffOnly: boolean
   /** Payload read permission AND visibleEntities for an entity. */
   canSee: (kind: 'collection' | 'global', slug: string) => boolean
+  /** Payload create or update permission of an entity (QA-20(c) `manage` modules). Omitted = none. */
+  canManage?: (kind: 'collection' | 'global', slug: string) => boolean
   /** Entity label (Payload labels.plural / global label). */
   labelOf: (kind: 'collection' | 'global', slug: string) => string
   badges?: Partial<Record<BadgeKey, number>>
@@ -344,11 +358,25 @@ function viewAllowed(item: Extract<ModuleItem, { view: string }>, roles: readonl
   return !item.roles || item.roles.some((r) => roles.includes(r))
 }
 
-/** Visible modules (registry order) with their visible items; modules without a visible item are dropped. */
+/** True when the caller may create/update at least one entity of a `manage` module. */
+function canManageModule(m: ModuleDef, input: VisibilityInput): boolean {
+  if (!input.canManage) return false
+  return allItems(m).some((it) => ('collection' in it ? input.canManage!('collection', it.collection) : 'global' in it ? input.canManage!('global', it.global) : false))
+}
+
+/**
+ * Visible modules (registry order) with their visible items. Dropped (QA-20(c), "only what the role can
+ * use"): modules without a visible item, modules whose visible items are all `personal` shortcuts the
+ * top bar already has (staff: "Pengguna & Akses" = own profile, "Sistem" = own notifications), and
+ * `manage` modules for callers who can neither create nor update any of their entities (PM: Master
+ * Data, Pengaturan). Everything is derived from the caller's Payload permissions + view roles.
+ */
 export function resolveModules(input: VisibilityInput, modules: readonly ModuleDef[] = MODULES): ResolvedModule[] {
   const out: ResolvedModule[] = []
   if (input.roles.length === 0) return out // no ProyekKas role → no panel access at all (Users.access.admin)
   for (const m of modules) {
+    if (m.manage && !canManageModule(m, input)) continue
+    const personal = new Set<string>()
     const sections: ResolvedSection[] = []
     m.sections.forEach((s, si) => {
       const items: ResolvedItem[] = []
@@ -359,16 +387,19 @@ export function resolveModules(input: VisibilityInput, modules: readonly ModuleD
           if (!viewAllowed(it, input.roles)) continue
           const badge = it.badge ? (input.badges?.[it.badge] ?? 0) : undefined
           items.push({ key: href, label: input.staffOnly && it.staffLabel ? it.staffLabel : it.label, href, kind, navKey: it.navKey, ...(badge ? { badge } : {}) })
+          if (it.personal) personal.add(href)
         } else {
           const slug = 'collection' in it ? it.collection : it.global
           const k = kind as 'collection' | 'global'
           if (!input.canSee(k, slug)) continue
           items.push({ key: href, label: it.label ?? input.labelOf(k, slug), href, kind, navKey: it.navKey })
+          if (it.personal) personal.add(href)
         }
       }
       if (items.length) sections.push({ key: `${m.id}-${si}`, label: s.label, items })
     })
     if (!sections.length) continue
+    if (sections.every((sec) => sec.items.every((i) => personal.has(i.href)))) continue
     const first = sections[0]!.items.find((i) => !i.label.startsWith('+')) ?? sections[0]!.items[0]!
     const badge = sections.reduce((n, s) => n + s.items.reduce((k, i) => k + (i.badge ?? 0), 0), 0)
     out.push({ id: m.id, label: m.label, icon: m.icon, hint: m.hint, href: first.href, badge, sections })

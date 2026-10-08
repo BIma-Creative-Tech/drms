@@ -1,4 +1,5 @@
 import { ROLES, type Role } from '@/access/roles'
+import { errorLine } from '@/lib/field-labels'
 
 /**
  * "Pengguna & akses PT" role matrix (MC2-4, ADR 0016 §2/§11, wireframe mc/wireframes.md §2) — pure
@@ -109,7 +110,8 @@ export function batchErrors(data: unknown, ops: readonly Op[]): { cells: Map<str
     const op = m ? ops[Number(m[1])] : undefined
     const msg = typeof e.message === 'string' && e.message ? e.message : 'Ditolak.'
     if (op) cells.set(op.key, cells.has(op.key) ? `${cells.get(op.key)}; ${msg}` : msg)
-    else general.push(typeof e.path === 'string' && e.path ? `${e.path}: ${msg}` : msg)
+    // QA-21: the field label, never the raw path ("reason: Wajib." → "Alasan: Wajib.")
+    else general.push(errorLine({ path: typeof e.path === 'string' ? e.path : null, message: msg }))
   }
   return { cells, general }
 }
