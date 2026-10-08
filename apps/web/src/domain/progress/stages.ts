@@ -90,7 +90,7 @@ export async function saveStageSet(req: PayloadRequest, projectId: number, body:
   const reweighted = input.filter((s) => s.id !== undefined && round2(byId.get(s.id)!.weightPct) !== round2(s.weightPct))
   const reason = (body.reason ?? '').trim()
   if ((reweighted.length > 0 || removed.length > 0 || reactivated.length > 0) && reason.length < 3) {
-    fail(400, 'VALIDATION', 'Alasan wajib diisi saat mengubah bobot atau menonaktifkan tahapan (G7).', 'reason')
+    fail(400, 'VALIDATION', 'Alasan wajib diisi saat mengubah bobot atau menonaktifkan tahapan.', 'reason')
   }
 
   req.context[CTX_STAGE_EDITOR] = true

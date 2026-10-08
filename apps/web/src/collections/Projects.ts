@@ -1,12 +1,14 @@
 import type { CollectionConfig } from 'payload'
 
-import { denyAll } from '@/access/roles'
+import { readOnlyFieldsGuard } from '@/access/field-guard'
+import { denyAll, hasRole } from '@/access/roles'
 import { assignedProjects, byRole, fieldRoles, rolesAllowed } from '@/access/policies'
 import { inIds } from '@/access/scope'
 import { reasonOnChange, withAudit } from '@/audit/hooks'
 import { progressWriteGuard } from '@/domain/progress/guards'
 import { codeField, odooRefField, percentField, rupiahField, uuidField } from '@/fields/common'
 import { companyField, companyHook } from '@/fields/company'
+import { userPicker } from '@/fields/users'
 
 export const PROJECT_STATUSES = [
   { label: 'Perencanaan', value: 'perencanaan' },
@@ -19,11 +21,13 @@ export const PROJECT_STATUSES = [
 const ownerOnly = fieldRoles('pk-owner')
 
 /**
- * Project (requirements v1.1 §4 "Project & tahapan"): Staff R assigned, PM R/U team,
+ * Project (requirements v1.1 §4 "Project & tahapan"): Staff R assigned, PM R team,
  * Finance R, Owner C/R/U/archive, Admin R. No delete (US-29: archive only).
- * PM may update operational fields of team projects; code/client/PM/RAB/status are Owner-only
- * (RAB changes go through addenda, T12). `progressPct` (E4) = Σ(weight × stage %) / 100, written only
- * by the progress recalculation (domain/progress/recalc.ts; guard + DB trigger pk_progress_guard).
+ * QA-20(b) (owner decision 2026-10-08): the PM is READ-ONLY on projects — only the Direktur of the
+ * project's PT changes them (RAB changes go through addenda, T12; progress through progress reports
+ * and the stage editor). A PM/Finance/Admin PATCH that changes a field → 403 naming the fields
+ * (`readOnlyFieldsGuard`), never a silent 200. `progressPct` (E4) = Σ(weight × stage %) / 100, written
+ * only by the progress recalculation (domain/progress/recalc.ts; guard + DB trigger pk_progress_guard).
  */
 export const Projects: CollectionConfig = withAudit(
   {
@@ -39,13 +43,10 @@ export const Projects: CollectionConfig = withAudit(
         'pk-staff': assignedProjects('id'),
       }),
       create: rolesAllowed('pk-owner'),
-      update: byRole({
-        'pk-owner': true,
-        'pk-pm': async ({ scope }) => inIds('id', (await scope()).teamProjects),
-      }),
+      update: byRole({ 'pk-owner': true }),
       delete: denyAll,
     },
-    hooks: { beforeChange: [companyHook('projects', { check: [{ field: 'client', collection: 'clients' }, { field: 'pm', collection: 'users', member: true }] })], beforeOperation: [progressWriteGuard('projects')] },
+    hooks: { beforeChange: [companyHook('projects', { check: [{ field: 'client', collection: 'clients' }, { field: 'pm', collection: 'users', member: true }] })], beforeOperation: [progressWriteGuard('projects'), readOnlyFieldsGuard('projects', (req, company) => hasRole(req, 'pk-owner', company), 'Direktur')] },
     fields: [
       companyField(),
       { ...codeField('Kode', 32, { perCompany: true }), access: { update: ownerOnly } },
@@ -60,7 +61,8 @@ export const Projects: CollectionConfig = withAudit(
           { name: 'radiusM', type: 'number', label: 'Radius geofence (m)', min: 10, max: 5000, admin: { description: 'Kosong = radius default perusahaan (Setting perusahaan).' } },
         ],
       },
-      { name: 'pm', type: 'relationship', relationTo: 'users', label: 'Project Manager', index: true, access: { update: ownerOnly } },
+      // QA-16: only active PMs of the project's PT, shown by name (users.displayName)
+      { name: 'pm', type: 'relationship', relationTo: 'users', label: 'Project Manager', index: true, access: { update: ownerOnly }, ...userPicker({ roles: ['pk-pm'] }) },
       { ...rupiahField('budget', 'RAB (Rp)'), access: { update: ownerOnly } },
       {
         type: 'row',

@@ -1,7 +1,7 @@
 import type { Access, AccessArgs, FieldAccess, PayloadRequest, Where } from 'payload'
 
 import { companiesWithRole, hasRole, hasRoleAny, isGroupAdmin, membershipsOf, relId, rolesIn, userRoles, type Role } from './roles'
-import { inIds, resolveScope, type Scope } from './scope'
+import { inIds, NO_ROWS, resolveScope, type Scope } from './scope'
 
 /**
  * Per-role access rules → one Payload access function (requirements v1.1 §4, architecture §7.2),
@@ -158,7 +158,8 @@ export const ownEmployee =
   (field: string): Rule =>
   async ({ scope }) => {
     const s = await scope()
-    return s.employeeIds.length === 0 ? false : s.employeeIds.length === 1 ? { [field]: { equals: s.employeeIds[0] } } : { [field]: { in: s.employeeIds } }
+    // QA-28: nothing in scope → an empty list (NO_ROWS), not a 403
+    return s.employeeIds.length === 0 ? NO_ROWS : s.employeeIds.length === 1 ? { [field]: { equals: s.employeeIds[0] } } : { [field]: { in: s.employeeIds } }
   }
 
 /**

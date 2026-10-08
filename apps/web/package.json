@@ -1,6 +1,6 @@
 {
   "name": "@proyekkas/web",
-  "version": "0.6.1",
+  "version": "0.6.2",
   "private": true,
   "type": "module",
   "engines": {
@@ -40,13 +40,13 @@
     "graphql": "16.14.2",
     "jose": "6.2.12",
     "motion": "13.4.0",
-    "next": "16.3.6",
+    "next": "16.3.8",
     "openid-client": "6.8.8",
     "payload": "3.90.1",
     "pg": "8.20.0",
     "react": "19.3.0",
     "react-dom": "19.3.0",
-    "sharp": "0.35.4",
+    "sharp": "0.35.5",
     "write-excel-file": "4.1.1",
     "zod": "4.6.5"
   },
@@ -59,7 +59,7 @@
     "@vitest/coverage-v8": "5.0.1",
     "esbuild": "0.28.2",
     "eslint": "9.39.5",
-    "eslint-config-next": "16.3.6",
+    "eslint-config-next": "16.3.8",
     "fflate": "0.8.3",
     "typescript": "6.0.3",
     "vitest": "5.0.1"

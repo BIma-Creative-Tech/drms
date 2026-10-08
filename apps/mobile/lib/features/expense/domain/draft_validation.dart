@@ -18,9 +18,23 @@ List<DraftIssue> validateForSave(DraftRequest d) => [
   if (d.title.length > 200) const DraftIssue('title', 'Judul maksimal 200 karakter.'),
 ];
 
+/// QA-15: message when a Staff-only user lists someone else as requester (same text as the server).
+const staffSelfOnlyMessage = 'Staff hanya dapat mengajukan untuk dirinya sendiri: "Diajukan Oleh" harus hanya Anda.';
+
+/// QA-15: "Diajukan Oleh" of a Staff-only user must be exactly [selfOnlyEmployee] (null = no restriction;
+/// a Staff-only user without an employee in the PT passes -1 → always an issue).
+List<DraftIssue> requesterIssues(DraftRequest d, {int? selfOnlyEmployee}) => [
+  if (selfOnlyEmployee != null && !(d.requesterIds.length == 1 && d.requesterIds.single == selfOnlyEmployee))
+    const DraftIssue('requesterIds', staffSelfOnlyMessage),
+];
+
+/// QA-15: employees a user may pick as requester — own employee only for a Staff-only user.
+List<T> requesterChoices<T>(List<T> employees, int Function(T) idOf, {int? selfOnlyEmployee}) =>
+    selfOnlyEmployee == null ? employees : employees.where((e) => idOf(e) == selfOnlyEmployee).toList();
+
 /// Everything required before "Ajukan" (online submit).
-List<DraftIssue> validateForSubmit(DraftRequest d) {
-  final issues = <DraftIssue>[...validateForSave(d)];
+List<DraftIssue> validateForSubmit(DraftRequest d, {int? selfOnlyEmployee}) {
+  final issues = <DraftIssue>[...validateForSave(d), ...requesterIssues(d, selfOnlyEmployee: selfOnlyEmployee)];
   final hasProject = d.projectId != null;
   final hasCostCenter = d.costCenterId != null;
   if (hasProject == hasCostCenter) {

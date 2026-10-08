@@ -27,7 +27,7 @@ import {
   type Lookups,
   type Option,
 } from '@/domain/cash/book'
-import { balances, currentLockDate, lockDates, type CashEntryDoc } from '@/domain/cash/ledger'
+import { balances, booksStartDate, currentLockDate, lockDates, type CashEntryDoc } from '@/domain/cash/ledger'
 import { periodEnd } from '@/domain/cash/periods'
 import { displayName, settings, today as businessToday } from '@/domain/expense/common'
 import { MONTHS_SHORT, periodLabel } from '@/domain/reports/rules'
@@ -41,6 +41,7 @@ import { foreignPtParam, PtChip, ptView, type PtView } from './pt'
 import { PtNotAllowed } from './shared'
 import { PerPt } from './pt-breakdown'
 import { Bento, Card, DashHead, DataTable, EmptyState, KpiRow, KpiTile, rp, rpShort, StatusPill, VIZ_STYLE, type Col } from './viz'
+import { NoAccess } from './NoAccess'
 
 /**
  * E2 (fase1-golive §E2, US-23/US-24, ADR 0005): web "Kas" for Finance — buku kas with filters,
@@ -193,16 +194,9 @@ function Frame({ props, name, children }: { props: AdminViewServerProps; name: s
   )
 }
 
-function Denied({ props, title, roles }: { props: AdminViewServerProps; title: string; roles: string }) {
-  return (
-    <Frame props={props} name="kas-denied">
-      <DashHead title={title} />
-      <div className="pk-alert bad" data-pk-denied>
-        <b aria-hidden>!</b>
-        <p>Halaman ini hanya untuk {roles}.</p>
-      </div>
-    </Frame>
-  )
+/** QA-20(c): uniform no-access page (title/roles kept for the call sites, never shown). */
+function Denied({ props }: { props: AdminViewServerProps; title?: string; roles?: string }) {
+  return <NoAccess props={props} />
 }
 
 const labelOf = (list: Array<{ id: number; label: string }>, id: number | null) => (id === null ? null : (list.find((x) => x.id === id)?.label ?? `#${id}`))
@@ -668,7 +662,7 @@ export async function KasEdit(props: AdminViewServerProps) {
   const editable = canEdit(e, lockDate)
   return (
     <Frame props={props} name="kas-ubah">
-      <DashHead title={`Edit ${e.entryNo}`} note="Hanya keterangan, sumber/kategori, pembebanan dan kendaraan. Alasan wajib.">
+      <DashHead title={`Edit ${e.entryNo}`} note="Keterangan, sumber/kategori, pembebanan, kendaraan dan bukti. Tanggal, akun dan nominal terkunci. Alasan wajib.">
         {back}
       </DashHead>
       {editable ? (
@@ -694,6 +688,7 @@ export async function KasEdit(props: AdminViewServerProps) {
                 projectId: relId(e.project) ?? null,
                 costCenterId: relId(e.costCenter) ?? null,
                 vehicleId: relId(e.vehicle) ?? null,
+                proofId: relId((e as { proof?: unknown }).proof) ?? null,
               }}
             />
           </Card>
@@ -754,7 +749,9 @@ export async function TutupBuku(props: AdminViewServerProps) {
     const todayDate = await businessToday(req, company)
     const lockDate = await currentLockDate(req, company)
     const tz = (await settings(req, company)).timezone || process.env.TZ || 'Asia/Makassar'
-    const periods = recentPeriods(todayDate, 13)
+    // QA-30: months before the PT's books start (earliest opening-balance date) are neither listed nor closable
+    const booksStart = await booksStartDate(req, company)
+    const periods = recentPeriods(todayDate, 13, booksStart)
     const sums = await periodSummaries(req, periods, [company])
     const res = await req.payload.find({ collection: 'period-closings', where: { company: { equals: company } }, sort: '-id', limit: 100, depth: 0, user: req.user, overrideAccess: false, req })
     const names = new Map<number, string>()
@@ -772,14 +769,14 @@ export async function TutupBuku(props: AdminViewServerProps) {
       reopenedAt: formatServerTime(x.reopenedAt as string, tz) || null,
       reopenReason: (x.reopenReason as string) ?? null,
     }))
-    return { todayDate, lockDate, periods, sums, closings }
+    return { todayDate, lockDate, periods, sums, closings, booksStart }
   })
-  const { todayDate, lockDate, periods, sums, closings } = d
-  const closable = new Set(closablePeriods(todayDate, lockDate))
+  const { todayDate, lockDate, periods, sums, closings, booksStart } = d
+  const closable = new Set(closablePeriods(todayDate, lockDate, 12, booksStart))
   const closedSet = new Set(closings.filter((c) => c.status === 'closed').map((c) => c.period))
   const latestClosed = closings.filter((c) => c.status === 'closed').map((c) => c.period).sort().at(-1) ?? null
-  type Row = { period: string; state: ReturnType<typeof periodState>; n: number; tin: number; tout: number; voids: number }
-  const rows: Row[] = periods.map((p) => ({ period: p, state: periodState(p, todayDate, lockDate), ...(sums.get(p) ?? { n: 0, tin: 0, tout: 0, voids: 0 }) }))
+  type Row = { period: string; state: ReturnType<typeof periodState>; n: number; tin: number; tout: number; voids: number; nKoreksi: number; koreksi: number }
+  const rows: Row[] = periods.map((p) => ({ period: p, state: periodState(p, todayDate, lockDate), ...(sums.get(p) ?? { n: 0, tin: 0, tout: 0, voids: 0, nKoreksi: 0, koreksi: 0 }) }))
   const cols: Col<Row>[] = [
     {
       key: 'p',
@@ -800,8 +797,17 @@ export async function TutupBuku(props: AdminViewServerProps) {
       },
     },
     { key: 'n', label: 'Transaksi', num: true, cell: (r) => `${r.n}${r.voids ? ` (${r.voids} void)` : ''}` },
+    // QA-30: Masuk/Keluar without void pairs (K-02b); the void pairs in their own column (book net = bersih + koreksi)
     { key: 'in', label: 'Masuk', num: true, sec: true, cell: (r) => rp(r.tin) },
     { key: 'out', label: 'Keluar', num: true, sec: true, cell: (r) => rp(r.tout) },
+    { key: 'net', label: 'Bersih', num: true, cell: (r) => rp(r.tin - r.tout) },
+    {
+      key: 'kor',
+      label: 'Koreksi (void)',
+      num: true,
+      sec: true,
+      cell: (r) => (r.nKoreksi ? <span data-pk-koreksi={r.period}>{`${rp(r.koreksi)} (${r.nKoreksi} baris)`}</span> : '—'),
+    },
     {
       key: 'a',
       label: 'Aksi',
@@ -899,7 +905,13 @@ export async function TutupBuku(props: AdminViewServerProps) {
             <p className="pk-kpi-x">{closable.size ? [...closable].map(periodLabel).join(', ') : 'Tidak ada — bulan berjalan belum bisa ditutup.'}</p>
           </KpiTile>
         </KpiRow>
-        <Card id="periods" title="Per bulan" sub="13 bulan terakhir, semua baris (void + jurnal balik saling meniadakan)" span={8} i={3}>
+        <Card
+          id="periods"
+          title="Per bulan"
+          sub={`13 bulan terakhir${booksStart ? ` sejak buku kas dimulai (${dayMonth(booksStart)})` : ''}. Masuk/Keluar tanpa pasangan void; koreksi void terpisah.`}
+          span={8}
+          i={3}
+        >
           <DataTable id="periods" cols={cols} rows={rows} rowKey={(r) => r.period} rowAttrs={(r) => ({ 'data-pk-period-row': r.period, 'data-pk-state': r.state })} caption="Ringkasan kas per bulan" empty={<EmptyState text="Belum ada data." />} />
         </Card>
         <Card id="history" title="Riwayat" sub="Tutup & buka kembali" span={4} i={4}>

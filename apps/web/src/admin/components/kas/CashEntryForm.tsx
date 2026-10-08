@@ -4,8 +4,11 @@ import Link from 'next/link'
 import React, { useId, useMemo, useRef, useState } from 'react'
 
 import { formatRupiah } from '@/lib/money'
+import { CASH_MINUS_MESSAGE } from '@/lib/rupiah-input'
 
+import { RupiahInput, useRupiah } from '../RupiahInput'
 import { fieldErrors, newIdemKey, sendJson, uploadAttachment } from './client'
+import { OverrideDialog, overridePromptOf, type OverridePrompt } from './OverrideDialog'
 
 /**
  * E2 form "Kas masuk / Kas keluar" (US-23) and its edit mode (ADR 0005 §5: descriptive fields
@@ -14,8 +17,11 @@ import { fieldErrors, newIdemKey, sendJson, uploadAttachment } from './client'
  * audit are the domain's job). Visible labels, inline errors linked by aria-describedby, an error
  * summary with role=alert, busy state, one Idempotency-Key per unchanged form (a retry after a
  * network error is replayed, never posted twice; the uploaded proof id is reused).
+ * QA 2026-10-08: Nominal through the shared Rupiah field (QA-03/QA-12: decimals / minus refused inline,
+ * never stripped); Tanggal `min` = the later of the lock date + 1 and the picked account's opening-
+ * balance date (QA-05); a cash-out that would make the balance negative asks "Tetap simpan" (QA-04).
  */
-export type Opt = { id: number; label: string; requiresVehicle?: boolean }
+export type Opt = { id: number; label: string; requiresVehicle?: boolean; openingDate?: string | null }
 
 export type CashEntryFormProps = {
   mode: 'create' | 'edit'
@@ -37,15 +43,15 @@ export type CashEntryFormProps = {
     projectId: number | null
     costCenterId: number | null
     vehicleId: number | null
+    /** QA-31: current proof (media-attachments id), replaceable in edit mode. */
+    proofId?: number | null
   }
 }
 
 type Scope = 'project' | 'pusat' | 'none'
 
-function digits(v: string): string {
-  return v.replace(/[^\d]/g, '').replace(/^0+/, '').slice(0, 13)
-}
-const grouped = (d: string) => (d ? Number(d).toLocaleString('id-ID') : '')
+const dmy = (d: string) => `${d.slice(8, 10)}/${d.slice(5, 7)}/${d.slice(0, 4)}`
+const later = (a: string | null | undefined, b: string | null | undefined) => (a && b ? (a > b ? a : b) : (a ?? b ?? undefined))
 
 export function CashEntryForm({ mode, today, minDate, lockDate, initialDirection, options, entry }: CashEntryFormProps) {
   const router = useRouter()
@@ -53,7 +59,11 @@ export function CashEntryForm({ mode, today, minDate, lockDate, initialDirection
   const edit = mode === 'edit' && entry
   const [direction, setDirection] = useState<'in' | 'out'>(entry?.direction ?? initialDirection)
   const [scope, setScope] = useState<Scope>(entry?.projectId ? 'project' : entry?.costCenterId ? 'pusat' : 'none')
-  const [amount, setAmount] = useState('')
+  const amount = useRupiah(null, { minusMessage: CASH_MINUS_MESSAGE })
+  const [accountId, setAccountId] = useState<string>(options.accounts.length === 1 ? String(options.accounts[0]!.id) : '')
+  const opening = options.accounts.find((a) => String(a.id) === accountId)?.openingDate ?? null
+  const [prompt, setPrompt] = useState<OverridePrompt | null>(null)
+  const pending = useRef<Record<string, unknown> | null>(null)
   const [categoryId, setCategoryId] = useState<string>(entry?.categoryId ? String(entry.categoryId) : '')
   const [busy, setBusy] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
@@ -93,13 +103,17 @@ export function CashEntryForm({ mode, today, minDate, lockDate, initialDirection
     if (direction === 'out' && !n('categoryId')) found.categoryId = 'Kategori wajib untuk kas keluar.'
     if (direction === 'in' && !n('cashInSourceId')) found.cashInSourceId = 'Sumber wajib untuk kas masuk.'
     if (!edit) {
-      const amt = Number(amount || '0')
-      if (!(amt > 0)) found.amount = 'Nominal wajib diisi (Rupiah, bilangan bulat > 0).'
+      amount.touch()
+      const amt = amount.parsed.value
+      if (amount.parsed.error) found.amount = amount.parsed.error
+      else if (amt === null) found.amount = 'Nominal wajib diisi (Rupiah, bilangan bulat > 0).'
       if (!n('cashAccountId')) found.cashAccountId = 'Pilih akun kas.'
       const date = s('entryDate')
+      const acctOpening = options.accounts.find((a) => a.id === n('cashAccountId'))?.openingDate ?? null
       if (!date) found.entryDate = 'Tanggal wajib diisi.'
       else if (date > today) found.entryDate = 'Tanggal tidak boleh di masa depan.'
       else if (lockDate && date <= lockDate) found.entryDate = `Periode sudah ditutup (tutup buku s/d ${lockDate}).`
+      else if (acctOpening && date < acctOpening) found.entryDate = `Tanggal sebelum tanggal saldo awal akun (${dmy(acctOpening)}).`
       Object.assign(body, { direction, entryDate: date, cashAccountId: n('cashAccountId'), amount: amt, description })
     } else {
       const reason = s('reason')
@@ -124,7 +138,10 @@ export function CashEntryForm({ mode, today, minDate, lockDate, initialDirection
       requestAnimationFrame(() => summaryRef.current?.focus())
       return
     }
-    if (edit && Object.keys(body).length === 1) {
+    // QA-31: a proof can be added / replaced while editing too (ADR 0005 §5: proof is descriptive)
+    const file = f.get('proof')
+    const hasFile = file instanceof File && file.size > 0
+    if (edit && !hasFile && Object.keys(body).length === 1) {
       setSummary('Tidak ada perubahan untuk disimpan.')
       requestAnimationFrame(() => summaryRef.current?.focus())
       return
@@ -132,24 +149,52 @@ export function CashEntryForm({ mode, today, minDate, lockDate, initialDirection
     setSummary(null)
     setBusy(true)
     try {
-      const file = f.get('proof')
-      if (!edit && file instanceof File && file.size > 0) {
+      if (hasFile) {
         if (proof.current?.file !== file) proof.current = { file, id: await uploadAttachment(file) }
         body.proofId = proof.current.id
       }
-      key.current ??= newIdemKey()
-      const r = edit ? await sendJson('PATCH', `/api/v1/cash-entries/${entry.id}`, body, key.current) : await sendJson('POST', '/api/v1/cash-entries', body, key.current)
-      if (!r.ok) {
-        const fe = fieldErrors(r.data)
-        setErrors(fe)
-        setSummary(r.error)
-        requestAnimationFrame(() => summaryRef.current?.focus())
+      await send(body)
+    } catch (x) {
+      setSummary((x as Error).message || 'Gagal menghubungi server. Coba lagi — permintaan yang sama tidak akan tercatat dua kali.')
+      requestAnimationFrame(() => summaryRef.current?.focus())
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const send = async (body: Record<string, unknown>) => {
+    key.current ??= newIdemKey()
+    const r = edit ? await sendJson('PATCH', `/api/v1/cash-entries/${entry.id}`, body, key.current) : await sendJson('POST', '/api/v1/cash-entries', body, key.current)
+    if (!r.ok) {
+      // QA-04: a confirmable refusal → app dialog; "Tetap simpan" re-sends with the flag (new body → new key)
+      const p = edit ? null : overridePromptOf(r.status, r.data)
+      if (p) {
+        pending.current = body
+        setPrompt(p)
         return
       }
-      const saved = r.data as { id: number }
-      router.push(edit ? `/admin/kas?diubah=${saved.id}#ce-${saved.id}` : `/admin/kas?baru=${saved.id}#ce-${saved.id}`)
-      router.refresh()
+      setPrompt(null)
+      const fe = fieldErrors(r.data)
+      setErrors(fe)
+      setSummary(r.error)
+      requestAnimationFrame(() => summaryRef.current?.focus())
+      return
+    }
+    setPrompt(null)
+    const saved = r.data as { id: number }
+    router.push(edit ? `/admin/kas?diubah=${saved.id}#ce-${saved.id}` : `/admin/kas?baru=${saved.id}#ce-${saved.id}`)
+    router.refresh()
+  }
+
+  const confirmOverride = async () => {
+    if (!prompt || !pending.current) return
+    const body = { ...pending.current, [prompt.flag]: true }
+    key.current = newIdemKey()
+    setBusy(true)
+    try {
+      await send(body)
     } catch (x) {
+      setPrompt(null)
       setSummary((x as Error).message || 'Gagal menghubungi server. Coba lagi — permintaan yang sama tidak akan tercatat dua kali.')
       requestAnimationFrame(() => summaryRef.current?.focus())
     } finally {
@@ -194,6 +239,7 @@ export function CashEntryForm({ mode, today, minDate, lockDate, initialDirection
   )
 
   return (
+    <>
     <form className="pk-kform" onSubmit={onSubmit} onChange={onChange} noValidate data-pk-form={edit ? 'cash-edit' : 'cash-create'}>
       {summary ? (
         <div ref={summaryRef} tabIndex={-1} role="alert" className="pk-alert bad" data-pk-form-error>
@@ -224,22 +270,22 @@ export function CashEntryForm({ mode, today, minDate, lockDate, initialDirection
             Nominal, tanggal, akun dan arah tidak dapat diubah — untuk itu void transaksi ini lalu catat ulang.
           </p>
         </div>
-      ) : (
-        <fieldset style={{ border: 0, padding: 0, margin: 0 }}>
-          <legend style={{ padding: 0, marginBottom: 6, fontSize: 13, fontWeight: 600 }}>
-            Jenis transaksi
-          </legend>
-          <div className="pk-seg dir" role="radiogroup" aria-label="Jenis transaksi">
-            {(['in', 'out'] as const).map((d) => (
-              <label key={d} data-pk-dir={d}>
-                <input type="radio" name="direction" value={d} checked={direction === d} onChange={() => setDirection(d)} />
-                <span aria-hidden>{d === 'in' ? '↓' : '↑'}</span>
-                {d === 'in' ? 'Kas masuk' : 'Kas keluar'}
-              </label>
-            ))}
-          </div>
-        </fieldset>
-      )}
+      ) : null}
+      {/* QA-31: same layout as "buat baru"; locked fields are shown disabled in edit mode */}
+      <fieldset style={{ border: 0, padding: 0, margin: 0 }} disabled={Boolean(edit)} data-pk-locked={edit ? 'direction' : undefined}>
+        <legend style={{ padding: 0, marginBottom: 6, fontSize: 13, fontWeight: 600 }}>
+          Jenis transaksi
+        </legend>
+        <div className="pk-seg dir" role="radiogroup" aria-label="Jenis transaksi">
+          {(['in', 'out'] as const).map((d) => (
+            <label key={d} data-pk-dir={d}>
+              <input type="radio" name="direction" value={d} checked={direction === d} onChange={() => setDirection(d)} />
+              <span aria-hidden>{d === 'in' ? '↓' : '↑'}</span>
+              {d === 'in' ? 'Kas masuk' : 'Kas keluar'}
+            </label>
+          ))}
+        </div>
+      </fieldset>
 
       <div className="pk-kgrid">
         {!edit ? (
@@ -248,40 +294,49 @@ export function CashEntryForm({ mode, today, minDate, lockDate, initialDirection
               <label htmlFor={id('entryDate')}>
                 Tanggal<span className="req" aria-hidden>*</span>
               </label>
-              <input id={id('entryDate')} type="date" name="entryDate" defaultValue={today} max={today} min={minDate ?? undefined} required aria-invalid={err('entryDate') ? true : undefined} aria-describedby={described('entryDate', true)} />
+              <input id={id('entryDate')} type="date" name="entryDate" defaultValue={today} max={today} min={later(minDate, opening)} required aria-invalid={err('entryDate') ? true : undefined} aria-describedby={described('entryDate', true)} />
               <p id={id('entryDate-h')} className="help">
-                {lockDate ? `Tutup buku s/d ${lockDate}: tanggal sebelumnya ditolak.` : 'Belum ada periode yang ditutup.'} Tidak boleh di masa depan.
+                {lockDate ? `Tutup buku s/d ${lockDate}: tanggal sebelumnya ditolak.` : 'Belum ada periode yang ditutup.'}
+                {opening ? ` Saldo awal akun per ${dmy(opening)}: tanggal sebelumnya ditolak.` : ''} Tidak boleh di masa depan.
               </p>
               <Err name="entryDate" />
             </div>
-            {select('cashAccountId', 'Akun kas', options.accounts, options.accounts.length === 1 ? options.accounts[0]!.id : null, { required: true })}
+            {select('cashAccountId', 'Akun kas', options.accounts, options.accounts.length === 1 ? options.accounts[0]!.id : null, { required: true, onPick: setAccountId })}
             <div className="pk-fld">
               <label htmlFor={id('amount')}>
                 Nominal<span className="req" aria-hidden>*</span>
               </label>
-              <div className="pk-money">
-                <span aria-hidden>Rp</span>
-                <input
-                  id={id('amount')}
-                  name="amount"
-                  inputMode="numeric"
-                  autoComplete="off"
-                  value={grouped(amount)}
-                  onChange={(e) => setAmount(digits(e.target.value))}
-                  placeholder="0"
-                  required
-                  aria-invalid={err('amount') ? true : undefined}
-                  aria-describedby={described('amount', true)}
-                  data-pk-field="amount"
-                />
-              </div>
+              <RupiahInput id={id('amount')} name="amount" field={amount} required invalid={!!err('amount')} describedBy={[amount.error || err('amount') ? id('amount-e') : null, id('amount-h')].filter(Boolean).join(' ')} testId="amount" />
               <p id={id('amount-h')} className="help">
-                Rupiah tanpa desimal{amount ? ` · ${formatRupiah(Number(amount))}` : ''}.
+                Rupiah tanpa desimal; titik sebagai pemisah ribuan{amount.parsed.value !== null ? ` · ${formatRupiah(amount.parsed.value)}` : ''}.
               </p>
-              <Err name="amount" />
+              {amount.error || err('amount') ? (
+                <p id={id('amount-e')} className="err" data-pk-amount-error>
+                  {amount.error ?? err('amount')}
+                </p>
+              ) : null}
             </div>
           </>
-        ) : null}
+        ) : (
+          <>
+            {/* QA-31: locked in edit mode (ADR 0005 §5) — shown, not hidden */}
+            <div className="pk-fld">
+              <label htmlFor={id('entryDate')}>Tanggal</label>
+              <input id={id('entryDate')} type="date" value={entry.entryDate} disabled readOnly aria-describedby={id('locked-h')} data-pk-locked="entryDate" />
+            </div>
+            <div className="pk-fld">
+              <label htmlFor={id('cashAccountId')}>Akun kas</label>
+              <input id={id('cashAccountId')} type="text" value={entry.account} disabled readOnly aria-describedby={id('locked-h')} data-pk-locked="cashAccountId" />
+            </div>
+            <div className="pk-fld">
+              <label htmlFor={id('amount')}>Nominal</label>
+              <input id={id('amount')} type="text" value={formatRupiah(entry.amount)} disabled readOnly aria-describedby={id('locked-h')} data-pk-locked="amount" />
+              <p id={id('locked-h')} className="help">
+                Tanggal, akun dan nominal terkunci — koreksi dengan Void lalu catat ulang.
+              </p>
+            </div>
+          </>
+        )}
 
         {direction === 'in'
           ? select('cashInSourceId', 'Sumber kas masuk', options.sources, entry?.cashInSourceId, { required: true })
@@ -324,15 +379,22 @@ export function CashEntryForm({ mode, today, minDate, lockDate, initialDirection
           <Err name="description" />
         </div>
 
-        {!edit ? (
-          <div className="pk-fld full">
-            <label htmlFor={id('proof')}>Bukti (opsional)</label>
-            <input id={id('proof')} type="file" name="proof" accept="application/pdf,image/jpeg,image/png" aria-describedby={id('proof-h')} />
-            <p id={id('proof-h')} className="help">
-              PDF, JPG atau PNG. PDF maks. 5 MB; gambar diperkecil otomatis.
+        <div className="pk-fld full">
+          <label htmlFor={id('proof')}>{edit && entry.proofId ? 'Ganti bukti (opsional)' : 'Bukti (opsional)'}</label>
+          {edit && entry.proofId ? (
+            <p className="help" data-pk-proof-current>
+              <a href={`/api/v1/media/attachments/${entry.proofId}/file`} target="_blank" rel="noopener noreferrer">
+                Lihat bukti saat ini
+              </a>{' '}
+              — pilih file baru untuk menggantinya.
             </p>
-          </div>
-        ) : (
+          ) : null}
+          <input id={id('proof')} type="file" name="proof" accept="application/pdf,image/jpeg,image/png" aria-describedby={id('proof-h')} data-pk-field="proof" />
+          <p id={id('proof-h')} className="help">
+            PDF, JPG atau PNG. PDF maks. 5 MB; gambar diperkecil otomatis.
+          </p>
+        </div>
+        {edit ? (
           <div className="pk-fld full">
             <label htmlFor={id('reason')}>
               Alasan perubahan<span className="req" aria-hidden>*</span>
@@ -343,7 +405,7 @@ export function CashEntryForm({ mode, today, minDate, lockDate, initialDirection
             </p>
             <Err name="reason" />
           </div>
-        )}
+        ) : null}
       </div>
 
       <div className="pk-kact" style={{ justifyContent: 'flex-end' }}>
@@ -355,6 +417,18 @@ export function CashEntryForm({ mode, today, minDate, lockDate, initialDirection
         </button>
       </div>
     </form>
+    {/* outside the form: a <dialog> holds its own <form> (nested forms are invalid HTML) */}
+    <OverrideDialog
+      prompt={prompt}
+      busy={busy}
+      onConfirm={() => void confirmOverride()}
+      onCancel={() => {
+        setPrompt(null)
+        setSummary('Belum disimpan — saldo akun akan minus. Periksa nominal atau akun, lalu simpan lagi.')
+        requestAnimationFrame(() => summaryRef.current?.focus())
+      }}
+    />
+    </>
   )
 }
 

@@ -2,6 +2,7 @@ import type { PayloadRequest } from 'payload'
 
 import { relId, userId, type Role } from '@/access/roles'
 import { formatRupiah } from '@/lib/money'
+import { DEFAULT_TZ, startOfLocalDay } from '@/lib/time'
 
 import type { ApprovalSnapshot } from './expense/rules'
 import { REQUEST_TYPE_LABELS, statusLabel, type RequestStatus, type RequestType } from './expense/types'
@@ -37,6 +38,8 @@ export type NotifyEvent =
   | 'expense.submitted'
   | 'expense.withdrawn'
   | 'expense.created_on_behalf'
+  // QA-18 (owner decision 2026-10-08): the team PM of the request's project
+  | 'expense.team_submitted'
 
 const DEFAULTS: Record<NotifyEvent, { title: string; body: string }> = {
   // ADR 0013 §10: "Diketahui" is the Direktur's approval; recipients = active Direktur (pk-owner)
@@ -58,7 +61,18 @@ const DEFAULTS: Record<NotifyEvent, { title: string; body: string }> = {
   'expense.submitted': { title: 'Diajukan: {docNo}', body: '{type} "{title}" {amount} telah diajukan dan menunggu persetujuan.' },
   'expense.withdrawn': { title: 'Ditarik ke Draft: {docNo}', body: 'Pengajuan "{title}" ditarik kembali ke Draft.' },
   'expense.created_on_behalf': { title: 'Pengajuan atas nama Anda: {docNo}', body: 'Draft {type} "{title}" {amount} dibuat atas nama Anda. Anda tercantum sebagai pemohon (Diajukan Oleh).' },
+  'expense.team_submitted': { title: 'Pengajuan tim: {docNo}', body: '{type} "{title}" {amount} di project Anda telah diajukan dan menunggu persetujuan.' },
 }
+
+/**
+ * QA-18 (owner decision 2026-10-08): the team PM of the request's PROJECT is informed of these steps —
+ * submitted (→ "Menunggu Diketahui"/"Menunggu Approval": `expense.team_submitted`), rejected,
+ * transferred, LPJ revision and completed (same events / texts as the requesters'). Requests on a cost
+ * center have no team PM here. Recipients: see `teamPms`.
+ */
+export const PM_EVENTS: ReadonlySet<NotifyEvent> = new Set<NotifyEvent>(['expense.team_submitted', 'expense.rejected', 'expense.transferred', 'expense.lpj_revision', 'expense.completed'])
+
+type Target = 'people' | 'finance' | 'ack' | 'approval' | 'pm'
 
 /** S3e: requester-side events that company-settings.notifyRequesterStatusEnabled can switch off. */
 export const REQUESTER_STATUS_EVENTS: ReadonlySet<NotifyEvent> = new Set<NotifyEvent>(['expense.submitted', 'expense.withdrawn', 'expense.created_on_behalf'])
@@ -79,6 +93,7 @@ type Doc = {
   currentLevel?: number | null
   approvalSnapshot?: ApprovalSnapshot | null
   company?: unknown
+  project?: unknown
 }
 
 /** Holders of `role` in the document's PT (ADR 0016 §5: recipients per PT). */
@@ -114,8 +129,70 @@ async function stepUsers(req: PayloadRequest, doc: Doc, kind: 'ack' | 'approval'
   return ids.filter((x) => !excluded.has(x))
 }
 
+/**
+ * QA-18: team PMs of the request's project = the project's PM (`projects.pm`) + accounts of employees
+ * with an active `team-assignments` row (role in project = pm, within its dates). PT scope rule (ADR 0016
+ * "Scope rule", 2026-10-02): only users holding the PM role IN THE REQUEST's PT through an active
+ * membership of an ACTIVE PT (membersWithRole), active accounts only. Requesters / creator get their own
+ * event already (not repeated); the actor is skipped by `deliver`.
+ */
+async function teamPms(req: PayloadRequest, doc: Doc): Promise<number[]> {
+  const project = relId(doc.project)
+  const company = relId(doc.company)
+  if (project === undefined || company === undefined) return []
+  const co = (await req.payload.findByID({ collection: 'companies', id: company, depth: 0, select: { active: true }, overrideAccess: true /* SYSTEM-READ: PT active (scope rule) */, req, disableErrors: true })) as {
+    active?: boolean | null
+  } | null
+  if (!co || co.active === false) return []
+  const p = (await req.payload.findByID({ collection: 'projects', id: project, depth: 0, select: { pm: true, company: true }, overrideAccess: true /* SYSTEM-READ: team PM of the project */, req, disableErrors: true })) as {
+    pm?: unknown
+    company?: unknown
+  } | null
+  if (!p || relId(p.company) !== company) return []
+  const candidates = new Set<number>()
+  const pm = relId(p.pm)
+  if (pm !== undefined) candidates.add(pm)
+  const now = new Date()
+  const today = startOfLocalDay(now, process.env.TZ || DEFAULT_TZ).toISOString() // same window as access/scope.ts
+  const assignments = await req.payload.find({
+    collection: 'team-assignments',
+    where: {
+      and: [
+        { project: { equals: project } },
+        { roleInProject: { equals: 'pm' } },
+        { or: [{ startDate: { exists: false } }, { startDate: { less_than_equal: now.toISOString() } }] },
+        { or: [{ endDate: { exists: false } }, { endDate: { greater_than_equal: today } }] },
+      ],
+    },
+    depth: 0,
+    pagination: false,
+    select: { employee: true },
+    overrideAccess: true, // SYSTEM-READ: PM assignments of the project (recipients)
+    req,
+  })
+  const emps = assignments.docs.map((a) => relId((a as { employee?: unknown }).employee)).filter((x): x is number => x !== undefined)
+  for (const u of await usersOfEmployees(req, emps, { activeOnly: true })) candidates.add(u)
+  if (candidates.size === 0) return []
+  const pmsOfPt = new Set(await membersWithRole(req, 'pk-pm', company))
+  const requesters = new Set(await people(req, doc))
+  return [...candidates].filter((u) => pmsOfPt.has(u) && !requesters.has(u)).sort((a, b) => a - b)
+}
+
 /** Events + recipients of one transition (pure mapping; recipients resolved lazily). */
-export function eventsFor(prev: { status: RequestStatus; currentLevel?: number | null } | null, doc: Doc): Array<{ event: NotifyEvent; to: 'people' | 'finance' | 'ack' | 'approval' }> {
+export function eventsFor(prev: { status: RequestStatus; currentLevel?: number | null } | null, doc: Doc): Array<{ event: NotifyEvent; to: Target }> {
+  const base = baseEventsFor(prev, doc)
+  // QA-18: the team PM of the project hears about submit / reject / transfer / LPJ revision / completion
+  if (relId(doc.project) === undefined || !prev || prev.status === doc.status) return base
+  const pm: Array<{ event: NotifyEvent; to: Target }> = []
+  if (prev.status === 'draft' && (doc.status === 'pending_ack' || doc.status === 'pending_approval')) pm.push({ event: 'expense.team_submitted', to: 'pm' })
+  else if (doc.status === 'rejected') pm.push({ event: 'expense.rejected', to: 'pm' })
+  else if (doc.status === 'transferred') pm.push({ event: 'expense.transferred', to: 'pm' })
+  else if (doc.status === 'lpj_revision') pm.push({ event: 'expense.lpj_revision', to: 'pm' })
+  else if (doc.status === 'completed') pm.push({ event: 'expense.completed', to: 'pm' })
+  return [...base, ...pm]
+}
+
+function baseEventsFor(prev: { status: RequestStatus; currentLevel?: number | null } | null, doc: Doc): Array<{ event: NotifyEvent; to: Target }> {
   const changed = !prev || prev.status !== doc.status
   if (!changed) {
     // multi-level approval: next level is waiting
@@ -241,16 +318,18 @@ export async function notifyCreated(req: PayloadRequest, doc: Doc): Promise<numb
   return deliver(req, doc, [{ event: 'expense.created_on_behalf', to: 'people' }], settings)
 }
 
-async function deliver(req: PayloadRequest, doc: Doc, events: Array<{ event: NotifyEvent; to: 'people' | 'finance' | 'ack' | 'approval' }>, settings: NotifySettings): Promise<number> {
+async function deliver(req: PayloadRequest, doc: Doc, events: Array<{ event: NotifyEvent; to: Target }>, settings: NotifySettings): Promise<number> {
   if (events.length === 0) return 0
   const actor = userId(req)
   let finance: number[] | null = null
+  let pms: number[] | null = null
   let written = 0
   const done = new Set<string>()
   for (const e of events) {
     let to: number[] = []
     if (e.to === 'people') to = await people(req, doc)
     else if (e.to === 'finance') to = finance ??= await usersWithRole(req, 'pk-finance', doc)
+    else if (e.to === 'pm') to = pms ??= await teamPms(req, doc)
     else to = await stepUsers(req, doc, e.to)
     const t = await template(req, e.event)
     for (const uid of to) {

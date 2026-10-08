@@ -38,6 +38,16 @@ baru juga muncul di lonceng **Notifikasi** (bar atas, kanan) dan — bila Admin 
 HP/Web **Persetujuan** → bagian **Addendum RAB** → buka → **Setujui (Direktur)** atau **Tolak** (alasan wajib).
 Setelah Anda, Finance juga menyetujui; RAB project bertambah otomatis dan tercatat.
 
+## 2a. Kekurangan LPJ di atas nominal disetujui (web)
+
+Bila nota LPJ Uang Muka membuat total transfer melebihi nominal yang Anda setujui **+ toleransi** (Pengaturan PT →
+*Toleransi kekurangan LPJ*, default 10%), Finance tidak bisa langsung mentransfer kekurangannya. Finance mengajukan
+**persetujuan kekurangan** dengan alasan; Anda mendapat notifikasi dan keputusan ada di **web → Persetujuan →
+Kekurangan LPJ di atas nominal disetujui** (nominal disetujui, kekurangan, total transfer baru, batas tanpa
+persetujuan, alasan Finance) → **Setujui** atau **Tolak** (alasan wajib). Setelah Anda, Finance juga menyetujui
+(sama seperti pengajuan). Belum tersedia di APK — notifikasi di HP membuka detail pengajuan, keputusannya di web.
+Toleransi diubah oleh Admin/Direktur di data PT (Pengaturan operasional).
+
 ## 3. Dashboard
 
 - **Web Beranda:** Saldo kas total, Pengajuan menunggu, Pencairan bulan ini, Realisasi vs anggaran; grafik **Arus
@@ -61,7 +71,10 @@ Setelah Anda, Finance juga menyetujui; RAB project bertambah otomatis dan tercat
 2. **Progress project** → project → **Editor tahapan** → **+ Tambah tahapan** atau **Mulai dari template tahapan** →
    atur bobot hingga **✓ sudah 100%** → **Simpan tahapan**.
 3. Mengubah RAB, bobot, atau mengarsipkan project wajib alasan. Project tidak bisa dihapus — pakai status **Arsip**.
-4. Progress fisik hanya berubah lewat laporan progress PM (tidak bisa diketik langsung).
+   Hanya Direktur yang mengubah data project; PM hanya membaca. Pilihan **Project Manager** berisi PM aktif PT itu
+   (nama · email).
+4. **Pengguna:** Direktur bisa melihat akun di PT-nya tetapi **tidak mengubahnya** — perubahan akun lewat Admin PT.
+5. Progress fisik hanya berubah lewat laporan progress PM (tidak bisa diketik langsung).
 
 ## 5. Laporan progress
 
@@ -70,7 +83,8 @@ klik foto untuk ukuran penuh. Anda juga boleh membuat laporan dari HP (sama sepe
 
 ## 6. Keuangan
 
-- **Kas** (baca saja) dan **Laporan** (Rekap Kas, Pengeluaran per Kategori, Anggaran Project, Biaya per Kendaraan,
+- **Kas** (baca saja; transaksi kas yang dikonfirmasi meski saldo menjadi minus dan transfer ke rekening belum
+  terverifikasi tercatat di **Audit Log** — aksi `overdraft_confirmed` / `bank_unverified_confirmed`) dan **Laporan** (Rekap Kas, Pengeluaran per Kategori, Anggaran Project, Biaya per Kendaraan,
   dll.) dengan unduh Excel/PDF.
 - **Laporan beberapa PT:** filter **PT** mempersempit laporan; bila lebih dari satu PT masuk: kolom **PT** per baris
   dan tabel **Subtotal per PT** + TOTAL. Kop: satu PT = kop PT itu; beberapa PT = kop grup + daftar PT.

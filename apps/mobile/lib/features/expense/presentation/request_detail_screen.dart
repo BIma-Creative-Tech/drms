@@ -208,7 +208,7 @@ class _LineCard extends ConsumerWidget {
                       ),
                     ),
                     Text(formatRupiah(r.amount)),
-                    if (canRemove)
+                    if (canRemove && receiptRemovable(r.status))
                       IconButton(
                         key: Key('receipt-remove-${r.id}'),
                         tooltip: t.receiptRemove,

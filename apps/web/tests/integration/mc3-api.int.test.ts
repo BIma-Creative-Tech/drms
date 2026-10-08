@@ -311,6 +311,7 @@ const ROUTE_CLASSES: Record<string, RouteClass> = {
   'GET /transfer-queue': 'selection',
   'GET /approvals/inbox': 'selection',
   'GET /lpj-queue': 'selection',
+  'GET /lpj-shortfall-approvals/inbox': 'selection',
   'GET /cash-entries': 'selection',
   'GET /cash-accounts/balances': 'selection',
   'GET /period-closings': 'selection',
@@ -354,7 +355,13 @@ const ROUTE_CLASSES: Record<string, RouteClass> = {
   'POST /expense-requests/:id/lpj/request-revision': 'document',
   'POST /expense-requests/:id/lpj/verify': 'document',
   'POST /expense-requests/:id/settle': 'document',
+  'GET /expense-requests/:id/settle/precheck': 'document', // QA-11
   'POST /expense-requests/:id/settle/reverse': 'document',
+  // QA-06 / ADR 0019: LPJ shortfall re-approval
+  'POST /expense-requests/:id/lpj/shortfall-approval': 'document',
+  'POST /expense-requests/:id/lpj/shortfall-approval/acknowledge': 'document',
+  'POST /expense-requests/:id/lpj/shortfall-approval/approve': 'document',
+  'POST /expense-requests/:id/lpj/shortfall-approval/reject': 'document',
   'PATCH /cash-entries/:id': 'document',
   'POST /cash-entries/:id/void': 'document',
   'POST /devices/:id/revoke': 'document',

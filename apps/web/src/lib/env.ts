@@ -139,6 +139,13 @@ export const envSchema = z
     IMAGE_RESIZE_CONCURRENCY: z.coerce.number().int().min(1).max(8).default(2),
     /** E9 P-1: uploads allowed to WAIT for a slot; one more → 503 + Retry-After (APK retries). */
     IMAGE_RESIZE_MAX_QUEUE: z.coerce.number().int().min(0).max(500).default(20),
+    /**
+     * QA-11 orphan attachments (domain/media-orphans.ts, worker job mediaOrphanCleanup): unclaimed uploads
+     * older than MEDIA_ORPHAN_MIN_AGE_DAYS. 'false' (default) = dry run (count only), 'true' = delete.
+     */
+    MEDIA_ORPHAN_PURGE_ENABLED: bool,
+    MEDIA_ORPHAN_MIN_AGE_DAYS: z.coerce.number().int().min(1).max(365).default(7),
+    MEDIA_ORPHAN_BATCH: z.coerce.number().int().min(1).max(2000).default(200),
     LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
     /** Android application id of the APK (ADR 0010 decision 1 proposal; client to confirm the domain). */
     ANDROID_APP_PACKAGE: z

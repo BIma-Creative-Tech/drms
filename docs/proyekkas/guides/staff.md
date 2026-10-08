@@ -49,12 +49,16 @@ Pilih jenisnya dulu:
    **Untuk PT mana?** → ketuk PT tempat biaya ini dibebankan. Di editor tertulis **PT: …**. (Pesan "Anda tidak bisa
    membuat pengajuan di PT yang dipilih. Ganti PT di beranda." = ubah pilihan PT di Beranda dulu.)
 2. Isi **Judul**, pilih **Project** *atau* **Pusat biaya** (salah satu saja), **Tanggal dibutuhkan**.
-3. **Diajukan oleh**: nama Anda sudah terisi. Bila pengajuan untuk beberapa orang, tekan **Pilih…** dan tambahkan.
+3. **Diajukan oleh**: nama Anda sudah terisi. Staff hanya bisa mengajukan **untuk dirinya sendiri** (keputusan
+   pemilik 8 Okt 2026): daftar pilihan hanya berisi nama Anda. Pengajuan untuk orang lain dibuat oleh PM, Admin atau
+   Finance. Draft lama yang mencantumkan orang lain ditolak saat diajukan dengan pesan "Staff hanya dapat mengajukan
+   untuk dirinya sendiri…" — hapus nama lain lalu ajukan lagi.
 4. **Rekening tujuan**: pilih rekening salah satu pemohon (di web daftar juga hanya berisi rekening pemohon; bila
    dikosongkan di web, dipakai rekening default pemohon pertama).
 5. **Tambah baris** untuk tiap barang/biaya: Uraian, Kategori, (Jumlah, Satuan), **Total**, Kendaraan (bila BBM/servis).
    *Total* adalah angka yang Anda isi (boleh dibulatkan dari nota); harga satuan hanya informasi.
 6. Reimburse: di tiap baris tekan **Foto nota (kamera)** atau **Dari galeri**, isi nomor nota, toko, tanggal, nominal.
+   Tanggal nota tidak boleh setelah hari ini (pesan "Tanggal nota tidak boleh di masa depan").
 7. **Simpan draft** (bisa tanpa sinyal) → saat online tekan **Ajukan** → konfirmasi.
 
 ![TODO screenshot: editor pengajuan dengan baris item dan Total (pratinjau)](img/staff-editor.png)
@@ -66,7 +70,8 @@ Pantau di **Pengajuan Saya** atau lonceng. Pemohon lain yang Anda cantumkan dibe
 namanya, diajukan, dan ditarik kembali; di web lonceng **Notifikasi** ada di bar atas, kanan.
 
 **Pesan yang sering muncul:** "Reimburse wajib melampirkan minimal 1 nota." · "Pilih salah satu: project atau pusat
-biaya." · "Rekening tujuan wajib dipilih." · "Data master belum tersedia…" (buka aplikasi saat online sekali).
+biaya." · "Rekening tujuan wajib dipilih." · "Data master belum tersedia…" (buka aplikasi saat online sekali) ·
+"Tanggal nota tidak boleh di masa depan" · "Staff hanya dapat mengajukan untuk dirinya sendiri…".
 
 ## 3. Mengubah, membatalkan, mengajukan ulang
 
@@ -83,6 +88,8 @@ biaya." · "Rekening tujuan wajib dipilih." · "Data master belum tersedia…" (
 
 1. Setelah status **Ditransfer**, belanjakan dana dan simpan notanya.
 2. Buka pengajuan → **Nota & LPJ** → **Tambah nota (kamera)** per baris. Salah foto? Ikon hapus → isi alasan.
+   Nota yang sudah **Valid** (divalidasi Finance) terkunci: tidak ada ikon hapus, dan server menolak dengan pesan
+   "Nota sudah divalidasi Finance". Hanya nota yang menunggu verifikasi atau ditolak yang bisa dihapus/diganti.
 3. Semua nota sudah masuk → **Nota sudah lengkap**.
 4. **Kirim LPJ**: tulis uraian penggunaan dana → Konfirmasi.
 5. Bila Finance meminta revisi, baca **Catatan Finance**, perbaiki nota, **Kirim ulang LPJ**.
@@ -98,10 +105,17 @@ Menu Anda: **Daftar pengajuan**, **Rekap absensi saya**, **+ Buat pengajuan**, *
 Di web Anda juga bisa **Cetak PDF Pengajuan Biaya** (tombol di samping kanan pengajuan yang sudah bernomor) —
 PDF tidak tersedia di APK. Kop dan logo PDF mengikuti PT pengajuan. Di web, form **+ Buat pengajuan** punya kolom
 **PT** di atas — wajib dipilih bila pemilih PT Anda berisi lebih dari satu PT, dan tidak bisa diubah setelah dibuat.
+Di form web, isian baris item dimuat dari server: setelah mengisi kolom, **tunggu sebentar (±1–3 detik) sebelum
+menekan Tambah Baris**, dan tunggu sampai kolom baris baru tampil. Menekan terlalu cepat dapat menghasilkan baris
+tanpa kolom (keterbatasan Payload CMS, QA-10/QA-26) — bila itu terjadi, muat ulang halaman (isian yang belum disimpan perlu diisi ulang). Di
+APK hal ini tidak terjadi.
 
 ## Pertanyaan umum
 
 - *Kenapa Direktur belum menyetujui?* Notifikasi ke HP belum aktif (Direktur melihatnya di aplikasi/web, dan lewat
   email bila diaktifkan Admin); ingatkan langsung bila mendesak.
 - *Nota berbeda sedikit dengan total baris?* Tidak apa-apa; sistem memberi tanda (flag) untuk diperiksa Finance.
+- *Muncul flag "Nota ganda dalam pengajuan ini"?* Foto yang sama, atau nomor nota + toko yang sama, diunggah dua kali
+  di pengajuan yang sama. Hapus salah satunya bila memang dobel; bila memang satu nota untuk dua baris, biarkan —
+  Finance yang memeriksa.
 - *HP hilang?* Lapor Admin segera. Data yang belum terkirim di HP itu harus diinput ulang.

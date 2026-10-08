@@ -6,6 +6,184 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.6.2] - 2026-10-09
+
+Fixes from the QA report 2026-10-08 (staging, tested 6–7 Oct; 31 tickets — status per ticket in
+`docs/proyekkas/qa/qa-report-2026-10-08-status.md`): finance integrity (QA-03/04/05/06/12/14/17/30), workflow &
+receipts (QA-07/08/09/11/15/18/19/27, QA-10/26 documented as an upstream limitation), access & UX
+(QA-16/20–25/28/29/31); QA-01 (CrowdSec ban by the test pattern) and QA-02 (WAF, infra) are not app changes, QA-13 is
+by design (Q-05). Plus the dependency security bump (`next` 16.3.8, `sharp` 0.35.5, `source-map-js` 1.2.2) and
+APK **mobile-v0.3.4** (pubspec `0.3.4+1`, notes `docs/release-notes/apk/0.3.4.md`). Owner decisions 2026-10-08:
+overdraft and unverified destination account = warning + confirmation; LPJ shortfall = tolerance then re-approval
+(ADR 0019); Staff request for themselves only; PM notifications; valid receipts locked; Direktur read-only on users;
+PM read-only on projects (403 naming the fields); unusable modules hidden; Admin reads addenda / progress.
+
+**Database migrations** (run by `migrate`, in this order; additive — the 0.6.1 web image and every released APK keep
+working; rollback = restore the pre-deploy dump): `20261008_090000_qa_finance_integrity`,
+`20261008_120000_qa_flow_lpj_totals`, `20261008_120100_qa_flow_lpj_source`, `20261008_120200_qa_flow_orphan_job`,
+`20261009_090000_qa_settlements_guard_merge`.
+
+### Release merge (0.6.2)
+- `20261009_090000_qa_settlements_guard_merge` (snapshot `.json` = the merged schema): both QA branches replace
+  `pk_settlements_guard`; `…120000_qa_flow_lpj_totals` (QA-09) ran after `…090000_qa_finance_integrity` (QA-06) and
+  dropped its shortfall re-approval rules. This migration installs the union (090000 body + the QA-09 provisional
+  totals rule); down restores the 120000 body. Integration test `qa-settlements-guard-merge.int.test.ts` proves both.
+- `CashEntry` (`/api/v1/cash-entries` responses) gains `proofId` (additive, QA-31: the current proof, replaceable via
+  `PATCH … proofId`); OpenAPI regenerated.
+- Persetujuan: the LPJ shortfall decisions (Setujui / Tolak) use the same app dialog as the request decisions
+  (`ActionButton` → `ActionDialog`, QA-22/QA-23).
+
+### Security — npm audit (high), 2026-10-09
+- `next` 16.3.6 → **16.3.8** (GHSA-3w37-wq28-93x7, -4jqv-mc3x-m676, -39w2-rjm5-chcv, -f87g-xv8r-7p7x, -mcj8-r9mp-w47p,
+  -cjq9-62q9-8jv4: cache poisoning, info disclosure, image-optimizer SSRF), `eslint-config-next` aligned; `sharp`
+  0.35.4 → **0.35.5** (GHSA-wq5f-xc86-pv6w, librsvg); transitive `source-map-js` → 1.2.2 (GHSA-68fv-2mgg-jv7q). Patch
+  releases older than `min-release-age=7` (16.4.0 is not). ADR 0001 pins Payload 3.90.1, not Next's patch level.
+  Verified: audit high passes, lint / typecheck / 719 unit / openapi / `next build` green.
+
+### QA report 2026-10-08 — keuangan (QA-03, QA-04, QA-05, QA-06, QA-12, QA-14, QA-17, QA-30)
+
+Status per ticket: `docs/proyekkas/qa/qa-report-2026-10-08-status.md`. Owner decisions 2026-10-08: overdraft and
+unverified destination account = warning + explicit confirmation (audited); LPJ shortfall = tolerance, then
+re-approval (ADR 0019).
+
+**Database migration** (run by `migrate`; additive — the previous web image and every released APK keep working):
+`20261008_090000_qa_finance_integrity` (schema, snapshot `.json`: audit actions `overdraft_confirmed` /
+`bank_unverified_confirmed`; `companies.shortfall_tolerance_pct` DEFAULT 10, CHECK 0–100; `settlements.shortfall_approval_*`
++ `pk_settlements_guard` extended; `approvals.doc_type` += `expense_shortfall`, `approvals.settlement_id`, owner CHECK,
+G1 trigger, unique indexes and PT check extended; trigger `transfers_shortfall_tolerance`). Rollback refused once a
+shortfall re-approval or a new audit action exists — restore the dump.
+
+#### Fixed
+- QA-03 / QA-12: every typed Rupiah amount in the admin (Kas masuk/keluar, Addendum RAB, receipt amount) goes through
+  one parser (`lib/rupiah-input.ts`, field `RupiahInput`): "." thousands separator; "1.000,50" → "Rupiah tanpa
+  desimal", "-5000" → "Gunakan jenis Kas keluar, bukan tanda minus", other characters refused inline; submit blocked
+  (was: silently 100050 / +5000).
+- QA-05: a cash entry / transfer / LPJ settlement dated before the account opening-balance date → 400 "Tanggal sebelum
+  tanggal saldo awal akun (dd/mm/yyyy)" on the date field (was 500); DB guard errors wrapped by drizzle (`cause`) are
+  mapped to 409 in `/api/v1`, the sync batch and the role-matrix save (`lib/pg-error.ts`); the cash form `min` date
+  follows the picked account's opening date.
+- QA-14: the opening balance counts only from its `openingBalanceDate` (K-01 balances, `GET /cash-accounts/balances`,
+  K-02 running balance; Rekap Kas column "Saldo awal akun baru" in the go-live month); months before go-live show 0 and
+  the dashboard "vs akhir <bulan>" compares with the right balance.
+- QA-30: Tutup buku lists and offers months only from the PT books start (earliest opening date of its cash accounts);
+  `POST /period-closings` before it → 400; the month summary shows Masuk/Keluar without void pairs, Bersih and a
+  separate "Koreksi (void)" column.
+
+#### Added
+- QA-04: cash-out (manual, transfer, LPJ shortfall transfer) that would make the account balance < 0 → 409
+  `CASH_OVERDRAFT_CONFIRM_REQUIRED` {cashAccountId, balance, after}; `confirmOverdraft: true` posts it and writes audit
+  `overdraft_confirmed` (balance before → after). App dialog "Tetap simpan" in the cash form and the transfer/settle
+  forms. Reversals (void) are never asked.
+- QA-17: Antrian Transfer shows "Terverifikasi / Belum diverifikasi" of the destination account; transfer / LPJ
+  shortfall transfer to an unverified account → 409 `BANK_ACCOUNT_UNVERIFIED_CONFIRM_REQUIRED` (destination in the
+  body); `confirmUnverifiedAccount: true` → audit `bank_unverified_confirmed`.
+- QA-06 / ADR 0019: PT setting "Toleransi kekurangan LPJ" (default 10 %). Above approved + tolerance, settle → 409
+  `SHORTFALL_REAPPROVAL_REQUIRED`; Finance asks `POST /expense-requests/{id}/lpj/shortfall-approval {note}`, the
+  request's approval rule for the new total decides (Direktur `…/acknowledge` → Finance `…/approve`, `…/reject
+  {reason}`), web inbox section in Persetujuan (`GET /lpj-shortfall-approvals/inbox`), `settlement.shortfallApproval`
+  in the request detail (Finance/Direktur). Web only; the APK is unchanged (ADR 0019 §APK).
+- OpenAPI: new codes / flags / paths above; `packages/api-contract/openapi.json` regenerated.
+- Guides: Finance (Rupiah input, go-live date, overdraft / unverified account dialogs, shortfall approval, tutup buku,
+  Rekap Kas), Direktur (shortfall approval on the web).
+
+### QA report 2026-10-08 — alur & nota (QA-07, QA-08, QA-09, QA-10/26, QA-11, QA-15, QA-18, QA-19, QA-27) — web + APK mobile-v0.3.4
+
+Branch `fix/qa-workflow-receipts`. Owner decisions 2026-10-08: valid receipts are locked (QA-27), Staff requests for
+themselves only (QA-15), the team PM is notified (QA-18). Status per ticket: `docs/proyekkas/qa/qa-report-2026-10-08-status.md`.
+
+**Database migrations** (run by `migrate`; additive): `20261008_120000_qa_flow_lpj_totals` (`pk_settlements_guard`:
+an open LPJ may change only `receipts_total` + `difference`, consistent with Σ active receipts),
+`20261008_120100_qa_flow_lpj_source` (data: cash-in source `LPJ` "Pengembalian LPJ" for every PT without it,
+audited, idempotent), `20261008_120200_qa_flow_orphan_job` (job slug `mediaOrphanCleanup`, snapshot `.json`).
+
+#### Added
+- API: `GET /api/v1/expense-requests/{id}/settle/precheck` (Finance, read-only) — 409 when the PT has no
+  "Pengembalian LPJ" source or the request no bank snapshot; the LPJ refund form calls it BEFORE uploading the proof.
+- Worker job `mediaOrphanCleanup` (daily 03:10): unclaimed `media-attachments` older than
+  `MEDIA_ORPHAN_MIN_AGE_DAYS` (7) that no document references; dry run unless `MEDIA_ORPHAN_PURGE_ENABLED=true`
+  (then tombstone + file delete, ≤ `MEDIA_ORPHAN_BATCH` per run, one `retention_purge` audit row). A tombstone
+  can never be claimed (409).
+- In-app notifications for the team PM of the request's project (PM role in that PT): `expense.team_submitted`,
+  `expense.rejected`, `expense.transferred`, `expense.lpj_revision`, `expense.completed` (QA-18).
+- Web: Finance sees **Konfirmasi selesai** on a transferred Reimburse (QA-19).
+
+#### Changed
+- Receipts: a receipt date after today (PT timezone) → 400 "Tanggal nota tidak boleh di masa depan" (QA-07); the
+  web form caps the date and checks before the upload.
+- Duplicate flags also inside the same request (same photo, or same receipt no. + vendor; one flag per pair on the
+  later receipt) — cross-request rule and PT scope rule unchanged (QA-08).
+- Flags and the open LPJ's receipts total / difference are recomputed after every receipt add / edit / remove /
+  valid / reject (QA-09; were refreshed only at LPJ submit). OpenAPI `Settlement.receiptsTotal` description updated.
+- A receipt Finance marked **valid** is locked: requester remove / edit → 409 "Nota sudah divalidasi Finance"; the
+  web hides the remove button (QA-27).
+- Staff-only users: "Diajukan Oleh" = own employee only (403 on create / update / admin form / APK sync, and on
+  submit of an older draft); admin picker filtered. PM keeps co-requesters (Q-09), Admin/Finance represent others (QA-15).
+- New PTs (also without "Salin default") get the system cash-in source `LPJ` (QA-11).
+
+#### Known limitation
+- QA-10 / QA-26 "Tambah Baris" race in the Payload 3.90.1 array field: the pending form-state request is not
+  exposed by Payload, so the button cannot be disabled cleanly; the hint stays and the Staff guide explains recovery.
+
+#### APK 0.3.4
+- Requester picker shows only the user for Staff-only users, submit validation with the server wording (QA-15);
+  no remove icon on valid receipts (QA-27); server refusal sentences (problem `title`) shown instead of the generic
+  409/403 text. Receipt date picker already capped at today (QA-07).
+
+### QA report 2026-10-08 — hak akses & UX (branch `fix/qa-rbac-ux`)
+
+Owner decisions 2026-10-08 on the role matrix (QA-20) plus the UX tickets QA-16, QA-21–QA-25, QA-28, QA-29, QA-31.
+No database migration; the REST/`/api/v1` contracts only gain `CashEntryUpdate.proofId` (additive, OpenAPI regenerated).
+
+#### Changed — access (QA-20, QA-28)
+- **PM is read-only on projects** (`collections/Projects.ts`): update access = Direktur of the project's PT only. A
+  PATCH that CHANGES a field by anyone else who can read the project (PM, Finance, Admin) → **403 naming the fields**
+  ("Anda tidak berhak mengubah: Nama project, Alamat. Hanya Direktur …", `errors[].path` per field) instead of a
+  silent 200 (`access/field-guard.ts` `readOnlyFieldsGuard`, beforeOperation). Callers who cannot read the project get
+  the normal 403/404 (no field names, no existence leak). The admin form is read-only for the PM (no Save).
+- **Direktur is read-only on users**: verified (integration test) — only an Admin of the user's PTs or a group admin
+  edits accounts; the Direktur keeps editing only the own signature (profile).
+- **Admin reads `budget-addenda` and `progress-reports`** (was 403); create/update stay closed (domain service only).
+- **Empty scope = empty list, not 403** (`access/scope.ts`): `inIds` / `ownEmployee` return a no-row `Where`
+  (`NO_ROWS`) instead of `false`. Staff without assignments opening the request form no longer gets 403 on
+  `/api/cost-centers` (QA-28); a PM without a team sees an empty project list. Roles WITHOUT a rule are still refused.
+  `companies` update access returns `false` (not an empty `IN`) for callers without an Admin/Direktur PT.
+
+#### Changed — navigation and "no access" (QA-20(c), QA-24)
+- Module launcher/bar show only modules a role can **use**, derived from Payload permissions: a module of only
+  personal shortcuts (own profile, own notifications — both already in the top bar) is hidden (Staff: Pengguna & Akses,
+  Sistem; PM: Sistem); **Master Data** and **Pengaturan** need create/update on at least one of their entities (PM:
+  hidden; Finance: Pengaturan hidden).
+- One **"Anda tidak memiliki akses ke halaman ini."** page with a back link for every custom view (Kas, Tutup buku,
+  Antrian Transfer, Verifikasi LPJ, Laporan, Audit Log, Addendum, Progress, Absensi, Akses PT) — no role codes.
+- Payload's unauthorized view replaced (`admin.components.views.unauthorized`); a logged-in caller without create
+  access on `/admin/collections/<slug>/create` is redirected there instead of Payload's hard-coded "Tidak sah, Anda
+  harus masuk…" (`src/admin/denied-create.ts`, called from the admin page). The REST 401 text is unchanged.
+
+#### Changed — pickers and messages (QA-16, QA-21, QA-22, QA-23)
+- User pickers show **"Nama · email"** (virtual `users.displayName` = `useAsTitle`; picker select/search mapped to
+  `name`/`email`). `projects.pm` lists only **active PMs of the project's PT**; `cost-centers.manager` active members of
+  the PT; approval-rule users active Direktur/Finance of the PT.
+- Error texts: field paths shown as form labels ("Uraian penggunaan dana: Wajib diisi") or dropped; no `HTTP 403`;
+  no `US-xx` / `ADR` / `G-x` / `Q-x` codes in user-facing domain messages (signature: no more `signatureMediaId`);
+  every `ValidationError` passes `req.t` + field labels ("Isian berikut tidak valid: Alasan perubahan" instead of
+  "The following field is invalid: changeReason"); duplicate per-PT `code` checked before the insert ("Kode … sudah
+  dipakai di PT ini", path `code`, not "company_id code").
+- `window.prompt/confirm/alert` replaced by the app dialog (`ActionDialog`, same look as Void/Addendum): approval
+  inbox, LPJ verification, reimburse receipt review, requester actions (submit, withdraw, cancel, resubmit, receipts,
+  complete, delete receipt). A reason shorter than 3 characters shows "… wajib diisi (minimal 3 karakter)." and the
+  dialog stays open; server errors stay in the dialog.
+
+#### Fixed — display (QA-25, QA-29, QA-31)
+- React hydration #418 on the expense-request detail: read-only server timestamps (`submittedAt`, `decidedAt`, …)
+  render as fixed company-TZ text ("8 Okt 2026 14:30 WITA") in form and list; requester panel Rupiah via
+  `formatRupiah` (no locale-dependent `toLocaleString`).
+- Admin date format `d MMM yyyy HH:mm`; boolean list cells "Aktif/Nonaktif" / "Ya/Tidak" (was "benar/salah");
+  technical media fields (SHA-256, original width/height/size, uploader, owner) hidden while uploading, read-only in
+  the sidebar of a saved file; requester/workflow panel controls never exceed the column at 390 px.
+- Kas edit (ADR 0005 §5): same layout as "Catat kas" — date, account and amount shown **locked**; the **proof can be
+  added or replaced** (`PATCH /api/v1/cash-entries/{id}` `proofId`, own unclaimed upload, audited with the reason).
+- Employee create form shows **No. HP** for Admin/Direktur/Finance/PM.
+
 ## [0.6.1] - 2026-10-05
 
 Employee privacy notice (UU PDP; Q-46, ADR 0018) with a versioned acknowledgement on the web and in APK 0.3.3,

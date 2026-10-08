@@ -7,6 +7,7 @@ import { AUTH_FAILURE_KEY } from '@/auth/strategies'
 import { writeAuditDetached } from '@/audit/writer'
 import { cachedMinAppVersion, resetMinVersionCache } from '@/lib/app-min-version'
 import { claimKey, IDEMPOTENCY_KEY_RE, requestHash, storeResponse } from '@/lib/idempotency'
+import { isDbGuardError, pgCode, pgMessage } from '@/lib/pg-error'
 import { requestMeta } from '@/lib/request-meta'
 import { takeToken } from '@/lib/rate-limit'
 import { withReqTransaction } from '@/lib/system-tx'
@@ -203,15 +204,18 @@ export function v1<B extends z.ZodType | undefined = undefined>(opts: V1Options<
           const errors = (err.data as { errors?: unknown } | null | undefined)?.errors
           // Domain errors may carry a stable machine code (e.g. E4 ProgressError: PHOTO_LIMIT, WEIGHTS_INCOMPLETE).
           const code = (err as { pkCode?: unknown }).pkCode
+          // QA-04/QA-06/QA-17: coded refusals may carry the figures the client shows (balance, limit …).
+          const extra = err.isPublic && typeof code === 'string' ? problemExtra((err as { pkExtra?: unknown }).pkExtra) : {}
           return problem(err.status, err.isPublic ? err.message : 'Request rejected', {
+            ...extra,
             ...(err.isPublic && Array.isArray(errors) ? { errors } : {}),
             ...(err.isPublic && typeof code === 'string' ? { code } : {}),
           })
         }
-        const pg = err as { code?: string; message?: string }
-        if (typeof pg.code === 'string' && /^(42501|23505|23514|P0001)$/.test(pg.code)) {
+        // QA-05: drizzle wraps the pg error (`cause` carries the SQLSTATE) — the unwrap is in pgCode.
+        if (isDbGuardError(err)) {
           // DB guards (triggers/constraints) are the last line of defence → 409, never a 500.
-          req.payload.logger.warn({ msg: 'v1 db guard', path: opts.path, code: pg.code, err: pg.message })
+          req.payload.logger.warn({ msg: 'v1 db guard', path: opts.path, code: pgCode(err), err: pgMessage(err) })
           return problem(409, 'Conflict', { detail: 'Ditolak oleh aturan integritas data.' })
         }
         req.payload.logger.error({ msg: 'v1 handler failed', path: opts.path, err: (err as Error).message })
@@ -239,6 +243,19 @@ export function headOf(endpoint: Endpoint): Endpoint {
       return new Response(null, { status: res.status, statusText: res.statusText, headers: res.headers })
     },
   }
+}
+
+const RESERVED_PROBLEM_KEYS = new Set(['type', 'title', 'status', 'detail', 'code', 'errors', 'instance'])
+
+/** Extra problem+json members of a coded domain error (plain scalars only; RFC 9457 members never overridden). */
+export function problemExtra(v: unknown): Record<string, unknown> {
+  if (v === null || typeof v !== 'object' || Array.isArray(v)) return {}
+  const out: Record<string, unknown> = {}
+  for (const [k, x] of Object.entries(v as Record<string, unknown>)) {
+    if (RESERVED_PROBLEM_KEYS.has(k) || !/^[a-zA-Z][a-zA-Z0-9]{0,40}$/.test(k)) continue
+    if (x === null || typeof x === 'number' || typeof x === 'string' || typeof x === 'boolean') out[k] = x
+  }
+  return out
 }
 
 /** S3e (S-06): human `detail` of a body validation error — distinct messages joined, max 3. */

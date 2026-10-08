@@ -109,7 +109,7 @@ async function requireSignature(req: PayloadRequest, signer: number, mode: 'requ
   if (mode === 'none') return null
   const sig = await resolveSignature(req, signer, captured)
   if (!sig && mode === 'required') {
-    fail(409, 'Tanda tangan wajib: unggah tanda tangan di profil atau kirim signatureMediaId (US-43).')
+    fail(409, 'Tanda tangan wajib: unggah tanda tangan Anda di Profil & tanda tangan (web) atau buat tanda tangan di aplikasi, lalu ulangi.')
   }
   return sig
 }

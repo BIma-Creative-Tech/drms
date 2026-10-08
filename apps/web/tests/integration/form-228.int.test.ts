@@ -197,7 +197,10 @@ describe('form 228/PB-DRMS/20/IX/2026 (F2 acceptance fixture)', () => {
     const acct = (await p.find({ collection: 'cash-accounts', where: { and: [{ company: { equals: await companyId() } }, { name: { equals: 'Bank Operasional' } }] }, limit: 1, overrideAccess: true /* SYSTEM-READ */ })).docs[0]!.id
     const proof = await upload('/api/v1/media/transfer-proofs', finance, await png(9100))
     expect(proof.status, JSON.stringify(proof.body)).toBe(201)
-    const t = await api('POST', `/api/v1/expense-requests/${requestId}/transfer`, finance, { cashAccountId: acct, bankRef: 'MDR-228-001', proofMediaId: proof.body.id })
+    // QA-17: the seeded account of the form is not verified → 409 with the destination, then the confirmed transfer
+    const unverified = await api('POST', `/api/v1/expense-requests/${requestId}/transfer`, finance, { cashAccountId: acct, bankRef: 'MDR-228-001', proofMediaId: proof.body.id })
+    expect(unverified.body).toMatchObject({ status: 409, code: 'BANK_ACCOUNT_UNVERIFIED_CONFIRM_REQUIRED', accountNo: FORM_228.bankAccountNo })
+    const t = await api('POST', `/api/v1/expense-requests/${requestId}/transfer`, finance, { cashAccountId: acct, bankRef: 'MDR-228-001', proofMediaId: proof.body.id, confirmUnverifiedAccount: true, confirmOverdraft: true }) // QA-04: seeded account starts at 0
     expect(t.status, JSON.stringify(t.body)).toBe(201)
     expect(t.body.request).toMatchObject({ status: 'transferred', transferredTotal: 1_447_500 })
     expect(t.body.cashEntryNo).toMatch(/^KK\/\d{4}\/\d{4}$/)

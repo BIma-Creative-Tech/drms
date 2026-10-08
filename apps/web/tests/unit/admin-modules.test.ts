@@ -50,7 +50,8 @@ async function readPermissions(user: { id: number; roles: Role[] }) {
   const payload = new Proxy({}, { get: () => () => Promise.reject(new Error('no db in unit test')) })
   // ADR 0016: roles come from a membership (company #1) — same shape as the auth strategies build
   const req = { user: withCompanyContext({ ...user, collection: 'users' }, [{ company: 1, roles: user.roles, employee: null }], null, user.roles.includes('pk-admin')), payload, context: {} }
-  const out: { collections: Record<string, { read: boolean }>; globals: Record<string, { read: boolean }> } = { collections: {}, globals: {} }
+  type P = { read: boolean; create?: boolean; update: boolean }
+  const out: { collections: Record<string, P>; globals: Record<string, P> } = { collections: {}, globals: {} }
   const check = async (fn: unknown) => {
     if (fn === undefined) return true
     try {
@@ -59,8 +60,9 @@ async function readPermissions(user: { id: number; roles: Role[] }) {
       return true
     }
   }
-  for (const c of config.collections) out.collections[c.slug] = { read: await check(c.access?.read) }
-  for (const g of config.globals) out.globals[g.slug] = { read: await check(g.access?.read) }
+  // QA-20(c): create/update decide the `manage` modules (Master Data, Pengaturan)
+  for (const c of config.collections) out.collections[c.slug] = { read: await check(c.access?.read), create: await check(c.access?.create), update: await check(c.access?.update) }
+  for (const g of config.globals) out.globals[g.slug] = { read: await check(g.access?.read), update: await check(g.access?.update) }
   return out
 }
 
@@ -152,16 +154,38 @@ describe('tile visibility per role (real config: admin.hidden + access.read + ro
     expect(hrefs(m)).toContain('/admin/collections/web-sessions') // admin-only entity
   })
 
-  it('staff-only: a small set — own requests/receipts, own attendance recap, notifications, profile', async () => {
+  it('staff-only: a small set — own requests/receipts, own attendance recap (profile + notifications live in the top bar)', async () => {
     const m = await modulesFor(['pk-staff'])
-    expect(ids(m).sort()).toEqual(['absensi', 'dashboard', 'keuangan', 'pengguna', 'sistem'])
+    // QA-20(c): "Pengguna & Akses" (= own profile only) and "Sistem" (= own notifications only) are gone
+    expect(ids(m).sort()).toEqual(['absensi', 'dashboard', 'keuangan'])
     const keu = m.find((x) => x.id === 'keuangan')!
     expect(keu.sections.flatMap((s) => s.items.map((i) => i.href))).toEqual(['/admin/collections/expense-requests', '/admin/collections/expense-requests/create', '/admin/collections/receipts'])
     const abs = m.find((x) => x.id === 'absensi')!
     expect(abs.sections.flatMap((s) => s.items.map((i) => i.label))).toEqual(['Rekap absensi saya'])
     expect(hrefs(m)).not.toContain('/admin/kas')
     expect(hrefs(m)).not.toContain('/admin/laporan')
-    for (const hidden of ['persetujuan', 'proyek', 'master', 'media', 'pengaturan', 'laporan']) expect(ids(m)).not.toContain(hidden)
+    for (const hidden of ['persetujuan', 'proyek', 'master', 'media', 'pengaturan', 'laporan', 'pengguna', 'sistem']) expect(ids(m)).not.toContain(hidden)
+  })
+
+  it('QA-20(c) PM: no Master Data / Pengaturan tiles (read-only reference data), no Sistem (own notifications only)', async () => {
+    const m = await modulesFor(['pk-pm'])
+    for (const hidden of ['master', 'pengaturan', 'sistem']) expect(ids(m)).not.toContain(hidden)
+    expect(ids(m)).toEqual(expect.arrayContaining<ModuleId>(['dashboard', 'proyek', 'keuangan', 'absensi', 'laporan', 'pengguna']))
+  })
+
+  it('QA-20(c) Finance keeps Master Data (creates banks/UoM/vendors); settings it can only read are hidden', async () => {
+    const m = await modulesFor(['pk-finance'])
+    expect(ids(m)).toContain('master')
+    expect(ids(m)).not.toContain('pengaturan')
+  })
+
+  it('QA-20(c) a module of only `personal` items is dropped; a `manage` module needs create/update', () => {
+    const base = { roles: ['pk-owner'] as Role[], staffOnly: false, canSee: () => true, labelOf: (_: unknown, s: string) => s }
+    const r = resolveModules({ ...base, canManage: (_k, s) => s === 'company-settings' })
+    expect(r.find((x) => x.id === 'pengaturan')).toBeDefined()
+    expect(r.find((x) => x.id === 'master')).toBeUndefined()
+    const sistem = resolveModules({ ...base, roles: ['pk-pm'], canSee: (_k, s) => s === 'notifications' })
+    expect(sistem.find((x) => x.id === 'sistem')).toBeUndefined()
   })
 
   it('staff + PM = PM menu (roles are a union)', async () => {

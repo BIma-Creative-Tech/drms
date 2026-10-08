@@ -138,7 +138,9 @@ export async function transferQueue(req: PayloadRequest, f?: QueueFilter) {
   const docs = await findVisible(req, officeQueueWhere(req, TRANSFER_QUEUE_WHERE, f), 'neededDate', 500)
   const refs = await refsOf(req, docs)
   const items = []
-  for (const d of docs) items.push({ ...base(d, refs), bank: d.bankSnapshot ?? null, flags: await flagCounts(req, d.id) })
+  // QA-17: verification state of the destination account (the transfer asks for a confirmation when unverified)
+  const verification = (v: unknown): 'verified' | 'unverified' => (v && typeof v === 'object' && (v as { verificationStatus?: string }).verificationStatus === 'verified' ? 'verified' : 'unverified')
+  for (const d of docs) items.push({ ...base(d, refs), bank: d.bankSnapshot ?? null, bankVerification: verification((d as { bankAccount?: unknown }).bankAccount), flags: await flagCounts(req, d.id) })
   // needed date ascending, requests without a date last
   items.sort((a, b) => (a.neededDate ?? '9999-12-31').localeCompare(b.neededDate ?? '9999-12-31') || a.id - b.id)
   return items

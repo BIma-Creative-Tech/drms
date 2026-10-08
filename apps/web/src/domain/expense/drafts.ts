@@ -1,6 +1,6 @@
 import type { CollectionSlug, PayloadRequest } from 'payload'
 
-import { employeeIn, hasRole, hasRoleAny, mappedCompanies, relId, soleCompany, userId } from '@/access/roles'
+import { employeeIn, hasRole, hasRoleAny, isRole, isStaffOnly, mappedCompanies, relId, rolesIn, soleCompany, userId, type Role } from '@/access/roles'
 import { companyOf } from '@/domain/companies'
 import { resolveScope } from '@/access/scope'
 
@@ -126,7 +126,7 @@ export async function validateContent(
     periodFrom?: string | null
     periodTo?: string | null
   },
-  opts: { forSubmit: boolean; creatorId: number },
+  opts: { forSubmit: boolean; creatorId: number; callerSetsRequesters?: boolean },
 ): Promise<void> {
   const errors: Array<{ path: string; message: string }> = []
   // ADR 0016 §5: roles, scope and own employee IN THE REQUEST's PT (from its project / cost center)
@@ -134,8 +134,8 @@ export async function validateContent(
   const office = company !== undefined ? hasRole(req, OFFICE, company) : hasRoleAny(req, ...OFFICE)
   const scope = () => resolveScope(req, company ?? null)
 
-  if (c.projectId && c.costCenterId) errors.push({ path: 'projectId', message: 'Pilih project ATAU pusat biaya, tidak keduanya (US-53).' })
-  if (opts.forSubmit && !c.projectId && !c.costCenterId) errors.push({ path: 'projectId', message: 'Project atau pusat biaya wajib diisi (US-53).' })
+  if (c.projectId && c.costCenterId) errors.push({ path: 'projectId', message: 'Pilih project ATAU pusat biaya, tidak keduanya.' })
+  if (opts.forSubmit && !c.projectId && !c.costCenterId) errors.push({ path: 'projectId', message: 'Project atau pusat biaya wajib diisi.' })
   if (opts.forSubmit && !(c.title ?? '').trim()) errors.push({ path: 'title', message: 'Judul wajib diisi.' })
   for (const f of ['neededDate', 'periodFrom', 'periodTo'] as const) {
     if (c[f] && !isBusinessDate(c[f])) errors.push({ path: f, message: 'Tanggal harus YYYY-MM-DD.' })
@@ -147,12 +147,12 @@ export async function validateContent(
     const p = await req.payload.findByID({ collection: 'projects', id: c.projectId, depth: 0, overrideAccess: true /* SYSTEM-READ: scope check */, req }).catch(() => null)
     if (!p || isForeign(req, relId(p.company) ?? -1)) errors.push({ path: 'projectId', message: 'Project tidak ditemukan.' })
     else if (p.status === 'arsip' || p.status === 'selesai') errors.push({ path: 'projectId', message: 'Project sudah selesai/diarsipkan.' })
-    else if (!office && !(await scope()).assignedProjects.includes(c.projectId)) fail(403, 'Project di luar penugasan Anda (G10).')
+    else if (!office && !(await scope()).assignedProjects.includes(c.projectId)) fail(403, 'Project di luar penugasan Anda.')
   }
   if (c.costCenterId) {
     const cc = await req.payload.findByID({ collection: 'cost-centers', id: c.costCenterId, depth: 0, overrideAccess: true /* SYSTEM-READ: scope check */, req }).catch(() => null)
     if (!cc || cc.active === false || isForeign(req, relId(cc.company) ?? -1)) errors.push({ path: 'costCenterId', message: 'Pusat biaya tidak ditemukan atau nonaktif.' })
-    else if (!office && !(await scope()).assignedCostCenters.includes(c.costCenterId)) fail(403, 'Pusat biaya di luar penugasan Anda (G10).')
+    else if (!office && !(await scope()).assignedCostCenters.includes(c.costCenterId)) fail(403, 'Pusat biaya di luar penugasan Anda.')
   }
 
   // Requesters (US-40): ≥ 1 active employee; Staff/PM only for themselves (Q-09 default).
@@ -166,11 +166,17 @@ export async function validateContent(
   // a role held in another PT. No derivable PT (no reference yet) → the role in any selected PT, as before.
   const derived = [...new Set([...(company !== undefined ? [company] : []), ...activeEmp.values()])]
   const onBehalf = derived.length > 0 ? derived.every((pt) => hasRole(req, ['pk-admin', 'pk-finance'], pt)) : hasRoleAny(req, 'pk-admin', 'pk-finance')
+  const ownPt = company ?? (derived.length === 1 ? derived[0] : undefined)
+  // QA-15 (owner decision 2026-10-08): a user whose ONLY role in the request's PT is Staff requests for
+  // themselves only — "Diajukan Oleh" = exactly their own employee. PM keeps Q-09 (themselves, may add
+  // co-requesters); Admin/Finance may represent others (QA-MC4-09 above). Checked for the CREATOR of the
+  // request (also at submit, so an older draft that breaks the rule cannot be sent) and for a Staff-only
+  // caller who changes the requesters of someone else's draft. Before Q-09 (clearer message for Staff).
+  if (uniq.length > 0) await assertStaffSelfOnly(req, uniq, ownPt, opts)
   if (!onBehalf) {
-    const own = company ?? (derived.length === 1 ? derived[0] : undefined)
-    const creatorEmp = own !== undefined ? employeeIn(req, own) : relId((req.user as { employee?: unknown } | null)?.employee)
+    const creatorEmp = ownPt !== undefined ? employeeIn(req, ownPt) : relId((req.user as { employee?: unknown } | null)?.employee)
     if (userId(req) === opts.creatorId && (creatorEmp === undefined || (uniq.length > 0 && !uniq.includes(creatorEmp)))) {
-      fail(403, 'Hanya Admin/Finance yang boleh membuat pengajuan atas nama orang lain (Q-09).')
+      fail(403, 'Hanya Admin/Finance yang boleh membuat pengajuan atas nama orang lain.')
     }
   }
 
@@ -181,7 +187,7 @@ export async function validateContent(
       .findByID({ collection: 'employee-bank-accounts', id: c.bankAccountId, depth: 0, overrideAccess: true /* SYSTEM-READ: G9 */, req })
       .catch(() => null)
     if (!acc || acc.active === false || isForeign(req, relId(acc.company) ?? -1)) errors.push({ path: 'bankAccountId', message: 'Rekening tidak ditemukan atau nonaktif.' })
-    else if (!uniq.includes(relId(acc.employee) ?? -1)) errors.push({ path: 'bankAccountId', message: 'Rekening harus milik salah satu pemohon (Q-11).' })
+    else if (!uniq.includes(relId(acc.employee) ?? -1)) errors.push({ path: 'bankAccountId', message: 'Rekening harus milik salah satu pemohon.' })
   }
 
   // Lines (US-37) + masters.
@@ -211,10 +217,47 @@ export async function validateContent(
     if (l.uomId && !uoms.has(l.uomId)) errors.push({ path: `lines.${i}.uomId`, message: 'Satuan tidak ditemukan atau nonaktif.' })
     if (l.vehicleId && !vehs.has(l.vehicleId)) errors.push({ path: `lines.${i}.vehicleId`, message: 'Kendaraan tidak ditemukan atau nonaktif.' })
     if (l.categoryId && needsVehicle.has(l.categoryId) && !l.vehicleId) {
-      errors.push({ path: `lines.${i}.vehicleId`, message: 'Kategori ini wajib ditautkan ke kendaraan (Q-22).' })
+      errors.push({ path: `lines.${i}.vehicleId`, message: 'Kategori ini wajib ditautkan ke kendaraan.' })
     }
   })
   if (errors.length > 0) fail(400, 'Data pengajuan tidak valid.', errors)
+}
+
+export const STAFF_SELF_ONLY_MESSAGE = 'Staff hanya dapat mengajukan untuk dirinya sendiri: "Diajukan Oleh" harus hanya Anda. Minta PM/Admin/Finance bila pengajuan untuk orang lain (QA-15).'
+
+/** QA-15: roles of `uid` IN PT `company` (active membership), from the caller's context when it is the caller. */
+async function rolesOfUserIn(req: PayloadRequest, uid: number, company: number): Promise<{ roles: Role[]; employee: number | undefined }> {
+  if (uid === userId(req)) return { roles: rolesIn(req, company), employee: employeeIn(req, company) }
+  const res = await req.payload.find({
+    collection: 'company-memberships',
+    where: { and: [{ user: { equals: uid } }, { company: { equals: company } }, { active: { equals: true } }] },
+    limit: 1,
+    depth: 0,
+    overrideAccess: true, // SYSTEM-READ: creator's roles in the request's PT (QA-15 rule)
+    req,
+  })
+  const m = res.docs[0] as { roles?: unknown; employee?: unknown } | undefined
+  return { roles: (Array.isArray(m?.roles) ? m.roles : []).filter(isRole), employee: relId(m?.employee) }
+}
+
+const staffOnly = (roles: readonly Role[]) => roles.includes('pk-staff') && roles.every((r) => r === 'pk-staff')
+
+async function assertStaffSelfOnly(req: PayloadRequest, requesters: number[], company: number | undefined, opts: { creatorId: number; callerSetsRequesters?: boolean }): Promise<void> {
+  const caller = userId(req)
+  const check = async (uid: number) => {
+    if (company === undefined) {
+      // no PT derivable yet (nothing chosen): only the caller's own Staff-only status is known
+      if (uid !== caller || !isStaffOnly(req.user)) return
+      const emp = relId((req.user as { employee?: unknown } | null)?.employee)
+      if (emp === undefined || requesters.some((e) => e !== emp)) fail(403, STAFF_SELF_ONLY_MESSAGE)
+      return
+    }
+    const { roles, employee } = await rolesOfUserIn(req, uid, company)
+    if (!staffOnly(roles)) return
+    if (employee === undefined || requesters.length !== 1 || requesters[0] !== employee) fail(403, STAFF_SELF_ONLY_MESSAGE)
+  }
+  if (opts.creatorId > 0) await check(opts.creatorId)
+  if (caller !== undefined && caller !== opts.creatorId && opts.callerSetsRequesters) await check(caller)
 }
 
 export function toDocLines(lines: LineInputApi[]) {
@@ -318,7 +361,7 @@ export async function updateDraft(req: PayloadRequest, id: number, input: DraftI
     periodFrom: input.periodFrom !== undefined ? input.periodFrom : doc.periodFrom,
     periodTo: input.periodTo !== undefined ? input.periodTo : doc.periodTo,
   }
-  await validateContent(req, current, { forSubmit: false, creatorId: relId(doc.createdBy) ?? -1 })
+  await validateContent(req, current, { forSubmit: false, creatorId: relId(doc.createdBy) ?? -1, callerSetsRequesters: input.requesterIds !== undefined && input.requesterIds.join(',') !== ids(doc.requesters).join(',') })
   const data: Record<string, unknown> = {}
   if (input.type !== undefined) data.type = input.type
   if (input.title !== undefined) data.title = input.title.trim()

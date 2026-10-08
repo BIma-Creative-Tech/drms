@@ -8,6 +8,7 @@ import { isDecisionRole, ruleDecisionError } from '@/domain/expense/decision'
 import { stepsError, type AckBy, type AckMode } from '@/domain/expense/rules'
 import { activeField, rupiahField } from '@/fields/common'
 import { companyField, companyHook } from '@/fields/company'
+import { userPicker } from '@/fields/users'
 
 const roleOptions = ROLES.map((r) => ({ label: ROLE_LABELS[r], value: r }))
 /** ADR 0013: only Direktur/Finance are offered for decision positions (the DB enum keeps every role). */
@@ -133,7 +134,8 @@ export const ApprovalRules: CollectionConfig = withAudit(
         filterOptions: ({ options }) => options.filter((o) => (typeof o === 'string' ? o : o.value) !== 'scope_manager'),
       },
       { name: 'acknowledgeRole', type: 'select', label: 'Peran "Diketahui Oleh"', defaultValue: 'pk-owner', options: roleOptions, filterOptions: decisionRoleOptions },
-      { name: 'acknowledgeUser', type: 'relationship', relationTo: 'users', label: 'User "Diketahui Oleh"' },
+      // QA-16: decision users of the rule's PT only (ADR 0013: Direktur / Finance), shown by name
+      { name: 'acknowledgeUser', type: 'relationship', relationTo: 'users', label: 'User "Diketahui Oleh"', ...userPicker({ roles: ['pk-owner', 'pk-finance'] }) },
       {
         name: 'signDiajukan',
         type: 'select',
@@ -166,7 +168,7 @@ export const ApprovalRules: CollectionConfig = withAudit(
         fields: [
           { name: 'level', type: 'number', label: 'Level', required: true, min: 1 },
           { name: 'approverRole', type: 'select', label: 'Peran approver', options: roleOptions, filterOptions: decisionRoleOptions },
-          { name: 'approverUser', type: 'relationship', relationTo: 'users', label: 'Approver (user tertentu)' },
+          { name: 'approverUser', type: 'relationship', relationTo: 'users', label: 'Approver (user tertentu)', ...userPicker({ roles: ['pk-owner', 'pk-finance'] }) },
         ],
       },
       activeField(),

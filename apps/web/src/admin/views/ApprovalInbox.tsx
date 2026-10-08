@@ -8,6 +8,7 @@ import { withReqTransaction } from '@/lib/system-tx'
 import { ActionButton } from '../components/ActionButton'
 import { ReviewDetails } from '../components/ReviewDetails'
 import { AddendumInboxSection } from './Addendum'
+import { ShortfallInboxSection } from './ShortfallInbox'
 import { itemCompany, PtChip, PtScopeNote, ptView } from './pt'
 import { Empty, Shell, TableScroll, badge, docLink, num, rp, table, td, th } from './shared'
 
@@ -122,6 +123,8 @@ export async function ApprovalInbox(props: AdminViewServerProps) {
       )}
       {/* E5: Addendum RAB waiting for the caller (Direktur "Setujui" / Finance approval). */}
       <AddendumInboxSection req={req} />
+      {/* QA-06 / ADR 0019: LPJ shortfall above approved + tolerance (Direktur → Finance). */}
+      <ShortfallInboxSection req={req} />
     </Shell>
   )
 }

@@ -2,7 +2,9 @@ import { sql } from '@payloadcms/db-postgres'
 import type { PayloadRequest } from 'payload'
 
 import { relId, userId } from '@/access/roles'
-import { assertAccount, currentLockDate, postEntry, voidEntry } from '@/domain/cash/ledger'
+import { writeAudit } from '@/audit/writer'
+import { assertAccount, assertOnOrAfterOpening, currentLockDate, postEntry, voidEntry } from '@/domain/cash/ledger'
+import { BANK_ACCOUNT_UNVERIFIED_CONFIRM_REQUIRED, failCoded } from '@/domain/coded-error'
 import { allocateDocNo } from '@/domain/numbering-db'
 import { parseBusinessDate } from '@/domain/numbering'
 import { getRequestTx } from '@/lib/tx'
@@ -18,6 +20,56 @@ export type TransferInput = {
   transferDate?: string
   /** Optional echo of the amount; must equal the approved amount (G3: Finance cannot change it). */
   amount?: number
+  /** QA-04: confirm a transfer that makes the cash account balance negative (audited). */
+  confirmOverdraft?: boolean
+  /** QA-17: confirm a transfer to a bank account that is not verified (audited). */
+  confirmUnverifiedAccount?: boolean
+}
+
+/** Verification state of the destination employee bank account of a request (QA-17). */
+export type DestinationCheck = { bankAccountId: number | null; verificationStatus: 'verified' | 'unverified' }
+
+/**
+ * QA-17 (owner decision 2026-10-08: warning + confirmation, audited): money to an employee bank account
+ * that Finance has not verified needs `confirmUnverifiedAccount: true`, else 409
+ * BANK_ACCOUNT_UNVERIFIED_CONFIRM_REQUIRED with the destination (the transfer screen shows it). A
+ * request without a linked account counts as unverified. Shared by the transfer (T3) and the LPJ
+ * shortfall transfer (settle). Returns the state so the caller audits a confirmed transfer.
+ */
+export async function checkDestination(req: PayloadRequest, doc: { bankAccount?: unknown; bankSnapshot?: { bankName?: string | null; accountNo?: string | null; accountHolder?: string | null } | null }, confirmed: boolean): Promise<DestinationCheck> {
+  const bankAccountId = relId(doc.bankAccount) ?? null
+  const acct = bankAccountId
+    ? ((await req.payload.findByID({ collection: 'employee-bank-accounts', id: bankAccountId, depth: 0, overrideAccess: true /* SYSTEM-READ: verification state of the request's destination */, req, disableErrors: true })) as {
+        verificationStatus?: string | null
+      } | null)
+    : null
+  const verificationStatus = acct?.verificationStatus === 'verified' ? 'verified' : 'unverified'
+  if (verificationStatus !== 'verified' && !confirmed) {
+    const snap = doc.bankSnapshot ?? {}
+    failCoded(
+      409,
+      BANK_ACCOUNT_UNVERIFIED_CONFIRM_REQUIRED,
+      'Rekening tujuan belum diverifikasi Finance. Periksa nomor rekening dan nama pemilik, lalu konfirmasi untuk tetap mentransfer.',
+      { bankAccountId, verificationStatus, bankName: snap.bankName ?? null, accountNo: snap.accountNo ?? null, accountHolder: snap.accountHolder ?? null },
+    )
+  }
+  return { bankAccountId, verificationStatus }
+}
+
+/** Audit row of a transfer confirmed to an unverified account (QA-17). */
+export async function auditUnverifiedTransfer(req: PayloadRequest, t: { id: number; docNo: string }, d: DestinationCheck, info: { requestId: number; requestNo?: string | null; amount: number; kind: string; companyId?: number }) {
+  await writeAudit(req, [
+    {
+      action: 'bank_unverified_confirmed',
+      docType: 'transfer',
+      docId: String(t.id),
+      docNo: t.docNo,
+      field: 'destination',
+      newValue: { bankAccountId: d.bankAccountId, verificationStatus: d.verificationStatus, requestId: info.requestId, requestNo: info.requestNo ?? null, amount: info.amount, kind: info.kind },
+      reason: 'Transfer ke rekening belum diverifikasi dikonfirmasi pengguna (QA-17)',
+      ...(info.companyId !== undefined ? { companyId: info.companyId } : {}),
+    },
+  ])
 }
 
 type TransferDoc = { id: number; docNo: string; request: unknown; amount: number; status: 'posted' | 'void'; cashEntry?: unknown; kind: string }
@@ -36,7 +88,7 @@ export async function recordTransfer(req: PayloadRequest, id: number, input: Tra
   const doc = await loadRaw(req, id)
   const approved = doc.approvedAmount ?? 0
   if (input.amount !== undefined && input.amount !== approved) {
-    fail(409, 'Nominal transfer harus sama dengan nominal yang disetujui; Finance tidak dapat mengubah nominal (G3).')
+    fail(409, 'Nominal transfer harus sama dengan nominal yang disetujui; Finance tidak dapat mengubah nominal.')
   }
   const todayDate = await today(req)
   const transferDate = input.transferDate ?? todayDate
@@ -44,9 +96,11 @@ export async function recordTransfer(req: PayloadRequest, id: number, input: Tra
   if (transferDate > todayDate) fail(400, 'Tanggal transfer tidak boleh di masa depan.')
   if (!input.bankRef.trim()) fail(400, 'Nomor referensi bank wajib diisi.')
   if (!doc.bankSnapshot?.accountNo) fail(409, 'Rekening tujuan belum tersimpan pada pengajuan.')
-  await assertAccount(req, input.cashAccountId, relId((doc as { company?: unknown }).company)) // QA-MC4-10: account of the request's PT
+  const account = await assertAccount(req, input.cashAccountId, relId((doc as { company?: unknown }).company)) // QA-MC4-10: account of the request's PT
+  assertOnOrAfterOpening(account, transferDate, 'transferDate') // QA-05: 400 instead of the wrapped trigger error
   const lock = await currentLockDate(req, relId((doc as { company?: unknown }).company))
   if (lock && transferDate <= lock) fail(409, `Periode ${transferDate.slice(0, 7)} sudah ditutup (tutup buku s/d ${lock}).`)
+  const destination = await checkDestination(req, doc, input.confirmUnverifiedAccount === true) // QA-17
 
   const { docNo } = await allocateDocNo(req, 'transfer', { companyId: relId((doc as { company?: unknown }).company)!, date: parseBusinessDate(transferDate) })
   await claimMedia(req, 'media-transfer-proofs', input.proofMediaId, id)
@@ -82,7 +136,11 @@ export async function recordTransfer(req: PayloadRequest, id: number, input: Tra
     sourceType: 'transfer',
     expenseRequestId: id,
     transferId: transfer.id,
+    confirmOverdraft: input.confirmOverdraft === true, // QA-04
   })
+  if (destination.verificationStatus !== 'verified') {
+    await auditUnverifiedTransfer(req, transfer, destination, { requestId: id, requestNo: doc.docNo, amount: approved, kind: doc.type, companyId: relId((doc as { company?: unknown }).company) })
+  }
   const linked = await req.payload.update({
     collection: 'transfers',
     id: transfer.id,

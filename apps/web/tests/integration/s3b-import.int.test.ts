@@ -295,10 +295,18 @@ describe('E11 opening balance lock + go-live date guard (ADR 0005 As implemented
     const today = new Date().toISOString().slice(0, 10)
     const err = await withSystemTransaction(p, null, (req) => postEntry(req, { direction: 'in', entryDate: today, cashAccountId: acc.id as number, amount: 1000, sourceType: 'manual', description: 'uji' })).then(
       () => null,
-      (e: { message: string; cause?: { message?: string; code?: string } }) => e,
+      (e: { message: string; status?: number }) => e,
     )
-    expect(err?.cause).toMatchObject({ code: '42501' })
-    expect(err?.cause?.message).toMatch(/before the opening balance date 2099-01-01/)
+    // QA-05: the service answers first (400 with the date) — the trigger stays the last line of defence
+    expect(err).toMatchObject({ status: 400, message: 'Tanggal sebelum tanggal saldo awal akun (01/01/2099).' })
+    const db = await sqlError(
+      'app',
+      `INSERT INTO cash_entries (entry_no, entry_date, direction, amount, cash_account_id, company_id, source_type, status, uuid)
+       VALUES ('KM/TEST/2099', $2, 'in', 1000, $1, (SELECT company_id FROM cash_accounts WHERE id = $1), 'manual', 'posted', gen_random_uuid()::text)`,
+      [acc.id, today],
+    )
+    expect(db?.code).toBe('42501')
+    expect(db?.message).toMatch(/before the opening balance date 2099-01-01/)
     // accounts without an opening date keep the F2 behaviour
     const legacy = await p.create({ collection: 'cash-accounts', data: { name: `Akun uji legacy ${randomUUID().slice(0, 6)}`, kind: 'cash', openingBalance: 0 }, overrideAccess: true /* SYSTEM-WRITE: test */ })
     const e = await withSystemTransaction(p, null, (req) => postEntry(req, { direction: 'in', entryDate: today, cashAccountId: legacy.id as number, amount: 1000, sourceType: 'manual', description: 'uji' }))

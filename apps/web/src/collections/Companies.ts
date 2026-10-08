@@ -5,7 +5,7 @@ import { companiesWithRole, denyAll, isGroupAdmin, memberCompanies, relId } from
 import { reasonOnDeactivate, withAudit } from '@/audit/hooks'
 import { percentField, rupiahField, uuidField } from '@/fields/common'
 import { SELFIE_RETENTION_DEFAULT_MONTHS } from '@/domain/attendance/retention-policy'
-import { copyCompanyDefaults, SKIP_COMPANY_DEFAULTS } from '@/domain/company-defaults'
+import { copyCompanyDefaults, ensureSystemCashInSources, SKIP_COMPANY_DEFAULTS } from '@/domain/company-defaults'
 import { DEFAULT_TZ, isValidTimeZone } from '@/lib/time'
 
 const intField = (name: string, label: string, def: number, min: number, max: number) => ({
@@ -73,7 +73,11 @@ const copyDefaultsOnCreate: CollectionAfterChangeHook = async ({ doc, operation,
   if (operation !== 'create' || req.context[SKIP_COMPANY_DEFAULTS] === true) return doc
   const choice = req.context[COPY_DEFAULTS_CTX] as { enabled: boolean; from: number | null } | undefined
   delete req.context[COPY_DEFAULTS_CTX]
-  if (choice && !choice.enabled) return doc
+  if (choice && !choice.enabled) {
+    // QA-11: even a bare PT gets the system cash-in source "Pengembalian LPJ" (the LPJ refund needs it)
+    await ensureSystemCashInSources(req, doc.id as number)
+    return doc
+  }
   await copyCompanyDefaults(req, doc.id as number, { from: choice?.from ?? null })
   return doc
 }
@@ -101,6 +105,14 @@ export const COMPANY_SETTING_FIELDS: Field[] = [
     ],
   },
   { ...rupiahField('receiptRoundingTolerance', 'Toleransi pembulatan nota per baris (Rp)', { required: true }), defaultValue: 1000 },
+  // QA-06 / ADR 0019 (owner decision 2026-10-08): LPJ shortfall up to this % above the approved amount is paid
+  // as today; above it the new total needs the approval flow (Direktur → Finance) before the shortfall transfer.
+  {
+    ...percentField('shortfallTolerancePct', 'Toleransi kekurangan LPJ di atas nominal disetujui (%)'),
+    defaultValue: 10,
+    required: true,
+    admin: { description: 'Kekurangan LPJ yang membuat total transfer melebihi nominal disetujui + toleransi ini harus disetujui ulang (Direktur → Finance) sebelum ditransfer.' },
+  },
   intField('receiptMaxAgeDays', 'Batas umur nota (hari)', 30, 1, 365),
   intField('reimburseAutoCloseDays', 'Tutup otomatis reimburse (hari)', 30, 1, 365),
   // F3 (Q-F3-1, user 2026-09-24: default 7): an Uang Muka without LPJ is "LPJ terlambat" (K-12b).
@@ -235,7 +247,7 @@ function settingKey(f: Field): string {
   if ('fields' in f && Array.isArray(f.fields)) return f.fields.map(settingKey).find(Boolean) ?? ''
   return ''
 }
-const OPERATIONAL = ['defaultGeofenceRadiusM', 'lateReportDays', 'budgetWarnPct', 'progressWarnGapPct', 'receiptRoundingTolerance', 'receiptMaxAgeDays', 'reimburseAutoCloseDays', 'lpjDueDays', 'syncExpenseDraftsEnabled', 'syncProgressReportsEnabled', 'defaultWorkSchedule']
+const OPERATIONAL = ['defaultGeofenceRadiusM', 'lateReportDays', 'budgetWarnPct', 'progressWarnGapPct', 'receiptRoundingTolerance', 'shortfallTolerancePct', 'receiptMaxAgeDays', 'reimburseAutoCloseDays', 'lpjDueDays', 'syncExpenseDraftsEnabled', 'syncProgressReportsEnabled', 'defaultWorkSchedule']
 const ATTENDANCE = ['syncAttendanceEnabled', 'selfieRetentionMonths', 'selfieRetentionDeleteEnabled']
 const REMINDERS = ['remindersEnabled', 'notifyRequesterStatusEnabled']
 /** COMPANY_SETTING_FIELDS in tab order; every field lands in exactly one tab (unit test). */
@@ -266,7 +278,13 @@ export const Companies: CollectionConfig = withAudit(
     access: {
       read: ({ req }) => (isGroupAdmin(req) ? true : { id: { in: memberCompanies(req, { all: true }) } }),
       create: ({ req }) => isGroupAdmin(req),
-      update: ({ req }) => (isGroupAdmin(req) ? true : { id: { in: companiesWithRole(req, ['pk-admin', 'pk-owner'], { all: true }) } }),
+      // QA-20(c): no Admin/Direktur PT → false (an empty `id IN ()` Where still counted as "may update"
+      // in the admin permissions and showed the Pengaturan module to PM/Finance/Staff)
+      update: ({ req }) => {
+        if (isGroupAdmin(req)) return true
+        const ids = companiesWithRole(req, ['pk-admin', 'pk-owner'], { all: true })
+        return ids.length > 0 ? { id: { in: ids } } : false
+      },
       delete: denyAll,
     },
     hooks: { beforeChange: [shortCodeGuard, captureCopyDefaults], afterChange: [copyDefaultsOnCreate] },

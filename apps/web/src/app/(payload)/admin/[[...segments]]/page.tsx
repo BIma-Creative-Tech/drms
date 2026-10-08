@@ -6,6 +6,8 @@ import config from '@payload-config'
 import { RootPage, generatePageMetadata } from '@payloadcms/next/views'
 import { importMap } from '../importMap'
 
+import { redirectDeniedCreate } from '@/admin/denied-create'
+
 type Args = {
   params: Promise<{
     segments: string[]
@@ -18,7 +20,11 @@ type Args = {
 export const generateMetadata = ({ params, searchParams }: Args): Promise<Metadata> =>
   generatePageMetadata({ config, params, searchParams })
 
-const Page = ({ params, searchParams }: Args) =>
-  RootPage({ config, params, searchParams, importMap })
+// ProyekKas QA-24 (keep on regeneration): a logged-in caller without create access is redirected to
+// our uniform no-access page instead of Payload's hard-coded "Tidak sah, Anda harus masuk…" view.
+const Page = async ({ params, searchParams }: Args) => {
+  await redirectDeniedCreate({ config, importMap, params })
+  return RootPage({ config, params, searchParams, importMap })
+}
 
 export default Page

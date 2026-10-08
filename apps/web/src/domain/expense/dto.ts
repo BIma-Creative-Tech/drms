@@ -2,7 +2,7 @@ import type { PayloadRequest } from 'payload'
 
 import { hasRole, relId } from '@/access/roles'
 
-import { actorContext, approvalsOf, displayName, projectCommitted, type RequestDoc } from './common'
+import { actorContext, approvalsOf, displayName, loadRaw, projectCommitted, type RequestDoc } from './common'
 import { displayUnitPrice } from './lines'
 import { budgetImpact, type ApprovalSnapshot } from './rules'
 import { allowedActions } from './state'
@@ -10,6 +10,7 @@ import { REQUEST_TYPE_LABELS, statusLabel, FLAG_LABELS, type FlagKind } from './
 import { withFlagVisibility } from './flag-visibility'
 import { receiptsOf } from './receipts'
 import { settlementOfRequest } from './lpj'
+import { shortfallSummary } from './shortfall-approval'
 import { SETTLEMENT_STATUS_LABELS } from './settlement-rules'
 import { nextActor, timeline } from './timeline'
 
@@ -99,6 +100,8 @@ export async function detail(req: PayloadRequest, id: number) {
   }
   const snap = (doc.approvalSnapshot ?? null) as ApprovalSnapshot | null
   const lpj = doc.type === 'advance' ? await settlementOfRequest(req, id) : null
+  // QA-06 / ADR 0019: shortfall vs approved + tolerance and its re-approval (office roles only)
+  const shortfall = lpj && lpj.settlementType === 'shortfall' && hasRole(req, ['pk-finance', 'pk-owner'], relId((doc as { company?: unknown }).company)) ? await shortfallSummary(req, await loadRaw(req, id), lpj) : null
   // F4: status timeline + "Giliran" (next expected actor) — same derivation as the web WorkflowPanel.
   const names: Record<number, string> = {}
   const nameIds = [snap?.acknowledgerUserId, ...(snap?.steps ?? []).map((s) => s.approverUserId)].filter((x): x is number => typeof x === 'number')
@@ -234,6 +237,7 @@ export async function detail(req: PayloadRequest, id: number) {
           reversalCount: lpj.reversalCount ?? 0,
           lastReversedAt: lpj.lastReversedAt ?? null,
           lastReversalReason: lpj.lastReversalReason ?? null,
+          shortfallApproval: shortfall,
         }
       : null,
     budget,

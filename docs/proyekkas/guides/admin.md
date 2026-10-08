@@ -49,6 +49,27 @@ Transfer tampil sebagai kartu per pengajuan.
 
 Tautan lama tetap berlaku (mis. `/admin/kas`, `/admin/collections/...`); hanya beranda `/admin` yang kini layar modul.
 
+Modul yang **tidak bisa dipakai** suatu peran tidak tampil (dihitung dari hak akses, bukan daftar tetap): modul yang
+isinya hanya profil sendiri / notifikasi sendiri disembunyikan (keduanya sudah ada di bar atas — Staff tidak melihat
+**Pengguna & Akses** dan **Sistem**); **Master Data** dan **Pengaturan** hanya tampil bagi yang boleh membuat atau
+mengubah salah satu isinya (PM tidak melihat keduanya; Finance tidak melihat Pengaturan). Halaman yang tidak boleh
+dibuka menampilkan satu pesan yang sama: **"Anda tidak memiliki akses ke halaman ini."** + **← Kembali ke beranda**.
+
+### Hak akses per peran — perubahan 2026-10-08 (laporan QA, keputusan pemilik)
+
+| Data | Admin | Direktur | Finance | PM | Staff |
+|---|---|---|---|---|---|
+| **Pengguna** (akun login) | Ubah akun di PT tempat ia Admin (Admin grup: semua) | **Hanya baca** (kecuali tanda tangan sendiri) | Profil sendiri | Profil sendiri | Profil sendiri |
+| **Project** (nama, alamat, RAB, status, …) | Baca | Buat & ubah | Baca | **Hanya baca** project timnya | Baca project penugasannya |
+| **Addendum RAB / Laporan progress** (data) | **Baca** (baru) | Baca | Baca | Baca timnya | — |
+| **Pusat biaya** (pilihan di form pengajuan) | Semua | Semua | Semua | Timnya | Penugasannya — kosong bila belum ditugaskan (tanpa error) |
+
+- Mengubah isian yang tidak boleh diubah (mis. PM mengubah nama/RAB project lewat API) ditolak **403** dengan nama
+  isiannya: *"Anda tidak berhak mengubah: Nama project, Alamat. Hanya Direktur yang dapat mengubah isian ini."* —
+  tidak lagi "tersimpan" diam-diam tanpa perubahan.
+- Pilihan **Project Manager** di form project hanya berisi **PM aktif PT itu**, tampil **nama · email**; begitu juga
+  **Penanggung jawab** pusat biaya (anggota aktif PT) dan user di **Aturan approval** (Direktur/Finance PT itu).
+
 ![TODO screenshot: layar modul Admin + bar menu modul Pengguna & Akses](img/admin-menu.png)
 
 ## 1. Pengguna, karyawan dan akses PT

@@ -1,7 +1,11 @@
 'use client'
 import React, { useRef, useState, useSyncExternalStore } from 'react'
 
-import { postJson, problemText } from './ActionButton'
+import { formatRupiah } from '@/lib/money'
+import { parseRupiah } from '@/lib/rupiah-input'
+
+import { ActionDialog } from './ActionDialog'
+import { postJson, problemText, promptLabel } from './ActionButton'
 import { TableScroll } from './TableScroll'
 
 /**
@@ -38,6 +42,8 @@ export type RequesterActionsProps = {
     flags: Flag[]
   }>
   requestFlags: Flag[]
+  /** Today (YYYY-MM-DD) in the request PT's timezone — QA-07: receipt dates after it are refused. */
+  today?: string
   settlement: {
     docNo: string | null
     statusLabel: string
@@ -65,7 +71,8 @@ function readFlashOnce(): string | null {
   return flashOnce
 }
 const noSubscribe = () => () => {}
-const rp = (v: number | null | undefined) => (v === null || v === undefined ? '—' : `Rp ${v.toLocaleString('id-ID')}`)
+// QA-25: same text on the server and in every browser (Intl/ICU grouping differed → hydration #418)
+const rp = (v: number | null | undefined) => (v === null || v === undefined ? '—' : formatRupiah(v))
 const idemKey = () => (typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : undefined)
 
 function flashAndGo(text: string, href?: string) {
@@ -115,26 +122,44 @@ async function post(url: string, body: unknown): Promise<Record<string, unknown>
   return (r.data ?? {}) as Record<string, unknown>
 }
 
-/** One button; optional required reason (≥ 3 chars, G7) or confirmation. */
-function Act(props: { label: string; url: string; success: string; primary?: boolean; reason?: string; confirm?: string; gotoNew?: boolean; testId: string }) {
+/**
+ * One button; optional required reason (≥ 3 chars, G7) or confirmation — QA-22/QA-23: in the app
+ * dialog (inline validation, stays open on a short reason or a server error), never prompt/confirm/alert.
+ * Exported for the office side of the workflow panel (QA-19: Finance confirms a Reimburse "selesai").
+ */
+export function Act(props: { label: string; url: string; success: string; primary?: boolean; reason?: string; confirm?: string; gotoNew?: boolean; testId: string }) {
   const { busy, error, run } = useAction()
-  const onClick = () => {
-    let body: Record<string, unknown> = {}
-    if (props.reason) {
-      const v = window.prompt(props.reason)
-      if (v === null) return
-      if (v.trim().length < 3) {
-        window.alert('Alasan wajib diisi (minimal 3 karakter).')
-        return
-      }
-      body = { reason: v.trim() }
-    } else if (props.confirm && !window.confirm(props.confirm)) return
-    void run(async () => {
-      const data = await post(props.url, body)
-      const newId = typeof data.id === 'number' ? data.id : undefined
-      flashAndGo(props.success, props.gotoNew && newId ? `/admin/collections/expense-requests/${newId}` : undefined)
-    })
+  const key = useRef<string | undefined>(undefined)
+  const done = (data: Record<string, unknown>) => {
+    const newId = typeof data.id === 'number' ? data.id : undefined
+    flashAndGo(props.success, props.gotoNew && newId ? `/admin/collections/expense-requests/${newId}` : undefined)
   }
+  if (props.reason || props.confirm) {
+    return (
+      <span style={{ display: 'inline-flex', flexDirection: 'column', gap: 4, marginRight: 6, marginBottom: 6 }}>
+        <ActionDialog
+          label={props.label}
+          title={props.label}
+          description={props.confirm}
+          confirmLabel={props.label}
+          field={props.reason ? { label: promptLabel(props.reason), minLength: 3 } : undefined}
+          rotateKey={() => {
+            key.current = idemKey()
+          }}
+          onConfirm={async (v) => {
+            const r = await postJson(props.url, props.reason ? { reason: v } : {}, { idempotencyKey: key.current })
+            if (!r.ok) return problemText(r.data, r.status)
+            done((r.data ?? {}) as Record<string, unknown>)
+            return null
+          }}
+          buttonClassName={btn(props.primary)}
+          danger={Boolean(props.reason)}
+          testId={props.testId}
+        />
+      </span>
+    )
+  }
+  const onClick = () => void run(async () => done(await post(props.url, {})))
   return (
     <span style={{ display: 'inline-flex', flexDirection: 'column', gap: 4, marginRight: 6, marginBottom: 6 }}>
       <button type="button" className={btn(props.primary)} style={{ margin: 0 }} disabled={busy} onClick={onClick} data-pk-action={props.testId}>
@@ -162,7 +187,7 @@ const noEnter = (e: React.KeyboardEvent) => {
   if (e.key === 'Enter' && !(e.target instanceof HTMLTextAreaElement)) e.preventDefault()
 }
 
-function ReceiptForm({ requestId, lines }: { requestId: number; lines: RequesterActionsProps['lines'] }) {
+function ReceiptForm({ requestId, lines, today }: { requestId: number; lines: RequesterActionsProps['lines']; today?: string }) {
   const { busy, error, run } = useAction()
   const { ref, text, file } = useFields()
   const onSubmit = () =>
@@ -171,10 +196,15 @@ function ReceiptForm({ requestId, lines }: { requestId: number; lines: Requester
       if (!image || image.size === 0) throw new Error('Foto nota wajib diunggah.')
       const vendorName = text('vendorName')
       const receiptDate = text('receiptDate')
-      const amount = Number(text('amount').replace(/[^\d]/g, ''))
+      // QA-03: shared Rupiah rules — "1.000,50" / "-5000" are refused with a message, never stripped
+      const parsed = parseRupiah(text('amount'))
       if (!vendorName) throw new Error('Vendor / toko wajib diisi.')
       if (!/^\d{4}-\d{2}-\d{2}$/.test(receiptDate)) throw new Error('Tanggal nota wajib diisi.')
-      if (!Number.isSafeInteger(amount) || amount <= 0) throw new Error('Nominal harus angka Rupiah > 0.')
+      if (parsed.error) throw new Error(`Nominal: ${parsed.error}`)
+      if (parsed.value === null) throw new Error('Nominal harus angka Rupiah > 0.')
+      const amount = parsed.value
+      // QA-07: checked before the upload (no orphan photo); the server refuses it anyway (400)
+      if (today && receiptDate > today) throw new Error('Tanggal nota tidak boleh di masa depan.')
       const imageId = await uploadReceiptImage(image)
       await post(`${base(requestId)}/receipts`, { lineId: text('lineId'), receiptNo: text('receiptNo') || null, vendorName, receiptDate, amount, imageId })
       flashAndGo('Nota tersimpan. Periksa flag validasi pada daftar nota (bila ada).')
@@ -205,11 +235,11 @@ function ReceiptForm({ requestId, lines }: { requestId: number; lines: Requester
       </label>
       <label style={field}>
         Tanggal nota
-        <input type="date" data-f="receiptDate" />
+        <input type="date" data-f="receiptDate" max={today} />
       </label>
       <label style={field}>
         Nominal tercetak (Rp)
-        <input type="text" data-f="amount" inputMode="numeric" placeholder="150000" />
+        <input type="text" data-f="amount" inputMode="numeric" placeholder="150.000" />
       </label>
       <button type="button" className={btn(true)} style={{ margin: 0 }} disabled={busy} onClick={onSubmit} data-pk-action="add-receipt">
         {busy ? 'Mengunggah…' : 'Upload nota'}
@@ -313,7 +343,7 @@ export function RequesterActions(p: RequesterActionsProps) {
 
       {showReceipts ? (
         <section style={box} data-pk-section="receipts">
-          <strong>Nota {p.type === 'reimburse' ? '(wajib per baris sebelum kirim, US-38)' : '(setelah dana ditransfer)'}</strong>
+          <strong>Nota {p.type === 'reimburse' ? '(wajib per baris sebelum kirim)' : '(setelah dana ditransfer)'}</strong>
           {p.receipts.length === 0 ? <div style={{ marginTop: 6 }}>Belum ada nota.</div> : null}
           {p.receipts.length > 0 ? (
             <TableScroll label="Nota">
@@ -350,7 +380,8 @@ export function RequesterActions(p: RequesterActionsProps) {
                       <td style={{ padding: 4, verticalAlign: 'top', whiteSpace: 'nowrap' }}>{rp(r.amount)}</td>
                       <td style={{ padding: 4, verticalAlign: 'top' }}>{RECEIPT_STATUS[r.status] ?? r.status}</td>
                       <td style={{ padding: 4, verticalAlign: 'top' }}>
-                        {has('add_receipt') && r.status !== 'removed' ? (
+                        {/* QA-27 (owner decision 2026-10-08): a receipt Finance marked valid is locked */}
+                        {has('add_receipt') && r.status !== 'removed' && r.status !== 'valid' ? (
                           <Act testId={`remove-receipt-${r.id}`} label="Hapus" url={`${url}/receipts/${r.id}/remove`} reason="Alasan menghapus nota (wajib):" success="Nota dihapus (tercatat di riwayat)." />
                         ) : null}
                       </td>
@@ -364,7 +395,7 @@ export function RequesterActions(p: RequesterActionsProps) {
             p.lines.length === 0 ? (
               <div style={{ marginTop: 6 }}>Simpan minimal 1 baris item dulu, lalu upload nota per baris.</div>
             ) : (
-              <ReceiptForm requestId={p.id} lines={p.lines} />
+              <ReceiptForm requestId={p.id} lines={p.lines} today={p.today} />
             )
           ) : null}
         </section>

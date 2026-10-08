@@ -199,6 +199,35 @@ void main() {
     expect(find.text('Nota dihapus.'), findsOneWidget);
   });
 
+  testWidgets('QA-27: a receipt Finance marked valid has no delete icon; pending ones keep it', (tester) async {
+    final json = advanceJson(status: 'lpj_revision', allowed: const ['add_receipt', 'lpj_submit']);
+    final receipts = [
+      {...(json['receipts'] as List).single as Map<String, dynamic>, 'status': 'valid'},
+      {...(json['receipts'] as List).single as Map<String, dynamic>, 'id': 502, 'status': 'pending', 'imageId': null},
+    ];
+    await pumpDetail(tester, {...json, 'receipts': receipts}, FakeExpenseApi());
+    await scrollTo(tester, find.byKey(const Key('receipt-remove-502')));
+    expect(find.byKey(const Key('receipt-remove-502')), findsOneWidget);
+    expect(find.byKey(const Key('receipt-remove-501')), findsNothing);
+  });
+
+  testWidgets('QA-27: a 409 from the server (receipt validated meanwhile) is shown, nothing crashes', (tester) async {
+    final api = FakeExpenseApi();
+    api.adapter.respond = (c) => (
+      409,
+      {'type': 'about:blank', 'title': 'Nota sudah divalidasi Finance; nota tidak dapat dihapus.', 'status': 409},
+    );
+    await pumpDetail(tester, advanceJson(status: 'lpj_revision', allowed: const ['add_receipt', 'lpj_submit']), api);
+    await scrollTo(tester, find.byKey(const Key('receipt-remove-501')));
+    await tester.tap(find.byKey(const Key('receipt-remove-501')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('receipt-remove-reason')), 'Foto buram');
+    await tester.tap(find.byKey(const Key('prompt-ok')));
+    await tester.pumpAndSettle();
+    expect(api.adapter.calls.single.uri.path, '/api/v1/expense-requests/42/receipts/501/remove');
+    expect(find.textContaining('Nota sudah divalidasi Finance'), findsOneWidget);
+  });
+
   testWidgets('offline: receipt/LPJ actions disabled, no delete buttons', (tester) async {
     await pumpDetail(tester, advanceJson(), FakeExpenseApi(), online: false);
     await scrollTo(tester, find.byKey(const Key('action-receipts-complete')));

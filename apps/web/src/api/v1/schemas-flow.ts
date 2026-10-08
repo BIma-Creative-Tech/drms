@@ -1,6 +1,7 @@
 import { z } from 'zod'
 
 import { companyFilterParam, createCompanyField } from './schemas'
+import { ShortfallApproval } from './schemas-shortfall'
 
 /**
  * /api/v1 contract for the F2a expense-request flow (T1–T4, T6–T8, period closing).
@@ -153,6 +154,21 @@ export const ReceiptUpdate = ReceiptCreate.omit({ imageId: true }).partial().str
 
 export const FlagReviewBody = z.object({ note: z.string().max(500).optional() }).strict().meta({ id: 'FlagReviewBody' })
 
+/**
+ * QA-04 (owner decision 2026-10-08): a cash-out that would make the account balance negative is
+ * refused 409 `CASH_OVERDRAFT_CONFIRM_REQUIRED` {balance, after} unless this is true (audited
+ * `overdraft_confirmed`).
+ */
+const confirmOverdraft = z
+  .boolean()
+  .optional()
+  .meta({ description: 'QA-04: confirm that this cash-out may make the cash account balance negative (else 409 CASH_OVERDRAFT_CONFIRM_REQUIRED with balance/after); audited overdraft_confirmed.' })
+/** QA-17: transfer to an employee bank account that is not verified → 409 unless confirmed (audited). */
+const confirmUnverifiedAccount = z
+  .boolean()
+  .optional()
+  .meta({ description: 'QA-17: confirm a transfer to a bank account with verificationStatus ≠ verified (else 409 BANK_ACCOUNT_UNVERIFIED_CONFIRM_REQUIRED); audited bank_unverified_confirmed.' })
+
 export const TransferCreate = z
   .object({
     cashAccountId: id,
@@ -160,6 +176,8 @@ export const TransferCreate = z
     proofMediaId: id.meta({ description: 'media-transfer-proofs id (POST /media/transfer-proofs).' }),
     transferDate: businessDate.optional(),
     amount: rupiahPos.optional().meta({ description: 'Optional echo; must equal the approved amount (Finance cannot change it, G3).' }),
+    confirmOverdraft: confirmOverdraft,
+    confirmUnverifiedAccount: confirmUnverifiedAccount,
   })
   .strict()
   .meta({ id: 'TransferCreate' })
@@ -325,7 +343,7 @@ export const ExpenseRequestDetail = ExpenseRequestListItem.extend({
       statusLabel: z.string(),
       usageNotes: z.string().nullable(),
       transferredTotal: rupiah.nullable(),
-      receiptsTotal: rupiah.nullable().meta({ description: 'Σ active receipts at the last LPJ submit.' }),
+      receiptsTotal: rupiah.nullable().meta({ description: 'Σ active receipts (pending + valid); refreshed at every LPJ submit and — QA-09 — after every receipt add / edit / remove / valid / reject while the LPJ is open.' }),
       verifiedReceiptsTotal: rupiah.nullable(),
       difference: z.number().int().nullable().meta({ description: 'transferred − receipts (verified after verification): > 0 refund, < 0 shortfall.' }),
       settlementType: z.enum(['none', 'refund', 'shortfall']).nullable(),
@@ -339,6 +357,9 @@ export const ExpenseRequestDetail = ExpenseRequestListItem.extend({
       reversalCount: z.number().int().meta({ description: 'E9: how often the settlement was reversed (void of the refund KM / shortfall transfer).' }),
       lastReversedAt: z.string().nullable(),
       lastReversalReason: z.string().nullable(),
+      shortfallApproval: ShortfallApproval.nullable()
+        .optional()
+        .meta({ description: 'QA-06 / ADR 0019 (Finance/Direktur of the PT only; null otherwise or without a shortfall): shortfall vs approved + tolerance and its re-approval.' }),
     })
     .nullable()
     .meta({ id: 'Settlement', description: 'T5 LPJ (Uang Muka only; null before "Nota Lengkap").' }),
@@ -396,6 +417,8 @@ export const SettleBody = z
     bankRef: z.string().trim().min(1).max(64).optional().meta({ description: 'Shortfall: required.' }),
     proofMediaId: id.nullable().optional().meta({ description: 'Shortfall: media-transfer-proofs id (required). Refund: media-attachments id (optional).' }),
     amount: rupiahPos.optional().meta({ description: 'Optional echo; must equal the server-computed |difference|.' }),
+    confirmOverdraft: confirmOverdraft,
+    confirmUnverifiedAccount: confirmUnverifiedAccount,
   })
   .strict()
   .meta({ id: 'SettleBody' })
@@ -441,6 +464,7 @@ export const CashEntryCreate = z
     costCenterId: id.nullable().optional(),
     vehicleId: id.nullable().optional(),
     proofId: id.nullable().optional().meta({ description: 'media-attachments id (optional, US-23).' }),
+    confirmOverdraft: confirmOverdraft,
   })
   .strict()
   .meta({ id: 'CashEntryCreate' })
@@ -454,6 +478,7 @@ export const CashEntryUpdate = z
     projectId: id.nullable().optional(),
     costCenterId: id.nullable().optional(),
     vehicleId: id.nullable().optional(),
+    proofId: id.nullable().optional().meta({ description: 'QA-31 (ADR 0005 §5): add or replace the proof (media-attachments id uploaded by the caller); null removes it.' }),
   })
   .strict()
   .meta({ id: 'CashEntryUpdate', description: 'Manual entries of an open period only; amount/date/account changes = void + new entry.' })
@@ -480,6 +505,7 @@ export const CashEntry = z
     reversalOfId: id.nullable(),
     reversedById: id.nullable(),
     voidReason: z.string().nullable(),
+    proofId: id.nullable().meta({ description: 'QA-31: current proof (media-attachments id; GET /media/attachments/{id}/file); PATCH proofId adds or replaces it.' }),
     postedAt: z.string().nullable(),
     companyId: id.nullable().meta({ description: 'MC3: PT of the entry.' }),
   })
@@ -592,6 +618,15 @@ export const SettleResult = z
     shortfallCashEntryId: id.nullable(),
   })
   .meta({ id: 'SettleResult' })
+
+/** QA-11: GET …/settle/precheck — the settlement configuration is complete (checked before uploading the proof). */
+export const SettlePrecheckResult = z
+  .object({
+    ready: z.literal(true),
+    settlementType: z.enum(['none', 'refund', 'shortfall']),
+    amount: rupiah,
+  })
+  .meta({ id: 'SettlePrecheckResult' })
 
 export const Notification = z
   .object({

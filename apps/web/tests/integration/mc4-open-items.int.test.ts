@@ -148,7 +148,7 @@ describe('QA-MC4-09: Q-09 on-behalf is decided by the role in the derived PT', (
   it('Admin of A + Staff of B: a project-less draft for B employees → 403 (was 201 under the Admin role of A)', async () => {
     const r = await call('POST', E, U.adminAstaffB, draft({ requesterIds: [X.empB2], bankAccountId: X.accB2 }), key())
     expect(r.status, JSON.stringify(r.body).slice(0, 300)).toBe(403)
-    expect(String((r.body as Body).detail ?? (r.body as Body).title)).toMatch(/atas nama orang lain|Q-09|Forbidden/)
+    expect(String((r.body as Body).detail ?? (r.body as Body).title)).toMatch(/atas nama orang lain|Q-09|dirinya sendiri|Forbidden/) // QA-15: Staff-only in B → own employee only
     const n = await p.count({ collection: 'expense-requests', where: { and: [{ createdBy: { equals: U.adminAstaffB.id } }, { company: { equals: B } }] }, overrideAccess: true /* SYSTEM-READ: assertion */ })
     expect(n.totalDocs).toBe(0)
   })
@@ -160,10 +160,12 @@ describe('QA-MC4-09: Q-09 on-behalf is decided by the role in the derived PT', (
     expect((await call('PATCH', `${E}/${own.id}`, U.adminAstaffB, { requesterIds: [X.empB2] }, key())).status).toBe(403)
   })
 
-  it('controls: Admin of A for an A employee without project → 201 in A; a Staff for themself (+ a colleague) → 201', async () => {
+  it('controls: Admin of A for an A employee without project → 201 in A; a Staff for themself → 201 (QA-15: a colleague → 403)', async () => {
     const a = await ok(call('POST', E, U.adminAstaffB, draft({ requesterIds: [X.empA], bankAccountId: X.accA }), key()), 201)
     expect(a.companyId ?? a.company?.id ?? a.company).toBe(A)
-    const s = await ok(call('POST', E, U.staffB, draft({ requesterIds: [X.empB, X.empB2] }), key()), 201)
+    // QA-15 (owner decision 2026-10-08): Staff requests for themselves only — no co-requesters
+    expect((await call('POST', E, U.staffB, draft({ requesterIds: [X.empB, X.empB2] }), key())).status).toBe(403)
+    const s = await ok(call('POST', E, U.staffB, draft({ requesterIds: [X.empB] }), key()), 201)
     expect(s.companyId ?? s.company?.id ?? s.company).toBe(B)
     // Staff of B for someone else only → 403 (unchanged Q-09 default)
     expect((await call('POST', E, U.staffB, draft({ requesterIds: [X.empB2] }), key())).status).toBe(403)

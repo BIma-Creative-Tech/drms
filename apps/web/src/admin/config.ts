@@ -78,6 +78,8 @@ export const S3E_ADMIN_VIEWS = {
 /** ADR 0017: "Keamanan akun" — optional self-service 2FA of the caller's own account (avatar menu). */
 export const ACCOUNT_ADMIN_VIEWS = {
   accountSecurity: { Component: '@/admin/views/KeamananAkun#KeamananAkunView', path: '/keamanan-akun' as const, exact: true, meta: { title: 'Keamanan akun' } },
+  // QA-24: Payload's built-in /unauthorized (key = admin.routes.unauthorized) → the uniform no-access page
+  unauthorized: { Component: '@/admin/views/NoAccess#UnauthorizedView' },
 }
 
 /**
