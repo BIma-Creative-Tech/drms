@@ -33,6 +33,7 @@ export function cashDto(e: CashEntryDoc & { postedAt?: string | null }) {
     reversalOfId: relId(e.reversalOf) ?? null,
     reversedById: relId(e.reversedBy) ?? null,
     voidReason: e.voidReason ?? null,
+    proofId: relId(e.proof) ?? null, // QA-31: current proof (media-attachments), replaceable via PATCH
     postedAt: e.postedAt ?? null,
     companyId: relId((e as { company?: unknown }).company) ?? null, // MC3
   }

@@ -3386,6 +3386,14 @@ export const openapiDocument = {
               "null"
             ]
           },
+          "proofId": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "exclusiveMinimum": 0,
+            "description": "QA-31: current proof (media-attachments id; GET /media/attachments/{id}/file); PATCH proofId adds or replaces it."
+          },
           "postedAt": {
             "type": [
               "string",
@@ -3422,6 +3430,7 @@ export const openapiDocument = {
           "reversalOfId",
           "reversedById",
           "voidReason",
+          "proofId",
           "postedAt",
           "companyId"
         ]

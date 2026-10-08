@@ -505,6 +505,7 @@ export const CashEntry = z
     reversalOfId: id.nullable(),
     reversedById: id.nullable(),
     voidReason: z.string().nullable(),
+    proofId: id.nullable().meta({ description: 'QA-31: current proof (media-attachments id; GET /media/attachments/{id}/file); PATCH proofId adds or replaces it.' }),
     postedAt: z.string().nullable(),
     companyId: id.nullable().meta({ description: 'MC3: PT of the entry.' }),
   })

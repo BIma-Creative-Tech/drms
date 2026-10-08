@@ -37,7 +37,7 @@ const todayIso = () => {
 const yesterday = () => addDays(todayIso(), -1)
 
 beforeAll(async () => {
-  w = await makeWorld('QF')
+  w = await makeWorld('QW')
 })
 beforeEach(() => resetRateLimits())
 

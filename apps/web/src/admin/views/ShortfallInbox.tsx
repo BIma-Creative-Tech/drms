@@ -1,8 +1,7 @@
 import type { PayloadRequest } from 'payload'
 import React from 'react'
 
-import { ConfirmAction } from '@/admin/components/addendum/ConfirmAction'
-import { ReasonAction } from '@/admin/components/kas/ReasonAction'
+import { ActionButton } from '@/admin/components/ActionButton'
 import { KAS_STYLE } from '@/admin/components/kas/style'
 import { shortfallInbox } from '@/domain/expense/shortfall-approval'
 import { withReqTransaction } from '@/lib/system-tx'
@@ -66,25 +65,21 @@ export async function ShortfallInboxSection({ req }: { req: PayloadRequest }) {
               label: 'Aksi',
               cell: (r) => (
                 <div className="pk-kact">
-                  <ConfirmAction
+                  {/* Same app dialog (ActionDialog via ActionButton, QA-22/QA-23) as the request decisions above */}
+                  <ActionButton
                     url={`${base(r.requestId)}/${r.step}`}
                     label="Setujui"
-                    title={`Setujui kekurangan ${r.docNo ?? ''}?`}
-                    description={
-                      <>
-                        Total transfer menjadi {rp(r.totalAfter)} (disetujui {rp(r.approvedAmount)}).{' '}
-                        {r.step === 'acknowledge' ? 'Berikutnya approval Finance.' : 'Transfer kekurangan dapat dicatat Finance setelah langkah terakhir.'}
-                      </>
-                    }
-                    confirmLabel="Setujui"
+                    variant="primary"
+                    confirm={`Setujui kekurangan ${r.docNo ?? `#${r.requestId}`}? Total transfer menjadi ${rp(r.totalAfter)} (disetujui ${rp(r.approvedAmount)}). ${
+                      r.step === 'acknowledge' ? 'Berikutnya approval Finance.' : 'Transfer kekurangan dapat dicatat Finance setelah langkah terakhir.'
+                    }`}
                     testId={`shortfall-inbox-${r.step}-${r.requestId}`}
                   />
-                  <ReasonAction
+                  <ActionButton
                     url={`${base(r.requestId)}/reject`}
                     label="Tolak"
-                    title={`Tolak kekurangan ${r.docNo ?? ''}?`}
-                    description={<>Transfer kekurangan tidak dapat dicatat. Alasan dikirim ke Finance.</>}
-                    confirmLabel="Tolak kekurangan"
+                    confirm="Transfer kekurangan tidak dapat dicatat. Alasan dikirim ke Finance."
+                    prompt={{ field: 'reason', message: 'Alasan penolakan kekurangan (wajib, minimal 3 karakter):', minLength: 3 }}
                     testId={`shortfall-inbox-reject-${r.requestId}`}
                   />
                 </div>
