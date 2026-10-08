@@ -1,6 +1,7 @@
 import { APIError, ValidationError } from 'payload'
 
 import { hasRole, isGroupAdmin, relId, type Role } from '@/access/roles'
+import { isDbGuardError } from '@/lib/pg-error'
 
 import { HttpError, json, v1 } from '../http'
 import { MembershipBatchBody } from '../schemas-flow'
@@ -24,8 +25,8 @@ function writeErrorOf(err: unknown): { status: number; message: string } | null 
     return { status: 400, message: list.join('; ') || 'Data tidak valid.' }
   }
   if (err instanceof APIError && err.status < 500) return { status: err.status === 403 ? 403 : 400, message: err.isPublic ? err.message : 'Ditolak.' }
-  const code = (err as { code?: unknown }).code
-  if (typeof code === 'string' && /^(42501|23505|23514|P0001)$/.test(code)) return { status: 409, message: 'Ditolak oleh aturan integritas data (mis. karyawan sudah terhubung ke akun lain di PT ini).' }
+  // QA-05: drizzle wraps the pg error — the SQLSTATE is on `cause` (pgCode unwraps it)
+  if (isDbGuardError(err)) return { status: 409, message: 'Ditolak oleh aturan integritas data (mis. karyawan sudah terhubung ke akun lain di PT ini).' }
   return null
 }
 

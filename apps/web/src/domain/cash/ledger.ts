@@ -9,6 +9,8 @@ import { claimMedia } from '@/domain/expense/receipts'
 import { allocateDocNo } from '@/domain/numbering-db'
 import { parseBusinessDate } from '@/domain/numbering'
 import { isBusinessDate } from '@/domain/expense/types'
+import { CASH_OVERDRAFT_CONFIRM_REQUIRED, failCoded } from '@/domain/coded-error'
+import { formatRupiah } from '@/lib/money'
 import { getRequestTx } from '@/lib/tx'
 
 import { isPeriod, periodEnd } from './periods'
@@ -53,6 +55,8 @@ export type PostInput = {
   expenseRequestId?: number | null
   transferId?: number | null
   reversalOfId?: number | null
+  /** QA-04: the caller confirmed that this cash-out may make the account balance negative (audited). */
+  confirmOverdraft?: boolean
 }
 
 /**
@@ -100,9 +104,63 @@ function closingCompany(req: PayloadRequest, companyId: number | undefined, role
  * is answered like a missing one BEFORE any lock-date check (a B account used to answer with PT B's
  * closing date: "tutup buku s/d …").
  */
-export async function assertAccount(req: PayloadRequest, id: number, companyId?: number) {
-  const a = await req.payload.findByID({ collection: 'cash-accounts', id, depth: 0, overrideAccess: true /* SYSTEM-READ: account check, PT compared below */, req }).catch(() => null)
+export type CashAccountDoc = { id: number; name?: string | null; company?: unknown; active?: boolean | null; openingBalance?: number | null; openingBalanceDate?: string | null }
+
+export async function assertAccount(req: PayloadRequest, id: number, companyId?: number): Promise<CashAccountDoc> {
+  const a = (await req.payload.findByID({ collection: 'cash-accounts', id, depth: 0, overrideAccess: true /* SYSTEM-READ: account check, PT compared below */, req }).catch(() => null)) as CashAccountDoc | null
   if (!a || a.active === false || (companyId !== undefined && relId(a.company) !== companyId)) fail(400, 'Akun kas tidak ditemukan atau nonaktif.', [{ path: 'cashAccountId', message: 'Akun kas tidak valid.' }])
+  return a!
+}
+
+/** 'YYYY-MM-DD' → 'dd/mm/yyyy' (Indonesian messages). */
+export const dmy = (d: string) => `${d.slice(8, 10)}/${d.slice(5, 7)}/${d.slice(0, 4)}`
+
+/**
+ * QA-05: no posting dated before the account's opening-balance (go-live) date — the opening balance
+ * already contains everything before it. The DB trigger pk_cash_entries_opening_guard stays the last
+ * line of defence; this answers 400 with the date instead of the wrapped trigger error (was a 500).
+ * `path` = the date field of the calling form (entryDate / transferDate / date).
+ */
+export function assertOnOrAfterOpening(account: Pick<CashAccountDoc, 'openingBalanceDate'>, date: string, path = 'entryDate'): void {
+  const opening = account.openingBalanceDate
+  if (opening && date < opening) {
+    const message = `Tanggal sebelum tanggal saldo awal akun (${dmy(opening)}).`
+    fail(400, message, [{ path, message }])
+  }
+}
+
+/** Current balance of ONE account (opening + Σ in − Σ out over all rows; ADR 0005, K-01 rule). */
+export async function accountBalance(req: PayloadRequest, accountId: number, companyId: number): Promise<number> {
+  const tx = await getRequestTx(req)
+  const r = (await tx.execute(sql`
+    SELECT (coalesce(a.opening_balance, 0)
+            + coalesce((SELECT sum(CASE WHEN e.direction = 'in' THEN e.amount ELSE -e.amount END) FROM cash_entries e WHERE e.cash_account_id = a.id), 0))::text AS b
+    FROM cash_accounts a WHERE a.id = ${accountId} AND a.company_id = ${companyId}`)) as unknown as { rows: Array<{ b: string }> }
+  return Number(r.rows[0]?.b ?? 0)
+}
+
+/**
+ * QA-04 (owner decision 2026-10-08: warning + explicit confirmation, audited): a cash-out that would
+ * make the account balance < 0 is refused with 409 CASH_OVERDRAFT_CONFIRM_REQUIRED {balance, after}
+ * unless the request confirms it (`confirmOverdraft: true`). Postings of one account are serialised by
+ * an advisory lock (two concurrent cash-outs cannot both pass on the same balance). Reversal rows (void)
+ * are corrections and never asked. Returns the confirmed overdraft (audited by postEntry) or null.
+ */
+async function checkOverdraft(req: PayloadRequest, account: CashAccountDoc, amount: number, confirmed: boolean): Promise<{ balance: number; after: number } | null> {
+  const tx = await getRequestTx(req)
+  await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${`pk:cash-account:${account.id}`}, 0))`)
+  const balance = await accountBalance(req, account.id, relId(account.company) ?? -1)
+  const after = balance - amount
+  if (after >= 0) return null
+  if (!confirmed) {
+    failCoded(
+      409,
+      CASH_OVERDRAFT_CONFIRM_REQUIRED,
+      `Saldo akun${account.name ? ` ${account.name}` : ''} akan menjadi minus: saldo ${formatRupiah(balance)}, sesudah transaksi ${formatRupiah(after)}. Konfirmasi untuk tetap menyimpan.`,
+      { cashAccountId: account.id, balance, after },
+    )
+  }
+  return { balance, after }
 }
 
 /**
@@ -120,9 +178,11 @@ export async function postEntry(req: PayloadRequest, input: PostInput): Promise<
   // QA-MC4-10: account (and its PT) first — the lock date of a PT the caller is not mapped to is never answered
   const mapped = mappedCompanies(req)
   if (companyId === undefined || (mapped !== null && !mapped.includes(companyId))) fail(400, 'Akun kas tidak ditemukan atau nonaktif.', [{ path: 'cashAccountId', message: 'Akun kas tidak valid.' }])
-  await assertAccount(req, input.cashAccountId)
+  const account = await assertAccount(req, input.cashAccountId)
+  assertOnOrAfterOpening(account, input.entryDate) // QA-05 (before any number is allocated)
   const lock = await currentLockDate(req, companyId)
   if (lock && input.entryDate <= lock) fail(409, `Periode ${input.entryDate.slice(0, 7)} sudah ditutup (tutup buku s/d ${lock}).`)
+  const overdraft = input.direction === 'out' && input.sourceType !== 'reversal' ? await checkOverdraft(req, account, input.amount, input.confirmOverdraft === true) : null
   const { docNo } = await allocateDocNo(req, input.direction === 'in' ? 'cash_in' : 'cash_out', { companyId: companyId!, date: parseBusinessDate(input.entryDate) })
   const doc = await req.payload.create({
     collection: 'cash-entries',
@@ -150,6 +210,22 @@ export async function postEntry(req: PayloadRequest, input: PostInput): Promise<
     overrideAccess: true, // SYSTEM-WRITE: ledger posting after guards
     req,
   })
+  if (overdraft) {
+    // QA-04: the confirmed overdraft is a fact of the audit trail (who, which entry, balance before → after)
+    await writeAudit(req, [
+      {
+        action: 'overdraft_confirmed',
+        docType: 'cash_entry',
+        docId: String(doc.id),
+        docNo,
+        field: 'balance',
+        oldValue: { cashAccountId: account.id, balance: overdraft.balance },
+        newValue: { cashAccountId: account.id, balance: overdraft.after, amount: input.amount, sourceType: input.sourceType, transferId: input.transferId ?? null, expenseRequestId: input.expenseRequestId ?? null },
+        reason: 'Saldo minus dikonfirmasi pengguna (QA-04)',
+        companyId: companyId!,
+      },
+    ])
+  }
   return doc as unknown as CashEntryDoc
 }
 
@@ -165,6 +241,8 @@ export type ManualInput = {
   costCenterId?: number | null
   vehicleId?: number | null
   proofId?: number | null
+  /** QA-04: confirm a cash-out that makes the balance negative. */
+  confirmOverdraft?: boolean
 }
 
 const MANUAL_REFS = [
@@ -321,6 +399,8 @@ export async function voidEntry(
 
 /**
  * Balance per account = opening balance + Σ in − Σ out over ALL rows (voids cancel via reversal rows),
+ * QA-14: the opening balance counts only from its `openingBalanceDate` on (an inflow on that date;
+ * `asOf` before it → 0; accounts without a date: always),
  * for the cash accounts of `companyIds` — default: the selected PTs where the caller is Finance /
  * Direktur (ADR 0016 §5; combined balance = Σ per PT, each item carries `companyId`).
  */
@@ -330,7 +410,8 @@ export async function balances(req: PayloadRequest, asOf?: string, opts: { compa
   const pts = (opts.companyIds ?? kasCompanies(req)).filter((c) => Number.isSafeInteger(c))
   if (pts.length === 0) return []
   const r = (await tx.execute(sql`
-    SELECT a.id, a.company_id, a.name, coalesce(a.opening_balance, 0)::text AS opening,
+    SELECT a.id, a.company_id, a.name,
+           (CASE WHEN a.opening_balance_date IS NULL OR a.opening_balance_date <= ${until} THEN coalesce(a.opening_balance, 0) ELSE 0 END)::text AS opening,
            coalesce(sum(CASE WHEN e.direction = 'in' THEN e.amount ELSE 0 END), 0)::text AS total_in,
            coalesce(sum(CASE WHEN e.direction = 'out' THEN e.amount ELSE 0 END), 0)::text AS total_out
     FROM cash_accounts a
@@ -339,7 +420,7 @@ export async function balances(req: PayloadRequest, asOf?: string, opts: { compa
       pts.map((c) => sql`${c}`),
       sql`, `,
     )})
-    GROUP BY a.id, a.name, a.opening_balance
+    GROUP BY a.id, a.name, a.opening_balance, a.opening_balance_date
     ORDER BY a.id`)) as unknown as { rows: Array<{ id: number; company_id: number; name: string; opening: string; total_in: string; total_out: string }> }
   return r.rows.map((x) => {
     const opening = Number(x.opening)
@@ -347,6 +428,16 @@ export async function balances(req: PayloadRequest, asOf?: string, opts: { compa
     const tout = Number(x.total_out)
     return { cashAccountId: Number(x.id), companyId: Number(x.company_id), name: x.name, openingBalance: opening, totalIn: tin, totalOut: tout, balance: opening + tin - tout }
   })
+}
+
+/**
+ * QA-30: first business date of the PT's cash books = the earliest `openingBalanceDate` of its cash
+ * accounts (active or not); null when no account has one (no lower bound — legacy accounts).
+ */
+export async function booksStartDate(req: PayloadRequest, companyId: number): Promise<string | null> {
+  const tx = await getRequestTx(req)
+  const r = (await tx.execute(sql`SELECT min(opening_balance_date) AS d FROM cash_accounts WHERE company_id = ${companyId} AND opening_balance_date IS NOT NULL`)) as unknown as { rows: Array<{ d: string | null }> }
+  return r.rows[0]?.d ?? null
 }
 
 /**
@@ -359,6 +450,11 @@ export async function closePeriod(req: PayloadRequest, period: string, note?: st
   const company = req.user ? closingCompany(req, companyId, ['pk-finance', 'pk-owner']) : (companyId ?? (await contextCompanyId(req)))
   if (req.user && !hasRole(req, ['pk-finance', 'pk-owner'], company)) fail(403, 'Hanya Finance/Direktur PT ini yang dapat menutup buku.')
   if (period >= (await today(req, company)).slice(0, 7)) fail(409, 'Hanya bulan yang sudah lewat yang dapat ditutup.')
+  // QA-30: nothing to close before the PT's books start (earliest opening-balance date of its cash accounts)
+  const start = await booksStartDate(req, company)
+  if (start && period < start.slice(0, 7)) {
+    fail(400, `Periode ${period} sebelum buku kas PT dimulai (saldo awal akun kas pertama per ${dmy(start)}). Tutup buku dimulai dari ${start.slice(0, 7)}.`, [{ path: 'period', message: `Periode paling awal: ${start.slice(0, 7)}.` }])
+  }
   const tx = await getRequestTx(req)
   await tx.execute(sql`LOCK TABLE period_closings IN SHARE ROW EXCLUSIVE MODE`)
   const existing = await req.payload.count({

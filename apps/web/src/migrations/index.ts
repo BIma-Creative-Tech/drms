@@ -31,6 +31,7 @@ import * as migration_20261002_080000_mc4_scope_rule from './20261002_080000_mc4
 import * as migration_20261003_090000_mc4_audit_company_backfill from './20261003_090000_mc4_audit_company_backfill';
 import * as migration_20261005_090000_privacy_notice from './20261005_090000_privacy_notice';
 import * as migration_20261005_090100_selfie_retention_6m from './20261005_090100_selfie_retention_6m';
+import * as migration_20261008_090000_qa_finance_integrity from './20261008_090000_qa_finance_integrity';
 
 export const migrations = [
   {
@@ -197,5 +198,10 @@ export const migrations = [
     up: migration_20261005_090100_selfie_retention_6m.up,
     down: migration_20261005_090100_selfie_retention_6m.down,
     name: '20261005_090100_selfie_retention_6m',
+  },
+  {
+    up: migration_20261008_090000_qa_finance_integrity.up,
+    down: migration_20261008_090000_qa_finance_integrity.down,
+    name: '20261008_090000_qa_finance_integrity',
   },
 ];

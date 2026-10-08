@@ -61,6 +61,10 @@ export const AUDIT_ACTIONS = [
   '2fa_disabled',
   // ADR 0018 (Q-46, ASVS 8.3.3): a user acknowledged the employee privacy notice ("Saya mengerti", web or APK).
   'privacy_ack',
+  // QA report 2026-10-08 (owner decisions): a cash-out confirmed although the account balance goes below 0
+  // (QA-04), a transfer confirmed to an employee bank account that is not verified (QA-17).
+  'overdraft_confirmed',
+  'bank_unverified_confirmed',
 ] as const
 export type AuditAction = (typeof AUDIT_ACTIONS)[number]
 

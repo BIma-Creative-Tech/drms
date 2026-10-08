@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { registerAddendumPaths } from './openapi-addendum'
 import { registerAttendancePaths } from './openapi-attendance'
 import { registerCompanyPaths } from './openapi-companies'
+import { registerShortfallPaths } from './openapi-shortfall'
 import { Device, DeviceRegister, DeviceRevoke, Health, Masters, MastersQuery, Me, Problem, Ready, TestEmailQueued } from './schemas'
 import * as F from './schemas-flow'
 import { PrivacyAck, PrivacyAckBody, PrivacyNotice } from './schemas-privacy'
@@ -253,7 +254,10 @@ export function buildOpenApiDocument(version: string) {
   post('/expense-requests/{id}/receipts-resubmit', 'Requester: receipts fixed (grand total changed → re-approval)', F.EmptyBody, ['id'], detailOk())
   post('/expense-requests/{id}/verify-receipts', 'Finance: all receipts valid + warnings reviewed → Nota Terverifikasi', F.EmptyBody, ['id'], detailOk())
   post('/expense-requests/{id}/flags/{fid}/review', 'Finance: mark a flag "sudah diperiksa"', F.FlagReviewBody, ['id', 'fid'], detailOk())
-  post('/expense-requests/{id}/transfer', 'Finance: record the transfer (amount = approved amount, proof, bank ref) → KK posted', F.TransferCreate, ['id'], res(201, 'Transferred', F.TransferResult, [400, 401, 403, 404, 409, 422, 426, 429]))
+  post(
+    '/expense-requests/{id}/transfer',
+    'Finance: record the transfer (amount = approved amount, proof, bank ref) → KK posted. QA-17: destination account not verified → 409 code BANK_ACCOUNT_UNVERIFIED_CONFIRM_REQUIRED (bankAccountId, verificationStatus, bankName, accountNo, accountHolder) unless confirmUnverifiedAccount (audited bank_unverified_confirmed); QA-04: cash account balance would go below 0 → 409 code CASH_OVERDRAFT_CONFIRM_REQUIRED (cashAccountId, balance, after) unless confirmOverdraft (audited overdraft_confirmed); QA-05: date before the account opening-balance date → 400',
+    F.TransferCreate, ['id'], res(201, 'Transferred', F.TransferResult, [400, 401, 403, 404, 409, 422, 426, 429]))
   post('/expense-requests/{id}/transfers/{tid}/void', 'Finance: void a transfer (reversal entry, reason)', F.ReasonBody, ['id', 'tid'], detailOk())
   registry.registerPath({
     method: 'get',
@@ -294,7 +298,8 @@ export function buildOpenApiDocument(version: string) {
   registry.registerPath({
     method: 'post',
     path: '/cash-entries',
-    summary: 'Finance: manual cash in/out (US-23); closed period → 409 (DB-enforced)',
+    summary:
+      'Finance: manual cash in/out (US-23); closed period → 409 (DB-enforced). QA-05: date before the account opening-balance date → 400 (errors[].path entryDate). QA-04: cash-out that makes the balance < 0 → 409 code CASH_OVERDRAFT_CONFIRM_REQUIRED (cashAccountId, balance, after) unless confirmOverdraft: true (audited overdraft_confirmed)',
     security,
     request: { headers: idem, body: jsonBody(F.CashEntryCreate) },
     responses: res(201, 'Posted', F.CashEntry, [400, 401, 403, 409, 422, 429]),
@@ -311,7 +316,7 @@ export function buildOpenApiDocument(version: string) {
   registry.registerPath({
     method: 'get',
     path: '/cash-accounts/balances',
-    summary: 'Finance/Direktur (pk-owner): balance per cash account (opening + in − out) of the selected PTs where the caller is Finance/Direktur; ?company= narrows (outside the selection → 403 COMPANY_NOT_ALLOWED)',
+    summary: 'Finance/Direktur (pk-owner): balance per cash account (opening — QA-14: only from its openingBalanceDate on — + in − out) of the selected PTs where the caller is Finance/Direktur; ?company= narrows (outside the selection → 403 COMPANY_NOT_ALLOWED)',
     security,
     request: { headers: deviceHeader, query: z.object({ asOf: z.string().optional(), company: F.CompanyFilterQuery.shape.company }) },
     responses: res(200, 'Balances', F.Balances, [400, 401, 403]),
@@ -331,7 +336,7 @@ export function buildOpenApiDocument(version: string) {
     request: { headers: deviceHeader, query: z.object({ company: z.string().regex(/^[1-9]\d{0,8}$/).optional() }) },
     responses: res(200, 'Periods', F.PeriodClosingList, [400, 401, 403]),
   })
-  post('/period-closings', 'Finance/Direktur (pk-owner): close a past month (DB rejects postings dated ≤ lock date)', F.PeriodCloseBody, [], res(201, 'Closed', F.PeriodClosing, [400, 401, 403, 409, 422, 429]))
+  post('/period-closings', 'Finance/Direktur (pk-owner): close a past month (DB rejects postings dated ≤ lock date); QA-30: a month before the earliest opening-balance date of the PT cash accounts → 400', F.PeriodCloseBody, [], res(201, 'Closed', F.PeriodClosing, [400, 401, 403, 409, 422, 429]))
   registry.registerPath({
     method: 'post',
     path: '/period-closings/{period}/reopen',
@@ -348,7 +353,7 @@ export function buildOpenApiDocument(version: string) {
   post('/expense-requests/{id}/lpj/verify', 'Finance: verify the LPJ (all receipts decided; verified total = Σ valid); difference 0 → Selesai', F.EmptyBody, ['id'], detailOk())
   post(
     '/expense-requests/{id}/settle',
-    'Finance: settle the verified LPJ — surplus → KM "Pengembalian LPJ", shortfall → transfer + KK (bank ref + proof) → Selesai',
+    'Finance: settle the verified LPJ — surplus → KM "Pengembalian LPJ", shortfall → transfer + KK (bank ref + proof) → Selesai. QA-06 / ADR 0019: total transfer above approved × (1 + shortfallTolerancePct/100) without an approved shortfall re-approval → 409 code SHORTFALL_REAPPROVAL_REQUIRED (approvedAmount, transferredTotal, tolerancePct, limit, shortfallApprovalStatus); shortfall transfer: same 409 confirmations as /transfer (BANK_ACCOUNT_UNVERIFIED_CONFIRM_REQUIRED, CASH_OVERDRAFT_CONFIRM_REQUIRED)',
     F.SettleBody,
     ['id'],
     res(200, 'Settled', F.SettleResult, [400, 401, 403, 404, 409, 422, 426, 429]),
@@ -576,6 +581,8 @@ export function buildOpenApiDocument(version: string) {
   registerAddendumPaths(registry, { security, deviceHeader, idem, res })
   // MC2-4: web PT switcher
   registerCompanyPaths(registry, { security, res })
+  // ---- QA-06 / ADR 0019: LPJ shortfall re-approval (web) -------------------------------------
+  registerShortfallPaths(registry, { security, idem, res, detail: F.ExpenseRequestDetail })
 
   return new OpenApiGeneratorV31(registry.definitions).generateDocument({
     openapi: '3.1.0',

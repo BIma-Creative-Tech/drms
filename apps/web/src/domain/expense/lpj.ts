@@ -2,13 +2,16 @@ import type { PayloadRequest } from 'payload'
 
 import { relId, userId } from '@/access/roles'
 import { writeAudit } from '@/audit/writer'
-import { assertAccount, currentLockDate, loadEntry, postEntry, voidEntry } from '@/domain/cash/ledger'
+import { assertAccount, assertOnOrAfterOpening, currentLockDate, loadEntry, postEntry, voidEntry } from '@/domain/cash/ledger'
+import { failCoded, SHORTFALL_REAPPROVAL_REQUIRED } from '@/domain/coded-error'
+import { formatRupiah } from '@/lib/money'
 import { allocateDocNo } from '@/domain/numbering-db'
 import { parseBusinessDate } from '@/domain/numbering'
 
-import { actorContext, fail, loadRaw, loadVisible, requireAction, requireActionAudited, today, updateRequest, type RequestDoc } from './common'
+import { actorContext, fail, loadRaw, loadVisible, requireAction, requireActionAudited, settings, today, updateRequest, type RequestDoc } from './common'
 import { claimMedia, receiptsOf, recomputeFlags } from './receipts'
-import { settlementOf, type SettlementStatus, type SettlementType } from './settlement-rules'
+import { settlementOf, shortfallCheck, type SettlementStatus, type SettlementType, type ShortfallApprovalStatus } from './settlement-rules'
+import { auditUnverifiedTransfer, checkDestination } from './transfers'
 import { isBusinessDate } from './types'
 
 /**
@@ -39,6 +42,14 @@ export type SettlementDoc = {
   reversalCount?: number | null
   lastReversedAt?: string | null
   lastReversalReason?: string | null
+  // QA-06 / ADR 0019
+  shortfallApprovalStatus?: ShortfallApprovalStatus | null
+  shortfallApprovalCycle?: number | null
+  shortfallApprovalLevel?: number | null
+  shortfallApprovalAmount?: number | null
+  shortfallApprovalSnapshot?: unknown
+  shortfallApprovalNote?: string | null
+  shortfallRejectReason?: string | null
 }
 
 export async function settlementOfRequest(req: PayloadRequest, requestId: number): Promise<SettlementDoc | null> {
@@ -53,7 +64,7 @@ export async function settlementOfRequest(req: PayloadRequest, requestId: number
   return (res.docs[0] as unknown as SettlementDoc | undefined) ?? null
 }
 
-async function updateSettlement(req: PayloadRequest, id: number, data: Record<string, unknown>, reason?: string): Promise<SettlementDoc> {
+export async function updateSettlement(req: PayloadRequest, id: number, data: Record<string, unknown>, reason?: string): Promise<SettlementDoc> {
   if (reason) req.context.auditReason = reason
   return (await req.payload.update({
     collection: 'settlements',
@@ -65,7 +76,7 @@ async function updateSettlement(req: PayloadRequest, id: number, data: Record<st
   })) as unknown as SettlementDoc
 }
 
-async function requireSettlement(req: PayloadRequest, requestId: number, status: SettlementStatus[]): Promise<SettlementDoc> {
+export async function requireSettlement(req: PayloadRequest, requestId: number, status: SettlementStatus[]): Promise<SettlementDoc> {
   const s = await settlementOfRequest(req, requestId)
   if (!s) fail(409, 'LPJ belum dibuat untuk pengajuan ini.')
   if (!status.includes(s.status)) fail(409, `LPJ berstatus ${s.status}; aksi tidak dapat dilakukan.`)
@@ -185,6 +196,32 @@ export type SettleInput = {
   proofMediaId?: number | null
   /** Optional echo; must equal the computed settlement amount (Finance cannot change it). */
   amount?: number
+  /** QA-04: confirm a shortfall transfer that makes the cash account balance negative (audited). */
+  confirmOverdraft?: boolean
+  /** QA-17: confirm a shortfall transfer to an unverified bank account (audited). */
+  confirmUnverifiedAccount?: boolean
+}
+
+/**
+ * QA-06 / ADR 0019: may the shortfall of this verified LPJ be paid now? Total after the shortfall
+ * ≤ approved × (1 + tolerance) (company setting `shortfallTolerancePct`, default 10), or an approved
+ * shortfall re-approval covering it.
+ */
+export async function shortfallStateOf(req: PayloadRequest, raw: RequestDoc, s: SettlementDoc) {
+  const st = settlementOf(s.transferredTotal ?? 0, s.verifiedReceiptsTotal ?? 0)
+  const companyId = relId((raw as { company?: unknown }).company)
+  const tolerancePct = Number((await settings(req, companyId)).shortfallTolerancePct ?? 10)
+  const shortfall = st.type === 'shortfall' ? st.amount : 0
+  // a settled LPJ already counts its shortfall transfer in the request's transferred total
+  const before = (raw.transferredTotal ?? 0) - (s.status === 'settled' ? shortfall : 0)
+  const check = shortfallCheck({
+    approvedAmount: raw.approvedAmount ?? 0,
+    transferredTotal: before,
+    shortfall,
+    tolerancePct,
+    approval: { status: s.shortfallApprovalStatus ?? null, amount: s.shortfallApprovalAmount ?? null },
+  })
+  return { ...check, tolerancePct, shortfall, approvedAmount: raw.approvedAmount ?? 0 }
 }
 
 /**
@@ -206,9 +243,25 @@ export async function settle(req: PayloadRequest, id: number, input: SettleInput
   const date = input.date ?? todayDate
   if (!isBusinessDate(date)) fail(400, 'Tanggal harus YYYY-MM-DD.')
   if (date > todayDate) fail(400, 'Tanggal tidak boleh di masa depan.')
-  await assertAccount(req, input.cashAccountId, relId((raw as { company?: unknown }).company)) // QA-MC4-10: account of the request's PT
+  const account = await assertAccount(req, input.cashAccountId, relId((raw as { company?: unknown }).company)) // QA-MC4-10: account of the request's PT
+  assertOnOrAfterOpening(account, date, 'date') // QA-05
   const lock = await currentLockDate(req, relId((raw as { company?: unknown }).company))
   if (lock && date <= lock) fail(409, `Periode ${date.slice(0, 7)} sudah ditutup (tutup buku s/d ${lock}).`)
+  if (st.type === 'shortfall') {
+    // QA-06 / ADR 0019: above approved + tolerance only after the re-approval of the new total
+    const sf = await shortfallStateOf(req, raw, s)
+    if (!sf.allowed) {
+      const pending = s.shortfallApprovalStatus === 'pending_ack' || s.shortfallApprovalStatus === 'pending_approval'
+      failCoded(
+        409,
+        SHORTFALL_REAPPROVAL_REQUIRED,
+        `Total transfer menjadi ${formatRupiah(sf.totalAfter)}, melebihi nominal disetujui ${formatRupiah(sf.approvedAmount)} + toleransi ${sf.tolerancePct}% (${formatRupiah(sf.ceiling)}). ${
+          pending ? 'Persetujuan kekurangan sedang berjalan.' : s.shortfallApprovalStatus === 'rejected' ? 'Persetujuan kekurangan ditolak.' : 'Ajukan persetujuan kekurangan (Direktur → Finance) terlebih dahulu.'
+        }`,
+        { approvedAmount: sf.approvedAmount, transferredTotal: sf.totalAfter, tolerancePct: sf.tolerancePct, limit: sf.ceiling, shortfallApprovalStatus: s.shortfallApprovalStatus ?? null },
+      )
+    }
+  }
   const lpjNo = s.docNo ?? ''
   const label = `${lpjNo} — ${raw.docNo ?? ''} ${raw.title}`.slice(0, 900)
   const data: Record<string, unknown> = { status: 'settled', settledAt: new Date().toISOString(), settledBy: userId(req) }
@@ -249,6 +302,7 @@ export async function settle(req: PayloadRequest, id: number, input: SettleInput
     if (!bankRef) fail(400, 'Nomor referensi bank wajib diisi untuk transfer kekurangan.', [{ path: 'bankRef', message: 'Wajib.' }])
     if (!input.proofMediaId) fail(400, 'Bukti transfer wajib untuk transfer kekurangan.', [{ path: 'proofMediaId', message: 'Wajib.' }])
     if (!raw.bankSnapshot?.accountNo) fail(409, 'Rekening tujuan belum tersimpan pada pengajuan.')
+    const destination = await checkDestination(req, raw, input.confirmUnverifiedAccount === true) // QA-17
     const { docNo } = await allocateDocNo(req, 'transfer', { companyId: relId((raw as { company?: unknown }).company)!, date: parseBusinessDate(date) })
     await claimMedia(req, 'media-transfer-proofs', input.proofMediaId, id)
     const transfer = (await req.payload.create({
@@ -283,7 +337,11 @@ export async function settle(req: PayloadRequest, id: number, input: SettleInput
       sourceType: 'transfer',
       expenseRequestId: id,
       transferId: transfer.id,
+      confirmOverdraft: input.confirmOverdraft === true, // QA-04
     })
+    if (destination.verificationStatus !== 'verified') {
+      await auditUnverifiedTransfer(req, transfer, destination, { requestId: id, requestNo: raw.docNo, amount: st.amount, kind: 'lpj_shortfall', companyId: relId((raw as { company?: unknown }).company) })
+    }
     await req.payload.update({
       collection: 'transfers',
       id: transfer.id,

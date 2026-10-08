@@ -61,6 +61,13 @@ Akun kas, Tanggal (kosong = hari ini), **No. referensi bank**, **Bukti** (foto/P
 - Kotak **"Anda juga yang menyetujui"**: Anda sendiri yang memberi Approval pada pengajuan ini. Boleh tetap
   dicatat (tercatat di audit), tetapi bila ada Finance lain sebaiknya transfer dicatat orang lain.
 - Kas keluar (KK) tercatat otomatis; status **Ditransfer**.
+- Kolom **Rekening tujuan** menandai **Terverifikasi** / **Belum diverifikasi**. Transfer ke rekening yang **belum
+  diverifikasi** memunculkan dialog peringatan (bank, nomor, nama pemilik): periksa dulu dengan karyawan, lalu
+  **Tetap simpan** — konfirmasi Anda tercatat di Audit Log. Verifikasi rekening di **Rekening karyawan** (status
+  verifikasi) supaya peringatan tidak muncul lagi.
+- Bila saldo akun kas yang dipilih akan menjadi **minus**, muncul dialog **Saldo akun kas akan minus** dengan saldo
+  sekarang dan sesudah transfer. Pilih akun lain / catat dulu kas masuk yang belum tercatat, atau **Tetap simpan**
+  bila dana memang ada (tercatat di Audit Log).
 - Salah catat? **Void transfer** (di bagian "Transfer tercatat — dapat dibatalkan" atau di detail pengajuan) + alasan:
   KK dibalik, pengajuan kembali ke antrian.
 
@@ -74,6 +81,14 @@ Akun kas, Tanggal (kosong = hari ini), **No. referensi bank**, **Bukti** (foto/P
    - Sisa dana → **Catat pengembalian & selesaikan** (kas masuk "Pengembalian LPJ").
    - Kekurangan → **Transfer kekurangan & selesaikan** (ref bank + bukti wajib).
    - Selisih 0 → langsung **Selesai**.
+4. **Kekurangan melebihi nominal disetujui + toleransi** (Pengaturan PT → *Toleransi kekurangan LPJ*, default
+   **10%**): misalnya disetujui Rp 1.350.000, toleransi 10% → total transfer paling banyak Rp 1.485.000 tanpa
+   persetujuan. Di atas itu, form transfer kekurangan diganti kotak **Perlu persetujuan kekurangan** → **Ajukan
+   persetujuan kekurangan** + alasan (mis. harga material naik). Total baru disetujui ulang dengan alur yang sama
+   seperti pengajuan: **Direktur** (Diketahui) lalu **Finance** — di menu **Persetujuan** (web), bagian **Kekurangan
+   LPJ di atas nominal disetujui**. Setelah disetujui, form **Transfer kekurangan & selesaikan** muncul lagi. Bila
+   ditolak, kotak menampilkan alasannya; Anda dapat **Ajukan ulang** dengan penjelasan baru. Persetujuan ini hanya
+   di web (belum di APK).
 
 Catatan: kas masuk pengembalian LPJ tidak bisa di-void; bila salah, laporkan ke tim.
 
@@ -84,6 +99,16 @@ beberapa PT: kartu **Pilih PT** → klik PT transaksi ini) → isi Tanggal, Akun
 (keluar), Project atau Pusat biaya (opsional), Kendaraan (opsional), **Keterangan**, Bukti (opsional) → Simpan.
 Nomor `KM/…` atau `KK/…` terbit dan saldo langsung berubah.
 
+- **Nominal:** angka Rupiah tanpa desimal; titik boleh sebagai pemisah ribuan (`1.250.000`). Koma (`1.000,50`),
+  tanda minus (`-5000`) atau huruf **ditolak** dengan pesan di bawah kolom (tidak lagi diubah diam-diam). Uang
+  keluar dicatat dengan jenis **Kas keluar**, bukan dengan tanda minus. Aturan yang sama berlaku untuk nominal nota
+  dan nominal tambahan Addendum RAB.
+- **Tanggal** tidak boleh sebelum **tanggal saldo awal (go-live)** akun kas yang dipilih — kalender tidak menawarkan
+  tanggal itu, dan server menjawab "Tanggal sebelum tanggal saldo awal akun (dd/mm/yyyy)".
+- **Kas keluar yang membuat saldo akun minus** memunculkan dialog dengan saldo sekarang dan sesudahnya. **Tetap
+  simpan** hanya bila dana memang ada (mis. setoran belum dicatat); konfirmasi tercatat di Audit Log. Void (jurnal
+  balik) tidak ditanya.
+
 - **Ubah:** hanya kas manual di periode terbuka; alasan wajib; nominal/tanggal/akun tidak bisa diubah → pakai void.
 - **Void:** tombol **Void** + alasan → baris asli bertanda *Void* dan muncul *Jurnal balik*. Kas dari transfer
   dibatalkan lewat **Void transfer**.
@@ -93,13 +118,18 @@ Nomor `KM/…` atau `KK/…` terbit dan saldo langsung berubah.
 ## 6. Tutup buku bulanan
 
 **Tutup buku** → bulan lalu → **Tutup buku**. Setelah ditutup, transaksi di bulan itu terkunci. Membuka kembali
-hanya **Direktur**. Langkah lengkap: [runbook tutup buku](../runbooks/tutup-buku.md).
+hanya **Direktur**. Daftar bulan dimulai dari bulan **saldo awal (go-live)** akun kas paling awal PT — bulan sebelum
+PT mulai memakai ProyekKas tidak ditawarkan dan ditolak bila dikirim. Kolom **Masuk/Keluar** = tanpa pasangan void;
+pasangan void + jurnal balik ada di kolom **Koreksi (void)** sendiri (bersih buku = Bersih + Koreksi). Langkah lengkap: [runbook tutup buku](../runbooks/tutup-buku.md).
 
 **Tutup buku per PT:** satu layar = satu PT. Bila Anda Finance di beberapa PT, halaman **Tutup buku** menampilkan
 kartu **Pilih PT** (dengan "terkunci s/d …" per PT) → klik PT → tutup bulannya. Pindah PT lewat tombol **PT:** di atas
 halaman. Menutup buku satu PT **tidak** mengunci PT lain — ulangi untuk setiap PT.
 
 ## 7. Laporan
+
+**Rekap Kas:** saldo awal akun dihitung **mulai tanggal saldo awalnya** — bulan sebelum go-live bersaldo 0; di bulan
+go-live muncul kolom **Saldo awal akun baru**. Perbandingan "vs akhir <bulan>" di Beranda memakai angka yang sama.
 
 **Laporan**: Rekap Kas · Buku Kas · Pengeluaran per Kategori · Anggaran Project · Rekap Pengajuan · Kelengkapan
 Nota/LPJ · Biaya per Kendaraan · Laporan Absensi. Atur filter → unduh **CSV**, **Excel (.xlsx)** atau **PDF**

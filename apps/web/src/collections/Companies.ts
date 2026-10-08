@@ -101,6 +101,14 @@ export const COMPANY_SETTING_FIELDS: Field[] = [
     ],
   },
   { ...rupiahField('receiptRoundingTolerance', 'Toleransi pembulatan nota per baris (Rp)', { required: true }), defaultValue: 1000 },
+  // QA-06 / ADR 0019 (owner decision 2026-10-08): LPJ shortfall up to this % above the approved amount is paid
+  // as today; above it the new total needs the approval flow (Direktur → Finance) before the shortfall transfer.
+  {
+    ...percentField('shortfallTolerancePct', 'Toleransi kekurangan LPJ di atas nominal disetujui (%)'),
+    defaultValue: 10,
+    required: true,
+    admin: { description: 'Kekurangan LPJ yang membuat total transfer melebihi nominal disetujui + toleransi ini harus disetujui ulang (Direktur → Finance) sebelum ditransfer.' },
+  },
   intField('receiptMaxAgeDays', 'Batas umur nota (hari)', 30, 1, 365),
   intField('reimburseAutoCloseDays', 'Tutup otomatis reimburse (hari)', 30, 1, 365),
   // F3 (Q-F3-1, user 2026-09-24: default 7): an Uang Muka without LPJ is "LPJ terlambat" (K-12b).
@@ -235,7 +243,7 @@ function settingKey(f: Field): string {
   if ('fields' in f && Array.isArray(f.fields)) return f.fields.map(settingKey).find(Boolean) ?? ''
   return ''
 }
-const OPERATIONAL = ['defaultGeofenceRadiusM', 'lateReportDays', 'budgetWarnPct', 'progressWarnGapPct', 'receiptRoundingTolerance', 'receiptMaxAgeDays', 'reimburseAutoCloseDays', 'lpjDueDays', 'syncExpenseDraftsEnabled', 'syncProgressReportsEnabled', 'defaultWorkSchedule']
+const OPERATIONAL = ['defaultGeofenceRadiusM', 'lateReportDays', 'budgetWarnPct', 'progressWarnGapPct', 'receiptRoundingTolerance', 'shortfallTolerancePct', 'receiptMaxAgeDays', 'reimburseAutoCloseDays', 'lpjDueDays', 'syncExpenseDraftsEnabled', 'syncProgressReportsEnabled', 'defaultWorkSchedule']
 const ATTENDANCE = ['syncAttendanceEnabled', 'selfieRetentionMonths', 'selfieRetentionDeleteEnabled']
 const REMINDERS = ['remindersEnabled', 'notifyRequesterStatusEnabled']
 /** COMPANY_SETTING_FIELDS in tab order; every field lands in exactly one tab (unit test). */

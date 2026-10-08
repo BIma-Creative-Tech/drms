@@ -2,6 +2,7 @@
 import { useRouter } from 'next/navigation'
 import React, { useId, useRef, useState } from 'react'
 
+import { RupiahInput, useRupiah } from '../RupiahInput'
 import { fieldErrors, newIdemKey, sendJson } from '../kas/client'
 
 /**
@@ -9,23 +10,23 @@ import { fieldErrors, newIdemKey, sendJson } from '../kas/client'
  * alasan. "Ajukan" creates + submits in one call (POST /api/v1/budget-addenda {submit:true});
  * "Simpan draft" keeps a Draft. Edit mode PATCHes a Draft. Live preview RAB lama → baru; inline
  * errors under each field (server errors mapped by path); one Idempotency-Key per content version.
+ * QA-03: Nominal through the shared Rupiah field (decimals / minus / other characters refused inline).
  */
 export type ProjectOpt = { id: number; code: string; name: string; budget: number | null }
 
 const rupiah = (v: number) => `Rp ${new Intl.NumberFormat('id-ID').format(v)}`
-const digits = (s: string) => s.replace(/\D/g, '').slice(0, 13)
 
 export function AddendumForm({ projects, initialProject, edit }: { projects: ProjectOpt[]; initialProject?: number; edit?: { id: number; projectId: number; addition: number; reason: string } }) {
   const router = useRouter()
   const uid = useId()
   const key = useRef<string | undefined>(newIdemKey())
   const [project, setProject] = useState<number | ''>(edit?.projectId ?? initialProject ?? (projects.length === 1 ? projects[0]!.id : ''))
-  const [amount, setAmount] = useState(edit ? String(edit.addition) : '')
+  const amount = useRupiah(edit ? edit.addition : null)
   const [reason, setReason] = useState(edit?.reason ?? '')
   const [errs, setErrs] = useState<Record<string, string>>({})
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState<null | 'draft' | 'submit'>(null)
-  const addition = amount ? Number(amount) : 0
+  const addition = amount.parsed.value ?? 0
   const p = projects.find((x) => x.id === project)
   const touch = () => {
     key.current = newIdemKey()
@@ -34,7 +35,9 @@ export function AddendumForm({ projects, initialProject, edit }: { projects: Pro
   const validate = (): Record<string, string> => {
     const e: Record<string, string> = {}
     if (!project) e.projectId = 'Pilih project.'
-    if (!(addition > 0)) e.addition = 'Nominal tambahan wajib diisi (> 0).'
+    amount.touch()
+    if (amount.parsed.error) e.addition = amount.parsed.error
+    else if (!(addition > 0)) e.addition = 'Nominal tambahan wajib diisi (> 0).'
     if (reason.trim().length < 3) e.reason = 'Alasan wajib diisi (min. 3 karakter).'
     return e
   }
@@ -121,29 +124,26 @@ export function AddendumForm({ projects, initialProject, edit }: { projects: Pro
               *
             </span>
           </label>
-          <div className="pk-money">
-            <span aria-hidden>Rp</span>
-            <input
-              id={`${uid}-a`}
-              inputMode="numeric"
-              autoComplete="off"
-              value={amount ? new Intl.NumberFormat('id-ID').format(Number(amount)) : ''}
-              onChange={(e) => {
-                setAmount(digits(e.target.value))
+          <RupiahInput
+            id={`${uid}-a`}
+            field={{
+              ...amount,
+              onChange: (v: string) => {
+                amount.onChange(v)
                 touch()
-              }}
-              aria-invalid={errs.addition ? true : undefined}
-              aria-describedby={`${uid}-ah`}
-              data-pk-field="addition"
-            />
-          </div>
-          {errs.addition ? (
+              },
+            }}
+            invalid={!!errs.addition}
+            describedBy={`${uid}-ah`}
+            testId="addition"
+          />
+          {amount.error || errs.addition ? (
             <p id={`${uid}-ah`} className="err">
-              {errs.addition}
+              {amount.error ?? errs.addition}
             </p>
           ) : (
             <p id={`${uid}-ah`} className="help">
-              Bilangan bulat Rupiah, lebih dari 0.
+              Bilangan bulat Rupiah (tanpa desimal), lebih dari 0; titik sebagai pemisah ribuan.
             </p>
           )}
         </div>

@@ -24,6 +24,7 @@ import { createDraft, updateDraft, type DraftInput, type LineInputApi } from '@/
 import { addReceipt, editReceipt } from '@/domain/expense/receipts'
 import { cancel } from '@/domain/expense/workflow'
 import { auditPrivacyDenied, PRIVACY_ACK_REQUIRED, PRIVACY_ACK_REQUIRED_DETAIL, privacyAckCheck } from '@/legal/privacy-enforcement'
+import { isDbGuardError } from '@/lib/pg-error'
 import { withReqTransaction } from '@/lib/system-tx'
 import { DEFAULT_TZ } from '@/lib/time'
 import { getRequestTx } from '@/lib/tx'
@@ -638,8 +639,8 @@ function mapError(err: unknown): SyncError[] | null {
     }
     return [{ code, message }]
   }
-  const pg = err as { code?: unknown }
-  if (typeof pg.code === 'string' && /^(42501|23505|23514|P0001)$/.test(pg.code)) {
+  // QA-05: drizzle wraps the pg error — the SQLSTATE is on `cause` (pgCode unwraps it)
+  if (isDbGuardError(err)) {
     return [{ code: 'INTEGRITY', message: 'Ditolak oleh aturan integritas data.' }]
   }
   return null

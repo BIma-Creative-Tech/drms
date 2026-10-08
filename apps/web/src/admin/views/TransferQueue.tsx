@@ -79,6 +79,12 @@ export async function TransferQueue(props: AdminViewServerProps) {
                 </td>
                 <td style={{ ...td, overflowWrap: 'anywhere' }} data-label="Rekening tujuan" data-span="full">
                   {r.bank ? `${r.bank.bankName ?? ''} · ${r.bank.accountHolder ?? ''} · ${r.bank.accountNo ?? ''}` : '—'}
+                  {/* QA-17: verification state of the employee account; unverified → the transfer asks for a confirmation */}
+                  <div style={{ marginTop: 2 }}>
+                    <span style={badge(r.bankVerification === 'verified' ? 'ok' : 'warn')} data-pk-bank-verification={r.bankVerification}>
+                      {r.bankVerification === 'verified' ? 'Terverifikasi' : 'Belum diverifikasi'}
+                    </span>
+                  </div>
                 </td>
                 <td style={num} data-label="Nominal disetujui">
                   {rp(r.approvedAmount)}

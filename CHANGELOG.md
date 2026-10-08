@@ -13,6 +13,52 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   releases older than `min-release-age=7` (16.4.0 is not). ADR 0001 pins Payload 3.90.1, not Next's patch level.
   Verified: audit high passes, lint / typecheck / 719 unit / openapi / `next build` green.
 
+### QA report 2026-10-08 — keuangan (QA-03, QA-04, QA-05, QA-06, QA-12, QA-14, QA-17, QA-30)
+
+Status per ticket: `docs/proyekkas/qa/qa-report-2026-10-08-status.md`. Owner decisions 2026-10-08: overdraft and
+unverified destination account = warning + explicit confirmation (audited); LPJ shortfall = tolerance, then
+re-approval (ADR 0019).
+
+**Database migration** (run by `migrate`; additive — the previous web image and every released APK keep working):
+`20261008_090000_qa_finance_integrity` (schema, snapshot `.json`: audit actions `overdraft_confirmed` /
+`bank_unverified_confirmed`; `companies.shortfall_tolerance_pct` DEFAULT 10, CHECK 0–100; `settlements.shortfall_approval_*`
++ `pk_settlements_guard` extended; `approvals.doc_type` += `expense_shortfall`, `approvals.settlement_id`, owner CHECK,
+G1 trigger, unique indexes and PT check extended; trigger `transfers_shortfall_tolerance`). Rollback refused once a
+shortfall re-approval or a new audit action exists — restore the dump.
+
+#### Fixed
+- QA-03 / QA-12: every typed Rupiah amount in the admin (Kas masuk/keluar, Addendum RAB, receipt amount) goes through
+  one parser (`lib/rupiah-input.ts`, field `RupiahInput`): "." thousands separator; "1.000,50" → "Rupiah tanpa
+  desimal", "-5000" → "Gunakan jenis Kas keluar, bukan tanda minus", other characters refused inline; submit blocked
+  (was: silently 100050 / +5000).
+- QA-05: a cash entry / transfer / LPJ settlement dated before the account opening-balance date → 400 "Tanggal sebelum
+  tanggal saldo awal akun (dd/mm/yyyy)" on the date field (was 500); DB guard errors wrapped by drizzle (`cause`) are
+  mapped to 409 in `/api/v1`, the sync batch and the role-matrix save (`lib/pg-error.ts`); the cash form `min` date
+  follows the picked account's opening date.
+- QA-14: the opening balance counts only from its `openingBalanceDate` (K-01 balances, `GET /cash-accounts/balances`,
+  K-02 running balance; Rekap Kas column "Saldo awal akun baru" in the go-live month); months before go-live show 0 and
+  the dashboard "vs akhir <bulan>" compares with the right balance.
+- QA-30: Tutup buku lists and offers months only from the PT books start (earliest opening date of its cash accounts);
+  `POST /period-closings` before it → 400; the month summary shows Masuk/Keluar without void pairs, Bersih and a
+  separate "Koreksi (void)" column.
+
+#### Added
+- QA-04: cash-out (manual, transfer, LPJ shortfall transfer) that would make the account balance < 0 → 409
+  `CASH_OVERDRAFT_CONFIRM_REQUIRED` {cashAccountId, balance, after}; `confirmOverdraft: true` posts it and writes audit
+  `overdraft_confirmed` (balance before → after). App dialog "Tetap simpan" in the cash form and the transfer/settle
+  forms. Reversals (void) are never asked.
+- QA-17: Antrian Transfer shows "Terverifikasi / Belum diverifikasi" of the destination account; transfer / LPJ
+  shortfall transfer to an unverified account → 409 `BANK_ACCOUNT_UNVERIFIED_CONFIRM_REQUIRED` (destination in the
+  body); `confirmUnverifiedAccount: true` → audit `bank_unverified_confirmed`.
+- QA-06 / ADR 0019: PT setting "Toleransi kekurangan LPJ" (default 10 %). Above approved + tolerance, settle → 409
+  `SHORTFALL_REAPPROVAL_REQUIRED`; Finance asks `POST /expense-requests/{id}/lpj/shortfall-approval {note}`, the
+  request's approval rule for the new total decides (Direktur `…/acknowledge` → Finance `…/approve`, `…/reject
+  {reason}`), web inbox section in Persetujuan (`GET /lpj-shortfall-approvals/inbox`), `settlement.shortfallApproval`
+  in the request detail (Finance/Direktur). Web only; the APK is unchanged (ADR 0019 §APK).
+- OpenAPI: new codes / flags / paths above; `packages/api-contract/openapi.json` regenerated.
+- Guides: Finance (Rupiah input, go-live date, overdraft / unverified account dialogs, shortfall approval, tutup buku,
+  Rekap Kas), Direktur (shortfall approval on the web).
+
 ## [0.6.1] - 2026-10-05
 
 Employee privacy notice (UU PDP; Q-46, ADR 0018) with a versioned acknowledgement on the web and in APK 0.3.3,

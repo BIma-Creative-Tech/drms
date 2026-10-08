@@ -331,6 +331,10 @@ export interface Company {
   progressWarnGapPct: number;
   progressBadGapPct: number;
   receiptRoundingTolerance: number;
+  /**
+   * Kekurangan LPJ yang membuat total transfer melebihi nominal disetujui + toleransi ini harus disetujui ulang (Direktur → Finance) sebelum ditransfer.
+   */
+  shortfallTolerancePct: number;
   receiptMaxAgeDays: number;
   reimburseAutoCloseDays: number;
   /**
@@ -1259,9 +1263,10 @@ export interface Approval {
    * Mengikuti dokumen induk.
    */
   company?: (number | null) | Company;
-  docType: 'expense_request' | 'budget_addendum';
+  docType: 'expense_request' | 'budget_addendum' | 'expense_shortfall';
   request?: (number | null) | ExpenseRequest;
   addendum?: (number | null) | BudgetAddendum;
+  settlement?: (number | null) | Settlement;
   cycle: number;
   position: 'diajukan' | 'dibuat' | 'diketahui' | 'approval';
   level: number;
@@ -1331,6 +1336,183 @@ export interface BudgetAddendum {
   changeReason?: string | null;
   updatedAt: string;
   createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "settlements".
+ */
+export interface Settlement {
+  id: number;
+  /**
+   * Mengikuti dokumen induk.
+   */
+  company?: (number | null) | Company;
+  docNo?: string | null;
+  request: number | ExpenseRequest;
+  status: 'draft' | 'submitted' | 'revision' | 'verified' | 'settled';
+  usageNotes?: string | null;
+  transferredTotal?: number | null;
+  receiptsTotal?: number | null;
+  verifiedReceiptsTotal?: number | null;
+  difference?: number | null;
+  settlementType?: ('none' | 'refund' | 'shortfall') | null;
+  financeNotes?: string | null;
+  submitCount?: number | null;
+  submittedAt?: string | null;
+  submittedBy?: (number | null) | User;
+  verifiedAt?: string | null;
+  verifiedBy?: (number | null) | User;
+  settledAt?: string | null;
+  settledBy?: (number | null) | User;
+  refundCashEntry?: (number | null) | CashEntry;
+  shortfallTransfer?: (number | null) | Transfer;
+  reversalCount?: number | null;
+  lastReversedAt?: string | null;
+  lastReversedBy?: (number | null) | User;
+  lastReversalReason?: string | null;
+  shortfallApprovalStatus?: ('pending_ack' | 'pending_approval' | 'approved' | 'rejected') | null;
+  shortfallApprovalCycle?: number | null;
+  shortfallApprovalLevel?: number | null;
+  shortfallApprovalAmount?: number | null;
+  shortfallApprovalSnapshot?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  shortfallApprovalNote?: string | null;
+  shortfallRejectReason?: string | null;
+  uuid?: string | null;
+  /**
+   * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
+   */
+  changeReason?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "cash-entries".
+ */
+export interface CashEntry {
+  id: number;
+  /**
+   * Mengikuti dokumen induk.
+   */
+  company?: (number | null) | Company;
+  entryNo?: string | null;
+  entryDate: string;
+  period?: string | null;
+  direction: 'in' | 'out';
+  amount: number;
+  cashAccount: number | CashAccount;
+  category?: (number | null) | ExpenseCategory;
+  cashInSource?: (number | null) | CashInSource;
+  project?: (number | null) | Project;
+  costCenter?: (number | null) | CostCenter;
+  vehicle?: (number | null) | Vehicle;
+  description?: string | null;
+  proof?: (number | null) | MediaAttachment;
+  sourceType: 'transfer' | 'settlement_refund' | 'manual' | 'reversal' | 'opening';
+  expenseRequest?: (number | null) | ExpenseRequest;
+  transfer?: (number | null) | Transfer;
+  status: 'posted' | 'void';
+  reversalOf?: (number | null) | CashEntry;
+  reversedBy?: (number | null) | CashEntry;
+  voidReason?: string | null;
+  voidedBy?: (number | null) | User;
+  voidedAt?: string | null;
+  postedBy?: (number | null) | User;
+  postedAt?: string | null;
+  uuid?: string | null;
+  /**
+   * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
+   */
+  changeReason?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "transfers".
+ */
+export interface Transfer {
+  id: number;
+  /**
+   * Mengikuti dokumen induk.
+   */
+  company?: (number | null) | Company;
+  docNo?: string | null;
+  request: number | ExpenseRequest;
+  kind: 'advance' | 'reimburse' | 'lpj_shortfall';
+  cashAccount: number | CashAccount;
+  amount: number;
+  destination?: {
+    bankName?: string | null;
+    accountNo?: string | null;
+    accountHolder?: string | null;
+  };
+  bankRef: string;
+  proof: number | MediaTransferProof;
+  transferDate: string;
+  postedBy?: (number | null) | User;
+  status: 'posted' | 'void';
+  cashEntry?: (number | null) | CashEntry;
+  voidReason?: string | null;
+  voidedBy?: (number | null) | User;
+  voidedAt?: string | null;
+  uuid?: string | null;
+  /**
+   * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
+   */
+  changeReason?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "media-transfer-proofs".
+ */
+export interface MediaTransferProof {
+  id: number;
+  uploadedBy?: (number | null) | User;
+  receivedAt?: string | null;
+  ownerDocType?: string | null;
+  ownerDocId?: string | null;
+  sha256Original?: string | null;
+  originalWidth?: number | null;
+  originalHeight?: number | null;
+  originalSize?: number | null;
+  capturedAt?: string | null;
+  ownerCompany?: (number | null) | Company;
+  /**
+   * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
+   */
+  changeReason?: string | null;
+  updatedAt: string;
+  createdAt: string;
+  url?: string | null;
+  thumbnailURL?: string | null;
+  filename?: string | null;
+  mimeType?: string | null;
+  filesize?: number | null;
+  width?: number | null;
+  height?: number | null;
+  focalX?: number | null;
+  focalY?: number | null;
+  sizes?: {
+    thumb?: {
+      url?: string | null;
+      width?: number | null;
+      height?: number | null;
+      mimeType?: string | null;
+      filesize?: number | null;
+      filename?: string | null;
+    };
+  };
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -1448,168 +1630,6 @@ export interface ReceiptFlag {
   reviewedAt?: string | null;
   reviewNote?: string | null;
   resolvedAt?: string | null;
-  updatedAt: string;
-  createdAt: string;
-}
-/**
- * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "transfers".
- */
-export interface Transfer {
-  id: number;
-  /**
-   * Mengikuti dokumen induk.
-   */
-  company?: (number | null) | Company;
-  docNo?: string | null;
-  request: number | ExpenseRequest;
-  kind: 'advance' | 'reimburse' | 'lpj_shortfall';
-  cashAccount: number | CashAccount;
-  amount: number;
-  destination?: {
-    bankName?: string | null;
-    accountNo?: string | null;
-    accountHolder?: string | null;
-  };
-  bankRef: string;
-  proof: number | MediaTransferProof;
-  transferDate: string;
-  postedBy?: (number | null) | User;
-  status: 'posted' | 'void';
-  cashEntry?: (number | null) | CashEntry;
-  voidReason?: string | null;
-  voidedBy?: (number | null) | User;
-  voidedAt?: string | null;
-  uuid?: string | null;
-  /**
-   * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
-   */
-  changeReason?: string | null;
-  updatedAt: string;
-  createdAt: string;
-}
-/**
- * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "media-transfer-proofs".
- */
-export interface MediaTransferProof {
-  id: number;
-  uploadedBy?: (number | null) | User;
-  receivedAt?: string | null;
-  ownerDocType?: string | null;
-  ownerDocId?: string | null;
-  sha256Original?: string | null;
-  originalWidth?: number | null;
-  originalHeight?: number | null;
-  originalSize?: number | null;
-  capturedAt?: string | null;
-  ownerCompany?: (number | null) | Company;
-  /**
-   * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
-   */
-  changeReason?: string | null;
-  updatedAt: string;
-  createdAt: string;
-  url?: string | null;
-  thumbnailURL?: string | null;
-  filename?: string | null;
-  mimeType?: string | null;
-  filesize?: number | null;
-  width?: number | null;
-  height?: number | null;
-  focalX?: number | null;
-  focalY?: number | null;
-  sizes?: {
-    thumb?: {
-      url?: string | null;
-      width?: number | null;
-      height?: number | null;
-      mimeType?: string | null;
-      filesize?: number | null;
-      filename?: string | null;
-    };
-  };
-}
-/**
- * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "cash-entries".
- */
-export interface CashEntry {
-  id: number;
-  /**
-   * Mengikuti dokumen induk.
-   */
-  company?: (number | null) | Company;
-  entryNo?: string | null;
-  entryDate: string;
-  period?: string | null;
-  direction: 'in' | 'out';
-  amount: number;
-  cashAccount: number | CashAccount;
-  category?: (number | null) | ExpenseCategory;
-  cashInSource?: (number | null) | CashInSource;
-  project?: (number | null) | Project;
-  costCenter?: (number | null) | CostCenter;
-  vehicle?: (number | null) | Vehicle;
-  description?: string | null;
-  proof?: (number | null) | MediaAttachment;
-  sourceType: 'transfer' | 'settlement_refund' | 'manual' | 'reversal' | 'opening';
-  expenseRequest?: (number | null) | ExpenseRequest;
-  transfer?: (number | null) | Transfer;
-  status: 'posted' | 'void';
-  reversalOf?: (number | null) | CashEntry;
-  reversedBy?: (number | null) | CashEntry;
-  voidReason?: string | null;
-  voidedBy?: (number | null) | User;
-  voidedAt?: string | null;
-  postedBy?: (number | null) | User;
-  postedAt?: string | null;
-  uuid?: string | null;
-  /**
-   * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
-   */
-  changeReason?: string | null;
-  updatedAt: string;
-  createdAt: string;
-}
-/**
- * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "settlements".
- */
-export interface Settlement {
-  id: number;
-  /**
-   * Mengikuti dokumen induk.
-   */
-  company?: (number | null) | Company;
-  docNo?: string | null;
-  request: number | ExpenseRequest;
-  status: 'draft' | 'submitted' | 'revision' | 'verified' | 'settled';
-  usageNotes?: string | null;
-  transferredTotal?: number | null;
-  receiptsTotal?: number | null;
-  verifiedReceiptsTotal?: number | null;
-  difference?: number | null;
-  settlementType?: ('none' | 'refund' | 'shortfall') | null;
-  financeNotes?: string | null;
-  submitCount?: number | null;
-  submittedAt?: string | null;
-  submittedBy?: (number | null) | User;
-  verifiedAt?: string | null;
-  verifiedBy?: (number | null) | User;
-  settledAt?: string | null;
-  settledBy?: (number | null) | User;
-  refundCashEntry?: (number | null) | CashEntry;
-  shortfallTransfer?: (number | null) | Transfer;
-  reversalCount?: number | null;
-  lastReversedAt?: string | null;
-  lastReversedBy?: (number | null) | User;
-  lastReversalReason?: string | null;
-  uuid?: string | null;
-  /**
-   * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
-   */
-  changeReason?: string | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -1897,7 +1917,9 @@ export interface AuditLog {
     | 'import'
     | '2fa_enabled'
     | '2fa_disabled'
-    | 'privacy_ack';
+    | 'privacy_ack'
+    | 'overdraft_confirmed'
+    | 'bank_unverified_confirmed';
   field?: string | null;
   lineNo?: number | null;
   oldValue?:
@@ -2353,6 +2375,7 @@ export interface CompaniesSelect<T extends boolean = true> {
   progressWarnGapPct?: T;
   progressBadGapPct?: T;
   receiptRoundingTolerance?: T;
+  shortfallTolerancePct?: T;
   receiptMaxAgeDays?: T;
   reimburseAutoCloseDays?: T;
   lpjDueDays?: T;
@@ -2868,6 +2891,7 @@ export interface ApprovalsSelect<T extends boolean = true> {
   docType?: T;
   request?: T;
   addendum?: T;
+  settlement?: T;
   cycle?: T;
   position?: T;
   level?: T;
@@ -3008,6 +3032,13 @@ export interface SettlementsSelect<T extends boolean = true> {
   lastReversedAt?: T;
   lastReversedBy?: T;
   lastReversalReason?: T;
+  shortfallApprovalStatus?: T;
+  shortfallApprovalCycle?: T;
+  shortfallApprovalLevel?: T;
+  shortfallApprovalAmount?: T;
+  shortfallApprovalSnapshot?: T;
+  shortfallApprovalNote?: T;
+  shortfallRejectReason?: T;
   uuid?: T;
   changeReason?: T;
   updatedAt?: T;

@@ -17,6 +17,7 @@ import { openapiEndpoint } from './endpoints/openapi'
 import { privacyAckEndpoint, privacyNoticeEndpoint } from './endpoints/privacy'
 import { PROGRESS_ENDPOINTS } from './endpoints/progress'
 import { REPORT_ENDPOINTS } from './endpoints/reports'
+import { SHORTFALL_ENDPOINTS } from './endpoints/shortfall'
 import { appConfigEndpoint } from './endpoints/app'
 import { syncBatchEndpoint } from './endpoints/sync'
 
@@ -58,4 +59,6 @@ export const v1Endpoints: Endpoint[] = [
   // Q-46 / ASVS 8.3.3 (ADR 0018): employee privacy notice (public) + own acknowledgement
   privacyNoticeEndpoint,
   privacyAckEndpoint,
+  // QA-06 / ADR 0019: LPJ shortfall above approved + tolerance → re-approval (web)
+  ...SHORTFALL_ENDPOINTS,
 ]
