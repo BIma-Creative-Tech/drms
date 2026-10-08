@@ -325,7 +325,7 @@ export const ExpenseRequestDetail = ExpenseRequestListItem.extend({
       statusLabel: z.string(),
       usageNotes: z.string().nullable(),
       transferredTotal: rupiah.nullable(),
-      receiptsTotal: rupiah.nullable().meta({ description: 'Σ active receipts at the last LPJ submit.' }),
+      receiptsTotal: rupiah.nullable().meta({ description: 'Σ active receipts (pending + valid); refreshed at every LPJ submit and — QA-09 — after every receipt add / edit / remove / valid / reject while the LPJ is open.' }),
       verifiedReceiptsTotal: rupiah.nullable(),
       difference: z.number().int().nullable().meta({ description: 'transferred − receipts (verified after verification): > 0 refund, < 0 shortfall.' }),
       settlementType: z.enum(['none', 'refund', 'shortfall']).nullable(),
@@ -592,6 +592,15 @@ export const SettleResult = z
     shortfallCashEntryId: id.nullable(),
   })
   .meta({ id: 'SettleResult' })
+
+/** QA-11: GET …/settle/precheck — the settlement configuration is complete (checked before uploading the proof). */
+export const SettlePrecheckResult = z
+  .object({
+    ready: z.literal(true),
+    settlementType: z.enum(['none', 'refund', 'shortfall']),
+    amount: rupiah,
+  })
+  .meta({ id: 'SettlePrecheckResult' })
 
 export const Notification = z
   .object({

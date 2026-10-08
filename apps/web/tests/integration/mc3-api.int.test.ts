@@ -354,6 +354,7 @@ const ROUTE_CLASSES: Record<string, RouteClass> = {
   'POST /expense-requests/:id/lpj/request-revision': 'document',
   'POST /expense-requests/:id/lpj/verify': 'document',
   'POST /expense-requests/:id/settle': 'document',
+  'GET /expense-requests/:id/settle/precheck': 'document', // QA-11
   'POST /expense-requests/:id/settle/reverse': 'document',
   'PATCH /cash-entries/:id': 'document',
   'POST /cash-entries/:id/void': 'document',

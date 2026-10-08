@@ -15,9 +15,10 @@ export type FlagReceipt = { id: number; lineId: string; receiptDate: string; amo
 export type FlagCategory = { id: number; name: string; allowedUoms: number[] }
 /**
  * A match in another active request. `otherCompanyId` = PT of that request when it is NOT the PT of
- * the request being checked (cross-PT hit, QA-MC4-06), else null.
+ * the request being checked (cross-PT hit, QA-MC4-06), else null. `otherReceiptId` is set only for a
+ * match INSIDE the same request (QA-08): the earlier receipt of the pair.
  */
-export type DuplicateHit = { receiptId: number; otherRequestId: number; otherDocNo: string | null; via: 'fields' | 'image'; otherCompanyId?: number | null }
+export type DuplicateHit = { receiptId: number; otherRequestId: number; otherDocNo: string | null; via: 'fields' | 'image'; otherCompanyId?: number | null; otherReceiptId?: number }
 
 export type FlagInput = {
   type: RequestType
@@ -130,7 +131,8 @@ export function computeFlags(input: FlagInput): FlagSpec[] {
     }
   }
 
-  // US-50 duplicates (matches found by the service in OTHER active requests).
+  // US-50 duplicates (matches found by the service in OTHER active requests and — QA-08 — inside the
+  // same request: `otherReceiptId`, flagged once on the later receipt of the pair).
   const seen = new Set<string>()
   for (const d of input.duplicates) {
     const r = input.receipts.find((x) => x.id === d.receiptId)
@@ -139,6 +141,21 @@ export function computeFlags(input: FlagInput): FlagSpec[] {
     const key = `duplicate:${line.id}:${r.id}:${d.otherRequestId}`
     if (seen.has(key)) continue
     seen.add(key)
+    if (d.otherReceiptId !== undefined) {
+      const first = input.receipts.find((x) => x.id === d.otherReceiptId)
+      const firstLine = first ? lineById.get(first.lineId) : undefined
+      out.push({
+        key,
+        kind: 'duplicate',
+        level: 'warning',
+        lineId: line.id,
+        lineNo: line.lineNo,
+        receiptId: r.id,
+        message: `Nota ganda dalam pengajuan ini: sama dengan nota ${firstLine ? `baris ${firstLine.lineNo}` : `#${d.otherReceiptId}`} (${d.via === 'image' ? 'foto identik' : 'nomor + toko sama'}).`,
+        detail: { sameRequest: true, otherReceiptId: d.otherReceiptId, otherLineNo: firstLine?.lineNo ?? null, via: d.via },
+      })
+      continue
+    }
     out.push({
       key,
       kind: 'duplicate',

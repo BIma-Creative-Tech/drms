@@ -2119,7 +2119,7 @@ export const openapiDocument = {
             ],
             "minimum": 0,
             "maximum": 10000000000000,
-            "description": "Σ active receipts at the last LPJ submit."
+            "description": "Σ active receipts (pending + valid); refreshed at every LPJ submit and — QA-09 — after every receipt add / edit / remove / valid / reject while the LPJ is open."
           },
           "verifiedReceiptsTotal": {
             "type": [
@@ -3852,6 +3852,35 @@ export const openapiDocument = {
           "cashAccountId"
         ],
         "additionalProperties": false
+      },
+      "SettlePrecheckResult": {
+        "type": "object",
+        "properties": {
+          "ready": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "settlementType": {
+            "type": "string",
+            "enum": [
+              "none",
+              "refund",
+              "shortfall"
+            ]
+          },
+          "amount": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000000000000
+          }
+        },
+        "required": [
+          "ready",
+          "settlementType",
+          "amount"
+        ]
       },
       "SettleReverseResult": {
         "type": "object",
@@ -10442,7 +10471,7 @@ export const openapiDocument = {
     },
     "/expense-requests/{id}/receipts": {
       "post": {
-        "summary": "Add a receipt to a line (image from POST /media/receipts)",
+        "summary": "Add a receipt to a line (image from POST /media/receipts); receiptDate after today (PT timezone) → 400 \"Tanggal nota tidak boleh di masa depan\" (QA-07)",
         "security": [
           {
             "bearer": []
@@ -10592,7 +10621,7 @@ export const openapiDocument = {
     },
     "/expense-requests/{id}/receipts/{rid}": {
       "patch": {
-        "summary": "Edit a receipt inside the receipt window",
+        "summary": "Edit a receipt inside the receipt window; future receiptDate → 400 (QA-07); a valid receipt is locked → 409 (QA-27)",
         "security": [
           {
             "bearer": []
@@ -10750,7 +10779,7 @@ export const openapiDocument = {
     },
     "/expense-requests/{id}/receipts/{rid}/remove": {
       "post": {
-        "summary": "Remove a receipt (status removed, reason)",
+        "summary": "Remove a receipt (status removed, reason); a receipt Finance marked valid is locked → 409 \"Nota sudah divalidasi Finance\" (QA-27)",
         "security": [
           {
             "bearer": []
@@ -14168,6 +14197,126 @@ export const openapiDocument = {
             }
           },
           "422": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/expense-requests/{id}/settle/precheck": {
+      "get": {
+        "summary": "QA-11 Finance: read-only check BEFORE uploading the settlement proof — may settle now (403/409), refund needs the PT's cash-in source \"Pengembalian LPJ\" (code LPJ) → else 409, shortfall needs the bank snapshot → else 409",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d+$"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": true,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "APK version; below company minimum → 426."
+            },
+            "required": false,
+            "description": "APK version; below company minimum → 426.",
+            "name": "X-App-Version",
+            "in": "header"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Ready",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettlePrecheckResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
             "description": "Problem",
             "content": {
               "application/problem+json": {

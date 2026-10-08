@@ -1,6 +1,6 @@
 import type { CollectionSlug, PayloadRequest } from 'payload'
 
-import { employeeIn, hasRole, hasRoleAny, mappedCompanies, relId, soleCompany, userId } from '@/access/roles'
+import { employeeIn, hasRole, hasRoleAny, isRole, isStaffOnly, mappedCompanies, relId, rolesIn, soleCompany, userId, type Role } from '@/access/roles'
 import { companyOf } from '@/domain/companies'
 import { resolveScope } from '@/access/scope'
 
@@ -126,7 +126,7 @@ export async function validateContent(
     periodFrom?: string | null
     periodTo?: string | null
   },
-  opts: { forSubmit: boolean; creatorId: number },
+  opts: { forSubmit: boolean; creatorId: number; callerSetsRequesters?: boolean },
 ): Promise<void> {
   const errors: Array<{ path: string; message: string }> = []
   // ADR 0016 §5: roles, scope and own employee IN THE REQUEST's PT (from its project / cost center)
@@ -166,9 +166,15 @@ export async function validateContent(
   // a role held in another PT. No derivable PT (no reference yet) → the role in any selected PT, as before.
   const derived = [...new Set([...(company !== undefined ? [company] : []), ...activeEmp.values()])]
   const onBehalf = derived.length > 0 ? derived.every((pt) => hasRole(req, ['pk-admin', 'pk-finance'], pt)) : hasRoleAny(req, 'pk-admin', 'pk-finance')
+  const ownPt = company ?? (derived.length === 1 ? derived[0] : undefined)
+  // QA-15 (owner decision 2026-10-08): a user whose ONLY role in the request's PT is Staff requests for
+  // themselves only — "Diajukan Oleh" = exactly their own employee. PM keeps Q-09 (themselves, may add
+  // co-requesters); Admin/Finance may represent others (QA-MC4-09 above). Checked for the CREATOR of the
+  // request (also at submit, so an older draft that breaks the rule cannot be sent) and for a Staff-only
+  // caller who changes the requesters of someone else's draft. Before Q-09 (clearer message for Staff).
+  if (uniq.length > 0) await assertStaffSelfOnly(req, uniq, ownPt, opts)
   if (!onBehalf) {
-    const own = company ?? (derived.length === 1 ? derived[0] : undefined)
-    const creatorEmp = own !== undefined ? employeeIn(req, own) : relId((req.user as { employee?: unknown } | null)?.employee)
+    const creatorEmp = ownPt !== undefined ? employeeIn(req, ownPt) : relId((req.user as { employee?: unknown } | null)?.employee)
     if (userId(req) === opts.creatorId && (creatorEmp === undefined || (uniq.length > 0 && !uniq.includes(creatorEmp)))) {
       fail(403, 'Hanya Admin/Finance yang boleh membuat pengajuan atas nama orang lain (Q-09).')
     }
@@ -215,6 +221,43 @@ export async function validateContent(
     }
   })
   if (errors.length > 0) fail(400, 'Data pengajuan tidak valid.', errors)
+}
+
+export const STAFF_SELF_ONLY_MESSAGE = 'Staff hanya dapat mengajukan untuk dirinya sendiri: "Diajukan Oleh" harus hanya Anda. Minta PM/Admin/Finance bila pengajuan untuk orang lain (QA-15).'
+
+/** QA-15: roles of `uid` IN PT `company` (active membership), from the caller's context when it is the caller. */
+async function rolesOfUserIn(req: PayloadRequest, uid: number, company: number): Promise<{ roles: Role[]; employee: number | undefined }> {
+  if (uid === userId(req)) return { roles: rolesIn(req, company), employee: employeeIn(req, company) }
+  const res = await req.payload.find({
+    collection: 'company-memberships',
+    where: { and: [{ user: { equals: uid } }, { company: { equals: company } }, { active: { equals: true } }] },
+    limit: 1,
+    depth: 0,
+    overrideAccess: true, // SYSTEM-READ: creator's roles in the request's PT (QA-15 rule)
+    req,
+  })
+  const m = res.docs[0] as { roles?: unknown; employee?: unknown } | undefined
+  return { roles: (Array.isArray(m?.roles) ? m.roles : []).filter(isRole), employee: relId(m?.employee) }
+}
+
+const staffOnly = (roles: readonly Role[]) => roles.includes('pk-staff') && roles.every((r) => r === 'pk-staff')
+
+async function assertStaffSelfOnly(req: PayloadRequest, requesters: number[], company: number | undefined, opts: { creatorId: number; callerSetsRequesters?: boolean }): Promise<void> {
+  const caller = userId(req)
+  const check = async (uid: number) => {
+    if (company === undefined) {
+      // no PT derivable yet (nothing chosen): only the caller's own Staff-only status is known
+      if (uid !== caller || !isStaffOnly(req.user)) return
+      const emp = relId((req.user as { employee?: unknown } | null)?.employee)
+      if (emp === undefined || requesters.some((e) => e !== emp)) fail(403, STAFF_SELF_ONLY_MESSAGE)
+      return
+    }
+    const { roles, employee } = await rolesOfUserIn(req, uid, company)
+    if (!staffOnly(roles)) return
+    if (employee === undefined || requesters.length !== 1 || requesters[0] !== employee) fail(403, STAFF_SELF_ONLY_MESSAGE)
+  }
+  if (opts.creatorId > 0) await check(opts.creatorId)
+  if (caller !== undefined && caller !== opts.creatorId && opts.callerSetsRequesters) await check(caller)
 }
 
 export function toDocLines(lines: LineInputApi[]) {
@@ -318,7 +361,7 @@ export async function updateDraft(req: PayloadRequest, id: number, input: DraftI
     periodFrom: input.periodFrom !== undefined ? input.periodFrom : doc.periodFrom,
     periodTo: input.periodTo !== undefined ? input.periodTo : doc.periodTo,
   }
-  await validateContent(req, current, { forSubmit: false, creatorId: relId(doc.createdBy) ?? -1 })
+  await validateContent(req, current, { forSubmit: false, creatorId: relId(doc.createdBy) ?? -1, callerSetsRequesters: input.requesterIds !== undefined && input.requesterIds.join(',') !== ids(doc.requesters).join(',') })
   const data: Record<string, unknown> = {}
   if (input.type !== undefined) data.type = input.type
   if (input.title !== undefined) data.title = input.title.trim()

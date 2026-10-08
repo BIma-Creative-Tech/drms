@@ -15,6 +15,12 @@ Anda juga bisa mengajukan dana untuk diri sendiri (lihat [panduan Staff](staff.m
   umur tertua) dan tabel di bawahnya (nomor, pemohon, project, **Menunggu** Direktur/Finance, lama dalam hari,
   terlama dulu). Juga kartu pengajuan tim bulan ini, LPJ tim, realisasi anggaran, dan menu **Keuangan → Pengajuan
   biaya**. Buka pengajuan untuk melihat baris, foto nota, dan flag per baris (bagian **Rincian untuk pemeriksa**).
+- **Notifikasi (lonceng, sejak 8 Okt 2026):** untuk pengajuan pada **project** yang Anda pegang (PM project atau
+  penugasan tim sebagai PM) Anda diberi tahu saat pengajuan **diajukan** ("Pengajuan tim: …"), **ditolak**,
+  **ditransfer**, **LPJ perlu revisi**, dan **selesai**. Hanya bila Anda berperan PM di PT pengajuan itu; pengajuan
+  pada pusat biaya tidak dikirim ke PM. Pengajuan Anda sendiri tetap memakai notifikasi pemohon.
+- **Mengajukan untuk orang lain:** PM boleh mencantumkan rekan sebagai pemohon tambahan (nama Anda tetap ada).
+  Staff hanya bisa mengajukan untuk dirinya sendiri.
 - Anda hanya melihat project/pusat biaya yang Anda pegang.
 - **PM di lebih dari satu PT:** peran PM berlaku per PT. Daftar mengikuti pilihan PT (web: tombol PT di bar atas;
   APK: tombol PT di Beranda — lihat [Hal umum](README.md#hal-umum-untuk-semua-peran)); bila lebih dari satu PT tampil,

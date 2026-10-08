@@ -191,6 +191,7 @@ export async function LpjVerification(props: AdminViewServerProps) {
                   bankRef="none"
                   proof={{ kind: 'attachments', required: false }}
                   amountText={`Kas masuk ${rp(amount)} (Pengembalian LPJ)`}
+                  precheckUrl={`${base(d.id)}/settle/precheck`}
                 />
               )
             ) : null}

@@ -201,6 +201,7 @@ export interface Config {
       reimburseAutoClose: TaskReimburseAutoClose;
       selfieRetention: TaskSelfieRetention;
       dailyReminders: TaskDailyReminders;
+      mediaOrphanCleanup: TaskMediaOrphanCleanup;
       inline: {
         input: unknown;
         output: unknown;
@@ -2044,7 +2045,13 @@ export interface PayloadJob {
         executedAt: string;
         completedAt: string;
         taskSlug:
-          'inline' | 'auditDailyAnchor' | 'sendEmail' | 'reimburseAutoClose' | 'selfieRetention' | 'dailyReminders';
+          | 'inline'
+          | 'auditDailyAnchor'
+          | 'sendEmail'
+          | 'reimburseAutoClose'
+          | 'selfieRetention'
+          | 'dailyReminders'
+          | 'mediaOrphanCleanup';
         taskID: string;
         input?:
           | {
@@ -2078,7 +2085,16 @@ export interface PayloadJob {
       }[]
     | null;
   taskSlug?:
-    ('inline' | 'auditDailyAnchor' | 'sendEmail' | 'reimburseAutoClose' | 'selfieRetention' | 'dailyReminders') | null;
+    | (
+        | 'inline'
+        | 'auditDailyAnchor'
+        | 'sendEmail'
+        | 'reimburseAutoClose'
+        | 'selfieRetention'
+        | 'dailyReminders'
+        | 'mediaOrphanCleanup'
+      )
+    | null;
   queue?: string | null;
   waitUntil?: string | null;
   processing?: boolean | null;
@@ -3760,6 +3776,18 @@ export interface TaskDailyReminders {
     date: string;
     notified: number;
     emails: number;
+  };
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "TaskMediaOrphanCleanup".
+ */
+export interface TaskMediaOrphanCleanup {
+  input?: unknown;
+  output: {
+    candidates: number;
+    deleted: number;
+    dryRun: boolean;
   };
 }
 /**

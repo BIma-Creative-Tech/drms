@@ -15,6 +15,7 @@ import { acknowledge, approve, cancel, complete, reject, submit, withdraw } from
 import { receiptsComplete, requestLpjRevision, reverseSettlement, settle, submitLpj, verifyLpj } from '@/domain/expense/lpj'
 import { requestHistory } from '@/domain/history'
 import { approvalInbox, lpjQueue, officeQueueWhere } from '@/domain/expense/queues'
+import { settlePrecheck } from '@/domain/expense/settle-precheck'
 
 import { companyQuery } from '../company-query'
 
@@ -445,6 +446,19 @@ export const settleEndpoint = v1({
 })
 
 /**
+ * GET /expense-requests/{id}/settle/precheck — QA-11: read-only configuration check the admin form runs
+ * BEFORE uploading the proof (no orphan file when e.g. the "Pengembalian LPJ" source is missing).
+ */
+export const settlePrecheckEndpoint = v1({
+  path: '/expense-requests/:id/settle/precheck',
+  method: 'get',
+  roles: ['pk-finance'],
+  rateLimit: ACTION_LIMIT,
+  transactional: true,
+  handler: async ({ req, params }) => json(await settlePrecheck(req, idParam(params))),
+})
+
+/**
  * POST /expense-requests/{id}/settle/reverse {reason} — E9: Finance voids the settlement's refund KM
  * or shortfall transfer (+ KK reversal) → LPJ "Terverifikasi", request "LPJ Terverifikasi" again.
  * Closed period → 409 (re-open first); not Finance / Finance self-involved → 403 (audited).
@@ -555,6 +569,7 @@ export const EXPENSE_ENDPOINTS = [
   lpjRevisionEndpoint,
   lpjVerifyEndpoint,
   settleEndpoint,
+  settlePrecheckEndpoint,
   settleReverseEndpoint,
   pdfEndpoint,
 ]

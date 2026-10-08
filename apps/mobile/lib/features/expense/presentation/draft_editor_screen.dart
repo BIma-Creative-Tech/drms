@@ -202,10 +202,17 @@ class _DraftEditorScreenState extends ConsumerState<DraftEditorScreen> {
     }
   }
 
+  /// QA-15: own employee of a Staff-only user in the draft's PT (-1 without one), else null (no limit).
+  int? _selfOnlyEmployee() {
+    final p = ref.read(currentProfileProvider)?.forCompany(_d.companyId);
+    if (p == null || !p.requestsForSelfOnly) return null;
+    return p.employee?.id ?? -1;
+  }
+
   Future<void> _submit() async {
     final t = AppLocalizations.of(context);
     final draft = _collect();
-    final issues = validateForSubmit(draft);
+    final issues = validateForSubmit(draft, selfOnlyEmployee: _selfOnlyEmployee());
     setState(() => _issues = issues);
     if (issues.isNotEmpty) return;
     final ok = await showDialog<bool>(
@@ -265,7 +272,9 @@ class _DraftEditorScreenState extends ConsumerState<DraftEditorScreen> {
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
     final m = widget.masters;
-    final employees = m[MasterTypes.employees] ?? const [];
+    final selfOnly = _selfOnlyEmployee();
+    final allEmployees = m[MasterTypes.employees] ?? const <MasterItem>[];
+    final employees = requesterChoices(allEmployees, (e) => e.id, selfOnlyEmployee: selfOnly);
     final accounts = (m[MasterTypes.bankAccounts] ?? const [])
         .where((a) => _d.requesterIds.isEmpty || _d.requesterIds.contains((a.extra['employee'] as num?)?.toInt()))
         .toList();
@@ -373,38 +382,46 @@ class _DraftEditorScreenState extends ConsumerState<DraftEditorScreen> {
               children: [
                 for (final id in _d.requesterIds)
                   InputChip(
-                    label: Text(employees.where((e) => e.id == id).firstOrNull?.label ?? '#$id'),
+                    label: Text(allEmployees.where((e) => e.id == id).firstOrNull?.label ?? '#$id'),
                     onDeleted: _d.requesterIds.length > 1
                         ? () => setState(() => _d = _d.copyWith(requesterIds: [..._d.requesterIds]..remove(id)))
                         : null,
                   ),
-                ActionChip(
-                  avatar: const Icon(Icons.person_add, size: 18),
-                  label: Text(t.choose),
-                  onPressed: () async {
-                    int? chosen;
-                    await showDialog<void>(
-                      context: context,
-                      builder: (c) => AlertDialog(
-                        content: MasterPickerField(
-                          label: t.fieldRequesters,
-                          items: employees,
-                          value: null,
-                          allowNone: false,
-                          onChanged: (v) {
-                            chosen = v;
-                            Navigator.pop(c);
-                          },
+                // QA-15: a Staff-only user can add only themselves (no other requesters)
+                if (selfOnly == null || (selfOnly > 0 && !_d.requesterIds.contains(selfOnly)))
+                  ActionChip(
+                    avatar: const Icon(Icons.person_add, size: 18),
+                    label: Text(t.choose),
+                    onPressed: () async {
+                      int? chosen;
+                      await showDialog<void>(
+                        context: context,
+                        builder: (c) => AlertDialog(
+                          content: MasterPickerField(
+                            label: t.fieldRequesters,
+                            items: employees,
+                            value: null,
+                            allowNone: false,
+                            onChanged: (v) {
+                              chosen = v;
+                              Navigator.pop(c);
+                            },
+                          ),
                         ),
-                      ),
-                    );
-                    if (chosen != null && !_d.requesterIds.contains(chosen)) {
-                      setState(() => _d = _d.copyWith(requesterIds: [..._d.requesterIds, chosen!]));
-                    }
-                  },
-                ),
+                      );
+                      if (chosen != null && !_d.requesterIds.contains(chosen)) {
+                        setState(() => _d = _d.copyWith(requesterIds: [..._d.requesterIds, chosen!]));
+                      }
+                    },
+                  ),
               ],
             ),
+            if (issueFor('requesterIds') != null)
+              Padding(
+                key: const Key('requesters-issue'),
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(issueFor('requesterIds')!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+              ),
             const SizedBox(height: 12),
             MasterPickerField(
               label: t.fieldBankAccount,

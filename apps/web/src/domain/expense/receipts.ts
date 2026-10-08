@@ -3,6 +3,7 @@ import type { CollectionSlug, PayloadRequest } from 'payload'
 
 import { relId, userId } from '@/access/roles'
 import { writeAudit } from '@/audit/writer'
+import { ORPHAN_MARK } from '@/domain/media-orphans'
 import { getRequestTx } from '@/lib/tx'
 
 import { actorContext, fail, ids, loadRaw, loadVisible, requireAction, requireActionAudited, settings, today, updateRequest, type RequestDoc } from './common'
@@ -74,6 +75,8 @@ export async function claimMedia(
     .catch(() => null)) as { id: number; uploadedBy?: unknown; ownerDocType?: string | null; ownerDocId?: string | null; sha256Original?: string | null } | null
   if (!m) fail(400, 'File tidak ditemukan.')
   if (!opts.anyUploader && relId(m.uploadedBy) !== userId(req)) fail(403, 'File bukan unggahan Anda.')
+  // QA-11: an unclaimed upload removed by the orphan cleanup (domain/media-orphans.ts) is a tombstone
+  if (m.ownerDocType === ORPHAN_MARK.type) fail(409, 'File sudah dihapus karena lama tidak dipakai; unggah ulang.')
   if (m.ownerDocId && !(m.ownerDocType === ownerType && m.ownerDocId === String(ownerId))) fail(409, 'File sudah dipakai di dokumen lain.')
   if (!m.ownerDocId) {
     await req.payload.update({
@@ -94,21 +97,36 @@ function lineIndex(doc: RequestDoc, lineId: string): number {
   return i
 }
 
-function validateReceipt(input: Partial<ReceiptInput>, forCreate: boolean) {
+/** QA-07: message of a receipt dated after today (company TZ) — same rule as the cash module. */
+export const FUTURE_RECEIPT_MESSAGE = 'Tanggal nota tidak boleh di masa depan'
+
+/** QA-27 (owner decision 2026-10-08): a receipt Finance marked valid is locked for the requester. */
+export const VALID_RECEIPT_LOCKED = 'Nota sudah divalidasi Finance'
+
+/**
+ * Receipt input rules. `todayDate` = today in the document PT's timezone (QA-07: a receipt dated in
+ * the future is refused with 400, like the cash module's "tidak boleh di masa depan").
+ */
+export function validateReceipt(input: Partial<ReceiptInput>, forCreate: boolean, todayDate: string) {
   const errors: Array<{ path: string; message: string }> = []
-  if (forCreate || input.receiptDate !== undefined) if (!isBusinessDate(input.receiptDate)) errors.push({ path: 'receiptDate', message: 'Tanggal nota harus YYYY-MM-DD.' })
+  if (forCreate || input.receiptDate !== undefined) {
+    if (!isBusinessDate(input.receiptDate)) errors.push({ path: 'receiptDate', message: 'Tanggal nota harus YYYY-MM-DD.' })
+    else if (input.receiptDate > todayDate) errors.push({ path: 'receiptDate', message: `${FUTURE_RECEIPT_MESSAGE} (hari ini ${todayDate}).` })
+  }
   if (forCreate || input.amount !== undefined) {
     if (!(typeof input.amount === 'number' && Number.isSafeInteger(input.amount) && input.amount > 0)) errors.push({ path: 'amount', message: 'Nominal harus bilangan bulat Rupiah > 0.' })
   }
   if (forCreate || input.vendorName !== undefined) if (!(input.vendorName ?? '').trim()) errors.push({ path: 'vendorName', message: 'Vendor/toko wajib diisi.' })
-  if (errors.length) fail(400, 'Data nota tidak valid.', errors)
+  if (errors.length) fail(400, errors.some((e) => e.message.startsWith(FUTURE_RECEIPT_MESSAGE)) ? `${FUTURE_RECEIPT_MESSAGE}.` : 'Data nota tidak valid.', errors)
 }
+
+const companyOfDoc = (doc: RequestDoc) => relId((doc as { company?: unknown }).company)
 
 /** POST /expense-requests/{id}/receipts (US-07, US-38). */
 export async function addReceipt(req: PayloadRequest, requestId: number, input: ReceiptInput, opts: { clientUuid?: string } = {}) {
   const doc = await loadVisible(req, requestId, { lock: true })
   requireAction(await actorContext(req, doc), 'add_receipt')
-  validateReceipt(input, true)
+  validateReceipt(input, true, await today(req, companyOfDoc(doc)))
   const idx = lineIndex(doc, input.lineId)
   const media = await claimMedia(req, 'media-receipts', input.imageId, requestId)
   const receipt = await req.payload.create({
@@ -137,7 +155,7 @@ export async function addReceipt(req: PayloadRequest, requestId: number, input: 
     overrideAccess: true, // SYSTEM-WRITE: receipt after add_receipt guard (DB: editable window)
     req,
   })
-  await recomputeFlags(req, requestId)
+  await afterReceiptChange(req, requestId)
   return receipt
 }
 
@@ -155,7 +173,8 @@ export async function editReceipt(req: PayloadRequest, requestId: number, receip
   requireAction(await actorContext(req, doc), 'add_receipt')
   const r = await loadReceipt(req, requestId, receiptId)
   if (r.status === 'removed') fail(409, 'Nota sudah dihapus.')
-  validateReceipt(input, false)
+  if (r.status === 'valid') fail(409, `${VALID_RECEIPT_LOCKED}; nota tidak dapat diubah.`)
+  validateReceipt(input, false, await today(req, companyOfDoc(doc)))
   const data: Record<string, unknown> = {}
   if (input.lineId !== undefined) {
     data.lineId = input.lineId
@@ -183,7 +202,7 @@ export async function editReceipt(req: PayloadRequest, requestId: number, receip
     overrideAccess: true, // SYSTEM-WRITE: receipt edit after guard
     req,
   })
-  await recomputeFlags(req, requestId)
+  await afterReceiptChange(req, requestId)
   return updated
 }
 
@@ -193,6 +212,8 @@ export async function removeReceipt(req: PayloadRequest, requestId: number, rece
   requireAction(await actorContext(req, doc), 'add_receipt')
   const r = await loadReceipt(req, requestId, receiptId)
   if (r.status === 'removed') fail(409, 'Nota sudah dihapus.')
+  // QA-27 (owner decision 2026-10-08): a valid receipt is locked — Finance decided on it.
+  if (r.status === 'valid') fail(409, `${VALID_RECEIPT_LOCKED}; nota tidak dapat dihapus.`)
   req.context.auditReason = reason
   const updated = await req.payload.update({
     collection: 'receipts',
@@ -202,7 +223,7 @@ export async function removeReceipt(req: PayloadRequest, requestId: number, rece
     overrideAccess: true, // SYSTEM-WRITE: soft removal after guard
     req,
   })
-  await recomputeFlags(req, requestId)
+  await afterReceiptChange(req, requestId)
   return updated
 }
 
@@ -212,7 +233,7 @@ export async function verifyReceipt(req: PayloadRequest, requestId: number, rece
   await requireActionAudited(req, await actorContext(req, doc), 'receipt_verify', doc)
   const r = await loadReceipt(req, requestId, receiptId)
   if (r.status !== 'pending' && r.status !== 'rejected') fail(409, 'Nota tidak dalam status menunggu verifikasi.')
-  return req.payload.update({
+  const updated = await req.payload.update({
     collection: 'receipts',
     id: receiptId,
     data: { status: 'valid', verifiedBy: userId(req), verifiedAt: new Date().toISOString() } as never,
@@ -220,6 +241,8 @@ export async function verifyReceipt(req: PayloadRequest, requestId: number, rece
     overrideAccess: true, // SYSTEM-WRITE: verification after guard (DB whitelist: status columns)
     req,
   })
+  await afterReceiptChange(req, requestId) // QA-09: a rejected → valid receipt counts again
+  return updated
 }
 
 /**
@@ -242,8 +265,54 @@ export async function rejectReceipt(req: PayloadRequest, requestId: number, rece
     overrideAccess: true, // SYSTEM-WRITE: rejection after guard
     req,
   })
-  if (doc.type === 'advance') return loadRaw(req, requestId)
-  return updateRequest(req, requestId, { status: 'receipt_revision' }, reason)
+  // QA-09: flags and the LPJ's provisional totals exclude the rejected receipt at once (were refreshed
+  // only by the next LPJ submit).
+  if (doc.type === 'advance') {
+    await afterReceiptChange(req, requestId)
+    return loadRaw(req, requestId)
+  }
+  const updated = await updateRequest(req, requestId, { status: 'receipt_revision' }, reason)
+  await afterReceiptChange(req, requestId)
+  return updated
+}
+
+/**
+ * QA-09: after EVERY receipt change (add / edit / remove / valid / reject) the flags are recomputed
+ * from the active receipts (pending + valid) and, on an Uang Muka whose LPJ is still open (draft /
+ * submitted / revision), the LPJ's provisional totals: receipts total = Σ active receipts,
+ * difference = transferred − receipts total (DB: pk_settlements_guard allows exactly these two
+ * columns, consistent, without a status change — migration 20261008_120000_qa_flow_receipts).
+ * The verified total stays the job of the LPJ verification.
+ */
+export async function afterReceiptChange(req: PayloadRequest, requestId: number): Promise<void> {
+  await recomputeFlags(req, requestId)
+  await recomputeSettlementTotals(req, requestId)
+}
+
+/** QA-09: provisional LPJ totals of an open LPJ (no-op for Reimburse / no LPJ / verified+). */
+export async function recomputeSettlementTotals(req: PayloadRequest, requestId: number): Promise<{ receiptsTotal: number; difference: number } | null> {
+  const res = await req.payload.find({
+    collection: 'settlements',
+    where: { request: { equals: requestId } },
+    limit: 1,
+    depth: 0,
+    overrideAccess: true, // SYSTEM-READ: LPJ of a request the caller acted on (guarded by the caller)
+    req,
+  })
+  const s = res.docs[0] as unknown as { id: number; status: string; transferredTotal?: number | null; receiptsTotal?: number | null; difference?: number | null } | undefined
+  if (!s || !['draft', 'submitted', 'revision'].includes(s.status)) return null
+  const receiptsTotal = (await receiptsOf(req, requestId, true)).reduce((a, r) => a + r.amount, 0)
+  const difference = (s.transferredTotal ?? 0) - receiptsTotal
+  if (s.receiptsTotal === receiptsTotal && s.difference === difference) return { receiptsTotal, difference }
+  await req.payload.update({
+    collection: 'settlements',
+    id: s.id,
+    data: { receiptsTotal, difference } as never,
+    depth: 0,
+    overrideAccess: true, // SYSTEM-WRITE: provisional LPJ totals after a receipt change (DB: pk_settlements_guard)
+    req,
+  })
+  return { receiptsTotal, difference }
 }
 
 /**
@@ -276,7 +345,7 @@ export async function resubmitReceipts(req: PayloadRequest, requestId: number) {
     await auditSkipped(req, updated, snapshot)
   }
   await writeSnapshot(req, updated, 'receipts_resubmit')
-  await recomputeFlags(req, requestId)
+  await afterReceiptChange(req, requestId)
   return updated
 }
 
@@ -400,6 +469,13 @@ export async function reviewFlag(req: PayloadRequest, requestId: number, flagId:
  * so the flag is no oracle for one. The scope depends on the receipt, not on who triggers the
  * recompute (submit / edit / resubmit by someone else gives the same flags). Imported receipts
  * without an uploader → own PT only.
+ *
+ * Match rules:
+ * - OTHER request: same photo (SHA-256 of the original) OR same normalised receipt number + vendor
+ *   + amount;
+ * - SAME request (QA-08): same photo OR same normalised receipt number + vendor (the amount is not
+ *   required: the same paper receipt split over two lines is still the same receipt). Only the LATER
+ *   receipt of a pair is flagged (`o.id < r.id`), so a pair yields one flag, not two.
  */
 async function duplicateHits(req: PayloadRequest, requestId: number): Promise<DuplicateHit[]> {
   const tx = await getRequestTx(req)
@@ -408,13 +484,17 @@ async function duplicateHits(req: PayloadRequest, requestId: number): Promise<Du
     sql`, `,
   )
   const r = (await tx.execute(sql`
-    SELECT r.id AS rid, o.request_id AS other, e.doc_no AS doc_no,
+    SELECT r.id AS rid, o.request_id AS other, o.id AS other_receipt, e.doc_no AS doc_no,
            CASE WHEN e.company_id <> r.company_id THEN e.company_id END AS other_company,
            CASE WHEN r.image_sha256 IS NOT NULL AND o.image_sha256 = r.image_sha256 THEN 'image' ELSE 'fields' END AS via
     FROM receipts r
-    JOIN receipts o ON o.id <> r.id AND o.request_id <> r.request_id
-     AND ((r.receipt_no_norm <> '' AND o.receipt_no_norm = r.receipt_no_norm AND o.vendor_norm = r.vendor_norm AND o.amount = r.amount)
-          OR (r.image_sha256 IS NOT NULL AND o.image_sha256 = r.image_sha256))
+    JOIN receipts o ON o.id <> r.id
+     AND ((o.request_id <> r.request_id
+           AND ((r.receipt_no_norm <> '' AND o.receipt_no_norm = r.receipt_no_norm AND o.vendor_norm = r.vendor_norm AND o.amount = r.amount)
+                OR (r.image_sha256 IS NOT NULL AND o.image_sha256 = r.image_sha256)))
+          OR (o.request_id = r.request_id AND o.id < r.id
+              AND ((r.receipt_no_norm <> '' AND o.receipt_no_norm = r.receipt_no_norm AND o.vendor_norm = r.vendor_norm)
+                   OR (r.image_sha256 IS NOT NULL AND o.image_sha256 = r.image_sha256))))
     JOIN expense_requests e ON e.id = o.request_id
     WHERE r.request_id = ${requestId}
       AND r.status::text IN ('pending', 'valid') AND o.status::text IN ('pending', 'valid')
@@ -422,8 +502,8 @@ async function duplicateHits(req: PayloadRequest, requestId: number): Promise<Du
       AND (e.company_id = r.company_id
            OR e.company_id IN (SELECT m.company_id FROM company_memberships m JOIN companies c ON c.id = m.company_id
                                WHERE m.user_id = r.created_by_id AND m.active AND c.active))
-    ORDER BY r.id, o.request_id`)) as unknown as {
-    rows: Array<{ rid: number; other: number; doc_no: string | null; other_company: number | null; via: 'image' | 'fields' }>
+    ORDER BY r.id, o.request_id, o.id`)) as unknown as {
+    rows: Array<{ rid: number; other: number; other_receipt: number; doc_no: string | null; other_company: number | null; via: 'image' | 'fields' }>
   }
   return r.rows.map((x) => ({
     receiptId: Number(x.rid),
@@ -431,6 +511,7 @@ async function duplicateHits(req: PayloadRequest, requestId: number): Promise<Du
     otherDocNo: x.doc_no,
     via: x.via,
     otherCompanyId: x.other_company === null ? null : Number(x.other_company),
+    ...(Number(x.other) === requestId ? { otherReceiptId: Number(x.other_receipt) } : {}),
   }))
 }
 
