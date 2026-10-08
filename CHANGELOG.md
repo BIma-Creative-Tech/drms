@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Security — npm audit (high), 2026-10-09
+- `next` 16.3.6 → **16.3.8** (GHSA-3w37-wq28-93x7, -4jqv-mc3x-m676, -39w2-rjm5-chcv, -f87g-xv8r-7p7x, -mcj8-r9mp-w47p,
+  -cjq9-62q9-8jv4: cache poisoning, info disclosure, image-optimizer SSRF), `eslint-config-next` aligned; `sharp`
+  0.35.4 → **0.35.5** (GHSA-wq5f-xc86-pv6w, librsvg); transitive `source-map-js` → 1.2.2 (GHSA-68fv-2mgg-jv7q). Patch
+  releases older than `min-release-age=7` (16.4.0 is not). ADR 0001 pins Payload 3.90.1, not Next's patch level.
+  Verified: audit high passes, lint / typecheck / 719 unit / openapi / `next build` green.
+
 ## [0.6.1] - 2026-10-05
 
 Employee privacy notice (UU PDP; Q-46, ADR 0018) with a versioned acknowledgement on the web and in APK 0.3.3,
