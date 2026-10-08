@@ -6,6 +6,33 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.6.2] - 2026-10-09
+
+Fixes from the QA report 2026-10-08 (staging, tested 6–7 Oct; 31 tickets — status per ticket in
+`docs/proyekkas/qa/qa-report-2026-10-08-status.md`): finance integrity (QA-03/04/05/06/12/14/17/30), workflow &
+receipts (QA-07/08/09/11/15/18/19/27, QA-10/26 documented as an upstream limitation), access & UX
+(QA-16/20–25/28/29/31); QA-01 (CrowdSec ban by the test pattern) and QA-02 (WAF, infra) are not app changes, QA-13 is
+by design (Q-05). Plus the dependency security bump (`next` 16.3.8, `sharp` 0.35.5, `source-map-js` 1.2.2) and
+APK **mobile-v0.3.4** (pubspec `0.3.4+1`, notes `docs/release-notes/apk/0.3.4.md`). Owner decisions 2026-10-08:
+overdraft and unverified destination account = warning + confirmation; LPJ shortfall = tolerance then re-approval
+(ADR 0019); Staff request for themselves only; PM notifications; valid receipts locked; Direktur read-only on users;
+PM read-only on projects (403 naming the fields); unusable modules hidden; Admin reads addenda / progress.
+
+**Database migrations** (run by `migrate`, in this order; additive — the 0.6.1 web image and every released APK keep
+working; rollback = restore the pre-deploy dump): `20261008_090000_qa_finance_integrity`,
+`20261008_120000_qa_flow_lpj_totals`, `20261008_120100_qa_flow_lpj_source`, `20261008_120200_qa_flow_orphan_job`,
+`20261009_090000_qa_settlements_guard_merge`.
+
+### Release merge (0.6.2)
+- `20261009_090000_qa_settlements_guard_merge` (snapshot `.json` = the merged schema): both QA branches replace
+  `pk_settlements_guard`; `…120000_qa_flow_lpj_totals` (QA-09) ran after `…090000_qa_finance_integrity` (QA-06) and
+  dropped its shortfall re-approval rules. This migration installs the union (090000 body + the QA-09 provisional
+  totals rule); down restores the 120000 body. Integration test `qa-settlements-guard-merge.int.test.ts` proves both.
+- `CashEntry` (`/api/v1/cash-entries` responses) gains `proofId` (additive, QA-31: the current proof, replaceable via
+  `PATCH … proofId`); OpenAPI regenerated.
+- Persetujuan: the LPJ shortfall decisions (Setujui / Tolak) use the same app dialog as the request decisions
+  (`ActionButton` → `ActionDialog`, QA-22/QA-23).
+
 ### Security — npm audit (high), 2026-10-09
 - `next` 16.3.6 → **16.3.8** (GHSA-3w37-wq28-93x7, -4jqv-mc3x-m676, -39w2-rjm5-chcv, -f87g-xv8r-7p7x, -mcj8-r9mp-w47p,
   -cjq9-62q9-8jv4: cache poisoning, info disclosure, image-optimizer SSRF), `eslint-config-next` aligned; `sharp`
