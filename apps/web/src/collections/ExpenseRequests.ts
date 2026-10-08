@@ -2,7 +2,7 @@ import { APIError, ValidationError, type CollectionAfterChangeHook, type Conditi
 
 import { RIWAYAT_TAB } from '@/admin/config'
 
-import { employeeIn, relId, rolesOf, userId } from '@/access/roles'
+import { employeeIn, ownEmployees, relId, rolesIn, rolesOf, userId } from '@/access/roles'
 import { fieldNever, rolesAllowed } from '@/access/policies'
 import { normalizeValue, reasonOnChange, withAudit } from '@/audit/hooks'
 import { writeAudit, type AuditRow } from '@/audit/writer'
@@ -16,7 +16,7 @@ import { rupiahField, uuidField } from '@/fields/common'
 import { requestMeta } from '@/lib/request-meta'
 import { forceDeferredChecks } from '@/lib/system-tx'
 import { notifyCreated, notifyTransition } from '@/domain/notifications'
-import { companyField, companyHook, pickerSameCompany } from '@/fields/company'
+import { companyField, companyHook, pickerSameCompany, sameCompanyOptions } from '@/fields/company'
 
 /**
  * T1 Pengajuan biaya (requirements v1.1 §7 T1; architecture §4.3, §5.1/§5.2).
@@ -63,6 +63,22 @@ export const bankAccountOptions = ({ data, user }: Pick<FilterOptionsProps, 'dat
   const owners = reqs.length > 0 ? reqs : emp !== undefined ? [emp] : []
   if (owners.length === 0) return false
   return { and: [{ employee: { in: owners } }, { active: { not_equals: false } }] }
+}
+
+/**
+ * QA-15 (owner decision 2026-10-08): "Diajukan Oleh" picker — a user whose only role in the document's
+ * PT (unknown yet: in every selected PT) is Staff sees only their OWN employee; everyone else the
+ * employees of the document's PT (pickerSameCompany). Server rule: drafts.ts validateContent.
+ */
+export const requesterOptions = ({ data, user }: Pick<FilterOptionsProps, 'data' | 'user'>): boolean | Where => {
+  const company = relId((data as { company?: unknown } | undefined)?.company)
+  const base = sameCompanyOptions({ data })
+  const roles = company !== undefined ? rolesIn({ user } as never, company) : rolesOf(user)
+  if (!(roles.includes('pk-staff') && roles.every((r) => r === 'pk-staff'))) return base
+  const own = company !== undefined ? [employeeIn({ user } as never, company)].filter((e): e is number => e !== undefined) : ownEmployees({ user } as never)
+  if (own.length === 0) return false
+  const mine: Where = { id: { in: own } }
+  return base === true ? mine : { and: [base, mine] }
 }
 
 /**
@@ -172,7 +188,12 @@ const beforeChange: CollectionBeforeChangeHook = async ({ data, originalDoc, ope
           periodFrom: pick<string | null>('periodFrom'),
           periodTo: pick<string | null>('periodTo'),
         },
-        { forSubmit: false, creatorId: operation === 'create' ? (userId(req) ?? -1) : (relId(prev.createdBy) ?? -1) },
+        {
+          forSubmit: false,
+          creatorId: operation === 'create' ? (userId(req) ?? -1) : (relId(prev.createdBy) ?? -1),
+          // QA-15: a Staff-only editor may not change the requesters of someone else's draft
+          callerSetsRequesters: operation === 'create' || (d.requesters !== undefined && ids(d.requesters as unknown[] | null).join(',') !== ids(prev.requesters as unknown[] | null).join(',')),
+        },
       )
     } catch (err) {
       const e = err as APIError & { data?: { errors?: Array<{ path: string; message: string }> } }
@@ -278,7 +299,8 @@ export const ExpenseRequests: CollectionConfig = withAudit(
       businessDate('periodFrom', 'Periode kegiatan dari (opsional, Q-04)'),
       businessDate('periodTo', 'Periode kegiatan sampai'),
       { name: 'notes', type: 'textarea', label: 'Keterangan', maxLength: 2000 },
-      { name: 'requesters', type: 'relationship', relationTo: 'employees', hasMany: true, label: 'Diajukan Oleh', admin: { isSortable: true }, ...pickerSameCompany() },
+      // QA-15: Staff-only users pick only themselves (requesterOptions); the server re-checks (validateContent)
+      { name: 'requesters', type: 'relationship', relationTo: 'employees', hasMany: true, label: 'Diajukan Oleh', admin: { isSortable: true }, ...pickerSameCompany(), filterOptions: requesterOptions },
       { name: 'createdBy', type: 'relationship', relationTo: 'users', label: 'Dibuat Oleh', index: true, access: system, admin: { ...ro, position: 'sidebar' } },
       {
         name: 'bankAccount',

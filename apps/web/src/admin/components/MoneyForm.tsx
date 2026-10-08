@@ -19,6 +19,11 @@ export type MoneyFormProps = {
   bankRef: 'required' | 'none'
   proof: { kind: 'transfer-proofs' | 'attachments'; required: boolean } | null
   amountText: string
+  /**
+   * QA-11: read-only GET checked BEFORE the proof upload (e.g. …/settle/precheck) — a configuration
+   * error is shown without leaving an orphan file behind.
+   */
+  precheckUrl?: string
 }
 
 async function uploadProof(kind: string, file: File): Promise<number> {
@@ -30,7 +35,7 @@ async function uploadProof(kind: string, file: File): Promise<number> {
   return (data as { id: number }).id
 }
 
-export function MoneyForm({ url, submitLabel, cashAccounts, bankRef, proof, amountText }: MoneyFormProps) {
+export function MoneyForm({ url, submitLabel, cashAccounts, bankRef, proof, amountText, precheckUrl }: MoneyFormProps) {
   const router = useRouter()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -62,6 +67,10 @@ export function MoneyForm({ url, submitLabel, cashAccounts, bankRef, proof, amou
     if (bankRef === 'required') body.bankRef = String(f.get('bankRef') ?? '').trim()
     setBusy(true)
     try {
+      if (precheckUrl) {
+        const pre = await fetch(precheckUrl, { credentials: 'same-origin', headers: { Accept: 'application/json' } })
+        if (!pre.ok) throw new Error(problemText(await pre.json().catch(() => null), pre.status))
+      }
       const file = f.get('proof')
       if (proof && file instanceof File && file.size > 0) body.proofMediaId = await uploadProof(proof.kind, file)
       else if (proof?.required) throw new Error('Bukti wajib diunggah.')

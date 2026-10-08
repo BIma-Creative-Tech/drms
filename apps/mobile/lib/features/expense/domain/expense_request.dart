@@ -65,6 +65,10 @@ abstract class ReceiptInfo with _$ReceiptInfo {
   }) = _ReceiptInfo;
 }
 
+/// QA-27 (owner decision 2026-10-08): a receipt Finance marked valid is locked — the requester can no
+/// longer remove it (server answers 409 "Nota sudah divalidasi Finance"); removed ones are gone already.
+bool receiptRemovable(String status) => status != 'valid' && status != 'removed';
+
 /// Receipt status labels (server `receipts.status`).
 String receiptStatusLabel(String status) => switch (status) {
   'pending' => 'Menunggu verifikasi',

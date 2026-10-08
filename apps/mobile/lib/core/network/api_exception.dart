@@ -64,6 +64,10 @@ class ProblemException extends ApiException {
     if (code == privacyAckRequiredCode) return privacyAckRequiredMessage;
     if (detail != null && detail!.trim().isNotEmpty) return detail!;
     if (errors.isNotEmpty) return errors.map((e) => e.message).join('\n');
+    // QA-15 / QA-27: domain refusals of /api/v1 carry their Indonesian sentence in `title` (e.g. "Nota sudah
+    // divalidasi Finance; nota tidak dapat dihapus."); HTTP reason phrases ("Conflict") never end with a period.
+    final t = title?.trim();
+    if (t != null && t.length > 10 && t.endsWith('.')) return t;
     return switch (status) {
       400 => 'Data yang dikirim tidak valid.',
       403 => 'Anda tidak berhak melakukan aksi ini.',

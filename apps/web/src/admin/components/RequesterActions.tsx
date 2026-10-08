@@ -40,6 +40,8 @@ export type RequesterActionsProps = {
     flags: Flag[]
   }>
   requestFlags: Flag[]
+  /** Today (YYYY-MM-DD) in the request PT's timezone — QA-07: receipt dates after it are refused. */
+  today?: string
   settlement: {
     docNo: string | null
     statusLabel: string
@@ -117,8 +119,11 @@ async function post(url: string, body: unknown): Promise<Record<string, unknown>
   return (r.data ?? {}) as Record<string, unknown>
 }
 
-/** One button; optional required reason (≥ 3 chars, G7) or confirmation. */
-function Act(props: { label: string; url: string; success: string; primary?: boolean; reason?: string; confirm?: string; gotoNew?: boolean; testId: string }) {
+/**
+ * One button; optional required reason (≥ 3 chars, G7) or confirmation. Exported for the office side
+ * of the workflow panel (QA-19: Finance confirms a Reimburse "selesai").
+ */
+export function Act(props: { label: string; url: string; success: string; primary?: boolean; reason?: string; confirm?: string; gotoNew?: boolean; testId: string }) {
   const { busy, error, run } = useAction()
   const onClick = () => {
     let body: Record<string, unknown> = {}
@@ -164,7 +169,7 @@ const noEnter = (e: React.KeyboardEvent) => {
   if (e.key === 'Enter' && !(e.target instanceof HTMLTextAreaElement)) e.preventDefault()
 }
 
-function ReceiptForm({ requestId, lines }: { requestId: number; lines: RequesterActionsProps['lines'] }) {
+function ReceiptForm({ requestId, lines, today }: { requestId: number; lines: RequesterActionsProps['lines']; today?: string }) {
   const { busy, error, run } = useAction()
   const { ref, text, file } = useFields()
   const onSubmit = () =>
@@ -180,6 +185,8 @@ function ReceiptForm({ requestId, lines }: { requestId: number; lines: Requester
       if (parsed.error) throw new Error(`Nominal: ${parsed.error}`)
       if (parsed.value === null) throw new Error('Nominal harus angka Rupiah > 0.')
       const amount = parsed.value
+      // QA-07: checked before the upload (no orphan photo); the server refuses it anyway (400)
+      if (today && receiptDate > today) throw new Error('Tanggal nota tidak boleh di masa depan.')
       const imageId = await uploadReceiptImage(image)
       await post(`${base(requestId)}/receipts`, { lineId: text('lineId'), receiptNo: text('receiptNo') || null, vendorName, receiptDate, amount, imageId })
       flashAndGo('Nota tersimpan. Periksa flag validasi pada daftar nota (bila ada).')
@@ -210,7 +217,7 @@ function ReceiptForm({ requestId, lines }: { requestId: number; lines: Requester
       </label>
       <label style={field}>
         Tanggal nota
-        <input type="date" data-f="receiptDate" />
+        <input type="date" data-f="receiptDate" max={today} />
       </label>
       <label style={field}>
         Nominal tercetak (Rp)
@@ -355,7 +362,8 @@ export function RequesterActions(p: RequesterActionsProps) {
                       <td style={{ padding: 4, verticalAlign: 'top', whiteSpace: 'nowrap' }}>{rp(r.amount)}</td>
                       <td style={{ padding: 4, verticalAlign: 'top' }}>{RECEIPT_STATUS[r.status] ?? r.status}</td>
                       <td style={{ padding: 4, verticalAlign: 'top' }}>
-                        {has('add_receipt') && r.status !== 'removed' ? (
+                        {/* QA-27 (owner decision 2026-10-08): a receipt Finance marked valid is locked */}
+                        {has('add_receipt') && r.status !== 'removed' && r.status !== 'valid' ? (
                           <Act testId={`remove-receipt-${r.id}`} label="Hapus" url={`${url}/receipts/${r.id}/remove`} reason="Alasan menghapus nota (wajib):" success="Nota dihapus (tercatat di riwayat)." />
                         ) : null}
                       </td>
@@ -369,7 +377,7 @@ export function RequesterActions(p: RequesterActionsProps) {
             p.lines.length === 0 ? (
               <div style={{ marginTop: 6 }}>Simpan minimal 1 baris item dulu, lalu upload nota per baris.</div>
             ) : (
-              <ReceiptForm requestId={p.id} lines={p.lines} />
+              <ReceiptForm requestId={p.id} lines={p.lines} today={p.today} />
             )
           ) : null}
         </section>

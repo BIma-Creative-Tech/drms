@@ -45,8 +45,11 @@ Urutan: **Direktur** menyetujui dulu ("Diketahui"), baru pengajuan masuk ke Anda
 3. **Verifikasi semua nota** → status **Nota Terverifikasi (Antri Transfer)**.
 
 Arti flag: *Selisih nominal nota vs baris* (info bila ≤ toleransi Rp 1.000) · *Nota terlalu lama* (> 30 hari) ·
-*Satuan tidak wajar* · *Nota ganda* (nota sama sudah dipakai di pengajuan lain) · *Tanggal nota di luar periode
-kegiatan*. Flag tidak menghalangi, tetapi wajib diperiksa.
+*Satuan tidak wajar* · *Nota ganda* (nota sama sudah dipakai di pengajuan lain, **atau** — sejak 8 Okt 2026 — foto
+yang sama / No. nota + toko yang sama diunggah dua kali **dalam pengajuan yang sama**: "Nota ganda dalam pengajuan
+ini…", flag ada di nota yang diunggah belakangan) · *Tanggal nota di luar periode kegiatan*. Flag tidak menghalangi,
+tetapi wajib diperiksa. Nota bertanggal setelah hari ini tidak bisa diunggah sama sekali. Nota yang Anda tandai
+**Valid** terkunci: pemohon tidak bisa menghapus atau mengubahnya lagi.
 
 ![TODO screenshot: Verifikasi nota Reimburse dengan tombol Valid/Tolak dan flag](img/finance-verifikasi-nota.png)
 
@@ -70,12 +73,17 @@ Akun kas, Tanggal (kosong = hari ini), **No. referensi bank**, **Bukti** (foto/P
   bila dana memang ada (tercatat di Audit Log).
 - Salah catat? **Void transfer** (di bagian "Transfer tercatat — dapat dibatalkan" atau di detail pengajuan) + alasan:
   KK dibalik, pengajuan kembali ke antrian.
+- Reimburse **Ditransfer**: bila pemohon sudah menerima dana tetapi belum menekan **Konfirmasi selesai**, Anda bisa
+  menekannya di detail pengajuan (di bawah "Giliran: Pemohon … atau Finance"). Tanpa itu pengajuan ditutup otomatis
+  setelah batas hari di Setting perusahaan.
 
 ## 4. LPJ Uang Muka
 
 **Verifikasi LPJ** → **LPJ diajukan**:
 1. Periksa Ditransfer / Nota / Selisih. Tiap nota **Valid**/**Tolak**. Tiap flag terbuka (mis. *Nota terlalu
    lama*): **Tandai flag diperiksa** (catatan opsional, tercatat di Riwayat/Audit).
+   Angka Nota / Selisih dan flag selisih dihitung ulang **setiap kali** nota ditandai Valid, ditolak atau dihapus
+   (nota ditolak tidak lagi dihitung) — tidak perlu menunggu pemohon mengirim ulang LPJ.
 2. **Verifikasi LPJ**, atau **Minta revisi** dengan catatan untuk pemohon.
 3. Bagian **Menunggu penyelesaian selisih**:
    - Sisa dana → **Catat pengembalian & selesaikan** (kas masuk "Pengembalian LPJ").
@@ -89,6 +97,11 @@ Akun kas, Tanggal (kosong = hari ini), **No. referensi bank**, **Bukti** (foto/P
    LPJ di atas nominal disetujui**. Setelah disetujui, form **Transfer kekurangan & selesaikan** muncul lagi. Bila
    ditolak, kotak menampilkan alasannya; Anda dapat **Ajukan ulang** dengan penjelasan baru. Persetujuan ini hanya
    di web (belum di APK).
+
+Sebelum bukti diunggah, sistem memeriksa kelengkapan pengaturan (mis. sumber kas masuk **Pengembalian LPJ**, kode
+`LPJ`). Bila kurang, pesan muncul **sebelum** file diunggah. Sumber `LPJ` kini dibuat otomatis untuk setiap PT (PT
+baru dan PT lama lewat migrasi); bila sengaja dihapus/diganti kodenya, buat lagi di Master → Sumber kas masuk.
+Bukti yang terlanjur terunggah tetapi tidak dipakai dokumen apa pun dibersihkan otomatis setelah beberapa hari.
 
 Catatan: kas masuk pengembalian LPJ tidak bisa di-void; bila salah, laporkan ke tim.
 

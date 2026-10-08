@@ -239,16 +239,16 @@ export function buildOpenApiDocument(version: string) {
   post('/expense-requests/{id}/approve', 'Approve the current level — Finance by default (G1/G2, ADR 0013; budget % before → after); PM/Staff/Admin → 403 (audited)', F.SignBody, ['id'], detailOk())
   post('/expense-requests/{id}/reject', 'Reject (reason) at "Diketahui" (Direktur) or an approval level (Finance); PM/Staff/Admin → 403 (audited)', F.RejectBody, ['id'], detailOk())
   post('/expense-requests/{id}/complete', 'Reimburse: Ditransfer → Selesai', F.EmptyBody, ['id'], detailOk())
-  post('/expense-requests/{id}/receipts', 'Add a receipt to a line (image from POST /media/receipts)', F.ReceiptCreate, ['id'], res(201, 'Request with receipts and flags', F.ExpenseRequestDetail, [400, 401, 403, 404, 409, 422, 426, 429]))
+  post('/expense-requests/{id}/receipts', 'Add a receipt to a line (image from POST /media/receipts); receiptDate after today (PT timezone) → 400 "Tanggal nota tidak boleh di masa depan" (QA-07)', F.ReceiptCreate, ['id'], res(201, 'Request with receipts and flags', F.ExpenseRequestDetail, [400, 401, 403, 404, 409, 422, 426, 429]))
   registry.registerPath({
     method: 'patch',
     path: '/expense-requests/{id}/receipts/{rid}',
-    summary: 'Edit a receipt inside the receipt window',
+    summary: 'Edit a receipt inside the receipt window; future receiptDate → 400 (QA-07); a valid receipt is locked → 409 (QA-27)',
     security,
     request: { headers: deviceHeader, params: idParams('id', 'rid'), body: jsonBody(F.ReceiptUpdate) },
     responses: detailOk(),
   })
-  post('/expense-requests/{id}/receipts/{rid}/remove', 'Remove a receipt (status removed, reason)', F.ReasonBody, ['id', 'rid'], detailOk())
+  post('/expense-requests/{id}/receipts/{rid}/remove', 'Remove a receipt (status removed, reason); a receipt Finance marked valid is locked → 409 "Nota sudah divalidasi Finance" (QA-27)', F.ReasonBody, ['id', 'rid'], detailOk())
   post('/expense-requests/{id}/receipts/{rid}/verify', 'Finance: receipt valid', F.EmptyBody, ['id', 'rid'], detailOk())
   post('/expense-requests/{id}/receipts/{rid}/reject', 'Finance: receipt rejected (reason) → Revisi Nota', F.ReasonBody, ['id', 'rid'], detailOk())
   post('/expense-requests/{id}/receipts-resubmit', 'Requester: receipts fixed (grand total changed → re-approval)', F.EmptyBody, ['id'], detailOk())
@@ -358,6 +358,15 @@ export function buildOpenApiDocument(version: string) {
     ['id'],
     res(200, 'Settled', F.SettleResult, [400, 401, 403, 404, 409, 422, 426, 429]),
   )
+  registry.registerPath({
+    method: 'get',
+    path: '/expense-requests/{id}/settle/precheck',
+    summary:
+      'QA-11 Finance: read-only check BEFORE uploading the settlement proof — may settle now (403/409), refund needs the PT\'s cash-in source "Pengembalian LPJ" (code LPJ) → else 409, shortfall needs the bank snapshot → else 409',
+    security,
+    request: { headers: deviceHeader, params: idParams('id') },
+    responses: res(200, 'Ready', F.SettlePrecheckResult, [401, 403, 404, 409, 426, 429]),
+  })
   post(
     '/expense-requests/{id}/settle/reverse',
     'E9 Finance: reverse a settlement — void the refund KM / shortfall transfer (+ KK reversal) → LPJ "Terverifikasi" again (reason; closed period → 409)',

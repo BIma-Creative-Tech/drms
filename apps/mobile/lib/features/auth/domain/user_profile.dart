@@ -235,6 +235,10 @@ abstract class UserProfile with _$UserProfile {
   /// Who may create requests on the APK (requirements §4: Staff and PM create own requests).
   bool get canCreateRequests => has(Role.staff) || has(Role.pm) || has(Role.admin);
 
+  /// QA-15 (owner decision 2026-10-08): only role Staff (use on [forCompany] of the draft's PT) → requests
+  /// for themselves only ("Diajukan Oleh" = own employee). PM / Admin / Finance may add others (Q-09).
+  bool get requestsForSelfOnly => roles.isNotEmpty && roles.every((r) => r == Role.staff);
+
   /// E4: progress reports are readable by PM (team), Direktur and Finance (all); Staff/Admin none.
   bool get canReadProgress => has(Role.pm) || has(Role.owner) || has(Role.finance);
 

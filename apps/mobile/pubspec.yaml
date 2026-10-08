@@ -3,7 +3,7 @@ description: "ProyekKas — aplikasi Android DRMS (pengajuan biaya, approval, ab
 publish_to: 'none'
 
 # X.Y.Z+N — N (versionCode) is overridden by CI with --build-number (ADR 0010 decision 13).
-version: 0.3.3+1
+version: 0.3.4+1
 
 environment:
   sdk: ">=3.13.4 <4.0.0"

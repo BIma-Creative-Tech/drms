@@ -32,6 +32,9 @@ import * as migration_20261003_090000_mc4_audit_company_backfill from './2026100
 import * as migration_20261005_090000_privacy_notice from './20261005_090000_privacy_notice';
 import * as migration_20261005_090100_selfie_retention_6m from './20261005_090100_selfie_retention_6m';
 import * as migration_20261008_090000_qa_finance_integrity from './20261008_090000_qa_finance_integrity';
+import * as migration_20261008_120000_qa_flow_lpj_totals from './20261008_120000_qa_flow_lpj_totals';
+import * as migration_20261008_120100_qa_flow_lpj_source from './20261008_120100_qa_flow_lpj_source';
+import * as migration_20261008_120200_qa_flow_orphan_job from './20261008_120200_qa_flow_orphan_job';
 
 export const migrations = [
   {
@@ -203,5 +206,20 @@ export const migrations = [
     up: migration_20261008_090000_qa_finance_integrity.up,
     down: migration_20261008_090000_qa_finance_integrity.down,
     name: '20261008_090000_qa_finance_integrity',
+  },
+  {
+    up: migration_20261008_120000_qa_flow_lpj_totals.up,
+    down: migration_20261008_120000_qa_flow_lpj_totals.down,
+    name: '20261008_120000_qa_flow_lpj_totals',
+  },
+  {
+    up: migration_20261008_120100_qa_flow_lpj_source.up,
+    down: migration_20261008_120100_qa_flow_lpj_source.down,
+    name: '20261008_120100_qa_flow_lpj_source',
+  },
+  {
+    up: migration_20261008_120200_qa_flow_orphan_job.up,
+    down: migration_20261008_120200_qa_flow_orphan_job.down,
+    name: '20261008_120200_qa_flow_orphan_job',
   },
 ];

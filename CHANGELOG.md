@@ -59,6 +59,49 @@ shortfall re-approval or a new audit action exists — restore the dump.
 - Guides: Finance (Rupiah input, go-live date, overdraft / unverified account dialogs, shortfall approval, tutup buku,
   Rekap Kas), Direktur (shortfall approval on the web).
 
+### QA report 2026-10-08 — alur & nota (QA-07, QA-08, QA-09, QA-10/26, QA-11, QA-15, QA-18, QA-19, QA-27) — web + APK mobile-v0.3.4
+
+Branch `fix/qa-workflow-receipts`. Owner decisions 2026-10-08: valid receipts are locked (QA-27), Staff requests for
+themselves only (QA-15), the team PM is notified (QA-18). Status per ticket: `docs/proyekkas/qa/qa-report-2026-10-08-status.md`.
+
+**Database migrations** (run by `migrate`; additive): `20261008_120000_qa_flow_lpj_totals` (`pk_settlements_guard`:
+an open LPJ may change only `receipts_total` + `difference`, consistent with Σ active receipts),
+`20261008_120100_qa_flow_lpj_source` (data: cash-in source `LPJ` "Pengembalian LPJ" for every PT without it,
+audited, idempotent), `20261008_120200_qa_flow_orphan_job` (job slug `mediaOrphanCleanup`, snapshot `.json`).
+
+#### Added
+- API: `GET /api/v1/expense-requests/{id}/settle/precheck` (Finance, read-only) — 409 when the PT has no
+  "Pengembalian LPJ" source or the request no bank snapshot; the LPJ refund form calls it BEFORE uploading the proof.
+- Worker job `mediaOrphanCleanup` (daily 03:10): unclaimed `media-attachments` older than
+  `MEDIA_ORPHAN_MIN_AGE_DAYS` (7) that no document references; dry run unless `MEDIA_ORPHAN_PURGE_ENABLED=true`
+  (then tombstone + file delete, ≤ `MEDIA_ORPHAN_BATCH` per run, one `retention_purge` audit row). A tombstone
+  can never be claimed (409).
+- In-app notifications for the team PM of the request's project (PM role in that PT): `expense.team_submitted`,
+  `expense.rejected`, `expense.transferred`, `expense.lpj_revision`, `expense.completed` (QA-18).
+- Web: Finance sees **Konfirmasi selesai** on a transferred Reimburse (QA-19).
+
+#### Changed
+- Receipts: a receipt date after today (PT timezone) → 400 "Tanggal nota tidak boleh di masa depan" (QA-07); the
+  web form caps the date and checks before the upload.
+- Duplicate flags also inside the same request (same photo, or same receipt no. + vendor; one flag per pair on the
+  later receipt) — cross-request rule and PT scope rule unchanged (QA-08).
+- Flags and the open LPJ's receipts total / difference are recomputed after every receipt add / edit / remove /
+  valid / reject (QA-09; were refreshed only at LPJ submit). OpenAPI `Settlement.receiptsTotal` description updated.
+- A receipt Finance marked **valid** is locked: requester remove / edit → 409 "Nota sudah divalidasi Finance"; the
+  web hides the remove button (QA-27).
+- Staff-only users: "Diajukan Oleh" = own employee only (403 on create / update / admin form / APK sync, and on
+  submit of an older draft); admin picker filtered. PM keeps co-requesters (Q-09), Admin/Finance represent others (QA-15).
+- New PTs (also without "Salin default") get the system cash-in source `LPJ` (QA-11).
+
+#### Known limitation
+- QA-10 / QA-26 "Tambah Baris" race in the Payload 3.90.1 array field: the pending form-state request is not
+  exposed by Payload, so the button cannot be disabled cleanly; the hint stays and the Staff guide explains recovery.
+
+#### APK 0.3.4
+- Requester picker shows only the user for Staff-only users, submit validation with the server wording (QA-15);
+  no remove icon on valid receipts (QA-27); server refusal sentences (problem `title`) shown instead of the generic
+  409/403 text. Receipt date picker already capped at today (QA-07).
+
 ## [0.6.1] - 2026-10-05
 
 Employee privacy notice (UU PDP; Q-46, ADR 0018) with a versioned acknowledgement on the web and in APK 0.3.3,

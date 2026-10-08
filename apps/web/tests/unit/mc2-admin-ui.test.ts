@@ -110,9 +110,12 @@ describe('employee ↔ PT mapping', () => {
     expect(pickerSameCompany().validate(undefined)).toBe(true)
     expect(pickerSameCompany({ required: true }).validate([])).toBe('Wajib diisi.')
     expect(pickerSameCompany({ required: true }).validate(4)).toBe(true)
-    for (const [slug, field] of [['employees', 'workSchedule'], ['team-assignments', 'employee'], ['employee-bank-accounts', 'employee'], ['expense-requests', 'requesters']] as const) {
+    for (const [slug, field] of [['employees', 'workSchedule'], ['team-assignments', 'employee'], ['employee-bank-accounts', 'employee']] as const) {
       const f = config.collections.find((c) => c.slug === slug)!.flattenedFields.find((x) => x.name === field) as { filterOptions?: unknown }
       expect(f.filterOptions, `${slug}.${field}`).toBe(sameCompanyOptions)
     }
+    // QA-15: "Diajukan Oleh" = the PT filter + own employee only for Staff-only users (tests/unit/qa-flow.test.ts)
+    const req = config.collections.find((c) => c.slug === 'expense-requests')!.flattenedFields.find((x) => x.name === 'requesters') as { filterOptions?: (a: unknown) => unknown }
+    expect(req.filterOptions!({ data: { company: 2 }, user: { roles: ['pk-pm'] } })).toEqual({ company: { equals: 2 } })
   })
 })

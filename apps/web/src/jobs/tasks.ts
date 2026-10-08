@@ -2,6 +2,7 @@ import { sql } from '@payloadcms/db-postgres'
 import type { TaskConfig } from 'payload'
 
 import { purgeExpiredSelfies } from '@/domain/attendance/retention'
+import { purgeOrphanMedia } from '@/domain/media-orphans'
 import { runDailyReminders } from '@/domain/reminders/service'
 import { autoCloseReimburse } from '@/domain/expense/auto-close'
 
@@ -155,4 +156,33 @@ export const dailyRemindersTask: TaskConfig<{
   },
 }
 
-export const tasks = [auditDailyAnchorTask, sendEmailTask, reimburseAutoCloseTask, selfieRetentionTask, dailyRemindersTask]
+/**
+ * QA-11 orphan attachments: daily 03:10 (process TZ). Unclaimed `media-attachments` uploads older than
+ * MEDIA_ORPHAN_MIN_AGE_DAYS (default 7) that no document references. MEDIA_ORPHAN_PURGE_ENABLED unset /
+ * false (default) = dry run (count only); true = tombstone + delete the files, at most MEDIA_ORPHAN_BATCH
+ * per run, one `retention_purge` audit row (domain/media-orphans.ts). Log = counts only.
+ */
+export const mediaOrphanCleanupTask: TaskConfig<{
+  input: Record<string, never>
+  output: { candidates: number; deleted: number; dryRun: boolean }
+}> = {
+  slug: 'mediaOrphanCleanup',
+  schedule: [{ cron: '10 3 * * *', queue: 'default' }],
+  inputSchema: [],
+  outputSchema: [
+    { name: 'candidates', type: 'number', required: true },
+    { name: 'deleted', type: 'number', required: true },
+    { name: 'dryRun', type: 'checkbox', required: true },
+  ],
+  handler: async ({ req }) => {
+    const rs = await purgeOrphanMedia(req.payload)
+    for (const r of rs) {
+      req.payload.logger.info({ msg: r.dryRun ? 'media orphan cleanup (dry run)' : 'media orphan cleanup', collection: r.collection, minAgeDays: r.minAgeDays, candidates: r.candidates, marked: r.marked, deleted: r.deleted, failed: r.failed, remaining: r.remaining })
+    }
+    return {
+      output: { candidates: rs.reduce((a, r) => a + r.candidates, 0), deleted: rs.reduce((a, r) => a + r.deleted, 0), dryRun: rs.every((r) => r.dryRun) },
+    }
+  },
+}
+
+export const tasks = [auditDailyAnchorTask, sendEmailTask, reimburseAutoCloseTask, selfieRetentionTask, dailyRemindersTask, mediaOrphanCleanupTask]

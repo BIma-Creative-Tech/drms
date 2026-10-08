@@ -127,7 +127,7 @@ describe('selfie retention job (fake clock)', () => {
     const view = await api('GET', `/api/v1/attendance/${attIn}/selfie`, w.users.finance)
     expect(view.status).toBe(404)
     // audit: one retention_purge row per run, counts only, source job
-    const audit = await sqlAs('app', "SELECT new_value, source, user_id FROM audit_logs WHERE action = 'retention_purge' ORDER BY id")
+    const audit = await sqlAs('app', "SELECT new_value, source, user_id FROM audit_logs WHERE action = 'retention_purge' AND doc_type = 'media_selfies' ORDER BY id") // QA-11: the orphan-attachment job writes its own rows
     expect(audit.rows.length).toBeGreaterThanOrEqual(2)
     expect(audit.rows[0]).toMatchObject({ source: 'job', user_id: null, new_value: { v: expect.objectContaining({ months: 6, deleted: 10, batch: 10 }) } })
     expect(JSON.stringify(audit.rows[0].new_value)).not.toMatch(/filename|jpg/)

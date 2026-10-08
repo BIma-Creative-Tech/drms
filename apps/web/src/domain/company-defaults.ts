@@ -7,7 +7,7 @@ import { WEEKDAY_KEYS } from '@/domain/attendance/schedule'
 import { ruleDecisionError } from '@/domain/expense/decision'
 import { stepsError, type AckBy, type AckMode } from '@/domain/expense/rules'
 import { DEFAULT_SEQUENCES } from '@/domain/numbering'
-import { DEFAULT_APPROVAL_RULES } from '@/seed/data'
+import { CASH_IN_SOURCES, DEFAULT_APPROVAL_RULES } from '@/seed/data'
 import { DEFAULT_TZ } from '@/lib/time'
 
 /**
@@ -23,7 +23,9 @@ import { DEFAULT_TZ } from '@/lib/time'
  *   copyable rule for gets the ADR 0013 defaults `DEFAULT_APPROVAL_RULES` (same as seed + import);
  * - the source's default work schedule (copied by name, set as the new PT's default);
  * - the per-PT settings (`COMPANY_SETTING_FIELDS`) whose value on the new PT still equals the field
- *   default — a value the creator changed in the form is kept.
+ *   default — a value the creator changed in the form is kept;
+ * - QA-11: the SYSTEM cash-in sources (`SYSTEM_CASH_IN_SOURCES`: "Pengembalian LPJ", code `LPJ`, used by
+ *   the LPJ refund) — also for a PT created WITHOUT copying defaults (`ensureSystemCashInSources`).
  *
  * IDEMPOTENT: every row is create-only by its natural key inside the target PT (doc type / rule
  * name / schedule name); a second run creates nothing and changes no setting that already differs
@@ -38,6 +40,47 @@ export type CopyDefaultsReport = {
   rules: { created: string[]; existing: string[]; skipped: string[] }
   workSchedule: { created: boolean; name: string | null; setAsDefault: boolean }
   settings: string[]
+  cashInSources: { created: string[]; existing: string[] }
+}
+
+/**
+ * QA-11: cash-in sources the workflow itself posts with (lpj.ts settle → KM "Pengembalian LPJ"). Same
+ * code/name as the seed (seed/data.ts CASH_IN_SOURCES); backfilled for existing PTs by migration
+ * 20261008_120100_qa_flow_lpj_source.
+ */
+export const SYSTEM_CASH_IN_SOURCES = CASH_IN_SOURCES.filter((s) => s.code === 'LPJ')
+
+/**
+ * Creates the missing SYSTEM_CASH_IN_SOURCES of PT `target` (create-only by code, any active flag:
+ * a deliberately deactivated source is left alone). Audited by the collection (`withAudit`, actor =
+ * the caller). SYSTEM-WRITE: the caller may have no membership in a new PT yet.
+ */
+export async function ensureSystemCashInSources(req: PayloadRequest, target: number): Promise<{ created: string[]; existing: string[] }> {
+  const out = { created: [] as string[], existing: [] as string[] }
+  const res = await req.payload.find({
+    collection: 'cash-in-sources',
+    where: { and: [{ company: { equals: target } }, { code: { in: SYSTEM_CASH_IN_SOURCES.map((s) => s.code) } }] },
+    depth: 0,
+    pagination: false,
+    overrideAccess: true, // SYSTEM-READ: system masters of the target PT
+    req,
+  })
+  const have = new Set(res.docs.map((d) => (d as { code?: string }).code))
+  for (const s of SYSTEM_CASH_IN_SOURCES) {
+    if (have.has(s.code)) {
+      out.existing.push(s.code)
+      continue
+    }
+    await req.payload.create({
+      collection: 'cash-in-sources',
+      data: { company: target, code: s.code, name: s.name, active: true } as never,
+      depth: 0,
+      overrideAccess: true, // SYSTEM-WRITE: system master of a PT (QA-11), audited by the collection
+      req,
+    })
+    out.created.push(s.code)
+  }
+  return out
 }
 
 /** req.context flag: the create comes from the seed / go-live import (they apply their own defaults). */
@@ -133,6 +176,7 @@ export async function copyCompanyDefaults(req: PayloadRequest, target: number, o
     rules: { created: [], existing: [], skipped: [] },
     workSchedule: { created: false, name: null, setAsDefault: false },
     settings: [],
+    cashInSources: { created: [], existing: [] },
   }
   const tgt = (await req.payload.findByID({ collection: 'companies', id: target, depth: 0, overrideAccess: true /* SYSTEM-READ: target PT */, req })) as unknown as Row
   const tz = (typeof tgt.timezone === 'string' && tgt.timezone) || process.env.TZ || DEFAULT_TZ
@@ -177,6 +221,9 @@ export async function copyCompanyDefaults(req: PayloadRequest, target: number, o
     haveRules.add(r.name as string)
     report.rules.created.push(r.name as string)
   }
+
+  // ---- QA-11: system cash-in sources ("Pengembalian LPJ")
+  report.cashInSources = await ensureSystemCashInSources(req, target)
 
   // ---- default work schedule (E6, Q-30) + per-PT settings (only values still at their default)
   const patch: Record<string, unknown> = {}

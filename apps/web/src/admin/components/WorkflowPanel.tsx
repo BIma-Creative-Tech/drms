@@ -2,7 +2,7 @@ import type { UIFieldServerProps } from 'payload'
 import React from 'react'
 
 import { ownEmployees, relId } from '@/access/roles'
-import { displayName, loadVisible } from '@/domain/expense/common'
+import { displayName, loadVisible, today } from '@/domain/expense/common'
 import { detail } from '@/domain/expense/dto'
 import { isDecisionSnapshot, SKIPPED_LABEL } from '@/domain/expense/decision'
 import type { ApprovalSnapshot } from '@/domain/expense/rules'
@@ -12,7 +12,7 @@ import { withSystemTransaction } from '@/lib/system-tx'
 
 import { ReasonAction } from './kas/ReasonAction'
 import { KAS_STYLE } from './kas/style'
-import { RequesterActions, type RequesterActionsProps } from './RequesterActions'
+import { Act, RequesterActions, type RequesterActionsProps } from './RequesterActions'
 import { ReviewDetails } from './ReviewDetails'
 
 type Detail = Awaited<ReturnType<typeof detail>>
@@ -52,7 +52,7 @@ export async function WorkflowPanel(props: UIFieldServerProps) {
       </div>
     )
   }
-  let data: { d: Detail; snap: ApprovalSnapshot | null; names: Record<number, string>; hasSignature: boolean } | null = null
+  let data: { d: Detail; snap: ApprovalSnapshot | null; names: Record<number, string>; hasSignature: boolean; todayDate: string } | null = null
   try {
     data = await withSystemTransaction(req.payload, req.user, async (r) => {
       const doc = await loadVisible(r, docId)
@@ -62,7 +62,7 @@ export async function WorkflowPanel(props: UIFieldServerProps) {
       const userIds = [snap?.acknowledgerUserId, ...(snap?.steps ?? []).map((s) => s.approverUserId)].filter((x): x is number => typeof x === 'number')
       for (const u of new Set(userIds)) names[u] = await displayName(r, u)
       const me = await r.payload.findByID({ collection: 'users', id: req.user!.id as number, depth: 0, overrideAccess: true /* SYSTEM-READ: own profile signature flag */, req: r })
-      return { d, snap, names, hasSignature: relId(me.signature) !== undefined }
+      return { d, snap, names, hasSignature: relId(me.signature) !== undefined, todayDate: await today(r, relId((doc as { company?: unknown }).company)) }
     })
   } catch (err) {
     // Not visible (404) → the document view itself already denies; anything else is logged.
@@ -70,7 +70,7 @@ export async function WorkflowPanel(props: UIFieldServerProps) {
     if (status !== 404) req.payload.logger.error({ msg: 'workflow panel failed', id: docId, err: (err as Error).message })
     return null
   }
-  const { d, snap, names, hasSignature } = data
+  const { d, snap, names, hasSignature, todayDate } = data
   const steps = timeline(d.type, d.status, { skipAck: snap?.acknowledge === 'none' })
   const next = nextActor({
     type: d.type,
@@ -165,6 +165,13 @@ export async function WorkflowPanel(props: UIFieldServerProps) {
               ))}
           </div>
         ) : null}
+        {!own && d.allowedActions.includes('complete') ? (
+          // QA-19: the turn text names "Pemohon atau Finance" — Finance confirms the Reimburse "selesai" here
+          // (state.ts: complete = own || Finance); the requester gets the same button in its panel below.
+          <div style={{ marginTop: 8 }} data-pk-finance-complete>
+            <Act testId="complete" label="Konfirmasi selesai" url={`/api/v1/expense-requests/${d.id}/complete`} confirm="Dana sudah diterima pemohon? Tandai pengajuan selesai." success="Pengajuan ditandai selesai." />
+          </div>
+        ) : null}
         {d.allowedActions.includes('settle_reverse') && d.settlement ? (
           // E9: Finance reverses the LPJ settlement (void refund KM / shortfall transfer) → "LPJ Terverifikasi".
           <div style={{ marginTop: 8, display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }} data-pk-settle-reverse>
@@ -224,6 +231,7 @@ export async function WorkflowPanel(props: UIFieldServerProps) {
           actions={acts}
           profileHref={`/admin/collections/users/${req.user.id}`}
           hasSignature={hasSignature}
+          today={todayDate}
           lines={d.lines.map((l) => ({ id: l.id, no: l.no, description: l.description ?? '', total: l.total }))}
           receipts={d.receipts.map((r) => ({
             ...r,

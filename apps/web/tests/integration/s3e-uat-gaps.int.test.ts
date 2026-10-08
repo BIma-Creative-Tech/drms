@@ -54,25 +54,25 @@ afterAll(async () => {
 })
 
 describe('S-04 notifications (US-05, US-41)', () => {
-  it('created on behalf / submitted / withdrawn → the other requester; approval email to the Direktur when enabled', async () => {
+  it('created on behalf / submitted / withdrawn → the other requester (QA-15: PM with a co-requester; Staff requests for themselves only); approval email to the Direktur when enabled', async () => {
     await settings({ notifyRequesterStatusEnabled: true, approvalEmailEnabled: true })
-    const c = await must(api('POST', E, w.users.staffA, draftBody(w, { requesterIds: [w.emp.a, w.emp.b] })), 201)
+    const c = await must(api('POST', E, w.users.pm, draftBody(w, { requesterIds: [w.emp.pm, w.emp.b], bankAccountId: w.accB })), 201)
     expect(await notes(w.users.staffB, c.id)).toEqual(['expense.created_on_behalf'])
-    expect(await notes(w.users.staffA, c.id)).toEqual([]) // the actor is never notified of their own action
-    const s = await must(api('POST', `${E}/${c.id}/submit`, w.users.staffA, {}))
+    expect(await notes(w.users.pm, c.id)).toEqual([]) // the actor is never notified of their own action
+    const s = await must(api('POST', `${E}/${c.id}/submit`, w.users.pm, {}))
     expect(await notes(w.users.staffB, c.id)).toEqual(['expense.created_on_behalf', 'expense.submitted'])
     expect(await notes(w.users.owner, c.id)).toEqual(['expense.pending_ack'])
-    expect(await notes(w.users.pm, c.id)).toEqual([]) // ADR 0013: PM monitors, never asked
+    expect(await notes(w.users.pm, c.id)).toEqual([]) // ADR 0013: PM monitors, never asked (QA-18: no team copy to the requesting PM)
     expect(await emailJobs(w.users.owner.id, s.docNo)).toBe(1)
     expect(await emailJobs(w.users.staffB.id, s.docNo)).toBe(0) // email only to deciders
-    await must(api('POST', `${E}/${c.id}/withdraw`, w.users.staffA, { reason: 'salah nominal' }))
+    await must(api('POST', `${E}/${c.id}/withdraw`, w.users.pm, { reason: 'salah nominal' }))
     expect(await notes(w.users.staffB, c.id)).toEqual(['expense.created_on_behalf', 'expense.submitted', 'expense.withdrawn'])
   })
 
   it('toggles off: no requester events, no approval email (the decider keeps the in-app row)', async () => {
     await settings({ notifyRequesterStatusEnabled: false, approvalEmailEnabled: false })
-    const c = await must(api('POST', E, w.users.staffA, draftBody(w, { requesterIds: [w.emp.a, w.emp.b] })), 201)
-    const s = await must(api('POST', `${E}/${c.id}/submit`, w.users.staffA, {}))
+    const c = await must(api('POST', E, w.users.pm, draftBody(w, { requesterIds: [w.emp.pm, w.emp.b], bankAccountId: w.accB })), 201)
+    const s = await must(api('POST', `${E}/${c.id}/submit`, w.users.pm, {}))
     expect(await notes(w.users.staffB, c.id)).toEqual([])
     expect(await notes(w.users.owner, c.id)).toEqual(['expense.pending_ack'])
     expect(await emailJobs(w.users.owner.id, s.docNo)).toBe(0)
