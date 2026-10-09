@@ -2,13 +2,16 @@ import { type MigrateDownArgs, type MigrateUpArgs, sql } from '@payloadcms/db-po
 
 /**
  * Owner decision 2026-10-09 (ADR 0021): new role `pk-operator` ("Operator/Anggota"), attendance-only
- * (web + APK) — see `access/roles.ts`. ADDITIVE / staging-safe: extends the Postgres enum backing
- * `company_memberships.roles[]` (the only live column typed with it — `users_roles`/`enum_users_roles`
- * was dropped in MC1, 20260927_230033_mc1_companies.ts). No existing row changes value.
+ * (web + APK) — see `access/roles.ts`. ADDITIVE / staging-safe: extends the Postgres enums whose
+ * Payload select options come from ROLES — `company_memberships.roles[]` and the approval-rule role
+ * selects (`approval_rules_steps.approver_role`, `approval_rules.acknowledge_role`; `enum_users_roles`
+ * is unused since MC1). No existing row changes value.
  */
 export async function up({ db }: MigrateUpArgs): Promise<void> {
   await db.execute(sql`
-  ALTER TYPE "public"."enum_company_memberships_roles" ADD VALUE IF NOT EXISTS 'pk-operator';`)
+  ALTER TYPE "public"."enum_company_memberships_roles" ADD VALUE IF NOT EXISTS 'pk-operator';
+  ALTER TYPE "public"."enum_approval_rules_steps_approver_role" ADD VALUE IF NOT EXISTS 'pk-operator';
+  ALTER TYPE "public"."enum_approval_rules_acknowledge_role" ADD VALUE IF NOT EXISTS 'pk-operator';`)
 }
 
 export async function down({}: MigrateDownArgs): Promise<void> {
