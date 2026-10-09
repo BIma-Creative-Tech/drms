@@ -6,6 +6,26 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+Owner decisions 2026-10-09 (roles, web attendance, LPJ for Staff). Migration `20261010_080000_p2s_operator_role`
+(adds the enum value `pk-operator`; additive, no data change).
+
+### Added
+
+- **Role "Operator/Anggota" (`pk-operator`)**, attendance only (web + APK): own check-in/out and own recap, own
+  profile; no access to projects, requests, masters or reports. Assigned per PT in "Pengguna & akses PT" like any role.
+- **Web self check-in/out for every role**: *Absensi → Absen* (`/admin/absensi/absen`) — pick an assigned location,
+  take a selfie, the browser sends GPS. API `POST /api/v1/attendance/check-in` and `/check-out`; same server rules
+  as the APK (team assignment, geofence radius, `syncAttendanceEnabled`, privacy acknowledgement ADR 0018; codes
+  FEATURE_DISABLED, NOT_ASSIGNED, OUTSIDE_GEOFENCE, ALREADY_CHECKED_IN, …). Every role may now upload a selfie.
+
+### Changed
+
+- **Admin has the same write rights as Direktur** on projects, project stages and progress reports (reverses
+  QA-20(b)/(d) of 2026-10-08).
+- **PM may create projects** and stages; PM edits stay limited to the PM's team projects. Finance/Staff remain
+  read-only (403 naming the fields).
+- **LPJ visible for Staff** in the web panel (`settlements` added to the Staff menu; read access was already there).
+
 ## [0.6.4] - 2026-10-09
 
 App renamed to **RR Teams** (web + Android, display name only) and the admin CMS follow-up (PR #32): the remaining

@@ -114,10 +114,10 @@ describe('QA-20(b) changed-field detection (403 naming the fields)', () => {
     expect(changedFields(fields, { pm: 8 }, current).map((f) => f.name)).toEqual(['pm'])
   })
 
-  it('projects: PM is read-only (update access = Direktur only) and the guard runs before access', () => {
+  it('projects: Direktur/Admin update all, PM their team only (owner decision 2026-10-09 reverses QA-20(b)); the guard runs before access', () => {
     const p = config.collections.find((c) => c.slug === 'projects')!
     expect((p.hooks.beforeOperation ?? []).length).toBeGreaterThanOrEqual(2)
-    expect(src('collections/Projects.ts')).toMatch(/update: byRole\(\{ 'pk-owner': true \}\)/)
+    expect(src('collections/Projects.ts')).toMatch(/update: byRole\(\{\s*'pk-owner': true,\s*'pk-admin': true,\s*'pk-pm':/)
   })
 })
 

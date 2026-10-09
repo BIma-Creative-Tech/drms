@@ -107,8 +107,8 @@ describe('row actions in the real config', () => {
 })
 
 describe('migration 20261009_120000_list_row_actions_column', () => {
-  it('is registered last and appends the column only to list preferences that do not name it', async () => {
-    expect(migrations.at(-1)?.name).toBe('20261009_120000_list_row_actions_column')
+  it('is registered and appends the column only to list preferences that do not name it', async () => {
+    expect(migrations.some((m) => m.name === '20261009_120000_list_row_actions_column')).toBe(true)
     const seen: string[] = []
     const flat = (x: unknown): string => {
       if (x === null || x === undefined) return ''

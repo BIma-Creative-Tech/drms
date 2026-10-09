@@ -34,6 +34,7 @@ const hasCompanyPredicate = (body: string) => HELPER_CALL.test(body) || BOUND_CO
 const ALLOWED: Record<string, string> = {
   'domain/attendance/queries.ts#currentSchedules': 'by employee ids of an already scoped list; schedule joined within the employee PT',
   'domain/attendance/queries.ts#employeeRef': 'one employee id, callers check scope / own employee first',
+  'domain/attendance/queries.ts#myAssignedLocations': "the caller's OWN employee ids (ownEmployees: one per mapped PT); locations come through those employees' assignments",
   'domain/attendance/web.ts#selfieState': 'by attendance ids of an already scoped list',
   'domain/attendance/record.ts#dayRowsAt': 'one employee + one location (both PT-bound, checked by recordAttendance)',
   'domain/attendance/corrections.ts#effectiveTime': 'one attendance id checked by correctAttendance',

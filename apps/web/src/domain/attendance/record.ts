@@ -1,14 +1,18 @@
+import { randomUUID } from 'node:crypto'
+
 import { sql } from '@payloadcms/db-postgres'
 import type { PayloadRequest } from 'payload'
 
-import { hasRole, mappedCompanies, relId } from '@/access/roles'
+import { employeeIn, hasRole, mappedCompanies, relId, userId } from '@/access/roles'
 import { resolveScope } from '@/access/scope'
-import { haversineM, insideGeofence, localDateString, type AttendanceKind } from '@/domain/sync/attendance'
+import { haversineM, insideGeofence, localDateString, employeeOfUser, type AttendanceKind } from '@/domain/sync/attendance'
+import { auditPrivacyDenied, PRIVACY_ACK_REQUIRED, PRIVACY_ACK_REQUIRED_DETAIL, privacyAckCheck } from '@/legal/privacy-enforcement'
+import { DEFAULT_TZ } from '@/lib/time'
 import { getRequestTx } from '@/lib/tx'
 
 import { snapshotOf, type ScheduleSnapshot } from './schedule'
 import { effectiveRadiusM } from './calendar'
-import { settings, userOfEmployee as userOfEmployeeLink } from '@/domain/companies'
+import { companyOf, settings, userOfEmployee as userOfEmployeeLink } from '@/domain/companies'
 
 /**
  * E6 — the ONE write path of `attendances` (sync items attendance.check_in / check_out / on_behalf,
@@ -232,4 +236,65 @@ export async function recordAttendance(req: PayloadRequest, input: RecordInput):
     req,
   })
   return { id: created.id as number, localDate }
+}
+
+export type WebCheckInput = { location: Location; lat: number; lng: number; accuracyM: number | null; selfieId: number }
+
+/**
+ * Owner decision 2026-10-09: "Absen bisa dilakukan di web dan juga aplikasi Android" — self
+ * check-in/out from the web admin panel, every role. Synchronous counterpart of the APK sync
+ * adapter (`domain/sync/service.ts` applyAttendance): same gates (company-settings
+ * syncAttendanceEnabled, ADR 0018 privacy ack) and the SAME single write path (recordAttendance
+ * above). Unlike the APK: no offline queue (no replay/idempotency table needed — `clientUuid` is
+ * generated here, one-shot), no mocked-location signal (browser geolocation has none to report),
+ * no "diabsenkan PM" (web self-service only; PM on-behalf stays an APK/sync feature).
+ */
+export async function recordWebAttendance(req: PayloadRequest, kind: AttendanceKind, input: WebCheckInput): Promise<{ id: number; localDate: string }> {
+  const uid = userId(req)
+  if (uid === undefined) reject('VALIDATION', 'Tidak terautentikasi.')
+  // ADR 0016 D1: the caller's employee IN THE LOCATION's PT (one employee per PT); an unmapped/missing
+  // location resolves to no company here too (recordAttendance → NOT_FOUND, QA-MC4-14).
+  const locCollection = input.location.type === 'project' ? 'projects' : 'cost-centers'
+  const locRaw = await companyOf(req, locCollection, input.location.id)
+  const mapped = mappedCompanies(req)
+  const locCompany = locRaw !== undefined && (mapped === null || mapped.includes(locRaw)) ? locRaw : undefined
+  const own = locCompany !== undefined ? employeeIn(req, locCompany) : await employeeOfUser(req, uid!)
+  if (own === undefined) reject('VALIDATION', 'Akun Anda belum terhubung ke data karyawan. Hubungi Admin.')
+  const company = locCompany ?? (await companyOf(req, 'employees', own))
+
+  const s = (await settings(req, company)) as { syncAttendanceEnabled?: boolean | null; timezone?: string | null }
+  if (s.syncAttendanceEnabled !== true) reject('FEATURE_DISABLED', 'Absensi dari web belum diaktifkan server (Setting perusahaan).')
+
+  const check = await privacyAckCheck(req, uid!)
+  if (check.required) {
+    await auditPrivacyDenied(req, check, { docType: 'attendance', field: `attendance.${kind}`, companyId: company ?? null })
+    reject(PRIVACY_ACK_REQUIRED, PRIVACY_ACK_REQUIRED_DETAIL)
+  }
+
+  const now = new Date()
+  return recordAttendance(req, {
+    kind,
+    employee: own!,
+    user: uid!,
+    location: input.location,
+    lat: input.lat,
+    lng: input.lng,
+    accuracyM: input.accuracyM,
+    isMocked: false,
+    selfieId: input.selfieId,
+    uploader: uid!,
+    time: now,
+    timeTrust: 'server',
+    estimatedTime: null,
+    receivedAt: now,
+    deviceTime: now.toISOString(),
+    offline: false,
+    flags: [],
+    clientUuid: randomUUID(),
+    device: null,
+    source: 'self',
+    recordedBy: null,
+    onBehalfReason: null,
+    timeZone: s.timezone || DEFAULT_TZ,
+  })
 }

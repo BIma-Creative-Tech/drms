@@ -159,9 +159,10 @@ describe('tile visibility per role (real config: admin.hidden + access.read + ro
     // QA-20(c): "Pengguna & Akses" (= own profile only) and "Sistem" (= own notifications only) are gone
     expect(ids(m).sort()).toEqual(['absensi', 'dashboard', 'keuangan'])
     const keu = m.find((x) => x.id === 'keuangan')!
-    expect(keu.sections.flatMap((s) => s.items.map((i) => i.href))).toEqual(['/admin/collections/expense-requests', '/admin/collections/expense-requests/create', '/admin/collections/receipts'])
+    expect(keu.sections.flatMap((s) => s.items.map((i) => i.href))).toEqual(['/admin/collections/expense-requests', '/admin/collections/expense-requests/create', '/admin/collections/receipts', '/admin/collections/settlements'])
     const abs = m.find((x) => x.id === 'absensi')!
-    expect(abs.sections.flatMap((s) => s.items.map((i) => i.label))).toEqual(['Rekap absensi saya'])
+    // owner decision 2026-10-09: web self check-in ("Absen") for every role
+    expect(abs.sections.flatMap((s) => s.items.map((i) => i.label))).toEqual(['Absen', 'Rekap absensi saya'])
     expect(hrefs(m)).not.toContain('/admin/kas')
     expect(hrefs(m)).not.toContain('/admin/laporan')
     for (const hidden of ['persetujuan', 'proyek', 'master', 'media', 'pengaturan', 'laporan', 'pengguna', 'sistem']) expect(ids(m)).not.toContain(hidden)
@@ -208,7 +209,7 @@ describe('tile visibility per role (real config: admin.hidden + access.read + ro
   it('a module with nothing visible is dropped; tile href = first visible item', () => {
     const r = resolveModules({ roles: ['pk-pm'], staffOnly: false, canSee: (k, s) => s === 'holidays', labelOf: (_, s) => s })
     const abs = r.find((x) => x.id === 'absensi')!
-    expect(abs.href).toBe('/admin/absensi')
+    expect(abs.href).toBe('/admin/absensi/absen') // "Absen" (every role, owner decision 2026-10-09) is the first item
     expect(r.find((x) => x.id === 'master')).toBeUndefined()
     expect(r.find((x) => x.id === 'media')).toBeUndefined()
   })
@@ -405,3 +406,22 @@ describe('breadcrumbs (deriveCrumbs)', () => {
   })
 })
 
+
+describe('pk-operator (owner decision 2026-10-09): attendance-only panel', () => {
+  it('sees only Dashboard + Absensi; inside Absensi only "Absen" and its own recap', async () => {
+    const m = await modulesFor(['pk-operator'])
+    expect(ids(m)).toEqual(['dashboard', 'absensi'])
+    expect(navKeys(m.filter((x) => x.id === 'absensi'))).toEqual(['absensi-absen', 'absensi-saya'])
+    expect(m.find((x) => x.id === 'absensi')!.sections[0]!.items.find((i) => i.navKey === 'absensi-saya')!.label).toBe('Rekap absensi saya')
+  })
+
+  it('every other role also gets the "Absen" entry (web self check-in for all roles)', async () => {
+    for (const r of ['pk-staff', 'pk-pm', 'pk-finance', 'pk-owner', 'pk-admin'] as Role[]) {
+      expect(navKeys(await modulesFor([r])), r).toContain('absensi-absen')
+    }
+  })
+
+  it('navUser flags an operator-only account', () => {
+    expect(navUser({ id: 1, roles: ['pk-operator'], name: 'Opr Satu' } as unknown as TypedUser)).toMatchObject({ operatorOnly: true, staffOnly: false, roleLabel: 'Operator/Anggota' })
+  })
+})

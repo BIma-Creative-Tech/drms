@@ -37,6 +37,7 @@ import * as migration_20261008_120100_qa_flow_lpj_source from './20261008_120100
 import * as migration_20261008_120200_qa_flow_orphan_job from './20261008_120200_qa_flow_orphan_job';
 import * as migration_20261009_090000_qa_settlements_guard_merge from './20261009_090000_qa_settlements_guard_merge';
 import * as migration_20261009_120000_list_row_actions_column from './20261009_120000_list_row_actions_column';
+import * as migration_20261010_080000_p2s_operator_role from './20261010_080000_p2s_operator_role';
 
 export const migrations = [
   {
@@ -233,5 +234,10 @@ export const migrations = [
     up: migration_20261009_120000_list_row_actions_column.up,
     down: migration_20261009_120000_list_row_actions_column.down,
     name: '20261009_120000_list_row_actions_column',
+  },
+  {
+    up: migration_20261010_080000_p2s_operator_role.up,
+    down: migration_20261010_080000_p2s_operator_role.down,
+    name: '20261010_080000_p2s_operator_role',
   },
 ];

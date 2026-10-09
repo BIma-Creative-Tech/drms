@@ -489,7 +489,7 @@ export interface CompanyMembership {
   user: number | User;
   company: number | Company;
   employee?: (number | null) | Employee;
-  roles?: ('pk-staff' | 'pk-pm' | 'pk-finance' | 'pk-owner' | 'pk-admin')[] | null;
+  roles?: ('pk-staff' | 'pk-pm' | 'pk-finance' | 'pk-owner' | 'pk-admin' | 'pk-operator')[] | null;
   active?: boolean | null;
   /**
    * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
@@ -970,14 +970,14 @@ export interface ApprovalRule {
   priority?: number | null;
   acknowledge: 'required' | 'optional' | 'none';
   acknowledgeBy: 'scope_manager' | 'role' | 'user';
-  acknowledgeRole?: ('pk-staff' | 'pk-pm' | 'pk-finance' | 'pk-owner' | 'pk-admin') | null;
+  acknowledgeRole?: ('pk-staff' | 'pk-pm' | 'pk-finance' | 'pk-owner' | 'pk-admin' | 'pk-operator') | null;
   acknowledgeUser?: (number | null) | User;
   signDiajukan: 'required' | 'optional' | 'none';
   signDibuat: 'required' | 'optional' | 'none';
   steps?:
     | {
         level: number;
-        approverRole?: ('pk-staff' | 'pk-pm' | 'pk-finance' | 'pk-owner' | 'pk-admin') | null;
+        approverRole?: ('pk-staff' | 'pk-pm' | 'pk-finance' | 'pk-owner' | 'pk-admin' | 'pk-operator') | null;
         approverUser?: (number | null) | User;
         id?: string | null;
       }[]

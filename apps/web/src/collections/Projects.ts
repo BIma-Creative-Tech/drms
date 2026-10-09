@@ -18,14 +18,17 @@ export const PROJECT_STATUSES = [
   { label: 'Arsip', value: 'arsip' },
 ] as const
 
-const ownerOnly = fieldRoles('pk-owner')
+/** Owner decision 2026-10-09: reverses QA-20(b) — PM and Admin gain the same project write rights as
+ * Direktur (additive, Direktur keeps them too). */
+const PROJECT_EDITOR_ROLES = ['pk-owner', 'pk-admin', 'pk-pm'] as const
+const projectEditors = fieldRoles(...PROJECT_EDITOR_ROLES)
 
 /**
- * Project (requirements v1.1 §4 "Project & tahapan"): Staff R assigned, PM R team,
- * Finance R, Owner C/R/U/archive, Admin R. No delete (US-29: archive only).
- * QA-20(b) (owner decision 2026-10-08): the PM is READ-ONLY on projects — only the Direktur of the
- * project's PT changes them (RAB changes go through addenda, T12; progress through progress reports
- * and the stage editor). A PM/Finance/Admin PATCH that changes a field → 403 naming the fields
+ * Project (requirements v1.1 §4 "Project & tahapan"): Staff R assigned, Finance R.
+ * Owner decision 2026-10-09 (reverses QA-20(b)/2026-10-08 "PM read-only, only Direktur edits"): PM
+ * and Admin now have the same C/R/U/archive rights as Direktur (`PROJECT_EDITOR_ROLES`); PM's write
+ * scope stays limited to their own team's projects, same as their read scope. No delete (US-29:
+ * archive only). A Finance/Staff PATCH that changes a field → 403 naming the fields
  * (`readOnlyFieldsGuard`), never a silent 200. `progressPct` (E4) = Σ(weight × stage %) / 100, written
  * only by the progress recalculation (domain/progress/recalc.ts; guard + DB trigger pk_progress_guard).
  */
@@ -42,16 +45,23 @@ export const Projects: CollectionConfig = withAudit(
         'pk-pm': async ({ scope }) => inIds('id', (await scope()).teamProjects),
         'pk-staff': assignedProjects('id'),
       }),
-      create: rolesAllowed('pk-owner'),
-      update: byRole({ 'pk-owner': true }),
+      create: rolesAllowed(...PROJECT_EDITOR_ROLES),
+      update: byRole({
+        'pk-owner': true,
+        'pk-admin': true,
+        'pk-pm': async ({ scope }) => inIds('id', (await scope()).teamProjects),
+      }),
       delete: denyAll,
     },
-    hooks: { beforeChange: [companyHook('projects', { check: [{ field: 'client', collection: 'clients' }, { field: 'pm', collection: 'users', member: true }] })], beforeOperation: [progressWriteGuard('projects'), readOnlyFieldsGuard('projects', (req, company) => hasRole(req, 'pk-owner', company), 'Direktur')] },
+    hooks: {
+      beforeChange: [companyHook('projects', { check: [{ field: 'client', collection: 'clients' }, { field: 'pm', collection: 'users', member: true }] })],
+      beforeOperation: [progressWriteGuard('projects'), readOnlyFieldsGuard('projects', (req, company) => hasRole(req, PROJECT_EDITOR_ROLES, company), 'Direktur, Admin, atau PM')],
+    },
     fields: [
       companyField(),
-      { ...codeField('Kode', 32, { perCompany: true }), access: { update: ownerOnly } },
+      { ...codeField('Kode', 32, { perCompany: true }), access: { update: projectEditors } },
       { name: 'name', type: 'text', label: 'Nama project', required: true, maxLength: 160 },
-      { name: 'client', type: 'relationship', relationTo: 'clients', label: 'Klien', access: { update: ownerOnly } },
+      { name: 'client', type: 'relationship', relationTo: 'clients', label: 'Klien', access: { update: projectEditors } },
       { name: 'address', type: 'textarea', label: 'Alamat', maxLength: 500 },
       {
         type: 'row',
@@ -62,8 +72,8 @@ export const Projects: CollectionConfig = withAudit(
         ],
       },
       // QA-16: only active PMs of the project's PT, shown by name (users.displayName)
-      { name: 'pm', type: 'relationship', relationTo: 'users', label: 'Project Manager', index: true, access: { update: ownerOnly }, ...userPicker({ roles: ['pk-pm'] }) },
-      { ...rupiahField('budget', 'RAB (Rp)'), access: { update: ownerOnly } },
+      { name: 'pm', type: 'relationship', relationTo: 'users', label: 'Project Manager', index: true, access: { update: projectEditors }, ...userPicker({ roles: ['pk-pm'] }) },
+      { ...rupiahField('budget', 'RAB (Rp)'), access: { update: projectEditors } },
       {
         type: 'row',
         fields: [
@@ -79,7 +89,7 @@ export const Projects: CollectionConfig = withAudit(
         defaultValue: 'perencanaan',
         options: [...PROJECT_STATUSES],
         index: true,
-        access: { update: ownerOnly },
+        access: { update: projectEditors },
       },
       {
         ...percentField('progressPct', 'Progress fisik (%)'),

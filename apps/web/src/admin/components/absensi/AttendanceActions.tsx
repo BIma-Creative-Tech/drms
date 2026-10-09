@@ -1,11 +1,12 @@
 'use client'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import React, { useId, useRef, useState } from 'react'
 
 import { geofenceError } from '@/domain/attendance/calendar'
 import { errorLine } from '@/lib/field-labels'
 
-import { newIdemKey, sendJson } from '../kas/client'
+import { newIdemKey, sendJson, uploadSelfie } from '../kas/client'
 
 /**
  * E6 web (S2) client actions of the attendance views. Same pattern as the Kas dialogs (native modal
@@ -439,4 +440,103 @@ export function GeofenceForm({ costCenterId, name, lat, lng, radiusM, defaultRad
       )}
     </form>
   )
+}
+
+export type SelfCheckLocation = { type: 'project' | 'cost_center'; id: number; label: string; checkIn: string | null; checkOut: string | null }
+
+function getPosition(): Promise<GeolocationPosition> {
+  return new Promise((resolve, reject) => {
+    if (!('geolocation' in navigator)) return reject(new Error('Perangkat/browser ini tidak mendukung GPS.'))
+    navigator.geolocation.getCurrentPosition(resolve, (e) => reject(new Error(e.message || 'Gagal mengambil lokasi GPS. Izinkan akses lokasi lalu coba lagi.')), {
+      enableHighAccuracy: true,
+      timeout: 15_000,
+      maximumAge: 0,
+    })
+  })
+}
+
+/**
+ * Owner decision 2026-10-09: web self check-in/out, every role (the APK's existing feature,
+ * available from the web admin panel too — same server-side rules, POST /attendance/check-in and
+ * /check-out). One location at a time: "Absen Masuk" when it has no check-in yet today, "Absen
+ * Pulang" when it has a check-in but no check-out, nothing to do once both are recorded.
+ */
+export function SelfCheckForm({ locations, privacyBlocked }: { locations: SelfCheckLocation[]; privacyBlocked: boolean }) {
+  const router = useRouter()
+  const fileRef = useRef<HTMLInputElement>(null)
+  const [locKey, setLocKey] = useState(locations[0] ? `${locations[0].type}:${locations[0].id}` : '')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const loc = locations.find((l) => `${l.type}:${l.id}` === locKey)
+  const action: 'check_in' | 'check_out' | null = loc ? (!loc.checkIn ? 'check_in' : !loc.checkOut ? 'check_out' : null) : null
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError(null)
+    if (!loc || !action) return
+    const file = fileRef.current?.files?.[0]
+    if (!file) return setError('Ambil foto selfie dulu.')
+    setBusy(true)
+    try {
+      const pos = await getPosition()
+      const selfieId = await uploadSelfie(file)
+      const body = {
+        [loc.type === 'project' ? 'project_id' : 'cost_center_id']: loc.id,
+        lat: pos.coords.latitude,
+        lng: pos.coords.longitude,
+        accuracy_m: pos.coords.accuracy ?? null,
+        selfie_media_id: selfieId,
+      }
+      const r = await sendJson('POST', `/api/v1/attendance/${action === 'check_in' ? 'check-in' : 'check-out'}`, body)
+      if (!r.ok) return setError(r.error ?? 'Gagal mengirim absensi.')
+      if (fileRef.current) fileRef.current.value = ''
+      router.refresh()
+    } catch (err) {
+      setError((err as Error).message || 'Gagal mengirim absensi.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  if (locations.length === 0) return <EmptyStateInline text="Anda belum ditugaskan ke project/pusat biaya manapun. Hubungi Admin untuk penugasan (Team Assignment)." />
+  if (privacyBlocked) {
+    return (
+      <p className="pk-kerr" role="alert">
+        Anda belum menekan &quot;Saya mengerti&quot; pada pemberitahuan privasi terbaru. Baca{' '}
+        <Link href="/privasi">pemberitahuan privasi</Link>, muat ulang halaman ini, lalu absen ulang.
+      </p>
+    )
+  }
+  return (
+    <form className="pk-kform" onSubmit={submit} data-pk-form="self-check">
+      <label>
+        Lokasi
+        <select value={locKey} onChange={(e) => setLocKey(e.target.value)} disabled={busy}>
+          {locations.map((l) => (
+            <option key={`${l.type}:${l.id}`} value={`${l.type}:${l.id}`}>
+              {l.label} {l.checkOut ? '(selesai hari ini)' : l.checkIn ? '(sudah absen masuk)' : ''}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label>
+        Foto selfie
+        <input ref={fileRef} type="file" accept="image/*" capture="user" aria-label="Foto selfie" disabled={busy || !action} />
+      </label>
+      <div className="pk-actions">
+        <button type="submit" className="pk-kbtn primary" disabled={busy || !action} data-pk-action={action ?? 'none'}>
+          {busy ? 'Mengirim…' : action === 'check_in' ? 'Absen Masuk' : action === 'check_out' ? 'Absen Pulang' : 'Sudah selesai hari ini'}
+        </button>
+      </div>
+      {error ? (
+        <p className="pk-kerr" role="alert">
+          {error}
+        </p>
+      ) : null}
+    </form>
+  )
+}
+
+function EmptyStateInline({ text }: { text: string }) {
+  return <p className="pk-muted">{text}</p>
 }
