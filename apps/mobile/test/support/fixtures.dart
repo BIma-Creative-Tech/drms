@@ -24,8 +24,7 @@ Map<String, dynamic> detailJson({
   'uuid': 'u-1',
   'project': null,
   'costCenter': {'id': 7, 'code': 'OPS-PB', 'name': 'Ops Palangka Banjar'},
-  'periodFrom': null,
-  'periodTo': null,
+  'urgencyLevel': null,
   'notes': null,
   'requesters': [
     {'id': 11, 'code': 'E11', 'name': 'Budi'},

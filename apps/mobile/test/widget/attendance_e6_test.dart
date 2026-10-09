@@ -89,10 +89,17 @@ void main() {
       expect(find.byKey(const Key('team-member-45')), findsOneWidget);
     });
 
-    testWidgets('Direktur: team view only (no own attendance)', (tester) async {
+    testWidgets('Direktur: own attendance + team (owner decision 2026-10-09: every role may check in)', (tester) async {
       await pumpHub(tester, {Role.owner});
-      expect(find.byType(TabBar), findsNothing);
+      expect(find.byKey(const Key('attendance-tab-team')), findsOneWidget);
+      await tester.tap(find.byKey(const Key('attendance-tab-team')));
+      await tester.pumpAndSettle();
       expect(find.byKey(const Key('team-member-44')), findsOneWidget);
+    });
+
+    testWidgets('Operator/Anggota: own attendance only, no team tab', (tester) async {
+      await pumpHub(tester, {Role.operator});
+      expect(find.byKey(const Key('attendance-tab-team')), findsNothing);
     });
 
     testWidgets('cost center as location: distance card with radius, then check-in enabled', (tester) async {

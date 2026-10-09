@@ -72,13 +72,15 @@ class HomeScreen extends ConsumerWidget {
           onPressed: () => context.push('/drafts/new?type=${RequestType.reimburse.code}'),
         ),
       ],
-      ModuleTile(
-        key: const Key('home-requests'),
-        module: PkModule.laporan,
-        icon: PkIcons.requests,
-        label: kind == HomeKind.direktur || kind == HomeKind.finance ? t.actionAllRequests : t.actionMyRequests,
-        onPressed: () => context.go('/requests'),
-      ),
+      // Owner decision 2026-10-09: an Operator/Anggota-only account has no requests (attendance only).
+      if (!profile.isOperatorOnly)
+        ModuleTile(
+          key: const Key('home-requests'),
+          module: PkModule.laporan,
+          icon: PkIcons.requests,
+          label: kind == HomeKind.direktur || kind == HomeKind.finance ? t.actionAllRequests : t.actionMyRequests,
+          onPressed: () => context.go('/requests'),
+        ),
       if (profile.canReadProgress)
         ModuleTile(
           key: const Key('home-progress'),

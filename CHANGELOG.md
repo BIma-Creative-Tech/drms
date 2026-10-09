@@ -10,6 +10,10 @@ Owner decisions 2026-10-09 (roles, web attendance, LPJ for Staff, urgency level)
 `20261010_080000_p2s_operator_role` (enum value `pk-operator`; additive) and `20261010_090000_p2s_urgency_level`
 (**drops `expense_requests.period_from/period_to`** — values are not kept; rollback = restore the pre-deploy dump).
 
+APK **mobile-v0.3.6** (pubspec `0.3.6+1`, notes `docs/release-notes/apk/0.3.6.md`; needs this server — the APK asks
+for the master type `urgency-levels`): role Operator/Anggota (home = Absensi only), own attendance for every role,
+"Tingkat urgensi" picker on drafts (drift schema **v4**: `local_drafts.urgency_level_id`, existing drafts kept).
+
 ### Removed
 
 - **"Periode kegiatan"** (periodFrom/periodTo) on expense requests and the receipt flag "di luar periode kegiatan"

@@ -252,8 +252,9 @@ abstract class ExpenseDetail with _$ExpenseDetail {
     int? rev,
     int? resubmitOfId,
     int? createdById,
-    String? periodFrom,
-    String? periodTo,
+
+    /// Owner decision 2026-10-09: "Tingkat urgensi" (replaces the activity period).
+    RefItem? urgencyLevel,
     int? bankAccountId,
 
     /// MC3: PT of the request (`companyId`).

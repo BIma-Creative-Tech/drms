@@ -110,6 +110,7 @@ class _DetailBody extends StatelessWidget {
         row(t.requesters, d.requesters.map((r) => r.name ?? '-').join(', ')),
         if (d.createdByName != null) row(t.createdBy, d.createdByName!),
         row(t.neededDate, formatDateOnly(d.neededDate)),
+        if (d.urgencyLevel != null) row(t.fieldUrgency, d.urgencyLevel!.name ?? '-'),
         if (d.requestDate != null) row(t.requestDate, formatDateOnly(d.requestDate)),
         if (d.bankName != null || d.bankAccountNo != null)
           row(t.bankAccount, [d.bankName, d.bankAccountHolder, d.bankAccountNo].whereType<String>().join(' · ')),
