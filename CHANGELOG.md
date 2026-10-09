@@ -8,9 +8,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
-- **Field reports per project kind — P1 backend** (ADR 0020, requirements v1.3 US-60…US-68; DRMS first, behind the
-  per-PT flag **`companies.fieldReportsEnabled`, default OFF**). Web views, the service PDF and the APK screens follow
-  (P1 web / P2 APK).
+- **Field reports per project kind — P1 backend + admin web views** (ADR 0020, requirements v1.3 US-60…US-68; DRMS
+  first, behind the per-PT flag **`companies.fieldReportsEnabled`, default OFF**). The service PDF and the APK screens
+  follow (P2 APK).
   - **Project kind** `projects.kind` (`umum` default for every existing project, `konstruksi`, `kontrak_unit`,
     `aftersales`, `trading`): decides the available reports (kontrak_unit → timesheet + service report; aftersales →
     service report + aftersales log); set by the Direktur or the Admin of the PT (Admin: the kind only), frozen once
@@ -37,8 +37,32 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
     `server_aftersales_activity`). Masters: `projects.kind`, unit fields on `vehicles`.
   - Shared UoMs M, M1, M2, M3, KG, TON, SAK, ZAK, BTG, LBR, TITIK, BH, SET, ROLL, KALENG, BKS, OH, JAM, LTR, HM (only codes
     that do not exist yet).
-  - Admin: collections under Proyek › "Laporan lapangan" (list views); Staff may upload photos to
+  - Admin: collections under Proyek › "Laporan lapangan" (list views, now "Data …"); Staff may upload photos to
     `media-progress-photos` only in a PT with field reports on.
+  - **Admin web views** (Proyek › "Laporan lapangan", shown only when a selected PT has the flag on and the role may
+    use them; otherwise the uniform no-access page with a "belum diaktifkan" hint):
+    - **Unit & kontrak** (`/admin/unit-kontrak`): contracts (kontrak_unit projects) with today's fill status and the
+      heavy-equipment units; contract detail with tabs **Timesheet** (matrix unit × day per month: work hours,
+      red = not filled, orange = breakdown, ⚠ = HM gap; a cell opens the timesheet or the prefilled input form),
+      **Rekap** (office/PM: HM start → end, work/standby/breakdown, availability, days not filled and — Direktur /
+      Finance / Admin only — rate and **billing estimate, labelled "Estimasi — bukan invoice"**; Excel/PDF/CSV via the
+      `rekap-timesheet-kontrak` report), **Unit** (contract units; add/edit for Direktur/Admin) and **Timeline**;
+      unit detail (identity, owner, status, last HM, service + timesheet history); timesheet detail and **web input**
+      (units active in the contract on the date, HM start prefilled from the previous HM end via the API with a live
+      HM-gap hint, Σ hours ≤ 24 live check, breakdown reason, "Salin dari kemarin", required HM photo).
+    - **Laporan servis** (`/admin/laporan-servis`): list (project, unit, mechanic, unit status, dates), detail (spare
+      parts, photos, history incl. corrections) and web input (APK field set, ≤ 10 photos).
+    - **Aftersales** (`/admin/aftersales`): weekly recap (PO in / delivered / open POs / PO value for the rate roles,
+      per customer, "Perlu ditindaklanjuti" = open POs with age + due quotation follow-ups, the week's activities,
+      exports via `rekap-aftersales`), activity list with filters, detail (deliveries of a PO, "Catat pengiriman") and
+      quick input (customer, kind chips, open-PO picker, items, optional value, follow-up, receiver, ≤ 5 photos).
+    - Corrections: PM of the team / Direktur with a required reason (`…/corrections`); the reporter's own edit within
+      24 h. Photos on the web go through `POST /api/v1/media/progress-photos` (non-JPEG converted in the browser).
+    - **Project timeline**: tab "Timeline" in the project detail (`/admin/progress/project/{id}?tab=timeline`) and the
+      contract detail — every field report of the project per date (service reports, timesheet day summaries "2 dari 3
+      unit diisi", activities; hook for the P3 daily reports) with type chips and "Buka" buttons.
+    - Staff and PM never see rates, estimates or aftersales values (no empty "Rp" columns); a reporter sees the value
+      they entered only on that activity's detail. Notifications and report rows link to these views.
   - Migrations (run as `<prefix>_owner`): `20261010_100000_fr1_foundation` (kind, unit fields, contract units, flag,
     numbering enum value, UoMs), `20261010_110000_fr1_field_reports` (three tables, SV sequence for every PT),
     `20261010_120000_fr1_security` (triggers: window/override, no delete, identity, cross-PT, project kind, contract
