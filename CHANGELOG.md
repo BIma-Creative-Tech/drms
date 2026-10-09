@@ -43,6 +43,8 @@ for the master type `urgency-levels`): role Operator/Anggota (home = Absensi onl
   QA-20(b)/(d) of 2026-10-08).
 - **PM may create projects** and stages; PM edits stay limited to the PM's team projects. Finance/Staff remain
   read-only (403 naming the fields).
+- Web *Absensi → Absen* is an APK-style field screen: one card per assigned location with today's state, large tap
+  targets, one wide "Absen Masuk / Absen Pulang" button.
 - **LPJ visible for Staff** in the web panel (`settlements` added to the Staff menu; read access was already there).
 
 ## [0.6.4] - 2026-10-09
