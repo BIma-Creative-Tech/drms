@@ -25,6 +25,7 @@ import '../features/expense/data/expense_api.dart';
 import '../features/masters/data/masters_repository.dart';
 import '../features/attendance/data/attendance_api.dart';
 import '../features/notifications/data/push_service.dart';
+import '../features/field_reports/data/field_repository.dart';
 import '../features/progress/data/progress_api.dart';
 import '../features/progress/data/progress_repository.dart';
 import '../features/sync/domain/sync_models.dart';
@@ -106,6 +107,7 @@ final syncApiProvider = Provider((ref) => SyncApi(ref.watch(apiClientProvider)))
 
 final draftRepositoryProvider = Provider((ref) => DraftRepository(ref.watch(databaseProvider)));
 final progressRepositoryProvider = Provider((ref) => ProgressRepository(ref.watch(databaseProvider)));
+final fieldRepositoryProvider = Provider((ref) => FieldRepository(ref.watch(databaseProvider)));
 final progressApiProvider = Provider((ref) => ProgressApi(ref.watch(apiClientProvider)));
 final attendanceApiProvider = Provider((ref) => AttendanceApi(ref.watch(apiClientProvider)));
 final outboxRepositoryProvider = Provider((ref) => OutboxRepository(ref.watch(databaseProvider)));
@@ -134,6 +136,7 @@ final syncEngineProvider = Provider((ref) {
     deviceId: () => device.deviceId,
     lock: ref.watch(syncLockProvider),
     progress: ref.watch(progressRepositoryProvider),
+    field: ref.watch(fieldRepositoryProvider),
     // Local kind → `POST /media/{kind}`: receipts, attendance selfies (F4b/E6), progress photos (E4).
     uploadMedia: (blob) => ref
         .read(expenseApiProvider)

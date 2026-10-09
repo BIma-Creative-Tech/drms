@@ -17,6 +17,7 @@ import '../../../core/util/async_lock.dart';
 import '../../auth/data/token_manager.dart';
 import '../../expense/data/draft_repository.dart';
 import '../../expense/data/expense_api.dart';
+import '../../field_reports/data/field_repository.dart';
 import '../../progress/data/progress_repository.dart';
 import '../application/sync_engine.dart';
 import '../data/outbox_repository.dart';
@@ -196,6 +197,7 @@ BackgroundSyncDeps platformDeps({
     deviceId: () => device.deviceId,
     lock: AsyncLock(),
     progress: ProgressRepository(db),
+    field: FieldRepository(db),
     uploadMedia: (blob) => expenseApi.uploadMedia(
       mediaUploadPath(blob.kind),
       blob.bytes,

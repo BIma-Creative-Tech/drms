@@ -42,6 +42,7 @@ enum HomeKind { direktur, finance, pm, staff }
 /// `GET /api/v1/me` `capabilities` (E1, ADR 0013): UI hints only — the server guards stay authoritative.
 @freezed
 abstract class Capabilities with _$Capabilities {
+  const Capabilities._();
   const factory Capabilities({
     /// Direktur (`pk-owner`) or Finance (`pk-finance`): "Persetujuan" inbox.
     @Default(false) bool approvalInbox,
@@ -51,7 +52,20 @@ abstract class Capabilities with _$Capabilities {
 
     /// E4: PM (team projects) or Direktur (all) may create progress reports; Staff cannot.
     @Default(false) bool progressReportCreate,
+
+    /// FR1 (ADR 0020): field reports on for the PT and Staff (assigned) / PM (team) / Direktur → service
+    /// reports on kontrak_unit / aftersales projects. The server already folds the PT flag in.
+    @Default(false) bool serviceReportCreate,
+
+    /// FR1: unit timesheets on kontrak_unit projects (same rule).
+    @Default(false) bool unitTimesheetCreate,
+
+    /// FR1: aftersales activities on aftersales projects (same rule).
+    @Default(false) bool aftersalesActivityCreate,
   }) = _Capabilities;
+
+  /// FR1: any field-report create right.
+  bool get anyField => serviceReportCreate || unitTimesheetCreate || aftersalesActivityCreate;
 
   /// Fallback for a `/me` cached by an app version before E1 (no `capabilities` field): the same
   /// rule the server applies (`apps/web/src/api/v1/endpoints/me.ts`).
@@ -83,6 +97,9 @@ abstract class CompanySettings with _$CompanySettings {
     @Default(true) bool syncExpenseDraftsEnabled,
     @Default(false) bool syncAttendanceEnabled,
     @Default(false) bool syncProgressReportsEnabled,
+
+    /// FR1 (ADR 0020 §10): "Laporan lapangan per jenis project" switched on for this PT (default off).
+    @Default(false) bool fieldReportsEnabled,
   }) = _CompanySettings;
 }
 
@@ -105,6 +122,9 @@ abstract class CompanyMembership with _$CompanyMembership {
   }) = _CompanyMembership;
 
   bool has(Role r) => roles.contains(r);
+
+  /// FR1: field reports on in this PT and at least one create capability here.
+  bool get hasFieldReports => settings.fieldReportsEnabled && capabilities.anyField;
 
   /// Same rule as [UserProfile.canCreateRequests], applied to the roles IN this PT.
   bool get canCreateRequests => has(Role.staff) || has(Role.pm) || has(Role.admin);
@@ -180,6 +200,9 @@ abstract class UserProfile with _$UserProfile {
         approvalInbox: scope.any((c) => c.capabilities.approvalInbox),
         teamMonitor: scope.any((c) => c.capabilities.teamMonitor),
         progressReportCreate: scope.any((c) => c.capabilities.progressReportCreate),
+        serviceReportCreate: scope.any((c) => c.capabilities.serviceReportCreate),
+        unitTimesheetCreate: scope.any((c) => c.capabilities.unitTimesheetCreate),
+        aftersalesActivityCreate: scope.any((c) => c.capabilities.aftersalesActivityCreate),
       ),
       employee: primary.employee,
       timezone: primary.timezone,
@@ -248,6 +271,17 @@ abstract class UserProfile with _$UserProfile {
 
   /// E4: create a progress report (server capability `progressReportCreate`).
   bool get canCreateProgress => capabilities.progressReportCreate;
+
+  /// FR1: PTs of the scope where the user may create at least one field report (flag on + capability).
+  List<CompanyMembership> get fieldCompanies => scopedCompanies.where((c) => c.hasFieldReports).toList();
+
+  /// FR1 "Laporan Lapangan" tile: a field-report capability in the scope (the server folds the PT flag into
+  /// the capabilities; the flag is checked too when the PT is known). Never for an Operator-only account.
+  bool get hasFieldReports {
+    if (isOperatorOnly) return false;
+    if (companies.isEmpty) return capabilities.anyField;
+    return fieldCompanies.isNotEmpty;
+  }
 
   /// E6: own check-in/out and own monthly recap. Owner decision 2026-10-09: every role (the server
   /// still requires an employee with a team assignment at a geofenced location).

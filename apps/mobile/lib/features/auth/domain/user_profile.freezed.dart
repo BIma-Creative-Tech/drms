@@ -18,7 +18,11 @@ mixin _$Capabilities {
 /// Direktur (`pk-owner`) or Finance (`pk-finance`): "Persetujuan" inbox.
  bool get approvalInbox;/// PM (`pk-pm`): team list / team dashboard, monitoring only (no decisions).
  bool get teamMonitor;/// E4: PM (team projects) or Direktur (all) may create progress reports; Staff cannot.
- bool get progressReportCreate;
+ bool get progressReportCreate;/// FR1 (ADR 0020): field reports on for the PT and Staff (assigned) / PM (team) / Direktur → service
+/// reports on kontrak_unit / aftersales projects. The server already folds the PT flag in.
+ bool get serviceReportCreate;/// FR1: unit timesheets on kontrak_unit projects (same rule).
+ bool get unitTimesheetCreate;/// FR1: aftersales activities on aftersales projects (same rule).
+ bool get aftersalesActivityCreate;
 /// Create a copy of Capabilities
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -30,20 +34,20 @@ $CapabilitiesCopyWith<Capabilities> get copyWith => _$CapabilitiesCopyWithImpl<C
 @override
 bool operator ==(Object other) {
   final _this = this as Capabilities;
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is Capabilities&&(identical(other.approvalInbox, _this.approvalInbox) || other.approvalInbox == _this.approvalInbox)&&(identical(other.teamMonitor, _this.teamMonitor) || other.teamMonitor == _this.teamMonitor)&&(identical(other.progressReportCreate, _this.progressReportCreate) || other.progressReportCreate == _this.progressReportCreate));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is Capabilities&&(identical(other.approvalInbox, _this.approvalInbox) || other.approvalInbox == _this.approvalInbox)&&(identical(other.teamMonitor, _this.teamMonitor) || other.teamMonitor == _this.teamMonitor)&&(identical(other.progressReportCreate, _this.progressReportCreate) || other.progressReportCreate == _this.progressReportCreate)&&(identical(other.serviceReportCreate, _this.serviceReportCreate) || other.serviceReportCreate == _this.serviceReportCreate)&&(identical(other.unitTimesheetCreate, _this.unitTimesheetCreate) || other.unitTimesheetCreate == _this.unitTimesheetCreate)&&(identical(other.aftersalesActivityCreate, _this.aftersalesActivityCreate) || other.aftersalesActivityCreate == _this.aftersalesActivityCreate));
 }
 
 
 @override
 int get hashCode {
   final _this = this as Capabilities;
-  return Object.hash(runtimeType,_this.approvalInbox,_this.teamMonitor,_this.progressReportCreate);
+  return Object.hash(runtimeType,_this.approvalInbox,_this.teamMonitor,_this.progressReportCreate,_this.serviceReportCreate,_this.unitTimesheetCreate,_this.aftersalesActivityCreate);
 }
 
 @override
 String toString() {
   final _this = this as Capabilities;
-  return 'Capabilities(approvalInbox: ${_this.approvalInbox}, teamMonitor: ${_this.teamMonitor}, progressReportCreate: ${_this.progressReportCreate})';
+  return 'Capabilities(approvalInbox: ${_this.approvalInbox}, teamMonitor: ${_this.teamMonitor}, progressReportCreate: ${_this.progressReportCreate}, serviceReportCreate: ${_this.serviceReportCreate}, unitTimesheetCreate: ${_this.unitTimesheetCreate}, aftersalesActivityCreate: ${_this.aftersalesActivityCreate})';
 }
 
 
@@ -54,7 +58,7 @@ abstract mixin class $CapabilitiesCopyWith<$Res>  {
   factory $CapabilitiesCopyWith(Capabilities value, $Res Function(Capabilities) _then) = _$CapabilitiesCopyWithImpl;
 @useResult
 $Res call({
- bool approvalInbox, bool teamMonitor, bool progressReportCreate
+ bool approvalInbox, bool teamMonitor, bool progressReportCreate, bool serviceReportCreate, bool unitTimesheetCreate, bool aftersalesActivityCreate
 });
 
 
@@ -71,11 +75,14 @@ class _$CapabilitiesCopyWithImpl<$Res>
 
 /// Create a copy of Capabilities
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? approvalInbox = null,Object? teamMonitor = null,Object? progressReportCreate = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? approvalInbox = null,Object? teamMonitor = null,Object? progressReportCreate = null,Object? serviceReportCreate = null,Object? unitTimesheetCreate = null,Object? aftersalesActivityCreate = null,}) {
   return _then(Capabilities(
 approvalInbox: null == approvalInbox ? _self.approvalInbox : approvalInbox // ignore: cast_nullable_to_non_nullable
 as bool,teamMonitor: null == teamMonitor ? _self.teamMonitor : teamMonitor // ignore: cast_nullable_to_non_nullable
 as bool,progressReportCreate: null == progressReportCreate ? _self.progressReportCreate : progressReportCreate // ignore: cast_nullable_to_non_nullable
+as bool,serviceReportCreate: null == serviceReportCreate ? _self.serviceReportCreate : serviceReportCreate // ignore: cast_nullable_to_non_nullable
+as bool,unitTimesheetCreate: null == unitTimesheetCreate ? _self.unitTimesheetCreate : unitTimesheetCreate // ignore: cast_nullable_to_non_nullable
+as bool,aftersalesActivityCreate: null == aftersalesActivityCreate ? _self.aftersalesActivityCreate : aftersalesActivityCreate // ignore: cast_nullable_to_non_nullable
 as bool,
   ));
 }
@@ -161,10 +168,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( bool approvalInbox,  bool teamMonitor,  bool progressReportCreate)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( bool approvalInbox,  bool teamMonitor,  bool progressReportCreate,  bool serviceReportCreate,  bool unitTimesheetCreate,  bool aftersalesActivityCreate)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _Capabilities() when $default != null:
-return $default(_that.approvalInbox,_that.teamMonitor,_that.progressReportCreate);case _:
+return $default(_that.approvalInbox,_that.teamMonitor,_that.progressReportCreate,_that.serviceReportCreate,_that.unitTimesheetCreate,_that.aftersalesActivityCreate);case _:
   return orElse();
 
 }
@@ -182,10 +189,10 @@ return $default(_that.approvalInbox,_that.teamMonitor,_that.progressReportCreate
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( bool approvalInbox,  bool teamMonitor,  bool progressReportCreate)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( bool approvalInbox,  bool teamMonitor,  bool progressReportCreate,  bool serviceReportCreate,  bool unitTimesheetCreate,  bool aftersalesActivityCreate)  $default,) {final _that = this;
 switch (_that) {
 case _Capabilities():
-return $default(_that.approvalInbox,_that.teamMonitor,_that.progressReportCreate);case _:
+return $default(_that.approvalInbox,_that.teamMonitor,_that.progressReportCreate,_that.serviceReportCreate,_that.unitTimesheetCreate,_that.aftersalesActivityCreate);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -202,10 +209,10 @@ return $default(_that.approvalInbox,_that.teamMonitor,_that.progressReportCreate
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( bool approvalInbox,  bool teamMonitor,  bool progressReportCreate)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( bool approvalInbox,  bool teamMonitor,  bool progressReportCreate,  bool serviceReportCreate,  bool unitTimesheetCreate,  bool aftersalesActivityCreate)?  $default,) {final _that = this;
 switch (_that) {
 case _Capabilities() when $default != null:
-return $default(_that.approvalInbox,_that.teamMonitor,_that.progressReportCreate);case _:
+return $default(_that.approvalInbox,_that.teamMonitor,_that.progressReportCreate,_that.serviceReportCreate,_that.unitTimesheetCreate,_that.aftersalesActivityCreate);case _:
   return null;
 
 }
@@ -216,8 +223,8 @@ return $default(_that.approvalInbox,_that.teamMonitor,_that.progressReportCreate
 /// @nodoc
 
 
-class _Capabilities implements Capabilities {
-  const _Capabilities({this.approvalInbox = false, this.teamMonitor = false, this.progressReportCreate = false});
+class _Capabilities extends Capabilities {
+  const _Capabilities({this.approvalInbox = false, this.teamMonitor = false, this.progressReportCreate = false, this.serviceReportCreate = false, this.unitTimesheetCreate = false, this.aftersalesActivityCreate = false}): super._();
   
 
 /// Direktur (`pk-owner`) or Finance (`pk-finance`): "Persetujuan" inbox.
@@ -226,6 +233,13 @@ class _Capabilities implements Capabilities {
 @override@JsonKey() final  bool teamMonitor;
 /// E4: PM (team projects) or Direktur (all) may create progress reports; Staff cannot.
 @override@JsonKey() final  bool progressReportCreate;
+/// FR1 (ADR 0020): field reports on for the PT and Staff (assigned) / PM (team) / Direktur → service
+/// reports on kontrak_unit / aftersales projects. The server already folds the PT flag in.
+@override@JsonKey() final  bool serviceReportCreate;
+/// FR1: unit timesheets on kontrak_unit projects (same rule).
+@override@JsonKey() final  bool unitTimesheetCreate;
+/// FR1: aftersales activities on aftersales projects (same rule).
+@override@JsonKey() final  bool aftersalesActivityCreate;
 
 /// Create a copy of Capabilities
 /// with the given fields replaced by the non-null parameter values.
@@ -237,18 +251,18 @@ _$CapabilitiesCopyWith<_Capabilities> get copyWith => __$CapabilitiesCopyWithImp
 
 @override
 bool operator ==(Object other) {
-    return identical(this, other) || (other.runtimeType == runtimeType&&other is _Capabilities&&(identical(other.approvalInbox, approvalInbox) || other.approvalInbox == approvalInbox)&&(identical(other.teamMonitor, teamMonitor) || other.teamMonitor == teamMonitor)&&(identical(other.progressReportCreate, progressReportCreate) || other.progressReportCreate == progressReportCreate));
+    return identical(this, other) || (other.runtimeType == runtimeType&&other is _Capabilities&&(identical(other.approvalInbox, approvalInbox) || other.approvalInbox == approvalInbox)&&(identical(other.teamMonitor, teamMonitor) || other.teamMonitor == teamMonitor)&&(identical(other.progressReportCreate, progressReportCreate) || other.progressReportCreate == progressReportCreate)&&(identical(other.serviceReportCreate, serviceReportCreate) || other.serviceReportCreate == serviceReportCreate)&&(identical(other.unitTimesheetCreate, unitTimesheetCreate) || other.unitTimesheetCreate == unitTimesheetCreate)&&(identical(other.aftersalesActivityCreate, aftersalesActivityCreate) || other.aftersalesActivityCreate == aftersalesActivityCreate));
 }
 
 
 @override
 int get hashCode {
-    return Object.hash(runtimeType,approvalInbox,teamMonitor,progressReportCreate);
+    return Object.hash(runtimeType,approvalInbox,teamMonitor,progressReportCreate,serviceReportCreate,unitTimesheetCreate,aftersalesActivityCreate);
 }
 
 @override
 String toString() {
-    return 'Capabilities(approvalInbox: $approvalInbox, teamMonitor: $teamMonitor, progressReportCreate: $progressReportCreate)';
+    return 'Capabilities(approvalInbox: $approvalInbox, teamMonitor: $teamMonitor, progressReportCreate: $progressReportCreate, serviceReportCreate: $serviceReportCreate, unitTimesheetCreate: $unitTimesheetCreate, aftersalesActivityCreate: $aftersalesActivityCreate)';
 }
 
 
@@ -259,7 +273,7 @@ abstract mixin class _$CapabilitiesCopyWith<$Res> implements $CapabilitiesCopyWi
   factory _$CapabilitiesCopyWith(_Capabilities value, $Res Function(_Capabilities) _then) = __$CapabilitiesCopyWithImpl;
 @override @useResult
 $Res call({
- bool approvalInbox, bool teamMonitor, bool progressReportCreate
+ bool approvalInbox, bool teamMonitor, bool progressReportCreate, bool serviceReportCreate, bool unitTimesheetCreate, bool aftersalesActivityCreate
 });
 
 
@@ -276,11 +290,14 @@ class __$CapabilitiesCopyWithImpl<$Res>
 
 /// Create a copy of Capabilities
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? approvalInbox = null,Object? teamMonitor = null,Object? progressReportCreate = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? approvalInbox = null,Object? teamMonitor = null,Object? progressReportCreate = null,Object? serviceReportCreate = null,Object? unitTimesheetCreate = null,Object? aftersalesActivityCreate = null,}) {
   return _then(_Capabilities(
 approvalInbox: null == approvalInbox ? _self.approvalInbox : approvalInbox // ignore: cast_nullable_to_non_nullable
 as bool,teamMonitor: null == teamMonitor ? _self.teamMonitor : teamMonitor // ignore: cast_nullable_to_non_nullable
 as bool,progressReportCreate: null == progressReportCreate ? _self.progressReportCreate : progressReportCreate // ignore: cast_nullable_to_non_nullable
+as bool,serviceReportCreate: null == serviceReportCreate ? _self.serviceReportCreate : serviceReportCreate // ignore: cast_nullable_to_non_nullable
+as bool,unitTimesheetCreate: null == unitTimesheetCreate ? _self.unitTimesheetCreate : unitTimesheetCreate // ignore: cast_nullable_to_non_nullable
+as bool,aftersalesActivityCreate: null == aftersalesActivityCreate ? _self.aftersalesActivityCreate : aftersalesActivityCreate // ignore: cast_nullable_to_non_nullable
 as bool,
   ));
 }
@@ -828,7 +845,8 @@ as int,
 /// @nodoc
 mixin _$CompanySettings {
 
- int get defaultGeofenceRadiusM; int get receiptRoundingTolerance; int get receiptMaxAgeDays; double get budgetWarnPct; bool get syncExpenseDraftsEnabled; bool get syncAttendanceEnabled; bool get syncProgressReportsEnabled;
+ int get defaultGeofenceRadiusM; int get receiptRoundingTolerance; int get receiptMaxAgeDays; double get budgetWarnPct; bool get syncExpenseDraftsEnabled; bool get syncAttendanceEnabled; bool get syncProgressReportsEnabled;/// FR1 (ADR 0020 §10): "Laporan lapangan per jenis project" switched on for this PT (default off).
+ bool get fieldReportsEnabled;
 /// Create a copy of CompanySettings
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -840,20 +858,20 @@ $CompanySettingsCopyWith<CompanySettings> get copyWith => _$CompanySettingsCopyW
 @override
 bool operator ==(Object other) {
   final _this = this as CompanySettings;
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is CompanySettings&&(identical(other.defaultGeofenceRadiusM, _this.defaultGeofenceRadiusM) || other.defaultGeofenceRadiusM == _this.defaultGeofenceRadiusM)&&(identical(other.receiptRoundingTolerance, _this.receiptRoundingTolerance) || other.receiptRoundingTolerance == _this.receiptRoundingTolerance)&&(identical(other.receiptMaxAgeDays, _this.receiptMaxAgeDays) || other.receiptMaxAgeDays == _this.receiptMaxAgeDays)&&(identical(other.budgetWarnPct, _this.budgetWarnPct) || other.budgetWarnPct == _this.budgetWarnPct)&&(identical(other.syncExpenseDraftsEnabled, _this.syncExpenseDraftsEnabled) || other.syncExpenseDraftsEnabled == _this.syncExpenseDraftsEnabled)&&(identical(other.syncAttendanceEnabled, _this.syncAttendanceEnabled) || other.syncAttendanceEnabled == _this.syncAttendanceEnabled)&&(identical(other.syncProgressReportsEnabled, _this.syncProgressReportsEnabled) || other.syncProgressReportsEnabled == _this.syncProgressReportsEnabled));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is CompanySettings&&(identical(other.defaultGeofenceRadiusM, _this.defaultGeofenceRadiusM) || other.defaultGeofenceRadiusM == _this.defaultGeofenceRadiusM)&&(identical(other.receiptRoundingTolerance, _this.receiptRoundingTolerance) || other.receiptRoundingTolerance == _this.receiptRoundingTolerance)&&(identical(other.receiptMaxAgeDays, _this.receiptMaxAgeDays) || other.receiptMaxAgeDays == _this.receiptMaxAgeDays)&&(identical(other.budgetWarnPct, _this.budgetWarnPct) || other.budgetWarnPct == _this.budgetWarnPct)&&(identical(other.syncExpenseDraftsEnabled, _this.syncExpenseDraftsEnabled) || other.syncExpenseDraftsEnabled == _this.syncExpenseDraftsEnabled)&&(identical(other.syncAttendanceEnabled, _this.syncAttendanceEnabled) || other.syncAttendanceEnabled == _this.syncAttendanceEnabled)&&(identical(other.syncProgressReportsEnabled, _this.syncProgressReportsEnabled) || other.syncProgressReportsEnabled == _this.syncProgressReportsEnabled)&&(identical(other.fieldReportsEnabled, _this.fieldReportsEnabled) || other.fieldReportsEnabled == _this.fieldReportsEnabled));
 }
 
 
 @override
 int get hashCode {
   final _this = this as CompanySettings;
-  return Object.hash(runtimeType,_this.defaultGeofenceRadiusM,_this.receiptRoundingTolerance,_this.receiptMaxAgeDays,_this.budgetWarnPct,_this.syncExpenseDraftsEnabled,_this.syncAttendanceEnabled,_this.syncProgressReportsEnabled);
+  return Object.hash(runtimeType,_this.defaultGeofenceRadiusM,_this.receiptRoundingTolerance,_this.receiptMaxAgeDays,_this.budgetWarnPct,_this.syncExpenseDraftsEnabled,_this.syncAttendanceEnabled,_this.syncProgressReportsEnabled,_this.fieldReportsEnabled);
 }
 
 @override
 String toString() {
   final _this = this as CompanySettings;
-  return 'CompanySettings(defaultGeofenceRadiusM: ${_this.defaultGeofenceRadiusM}, receiptRoundingTolerance: ${_this.receiptRoundingTolerance}, receiptMaxAgeDays: ${_this.receiptMaxAgeDays}, budgetWarnPct: ${_this.budgetWarnPct}, syncExpenseDraftsEnabled: ${_this.syncExpenseDraftsEnabled}, syncAttendanceEnabled: ${_this.syncAttendanceEnabled}, syncProgressReportsEnabled: ${_this.syncProgressReportsEnabled})';
+  return 'CompanySettings(defaultGeofenceRadiusM: ${_this.defaultGeofenceRadiusM}, receiptRoundingTolerance: ${_this.receiptRoundingTolerance}, receiptMaxAgeDays: ${_this.receiptMaxAgeDays}, budgetWarnPct: ${_this.budgetWarnPct}, syncExpenseDraftsEnabled: ${_this.syncExpenseDraftsEnabled}, syncAttendanceEnabled: ${_this.syncAttendanceEnabled}, syncProgressReportsEnabled: ${_this.syncProgressReportsEnabled}, fieldReportsEnabled: ${_this.fieldReportsEnabled})';
 }
 
 
@@ -864,7 +882,7 @@ abstract mixin class $CompanySettingsCopyWith<$Res>  {
   factory $CompanySettingsCopyWith(CompanySettings value, $Res Function(CompanySettings) _then) = _$CompanySettingsCopyWithImpl;
 @useResult
 $Res call({
- int defaultGeofenceRadiusM, int receiptRoundingTolerance, int receiptMaxAgeDays, double budgetWarnPct, bool syncExpenseDraftsEnabled, bool syncAttendanceEnabled, bool syncProgressReportsEnabled
+ int defaultGeofenceRadiusM, int receiptRoundingTolerance, int receiptMaxAgeDays, double budgetWarnPct, bool syncExpenseDraftsEnabled, bool syncAttendanceEnabled, bool syncProgressReportsEnabled, bool fieldReportsEnabled
 });
 
 
@@ -881,7 +899,7 @@ class _$CompanySettingsCopyWithImpl<$Res>
 
 /// Create a copy of CompanySettings
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? defaultGeofenceRadiusM = null,Object? receiptRoundingTolerance = null,Object? receiptMaxAgeDays = null,Object? budgetWarnPct = null,Object? syncExpenseDraftsEnabled = null,Object? syncAttendanceEnabled = null,Object? syncProgressReportsEnabled = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? defaultGeofenceRadiusM = null,Object? receiptRoundingTolerance = null,Object? receiptMaxAgeDays = null,Object? budgetWarnPct = null,Object? syncExpenseDraftsEnabled = null,Object? syncAttendanceEnabled = null,Object? syncProgressReportsEnabled = null,Object? fieldReportsEnabled = null,}) {
   return _then(CompanySettings(
 defaultGeofenceRadiusM: null == defaultGeofenceRadiusM ? _self.defaultGeofenceRadiusM : defaultGeofenceRadiusM // ignore: cast_nullable_to_non_nullable
 as int,receiptRoundingTolerance: null == receiptRoundingTolerance ? _self.receiptRoundingTolerance : receiptRoundingTolerance // ignore: cast_nullable_to_non_nullable
@@ -890,6 +908,7 @@ as int,budgetWarnPct: null == budgetWarnPct ? _self.budgetWarnPct : budgetWarnPc
 as double,syncExpenseDraftsEnabled: null == syncExpenseDraftsEnabled ? _self.syncExpenseDraftsEnabled : syncExpenseDraftsEnabled // ignore: cast_nullable_to_non_nullable
 as bool,syncAttendanceEnabled: null == syncAttendanceEnabled ? _self.syncAttendanceEnabled : syncAttendanceEnabled // ignore: cast_nullable_to_non_nullable
 as bool,syncProgressReportsEnabled: null == syncProgressReportsEnabled ? _self.syncProgressReportsEnabled : syncProgressReportsEnabled // ignore: cast_nullable_to_non_nullable
+as bool,fieldReportsEnabled: null == fieldReportsEnabled ? _self.fieldReportsEnabled : fieldReportsEnabled // ignore: cast_nullable_to_non_nullable
 as bool,
   ));
 }
@@ -975,10 +994,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( int defaultGeofenceRadiusM,  int receiptRoundingTolerance,  int receiptMaxAgeDays,  double budgetWarnPct,  bool syncExpenseDraftsEnabled,  bool syncAttendanceEnabled,  bool syncProgressReportsEnabled)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( int defaultGeofenceRadiusM,  int receiptRoundingTolerance,  int receiptMaxAgeDays,  double budgetWarnPct,  bool syncExpenseDraftsEnabled,  bool syncAttendanceEnabled,  bool syncProgressReportsEnabled,  bool fieldReportsEnabled)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _CompanySettings() when $default != null:
-return $default(_that.defaultGeofenceRadiusM,_that.receiptRoundingTolerance,_that.receiptMaxAgeDays,_that.budgetWarnPct,_that.syncExpenseDraftsEnabled,_that.syncAttendanceEnabled,_that.syncProgressReportsEnabled);case _:
+return $default(_that.defaultGeofenceRadiusM,_that.receiptRoundingTolerance,_that.receiptMaxAgeDays,_that.budgetWarnPct,_that.syncExpenseDraftsEnabled,_that.syncAttendanceEnabled,_that.syncProgressReportsEnabled,_that.fieldReportsEnabled);case _:
   return orElse();
 
 }
@@ -996,10 +1015,10 @@ return $default(_that.defaultGeofenceRadiusM,_that.receiptRoundingTolerance,_tha
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( int defaultGeofenceRadiusM,  int receiptRoundingTolerance,  int receiptMaxAgeDays,  double budgetWarnPct,  bool syncExpenseDraftsEnabled,  bool syncAttendanceEnabled,  bool syncProgressReportsEnabled)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( int defaultGeofenceRadiusM,  int receiptRoundingTolerance,  int receiptMaxAgeDays,  double budgetWarnPct,  bool syncExpenseDraftsEnabled,  bool syncAttendanceEnabled,  bool syncProgressReportsEnabled,  bool fieldReportsEnabled)  $default,) {final _that = this;
 switch (_that) {
 case _CompanySettings():
-return $default(_that.defaultGeofenceRadiusM,_that.receiptRoundingTolerance,_that.receiptMaxAgeDays,_that.budgetWarnPct,_that.syncExpenseDraftsEnabled,_that.syncAttendanceEnabled,_that.syncProgressReportsEnabled);case _:
+return $default(_that.defaultGeofenceRadiusM,_that.receiptRoundingTolerance,_that.receiptMaxAgeDays,_that.budgetWarnPct,_that.syncExpenseDraftsEnabled,_that.syncAttendanceEnabled,_that.syncProgressReportsEnabled,_that.fieldReportsEnabled);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -1016,10 +1035,10 @@ return $default(_that.defaultGeofenceRadiusM,_that.receiptRoundingTolerance,_tha
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( int defaultGeofenceRadiusM,  int receiptRoundingTolerance,  int receiptMaxAgeDays,  double budgetWarnPct,  bool syncExpenseDraftsEnabled,  bool syncAttendanceEnabled,  bool syncProgressReportsEnabled)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( int defaultGeofenceRadiusM,  int receiptRoundingTolerance,  int receiptMaxAgeDays,  double budgetWarnPct,  bool syncExpenseDraftsEnabled,  bool syncAttendanceEnabled,  bool syncProgressReportsEnabled,  bool fieldReportsEnabled)?  $default,) {final _that = this;
 switch (_that) {
 case _CompanySettings() when $default != null:
-return $default(_that.defaultGeofenceRadiusM,_that.receiptRoundingTolerance,_that.receiptMaxAgeDays,_that.budgetWarnPct,_that.syncExpenseDraftsEnabled,_that.syncAttendanceEnabled,_that.syncProgressReportsEnabled);case _:
+return $default(_that.defaultGeofenceRadiusM,_that.receiptRoundingTolerance,_that.receiptMaxAgeDays,_that.budgetWarnPct,_that.syncExpenseDraftsEnabled,_that.syncAttendanceEnabled,_that.syncProgressReportsEnabled,_that.fieldReportsEnabled);case _:
   return null;
 
 }
@@ -1031,7 +1050,7 @@ return $default(_that.defaultGeofenceRadiusM,_that.receiptRoundingTolerance,_tha
 
 
 class _CompanySettings implements CompanySettings {
-  const _CompanySettings({this.defaultGeofenceRadiusM = 100, this.receiptRoundingTolerance = 0, this.receiptMaxAgeDays = 0, this.budgetWarnPct = 85, this.syncExpenseDraftsEnabled = true, this.syncAttendanceEnabled = false, this.syncProgressReportsEnabled = false});
+  const _CompanySettings({this.defaultGeofenceRadiusM = 100, this.receiptRoundingTolerance = 0, this.receiptMaxAgeDays = 0, this.budgetWarnPct = 85, this.syncExpenseDraftsEnabled = true, this.syncAttendanceEnabled = false, this.syncProgressReportsEnabled = false, this.fieldReportsEnabled = false});
   
 
 @override@JsonKey() final  int defaultGeofenceRadiusM;
@@ -1041,6 +1060,8 @@ class _CompanySettings implements CompanySettings {
 @override@JsonKey() final  bool syncExpenseDraftsEnabled;
 @override@JsonKey() final  bool syncAttendanceEnabled;
 @override@JsonKey() final  bool syncProgressReportsEnabled;
+/// FR1 (ADR 0020 §10): "Laporan lapangan per jenis project" switched on for this PT (default off).
+@override@JsonKey() final  bool fieldReportsEnabled;
 
 /// Create a copy of CompanySettings
 /// with the given fields replaced by the non-null parameter values.
@@ -1052,18 +1073,18 @@ _$CompanySettingsCopyWith<_CompanySettings> get copyWith => __$CompanySettingsCo
 
 @override
 bool operator ==(Object other) {
-    return identical(this, other) || (other.runtimeType == runtimeType&&other is _CompanySettings&&(identical(other.defaultGeofenceRadiusM, defaultGeofenceRadiusM) || other.defaultGeofenceRadiusM == defaultGeofenceRadiusM)&&(identical(other.receiptRoundingTolerance, receiptRoundingTolerance) || other.receiptRoundingTolerance == receiptRoundingTolerance)&&(identical(other.receiptMaxAgeDays, receiptMaxAgeDays) || other.receiptMaxAgeDays == receiptMaxAgeDays)&&(identical(other.budgetWarnPct, budgetWarnPct) || other.budgetWarnPct == budgetWarnPct)&&(identical(other.syncExpenseDraftsEnabled, syncExpenseDraftsEnabled) || other.syncExpenseDraftsEnabled == syncExpenseDraftsEnabled)&&(identical(other.syncAttendanceEnabled, syncAttendanceEnabled) || other.syncAttendanceEnabled == syncAttendanceEnabled)&&(identical(other.syncProgressReportsEnabled, syncProgressReportsEnabled) || other.syncProgressReportsEnabled == syncProgressReportsEnabled));
+    return identical(this, other) || (other.runtimeType == runtimeType&&other is _CompanySettings&&(identical(other.defaultGeofenceRadiusM, defaultGeofenceRadiusM) || other.defaultGeofenceRadiusM == defaultGeofenceRadiusM)&&(identical(other.receiptRoundingTolerance, receiptRoundingTolerance) || other.receiptRoundingTolerance == receiptRoundingTolerance)&&(identical(other.receiptMaxAgeDays, receiptMaxAgeDays) || other.receiptMaxAgeDays == receiptMaxAgeDays)&&(identical(other.budgetWarnPct, budgetWarnPct) || other.budgetWarnPct == budgetWarnPct)&&(identical(other.syncExpenseDraftsEnabled, syncExpenseDraftsEnabled) || other.syncExpenseDraftsEnabled == syncExpenseDraftsEnabled)&&(identical(other.syncAttendanceEnabled, syncAttendanceEnabled) || other.syncAttendanceEnabled == syncAttendanceEnabled)&&(identical(other.syncProgressReportsEnabled, syncProgressReportsEnabled) || other.syncProgressReportsEnabled == syncProgressReportsEnabled)&&(identical(other.fieldReportsEnabled, fieldReportsEnabled) || other.fieldReportsEnabled == fieldReportsEnabled));
 }
 
 
 @override
 int get hashCode {
-    return Object.hash(runtimeType,defaultGeofenceRadiusM,receiptRoundingTolerance,receiptMaxAgeDays,budgetWarnPct,syncExpenseDraftsEnabled,syncAttendanceEnabled,syncProgressReportsEnabled);
+    return Object.hash(runtimeType,defaultGeofenceRadiusM,receiptRoundingTolerance,receiptMaxAgeDays,budgetWarnPct,syncExpenseDraftsEnabled,syncAttendanceEnabled,syncProgressReportsEnabled,fieldReportsEnabled);
 }
 
 @override
 String toString() {
-    return 'CompanySettings(defaultGeofenceRadiusM: $defaultGeofenceRadiusM, receiptRoundingTolerance: $receiptRoundingTolerance, receiptMaxAgeDays: $receiptMaxAgeDays, budgetWarnPct: $budgetWarnPct, syncExpenseDraftsEnabled: $syncExpenseDraftsEnabled, syncAttendanceEnabled: $syncAttendanceEnabled, syncProgressReportsEnabled: $syncProgressReportsEnabled)';
+    return 'CompanySettings(defaultGeofenceRadiusM: $defaultGeofenceRadiusM, receiptRoundingTolerance: $receiptRoundingTolerance, receiptMaxAgeDays: $receiptMaxAgeDays, budgetWarnPct: $budgetWarnPct, syncExpenseDraftsEnabled: $syncExpenseDraftsEnabled, syncAttendanceEnabled: $syncAttendanceEnabled, syncProgressReportsEnabled: $syncProgressReportsEnabled, fieldReportsEnabled: $fieldReportsEnabled)';
 }
 
 
@@ -1074,7 +1095,7 @@ abstract mixin class _$CompanySettingsCopyWith<$Res> implements $CompanySettings
   factory _$CompanySettingsCopyWith(_CompanySettings value, $Res Function(_CompanySettings) _then) = __$CompanySettingsCopyWithImpl;
 @override @useResult
 $Res call({
- int defaultGeofenceRadiusM, int receiptRoundingTolerance, int receiptMaxAgeDays, double budgetWarnPct, bool syncExpenseDraftsEnabled, bool syncAttendanceEnabled, bool syncProgressReportsEnabled
+ int defaultGeofenceRadiusM, int receiptRoundingTolerance, int receiptMaxAgeDays, double budgetWarnPct, bool syncExpenseDraftsEnabled, bool syncAttendanceEnabled, bool syncProgressReportsEnabled, bool fieldReportsEnabled
 });
 
 
@@ -1091,7 +1112,7 @@ class __$CompanySettingsCopyWithImpl<$Res>
 
 /// Create a copy of CompanySettings
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? defaultGeofenceRadiusM = null,Object? receiptRoundingTolerance = null,Object? receiptMaxAgeDays = null,Object? budgetWarnPct = null,Object? syncExpenseDraftsEnabled = null,Object? syncAttendanceEnabled = null,Object? syncProgressReportsEnabled = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? defaultGeofenceRadiusM = null,Object? receiptRoundingTolerance = null,Object? receiptMaxAgeDays = null,Object? budgetWarnPct = null,Object? syncExpenseDraftsEnabled = null,Object? syncAttendanceEnabled = null,Object? syncProgressReportsEnabled = null,Object? fieldReportsEnabled = null,}) {
   return _then(_CompanySettings(
 defaultGeofenceRadiusM: null == defaultGeofenceRadiusM ? _self.defaultGeofenceRadiusM : defaultGeofenceRadiusM // ignore: cast_nullable_to_non_nullable
 as int,receiptRoundingTolerance: null == receiptRoundingTolerance ? _self.receiptRoundingTolerance : receiptRoundingTolerance // ignore: cast_nullable_to_non_nullable
@@ -1100,6 +1121,7 @@ as int,budgetWarnPct: null == budgetWarnPct ? _self.budgetWarnPct : budgetWarnPc
 as double,syncExpenseDraftsEnabled: null == syncExpenseDraftsEnabled ? _self.syncExpenseDraftsEnabled : syncExpenseDraftsEnabled // ignore: cast_nullable_to_non_nullable
 as bool,syncAttendanceEnabled: null == syncAttendanceEnabled ? _self.syncAttendanceEnabled : syncAttendanceEnabled // ignore: cast_nullable_to_non_nullable
 as bool,syncProgressReportsEnabled: null == syncProgressReportsEnabled ? _self.syncProgressReportsEnabled : syncProgressReportsEnabled // ignore: cast_nullable_to_non_nullable
+as bool,fieldReportsEnabled: null == fieldReportsEnabled ? _self.fieldReportsEnabled : fieldReportsEnabled // ignore: cast_nullable_to_non_nullable
 as bool,
   ));
 }

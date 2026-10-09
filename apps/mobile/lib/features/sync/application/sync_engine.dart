@@ -15,6 +15,7 @@ import '../../companies/data/company_backfill.dart';
 import '../../expense/data/draft_repository.dart';
 import '../../expense/data/expense_mappers.dart';
 import '../../expense/domain/draft.dart';
+import '../../field_reports/data/field_repository.dart';
 import '../../progress/data/progress_repository.dart';
 import '../data/outbox_repository.dart';
 import '../data/sync_api.dart';
@@ -67,6 +68,7 @@ class SyncEngine {
     required this.lock,
     required this.uploadMedia,
     this.progress,
+    this.field,
     this.memberships,
     Random? random,
   }) : _random = random ?? Random();
@@ -84,6 +86,9 @@ class SyncEngine {
 
   /// E4 progress reports: per-item results are applied to the local report rows.
   final ProgressRepository? progress;
+
+  /// FR1 field reports (service / timesheet / aftersales): per-item results applied to the local rows.
+  final FieldRepository? field;
   final Random _random;
 
   /// PT ids of the account (default: the cached `/me`); null = unknown / server before MC3.
@@ -146,7 +151,7 @@ class SyncEngine {
       if (!ok) continue;
       final resolved = resolveMediaIds(jsonDecode(item.payloadJson) as Map<String, dynamic>, mediaIds);
       if (resolved == null) {
-        final msg = SyncItemType.isProgress(item.type)
+        final msg = SyncItemType.isProgress(item.type) || SyncItemType.isField(item.type)
             ? 'Foto laporan tidak ditemukan di HP. Ambil ulang foto.'
             : 'Foto nota tidak ditemukan di HP. Ambil ulang foto nota.';
         await outbox.setStatus(item.opUuid, 'rejected', code: 'MEDIA_MISSING', message: msg);
@@ -222,7 +227,8 @@ class SyncEngine {
       for (final r in res.results) {
         final row = byUuid[r.clientUuid];
         if (row == null) continue;
-        if (SyncItemType.isProgress(row.type)) {
+        final isField = SyncItemType.isField(row.type);
+        if (SyncItemType.isProgress(row.type) || isField) {
           switch (r.status) {
             case SyncItemStatus.applied || SyncItemStatus.duplicate:
               applied++;
@@ -253,7 +259,11 @@ class SyncEngine {
               await _deferOne(row, 'DEFERRED', r.errors.firstOrNull?.message);
               continue;
           }
-          await progress?.applyResult(sub, row.targetUuid, r);
+          if (isField) {
+            await field?.applyResult(sub, row.targetUuid, r);
+          } else {
+            await progress?.applyResult(sub, row.targetUuid, r);
+          }
           continue;
         }
         switch (r.status) {
@@ -350,6 +360,8 @@ class SyncEngine {
   Future<void> _markRejected(OutboxData row, String msg, {String? code}) async {
     if (SyncItemType.isProgress(row.type)) {
       await progress?.markRejected(row.targetUuid, msg, code: code);
+    } else if (SyncItemType.isField(row.type)) {
+      await field?.markRejected(row.targetUuid, msg, code: code);
     } else {
       await _markDraft(row, DraftSyncState.rejected, error: msg);
     }

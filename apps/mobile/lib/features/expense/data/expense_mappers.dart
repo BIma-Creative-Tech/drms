@@ -74,6 +74,9 @@ Capabilities _capabilities(Json? caps, Set<Role> roles) => caps == null
         approvalInbox: caps['approvalInbox'] == true,
         teamMonitor: caps['teamMonitor'] == true,
         progressReportCreate: caps['progressReportCreate'] == true,
+        serviceReportCreate: caps['serviceReportCreate'] == true,
+        unitTimesheetCreate: caps['unitTimesheetCreate'] == true,
+        aftersalesActivityCreate: caps['aftersalesActivityCreate'] == true,
       );
 
 /// `GET /me` `companies[]` item (openapi `MeCompany`, MC3).
@@ -100,6 +103,7 @@ CompanyMembership companyMembershipFromJson(Json j) {
       syncExpenseDraftsEnabled: s['syncExpenseDraftsEnabled'] != false,
       syncAttendanceEnabled: s['syncAttendanceEnabled'] == true,
       syncProgressReportsEnabled: s['syncProgressReportsEnabled'] == true,
+      fieldReportsEnabled: s['fieldReportsEnabled'] == true,
     ),
   );
 }
@@ -490,8 +494,12 @@ const mediaPlaceholderKey = 'pk_media_uuid';
 /// Local-only key of an attendance item's selfie (replaced by `selfie_media_id`).
 const selfiePlaceholderKey = 'pk_selfie_uuid';
 
-/// Local-only key of a progress report item: local photo ids, replaced by `photo_media_ids` (E4).
+/// Local-only key of a progress report item: local photo ids, replaced by `photo_media_ids` (E4). FR1 service
+/// reports and aftersales activities use it too (same `photo_media_ids` field).
 const progressPhotosPlaceholderKey = 'pk_photo_uuids';
+
+/// Local-only key of a `unit_timesheet.upsert` item (FR1): the HM meter photo, replaced by `hm_photo_media_id`.
+const hmPhotoPlaceholderKey = 'pk_hm_photo_uuid';
 
 /// Replaces [mediaPlaceholderKey] by `media_id` using [mediaIds] (local uuid → server id).
 /// Returns null when a photo has no server id yet.
@@ -511,6 +519,16 @@ Json? resolveMediaIds(Json payload, Map<String, int> mediaIds) {
     } else {
       out['photo_media_ids'] = ids;
     }
+    return out;
+  }
+  // FR1 timesheet: exactly one HM photo (`hm_photo_media_id`, SyncUnitTimesheetPayload).
+  if (payload.containsKey(hmPhotoPlaceholderKey)) {
+    final out = Map<String, dynamic>.of(payload);
+    final local = out.remove(hmPhotoPlaceholderKey);
+    if (local == null) return out;
+    final id = mediaIds['$local'];
+    if (id == null) return null;
+    out['hm_photo_media_id'] = id;
     return out;
   }
   // Attendance: the selfie sits at the top level (`selfie_media_id`, SyncAttendancePayload).
