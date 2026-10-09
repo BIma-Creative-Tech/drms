@@ -1,10 +1,11 @@
 import { sql } from '@payloadcms/db-postgres'
-import { APIError, ValidationError, type PayloadRequest } from 'payload'
+import { APIError, ValidationError, type CollectionSlug, type PayloadRequest } from 'payload'
 import type { z } from 'zod'
 
 import { runUnderCompany } from '@/access/company-context'
 import { companyContextOf, employeeIn, hasRole, mappedCompanies, relId, userId, type Membership } from '@/access/roles'
 import { companyOf } from '@/domain/companies'
+import { FIELD_COLLECTIONS } from '@/domain/field/access'
 import {
   SyncAttendancePayload,
   SyncDraftDeletePayload,
@@ -33,6 +34,7 @@ import { AttendanceReject, recordAttendance, userOfEmployee } from '@/domain/att
 
 import { attendanceTimeOf, employeeOfUser } from './attendance'
 import { judgeTime, type TimeVerdict } from './clock'
+import { applyFieldItem, FIELD_COPY_KEY, FIELD_SYNC_TYPES, fieldItemRef, FieldSyncReject } from './field'
 import { applyProgressReport, ProgressSyncReject } from './progress'
 
 /**
@@ -126,7 +128,7 @@ export async function itemCompany(req: PayloadRequest, item: SyncItemIn): Promis
   if (pid !== undefined) return (await companyOf(req, 'projects', pid)) ?? null
   const cc = posId(p.cost_center_id)
   if (cc !== undefined) return (await companyOf(req, 'cost-centers', cc)) ?? null
-  const byUuid = async (collection: 'expense-requests' | 'progress-reports', uuid: unknown): Promise<number | null> => {
+  const byUuid = async (collection: CollectionSlug, uuid: unknown): Promise<number | null> => {
     if (typeof uuid !== 'string' || !/^[0-9a-f-]{36}$/i.test(uuid)) return null
     const r = await req.payload.find({ collection, where: { clientUuid: { equals: uuid } }, depth: 0, limit: 1, pagination: false, overrideAccess: true /* SYSTEM-READ: PT of an offline id */, req })
     return relId((r.docs[0] as { company?: unknown } | undefined)?.company) ?? null
@@ -140,6 +142,13 @@ export async function itemCompany(req: PayloadRequest, item: SyncItemIn): Promis
     const rid = posId(p.report_id)
     if (rid !== undefined) return (await companyOf(req, 'progress-reports', rid)) ?? null
     return byUuid('progress-reports', p.report_client_uuid ?? item.client_uuid)
+  }
+  const fieldType = FIELD_SYNC_TYPES[item.type]
+  if (fieldType) {
+    const ref = fieldItemRef(fieldType, p)
+    const rid = posId(ref.id)
+    if (rid !== undefined) return (await companyOf(req, FIELD_COLLECTIONS[fieldType], rid)) ?? null
+    return byUuid(FIELD_COLLECTIONS[fieldType], ref.uuid ?? item.client_uuid)
   }
   return null
 }
@@ -577,9 +586,9 @@ async function store(c: ItemCtx, batch: SyncBatchIn, deviceId: string, verdict: 
   await writeAudit(req, [
     {
       action: 'sync_offline',
-      docType: ATTENDANCE.has(item.type) ? 'attendance' : item.type === 'progress_report.draft_upsert' ? 'progress_report' : 'expense_request',
+      docType: ATTENDANCE.has(item.type) ? 'attendance' : item.type === 'progress_report.draft_upsert' ? 'progress_report' : (FIELD_SYNC_TYPES[item.type] ?? 'expense_request'),
       docId: result.server_id ?? undefined,
-      docNo: result.server_copy?.doc_no ?? result.server_report?.doc_no ?? undefined,
+      docNo: result.server_copy?.doc_no ?? result.server_report?.doc_no ?? result.server_service_report?.doc_no ?? undefined,
       field: item.type,
       newValue: {
         client_uuid: item.client_uuid,
@@ -619,7 +628,7 @@ async function checkDependencies(req: PayloadRequest, uid: number, item: SyncIte
 
 /** Domain/DB error → sync error codes (never internals). null = unexpected (item deferred). */
 function mapError(err: unknown): SyncError[] | null {
-  if (err instanceof SyncReject || err instanceof ProgressSyncReject) return err.errors
+  if (err instanceof SyncReject || err instanceof ProgressSyncReject || err instanceof FieldSyncReject) return err.errors
   if (err instanceof APIError && err.status < 500) {
     const message = err.isPublic ? err.message : 'Ditolak.'
     const pkCode = (err as { pkCode?: unknown }).pkCode // E4 ProgressError: stable domain code
@@ -711,11 +720,28 @@ async function processOwn(c: ItemCtx, batch: SyncBatchIn, deviceId: string, verd
       const features = await featuresOf(req, declared!)
       const isAttendance = ATTENDANCE.has(item.type)
       const isProgress = item.type === 'progress_report.draft_upsert'
+      const fieldType = FIELD_SYNC_TYPES[item.type]
       if (isAttendance && !features.attendance) reject('FEATURE_DISABLED', 'Absensi dari aplikasi belum diaktifkan server (Setting perusahaan).')
       if (isProgress && !features.progress) reject('FEATURE_DISABLED', 'Laporan progress dari aplikasi sedang dinonaktifkan server (Setting perusahaan).')
-      if (!isAttendance && !isProgress && !features.drafts) reject('FEATURE_DISABLED', 'Sinkronisasi draft pengajuan sedang dinonaktifkan server.')
+      // FR1: the field-report flag (companies.fieldReportsEnabled) is enforced by the domain services (creates → FEATURE_DISABLED)
+      if (!isAttendance && !isProgress && !fieldType && !features.drafts) reject('FEATURE_DISABLED', 'Sinkronisasi draft pengajuan sedang dinonaktifkan server.')
       if (isAttendance) await refuseWithoutPrivacyAck(c, declared)
       await checkDependencies(req, uid, item)
+      if (fieldType) {
+        const fo = await applyFieldItem(c, fieldType, verdict, receivedAt)
+        const result: SyncResultOut = {
+          ...base,
+          status: fo.status,
+          server_id: String(fo.id),
+          rev: fo.rev,
+          flags: [...base.flags, ...fo.flags],
+          errors: fo.errors,
+          server_copy: null,
+          [FIELD_COPY_KEY[fieldType]]: fo.copy,
+        }
+        await store(c, batch, deviceId, verdict, result, declared)
+        return result
+      }
       if (isProgress) {
         const po = await applyProgressReport(c, verdict, receivedAt)
         const result: SyncResultOut = {
@@ -757,14 +783,17 @@ async function processOwn(c: ItemCtx, batch: SyncBatchIn, deviceId: string, verd
     }
     const target = err instanceof SyncReject ? err.target : null
     const report = err instanceof ProgressSyncReject ? err : null
+    const field = err instanceof FieldSyncReject ? err : null
+    const fieldType = FIELD_SYNC_TYPES[item.type]
     const rejected: SyncResultOut = {
       ...base,
       status: 'rejected',
-      server_id: target ? String(target.id) : report?.id ? String(report.id) : null,
-      rev: target?.copy?.rev ?? report?.copy?.rev ?? null,
+      server_id: target ? String(target.id) : report?.id ? String(report.id) : field?.id ? String(field.id) : null,
+      rev: target?.copy?.rev ?? report?.copy?.rev ?? field?.copy?.rev ?? null,
       errors,
       server_copy: target?.copy ?? null,
       ...(item.type === 'progress_report.draft_upsert' ? { server_report: report?.copy ?? null } : {}),
+      ...(fieldType ? { [FIELD_COPY_KEY[fieldType]]: field?.copy ?? null } : {}),
     }
     return withReqTransaction(req, async () => {
       await lockItem(req, item.client_uuid)

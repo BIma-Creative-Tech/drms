@@ -7,6 +7,7 @@ import { registerDeviceEndpoint, revokeDeviceEndpoint } from './endpoints/device
 import { healthEndpoint, healthHeadEndpoint, readyEndpoint, readyHeadEndpoint } from './endpoints/health'
 import { CASH_ENDPOINTS } from './endpoints/cash'
 import { EXPENSE_ENDPOINTS } from './endpoints/expense-requests'
+import { FIELD_ENDPOINTS } from './endpoints/field'
 import { mastersEndpoint } from './endpoints/masters'
 import { membershipBatchEndpoint } from './endpoints/memberships'
 import { mediaFileEndpoint, mediaSignedUrlEndpoint, uploadMediaEndpoint } from './endpoints/media'
@@ -61,4 +62,6 @@ export const v1Endpoints: Endpoint[] = [
   privacyAckEndpoint,
   // QA-06 / ADR 0019: LPJ shortfall above approved + tolerance → re-approval (web)
   ...SHORTFALL_ENDPOINTS,
+  // FR1 (ADR 0020): field reports per project kind — service reports, unit timesheets, aftersales log, units
+  ...FIELD_ENDPOINTS,
 ]

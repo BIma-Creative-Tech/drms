@@ -140,6 +140,17 @@ async function teamPms(req: PayloadRequest, doc: Doc): Promise<number[]> {
   const project = relId(doc.project)
   const company = relId(doc.company)
   if (project === undefined || company === undefined) return []
+  const pms = await projectPmUsers(req, project, company)
+  if (pms.length === 0) return []
+  const requesters = new Set(await people(req, doc))
+  return pms.filter((u) => !requesters.has(u))
+}
+
+/**
+ * Active PM accounts of a project: `projects.pm` + active team-assignments with role pm, holding pk-pm
+ * in the project's (active) PT. Shared by QA-18 (expense requests) and FR1 (field reports).
+ */
+export async function projectPmUsers(req: PayloadRequest, project: number, company: number): Promise<number[]> {
   const co = (await req.payload.findByID({ collection: 'companies', id: company, depth: 0, select: { active: true }, overrideAccess: true /* SYSTEM-READ: PT active (scope rule) */, req, disableErrors: true })) as {
     active?: boolean | null
   } | null
@@ -174,8 +185,7 @@ async function teamPms(req: PayloadRequest, doc: Doc): Promise<number[]> {
   for (const u of await usersOfEmployees(req, emps, { activeOnly: true })) candidates.add(u)
   if (candidates.size === 0) return []
   const pmsOfPt = new Set(await membersWithRole(req, 'pk-pm', company))
-  const requesters = new Set(await people(req, doc))
-  return [...candidates].filter((u) => pmsOfPt.has(u) && !requesters.has(u)).sort((a, b) => a - b)
+  return [...candidates].filter((u) => pmsOfPt.has(u)).sort((a, b) => a - b)
 }
 
 /** Events + recipients of one transition (pure mapping; recipients resolved lazily). */
@@ -374,6 +384,13 @@ export function notificationHref(docType: string | null | undefined, docId: stri
       return `/admin/progress/laporan/${docId}`
     case 'budget_addendum':
       return `/admin/addendum/detail/${docId}`
+    // FR1: field reports (list/detail views of the Payload collections until the P1 web views land)
+    case 'service_report':
+      return `/admin/collections/service-reports/${docId}`
+    case 'unit_timesheet':
+      return `/admin/collections/unit-timesheets/${docId}`
+    case 'aftersales_activity':
+      return `/admin/collections/aftersales-activities/${docId}`
     default:
       return null
   }

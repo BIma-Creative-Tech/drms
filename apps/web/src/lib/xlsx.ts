@@ -28,7 +28,7 @@ function dateOf(v: string): Date | null {
 export function xlsxCell(v: string | number | null, type: XlsxColumnType, bold = false): Cell {
   const b = bold ? { fontWeight: 'bold' as const } : {}
   if (v === null || v === undefined || v === '') return null
-  if (type === 'money' || type === 'int') return typeof v === 'number' ? { value: v, type: Number, format: '#,##0', ...b } : { value: String(v), type: String, ...b }
+  if (type === 'money' || type === 'int') return typeof v === 'number' ? { value: v, type: Number, format: Number.isInteger(v) ? '#,##0' : '#,##0.00', ...b } : { value: String(v), type: String, ...b }
   if (type === 'pct') return typeof v === 'number' ? { value: v, type: Number, format: '0.00', ...b } : { value: String(v), type: String, ...b }
   if ((type === 'date' || type === 'datetime') && typeof v === 'string') {
     const d = dateOf(v)

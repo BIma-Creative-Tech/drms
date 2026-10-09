@@ -5,7 +5,7 @@
 import { localHHMM } from '@/domain/attendance/schedule'
 import { localDateInTz } from '@/lib/time'
 
-export const REMINDER_RULES = ['late_progress', 'lpj_overdue', 'revision_pending', 'budget_threshold'] as const
+export const REMINDER_RULES = ['late_progress', 'lpj_overdue', 'revision_pending', 'budget_threshold', 'aftersales_followup'] as const
 export type ReminderRule = (typeof REMINDER_RULES)[number]
 
 export const REMINDER_EVENTS: Record<ReminderRule, string> = {
@@ -13,6 +13,7 @@ export const REMINDER_EVENTS: Record<ReminderRule, string> = {
   lpj_overdue: 'reminder.lpj_overdue',
   revision_pending: 'reminder.revision_pending',
   budget_threshold: 'reminder.budget_threshold',
+  aftersales_followup: 'reminder.aftersales_followup', // FR1 (ADR 0020): quotation follow-up due → reporter + PM
 }
 
 export type ReminderSettings = {
@@ -26,6 +27,8 @@ export type ReminderSettings = {
   lpjOverdue: { enabled: boolean; days: number }
   revision: { enabled: boolean; days: number }
   budget: { enabled: boolean; thresholds: number[] }
+  /** FR1: only where the PT's field reports are on (companies.fieldReportsEnabled). */
+  aftersalesFollowup: { enabled: boolean }
 }
 
 const int = (v: unknown, def: number, min: number, max: number) => (typeof v === 'number' && Number.isInteger(v) && v >= min && v <= max ? v : def)
@@ -45,6 +48,7 @@ export function reminderSettingsOf(s: Record<string, unknown>, fallbackTz: strin
     lpjOverdue: { enabled: bool(s.reminderLpjOverdueEnabled, true), days: int(s.lpjDueDays, 7, 1, 365) },
     revision: { enabled: bool(s.reminderRevisionEnabled, true), days: int(s.reminderRevisionDays, 3, 1, 60) },
     budget: { enabled: bool(s.reminderBudgetEnabled, true), thresholds: [...new Set([warn, over])].sort((a, b) => a - b) },
+    aftersalesFollowup: { enabled: bool(s.fieldReportsEnabled, false) },
   }
 }
 
@@ -75,6 +79,10 @@ export function fill(tpl: string, vars: Record<string, string>): string {
 }
 
 export const DEFAULT_TEXTS: Record<Exclude<ReminderRule, 'late_progress'>, { title: string; body: string }> = {
+  aftersales_followup: {
+    title: 'Follow-up penawaran: {client}',
+    body: 'Penawaran {docNo} ke {client} ({project}) jatuh tempo follow-up {date}.',
+  },
   lpj_overdue: {
     title: 'LPJ terlambat: {docNo}',
     body: 'Uang muka {docNo} "{title}" sudah {days} hari sejak ditransfer ({since}) tanpa nota/LPJ (batas {limit} hari). Segera ajukan LPJ.',

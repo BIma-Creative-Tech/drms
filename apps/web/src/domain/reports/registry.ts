@@ -5,6 +5,7 @@ import type { Role } from '@/access/roles'
 import { REQUEST_STATUSES, REQUEST_TYPE_LABELS, REQUEST_TYPES, statusLabel, type RequestStatus, type RequestType } from '@/domain/expense/types'
 
 import { absensiReport } from './attendance-report'
+import { rekapAftersales, rekapTimesheetKontrak } from './field-reports'
 import { projectProgressVsBudget } from './progress'
 import { auditLogCount, auditLogPage, AUDIT_PAGE, AUDIT_SOURCES, parseAuditFilter, type AuditFilter } from './audit-log'
 import {
@@ -180,7 +181,7 @@ async function accountOptions(req: PayloadRequest, scope: ReportScope): Promise<
 }
 async function vehicleOptions(req: PayloadRequest, scope: ReportScope): Promise<Option[]> {
   const pre = await ptPrefix(req, scope)
-  const r = await rows(req, sql`SELECT v.id, v.company_id, coalesce(v.plate_display, v.plate_no) AS plate, v.type FROM vehicles v WHERE ${masterScopeSql(scope, 'v')} ORDER BY 3`)
+  const r = await rows(req, sql`SELECT v.id, v.company_id, coalesce(v.unit_code || coalesce(' · ' || v.plate_display, ''), v.plate_display, v.plate_no) AS plate, v.type FROM vehicles v WHERE ${masterScopeSql(scope, 'v')} ORDER BY 3`)
   return r.map((x) => ({ value: String(x.id), label: `${pre(x.company_id)}${x.plate} (${x.type})` }))
 }
 async function requesterOptions(req: PayloadRequest, scope: ReportScope): Promise<Option[]> {
@@ -1106,7 +1107,7 @@ function withCompanies(def: ReportDef): ReportDef {
   }
 }
 
-export const REPORTS: ReportDef[] = [rekapKas, bukuKas, pengeluaranKategori, anggaranProject, rekapPengajuan, kelengkapan, biayaKendaraan, absensiReport].map(withCompanies)
+export const REPORTS: ReportDef[] = [rekapKas, bukuKas, pengeluaranKategori, anggaranProject, rekapPengajuan, kelengkapan, biayaKendaraan, absensiReport, rekapTimesheetKontrak, rekapAftersales].map(withCompanies)
 export const AUDIT_REPORT = withCompanies(auditLog)
 export const ALL_REPORTS: ReportDef[] = [...REPORTS, AUDIT_REPORT]
 export const REPORT_CODES = ALL_REPORTS.map((r) => r.code)

@@ -48,7 +48,12 @@ const MIME: Record<Format, string> = {
 export function cellText(v: Cell, type: ColType): string {
   if (v === null || v === undefined || v === '') return type === 'money' || type === 'int' || type === 'pct' ? '' : ''
   if (type === 'money' && typeof v === 'number') return formatRupiah(v).replace(/^(-?)Rp /, '$1')
-  if (type === 'int' && typeof v === 'number') return String(v).replace(/\B(?=(\d{3})+(?!\d))/g, '.')
+  if (type === 'int' && typeof v === 'number') {
+    if (Number.isInteger(v)) return String(v).replace(/\B(?=(\d{3})+(?!\d))/g, '.')
+    // FR1: hours / HM with decimals (Indonesian: thousands ".", decimals ",", max 2 places)
+    const [i, d] = v.toFixed(2).replace(/\.?0+$/, '').split('.') as [string, string | undefined]
+    return i.replace(/\B(?=(\d{3})+(?!\d))/g, '.') + (d ? `,${d}` : '')
+  }
   if (type === 'pct' && typeof v === 'number') return formatPct(v)
   if (type === 'date' && typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v)) return `${v.slice(8, 10)}/${v.slice(5, 7)}/${v.slice(0, 4)}`
   if (type === 'datetime' && typeof v === 'string' && /^\d{4}-\d{2}-\d{2} /.test(v)) return `${v.slice(8, 10)}/${v.slice(5, 7)}/${v.slice(0, 4)} ${v.slice(11, 16)}`

@@ -725,7 +725,7 @@ export async function vehicleCosts(req: PayloadRequest, scope: ReportScope, f: V
             ${f.categoryId ? sql`AND ce.category_id = ${f.categoryId}` : sql``}
           GROUP BY 1, 2),
         u AS (SELECT vehicle_id, category_id, amount AS a, 0::numeric AS b FROM a UNION ALL SELECT vehicle_id, category_id, 0, amount FROM b)
-        SELECT v.id, v.company_id, coalesce(v.plate_display, v.plate_no) AS plate, v.type, u.category_id, c.name AS category,
+        SELECT v.id, v.company_id, coalesce(v.plate_display, v.plate_no, v.unit_code) AS plate, v.type, u.category_id, c.name AS category,
                sum(u.a)::text AS from_requests, sum(u.b)::text AS from_manual
         FROM u JOIN vehicles v ON v.id = u.vehicle_id LEFT JOIN expense_categories c ON c.id = u.category_id
         GROUP BY v.id, v.company_id, plate, v.type, u.category_id, c.name ORDER BY plate, c.name NULLS LAST`,

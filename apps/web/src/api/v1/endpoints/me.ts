@@ -23,11 +23,17 @@ type UserShape = {
  * (approval inbox) = Direktur (pk-owner) or Finance; the PM monitors the team list; progress
  * reports are created by the PM (team projects) or the Direktur. The server guards stay authoritative.
  */
-export function capabilitiesOf(roles: readonly Role[]) {
+export function capabilitiesOf(roles: readonly Role[], opts: { fieldReportsEnabled?: boolean } = {}) {
+  // FR1 (ADR 0020 §2): Staff (assigned projects), PM (team) and Direktur report in the field when the
+  // PT's flag is on; WHICH report a project offers follows its kind (projects.kind, masters/units).
+  const field = opts.fieldReportsEnabled === true && roles.some((r) => r === 'pk-staff' || r === 'pk-pm' || r === 'pk-owner')
   return {
     approvalInbox: roles.some((r) => r === 'pk-owner' || r === 'pk-finance'),
     teamMonitor: roles.includes('pk-pm'),
     progressReportCreate: roles.some((r) => r === 'pk-pm' || r === 'pk-owner'),
+    serviceReportCreate: field,
+    unitTimesheetCreate: field,
+    aftersalesActivityCreate: field,
   }
 }
 
@@ -97,7 +103,7 @@ export const meEndpoint = v1({
         roles,
         employeeId: m.employee,
         employee: m.employee !== null ? (employees.get(m.employee) ?? null) : null,
-        capabilities: capabilitiesOf(roles),
+        capabilities: capabilitiesOf(roles, { fieldReportsEnabled: c.fieldReportsEnabled === true }),
         settings: {
           defaultGeofenceRadiusM: c.defaultGeofenceRadiusM,
           receiptRoundingTolerance: c.receiptRoundingTolerance,
@@ -106,6 +112,7 @@ export const meEndpoint = v1({
           syncExpenseDraftsEnabled: c.syncExpenseDraftsEnabled !== false,
           syncAttendanceEnabled: c.syncAttendanceEnabled === true,
           syncProgressReportsEnabled: c.syncProgressReportsEnabled !== false,
+          fieldReportsEnabled: c.fieldReportsEnabled === true,
         },
       })
     }
@@ -129,7 +136,7 @@ export const meEndpoint = v1({
       email: u.email,
       name: u.name ?? null,
       roles,
-      capabilities: capabilitiesOf(roles),
+      capabilities: capabilitiesOf(roles, { fieldReportsEnabled: companies.some((c) => c.selected && c.settings.fieldReportsEnabled) }),
       employee: legacyEmployeeId !== null ? (employees.get(legacyEmployeeId) ?? null) : null,
       authMethod: u._strategy ?? 'oidcSession',
       device: u._pkDevice ?? null,
