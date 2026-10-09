@@ -46,7 +46,7 @@ describe('bundled notice = docs/proyekkas/legal/pemberitahuan-privasi.md (single
 
   it('version 1, title from the first heading, contact filled in (no [placeholders] left)', () => {
     expect(PRIVACY_NOTICE_VERSION).toBe(1)
-    expect(PRIVACY_NOTICE.title).toBe('Pemberitahuan Privasi Karyawan — Aplikasi ProyekKas')
+    expect(PRIVACY_NOTICE.title).toBe('Pemberitahuan Privasi Karyawan — Aplikasi RR Teams')
     expect(PRIVACY_NOTICE.markdown).toMatch(/## 8\. Kontak\s+\*\*[^[\]*]+\*\*/)
     expect(PRIVACY_NOTICE.markdown).not.toMatch(/\[(Nama PIC|email|telepon|tanggal disetujui)\]/)
   })

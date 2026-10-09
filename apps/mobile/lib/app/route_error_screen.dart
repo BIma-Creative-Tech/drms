@@ -55,7 +55,7 @@ class FatalBuildErrorView extends StatelessWidget {
         child: Padding(
           padding: EdgeInsets.all(24),
           child: Text(
-            'Terjadi kesalahan saat menampilkan layar ini. Tutup lalu buka lagi aplikasi ProyekKas.',
+            'Terjadi kesalahan saat menampilkan layar ini. Tutup lalu buka lagi aplikasi RR Teams.',
             textAlign: TextAlign.center,
             style: TextStyle(color: Color(0xFF212121), fontSize: 16),
           ),

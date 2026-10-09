@@ -43,12 +43,12 @@ android {
     productFlavors {
         create("staging") {
             dimension = "env"
-            resValue("string", "app_name", "ProyekKas STG")
+            resValue("string", "app_name", "RR Teams STG")
             manifestPlaceholders["appLinkHost"] = "drms-kas.staging.bimacreative.tech"
         }
         create("prod") {
             dimension = "env"
-            resValue("string", "app_name", "ProyekKas")
+            resValue("string", "app_name", "RR Teams")
             manifestPlaceholders["appLinkHost"] = "drms-kas.bimacreative.tech"
         }
     }

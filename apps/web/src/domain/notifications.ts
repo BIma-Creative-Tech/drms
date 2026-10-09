@@ -295,8 +295,8 @@ export function approvalEmail(doc: Doc, event: NotifyEvent, appUrl: string | und
   const step = event === 'expense.pending_ack' ? 'persetujuan Anda sebagai Direktur (Diketahui)' : 'approval Anda'
   const base = appUrl ? `${appUrl.replace(/\/$/, '')}/admin/persetujuan` : null
   return {
-    subject: `ProyekKas — Menunggu keputusan Anda: ${no}`.slice(0, 200),
-    text: `Pengajuan ${no} (${REQUEST_TYPE_LABELS[doc.type]}) menunggu ${step}.\n\n${base ? `Buka Persetujuan: ${base}\n\n` : ''}Email otomatis ProyekKas. Pengaturan: Setting perusahaan → Notifikasi status pengajuan.\n`,
+    subject: `RR Teams — Menunggu keputusan Anda: ${no}`.slice(0, 200),
+    text: `Pengajuan ${no} (${REQUEST_TYPE_LABELS[doc.type]}) menunggu ${step}.\n\n${base ? `Buka Persetujuan: ${base}\n\n` : ''}Email otomatis RR Teams. Pengaturan: Setting perusahaan → Notifikasi status pengajuan.\n`,
   }
 }
 

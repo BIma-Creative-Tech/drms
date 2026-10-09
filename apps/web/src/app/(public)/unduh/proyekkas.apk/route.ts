@@ -12,7 +12,7 @@ export const dynamic = 'force-dynamic'
  * CompanySettings.appDownloadUrl → `Cache-Control: no-cache` + ETag = file SHA-256, so browsers and
  * proxies revalidate and never serve an old release. 404 (Indonesian text) while nothing is published.
  */
-const NOT_FOUND = 'APK ProyekKas belum tersedia di server ini. Hubungi admin perusahaan.\n'
+const NOT_FOUND = 'APK RR Teams belum tersedia di server ini. Hubungi admin perusahaan.\n'
 
 function baseHeaders(): Record<string, string> {
   return {

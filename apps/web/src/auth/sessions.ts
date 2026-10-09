@@ -66,7 +66,7 @@ export async function auditLoginFailed(
             newValue: info.keycloakSub ? { keycloakSub: info.keycloakSub } : undefined,
             reason:
               info.reason === 'unknown_or_inactive_user'
-                ? 'Akun belum terdaftar atau tidak aktif di ProyekKas'
+                ? 'Akun belum terdaftar atau tidak aktif di RR Teams'
                 : info.reason === 'no_login_role'
                   ? 'Token Keycloak tanpa realm role pk-user'
                   : 'Callback OIDC gagal (state/nonce/PKCE/penukaran kode)',

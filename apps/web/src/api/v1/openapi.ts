@@ -596,7 +596,7 @@ export function buildOpenApiDocument(version: string) {
   return new OpenApiGeneratorV31(registry.definitions).generateDocument({
     openapi: '3.1.0',
     info: {
-      title: 'ProyekKas API v1',
+      title: 'RR Teams API v1',
       version,
       description: 'Versioned contract for the Android APK and admin custom views (architecture §6). Errors: RFC 9457.',
     },

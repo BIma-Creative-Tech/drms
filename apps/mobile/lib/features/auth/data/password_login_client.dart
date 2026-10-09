@@ -11,7 +11,7 @@ enum PasswordLoginError {
   accountDisabled('Akun Anda dinonaktifkan. Hubungi Admin.'),
   accountNotSetUp(
     'Akun Anda belum siap dipakai (misalnya kata sandi sementara belum diganti). '
-    'Atur kata sandi lewat halaman login web ProyekKas atau hubungi Admin.',
+    'Atur kata sandi lewat halaman login web RR Teams atau hubungi Admin.',
   ),
   directGrantDisabled('Login langsung belum diaktifkan di server. Hubungi Admin.'),
   clientRejected('Aplikasi ditolak oleh server login. Hubungi Admin.'),

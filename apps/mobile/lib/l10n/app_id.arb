@@ -1,6 +1,6 @@
 {
   "@@locale": "id",
-  "appTitle": "ProyekKas",
+  "appTitle": "RR Teams",
   "loading": "Memuat…",
   "retry": "Coba lagi",
   "cancel": "Batal",
@@ -28,7 +28,7 @@
       }
     }
   },
-  "loginTitle": "Masuk ke ProyekKas",
+  "loginTitle": "Masuk ke RR Teams",
   "loginSubtitle": "Gunakan akun DRMS Anda. Halaman masuk dibuka di browser HP.",
   "loginButton": "Masuk",
   "loginCancelled": "Login dibatalkan. Jika halaman login tidak kembali ke aplikasi, tutup browser lalu tekan Masuk lagi.",

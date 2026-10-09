@@ -125,7 +125,7 @@ describe('GET/HEAD /unduh/proyekkas.apk', () => {
     const r = await GET(req())
     expect(r.status).toBe(200)
     expect(r.headers.get('content-type')).toBe('application/vnd.android.package-archive')
-    expect(r.headers.get('content-disposition')).toBe('attachment; filename="ProyekKas-0.2.0.apk"')
+    expect(r.headers.get('content-disposition')).toBe('attachment; filename="RR-Teams-0.2.0.apk"')
     expect(r.headers.get('content-length')).toBe(String(APK_BYTES.length))
     expect(r.headers.get('cache-control')).toBe('no-cache')
     expect(r.headers.get('x-content-type-options')).toBe('nosniff')
@@ -136,7 +136,7 @@ describe('GET/HEAD /unduh/proyekkas.apk', () => {
     const h = await HEAD(req())
     expect(h.status).toBe(200)
     expect(h.headers.get('content-length')).toBe(String(APK_BYTES.length))
-    expect(h.headers.get('content-disposition')).toBe('attachment; filename="ProyekKas-0.2.0.apk"')
+    expect(h.headers.get('content-disposition')).toBe('attachment; filename="RR-Teams-0.2.0.apk"')
     expect(await h.text()).toBe('')
   })
 
@@ -246,7 +246,7 @@ describe('release notes (publish-apk --notes → manifest → app config)', () =
 describe('/unduh page markup', () => {
   it('shows version, size, date, button, hashes, steps and the employees-only note', () => {
     const html = renderToStaticMarkup(React.createElement(DownloadView, { release: { manifest: { ...valid, size: 24_600_000 }, size: 24_600_000 } }))
-    expect(html).toContain('ProyekKas 0.2.0')
+    expect(html).toContain('RR Teams 0.2.0')
     expect(html).toContain('24,6 MB')
     expect(html).toContain('27 September 2026, 21.20 WITA')
     expect(html).toContain('href="/unduh/proyekkas.apk"')

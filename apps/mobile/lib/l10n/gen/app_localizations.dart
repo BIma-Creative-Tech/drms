@@ -94,7 +94,7 @@ abstract class AppLocalizations {
   /// No description provided for @appTitle.
   ///
   /// In id, this message translates to:
-  /// **'ProyekKas'**
+  /// **'RR Teams'**
   String get appTitle;
 
   /// No description provided for @loading.
@@ -178,7 +178,7 @@ abstract class AppLocalizations {
   /// No description provided for @loginTitle.
   ///
   /// In id, this message translates to:
-  /// **'Masuk ke ProyekKas'**
+  /// **'Masuk ke RR Teams'**
   String get loginTitle;
 
   /// No description provided for @loginSubtitle.

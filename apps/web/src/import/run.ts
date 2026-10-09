@@ -467,7 +467,7 @@ const MASTERS: Array<{ key: SheetKey; rows: (d: ImportData) => number; run: Mast
           const employee = await x.idOf('employees', 'code', a.employeeCode)
           const where: Where = { and: [{ bank: { equals: bank } }, { accountNo: { equals: a.accountNo } }] }
           const existing = await x.findOne('employee-bank-accounts', where)
-          if (existing && existing.employee !== employee) throw new Error(`Rekening ${a.bankCode} ${a.accountNo} sudah terdaftar untuk karyawan lain di ProyekKas.`)
+          if (existing && existing.employee !== employee) throw new Error(`Rekening ${a.bankCode} ${a.accountNo} sudah terdaftar untuk karyawan lain di RR Teams.`)
           return x.upsert(
             'employee-bank-accounts',
             where,

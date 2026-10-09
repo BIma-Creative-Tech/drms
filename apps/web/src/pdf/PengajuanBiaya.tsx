@@ -152,7 +152,7 @@ export function PengajuanBiaya({ d }: { d: PdfData }) {
   const pairs: PdfReceipt[][] = []
   for (let i = 0; i < d.receipts.length; i += 2) pairs.push(d.receipts.slice(i, i + 2))
   return (
-    <Document title={`Pengajuan Biaya ${d.docNo}`} author={d.companyName} creator="ProyekKas" producer="ProyekKas" language="id-ID">
+    <Document title={`Pengajuan Biaya ${d.docNo}`} author={d.companyName} creator="RR Teams" producer="RR Teams" language="id-ID">
       <Page size="A4" style={s.page}>
         <View style={s.header}>
           <View style={s.kop}>

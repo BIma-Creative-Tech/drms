@@ -1,10 +1,10 @@
-# Pemberitahuan Privasi Karyawan — Aplikasi ProyekKas
+# Pemberitahuan Privasi Karyawan — Aplikasi RR Teams
 
-- **Versi:** 1 (disetujui pemilik 2026-10-05, Q-46; tinjauan HR/legal PT DRMS menyusul — perubahan terbit sebagai versi 2) · **Berlaku sejak:** 5 Oktober 2026
-- **Pengendali data:** PT Double Rezki Makmur Sejahtera (DRMS) beserta PT lain dalam grup yang memakai ProyekKas
+- **Versi:** 1 (disetujui pemilik 2026-10-05, Q-46; tinjauan HR/legal PT DRMS menyusul — perubahan terbit sebagai versi 2; 9 Oktober 2026: nama aplikasi ProyekKas diganti menjadi RR Teams — redaksional, isi tidak berubah) · **Berlaku sejak:** 5 Oktober 2026
+- **Pengendali data:** PT Double Rezki Makmur Sejahtera (DRMS) beserta PT lain dalam grup yang memakai RR Teams
 - **Dasar hukum:** Undang-Undang No. 27 Tahun 2022 tentang Pelindungan Data Pribadi (UU PDP)
 
-Pemberitahuan ini menjelaskan data pribadi apa yang dikumpulkan aplikasi ProyekKas (web dan aplikasi Android),
+Pemberitahuan ini menjelaskan data pribadi apa yang dikumpulkan aplikasi RR Teams (web dan aplikasi Android),
 untuk apa, siapa yang dapat melihatnya, berapa lama disimpan, dan apa hak Anda.
 
 ## 1. Data yang dikumpulkan

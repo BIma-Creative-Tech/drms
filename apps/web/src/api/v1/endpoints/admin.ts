@@ -29,9 +29,9 @@ export const testEmailEndpoint = v1({
       task: 'sendEmail',
       input: {
         userId: u.id,
-        subject: 'ProyekKas — email uji',
+        subject: 'RR Teams — email uji',
         text:
-          'Ini email uji dari ProyekKas.\n\n' +
+          'Ini email uji dari RR Teams.\n\n' +
           'Dikirim atas permintaan admin sendiri melalui POST /api/v1/admin/test-email.\n' +
           'Jika Anda tidak meminta email ini, abaikan dan laporkan ke admin sistem.\n',
       },

@@ -8,11 +8,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [0.6.4] - 2026-10-09
 
-Admin CMS follow-up (PR #32): the remaining text links in the custom views (stat tiles, card headers, empty states,
-back/next links) become buttons. Web only, no database migration; APK unchanged (mobile-v0.3.4).
+App renamed to **RR Teams** (web + Android, display name only) and the admin CMS follow-up (PR #32): the remaining
+text links in the custom views become buttons. No database migration. APK **mobile-v0.3.5** (pubspec `0.3.5+1`, notes
+`docs/release-notes/apk/0.3.5.md`) — rename only; it works with server ≥ 0.6.2.
 
 ### Changed
 
+- **App renamed to "RR Teams"** (owner 2026-10-09; display name only). Web: admin bar, login logo, browser title
+  suffix " — RR Teams", /unduh page and APK download name `RR-Teams-<v>.apk`, e-mail subjects/texts, PDF metadata,
+  API title, error messages, import template/report. The "DRMS" sub-label next to the name is dropped. Android
+  (**APK 0.3.5**, notes `docs/release-notes/apk/0.3.5.md`): launcher label "RR Teams" / "RR Teams STG", app title,
+  login title, messages. Employee privacy notice: name changed editorially, **stays version 1** (no re-acknowledgement).
+  Unchanged on purpose: Android `applicationId`, package/class names, database, domains, `/unduh/proyekkas.apk` URL
+  (installed apps keep updating). Keycloak login page title (realm display name) is infra-managed — separate request.
 - Admin custom views: the remaining text links become buttons — card header actions ("Jadwal baru", "Lihat semua",
   "Rekap Kas", …) and empty-state actions are small outlined buttons with an icon (pencil for Ubah/Atur, plus for
   Buat/…baru, arrow for navigation); the hint of clickable stat tiles ("Ubah", "Atur titik", "Daftar", "Lihat

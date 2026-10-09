@@ -139,7 +139,7 @@ export default buildConfig({
     dateFormat: 'd MMM yyyy HH:mm',
     // Default 'gravatar' sends md5(email) to www.gravatar.com (privacy + CSP img-src), spike f.
     avatar: 'default',
-    meta: { titleSuffix: ' — ProyekKas DRMS' },
+    meta: { titleSuffix: ' — RR Teams' },
   },
   // F2c: staff-only users see only their requests, receipts, notifications and profile.
   // E9 B-1 (G-21): non-object REST bodies (form/text, JSON arrays) → 400 before any hook runs.
