@@ -371,6 +371,6 @@ describe('login_failed on the ProyekKas side', () => {
     for (let i = 0; i < 35; i++) await auditLoginFailed(payload, new Headers({ 'x-real-ip': ip }), { reason: 'unknown_or_inactive_user', keycloakSub: 'kc-sub-e9' })
     const rows = await sqlAs('app', "SELECT new_value, reason FROM audit_logs WHERE action = 'login_failed' AND ip = $1", [ip])
     expect(rows.rows.length).toBe(30)
-    expect(rows.rows[0]).toMatchObject({ new_value: { v: { keycloakSub: 'kc-sub-e9' } }, reason: 'Akun belum terdaftar atau tidak aktif di ProyekKas' })
+    expect(rows.rows[0]).toMatchObject({ new_value: { v: { keycloakSub: 'kc-sub-e9' } }, reason: 'Akun belum terdaftar atau tidak aktif di RR Teams' })
   })
 })
