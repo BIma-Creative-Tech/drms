@@ -19,6 +19,7 @@ import '../../companies/presentation/company_switcher.dart';
 import '../../companies/presentation/unassigned_screen.dart';
 import '../../dashboard/presentation/kpi_home.dart';
 import '../../expense/domain/request_status.dart';
+import '../../field_reports/application/field_providers.dart';
 import '../../notifications/application/notifications_providers.dart';
 import '../../notifications/presentation/notifications_screen.dart';
 import '../../progress/application/progress_providers.dart';
@@ -44,6 +45,8 @@ class HomeScreen extends ConsumerWidget {
     final expenseInbox = profile.hasApprovalInbox ? ref.watch(inboxProvider).value?.items.length : null;
     final addendumInbox = profile.hasApprovalInbox ? (ref.watch(addendumInboxProvider).value?.length ?? 0) : 0;
     final inboxCount = expenseInbox == null ? null : expenseInbox + addendumInbox;
+    // FR1: reports of this phone not yet on the server (drafts, waiting for signal, conflicts, rejections).
+    final openField = profile.hasFieldReports ? (ref.watch(openFieldDraftsProvider).value?.length ?? 0) : 0;
 
     final actions = <Widget>[
       if (profile.hasApprovalInbox)
@@ -90,6 +93,18 @@ class HomeScreen extends ConsumerWidget {
           subtitle: openProgress > 0 ? t.progressPendingCount(openProgress) : null,
           badge: openProgress > 0 ? '$openProgress' : null,
           onPressed: () => context.push('/progress'),
+        ),
+      // FR1 (ADR 0020): service report / unit timesheet / aftersales activity — any of the three capabilities
+      // (the server folds the PT flag fieldReportsEnabled in); never for an Operator-only account.
+      if (profile.hasFieldReports)
+        ModuleTile(
+          key: const Key('home-field'),
+          module: PkModule.proyek,
+          icon: PkIcons.report,
+          label: t.fieldHubTitle,
+          subtitle: openField > 0 ? t.fieldPendingCount(openField) : t.fieldHubSub,
+          badge: openField > 0 ? '$openField' : null,
+          onPressed: () => context.push('/field'),
         ),
       // E5 Addendum RAB: PM creates (team projects), Direktur/Finance follow all (decisions via the inbox).
       if (profile.has(Role.pm) || profile.hasApprovalInbox)

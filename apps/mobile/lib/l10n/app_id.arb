@@ -1247,5 +1247,427 @@
     }
   },
   "privacyAttendanceBlocked": "Absensi (selfie dan lokasi) belum bisa dipakai. Baca pemberitahuan privasi lalu tekan \"Saya mengerti\".",
-  "privacyRead": "Baca pemberitahuan privasi"
+  "privacyRead": "Baca pemberitahuan privasi",
+  "fieldHubTitle": "Laporan Lapangan",
+  "fieldHubSub": "Servis unit, timesheet, aftersales",
+  "fieldPendingCount": "{count} belum terkirim",
+  "@fieldPendingCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "fieldTabNew": "Buat laporan",
+  "fieldTabHistory": "Riwayat saya",
+  "fieldOfflineCache": "Tidak ada sinyal: data unit, kontrak dan PO dari penyimpanan HP (bisa belum terbaru). Laporan tetap bisa dibuat dan dikirim otomatis saat ada sinyal.",
+  "fieldNoProjectsHub": "Belum ada project kontrak unit atau aftersales yang ditugaskan ke Anda. Hubungi PM/Admin bila ini keliru.",
+  "fieldLocalTitle": "Di HP ini",
+  "fieldServerTitle": "Terkirim ke server",
+  "fieldHistoryOffline": "Tidak ada sinyal — riwayat dari server tampil saat online.",
+  "fieldHistoryEmpty": "Belum ada laporan lapangan Anda.",
+  "fieldEditTag": "Ubah {doc}",
+  "@fieldEditTag": {
+    "placeholders": {
+      "doc": {
+        "type": "String"
+      }
+    }
+  },
+  "fieldConflictHint": "Sudah ada perubahan di server. Ketuk untuk memilih versi yang dipakai.",
+  "fieldEditableTag": "Bisa diubah ≤ 24 jam",
+  "fieldFlagOffline": "Offline",
+  "fieldFlagBackdated": "Tanggal mundur",
+  "fieldFlagHmGap": "Selisih HM",
+  "fieldFlagBreakdown": "Breakdown ≥ 4 jam",
+  "fieldFlagCorrected": "Dikoreksi",
+  "fieldValueShown": "Nilai: {value}",
+  "@fieldValueShown": {
+    "placeholders": {
+      "value": {
+        "type": "String"
+      }
+    }
+  },
+  "fieldReporter": "Pelapor: {name}",
+  "@fieldReporter": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "fieldEditUntil": "Ubah (sampai {time})",
+  "@fieldEditUntil": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "fieldNotEditable": "Sudah lewat 24 jam: perubahan hanya lewat koreksi PM/Direktur di web.",
+  "fieldNotFound": "Laporan tidak ditemukan di HP ini.",
+  "fieldStateDraft": "Draft",
+  "fieldStateQueued": "Menunggu sinyal",
+  "fieldStateSent": "Terkirim",
+  "fieldStateConflict": "Konflik",
+  "fieldStateRejected": "Ditolak",
+  "fieldDraftSaved": "Draft tersimpan",
+  "fieldQueuedOnline": "Laporan disimpan dan sedang dikirim.",
+  "fieldQueuedOffline": "Laporan disimpan di HP dan dikirim otomatis saat ada sinyal.",
+  "fieldFixErrors": "Periksa isian yang ditandai merah.",
+  "fieldDiscardTitle": "Hapus draft?",
+  "fieldDiscardBody": "Draft dan fotonya dihapus dari HP ini. Server belum menerima laporan ini.",
+  "fieldDiscarded": "Draft dihapus.",
+  "fieldPhotoFailed": "Foto gagal disimpan. Coba lagi.",
+  "fieldAddPhoto": "Ambil foto",
+  "fieldEditWindow": "Bisa diubah sampai {time}.",
+  "@fieldEditWindow": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "fieldEditReason": "Alasan perubahan (opsional)",
+  "fieldEditReasonHelp": "Tercatat di riwayat audit.",
+  "fieldSaveEdit": "Simpan perubahan",
+  "fieldReportNotes": "Catatan",
+  "fieldDate": "Tanggal",
+  "fieldProjectContract": "Project / kontrak",
+  "fieldNoProjects": "Tidak ada project kontrak unit / aftersales untuk Anda.",
+  "fieldProjectUnavailable": "Project ini tidak lagi tersedia untuk laporan lapangan Anda (penugasan atau jenis project berubah).",
+  "fieldUnit": "Unit",
+  "fieldPickUnit": "Pilih unit",
+  "fieldChoose": "Pilih",
+  "fieldChange": "Ganti",
+  "fieldNoUnits": "Belum ada unit untuk project ini di HP. Buka saat online untuk memuat data unit.",
+  "fieldUnitSearch": "Cari kode unit / plat / tipe",
+  "fieldUnitNone": "Unit tidak ditemukan.",
+  "fieldUnitOwnerOwn": "Milik sendiri",
+  "fieldUnitOwnerCustomer": "Milik pelanggan ({name})",
+  "@fieldUnitOwnerCustomer": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "fieldUnitLastHm": "HM terakhir {hm}",
+  "@fieldUnitLastHm": {
+    "placeholders": {
+      "hm": {
+        "type": "String"
+      }
+    }
+  },
+  "fieldHmAtService": "HM saat servis",
+  "fieldHmLast": "HM terakhir unit {hm}",
+  "@fieldHmLast": {
+    "placeholders": {
+      "hm": {
+        "type": "String"
+      }
+    }
+  },
+  "fieldHmBelow": "Lebih kecil dari HM terakhir unit ({hm}). Server akan menolak; koreksi HM lama oleh PM/Direktur.",
+  "@fieldHmBelow": {
+    "placeholders": {
+      "hm": {
+        "type": "String"
+      }
+    }
+  },
+  "fieldStart": "Mulai",
+  "fieldEnd": "Selesai",
+  "fieldWork": "Pekerjaan",
+  "fieldServiceType": "Jenis servis",
+  "fieldComplaint": "Keluhan",
+  "fieldAction": "Tindakan / pekerjaan",
+  "fieldHelpers": "Helper (opsional)",
+  "fieldSpareparts": "Sparepart dipakai",
+  "fieldPartNameHeader": "Nama / no. part",
+  "fieldPartNameHint": "Nama sparepart",
+  "fieldPartNoHint": "No. part (opsional)",
+  "fieldUomHint": "set",
+  "fieldAddSparepart": "Tambah sparepart",
+  "fieldSparepartsNote": "Catatan saja — stok sparepart tidak dikelola di aplikasi.",
+  "fieldUnitStatusAfter": "Status unit setelah servis",
+  "fieldPmNotified": "PM akan diberi notifikasi: unit {unit} menunggu part.",
+  "@fieldPmNotified": {
+    "placeholders": {
+      "unit": {
+        "type": "String"
+      }
+    }
+  },
+  "fieldPhotos": "Foto",
+  "fieldPhotoBefore": "Foto sebelum servis",
+  "fieldPhotoAfter": "Foto sesudah servis",
+  "fieldPhotoBeforeCount": "Sebelum ({count})",
+  "@fieldPhotoBeforeCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "fieldPhotoAfterCount": "Sesudah ({count})",
+  "@fieldPhotoAfterCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "fieldPhotoLimit": "Maksimal {max} foto per laporan.",
+  "@fieldPhotoLimit": {
+    "placeholders": {
+      "max": {
+        "type": "int"
+      }
+    }
+  },
+  "fieldPhotosOnServer": "{count} foto sudah ada di server (foto tidak bisa dihapus).",
+  "@fieldPhotosOnServer": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "fieldPartsCount": "{count} sparepart",
+  "@fieldPartsCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "fieldPhotoCount": "{count} foto",
+  "@fieldPhotoCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "fieldServiceTitle": "Laporan Servis Unit",
+  "fieldServiceEditTitle": "Ubah Laporan Servis",
+  "fieldServiceSubmit": "Kirim laporan servis",
+  "fieldTimesheetTitle": "Timesheet Unit",
+  "fieldTimesheetEditTitle": "Ubah Timesheet Unit",
+  "fieldContract": "Kontrak",
+  "fieldNoContracts": "Tidak ada project kontrak unit untuk Anda.",
+  "fieldNoContractUnits": "Tidak ada unit kontrak yang aktif pada {date}. Buka saat online untuk memuat data kontrak.",
+  "@fieldNoContractUnits": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "fieldTabFilled": "terisi",
+  "fieldTabMissing": "belum",
+  "fieldTimesheetAlreadySent": "Timesheet unit ini untuk tanggal tersebut sudah ada di server. Perubahan lewat Riwayat saya (≤ 24 jam) atau koreksi PM.",
+  "fieldHourMeter": "Hour meter (HM)",
+  "fieldHmStart": "HM awal",
+  "fieldHmEnd": "HM akhir",
+  "fieldHmPrefilled": "HM awal diisi otomatis dari HM akhir {date} ({hm}).",
+  "@fieldHmPrefilled": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      },
+      "hm": {
+        "type": "String"
+      }
+    }
+  },
+  "fieldHmUsed": "Selisih HM: {hours} jam",
+  "@fieldHmUsed": {
+    "placeholders": {
+      "hours": {
+        "type": "String"
+      }
+    }
+  },
+  "fieldHmGap": "HM awal berbeda dengan HM akhir sebelumnya ({hm}). Boleh dikirim, akan ditandai \"Selisih HM\" untuk dicek PM.",
+  "@fieldHmGap": {
+    "placeholders": {
+      "hm": {
+        "type": "String"
+      }
+    }
+  },
+  "fieldHmPhoto": "Foto meter HM",
+  "fieldHmPhotoRequired": "Foto meter HM akhir (wajib)",
+  "fieldHmPhotoFixed": "Foto meter HM sudah di server (tidak bisa diganti).",
+  "fieldOperatingHours": "Jam operasi",
+  "fieldWorkHours": "Kerja",
+  "fieldStandbyHours": "Standby",
+  "fieldBreakdownHours": "Breakdown",
+  "fieldHoursTotal": "Total {total} dari 24 jam",
+  "@fieldHoursTotal": {
+    "placeholders": {
+      "total": {
+        "type": "String"
+      }
+    }
+  },
+  "fieldHoursOver": "Total {total} jam — melebihi 24 jam",
+  "@fieldHoursOver": {
+    "placeholders": {
+      "total": {
+        "type": "String"
+      }
+    }
+  },
+  "fieldHoursLegend": "kerja (biru) · standby (kuning) · breakdown (merah)",
+  "fieldBreakdownReason": "Alasan breakdown",
+  "fieldBreakdownReasonHint": "Mis. hidrolik bocor, menunggu part",
+  "fieldNoBreakdown": "— (tidak ada breakdown)",
+  "fieldSuggestService": "Breakdown {hours} jam. Sebaiknya buat laporan servis untuk unit ini.",
+  "@fieldSuggestService": {
+    "placeholders": {
+      "hours": {
+        "type": "String"
+      }
+    }
+  },
+  "fieldCreateServiceReport": "Buat laporan servis",
+  "fieldOperatorFuel": "Operator & BBM",
+  "fieldCopyYesterday": "Salin dari kemarin",
+  "fieldCopyNone": "Belum ada timesheet sebelumnya untuk unit ini.",
+  "fieldCopied": "Operator dan lokasi disalin dari {date}.",
+  "@fieldCopied": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "fieldOperatorName": "Nama operator",
+  "fieldFuel": "BBM (liter)",
+  "fieldLocation": "Lokasi",
+  "fieldNextUnit": "Unit berikutnya: {unit} belum diisi",
+  "@fieldNextUnit": {
+    "placeholders": {
+      "unit": {
+        "type": "String"
+      }
+    }
+  },
+  "fieldNextNone": "Semua unit kontrak sudah terisi untuk tanggal ini.",
+  "fieldSaveAndNext": "Simpan & lanjut ke {unit}",
+  "@fieldSaveAndNext": {
+    "placeholders": {
+      "unit": {
+        "type": "String"
+      }
+    }
+  },
+  "fieldTimesheetSave": "Simpan timesheet",
+  "fieldActivityTitle": "Aktivitas Aftersales",
+  "fieldActivityEditTitle": "Ubah Aktivitas Aftersales",
+  "fieldActivityNew": "Aktivitas baru",
+  "fieldActivityEdit": "Ubah aktivitas",
+  "fieldNoAftersalesProjects": "Tidak ada project aftersales untuk Anda.",
+  "fieldCustomer": "Pelanggan",
+  "fieldNoCustomers": "Belum ada daftar pelanggan di HP. Buka saat online; pelanggan diambil dari unit, PO dan aktivitas project ini.",
+  "fieldActivityKind": "Jenis aktivitas",
+  "fieldForPo": "Untuk PO (PO terbuka pelanggan ini)",
+  "fieldNoOpenPos": "Tidak ada PO terbuka untuk pelanggan ini.",
+  "fieldDocQuote": "No. penawaran",
+  "fieldDocPo": "No. PO",
+  "fieldDocDelivery": "No. surat jalan",
+  "fieldDocInvoice": "No. invoice",
+  "fieldDocOther": "No. dokumen",
+  "fieldItems": "Item",
+  "fieldItemsDelivered": "Item dikirim",
+  "fieldAddItem": "Tambah item",
+  "fieldPoDelivered": "PO ini sudah terkirim semua",
+  "fieldPoDeliveredHelp": "Tidak dicentang = terkirim sebagian (PO tetap terbuka).",
+  "fieldFollowUpPick": "Tanggal follow-up (opsional)",
+  "fieldFollowUpOn": "Follow-up {date}",
+  "@fieldFollowUpOn": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "fieldFollowUpShort": "follow-up {date}",
+  "@fieldFollowUpShort": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "fieldFollowUpHelp": "Anda dan PM diingatkan pada tanggal follow-up.",
+  "fieldReceiver": "Penerima",
+  "fieldValue": "Nilai Rp (opsional)",
+  "fieldValueHelp": "Hanya terlihat oleh Anda dan Direktur/Finance.",
+  "fieldProofPhoto": "Foto surat jalan / serah terima",
+  "fieldProofPhotos": "Foto surat jalan / serah terima ({count}/{max})",
+  "@fieldProofPhotos": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "max": {
+        "type": "int"
+      }
+    }
+  },
+  "fieldActivitySubmit": "Simpan aktivitas",
+  "fieldToday": "Hari ini ({count})",
+  "@fieldToday": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "fieldTodayEmpty": "Belum ada aktivitas pada tanggal ini.",
+  "fieldTodayOffline": "Tidak ada sinyal — aktivitas di server tampil saat online.",
+  "fieldNeedsFollowUp": "Perlu ditindaklanjuti",
+  "fieldOpenPosCount": "{count} PO belum terkirim",
+  "@fieldOpenPosCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "fieldFollowUpsToday": "{count} penawaran follow-up hari ini",
+  "@fieldFollowUpsToday": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "fieldPoStatus": "Status PO",
+  "fieldConflictTitle": "Konflik laporan lapangan",
+  "fieldConflictGone": "Konflik sudah selesai.",
+  "fieldUseServer": "Pakai versi server",
+  "fieldResendMine": "Kirim ulang versi saya",
+  "fieldNotEditableAnymore": "Sudah lewat 24 jam: versi HP tidak bisa dikirim ulang. Minta koreksi PM/Direktur.",
+  "fieldUsedServer": "Versi server dipakai; salinan di HP dihapus.",
+  "fieldResent": "Versi HP dikirim ulang.",
+  "fieldResendReason": "Alasan kirim ulang",
+  "fieldResendReasonHelp": "Wajib, min. 3 karakter (tercatat di audit).",
+  "fieldDiffers": "berbeda",
+  "fieldServerVersion": "Server",
+  "fieldMyVersion": "HP ini",
+  "fieldNewPhotos": "{count} foto baru",
+  "@fieldNewPhotos": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  }
 }

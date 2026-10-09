@@ -3570,6 +3570,1074 @@ abstract class AppLocalizations {
   /// In id, this message translates to:
   /// **'Baca pemberitahuan privasi'**
   String get privacyRead;
+
+  /// No description provided for @fieldHubTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Laporan Lapangan'**
+  String get fieldHubTitle;
+
+  /// No description provided for @fieldHubSub.
+  ///
+  /// In id, this message translates to:
+  /// **'Servis unit, timesheet, aftersales'**
+  String get fieldHubSub;
+
+  /// No description provided for @fieldPendingCount.
+  ///
+  /// In id, this message translates to:
+  /// **'{count} belum terkirim'**
+  String fieldPendingCount(int count);
+
+  /// No description provided for @fieldTabNew.
+  ///
+  /// In id, this message translates to:
+  /// **'Buat laporan'**
+  String get fieldTabNew;
+
+  /// No description provided for @fieldTabHistory.
+  ///
+  /// In id, this message translates to:
+  /// **'Riwayat saya'**
+  String get fieldTabHistory;
+
+  /// No description provided for @fieldOfflineCache.
+  ///
+  /// In id, this message translates to:
+  /// **'Tidak ada sinyal: data unit, kontrak dan PO dari penyimpanan HP (bisa belum terbaru). Laporan tetap bisa dibuat dan dikirim otomatis saat ada sinyal.'**
+  String get fieldOfflineCache;
+
+  /// No description provided for @fieldNoProjectsHub.
+  ///
+  /// In id, this message translates to:
+  /// **'Belum ada project kontrak unit atau aftersales yang ditugaskan ke Anda. Hubungi PM/Admin bila ini keliru.'**
+  String get fieldNoProjectsHub;
+
+  /// No description provided for @fieldLocalTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Di HP ini'**
+  String get fieldLocalTitle;
+
+  /// No description provided for @fieldServerTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Terkirim ke server'**
+  String get fieldServerTitle;
+
+  /// No description provided for @fieldHistoryOffline.
+  ///
+  /// In id, this message translates to:
+  /// **'Tidak ada sinyal — riwayat dari server tampil saat online.'**
+  String get fieldHistoryOffline;
+
+  /// No description provided for @fieldHistoryEmpty.
+  ///
+  /// In id, this message translates to:
+  /// **'Belum ada laporan lapangan Anda.'**
+  String get fieldHistoryEmpty;
+
+  /// No description provided for @fieldEditTag.
+  ///
+  /// In id, this message translates to:
+  /// **'Ubah {doc}'**
+  String fieldEditTag(String doc);
+
+  /// No description provided for @fieldConflictHint.
+  ///
+  /// In id, this message translates to:
+  /// **'Sudah ada perubahan di server. Ketuk untuk memilih versi yang dipakai.'**
+  String get fieldConflictHint;
+
+  /// No description provided for @fieldEditableTag.
+  ///
+  /// In id, this message translates to:
+  /// **'Bisa diubah ≤ 24 jam'**
+  String get fieldEditableTag;
+
+  /// No description provided for @fieldFlagOffline.
+  ///
+  /// In id, this message translates to:
+  /// **'Offline'**
+  String get fieldFlagOffline;
+
+  /// No description provided for @fieldFlagBackdated.
+  ///
+  /// In id, this message translates to:
+  /// **'Tanggal mundur'**
+  String get fieldFlagBackdated;
+
+  /// No description provided for @fieldFlagHmGap.
+  ///
+  /// In id, this message translates to:
+  /// **'Selisih HM'**
+  String get fieldFlagHmGap;
+
+  /// No description provided for @fieldFlagBreakdown.
+  ///
+  /// In id, this message translates to:
+  /// **'Breakdown ≥ 4 jam'**
+  String get fieldFlagBreakdown;
+
+  /// No description provided for @fieldFlagCorrected.
+  ///
+  /// In id, this message translates to:
+  /// **'Dikoreksi'**
+  String get fieldFlagCorrected;
+
+  /// No description provided for @fieldValueShown.
+  ///
+  /// In id, this message translates to:
+  /// **'Nilai: {value}'**
+  String fieldValueShown(String value);
+
+  /// No description provided for @fieldReporter.
+  ///
+  /// In id, this message translates to:
+  /// **'Pelapor: {name}'**
+  String fieldReporter(String name);
+
+  /// No description provided for @fieldEditUntil.
+  ///
+  /// In id, this message translates to:
+  /// **'Ubah (sampai {time})'**
+  String fieldEditUntil(String time);
+
+  /// No description provided for @fieldNotEditable.
+  ///
+  /// In id, this message translates to:
+  /// **'Sudah lewat 24 jam: perubahan hanya lewat koreksi PM/Direktur di web.'**
+  String get fieldNotEditable;
+
+  /// No description provided for @fieldNotFound.
+  ///
+  /// In id, this message translates to:
+  /// **'Laporan tidak ditemukan di HP ini.'**
+  String get fieldNotFound;
+
+  /// No description provided for @fieldStateDraft.
+  ///
+  /// In id, this message translates to:
+  /// **'Draft'**
+  String get fieldStateDraft;
+
+  /// No description provided for @fieldStateQueued.
+  ///
+  /// In id, this message translates to:
+  /// **'Menunggu sinyal'**
+  String get fieldStateQueued;
+
+  /// No description provided for @fieldStateSent.
+  ///
+  /// In id, this message translates to:
+  /// **'Terkirim'**
+  String get fieldStateSent;
+
+  /// No description provided for @fieldStateConflict.
+  ///
+  /// In id, this message translates to:
+  /// **'Konflik'**
+  String get fieldStateConflict;
+
+  /// No description provided for @fieldStateRejected.
+  ///
+  /// In id, this message translates to:
+  /// **'Ditolak'**
+  String get fieldStateRejected;
+
+  /// No description provided for @fieldDraftSaved.
+  ///
+  /// In id, this message translates to:
+  /// **'Draft tersimpan'**
+  String get fieldDraftSaved;
+
+  /// No description provided for @fieldQueuedOnline.
+  ///
+  /// In id, this message translates to:
+  /// **'Laporan disimpan dan sedang dikirim.'**
+  String get fieldQueuedOnline;
+
+  /// No description provided for @fieldQueuedOffline.
+  ///
+  /// In id, this message translates to:
+  /// **'Laporan disimpan di HP dan dikirim otomatis saat ada sinyal.'**
+  String get fieldQueuedOffline;
+
+  /// No description provided for @fieldFixErrors.
+  ///
+  /// In id, this message translates to:
+  /// **'Periksa isian yang ditandai merah.'**
+  String get fieldFixErrors;
+
+  /// No description provided for @fieldDiscardTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Hapus draft?'**
+  String get fieldDiscardTitle;
+
+  /// No description provided for @fieldDiscardBody.
+  ///
+  /// In id, this message translates to:
+  /// **'Draft dan fotonya dihapus dari HP ini. Server belum menerima laporan ini.'**
+  String get fieldDiscardBody;
+
+  /// No description provided for @fieldDiscarded.
+  ///
+  /// In id, this message translates to:
+  /// **'Draft dihapus.'**
+  String get fieldDiscarded;
+
+  /// No description provided for @fieldPhotoFailed.
+  ///
+  /// In id, this message translates to:
+  /// **'Foto gagal disimpan. Coba lagi.'**
+  String get fieldPhotoFailed;
+
+  /// No description provided for @fieldAddPhoto.
+  ///
+  /// In id, this message translates to:
+  /// **'Ambil foto'**
+  String get fieldAddPhoto;
+
+  /// No description provided for @fieldEditWindow.
+  ///
+  /// In id, this message translates to:
+  /// **'Bisa diubah sampai {time}.'**
+  String fieldEditWindow(String time);
+
+  /// No description provided for @fieldEditReason.
+  ///
+  /// In id, this message translates to:
+  /// **'Alasan perubahan (opsional)'**
+  String get fieldEditReason;
+
+  /// No description provided for @fieldEditReasonHelp.
+  ///
+  /// In id, this message translates to:
+  /// **'Tercatat di riwayat audit.'**
+  String get fieldEditReasonHelp;
+
+  /// No description provided for @fieldSaveEdit.
+  ///
+  /// In id, this message translates to:
+  /// **'Simpan perubahan'**
+  String get fieldSaveEdit;
+
+  /// No description provided for @fieldReportNotes.
+  ///
+  /// In id, this message translates to:
+  /// **'Catatan'**
+  String get fieldReportNotes;
+
+  /// No description provided for @fieldDate.
+  ///
+  /// In id, this message translates to:
+  /// **'Tanggal'**
+  String get fieldDate;
+
+  /// No description provided for @fieldProjectContract.
+  ///
+  /// In id, this message translates to:
+  /// **'Project / kontrak'**
+  String get fieldProjectContract;
+
+  /// No description provided for @fieldNoProjects.
+  ///
+  /// In id, this message translates to:
+  /// **'Tidak ada project kontrak unit / aftersales untuk Anda.'**
+  String get fieldNoProjects;
+
+  /// No description provided for @fieldProjectUnavailable.
+  ///
+  /// In id, this message translates to:
+  /// **'Project ini tidak lagi tersedia untuk laporan lapangan Anda (penugasan atau jenis project berubah).'**
+  String get fieldProjectUnavailable;
+
+  /// No description provided for @fieldUnit.
+  ///
+  /// In id, this message translates to:
+  /// **'Unit'**
+  String get fieldUnit;
+
+  /// No description provided for @fieldPickUnit.
+  ///
+  /// In id, this message translates to:
+  /// **'Pilih unit'**
+  String get fieldPickUnit;
+
+  /// No description provided for @fieldChoose.
+  ///
+  /// In id, this message translates to:
+  /// **'Pilih'**
+  String get fieldChoose;
+
+  /// No description provided for @fieldChange.
+  ///
+  /// In id, this message translates to:
+  /// **'Ganti'**
+  String get fieldChange;
+
+  /// No description provided for @fieldNoUnits.
+  ///
+  /// In id, this message translates to:
+  /// **'Belum ada unit untuk project ini di HP. Buka saat online untuk memuat data unit.'**
+  String get fieldNoUnits;
+
+  /// No description provided for @fieldUnitSearch.
+  ///
+  /// In id, this message translates to:
+  /// **'Cari kode unit / plat / tipe'**
+  String get fieldUnitSearch;
+
+  /// No description provided for @fieldUnitNone.
+  ///
+  /// In id, this message translates to:
+  /// **'Unit tidak ditemukan.'**
+  String get fieldUnitNone;
+
+  /// No description provided for @fieldUnitOwnerOwn.
+  ///
+  /// In id, this message translates to:
+  /// **'Milik sendiri'**
+  String get fieldUnitOwnerOwn;
+
+  /// No description provided for @fieldUnitOwnerCustomer.
+  ///
+  /// In id, this message translates to:
+  /// **'Milik pelanggan ({name})'**
+  String fieldUnitOwnerCustomer(String name);
+
+  /// No description provided for @fieldUnitLastHm.
+  ///
+  /// In id, this message translates to:
+  /// **'HM terakhir {hm}'**
+  String fieldUnitLastHm(String hm);
+
+  /// No description provided for @fieldHmAtService.
+  ///
+  /// In id, this message translates to:
+  /// **'HM saat servis'**
+  String get fieldHmAtService;
+
+  /// No description provided for @fieldHmLast.
+  ///
+  /// In id, this message translates to:
+  /// **'HM terakhir unit {hm}'**
+  String fieldHmLast(String hm);
+
+  /// No description provided for @fieldHmBelow.
+  ///
+  /// In id, this message translates to:
+  /// **'Lebih kecil dari HM terakhir unit ({hm}). Server akan menolak; koreksi HM lama oleh PM/Direktur.'**
+  String fieldHmBelow(String hm);
+
+  /// No description provided for @fieldStart.
+  ///
+  /// In id, this message translates to:
+  /// **'Mulai'**
+  String get fieldStart;
+
+  /// No description provided for @fieldEnd.
+  ///
+  /// In id, this message translates to:
+  /// **'Selesai'**
+  String get fieldEnd;
+
+  /// No description provided for @fieldWork.
+  ///
+  /// In id, this message translates to:
+  /// **'Pekerjaan'**
+  String get fieldWork;
+
+  /// No description provided for @fieldServiceType.
+  ///
+  /// In id, this message translates to:
+  /// **'Jenis servis'**
+  String get fieldServiceType;
+
+  /// No description provided for @fieldComplaint.
+  ///
+  /// In id, this message translates to:
+  /// **'Keluhan'**
+  String get fieldComplaint;
+
+  /// No description provided for @fieldAction.
+  ///
+  /// In id, this message translates to:
+  /// **'Tindakan / pekerjaan'**
+  String get fieldAction;
+
+  /// No description provided for @fieldHelpers.
+  ///
+  /// In id, this message translates to:
+  /// **'Helper (opsional)'**
+  String get fieldHelpers;
+
+  /// No description provided for @fieldSpareparts.
+  ///
+  /// In id, this message translates to:
+  /// **'Sparepart dipakai'**
+  String get fieldSpareparts;
+
+  /// No description provided for @fieldPartNameHeader.
+  ///
+  /// In id, this message translates to:
+  /// **'Nama / no. part'**
+  String get fieldPartNameHeader;
+
+  /// No description provided for @fieldPartNameHint.
+  ///
+  /// In id, this message translates to:
+  /// **'Nama sparepart'**
+  String get fieldPartNameHint;
+
+  /// No description provided for @fieldPartNoHint.
+  ///
+  /// In id, this message translates to:
+  /// **'No. part (opsional)'**
+  String get fieldPartNoHint;
+
+  /// No description provided for @fieldUomHint.
+  ///
+  /// In id, this message translates to:
+  /// **'set'**
+  String get fieldUomHint;
+
+  /// No description provided for @fieldAddSparepart.
+  ///
+  /// In id, this message translates to:
+  /// **'Tambah sparepart'**
+  String get fieldAddSparepart;
+
+  /// No description provided for @fieldSparepartsNote.
+  ///
+  /// In id, this message translates to:
+  /// **'Catatan saja — stok sparepart tidak dikelola di aplikasi.'**
+  String get fieldSparepartsNote;
+
+  /// No description provided for @fieldUnitStatusAfter.
+  ///
+  /// In id, this message translates to:
+  /// **'Status unit setelah servis'**
+  String get fieldUnitStatusAfter;
+
+  /// No description provided for @fieldPmNotified.
+  ///
+  /// In id, this message translates to:
+  /// **'PM akan diberi notifikasi: unit {unit} menunggu part.'**
+  String fieldPmNotified(String unit);
+
+  /// No description provided for @fieldPhotos.
+  ///
+  /// In id, this message translates to:
+  /// **'Foto'**
+  String get fieldPhotos;
+
+  /// No description provided for @fieldPhotoBefore.
+  ///
+  /// In id, this message translates to:
+  /// **'Foto sebelum servis'**
+  String get fieldPhotoBefore;
+
+  /// No description provided for @fieldPhotoAfter.
+  ///
+  /// In id, this message translates to:
+  /// **'Foto sesudah servis'**
+  String get fieldPhotoAfter;
+
+  /// No description provided for @fieldPhotoBeforeCount.
+  ///
+  /// In id, this message translates to:
+  /// **'Sebelum ({count})'**
+  String fieldPhotoBeforeCount(int count);
+
+  /// No description provided for @fieldPhotoAfterCount.
+  ///
+  /// In id, this message translates to:
+  /// **'Sesudah ({count})'**
+  String fieldPhotoAfterCount(int count);
+
+  /// No description provided for @fieldPhotoLimit.
+  ///
+  /// In id, this message translates to:
+  /// **'Maksimal {max} foto per laporan.'**
+  String fieldPhotoLimit(int max);
+
+  /// No description provided for @fieldPhotosOnServer.
+  ///
+  /// In id, this message translates to:
+  /// **'{count} foto sudah ada di server (foto tidak bisa dihapus).'**
+  String fieldPhotosOnServer(int count);
+
+  /// No description provided for @fieldPartsCount.
+  ///
+  /// In id, this message translates to:
+  /// **'{count} sparepart'**
+  String fieldPartsCount(int count);
+
+  /// No description provided for @fieldPhotoCount.
+  ///
+  /// In id, this message translates to:
+  /// **'{count} foto'**
+  String fieldPhotoCount(int count);
+
+  /// No description provided for @fieldServiceTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Laporan Servis Unit'**
+  String get fieldServiceTitle;
+
+  /// No description provided for @fieldServiceEditTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Ubah Laporan Servis'**
+  String get fieldServiceEditTitle;
+
+  /// No description provided for @fieldServiceSubmit.
+  ///
+  /// In id, this message translates to:
+  /// **'Kirim laporan servis'**
+  String get fieldServiceSubmit;
+
+  /// No description provided for @fieldTimesheetTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Timesheet Unit'**
+  String get fieldTimesheetTitle;
+
+  /// No description provided for @fieldTimesheetEditTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Ubah Timesheet Unit'**
+  String get fieldTimesheetEditTitle;
+
+  /// No description provided for @fieldContract.
+  ///
+  /// In id, this message translates to:
+  /// **'Kontrak'**
+  String get fieldContract;
+
+  /// No description provided for @fieldNoContracts.
+  ///
+  /// In id, this message translates to:
+  /// **'Tidak ada project kontrak unit untuk Anda.'**
+  String get fieldNoContracts;
+
+  /// No description provided for @fieldNoContractUnits.
+  ///
+  /// In id, this message translates to:
+  /// **'Tidak ada unit kontrak yang aktif pada {date}. Buka saat online untuk memuat data kontrak.'**
+  String fieldNoContractUnits(String date);
+
+  /// No description provided for @fieldTabFilled.
+  ///
+  /// In id, this message translates to:
+  /// **'terisi'**
+  String get fieldTabFilled;
+
+  /// No description provided for @fieldTabMissing.
+  ///
+  /// In id, this message translates to:
+  /// **'belum'**
+  String get fieldTabMissing;
+
+  /// No description provided for @fieldTimesheetAlreadySent.
+  ///
+  /// In id, this message translates to:
+  /// **'Timesheet unit ini untuk tanggal tersebut sudah ada di server. Perubahan lewat Riwayat saya (≤ 24 jam) atau koreksi PM.'**
+  String get fieldTimesheetAlreadySent;
+
+  /// No description provided for @fieldHourMeter.
+  ///
+  /// In id, this message translates to:
+  /// **'Hour meter (HM)'**
+  String get fieldHourMeter;
+
+  /// No description provided for @fieldHmStart.
+  ///
+  /// In id, this message translates to:
+  /// **'HM awal'**
+  String get fieldHmStart;
+
+  /// No description provided for @fieldHmEnd.
+  ///
+  /// In id, this message translates to:
+  /// **'HM akhir'**
+  String get fieldHmEnd;
+
+  /// No description provided for @fieldHmPrefilled.
+  ///
+  /// In id, this message translates to:
+  /// **'HM awal diisi otomatis dari HM akhir {date} ({hm}).'**
+  String fieldHmPrefilled(String date, String hm);
+
+  /// No description provided for @fieldHmUsed.
+  ///
+  /// In id, this message translates to:
+  /// **'Selisih HM: {hours} jam'**
+  String fieldHmUsed(String hours);
+
+  /// No description provided for @fieldHmGap.
+  ///
+  /// In id, this message translates to:
+  /// **'HM awal berbeda dengan HM akhir sebelumnya ({hm}). Boleh dikirim, akan ditandai \"Selisih HM\" untuk dicek PM.'**
+  String fieldHmGap(String hm);
+
+  /// No description provided for @fieldHmPhoto.
+  ///
+  /// In id, this message translates to:
+  /// **'Foto meter HM'**
+  String get fieldHmPhoto;
+
+  /// No description provided for @fieldHmPhotoRequired.
+  ///
+  /// In id, this message translates to:
+  /// **'Foto meter HM akhir (wajib)'**
+  String get fieldHmPhotoRequired;
+
+  /// No description provided for @fieldHmPhotoFixed.
+  ///
+  /// In id, this message translates to:
+  /// **'Foto meter HM sudah di server (tidak bisa diganti).'**
+  String get fieldHmPhotoFixed;
+
+  /// No description provided for @fieldOperatingHours.
+  ///
+  /// In id, this message translates to:
+  /// **'Jam operasi'**
+  String get fieldOperatingHours;
+
+  /// No description provided for @fieldWorkHours.
+  ///
+  /// In id, this message translates to:
+  /// **'Kerja'**
+  String get fieldWorkHours;
+
+  /// No description provided for @fieldStandbyHours.
+  ///
+  /// In id, this message translates to:
+  /// **'Standby'**
+  String get fieldStandbyHours;
+
+  /// No description provided for @fieldBreakdownHours.
+  ///
+  /// In id, this message translates to:
+  /// **'Breakdown'**
+  String get fieldBreakdownHours;
+
+  /// No description provided for @fieldHoursTotal.
+  ///
+  /// In id, this message translates to:
+  /// **'Total {total} dari 24 jam'**
+  String fieldHoursTotal(String total);
+
+  /// No description provided for @fieldHoursOver.
+  ///
+  /// In id, this message translates to:
+  /// **'Total {total} jam — melebihi 24 jam'**
+  String fieldHoursOver(String total);
+
+  /// No description provided for @fieldHoursLegend.
+  ///
+  /// In id, this message translates to:
+  /// **'kerja (biru) · standby (kuning) · breakdown (merah)'**
+  String get fieldHoursLegend;
+
+  /// No description provided for @fieldBreakdownReason.
+  ///
+  /// In id, this message translates to:
+  /// **'Alasan breakdown'**
+  String get fieldBreakdownReason;
+
+  /// No description provided for @fieldBreakdownReasonHint.
+  ///
+  /// In id, this message translates to:
+  /// **'Mis. hidrolik bocor, menunggu part'**
+  String get fieldBreakdownReasonHint;
+
+  /// No description provided for @fieldNoBreakdown.
+  ///
+  /// In id, this message translates to:
+  /// **'— (tidak ada breakdown)'**
+  String get fieldNoBreakdown;
+
+  /// No description provided for @fieldSuggestService.
+  ///
+  /// In id, this message translates to:
+  /// **'Breakdown {hours} jam. Sebaiknya buat laporan servis untuk unit ini.'**
+  String fieldSuggestService(String hours);
+
+  /// No description provided for @fieldCreateServiceReport.
+  ///
+  /// In id, this message translates to:
+  /// **'Buat laporan servis'**
+  String get fieldCreateServiceReport;
+
+  /// No description provided for @fieldOperatorFuel.
+  ///
+  /// In id, this message translates to:
+  /// **'Operator & BBM'**
+  String get fieldOperatorFuel;
+
+  /// No description provided for @fieldCopyYesterday.
+  ///
+  /// In id, this message translates to:
+  /// **'Salin dari kemarin'**
+  String get fieldCopyYesterday;
+
+  /// No description provided for @fieldCopyNone.
+  ///
+  /// In id, this message translates to:
+  /// **'Belum ada timesheet sebelumnya untuk unit ini.'**
+  String get fieldCopyNone;
+
+  /// No description provided for @fieldCopied.
+  ///
+  /// In id, this message translates to:
+  /// **'Operator dan lokasi disalin dari {date}.'**
+  String fieldCopied(String date);
+
+  /// No description provided for @fieldOperatorName.
+  ///
+  /// In id, this message translates to:
+  /// **'Nama operator'**
+  String get fieldOperatorName;
+
+  /// No description provided for @fieldFuel.
+  ///
+  /// In id, this message translates to:
+  /// **'BBM (liter)'**
+  String get fieldFuel;
+
+  /// No description provided for @fieldLocation.
+  ///
+  /// In id, this message translates to:
+  /// **'Lokasi'**
+  String get fieldLocation;
+
+  /// No description provided for @fieldNextUnit.
+  ///
+  /// In id, this message translates to:
+  /// **'Unit berikutnya: {unit} belum diisi'**
+  String fieldNextUnit(String unit);
+
+  /// No description provided for @fieldNextNone.
+  ///
+  /// In id, this message translates to:
+  /// **'Semua unit kontrak sudah terisi untuk tanggal ini.'**
+  String get fieldNextNone;
+
+  /// No description provided for @fieldSaveAndNext.
+  ///
+  /// In id, this message translates to:
+  /// **'Simpan & lanjut ke {unit}'**
+  String fieldSaveAndNext(String unit);
+
+  /// No description provided for @fieldTimesheetSave.
+  ///
+  /// In id, this message translates to:
+  /// **'Simpan timesheet'**
+  String get fieldTimesheetSave;
+
+  /// No description provided for @fieldActivityTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Aktivitas Aftersales'**
+  String get fieldActivityTitle;
+
+  /// No description provided for @fieldActivityEditTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Ubah Aktivitas Aftersales'**
+  String get fieldActivityEditTitle;
+
+  /// No description provided for @fieldActivityNew.
+  ///
+  /// In id, this message translates to:
+  /// **'Aktivitas baru'**
+  String get fieldActivityNew;
+
+  /// No description provided for @fieldActivityEdit.
+  ///
+  /// In id, this message translates to:
+  /// **'Ubah aktivitas'**
+  String get fieldActivityEdit;
+
+  /// No description provided for @fieldNoAftersalesProjects.
+  ///
+  /// In id, this message translates to:
+  /// **'Tidak ada project aftersales untuk Anda.'**
+  String get fieldNoAftersalesProjects;
+
+  /// No description provided for @fieldCustomer.
+  ///
+  /// In id, this message translates to:
+  /// **'Pelanggan'**
+  String get fieldCustomer;
+
+  /// No description provided for @fieldNoCustomers.
+  ///
+  /// In id, this message translates to:
+  /// **'Belum ada daftar pelanggan di HP. Buka saat online; pelanggan diambil dari unit, PO dan aktivitas project ini.'**
+  String get fieldNoCustomers;
+
+  /// No description provided for @fieldActivityKind.
+  ///
+  /// In id, this message translates to:
+  /// **'Jenis aktivitas'**
+  String get fieldActivityKind;
+
+  /// No description provided for @fieldForPo.
+  ///
+  /// In id, this message translates to:
+  /// **'Untuk PO (PO terbuka pelanggan ini)'**
+  String get fieldForPo;
+
+  /// No description provided for @fieldNoOpenPos.
+  ///
+  /// In id, this message translates to:
+  /// **'Tidak ada PO terbuka untuk pelanggan ini.'**
+  String get fieldNoOpenPos;
+
+  /// No description provided for @fieldDocQuote.
+  ///
+  /// In id, this message translates to:
+  /// **'No. penawaran'**
+  String get fieldDocQuote;
+
+  /// No description provided for @fieldDocPo.
+  ///
+  /// In id, this message translates to:
+  /// **'No. PO'**
+  String get fieldDocPo;
+
+  /// No description provided for @fieldDocDelivery.
+  ///
+  /// In id, this message translates to:
+  /// **'No. surat jalan'**
+  String get fieldDocDelivery;
+
+  /// No description provided for @fieldDocInvoice.
+  ///
+  /// In id, this message translates to:
+  /// **'No. invoice'**
+  String get fieldDocInvoice;
+
+  /// No description provided for @fieldDocOther.
+  ///
+  /// In id, this message translates to:
+  /// **'No. dokumen'**
+  String get fieldDocOther;
+
+  /// No description provided for @fieldItems.
+  ///
+  /// In id, this message translates to:
+  /// **'Item'**
+  String get fieldItems;
+
+  /// No description provided for @fieldItemsDelivered.
+  ///
+  /// In id, this message translates to:
+  /// **'Item dikirim'**
+  String get fieldItemsDelivered;
+
+  /// No description provided for @fieldAddItem.
+  ///
+  /// In id, this message translates to:
+  /// **'Tambah item'**
+  String get fieldAddItem;
+
+  /// No description provided for @fieldPoDelivered.
+  ///
+  /// In id, this message translates to:
+  /// **'PO ini sudah terkirim semua'**
+  String get fieldPoDelivered;
+
+  /// No description provided for @fieldPoDeliveredHelp.
+  ///
+  /// In id, this message translates to:
+  /// **'Tidak dicentang = terkirim sebagian (PO tetap terbuka).'**
+  String get fieldPoDeliveredHelp;
+
+  /// No description provided for @fieldFollowUpPick.
+  ///
+  /// In id, this message translates to:
+  /// **'Tanggal follow-up (opsional)'**
+  String get fieldFollowUpPick;
+
+  /// No description provided for @fieldFollowUpOn.
+  ///
+  /// In id, this message translates to:
+  /// **'Follow-up {date}'**
+  String fieldFollowUpOn(String date);
+
+  /// No description provided for @fieldFollowUpShort.
+  ///
+  /// In id, this message translates to:
+  /// **'follow-up {date}'**
+  String fieldFollowUpShort(String date);
+
+  /// No description provided for @fieldFollowUpHelp.
+  ///
+  /// In id, this message translates to:
+  /// **'Anda dan PM diingatkan pada tanggal follow-up.'**
+  String get fieldFollowUpHelp;
+
+  /// No description provided for @fieldReceiver.
+  ///
+  /// In id, this message translates to:
+  /// **'Penerima'**
+  String get fieldReceiver;
+
+  /// No description provided for @fieldValue.
+  ///
+  /// In id, this message translates to:
+  /// **'Nilai Rp (opsional)'**
+  String get fieldValue;
+
+  /// No description provided for @fieldValueHelp.
+  ///
+  /// In id, this message translates to:
+  /// **'Hanya terlihat oleh Anda dan Direktur/Finance.'**
+  String get fieldValueHelp;
+
+  /// No description provided for @fieldProofPhoto.
+  ///
+  /// In id, this message translates to:
+  /// **'Foto surat jalan / serah terima'**
+  String get fieldProofPhoto;
+
+  /// No description provided for @fieldProofPhotos.
+  ///
+  /// In id, this message translates to:
+  /// **'Foto surat jalan / serah terima ({count}/{max})'**
+  String fieldProofPhotos(int count, int max);
+
+  /// No description provided for @fieldActivitySubmit.
+  ///
+  /// In id, this message translates to:
+  /// **'Simpan aktivitas'**
+  String get fieldActivitySubmit;
+
+  /// No description provided for @fieldToday.
+  ///
+  /// In id, this message translates to:
+  /// **'Hari ini ({count})'**
+  String fieldToday(int count);
+
+  /// No description provided for @fieldTodayEmpty.
+  ///
+  /// In id, this message translates to:
+  /// **'Belum ada aktivitas pada tanggal ini.'**
+  String get fieldTodayEmpty;
+
+  /// No description provided for @fieldTodayOffline.
+  ///
+  /// In id, this message translates to:
+  /// **'Tidak ada sinyal — aktivitas di server tampil saat online.'**
+  String get fieldTodayOffline;
+
+  /// No description provided for @fieldNeedsFollowUp.
+  ///
+  /// In id, this message translates to:
+  /// **'Perlu ditindaklanjuti'**
+  String get fieldNeedsFollowUp;
+
+  /// No description provided for @fieldOpenPosCount.
+  ///
+  /// In id, this message translates to:
+  /// **'{count} PO belum terkirim'**
+  String fieldOpenPosCount(int count);
+
+  /// No description provided for @fieldFollowUpsToday.
+  ///
+  /// In id, this message translates to:
+  /// **'{count} penawaran follow-up hari ini'**
+  String fieldFollowUpsToday(int count);
+
+  /// No description provided for @fieldPoStatus.
+  ///
+  /// In id, this message translates to:
+  /// **'Status PO'**
+  String get fieldPoStatus;
+
+  /// No description provided for @fieldConflictTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Konflik laporan lapangan'**
+  String get fieldConflictTitle;
+
+  /// No description provided for @fieldConflictGone.
+  ///
+  /// In id, this message translates to:
+  /// **'Konflik sudah selesai.'**
+  String get fieldConflictGone;
+
+  /// No description provided for @fieldUseServer.
+  ///
+  /// In id, this message translates to:
+  /// **'Pakai versi server'**
+  String get fieldUseServer;
+
+  /// No description provided for @fieldResendMine.
+  ///
+  /// In id, this message translates to:
+  /// **'Kirim ulang versi saya'**
+  String get fieldResendMine;
+
+  /// No description provided for @fieldNotEditableAnymore.
+  ///
+  /// In id, this message translates to:
+  /// **'Sudah lewat 24 jam: versi HP tidak bisa dikirim ulang. Minta koreksi PM/Direktur.'**
+  String get fieldNotEditableAnymore;
+
+  /// No description provided for @fieldUsedServer.
+  ///
+  /// In id, this message translates to:
+  /// **'Versi server dipakai; salinan di HP dihapus.'**
+  String get fieldUsedServer;
+
+  /// No description provided for @fieldResent.
+  ///
+  /// In id, this message translates to:
+  /// **'Versi HP dikirim ulang.'**
+  String get fieldResent;
+
+  /// No description provided for @fieldResendReason.
+  ///
+  /// In id, this message translates to:
+  /// **'Alasan kirim ulang'**
+  String get fieldResendReason;
+
+  /// No description provided for @fieldResendReasonHelp.
+  ///
+  /// In id, this message translates to:
+  /// **'Wajib, min. 3 karakter (tercatat di audit).'**
+  String get fieldResendReasonHelp;
+
+  /// No description provided for @fieldDiffers.
+  ///
+  /// In id, this message translates to:
+  /// **'berbeda'**
+  String get fieldDiffers;
+
+  /// No description provided for @fieldServerVersion.
+  ///
+  /// In id, this message translates to:
+  /// **'Server'**
+  String get fieldServerVersion;
+
+  /// No description provided for @fieldMyVersion.
+  ///
+  /// In id, this message translates to:
+  /// **'HP ini'**
+  String get fieldMyVersion;
+
+  /// No description provided for @fieldNewPhotos.
+  ///
+  /// In id, this message translates to:
+  /// **'{count} foto baru'**
+  String fieldNewPhotos(int count);
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {
