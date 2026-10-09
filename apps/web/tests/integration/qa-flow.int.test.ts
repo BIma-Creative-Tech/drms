@@ -51,8 +51,12 @@ async function ok(p: Promise<{ status: number; body: any }>, status = 200) { // 
   return r.body
 }
 
+// Own seed range: png() restarts at seed 1 in every test file (one fork per file, one shared DB), so
+// default photos would be byte-identical to receipts of files that ran earlier (e.g. lpj) and raise an
+// unintended cross-request "foto identik" duplicate flag (file-order dependent).
+let ownSeed = 3_000
 async function receiptImage(user: FlowUser = w.users.staffA, bytes?: Buffer): Promise<number> {
-  const img = await upload('/api/v1/media/receipts', user, bytes ?? (await png()))
+  const img = await upload('/api/v1/media/receipts', user, bytes ?? (await png(++ownSeed)))
   expect(img.status, JSON.stringify(img.body)).toBe(201)
   return img.body.id as number
 }
