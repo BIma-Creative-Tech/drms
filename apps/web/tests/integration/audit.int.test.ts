@@ -49,6 +49,7 @@ const fixtures: Record<string, Fixture> = {
   },
   'notification-templates': { create: () => ({ event: 'audit.test', title: 'T', body: 'B' }), update: { title: 'T2' }, field: 'title' },
   vehicles: { create: () => ({ plateNo: 'kh 1 au', type: 'Pickup', costCenter: ids['cost-centers'] }), update: { brandModel: 'Toyota' }, field: 'brandModel' },
+  'urgency-levels': { create: () => ({ code: 'AUD-URG', name: 'Urgensi Audit', rank: 9 }), update: { name: 'Urgensi Audit 2' }, field: 'name' },
   'document-sequences': {
     create: () => ({ docType: 'reversal', docCode: 'RV', pattern: 'RV/{YY}{MM}/{seq}', resetPolicy: 'monthly', padding: 4, startAt: 1, timezone: 'Asia/Makassar' }),
     update: { pattern: 'RVS/{YY}{MM}/{seq}' },

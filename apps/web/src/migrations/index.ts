@@ -39,6 +39,9 @@ import * as migration_20261009_090000_qa_settlements_guard_merge from './2026100
 import * as migration_20261009_120000_list_row_actions_column from './20261009_120000_list_row_actions_column';
 import * as migration_20261010_080000_p2s_operator_role from './20261010_080000_p2s_operator_role';
 import * as migration_20261010_090000_p2s_urgency_level from './20261010_090000_p2s_urgency_level';
+import * as migration_20261010_100000_fr1_foundation from './20261010_100000_fr1_foundation';
+import * as migration_20261010_110000_fr1_field_reports from './20261010_110000_fr1_field_reports';
+import * as migration_20261010_120000_fr1_security from './20261010_120000_fr1_security';
 
 export const migrations = [
   {
@@ -245,5 +248,20 @@ export const migrations = [
     up: migration_20261010_090000_p2s_urgency_level.up,
     down: migration_20261010_090000_p2s_urgency_level.down,
     name: '20261010_090000_p2s_urgency_level',
+  },
+  {
+    up: migration_20261010_100000_fr1_foundation.up,
+    down: migration_20261010_100000_fr1_foundation.down,
+    name: '20261010_100000_fr1_foundation',
+  },
+  {
+    up: migration_20261010_110000_fr1_field_reports.up,
+    down: migration_20261010_110000_fr1_field_reports.down,
+    name: '20261010_110000_fr1_field_reports',
+  },
+  {
+    up: migration_20261010_120000_fr1_security.up,
+    down: migration_20261010_120000_fr1_security.down,
+    name: '20261010_120000_fr1_security',
   },
 ];

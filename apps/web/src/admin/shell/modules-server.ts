@@ -1,8 +1,8 @@
 import { getTranslation } from '@payloadcms/translations'
 import type { Payload, SanitizedPermissions, TypedUser, VisibleEntities } from 'payload'
 
-import { companyContextOf, isOperatorOnly, isStaffOnly, ROLE_LABELS, rolesOf, type Role } from '@/access/roles'
-import { resolveModules, type BadgeKey, type ResolvedModule } from '@/admin/modules/registry'
+import { companyContextOf, isOperatorOnly, isStaffOnly, membershipsOf, ROLE_LABELS, rolesOf, type Role } from '@/access/roles'
+import { resolveModules, type BadgeKey, type FeatureKey, type ResolvedModule } from '@/admin/modules/registry'
 import { TRANSFER_QUEUE_WHERE } from '@/domain/expense/types'
 
 import { normalizeSelection, type SwitcherState } from './company-switcher'
@@ -72,8 +72,31 @@ export function navUser(user: TypedUser): NavUser {
   }
 }
 
+/**
+ * FR1 (ADR 0020 §10): per-PT feature flags that gate custom views in the menu — on when ANY selected
+ * PT of the caller has it (companies.fieldReportsEnabled). A failing lookup hides the views (→ off).
+ */
+export async function loadFeatures(payload: Partial<Pick<Payload, 'find'>>, user: TypedUser): Promise<Partial<Record<FeatureKey, boolean>>> {
+  const ids = membershipsOf(user).map((m) => m.company)
+  if (ids.length === 0 || typeof payload.find !== 'function') return {}
+  try {
+    const r = await payload.find({
+      collection: 'companies',
+      where: { and: [{ id: { in: ids } }, { fieldReportsEnabled: { equals: true } }] },
+      depth: 0,
+      limit: 1,
+      pagination: false,
+      select: { shortCode: true },
+      overrideAccess: true, // SYSTEM-READ: feature flag of the caller's own selected PTs (menu only; views re-check)
+    })
+    return { fieldReports: r.docs.length > 0 }
+  } catch {
+    return {}
+  }
+}
+
 export type ModuleNavInput = {
-  payload: Pick<Payload, 'count' | 'config'>
+  payload: Pick<Payload, 'count' | 'config'> & Partial<Pick<Payload, 'find'>>
   user: TypedUser
   permissions?: SanitizedPermissions | null
   visibleEntities?: VisibleEntities | null
@@ -104,8 +127,8 @@ export async function loadModules({ payload, user, permissions, visibleEntities,
     const perms = (kind === 'collection' ? permissions?.collections : permissions?.globals) as Record<string, { create?: unknown; update?: unknown } | undefined> | undefined
     return Boolean(perms?.[slug]?.create || perms?.[slug]?.update)
   }
-  const badges = await loadBadges(payload, user)
-  return resolveModules({ roles: rolesOf(user), staffOnly: isStaffOnly(user), operatorOnly: isOperatorOnly(user), canSee, canManage, labelOf, badges })
+  const [badges, features] = await Promise.all([loadBadges(payload, user), loadFeatures(payload, user)])
+  return resolveModules({ roles: rolesOf(user), staffOnly: isStaffOnly(user), operatorOnly: isOperatorOnly(user), canSee, canManage, labelOf, badges, features })
 }
 
 /**

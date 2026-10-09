@@ -111,12 +111,27 @@
               "progressReportCreate": {
                 "type": "boolean",
                 "description": "E4: holds pk-pm (team projects) or pk-owner (all) → may create progress reports."
+              },
+              "serviceReportCreate": {
+                "type": "boolean",
+                "description": "FR1 (ADR 0020): field reports on for the PT (companies.fieldReportsEnabled) and holds pk-staff (assigned projects), pk-pm (team) or pk-owner → may create service reports on projects of kind kontrak_unit / aftersales."
+              },
+              "unitTimesheetCreate": {
+                "type": "boolean",
+                "description": "FR1: same rule → unit timesheets on projects of kind kontrak_unit."
+              },
+              "aftersalesActivityCreate": {
+                "type": "boolean",
+                "description": "FR1: same rule → aftersales activities on projects of kind aftersales."
               }
             },
             "required": [
               "approvalInbox",
               "teamMonitor",
-              "progressReportCreate"
+              "progressReportCreate",
+              "serviceReportCreate",
+              "unitTimesheetCreate",
+              "aftersalesActivityCreate"
             ],
             "description": "DEPRECATED (MC3): derived from the top-level `roles` (union over the selected PTs). Use companies[].capabilities."
           },
@@ -392,6 +407,10 @@
               },
               "syncProgressReportsEnabled": {
                 "type": "boolean"
+              },
+              "fieldReportsEnabled": {
+                "type": "boolean",
+                "description": "FR1 (ADR 0020): field reports per project kind switched on for this PT (default false)."
               }
             },
             "required": [
@@ -401,7 +420,8 @@
               "budgetWarnPct",
               "syncExpenseDraftsEnabled",
               "syncAttendanceEnabled",
-              "syncProgressReportsEnabled"
+              "syncProgressReportsEnabled",
+              "fieldReportsEnabled"
             ],
             "description": "Per-PT settings the APK needs (feature flags are applied per item PT: sync FEATURE_DISABLED)."
           }
@@ -455,12 +475,27 @@
           "progressReportCreate": {
             "type": "boolean",
             "description": "E4: holds pk-pm (team projects) or pk-owner (all) → may create progress reports."
+          },
+          "serviceReportCreate": {
+            "type": "boolean",
+            "description": "FR1 (ADR 0020): field reports on for the PT (companies.fieldReportsEnabled) and holds pk-staff (assigned projects), pk-pm (team) or pk-owner → may create service reports on projects of kind kontrak_unit / aftersales."
+          },
+          "unitTimesheetCreate": {
+            "type": "boolean",
+            "description": "FR1: same rule → unit timesheets on projects of kind kontrak_unit."
+          },
+          "aftersalesActivityCreate": {
+            "type": "boolean",
+            "description": "FR1: same rule → aftersales activities on projects of kind aftersales."
           }
         },
         "required": [
           "approvalInbox",
           "teamMonitor",
-          "progressReportCreate"
+          "progressReportCreate",
+          "serviceReportCreate",
+          "unitTimesheetCreate",
+          "aftersalesActivityCreate"
         ],
         "description": "UI hints for the APK (E1); the server guards stay authoritative."
       },
@@ -4734,7 +4769,7 @@
             "items": {
               "type": "string"
             },
-            "description": "OFFLINE, CLOCK_SKEW, CLIENT_TOTAL_MISMATCH, ALREADY_CANCELLED, DEVICE_TIME_ONLY."
+            "description": "OFFLINE, CLOCK_SKEW, CLIENT_TOTAL_MISMATCH, ALREADY_CANCELLED, DEVICE_TIME_ONLY; FR1 also BACKDATED, HM_GAP, BREAKDOWN_SUGGEST_SERVICE."
           },
           "errors": {
             "type": "array",
@@ -4743,7 +4778,7 @@
               "properties": {
                 "code": {
                   "type": "string",
-                  "description": "VALIDATION, NOT_EDITABLE, STALE_REV (conflict), NOT_FOUND, FORBIDDEN, MEDIA_MISSING, CLIENT_UUID_CONFLICT, COMPANY_NOT_ALLOWED (MC3: company_id is not an active membership of the caller), COMPANY_MISMATCH (MC3: the PT derived from the item references ≠ company_id — or ≠ the only PT of a caller without company_id; only for a PT the caller is mapped to — a reference in another PT is answered like a missing one, QA-MC4-14), FEATURE_DISABLED, DEPENDENCY_FAILED, DEPENDENCY_PENDING, STATE_CONFLICT, INTEGRITY, UNSUPPORTED, INTERNAL; attendance: MOCK_LOCATION, OUTSIDE_GEOFENCE, NOT_ASSIGNED, NO_GEOFENCE, ALREADY_CHECKED_IN, NO_CHECK_IN, ALREADY_CHECKED_OUT (on_behalf also FORBIDDEN: not a PM / not a team location / own attendance), PRIVACY_ACK_REQUIRED (ADR 0018: while the app setting minAppVersion ≥ 0.3.3, the caller — for on_behalf the PM — has not acknowledged the current privacy notice; final, never retry: show the notice, POST /me/privacy-ack, record again); progress reports: WEIGHTS_INCOMPLETE, PROGRESS_DECREASED, PHOTO_LIMIT, MEDIA_IN_USE."
+                  "description": "VALIDATION, NOT_EDITABLE, STALE_REV (conflict), NOT_FOUND, FORBIDDEN, MEDIA_MISSING, CLIENT_UUID_CONFLICT, COMPANY_NOT_ALLOWED (MC3: company_id is not an active membership of the caller), COMPANY_MISMATCH (MC3: the PT derived from the item references ≠ company_id — or ≠ the only PT of a caller without company_id; only for a PT the caller is mapped to — a reference in another PT is answered like a missing one, QA-MC4-14), FEATURE_DISABLED, DEPENDENCY_FAILED, DEPENDENCY_PENDING, STATE_CONFLICT, INTEGRITY, UNSUPPORTED, INTERNAL; attendance: MOCK_LOCATION, OUTSIDE_GEOFENCE, NOT_ASSIGNED, NO_GEOFENCE, ALREADY_CHECKED_IN, NO_CHECK_IN, ALREADY_CHECKED_OUT (on_behalf also FORBIDDEN: not a PM / not a team location / own attendance), PRIVACY_ACK_REQUIRED (ADR 0018: while the app setting minAppVersion ≥ 0.3.3, the caller — for on_behalf the PM — has not acknowledged the current privacy notice; final, never retry: show the notice, POST /me/privacy-ack, record again); progress reports: WEIGHTS_INCOMPLETE, PROGRESS_DECREASED, PHOTO_LIMIT, MEDIA_IN_USE; FR1 field reports: FEATURE_DISABLED, WRONG_PROJECT_KIND, HM_DECREASED, NOT_IN_CONTRACT, DUPLICATE_DATE, PO_CLOSED, PHOTO_LIMIT, MEDIA_IN_USE."
                 },
                 "field": {
                   "type": "string"
@@ -4770,6 +4805,15 @@
           },
           "server_report": {
             "$ref": "#/components/schemas/SyncProgressReportCopy"
+          },
+          "server_service_report": {
+            "$ref": "#/components/schemas/SyncServiceReportCopy"
+          },
+          "server_unit_timesheet": {
+            "$ref": "#/components/schemas/SyncUnitTimesheetCopy"
+          },
+          "server_aftersales_activity": {
+            "$ref": "#/components/schemas/SyncAftersalesActivityCopy"
           }
         },
         "required": [
@@ -5167,6 +5211,301 @@
         ],
         "description": "Server version of a progress report (server wins on conflict)."
       },
+      "SyncServiceReportCopy": {
+        "type": [
+          "object",
+          "null"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "exclusiveMinimum": 0
+          },
+          "client_uuid": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "rev": {
+            "type": "integer"
+          },
+          "doc_no": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "project_id": {
+            "type": "integer",
+            "exclusiveMinimum": 0
+          },
+          "unit_id": {
+            "type": "integer",
+            "exclusiveMinimum": 0
+          },
+          "report_date": {
+            "type": "string"
+          },
+          "hour_meter": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "service_type": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string"
+          },
+          "unit_status_after": {
+            "type": "string"
+          },
+          "photo_media_ids": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "exclusiveMinimum": 0
+            }
+          },
+          "flags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "offline": {
+            "type": "boolean"
+          },
+          "editable_until": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "updated_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "client_uuid",
+          "rev",
+          "doc_no",
+          "project_id",
+          "unit_id",
+          "report_date",
+          "hour_meter",
+          "service_type",
+          "action",
+          "unit_status_after",
+          "photo_media_ids",
+          "flags",
+          "offline",
+          "editable_until",
+          "updated_at"
+        ],
+        "description": "Server version of a service report (server wins on conflict)."
+      },
+      "SyncUnitTimesheetCopy": {
+        "type": [
+          "object",
+          "null"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "exclusiveMinimum": 0
+          },
+          "client_uuid": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "rev": {
+            "type": "integer"
+          },
+          "project_id": {
+            "type": "integer",
+            "exclusiveMinimum": 0
+          },
+          "unit_id": {
+            "type": "integer",
+            "exclusiveMinimum": 0
+          },
+          "report_date": {
+            "type": "string"
+          },
+          "hm_start": {
+            "type": "number"
+          },
+          "hm_end": {
+            "type": "number"
+          },
+          "work_hours": {
+            "type": "number"
+          },
+          "standby_hours": {
+            "type": "number"
+          },
+          "breakdown_hours": {
+            "type": "number"
+          },
+          "hm_photo_media_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "exclusiveMinimum": 0
+          },
+          "flags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "offline": {
+            "type": "boolean"
+          },
+          "editable_until": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "updated_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "client_uuid",
+          "rev",
+          "project_id",
+          "unit_id",
+          "report_date",
+          "hm_start",
+          "hm_end",
+          "work_hours",
+          "standby_hours",
+          "breakdown_hours",
+          "hm_photo_media_id",
+          "flags",
+          "offline",
+          "editable_until",
+          "updated_at"
+        ],
+        "description": "Server version of a unit timesheet (server wins on conflict)."
+      },
+      "SyncAftersalesActivityCopy": {
+        "type": [
+          "object",
+          "null"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "exclusiveMinimum": 0
+          },
+          "client_uuid": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "rev": {
+            "type": "integer"
+          },
+          "doc_no": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "External document number (Q/PO/SJ/INV)."
+          },
+          "project_id": {
+            "type": "integer",
+            "exclusiveMinimum": 0
+          },
+          "client_id": {
+            "type": "integer",
+            "exclusiveMinimum": 0
+          },
+          "activity_date": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "po_status": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "relates_to": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "exclusiveMinimum": 0
+          },
+          "photo_media_ids": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "exclusiveMinimum": 0
+            }
+          },
+          "flags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "offline": {
+            "type": "boolean"
+          },
+          "editable_until": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "updated_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "client_uuid",
+          "rev",
+          "doc_no",
+          "project_id",
+          "client_id",
+          "activity_date",
+          "kind",
+          "po_status",
+          "relates_to",
+          "photo_media_ids",
+          "flags",
+          "offline",
+          "editable_until",
+          "updated_at"
+        ],
+        "description": "Server version of an aftersales activity (server wins on conflict; the value is not echoed)."
+      },
       "SyncBatch": {
         "type": "object",
         "properties": {
@@ -5319,11 +5658,20 @@
                 "$ref": "#/components/schemas/SyncProgressReportPayload"
               },
               {
+                "$ref": "#/components/schemas/SyncServiceReportPayload"
+              },
+              {
+                "$ref": "#/components/schemas/SyncUnitTimesheetPayload"
+              },
+              {
+                "$ref": "#/components/schemas/SyncAftersalesActivityPayload"
+              },
+              {
                 "type": "object",
                 "additionalProperties": {}
               }
             ],
-            "description": "Type specific: expense_request.draft_upsert → SyncDraftUpsertPayload, expense_request.draft_delete → SyncDraftDeletePayload, attendance.check_in / attendance.check_out → SyncAttendancePayload, attendance.on_behalf → SyncOnBehalfPayload, progress_report.draft_upsert → SyncProgressReportPayload; other types: free-form until supported."
+            "description": "Type specific: expense_request.draft_upsert → SyncDraftUpsertPayload, expense_request.draft_delete → SyncDraftDeletePayload, attendance.check_in / attendance.check_out → SyncAttendancePayload, attendance.on_behalf → SyncOnBehalfPayload, progress_report.draft_upsert → SyncProgressReportPayload, service_report.upsert → SyncServiceReportPayload, unit_timesheet.upsert → SyncUnitTimesheetPayload, aftersales_activity.upsert → SyncAftersalesActivityPayload; other types: free-form until supported."
           }
         },
         "required": [
@@ -5345,9 +5693,12 @@
           "attendance.on_behalf",
           "expense_request.draft_upsert",
           "expense_request.draft_delete",
-          "progress_report.draft_upsert"
+          "progress_report.draft_upsert",
+          "service_report.upsert",
+          "unit_timesheet.upsert",
+          "aftersales_activity.upsert"
         ],
-        "description": "attendance.on_behalf (US-14, E6): PM only. progress_report.draft_upsert (E4) = create or edit (≤ 24 h) of a progress report (company-settings.syncProgressReportsEnabled)."
+        "description": "attendance.on_behalf (US-14, E6): PM only. progress_report.draft_upsert (E4) = create or edit (≤ 24 h) of a progress report (company-settings.syncProgressReportsEnabled). FR1 (ADR 0020): service_report.upsert / unit_timesheet.upsert / aftersales_activity.upsert = create or edit (reporter, ≤ 24 h) of a field report (companies.fieldReportsEnabled; creates otherwise FEATURE_DISABLED)."
       },
       "SyncDraftUpsertPayload": {
         "type": "object",
@@ -5822,6 +6173,408 @@
             "description": "Required when editing an existing report."
           }
         },
+        "additionalProperties": false
+      },
+      "SyncServiceReportPayload": {
+        "type": "object",
+        "properties": {
+          "report_id": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "description": "Server id (edit of a report created online)."
+          },
+          "report_client_uuid": {
+            "type": "string",
+            "format": "uuid",
+            "description": "APK id of the report (default: the client_uuid of the item that created it)."
+          },
+          "project_id": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "description": "Required for a new report."
+          },
+          "unit_id": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "description": "Required for a new report."
+          },
+          "report_date": {
+            "type": "string",
+            "pattern": "^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$",
+            "description": "Default: the company-TZ date of the time that counts."
+          },
+          "helpers": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 200
+          },
+          "start_time": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+          },
+          "end_time": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+          },
+          "hour_meter": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 10000000
+          },
+          "service_type": {
+            "type": "string",
+            "enum": [
+              "servis_berkala",
+              "perbaikan",
+              "inspeksi",
+              "pemasangan"
+            ],
+            "description": "Required for a new report."
+          },
+          "complaint": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 2000
+          },
+          "action": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 4000,
+            "description": "Required for a new report."
+          },
+          "unit_status_after": {
+            "type": "string",
+            "enum": [
+              "siap",
+              "rusak",
+              "menunggu_part"
+            ],
+            "description": "Required for a new report."
+          },
+          "spareparts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SyncSparepartLine"
+            },
+            "maxItems": 50
+          },
+          "notes": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 2000
+          },
+          "photo_media_ids": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "exclusiveMinimum": 0
+            },
+            "maxItems": 10,
+            "description": "On an edit: ids not yet on the report are added (photos are never removed)."
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 1000
+          }
+        },
+        "additionalProperties": false
+      },
+      "SyncSparepartLine": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "part_no": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 64
+          },
+          "qty": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "maximum": 1000000
+          },
+          "uom": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 16
+          },
+          "note": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 300
+          }
+        },
+        "required": [
+          "name",
+          "qty"
+        ],
+        "additionalProperties": false
+      },
+      "SyncUnitTimesheetPayload": {
+        "type": "object",
+        "properties": {
+          "timesheet_id": {
+            "type": "integer",
+            "exclusiveMinimum": 0
+          },
+          "timesheet_client_uuid": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "project_id": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "description": "Required for a new timesheet (kind kontrak_unit)."
+          },
+          "unit_id": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "description": "Required for a new timesheet (active contract unit on report_date)."
+          },
+          "report_date": {
+            "type": "string",
+            "pattern": "^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$",
+            "description": "Required for a new timesheet."
+          },
+          "hm_start": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 10000000
+          },
+          "hm_end": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 10000000
+          },
+          "work_hours": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 24
+          },
+          "standby_hours": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 24
+          },
+          "breakdown_hours": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 24
+          },
+          "breakdown_reason": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 500
+          },
+          "fuel_liters": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 100000
+          },
+          "operator_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 128
+          },
+          "location": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 200
+          },
+          "notes": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 2000
+          },
+          "hm_photo_media_id": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "description": "Required for a new timesheet (photo of the HM meter). Cannot change afterwards."
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 1000
+          }
+        },
+        "additionalProperties": false
+      },
+      "SyncAftersalesActivityPayload": {
+        "type": "object",
+        "properties": {
+          "activity_id": {
+            "type": "integer",
+            "exclusiveMinimum": 0
+          },
+          "activity_client_uuid": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "project_id": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "description": "Required for a new activity."
+          },
+          "client_id": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "description": "Required for a new activity (customer of the PT)."
+          },
+          "activity_date": {
+            "type": "string",
+            "pattern": "^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "penawaran",
+              "po_masuk",
+              "pengiriman",
+              "penagihan",
+              "kunjungan",
+              "lainnya"
+            ],
+            "description": "Required for a new activity."
+          },
+          "doc_no": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 64
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SyncActivityItem"
+            },
+            "maxItems": 50
+          },
+          "value": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 10000000000000
+          },
+          "relates_to": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "exclusiveMinimum": 0,
+            "description": "pengiriman / penagihan: server id of the incoming PO."
+          },
+          "po_delivered": {
+            "type": "boolean"
+          },
+          "follow_up_date": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$"
+          },
+          "receiver": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 128
+          },
+          "notes": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 2000
+          },
+          "photo_media_ids": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "exclusiveMinimum": 0
+            },
+            "maxItems": 5
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 1000
+          }
+        },
+        "additionalProperties": false
+      },
+      "SyncActivityItem": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "part_no": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 64
+          },
+          "qty": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "maximum": 1000000
+          },
+          "uom": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 16
+          }
+        },
+        "required": [
+          "name",
+          "qty"
+        ],
         "additionalProperties": false
       },
       "ProjectProgressList": {
@@ -8339,6 +9092,2270 @@
         },
         "required": [
           "items"
+        ]
+      },
+      "ServiceReportList": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ServiceReport"
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ]
+      },
+      "ServiceReport": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "exclusiveMinimum": 0
+          },
+          "uuid": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "companyId": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "exclusiveMinimum": 0
+          },
+          "docNo": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "SV/YYMM/####"
+          },
+          "project": {
+            "$ref": "#/components/schemas/FieldProjectRef"
+          },
+          "unit": {
+            "$ref": "#/components/schemas/FieldUnitRef"
+          },
+          "reportDate": {
+            "type": "string"
+          },
+          "reporter": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "exclusiveMinimum": 0
+              },
+              "name": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "name"
+            ]
+          },
+          "helpers": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "startTime": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "endTime": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "hourMeter": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "serviceType": {
+            "$ref": "#/components/schemas/ServiceType"
+          },
+          "complaint": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "action": {
+            "type": "string"
+          },
+          "unitStatusAfter": {
+            "$ref": "#/components/schemas/UnitStatus"
+          },
+          "spareparts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SparepartLine"
+            }
+          },
+          "notes": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "photos": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FieldPhoto"
+            }
+          },
+          "offline": {
+            "type": "boolean"
+          },
+          "timeTrust": {
+            "type": "string",
+            "enum": [
+              "server",
+              "estimated",
+              "device_only"
+            ]
+          },
+          "source": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "web",
+              "apk",
+              null
+            ]
+          },
+          "flags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "OFFLINE, DEVICE_TIME_ONLY, CLOCK_SKEW, BACKDATED, HM_GAP (timesheet), BREAKDOWN_SUGGEST_SERVICE (timesheet), CORRECTED."
+          },
+          "receivedAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "editableUntil": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "editable": {
+            "type": "boolean",
+            "description": "The caller is the reporter and the 24 h window is open."
+          },
+          "correctedAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "correctedBy": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "type": "integer",
+                "exclusiveMinimum": 0
+              },
+              "name": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "name"
+            ]
+          },
+          "rev": {
+            "type": "integer",
+            "description": "Content revision (sync base_rev)."
+          },
+          "clientUuid": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "createdAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "uuid",
+          "companyId",
+          "docNo",
+          "project",
+          "unit",
+          "reportDate",
+          "reporter",
+          "helpers",
+          "startTime",
+          "endTime",
+          "hourMeter",
+          "serviceType",
+          "complaint",
+          "action",
+          "unitStatusAfter",
+          "spareparts",
+          "notes",
+          "photos",
+          "offline",
+          "timeTrust",
+          "source",
+          "flags",
+          "receivedAt",
+          "editableUntil",
+          "editable",
+          "correctedAt",
+          "correctedBy",
+          "rev",
+          "clientUuid",
+          "createdAt"
+        ]
+      },
+      "FieldProjectRef": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "exclusiveMinimum": 0
+          },
+          "code": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "kind": {
+            "$ref": "#/components/schemas/ProjectKind"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "name",
+          "kind"
+        ]
+      },
+      "ProjectKind": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "enum": [
+          "umum",
+          "konstruksi",
+          "kontrak_unit",
+          "aftersales",
+          "trading",
+          null
+        ],
+        "description": "ADR 0020: kontrak_unit → timesheet + servis; aftersales → servis + aktivitas; others: no field reports (konstruksi: P3)."
+      },
+      "FieldUnitRef": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "exclusiveMinimum": 0
+          },
+          "label": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "unitCode": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "plateDisplay": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "type": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "owner": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "sendiri",
+              "pelanggan",
+              null
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "label",
+          "unitCode",
+          "plateDisplay",
+          "type",
+          "owner"
+        ]
+      },
+      "ServiceType": {
+        "type": "string",
+        "enum": [
+          "servis_berkala",
+          "perbaikan",
+          "inspeksi",
+          "pemasangan"
+        ]
+      },
+      "UnitStatus": {
+        "type": "string",
+        "enum": [
+          "siap",
+          "rusak",
+          "menunggu_part"
+        ]
+      },
+      "SparepartLine": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "partNo": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 64
+          },
+          "qty": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "maximum": 1000000
+          },
+          "uom": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 16,
+            "description": "Satuan (text, e.g. PCS, SET, LTR)."
+          },
+          "note": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 300
+          }
+        },
+        "required": [
+          "name",
+          "qty"
+        ],
+        "additionalProperties": false,
+        "description": "Spare part used (text only — no stock is kept, ADR 0020 §9)."
+      },
+      "FieldPhoto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "exclusiveMinimum": 0
+          },
+          "width": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "height": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "filesize": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "url": {
+            "type": "string",
+            "description": "GET (auth) — /api/v1/media/progress-photos/{id}/file"
+          },
+          "thumbUrl": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "width",
+          "height",
+          "filesize",
+          "url",
+          "thumbUrl"
+        ]
+      },
+      "ServiceReportCreate": {
+        "type": "object",
+        "properties": {
+          "company": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "description": "MC4: explicit PT (companies id) of the new record. Must be one of your PTs where you hold the role this create needs (else 403 COMPANY_NOT_ALLOWED) and the PT of the referenced project / cost center / cash account (else 400 COMPANY_MISMATCH; a reference in a PT you are not mapped to is answered like a missing one). Omitted = derived from the references, else your only selected PT (unchanged behaviour of APK 0.2.x / 0.3.0)."
+          },
+          "projectId": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "description": "Project of kind kontrak_unit or aftersales (else 409 WRONG_PROJECT_KIND)."
+          },
+          "unitId": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "description": "Unit of the project PT; a customer-owned unit must belong to the project's client when the project has one."
+          },
+          "reportDate": {
+            "type": "string",
+            "pattern": "^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$",
+            "description": "Default: today (company TZ). Not in the future, ≤ 14 days back."
+          },
+          "helpers": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 200,
+            "description": "Helper (names, text)."
+          },
+          "startTime": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+          },
+          "endTime": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+          },
+          "hourMeter": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 10000000,
+            "description": "HM at the service; below the unit's latest reading on/before the date → 409 HM_DECREASED (corrections: PM/Direktur)."
+          },
+          "serviceType": {
+            "$ref": "#/components/schemas/ServiceType"
+          },
+          "complaint": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 2000
+          },
+          "action": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 4000,
+            "description": "Tindakan / pekerjaan."
+          },
+          "unitStatusAfter": {
+            "type": "string",
+            "enum": [
+              "siap",
+              "rusak",
+              "menunggu_part"
+            ],
+            "description": "Unit status after the service → vehicles.status (menunggu_part notifies the project PM)."
+          },
+          "spareparts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SparepartLine"
+            },
+            "maxItems": 50
+          },
+          "notes": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 2000
+          },
+          "photoIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "exclusiveMinimum": 0
+            },
+            "maxItems": 10,
+            "description": "media-progress-photos ids uploaded by the caller (before/after), max 10."
+          },
+          "clientUuid": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Client id; a replay by the same reporter returns the existing record (200); another user → 409 CLIENT_UUID_CONFLICT."
+          }
+        },
+        "required": [
+          "projectId",
+          "unitId",
+          "serviceType",
+          "action",
+          "unitStatusAfter"
+        ],
+        "additionalProperties": false
+      },
+      "ServiceReportUpdate": {
+        "type": "object",
+        "properties": {
+          "helpers": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 200,
+            "description": "Helper (names, text)."
+          },
+          "startTime": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+          },
+          "endTime": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+          },
+          "hourMeter": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 10000000,
+            "description": "HM at the service; below the unit's latest reading on/before the date → 409 HM_DECREASED (corrections: PM/Direktur)."
+          },
+          "serviceType": {
+            "$ref": "#/components/schemas/ServiceType"
+          },
+          "complaint": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 2000
+          },
+          "action": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 4000,
+            "description": "Tindakan / pekerjaan."
+          },
+          "unitStatusAfter": {
+            "$ref": "#/components/schemas/UnitStatus"
+          },
+          "spareparts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SparepartLine"
+            },
+            "maxItems": 50
+          },
+          "notes": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 2000
+          },
+          "addPhotoIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "exclusiveMinimum": 0
+            },
+            "maxItems": 10,
+            "description": "Photos to add (total ≤ 10)."
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 1000,
+            "description": "Optional for the reporter's own edit inside the 24 h window (audited)."
+          }
+        },
+        "additionalProperties": false
+      },
+      "ServiceReportCorrection": {
+        "type": "object",
+        "properties": {
+          "helpers": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 200,
+            "description": "Helper (names, text)."
+          },
+          "startTime": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+          },
+          "endTime": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+          },
+          "hourMeter": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 10000000,
+            "description": "HM at the service; below the unit's latest reading on/before the date → 409 HM_DECREASED (corrections: PM/Direktur)."
+          },
+          "serviceType": {
+            "$ref": "#/components/schemas/ServiceType"
+          },
+          "complaint": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 2000
+          },
+          "action": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 4000,
+            "description": "Tindakan / pekerjaan."
+          },
+          "unitStatusAfter": {
+            "$ref": "#/components/schemas/UnitStatus"
+          },
+          "spareparts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SparepartLine"
+            },
+            "maxItems": 50
+          },
+          "notes": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 2000
+          },
+          "addPhotoIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "exclusiveMinimum": 0
+            },
+            "maxItems": 10,
+            "description": "Photos to add (total ≤ 10)."
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 1000,
+            "description": "Required: PM of the project team or Direktur, any time (audited, flag CORRECTED)."
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "additionalProperties": false
+      },
+      "UnitTimesheetList": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UnitTimesheet"
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ]
+      },
+      "UnitTimesheet": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "exclusiveMinimum": 0
+          },
+          "uuid": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "companyId": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "exclusiveMinimum": 0
+          },
+          "project": {
+            "$ref": "#/components/schemas/FieldProjectRef"
+          },
+          "unit": {
+            "$ref": "#/components/schemas/FieldUnitRef"
+          },
+          "contractUnitId": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "exclusiveMinimum": 0
+          },
+          "reportDate": {
+            "type": "string"
+          },
+          "reporter": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "exclusiveMinimum": 0
+              },
+              "name": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "name"
+            ]
+          },
+          "hmStart": {
+            "type": "number"
+          },
+          "hmEnd": {
+            "type": "number"
+          },
+          "hmUsed": {
+            "type": "number",
+            "description": "hmEnd − hmStart."
+          },
+          "workHours": {
+            "type": "number"
+          },
+          "standbyHours": {
+            "type": "number"
+          },
+          "breakdownHours": {
+            "type": "number"
+          },
+          "breakdownReason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "fuelLiters": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "operatorName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "location": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "notes": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "hmPhoto": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/FieldPhoto"
+              },
+              {
+                "type": [
+                  "object",
+                  "null"
+                ]
+              }
+            ]
+          },
+          "suggestServiceReport": {
+            "type": "boolean",
+            "description": "breakdownHours ≥ 4 → suggest a service report."
+          },
+          "offline": {
+            "type": "boolean"
+          },
+          "timeTrust": {
+            "type": "string",
+            "enum": [
+              "server",
+              "estimated",
+              "device_only"
+            ]
+          },
+          "source": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "web",
+              "apk",
+              null
+            ]
+          },
+          "flags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "OFFLINE, DEVICE_TIME_ONLY, CLOCK_SKEW, BACKDATED, HM_GAP (timesheet), BREAKDOWN_SUGGEST_SERVICE (timesheet), CORRECTED."
+          },
+          "receivedAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "editableUntil": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "editable": {
+            "type": "boolean",
+            "description": "The caller is the reporter and the 24 h window is open."
+          },
+          "correctedAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "correctedBy": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "type": "integer",
+                "exclusiveMinimum": 0
+              },
+              "name": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "name"
+            ]
+          },
+          "rev": {
+            "type": "integer",
+            "description": "Content revision (sync base_rev)."
+          },
+          "clientUuid": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "createdAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "uuid",
+          "companyId",
+          "project",
+          "unit",
+          "contractUnitId",
+          "reportDate",
+          "reporter",
+          "hmStart",
+          "hmEnd",
+          "hmUsed",
+          "workHours",
+          "standbyHours",
+          "breakdownHours",
+          "breakdownReason",
+          "fuelLiters",
+          "operatorName",
+          "location",
+          "notes",
+          "hmPhoto",
+          "suggestServiceReport",
+          "offline",
+          "timeTrust",
+          "source",
+          "flags",
+          "receivedAt",
+          "editableUntil",
+          "editable",
+          "correctedAt",
+          "correctedBy",
+          "rev",
+          "clientUuid",
+          "createdAt"
+        ]
+      },
+      "UnitTimesheetCreate": {
+        "type": "object",
+        "properties": {
+          "company": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "description": "MC4: explicit PT (companies id) of the new record. Must be one of your PTs where you hold the role this create needs (else 403 COMPANY_NOT_ALLOWED) and the PT of the referenced project / cost center / cash account (else 400 COMPANY_MISMATCH; a reference in a PT you are not mapped to is answered like a missing one). Omitted = derived from the references, else your only selected PT (unchanged behaviour of APK 0.2.x / 0.3.0)."
+          },
+          "projectId": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "description": "Project of kind kontrak_unit."
+          },
+          "unitId": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "description": "Unit in an ACTIVE contract unit of the project on reportDate (else 409 NOT_IN_CONTRACT). One timesheet per unit and date (409 DUPLICATE_DATE)."
+          },
+          "reportDate": {
+            "type": "string",
+            "pattern": "^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$"
+          },
+          "hmStart": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 10000000,
+            "description": "HM awal; ≠ the previous timesheet's HM akhir → flag HM_GAP (not rejected)."
+          },
+          "hmEnd": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 10000000,
+            "description": "HM akhir ≥ HM awal."
+          },
+          "workHours": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 24
+          },
+          "standbyHours": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 24
+          },
+          "breakdownHours": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 24
+          },
+          "breakdownReason": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 500,
+            "description": "Required when breakdownHours > 0."
+          },
+          "fuelLiters": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 100000
+          },
+          "operatorName": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 128,
+            "description": "Operator (text; operators have no account)."
+          },
+          "location": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 200
+          },
+          "notes": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 2000
+          },
+          "hmPhotoId": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "description": "Photo of the HM meter (media-progress-photos, uploaded by the caller) — required, exactly one."
+          },
+          "clientUuid": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Client id; a replay by the same reporter returns the existing record (200); another user → 409 CLIENT_UUID_CONFLICT."
+          }
+        },
+        "required": [
+          "projectId",
+          "unitId",
+          "reportDate",
+          "hmStart",
+          "hmEnd",
+          "workHours",
+          "hmPhotoId"
+        ],
+        "additionalProperties": false,
+        "description": "Σ work + standby + breakdown ≤ 24."
+      },
+      "UnitTimesheetUpdate": {
+        "type": "object",
+        "properties": {
+          "hmStart": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 10000000,
+            "description": "HM awal; ≠ the previous timesheet's HM akhir → flag HM_GAP (not rejected)."
+          },
+          "hmEnd": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 10000000,
+            "description": "HM akhir ≥ HM awal."
+          },
+          "workHours": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 24
+          },
+          "standbyHours": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 24
+          },
+          "breakdownHours": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 24
+          },
+          "breakdownReason": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 500,
+            "description": "Required when breakdownHours > 0."
+          },
+          "fuelLiters": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 100000
+          },
+          "operatorName": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 128,
+            "description": "Operator (text; operators have no account)."
+          },
+          "location": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 200
+          },
+          "notes": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 2000
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 1000
+          }
+        },
+        "additionalProperties": false
+      },
+      "UnitTimesheetCorrection": {
+        "type": "object",
+        "properties": {
+          "hmStart": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 10000000,
+            "description": "HM awal; ≠ the previous timesheet's HM akhir → flag HM_GAP (not rejected)."
+          },
+          "hmEnd": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 10000000,
+            "description": "HM akhir ≥ HM awal."
+          },
+          "workHours": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 24
+          },
+          "standbyHours": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 24
+          },
+          "breakdownHours": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 24
+          },
+          "breakdownReason": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 500,
+            "description": "Required when breakdownHours > 0."
+          },
+          "fuelLiters": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 100000
+          },
+          "operatorName": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 128,
+            "description": "Operator (text; operators have no account)."
+          },
+          "location": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 200
+          },
+          "notes": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 2000
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 1000,
+            "description": "Required (PM team / Direktur, any time, audited)."
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "additionalProperties": false
+      },
+      "AftersalesActivityList": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AftersalesActivity"
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ]
+      },
+      "AftersalesActivity": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "exclusiveMinimum": 0
+          },
+          "uuid": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "companyId": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "exclusiveMinimum": 0
+          },
+          "project": {
+            "$ref": "#/components/schemas/FieldProjectRef"
+          },
+          "activityDate": {
+            "type": "string"
+          },
+          "reporter": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "exclusiveMinimum": 0
+              },
+              "name": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "name"
+            ]
+          },
+          "client": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "exclusiveMinimum": 0
+              },
+              "name": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "name"
+            ]
+          },
+          "kind": {
+            "$ref": "#/components/schemas/AftersalesActivityKind"
+          },
+          "docNo": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AftersalesActivityItem"
+            }
+          },
+          "value": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 10000000000000,
+            "description": "null when hidden from the caller (valueVisible false) or not entered."
+          },
+          "valueVisible": {
+            "type": "boolean"
+          },
+          "relatesTo": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "type": "integer",
+                "exclusiveMinimum": 0
+              },
+              "docNo": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "activityDate": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "docNo",
+              "activityDate"
+            ]
+          },
+          "poStatus": {
+            "$ref": "#/components/schemas/PoStatus"
+          },
+          "followUpDate": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "receiver": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "notes": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "photos": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FieldPhoto"
+            }
+          },
+          "offline": {
+            "type": "boolean"
+          },
+          "timeTrust": {
+            "type": "string",
+            "enum": [
+              "server",
+              "estimated",
+              "device_only"
+            ]
+          },
+          "source": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "web",
+              "apk",
+              null
+            ]
+          },
+          "flags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "OFFLINE, DEVICE_TIME_ONLY, CLOCK_SKEW, BACKDATED, HM_GAP (timesheet), BREAKDOWN_SUGGEST_SERVICE (timesheet), CORRECTED."
+          },
+          "receivedAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "editableUntil": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "editable": {
+            "type": "boolean",
+            "description": "The caller is the reporter and the 24 h window is open."
+          },
+          "correctedAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "correctedBy": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "type": "integer",
+                "exclusiveMinimum": 0
+              },
+              "name": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "name"
+            ]
+          },
+          "rev": {
+            "type": "integer",
+            "description": "Content revision (sync base_rev)."
+          },
+          "clientUuid": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "createdAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "uuid",
+          "companyId",
+          "project",
+          "activityDate",
+          "reporter",
+          "client",
+          "kind",
+          "docNo",
+          "items",
+          "value",
+          "valueVisible",
+          "relatesTo",
+          "poStatus",
+          "followUpDate",
+          "receiver",
+          "notes",
+          "photos",
+          "offline",
+          "timeTrust",
+          "source",
+          "flags",
+          "receivedAt",
+          "editableUntil",
+          "editable",
+          "correctedAt",
+          "correctedBy",
+          "rev",
+          "clientUuid",
+          "createdAt"
+        ]
+      },
+      "AftersalesActivityKind": {
+        "type": "string",
+        "enum": [
+          "penawaran",
+          "po_masuk",
+          "pengiriman",
+          "penagihan",
+          "kunjungan",
+          "lainnya"
+        ]
+      },
+      "AftersalesActivityItem": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "partNo": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 64
+          },
+          "qty": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "maximum": 1000000
+          },
+          "uom": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 16
+          }
+        },
+        "required": [
+          "name",
+          "qty"
+        ],
+        "additionalProperties": false
+      },
+      "PoStatus": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "enum": [
+          "belum_kirim",
+          "sebagian",
+          "terkirim",
+          "batal",
+          null
+        ]
+      },
+      "AftersalesActivityCreate": {
+        "type": "object",
+        "properties": {
+          "company": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "description": "MC4: explicit PT (companies id) of the new record. Must be one of your PTs where you hold the role this create needs (else 403 COMPANY_NOT_ALLOWED) and the PT of the referenced project / cost center / cash account (else 400 COMPANY_MISMATCH; a reference in a PT you are not mapped to is answered like a missing one). Omitted = derived from the references, else your only selected PT (unchanged behaviour of APK 0.2.x / 0.3.0)."
+          },
+          "projectId": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "description": "Project of kind aftersales."
+          },
+          "clientId": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "description": "Customer (clients) of the project PT."
+          },
+          "activityDate": {
+            "type": "string",
+            "pattern": "^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$",
+            "description": "Default: today (company TZ)."
+          },
+          "kind": {
+            "$ref": "#/components/schemas/AftersalesActivityKind"
+          },
+          "docNo": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 64,
+            "description": "No. dokumen (Q/PO/SJ/INV), text."
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AftersalesActivityItem"
+            },
+            "maxItems": 50
+          },
+          "value": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 10000000000000,
+            "description": "Nilai (Rp), optional; readable only by Direktur/Finance/Admin and the reporter."
+          },
+          "followUpDate": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$",
+            "description": "Penawaran only: follow-up date (reminder to reporter + PM when due)."
+          },
+          "receiver": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 128,
+            "description": "Pengiriman: penerima."
+          },
+          "notes": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 2000
+          },
+          "relatesTo": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "exclusiveMinimum": 0,
+            "description": "pengiriman (required) / penagihan: the incoming PO (po_masuk) of the same customer."
+          },
+          "poDelivered": {
+            "type": "boolean",
+            "description": "pengiriman: \"PO selesai dikirim?\" — true → PO terkirim, false/absent → sebagian."
+          },
+          "photoIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "exclusiveMinimum": 0
+            },
+            "maxItems": 5,
+            "description": "Proof photos (surat jalan / serah terima), max 5."
+          },
+          "clientUuid": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Client id; a replay by the same reporter returns the existing record (200); another user → 409 CLIENT_UUID_CONFLICT."
+          }
+        },
+        "required": [
+          "projectId",
+          "clientId",
+          "kind"
+        ],
+        "additionalProperties": false
+      },
+      "AftersalesActivityUpdate": {
+        "type": "object",
+        "properties": {
+          "docNo": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 64,
+            "description": "No. dokumen (Q/PO/SJ/INV), text."
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AftersalesActivityItem"
+            },
+            "maxItems": 50
+          },
+          "value": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 10000000000000,
+            "description": "Nilai (Rp), optional; readable only by Direktur/Finance/Admin and the reporter."
+          },
+          "followUpDate": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$",
+            "description": "Penawaran only: follow-up date (reminder to reporter + PM when due)."
+          },
+          "receiver": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 128,
+            "description": "Pengiriman: penerima."
+          },
+          "notes": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 2000
+          },
+          "addPhotoIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "exclusiveMinimum": 0
+            },
+            "maxItems": 5
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 1000
+          }
+        },
+        "additionalProperties": false
+      },
+      "AftersalesActivityCorrection": {
+        "type": "object",
+        "properties": {
+          "docNo": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 64,
+            "description": "No. dokumen (Q/PO/SJ/INV), text."
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AftersalesActivityItem"
+            },
+            "maxItems": 50
+          },
+          "value": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 10000000000000,
+            "description": "Nilai (Rp), optional; readable only by Direktur/Finance/Admin and the reporter."
+          },
+          "followUpDate": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$",
+            "description": "Penawaran only: follow-up date (reminder to reporter + PM when due)."
+          },
+          "receiver": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 128,
+            "description": "Pengiriman: penerima."
+          },
+          "notes": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 2000
+          },
+          "addPhotoIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "exclusiveMinimum": 0
+            },
+            "maxItems": 5
+          },
+          "poStatus": {
+            "type": "string",
+            "enum": [
+              "belum_kirim",
+              "sebagian",
+              "terkirim",
+              "batal"
+            ],
+            "description": "po_masuk only (e.g. batal); a cancelled PO stays cancelled."
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 1000,
+            "description": "Required (PM team / Direktur)."
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "additionalProperties": false
+      },
+      "OpenPoList": {
+        "type": "object",
+        "properties": {
+          "asOf": {
+            "type": "string"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OpenPo"
+            }
+          }
+        },
+        "required": [
+          "asOf",
+          "items"
+        ]
+      },
+      "OpenPo": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "exclusiveMinimum": 0
+          },
+          "companyId": {
+            "type": "integer",
+            "exclusiveMinimum": 0
+          },
+          "project": {
+            "$ref": "#/components/schemas/FieldProjectRef"
+          },
+          "client": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "exclusiveMinimum": 0
+              },
+              "name": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "name"
+            ]
+          },
+          "activityDate": {
+            "type": "string"
+          },
+          "docNo": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AftersalesActivityItem"
+            }
+          },
+          "value": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 10000000000000
+          },
+          "valueVisible": {
+            "type": "boolean"
+          },
+          "poStatus": {
+            "$ref": "#/components/schemas/PoStatus"
+          },
+          "ageDays": {
+            "type": "integer"
+          },
+          "deliveries": {
+            "type": "integer",
+            "description": "Deliveries (pengiriman) recorded against this PO."
+          }
+        },
+        "required": [
+          "id",
+          "companyId",
+          "project",
+          "client",
+          "activityDate",
+          "docNo",
+          "items",
+          "value",
+          "valueVisible",
+          "poStatus",
+          "ageDays",
+          "deliveries"
+        ]
+      },
+      "UnitList": {
+        "type": "object",
+        "properties": {
+          "serverTime": {
+            "type": "string"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Unit"
+            }
+          }
+        },
+        "required": [
+          "serverTime",
+          "items"
+        ]
+      },
+      "Unit": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "exclusiveMinimum": 0
+          },
+          "companyId": {
+            "type": "integer",
+            "exclusiveMinimum": 0
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "kendaraan",
+              "alat_berat"
+            ]
+          },
+          "label": {
+            "type": "string"
+          },
+          "unitCode": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "plateNo": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "plateDisplay": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "type": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "brandModel": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "serialNo": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "owner": {
+            "type": "string",
+            "enum": [
+              "sendiri",
+              "pelanggan"
+            ]
+          },
+          "client": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "type": "integer",
+                "exclusiveMinimum": 0
+              },
+              "name": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "name"
+            ]
+          },
+          "status": {
+            "$ref": "#/components/schemas/UnitStatus"
+          },
+          "lastHourMeter": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "lastHourMeterAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "contract": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "type": "integer",
+                "exclusiveMinimum": 0
+              },
+              "projectId": {
+                "type": "integer",
+                "exclusiveMinimum": 0
+              },
+              "startDate": {
+                "type": "string"
+              },
+              "endDate": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "projectId",
+              "startDate",
+              "endDate"
+            ],
+            "description": "With ?project= (kontrak_unit): the active contract unit (no rates)."
+          },
+          "active": {
+            "type": "boolean"
+          },
+          "updatedAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "companyId",
+          "kind",
+          "label",
+          "unitCode",
+          "plateNo",
+          "plateDisplay",
+          "type",
+          "brandModel",
+          "serialNo",
+          "owner",
+          "client",
+          "status",
+          "lastHourMeter",
+          "lastHourMeterAt",
+          "contract",
+          "active",
+          "updatedAt"
+        ],
+        "description": "Unit & Kendaraan (no contract rates)."
+      },
+      "ContractUnitList": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "integer",
+            "exclusiveMinimum": 0
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ContractUnit"
+            }
+          }
+        },
+        "required": [
+          "projectId",
+          "items"
+        ]
+      },
+      "ContractUnit": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "exclusiveMinimum": 0
+          },
+          "companyId": {
+            "type": "integer",
+            "exclusiveMinimum": 0
+          },
+          "projectId": {
+            "type": "integer",
+            "exclusiveMinimum": 0
+          },
+          "unit": {
+            "$ref": "#/components/schemas/FieldUnitRef"
+          },
+          "startDate": {
+            "type": "string"
+          },
+          "endDate": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "active": {
+            "type": "boolean"
+          },
+          "rateBasis": {
+            "type": "string",
+            "enum": [
+              "per_jam",
+              "per_bulan"
+            ]
+          },
+          "rate": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 10000000000000,
+            "description": "null unless Direktur/Finance/Admin of the PT (ratesVisible)."
+          },
+          "minHoursPerMonth": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "ratesVisible": {
+            "type": "boolean"
+          },
+          "notes": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "companyId",
+          "projectId",
+          "unit",
+          "startDate",
+          "endDate",
+          "active",
+          "rateBasis",
+          "rate",
+          "minHoursPerMonth",
+          "ratesVisible",
+          "notes"
         ]
       }
     },
@@ -20448,6 +23465,8 @@
                 "kelengkapan",
                 "biaya-kendaraan",
                 "absensi",
+                "rekap-timesheet-kontrak",
+                "rekap-aftersales",
                 "audit-log"
               ]
             },
@@ -20671,6 +23690,8 @@
                         "kelengkapan",
                         "biaya-kendaraan",
                         "absensi",
+                        "rekap-timesheet-kontrak",
+                        "rekap-aftersales",
                         "audit-log"
                       ]
                     },
@@ -21004,6 +24025,8 @@
                 "kelengkapan",
                 "biaya-kendaraan",
                 "absensi",
+                "rekap-timesheet-kontrak",
+                "rekap-aftersales",
                 "audit-log"
               ]
             },
@@ -24294,6 +27317,2555 @@
             }
           },
           "403": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/service-reports": {
+      "get": {
+        "summary": "Service report: list, newest first, in the caller's read scope (Staff: assigned projects + own; PM: team + own; Direktur/Finance/Admin: all of the PT)",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0
+            },
+            "required": false,
+            "name": "project",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$"
+            },
+            "required": false,
+            "name": "from",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$"
+            },
+            "required": false,
+            "name": "to",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "1",
+                "true"
+              ],
+              "description": "Only records created by the caller."
+            },
+            "required": false,
+            "description": "Only records created by the caller.",
+            "name": "mine",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 25
+            },
+            "required": false,
+            "name": "limit",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 64
+            },
+            "required": false,
+            "name": "cursor",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9]\\d{0,8}(,[1-9]\\d{0,8})*$",
+              "description": "MC3: PT filter (comma separated ids). Only narrows the effective selection (X-Company-Ids / cookie ∩ memberships); a PT outside it → 403 COMPANY_NOT_ALLOWED."
+            },
+            "required": false,
+            "description": "MC3: PT filter (comma separated ids). Only narrows the effective selection (X-Company-Ids / cookie ∩ memberships); a PT outside it → 403 COMPANY_NOT_ALLOWED.",
+            "name": "company",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0
+            },
+            "required": false,
+            "name": "unit",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "siap",
+                "rusak",
+                "menunggu_part"
+              ],
+              "description": "unitStatusAfter"
+            },
+            "required": false,
+            "description": "unitStatusAfter",
+            "name": "status",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0
+            },
+            "required": false,
+            "name": "reporter",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": true,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "APK version; below company minimum → 426."
+            },
+            "required": false,
+            "description": "APK version; below company minimum → 426.",
+            "name": "X-App-Version",
+            "in": "header"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Page",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceReportList"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "FR1 Laporan servis unit (SV/YYMM/####): Staff assigned / PM team / Direktur; project kind kontrak_unit or aftersales (409 WRONG_PROJECT_KIND); PT flag off → 403 FEATURE_DISABLED; HM below the unit's latest reading → 409 HM_DECREASED; unitStatusAfter updates the unit (menunggu_part notifies the PM)",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CompanyIds"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": false,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422."
+            },
+            "required": false,
+            "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422.",
+            "name": "Idempotency-Key",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ServiceReportCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Service report (replayed clientUuid)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceReport"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Service report",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceReport"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/service-reports/{id}": {
+      "get": {
+        "summary": "Service report: detail (404 outside the read scope)",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d+$"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": true,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "APK version; below company minimum → 426."
+            },
+            "required": false,
+            "description": "APK version; below company minimum → 426.",
+            "name": "X-App-Version",
+            "in": "header"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Service report",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceReport"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "summary": "Service report: edit by the reporter within 24 h (409 NOT_EDITABLE after the window; corrections: POST …/corrections)",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d+$"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": false,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422."
+            },
+            "required": false,
+            "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422.",
+            "name": "Idempotency-Key",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ServiceReportUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Service report",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceReport"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/service-reports/{id}/corrections": {
+      "post": {
+        "summary": "Service report: correction by the PM of the project team or the Direktur, any time, reason required (audited, flag CORRECTED)",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d+$"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": false,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422."
+            },
+            "required": false,
+            "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422.",
+            "name": "Idempotency-Key",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ServiceReportCorrection"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Service report",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceReport"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/unit-timesheets": {
+      "get": {
+        "summary": "Unit timesheet: list, newest first, in the caller's read scope (Staff: assigned projects + own; PM: team + own; Direktur/Finance/Admin: all of the PT)",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0
+            },
+            "required": false,
+            "name": "project",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$"
+            },
+            "required": false,
+            "name": "from",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$"
+            },
+            "required": false,
+            "name": "to",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "1",
+                "true"
+              ],
+              "description": "Only records created by the caller."
+            },
+            "required": false,
+            "description": "Only records created by the caller.",
+            "name": "mine",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 25
+            },
+            "required": false,
+            "name": "limit",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 64
+            },
+            "required": false,
+            "name": "cursor",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9]\\d{0,8}(,[1-9]\\d{0,8})*$",
+              "description": "MC3: PT filter (comma separated ids). Only narrows the effective selection (X-Company-Ids / cookie ∩ memberships); a PT outside it → 403 COMPANY_NOT_ALLOWED."
+            },
+            "required": false,
+            "description": "MC3: PT filter (comma separated ids). Only narrows the effective selection (X-Company-Ids / cookie ∩ memberships); a PT outside it → 403 COMPANY_NOT_ALLOWED.",
+            "name": "company",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0
+            },
+            "required": false,
+            "name": "unit",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0
+            },
+            "required": false,
+            "name": "reporter",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": true,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "APK version; below company minimum → 426."
+            },
+            "required": false,
+            "description": "APK version; below company minimum → 426.",
+            "name": "X-App-Version",
+            "in": "header"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Page",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnitTimesheetList"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "FR1 Timesheet harian unit: one per unit and date (409 DUPLICATE_DATE), unit in an active contract unit of the kontrak_unit project on that date (409 NOT_IN_CONTRACT), HM photo required; HM start ≠ previous HM end → flag HM_GAP; updates the unit's last HM",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CompanyIds"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": false,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422."
+            },
+            "required": false,
+            "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422.",
+            "name": "Idempotency-Key",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UnitTimesheetCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Unit timesheet (replayed clientUuid)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnitTimesheet"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Unit timesheet",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnitTimesheet"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/unit-timesheets/{id}": {
+      "get": {
+        "summary": "Unit timesheet: detail (404 outside the read scope)",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d+$"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": true,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "APK version; below company minimum → 426."
+            },
+            "required": false,
+            "description": "APK version; below company minimum → 426.",
+            "name": "X-App-Version",
+            "in": "header"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Unit timesheet",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnitTimesheet"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "summary": "Unit timesheet: edit by the reporter within 24 h (409 NOT_EDITABLE after the window; corrections: POST …/corrections)",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d+$"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": false,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422."
+            },
+            "required": false,
+            "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422.",
+            "name": "Idempotency-Key",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UnitTimesheetUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Unit timesheet",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnitTimesheet"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/unit-timesheets/{id}/corrections": {
+      "post": {
+        "summary": "Unit timesheet: correction by the PM of the project team or the Direktur, any time, reason required (audited, flag CORRECTED)",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d+$"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": false,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422."
+            },
+            "required": false,
+            "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422.",
+            "name": "Idempotency-Key",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UnitTimesheetCorrection"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Unit timesheet",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnitTimesheet"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/aftersales-activities": {
+      "get": {
+        "summary": "Aftersales activity: list, newest first, in the caller's read scope (Staff: assigned projects + own; PM: team + own; Direktur/Finance/Admin: all of the PT)",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0
+            },
+            "required": false,
+            "name": "project",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$"
+            },
+            "required": false,
+            "name": "from",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$"
+            },
+            "required": false,
+            "name": "to",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "1",
+                "true"
+              ],
+              "description": "Only records created by the caller."
+            },
+            "required": false,
+            "description": "Only records created by the caller.",
+            "name": "mine",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 25
+            },
+            "required": false,
+            "name": "limit",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 64
+            },
+            "required": false,
+            "name": "cursor",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9]\\d{0,8}(,[1-9]\\d{0,8})*$",
+              "description": "MC3: PT filter (comma separated ids). Only narrows the effective selection (X-Company-Ids / cookie ∩ memberships); a PT outside it → 403 COMPANY_NOT_ALLOWED."
+            },
+            "required": false,
+            "description": "MC3: PT filter (comma separated ids). Only narrows the effective selection (X-Company-Ids / cookie ∩ memberships); a PT outside it → 403 COMPANY_NOT_ALLOWED.",
+            "name": "company",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0
+            },
+            "required": false,
+            "name": "client",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "$ref": "#/components/schemas/AftersalesActivityKind"
+            },
+            "required": false,
+            "name": "kind",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "$ref": "#/components/schemas/PoStatus"
+            },
+            "required": false,
+            "name": "poStatus",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0
+            },
+            "required": false,
+            "name": "reporter",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": true,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "APK version; below company minimum → 426."
+            },
+            "required": false,
+            "description": "APK version; below company minimum → 426.",
+            "name": "X-App-Version",
+            "in": "header"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Page",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AftersalesActivityList"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "FR1 Log aktivitas aftersales (project kind aftersales): penawaran / po_masuk / pengiriman (refers to an open PO of the same customer, moves its status; 409 PO_CLOSED) / penagihan / kunjungan / lainnya. Value (Rp) readable only by Direktur/Finance/Admin and the reporter",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CompanyIds"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": false,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422."
+            },
+            "required": false,
+            "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422.",
+            "name": "Idempotency-Key",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AftersalesActivityCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Aftersales activity (replayed clientUuid)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AftersalesActivity"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Aftersales activity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AftersalesActivity"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/aftersales-activities/{id}": {
+      "get": {
+        "summary": "Aftersales activity: detail (404 outside the read scope)",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d+$"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": true,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "APK version; below company minimum → 426."
+            },
+            "required": false,
+            "description": "APK version; below company minimum → 426.",
+            "name": "X-App-Version",
+            "in": "header"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Aftersales activity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AftersalesActivity"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "summary": "Aftersales activity: edit by the reporter within 24 h (409 NOT_EDITABLE after the window; corrections: POST …/corrections)",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d+$"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": false,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422."
+            },
+            "required": false,
+            "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422.",
+            "name": "Idempotency-Key",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AftersalesActivityUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Aftersales activity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AftersalesActivity"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/aftersales-activities/{id}/corrections": {
+      "post": {
+        "summary": "Aftersales activity: correction by the PM of the project team or the Direktur, any time, reason required (audited, flag CORRECTED)",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d+$"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": false,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422."
+            },
+            "required": false,
+            "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422.",
+            "name": "Idempotency-Key",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AftersalesActivityCorrection"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Aftersales activity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AftersalesActivity"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/aftersales/open-pos": {
+      "get": {
+        "summary": "FR1: incoming POs still to deliver (belum_kirim / sebagian), oldest first, in the caller's scope; ?client= / ?project= narrow",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0
+            },
+            "required": false,
+            "name": "client",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0
+            },
+            "required": false,
+            "name": "project",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9]\\d{0,8}(,[1-9]\\d{0,8})*$",
+              "description": "MC3: PT filter (comma separated ids). Only narrows the effective selection (X-Company-Ids / cookie ∩ memberships); a PT outside it → 403 COMPANY_NOT_ALLOWED."
+            },
+            "required": false,
+            "description": "MC3: PT filter (comma separated ids). Only narrows the effective selection (X-Company-Ids / cookie ∩ memberships); a PT outside it → 403 COMPANY_NOT_ALLOWED.",
+            "name": "company",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": true,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "APK version; below company minimum → 426."
+            },
+            "required": false,
+            "description": "APK version; below company minimum → 426.",
+            "name": "X-App-Version",
+            "in": "header"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Open POs",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OpenPoList"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/units": {
+      "get": {
+        "summary": "FR1 \"Unit & Kendaraan\" of the caller's PTs (never with contract rates); ?project= (kontrak_unit: units in an active contract today; aftersales: active units of the PT), ?updatedSince= delta",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "description": "kontrak_unit: units in an active contract of the project today; aftersales: every active unit of the PT."
+            },
+            "required": false,
+            "description": "kontrak_unit: units in an active contract of the project today; aftersales: every active unit of the PT.",
+            "name": "project",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "description": "Delta sync: only units changed after this instant (incl. deactivated ones)."
+            },
+            "required": false,
+            "description": "Delta sync: only units changed after this instant (incl. deactivated ones).",
+            "name": "updatedSince",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9]\\d{0,8}(,[1-9]\\d{0,8})*$",
+              "description": "MC3: PT filter (comma separated ids). Only narrows the effective selection (X-Company-Ids / cookie ∩ memberships); a PT outside it → 403 COMPANY_NOT_ALLOWED."
+            },
+            "required": false,
+            "description": "MC3: PT filter (comma separated ids). Only narrows the effective selection (X-Company-Ids / cookie ∩ memberships); a PT outside it → 403 COMPANY_NOT_ALLOWED.",
+            "name": "company",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": true,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "APK version; below company minimum → 426."
+            },
+            "required": false,
+            "description": "APK version; below company minimum → 426.",
+            "name": "X-App-Version",
+            "in": "header"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Units",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnitList"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/projects/{id}/contract-units": {
+      "get": {
+        "summary": "FR1 contract units of a project the caller may read; rate / minimum hours null unless Direktur, Finance or Admin of the PT",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d+$"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": true,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "APK version; below company minimum → 426."
+            },
+            "required": false,
+            "description": "APK version; below company minimum → 426.",
+            "name": "X-App-Version",
+            "in": "header"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Contract units",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContractUnitList"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
             "description": "Problem",
             "content": {
               "application/problem+json": {

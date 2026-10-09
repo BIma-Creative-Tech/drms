@@ -15,7 +15,13 @@ import { officeScope } from '@/domain/reports/scope'
 import { withReqTransaction } from '@/lib/system-tx'
 import { DEFAULT_TZ } from '@/lib/time'
 
+import { timelineTypesFor } from '@/domain/field/views'
+import { enabledCompanies, type ProjectOpt } from '@/domain/field/web'
+import { kindOf } from '@/domain/field/rules'
+
 import { ChartHover } from './ChartHover'
+import { FIELD_STYLE, Tabs } from './field-ui'
+import { ProjectTimeline } from './field-timeline'
 import { Frame } from './frame'
 import { ptView } from './pt'
 import { Alert, dateId, dateTimeId, ProgressLegend, ProgressTable, ProgressTonePill, ProgressVsBudgetRows } from './progress-ui'
@@ -126,7 +132,7 @@ export async function ProjectProgressView(props: AdminViewServerProps) {
   const d = await withReqTransaction(req, async () => {
     const project = id ? await requireVisibleProject(req, id).catch(() => null) : null
     if (!project) return null
-    const full = (await req.payload.findByID({ collection: 'projects', id, depth: 0, user: req.user, overrideAccess: false, req })) as { id: number; code: string; name: string; status: string; budget?: number | null }
+    const full = (await req.payload.findByID({ collection: 'projects', id, depth: 0, user: req.user, overrideAccess: false, req })) as { id: number; code: string; name: string; status: string; budget?: number | null; kind?: string | null; company?: unknown; client?: unknown }
     const set = await loadStageSet(req, id)
     const k09 = (await projectProgressVsBudget(req, await officeScope(req), { projectId: id, includeArchived: true })).projects[0]
     const reports = await listReports(req, { projectId: id, limit: 100 })
@@ -135,7 +141,10 @@ export async function ProjectProgressView(props: AdminViewServerProps) {
     const templates = hasRoleAny(req, 'pk-owner')
       ? ((await req.payload.find({ collection: 'stage-templates', where: { active: { equals: true } }, depth: 0, pagination: false, select: { name: true }, user: req.user, overrideAccess: false, req }).catch(() => ({ docs: [] }))).docs as Array<{ id: number; name: string }>)
       : []
-    return { project: full, set, k09, reports: reports.items, addenda: addenda.items, teamPm, templates, tz: await tzOf(req) }
+    // FR1 (ADR 0020): field-report timeline tab for project kinds with field reports, PT flag on
+    const companyId = typeof full.company === 'number' ? full.company : ((full.company as { id?: number } | null)?.id ?? null)
+    const field = timelineTypesFor(kindOf(full.kind)).length > 0 && companyId !== null && (await enabledCompanies(req)).includes(companyId)
+    return { project: full, set, k09, reports: reports.items, addenda: addenda.items, teamPm, templates, tz: await tzOf(req), field, companyId }
   })
   if (!d) {
     return (
@@ -150,6 +159,24 @@ export async function ProjectProgressView(props: AdminViewServerProps) {
   }
   const { project, set, k09, reports, addenda, teamPm, templates } = d
   const owner = hasRoleAny(req, 'pk-owner')
+  const sp = (props.searchParams ?? {}) as Record<string, string | string[] | undefined>
+  const tab = d.field && sp.tab === 'timeline' ? 'timeline' : 'ringkasan'
+  const kind = kindOf(project.kind)
+  const tabs = d.field
+    ? [
+        { key: 'ringkasan', label: 'Ringkasan', href: projectHref(project.id) },
+        { key: 'timeline', label: 'Timeline', href: `${projectHref(project.id)}?tab=timeline` },
+        ...(kind === 'kontrak_unit'
+          ? [
+              { key: 'timesheet', label: 'Timesheet', href: `/admin/unit-kontrak/kontrak/${project.id}?tab=timesheet` },
+              { key: 'unit', label: 'Unit', href: `/admin/unit-kontrak/kontrak/${project.id}?tab=unit` },
+            ]
+          : kind === 'aftersales'
+            ? [{ key: 'aktivitas', label: 'Aktivitas', href: `/admin/aftersales/aktivitas?project=${project.id}` }]
+            : []),
+      ]
+    : []
+  const fieldProject: ProjectOpt | null = d.field && d.companyId !== null ? { id: project.id, code: project.code, name: project.name, kind, companyId: d.companyId, clientId: typeof project.client === 'number' ? project.client : null, status: project.status, label: `${project.code} ${project.name}` } : null
   const canEdit = (owner || teamPm) && project.status !== 'arsip'
   const byStage = new Map<number, ReportDto[]>()
   for (const r of reports) byStage.set(r.stage.id, [...(byStage.get(r.stage.id) ?? []), r])
@@ -172,91 +199,100 @@ export async function ProjectProgressView(props: AdminViewServerProps) {
             ) : null}
           </div>
         </DashHead>
-        <Bento label="Progress project">
-          <KpiRow cols={4}>
-            <KpiTile id="p-progress" icon="target" label="Progress fisik" value={pctText(set.progressPct)} kpi="project-progress" i={0}>
-              <div className="pk-meter" role="presentation">
-                <span style={{ width: `${Math.min(100, set.progressPct)}%` }} />
-              </div>
-              <p className="pk-kpi-x">{active.length} tahapan aktif</p>
-            </KpiTile>
-            <KpiTile id="p-budget" icon="wallet" label="% anggaran terpakai" value={pctText(k09?.budgetPct ?? null)} kpi="project-budget-pct" i={1}>
-              <p className="pk-kpi-x">
-                Komitmen <b>{rp(k09?.committed ?? 0)}</b> dari RAB {rp(project.budget ?? null)}
-              </p>
-            </KpiTile>
-            <KpiTile id="p-k09" icon="scale" label="Status K-09" value={k09?.gap === null || !k09 ? '—' : `${k09.gap > 0 ? '+' : ''}${pctText(k09.gap)}`} kpi="project-gap" i={2}>
-              <p className="pk-kpi-x">{k09 ? <ProgressTonePill p={k09} /> : null}</p>
-            </KpiTile>
-            <KpiTile id="p-reports" icon="doc" label="Laporan progress" value={String(reports.length)} kpi="project-reports" href={`/admin/progress/laporan?project=${project.id}`} more="Daftar laporan" i={3}>
-              <p className="pk-kpi-x">terakhir {dateId(reports[0]?.reportDate)}</p>
-            </KpiTile>
-          </KpiRow>
+        {tabs.length ? (
+          <>
+            <style>{FIELD_STYLE}</style>
+            <Tabs label="Bagian project" tabs={tabs} current={tab} />
+          </>
+        ) : null}
+        {tab === 'timeline' && fieldProject ? <ProjectTimeline req={req} project={fieldProject} sp={sp} base={projectHref(project.id)} /> : null}
+        {tab === 'timeline' ? null : (
+          <Bento label="Progress project">
+            <KpiRow cols={4}>
+              <KpiTile id="p-progress" icon="target" label="Progress fisik" value={pctText(set.progressPct)} kpi="project-progress" i={0}>
+                <div className="pk-meter" role="presentation">
+                  <span style={{ width: `${Math.min(100, set.progressPct)}%` }} />
+                </div>
+                <p className="pk-kpi-x">{active.length} tahapan aktif</p>
+              </KpiTile>
+              <KpiTile id="p-budget" icon="wallet" label="% anggaran terpakai" value={pctText(k09?.budgetPct ?? null)} kpi="project-budget-pct" i={1}>
+                <p className="pk-kpi-x">
+                  Komitmen <b>{rp(k09?.committed ?? 0)}</b> dari RAB {rp(project.budget ?? null)}
+                </p>
+              </KpiTile>
+              <KpiTile id="p-k09" icon="scale" label="Status K-09" value={k09?.gap === null || !k09 ? '—' : `${k09.gap > 0 ? '+' : ''}${pctText(k09.gap)}`} kpi="project-gap" i={2}>
+                <p className="pk-kpi-x">{k09 ? <ProgressTonePill p={k09} /> : null}</p>
+              </KpiTile>
+              <KpiTile id="p-reports" icon="doc" label="Laporan progress" value={String(reports.length)} kpi="project-reports" href={`/admin/progress/laporan?project=${project.id}`} more="Daftar laporan" i={3}>
+                <p className="pk-kpi-x">terakhir {dateId(reports[0]?.reportDate)}</p>
+              </KpiTile>
+            </KpiRow>
 
-          <Card id="stages" title="Tahapan & progress" sub="Bobot × progress tahapan = progress fisik project" span={canEdit ? 5 : 12} i={4}>
-            <StageBars stages={active} />
-          </Card>
-          {canEdit ? (
-            <Card id="stage-editor" title="Editor tahapan" sub={owner ? 'Direktur: tambah, nonaktifkan, ubah nama/urutan/bobot' : 'PM: ubah nama, urutan dan bobot'} span={7} i={5}>
-              <StageEditor projectId={project.id} stages={active.map((s) => ({ id: s.id, name: s.name, weightPct: s.weightPct, sequence: s.sequence, progressPct: s.progressPct }))} canAddRemove={owner} templates={templates} />
+            <Card id="stages" title="Tahapan & progress" sub="Bobot × progress tahapan = progress fisik project" span={canEdit ? 5 : 12} i={4}>
+              <StageBars stages={active} />
             </Card>
-          ) : null}
+            {canEdit ? (
+              <Card id="stage-editor" title="Editor tahapan" sub={owner ? 'Direktur: tambah, nonaktifkan, ubah nama/urutan/bobot' : 'PM: ubah nama, urutan dan bobot'} span={7} i={5}>
+                <StageEditor projectId={project.id} stages={active.map((s) => ({ id: s.id, name: s.name, weightPct: s.weightPct, sequence: s.sequence, progressPct: s.progressPct }))} canAddRemove={owner} templates={templates} />
+              </Card>
+            ) : null}
 
-          <Card id="timeline" title="Timeline progress per tahapan" sub="Laporan terbaru di atas · % tahapan sebelum → sesudah" span={8} i={6} action={{ href: `/admin/progress/laporan?project=${project.id}`, label: 'Semua laporan' }}>
-            {active.length === 0 ? (
-              <EmptyState text="Belum ada tahapan." />
-            ) : (
-              <div style={{ display: 'grid', gap: 18 }}>
-                {active.map((s) => (
-                  <section key={s.id} aria-labelledby={`tl-${s.id}`} data-pk-timeline-stage={s.id}>
-                    <h3 id={`tl-${s.id}`} style={{ fontSize: 14, margin: '0 0 8px' }}>
-                      {s.name} <span style={{ fontWeight: 400, color: 'var(--pk-muted-fg)' }}>· bobot {pctText(s.weightPct)} · {pctText(s.progressPct)}</span>
-                    </h3>
-                    {(byStage.get(s.id) ?? []).length === 0 ? (
-                      <p className="pk-note" style={{ margin: 0 }}>
-                        Belum ada laporan.
-                      </p>
-                    ) : (
-                      <ol className="pk-tl">
-                        {(byStage.get(s.id) ?? []).slice(0, 6).map((r) => (
-                          <li key={r.id}>
-                            <div className="when">
-                              {dateId(r.reportDate)} · {r.reporter.name ?? '—'}
-                              {r.offline ? ' · offline' : ''}
-                            </div>
-                            <p className="what">
-                              <a href={reportHref(r.id)}>{r.docNo ?? `#${r.id}`}</a> · <b>{pctText(r.pctBefore)}</b> → <b>{pctText(r.pctAfter)}</b> · {r.work.length > 90 ? `${r.work.slice(0, 90)}…` : r.work}
-                            </p>
-                          </li>
-                        ))}
-                      </ol>
-                    )}
-                  </section>
-                ))}
-              </div>
-            )}
-          </Card>
-          <Card id="project-addenda" title="Addendum RAB" sub={`RAB sekarang ${rp(project.budget ?? null)}`} span={4} i={7} action={{ href: `/admin/addendum?project=${project.id}`, label: 'Semua' }}>
-            {addenda.length === 0 ? (
-              <EmptyState text="Belum ada addendum." action={teamPm ? { href: `/admin/addendum/baru?project=${project.id}`, label: '+ Ajukan addendum RAB' } : undefined} />
-            ) : (
-              <ul className="pk-hbars">
-                {addenda.map((a) => (
-                  <li key={a.id}>
-                    <a className="pk-hbar" href={`/admin/addendum/detail/${a.id}`} style={{ gridTemplateColumns: 'minmax(0,1fr) auto' }}>
-                      <span className="l">
-                        {a.docNo ?? 'Draft'} · +{rp(a.addition)}
-                      </span>
-                      <span className="v">
-                        <StatusPill tone={a.status === 'approved' ? 'ok' : a.status === 'rejected' ? 'bad' : a.status === 'cancelled' || a.status === 'draft' ? 'none' : 'wait'} label={a.statusLabel} />
-                      </span>
-                    </a>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </Card>
-        </Bento>
+            <Card id="timeline" title="Timeline progress per tahapan" sub="Laporan terbaru di atas · % tahapan sebelum → sesudah" span={8} i={6} action={{ href: `/admin/progress/laporan?project=${project.id}`, label: 'Semua laporan' }}>
+              {active.length === 0 ? (
+                <EmptyState text="Belum ada tahapan." />
+              ) : (
+                <div style={{ display: 'grid', gap: 18 }}>
+                  {active.map((s) => (
+                    <section key={s.id} aria-labelledby={`tl-${s.id}`} data-pk-timeline-stage={s.id}>
+                      <h3 id={`tl-${s.id}`} style={{ fontSize: 14, margin: '0 0 8px' }}>
+                        {s.name} <span style={{ fontWeight: 400, color: 'var(--pk-muted-fg)' }}>· bobot {pctText(s.weightPct)} · {pctText(s.progressPct)}</span>
+                      </h3>
+                      {(byStage.get(s.id) ?? []).length === 0 ? (
+                        <p className="pk-note" style={{ margin: 0 }}>
+                          Belum ada laporan.
+                        </p>
+                      ) : (
+                        <ol className="pk-tl">
+                          {(byStage.get(s.id) ?? []).slice(0, 6).map((r) => (
+                            <li key={r.id}>
+                              <div className="when">
+                                {dateId(r.reportDate)} · {r.reporter.name ?? '—'}
+                                {r.offline ? ' · offline' : ''}
+                              </div>
+                              <p className="what">
+                                <a href={reportHref(r.id)}>{r.docNo ?? `#${r.id}`}</a> · <b>{pctText(r.pctBefore)}</b> → <b>{pctText(r.pctAfter)}</b> · {r.work.length > 90 ? `${r.work.slice(0, 90)}…` : r.work}
+                              </p>
+                            </li>
+                          ))}
+                        </ol>
+                      )}
+                    </section>
+                  ))}
+                </div>
+              )}
+            </Card>
+            <Card id="project-addenda" title="Addendum RAB" sub={`RAB sekarang ${rp(project.budget ?? null)}`} span={4} i={7} action={{ href: `/admin/addendum?project=${project.id}`, label: 'Semua' }}>
+              {addenda.length === 0 ? (
+                <EmptyState text="Belum ada addendum." action={teamPm ? { href: `/admin/addendum/baru?project=${project.id}`, label: '+ Ajukan addendum RAB' } : undefined} />
+              ) : (
+                <ul className="pk-hbars">
+                  {addenda.map((a) => (
+                    <li key={a.id}>
+                      <a className="pk-hbar" href={`/admin/addendum/detail/${a.id}`} style={{ gridTemplateColumns: 'minmax(0,1fr) auto' }}>
+                        <span className="l">
+                          {a.docNo ?? 'Draft'} · +{rp(a.addition)}
+                        </span>
+                        <span className="v">
+                          <StatusPill tone={a.status === 'approved' ? 'ok' : a.status === 'rejected' ? 'bad' : a.status === 'cancelled' || a.status === 'draft' ? 'none' : 'wait'} label={a.statusLabel} />
+                        </span>
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </Card>
+          </Bento>
+        )}
       </ChartHover>
     </Frame>
   )

@@ -138,7 +138,15 @@ export const PER_PT_DOC_TYPES: Readonly<Record<string, readonly [table: string, 
   media_selfies: ['media_selfies', 'owner_company_id'],
   media_progress_photos: ['media_progress_photos', 'owner_company_id'],
   media_attachments: ['media_attachments', 'owner_company_id'],
+  // FR1 (ADR 0020): contract units + field reports (rows written after the MC4 backfill — not in its frozen copy)
+  contract_unit: ['contract_units', 'company_id'],
+  service_report: ['service_reports', 'company_id'],
+  unit_timesheet: ['unit_timesheets', 'company_id'],
+  aftersales_activity: ['aftersales_activities', 'company_id'],
 }
+
+/** Doc types added after the MC4 audit backfill (migration 20261003): absent from its frozen BY_ID copy. */
+export const POST_MC4_DOC_TYPES: readonly string[] = ['contract_unit', 'service_report', 'unit_timesheet', 'aftersales_activity']
 
 async function derivedCompany(tx: Awaited<ReturnType<typeof getRequestTx>>, row: AuditRow, cache: Map<string, number | null>): Promise<number | null | undefined> {
   if (row.companyId !== undefined) return row.companyId

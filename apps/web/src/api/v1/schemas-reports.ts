@@ -26,7 +26,7 @@ const CompletenessRow = z.object({
   openWarnings: z.number().int(),
 })
 
-export const ReportCode = z.enum(['rekap-kas', 'buku-kas', 'pengeluaran-kategori', 'anggaran-project', 'rekap-pengajuan', 'kelengkapan', 'biaya-kendaraan', 'absensi', 'audit-log'])
+export const ReportCode = z.enum(['rekap-kas', 'buku-kas', 'pengeluaran-kategori', 'anggaran-project', 'rekap-pengajuan', 'kelengkapan', 'biaya-kendaraan', 'absensi', 'rekap-timesheet-kontrak', 'rekap-aftersales', 'audit-log'])
 export const ReportFormat = z.enum(['csv', 'xlsx', 'pdf'])
 
 export const ProjectBudget = z.object({

@@ -207,7 +207,7 @@ export async function cashLookups(req: PayloadRequest): Promise<Lookups> {
     costCenters: costCenters.map((d) => ({ id: d.id as number, companyId: cid(d), label: codeName(d), active: d.active !== false })),
     categories: categories.map((d) => ({ id: d.id as number, companyId: cid(d), label: codeName(d), active: d.active !== false, requiresVehicle: d.requiresVehicle === true })),
     sources: sources.map((d) => ({ id: d.id as number, companyId: cid(d), label: codeName(d), active: d.active !== false })),
-    vehicles: vehicles.map((d) => ({ id: d.id as number, companyId: cid(d), label: [d.plateDisplay ?? d.plateNo, d.type].filter(Boolean).join(' · '), active: d.active !== false })),
+    vehicles: vehicles.map((d) => ({ id: d.id as number, companyId: cid(d), label: [d.plateDisplay ?? d.plateNo ?? d.unitCode, d.type].filter(Boolean).join(' · '), active: d.active !== false })),
   }
 }
 

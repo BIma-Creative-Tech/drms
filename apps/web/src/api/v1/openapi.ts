@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { registerAddendumPaths } from './openapi-addendum'
 import { registerAttendancePaths } from './openapi-attendance'
 import { registerCompanyPaths } from './openapi-companies'
+import { registerFieldPaths } from './openapi-field'
 import { registerShortfallPaths } from './openapi-shortfall'
 import { Device, DeviceRegister, DeviceRevoke, Health, Masters, MastersQuery, Me, Problem, Ready, TestEmailQueued } from './schemas'
 import * as F from './schemas-flow'
@@ -592,6 +593,8 @@ export function buildOpenApiDocument(version: string) {
   registerCompanyPaths(registry, { security, res })
   // ---- QA-06 / ADR 0019: LPJ shortfall re-approval (web) -------------------------------------
   registerShortfallPaths(registry, { security, idem, res, detail: F.ExpenseRequestDetail })
+  // ---- FR1 field reports per project kind (ADR 0020) -----------------------------------------
+  registerFieldPaths(registry, { security, deviceHeader, idem, res })
 
   return new OpenApiGeneratorV31(registry.definitions).generateDocument({
     openapi: '3.1.0',

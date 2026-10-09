@@ -1,10 +1,11 @@
-import type { CollectionConfig } from 'payload'
+import { APIError, type CollectionBeforeChangeHook, type CollectionConfig } from 'payload'
 
 import { readOnlyFieldsGuard } from '@/access/field-guard'
 import { denyAll, hasRole, isOperatorOnly } from '@/access/roles'
 import { assignedProjects, byRole, fieldRoles, rolesAllowed } from '@/access/policies'
 import { inIds } from '@/access/scope'
 import { reasonOnChange, withAudit } from '@/audit/hooks'
+import { PROJECT_KIND_LABELS, PROJECT_KINDS } from '@/domain/field/rules'
 import { progressWriteGuard } from '@/domain/progress/guards'
 import { codeField, odooRefField, percentField, rupiahField, uuidField } from '@/fields/common'
 import { companyField, companyHook } from '@/fields/company'
@@ -22,6 +23,21 @@ export const PROJECT_STATUSES = [
  * Direktur (additive, Direktur keeps them too). */
 const PROJECT_EDITOR_ROLES = ['pk-owner', 'pk-admin', 'pk-pm'] as const
 const projectEditors = fieldRoles(...PROJECT_EDITOR_ROLES)
+
+/** FR1 (ADR 0020 §1): the project kind is set by the Direktur or the Admin of the project's PT. */
+const kindEditors = fieldRoles('pk-owner', 'pk-admin')
+
+/**
+ * FR1: a kind change is refused once the project has field reports or contract units (409).
+ */
+const kindChangeGuard: CollectionBeforeChangeHook = async ({ data, originalDoc, operation, req }) => {
+  if (operation !== 'update' || !originalDoc || data.kind === undefined || data.kind === originalDoc.kind) return data
+  for (const collection of ['contract-units', 'service-reports', 'unit-timesheets', 'aftersales-activities'] as const) {
+    const r = await req.payload.find({ collection, where: { project: { equals: originalDoc.id } }, limit: 1, depth: 0, pagination: false, select: { project: true } as never, overrideAccess: true /* SYSTEM-READ: does the project have field data? */, req })
+    if (r.docs.length > 0) throw new APIError('Jenis project tidak dapat diubah: project ini sudah punya laporan lapangan atau unit kontrak.', 409, { errors: [{ path: 'kind', message: 'Sudah ada data lapangan.' }] }, true)
+  }
+  return data
+}
 
 /**
  * Project (requirements v1.1 §4 "Project & tahapan"): Staff R assigned, Finance R.
@@ -56,13 +72,27 @@ export const Projects: CollectionConfig = withAudit(
       delete: denyAll,
     },
     hooks: {
-      beforeChange: [companyHook('projects', { check: [{ field: 'client', collection: 'clients' }, { field: 'pm', collection: 'users', member: true }] })],
+      beforeChange: [companyHook('projects', { check: [{ field: 'client', collection: 'clients' }, { field: 'pm', collection: 'users', member: true }] }), kindChangeGuard],
       beforeOperation: [progressWriteGuard('projects'), readOnlyFieldsGuard('projects', (req, company) => hasRole(req, PROJECT_EDITOR_ROLES, company), 'Direktur, Admin, atau PM')],
     },
     fields: [
       companyField(),
       { ...codeField('Kode', 32, { perCompany: true }), access: { update: projectEditors } },
       { name: 'name', type: 'text', label: 'Nama project', required: true, maxLength: 160 },
+      {
+        name: 'kind',
+        type: 'select',
+        label: 'Jenis project',
+        // not `required` at the Payload level (typed creates without it stay valid); default + DB NOT NULL
+        defaultValue: 'umum',
+        index: true,
+        options: PROJECT_KINDS.map((k) => ({ label: PROJECT_KIND_LABELS[k], value: k })),
+        access: { update: kindEditors },
+        admin: {
+          position: 'sidebar',
+          description: 'Menentukan laporan lapangan: kontrak unit → timesheet + servis; aftersales → servis + aktivitas. Umum/konstruksi/trading: belum ada laporan lapangan. Diubah oleh Direktur/Admin.',
+        },
+      },
       { name: 'client', type: 'relationship', relationTo: 'clients', label: 'Klien', access: { update: projectEditors } },
       { name: 'address', type: 'textarea', label: 'Alamat', maxLength: 500 },
       {

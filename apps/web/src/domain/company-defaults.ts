@@ -135,6 +135,9 @@ async function createIn(req: PayloadRequest, collection: 'document-sequences' | 
 }
 
 /** Named leaf setting fields (rows / collapsibles flattened) with their default values. */
+/** FR1 (ADR 0020 §10): feature flags rolled out PT by PT stay at their default (OFF) on a new PT. */
+export const NOT_COPIED_SETTINGS: ReadonlySet<string> = new Set(['fieldReportsEnabled'])
+
 export function settingDefaults(fields: readonly Field[] = COMPANY_SETTING_FIELDS): Array<{ name: string; defaultValue: unknown }> {
   const out: Array<{ name: string; defaultValue: unknown }> = []
   for (const f of fields) {
@@ -278,6 +281,7 @@ export async function copyCompanyDefaults(req: PayloadRequest, target: number, o
   }
   if (opts.settings !== false && src) {
     for (const { name, defaultValue } of settingDefaults()) {
+      if (NOT_COPIED_SETTINGS.has(name)) continue
       const now = tgt[name]
       const atDefault = now === undefined || now === null || now === defaultValue
       if (atDefault && src[name] !== undefined && src[name] !== null && src[name] !== now) {

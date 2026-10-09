@@ -26,6 +26,8 @@ const WITH_COMPANY = [
   'attendance-corrections', 'company-memberships', 'notifications', 'audit-logs',
   // per-PT collections added after MC2
   'urgency-levels',
+  // FR1 (ADR 0020)
+  'contract-units', 'service-reports', 'unit-timesheets', 'aftersales-activities',
 ].sort()
 
 describe('PT column + PT filter on list views', () => {

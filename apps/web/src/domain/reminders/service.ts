@@ -1,7 +1,7 @@
 import { sql } from '@payloadcms/db-postgres'
 import type { Payload, PayloadRequest } from 'payload'
 
-import { notificationTemplate, pushEnabled } from '@/domain/notifications'
+import { notificationTemplate, projectPmUsers, pushEnabled } from '@/domain/notifications'
 import { lateProgressProjects, LATE_REPORT_EVENT, notifyLateProgressReport } from '@/domain/progress/reminders'
 import { projectBudgets } from '@/domain/reports/kpi'
 import { fromCompanies } from '@/domain/reports/scope'
@@ -240,6 +240,33 @@ async function revisionPending(run: Run) {
   }
 }
 
+/**
+ * FR1 (ADR 0020 §5): quotations (aftersales `penawaran`) whose follow-up date is due (≤ today, at most
+ * 30 days back) → the reporter + the project's PMs, ONCE per quotation and follow-up date.
+ */
+async function aftersalesFollowup(run: Run) {
+  const { req, s, date } = run
+  const rows = await q<{ id: number; doc_no: string | null; follow_up_date: string; reporter_id: number; project_id: number; client: string; code: string; pname: string }>(
+    req,
+    sql`SELECT a.id, a.doc_no, a.follow_up_date, a.reporter_id, a.project_id, c.name AS client, p.code, p.name AS pname
+          FROM aftersales_activities a JOIN clients c ON c.id = a.client_id JOIN projects p ON p.id = a.project_id
+         WHERE a.company_id = ${s.companyId} AND a.kind = 'penawaran' AND a.follow_up_date IS NOT NULL
+           AND a.follow_up_date <= ${date} AND a.follow_up_date >= to_char(${date}::date - 30, 'YYYY-MM-DD')
+           AND p.status::text <> 'arsip'
+         ORDER BY a.follow_up_date, a.id`,
+  )
+  const t = await notificationTemplate(req, REMINDER_EVENTS.aftersales_followup, DEFAULT_TEXTS.aftersales_followup)
+  for (const r of rows) {
+    const pms = await projectPmUsers(req, Number(r.project_id), s.companyId)
+    const vars = { docNo: r.doc_no ?? `#${r.id}`, client: r.client, project: `${r.code} ${r.pname}`, date: r.follow_up_date }
+    await run.deliver('aftersales_followup', `activity:${r.id}`, `fu:${r.follow_up_date}`, [Number(r.reporter_id), ...pms], async (userIds) => {
+      const m: Msg = { title: fill(t.title, vars), body: fill(t.body, vars), docType: 'aftersales_activity', docId: String(r.id), docNo: r.doc_no }
+      await inApp(req, REMINDER_EVENTS.aftersales_followup, userIds, m, s.companyId)
+      return m
+    })
+  }
+}
+
 async function budgetThreshold(run: Run) {
   const { req, s } = run
   const office = [...(await roleHolders(req, 'pk-owner', s.companyId)), ...(await roleHolders(req, 'pk-finance', s.companyId))]
@@ -299,6 +326,7 @@ async function runCompany(payload: Payload, companyId: number, now: Date, force:
       if (s.lpjOverdue.enabled) await lpjOverdue(run)
       if (s.revision.enabled) await revisionPending(run)
       if (s.budget.enabled) await budgetThreshold(run)
+      if (s.aftersalesFollowup.enabled) await aftersalesFollowup(run)
       await tx.execute(
         sql`INSERT INTO reminder_runs (company_id, run_date, summary) VALUES (${companyId}, ${date}, ${JSON.stringify({ rules: run.rules, emails: run.emails })}::jsonb)
             ON CONFLICT (company_id, run_date) DO UPDATE SET summary = EXCLUDED.summary, finished_at = clock_timestamp()`,

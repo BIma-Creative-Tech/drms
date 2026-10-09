@@ -47,6 +47,18 @@ import { NotificationsView as NotificationsView_c3b608bcff53bfc6e9104ed1897a90d5
 import { KeamananAkunView as KeamananAkunView_6681b9a15a5eb31c998645ca38ba9da9 } from '@/admin/views/KeamananAkun'
 import { UnauthorizedView as UnauthorizedView_401f81a3e6a8507dd399c4318d1104a0 } from '@/admin/views/NoAccess'
 import { AksesPtView as AksesPtView_ea4d12435de88c992418066fdcec1f38 } from '@/admin/views/AksesPt'
+import { FieldContracts as FieldContracts_fbe9056c3fd855882d87e1ac7f3b0327 } from '@/admin/views/FieldUnits'
+import { FieldContractDetail as FieldContractDetail_fbe9056c3fd855882d87e1ac7f3b0327 } from '@/admin/views/FieldUnits'
+import { FieldUnitDetail as FieldUnitDetail_fbe9056c3fd855882d87e1ac7f3b0327 } from '@/admin/views/FieldUnits'
+import { FieldTimesheetNew as FieldTimesheetNew_fbe9056c3fd855882d87e1ac7f3b0327 } from '@/admin/views/FieldUnits'
+import { FieldTimesheetDetail as FieldTimesheetDetail_fbe9056c3fd855882d87e1ac7f3b0327 } from '@/admin/views/FieldUnits'
+import { FieldServiceList as FieldServiceList_2d301ec73d56aa7c0054d7908bb911ed } from '@/admin/views/FieldService'
+import { FieldServiceNew as FieldServiceNew_2d301ec73d56aa7c0054d7908bb911ed } from '@/admin/views/FieldService'
+import { FieldServiceDetail as FieldServiceDetail_2d301ec73d56aa7c0054d7908bb911ed } from '@/admin/views/FieldService'
+import { FieldAftersalesRecap as FieldAftersalesRecap_5c4757a0e1a870290c655f812acb2805 } from '@/admin/views/FieldAftersales'
+import { FieldActivityList as FieldActivityList_5c4757a0e1a870290c655f812acb2805 } from '@/admin/views/FieldAftersales'
+import { FieldActivityNew as FieldActivityNew_5c4757a0e1a870290c655f812acb2805 } from '@/admin/views/FieldAftersales'
+import { FieldActivityDetail as FieldActivityDetail_5c4757a0e1a870290c655f812acb2805 } from '@/admin/views/FieldAftersales'
 import { CollectionCards as CollectionCards_f9c02e79a4aed9a3924487c0cd4cafb1 } from '@payloadcms/next/rsc'
 
 /** @type import('payload').ImportMap */
@@ -100,5 +112,17 @@ export const importMap = {
   "@/admin/views/KeamananAkun#KeamananAkunView": KeamananAkunView_6681b9a15a5eb31c998645ca38ba9da9,
   "@/admin/views/NoAccess#UnauthorizedView": UnauthorizedView_401f81a3e6a8507dd399c4318d1104a0,
   "@/admin/views/AksesPt#AksesPtView": AksesPtView_ea4d12435de88c992418066fdcec1f38,
+  "@/admin/views/FieldUnits#FieldContracts": FieldContracts_fbe9056c3fd855882d87e1ac7f3b0327,
+  "@/admin/views/FieldUnits#FieldContractDetail": FieldContractDetail_fbe9056c3fd855882d87e1ac7f3b0327,
+  "@/admin/views/FieldUnits#FieldUnitDetail": FieldUnitDetail_fbe9056c3fd855882d87e1ac7f3b0327,
+  "@/admin/views/FieldUnits#FieldTimesheetNew": FieldTimesheetNew_fbe9056c3fd855882d87e1ac7f3b0327,
+  "@/admin/views/FieldUnits#FieldTimesheetDetail": FieldTimesheetDetail_fbe9056c3fd855882d87e1ac7f3b0327,
+  "@/admin/views/FieldService#FieldServiceList": FieldServiceList_2d301ec73d56aa7c0054d7908bb911ed,
+  "@/admin/views/FieldService#FieldServiceNew": FieldServiceNew_2d301ec73d56aa7c0054d7908bb911ed,
+  "@/admin/views/FieldService#FieldServiceDetail": FieldServiceDetail_2d301ec73d56aa7c0054d7908bb911ed,
+  "@/admin/views/FieldAftersales#FieldAftersalesRecap": FieldAftersalesRecap_5c4757a0e1a870290c655f812acb2805,
+  "@/admin/views/FieldAftersales#FieldActivityList": FieldActivityList_5c4757a0e1a870290c655f812acb2805,
+  "@/admin/views/FieldAftersales#FieldActivityNew": FieldActivityNew_5c4757a0e1a870290c655f812acb2805,
+  "@/admin/views/FieldAftersales#FieldActivityDetail": FieldActivityDetail_5c4757a0e1a870290c655f812acb2805,
   "@payloadcms/next/rsc#CollectionCards": CollectionCards_f9c02e79a4aed9a3924487c0cd4cafb1
 }

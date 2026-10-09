@@ -31,8 +31,15 @@ export const SyncItemTypeEnum = z
     'expense_request.draft_upsert',
     'expense_request.draft_delete',
     'progress_report.draft_upsert',
+    'service_report.upsert',
+    'unit_timesheet.upsert',
+    'aftersales_activity.upsert',
   ])
-  .meta({ id: 'SyncItemType', description: 'attendance.on_behalf (US-14, E6): PM only. progress_report.draft_upsert (E4) = create or edit (≤ 24 h) of a progress report (company-settings.syncProgressReportsEnabled).' })
+  .meta({
+    id: 'SyncItemType',
+    description:
+      'attendance.on_behalf (US-14, E6): PM only. progress_report.draft_upsert (E4) = create or edit (≤ 24 h) of a progress report (company-settings.syncProgressReportsEnabled). FR1 (ADR 0020): service_report.upsert / unit_timesheet.upsert / aftersales_activity.upsert = create or edit (reporter, ≤ 24 h) of a field report (companies.fieldReportsEnabled; creates otherwise FEATURE_DISABLED).',
+  })
 export type SyncItemType = z.infer<typeof SyncItemTypeEnum>
 
 export const SyncClock = z
@@ -191,6 +198,109 @@ export const SyncProgressReportPayload = z
   .meta({ id: 'SyncProgressReportPayload' })
 export type SyncProgressReport = z.infer<typeof SyncProgressReportPayload>
 
+// ---------------------------------------------------------------- FR1 field reports (ADR 0020)
+
+const dec2 = (max: number) =>
+  z
+    .number()
+    .min(0)
+    .max(max)
+    .refine((v) => Math.abs(Math.round(v * 100) - v * 100) < 1e-6, 'maks. 2 desimal')
+const fieldQty = z
+  .number()
+  .positive()
+  .max(1e6)
+  .refine((v) => Math.abs(Math.round(v * 1000) - v * 1000) < 1e-6, 'maks. 3 desimal')
+const optStr = (max: number) => z.string().trim().max(max).nullable().optional()
+
+export const SyncSparepartLine = z
+  .object({ name: z.string().trim().min(1).max(160), part_no: optStr(64), qty: fieldQty, uom: optStr(16), note: optStr(300) })
+  .strict()
+  .meta({ id: 'SyncSparepartLine' })
+export const SyncActivityItem = z
+  .object({ name: z.string().trim().min(1).max(160), part_no: optStr(64), qty: fieldQty, uom: optStr(16) })
+  .strict()
+  .meta({ id: 'SyncActivityItem' })
+
+/**
+ * `service_report.upsert` (FR1): creates a service report (Staff assigned / PM team / Direktur, project
+ * kind kontrak_unit or aftersales) or edits the reporter's own within 24 h (`base_rev` = server rev).
+ * Photos first via POST /api/v1/media/progress-photos (≤ 10). HM below the unit's latest reading →
+ * rejected HM_DECREASED.
+ */
+export const SyncServiceReportPayload = z
+  .object({
+    report_id: id.optional().meta({ description: 'Server id (edit of a report created online).' }),
+    report_client_uuid: z.uuid().optional().meta({ description: 'APK id of the report (default: the client_uuid of the item that created it).' }),
+    project_id: id.optional().meta({ description: 'Required for a new report.' }),
+    unit_id: id.optional().meta({ description: 'Required for a new report.' }),
+    report_date: businessDate.optional().meta({ description: 'Default: the company-TZ date of the time that counts.' }),
+    helpers: optStr(200),
+    start_time: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).nullable().optional(),
+    end_time: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).nullable().optional(),
+    hour_meter: dec2(10_000_000).nullable().optional(),
+    service_type: z.enum(['servis_berkala', 'perbaikan', 'inspeksi', 'pemasangan']).optional().meta({ description: 'Required for a new report.' }),
+    complaint: optStr(2000),
+    action: z.string().trim().min(3).max(4000).optional().meta({ description: 'Required for a new report.' }),
+    unit_status_after: z.enum(['siap', 'rusak', 'menunggu_part']).optional().meta({ description: 'Required for a new report.' }),
+    spareparts: z.array(SyncSparepartLine).max(50).optional(),
+    notes: optStr(2000),
+    photo_media_ids: z.array(id).max(10).optional().meta({ description: 'On an edit: ids not yet on the report are added (photos are never removed).' }),
+    reason: z.string().trim().min(3).max(1000).optional(),
+  })
+  .strict()
+  .meta({ id: 'SyncServiceReportPayload' })
+export type SyncServiceReport = z.infer<typeof SyncServiceReportPayload>
+
+/** `unit_timesheet.upsert` (FR1): one timesheet per unit and date; the HM photo is required on create. */
+export const SyncUnitTimesheetPayload = z
+  .object({
+    timesheet_id: id.optional(),
+    timesheet_client_uuid: z.uuid().optional(),
+    project_id: id.optional().meta({ description: 'Required for a new timesheet (kind kontrak_unit).' }),
+    unit_id: id.optional().meta({ description: 'Required for a new timesheet (active contract unit on report_date).' }),
+    report_date: businessDate.optional().meta({ description: 'Required for a new timesheet.' }),
+    hm_start: dec2(10_000_000).optional(),
+    hm_end: dec2(10_000_000).optional(),
+    work_hours: dec2(24).optional(),
+    standby_hours: dec2(24).optional(),
+    breakdown_hours: dec2(24).optional(),
+    breakdown_reason: optStr(500),
+    fuel_liters: dec2(100_000).nullable().optional(),
+    operator_name: optStr(128),
+    location: optStr(200),
+    notes: optStr(2000),
+    hm_photo_media_id: id.optional().meta({ description: 'Required for a new timesheet (photo of the HM meter). Cannot change afterwards.' }),
+    reason: z.string().trim().min(3).max(1000).optional(),
+  })
+  .strict()
+  .meta({ id: 'SyncUnitTimesheetPayload' })
+export type SyncUnitTimesheet = z.infer<typeof SyncUnitTimesheetPayload>
+
+/** `aftersales_activity.upsert` (FR1): one activity of the aftersales log (project kind aftersales). */
+export const SyncAftersalesActivityPayload = z
+  .object({
+    activity_id: id.optional(),
+    activity_client_uuid: z.uuid().optional(),
+    project_id: id.optional().meta({ description: 'Required for a new activity.' }),
+    client_id: id.optional().meta({ description: 'Required for a new activity (customer of the PT).' }),
+    activity_date: businessDate.optional(),
+    kind: z.enum(['penawaran', 'po_masuk', 'pengiriman', 'penagihan', 'kunjungan', 'lainnya']).optional().meta({ description: 'Required for a new activity.' }),
+    doc_no: optStr(64),
+    items: z.array(SyncActivityItem).max(50).optional(),
+    value: rupiah.nullable().optional(),
+    relates_to: id.nullable().optional().meta({ description: 'pengiriman / penagihan: server id of the incoming PO.' }),
+    po_delivered: z.boolean().optional(),
+    follow_up_date: businessDate.nullable().optional(),
+    receiver: optStr(128),
+    notes: optStr(2000),
+    photo_media_ids: z.array(id).max(5).optional(),
+    reason: z.string().trim().min(3).max(1000).optional(),
+  })
+  .strict()
+  .meta({ id: 'SyncAftersalesActivityPayload' })
+export type SyncAftersalesActivity = z.infer<typeof SyncAftersalesActivityPayload>
+
 export const SyncItem = z
   .object({
     client_uuid: z.uuid().meta({ description: 'Idempotency key of this queue item (UUIDv7). Replays return `duplicate` with the stored result.' }),
@@ -220,10 +330,20 @@ export const SyncItem = z
     // Documented as anyOf (components for the Dart client); validated per item type by the
     // service, so a bad payload rejects only its own item (never the whole batch).
     payload: z
-      .union([SyncDraftUpsertPayload, SyncDraftDeletePayload, SyncAttendancePayload, SyncOnBehalfPayload, SyncProgressReportPayload, z.record(z.string(), z.unknown())])
+      .union([
+        SyncDraftUpsertPayload,
+        SyncDraftDeletePayload,
+        SyncAttendancePayload,
+        SyncOnBehalfPayload,
+        SyncProgressReportPayload,
+        SyncServiceReportPayload,
+        SyncUnitTimesheetPayload,
+        SyncAftersalesActivityPayload,
+        z.record(z.string(), z.unknown()),
+      ])
       .meta({
         description:
-          'Type specific: expense_request.draft_upsert → SyncDraftUpsertPayload, expense_request.draft_delete → SyncDraftDeletePayload, attendance.check_in / attendance.check_out → SyncAttendancePayload, attendance.on_behalf → SyncOnBehalfPayload, progress_report.draft_upsert → SyncProgressReportPayload; other types: free-form until supported.',
+          'Type specific: expense_request.draft_upsert → SyncDraftUpsertPayload, expense_request.draft_delete → SyncDraftDeletePayload, attendance.check_in / attendance.check_out → SyncAttendancePayload, attendance.on_behalf → SyncOnBehalfPayload, progress_report.draft_upsert → SyncProgressReportPayload, service_report.upsert → SyncServiceReportPayload, unit_timesheet.upsert → SyncUnitTimesheetPayload, aftersales_activity.upsert → SyncAftersalesActivityPayload; other types: free-form until supported.',
       }),
   })
   .strict()
@@ -316,6 +436,71 @@ export const SyncProgressReportCopy = z
   .meta({ id: 'SyncProgressReportCopy', description: 'Server version of a progress report (server wins on conflict).' })
 export type SyncProgressReportCopyOut = z.infer<typeof SyncProgressReportCopy>
 
+export const SyncServiceReportCopy = z
+  .object({
+    id,
+    client_uuid: z.string().nullable(),
+    rev: z.number().int(),
+    doc_no: z.string().nullable(),
+    project_id: id,
+    unit_id: id,
+    report_date: z.string(),
+    hour_meter: z.number().nullable(),
+    service_type: z.string(),
+    action: z.string(),
+    unit_status_after: z.string(),
+    photo_media_ids: z.array(id),
+    flags: z.array(z.string()),
+    offline: z.boolean(),
+    editable_until: z.string().nullable(),
+    updated_at: z.string().nullable(),
+  })
+  .meta({ id: 'SyncServiceReportCopy', description: 'Server version of a service report (server wins on conflict).' })
+export type SyncServiceReportCopyOut = z.infer<typeof SyncServiceReportCopy>
+
+export const SyncUnitTimesheetCopy = z
+  .object({
+    id,
+    client_uuid: z.string().nullable(),
+    rev: z.number().int(),
+    project_id: id,
+    unit_id: id,
+    report_date: z.string(),
+    hm_start: z.number(),
+    hm_end: z.number(),
+    work_hours: z.number(),
+    standby_hours: z.number(),
+    breakdown_hours: z.number(),
+    hm_photo_media_id: id.nullable(),
+    flags: z.array(z.string()),
+    offline: z.boolean(),
+    editable_until: z.string().nullable(),
+    updated_at: z.string().nullable(),
+  })
+  .meta({ id: 'SyncUnitTimesheetCopy', description: 'Server version of a unit timesheet (server wins on conflict).' })
+export type SyncUnitTimesheetCopyOut = z.infer<typeof SyncUnitTimesheetCopy>
+
+export const SyncAftersalesActivityCopy = z
+  .object({
+    id,
+    client_uuid: z.string().nullable(),
+    rev: z.number().int(),
+    doc_no: z.string().nullable().meta({ description: 'External document number (Q/PO/SJ/INV).' }),
+    project_id: id,
+    client_id: id,
+    activity_date: z.string(),
+    kind: z.string(),
+    po_status: z.string().nullable(),
+    relates_to: id.nullable(),
+    photo_media_ids: z.array(id),
+    flags: z.array(z.string()),
+    offline: z.boolean(),
+    editable_until: z.string().nullable(),
+    updated_at: z.string().nullable(),
+  })
+  .meta({ id: 'SyncAftersalesActivityCopy', description: 'Server version of an aftersales activity (server wins on conflict; the value is not echoed).' })
+export type SyncAftersalesActivityCopyOut = z.infer<typeof SyncAftersalesActivityCopy>
+
 export const SYNC_STATUSES = ['applied', 'duplicate', 'rejected', 'conflict', 'deferred', 'unsupported'] as const
 export type SyncStatus = (typeof SYNC_STATUSES)[number]
 
@@ -331,10 +516,10 @@ export const SyncResult = z
     rev: z.number().int().nullable(),
     received_at: z.string().meta({ description: 'Authoritative server time of (first) processing, UTC.' }),
     time_trust: z.enum(['server', 'estimated', 'device_only']),
-    flags: z.array(z.string()).meta({ description: 'OFFLINE, CLOCK_SKEW, CLIENT_TOTAL_MISMATCH, ALREADY_CANCELLED, DEVICE_TIME_ONLY.' }),
+    flags: z.array(z.string()).meta({ description: 'OFFLINE, CLOCK_SKEW, CLIENT_TOTAL_MISMATCH, ALREADY_CANCELLED, DEVICE_TIME_ONLY; FR1 also BACKDATED, HM_GAP, BREAKDOWN_SUGGEST_SERVICE.' }),
     errors: z.array(
       z.object({
-        code: z.string().meta({ description: 'VALIDATION, NOT_EDITABLE, STALE_REV (conflict), NOT_FOUND, FORBIDDEN, MEDIA_MISSING, CLIENT_UUID_CONFLICT, COMPANY_NOT_ALLOWED (MC3: company_id is not an active membership of the caller), COMPANY_MISMATCH (MC3: the PT derived from the item references ≠ company_id — or ≠ the only PT of a caller without company_id; only for a PT the caller is mapped to — a reference in another PT is answered like a missing one, QA-MC4-14), FEATURE_DISABLED, DEPENDENCY_FAILED, DEPENDENCY_PENDING, STATE_CONFLICT, INTEGRITY, UNSUPPORTED, INTERNAL; attendance: MOCK_LOCATION, OUTSIDE_GEOFENCE, NOT_ASSIGNED, NO_GEOFENCE, ALREADY_CHECKED_IN, NO_CHECK_IN, ALREADY_CHECKED_OUT (on_behalf also FORBIDDEN: not a PM / not a team location / own attendance), PRIVACY_ACK_REQUIRED (ADR 0018: while the app setting minAppVersion ≥ 0.3.3, the caller — for on_behalf the PM — has not acknowledged the current privacy notice; final, never retry: show the notice, POST /me/privacy-ack, record again); progress reports: WEIGHTS_INCOMPLETE, PROGRESS_DECREASED, PHOTO_LIMIT, MEDIA_IN_USE.' }),
+        code: z.string().meta({ description: 'VALIDATION, NOT_EDITABLE, STALE_REV (conflict), NOT_FOUND, FORBIDDEN, MEDIA_MISSING, CLIENT_UUID_CONFLICT, COMPANY_NOT_ALLOWED (MC3: company_id is not an active membership of the caller), COMPANY_MISMATCH (MC3: the PT derived from the item references ≠ company_id — or ≠ the only PT of a caller without company_id; only for a PT the caller is mapped to — a reference in another PT is answered like a missing one, QA-MC4-14), FEATURE_DISABLED, DEPENDENCY_FAILED, DEPENDENCY_PENDING, STATE_CONFLICT, INTEGRITY, UNSUPPORTED, INTERNAL; attendance: MOCK_LOCATION, OUTSIDE_GEOFENCE, NOT_ASSIGNED, NO_GEOFENCE, ALREADY_CHECKED_IN, NO_CHECK_IN, ALREADY_CHECKED_OUT (on_behalf also FORBIDDEN: not a PM / not a team location / own attendance), PRIVACY_ACK_REQUIRED (ADR 0018: while the app setting minAppVersion ≥ 0.3.3, the caller — for on_behalf the PM — has not acknowledged the current privacy notice; final, never retry: show the notice, POST /me/privacy-ack, record again); progress reports: WEIGHTS_INCOMPLETE, PROGRESS_DECREASED, PHOTO_LIMIT, MEDIA_IN_USE; FR1 field reports: FEATURE_DISABLED, WRONG_PROJECT_KIND, HM_DECREASED, NOT_IN_CONTRACT, DUPLICATE_DATE, PO_CLOSED, PHOTO_LIMIT, MEDIA_IN_USE.' }),
         field: z.string().optional(),
         message: z.string(),
       }),
@@ -343,6 +528,10 @@ export const SyncResult = z
     server_copy: SyncDraftCopy.nullable(),
     // progress_report.draft_upsert only: server version of the report (applied, conflict, NOT_EDITABLE).
     server_report: SyncProgressReportCopy.nullable().optional(),
+    // FR1 field reports: server version of the record (applied, conflict, NOT_EDITABLE)
+    server_service_report: SyncServiceReportCopy.nullable().optional(),
+    server_unit_timesheet: SyncUnitTimesheetCopy.nullable().optional(),
+    server_aftersales_activity: SyncAftersalesActivityCopy.nullable().optional(),
   })
   .meta({ id: 'SyncResult' })
 export type SyncResultOut = z.infer<typeof SyncResult>

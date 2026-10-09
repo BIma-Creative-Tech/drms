@@ -171,6 +171,16 @@ export const COMPANY_SETTING_FIELDS: Field[] = [
     defaultValue: true,
     admin: { description: 'E4: laporan progress harian + foto dari APK. Nonaktif → item laporan ditolak FEATURE_DISABLED (rollback).' },
   },
+  {
+    name: 'fieldReportsEnabled',
+    type: 'checkbox',
+    label: 'Laporan lapangan per jenis project aktif (servis unit, timesheet unit, aktivitas aftersales)',
+    defaultValue: false,
+    admin: {
+      description:
+        'FR1 (ADR 0020): Staff yang ditugaskan, PM, dan Direktur membuat laporan lapangan sesuai jenis project. Nonaktif → pembuatan laporan baru ditolak FEATURE_DISABLED (web, API, APK); data lama tetap terbaca.',
+    },
+  },
   // E7 (M12, US-11): daily reminders, per PT.
   {
     type: 'collapsible',
@@ -249,7 +259,7 @@ function settingKey(f: Field): string {
   if ('fields' in f && Array.isArray(f.fields)) return f.fields.map(settingKey).find(Boolean) ?? ''
   return ''
 }
-const OPERATIONAL = ['defaultGeofenceRadiusM', 'lateReportDays', 'budgetWarnPct', 'progressWarnGapPct', 'receiptRoundingTolerance', 'shortfallTolerancePct', 'receiptMaxAgeDays', 'reimburseAutoCloseDays', 'lpjDueDays', 'syncExpenseDraftsEnabled', 'syncProgressReportsEnabled', 'defaultWorkSchedule']
+const OPERATIONAL = ['defaultGeofenceRadiusM', 'lateReportDays', 'budgetWarnPct', 'progressWarnGapPct', 'receiptRoundingTolerance', 'shortfallTolerancePct', 'receiptMaxAgeDays', 'reimburseAutoCloseDays', 'lpjDueDays', 'syncExpenseDraftsEnabled', 'syncProgressReportsEnabled', 'fieldReportsEnabled', 'defaultWorkSchedule']
 const ATTENDANCE = ['syncAttendanceEnabled', 'selfieRetentionMonths', 'selfieRetentionDeleteEnabled']
 const REMINDERS = ['remindersEnabled', 'notifyRequesterStatusEnabled']
 /** COMPANY_SETTING_FIELDS in tab order; every field lands in exactly one tab (unit test). */

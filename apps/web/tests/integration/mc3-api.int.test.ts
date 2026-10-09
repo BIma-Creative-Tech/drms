@@ -200,7 +200,8 @@ describe('MC3 — GET /me companies[] + deprecated single-PT fields', () => {
     expect(me.activeCompanyIds).toEqual([A, B, C])
     expect(me.legacyCompanyId).toBe(A)
     expect([...me.roles].sort()).toEqual(['pk-finance', 'pk-pm', 'pk-staff'])
-    expect(me.capabilities).toEqual({ approvalInbox: true, teamMonitor: true, progressReportCreate: true })
+    // FR1: field-report capabilities stay false while no selected PT has companies.fieldReportsEnabled
+    expect(me.capabilities).toEqual({ approvalInbox: true, teamMonitor: true, progressReportCreate: true, serviceReportCreate: false, unitTimesheetCreate: false, aftersalesActivityCreate: false })
     expect(me.employee.id).toBe(X.empTriA)
     expect(me.settings.shortCode).toBe('DRMS')
     // narrowed read selection: companies[] still lists every membership, `selected` + legacy follow the selection
@@ -391,6 +392,25 @@ const ROUTE_CLASSES: Record<string, RouteClass> = {
   // owner decision 2026-10-09: web self check-in/out — PT of the referenced project / cost center, own employee there
   'POST /attendance/check-in': 'named-pt',
   'POST /attendance/check-out': 'named-pt',
+  // FR1 (ADR 0020): field reports per project kind
+  'GET /service-reports': 'selection',
+  'GET /unit-timesheets': 'selection',
+  'GET /aftersales-activities': 'selection',
+  'GET /aftersales/open-pos': 'selection',
+  'GET /units': 'selection',
+  'GET /service-reports/:id': 'document',
+  'PATCH /service-reports/:id': 'document',
+  'POST /service-reports/:id/corrections': 'document',
+  'GET /unit-timesheets/:id': 'document',
+  'PATCH /unit-timesheets/:id': 'document',
+  'POST /unit-timesheets/:id/corrections': 'document',
+  'GET /aftersales-activities/:id': 'document',
+  'PATCH /aftersales-activities/:id': 'document',
+  'POST /aftersales-activities/:id/corrections': 'document',
+  'GET /projects/:id/contract-units': 'document',
+  'POST /service-reports': 'named-pt',
+  'POST /unit-timesheets': 'named-pt',
+  'POST /aftersales-activities': 'named-pt',
 }
 
 describe('MC3 — route classes sampled across PTs', () => {

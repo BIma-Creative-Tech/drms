@@ -90,3 +90,26 @@ export const ACCOUNT_ADMIN_VIEWS = {
 export const MC2_ADMIN_VIEWS = {
   accessMatrix: { Component: '@/admin/views/AksesPt#AksesPtView', path: '/akses-pt' as const, exact: true, meta: { title: 'Pengguna & akses PT' } },
 }
+
+/**
+ * FR1 (ADR 0020, plan "Web"): field reports per project kind — "Unit & kontrak" (contract list,
+ * contract detail with tabs Timesheet/Rekap/Unit/Timeline, unit detail, timesheet input/detail),
+ * "Laporan servis" (list/input/detail) and "Aftersales" (weekly recap, activity list/input/detail).
+ * All exact; static segments (`baru`, `detail`, `kontrak`, `unit`, `timesheet`) never collide with an
+ * id segment. Role + per-PT flag (companies.fieldReportsEnabled) checks inside the views; /api/v1
+ * re-checks every write.
+ */
+export const FR1_ADMIN_VIEWS = {
+  fieldContracts: { Component: '@/admin/views/FieldUnits#FieldContracts', path: '/unit-kontrak' as const, exact: true, meta: { title: 'Unit & kontrak' } },
+  fieldContract: { Component: '@/admin/views/FieldUnits#FieldContractDetail', path: '/unit-kontrak/kontrak/:id' as const, exact: true, meta: { title: 'Kontrak unit' } },
+  fieldUnit: { Component: '@/admin/views/FieldUnits#FieldUnitDetail', path: '/unit-kontrak/unit/:id' as const, exact: true, meta: { title: 'Unit' } },
+  fieldTimesheetNew: { Component: '@/admin/views/FieldUnits#FieldTimesheetNew', path: '/unit-kontrak/timesheet/baru' as const, exact: true, meta: { title: 'Isi timesheet' } },
+  fieldTimesheet: { Component: '@/admin/views/FieldUnits#FieldTimesheetDetail', path: '/unit-kontrak/timesheet/detail/:id' as const, exact: true, meta: { title: 'Timesheet unit' } },
+  fieldServiceList: { Component: '@/admin/views/FieldService#FieldServiceList', path: '/laporan-servis' as const, exact: true, meta: { title: 'Laporan servis' } },
+  fieldServiceNew: { Component: '@/admin/views/FieldService#FieldServiceNew', path: '/laporan-servis/baru' as const, exact: true, meta: { title: 'Laporan servis baru' } },
+  fieldService: { Component: '@/admin/views/FieldService#FieldServiceDetail', path: '/laporan-servis/detail/:id' as const, exact: true, meta: { title: 'Laporan servis' } },
+  fieldAftersales: { Component: '@/admin/views/FieldAftersales#FieldAftersalesRecap', path: '/aftersales' as const, exact: true, meta: { title: 'Aftersales' } },
+  fieldActivities: { Component: '@/admin/views/FieldAftersales#FieldActivityList', path: '/aftersales/aktivitas' as const, exact: true, meta: { title: 'Aktivitas aftersales' } },
+  fieldActivityNew: { Component: '@/admin/views/FieldAftersales#FieldActivityNew', path: '/aftersales/aktivitas/baru' as const, exact: true, meta: { title: 'Catat aktivitas' } },
+  fieldActivity: { Component: '@/admin/views/FieldAftersales#FieldActivityDetail', path: '/aftersales/aktivitas/detail/:id' as const, exact: true, meta: { title: 'Aktivitas aftersales' } },
+}

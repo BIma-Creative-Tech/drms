@@ -14,12 +14,12 @@ const LIMIT = 500
 
 /** type → collection + whitelisted fields (never internal/sensitive columns like odoo refs). */
 const MAP: Record<MasterType, { collection: CollectionSlug; fields: string[] }> = {
-  projects: { collection: 'projects', fields: ['code', 'name', 'client', 'address', 'lat', 'lng', 'radiusM', 'pm', 'status', 'startDate', 'targetDate', 'progressPct'] },
+  projects: { collection: 'projects', fields: ['code', 'name', 'kind', 'client', 'address', 'lat', 'lng', 'radiusM', 'pm', 'status', 'startDate', 'targetDate', 'progressPct'] },
   'project-stages': { collection: 'project-stages', fields: ['project', 'name', 'weightPct', 'sequence', 'progressPct', 'active'] },
   'cost-centers': { collection: 'cost-centers', fields: ['code', 'name', 'type', 'manager', 'lat', 'lng', 'radiusM', 'active'] },
   'expense-categories': { collection: 'expense-categories', fields: ['code', 'name', 'defaultUom', 'allowedUoms', 'requiresVehicle', 'active'] },
   uoms: { collection: 'uoms', fields: ['code', 'name', 'category', 'active'] },
-  vehicles: { collection: 'vehicles', fields: ['plateNo', 'plateDisplay', 'type', 'brandModel', 'costCenter', 'project', 'active'] },
+  vehicles: { collection: 'vehicles', fields: ['kind', 'displayName', 'unitCode', 'plateNo', 'plateDisplay', 'type', 'brandModel', 'owner', 'status', 'costCenter', 'project', 'active'] },
   employees: { collection: 'employees', fields: ['code', 'name', 'nickname', 'position', 'active'] },
   banks: { collection: 'banks', fields: ['code', 'name', 'active'] },
   'bank-accounts': { collection: 'employee-bank-accounts', fields: ['employee', 'bank', 'accountNo', 'accountHolder', 'isDefault', 'verificationStatus', 'active'] },

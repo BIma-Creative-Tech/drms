@@ -13,6 +13,7 @@ Owner decisions 2026-10-09 (roles, web attendance, LPJ for Staff, urgency level)
 APK **mobile-v0.3.6** (pubspec `0.3.6+1`, notes `docs/release-notes/apk/0.3.6.md`; needs this server — the APK asks
 for the master type `urgency-levels`): role Operator/Anggota (home = Absensi only), own attendance for every role,
 "Tingkat urgensi" picker on drafts (drift schema **v4**: `local_drafts.urgency_level_id`, existing drafts kept).
+Plus field reports per project kind (FR1 P1, behind the per-PT flag `fieldReportsEnabled`, default OFF) — see Added.
 
 ### Removed
 
@@ -30,6 +31,67 @@ for the master type `urgency-levels`): role Operator/Anggota (home = Absensi onl
 
 ### Added
 
+- **Field reports per project kind — P1 backend + admin web views** (ADR 0020, requirements v1.3 US-60…US-68; DRMS
+  first, behind the per-PT flag **`companies.fieldReportsEnabled`, default OFF**). The service PDF and the APK screens
+  follow (P2 APK).
+  - **Project kind** `projects.kind` (`umum` default for every existing project, `konstruksi`, `kontrak_unit`,
+    `aftersales`, `trading`): decides the available reports (kontrak_unit → timesheet + service report; aftersales →
+    service report + aftersales log); set by the Direktur or the Admin of the PT, frozen once
+    the project has field data; wrong kind → 409 `WRONG_PROJECT_KIND`.
+  - **Unit & Kendaraan** (`vehicles` extended): heavy equipment with a unit code (unique per PT), plate optional for
+    heavy equipment, serial no., owner own fleet / customer (+ client of the same PT), system fields status (from the
+    latest service report) and last hour meter.
+  - **Contract units** (`contract-units`): own unit in a kontrak_unit project for a period with rate per hour (+ monthly
+    minimum) or per month; never active in two overlapping contracts (hook + DB trigger); rates readable only by
+    Direktur / Finance / Admin.
+  - **Service reports** (`service-reports`, numbering `SV/YYMM/####`), **unit timesheets** (`unit-timesheets`, one per
+    unit and date, HM_GAP flag, HM photo) and **aftersales activity log** (`aftersales-activities`: quotation /
+    incoming PO / delivery / invoicing / visit; deliveries move the PO status; values hidden from Staff/PM). Created by
+    **Staff assigned to the project**, the PM of the team or the Direktur (manual progress reports stay PM/Direktur);
+    reporter edits ≤ 24 h, then PM/Direktur corrections with a reason (audited); no delete; immutability, cross-PT and
+    photo-limit guards in the DB. Side effects: unit status / last HM, in-app notification to the PM on "menunggu
+    part", daily reminder for due quotation follow-ups (rule `aftersales_followup`).
+  - API v1: `/service-reports`, `/unit-timesheets`, `/aftersales-activities` (list, detail, create, edit,
+    `/{id}/corrections`), `GET /aftersales/open-pos`, `GET /units`, `GET /projects/{id}/contract-units`; reports
+    `rekap-timesheet-kontrak` (hours, availability, **billing estimate — not an invoice**) and `rekap-aftersales`
+    (registry: screen, CSV, XLSX, PDF); `GET /me` capabilities `serviceReportCreate`, `unitTimesheetCreate`,
+    `aftersalesActivityCreate` + `settings.fieldReportsEnabled`; sync items `service_report.upsert`,
+    `unit_timesheet.upsert`, `aftersales_activity.upsert` (`server_service_report` / `server_unit_timesheet` /
+    `server_aftersales_activity`). Masters: `projects.kind`, unit fields on `vehicles`.
+  - Shared UoMs M, M1, M2, M3, KG, TON, SAK, ZAK, BTG, LBR, TITIK, BH, SET, ROLL, KALENG, BKS, OH, JAM, LTR, HM (only codes
+    that do not exist yet).
+  - Admin: collections under Proyek › "Laporan lapangan" (list views, now "Data …"); Staff may upload photos to
+    `media-progress-photos` only in a PT with field reports on.
+  - **Admin web views** (Proyek › "Laporan lapangan", shown only when a selected PT has the flag on and the role may
+    use them; otherwise the uniform no-access page with a "belum diaktifkan" hint):
+    - **Unit & kontrak** (`/admin/unit-kontrak`): contracts (kontrak_unit projects) with today's fill status and the
+      heavy-equipment units; contract detail with tabs **Timesheet** (matrix unit × day per month: work hours,
+      red = not filled, orange = breakdown, ⚠ = HM gap; a cell opens the timesheet or the prefilled input form),
+      **Rekap** (office/PM: HM start → end, work/standby/breakdown, availability, days not filled and — Direktur /
+      Finance / Admin only — rate and **billing estimate, labelled "Estimasi — bukan invoice"**; Excel/PDF/CSV via the
+      `rekap-timesheet-kontrak` report), **Unit** (contract units; add/edit for Direktur/Admin) and **Timeline**;
+      unit detail (identity, owner, status, last HM, service + timesheet history); timesheet detail and **web input**
+      (units active in the contract on the date, HM start prefilled from the previous HM end via the API with a live
+      HM-gap hint, Σ hours ≤ 24 live check, breakdown reason, "Salin dari kemarin", required HM photo).
+    - **Laporan servis** (`/admin/laporan-servis`): list (project, unit, mechanic, unit status, dates), detail (spare
+      parts, photos, history incl. corrections) and web input (APK field set, ≤ 10 photos).
+    - **Aftersales** (`/admin/aftersales`): weekly recap (PO in / delivered / open POs / PO value for the rate roles,
+      per customer, "Perlu ditindaklanjuti" = open POs with age + due quotation follow-ups, the week's activities,
+      exports via `rekap-aftersales`), activity list with filters, detail (deliveries of a PO, "Catat pengiriman") and
+      quick input (customer, kind chips, open-PO picker, items, optional value, follow-up, receiver, ≤ 5 photos).
+    - Corrections: PM of the team / Direktur with a required reason (`…/corrections`); the reporter's own edit within
+      24 h. Photos on the web go through `POST /api/v1/media/progress-photos` (non-JPEG converted in the browser).
+    - **Project timeline**: tab "Timeline" in the project detail (`/admin/progress/project/{id}?tab=timeline`) and the
+      contract detail — every field report of the project per date (service reports, timesheet day summaries "2 dari 3
+      unit diisi", activities; hook for the P3 daily reports) with type chips and "Buka" buttons.
+    - Staff and PM never see rates, estimates or aftersales values (no empty "Rp" columns); a reporter sees the value
+      they entered only on that activity's detail. Notifications and report rows link to these views.
+  - Migrations (run as `<prefix>_owner`): `20261010_100000_fr1_foundation` (kind, unit fields, contract units, flag,
+    numbering enum value, UoMs), `20261010_110000_fr1_field_reports` (three tables, SV sequence for every PT),
+    `20261010_120000_fr1_security` (triggers: window/override, no delete, identity, cross-PT, project kind, contract
+    overlap, photo limits, media owner PT, reminder rule). Additive; existing rows keep their behaviour.
+  - Docs: ADR 0020, requirements v1.3 (open client questions Q-FR-1…6), traceability rows US-60…US-68.
+
 - **Role "Operator/Anggota" (`pk-operator`)**, attendance only (web + APK): own check-in/out and own recap, own
   profile; no access to projects, requests, masters or reports. Assigned per PT in "Pengguna & akses PT" like any role.
 - **Web self check-in/out for every role**: *Absensi → Absen* (`/admin/absensi/absen`) — pick an assigned location,
@@ -38,6 +100,9 @@ for the master type `urgency-levels`): role Operator/Anggota (home = Absensi onl
   FEATURE_DISABLED, NOT_ASSIGNED, OUTSIDE_GEOFENCE, ALREADY_CHECKED_IN, …). Every role may now upload a selfie.
 
 ### Changed
+
+- Report cells of type `int` show up to 2 decimals when the value is not whole (hours / HM; CSV text `1.234,5`, XLSX
+  `#,##0.00`); whole numbers unchanged.
 
 - **Admin has the same write rights as Direktur** on projects, project stages and progress reports (reverses
   QA-20(b)/(d) of 2026-10-08).
