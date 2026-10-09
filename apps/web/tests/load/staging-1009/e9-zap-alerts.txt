@@ -1,0 +1,9 @@
+# ZAP baseline alerts of E9 (2026-09-26, staging 0.2.1, unauthenticated; s3-e9-evidence/zap-baseline-{root,admin-login}.md)
+# risk|name — used by run.sh zap to mark NEW / UNCHANGED / GONE
+Medium|CSP: style-src unsafe-inline
+Low|Cross-Origin-Embedder-Policy Header Missing or Invalid
+Low|Cross-Origin-Resource-Policy Header Missing or Invalid
+Informational|Content-Type Header Missing
+Informational|Modern Web Application
+Informational|Non-Storable Content
+Informational|Storable and Cacheable Content
