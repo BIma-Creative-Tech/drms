@@ -133,6 +133,8 @@ export const MASTER_TYPES = [
   'cash-in-sources',
   // owner decision 2026-10-09: "Tingkat urgensi" picker of the expense draft
   'urgency-levels',
+  // FR1 (ADR 0020 §2): customer picker of the aftersales activity log (Staff only on aftersales projects)
+  'clients',
 ] as const
 export type MasterType = (typeof MASTER_TYPES)[number]
 

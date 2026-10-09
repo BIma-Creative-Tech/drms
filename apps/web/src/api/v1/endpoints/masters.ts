@@ -30,6 +30,8 @@ const MAP: Record<MasterType, { collection: CollectionSlug; fields: string[] }> 
   vendors: { collection: 'vendors', fields: ['name', 'contact', 'active'] },
   'cash-in-sources': { collection: 'cash-in-sources', fields: ['code', 'name', 'active'] },
   'urgency-levels': { collection: 'urgency-levels', fields: ['code', 'name', 'rank', 'active'] },
+  // FR1: customers (collection access: office roles + PM; Staff only when assigned to an aftersales project of the PT)
+  clients: { collection: 'clients', fields: ['name', 'contact', 'phone', 'active'] },
 }
 
 const SHARED: ReadonlySet<MasterType> = new Set(SHARED_MASTER_TYPES)

@@ -62,6 +62,17 @@ describe('gate: feature flag, project kind, assignment', () => {
     expect(me.body.companies[0].capabilities).toMatchObject({ serviceReportCreate: true, unitTimesheetCreate: true, aftersalesActivityCreate: true, progressReportCreate: false })
   })
 
+  it('masters type clients: Staff of an aftersales project gets the PT customers; other Staff none', async () => {
+    const a = await api('GET', '/api/v1/masters?types=clients', w.users.staffA)
+    expect(a.status, JSON.stringify(a.body)).toBe(200)
+    const items = (a.body as { types: { clients: { items: Array<{ id: number; name: string }> } } }).types.clients.items
+    expect(items.map((c) => c.id)).toEqual(expect.arrayContaining([w.client]))
+    expect(Object.keys(items[0]!)).not.toContain('npwp')
+    const b = await api('GET', '/api/v1/masters?types=clients', w.users.staffB)
+    expect(b.status).toBe(200)
+    expect((b.body as { types: { clients: { items: unknown[] } } }).types.clients.items).toEqual([])
+  })
+
   it('wrong project kind → 409 WRONG_PROJECT_KIND', async () => {
     const a = await api('POST', '/api/v1/unit-timesheets', w.users.pm, { projectId: w.aftersales, unitId: w.ex01, reportDate: w.today, hmStart: 1, hmEnd: 2, workHours: 1, hmPhotoId: 1 })
     expect(a.status).toBe(409)
