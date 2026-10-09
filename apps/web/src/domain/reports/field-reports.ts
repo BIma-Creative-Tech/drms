@@ -126,7 +126,7 @@ export const rekapTimesheetKontrak: ReportDef = {
       const est = rates && x.rate !== null ? billingEstimate({ rateBasis: x.rate_basis, rate: n(x.rate), minHoursPerMonth: x.min_hours === null ? null : n(x.min_hours), startDate: x.start_date, endDate: x.end_date }, month, work) : null
       return {
         company,
-        href: `/admin/collections/unit-timesheets?where[contractUnit][equals]=${x.id}`,
+        href: `/admin/unit-kontrak/kontrak/${x.project_id}?tab=timesheet&bulan=${month}`,
         cells: {
           project: `${x.code} ${x.pname}`,
           unit: [x.unit_code, x.plate].filter(Boolean).join(' · ') || x.type || `#${x.id}`,
@@ -182,7 +182,7 @@ export const rekapTimesheetKontrak: ReportDef = {
       ],
       rows: detail.map((x) => ({
         company: Number(x.company_id),
-        href: `/admin/collections/unit-timesheets/${x.id}`,
+        href: `/admin/unit-kontrak/timesheet/detail/${x.id}`,
         cells: {
           tanggal: String(x.report_date),
           project: String(x.code),
@@ -306,7 +306,7 @@ export const rekapAftersales: ReportDef = {
       ],
       rows: r.map((x) => ({
         company: Number(x.company_id),
-        href: `/admin/collections/aftersales-activities?where[client][equals]=${x.client_id}`,
+        href: `/admin/aftersales/aktivitas?pelanggan=${x.client_id}&dari=${from}&sampai=${to}`,
         cells: {
           pelanggan: x.name,
           penawaran: x.penawaran,
@@ -366,7 +366,7 @@ export const rekapAftersales: ReportDef = {
           ],
           rows: open.map((x) => ({
             company: Number(x.company_id),
-            href: `/admin/collections/aftersales-activities/${x.id}`,
+            href: `/admin/aftersales/aktivitas/detail/${x.id}`,
             cells: {
               tanggal: String(x.activity_date),
               pelanggan: String(x.client),
@@ -392,7 +392,7 @@ export const rekapAftersales: ReportDef = {
           ],
           rows: due.map((x) => ({
             company: Number(x.company_id),
-            href: `/admin/collections/aftersales-activities/${x.id}`,
+            href: `/admin/aftersales/aktivitas/detail/${x.id}`,
             cells: { followUp: String(x.follow_up_date), pelanggan: String(x.client), noPenawaran: (x.doc_no as string | null) ?? null, tanggal: String(x.activity_date), project: String(x.code) },
           })),
           empty: 'Tidak ada follow-up jatuh tempo.',

@@ -384,13 +384,13 @@ export function notificationHref(docType: string | null | undefined, docId: stri
       return `/admin/progress/laporan/${docId}`
     case 'budget_addendum':
       return `/admin/addendum/detail/${docId}`
-    // FR1: field reports (list/detail views of the Payload collections until the P1 web views land)
+    // FR1: field reports → the custom detail views (ADR 0020 web views)
     case 'service_report':
-      return `/admin/collections/service-reports/${docId}`
+      return `/admin/laporan-servis/detail/${docId}`
     case 'unit_timesheet':
-      return `/admin/collections/unit-timesheets/${docId}`
+      return `/admin/unit-kontrak/timesheet/detail/${docId}`
     case 'aftersales_activity':
-      return `/admin/collections/aftersales-activities/${docId}`
+      return `/admin/aftersales/aktivitas/detail/${docId}`
     default:
       return null
   }

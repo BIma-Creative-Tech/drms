@@ -33,6 +33,9 @@ export type ModuleId =
 
 export type BadgeKey = 'transfers' | 'lpj'
 
+/** Per-PT feature switches that gate custom views (any selected PT with the flag on). */
+export type FeatureKey = 'fieldReports'
+
 /** An entity list/edit route or a custom admin view (href relative to /admin). */
 export type ModuleItem =
   | { collection: string; label?: string; navKey?: string; personal?: true }
@@ -49,6 +52,8 @@ export type ModuleItem =
       navKey?: string
       /** Label for staff-only users (e.g. "Rekap absensi saya"). */
       staffLabel?: string
+      /** FR1: shown only when a selected PT has this feature on (companies.fieldReportsEnabled). */
+      feature?: FeatureKey
     }
 
 export type ModuleSection = { label?: string; items: readonly ModuleItem[] }
@@ -75,6 +80,8 @@ const OFFICE: readonly Role[] = ['pk-finance', 'pk-owner']
 const OFFICE_PM: readonly Role[] = [...OFFICE, 'pk-pm']
 const OFFICE_PM_ADMIN: readonly Role[] = [...OFFICE_PM, 'pk-admin']
 const OFFICE_ADMIN: readonly Role[] = [...OFFICE, 'pk-admin']
+/** FR1 (ADR 0020 §2): field reports are read by every role (rows narrowed by access); recaps office + PM. */
+const FIELD_ALL: readonly Role[] = [...OFFICE_PM_ADMIN, 'pk-staff']
 /** Creating requests: Staff/PM/Admin/Finance (collection create access, Q-09). */
 export const CREATOR_ROLES: readonly Role[] = ['pk-staff', 'pk-pm', 'pk-admin', 'pk-finance']
 
@@ -121,10 +128,20 @@ export const MODULES: readonly ModuleDef[] = [
         ],
       },
       { label: 'Addendum', items: [{ view: '/addendum', label: 'Addendum RAB', roles: OFFICE_PM, navKey: 'addendum' }, { collection: 'budget-addenda', label: 'Data addendum' }] },
-      // FR1 (ADR 0020): field reports per project kind (list views; custom views follow)
+      // FR1 (ADR 0020): field reports per project kind — custom views only where a selected PT has
+      // companies.fieldReportsEnabled; the raw collection lists stay for the office (Payload access).
       {
         label: 'Laporan lapangan',
-        items: [{ collection: 'service-reports' }, { collection: 'unit-timesheets' }, { collection: 'aftersales-activities' }, { collection: 'contract-units' }],
+        items: [
+          { view: '/unit-kontrak', label: 'Unit & kontrak', roles: FIELD_ALL, feature: 'fieldReports', navKey: 'unit-kontrak' },
+          { view: '/laporan-servis', label: 'Laporan servis', roles: FIELD_ALL, feature: 'fieldReports', navKey: 'laporan-servis' },
+          { view: '/aftersales', label: 'Rekap aftersales', roles: OFFICE_PM_ADMIN, feature: 'fieldReports', navKey: 'aftersales' },
+          { view: '/aftersales/aktivitas', label: 'Aktivitas aftersales', roles: FIELD_ALL, feature: 'fieldReports', navKey: 'aktivitas-aftersales' },
+          { collection: 'service-reports', label: 'Data laporan servis' },
+          { collection: 'unit-timesheets', label: 'Data timesheet unit' },
+          { collection: 'aftersales-activities', label: 'Data aktivitas aftersales' },
+          { collection: 'contract-units' },
+        ],
       },
     ],
   },
@@ -356,10 +373,13 @@ export type VisibilityInput = {
   /** Entity label (Payload labels.plural / global label). */
   labelOf: (kind: 'collection' | 'global', slug: string) => string
   badges?: Partial<Record<BadgeKey, number>>
+  /** Features on in at least one selected PT (omitted = none: feature-gated views hidden). */
+  features?: Partial<Record<FeatureKey, boolean>>
 }
 
-function viewAllowed(item: Extract<ModuleItem, { view: string }>, roles: readonly Role[]): boolean {
+function viewAllowed(item: Extract<ModuleItem, { view: string }>, roles: readonly Role[], features?: Partial<Record<FeatureKey, boolean>>): boolean {
   if (roles.length === 0) return false
+  if (item.feature && features?.[item.feature] !== true) return false
   return !item.roles || item.roles.some((r) => roles.includes(r))
 }
 
@@ -389,7 +409,7 @@ export function resolveModules(input: VisibilityInput, modules: readonly ModuleD
         const kind = itemKind(it)
         const href = itemHref(it)
         if ('view' in it) {
-          if (!viewAllowed(it, input.roles)) continue
+          if (!viewAllowed(it, input.roles, input.features)) continue
           const badge = it.badge ? (input.badges?.[it.badge] ?? 0) : undefined
           items.push({ key: href, label: input.staffOnly && it.staffLabel ? it.staffLabel : it.label, href, kind, navKey: it.navKey, ...(badge ? { badge } : {}) })
           if (it.personal) personal.add(href)

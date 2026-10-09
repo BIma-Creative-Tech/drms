@@ -66,9 +66,11 @@ async function readPermissions(user: { id: number; roles: Role[] }) {
   return out
 }
 
-async function modulesFor(roles: Role[], badge = 0): Promise<ResolvedModule[]> {
+async function modulesFor(roles: Role[], badge = 0, fieldReports = false): Promise<ResolvedModule[]> {
   const user = withCompanyContext({ id: 42, collection: 'users', email: 'uji@contoh.test', name: 'Uji Coba' }, [{ company: 1, roles, employee: null }], null, roles.includes('pk-admin')) as unknown as TypedUser
-  const payload = { config, count: async () => ({ totalDocs: badge }) } as unknown as Payload
+  // FR1: companies.fieldReportsEnabled of the selected PT (loadFeatures); without `find` → off
+  const find = fieldReports ? { find: async () => ({ docs: [{ id: 1 }] }) } : {}
+  const payload = { config, count: async () => ({ totalDocs: badge }), ...find } as unknown as Payload
   return loadModules({ payload, user, permissions: (await readPermissions({ id: 42, roles })) as never, visibleEntities: visibleFor(user) as never })
 }
 
@@ -104,8 +106,8 @@ describe('registry guard: every entity maps to exactly one module', () => {
   })
 
   it('every custom view item points at a registered admin view path', async () => {
-    const { E2_ADMIN_VIEWS, E6_ADMIN_VIEWS, F2_ADMIN_VIEWS, F3_ADMIN_VIEWS, MC2_ADMIN_VIEWS, S2A_ADMIN_VIEWS, S3E_ADMIN_VIEWS } = await import('@/admin/config')
-    const paths = new Set(Object.values({ ...F2_ADMIN_VIEWS, ...F3_ADMIN_VIEWS, ...E2_ADMIN_VIEWS, ...E6_ADMIN_VIEWS, ...S2A_ADMIN_VIEWS, ...S3E_ADMIN_VIEWS, ...MC2_ADMIN_VIEWS }).map((v) => ('path' in v ? v.path : '')))
+    const { E2_ADMIN_VIEWS, E6_ADMIN_VIEWS, F2_ADMIN_VIEWS, F3_ADMIN_VIEWS, FR1_ADMIN_VIEWS, MC2_ADMIN_VIEWS, S2A_ADMIN_VIEWS, S3E_ADMIN_VIEWS } = await import('@/admin/config')
+    const paths = new Set(Object.values({ ...F2_ADMIN_VIEWS, ...F3_ADMIN_VIEWS, ...E2_ADMIN_VIEWS, ...E6_ADMIN_VIEWS, ...S2A_ADMIN_VIEWS, ...S3E_ADMIN_VIEWS, ...MC2_ADMIN_VIEWS, ...FR1_ADMIN_VIEWS }).map((v) => ('path' in v ? v.path : '')))
     for (const m of MODULES)
       for (const s of m.sections)
         for (const i of s.items) if ('view' in i && !i.view.startsWith('/collections/')) expect(paths, `${m.id}: ${i.view}`).toContain(i.view)
@@ -191,6 +193,20 @@ describe('tile visibility per role (real config: admin.hidden + access.read + ro
   it('staff + PM = PM menu (roles are a union)', async () => {
     expect(navKeys(await modulesFor(['pk-staff', 'pk-pm']))).toContain('progress')
     expect(navKeys(await modulesFor(['pk-pm', 'pk-staff']))).not.toContain('kas')
+  })
+
+  it('FR1: field views only where a selected PT has field reports on (per-PT flag), by role', async () => {
+    const FIELD = ['unit-kontrak', 'laporan-servis', 'aftersales', 'aktivitas-aftersales']
+    for (const r of ['pk-owner', 'pk-finance', 'pk-pm', 'pk-admin', 'pk-staff'] as Role[]) expect(navKeys(await modulesFor([r])).filter((k) => FIELD.includes(k as string)), `${r} flag off`).toEqual([])
+    expect(navKeys(await modulesFor(['pk-owner'], 0, true))).toEqual(expect.arrayContaining(FIELD))
+    expect(navKeys(await modulesFor(['pk-pm'], 0, true))).toEqual(expect.arrayContaining(FIELD))
+    // Staff (assigned projects): input + lists, no weekly recap; the Proyek tile opens "Unit & kontrak"
+    const staff = await modulesFor(['pk-staff'], 0, true)
+    expect(navKeys(staff).filter((k) => FIELD.includes(k as string))).toEqual(['unit-kontrak', 'laporan-servis', 'aktivitas-aftersales'])
+    expect(staff.find((x) => x.id === 'proyek')?.href).toBe('/admin/unit-kontrak')
+    expect(moduleForPath('/admin/unit-kontrak/kontrak/5')).toBe('proyek')
+    expect(moduleForPath('/admin/aftersales/aktivitas/detail/9')).toBe('proyek')
+    expect(moduleForPath('/admin/laporan-servis/baru')).toBe('proyek')
   })
 
   it('no role → no module', async () => {
