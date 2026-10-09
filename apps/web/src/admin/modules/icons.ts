@@ -61,6 +61,14 @@ export const ICONS = {
   menu: { style: 'stroke', paths: [{ d: "M3 7h18M3 12h18M3 17h18" }] },
   /** Iconsax Add (Linear) */
   add: { style: 'stroke', paths: [{ d: "M6 12h12M12 18V6" }] },
+  /** Iconsax Edit2 (Linear) — row action "Ubah" */
+  edit: { style: 'stroke', paths: [{ d: "m13.26 3.6-8.21 8.69c-.31.33-.61.98-.67 1.43l-.37 3.24c-.13 1.17.71 1.97 1.87 1.77l3.22-.55c.45-.08 1.08-.41 1.39-.75l8.21-8.69c1.42-1.5 2.06-3.21-.15-5.3-2.2-2.07-3.87-1.34-5.29.16Z" }, { d: "M11.89 5.05a6.126 6.126 0 0 0 5.45 5.15M3 22h18" }] },
+  /** Iconsax Eye (Linear) — row action "Lihat" */
+  eye: { style: 'stroke', paths: [{ d: "M15.58 12c0 1.98-1.6 3.58-3.58 3.58S8.42 13.98 8.42 12s1.6-3.58 3.58-3.58 3.58 1.6 3.58 3.58Z" }, { d: "M12 20.27c3.53 0 6.82-2.08 9.11-5.68.9-1.41.9-3.78 0-5.19-2.29-3.6-5.58-5.68-9.11-5.68-3.53 0-6.82 2.08-9.11 5.68-.9 1.41-.9 3.78 0 5.19 2.29 3.6 5.58 5.68 9.11 5.68Z" }] },
+  /** Iconsax DocumentText (Linear) — row action "Buka" (workflow documents) */
+  document: { style: 'stroke', paths: [{ d: "M21 7v10c0 3-1.5 5-5 5H8c-3.5 0-5-2-5-5V7c0-3 1.5-5 5-5h8c3.5 0 5 2 5 5Z" }, { d: "M14.5 4.5v2c0 1.1.9 2 2 2h2M8 13h4M8 17h8" }] },
+  /** Iconsax ArrowLeft (Linear) — "kembali" buttons */
+  arrowLeft: { style: 'stroke', paths: [{ d: "M9.57 5.93L3.5 12l6.07 6.07M20.5 12H3.67" }] },
 } satisfies Record<string, IconDef>
 
 export type IconName = keyof typeof ICONS

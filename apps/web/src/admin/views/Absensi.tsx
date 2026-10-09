@@ -21,7 +21,7 @@ import { formatServerTime } from '@/pdf/format'
 import { ChartHover } from './ChartHover'
 import { F3Root } from './f3-ui'
 import { foreignPtParam, PtChip, ptView, type PtView } from './pt'
-import { PtNotAllowed } from './shared'
+import { EditButton, PtNotAllowed } from './shared'
 import { Bento, Card, DashHead, DataTable, EmptyState, HBarList, KpiRow, KpiTile, StatusPill, TableView, VIZ_STYLE } from './viz'
 import { settings as companySettings } from '@/domain/companies'
 import { NoAccess } from './NoAccess'
@@ -1171,6 +1171,9 @@ export async function AbsensiJadwal(props: AdminViewServerProps) {
               { key: 't', label: 'Toleransi', num: true, cell: (s) => `${s.tol} m` },
               { key: 'u', label: 'Dipakai', num: true, sec: true, cell: (s) => `${s.used} org` },
               { key: 'a', label: 'Status', cell: (s) => (s.active ? <StatusPill tone="ok" label="Aktif" /> : <StatusPill tone="none" label="Nonaktif" />) },
+              ...(canWrite
+                ? [{ key: 'e', label: 'Aksi', num: true, cell: (s: (typeof d.schedules)[number]) => <EditButton href={`/admin/collections/work-schedules/${s.id}`} name={`jadwal ${s.name}`} /> }]
+                : []),
             ]}
           />
         </Card>
@@ -1207,7 +1210,9 @@ export async function AbsensiJadwal(props: AdminViewServerProps) {
                 ),
               },
               { key: 'n', label: 'Keterangan', cell: (h) => (h.date < d.today ? <span style={{ color: 'var(--pk-muted-fg)' }}>{h.name}</span> : h.name) },
-              { key: 'e', label: '', cell: (h) => (canWrite ? <a href={`/admin/collections/holidays/${h.id}`}>Ubah</a> : null) },
+              ...(canWrite
+                ? [{ key: 'e', label: 'Aksi', num: true, cell: (h: (typeof d.holidays)[number]) => <EditButton href={`/admin/collections/holidays/${h.id}`} name={`hari libur ${h.name}`} /> }]
+                : []),
             ]}
           />
         </Card>

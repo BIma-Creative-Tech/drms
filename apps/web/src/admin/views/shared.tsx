@@ -1,9 +1,11 @@
 import { DefaultTemplate } from '@payloadcms/next/templates'
 import { Gutter } from '@payloadcms/ui'
 import type { AdminViewServerProps, PayloadRequest } from 'payload'
+import Link from 'next/link'
 import React from 'react'
 
 import { hasRoleAny, type Role } from '@/access/roles'
+import { Icon } from '@/admin/modules/Icon'
 import { formatRupiah } from '@/lib/money'
 
 import { NoAccess } from './NoAccess'
@@ -71,6 +73,20 @@ export const badge = (tone: 'ok' | 'warn' | 'bad' | 'muted'): React.CSSPropertie
 })
 
 export const rp = (v: number | null | undefined) => (v === null || v === undefined ? '—' : formatRupiah(v))
+
+/**
+ * Row action "Ubah" in the custom views' tables — the same look as the "Aksi" column of the Payload
+ * lists (.pk-row-act, (payload)/custom.scss). The accessible name starts with the visible text and names
+ * the row ("Ubah hari libur Natal").
+ */
+export function EditButton({ href, name }: { href: string; name: string }) {
+  return (
+    <Link href={href} prefetch={false} className="pk-row-act" data-kind="edit" aria-label={`Ubah ${name}`} data-pk-row-action="edit">
+      <Icon name="edit" size={16} />
+      <span>Ubah</span>
+    </Link>
+  )
+}
 
 export function docLink(id: number, label: string) {
   return <a href={`/admin/collections/expense-requests/${id}`}>{label}</a>
