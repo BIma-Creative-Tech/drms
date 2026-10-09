@@ -69,6 +69,8 @@ export const ICONS = {
   document: { style: 'stroke', paths: [{ d: "M21 7v10c0 3-1.5 5-5 5H8c-3.5 0-5-2-5-5V7c0-3 1.5-5 5-5h8c3.5 0 5 2 5 5Z" }, { d: "M14.5 4.5v2c0 1.1.9 2 2 2h2M8 13h4M8 17h8" }] },
   /** Iconsax ArrowLeft (Linear) — "kembali" buttons */
   arrowLeft: { style: 'stroke', paths: [{ d: "M9.57 5.93L3.5 12l6.07 6.07M20.5 12H3.67" }] },
+  /** Iconsax ArrowRight (Linear) — "Lihat semua" / "Daftar" link buttons */
+  arrowRight: { style: 'stroke', paths: [{ d: "M14.43 5.93L20.5 12l-6.07 6.07M3.5 12h16.83" }] },
 } satisfies Record<string, IconDef>
 
 export type IconName = keyof typeof ICONS

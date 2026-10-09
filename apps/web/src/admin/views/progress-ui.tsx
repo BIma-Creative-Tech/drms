@@ -1,6 +1,8 @@
 import Link from 'next/link'
 import React from 'react'
 
+import { Icon as Glyph } from '@/admin/modules/Icon'
+
 import { MONTHS_SHORT } from '@/domain/reports/rules'
 import type { PillTone } from '@/domain/reports/viz'
 import type { ProjectProgress } from '@/domain/reports/progress'
@@ -256,7 +258,10 @@ export function ProgressVsBudgetCard({ id, data, span = 12, i = 0, limit = 6, pm
             K-09 (US-12){pm ? ' · project tim Anda' : ''} · {flagged > 0 ? `${flagged} project perlu perhatian` : 'semua sesuai'} · selisih terbesar dulu
           </span>
         </h2>
-        <Link href="/admin/progress">Progress project →</Link>
+        <Link className="pk-btn sm" href="/admin/progress" data-pk-card-action>
+          <span>Progress project</span>
+          <Glyph name="arrowRight" size={16} />
+        </Link>
       </div>
       <div className="pk-card-b">
         {rows.length > 0 ? <ProgressLegend warn={data.warnGapPct} bad={data.badGapPct} /> : null}
