@@ -40,6 +40,19 @@ import { NoAccess } from './NoAccess'
  * colour, never colour alone. `data-pk-*` = stable UAT selectors.
  */
 export const ABSENSI_STYLE = `
+/* web self check-in (owner decision 2026-10-09): APK-like field screen */
+.pk-selfcheck { max-width: 560px; }
+.pk-sc-locs { border: 0; margin: 0; padding: 0; display: grid; gap: 10px; }
+.pk-sc-locs legend { font-size: 13px; font-weight: 600; margin-bottom: 6px; }
+.pk-sc-loc { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; align-items: center; min-height: 56px; padding: 12px 14px; border: 1px solid var(--pk-border); border-radius: var(--style-radius-m); background: var(--pk-card); cursor: pointer; }
+.pk-sc-loc:has(input:checked) { border-color: var(--pk-primary); box-shadow: 0 0 0 1px var(--pk-primary); }
+.pk-sc-loc input { width: 20px; height: 20px; margin: 0; grid-row: span 2; accent-color: var(--pk-primary); }
+.pk-sc-loc .name { font-weight: 600; font-size: 15px; display: flex; flex-direction: column; }
+.pk-sc-loc .name .sub { font-weight: 400; font-size: 12px; color: var(--pk-muted-fg); }
+.pk-sc-loc .st { font-size: 12px; font-weight: 600; color: var(--pk-muted-fg); }
+.pk-sc-loc[data-state='hadir'] .st { color: var(--pk-primary); }
+.pk-sc-loc[data-state='selesai'] .st { color: var(--pk-tone-ok-text); }
+.pk-sc-go { width: 100%; min-height: 52px; font-size: 16px; border-radius: 999px; }
 .pk-f3 {
   --dc-ok: var(--pk-tone-ok-text); --dc-warn: var(--pk-tone-warn-text); --dc-bad: var(--pk-tone-bad-text); --dc-info: var(--pk-primary);
 }
