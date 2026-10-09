@@ -363,14 +363,16 @@ describe('K-02 kas masuk/keluar per bulan', () => {
   const range = () => ({ from: addMonths(month, -35), to: month })
 
   it('K-02a (book) = doc SQL per month, per account and total; balance roll-forward = K-01 at month ends', async () => {
-    const accounts = (await sqlAs('app', 'SELECT id FROM cash_accounts')).rows.map((x) => x.id as number)
+    // MC4: Finance/Direktur of this world see PT #1 only; other suites (e.g. mc3-api) add rows in other PTs
+    const pt = await companyId()
+    const accounts = (await sqlAs('app', 'SELECT id FROM cash_accounts WHERE company_id = $1', [pt])).rows.map((x) => x.id as number)
     for (const acc of [undefined, ...accounts.slice(-3)]) {
       const mine = await asFinance(async (req) => cashFlowMonthly(req, await officeScope(req), { ...range(), accountId: acc }, 'book'))
       const doc = await sqlAs(
         'app',
         `SELECT period, sum(amount) FILTER (WHERE direction='in')::text AS masuk, sum(amount) FILTER (WHERE direction='out')::text AS keluar
-         FROM cash_entries WHERE period BETWEEN $1 AND $2 ${acc ? 'AND cash_account_id=$3' : ''} GROUP BY period ORDER BY period`,
-        acc ? [range().from, range().to, acc] : [range().from, range().to],
+         FROM cash_entries WHERE company_id = $3 AND period BETWEEN $1 AND $2 ${acc ? 'AND cash_account_id=$4' : ''} GROUP BY period ORDER BY period`,
+        acc ? [range().from, range().to, pt, acc] : [range().from, range().to, pt],
       )
       const exp = new Map(doc.rows.map((x) => [x.period, x]))
       for (const m of mine) {
@@ -395,15 +397,15 @@ describe('K-02 kas masuk/keluar per bulan', () => {
     const doc = await sqlAs(
       'app',
       `SELECT period, sum(amount) FILTER (WHERE direction='in')::text AS masuk, sum(amount) FILTER (WHERE direction='out')::text AS keluar
-       FROM cash_entries WHERE period BETWEEN $1 AND $2 AND status='posted' AND source_type<>'reversal' GROUP BY period`,
-      [range().from, range().to],
+       FROM cash_entries WHERE company_id = $3 AND period BETWEEN $1 AND $2 AND status='posted' AND source_type<>'reversal' GROUP BY period`,
+      [range().from, range().to, await companyId()], // MC4: Finance/Direktur of this world see PT #1 only; other suites (e.g. mc3-api) add rows in other PTs
     )
     const exp = new Map(doc.rows.map((x) => [x.period, x]))
     const voids = await sqlAs(
       'app',
       `SELECT period, sum(CASE direction WHEN 'in' THEN amount ELSE -amount END)::text AS net FROM cash_entries
-       WHERE period BETWEEN $1 AND $2 AND (status='void' OR source_type='reversal') GROUP BY period`,
-      [range().from, range().to],
+       WHERE company_id = $3 AND period BETWEEN $1 AND $2 AND (status='void' OR source_type='reversal') GROUP BY period`,
+      [range().from, range().to, await companyId()],
     )
     const vnet = new Map(voids.rows.map((x) => [x.period, n(x.net)]))
     for (const [i, m] of b.entries()) {
@@ -577,13 +579,14 @@ describe('K-13 rekap pengajuan', () => {
     const f = { from: '2000-01-01', to: '2999-12-31' }
     const s = await asFinance(async (req) => requestSummary(req, await officeScope(req), f))
     // same filter as the report: non-draft with a request date in range (a draft cancelled before submit has none)
-    const doc = await sqlAs('app', "SELECT status::text AS s, count(*)::int AS n FROM expense_requests WHERE status <> 'draft' AND request_date BETWEEN '2000-01-01' AND '2999-12-31' GROUP BY status")
+    // MC4: Finance/Direktur of this world see PT #1 only; other suites (e.g. mc3-api) add rows in other PTs
+    const doc = await sqlAs('app', "SELECT status::text AS s, count(*)::int AS n FROM expense_requests WHERE company_id = $1 AND status <> 'draft' AND request_date BETWEEN '2000-01-01' AND '2999-12-31' GROUP BY status", [await companyId()])
     const by = new Map(doc.rows.map((x) => [x.s, x.n]))
     const mineBy = new Map<string, number>()
     for (const x of s.byStatus) mineBy.set(x.status, (mineBy.get(x.status) ?? 0) + x.count)
     expect(Object.fromEntries(mineBy)).toEqual(Object.fromEntries(by))
     expect(s.byCategory.reduce((a, c) => a + c.sum, 0)).toBe(s.total.sum)
-    const gt = await sqlAs('app', "SELECT coalesce(sum(grand_total),0)::text AS s FROM expense_requests WHERE status <> 'draft' AND request_date BETWEEN '2000-01-01' AND '2999-12-31'")
+    const gt = await sqlAs('app', "SELECT coalesce(sum(grand_total),0)::text AS s FROM expense_requests WHERE company_id = $1 AND status <> 'draft' AND request_date BETWEEN '2000-01-01' AND '2999-12-31'", [await companyId()])
     expect(s.total.sum).toBe(n(gt.rows[0].s))
   })
 
@@ -648,9 +651,9 @@ describe('K-14 biaya per kendaraan / K-15 pusat biaya / K-17 per kategori', () =
       const s = await asFinance(async (req) => spending(req, await officeScope(req), { from, to, basis: 'dicairkan', group: 'kategori' }))
       const doc = await sqlAs(
         'app',
-        `SELECT (SELECT coalesce(sum(c.amount),0) FROM cash_entries c JOIN transfers t ON t.id=c.transfer_id WHERE c.source_type='transfer' AND c.status='posted' AND t.kind<>'lpj_shortfall' AND c.entry_date BETWEEN $1 AND $2)::text AS kk,
-                (SELECT coalesce(sum(amount),0) FROM cash_entries WHERE source_type='manual' AND direction='out' AND status='posted' AND entry_date BETWEEN $1 AND $2)::text AS man`,
-        [from, to],
+        `SELECT (SELECT coalesce(sum(c.amount),0) FROM cash_entries c JOIN transfers t ON t.id=c.transfer_id WHERE c.company_id = $3 AND c.source_type='transfer' AND c.status='posted' AND t.kind<>'lpj_shortfall' AND c.entry_date BETWEEN $1 AND $2)::text AS kk,
+                (SELECT coalesce(sum(amount),0) FROM cash_entries WHERE company_id = $3 AND source_type='manual' AND direction='out' AND status='posted' AND entry_date BETWEEN $1 AND $2)::text AS man`,
+        [from, to, await companyId()], // MC4: Finance/Direktur of this world see PT #1 only; other suites (e.g. mc3-api) add rows in other PTs
       )
       expect(s.total, `${from}..${to}`).toBe(n(doc.rows[0].kk) + n(doc.rows[0].man))
       expect(s.items.reduce((a, i) => a + i.fromManual, 0)).toBe(n(doc.rows[0].man))
@@ -666,8 +669,8 @@ describe('K-16 audit log', () => {
     const first = await asUser(w.users.owner, (req) => AUDIT_REPORT.run(req, { kind: 'all' }, sp, { limit: 50 }))
     const sql = await sqlAs(
       'app',
-      "SELECT count(*)::int AS n FROM audit_logs WHERE action='approve' AND server_time >= ($1::date::timestamp AT TIME ZONE 'Asia/Makassar') AND server_time < (($2::date + 1)::timestamp AT TIME ZONE 'Asia/Makassar')",
-      [addDays(today, -1), today],
+      "SELECT count(*)::int AS n FROM audit_logs WHERE company_id = $3 AND action='approve' AND server_time >= ($1::date::timestamp AT TIME ZONE 'Asia/Makassar') AND server_time < (($2::date + 1)::timestamp AT TIME ZONE 'Asia/Makassar')",
+      [addDays(today, -1), today, await companyId()], // MC4: Finance/Direktur of this world see PT #1 only; other suites (e.g. mc3-api) add rows in other PTs
     )
     expect(first.count).toBe(sql.rows[0].n)
     expect(first.count).toBeGreaterThan(50)
