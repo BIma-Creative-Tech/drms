@@ -37,6 +37,7 @@ const fixtures: Record<string, Fixture> = {
   'expense-categories': { create: () => ({ code: 'AUD-CAT', name: 'Kat Audit', allowedUoms: [ids.uoms] }), update: { allowedUoms: [] }, field: 'allowedUoms' },
   'budget-lines': { create: () => ({ project: ids.projects, category: ids['expense-categories'], amount: 1_000_000 }), update: { amount: 1_500_000 }, field: 'amount' },
   'cash-in-sources': { create: () => ({ code: 'AUD-CIS', name: 'CIS Audit' }), update: { name: 'CIS Audit 2' }, field: 'name' },
+  'urgency-levels': { create: () => ({ code: 'AUD-URG', name: 'Urgensi Audit', rank: 9 }), update: { name: 'Urgensi Audit 2' }, field: 'name' },
   'cash-accounts': { create: () => ({ name: 'Kas Audit', kind: 'cash' }), update: { accountHolder: 'PT DRMS' }, field: 'accountHolder' },
   'cost-centers': { create: () => ({ code: 'AUD-CC', name: 'CC Audit' }), update: { name: 'CC Audit 2' }, field: 'name' },
   'team-assignments': { create: () => ({ employee: ids.employees, project: ids.projects, roleInProject: 'staff' }), update: { roleInProject: 'mandor' }, field: 'roleInProject' },
