@@ -507,27 +507,35 @@ export function SelfCheckForm({ locations, privacyBlocked }: { locations: SelfCh
       </p>
     )
   }
+  // Field screen in the APK style (owner decision 2026-10-09): big tap targets, one location card each
+  // with today's state, one wide action button.
   return (
-    <form className="pk-kform" onSubmit={submit} data-pk-form="self-check">
-      <label>
-        Lokasi
-        <select value={locKey} onChange={(e) => setLocKey(e.target.value)} disabled={busy}>
-          {locations.map((l) => (
-            <option key={`${l.type}:${l.id}`} value={`${l.type}:${l.id}`}>
-              {l.label} {l.checkOut ? '(selesai hari ini)' : l.checkIn ? '(sudah absen masuk)' : ''}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label>
-        Foto selfie
-        <input ref={fileRef} type="file" accept="image/*" capture="user" aria-label="Foto selfie" disabled={busy || !action} />
-      </label>
-      <div className="pk-actions">
-        <button type="submit" className="pk-kbtn primary" disabled={busy || !action} data-pk-action={action ?? 'none'}>
-          {busy ? 'Mengirim…' : action === 'check_in' ? 'Absen Masuk' : action === 'check_out' ? 'Absen Pulang' : 'Sudah selesai hari ini'}
-        </button>
+    <form className="pk-kform pk-selfcheck" onSubmit={submit} data-pk-form="self-check">
+      <fieldset className="pk-sc-locs" disabled={busy}>
+        <legend>Lokasi</legend>
+        {locations.map((l) => {
+          const key = `${l.type}:${l.id}`
+          const state = l.checkOut ? 'selesai' : l.checkIn ? 'hadir' : 'belum'
+          return (
+            <label key={key} className="pk-sc-loc" data-state={state} data-pk-loc={key}>
+              <input type="radio" name="self-check-loc" value={key} checked={locKey === key} onChange={() => setLocKey(key)} />
+              <span className="name">
+                {l.label}
+                <span className="sub">{l.type === 'project' ? 'Project' : 'Pusat biaya'}</span>
+              </span>
+              <span className="st">{l.checkOut ? `Selesai · pulang ${l.checkOut}` : l.checkIn ? `Masuk ${l.checkIn}` : 'Belum absen'}</span>
+            </label>
+          )
+        })}
+      </fieldset>
+      <div className="pk-fld">
+        <label htmlFor="self-check-selfie">Foto selfie</label>
+        <input id="self-check-selfie" ref={fileRef} type="file" accept="image/*" capture="user" disabled={busy || !action} />
+        <p className="help">Di HP kamera depan langsung terbuka. Lokasi GPS diambil saat menekan tombol.</p>
       </div>
+      <button type="submit" className="pk-kbtn primary pk-sc-go" disabled={busy || !action} data-pk-action={action ?? 'none'}>
+        {busy ? 'Mengirim…' : action === 'check_in' ? 'Absen Masuk' : action === 'check_out' ? 'Absen Pulang' : 'Sudah selesai hari ini'}
+      </button>
       {error ? (
         <p className="pk-kerr" role="alert">
           {error}
