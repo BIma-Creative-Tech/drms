@@ -73,7 +73,7 @@ describe('Master Perusahaan (companies)', () => {
 
   it('list: Kode · Nama · Zona waktu · Anggota · Status · Dibuat; create/deactivate = group admin only', async () => {
     const c = config.collections.find((x) => x.slug === 'companies')!
-    expect(c.admin.defaultColumns).toEqual(['shortCode', 'name', 'timezone', 'memberCount', 'active', 'createdAt'])
+    expect(c.admin.defaultColumns).toEqual(['shortCode', 'name', 'timezone', 'memberCount', 'active', 'createdAt', 'rowActions'])
     const req = (groupAdmin: boolean) => ({ user: withCompanyContext({ id: 1 }, [{ company: 1, roles: ['pk-admin'], employee: null }], null, groupAdmin), context: {} })
     expect(await c.access.create!({ req: req(false) } as never)).toBe(false)
     expect(await c.access.create!({ req: req(true) } as never)).toBe(true)

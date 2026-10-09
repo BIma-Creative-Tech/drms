@@ -31,8 +31,12 @@ export const F3_STYLE = `
 .pk-f3 form.pk-filter input, .pk-f3 form.pk-filter select { font-size: 13px; padding: 4px 6px; min-width: 140px; background: var(--theme-input-bg, var(--theme-elevation-0)); color: var(--theme-text); border: 1px solid var(--pk-input); border-radius: var(--style-radius-s); }
 .pk-f3 form.pk-filter select[multiple] { min-height: 90px; }
 .pk-f3 .pk-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 0 0 12px; font-size: 13px; }
-.pk-f3 .pk-btn { display: inline-block; padding: 6px 14px; border-radius: var(--style-radius-m); border: 1px solid var(--pk-input); text-decoration: none; background: var(--pk-card); color: var(--theme-text); font-size: 13px; font-weight: 600; cursor: pointer; }
+/* one button system: same box as .pk-kbtn (components/kas/style.ts) — 38 px, 32 px .sm, 44 px on touch */
+.pk-f3 .pk-btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 38px; padding: 0 14px; border-radius: var(--style-radius-m); border: 1px solid color-mix(in oklab, var(--pk-muted-fg) 60%, var(--pk-input)); text-decoration: none; background: var(--pk-card); color: var(--theme-text); font: inherit; font-size: 13px; font-weight: 600; line-height: 1.2; white-space: nowrap; cursor: pointer; }
 .pk-f3 .pk-btn:hover { border-color: var(--pk-primary); color: var(--pk-primary); }
+.pk-f3 .pk-btn:focus-visible { outline: 2px solid var(--pk-ring); outline-offset: 2px; }
+.pk-f3 .pk-btn.sm { min-height: 32px; padding: 0 10px; font-size: 12px; }
+@media (pointer: coarse) { .pk-f3 .pk-btn, .pk-f3 .pk-btn.sm { min-height: 44px; } }
 .pk-f3 .pk-btn.primary { background: var(--pk-primary); border-color: var(--pk-primary); color: var(--pk-on-primary); }
 .pk-f3 .pk-btn.primary:hover { background: var(--pk-primary-hover); color: var(--pk-on-primary); }
 .pk-f3 .pk-tabs { display: flex; gap: 8px; margin: 0 0 16px; flex-wrap: wrap; }

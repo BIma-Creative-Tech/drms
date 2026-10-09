@@ -6,7 +6,7 @@
  * focus ring on every control, reduced motion respected.
  */
 export const KAS_STYLE = `
-.pk-kbtn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 38px; padding: 0 14px; border-radius: var(--style-radius-m); border: 1px solid var(--pk-input); background: var(--pk-card); color: var(--pk-fg); font: inherit; font-size: 13px; font-weight: 600; line-height: 1.2; cursor: pointer; text-decoration: none; white-space: nowrap; transition: background-color .15s ease, border-color .15s ease, color .15s ease; }
+.pk-kbtn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 38px; padding: 0 14px; border-radius: var(--style-radius-m); border: 1px solid color-mix(in oklab, var(--pk-muted-fg) 60%, var(--pk-input)); background: var(--pk-card); color: var(--pk-fg); font: inherit; font-size: 13px; font-weight: 600; line-height: 1.2; cursor: pointer; text-decoration: none; white-space: nowrap; transition: background-color .15s ease, border-color .15s ease, color .15s ease; }
 .pk-kbtn:hover { border-color: var(--pk-primary); color: var(--pk-primary); }
 .pk-kbtn:focus-visible, .pk-fld :is(input, select, textarea):focus-visible, .pk-seg label:has(input:focus-visible) { outline: 2px solid var(--pk-ring); outline-offset: 2px; }
 .pk-kbtn[disabled] { opacity: .6; cursor: progress; }
