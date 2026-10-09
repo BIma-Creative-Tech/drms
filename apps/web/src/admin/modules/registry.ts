@@ -121,6 +121,11 @@ export const MODULES: readonly ModuleDef[] = [
         ],
       },
       { label: 'Addendum', items: [{ view: '/addendum', label: 'Addendum RAB', roles: OFFICE_PM, navKey: 'addendum' }, { collection: 'budget-addenda', label: 'Data addendum' }] },
+      // FR1 (ADR 0020): field reports per project kind (list views; custom views follow)
+      {
+        label: 'Laporan lapangan',
+        items: [{ collection: 'service-reports' }, { collection: 'unit-timesheets' }, { collection: 'aftersales-activities' }, { collection: 'contract-units' }],
+      },
     ],
   },
   {

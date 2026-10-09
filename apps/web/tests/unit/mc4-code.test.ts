@@ -156,9 +156,13 @@ describe('MC4 extra (d) — saved list columns get the PT column once (migration
     config = await (await import('@/payload.config')).default
   })
 
-  it('the migration names exactly the collections with a PT list column', () => {
+  it('the migration names exactly the collections with a PT list column (+ collections created after it)', () => {
     const got = config.collections.filter((c) => companyFieldOf(c as unknown as CollectionConfig)).map((c) => c.slug).sort()
-    expect([...LIST_COMPANY_SLUGS].sort()).toEqual(got)
+    // FR1 collections were created after this released data migration: no saved list preferences can
+    // predate their PT column (withCompanyListUi puts `company` into their defaultColumns from the start).
+    const AFTER_MC4 = ['contract-units', 'service-reports', 'unit-timesheets', 'aftersales-activities']
+    expect([...LIST_COMPANY_SLUGS, ...AFTER_MC4].sort()).toEqual(got)
+    for (const s of AFTER_MC4) expect(LIST_COMPANY_SLUGS as readonly string[]).not.toContain(s)
   })
 
   it('companies: copy-defaults fields are virtual (no column) and create-only', () => {

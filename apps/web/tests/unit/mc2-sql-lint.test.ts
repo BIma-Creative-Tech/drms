@@ -15,7 +15,7 @@ import { describe, expect, it } from 'vitest'
  */
 const ROOT = path.resolve(__dirname, '../../src')
 // QA-MC4-13: the whole of domain/expense, progress, addendum and sync (was: three single files)
-const SCAN = ['domain/reports', 'domain/reminders', 'domain/attendance', 'domain/cash', 'domain/expense', 'domain/progress', 'domain/addendum', 'domain/sync']
+const SCAN = ['domain/reports', 'domain/reminders', 'domain/attendance', 'domain/cash', 'domain/expense', 'domain/progress', 'domain/addendum', 'domain/sync', 'domain/field']
 
 const PER_PT_TABLES = [
   'expense_requests', 'cash_entries', 'cash_accounts', 'projects', 'cost_centers', 'attendances', 'employees', 'team_assignments', 'transfers',
@@ -23,6 +23,8 @@ const PER_PT_TABLES = [
   'cash_in_sources', 'work_schedules', 'media_selfies',
   // QA-MC4-13: the per-PT tables the lint did not know
   'approvals', 'budget_addenda', 'project_stages', 'attendance_corrections', 'employee_bank_accounts', 'company_memberships', 'document_sequence_counters',
+  // FR1 (ADR 0020)
+  'contract_units', 'service_reports', 'unit_timesheets', 'aftersales_activities', 'clients',
 ]
 /** Company helpers (they build `company_id IN (<bound ids>)` from the caller's scope) — a CALL, not a mention. */
 const HELPER_CALL = /\b(?:requestScopeSql|cashScopeSql|ledgerScopeSql|projectScopeSql|costCenterScopeSql|masterScopeSql|companyScopeSql|locationScopeSql|employeeCompanySql|candidateWhere|ptSql)\(/

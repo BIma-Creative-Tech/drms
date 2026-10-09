@@ -100,6 +100,10 @@ export interface Config {
     settlements: Settlement;
     'cash-entries': CashEntry;
     'period-closings': PeriodClosing;
+    'contract-units': ContractUnit;
+    'service-reports': ServiceReport;
+    'unit-timesheets': UnitTimesheet;
+    'aftersales-activities': AftersalesActivity;
     attendances: Attendance;
     'attendance-corrections': AttendanceCorrection;
     'progress-reports': ProgressReport;
@@ -156,6 +160,10 @@ export interface Config {
     settlements: SettlementsSelect<false> | SettlementsSelect<true>;
     'cash-entries': CashEntriesSelect<false> | CashEntriesSelect<true>;
     'period-closings': PeriodClosingsSelect<false> | PeriodClosingsSelect<true>;
+    'contract-units': ContractUnitsSelect<false> | ContractUnitsSelect<true>;
+    'service-reports': ServiceReportsSelect<false> | ServiceReportsSelect<true>;
+    'unit-timesheets': UnitTimesheetsSelect<false> | UnitTimesheetsSelect<true>;
+    'aftersales-activities': AftersalesActivitiesSelect<false> | AftersalesActivitiesSelect<true>;
     attendances: AttendancesSelect<false> | AttendancesSelect<true>;
     'attendance-corrections': AttendanceCorrectionsSelect<false> | AttendanceCorrectionsSelect<true>;
     'progress-reports': ProgressReportsSelect<false> | ProgressReportsSelect<true>;
@@ -355,6 +363,10 @@ export interface Company {
    * E4: laporan progress harian + foto dari APK. Nonaktif → item laporan ditolak FEATURE_DISABLED (rollback).
    */
   syncProgressReportsEnabled?: boolean | null;
+  /**
+   * FR1 (ADR 0020): Staff yang ditugaskan, PM, dan Direktur membuat laporan lapangan sesuai jenis project. Nonaktif → pembuatan laporan baru ditolak FEATURE_DISABLED (web, API, APK); data lama tetap terbaca.
+   */
+  fieldReportsEnabled?: boolean | null;
   /**
    * Absen masuk/pulang sendiri di project/pusat biaya yang ditugaskan (geofence, selfie, lokasi palsu ditolak) dan "diabsenkan PM". Nonaktif → item absensi ditolak FEATURE_DISABLED. Nyalakan di prod setelah checklist go-live.
    */
@@ -670,6 +682,10 @@ export interface Project {
   company?: (number | null) | Company;
   code: string;
   name: string;
+  /**
+   * Menentukan laporan lapangan: kontrak unit → timesheet + servis; aftersales → servis + aktivitas. Umum/konstruksi/trading: belum ada laporan lapangan. Diubah oleh Direktur/Admin.
+   */
+  kind?: ('umum' | 'konstruksi' | 'kontrak_unit' | 'aftersales' | 'trading') | null;
   client?: (number | null) | Client;
   address?: string | null;
   lat?: number | null;
@@ -1020,15 +1036,42 @@ export interface Vehicle {
    * Wajib bila Anda memilih lebih dari satu PT di pemilih PT; tidak dapat diubah setelah dibuat.
    */
   company?: (number | null) | Company;
-  plateNo: string;
+  kind?: ('kendaraan' | 'alat_berat') | null;
+  /**
+   * Kode unit · nomor polisi (otomatis).
+   */
+  displayName?: string | null;
+  /**
+   * Wajib untuk alat berat, unik per PT (mis. EX-01).
+   */
+  unitCode?: string | null;
+  /**
+   * Wajib untuk kendaraan; opsional untuk alat berat (unik bila diisi).
+   */
+  plateNo?: string | null;
   plateDisplay?: string | null;
   /**
-   * mis. Hilux, Tronton
+   * mis. Hilux, Tronton, Excavator 20 t
    */
   type: string;
   brandModel?: string | null;
+  serialNo?: string | null;
+  owner?: ('sendiri' | 'pelanggan') | null;
+  /**
+   * Wajib bila milik pelanggan.
+   */
+  client?: (number | null) | Client;
   costCenter?: (number | null) | CostCenter;
   project?: (number | null) | Project;
+  /**
+   * Dari laporan servis terakhir.
+   */
+  status?: ('siap' | 'rusak' | 'menunggu_part') | null;
+  /**
+   * Dari timesheet / laporan servis.
+   */
+  lastHourMeter?: number | null;
+  lastHourMeterAt?: string | null;
   /**
    * Referensi Odoo (diisi otomatis saat sinkronisasi ke Odoo).
    */
@@ -1060,7 +1103,8 @@ export interface DocumentSequence {
     | 'cash_out'
     | 'progress_report'
     | 'budget_addendum'
-    | 'reversal';
+    | 'reversal'
+    | 'service_report';
   /**
    * Token {DOC}, mis. PB, TRF.
    */
@@ -1653,6 +1697,223 @@ export interface PeriodClosing {
   reopenedBy?: (number | null) | User;
   reopenedAt?: string | null;
   reopenReason?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * Unit armada sendiri yang disewakan di project berjenis "Kontrak unit". Tarif hanya terlihat oleh Direktur, Finance, dan Admin.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "contract-units".
+ */
+export interface ContractUnit {
+  id: number;
+  /**
+   * Mengikuti dokumen induk.
+   */
+  company?: (number | null) | Company;
+  project: number | Project;
+  unit: number | Vehicle;
+  /**
+   * YYYY-MM-DD
+   */
+  startDate: string;
+  /**
+   * Kosong = berjalan.
+   */
+  endDate?: string | null;
+  rateBasis: 'per_jam' | 'per_bulan';
+  rate: number;
+  /**
+   * Per jam: tagihan estimasi = tarif × maks(jam kerja, minimum).
+   */
+  minHoursPerMonth?: number | null;
+  active?: boolean | null;
+  notes?: string | null;
+  uuid?: string | null;
+  /**
+   * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
+   */
+  changeReason?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * Dibuat dari aplikasi Android atau API laporan lapangan (bukan dari form ini).
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "service-reports".
+ */
+export interface ServiceReport {
+  id: number;
+  /**
+   * Mengikuti dokumen induk.
+   */
+  company?: (number | null) | Company;
+  docNo?: string | null;
+  project: number | Project;
+  unit: number | Vehicle;
+  reportDate: string;
+  reporter: number | User;
+  helpers?: string | null;
+  startTime?: string | null;
+  endTime?: string | null;
+  hourMeter?: number | null;
+  serviceType: 'servis_berkala' | 'perbaikan' | 'inspeksi' | 'pemasangan';
+  complaint?: string | null;
+  action: string;
+  unitStatusAfter: 'siap' | 'rusak' | 'menunggu_part';
+  spareparts?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  notes?: string | null;
+  photoCount?: number | null;
+  receivedAt?: string | null;
+  editableUntil?: string | null;
+  deviceTime?: string | null;
+  timeTrust?: ('server' | 'estimated' | 'device_only') | null;
+  offline?: boolean | null;
+  source?: ('web' | 'apk') | null;
+  flags?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  correctedAt?: string | null;
+  correctedBy?: (number | null) | User;
+  syncRev?: number | null;
+  clientUuid?: string | null;
+  uuid?: string | null;
+  /**
+   * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
+   */
+  changeReason?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * Dibuat dari aplikasi Android atau API laporan lapangan (bukan dari form ini).
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "unit-timesheets".
+ */
+export interface UnitTimesheet {
+  id: number;
+  /**
+   * Mengikuti dokumen induk.
+   */
+  company?: (number | null) | Company;
+  project: number | Project;
+  unit: number | Vehicle;
+  contractUnit: number | ContractUnit;
+  reportDate: string;
+  reporter: number | User;
+  hmStart: number;
+  hmEnd: number;
+  workHours: number;
+  standbyHours?: number | null;
+  breakdownHours?: number | null;
+  breakdownReason?: string | null;
+  fuelLiters?: number | null;
+  operatorName?: string | null;
+  location?: string | null;
+  notes?: string | null;
+  photoCount?: number | null;
+  receivedAt?: string | null;
+  editableUntil?: string | null;
+  deviceTime?: string | null;
+  timeTrust?: ('server' | 'estimated' | 'device_only') | null;
+  offline?: boolean | null;
+  source?: ('web' | 'apk') | null;
+  flags?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  correctedAt?: string | null;
+  correctedBy?: (number | null) | User;
+  syncRev?: number | null;
+  clientUuid?: string | null;
+  uuid?: string | null;
+  /**
+   * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
+   */
+  changeReason?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * Dibuat dari aplikasi Android atau API laporan lapangan (bukan dari form ini). Nilai (Rp) hanya terlihat oleh Direktur, Finance, Admin, dan pelapornya.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "aftersales-activities".
+ */
+export interface AftersalesActivity {
+  id: number;
+  /**
+   * Mengikuti dokumen induk.
+   */
+  company?: (number | null) | Company;
+  project: number | Project;
+  activityDate: string;
+  reporter: number | User;
+  client: number | Client;
+  kind: 'penawaran' | 'po_masuk' | 'pengiriman' | 'penagihan' | 'kunjungan' | 'lainnya';
+  docNo?: string | null;
+  items?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  value?: number | null;
+  relatesTo?: (number | null) | AftersalesActivity;
+  poStatus?: ('belum_kirim' | 'sebagian' | 'terkirim' | 'batal') | null;
+  followUpDate?: string | null;
+  receiver?: string | null;
+  notes?: string | null;
+  photoCount?: number | null;
+  receivedAt?: string | null;
+  editableUntil?: string | null;
+  deviceTime?: string | null;
+  timeTrust?: ('server' | 'estimated' | 'device_only') | null;
+  offline?: boolean | null;
+  source?: ('web' | 'apk') | null;
+  flags?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  correctedAt?: string | null;
+  correctedBy?: (number | null) | User;
+  syncRev?: number | null;
+  clientUuid?: string | null;
+  uuid?: string | null;
+  /**
+   * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
+   */
+  changeReason?: string | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -2265,6 +2526,22 @@ export interface PayloadLockedDocument {
         value: number | PeriodClosing;
       } | null)
     | ({
+        relationTo: 'contract-units';
+        value: number | ContractUnit;
+      } | null)
+    | ({
+        relationTo: 'service-reports';
+        value: number | ServiceReport;
+      } | null)
+    | ({
+        relationTo: 'unit-timesheets';
+        value: number | UnitTimesheet;
+      } | null)
+    | ({
+        relationTo: 'aftersales-activities';
+        value: number | AftersalesActivity;
+      } | null)
+    | ({
         relationTo: 'attendances';
         value: number | Attendance;
       } | null)
@@ -2400,6 +2677,7 @@ export interface CompaniesSelect<T extends boolean = true> {
   syncExpenseDraftsEnabled?: T;
   defaultWorkSchedule?: T;
   syncProgressReportsEnabled?: T;
+  fieldReportsEnabled?: T;
   syncAttendanceEnabled?: T;
   selfieRetentionMonths?: T;
   selfieRetentionDeleteEnabled?: T;
@@ -2529,6 +2807,7 @@ export interface ProjectsSelect<T extends boolean = true> {
   company?: T;
   code?: T;
   name?: T;
+  kind?: T;
   client?: T;
   address?: T;
   lat?: T;
@@ -2771,12 +3050,21 @@ export interface UomsSelect<T extends boolean = true> {
  */
 export interface VehiclesSelect<T extends boolean = true> {
   company?: T;
+  kind?: T;
+  displayName?: T;
+  unitCode?: T;
   plateNo?: T;
   plateDisplay?: T;
   type?: T;
   brandModel?: T;
+  serialNo?: T;
+  owner?: T;
+  client?: T;
   costCenter?: T;
   project?: T;
+  status?: T;
+  lastHourMeter?: T;
+  lastHourMeterAt?: T;
   odooFleetRef?: T;
   active?: T;
   uuid?: T;
@@ -3111,6 +3399,138 @@ export interface PeriodClosingsSelect<T extends boolean = true> {
   reopenedBy?: T;
   reopenedAt?: T;
   reopenReason?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "contract-units_select".
+ */
+export interface ContractUnitsSelect<T extends boolean = true> {
+  company?: T;
+  project?: T;
+  unit?: T;
+  startDate?: T;
+  endDate?: T;
+  rateBasis?: T;
+  rate?: T;
+  minHoursPerMonth?: T;
+  active?: T;
+  notes?: T;
+  uuid?: T;
+  changeReason?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "service-reports_select".
+ */
+export interface ServiceReportsSelect<T extends boolean = true> {
+  company?: T;
+  docNo?: T;
+  project?: T;
+  unit?: T;
+  reportDate?: T;
+  reporter?: T;
+  helpers?: T;
+  startTime?: T;
+  endTime?: T;
+  hourMeter?: T;
+  serviceType?: T;
+  complaint?: T;
+  action?: T;
+  unitStatusAfter?: T;
+  spareparts?: T;
+  notes?: T;
+  photoCount?: T;
+  receivedAt?: T;
+  editableUntil?: T;
+  deviceTime?: T;
+  timeTrust?: T;
+  offline?: T;
+  source?: T;
+  flags?: T;
+  correctedAt?: T;
+  correctedBy?: T;
+  syncRev?: T;
+  clientUuid?: T;
+  uuid?: T;
+  changeReason?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "unit-timesheets_select".
+ */
+export interface UnitTimesheetsSelect<T extends boolean = true> {
+  company?: T;
+  project?: T;
+  unit?: T;
+  contractUnit?: T;
+  reportDate?: T;
+  reporter?: T;
+  hmStart?: T;
+  hmEnd?: T;
+  workHours?: T;
+  standbyHours?: T;
+  breakdownHours?: T;
+  breakdownReason?: T;
+  fuelLiters?: T;
+  operatorName?: T;
+  location?: T;
+  notes?: T;
+  photoCount?: T;
+  receivedAt?: T;
+  editableUntil?: T;
+  deviceTime?: T;
+  timeTrust?: T;
+  offline?: T;
+  source?: T;
+  flags?: T;
+  correctedAt?: T;
+  correctedBy?: T;
+  syncRev?: T;
+  clientUuid?: T;
+  uuid?: T;
+  changeReason?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "aftersales-activities_select".
+ */
+export interface AftersalesActivitiesSelect<T extends boolean = true> {
+  company?: T;
+  project?: T;
+  activityDate?: T;
+  reporter?: T;
+  client?: T;
+  kind?: T;
+  docNo?: T;
+  items?: T;
+  value?: T;
+  relatesTo?: T;
+  poStatus?: T;
+  followUpDate?: T;
+  receiver?: T;
+  notes?: T;
+  photoCount?: T;
+  receivedAt?: T;
+  editableUntil?: T;
+  deviceTime?: T;
+  timeTrust?: T;
+  offline?: T;
+  source?: T;
+  flags?: T;
+  correctedAt?: T;
+  correctedBy?: T;
+  syncRev?: T;
+  clientUuid?: T;
+  uuid?: T;
+  changeReason?: T;
   updatedAt?: T;
   createdAt?: T;
 }

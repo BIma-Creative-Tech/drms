@@ -1,10 +1,11 @@
 import { sql, type PostgresAdapter } from '@payloadcms/db-postgres'
 import type { Access, CollectionSlug, PayloadRequest, Where } from 'payload'
 
-import { anyRole, companiesWithRole, isGroupAdmin, mappedCompanies, type Role } from '@/access/roles'
+import { anyRole, companiesWithRole, hasRoleAny, isGroupAdmin, mappedCompanies, type Role } from '@/access/roles'
 import { anyOf, byRoleAny, ownUser, rolesAllowedAny, type Rule } from '@/access/policies'
 import { allCompanyIds } from '@/domain/companies'
 import { visibleRequestIds } from '@/domain/expense/access'
+import { FIELD_COLLECTIONS, fieldPhotoWhere, isFieldOwnerType, staffMayUploadFieldPhotos } from '@/domain/field/access'
 import { reportPhotoWhere } from '@/domain/progress/access'
 import { assertSelfieUploadAllowed } from '@/legal/privacy-enforcement'
 
@@ -31,7 +32,7 @@ const FOCUS = 'pkMediaFocus'
 const focusOf = (req: PayloadRequest): Focus | undefined => req.context?.[FOCUS] as Focus | undefined
 
 /** `[id]` when the caller may read owner document `id` (caller's own access), else []. */
-async function visibleOwner(req: PayloadRequest, collection: 'expense-requests' | 'progress-reports', id: string | null): Promise<string[]> {
+async function visibleOwner(req: PayloadRequest, collection: CollectionSlug, id: string | null): Promise<string[]> {
   if (!id || !/^\d{1,10}$/.test(id)) return []
   const res = await req.payload
     .find({ collection, where: { id: { equals: Number(id) } }, depth: 0, limit: 1, pagination: false, select: { updatedAt: true }, user: req.user, overrideAccess: false, req })
@@ -199,13 +200,31 @@ const reportPhotoRule: Rule = async ({ req }) => {
   const ids = f.ownerDocType === 'progress_report' ? await visibleOwner(req, 'progress-reports', f.ownerDocId) : []
   return ids.length ? { and: [{ ownerDocType: { equals: 'progress_report' } }, { ownerDocId: { in: ids } }] } : false
 }
+/**
+ * FR1 (ADR 0020): photos of field reports (service report / timesheet HM / aftersales activity, owner
+ * types `service_report` | `unit_timesheet` | `aftersales_activity`) are readable by everyone who may
+ * read the owning report (Staff: assigned projects, PM: team) — same focus/list split as above.
+ */
+const fieldPhotoRule: Rule = async ({ req }) => {
+  const f = focusOf(req)
+  if (!f) return fieldPhotoWhere(req, { exceptCompanies: (await officeScope(req)).ids })
+  if (!isFieldOwnerType(f.ownerDocType)) return false
+  const ids = await visibleOwner(req, FIELD_COLLECTIONS[f.ownerDocType], f.ownerDocId)
+  return ids.length ? { and: [{ ownerDocType: { equals: f.ownerDocType } }, { ownerDocId: { in: ids } }] } : false
+}
 const progressPhotoRead: Access = byRoleAny({
-  'pk-admin': anyOf(officeOwned, reportPhotoRule),
-  'pk-owner': anyOf(officeOwned, reportPhotoRule),
-  'pk-finance': anyOf(officeOwned, reportPhotoRule),
-  'pk-pm': anyOf(ownUser('uploadedBy'), reportPhotoRule),
-  'pk-staff': ownUser('uploadedBy'),
+  'pk-admin': anyOf(officeOwned, reportPhotoRule, fieldPhotoRule),
+  'pk-owner': anyOf(officeOwned, reportPhotoRule, fieldPhotoRule),
+  'pk-finance': anyOf(officeOwned, reportPhotoRule, fieldPhotoRule),
+  'pk-pm': anyOf(ownUser('uploadedBy'), reportPhotoRule, fieldPhotoRule),
+  'pk-staff': anyOf(ownUser('uploadedBy'), fieldPhotoRule),
 })
+
+/** E4: PM / Direktur upload progress photos; FR1: Staff only in a PT with field reports switched on. */
+const progressPhotoCreate: Access = async (args) => {
+  if (hasRoleAny(args.req, 'pk-pm', 'pk-owner')) return true
+  return hasRoleAny(args.req, 'pk-staff') && (await staffMayUploadFieldPhotos(args.req))
+}
 
 /**
  * QA-MC4-11 (scope rule 2026-10-02): a PT logo is readable by the users MAPPED to that PT (and the
@@ -304,8 +323,9 @@ export const MediaProgressPhotos = mediaCollection({
   formatOptions: { format: 'jpeg', options: { quality: 78, mozjpeg: true } },
   imageSizes: [thumbJpeg],
   // E4 (US-10): PM / Direktur upload; ≤ 5 per report (report service); EXIF/GPS stripped by re-encode.
+  // FR1: also the photos of field reports (≤ 10 service, 1 HM photo per timesheet, ≤ 5 per activity).
   ownerCompany: true,
-  access: { read: focused('media-progress-photos', progressPhotoRead, true), create: rolesAllowedAny('pk-pm', 'pk-owner') },
+  access: { read: focused('media-progress-photos', progressPhotoRead, true), create: progressPhotoCreate },
 })
 
 export const MediaSignatures = mediaCollection({

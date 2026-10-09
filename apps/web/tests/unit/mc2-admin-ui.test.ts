@@ -24,6 +24,8 @@ const WITH_COMPANY = [
   'employee-bank-accounts', 'team-assignments', 'period-closings', 'expense-requests', 'expense-line-snapshots', 'approvals',
   'receipts', 'receipt-flags', 'transfers', 'cash-entries', 'settlements', 'budget-addenda', 'progress-reports', 'attendances',
   'attendance-corrections', 'company-memberships', 'notifications', 'audit-logs',
+  // FR1 (ADR 0020)
+  'contract-units', 'service-reports', 'unit-timesheets', 'aftersales-activities',
 ].sort()
 
 describe('PT column + PT filter on list views', () => {

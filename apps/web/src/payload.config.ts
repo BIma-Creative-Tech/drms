@@ -24,6 +24,8 @@ import { CashAccounts } from './collections/CashAccounts'
 import { CashEntries } from './collections/CashEntries'
 import { CashInSources } from './collections/CashInSources'
 import { Companies } from './collections/Companies'
+import { AftersalesActivities } from './collections/AftersalesActivities'
+import { ContractUnits } from './collections/ContractUnits'
 import { CompanyMemberships } from './collections/CompanyMemberships'
 import { Clients } from './collections/Clients'
 import { CostCenters } from './collections/CostCenters'
@@ -43,11 +45,13 @@ import { ProgressReports } from './collections/ProgressReports'
 import { Projects } from './collections/Projects'
 import { ProjectStages } from './collections/ProjectStages'
 import { ReceiptFlags } from './collections/ReceiptFlags'
+import { ServiceReports } from './collections/ServiceReports'
 import { Receipts } from './collections/Receipts'
 import { Settlements } from './collections/Settlements'
 import { StageTemplates } from './collections/StageTemplates'
 import { TeamAssignments } from './collections/TeamAssignments'
 import { Transfers } from './collections/Transfers'
+import { UnitTimesheets } from './collections/UnitTimesheets'
 import { Uoms } from './collections/Uoms'
 import { Users } from './collections/Users'
 import { Vehicles } from './collections/Vehicles'
@@ -101,6 +105,9 @@ export const MASTER_COLLECTIONS = [
   DocumentSequences,
 ]
 
+/** FR1 (ADR 0020): field reports per project kind — contract units + the DRMS reports. */
+export const FIELD_COLLECTIONS = [ContractUnits, ServiceReports, UnitTimesheets, AftersalesActivities]
+
 /** F2 business documents (T1–T8, period closing). */
 export const FLOW_COLLECTIONS = [
   ExpenseRequests,
@@ -145,7 +152,7 @@ export default buildConfig({
   // E9 B-1 (G-21): non-object REST bodies (form/text, JSON arrays) → 400 before any hook runs.
   // MC2-4: PT column (short-code chip) + PT filter chips on every list with a `company` column.
   // QA-29 / QA-25: boolean cells "Aktif/Nonaktif" / "Ya/Tidak", server timestamps as fixed WITA text.
-  collections: withBodyGuard(withStaffPanelVisibility(withCompanyListUi(withRowActions(withDisplayCells([Users, Companies, CompanyMemberships, ...MASTER_COLLECTIONS, ...FLOW_COLLECTIONS, Attendances, AttendanceCorrections, ProgressReports, BudgetAddenda, Notifications, Devices, WebSessions, AuditLogs, ...MEDIA_COLLECTIONS]))))),
+  collections: withBodyGuard(withStaffPanelVisibility(withCompanyListUi(withRowActions(withDisplayCells([Users, Companies, CompanyMemberships, ...MASTER_COLLECTIONS, ...FLOW_COLLECTIONS, ...FIELD_COLLECTIONS, Attendances, AttendanceCorrections, ProgressReports, BudgetAddenda, Notifications, Devices, WebSessions, AuditLogs, ...MEDIA_COLLECTIONS]))))),
   globals: withGlobalBodyGuard(withStaffHiddenGlobals([CompanySettings])),
   // Admin UI in Bahasa Indonesia (ADR 0001 §5; @payloadcms/translations/languages/id @3.90.1).
   // empty list cells: "—" (as in the custom views) instead of Payload's "<Tidak ada Klien>" in every row

@@ -1,8 +1,9 @@
 import type { Field, SanitizedConfig } from 'payload'
 import { beforeAll, describe, expect, it } from 'vitest'
 
-import { PER_PT_DOC_TYPES } from '@/audit/writer'
+import { PER_PT_DOC_TYPES, POST_MC4_DOC_TYPES } from '@/audit/writer'
 import { PER_PT_TABLES } from '@/migrations/20260927_234849_mc1_company_columns'
+import { FR1_PER_PT_TABLES } from '@/migrations/20261010_120000_fr1_security'
 import { BY_DOC_NO, BY_ID } from '@/migrations/20261003_090000_mc4_audit_company_backfill'
 
 /**
@@ -45,9 +46,9 @@ describe('UAT MC4-04: PT tag of audit rows for every per-PT doc type', () => {
     expect(actual).toEqual(expected)
   })
 
-  it('every company_id table of the map is a per-PT table of MC1 (or the membership table)', () => {
+  it('every company_id table of the map is a per-PT table of MC1 / FR1 (or the membership table)', () => {
     for (const [d, [table, column]] of Object.entries(PER_PT_DOC_TYPES)) {
-      if (column === 'company_id') expect([...PER_PT_TABLES, 'company_memberships'], d).toContain(table)
+      if (column === 'company_id') expect([...PER_PT_TABLES, ...FR1_PER_PT_TABLES, 'company_memberships'], d).toContain(table)
     }
   })
 
@@ -57,8 +58,10 @@ describe('UAT MC4-04: PT tag of audit rows for every per-PT doc type', () => {
     }
   })
 
-  it('the migration uses the same docType → table mapping as the writer (frozen copy)', () => {
-    expect(BY_ID).toEqual(PER_PT_DOC_TYPES)
+  it('the migration uses the same docType → table mapping as the writer (frozen copy; FR1 types came later)', () => {
+    const atBackfill = Object.fromEntries(Object.entries(PER_PT_DOC_TYPES).filter(([d]) => !POST_MC4_DOC_TYPES.includes(d)))
+    expect(BY_ID).toEqual(atBackfill)
+    for (const d of POST_MC4_DOC_TYPES) expect(Object.hasOwn(BY_ID, d), d).toBe(false)
   })
 
   it('the doc-number fallback only names per-PT number columns', () => {

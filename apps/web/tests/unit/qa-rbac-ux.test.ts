@@ -114,10 +114,13 @@ describe('QA-20(b) changed-field detection (403 naming the fields)', () => {
     expect(changedFields(fields, { pm: 8 }, current).map((f) => f.name)).toEqual(['pm'])
   })
 
-  it('projects: PM is read-only (update access = Direktur only) and the guard runs before access', () => {
+  it('projects: PM is read-only (update access = Direktur; FR1: Admin only the kind) and the guard runs before access', () => {
     const p = config.collections.find((c) => c.slug === 'projects')!
     expect((p.hooks.beforeOperation ?? []).length).toBeGreaterThanOrEqual(2)
-    expect(src('collections/Projects.ts')).toMatch(/update: byRole\(\{ 'pk-owner': true \}\)/)
+    expect(src('collections/Projects.ts')).toMatch(/update: byRole\(\{ 'pk-owner': true, 'pk-admin': true \}\)/)
+    // every data field but `kind` stays Direktur-only for updates (field access), so the Admin changes the kind only
+    const editable = (p.flattenedFields as Array<{ name: string; access?: { update?: unknown } }>).filter((f) => !['company', 'progressPct', 'uuid', 'changeReason', 'rowActions', 'kind', 'createdAt', 'updatedAt'].includes(f.name) && !f.access?.update)
+    expect(editable.map((f) => f.name)).toEqual([])
   })
 })
 
