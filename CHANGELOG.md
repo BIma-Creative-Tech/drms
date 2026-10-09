@@ -6,10 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.6.3] - 2026-10-09
+
+Admin CMS usability (PR #30): explicit row action buttons on every list, Rupiah amounts and "—" for empty cells in
+lists, one button system in the custom views. Web only; APK unchanged (mobile-v0.3.4 works with it).
+
 ### Changed
 
 - Admin lists: every Payload list view gets an **"Aksi"** column with a labelled button per row — **Ubah** (pencil,
-  tinted) when the user may edit the collection, **Buka** for workflow documents (requests, cash entries, transfers,
+  tinted) when the user may edit that row (per PT / own draft), **Buka** for workflow documents (requests, cash entries, transfers,
   settlements, receipts, addenda, progress reports, attendance), otherwise **Lihat**. Before, the linked first column
   (plain text) was the only way to open a record. The column stays pinned to the right edge while a wide table
   scrolls sideways (390 px); 32 px targets (44 px on touch), theme focus ring, contrast ≥ 4.5:1 text / ≥ 3:1 border in
