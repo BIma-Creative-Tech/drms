@@ -119,7 +119,7 @@ describe.skipIf(!smtp)('delivery through the SMTP sink (STARTTLS required, AUTH,
     const mails = await mailsTo(admin.email)
     expect(mails).toHaveLength(1)
     expect(mails[0]!.From).toEqual({ Name: 'ProyekKas Test', Address: smtp!.user })
-    expect(mails[0]!.Subject).toBe('ProyekKas — email uji')
+    expect(mails[0]!.Subject).toBe('RR Teams — email uji')
   })
 
   it('From is forced even when a caller passes another sender', async () => {
