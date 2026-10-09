@@ -1,5 +1,21 @@
 # ProyekKas — staging load test + ZAP baseline, 2026-10-09 (plan)
 
+> **RESCHEDULED → Saturday 2026-10-10, same clock times** (owner decision 2026-10-09 ≈ 20:30 WIB, in the infra-lead
+> session: release v0.6.4 first, load test after it). Everything below that says "2026-10-09" / "tonight" now means
+> **2026-10-10**; all times are unchanged:
+> - run window **22:00–24:00 WITA (21:00–23:00 WIB)**, hard stop 23:50 WITA (watchdog A4), ×3 latest start 23:20 WITA;
+> - **I-4 quiet host 2026-10-10 20:50–23:15 WIB** (pause `ci-runner-supervisor`, no deploys, no agent test stacks),
+>   `run.sh check` baseline **load1 < 2.0** before the start, watchdog guards unchanged (prod health p95 > 1 s / 60 s,
+>   prod RAM > 85 %, load1 > 3.5, deadline);
+> - owner steps O-2 (admin.uji = Aktif + Admin grup) **2026-10-10 21:30–21:55 WITA**, O-3 after the run;
+> - infra I-1…I-3 by 2026-10-10 21:00 WITA, I-5 (scramble passwords) after the run. If I-1 passwords were already
+>   handed over on 2026-10-09, keep `/root/lt1009/pw.csv` (600) until the run, or re-issue — infra's call.
+> - **Target version changes:** staging will run **v0.6.4** (`0.6.4-stg-<sha>`: app renamed "RR Teams", admin UI
+>   buttons; no DB migration, same API) instead of 0.6.2. The mix and fixture are unaffected; compare results with E9
+>   as planned and note the version in the report.
+> - The scripts take the date from the clock (`run.sh` `wita_epoch` = today in WITA) → no code change; the fixture
+>   reason text default still says 2026-10-09 — set `LT_REASON='Uji beban staging 2026-10-10 (data fiktif, tests/load/staging-1009)'`.
+
 - **Approval:** owner 2026-10-09 — **staging only**, **22:00–24:00 WITA (21:00–23:00 WIB)**, automatic stop if prod
   is impacted. Prepared by the QA agent on `test/staging-loadtest-1009` (from `main` `38d2be8` = v0.6.2).
 - **Target:** `https://drms-kas.staging.bimacreative.tech` = `0.6.2-stg-38d2be8` (web `drms-pk-stg` 384 MiB /
