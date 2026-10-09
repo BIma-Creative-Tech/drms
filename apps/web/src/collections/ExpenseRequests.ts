@@ -186,8 +186,7 @@ const beforeChange: CollectionBeforeChangeHook = async ({ data, originalDoc, ope
           bankAccountId: relId(pick('bankAccount')) ?? null,
           lines: fromDocLines({ lines } as unknown as RequestDoc),
           neededDate: pick<string | null>('neededDate'),
-          periodFrom: pick<string | null>('periodFrom'),
-          periodTo: pick<string | null>('periodTo'),
+          urgencyLevelId: relId(pick('urgencyLevel')) ?? null,
         },
         {
           forSubmit: false,
@@ -256,7 +255,7 @@ export const ExpenseRequests: CollectionConfig = withAudit(
     admin: {
       useAsTitle: 'title',
       group: 'Keuangan',
-      defaultColumns: ['docNo', 'type', 'title', 'status', 'grandTotal', 'createdBy', 'updatedAt'],
+      defaultColumns: ['docNo', 'type', 'title', 'urgencyLevel', 'status', 'grandTotal', 'createdBy', 'updatedAt'],
       listSearchableFields: ['docNo', 'title'],
       components: { views: { edit: RIWAYAT_TAB } },
     },
@@ -267,7 +266,7 @@ export const ExpenseRequests: CollectionConfig = withAudit(
       update: requestUpdateAccess,
       delete: denyDeleteLogged('expense_request'),
     },
-    hooks: { beforeChange: [companyHook('expense-requests', { derive: [{ field: 'project', collection: 'projects' }, { field: 'costCenter', collection: 'cost-centers' }, { field: 'requesters', collection: 'employees' }], check: [{ field: 'bankAccount', collection: 'employee-bank-accounts' }, { field: 'approvalRule', collection: 'approval-rules' }, { field: 'resubmitOf', collection: 'expense-requests' }, { field: 'lines', collection: 'expense-categories', sub: 'category' }, { field: 'lines', collection: 'vehicles', sub: 'vehicle' }] }), beforeChange], afterChange: [auditLines, notify] },
+    hooks: { beforeChange: [companyHook('expense-requests', { derive: [{ field: 'project', collection: 'projects' }, { field: 'costCenter', collection: 'cost-centers' }, { field: 'requesters', collection: 'employees' }], check: [{ field: 'bankAccount', collection: 'employee-bank-accounts' }, { field: 'urgencyLevel', collection: 'urgency-levels' }, { field: 'approvalRule', collection: 'approval-rules' }, { field: 'resubmitOf', collection: 'expense-requests' }, { field: 'lines', collection: 'expense-categories', sub: 'category' }, { field: 'lines', collection: 'vehicles', sub: 'vehicle' }] }), beforeChange], afterChange: [auditLines, notify] },
     fields: [
       companyField(),
       { name: 'docNo', type: 'text', label: 'Nomor', index: true, access: system, admin: { ...ro, position: 'sidebar' } },
@@ -301,8 +300,8 @@ export const ExpenseRequests: CollectionConfig = withAudit(
       { name: 'costCenter', type: 'relationship', relationTo: 'cost-centers', label: 'Pusat biaya', index: true, ...pickerSameCompany() },
       businessDate('requestDate', 'Tanggal pengajuan (server)', { access: system, admin: { ...ro, position: 'sidebar' } }),
       businessDate('neededDate', 'Tanggal dibutuhkan'),
-      businessDate('periodFrom', 'Periode kegiatan dari (opsional, Q-04)'),
-      businessDate('periodTo', 'Periode kegiatan sampai'),
+      // Owner decision 2026-10-09: replaces "Periode kegiatan" (periodFrom/periodTo, Q-04).
+      { name: 'urgencyLevel', type: 'relationship', relationTo: 'urgency-levels', label: 'Tingkat urgensi', index: true, ...pickerSameCompany() },
       { name: 'notes', type: 'textarea', label: 'Keterangan', maxLength: 2000 },
       // QA-15: Staff-only users pick only themselves (requesterOptions); the server re-checks (validateContent)
       { name: 'requesters', type: 'relationship', relationTo: 'employees', hasMany: true, label: 'Diajukan Oleh', admin: { isSortable: true }, ...pickerSameCompany(), filterOptions: requesterOptions },

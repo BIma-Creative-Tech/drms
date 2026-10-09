@@ -1,7 +1,7 @@
 import { getTranslation } from '@payloadcms/translations'
 import type { Payload, SanitizedPermissions, TypedUser, VisibleEntities } from 'payload'
 
-import { companyContextOf, isStaffOnly, ROLE_LABELS, rolesOf, type Role } from '@/access/roles'
+import { companyContextOf, isOperatorOnly, isStaffOnly, ROLE_LABELS, rolesOf, type Role } from '@/access/roles'
 import { resolveModules, type BadgeKey, type ResolvedModule } from '@/admin/modules/registry'
 import { TRANSFER_QUEUE_WHERE } from '@/domain/expense/types'
 
@@ -47,7 +47,7 @@ export async function loadUnread(payload: Pick<Payload, 'count'>, user: TypedUse
   }
 }
 
-export type NavUser = { id: number | string; name: string; email: string; roles: Role[]; roleLabel: string; staffOnly: boolean; initials: string }
+export type NavUser = { id: number | string; name: string; email: string; roles: Role[]; roleLabel: string; staffOnly: boolean; operatorOnly: boolean; initials: string }
 
 export function navUser(user: TypedUser): NavUser {
   const u = user as unknown as { id: number | string; name?: string | null; email?: string | null }
@@ -60,7 +60,16 @@ export function navUser(user: TypedUser): NavUser {
       .slice(0, 2)
       .map((p) => p[0]!.toUpperCase())
       .join('') || '?'
-  return { id: u.id, name, email: u.email ?? '', roles, roleLabel: roles.map((r) => ROLE_LABELS[r]).join(' · ') || 'Tanpa peran', staffOnly: isStaffOnly(user), initials }
+  return {
+    id: u.id,
+    name,
+    email: u.email ?? '',
+    roles,
+    roleLabel: roles.map((r) => ROLE_LABELS[r]).join(' · ') || 'Tanpa peran',
+    staffOnly: isStaffOnly(user),
+    operatorOnly: isOperatorOnly(user),
+    initials,
+  }
 }
 
 export type ModuleNavInput = {
@@ -96,7 +105,7 @@ export async function loadModules({ payload, user, permissions, visibleEntities,
     return Boolean(perms?.[slug]?.create || perms?.[slug]?.update)
   }
   const badges = await loadBadges(payload, user)
-  return resolveModules({ roles: rolesOf(user), staffOnly: isStaffOnly(user), canSee, canManage, labelOf, badges })
+  return resolveModules({ roles: rolesOf(user), staffOnly: isStaffOnly(user), operatorOnly: isOperatorOnly(user), canSee, canManage, labelOf, badges })
 }
 
 /**

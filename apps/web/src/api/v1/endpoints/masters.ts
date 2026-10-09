@@ -29,6 +29,7 @@ const MAP: Record<MasterType, { collection: CollectionSlug; fields: string[] }> 
   // MC3-1: receipt vendor picker (vendor_id) and Kas "sumber kas masuk" — per PT, read access of the collection
   vendors: { collection: 'vendors', fields: ['name', 'contact', 'active'] },
   'cash-in-sources': { collection: 'cash-in-sources', fields: ['code', 'name', 'active'] },
+  'urgency-levels': { collection: 'urgency-levels', fields: ['code', 'name', 'rank', 'active'] },
 }
 
 const SHARED: ReadonlySet<MasterType> = new Set(SHARED_MASTER_TYPES)

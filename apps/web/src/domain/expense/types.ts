@@ -104,7 +104,7 @@ export const FLAG_LABELS: Record<FlagKind, string> = {
   amount_diff: 'Selisih nominal nota vs baris',
   date_after_request: 'Tanggal nota setelah tanggal pengajuan',
   date_too_old: 'Nota terlalu lama',
-  date_out_of_period: 'Tanggal nota di luar periode kegiatan',
+  date_out_of_period: 'Tanggal nota di luar periode kegiatan (lama)',
   uom_suspicious: 'Satuan tidak wajar',
   duplicate: 'Nota ganda',
 }

@@ -57,15 +57,16 @@ import {
  * streams behind a skeleton (Suspense); every number links to the list/report that produces it
  * (C9); a failing layout shows its own error (wireframes §0).
  */
-type Layout = 'owner' | 'finance' | 'pm' | 'admin' | 'staff'
+type Layout = 'owner' | 'finance' | 'pm' | 'admin' | 'staff' | 'operator'
 const ORDER: Array<[Layout, Role]> = [
   ['owner', 'pk-owner'],
   ['finance', 'pk-finance'],
   ['pm', 'pk-pm'],
   ['admin', 'pk-admin'],
   ['staff', 'pk-staff'],
+  ['operator', 'pk-operator'],
 ]
-const LABEL: Record<Layout, string> = { owner: 'Direktur', finance: 'Finance', pm: 'PM', admin: 'Admin', staff: 'Staff' }
+const LABEL: Record<Layout, string> = { owner: 'Direktur', finance: 'Finance', pm: 'PM', admin: 'Admin', staff: 'Staff', operator: 'Operator/Anggota' }
 
 const ER = '/admin/collections/expense-requests'
 const where = (q: Record<string, string>) => new URLSearchParams(q).toString()
@@ -136,6 +137,8 @@ async function Body({ layout, req, months }: { layout: Layout; req: PayloadReque
         return await Pm({ req })
       case 'admin':
         return await Admin({ req })
+      case 'operator':
+        return await Operator({ req })
       default:
         return await Staff({ req })
     }
@@ -1260,6 +1263,32 @@ async function Staff({ req }: { req: PayloadRequest }) {
         </Card>
       </Bento>
     </>
+  )
+}
+
+/**
+ * Operator/Anggota (owner decision 2026-10-09): attendance-only role, so its dashboard offers just the
+ * two things it may do — see `access/panel-visibility.ts` (OPERATOR_VISIBLE_COLLECTIONS) and
+ * `admin/modules/registry.ts` for the matching nav restriction.
+ */
+async function Operator({ req }: { req: PayloadRequest }) {
+  const user = req.user as { id: number; name?: string | null; email?: string } | null
+  return (
+    <Bento label="Absensi">
+      <Card id="operator-absen" title="Absen" sub={`Halo, ${user?.name || user?.email || ''}`} span={12}>
+        <div className="pk-actions">
+          <Link className="pk-btn primary" href="/admin/absensi/absen">
+            Absen sekarang
+          </Link>
+          <Link className="pk-btn" href="/admin/absensi/rekap">
+            Rekap absensi saya
+          </Link>
+          <a className="pk-btn" href={`/admin/collections/users/${user?.id ?? ''}`}>
+            Profil
+          </a>
+        </div>
+      </Card>
+    </Bento>
   )
 }
 

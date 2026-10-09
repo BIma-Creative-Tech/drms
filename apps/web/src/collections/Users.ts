@@ -114,6 +114,7 @@ export const Users: CollectionConfig = withAudit(
         'pk-finance': ownUser('id'),
         'pk-pm': ownUser('id'),
         'pk-staff': ownUser('id'),
+        'pk-operator': ownUser('id'),
       }),
       create: rolesAllowedAny('pk-admin'),
       // F2c: everyone may update their OWN row — field access limits that to `signature`.
@@ -123,6 +124,7 @@ export const Users: CollectionConfig = withAudit(
         'pk-finance': ownUser('id'),
         'pk-pm': ownUser('id'),
         'pk-staff': ownUser('id'),
+        'pk-operator': ownUser('id'),
       }),
       delete: denyAll,
     },

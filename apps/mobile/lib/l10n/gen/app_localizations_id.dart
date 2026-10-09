@@ -331,6 +331,9 @@ class AppLocalizationsId extends AppLocalizations {
   String get fieldNeededDate => 'Tanggal dibutuhkan';
 
   @override
+  String get fieldUrgency => 'Tingkat urgensi';
+
+  @override
   String get fieldNotes => 'Keterangan';
 
   @override

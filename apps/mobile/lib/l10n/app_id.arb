@@ -162,6 +162,7 @@
   "fieldProject": "Project",
   "fieldCostCenter": "Pusat biaya",
   "fieldNeededDate": "Tanggal dibutuhkan",
+  "fieldUrgency": "Tingkat urgensi",
   "fieldNotes": "Keterangan",
   "fieldRequesters": "Diajukan oleh (pemohon)",
   "fieldBankAccount": "Rekening tujuan",

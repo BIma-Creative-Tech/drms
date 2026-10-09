@@ -1114,17 +1114,39 @@ export const openapiDocument = {
           "costCenter": {
             "$ref": "#/components/schemas/Ref"
           },
-          "periodFrom": {
+          "urgencyLevel": {
             "type": [
-              "string",
+              "object",
               "null"
-            ]
-          },
-          "periodTo": {
-            "type": [
-              "string",
-              "null"
-            ]
+            ],
+            "properties": {
+              "id": {
+                "type": "integer",
+                "exclusiveMinimum": 0
+              },
+              "code": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "name": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "rank": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "id"
+            ],
+            "description": "\"Tingkat urgensi\" (owner decision 2026-10-09; replaces periodFrom/periodTo)."
           },
           "notes": {
             "type": [
@@ -2010,8 +2032,7 @@ export const openapiDocument = {
           "uuid",
           "project",
           "costCenter",
-          "periodFrom",
-          "periodTo",
+          "urgencyLevel",
           "notes",
           "requesters",
           "createdBy",
@@ -2462,19 +2483,29 @@ export const openapiDocument = {
             ],
             "pattern": "^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$"
           },
+          "urgencyLevelId": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "exclusiveMinimum": 0,
+            "description": "urgency-levels id of the request PT (\"Tingkat urgensi\", owner decision 2026-10-09)."
+          },
           "periodFrom": {
             "type": [
               "string",
               "null"
             ],
-            "pattern": "^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$"
+            "pattern": "^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$",
+            "description": "Ignored since 2026-10-09: \"Periode kegiatan\" was replaced by the urgency level. Still accepted so older apps keep working."
           },
           "periodTo": {
             "type": [
               "string",
               "null"
             ],
-            "pattern": "^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$"
+            "pattern": "^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$",
+            "description": "Ignored since 2026-10-09: \"Periode kegiatan\" was replaced by the urgency level. Still accepted so older apps keep working."
           },
           "notes": {
             "type": [
@@ -2628,19 +2659,29 @@ export const openapiDocument = {
             ],
             "pattern": "^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$"
           },
+          "urgencyLevelId": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "exclusiveMinimum": 0,
+            "description": "urgency-levels id of the request PT (\"Tingkat urgensi\", owner decision 2026-10-09)."
+          },
           "periodFrom": {
             "type": [
               "string",
               "null"
             ],
-            "pattern": "^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$"
+            "pattern": "^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$",
+            "description": "Ignored since 2026-10-09: \"Periode kegiatan\" was replaced by the urgency level. Still accepted so older apps keep working."
           },
           "periodTo": {
             "type": [
               "string",
               "null"
             ],
-            "pattern": "^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$"
+            "pattern": "^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$",
+            "description": "Ignored since 2026-10-09: \"Periode kegiatan\" was replaced by the urgency level. Still accepted so older apps keep working."
           },
           "notes": {
             "type": [
@@ -4809,17 +4850,12 @@ export const openapiDocument = {
               "null"
             ]
           },
-          "period_from": {
+          "urgency_level_id": {
             "type": [
-              "string",
+              "integer",
               "null"
-            ]
-          },
-          "period_to": {
-            "type": [
-              "string",
-              "null"
-            ]
+            ],
+            "exclusiveMinimum": 0
           },
           "notes": {
             "type": [
@@ -5021,8 +5057,7 @@ export const openapiDocument = {
           "project_id",
           "cost_center_id",
           "needed_date",
-          "period_from",
-          "period_to",
+          "urgency_level_id",
           "notes",
           "requester_ids",
           "bank_account_id",
@@ -5363,19 +5398,29 @@ export const openapiDocument = {
             ],
             "pattern": "^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$"
           },
+          "urgency_level_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "exclusiveMinimum": 0,
+            "description": "urgency-levels id of the request PT (owner decision 2026-10-09)."
+          },
           "period_from": {
             "type": [
               "string",
               "null"
             ],
-            "pattern": "^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$"
+            "pattern": "^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$",
+            "description": "Ignored since 2026-10-09: \"Periode kegiatan\" was replaced by the urgency level. Still accepted so older apps keep working."
           },
           "period_to": {
             "type": [
               "string",
               "null"
             ],
-            "pattern": "^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$"
+            "pattern": "^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$",
+            "description": "Ignored since 2026-10-09: \"Periode kegiatan\" was replaced by the urgency level. Still accepted so older apps keep working."
           },
           "notes": {
             "type": [
@@ -6999,6 +7044,68 @@ export const openapiDocument = {
           "members"
         ]
       },
+      "AttendanceCheckResult": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "exclusiveMinimum": 0
+          },
+          "localDate": {
+            "type": "string",
+            "pattern": "^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$"
+          }
+        },
+        "required": [
+          "id",
+          "localDate"
+        ]
+      },
+      "AttendanceCheckBody": {
+        "type": "object",
+        "properties": {
+          "project_id": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "description": "Project (one of project_id / cost_center_id)."
+          },
+          "cost_center_id": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "description": "Cost center / operational location (E6, Q-40)."
+          },
+          "lat": {
+            "type": "number",
+            "minimum": -90,
+            "maximum": 90
+          },
+          "lng": {
+            "type": "number",
+            "minimum": -180,
+            "maximum": 180
+          },
+          "accuracy_m": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 10000,
+            "description": "Browser GPS accuracy radius (m); up to 50 m is added to the geofence radius."
+          },
+          "selfie_media_id": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "description": "media-selfies id uploaded by the caller (POST /api/v1/media/selfies)."
+          }
+        },
+        "required": [
+          "lat",
+          "lng",
+          "selfie_media_id"
+        ],
+        "additionalProperties": false
+      },
       "AttendanceCorrection": {
         "type": "object",
         "properties": {
@@ -8547,10 +8654,10 @@ export const openapiDocument = {
             "schema": {
               "type": "string",
               "pattern": "^[a-z-]+(,[a-z-]+)*$",
-              "description": "Comma separated subset of: projects, project-stages, cost-centers, expense-categories, uoms, vehicles, employees, banks, bank-accounts, work-schedules, holidays, team-assignments, vendors, cash-in-sources. Default: all."
+              "description": "Comma separated subset of: projects, project-stages, cost-centers, expense-categories, uoms, vehicles, employees, banks, bank-accounts, work-schedules, holidays, team-assignments, vendors, cash-in-sources, urgency-levels. Default: all."
             },
             "required": false,
-            "description": "Comma separated subset of: projects, project-stages, cost-centers, expense-categories, uoms, vehicles, employees, banks, bank-accounts, work-schedules, holidays, team-assignments, vendors, cash-in-sources. Default: all.",
+            "description": "Comma separated subset of: projects, project-stages, cost-centers, expense-categories, uoms, vehicles, employees, banks, bank-accounts, work-schedules, holidays, team-assignments, vendors, cash-in-sources, urgency-levels. Default: all.",
             "name": "types",
             "in": "query"
           },
@@ -21584,6 +21691,266 @@ export const openapiDocument = {
             }
           },
           "403": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/attendance/check-in": {
+      "post": {
+        "summary": "Owner decision 2026-10-09: web self check-in, every role. Selfie first with POST /media/selfies. Synchronous counterpart of the APK sync item attendance.check_in — same gates (company-settings.syncAttendanceEnabled, else FEATURE_DISABLED; ADR 0018 privacy ack, else PRIVACY_ACK_REQUIRED) and rejection codes (MOCK_LOCATION never applies on web; NOT_FOUND, VALIDATION, NO_GEOFENCE, NOT_ASSIGNED, OUTSIDE_GEOFENCE, MEDIA_MISSING, FORBIDDEN, ALREADY_CHECKED_IN)",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": true,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "APK version; below company minimum → 426."
+            },
+            "required": false,
+            "description": "APK version; below company minimum → 426.",
+            "name": "X-App-Version",
+            "in": "header"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AttendanceCheckBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Recorded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttendanceCheckResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/attendance/check-out": {
+      "post": {
+        "summary": "Owner decision 2026-10-09: web self check-out, every role. Same gates/codes as /attendance/check-in, plus NO_CHECK_IN and ALREADY_CHECKED_OUT",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": true,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "APK version; below company minimum → 426."
+            },
+            "required": false,
+            "description": "APK version; below company minimum → 426.",
+            "name": "X-App-Version",
+            "in": "header"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AttendanceCheckBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Recorded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttendanceCheckResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
             "description": "Problem",
             "content": {
               "application/problem+json": {

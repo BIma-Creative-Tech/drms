@@ -286,7 +286,9 @@ export const MediaSelfies = mediaCollection({
   // keeps selfies embeddable in PDF recaps (@react-pdf: JPEG/PNG only).
   formatOptions: { format: 'jpeg', options: { quality: 75, mozjpeg: true } },
   ownerCompany: true,
-  access: { read: focused('media-selfies', ownOrOffice, false), create: rolesAllowedAny('pk-staff', 'pk-pm', 'pk-admin') },
+  // Owner decision 2026-10-09: web self check-in/out is every role, so every role may upload a selfie
+  // (previously staff/pm/admin only, from when only the APK captured attendance).
+  access: { read: focused('media-selfies', ownOrOffice, false), create: rolesAllowedAny('pk-staff', 'pk-pm', 'pk-admin', 'pk-owner', 'pk-finance', 'pk-operator') },
   // ADR 0018 (owner 2026-10-05): no selfie of an uploader without the current privacy acknowledgement while
   // "Versi APK minimum" ≥ 0.3.3 (403 PRIVACY_ACK_REQUIRED, audited access_denied).
   createGuard: assertSelfieUploadAllowed,

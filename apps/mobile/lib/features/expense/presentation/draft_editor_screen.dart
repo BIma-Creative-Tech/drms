@@ -376,6 +376,17 @@ class _DraftEditorScreenState extends ConsumerState<DraftEditorScreen> {
                 if (picked != null) setState(() => _d = _d.copyWith(neededDate: toYmd(picked)));
               },
             ),
+            // Owner decision 2026-10-09: "Tingkat urgensi" (per-PT master, lowest rank first)
+            MasterPickerField(
+              key: const Key('draft-urgency'),
+              label: t.fieldUrgency,
+              items: [...(m[MasterTypes.urgencyLevels] ?? const <MasterItem>[])]
+                ..sort((a, b) => ((a.extra['rank'] as num?) ?? 0).compareTo((b.extra['rank'] as num?) ?? 0)),
+              value: _d.urgencyLevelId,
+              errorText: issueFor('urgencyLevelId'),
+              onChanged: (v) => setState(() => _d = _d.copyWith(urgencyLevelId: v)),
+            ),
+            const SizedBox(height: 12),
             Text(t.fieldRequesters),
             Wrap(
               spacing: 6,

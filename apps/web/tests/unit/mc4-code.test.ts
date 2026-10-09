@@ -157,7 +157,9 @@ describe('MC4 extra (d) — saved list columns get the PT column once (migration
   })
 
   it('the migration names exactly the collections with a PT list column', () => {
-    const got = config.collections.filter((c) => companyFieldOf(c as unknown as CollectionConfig)).map((c) => c.slug).sort()
+    // collections created after that migration had no saved list preferences to fix
+    const ADDED_LATER = ['urgency-levels'] // 20261010_090000_p2s_urgency_level
+    const got = config.collections.filter((c) => companyFieldOf(c as unknown as CollectionConfig) && !ADDED_LATER.includes(c.slug)).map((c) => c.slug).sort()
     expect([...LIST_COMPANY_SLUGS].sort()).toEqual(got)
   })
 

@@ -52,23 +52,18 @@ describe('QA-20(a) Direktur is read-only on users', () => {
   })
 })
 
-describe('QA-20(b) PM is read-only on projects — 403 naming the fields, never a silent 200', () => {
-  it('PM PATCH name/address → 403 naming "Nama project", "Alamat"; budget/status → 403 naming them; nothing saved', async () => {
-    const p = await getTestPayload()
-    const before = await p.findByID({ collection: 'projects', id: w.project, depth: 0, overrideAccess: true /* SYSTEM-READ: assertion */ })
+describe('PM/Admin can update their project (owner decision 2026-10-09 reverses QA-20(b)), never a silent 200 for the rest', () => {
+  it('PM PATCH name/address and budget/status on their own project → 200, fields saved', async () => {
     const a = await api('PATCH', `/api/projects/${w.project}`, w.users.pm, { name: 'Diubah PM', address: 'Jl. Baru' })
-    expect(a.status, msg(a.body)).toBe(403)
-    expect(msg(a.body)).toMatch(/Nama project/)
-    expect(msg(a.body)).toMatch(/Alamat/)
-    const b = await api('PATCH', `/api/projects/${w.project}`, w.users.pm, { budget: 1, status: 'selesai' })
-    expect(b.status, msg(b.body)).toBe(403)
-    expect(msg(b.body)).toMatch(/RAB \(Rp\)/)
-    expect(msg(b.body)).toMatch(/Status/)
+    expect(a.status, msg(a.body)).toBe(200)
+    const b = await api('PATCH', `/api/projects/${w.project}`, w.users.pm, { budget: 1, status: 'selesai', changeReason: 'uji akses PM' })
+    expect(b.status, msg(b.body)).toBe(200)
+    const p = await getTestPayload()
     const after = await p.findByID({ collection: 'projects', id: w.project, depth: 0, overrideAccess: true /* SYSTEM-READ: assertion */ })
-    expect({ name: after.name, budget: after.budget, status: after.status }).toEqual({ name: before.name, budget: before.budget, status: before.status })
+    expect({ name: after.name, address: after.address, budget: after.budget, status: after.status }).toEqual({ name: 'Diubah PM', address: 'Jl. Baru', budget: 1, status: 'selesai' })
   })
 
-  it('Finance (reads all) is also refused with the field names; Direktur saves', async () => {
+  it('Finance (reads all) is refused with the field names; Direktur saves', async () => {
     const f = await api('PATCH', `/api/projects/${w.project}`, w.users.finance, { name: 'Diubah Finance' })
     expect(f.status).toBe(403)
     expect(msg(f.body)).toMatch(/Nama project/)
@@ -82,10 +77,10 @@ describe('QA-20(b) PM is read-only on projects — 403 naming the fields, never 
     expect(msg(r.body)).not.toMatch(/Nama project/)
   })
 
-  it('PM has no update permission on the project document (admin form is read-only)', async () => {
+  it('PM has update permission on their own project document (admin form is editable)', async () => {
     const perms = (await docAccessOperation({ id: w.project, collection: (await getTestPayload()).collections.projects, req: await reqAs(w.users.pm) } as never)) as { read?: unknown; update?: unknown }
     expect(Boolean(perms.read)).toBe(true)
-    expect(Boolean(perms.update)).toBe(false)
+    expect(Boolean(perms.update)).toBe(true)
   })
 })
 

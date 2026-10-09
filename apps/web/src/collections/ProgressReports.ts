@@ -12,7 +12,8 @@ const jsonView = { readOnly: true, components: { Field: '@/components/ReadOnlyJs
 
 /**
  * T11 Laporan progress (`LP/YYMM/####`, US-10/US-31, requirements §4: PM C/R team, Direktur C/R all,
- * Finance R, Admin R (QA-20(d)), Staff —). Written ONLY by the domain service (`domain/progress/reports.ts`:
+ * Admin C/R all (owner decision 2026-10-09, reverses QA-20(d)), Finance R, Staff —). Written ONLY by
+ * the domain service (`domain/progress/reports.ts`:
  * POST/PATCH /api/v1/progress-reports and sync item `progress_report.draft_upsert`) — HTTP
  * create/update/delete on the collection are closed. The service sets the stage % (before → after)
  * and recalculates the project progress in the same transaction (G11).
@@ -33,7 +34,8 @@ export const ProgressReports: CollectionConfig = withAudit(
     },
     defaultSort: '-id',
     access: {
-      // QA-20(d) (owner decision 2026-10-08): Admin reads every row of its PTs (read-only)
+      // Admin reads every row of its PTs; writes go through domain/progress/reports.ts (canReportOn),
+      // which now admits Admin the same as Direktur (owner decision 2026-10-09, reverses QA-20(d)).
       read: byRole({
         'pk-admin': true,
         'pk-owner': true,

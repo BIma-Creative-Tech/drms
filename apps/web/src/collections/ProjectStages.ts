@@ -28,8 +28,9 @@ export const ProjectStages: CollectionConfig = withAudit(
         'pk-pm': teamProjects(),
         'pk-staff': assignedProjects(),
       }),
-      create: rolesAllowed('pk-owner'),
-      update: byRole({ 'pk-owner': true, 'pk-pm': teamProjects() }),
+      // Owner decision 2026-10-09: Admin gains the same stage-creation right as Direktur/PM (reverses QA-20).
+      create: rolesAllowed('pk-owner', 'pk-admin', 'pk-pm'),
+      update: byRole({ 'pk-owner': true, 'pk-admin': true, 'pk-pm': teamProjects() }),
       delete: denyAll,
     },
     hooks: { beforeOperation: [progressWriteGuard('project-stages')], beforeChange: [companyHook('project-stages', { derive: [{ field: 'project', collection: 'projects' }] }), stageWeightGuard], afterChange: [stageRecalcHook] },

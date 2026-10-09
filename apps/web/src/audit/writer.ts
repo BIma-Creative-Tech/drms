@@ -102,6 +102,7 @@ type UserLike = { id?: unknown; roles?: unknown } | null | undefined
  */
 export const PER_PT_DOC_TYPES: Readonly<Record<string, readonly [table: string, column: string]>> = {
   expense_request: ['expense_requests', 'company_id'],
+  urgency_level: ['urgency_levels', 'company_id'],
   budget_addendum: ['budget_addenda', 'company_id'],
   progress_report: ['progress_reports', 'company_id'],
   settlement: ['settlements', 'company_id'],

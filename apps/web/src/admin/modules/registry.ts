@@ -47,7 +47,7 @@ export type ModuleItem =
       badge?: BadgeKey
       /** `data-pk-nav-link` value (kept from F2NavLinks for tests/e2e). */
       navKey?: string
-      /** Label for staff-only users (e.g. "Rekap absensi saya"). */
+      /** Label for a restricted-panel user (staff-only or operator-only, e.g. "Rekap absensi saya"). */
       staffLabel?: string
     }
 
@@ -160,6 +160,8 @@ export const MODULES: readonly ModuleDef[] = [
     sections: [
       {
         items: [
+          // Owner decision 2026-10-09: web self check-in/out for every role (incl. Operator/Anggota)
+          { view: '/absensi/absen', label: 'Absen', navKey: 'absensi-absen' },
           { view: '/absensi', label: 'Tim hari ini', roles: OFFICE_PM_ADMIN, navKey: 'absensi' },
           { view: '/absensi/rekap', label: 'Rekap bulanan', staffLabel: 'Rekap absensi saya', navKey: 'absensi-saya' },
           { view: '/absensi/jadwal', label: 'Jadwal & hari libur', roles: OFFICE_PM_ADMIN, navKey: 'absensi-jadwal' },
@@ -204,7 +206,7 @@ export const MODULES: readonly ModuleDef[] = [
     icon: 'master',
     hint: 'Bank, satuan, vendor',
     manage: true,
-    sections: [{ items: [{ collection: 'banks' }, { collection: 'uoms' }, { collection: 'expense-categories' }, { collection: 'vehicles' }, { collection: 'vendors' }] }],
+    sections: [{ items: [{ collection: 'banks' }, { collection: 'uoms' }, { collection: 'expense-categories' }, { collection: 'urgency-levels' }, { collection: 'vehicles' }, { collection: 'vendors' }] }],
   },
   {
     id: 'media',
@@ -344,6 +346,8 @@ export type ResolvedModule = { id: ModuleId; label: string; icon: IconName; hint
 export type VisibilityInput = {
   roles: readonly Role[]
   staffOnly: boolean
+  /** Operator/Anggota-only caller (owner decision 2026-10-09): same restricted-label treatment as `staffOnly`. */
+  operatorOnly?: boolean
   /** Payload read permission AND visibleEntities for an entity. */
   canSee: (kind: 'collection' | 'global', slug: string) => boolean
   /** Payload create or update permission of an entity (QA-20(c) `manage` modules). Omitted = none. */
@@ -386,7 +390,8 @@ export function resolveModules(input: VisibilityInput, modules: readonly ModuleD
         if ('view' in it) {
           if (!viewAllowed(it, input.roles)) continue
           const badge = it.badge ? (input.badges?.[it.badge] ?? 0) : undefined
-          items.push({ key: href, label: input.staffOnly && it.staffLabel ? it.staffLabel : it.label, href, kind, navKey: it.navKey, ...(badge ? { badge } : {}) })
+          const restricted = input.staffOnly || input.operatorOnly === true
+          items.push({ key: href, label: restricted && it.staffLabel ? it.staffLabel : it.label, href, kind, navKey: it.navKey, ...(badge ? { badge } : {}) })
           if (it.personal) personal.add(href)
         } else {
           const slug = 'collection' in it ? it.collection : it.global

@@ -220,8 +220,7 @@ export async function draftCopy(req: PayloadRequest, id: number): Promise<SyncDr
     project_id: relId(doc.project) ?? null,
     cost_center_id: relId(doc.costCenter) ?? null,
     needed_date: doc.neededDate ?? null,
-    period_from: doc.periodFrom ?? null,
-    period_to: doc.periodTo ?? null,
+    urgency_level_id: relId(doc.urgencyLevel) ?? null,
     notes: doc.notes ?? null,
     requester_ids: ids(doc.requesters),
     bank_account_id: relId(doc.bankAccount) ?? null,
@@ -305,8 +304,8 @@ function toDraftInput(p: SyncDraftUpsert): DraftInput {
   if (p.project_id !== undefined) input.projectId = p.project_id
   if (p.cost_center_id !== undefined) input.costCenterId = p.cost_center_id
   if (p.needed_date !== undefined) input.neededDate = p.needed_date
-  if (p.period_from !== undefined) input.periodFrom = p.period_from
-  if (p.period_to !== undefined) input.periodTo = p.period_to
+  if (p.urgency_level_id !== undefined) input.urgencyLevelId = p.urgency_level_id
+  // period_from / period_to (APK ≤ 0.3.x) are accepted and ignored since 2026-10-09
   if (p.notes !== undefined) input.notes = p.notes
   if (p.requester_ids !== undefined) input.requesterIds = p.requester_ids
   if (p.bank_account_id !== undefined) input.bankAccountId = p.bank_account_id

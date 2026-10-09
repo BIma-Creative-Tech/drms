@@ -200,9 +200,9 @@ describe('progress reports (T11, US-10)', () => {
     expect(direkturWrongStage.status).toBe(400)
   })
 
-  it('negative authz: Staff, Finance, Admin and a PM of another project cannot create (403 + access_denied audit); Direktur can', async () => {
+  it('negative authz: Staff, Finance and a PM of another project cannot create (403 + access_denied audit); Direktur can', async () => {
     const body = { projectId: w.project, stageId: stageA, pctAfter: 55, work: 'Uji hak akses' }
-    for (const u of [w.users.staffA, w.users.finance, w.users.admin, w.users.otherPm]) {
+    for (const u of [w.users.staffA, w.users.finance, w.users.otherPm]) {
       const r = await api('POST', '/api/v1/progress-reports', u, body)
       expect(r.status, u.email).toBe(403)
       expect(r.body.code).toBe('FORBIDDEN')
@@ -214,6 +214,13 @@ describe('progress reports (T11, US-10)', () => {
     expect(await projectPct(w.project)).toBe(25) // 30 × 60 % + 70 × 10 %
     // the collection itself is closed for HTTP writes
     expect((await api('POST', '/api/progress-reports', w.users.owner, { project: w.project, stage: stageA, work: 'x', pctBefore: 0, pctAfter: 1, reportDate: '2026-09-26', reporter: w.users.owner.id })).status).toBe(403)
+  })
+
+  it('Admin can create a progress report on any project of its PT (owner decision 2026-10-09 reverses QA-20(d)), isolated from the cumulative fixture above', async () => {
+    const adminProject = await sysCreate('projects', { code: `prg-ADM${Date.now() % 100000}`, name: 'e4 admin project', pm: w.users.pm.id, budget: 5_000_000, status: 'berjalan' })
+    const adminStage = await sysCreate('project-stages', { project: adminProject, name: 'Satu-satunya', weightPct: 100, sequence: 1 })
+    const r = await api('POST', '/api/v1/progress-reports', w.users.admin, { projectId: adminProject, stageId: adminStage, pctAfter: 40, work: 'Uji Admin' })
+    expect(r.status, JSON.stringify(r.body)).toBe(201)
   })
 
   it('photo limit: 6 photos refused at create (400), adding beyond 5 on edit refused (PHOTO_LIMIT), foreign photo refused', async () => {

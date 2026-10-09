@@ -45,3 +45,13 @@ export async function uploadAttachment(file: File): Promise<number> {
   if (!res.ok) throw new Error(problemText(data, res.status))
   return (data as { id: number }).id
 }
+
+/** Selfie upload for web self-check-in/out (owner decision 2026-10-09; media-selfies, ADR 0004). */
+export async function uploadSelfie(file: File): Promise<number> {
+  const fd = new FormData()
+  fd.append('file', file)
+  const res = await fetch('/api/v1/media/selfies', { method: 'POST', credentials: 'same-origin', body: fd })
+  const data = await res.json().catch(() => null)
+  if (!res.ok) throw new Error(problemText(data, res.status))
+  return (data as { id: number }).id
+}

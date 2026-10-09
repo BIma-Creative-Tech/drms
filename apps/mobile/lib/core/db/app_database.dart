@@ -23,6 +23,9 @@ class LocalDrafts extends Table {
   IntColumn get projectId => integer().nullable()();
   IntColumn get costCenterId => integer().nullable()();
   TextColumn get neededDate => text().nullable()();
+
+  /// Schema v4 (owner decision 2026-10-09): "Tingkat urgensi" of the draft; null = not chosen.
+  IntColumn get urgencyLevelId => integer().nullable()();
   TextColumn get notes => text().nullable()();
   TextColumn get requesterIdsJson => text().withDefault(const Constant('[]'))();
   IntColumn get bankAccountId => integer().nullable()();
@@ -185,7 +188,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
 
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 4;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -201,6 +204,8 @@ class AppDatabase extends _$AppDatabase {
         await m.addColumn(outbox, outbox.companyId);
         if (from >= 2) await m.addColumn(localProgressReports, localProgressReports.companyId);
       }
+      // v4 (2026-10-09): urgency level of a draft, nullable — existing drafts keep NULL ("not chosen").
+      if (from < 4) await m.addColumn(localDrafts, localDrafts.urgencyLevelId);
     },
     beforeOpen: (details) async {
       await customStatement('PRAGMA foreign_keys = ON');
