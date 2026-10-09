@@ -145,7 +145,7 @@ class Run {
     for (const uid of userIds) {
       await this.req.payload.jobs.queue({
         task: 'sendEmail',
-        input: { userId: uid, subject: `ProyekKas — ${m.title}`.slice(0, 200), text: `${m.body}\n\n${base ? `Buka ProyekKas: ${base}\n\n` : ''}Email otomatis pengingat harian ProyekKas.\n` },
+        input: { userId: uid, subject: `RR Teams — ${m.title}`.slice(0, 200), text: `${m.body}\n\n${base ? `Buka RR Teams: ${base}\n\n` : ''}Email otomatis pengingat harian RR Teams.\n` },
         req: this.req,
       })
       this.emails++

@@ -230,7 +230,7 @@ export function resolveReferences(data: ImportData, db: DbKeys, kcMap: ReadonlyM
     }
     for (const u of data.users) {
       if (u.roles.length === 0 && !data.access.some((a) => a.username === u.username)) {
-        issues.push({ level: 'warning', sheet: SHEET_BY_KEY.pengguna.name, row: u._row, column: 'peran', message: `"${u.username}" tanpa peran di PT mana pun: akun dibuat tetapi belum bisa memakai ProyekKas.` })
+        issues.push({ level: 'warning', sheet: SHEET_BY_KEY.pengguna.name, row: u._row, column: 'peran', message: `"${u.username}" tanpa peran di PT mana pun: akun dibuat tetapi belum bisa memakai RR Teams.` })
       }
     }
   }
@@ -252,7 +252,7 @@ export function resolveReferences(data: ImportData, db: DbKeys, kcMap: ReadonlyM
     const byEmail = db.usersByEmail.get(email)
     if (bySub) {
       if (byEmail && byEmail.id !== bySub.id) {
-        issues.push({ level: 'error', sheet: sheetUsers, row: u._row, column: 'email', message: `Email ${email} sudah dipakai pengguna lain di ProyekKas.` })
+        issues.push({ level: 'error', sheet: sheetUsers, row: u._row, column: 'email', message: `Email ${email} sudah dipakai pengguna lain di RR Teams.` })
       }
       users.set(u.username, { username: u.username, email, action: 'update', sub, id: bySub.id })
     } else if (byEmail) {
@@ -269,7 +269,7 @@ export function resolveReferences(data: ImportData, db: DbKeys, kcMap: ReadonlyM
         sheet: sheetUsers,
         row: u._row,
         column: 'username',
-        message: `Akun Keycloak untuk "${u.username}" belum ada di file pemetaan → pengguna belum dibuat di ProyekKas (jalankan ulang impor setelah Lead membuat akun di Keycloak).`,
+        message: `Akun Keycloak untuk "${u.username}" belum ada di file pemetaan → pengguna belum dibuat di RR Teams (jalankan ulang impor setelah Lead membuat akun di Keycloak).`,
       })
     }
   }
@@ -290,7 +290,7 @@ export function resolveReferences(data: ImportData, db: DbKeys, kcMap: ReadonlyM
     const pt = P(rowObj)
     if (ref.includes('@')) {
       const existing = db.usersByEmail.get(ref)
-      if (!existing) issues.push({ level: 'error', sheet: SHEET_BY_KEY[sheet].name, row, column, message: `Pengguna dengan email ${ref} tidak ditemukan di ProyekKas.` })
+      if (!existing) issues.push({ level: 'error', sheet: SHEET_BY_KEY[sheet].name, row, column, message: `Pengguna dengan email ${ref} tidak ditemukan di RR Teams.` })
       else if (pt && !db.membershipsByUser.get(existing.id)?.has(pt)) issues.push({ level: 'error', sheet: SHEET_BY_KEY[sheet].name, row, column, message: `Pengguna ${ref} bukan anggota aktif PT ${pt}.` })
       return
     }

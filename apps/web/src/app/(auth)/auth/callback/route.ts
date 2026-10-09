@@ -50,14 +50,14 @@ export async function GET(request: NextRequest): Promise<Response> {
     if (!user) {
       payload.logger.warn({ msg: 'login denied: unknown or inactive user' })
       await auditLoginFailed(payload, request.headers, { reason: 'unknown_or_inactive_user', keycloakSub: idClaims.sub })
-      return fail(403, 'Akun belum terdaftar atau tidak aktif di ProyekKas.')
+      return fail(403, 'Akun belum terdaftar atau tidak aktif di RR Teams.')
     }
     // ADR 0016 §2: the token proves identity + `pk-user` (MC1 transition: or a legacy pk-* role);
     // per-PT roles are DB-only (company-memberships) — no role sync from the token any more.
     if (!tokenAllowsLogin(access.realm_access?.roles)) {
       payload.logger.warn({ msg: 'login denied: no pk-user realm role' })
       await auditLoginFailed(payload, request.headers, { reason: 'no_login_role', userId: user.id, keycloakSub: idClaims.sub })
-      return fail(403, 'Akun belum diberi akses ProyekKas.')
+      return fail(403, 'Akun belum diberi akses RR Teams.')
     }
     const session = await createWebSession(payload, { id: user.id }, {
       keycloakSid: typeof idClaims.sid === 'string' ? idClaims.sid : undefined,

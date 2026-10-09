@@ -8,6 +8,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Changed
 
+- **App renamed to "RR Teams"** (owner 2026-10-09; display name only). Web: admin bar, login logo, browser title
+  suffix " — RR Teams", /unduh page and APK download name `RR-Teams-<v>.apk`, e-mail subjects/texts, PDF metadata,
+  API title, error messages, import template/report. The "DRMS" sub-label next to the name is dropped. Android
+  (**APK 0.3.5**, notes `docs/release-notes/apk/0.3.5.md`): launcher label "RR Teams" / "RR Teams STG", app title,
+  login title, messages. Employee privacy notice: name changed editorially, **stays version 1** (no re-acknowledgement).
+  Unchanged on purpose: Android `applicationId`, package/class names, database, domains, `/unduh/proyekkas.apk` URL
+  (installed apps keep updating). Keycloak login page title (realm display name) is infra-managed — separate request.
+
+### Changed
+
 - Admin custom views: the remaining text links become buttons — card header actions ("Jadwal baru", "Lihat semua",
   "Rekap Kas", …) and empty-state actions are small outlined buttons with an icon (pencil for Ubah/Atur, plus for
   Buat/…baru, arrow for navigation); the hint of clickable stat tiles ("Ubah", "Atur titik", "Daftar", "Lihat

@@ -64,7 +64,7 @@ try {
   const who = (await (payload.db as unknown as PostgresAdapter).drizzle.execute(sql`SELECT current_user::text AS u, current_database()::text AS d`)) as unknown as { rows: Array<{ u: string; d: string }> }
   const { u, d } = who.rows[0]!
   if (/_owner$/.test(u)) throw new Error(`jalankan dengan role APP (bukan ${u}) — sama seperti seed`)
-  console.log(`ProyekKas impor go-live — mode ${opts.mode}, database ${d} (role ${u}), file ${path.basename(opts.file!)}`)
+  console.log(`RR Teams impor go-live — mode ${opts.mode}, database ${d} (role ${u}), file ${path.basename(opts.file!)}`)
   const bytes = new Uint8Array(readFileSync(opts.file!))
   const report = await runImport(payload, { bytes, fileName: path.basename(opts.file!), mode: opts.mode!, kcMap, operator: opts.operator })
   console.log(formatReport(report))

@@ -9,6 +9,7 @@ import React, { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef,
 
 import { Icon } from '@/admin/modules/Icon'
 import { activeHref, moduleForPath, profileHref, type ResolvedItem, type ResolvedModule, type ResolvedSection } from '@/admin/modules/registry'
+import { BRAND_NAME } from '@/theme/graphics'
 
 import type { SwitcherState } from './company-switcher'
 import { CompanySwitcher } from './CompanySwitcher'
@@ -467,7 +468,7 @@ export function ModuleBar({ modules, user, companies, bell, logout }: Props) {
             </Link>
           ) : (
             <span className="pk-bar__module pk-bar__brand">
-              ProyekKas <span className="pk-bar__brand-sub">DRMS</span>
+              {BRAND_NAME}
             </span>
           )}
         </div>

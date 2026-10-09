@@ -1,6 +1,6 @@
 import React from 'react'
 
-import { BRAND_NAME, BRAND_PRODUCT } from '@/theme/graphics'
+import { BRAND_NAME } from '@/theme/graphics'
 
 /** Brand row of the public pages (/unduh, /privasi): inline SVG mark + name, no client JS. */
 export function PublicBrand() {
@@ -12,7 +12,7 @@ export function PublicBrand() {
         <circle cx="17.5" cy="17.5" r="2" className="pk-pub__mark-dot" />
       </svg>
       <span>
-        <span className="pk-pub__name">{BRAND_NAME}</span> <span className="pk-pub__product">{BRAND_PRODUCT}</span>
+        <span className="pk-pub__name">{BRAND_NAME}</span>
       </span>
     </header>
   )

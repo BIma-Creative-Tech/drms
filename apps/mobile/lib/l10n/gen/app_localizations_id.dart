@@ -10,7 +10,7 @@ class AppLocalizationsId extends AppLocalizations {
   AppLocalizationsId([String locale = 'id']) : super(locale);
 
   @override
-  String get appTitle => 'ProyekKas';
+  String get appTitle => 'RR Teams';
 
   @override
   String get loading => 'Memuat…';
@@ -56,7 +56,7 @@ class AppLocalizationsId extends AppLocalizations {
   }
 
   @override
-  String get loginTitle => 'Masuk ke ProyekKas';
+  String get loginTitle => 'Masuk ke RR Teams';
 
   @override
   String get loginSubtitle => 'Gunakan akun DRMS Anda. Halaman masuk dibuka di browser HP.';
