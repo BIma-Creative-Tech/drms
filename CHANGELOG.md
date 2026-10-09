@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.6.4] - 2026-10-09
+
+Admin CMS follow-up (PR #32): the remaining text links in the custom views (stat tiles, card headers, empty states,
+back/next links) become buttons. Web only, no database migration; APK unchanged (mobile-v0.3.4).
+
 ### Changed
 
 - Admin custom views: the remaining text links become buttons — card header actions ("Jadwal baru", "Lihat semua",
