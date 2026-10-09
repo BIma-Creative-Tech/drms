@@ -102,8 +102,16 @@ describe('pk-operator (Operator/Anggota) is attendance-only', () => {
     expect(users.every((u) => u === operator.id)).toBe(true)
   })
 
-  it('no business data: projects / expense requests / employees → 403; cannot create a request', async () => {
-    for (const c of ['projects', 'expense-requests', 'employees', 'cost-centers']) {
+  it('sees only its assigned project (APK location list), without the RAB', async () => {
+    const r = await api('GET', '/api/projects?limit=50&depth=0', operator)
+    expect(r.status).toBe(200)
+    const docs = (r.body as { docs: Array<{ id: number; budget?: unknown }> }).docs
+    expect(docs.map((d) => d.id)).toEqual([w.project])
+    expect(docs[0]!.budget).toBeUndefined()
+  })
+
+  it('no business data: expense requests / employees / team assignments → 403; cannot create a request', async () => {
+    for (const c of ['expense-requests', 'employees', 'team-assignments']) {
       expect((await api('GET', `/api/${c}?limit=1`, operator)).status, c).toBe(403)
     }
     const create = await api('POST', '/api/expense-requests', operator, { title: 'x' })

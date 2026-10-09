@@ -1,7 +1,7 @@
 import type { CollectionConfig } from 'payload'
 
 import { readOnlyFieldsGuard } from '@/access/field-guard'
-import { denyAll, hasRole } from '@/access/roles'
+import { denyAll, hasRole, isOperatorOnly } from '@/access/roles'
 import { assignedProjects, byRole, fieldRoles, rolesAllowed } from '@/access/policies'
 import { inIds } from '@/access/scope'
 import { reasonOnChange, withAudit } from '@/audit/hooks'
@@ -44,6 +44,8 @@ export const Projects: CollectionConfig = withAudit(
         'pk-finance': true,
         'pk-pm': async ({ scope }) => inIds('id', (await scope()).teamProjects),
         'pk-staff': assignedProjects('id'),
+        // Operator/Anggota: its assigned projects only — the APK attendance location list (masters)
+        'pk-operator': assignedProjects('id'),
       }),
       create: rolesAllowed(...PROJECT_EDITOR_ROLES),
       update: byRole({
@@ -73,7 +75,8 @@ export const Projects: CollectionConfig = withAudit(
       },
       // QA-16: only active PMs of the project's PT, shown by name (users.displayName)
       { name: 'pm', type: 'relationship', relationTo: 'users', label: 'Project Manager', index: true, access: { update: projectEditors }, ...userPicker({ roles: ['pk-pm'] }) },
-      { ...rupiahField('budget', 'RAB (Rp)'), access: { update: projectEditors } },
+      // RAB hidden from Operator/Anggota (attendance-only role reads its assigned project for the location only)
+      { ...rupiahField('budget', 'RAB (Rp)'), access: { read: ({ req }) => !isOperatorOnly(req.user), update: projectEditors } },
       {
         type: 'row',
         fields: [
