@@ -72,6 +72,9 @@ abstract class DraftRequest with _$DraftRequest {
     int? projectId,
     int? costCenterId,
     String? neededDate,
+
+    /// Owner decision 2026-10-09: "Tingkat urgensi" (`urgency-levels` master of the draft's PT).
+    int? urgencyLevelId,
     String? notes,
     @Default([]) List<int> requesterIds,
     int? bankAccountId,

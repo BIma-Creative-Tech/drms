@@ -29,7 +29,20 @@ abstract final class MasterTypes {
   static const projectStages = 'project-stages';
   static const teamAssignments = 'team-assignments';
 
-  static const forExpense = [projects, costCenters, categories, uoms, vehicles, employees, bankAccounts, banks];
+  /// Owner decision 2026-10-09: "Tingkat urgensi" of an expense draft (server ≥ 0.7 knows this type).
+  static const urgencyLevels = 'urgency-levels';
+
+  static const forExpense = [
+    projects,
+    costCenters,
+    categories,
+    uoms,
+    vehicles,
+    employees,
+    bankAccounts,
+    banks,
+    urgencyLevels,
+  ];
 
   /// Everything the APK caches (expense pickers + E4 stages + E6 team assignments for on-behalf offline).
   static const forApp = [...forExpense, projectStages, teamAssignments];
@@ -52,6 +65,7 @@ MasterItem masterFromJson(String type, Map<String, dynamic> j, {Map<int, String>
       return [bank, s('accountHolder'), masked].where((e) => e.isNotEmpty).join(' · ');
     }(),
     MasterTypes.projectStages => s('name'),
+    MasterTypes.urgencyLevels => s('name'),
     MasterTypes.teamAssignments => '#$id',
     MasterTypes.employees => s('nickname').isNotEmpty ? '${s('name')} (${s('nickname')})' : s('name'),
     _ => s('code').isNotEmpty ? '${s('code')} — ${s('name')}' : s('name'),

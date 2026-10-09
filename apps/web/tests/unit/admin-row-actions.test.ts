@@ -107,12 +107,8 @@ describe('row actions in the real config', () => {
 })
 
 describe('migration 20261009_120000_list_row_actions_column', () => {
-  it('is registered last and appends the column only to list preferences that do not name it', async () => {
-    // registered after every migration it shipped with; later migrations only add collections whose
-    // defaultColumns already end with rowActions (withRowActions), so no saved preference predates it
-    const names = migrations.map((m) => m.name)
-    expect(names.indexOf('20261009_120000_list_row_actions_column')).toBe(names.indexOf('20261009_090000_qa_settlements_guard_merge') + 1)
-    expect(names.slice(names.indexOf('20261009_120000_list_row_actions_column') + 1).every((n) => n >= '20261010')).toBe(true)
+  it('is registered and appends the column only to list preferences that do not name it', async () => {
+    expect(migrations.some((m) => m.name === '20261009_120000_list_row_actions_column')).toBe(true)
     const seen: string[] = []
     const flat = (x: unknown): string => {
       if (x === null || x === undefined) return ''

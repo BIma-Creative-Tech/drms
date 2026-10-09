@@ -40,8 +40,8 @@ export type RequestDoc = {
   costCenter?: unknown
   requestDate?: string | null
   neededDate?: string | null
-  periodFrom?: string | null
-  periodTo?: string | null
+  /** Owner decision 2026-10-09: "Tingkat Urgensi" (urgency-levels, per PT); replaces periodFrom/periodTo. */
+  urgencyLevel?: unknown
   notes?: string | null
   requesters?: unknown[] | null
   createdBy?: unknown

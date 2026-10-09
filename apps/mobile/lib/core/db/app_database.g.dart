@@ -94,6 +94,17 @@ class $LocalDraftsTable extends LocalDrafts
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _urgencyLevelIdMeta = const VerificationMeta(
+    'urgencyLevelId',
+  );
+  @override
+  late final GeneratedColumn<int> urgencyLevelId = GeneratedColumn<int>(
+    'urgency_level_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _notesMeta = const VerificationMeta('notes');
   @override
   late final GeneratedColumn<String> notes = GeneratedColumn<String>(
@@ -229,6 +240,7 @@ class $LocalDraftsTable extends LocalDrafts
     projectId,
     costCenterId,
     neededDate,
+    urgencyLevelId,
     notes,
     requesterIdsJson,
     bankAccountId,
@@ -308,6 +320,15 @@ class $LocalDraftsTable extends LocalDrafts
       context.handle(
         _neededDateMeta,
         neededDate.isAcceptableOrUnknown(data['needed_date']!, _neededDateMeta),
+      );
+    }
+    if (data.containsKey('urgency_level_id')) {
+      context.handle(
+        _urgencyLevelIdMeta,
+        urgencyLevelId.isAcceptableOrUnknown(
+          data['urgency_level_id']!,
+          _urgencyLevelIdMeta,
+        ),
       );
     }
     if (data.containsKey('notes')) {
@@ -430,6 +451,10 @@ class $LocalDraftsTable extends LocalDrafts
         DriftSqlType.string,
         data['${effectivePrefix}needed_date'],
       ),
+      urgencyLevelId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}urgency_level_id'],
+      ),
       notes: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}notes'],
@@ -495,6 +520,9 @@ class LocalDraft extends DataClass implements Insertable<LocalDraft> {
   final int? projectId;
   final int? costCenterId;
   final String? neededDate;
+
+  /// Schema v4 (owner decision 2026-10-09): "Tingkat urgensi" of the draft; null = not chosen.
+  final int? urgencyLevelId;
   final String? notes;
   final String requesterIdsJson;
   final int? bankAccountId;
@@ -517,6 +545,7 @@ class LocalDraft extends DataClass implements Insertable<LocalDraft> {
     this.projectId,
     this.costCenterId,
     this.neededDate,
+    this.urgencyLevelId,
     this.notes,
     required this.requesterIdsJson,
     this.bankAccountId,
@@ -547,6 +576,9 @@ class LocalDraft extends DataClass implements Insertable<LocalDraft> {
     }
     if (!nullToAbsent || neededDate != null) {
       map['needed_date'] = Variable<String>(neededDate);
+    }
+    if (!nullToAbsent || urgencyLevelId != null) {
+      map['urgency_level_id'] = Variable<int>(urgencyLevelId);
     }
     if (!nullToAbsent || notes != null) {
       map['notes'] = Variable<String>(notes);
@@ -592,6 +624,9 @@ class LocalDraft extends DataClass implements Insertable<LocalDraft> {
       neededDate: neededDate == null && nullToAbsent
           ? const Value.absent()
           : Value(neededDate),
+      urgencyLevelId: urgencyLevelId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(urgencyLevelId),
       notes: notes == null && nullToAbsent
           ? const Value.absent()
           : Value(notes),
@@ -632,6 +667,7 @@ class LocalDraft extends DataClass implements Insertable<LocalDraft> {
       projectId: serializer.fromJson<int?>(json['projectId']),
       costCenterId: serializer.fromJson<int?>(json['costCenterId']),
       neededDate: serializer.fromJson<String?>(json['neededDate']),
+      urgencyLevelId: serializer.fromJson<int?>(json['urgencyLevelId']),
       notes: serializer.fromJson<String?>(json['notes']),
       requesterIdsJson: serializer.fromJson<String>(json['requesterIdsJson']),
       bankAccountId: serializer.fromJson<int?>(json['bankAccountId']),
@@ -657,6 +693,7 @@ class LocalDraft extends DataClass implements Insertable<LocalDraft> {
       'projectId': serializer.toJson<int?>(projectId),
       'costCenterId': serializer.toJson<int?>(costCenterId),
       'neededDate': serializer.toJson<String?>(neededDate),
+      'urgencyLevelId': serializer.toJson<int?>(urgencyLevelId),
       'notes': serializer.toJson<String?>(notes),
       'requesterIdsJson': serializer.toJson<String>(requesterIdsJson),
       'bankAccountId': serializer.toJson<int?>(bankAccountId),
@@ -680,6 +717,7 @@ class LocalDraft extends DataClass implements Insertable<LocalDraft> {
     Value<int?> projectId = const Value.absent(),
     Value<int?> costCenterId = const Value.absent(),
     Value<String?> neededDate = const Value.absent(),
+    Value<int?> urgencyLevelId = const Value.absent(),
     Value<String?> notes = const Value.absent(),
     String? requesterIdsJson,
     Value<int?> bankAccountId = const Value.absent(),
@@ -700,6 +738,9 @@ class LocalDraft extends DataClass implements Insertable<LocalDraft> {
     projectId: projectId.present ? projectId.value : this.projectId,
     costCenterId: costCenterId.present ? costCenterId.value : this.costCenterId,
     neededDate: neededDate.present ? neededDate.value : this.neededDate,
+    urgencyLevelId: urgencyLevelId.present
+        ? urgencyLevelId.value
+        : this.urgencyLevelId,
     notes: notes.present ? notes.value : this.notes,
     requesterIdsJson: requesterIdsJson ?? this.requesterIdsJson,
     bankAccountId: bankAccountId.present
@@ -732,6 +773,9 @@ class LocalDraft extends DataClass implements Insertable<LocalDraft> {
       neededDate: data.neededDate.present
           ? data.neededDate.value
           : this.neededDate,
+      urgencyLevelId: data.urgencyLevelId.present
+          ? data.urgencyLevelId.value
+          : this.urgencyLevelId,
       notes: data.notes.present ? data.notes.value : this.notes,
       requesterIdsJson: data.requesterIdsJson.present
           ? data.requesterIdsJson.value
@@ -763,6 +807,7 @@ class LocalDraft extends DataClass implements Insertable<LocalDraft> {
           ..write('projectId: $projectId, ')
           ..write('costCenterId: $costCenterId, ')
           ..write('neededDate: $neededDate, ')
+          ..write('urgencyLevelId: $urgencyLevelId, ')
           ..write('notes: $notes, ')
           ..write('requesterIdsJson: $requesterIdsJson, ')
           ..write('bankAccountId: $bankAccountId, ')
@@ -788,6 +833,7 @@ class LocalDraft extends DataClass implements Insertable<LocalDraft> {
     projectId,
     costCenterId,
     neededDate,
+    urgencyLevelId,
     notes,
     requesterIdsJson,
     bankAccountId,
@@ -812,6 +858,7 @@ class LocalDraft extends DataClass implements Insertable<LocalDraft> {
           other.projectId == this.projectId &&
           other.costCenterId == this.costCenterId &&
           other.neededDate == this.neededDate &&
+          other.urgencyLevelId == this.urgencyLevelId &&
           other.notes == this.notes &&
           other.requesterIdsJson == this.requesterIdsJson &&
           other.bankAccountId == this.bankAccountId &&
@@ -834,6 +881,7 @@ class LocalDraftsCompanion extends UpdateCompanion<LocalDraft> {
   final Value<int?> projectId;
   final Value<int?> costCenterId;
   final Value<String?> neededDate;
+  final Value<int?> urgencyLevelId;
   final Value<String?> notes;
   final Value<String> requesterIdsJson;
   final Value<int?> bankAccountId;
@@ -855,6 +903,7 @@ class LocalDraftsCompanion extends UpdateCompanion<LocalDraft> {
     this.projectId = const Value.absent(),
     this.costCenterId = const Value.absent(),
     this.neededDate = const Value.absent(),
+    this.urgencyLevelId = const Value.absent(),
     this.notes = const Value.absent(),
     this.requesterIdsJson = const Value.absent(),
     this.bankAccountId = const Value.absent(),
@@ -877,6 +926,7 @@ class LocalDraftsCompanion extends UpdateCompanion<LocalDraft> {
     this.projectId = const Value.absent(),
     this.costCenterId = const Value.absent(),
     this.neededDate = const Value.absent(),
+    this.urgencyLevelId = const Value.absent(),
     this.notes = const Value.absent(),
     this.requesterIdsJson = const Value.absent(),
     this.bankAccountId = const Value.absent(),
@@ -903,6 +953,7 @@ class LocalDraftsCompanion extends UpdateCompanion<LocalDraft> {
     Expression<int>? projectId,
     Expression<int>? costCenterId,
     Expression<String>? neededDate,
+    Expression<int>? urgencyLevelId,
     Expression<String>? notes,
     Expression<String>? requesterIdsJson,
     Expression<int>? bankAccountId,
@@ -925,6 +976,7 @@ class LocalDraftsCompanion extends UpdateCompanion<LocalDraft> {
       if (projectId != null) 'project_id': projectId,
       if (costCenterId != null) 'cost_center_id': costCenterId,
       if (neededDate != null) 'needed_date': neededDate,
+      if (urgencyLevelId != null) 'urgency_level_id': urgencyLevelId,
       if (notes != null) 'notes': notes,
       if (requesterIdsJson != null) 'requester_ids_json': requesterIdsJson,
       if (bankAccountId != null) 'bank_account_id': bankAccountId,
@@ -949,6 +1001,7 @@ class LocalDraftsCompanion extends UpdateCompanion<LocalDraft> {
     Value<int?>? projectId,
     Value<int?>? costCenterId,
     Value<String?>? neededDate,
+    Value<int?>? urgencyLevelId,
     Value<String?>? notes,
     Value<String>? requesterIdsJson,
     Value<int?>? bankAccountId,
@@ -971,6 +1024,7 @@ class LocalDraftsCompanion extends UpdateCompanion<LocalDraft> {
       projectId: projectId ?? this.projectId,
       costCenterId: costCenterId ?? this.costCenterId,
       neededDate: neededDate ?? this.neededDate,
+      urgencyLevelId: urgencyLevelId ?? this.urgencyLevelId,
       notes: notes ?? this.notes,
       requesterIdsJson: requesterIdsJson ?? this.requesterIdsJson,
       bankAccountId: bankAccountId ?? this.bankAccountId,
@@ -1012,6 +1066,9 @@ class LocalDraftsCompanion extends UpdateCompanion<LocalDraft> {
     }
     if (neededDate.present) {
       map['needed_date'] = Variable<String>(neededDate.value);
+    }
+    if (urgencyLevelId.present) {
+      map['urgency_level_id'] = Variable<int>(urgencyLevelId.value);
     }
     if (notes.present) {
       map['notes'] = Variable<String>(notes.value);
@@ -1063,6 +1120,7 @@ class LocalDraftsCompanion extends UpdateCompanion<LocalDraft> {
           ..write('projectId: $projectId, ')
           ..write('costCenterId: $costCenterId, ')
           ..write('neededDate: $neededDate, ')
+          ..write('urgencyLevelId: $urgencyLevelId, ')
           ..write('notes: $notes, ')
           ..write('requesterIdsJson: $requesterIdsJson, ')
           ..write('bankAccountId: $bankAccountId, ')
@@ -5708,6 +5766,7 @@ typedef $$LocalDraftsTableCreateCompanionBuilder =
       Value<int?> projectId,
       Value<int?> costCenterId,
       Value<String?> neededDate,
+      Value<int?> urgencyLevelId,
       Value<String?> notes,
       Value<String> requesterIdsJson,
       Value<int?> bankAccountId,
@@ -5731,6 +5790,7 @@ typedef $$LocalDraftsTableUpdateCompanionBuilder =
       Value<int?> projectId,
       Value<int?> costCenterId,
       Value<String?> neededDate,
+      Value<int?> urgencyLevelId,
       Value<String?> notes,
       Value<String> requesterIdsJson,
       Value<int?> bankAccountId,
@@ -5835,6 +5895,11 @@ class $$LocalDraftsTableFilterComposer
 
   ColumnFilters<String> get neededDate => $composableBuilder(
     column: $table.neededDate,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get urgencyLevelId => $composableBuilder(
+    column: $table.urgencyLevelId,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -5993,6 +6058,11 @@ class $$LocalDraftsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<int> get urgencyLevelId => $composableBuilder(
+    column: $table.urgencyLevelId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get notes => $composableBuilder(
     column: $table.notes,
     builder: (column) => ColumnOrderings(column),
@@ -6085,6 +6155,11 @@ class $$LocalDraftsTableAnnotationComposer
 
   GeneratedColumn<String> get neededDate => $composableBuilder(
     column: $table.neededDate,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get urgencyLevelId => $composableBuilder(
+    column: $table.urgencyLevelId,
     builder: (column) => column,
   );
 
@@ -6214,6 +6289,7 @@ class $$LocalDraftsTableTableManager
                 Value<int?> projectId = const Value.absent(),
                 Value<int?> costCenterId = const Value.absent(),
                 Value<String?> neededDate = const Value.absent(),
+                Value<int?> urgencyLevelId = const Value.absent(),
                 Value<String?> notes = const Value.absent(),
                 Value<String> requesterIdsJson = const Value.absent(),
                 Value<int?> bankAccountId = const Value.absent(),
@@ -6235,6 +6311,7 @@ class $$LocalDraftsTableTableManager
                 projectId: projectId,
                 costCenterId: costCenterId,
                 neededDate: neededDate,
+                urgencyLevelId: urgencyLevelId,
                 notes: notes,
                 requesterIdsJson: requesterIdsJson,
                 bankAccountId: bankAccountId,
@@ -6258,6 +6335,7 @@ class $$LocalDraftsTableTableManager
                 Value<int?> projectId = const Value.absent(),
                 Value<int?> costCenterId = const Value.absent(),
                 Value<String?> neededDate = const Value.absent(),
+                Value<int?> urgencyLevelId = const Value.absent(),
                 Value<String?> notes = const Value.absent(),
                 Value<String> requesterIdsJson = const Value.absent(),
                 Value<int?> bankAccountId = const Value.absent(),
@@ -6279,6 +6357,7 @@ class $$LocalDraftsTableTableManager
                 projectId: projectId,
                 costCenterId: costCenterId,
                 neededDate: neededDate,
+                urgencyLevelId: urgencyLevelId,
                 notes: notes,
                 requesterIdsJson: requesterIdsJson,
                 bankAccountId: bankAccountId,

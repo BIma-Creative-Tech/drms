@@ -154,8 +154,7 @@ export async function submit(req: PayloadRequest, id: number, opts: SubmitOption
       bankAccountId: relId(doc.bankAccount) ?? null,
       lines: fromDocLines(doc),
       neededDate: doc.neededDate,
-      periodFrom: doc.periodFrom,
-      periodTo: doc.periodTo,
+      urgencyLevelId: relId(doc.urgencyLevel) ?? null,
     },
     { forSubmit: true, creatorId: creator },
   )

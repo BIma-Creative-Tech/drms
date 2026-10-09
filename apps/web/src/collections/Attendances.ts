@@ -43,6 +43,8 @@ export const Attendances: CollectionConfig = withAudit(
         'pk-finance': true,
         'pk-pm': anyOf(teamProjects('project'), teamCostCenters('costCenter'), ownUser('user'), ownEmployee('employee')),
         'pk-staff': anyOf(ownUser('user'), ownEmployee('employee')),
+        // Operator/Anggota (owner decision 2026-10-09): own attendance only, same as Staff.
+        'pk-operator': anyOf(ownUser('user'), ownEmployee('employee')),
       }),
       create: denyAll,
       update: denyAll,

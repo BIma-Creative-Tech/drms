@@ -40,6 +40,22 @@ export function registerAttendancePaths(registry: OpenAPIRegistry, h: Helpers): 
   })
   registry.registerPath({
     method: 'post',
+    path: '/attendance/check-in',
+    summary: 'Owner decision 2026-10-09: web self check-in, every role. Selfie first with POST /media/selfies. Synchronous counterpart of the APK sync item attendance.check_in — same gates (company-settings.syncAttendanceEnabled, else FEATURE_DISABLED; ADR 0018 privacy ack, else PRIVACY_ACK_REQUIRED) and rejection codes (MOCK_LOCATION never applies on web; NOT_FOUND, VALIDATION, NO_GEOFENCE, NOT_ASSIGNED, OUTSIDE_GEOFENCE, MEDIA_MISSING, FORBIDDEN, ALREADY_CHECKED_IN)',
+    security: h.security,
+    request: { headers: h.deviceHeader, body: { content: { 'application/json': { schema: A.AttendanceCheckBody } } } },
+    responses: h.res(201, 'Recorded', A.AttendanceCheckResult, [400, 401, 403, 404, 409, 426, 429]),
+  })
+  registry.registerPath({
+    method: 'post',
+    path: '/attendance/check-out',
+    summary: 'Owner decision 2026-10-09: web self check-out, every role. Same gates/codes as /attendance/check-in, plus NO_CHECK_IN and ALREADY_CHECKED_OUT',
+    security: h.security,
+    request: { headers: h.deviceHeader, body: { content: { 'application/json': { schema: A.AttendanceCheckBody } } } },
+    responses: h.res(201, 'Recorded', A.AttendanceCheckResult, [400, 401, 403, 404, 409, 426, 429]),
+  })
+  registry.registerPath({
+    method: 'post',
     path: '/attendance/{id}/correct',
     summary: 'US-15 T10 correction of one attendance time (PM of the team location or Admin; never own attendance; reason required; same local date). Creates an append-only correction; audit old → new',
     security: h.security,

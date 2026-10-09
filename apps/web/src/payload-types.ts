@@ -88,6 +88,7 @@ export interface Config {
     'approval-rules': ApprovalRule;
     'notification-templates': NotificationTemplate;
     uoms: Uom;
+    'urgency-levels': UrgencyLevel;
     vehicles: Vehicle;
     'cost-centers': CostCenter;
     'document-sequences': DocumentSequence;
@@ -148,6 +149,7 @@ export interface Config {
     'approval-rules': ApprovalRulesSelect<false> | ApprovalRulesSelect<true>;
     'notification-templates': NotificationTemplatesSelect<false> | NotificationTemplatesSelect<true>;
     uoms: UomsSelect<false> | UomsSelect<true>;
+    'urgency-levels': UrgencyLevelsSelect<false> | UrgencyLevelsSelect<true>;
     vehicles: VehiclesSelect<false> | VehiclesSelect<true>;
     'cost-centers': CostCentersSelect<false> | CostCentersSelect<true>;
     'document-sequences': DocumentSequencesSelect<false> | DocumentSequencesSelect<true>;
@@ -501,7 +503,7 @@ export interface CompanyMembership {
   user: number | User;
   company: number | Company;
   employee?: (number | null) | Employee;
-  roles?: ('pk-staff' | 'pk-pm' | 'pk-finance' | 'pk-owner' | 'pk-admin')[] | null;
+  roles?: ('pk-staff' | 'pk-pm' | 'pk-finance' | 'pk-owner' | 'pk-admin' | 'pk-operator')[] | null;
   active?: boolean | null;
   /**
    * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
@@ -986,14 +988,14 @@ export interface ApprovalRule {
   priority?: number | null;
   acknowledge: 'required' | 'optional' | 'none';
   acknowledgeBy: 'scope_manager' | 'role' | 'user';
-  acknowledgeRole?: ('pk-staff' | 'pk-pm' | 'pk-finance' | 'pk-owner' | 'pk-admin') | null;
+  acknowledgeRole?: ('pk-staff' | 'pk-pm' | 'pk-finance' | 'pk-owner' | 'pk-admin' | 'pk-operator') | null;
   acknowledgeUser?: (number | null) | User;
   signDiajukan: 'required' | 'optional' | 'none';
   signDibuat: 'required' | 'optional' | 'none';
   steps?:
     | {
         level: number;
-        approverRole?: ('pk-staff' | 'pk-pm' | 'pk-finance' | 'pk-owner' | 'pk-admin') | null;
+        approverRole?: ('pk-staff' | 'pk-pm' | 'pk-finance' | 'pk-owner' | 'pk-admin' | 'pk-operator') | null;
         approverUser?: (number | null) | User;
         id?: string | null;
       }[]
@@ -1019,6 +1021,31 @@ export interface NotificationTemplate {
   body: string;
   channel: 'push' | 'inapp' | 'both';
   active?: boolean | null;
+  /**
+   * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
+   */
+  changeReason?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "urgency-levels".
+ */
+export interface UrgencyLevel {
+  id: number;
+  /**
+   * Wajib bila Anda memilih lebih dari satu PT di pemilih PT; tidak dapat diubah setelah dibuat.
+   */
+  company?: (number | null) | Company;
+  code: string;
+  name: string;
+  /**
+   * 1 = paling rendah. Menentukan urutan di pilihan dan antrian.
+   */
+  rank: number;
+  active?: boolean | null;
+  uuid?: string | null;
   /**
    * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
    */
@@ -1160,14 +1187,7 @@ export interface ExpenseRequest {
    * Format YYYY-MM-DD (zona waktu perusahaan).
    */
   neededDate?: string | null;
-  /**
-   * Format YYYY-MM-DD (zona waktu perusahaan).
-   */
-  periodFrom?: string | null;
-  /**
-   * Format YYYY-MM-DD (zona waktu perusahaan).
-   */
-  periodTo?: string | null;
+  urgencyLevel?: (number | null) | UrgencyLevel;
   notes?: string | null;
   requesters?: (number | Employee)[] | null;
   createdBy?: (number | null) | User;
@@ -2486,6 +2506,10 @@ export interface PayloadLockedDocument {
         value: number | Uom;
       } | null)
     | ({
+        relationTo: 'urgency-levels';
+        value: number | UrgencyLevel;
+      } | null)
+    | ({
         relationTo: 'vehicles';
         value: number | Vehicle;
       } | null)
@@ -3046,6 +3070,21 @@ export interface UomsSelect<T extends boolean = true> {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "urgency-levels_select".
+ */
+export interface UrgencyLevelsSelect<T extends boolean = true> {
+  company?: T;
+  code?: T;
+  name?: T;
+  rank?: T;
+  active?: T;
+  uuid?: T;
+  changeReason?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "vehicles_select".
  */
 export interface VehiclesSelect<T extends boolean = true> {
@@ -3124,8 +3163,7 @@ export interface ExpenseRequestsSelect<T extends boolean = true> {
   costCenter?: T;
   requestDate?: T;
   neededDate?: T;
-  periodFrom?: T;
-  periodTo?: T;
+  urgencyLevel?: T;
   notes?: T;
   requesters?: T;
   createdBy?: T;

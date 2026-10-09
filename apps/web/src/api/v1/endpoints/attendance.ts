@@ -1,23 +1,29 @@
 import { createReadStream } from 'node:fs'
 import { Readable } from 'node:stream'
 
+import type { PayloadRequest } from 'payload'
+import type { z } from 'zod'
+
 import { ownEmployees, relId, userId } from '@/access/roles'
 import { writeAudit } from '@/audit/writer'
 import { correctAttendance } from '@/domain/attendance/corrections'
+import { AttendanceReject, recordWebAttendance, type Location } from '@/domain/attendance/record'
 import { employeeRecap, myRecap, teamTodayFor } from '@/domain/attendance/service'
 import { fileSize, mediaPath } from '@/lib/media-files'
 import { withReqTransaction } from '@/lib/system-tx'
 
 import { companyQuery, singleCompanyQuery } from '../company-query'
 import { HttpError, json, v1 } from '../http'
-import { AttendanceCorrectBody, AttendanceMonthQuery, AttendanceRecapQuery, TeamTodayQuery } from '../schemas-attendance'
+import { AttendanceCheckBody, AttendanceCorrectBody, AttendanceMonthQuery, AttendanceRecapQuery, TeamTodayQuery } from '../schemas-attendance'
 
 /**
- * E6 attendance endpoints (APK + web S2). Check-in/out and "diabsenkan PM" are sync items
- * (POST /sync/batch); these are the online reads + T10 correction.
+ * E6 attendance endpoints (APK + web S2). "Diabsenkan PM" is APK/sync-only (POST /sync/batch);
+ * everything here is reads + T10 correction + the web self-service check-in/out (owner decision
+ * 2026-10-09, every role).
  * - GET  /attendance/me?month=YYYY-MM                 US-09 own monthly recap (any role with an employee)
  * - GET  /attendance/recap?employee_id=&month=        recap of an employee: PM team / Admin, Owner, Finance
  * - GET  /attendance/team-today?date=&project_id=&cost_center_id=   US-13 (PM team; office roles all)
+ * - POST /attendance/check-in, /attendance/check-out  self-service web absen (every role)
  * - POST /attendance/{id}/correct {new_time, reason}  US-15 T10 (PM team / Admin; never own; idempotent)
  * - GET  /attendance/{id}/selfie                      selfie of a visible attendance; audited view_sensitive
  */
@@ -71,6 +77,60 @@ export const teamTodayEndpoint = v1({
     )
     return json(r)
   },
+})
+
+/** Domain error code → HTTP status (domain/attendance/record.ts AttendanceReject.code). */
+const ATTENDANCE_REJECT_STATUS: Record<string, number> = {
+  NOT_FOUND: 404,
+  VALIDATION: 400,
+  MOCK_LOCATION: 400,
+  NO_GEOFENCE: 409,
+  NOT_ASSIGNED: 403,
+  OUTSIDE_GEOFENCE: 409,
+  MEDIA_MISSING: 400,
+  FORBIDDEN: 403,
+  ALREADY_CHECKED_IN: 409,
+  NO_CHECK_IN: 409,
+  ALREADY_CHECKED_OUT: 409,
+  FEATURE_DISABLED: 403,
+  PRIVACY_ACK_REQUIRED: 403,
+}
+
+/** Shared handler of /attendance/check-in and /attendance/check-out (owner decision 2026-10-09). */
+function webCheckHandler(kind: 'check_in' | 'check_out') {
+  return async ({ req, body }: { req: PayloadRequest; body: z.infer<typeof AttendanceCheckBody> }) => {
+    const location: Location = body.project_id !== undefined ? { type: 'project', id: body.project_id } : { type: 'cost_center', id: body.cost_center_id! }
+    try {
+      const r = await recordWebAttendance(req, kind, { location, lat: body.lat, lng: body.lng, accuracyM: body.accuracy_m ?? null, selfieId: body.selfie_media_id })
+      return json(r, 201)
+    } catch (err) {
+      if (err instanceof AttendanceReject) {
+        throw new HttpError(ATTENDANCE_REJECT_STATUS[err.code] ?? 400, err.message, {
+          code: err.code,
+          ...(err.field ? { errors: [{ path: err.field, message: err.message }] } : {}),
+        })
+      }
+      throw err
+    }
+  }
+}
+
+export const attendanceCheckInEndpoint = v1({
+  path: '/attendance/check-in',
+  method: 'post',
+  body: AttendanceCheckBody,
+  rateLimit: [30, 60_000],
+  transactional: true,
+  handler: webCheckHandler('check_in'),
+})
+
+export const attendanceCheckOutEndpoint = v1({
+  path: '/attendance/check-out',
+  method: 'post',
+  body: AttendanceCheckBody,
+  rateLimit: [30, 60_000],
+  transactional: true,
+  handler: webCheckHandler('check_out'),
 })
 
 export const correctAttendanceEndpoint = v1({
@@ -146,4 +206,12 @@ export const attendanceSelfieEndpoint = v1({
   },
 })
 
-export const ATTENDANCE_ENDPOINTS = [attendanceMeEndpoint, attendanceRecapEndpoint, teamTodayEndpoint, correctAttendanceEndpoint, attendanceSelfieEndpoint]
+export const ATTENDANCE_ENDPOINTS = [
+  attendanceMeEndpoint,
+  attendanceRecapEndpoint,
+  teamTodayEndpoint,
+  attendanceCheckInEndpoint,
+  attendanceCheckOutEndpoint,
+  correctAttendanceEndpoint,
+  attendanceSelfieEndpoint,
+]

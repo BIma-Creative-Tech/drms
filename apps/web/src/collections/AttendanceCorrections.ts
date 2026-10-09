@@ -34,6 +34,8 @@ export const AttendanceCorrections: CollectionConfig = withAudit(
         'pk-finance': true,
         'pk-pm': anyOf(teamProjects('project'), teamCostCenters('costCenter'), ownEmployee('employee')),
         'pk-staff': ownEmployee('employee'),
+        // Operator/Anggota (owner decision 2026-10-09): own corrections only, same as Staff.
+        'pk-operator': ownEmployee('employee'),
       }),
       create: denyAll,
       update: denyAll,

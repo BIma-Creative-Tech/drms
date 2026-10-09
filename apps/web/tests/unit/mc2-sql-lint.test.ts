@@ -23,6 +23,7 @@ const PER_PT_TABLES = [
   'cash_in_sources', 'work_schedules', 'media_selfies',
   // QA-MC4-13: the per-PT tables the lint did not know
   'approvals', 'budget_addenda', 'project_stages', 'attendance_corrections', 'employee_bank_accounts', 'company_memberships', 'document_sequence_counters',
+  'urgency_levels',
   // FR1 (ADR 0020)
   'contract_units', 'service_reports', 'unit_timesheets', 'aftersales_activities', 'clients',
 ]
@@ -36,6 +37,7 @@ const hasCompanyPredicate = (body: string) => HELPER_CALL.test(body) || BOUND_CO
 const ALLOWED: Record<string, string> = {
   'domain/attendance/queries.ts#currentSchedules': 'by employee ids of an already scoped list; schedule joined within the employee PT',
   'domain/attendance/queries.ts#employeeRef': 'one employee id, callers check scope / own employee first',
+  'domain/attendance/queries.ts#myAssignedLocations': "the caller's OWN employee ids (ownEmployees: one per mapped PT); locations come through those employees' assignments",
   'domain/attendance/web.ts#selfieState': 'by attendance ids of an already scoped list',
   'domain/attendance/record.ts#dayRowsAt': 'one employee + one location (both PT-bound, checked by recordAttendance)',
   'domain/attendance/corrections.ts#effectiveTime': 'one attendance id checked by correctAttendance',

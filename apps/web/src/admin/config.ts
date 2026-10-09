@@ -52,6 +52,7 @@ export const E2_ADMIN_VIEWS = {
  */
 export const E6_ADMIN_VIEWS = {
   absensiToday: { Component: '@/admin/views/Absensi#AbsensiToday', path: '/absensi' as const, exact: true, meta: { title: 'Absensi' } },
+  absensiAbsen: { Component: '@/admin/views/Absensi#AbsensiAbsen', path: '/absensi/absen' as const, exact: true, meta: { title: 'Absen' } },
   absensiRekap: { Component: '@/admin/views/Absensi#AbsensiRekap', path: '/absensi/rekap' as const, exact: true, meta: { title: 'Rekap absensi' } },
   absensiJadwal: { Component: '@/admin/views/Absensi#AbsensiJadwal', path: '/absensi/jadwal' as const, exact: true, meta: { title: 'Jadwal & hari libur' } },
 }

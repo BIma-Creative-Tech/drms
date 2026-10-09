@@ -1,9 +1,7 @@
-import type { CollectionConfig } from 'payload'
+import { APIError, type CollectionBeforeChangeHook, type CollectionConfig } from 'payload'
 
-import { APIError, type CollectionBeforeChangeHook, type CollectionBeforeOperationHook } from 'payload'
-
-import { changedFields, readOnlyFieldsGuard } from '@/access/field-guard'
-import { denyAll, hasRole, relId } from '@/access/roles'
+import { readOnlyFieldsGuard } from '@/access/field-guard'
+import { denyAll, hasRole, isOperatorOnly } from '@/access/roles'
 import { assignedProjects, byRole, fieldRoles, rolesAllowed } from '@/access/policies'
 import { inIds } from '@/access/scope'
 import { reasonOnChange, withAudit } from '@/audit/hooks'
@@ -21,35 +19,16 @@ export const PROJECT_STATUSES = [
   { label: 'Arsip', value: 'arsip' },
 ] as const
 
-const ownerOnly = fieldRoles('pk-owner')
+/** Owner decision 2026-10-09: reverses QA-20(b) — PM and Admin gain the same project write rights as
+ * Direktur (additive, Direktur keeps them too). */
+const PROJECT_EDITOR_ROLES = ['pk-owner', 'pk-admin', 'pk-pm'] as const
+const projectEditors = fieldRoles(...PROJECT_EDITOR_ROLES)
+
 /** FR1 (ADR 0020 §1): the project kind is set by the Direktur or the Admin of the project's PT. */
 const kindEditors = fieldRoles('pk-owner', 'pk-admin')
 
-/** Fields an Admin (not Direktur) may change on a project: only the kind (+ the virtual reason). */
-const ADMIN_FIELDS = new Set(['kind', 'changeReason'])
-
 /**
- * QA-20(b) + FR1: the Direktur changes projects; the Admin of the PT only the project KIND. An Admin
- * body that changes only `kind` passes; anything else gets the QA-20(b) 403 naming the fields.
- */
-const projectFieldsGuard = (async (args: Parameters<CollectionBeforeOperationHook>[0]) => {
-  const { operation, overrideAccess, req } = args
-  const a = args.args as { id?: number | string; data?: Record<string, unknown> }
-  if (operation === 'update' && !overrideAccess && req.user && a.id !== undefined && a.data && typeof a.data === 'object') {
-    const current = (await req.payload.findByID({ collection: 'projects', id: a.id, depth: 0, overrideAccess: true /* SYSTEM-READ: diff of the request body */, req, disableErrors: true })) as Record<string, unknown> | null
-    const company = relId(current?.company)
-    if (current && !hasRole(req, 'pk-owner', company) && hasRole(req, 'pk-admin', company)) {
-      const changed = changedFields(req.payload.collections.projects.config.flattenedFields, a.data, current)
-      if (changed.every((f) => ADMIN_FIELDS.has(f.name))) return args.args
-    }
-  }
-  return readOnlyFieldsGuard('projects', (r, c) => hasRole(r, 'pk-owner', c), 'Direktur')(args)
-}) as CollectionBeforeOperationHook
-
-/**
- * Defence in depth for bulk updates (no id → the guard above does not run): a caller without the
- * Direktur role in the project's PT changes nothing but `kind` (field access drops the rest).
- * A kind change is refused once the project has field reports or contract units (409).
+ * FR1: a kind change is refused once the project has field reports or contract units (409).
  */
 const kindChangeGuard: CollectionBeforeChangeHook = async ({ data, originalDoc, operation, req }) => {
   if (operation !== 'update' || !originalDoc || data.kind === undefined || data.kind === originalDoc.kind) return data
@@ -61,16 +40,13 @@ const kindChangeGuard: CollectionBeforeChangeHook = async ({ data, originalDoc, 
 }
 
 /**
- * Project (requirements v1.1 §4 "Project & tahapan"): Staff R assigned, PM R team,
- * Finance R, Owner C/R/U/archive, Admin R. No delete (US-29: archive only).
- * QA-20(b) (owner decision 2026-10-08): the PM is READ-ONLY on projects — only the Direktur of the
- * project's PT changes them (RAB changes go through addenda, T12; progress through progress reports
- * and the stage editor). A PM/Finance/Admin PATCH that changes a field → 403 naming the fields
+ * Project (requirements v1.1 §4 "Project & tahapan"): Staff R assigned, Finance R.
+ * Owner decision 2026-10-09 (reverses QA-20(b)/2026-10-08 "PM read-only, only Direktur edits"): PM
+ * and Admin now have the same C/R/U/archive rights as Direktur (`PROJECT_EDITOR_ROLES`); PM's write
+ * scope stays limited to their own team's projects, same as their read scope. No delete (US-29:
+ * archive only). A Finance/Staff PATCH that changes a field → 403 naming the fields
  * (`readOnlyFieldsGuard`), never a silent 200. `progressPct` (E4) = Σ(weight × stage %) / 100, written
  * only by the progress recalculation (domain/progress/recalc.ts; guard + DB trigger pk_progress_guard).
- * FR1 (ADR 0020 §1): `kind` (umum | konstruksi | kontrak_unit | aftersales | trading) decides the field
- * reports; set by the Direktur or the Admin of the PT (the Admin changes nothing else), frozen once
- * the project has field data (hook + DB trigger of migration fr1_security).
  */
 export const Projects: CollectionConfig = withAudit(
   {
@@ -84,20 +60,25 @@ export const Projects: CollectionConfig = withAudit(
         'pk-finance': true,
         'pk-pm': async ({ scope }) => inIds('id', (await scope()).teamProjects),
         'pk-staff': assignedProjects('id'),
+        // Operator/Anggota: its assigned projects only — the APK attendance location list (masters)
+        'pk-operator': assignedProjects('id'),
       }),
-      create: rolesAllowed('pk-owner'),
-      // FR1: the Admin may update — only the project kind (projectFieldsGuard + field access)
-      update: byRole({ 'pk-owner': true, 'pk-admin': true }),
+      create: rolesAllowed(...PROJECT_EDITOR_ROLES),
+      update: byRole({
+        'pk-owner': true,
+        'pk-admin': true,
+        'pk-pm': async ({ scope }) => inIds('id', (await scope()).teamProjects),
+      }),
       delete: denyAll,
     },
     hooks: {
       beforeChange: [companyHook('projects', { check: [{ field: 'client', collection: 'clients' }, { field: 'pm', collection: 'users', member: true }] }), kindChangeGuard],
-      beforeOperation: [progressWriteGuard('projects'), projectFieldsGuard],
+      beforeOperation: [progressWriteGuard('projects'), readOnlyFieldsGuard('projects', (req, company) => hasRole(req, PROJECT_EDITOR_ROLES, company), 'Direktur, Admin, atau PM')],
     },
     fields: [
       companyField(),
-      { ...codeField('Kode', 32, { perCompany: true }), access: { update: ownerOnly } },
-      { name: 'name', type: 'text', label: 'Nama project', required: true, maxLength: 160, access: { update: ownerOnly } },
+      { ...codeField('Kode', 32, { perCompany: true }), access: { update: projectEditors } },
+      { name: 'name', type: 'text', label: 'Nama project', required: true, maxLength: 160 },
       {
         name: 'kind',
         type: 'select',
@@ -112,24 +93,25 @@ export const Projects: CollectionConfig = withAudit(
           description: 'Menentukan laporan lapangan: kontrak unit → timesheet + servis; aftersales → servis + aktivitas. Umum/konstruksi/trading: belum ada laporan lapangan. Diubah oleh Direktur/Admin.',
         },
       },
-      { name: 'client', type: 'relationship', relationTo: 'clients', label: 'Klien', access: { update: ownerOnly } },
-      { name: 'address', type: 'textarea', label: 'Alamat', maxLength: 500, access: { update: ownerOnly } },
+      { name: 'client', type: 'relationship', relationTo: 'clients', label: 'Klien', access: { update: projectEditors } },
+      { name: 'address', type: 'textarea', label: 'Alamat', maxLength: 500 },
       {
         type: 'row',
         fields: [
-          { name: 'lat', type: 'number', label: 'Latitude', min: -90, max: 90, access: { update: ownerOnly } },
-          { name: 'lng', type: 'number', label: 'Longitude', min: -180, max: 180, access: { update: ownerOnly } },
-          { name: 'radiusM', type: 'number', label: 'Radius geofence (m)', min: 10, max: 5000, access: { update: ownerOnly }, admin: { description: 'Kosong = radius default perusahaan (Setting perusahaan).' } },
+          { name: 'lat', type: 'number', label: 'Latitude', min: -90, max: 90 },
+          { name: 'lng', type: 'number', label: 'Longitude', min: -180, max: 180 },
+          { name: 'radiusM', type: 'number', label: 'Radius geofence (m)', min: 10, max: 5000, admin: { description: 'Kosong = radius default perusahaan (Setting perusahaan).' } },
         ],
       },
       // QA-16: only active PMs of the project's PT, shown by name (users.displayName)
-      { name: 'pm', type: 'relationship', relationTo: 'users', label: 'Project Manager', index: true, access: { update: ownerOnly }, ...userPicker({ roles: ['pk-pm'] }) },
-      { ...rupiahField('budget', 'RAB (Rp)'), access: { update: ownerOnly } },
+      { name: 'pm', type: 'relationship', relationTo: 'users', label: 'Project Manager', index: true, access: { update: projectEditors }, ...userPicker({ roles: ['pk-pm'] }) },
+      // RAB hidden from Operator/Anggota (attendance-only role reads its assigned project for the location only)
+      { ...rupiahField('budget', 'RAB (Rp)'), access: { read: ({ req }) => !isOperatorOnly(req.user), update: projectEditors } },
       {
         type: 'row',
         fields: [
-          { name: 'startDate', type: 'date', label: 'Tanggal mulai', access: { update: ownerOnly }, admin: { date: { pickerAppearance: 'dayOnly' } } },
-          { name: 'targetDate', type: 'date', label: 'Target selesai', access: { update: ownerOnly }, admin: { date: { pickerAppearance: 'dayOnly' } } },
+          { name: 'startDate', type: 'date', label: 'Tanggal mulai', admin: { date: { pickerAppearance: 'dayOnly' } } },
+          { name: 'targetDate', type: 'date', label: 'Target selesai', admin: { date: { pickerAppearance: 'dayOnly' } } },
         ],
       },
       {
@@ -140,7 +122,7 @@ export const Projects: CollectionConfig = withAudit(
         defaultValue: 'perencanaan',
         options: [...PROJECT_STATUSES],
         index: true,
-        access: { update: ownerOnly },
+        access: { update: projectEditors },
       },
       {
         ...percentField('progressPct', 'Progress fisik (%)'),
@@ -148,7 +130,7 @@ export const Projects: CollectionConfig = withAudit(
         access: { create: () => false, update: () => false },
         admin: { readOnly: true, position: 'sidebar', description: 'Dihitung dari bobot × progress tahapan (hanya lewat laporan progress).' },
       },
-      { ...odooRefField('odooAnalyticRef', 'Ref. akun analitik Odoo'), access: { update: ownerOnly } },
+      odooRefField('odooAnalyticRef', 'Ref. akun analitik Odoo'),
       uuidField(),
     ],
   },

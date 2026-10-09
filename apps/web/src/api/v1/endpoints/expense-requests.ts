@@ -258,7 +258,8 @@ export const createRequestEndpoint = v1({
   transactional: true,
   idempotent: true,
   handler: async ({ req, body }) => {
-    const { company, ...input } = body
+    // periodFrom/periodTo: accepted from older apps, ignored since 2026-10-09 (replaced by urgencyLevelId)
+    const { company, periodFrom: _pf, periodTo: _pt, ...input } = body
     // MC4: optional body `company` (ADR 0016 §5) — roles = collection create access of expense-requests
     // (the answer is built under the same PT, so a PT outside the header selection still reads back)
     return withNamedCompany(
@@ -281,7 +282,8 @@ export const updateRequestEndpoint = v1({
   transactional: true,
   handler: async ({ req, body, params }) => {
     const id = idParam(params)
-    await updateDraft(req, id, body)
+    const { periodFrom: _pf, periodTo: _pt, ...input } = body
+    await updateDraft(req, id, input)
     return ok(req, id)
   },
 })

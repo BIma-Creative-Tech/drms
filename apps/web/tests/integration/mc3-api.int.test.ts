@@ -389,6 +389,9 @@ const ROUTE_CLASSES: Record<string, RouteClass> = {
   'POST /progress-reports': 'named-pt',
   'POST /budget-addenda': 'named-pt',
   'POST /sync/batch': 'named-pt',
+  // owner decision 2026-10-09: web self check-in/out — PT of the referenced project / cost center, own employee there
+  'POST /attendance/check-in': 'named-pt',
+  'POST /attendance/check-out': 'named-pt',
   // FR1 (ADR 0020): field reports per project kind
   'GET /service-reports': 'selection',
   'GET /unit-timesheets': 'selection',

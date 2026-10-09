@@ -691,6 +691,12 @@ abstract class AppLocalizations {
   /// **'Tanggal dibutuhkan'**
   String get fieldNeededDate;
 
+  /// No description provided for @fieldUrgency.
+  ///
+  /// In id, this message translates to:
+  /// **'Tingkat urgensi'**
+  String get fieldUrgency;
+
   /// No description provided for @fieldNotes.
   ///
   /// In id, this message translates to:

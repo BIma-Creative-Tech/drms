@@ -1,7 +1,7 @@
 import type { CollectionSlug, Payload, PayloadRequest, Where } from 'payload'
 import sharp from 'sharp'
 
-import { SKIP_COMPANY_DEFAULTS } from '@/domain/company-defaults'
+import { DEFAULT_URGENCY_LEVELS, SKIP_COMPANY_DEFAULTS } from '@/domain/company-defaults'
 import { DEFAULT_SEQUENCES } from '@/domain/numbering'
 import { normalizePlate } from '@/domain/plates'
 import { withSystemTransaction } from '@/lib/system-tx'
@@ -72,6 +72,8 @@ export async function seed(payload: Payload, data: SeedData = DEFAULT_SEED_DATA)
         k(`cat:${c.code}`),
       )
     }
+    // Owner decision 2026-10-09: default "Tingkat Urgensi" (not part of the seed file schema)
+    for (const u of DEFAULT_URGENCY_LEVELS) await ensure('urgency-levels', inPt({ code: { equals: u.code } }), { ...u, company: cid, active: true }, k(`urg:${u.code}`))
     for (const s of block.cashInSources) await ensure('cash-in-sources', inPt({ code: { equals: s.code } }), { ...s, company: cid, active: true }, k(`cis:${s.code}`))
     for (const a of block.cashAccounts) await ensure('cash-accounts', inPt({ name: { equals: a.name } }), { ...a, company: cid, openingBalance: 0, active: true }, k(`ca:${a.name}`))
     for (const cc of block.costCenters) await ensure('cost-centers', inPt({ code: { equals: cc.code } }), { ...cc, company: cid, active: true }, k(`cc:${cc.code}`))

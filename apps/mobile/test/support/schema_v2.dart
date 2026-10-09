@@ -20,13 +20,25 @@ final schemaV1 = [
     if (!s.contains('"local_progress_reports"')) s,
 ];
 
-/// An in-memory database that starts as schema [version] (1 or 2) with rows from [seed], then is opened by
+/// v3 (MC3, mobile-v0.3.x): v2 + `company_id` exactly as drift's `addColumn` added it.
+final schemaV3 = [
+  ...schemaV2,
+  'ALTER TABLE "local_drafts" ADD COLUMN "company_id" INTEGER NULL',
+  'ALTER TABLE "outbox" ADD COLUMN "company_id" INTEGER NULL',
+  'ALTER TABLE "local_progress_reports" ADD COLUMN "company_id" INTEGER NULL',
+];
+
+/// An in-memory database that starts as schema [version] (1, 2 or 3) with rows from [seed], then is opened by
 /// the current `AppDatabase` (runs the drift migration to the current schema version).
 AppDatabase oldPhoneDb(int version, void Function(CommonDatabase raw) seed) => AppDatabase(
   NativeDatabase.memory(
     setup: (raw) {
       if (raw.select('PRAGMA user_version').first.values.first == 0) {
-        for (final s in version == 1 ? schemaV1 : schemaV2) {
+        for (final s in switch (version) {
+          1 => schemaV1,
+          2 => schemaV2,
+          _ => schemaV3,
+        }) {
           raw.execute(s);
         }
         seed(raw);

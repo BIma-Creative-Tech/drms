@@ -276,8 +276,7 @@ ExpenseDetail detailFromJson(Json j) {
     rev: _intN(j['rev']),
     resubmitOfId: _intN(j['resubmitOfId']),
     createdById: _intN(j['createdById']),
-    periodFrom: _strN(j['periodFrom']),
-    periodTo: _strN(j['periodTo']),
+    urgencyLevel: refFromJson(j['urgencyLevel']),
     bankAccountId: _intN(j['bankAccountId']),
   );
 }
@@ -359,6 +358,7 @@ Json draftToCreateBody(DraftRequest d) => {
   'projectId': d.projectId,
   'costCenterId': d.costCenterId,
   'neededDate': d.neededDate,
+  'urgencyLevelId': d.urgencyLevelId,
   'notes': (d.notes == null || d.notes!.trim().isEmpty) ? null : d.notes!.trim(),
   if (d.requesterIds.isNotEmpty) 'requesterIds': d.requesterIds,
   'bankAccountId': d.bankAccountId,
@@ -392,6 +392,7 @@ Json draftToSyncPayload(DraftRequest d, {bool includeDraftId = false}) => {
   'project_id': d.projectId,
   'cost_center_id': d.costCenterId,
   'needed_date': d.neededDate,
+  'urgency_level_id': d.urgencyLevelId,
   'notes': (d.notes == null || d.notes!.trim().isEmpty) ? null : d.notes!.trim(),
   'requester_ids': d.requesterIds,
   'bank_account_id': d.bankAccountId,
@@ -446,6 +447,7 @@ DraftRequest draftFromServer(
   projectId: d.project?.id,
   costCenterId: d.costCenter?.id,
   neededDate: d.neededDate,
+  urgencyLevelId: d.urgencyLevel?.id,
   notes: d.notes,
   requesterIds: [for (final r in d.requesters) r.id],
   bankAccountId: d.bankAccountId,

@@ -4875,6 +4875,181 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.urgency_levels": {
+      "name": "urgency_levels",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "company_id": {
+          "name": "company_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "code": {
+          "name": "code",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "rank": {
+          "name": "rank",
+          "type": "numeric",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "active": {
+          "name": "active",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false,
+          "default": true
+        },
+        "uuid": {
+          "name": "uuid",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp(3) with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp(3) with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "urgency_levels_company_idx": {
+          "name": "urgency_levels_company_idx",
+          "columns": [
+            {
+              "expression": "company_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "urgency_levels_code_idx": {
+          "name": "urgency_levels_code_idx",
+          "columns": [
+            {
+              "expression": "code",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "urgency_levels_active_idx": {
+          "name": "urgency_levels_active_idx",
+          "columns": [
+            {
+              "expression": "active",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "urgency_levels_uuid_idx": {
+          "name": "urgency_levels_uuid_idx",
+          "columns": [
+            {
+              "expression": "uuid",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "urgency_levels_updated_at_idx": {
+          "name": "urgency_levels_updated_at_idx",
+          "columns": [
+            {
+              "expression": "updated_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "urgency_levels_created_at_idx": {
+          "name": "urgency_levels_created_at_idx",
+          "columns": [
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "urgency_levels_company_id_companies_id_fk": {
+          "name": "urgency_levels_company_id_companies_id_fk",
+          "tableFrom": "urgency_levels",
+          "tableTo": "companies",
+          "columnsFrom": [
+            "company_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.vehicles": {
       "name": "vehicles",
       "schema": "",
@@ -5972,15 +6147,9 @@
           "primaryKey": false,
           "notNull": false
         },
-        "period_from": {
-          "name": "period_from",
-          "type": "varchar",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "period_to": {
-          "name": "period_to",
-          "type": "varchar",
+        "urgency_level_id": {
+          "name": "urgency_level_id",
+          "type": "integer",
           "primaryKey": false,
           "notNull": false
         },
@@ -6216,6 +6385,21 @@
           "method": "btree",
           "with": {}
         },
+        "expense_requests_urgency_level_idx": {
+          "name": "expense_requests_urgency_level_idx",
+          "columns": [
+            {
+              "expression": "urgency_level_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
         "expense_requests_created_by_idx": {
           "name": "expense_requests_created_by_idx",
           "columns": [
@@ -6370,6 +6554,19 @@
           "tableTo": "cost_centers",
           "columnsFrom": [
             "cost_center_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "expense_requests_urgency_level_id_urgency_levels_id_fk": {
+          "name": "expense_requests_urgency_level_id_urgency_levels_id_fk",
+          "tableFrom": "expense_requests",
+          "tableTo": "urgency_levels",
+          "columnsFrom": [
+            "urgency_level_id"
           ],
           "columnsTo": [
             "id"
@@ -17099,6 +17296,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "urgency_levels_id": {
+          "name": "urgency_levels_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
         "vehicles_id": {
           "name": "vehicles_id",
           "type": "integer",
@@ -17607,6 +17810,21 @@
           "columns": [
             {
               "expression": "uoms_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "payload_locked_documents_rels_urgency_levels_id_idx": {
+          "name": "payload_locked_documents_rels_urgency_levels_id_idx",
+          "columns": [
+            {
+              "expression": "urgency_levels_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -18288,6 +18506,19 @@
           "tableTo": "uoms",
           "columnsFrom": [
             "uoms_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "payload_locked_documents_rels_urgency_levels_fk": {
+          "name": "payload_locked_documents_rels_urgency_levels_fk",
+          "tableFrom": "payload_locked_documents_rels",
+          "tableTo": "urgency_levels",
+          "columnsFrom": [
+            "urgency_levels_id"
           ],
           "columnsTo": [
             "id"
@@ -19131,7 +19362,8 @@
         "pk-pm",
         "pk-finance",
         "pk-owner",
-        "pk-admin"
+        "pk-admin",
+        "pk-operator"
       ]
     },
     "public.enum_employee_bank_accounts_verification_status": {
@@ -19189,7 +19421,8 @@
         "pk-pm",
         "pk-finance",
         "pk-owner",
-        "pk-admin"
+        "pk-admin",
+        "pk-operator"
       ]
     },
     "public.enum_approval_rules_doc_type": {
@@ -19235,7 +19468,8 @@
         "pk-pm",
         "pk-finance",
         "pk-owner",
-        "pk-admin"
+        "pk-admin",
+        "pk-operator"
       ]
     },
     "public.enum_approval_rules_sign_diajukan": {

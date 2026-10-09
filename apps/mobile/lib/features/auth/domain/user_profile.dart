@@ -9,7 +9,10 @@ enum Role {
   pm('pk-pm'),
   finance('pk-finance'),
   owner('pk-owner'),
-  admin('pk-admin');
+  admin('pk-admin'),
+
+  /// Owner decision 2026-10-09: attendance only ("Operator/Anggota").
+  operator('pk-operator');
 
   const Role(this.code);
   final String code;
@@ -21,6 +24,7 @@ enum Role {
     finance => 'Finance',
     owner => 'Direktur',
     admin => 'Admin',
+    operator => 'Operator/Anggota',
   };
 
   static Role? fromCode(String code) {
@@ -245,8 +249,12 @@ abstract class UserProfile with _$UserProfile {
   /// E4: create a progress report (server capability `progressReportCreate`).
   bool get canCreateProgress => capabilities.progressReportCreate;
 
-  /// E6: own check-in/out and own monthly recap (employees in the field: Staff and PM).
-  bool get hasOwnAttendance => has(Role.staff) || has(Role.pm);
+  /// E6: own check-in/out and own monthly recap. Owner decision 2026-10-09: every role (the server
+  /// still requires an employee with a team assignment at a geofenced location).
+  bool get hasOwnAttendance => roles.isNotEmpty;
+
+  /// Owner decision 2026-10-09: "Operator/Anggota" only — attendance, nothing else on the home screen.
+  bool get isOperatorOnly => roles.isNotEmpty && roles.every((r) => r == Role.operator);
 
   /// E6: "Tim hari ini" (PM team; Admin/Direktur/Finance all).
   bool get canSeeTeamAttendance => has(Role.pm) || has(Role.owner) || has(Role.finance) || has(Role.admin);

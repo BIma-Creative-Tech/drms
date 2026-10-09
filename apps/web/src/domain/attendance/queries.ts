@@ -281,3 +281,31 @@ export async function teamMembers(req: PayloadRequest, scope: AttScope, fromDate
   }
   return [...by.values()]
 }
+
+type OwnAssignmentRow = { employee_id: number; project_id: number | null; project_code: string | null; project_name: string | null; cost_center_id: number | null; cc_code: string | null; cc_name: string | null }
+
+/**
+ * Locations the caller's OWN employee(s) are assigned to on `date` (start/end inclusive), with the
+ * assigned employee (one per PT, ADR 0016 D1) — always visible to oneself regardless of role/scope
+ * (unlike `teamMembers`, which answers "who may I see"). Location picker of `/absensi/absen`.
+ */
+export async function myAssignedLocations(req: PayloadRequest, employeeIds: readonly number[], date: string): Promise<Array<LocationRef & { employeeId: number }>> {
+  if (employeeIds.length === 0) return []
+  const r = await rows<OwnAssignmentRow>(
+    req,
+    sql`SELECT DISTINCT ta.employee_id, ta.project_id, p.code AS project_code, p.name AS project_name, ta.cost_center_id, cc.code AS cc_code, cc.name AS cc_name
+        FROM team_assignments ta
+        LEFT JOIN projects p ON p.id = ta.project_id
+        LEFT JOIN cost_centers cc ON cc.id = ta.cost_center_id
+        WHERE ${inList(sql`ta.employee_id`, employeeIds)}
+          AND (ta.start_date IS NULL OR to_char(ta.start_date AT TIME ZONE 'UTC', 'YYYY-MM-DD') <= ${date})
+          AND (ta.end_date IS NULL OR to_char(ta.end_date AT TIME ZONE 'UTC', 'YYYY-MM-DD') >= ${date})
+        ORDER BY p.code, cc.code`,
+  )
+  return r.map((x) => ({
+    employeeId: Number(x.employee_id),
+    ...(x.project_id !== null
+      ? { type: 'project' as const, id: Number(x.project_id), code: x.project_code ?? '', name: x.project_name ?? '' }
+      : { type: 'cost_center' as const, id: Number(x.cost_center_id), code: x.cc_code ?? '', name: x.cc_name ?? '' }),
+  }))
+}

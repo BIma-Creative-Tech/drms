@@ -557,8 +557,6 @@ export async function recomputeFlags(req: PayloadRequest, requestId: number): Pr
     type: doc.type,
     requestDate: doc.requestDate ?? (await today(req)),
     transferDate,
-    periodFrom: doc.periodFrom,
-    periodTo: doc.periodTo,
     lines,
     receipts,
     categories,

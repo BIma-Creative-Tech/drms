@@ -4,17 +4,19 @@ import type { AdminViewServerProps, PayloadRequest } from 'payload'
 import Link from 'next/link'
 import React from 'react'
 
-import { hasRoleAny, relId } from '@/access/roles'
-import { CorrectionDialog, DefaultSchedule, GeofenceForm, HolidayAdd, ScheduleAssign, SelfieButton, type Option } from '@/admin/components/absensi/AttendanceActions'
+import { hasRoleAny, ownEmployees, relId, userId } from '@/access/roles'
+import { CorrectionDialog, DefaultSchedule, GeofenceForm, HolidayAdd, ScheduleAssign, SelfCheckForm, SelfieButton, type Option, type SelfCheckLocation } from '@/admin/components/absensi/AttendanceActions'
 import { KAS_STYLE } from '@/admin/components/kas/style'
 import { Icon as Glyph } from '@/admin/modules/Icon'
 import type { DayRecap, LocationDay, LocationRef, RecapSummary, TeamTodayRow } from '@/domain/attendance/aggregate'
 import { classCounts, classifyDay, DAY_CLASSES, LEGEND, minutesText, monthWeeks, offsetText, shiftMonth, type DayClass } from '@/domain/attendance/calendar'
-import { attendanceContext, attendanceScope, employeeRef, narrowAttScope, narrowAttToCompanies, type AttScope } from '@/domain/attendance/queries'
+import { attendanceContext, attendanceScope, employeeRef, myAssignedLocations, narrowAttScope, narrowAttToCompanies, type AttScope } from '@/domain/attendance/queries'
+import { dayRowsAt } from '@/domain/attendance/record'
 import type { ScheduleSnapshot } from '@/domain/attendance/schedule'
 import { employeeRecap, myRecap, teamTodayFor, type MonthlyRecap, type TeamTodayResult } from '@/domain/attendance/service'
 import { correctionHistory, mayCorrect, recapEmployees, scopeLocations, selfieState, teamMonth, type CorrectionRow, type Opt } from '@/domain/attendance/web'
 import { firstDay, lastDay, MONTHS_SHORT, PERIOD_RE, periodLabel } from '@/domain/reports/rules'
+import { privacyAckCheck } from '@/legal/privacy-enforcement'
 import { withReqTransaction } from '@/lib/system-tx'
 import { tzOffsetMinutes } from '@/lib/time'
 import { formatServerTime } from '@/pdf/format'
@@ -38,6 +40,19 @@ import { NoAccess } from './NoAccess'
  * colour, never colour alone. `data-pk-*` = stable UAT selectors.
  */
 export const ABSENSI_STYLE = `
+/* web self check-in (owner decision 2026-10-09): APK-like field screen */
+.pk-selfcheck { max-width: 560px; }
+.pk-sc-locs { border: 0; margin: 0; padding: 0; display: grid; gap: 10px; }
+.pk-sc-locs legend { font-size: 13px; font-weight: 600; margin-bottom: 6px; }
+.pk-sc-loc { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; align-items: center; min-height: 56px; padding: 12px 14px; border: 1px solid var(--pk-border); border-radius: var(--style-radius-m); background: var(--pk-card); cursor: pointer; }
+.pk-sc-loc:has(input:checked) { border-color: var(--pk-primary); box-shadow: 0 0 0 1px var(--pk-primary); }
+.pk-sc-loc input { width: 20px; height: 20px; margin: 0; grid-row: span 2; accent-color: var(--pk-primary); }
+.pk-sc-loc .name { font-weight: 600; font-size: 15px; display: flex; flex-direction: column; }
+.pk-sc-loc .name .sub { font-weight: 400; font-size: 12px; color: var(--pk-muted-fg); }
+.pk-sc-loc .st { font-size: 12px; font-weight: 600; color: var(--pk-muted-fg); }
+.pk-sc-loc[data-state='hadir'] .st { color: var(--pk-primary); }
+.pk-sc-loc[data-state='selesai'] .st { color: var(--pk-tone-ok-text); }
+.pk-sc-go { width: 100%; min-height: 52px; font-size: 16px; border-radius: 999px; }
 .pk-f3 {
   --dc-ok: var(--pk-tone-ok-text); --dc-warn: var(--pk-tone-warn-text); --dc-bad: var(--pk-tone-bad-text); --dc-info: var(--pk-primary);
 }
@@ -211,14 +226,18 @@ function Frame({ props, name, children }: { props: AdminViewServerProps; name: s
   )
 }
 
-function SubNav({ active, scope }: { active: 'today' | 'rekap' | 'jadwal'; scope: AttScope | null }) {
+function SubNav({ active, scope }: { active: 'today' | 'absen' | 'rekap' | 'jadwal'; scope: AttScope | null }) {
   const items: Array<[typeof active, string, string]> = scope
     ? [
         ['today', '/admin/absensi', 'Tim hari ini'],
+        ['absen', '/admin/absensi/absen', 'Absen'],
         ['rekap', '/admin/absensi/rekap', 'Rekap bulanan'],
         ['jadwal', '/admin/absensi/jadwal', 'Jadwal & hari libur'],
       ]
-    : [['rekap', '/admin/absensi/rekap', 'Rekap saya']]
+    : [
+        ['absen', '/admin/absensi/absen', 'Absen'],
+        ['rekap', '/admin/absensi/rekap', 'Rekap saya'],
+      ]
   return (
     <nav className="pk-subnav" aria-label="Menu absensi">
       {items.map(([k, href, label]) => (
@@ -571,6 +590,48 @@ function Stamp({ loc, kind, d, tz }: { loc: LocationDay; kind: 'checkIn' | 'chec
       {s.corrected ? ' · dikoreksi' : ''}
       <span className="pk-sr"> {d.date}</span>
     </span>
+  )
+}
+
+/**
+ * Owner decision 2026-10-09: web self check-in/out, every role. The location list is the caller's own
+ * assignments (`myAssignedLocations`); POST /attendance/check-in|check-out re-check everything
+ * (assignment, geofence, company-settings.syncAttendanceEnabled, ADR 0018 privacy ack).
+ */
+export async function AbsensiAbsen(props: AdminViewServerProps) {
+  const req = props.initPageResult.req
+  let data: { scope: AttScope | null; locations: SelfCheckLocation[]; privacyBlocked: boolean } | null = null
+  try {
+    data = await withReqTransaction(req, async () => {
+      const scope = await attendanceScope(req)
+      const ctx = await attendanceContext(req)
+      const uid = userId(req)
+      const assigned = await myAssignedLocations(req, ownEmployees(req), ctx.today)
+      const locations: SelfCheckLocation[] = await Promise.all(
+        assigned.map(async (l) => {
+          const rows = await dayRowsAt(req, l.employeeId, { type: l.type, id: l.id }, ctx.today)
+          const at = (k: 'check_in' | 'check_out') => {
+            const r = rows.find((x) => x.kind === k)
+            return r ? formatServerTime(String(r.effective_time), ctx.timeZone) : null
+          }
+          return { type: l.type, id: l.id, label: `${l.code} ${l.name}`, checkIn: at('check_in'), checkOut: at('check_out') }
+        }),
+      )
+      const privacyBlocked = uid === undefined ? false : (await privacyAckCheck(req, uid)).required
+      return { scope, locations, privacyBlocked }
+    })
+  } catch (err) {
+    return <Failed props={props} name="absensi-absen" title="Absensi · Absen" err={err} req={req} />
+  }
+  const { scope, locations, privacyBlocked } = data
+  return (
+    <Frame props={props} name="absensi-absen">
+      <DashHead title="Absensi · Absen" note="Absen masuk / pulang dari web, aturan sama dengan aplikasi Android." />
+      <SubNav active="absen" scope={scope} />
+      <Card id="self-check" title="Absen hari ini" span={12}>
+        <SelfCheckForm locations={locations} privacyBlocked={privacyBlocked} />
+      </Card>
+    </Frame>
   )
 }
 

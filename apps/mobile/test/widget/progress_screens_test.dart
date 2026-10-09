@@ -409,6 +409,21 @@ void main() {
       expect(find.textContaining('Rekap bulanan (absen dari aplikasi belum diaktifkan Admin)'), findsOneWidget);
     });
 
+    testWidgets('Operator/Anggota (owner decision 2026-10-09): only the attendance tile', (tester) async {
+      await pumpHome(tester, {Role.operator});
+      expect(find.byKey(const Key('home-attendance')), findsOneWidget);
+      for (final k in [
+        'home-requests',
+        'home-new-advance',
+        'home-new-reimburse',
+        'home-progress',
+        'home-inbox',
+        'home-addenda',
+      ]) {
+        expect(find.byKey(Key(k)), findsNothing, reason: k);
+      }
+    });
+
     testWidgets('PM: progress button with the unsent count and the progress-vs-budget summary', (tester) async {
       await pumpHome(tester, {Role.pm});
       expect(find.byKey(const Key('home-progress')), findsOneWidget);

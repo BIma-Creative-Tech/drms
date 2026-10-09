@@ -84,8 +84,9 @@ const CREATE_MATRIX: Array<[CollectionSlug, Role[], () => Record<string, unknown
   ['vehicles', ['pk-admin'], () => ({ plateNo: `DA ${1000 + n++} ZZ`, type: 'Truk' })],
   ['employees', ['pk-admin'], () => ({ code: uniq(), name: 'x' })],
   ['employee-bank-accounts', ['pk-admin', 'pk-finance'], () => ({ employee: otherEmp, bank: bankId, accountNo: String(900000 + n++), accountHolder: 'x' })],
-  ['projects', ['pk-owner'], () => ({ code: uniq(), name: 'x' })],
-  ['project-stages', ['pk-owner'], () => ({ project: teamProject, name: 'x', weightPct: 1, sequence: 1 })],
+  // Owner decision 2026-10-09 reverses QA-20(b): PM and Admin gain Direktur's project create rights.
+  ['projects', ['pk-owner', 'pk-admin', 'pk-pm'], () => ({ code: uniq(), name: 'x' })],
+  ['project-stages', ['pk-owner', 'pk-admin', 'pk-pm'], () => ({ project: teamProject, name: 'x', weightPct: 1, sequence: 1 })],
   ['stage-templates', ['pk-admin', 'pk-owner'], () => ({ name: uniq(), items: [{ name: 'a', weightPct: 100, sequence: 1 }] })],
   ['budget-lines', ['pk-owner'], () => ({ project: otherProject, category: catId, amount: 1 })],
   ['work-schedules', ['pk-admin'], () => ({ name: uniq(), startTime: '08:00', endTime: '17:00' })],
@@ -169,20 +170,30 @@ describe('read scopes (own / team / assigned / all)', () => {
 })
 
 describe('update scopes and protected fields', () => {
-  it('QA-20(b): PM is read-only on projects — a changed field is a 403 naming it (never a silent drop); not other projects', async () => {
+  it('PM/Admin can update their team project (owner decision 2026-10-09 reverses QA-20(b)); PM still cannot touch other projects', async () => {
     const p = await getTestPayload()
     const pm = users['pk-pm']
     const before = await p.findByID({ collection: 'projects', id: teamProject, depth: 0, overrideAccess: true /* SYSTEM-READ: assertion */ })
-    await expect(p.update({ collection: 'projects', id: teamProject, data: { address: 'Jl. PM', budget: 999, status: 'arsip', pm: otherPm.id }, user: pm, overrideAccess: false, depth: 0 })).rejects.toMatchObject({
+    const updated = await p.update({ collection: 'projects', id: teamProject, data: { address: 'Jl. PM', budget: 999, status: 'berjalan', changeReason: 'uji akses PM' }, user: pm, overrideAccess: false, depth: 0 })
+    expect({ address: updated.address, budget: updated.budget, status: updated.status }).toEqual({ address: 'Jl. PM', budget: 999, status: 'berjalan' })
+    // restore so later tests in this file see the original fixture
+    await p.update({ collection: 'projects', id: teamProject, data: { address: before.address, budget: before.budget, status: before.status, changeReason: 'kembalikan fixture' }, user: users['pk-owner'], overrideAccess: false, depth: 0 })
+    // Payload answers 403 when the update Where excludes the document (architecture §7.4: 404/403/empty) — PM's scope is still team-only
+    await expect(p.update({ collection: 'projects', id: otherProject, data: { address: 'x' }, user: pm, overrideAccess: false })).rejects.toMatchObject({ status: 403 })
+  })
+
+  it('Finance is read-only on projects — a changed field is a 403 naming it (never a silent drop)', async () => {
+    const p = await getTestPayload()
+    const fin = users['pk-finance']
+    const before = await p.findByID({ collection: 'projects', id: teamProject, depth: 0, overrideAccess: true /* SYSTEM-READ: assertion */ })
+    await expect(p.update({ collection: 'projects', id: teamProject, data: { address: 'Jl. Finance', budget: 999, status: 'arsip', pm: otherPm.id }, user: fin, overrideAccess: false, depth: 0 })).rejects.toMatchObject({
       status: 403,
       message: expect.stringMatching(/Alamat.*Project Manager.*RAB \(Rp\).*Status/),
     })
     const after = await p.findByID({ collection: 'projects', id: teamProject, depth: 0, overrideAccess: true /* SYSTEM-READ: assertion */ })
     expect({ address: after.address, budget: after.budget, status: after.status, pm: after.pm }).toEqual({ address: before.address, budget: before.budget, status: before.status, pm: before.pm })
-    // unchanged values pass the guard but the PM has no update access at all
-    await expect(p.update({ collection: 'projects', id: teamProject, data: { name: before.name }, user: pm, overrideAccess: false })).rejects.toMatchObject({ status: 403 })
-    // Payload answers 403 when the update Where excludes the document (architecture §7.4: 404/403/empty)
-    await expect(p.update({ collection: 'projects', id: otherProject, data: { address: 'x' }, user: pm, overrideAccess: false })).rejects.toMatchObject({ status: 403 })
+    // unchanged values pass the guard but Finance has no update access at all
+    await expect(p.update({ collection: 'projects', id: teamProject, data: { name: before.name }, user: fin, overrideAccess: false })).rejects.toMatchObject({ status: 403 })
   })
 
   it('PM cannot assign the PM role or assign to other projects (escalation guard)', async () => {

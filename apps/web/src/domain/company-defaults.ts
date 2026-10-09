@@ -83,6 +83,28 @@ export async function ensureSystemCashInSources(req: PayloadRequest, target: num
   return out
 }
 
+/** Owner decision 2026-10-09: default "Tingkat Urgensi" of a PT (configurable afterwards). */
+export const DEFAULT_URGENCY_LEVELS = [
+  { code: 'LOW', name: 'Low', rank: 1 },
+  { code: 'MEDIUM', name: 'Medium', rank: 2 },
+  { code: 'HIGH', name: 'High', rank: 3 },
+  { code: 'SUPER', name: 'Super', rank: 4 },
+] as const
+
+/**
+ * Creates DEFAULT_URGENCY_LEVELS in PT `target` when it has none at all (levels are never deleted, so
+ * "none" = never seeded; a PT that renamed or deactivated its levels is left alone). Audited by the
+ * collection. SYSTEM-WRITE: the caller may have no membership in a new PT yet.
+ */
+export async function ensureDefaultUrgencyLevels(req: PayloadRequest, target: number): Promise<string[]> {
+  const res = await req.payload.find({ collection: 'urgency-levels', where: { company: { equals: target } }, limit: 1, depth: 0, overrideAccess: true /* SYSTEM-READ: masters of the target PT */, req })
+  if (res.docs.length > 0) return []
+  for (const u of DEFAULT_URGENCY_LEVELS) {
+    await req.payload.create({ collection: 'urgency-levels', data: { company: target, ...u, active: true } as never, depth: 0, overrideAccess: true /* SYSTEM-WRITE: default master of a PT */, req })
+  }
+  return DEFAULT_URGENCY_LEVELS.map((u) => u.code)
+}
+
 /** req.context flag: the create comes from the seed / go-live import (they apply their own defaults). */
 export const SKIP_COMPANY_DEFAULTS = 'pkSkipCompanyDefaults'
 

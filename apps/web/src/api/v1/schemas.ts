@@ -131,6 +131,8 @@ export const MASTER_TYPES = [
   'team-assignments',
   'vendors',
   'cash-in-sources',
+  // owner decision 2026-10-09: "Tingkat urgensi" picker of the expense draft
+  'urgency-levels',
 ] as const
 export type MasterType = (typeof MASTER_TYPES)[number]
 

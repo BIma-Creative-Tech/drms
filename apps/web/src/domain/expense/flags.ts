@@ -26,8 +26,6 @@ export type FlagInput = {
   requestDate: string
   /** Uang Muka: date of the (first) posted transfer, if any. */
   transferDate?: string | null
-  periodFrom?: string | null
-  periodTo?: string | null
   lines: FlagLine[]
   /** Active receipts only (not rejected/removed). */
   receipts: FlagReceipt[]
@@ -122,13 +120,8 @@ export function computeFlags(input: FlagInput): FlagSpec[] {
     } else if (input.transferDate && r.receiptDate < addDays(input.transferDate, -input.maxAgeDays)) {
       push('date_too_old', `Nota lebih tua dari ${input.maxAgeDays} hari sebelum transfer.`, { receiptDate: r.receiptDate, transferDate: input.transferDate, maxAgeDays: input.maxAgeDays })
     }
-    if ((input.periodFrom && r.receiptDate < input.periodFrom) || (input.periodTo && r.receiptDate > input.periodTo)) {
-      push('date_out_of_period', `Tanggal nota ${r.receiptDate} di luar periode kegiatan.`, {
-        receiptDate: r.receiptDate,
-        periodFrom: input.periodFrom ?? null,
-        periodTo: input.periodTo ?? null,
-      })
-    }
+    // `date_out_of_period` is no longer raised: the activity period was replaced by "Tingkat Urgensi"
+    // (owner decision 2026-10-09). The kind stays in FLAG_KINDS for historic flags (append-only).
   }
 
   // US-50 duplicates (matches found by the service in OTHER active requests and — QA-08 — inside the

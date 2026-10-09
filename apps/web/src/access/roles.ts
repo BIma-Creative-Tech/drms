@@ -1,10 +1,15 @@
 import type { Access, PayloadRequest } from 'payload'
 
 /**
- * The five ProyekKas roles (ADR 0003 §2 as revised by ADR 0016 §2): held PER PT in
- * `company-memberships` (DB only). Keycloak keeps identity + the coarse realm role `pk-user`.
+ * The ProyekKas roles (ADR 0003 §2 as revised by ADR 0016 §2, `pk-operator` added by owner decision
+ * 2026-10-09, ADR 0021): held PER PT in `company-memberships` (DB only). Keycloak keeps identity + the
+ * coarse realm role `pk-user`. `pk-operator` ("Operator/Anggota") is attendance-only (web + APK): it
+ * may only check in/out and read its own attendance recap — see `isOperatorOnly`,
+ * `access/panel-visibility.ts` and `admin/modules/registry.ts` for the enforced narrowing. It is
+ * intentionally absent from `anyMember` (access/policies.ts) and from every per-collection role map
+ * that exposes business data — new code must not add it there without a specific reason.
  */
-export const ROLES = ['pk-staff', 'pk-pm', 'pk-finance', 'pk-owner', 'pk-admin'] as const
+export const ROLES = ['pk-staff', 'pk-pm', 'pk-finance', 'pk-owner', 'pk-admin', 'pk-operator'] as const
 export type Role = (typeof ROLES)[number]
 
 /** Keycloak realm role "may log in to ProyekKas" (ADR 0016 §2). */
@@ -20,15 +25,17 @@ export const ROLE_LABELS: Record<Role, string> = {
   'pk-finance': 'Finance',
   'pk-owner': 'Direktur',
   'pk-admin': 'Admin',
+  'pk-operator': 'Operator/Anggota',
 }
 
 /**
  * Roles allowed into the Payload admin panel (architecture §7.2). F2c (user decision 2026-09-24):
  * Staff also gets a restricted web panel (own requests, receipts, notifications, own profile) —
- * permanent fallback for field staff without the APK. What staff SEES is narrowed by
- * `src/access/panel-visibility.ts`; what staff may READ/WRITE is still decided by access functions.
+ * permanent fallback for field staff without the APK. `pk-operator` (owner decision 2026-10-09) gets
+ * an even narrower panel (attendance only). What a restricted role SEES is narrowed by
+ * `src/access/panel-visibility.ts`; what it may READ/WRITE is still decided by access functions.
  */
-export const PANEL_ROLES: readonly Role[] = ['pk-admin', 'pk-finance', 'pk-owner', 'pk-pm', 'pk-staff']
+export const PANEL_ROLES: readonly Role[] = ['pk-admin', 'pk-finance', 'pk-owner', 'pk-pm', 'pk-staff', 'pk-operator']
 
 // ---- company context (ADR 0016 §5) --------------------------------------------------------------
 
@@ -91,10 +98,20 @@ export function userRoles(req: ReqLike): Role[] {
   return rolesOf(req.user)
 }
 
+/** Does the caller hold exactly `role` and no other panel role in the selected PTs? */
+function isRoleOnly(user: unknown, role: Role): boolean {
+  const roles = rolesOf(user)
+  return roles.includes(role) && !roles.some((r) => r !== role)
+}
+
 /** Staff without any other panel role in the selected PTs (the restricted "requester" panel). */
 export function isStaffOnly(user: unknown): boolean {
-  const roles = rolesOf(user)
-  return roles.includes('pk-staff') && !roles.some((r) => r !== 'pk-staff')
+  return isRoleOnly(user, 'pk-staff')
+}
+
+/** Operator/Anggota without any other panel role (the restricted attendance-only panel). */
+export function isOperatorOnly(user: unknown): boolean {
+  return isRoleOnly(user, 'pk-operator')
 }
 
 /**
