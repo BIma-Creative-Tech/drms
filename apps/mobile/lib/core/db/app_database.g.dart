@@ -5730,6 +5730,4694 @@ class LocalProgressReportsCompanion
   }
 }
 
+class $LocalFieldReportsTable extends LocalFieldReports
+    with TableInfo<$LocalFieldReportsTable, LocalFieldReport> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $LocalFieldReportsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _clientUuidMeta = const VerificationMeta(
+    'clientUuid',
+  );
+  @override
+  late final GeneratedColumn<String> clientUuid = GeneratedColumn<String>(
+    'client_uuid',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _userSubMeta = const VerificationMeta(
+    'userSub',
+  );
+  @override
+  late final GeneratedColumn<String> userSub = GeneratedColumn<String>(
+    'user_sub',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _companyIdMeta = const VerificationMeta(
+    'companyId',
+  );
+  @override
+  late final GeneratedColumn<int> companyId = GeneratedColumn<int>(
+    'company_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _reportTypeMeta = const VerificationMeta(
+    'reportType',
+  );
+  @override
+  late final GeneratedColumn<String> reportType = GeneratedColumn<String>(
+    'report_type',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _projectIdMeta = const VerificationMeta(
+    'projectId',
+  );
+  @override
+  late final GeneratedColumn<int> projectId = GeneratedColumn<int>(
+    'project_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _projectLabelMeta = const VerificationMeta(
+    'projectLabel',
+  );
+  @override
+  late final GeneratedColumn<String> projectLabel = GeneratedColumn<String>(
+    'project_label',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _unitIdMeta = const VerificationMeta('unitId');
+  @override
+  late final GeneratedColumn<int> unitId = GeneratedColumn<int>(
+    'unit_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _clientIdMeta = const VerificationMeta(
+    'clientId',
+  );
+  @override
+  late final GeneratedColumn<int> clientId = GeneratedColumn<int>(
+    'client_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _reportDateMeta = const VerificationMeta(
+    'reportDate',
+  );
+  @override
+  late final GeneratedColumn<String> reportDate = GeneratedColumn<String>(
+    'report_date',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _hourMeterMeta = const VerificationMeta(
+    'hourMeter',
+  );
+  @override
+  late final GeneratedColumn<double> hourMeter = GeneratedColumn<double>(
+    'hour_meter',
+    aliasedName,
+    true,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _contentJsonMeta = const VerificationMeta(
+    'contentJson',
+  );
+  @override
+  late final GeneratedColumn<String> contentJson = GeneratedColumn<String>(
+    'content_json',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('{}'),
+  );
+  static const VerificationMeta _photoUuidsJsonMeta = const VerificationMeta(
+    'photoUuidsJson',
+  );
+  @override
+  late final GeneratedColumn<String> photoUuidsJson = GeneratedColumn<String>(
+    'photo_uuids_json',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('[]'),
+  );
+  static const VerificationMeta _serverPhotoCountMeta = const VerificationMeta(
+    'serverPhotoCount',
+  );
+  @override
+  late final GeneratedColumn<int> serverPhotoCount = GeneratedColumn<int>(
+    'server_photo_count',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _reasonMeta = const VerificationMeta('reason');
+  @override
+  late final GeneratedColumn<String> reason = GeneratedColumn<String>(
+    'reason',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _serverIdMeta = const VerificationMeta(
+    'serverId',
+  );
+  @override
+  late final GeneratedColumn<int> serverId = GeneratedColumn<int>(
+    'server_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _serverRevMeta = const VerificationMeta(
+    'serverRev',
+  );
+  @override
+  late final GeneratedColumn<int> serverRev = GeneratedColumn<int>(
+    'server_rev',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _docNoMeta = const VerificationMeta('docNo');
+  @override
+  late final GeneratedColumn<String> docNo = GeneratedColumn<String>(
+    'doc_no',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _editableUntilMeta = const VerificationMeta(
+    'editableUntil',
+  );
+  @override
+  late final GeneratedColumn<String> editableUntil = GeneratedColumn<String>(
+    'editable_until',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _syncStateMeta = const VerificationMeta(
+    'syncState',
+  );
+  @override
+  late final GeneratedColumn<String> syncState = GeneratedColumn<String>(
+    'sync_state',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('local'),
+  );
+  static const VerificationMeta _lastErrorMeta = const VerificationMeta(
+    'lastError',
+  );
+  @override
+  late final GeneratedColumn<String> lastError = GeneratedColumn<String>(
+    'last_error',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _lastErrorCodeMeta = const VerificationMeta(
+    'lastErrorCode',
+  );
+  @override
+  late final GeneratedColumn<String> lastErrorCode = GeneratedColumn<String>(
+    'last_error_code',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _conflictCopyJsonMeta = const VerificationMeta(
+    'conflictCopyJson',
+  );
+  @override
+  late final GeneratedColumn<String> conflictCopyJson = GeneratedColumn<String>(
+    'conflict_copy_json',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _offlineMeta = const VerificationMeta(
+    'offline',
+  );
+  @override
+  late final GeneratedColumn<bool> offline = GeneratedColumn<bool>(
+    'offline',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("offline" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    clientUuid,
+    userSub,
+    companyId,
+    reportType,
+    projectId,
+    projectLabel,
+    unitId,
+    clientId,
+    reportDate,
+    hourMeter,
+    contentJson,
+    photoUuidsJson,
+    serverPhotoCount,
+    reason,
+    serverId,
+    serverRev,
+    docNo,
+    editableUntil,
+    syncState,
+    lastError,
+    lastErrorCode,
+    conflictCopyJson,
+    offline,
+    createdAt,
+    updatedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'local_field_reports';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<LocalFieldReport> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('client_uuid')) {
+      context.handle(
+        _clientUuidMeta,
+        clientUuid.isAcceptableOrUnknown(data['client_uuid']!, _clientUuidMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_clientUuidMeta);
+    }
+    if (data.containsKey('user_sub')) {
+      context.handle(
+        _userSubMeta,
+        userSub.isAcceptableOrUnknown(data['user_sub']!, _userSubMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_userSubMeta);
+    }
+    if (data.containsKey('company_id')) {
+      context.handle(
+        _companyIdMeta,
+        companyId.isAcceptableOrUnknown(data['company_id']!, _companyIdMeta),
+      );
+    }
+    if (data.containsKey('report_type')) {
+      context.handle(
+        _reportTypeMeta,
+        reportType.isAcceptableOrUnknown(data['report_type']!, _reportTypeMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_reportTypeMeta);
+    }
+    if (data.containsKey('project_id')) {
+      context.handle(
+        _projectIdMeta,
+        projectId.isAcceptableOrUnknown(data['project_id']!, _projectIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_projectIdMeta);
+    }
+    if (data.containsKey('project_label')) {
+      context.handle(
+        _projectLabelMeta,
+        projectLabel.isAcceptableOrUnknown(
+          data['project_label']!,
+          _projectLabelMeta,
+        ),
+      );
+    }
+    if (data.containsKey('unit_id')) {
+      context.handle(
+        _unitIdMeta,
+        unitId.isAcceptableOrUnknown(data['unit_id']!, _unitIdMeta),
+      );
+    }
+    if (data.containsKey('client_id')) {
+      context.handle(
+        _clientIdMeta,
+        clientId.isAcceptableOrUnknown(data['client_id']!, _clientIdMeta),
+      );
+    }
+    if (data.containsKey('report_date')) {
+      context.handle(
+        _reportDateMeta,
+        reportDate.isAcceptableOrUnknown(data['report_date']!, _reportDateMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_reportDateMeta);
+    }
+    if (data.containsKey('hour_meter')) {
+      context.handle(
+        _hourMeterMeta,
+        hourMeter.isAcceptableOrUnknown(data['hour_meter']!, _hourMeterMeta),
+      );
+    }
+    if (data.containsKey('content_json')) {
+      context.handle(
+        _contentJsonMeta,
+        contentJson.isAcceptableOrUnknown(
+          data['content_json']!,
+          _contentJsonMeta,
+        ),
+      );
+    }
+    if (data.containsKey('photo_uuids_json')) {
+      context.handle(
+        _photoUuidsJsonMeta,
+        photoUuidsJson.isAcceptableOrUnknown(
+          data['photo_uuids_json']!,
+          _photoUuidsJsonMeta,
+        ),
+      );
+    }
+    if (data.containsKey('server_photo_count')) {
+      context.handle(
+        _serverPhotoCountMeta,
+        serverPhotoCount.isAcceptableOrUnknown(
+          data['server_photo_count']!,
+          _serverPhotoCountMeta,
+        ),
+      );
+    }
+    if (data.containsKey('reason')) {
+      context.handle(
+        _reasonMeta,
+        reason.isAcceptableOrUnknown(data['reason']!, _reasonMeta),
+      );
+    }
+    if (data.containsKey('server_id')) {
+      context.handle(
+        _serverIdMeta,
+        serverId.isAcceptableOrUnknown(data['server_id']!, _serverIdMeta),
+      );
+    }
+    if (data.containsKey('server_rev')) {
+      context.handle(
+        _serverRevMeta,
+        serverRev.isAcceptableOrUnknown(data['server_rev']!, _serverRevMeta),
+      );
+    }
+    if (data.containsKey('doc_no')) {
+      context.handle(
+        _docNoMeta,
+        docNo.isAcceptableOrUnknown(data['doc_no']!, _docNoMeta),
+      );
+    }
+    if (data.containsKey('editable_until')) {
+      context.handle(
+        _editableUntilMeta,
+        editableUntil.isAcceptableOrUnknown(
+          data['editable_until']!,
+          _editableUntilMeta,
+        ),
+      );
+    }
+    if (data.containsKey('sync_state')) {
+      context.handle(
+        _syncStateMeta,
+        syncState.isAcceptableOrUnknown(data['sync_state']!, _syncStateMeta),
+      );
+    }
+    if (data.containsKey('last_error')) {
+      context.handle(
+        _lastErrorMeta,
+        lastError.isAcceptableOrUnknown(data['last_error']!, _lastErrorMeta),
+      );
+    }
+    if (data.containsKey('last_error_code')) {
+      context.handle(
+        _lastErrorCodeMeta,
+        lastErrorCode.isAcceptableOrUnknown(
+          data['last_error_code']!,
+          _lastErrorCodeMeta,
+        ),
+      );
+    }
+    if (data.containsKey('conflict_copy_json')) {
+      context.handle(
+        _conflictCopyJsonMeta,
+        conflictCopyJson.isAcceptableOrUnknown(
+          data['conflict_copy_json']!,
+          _conflictCopyJsonMeta,
+        ),
+      );
+    }
+    if (data.containsKey('offline')) {
+      context.handle(
+        _offlineMeta,
+        offline.isAcceptableOrUnknown(data['offline']!, _offlineMeta),
+      );
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {clientUuid};
+  @override
+  LocalFieldReport map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return LocalFieldReport(
+      clientUuid: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}client_uuid'],
+      )!,
+      userSub: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}user_sub'],
+      )!,
+      companyId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}company_id'],
+      ),
+      reportType: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}report_type'],
+      )!,
+      projectId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}project_id'],
+      )!,
+      projectLabel: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}project_label'],
+      )!,
+      unitId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}unit_id'],
+      ),
+      clientId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}client_id'],
+      ),
+      reportDate: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}report_date'],
+      )!,
+      hourMeter: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}hour_meter'],
+      ),
+      contentJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}content_json'],
+      )!,
+      photoUuidsJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}photo_uuids_json'],
+      )!,
+      serverPhotoCount: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}server_photo_count'],
+      )!,
+      reason: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}reason'],
+      ),
+      serverId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}server_id'],
+      ),
+      serverRev: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}server_rev'],
+      ),
+      docNo: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}doc_no'],
+      ),
+      editableUntil: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}editable_until'],
+      ),
+      syncState: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}sync_state'],
+      )!,
+      lastError: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}last_error'],
+      ),
+      lastErrorCode: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}last_error_code'],
+      ),
+      conflictCopyJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}conflict_copy_json'],
+      ),
+      offline: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}offline'],
+      )!,
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+    );
+  }
+
+  @override
+  $LocalFieldReportsTable createAlias(String alias) {
+    return $LocalFieldReportsTable(attachedDatabase, alias);
+  }
+}
+
+class LocalFieldReport extends DataClass
+    implements Insertable<LocalFieldReport> {
+  final String clientUuid;
+  final String userSub;
+  final int? companyId;
+
+  /// service_report | unit_timesheet | aftersales_activity
+  final String reportType;
+  final int projectId;
+  final String projectLabel;
+  final int? unitId;
+  final int? clientId;
+
+  /// Business date `YYYY-MM-DD` (company TZ).
+  final String reportDate;
+
+  /// Timesheet: HM akhir; service report: HM saat servis (prefill / HM floor of later reports).
+  final double? hourMeter;
+  final String contentJson;
+
+  /// Every local photo id (media_blobs, kind `field`) of the report, for clean-up.
+  final String photoUuidsJson;
+  final int serverPhotoCount;
+  final String? reason;
+  final int? serverId;
+  final int? serverRev;
+  final String? docNo;
+  final String? editableUntil;
+
+  /// local (draft) | queued | synced | conflict | rejected
+  final String syncState;
+  final String? lastError;
+  final String? lastErrorCode;
+
+  /// `server_service_report` / `server_unit_timesheet` / `server_aftersales_activity` of a conflict / NOT_EDITABLE.
+  final String? conflictCopyJson;
+  final bool offline;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  const LocalFieldReport({
+    required this.clientUuid,
+    required this.userSub,
+    this.companyId,
+    required this.reportType,
+    required this.projectId,
+    required this.projectLabel,
+    this.unitId,
+    this.clientId,
+    required this.reportDate,
+    this.hourMeter,
+    required this.contentJson,
+    required this.photoUuidsJson,
+    required this.serverPhotoCount,
+    this.reason,
+    this.serverId,
+    this.serverRev,
+    this.docNo,
+    this.editableUntil,
+    required this.syncState,
+    this.lastError,
+    this.lastErrorCode,
+    this.conflictCopyJson,
+    required this.offline,
+    required this.createdAt,
+    required this.updatedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['client_uuid'] = Variable<String>(clientUuid);
+    map['user_sub'] = Variable<String>(userSub);
+    if (!nullToAbsent || companyId != null) {
+      map['company_id'] = Variable<int>(companyId);
+    }
+    map['report_type'] = Variable<String>(reportType);
+    map['project_id'] = Variable<int>(projectId);
+    map['project_label'] = Variable<String>(projectLabel);
+    if (!nullToAbsent || unitId != null) {
+      map['unit_id'] = Variable<int>(unitId);
+    }
+    if (!nullToAbsent || clientId != null) {
+      map['client_id'] = Variable<int>(clientId);
+    }
+    map['report_date'] = Variable<String>(reportDate);
+    if (!nullToAbsent || hourMeter != null) {
+      map['hour_meter'] = Variable<double>(hourMeter);
+    }
+    map['content_json'] = Variable<String>(contentJson);
+    map['photo_uuids_json'] = Variable<String>(photoUuidsJson);
+    map['server_photo_count'] = Variable<int>(serverPhotoCount);
+    if (!nullToAbsent || reason != null) {
+      map['reason'] = Variable<String>(reason);
+    }
+    if (!nullToAbsent || serverId != null) {
+      map['server_id'] = Variable<int>(serverId);
+    }
+    if (!nullToAbsent || serverRev != null) {
+      map['server_rev'] = Variable<int>(serverRev);
+    }
+    if (!nullToAbsent || docNo != null) {
+      map['doc_no'] = Variable<String>(docNo);
+    }
+    if (!nullToAbsent || editableUntil != null) {
+      map['editable_until'] = Variable<String>(editableUntil);
+    }
+    map['sync_state'] = Variable<String>(syncState);
+    if (!nullToAbsent || lastError != null) {
+      map['last_error'] = Variable<String>(lastError);
+    }
+    if (!nullToAbsent || lastErrorCode != null) {
+      map['last_error_code'] = Variable<String>(lastErrorCode);
+    }
+    if (!nullToAbsent || conflictCopyJson != null) {
+      map['conflict_copy_json'] = Variable<String>(conflictCopyJson);
+    }
+    map['offline'] = Variable<bool>(offline);
+    map['created_at'] = Variable<DateTime>(createdAt);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    return map;
+  }
+
+  LocalFieldReportsCompanion toCompanion(bool nullToAbsent) {
+    return LocalFieldReportsCompanion(
+      clientUuid: Value(clientUuid),
+      userSub: Value(userSub),
+      companyId: companyId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(companyId),
+      reportType: Value(reportType),
+      projectId: Value(projectId),
+      projectLabel: Value(projectLabel),
+      unitId: unitId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(unitId),
+      clientId: clientId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(clientId),
+      reportDate: Value(reportDate),
+      hourMeter: hourMeter == null && nullToAbsent
+          ? const Value.absent()
+          : Value(hourMeter),
+      contentJson: Value(contentJson),
+      photoUuidsJson: Value(photoUuidsJson),
+      serverPhotoCount: Value(serverPhotoCount),
+      reason: reason == null && nullToAbsent
+          ? const Value.absent()
+          : Value(reason),
+      serverId: serverId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(serverId),
+      serverRev: serverRev == null && nullToAbsent
+          ? const Value.absent()
+          : Value(serverRev),
+      docNo: docNo == null && nullToAbsent
+          ? const Value.absent()
+          : Value(docNo),
+      editableUntil: editableUntil == null && nullToAbsent
+          ? const Value.absent()
+          : Value(editableUntil),
+      syncState: Value(syncState),
+      lastError: lastError == null && nullToAbsent
+          ? const Value.absent()
+          : Value(lastError),
+      lastErrorCode: lastErrorCode == null && nullToAbsent
+          ? const Value.absent()
+          : Value(lastErrorCode),
+      conflictCopyJson: conflictCopyJson == null && nullToAbsent
+          ? const Value.absent()
+          : Value(conflictCopyJson),
+      offline: Value(offline),
+      createdAt: Value(createdAt),
+      updatedAt: Value(updatedAt),
+    );
+  }
+
+  factory LocalFieldReport.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return LocalFieldReport(
+      clientUuid: serializer.fromJson<String>(json['clientUuid']),
+      userSub: serializer.fromJson<String>(json['userSub']),
+      companyId: serializer.fromJson<int?>(json['companyId']),
+      reportType: serializer.fromJson<String>(json['reportType']),
+      projectId: serializer.fromJson<int>(json['projectId']),
+      projectLabel: serializer.fromJson<String>(json['projectLabel']),
+      unitId: serializer.fromJson<int?>(json['unitId']),
+      clientId: serializer.fromJson<int?>(json['clientId']),
+      reportDate: serializer.fromJson<String>(json['reportDate']),
+      hourMeter: serializer.fromJson<double?>(json['hourMeter']),
+      contentJson: serializer.fromJson<String>(json['contentJson']),
+      photoUuidsJson: serializer.fromJson<String>(json['photoUuidsJson']),
+      serverPhotoCount: serializer.fromJson<int>(json['serverPhotoCount']),
+      reason: serializer.fromJson<String?>(json['reason']),
+      serverId: serializer.fromJson<int?>(json['serverId']),
+      serverRev: serializer.fromJson<int?>(json['serverRev']),
+      docNo: serializer.fromJson<String?>(json['docNo']),
+      editableUntil: serializer.fromJson<String?>(json['editableUntil']),
+      syncState: serializer.fromJson<String>(json['syncState']),
+      lastError: serializer.fromJson<String?>(json['lastError']),
+      lastErrorCode: serializer.fromJson<String?>(json['lastErrorCode']),
+      conflictCopyJson: serializer.fromJson<String?>(json['conflictCopyJson']),
+      offline: serializer.fromJson<bool>(json['offline']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'clientUuid': serializer.toJson<String>(clientUuid),
+      'userSub': serializer.toJson<String>(userSub),
+      'companyId': serializer.toJson<int?>(companyId),
+      'reportType': serializer.toJson<String>(reportType),
+      'projectId': serializer.toJson<int>(projectId),
+      'projectLabel': serializer.toJson<String>(projectLabel),
+      'unitId': serializer.toJson<int?>(unitId),
+      'clientId': serializer.toJson<int?>(clientId),
+      'reportDate': serializer.toJson<String>(reportDate),
+      'hourMeter': serializer.toJson<double?>(hourMeter),
+      'contentJson': serializer.toJson<String>(contentJson),
+      'photoUuidsJson': serializer.toJson<String>(photoUuidsJson),
+      'serverPhotoCount': serializer.toJson<int>(serverPhotoCount),
+      'reason': serializer.toJson<String?>(reason),
+      'serverId': serializer.toJson<int?>(serverId),
+      'serverRev': serializer.toJson<int?>(serverRev),
+      'docNo': serializer.toJson<String?>(docNo),
+      'editableUntil': serializer.toJson<String?>(editableUntil),
+      'syncState': serializer.toJson<String>(syncState),
+      'lastError': serializer.toJson<String?>(lastError),
+      'lastErrorCode': serializer.toJson<String?>(lastErrorCode),
+      'conflictCopyJson': serializer.toJson<String?>(conflictCopyJson),
+      'offline': serializer.toJson<bool>(offline),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+    };
+  }
+
+  LocalFieldReport copyWith({
+    String? clientUuid,
+    String? userSub,
+    Value<int?> companyId = const Value.absent(),
+    String? reportType,
+    int? projectId,
+    String? projectLabel,
+    Value<int?> unitId = const Value.absent(),
+    Value<int?> clientId = const Value.absent(),
+    String? reportDate,
+    Value<double?> hourMeter = const Value.absent(),
+    String? contentJson,
+    String? photoUuidsJson,
+    int? serverPhotoCount,
+    Value<String?> reason = const Value.absent(),
+    Value<int?> serverId = const Value.absent(),
+    Value<int?> serverRev = const Value.absent(),
+    Value<String?> docNo = const Value.absent(),
+    Value<String?> editableUntil = const Value.absent(),
+    String? syncState,
+    Value<String?> lastError = const Value.absent(),
+    Value<String?> lastErrorCode = const Value.absent(),
+    Value<String?> conflictCopyJson = const Value.absent(),
+    bool? offline,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+  }) => LocalFieldReport(
+    clientUuid: clientUuid ?? this.clientUuid,
+    userSub: userSub ?? this.userSub,
+    companyId: companyId.present ? companyId.value : this.companyId,
+    reportType: reportType ?? this.reportType,
+    projectId: projectId ?? this.projectId,
+    projectLabel: projectLabel ?? this.projectLabel,
+    unitId: unitId.present ? unitId.value : this.unitId,
+    clientId: clientId.present ? clientId.value : this.clientId,
+    reportDate: reportDate ?? this.reportDate,
+    hourMeter: hourMeter.present ? hourMeter.value : this.hourMeter,
+    contentJson: contentJson ?? this.contentJson,
+    photoUuidsJson: photoUuidsJson ?? this.photoUuidsJson,
+    serverPhotoCount: serverPhotoCount ?? this.serverPhotoCount,
+    reason: reason.present ? reason.value : this.reason,
+    serverId: serverId.present ? serverId.value : this.serverId,
+    serverRev: serverRev.present ? serverRev.value : this.serverRev,
+    docNo: docNo.present ? docNo.value : this.docNo,
+    editableUntil: editableUntil.present
+        ? editableUntil.value
+        : this.editableUntil,
+    syncState: syncState ?? this.syncState,
+    lastError: lastError.present ? lastError.value : this.lastError,
+    lastErrorCode: lastErrorCode.present
+        ? lastErrorCode.value
+        : this.lastErrorCode,
+    conflictCopyJson: conflictCopyJson.present
+        ? conflictCopyJson.value
+        : this.conflictCopyJson,
+    offline: offline ?? this.offline,
+    createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt ?? this.updatedAt,
+  );
+  LocalFieldReport copyWithCompanion(LocalFieldReportsCompanion data) {
+    return LocalFieldReport(
+      clientUuid: data.clientUuid.present
+          ? data.clientUuid.value
+          : this.clientUuid,
+      userSub: data.userSub.present ? data.userSub.value : this.userSub,
+      companyId: data.companyId.present ? data.companyId.value : this.companyId,
+      reportType: data.reportType.present
+          ? data.reportType.value
+          : this.reportType,
+      projectId: data.projectId.present ? data.projectId.value : this.projectId,
+      projectLabel: data.projectLabel.present
+          ? data.projectLabel.value
+          : this.projectLabel,
+      unitId: data.unitId.present ? data.unitId.value : this.unitId,
+      clientId: data.clientId.present ? data.clientId.value : this.clientId,
+      reportDate: data.reportDate.present
+          ? data.reportDate.value
+          : this.reportDate,
+      hourMeter: data.hourMeter.present ? data.hourMeter.value : this.hourMeter,
+      contentJson: data.contentJson.present
+          ? data.contentJson.value
+          : this.contentJson,
+      photoUuidsJson: data.photoUuidsJson.present
+          ? data.photoUuidsJson.value
+          : this.photoUuidsJson,
+      serverPhotoCount: data.serverPhotoCount.present
+          ? data.serverPhotoCount.value
+          : this.serverPhotoCount,
+      reason: data.reason.present ? data.reason.value : this.reason,
+      serverId: data.serverId.present ? data.serverId.value : this.serverId,
+      serverRev: data.serverRev.present ? data.serverRev.value : this.serverRev,
+      docNo: data.docNo.present ? data.docNo.value : this.docNo,
+      editableUntil: data.editableUntil.present
+          ? data.editableUntil.value
+          : this.editableUntil,
+      syncState: data.syncState.present ? data.syncState.value : this.syncState,
+      lastError: data.lastError.present ? data.lastError.value : this.lastError,
+      lastErrorCode: data.lastErrorCode.present
+          ? data.lastErrorCode.value
+          : this.lastErrorCode,
+      conflictCopyJson: data.conflictCopyJson.present
+          ? data.conflictCopyJson.value
+          : this.conflictCopyJson,
+      offline: data.offline.present ? data.offline.value : this.offline,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('LocalFieldReport(')
+          ..write('clientUuid: $clientUuid, ')
+          ..write('userSub: $userSub, ')
+          ..write('companyId: $companyId, ')
+          ..write('reportType: $reportType, ')
+          ..write('projectId: $projectId, ')
+          ..write('projectLabel: $projectLabel, ')
+          ..write('unitId: $unitId, ')
+          ..write('clientId: $clientId, ')
+          ..write('reportDate: $reportDate, ')
+          ..write('hourMeter: $hourMeter, ')
+          ..write('contentJson: $contentJson, ')
+          ..write('photoUuidsJson: $photoUuidsJson, ')
+          ..write('serverPhotoCount: $serverPhotoCount, ')
+          ..write('reason: $reason, ')
+          ..write('serverId: $serverId, ')
+          ..write('serverRev: $serverRev, ')
+          ..write('docNo: $docNo, ')
+          ..write('editableUntil: $editableUntil, ')
+          ..write('syncState: $syncState, ')
+          ..write('lastError: $lastError, ')
+          ..write('lastErrorCode: $lastErrorCode, ')
+          ..write('conflictCopyJson: $conflictCopyJson, ')
+          ..write('offline: $offline, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hashAll([
+    clientUuid,
+    userSub,
+    companyId,
+    reportType,
+    projectId,
+    projectLabel,
+    unitId,
+    clientId,
+    reportDate,
+    hourMeter,
+    contentJson,
+    photoUuidsJson,
+    serverPhotoCount,
+    reason,
+    serverId,
+    serverRev,
+    docNo,
+    editableUntil,
+    syncState,
+    lastError,
+    lastErrorCode,
+    conflictCopyJson,
+    offline,
+    createdAt,
+    updatedAt,
+  ]);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is LocalFieldReport &&
+          other.clientUuid == this.clientUuid &&
+          other.userSub == this.userSub &&
+          other.companyId == this.companyId &&
+          other.reportType == this.reportType &&
+          other.projectId == this.projectId &&
+          other.projectLabel == this.projectLabel &&
+          other.unitId == this.unitId &&
+          other.clientId == this.clientId &&
+          other.reportDate == this.reportDate &&
+          other.hourMeter == this.hourMeter &&
+          other.contentJson == this.contentJson &&
+          other.photoUuidsJson == this.photoUuidsJson &&
+          other.serverPhotoCount == this.serverPhotoCount &&
+          other.reason == this.reason &&
+          other.serverId == this.serverId &&
+          other.serverRev == this.serverRev &&
+          other.docNo == this.docNo &&
+          other.editableUntil == this.editableUntil &&
+          other.syncState == this.syncState &&
+          other.lastError == this.lastError &&
+          other.lastErrorCode == this.lastErrorCode &&
+          other.conflictCopyJson == this.conflictCopyJson &&
+          other.offline == this.offline &&
+          other.createdAt == this.createdAt &&
+          other.updatedAt == this.updatedAt);
+}
+
+class LocalFieldReportsCompanion extends UpdateCompanion<LocalFieldReport> {
+  final Value<String> clientUuid;
+  final Value<String> userSub;
+  final Value<int?> companyId;
+  final Value<String> reportType;
+  final Value<int> projectId;
+  final Value<String> projectLabel;
+  final Value<int?> unitId;
+  final Value<int?> clientId;
+  final Value<String> reportDate;
+  final Value<double?> hourMeter;
+  final Value<String> contentJson;
+  final Value<String> photoUuidsJson;
+  final Value<int> serverPhotoCount;
+  final Value<String?> reason;
+  final Value<int?> serverId;
+  final Value<int?> serverRev;
+  final Value<String?> docNo;
+  final Value<String?> editableUntil;
+  final Value<String> syncState;
+  final Value<String?> lastError;
+  final Value<String?> lastErrorCode;
+  final Value<String?> conflictCopyJson;
+  final Value<bool> offline;
+  final Value<DateTime> createdAt;
+  final Value<DateTime> updatedAt;
+  final Value<int> rowid;
+  const LocalFieldReportsCompanion({
+    this.clientUuid = const Value.absent(),
+    this.userSub = const Value.absent(),
+    this.companyId = const Value.absent(),
+    this.reportType = const Value.absent(),
+    this.projectId = const Value.absent(),
+    this.projectLabel = const Value.absent(),
+    this.unitId = const Value.absent(),
+    this.clientId = const Value.absent(),
+    this.reportDate = const Value.absent(),
+    this.hourMeter = const Value.absent(),
+    this.contentJson = const Value.absent(),
+    this.photoUuidsJson = const Value.absent(),
+    this.serverPhotoCount = const Value.absent(),
+    this.reason = const Value.absent(),
+    this.serverId = const Value.absent(),
+    this.serverRev = const Value.absent(),
+    this.docNo = const Value.absent(),
+    this.editableUntil = const Value.absent(),
+    this.syncState = const Value.absent(),
+    this.lastError = const Value.absent(),
+    this.lastErrorCode = const Value.absent(),
+    this.conflictCopyJson = const Value.absent(),
+    this.offline = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  LocalFieldReportsCompanion.insert({
+    required String clientUuid,
+    required String userSub,
+    this.companyId = const Value.absent(),
+    required String reportType,
+    required int projectId,
+    this.projectLabel = const Value.absent(),
+    this.unitId = const Value.absent(),
+    this.clientId = const Value.absent(),
+    required String reportDate,
+    this.hourMeter = const Value.absent(),
+    this.contentJson = const Value.absent(),
+    this.photoUuidsJson = const Value.absent(),
+    this.serverPhotoCount = const Value.absent(),
+    this.reason = const Value.absent(),
+    this.serverId = const Value.absent(),
+    this.serverRev = const Value.absent(),
+    this.docNo = const Value.absent(),
+    this.editableUntil = const Value.absent(),
+    this.syncState = const Value.absent(),
+    this.lastError = const Value.absent(),
+    this.lastErrorCode = const Value.absent(),
+    this.conflictCopyJson = const Value.absent(),
+    this.offline = const Value.absent(),
+    required DateTime createdAt,
+    required DateTime updatedAt,
+    this.rowid = const Value.absent(),
+  }) : clientUuid = Value(clientUuid),
+       userSub = Value(userSub),
+       reportType = Value(reportType),
+       projectId = Value(projectId),
+       reportDate = Value(reportDate),
+       createdAt = Value(createdAt),
+       updatedAt = Value(updatedAt);
+  static Insertable<LocalFieldReport> custom({
+    Expression<String>? clientUuid,
+    Expression<String>? userSub,
+    Expression<int>? companyId,
+    Expression<String>? reportType,
+    Expression<int>? projectId,
+    Expression<String>? projectLabel,
+    Expression<int>? unitId,
+    Expression<int>? clientId,
+    Expression<String>? reportDate,
+    Expression<double>? hourMeter,
+    Expression<String>? contentJson,
+    Expression<String>? photoUuidsJson,
+    Expression<int>? serverPhotoCount,
+    Expression<String>? reason,
+    Expression<int>? serverId,
+    Expression<int>? serverRev,
+    Expression<String>? docNo,
+    Expression<String>? editableUntil,
+    Expression<String>? syncState,
+    Expression<String>? lastError,
+    Expression<String>? lastErrorCode,
+    Expression<String>? conflictCopyJson,
+    Expression<bool>? offline,
+    Expression<DateTime>? createdAt,
+    Expression<DateTime>? updatedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (clientUuid != null) 'client_uuid': clientUuid,
+      if (userSub != null) 'user_sub': userSub,
+      if (companyId != null) 'company_id': companyId,
+      if (reportType != null) 'report_type': reportType,
+      if (projectId != null) 'project_id': projectId,
+      if (projectLabel != null) 'project_label': projectLabel,
+      if (unitId != null) 'unit_id': unitId,
+      if (clientId != null) 'client_id': clientId,
+      if (reportDate != null) 'report_date': reportDate,
+      if (hourMeter != null) 'hour_meter': hourMeter,
+      if (contentJson != null) 'content_json': contentJson,
+      if (photoUuidsJson != null) 'photo_uuids_json': photoUuidsJson,
+      if (serverPhotoCount != null) 'server_photo_count': serverPhotoCount,
+      if (reason != null) 'reason': reason,
+      if (serverId != null) 'server_id': serverId,
+      if (serverRev != null) 'server_rev': serverRev,
+      if (docNo != null) 'doc_no': docNo,
+      if (editableUntil != null) 'editable_until': editableUntil,
+      if (syncState != null) 'sync_state': syncState,
+      if (lastError != null) 'last_error': lastError,
+      if (lastErrorCode != null) 'last_error_code': lastErrorCode,
+      if (conflictCopyJson != null) 'conflict_copy_json': conflictCopyJson,
+      if (offline != null) 'offline': offline,
+      if (createdAt != null) 'created_at': createdAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  LocalFieldReportsCompanion copyWith({
+    Value<String>? clientUuid,
+    Value<String>? userSub,
+    Value<int?>? companyId,
+    Value<String>? reportType,
+    Value<int>? projectId,
+    Value<String>? projectLabel,
+    Value<int?>? unitId,
+    Value<int?>? clientId,
+    Value<String>? reportDate,
+    Value<double?>? hourMeter,
+    Value<String>? contentJson,
+    Value<String>? photoUuidsJson,
+    Value<int>? serverPhotoCount,
+    Value<String?>? reason,
+    Value<int?>? serverId,
+    Value<int?>? serverRev,
+    Value<String?>? docNo,
+    Value<String?>? editableUntil,
+    Value<String>? syncState,
+    Value<String?>? lastError,
+    Value<String?>? lastErrorCode,
+    Value<String?>? conflictCopyJson,
+    Value<bool>? offline,
+    Value<DateTime>? createdAt,
+    Value<DateTime>? updatedAt,
+    Value<int>? rowid,
+  }) {
+    return LocalFieldReportsCompanion(
+      clientUuid: clientUuid ?? this.clientUuid,
+      userSub: userSub ?? this.userSub,
+      companyId: companyId ?? this.companyId,
+      reportType: reportType ?? this.reportType,
+      projectId: projectId ?? this.projectId,
+      projectLabel: projectLabel ?? this.projectLabel,
+      unitId: unitId ?? this.unitId,
+      clientId: clientId ?? this.clientId,
+      reportDate: reportDate ?? this.reportDate,
+      hourMeter: hourMeter ?? this.hourMeter,
+      contentJson: contentJson ?? this.contentJson,
+      photoUuidsJson: photoUuidsJson ?? this.photoUuidsJson,
+      serverPhotoCount: serverPhotoCount ?? this.serverPhotoCount,
+      reason: reason ?? this.reason,
+      serverId: serverId ?? this.serverId,
+      serverRev: serverRev ?? this.serverRev,
+      docNo: docNo ?? this.docNo,
+      editableUntil: editableUntil ?? this.editableUntil,
+      syncState: syncState ?? this.syncState,
+      lastError: lastError ?? this.lastError,
+      lastErrorCode: lastErrorCode ?? this.lastErrorCode,
+      conflictCopyJson: conflictCopyJson ?? this.conflictCopyJson,
+      offline: offline ?? this.offline,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (clientUuid.present) {
+      map['client_uuid'] = Variable<String>(clientUuid.value);
+    }
+    if (userSub.present) {
+      map['user_sub'] = Variable<String>(userSub.value);
+    }
+    if (companyId.present) {
+      map['company_id'] = Variable<int>(companyId.value);
+    }
+    if (reportType.present) {
+      map['report_type'] = Variable<String>(reportType.value);
+    }
+    if (projectId.present) {
+      map['project_id'] = Variable<int>(projectId.value);
+    }
+    if (projectLabel.present) {
+      map['project_label'] = Variable<String>(projectLabel.value);
+    }
+    if (unitId.present) {
+      map['unit_id'] = Variable<int>(unitId.value);
+    }
+    if (clientId.present) {
+      map['client_id'] = Variable<int>(clientId.value);
+    }
+    if (reportDate.present) {
+      map['report_date'] = Variable<String>(reportDate.value);
+    }
+    if (hourMeter.present) {
+      map['hour_meter'] = Variable<double>(hourMeter.value);
+    }
+    if (contentJson.present) {
+      map['content_json'] = Variable<String>(contentJson.value);
+    }
+    if (photoUuidsJson.present) {
+      map['photo_uuids_json'] = Variable<String>(photoUuidsJson.value);
+    }
+    if (serverPhotoCount.present) {
+      map['server_photo_count'] = Variable<int>(serverPhotoCount.value);
+    }
+    if (reason.present) {
+      map['reason'] = Variable<String>(reason.value);
+    }
+    if (serverId.present) {
+      map['server_id'] = Variable<int>(serverId.value);
+    }
+    if (serverRev.present) {
+      map['server_rev'] = Variable<int>(serverRev.value);
+    }
+    if (docNo.present) {
+      map['doc_no'] = Variable<String>(docNo.value);
+    }
+    if (editableUntil.present) {
+      map['editable_until'] = Variable<String>(editableUntil.value);
+    }
+    if (syncState.present) {
+      map['sync_state'] = Variable<String>(syncState.value);
+    }
+    if (lastError.present) {
+      map['last_error'] = Variable<String>(lastError.value);
+    }
+    if (lastErrorCode.present) {
+      map['last_error_code'] = Variable<String>(lastErrorCode.value);
+    }
+    if (conflictCopyJson.present) {
+      map['conflict_copy_json'] = Variable<String>(conflictCopyJson.value);
+    }
+    if (offline.present) {
+      map['offline'] = Variable<bool>(offline.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('LocalFieldReportsCompanion(')
+          ..write('clientUuid: $clientUuid, ')
+          ..write('userSub: $userSub, ')
+          ..write('companyId: $companyId, ')
+          ..write('reportType: $reportType, ')
+          ..write('projectId: $projectId, ')
+          ..write('projectLabel: $projectLabel, ')
+          ..write('unitId: $unitId, ')
+          ..write('clientId: $clientId, ')
+          ..write('reportDate: $reportDate, ')
+          ..write('hourMeter: $hourMeter, ')
+          ..write('contentJson: $contentJson, ')
+          ..write('photoUuidsJson: $photoUuidsJson, ')
+          ..write('serverPhotoCount: $serverPhotoCount, ')
+          ..write('reason: $reason, ')
+          ..write('serverId: $serverId, ')
+          ..write('serverRev: $serverRev, ')
+          ..write('docNo: $docNo, ')
+          ..write('editableUntil: $editableUntil, ')
+          ..write('syncState: $syncState, ')
+          ..write('lastError: $lastError, ')
+          ..write('lastErrorCode: $lastErrorCode, ')
+          ..write('conflictCopyJson: $conflictCopyJson, ')
+          ..write('offline: $offline, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $FieldUnitsTable extends FieldUnits
+    with TableInfo<$FieldUnitsTable, FieldUnitRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $FieldUnitsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _userSubMeta = const VerificationMeta(
+    'userSub',
+  );
+  @override
+  late final GeneratedColumn<String> userSub = GeneratedColumn<String>(
+    'user_sub',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _companyIdMeta = const VerificationMeta(
+    'companyId',
+  );
+  @override
+  late final GeneratedColumn<int> companyId = GeneratedColumn<int>(
+    'company_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _kindMeta = const VerificationMeta('kind');
+  @override
+  late final GeneratedColumn<String> kind = GeneratedColumn<String>(
+    'kind',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('alat_berat'),
+  );
+  static const VerificationMeta _labelMeta = const VerificationMeta('label');
+  @override
+  late final GeneratedColumn<String> label = GeneratedColumn<String>(
+    'label',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _unitCodeMeta = const VerificationMeta(
+    'unitCode',
+  );
+  @override
+  late final GeneratedColumn<String> unitCode = GeneratedColumn<String>(
+    'unit_code',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _plateDisplayMeta = const VerificationMeta(
+    'plateDisplay',
+  );
+  @override
+  late final GeneratedColumn<String> plateDisplay = GeneratedColumn<String>(
+    'plate_display',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _unitTypeMeta = const VerificationMeta(
+    'unitType',
+  );
+  @override
+  late final GeneratedColumn<String> unitType = GeneratedColumn<String>(
+    'unit_type',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _brandModelMeta = const VerificationMeta(
+    'brandModel',
+  );
+  @override
+  late final GeneratedColumn<String> brandModel = GeneratedColumn<String>(
+    'brand_model',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _serialNoMeta = const VerificationMeta(
+    'serialNo',
+  );
+  @override
+  late final GeneratedColumn<String> serialNo = GeneratedColumn<String>(
+    'serial_no',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _ownerMeta = const VerificationMeta('owner');
+  @override
+  late final GeneratedColumn<String> owner = GeneratedColumn<String>(
+    'owner',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('sendiri'),
+  );
+  static const VerificationMeta _clientIdMeta = const VerificationMeta(
+    'clientId',
+  );
+  @override
+  late final GeneratedColumn<int> clientId = GeneratedColumn<int>(
+    'client_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _clientNameMeta = const VerificationMeta(
+    'clientName',
+  );
+  @override
+  late final GeneratedColumn<String> clientName = GeneratedColumn<String>(
+    'client_name',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _statusMeta = const VerificationMeta('status');
+  @override
+  late final GeneratedColumn<String> status = GeneratedColumn<String>(
+    'status',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('siap'),
+  );
+  static const VerificationMeta _lastHourMeterMeta = const VerificationMeta(
+    'lastHourMeter',
+  );
+  @override
+  late final GeneratedColumn<double> lastHourMeter = GeneratedColumn<double>(
+    'last_hour_meter',
+    aliasedName,
+    true,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _lastHourMeterAtMeta = const VerificationMeta(
+    'lastHourMeterAt',
+  );
+  @override
+  late final GeneratedColumn<String> lastHourMeterAt = GeneratedColumn<String>(
+    'last_hour_meter_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _activeMeta = const VerificationMeta('active');
+  @override
+  late final GeneratedColumn<bool> active = GeneratedColumn<bool>(
+    'active',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("active" IN (0, 1))',
+    ),
+    defaultValue: const Constant(true),
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<String> updatedAt = GeneratedColumn<String>(
+    'updated_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    userSub,
+    id,
+    companyId,
+    kind,
+    label,
+    unitCode,
+    plateDisplay,
+    unitType,
+    brandModel,
+    serialNo,
+    owner,
+    clientId,
+    clientName,
+    status,
+    lastHourMeter,
+    lastHourMeterAt,
+    active,
+    updatedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'field_units';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<FieldUnitRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('user_sub')) {
+      context.handle(
+        _userSubMeta,
+        userSub.isAcceptableOrUnknown(data['user_sub']!, _userSubMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_userSubMeta);
+    }
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('company_id')) {
+      context.handle(
+        _companyIdMeta,
+        companyId.isAcceptableOrUnknown(data['company_id']!, _companyIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_companyIdMeta);
+    }
+    if (data.containsKey('kind')) {
+      context.handle(
+        _kindMeta,
+        kind.isAcceptableOrUnknown(data['kind']!, _kindMeta),
+      );
+    }
+    if (data.containsKey('label')) {
+      context.handle(
+        _labelMeta,
+        label.isAcceptableOrUnknown(data['label']!, _labelMeta),
+      );
+    }
+    if (data.containsKey('unit_code')) {
+      context.handle(
+        _unitCodeMeta,
+        unitCode.isAcceptableOrUnknown(data['unit_code']!, _unitCodeMeta),
+      );
+    }
+    if (data.containsKey('plate_display')) {
+      context.handle(
+        _plateDisplayMeta,
+        plateDisplay.isAcceptableOrUnknown(
+          data['plate_display']!,
+          _plateDisplayMeta,
+        ),
+      );
+    }
+    if (data.containsKey('unit_type')) {
+      context.handle(
+        _unitTypeMeta,
+        unitType.isAcceptableOrUnknown(data['unit_type']!, _unitTypeMeta),
+      );
+    }
+    if (data.containsKey('brand_model')) {
+      context.handle(
+        _brandModelMeta,
+        brandModel.isAcceptableOrUnknown(data['brand_model']!, _brandModelMeta),
+      );
+    }
+    if (data.containsKey('serial_no')) {
+      context.handle(
+        _serialNoMeta,
+        serialNo.isAcceptableOrUnknown(data['serial_no']!, _serialNoMeta),
+      );
+    }
+    if (data.containsKey('owner')) {
+      context.handle(
+        _ownerMeta,
+        owner.isAcceptableOrUnknown(data['owner']!, _ownerMeta),
+      );
+    }
+    if (data.containsKey('client_id')) {
+      context.handle(
+        _clientIdMeta,
+        clientId.isAcceptableOrUnknown(data['client_id']!, _clientIdMeta),
+      );
+    }
+    if (data.containsKey('client_name')) {
+      context.handle(
+        _clientNameMeta,
+        clientName.isAcceptableOrUnknown(data['client_name']!, _clientNameMeta),
+      );
+    }
+    if (data.containsKey('status')) {
+      context.handle(
+        _statusMeta,
+        status.isAcceptableOrUnknown(data['status']!, _statusMeta),
+      );
+    }
+    if (data.containsKey('last_hour_meter')) {
+      context.handle(
+        _lastHourMeterMeta,
+        lastHourMeter.isAcceptableOrUnknown(
+          data['last_hour_meter']!,
+          _lastHourMeterMeta,
+        ),
+      );
+    }
+    if (data.containsKey('last_hour_meter_at')) {
+      context.handle(
+        _lastHourMeterAtMeta,
+        lastHourMeterAt.isAcceptableOrUnknown(
+          data['last_hour_meter_at']!,
+          _lastHourMeterAtMeta,
+        ),
+      );
+    }
+    if (data.containsKey('active')) {
+      context.handle(
+        _activeMeta,
+        active.isAcceptableOrUnknown(data['active']!, _activeMeta),
+      );
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {userSub, id};
+  @override
+  FieldUnitRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return FieldUnitRow(
+      userSub: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}user_sub'],
+      )!,
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}id'],
+      )!,
+      companyId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}company_id'],
+      )!,
+      kind: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}kind'],
+      )!,
+      label: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}label'],
+      )!,
+      unitCode: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}unit_code'],
+      ),
+      plateDisplay: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}plate_display'],
+      ),
+      unitType: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}unit_type'],
+      ),
+      brandModel: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}brand_model'],
+      ),
+      serialNo: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}serial_no'],
+      ),
+      owner: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}owner'],
+      )!,
+      clientId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}client_id'],
+      ),
+      clientName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}client_name'],
+      ),
+      status: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}status'],
+      )!,
+      lastHourMeter: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}last_hour_meter'],
+      ),
+      lastHourMeterAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}last_hour_meter_at'],
+      ),
+      active: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}active'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}updated_at'],
+      ),
+    );
+  }
+
+  @override
+  $FieldUnitsTable createAlias(String alias) {
+    return $FieldUnitsTable(attachedDatabase, alias);
+  }
+}
+
+class FieldUnitRow extends DataClass implements Insertable<FieldUnitRow> {
+  final String userSub;
+  final int id;
+  final int companyId;
+  final String kind;
+  final String label;
+  final String? unitCode;
+  final String? plateDisplay;
+  final String? unitType;
+  final String? brandModel;
+  final String? serialNo;
+
+  /// sendiri | pelanggan
+  final String owner;
+  final int? clientId;
+  final String? clientName;
+
+  /// siap | rusak | menunggu_part
+  final String status;
+  final double? lastHourMeter;
+  final String? lastHourMeterAt;
+  final bool active;
+  final String? updatedAt;
+  const FieldUnitRow({
+    required this.userSub,
+    required this.id,
+    required this.companyId,
+    required this.kind,
+    required this.label,
+    this.unitCode,
+    this.plateDisplay,
+    this.unitType,
+    this.brandModel,
+    this.serialNo,
+    required this.owner,
+    this.clientId,
+    this.clientName,
+    required this.status,
+    this.lastHourMeter,
+    this.lastHourMeterAt,
+    required this.active,
+    this.updatedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['user_sub'] = Variable<String>(userSub);
+    map['id'] = Variable<int>(id);
+    map['company_id'] = Variable<int>(companyId);
+    map['kind'] = Variable<String>(kind);
+    map['label'] = Variable<String>(label);
+    if (!nullToAbsent || unitCode != null) {
+      map['unit_code'] = Variable<String>(unitCode);
+    }
+    if (!nullToAbsent || plateDisplay != null) {
+      map['plate_display'] = Variable<String>(plateDisplay);
+    }
+    if (!nullToAbsent || unitType != null) {
+      map['unit_type'] = Variable<String>(unitType);
+    }
+    if (!nullToAbsent || brandModel != null) {
+      map['brand_model'] = Variable<String>(brandModel);
+    }
+    if (!nullToAbsent || serialNo != null) {
+      map['serial_no'] = Variable<String>(serialNo);
+    }
+    map['owner'] = Variable<String>(owner);
+    if (!nullToAbsent || clientId != null) {
+      map['client_id'] = Variable<int>(clientId);
+    }
+    if (!nullToAbsent || clientName != null) {
+      map['client_name'] = Variable<String>(clientName);
+    }
+    map['status'] = Variable<String>(status);
+    if (!nullToAbsent || lastHourMeter != null) {
+      map['last_hour_meter'] = Variable<double>(lastHourMeter);
+    }
+    if (!nullToAbsent || lastHourMeterAt != null) {
+      map['last_hour_meter_at'] = Variable<String>(lastHourMeterAt);
+    }
+    map['active'] = Variable<bool>(active);
+    if (!nullToAbsent || updatedAt != null) {
+      map['updated_at'] = Variable<String>(updatedAt);
+    }
+    return map;
+  }
+
+  FieldUnitsCompanion toCompanion(bool nullToAbsent) {
+    return FieldUnitsCompanion(
+      userSub: Value(userSub),
+      id: Value(id),
+      companyId: Value(companyId),
+      kind: Value(kind),
+      label: Value(label),
+      unitCode: unitCode == null && nullToAbsent
+          ? const Value.absent()
+          : Value(unitCode),
+      plateDisplay: plateDisplay == null && nullToAbsent
+          ? const Value.absent()
+          : Value(plateDisplay),
+      unitType: unitType == null && nullToAbsent
+          ? const Value.absent()
+          : Value(unitType),
+      brandModel: brandModel == null && nullToAbsent
+          ? const Value.absent()
+          : Value(brandModel),
+      serialNo: serialNo == null && nullToAbsent
+          ? const Value.absent()
+          : Value(serialNo),
+      owner: Value(owner),
+      clientId: clientId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(clientId),
+      clientName: clientName == null && nullToAbsent
+          ? const Value.absent()
+          : Value(clientName),
+      status: Value(status),
+      lastHourMeter: lastHourMeter == null && nullToAbsent
+          ? const Value.absent()
+          : Value(lastHourMeter),
+      lastHourMeterAt: lastHourMeterAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(lastHourMeterAt),
+      active: Value(active),
+      updatedAt: updatedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(updatedAt),
+    );
+  }
+
+  factory FieldUnitRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return FieldUnitRow(
+      userSub: serializer.fromJson<String>(json['userSub']),
+      id: serializer.fromJson<int>(json['id']),
+      companyId: serializer.fromJson<int>(json['companyId']),
+      kind: serializer.fromJson<String>(json['kind']),
+      label: serializer.fromJson<String>(json['label']),
+      unitCode: serializer.fromJson<String?>(json['unitCode']),
+      plateDisplay: serializer.fromJson<String?>(json['plateDisplay']),
+      unitType: serializer.fromJson<String?>(json['unitType']),
+      brandModel: serializer.fromJson<String?>(json['brandModel']),
+      serialNo: serializer.fromJson<String?>(json['serialNo']),
+      owner: serializer.fromJson<String>(json['owner']),
+      clientId: serializer.fromJson<int?>(json['clientId']),
+      clientName: serializer.fromJson<String?>(json['clientName']),
+      status: serializer.fromJson<String>(json['status']),
+      lastHourMeter: serializer.fromJson<double?>(json['lastHourMeter']),
+      lastHourMeterAt: serializer.fromJson<String?>(json['lastHourMeterAt']),
+      active: serializer.fromJson<bool>(json['active']),
+      updatedAt: serializer.fromJson<String?>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'userSub': serializer.toJson<String>(userSub),
+      'id': serializer.toJson<int>(id),
+      'companyId': serializer.toJson<int>(companyId),
+      'kind': serializer.toJson<String>(kind),
+      'label': serializer.toJson<String>(label),
+      'unitCode': serializer.toJson<String?>(unitCode),
+      'plateDisplay': serializer.toJson<String?>(plateDisplay),
+      'unitType': serializer.toJson<String?>(unitType),
+      'brandModel': serializer.toJson<String?>(brandModel),
+      'serialNo': serializer.toJson<String?>(serialNo),
+      'owner': serializer.toJson<String>(owner),
+      'clientId': serializer.toJson<int?>(clientId),
+      'clientName': serializer.toJson<String?>(clientName),
+      'status': serializer.toJson<String>(status),
+      'lastHourMeter': serializer.toJson<double?>(lastHourMeter),
+      'lastHourMeterAt': serializer.toJson<String?>(lastHourMeterAt),
+      'active': serializer.toJson<bool>(active),
+      'updatedAt': serializer.toJson<String?>(updatedAt),
+    };
+  }
+
+  FieldUnitRow copyWith({
+    String? userSub,
+    int? id,
+    int? companyId,
+    String? kind,
+    String? label,
+    Value<String?> unitCode = const Value.absent(),
+    Value<String?> plateDisplay = const Value.absent(),
+    Value<String?> unitType = const Value.absent(),
+    Value<String?> brandModel = const Value.absent(),
+    Value<String?> serialNo = const Value.absent(),
+    String? owner,
+    Value<int?> clientId = const Value.absent(),
+    Value<String?> clientName = const Value.absent(),
+    String? status,
+    Value<double?> lastHourMeter = const Value.absent(),
+    Value<String?> lastHourMeterAt = const Value.absent(),
+    bool? active,
+    Value<String?> updatedAt = const Value.absent(),
+  }) => FieldUnitRow(
+    userSub: userSub ?? this.userSub,
+    id: id ?? this.id,
+    companyId: companyId ?? this.companyId,
+    kind: kind ?? this.kind,
+    label: label ?? this.label,
+    unitCode: unitCode.present ? unitCode.value : this.unitCode,
+    plateDisplay: plateDisplay.present ? plateDisplay.value : this.plateDisplay,
+    unitType: unitType.present ? unitType.value : this.unitType,
+    brandModel: brandModel.present ? brandModel.value : this.brandModel,
+    serialNo: serialNo.present ? serialNo.value : this.serialNo,
+    owner: owner ?? this.owner,
+    clientId: clientId.present ? clientId.value : this.clientId,
+    clientName: clientName.present ? clientName.value : this.clientName,
+    status: status ?? this.status,
+    lastHourMeter: lastHourMeter.present
+        ? lastHourMeter.value
+        : this.lastHourMeter,
+    lastHourMeterAt: lastHourMeterAt.present
+        ? lastHourMeterAt.value
+        : this.lastHourMeterAt,
+    active: active ?? this.active,
+    updatedAt: updatedAt.present ? updatedAt.value : this.updatedAt,
+  );
+  FieldUnitRow copyWithCompanion(FieldUnitsCompanion data) {
+    return FieldUnitRow(
+      userSub: data.userSub.present ? data.userSub.value : this.userSub,
+      id: data.id.present ? data.id.value : this.id,
+      companyId: data.companyId.present ? data.companyId.value : this.companyId,
+      kind: data.kind.present ? data.kind.value : this.kind,
+      label: data.label.present ? data.label.value : this.label,
+      unitCode: data.unitCode.present ? data.unitCode.value : this.unitCode,
+      plateDisplay: data.plateDisplay.present
+          ? data.plateDisplay.value
+          : this.plateDisplay,
+      unitType: data.unitType.present ? data.unitType.value : this.unitType,
+      brandModel: data.brandModel.present
+          ? data.brandModel.value
+          : this.brandModel,
+      serialNo: data.serialNo.present ? data.serialNo.value : this.serialNo,
+      owner: data.owner.present ? data.owner.value : this.owner,
+      clientId: data.clientId.present ? data.clientId.value : this.clientId,
+      clientName: data.clientName.present
+          ? data.clientName.value
+          : this.clientName,
+      status: data.status.present ? data.status.value : this.status,
+      lastHourMeter: data.lastHourMeter.present
+          ? data.lastHourMeter.value
+          : this.lastHourMeter,
+      lastHourMeterAt: data.lastHourMeterAt.present
+          ? data.lastHourMeterAt.value
+          : this.lastHourMeterAt,
+      active: data.active.present ? data.active.value : this.active,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('FieldUnitRow(')
+          ..write('userSub: $userSub, ')
+          ..write('id: $id, ')
+          ..write('companyId: $companyId, ')
+          ..write('kind: $kind, ')
+          ..write('label: $label, ')
+          ..write('unitCode: $unitCode, ')
+          ..write('plateDisplay: $plateDisplay, ')
+          ..write('unitType: $unitType, ')
+          ..write('brandModel: $brandModel, ')
+          ..write('serialNo: $serialNo, ')
+          ..write('owner: $owner, ')
+          ..write('clientId: $clientId, ')
+          ..write('clientName: $clientName, ')
+          ..write('status: $status, ')
+          ..write('lastHourMeter: $lastHourMeter, ')
+          ..write('lastHourMeterAt: $lastHourMeterAt, ')
+          ..write('active: $active, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    userSub,
+    id,
+    companyId,
+    kind,
+    label,
+    unitCode,
+    plateDisplay,
+    unitType,
+    brandModel,
+    serialNo,
+    owner,
+    clientId,
+    clientName,
+    status,
+    lastHourMeter,
+    lastHourMeterAt,
+    active,
+    updatedAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is FieldUnitRow &&
+          other.userSub == this.userSub &&
+          other.id == this.id &&
+          other.companyId == this.companyId &&
+          other.kind == this.kind &&
+          other.label == this.label &&
+          other.unitCode == this.unitCode &&
+          other.plateDisplay == this.plateDisplay &&
+          other.unitType == this.unitType &&
+          other.brandModel == this.brandModel &&
+          other.serialNo == this.serialNo &&
+          other.owner == this.owner &&
+          other.clientId == this.clientId &&
+          other.clientName == this.clientName &&
+          other.status == this.status &&
+          other.lastHourMeter == this.lastHourMeter &&
+          other.lastHourMeterAt == this.lastHourMeterAt &&
+          other.active == this.active &&
+          other.updatedAt == this.updatedAt);
+}
+
+class FieldUnitsCompanion extends UpdateCompanion<FieldUnitRow> {
+  final Value<String> userSub;
+  final Value<int> id;
+  final Value<int> companyId;
+  final Value<String> kind;
+  final Value<String> label;
+  final Value<String?> unitCode;
+  final Value<String?> plateDisplay;
+  final Value<String?> unitType;
+  final Value<String?> brandModel;
+  final Value<String?> serialNo;
+  final Value<String> owner;
+  final Value<int?> clientId;
+  final Value<String?> clientName;
+  final Value<String> status;
+  final Value<double?> lastHourMeter;
+  final Value<String?> lastHourMeterAt;
+  final Value<bool> active;
+  final Value<String?> updatedAt;
+  final Value<int> rowid;
+  const FieldUnitsCompanion({
+    this.userSub = const Value.absent(),
+    this.id = const Value.absent(),
+    this.companyId = const Value.absent(),
+    this.kind = const Value.absent(),
+    this.label = const Value.absent(),
+    this.unitCode = const Value.absent(),
+    this.plateDisplay = const Value.absent(),
+    this.unitType = const Value.absent(),
+    this.brandModel = const Value.absent(),
+    this.serialNo = const Value.absent(),
+    this.owner = const Value.absent(),
+    this.clientId = const Value.absent(),
+    this.clientName = const Value.absent(),
+    this.status = const Value.absent(),
+    this.lastHourMeter = const Value.absent(),
+    this.lastHourMeterAt = const Value.absent(),
+    this.active = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  FieldUnitsCompanion.insert({
+    required String userSub,
+    required int id,
+    required int companyId,
+    this.kind = const Value.absent(),
+    this.label = const Value.absent(),
+    this.unitCode = const Value.absent(),
+    this.plateDisplay = const Value.absent(),
+    this.unitType = const Value.absent(),
+    this.brandModel = const Value.absent(),
+    this.serialNo = const Value.absent(),
+    this.owner = const Value.absent(),
+    this.clientId = const Value.absent(),
+    this.clientName = const Value.absent(),
+    this.status = const Value.absent(),
+    this.lastHourMeter = const Value.absent(),
+    this.lastHourMeterAt = const Value.absent(),
+    this.active = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : userSub = Value(userSub),
+       id = Value(id),
+       companyId = Value(companyId);
+  static Insertable<FieldUnitRow> custom({
+    Expression<String>? userSub,
+    Expression<int>? id,
+    Expression<int>? companyId,
+    Expression<String>? kind,
+    Expression<String>? label,
+    Expression<String>? unitCode,
+    Expression<String>? plateDisplay,
+    Expression<String>? unitType,
+    Expression<String>? brandModel,
+    Expression<String>? serialNo,
+    Expression<String>? owner,
+    Expression<int>? clientId,
+    Expression<String>? clientName,
+    Expression<String>? status,
+    Expression<double>? lastHourMeter,
+    Expression<String>? lastHourMeterAt,
+    Expression<bool>? active,
+    Expression<String>? updatedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (userSub != null) 'user_sub': userSub,
+      if (id != null) 'id': id,
+      if (companyId != null) 'company_id': companyId,
+      if (kind != null) 'kind': kind,
+      if (label != null) 'label': label,
+      if (unitCode != null) 'unit_code': unitCode,
+      if (plateDisplay != null) 'plate_display': plateDisplay,
+      if (unitType != null) 'unit_type': unitType,
+      if (brandModel != null) 'brand_model': brandModel,
+      if (serialNo != null) 'serial_no': serialNo,
+      if (owner != null) 'owner': owner,
+      if (clientId != null) 'client_id': clientId,
+      if (clientName != null) 'client_name': clientName,
+      if (status != null) 'status': status,
+      if (lastHourMeter != null) 'last_hour_meter': lastHourMeter,
+      if (lastHourMeterAt != null) 'last_hour_meter_at': lastHourMeterAt,
+      if (active != null) 'active': active,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  FieldUnitsCompanion copyWith({
+    Value<String>? userSub,
+    Value<int>? id,
+    Value<int>? companyId,
+    Value<String>? kind,
+    Value<String>? label,
+    Value<String?>? unitCode,
+    Value<String?>? plateDisplay,
+    Value<String?>? unitType,
+    Value<String?>? brandModel,
+    Value<String?>? serialNo,
+    Value<String>? owner,
+    Value<int?>? clientId,
+    Value<String?>? clientName,
+    Value<String>? status,
+    Value<double?>? lastHourMeter,
+    Value<String?>? lastHourMeterAt,
+    Value<bool>? active,
+    Value<String?>? updatedAt,
+    Value<int>? rowid,
+  }) {
+    return FieldUnitsCompanion(
+      userSub: userSub ?? this.userSub,
+      id: id ?? this.id,
+      companyId: companyId ?? this.companyId,
+      kind: kind ?? this.kind,
+      label: label ?? this.label,
+      unitCode: unitCode ?? this.unitCode,
+      plateDisplay: plateDisplay ?? this.plateDisplay,
+      unitType: unitType ?? this.unitType,
+      brandModel: brandModel ?? this.brandModel,
+      serialNo: serialNo ?? this.serialNo,
+      owner: owner ?? this.owner,
+      clientId: clientId ?? this.clientId,
+      clientName: clientName ?? this.clientName,
+      status: status ?? this.status,
+      lastHourMeter: lastHourMeter ?? this.lastHourMeter,
+      lastHourMeterAt: lastHourMeterAt ?? this.lastHourMeterAt,
+      active: active ?? this.active,
+      updatedAt: updatedAt ?? this.updatedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (userSub.present) {
+      map['user_sub'] = Variable<String>(userSub.value);
+    }
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (companyId.present) {
+      map['company_id'] = Variable<int>(companyId.value);
+    }
+    if (kind.present) {
+      map['kind'] = Variable<String>(kind.value);
+    }
+    if (label.present) {
+      map['label'] = Variable<String>(label.value);
+    }
+    if (unitCode.present) {
+      map['unit_code'] = Variable<String>(unitCode.value);
+    }
+    if (plateDisplay.present) {
+      map['plate_display'] = Variable<String>(plateDisplay.value);
+    }
+    if (unitType.present) {
+      map['unit_type'] = Variable<String>(unitType.value);
+    }
+    if (brandModel.present) {
+      map['brand_model'] = Variable<String>(brandModel.value);
+    }
+    if (serialNo.present) {
+      map['serial_no'] = Variable<String>(serialNo.value);
+    }
+    if (owner.present) {
+      map['owner'] = Variable<String>(owner.value);
+    }
+    if (clientId.present) {
+      map['client_id'] = Variable<int>(clientId.value);
+    }
+    if (clientName.present) {
+      map['client_name'] = Variable<String>(clientName.value);
+    }
+    if (status.present) {
+      map['status'] = Variable<String>(status.value);
+    }
+    if (lastHourMeter.present) {
+      map['last_hour_meter'] = Variable<double>(lastHourMeter.value);
+    }
+    if (lastHourMeterAt.present) {
+      map['last_hour_meter_at'] = Variable<String>(lastHourMeterAt.value);
+    }
+    if (active.present) {
+      map['active'] = Variable<bool>(active.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<String>(updatedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('FieldUnitsCompanion(')
+          ..write('userSub: $userSub, ')
+          ..write('id: $id, ')
+          ..write('companyId: $companyId, ')
+          ..write('kind: $kind, ')
+          ..write('label: $label, ')
+          ..write('unitCode: $unitCode, ')
+          ..write('plateDisplay: $plateDisplay, ')
+          ..write('unitType: $unitType, ')
+          ..write('brandModel: $brandModel, ')
+          ..write('serialNo: $serialNo, ')
+          ..write('owner: $owner, ')
+          ..write('clientId: $clientId, ')
+          ..write('clientName: $clientName, ')
+          ..write('status: $status, ')
+          ..write('lastHourMeter: $lastHourMeter, ')
+          ..write('lastHourMeterAt: $lastHourMeterAt, ')
+          ..write('active: $active, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $FieldContractUnitsTable extends FieldContractUnits
+    with TableInfo<$FieldContractUnitsTable, FieldContractUnitRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $FieldContractUnitsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _userSubMeta = const VerificationMeta(
+    'userSub',
+  );
+  @override
+  late final GeneratedColumn<String> userSub = GeneratedColumn<String>(
+    'user_sub',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _companyIdMeta = const VerificationMeta(
+    'companyId',
+  );
+  @override
+  late final GeneratedColumn<int> companyId = GeneratedColumn<int>(
+    'company_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _projectIdMeta = const VerificationMeta(
+    'projectId',
+  );
+  @override
+  late final GeneratedColumn<int> projectId = GeneratedColumn<int>(
+    'project_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _unitIdMeta = const VerificationMeta('unitId');
+  @override
+  late final GeneratedColumn<int> unitId = GeneratedColumn<int>(
+    'unit_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _unitLabelMeta = const VerificationMeta(
+    'unitLabel',
+  );
+  @override
+  late final GeneratedColumn<String> unitLabel = GeneratedColumn<String>(
+    'unit_label',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _unitCodeMeta = const VerificationMeta(
+    'unitCode',
+  );
+  @override
+  late final GeneratedColumn<String> unitCode = GeneratedColumn<String>(
+    'unit_code',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _startDateMeta = const VerificationMeta(
+    'startDate',
+  );
+  @override
+  late final GeneratedColumn<String> startDate = GeneratedColumn<String>(
+    'start_date',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _endDateMeta = const VerificationMeta(
+    'endDate',
+  );
+  @override
+  late final GeneratedColumn<String> endDate = GeneratedColumn<String>(
+    'end_date',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _activeMeta = const VerificationMeta('active');
+  @override
+  late final GeneratedColumn<bool> active = GeneratedColumn<bool>(
+    'active',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("active" IN (0, 1))',
+    ),
+    defaultValue: const Constant(true),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    userSub,
+    id,
+    companyId,
+    projectId,
+    unitId,
+    unitLabel,
+    unitCode,
+    startDate,
+    endDate,
+    active,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'field_contract_units';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<FieldContractUnitRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('user_sub')) {
+      context.handle(
+        _userSubMeta,
+        userSub.isAcceptableOrUnknown(data['user_sub']!, _userSubMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_userSubMeta);
+    }
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('company_id')) {
+      context.handle(
+        _companyIdMeta,
+        companyId.isAcceptableOrUnknown(data['company_id']!, _companyIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_companyIdMeta);
+    }
+    if (data.containsKey('project_id')) {
+      context.handle(
+        _projectIdMeta,
+        projectId.isAcceptableOrUnknown(data['project_id']!, _projectIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_projectIdMeta);
+    }
+    if (data.containsKey('unit_id')) {
+      context.handle(
+        _unitIdMeta,
+        unitId.isAcceptableOrUnknown(data['unit_id']!, _unitIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_unitIdMeta);
+    }
+    if (data.containsKey('unit_label')) {
+      context.handle(
+        _unitLabelMeta,
+        unitLabel.isAcceptableOrUnknown(data['unit_label']!, _unitLabelMeta),
+      );
+    }
+    if (data.containsKey('unit_code')) {
+      context.handle(
+        _unitCodeMeta,
+        unitCode.isAcceptableOrUnknown(data['unit_code']!, _unitCodeMeta),
+      );
+    }
+    if (data.containsKey('start_date')) {
+      context.handle(
+        _startDateMeta,
+        startDate.isAcceptableOrUnknown(data['start_date']!, _startDateMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_startDateMeta);
+    }
+    if (data.containsKey('end_date')) {
+      context.handle(
+        _endDateMeta,
+        endDate.isAcceptableOrUnknown(data['end_date']!, _endDateMeta),
+      );
+    }
+    if (data.containsKey('active')) {
+      context.handle(
+        _activeMeta,
+        active.isAcceptableOrUnknown(data['active']!, _activeMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {userSub, id};
+  @override
+  FieldContractUnitRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return FieldContractUnitRow(
+      userSub: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}user_sub'],
+      )!,
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}id'],
+      )!,
+      companyId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}company_id'],
+      )!,
+      projectId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}project_id'],
+      )!,
+      unitId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}unit_id'],
+      )!,
+      unitLabel: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}unit_label'],
+      )!,
+      unitCode: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}unit_code'],
+      ),
+      startDate: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}start_date'],
+      )!,
+      endDate: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}end_date'],
+      ),
+      active: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}active'],
+      )!,
+    );
+  }
+
+  @override
+  $FieldContractUnitsTable createAlias(String alias) {
+    return $FieldContractUnitsTable(attachedDatabase, alias);
+  }
+}
+
+class FieldContractUnitRow extends DataClass
+    implements Insertable<FieldContractUnitRow> {
+  final String userSub;
+  final int id;
+  final int companyId;
+  final int projectId;
+  final int unitId;
+  final String unitLabel;
+  final String? unitCode;
+  final String startDate;
+  final String? endDate;
+  final bool active;
+  const FieldContractUnitRow({
+    required this.userSub,
+    required this.id,
+    required this.companyId,
+    required this.projectId,
+    required this.unitId,
+    required this.unitLabel,
+    this.unitCode,
+    required this.startDate,
+    this.endDate,
+    required this.active,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['user_sub'] = Variable<String>(userSub);
+    map['id'] = Variable<int>(id);
+    map['company_id'] = Variable<int>(companyId);
+    map['project_id'] = Variable<int>(projectId);
+    map['unit_id'] = Variable<int>(unitId);
+    map['unit_label'] = Variable<String>(unitLabel);
+    if (!nullToAbsent || unitCode != null) {
+      map['unit_code'] = Variable<String>(unitCode);
+    }
+    map['start_date'] = Variable<String>(startDate);
+    if (!nullToAbsent || endDate != null) {
+      map['end_date'] = Variable<String>(endDate);
+    }
+    map['active'] = Variable<bool>(active);
+    return map;
+  }
+
+  FieldContractUnitsCompanion toCompanion(bool nullToAbsent) {
+    return FieldContractUnitsCompanion(
+      userSub: Value(userSub),
+      id: Value(id),
+      companyId: Value(companyId),
+      projectId: Value(projectId),
+      unitId: Value(unitId),
+      unitLabel: Value(unitLabel),
+      unitCode: unitCode == null && nullToAbsent
+          ? const Value.absent()
+          : Value(unitCode),
+      startDate: Value(startDate),
+      endDate: endDate == null && nullToAbsent
+          ? const Value.absent()
+          : Value(endDate),
+      active: Value(active),
+    );
+  }
+
+  factory FieldContractUnitRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return FieldContractUnitRow(
+      userSub: serializer.fromJson<String>(json['userSub']),
+      id: serializer.fromJson<int>(json['id']),
+      companyId: serializer.fromJson<int>(json['companyId']),
+      projectId: serializer.fromJson<int>(json['projectId']),
+      unitId: serializer.fromJson<int>(json['unitId']),
+      unitLabel: serializer.fromJson<String>(json['unitLabel']),
+      unitCode: serializer.fromJson<String?>(json['unitCode']),
+      startDate: serializer.fromJson<String>(json['startDate']),
+      endDate: serializer.fromJson<String?>(json['endDate']),
+      active: serializer.fromJson<bool>(json['active']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'userSub': serializer.toJson<String>(userSub),
+      'id': serializer.toJson<int>(id),
+      'companyId': serializer.toJson<int>(companyId),
+      'projectId': serializer.toJson<int>(projectId),
+      'unitId': serializer.toJson<int>(unitId),
+      'unitLabel': serializer.toJson<String>(unitLabel),
+      'unitCode': serializer.toJson<String?>(unitCode),
+      'startDate': serializer.toJson<String>(startDate),
+      'endDate': serializer.toJson<String?>(endDate),
+      'active': serializer.toJson<bool>(active),
+    };
+  }
+
+  FieldContractUnitRow copyWith({
+    String? userSub,
+    int? id,
+    int? companyId,
+    int? projectId,
+    int? unitId,
+    String? unitLabel,
+    Value<String?> unitCode = const Value.absent(),
+    String? startDate,
+    Value<String?> endDate = const Value.absent(),
+    bool? active,
+  }) => FieldContractUnitRow(
+    userSub: userSub ?? this.userSub,
+    id: id ?? this.id,
+    companyId: companyId ?? this.companyId,
+    projectId: projectId ?? this.projectId,
+    unitId: unitId ?? this.unitId,
+    unitLabel: unitLabel ?? this.unitLabel,
+    unitCode: unitCode.present ? unitCode.value : this.unitCode,
+    startDate: startDate ?? this.startDate,
+    endDate: endDate.present ? endDate.value : this.endDate,
+    active: active ?? this.active,
+  );
+  FieldContractUnitRow copyWithCompanion(FieldContractUnitsCompanion data) {
+    return FieldContractUnitRow(
+      userSub: data.userSub.present ? data.userSub.value : this.userSub,
+      id: data.id.present ? data.id.value : this.id,
+      companyId: data.companyId.present ? data.companyId.value : this.companyId,
+      projectId: data.projectId.present ? data.projectId.value : this.projectId,
+      unitId: data.unitId.present ? data.unitId.value : this.unitId,
+      unitLabel: data.unitLabel.present ? data.unitLabel.value : this.unitLabel,
+      unitCode: data.unitCode.present ? data.unitCode.value : this.unitCode,
+      startDate: data.startDate.present ? data.startDate.value : this.startDate,
+      endDate: data.endDate.present ? data.endDate.value : this.endDate,
+      active: data.active.present ? data.active.value : this.active,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('FieldContractUnitRow(')
+          ..write('userSub: $userSub, ')
+          ..write('id: $id, ')
+          ..write('companyId: $companyId, ')
+          ..write('projectId: $projectId, ')
+          ..write('unitId: $unitId, ')
+          ..write('unitLabel: $unitLabel, ')
+          ..write('unitCode: $unitCode, ')
+          ..write('startDate: $startDate, ')
+          ..write('endDate: $endDate, ')
+          ..write('active: $active')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    userSub,
+    id,
+    companyId,
+    projectId,
+    unitId,
+    unitLabel,
+    unitCode,
+    startDate,
+    endDate,
+    active,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is FieldContractUnitRow &&
+          other.userSub == this.userSub &&
+          other.id == this.id &&
+          other.companyId == this.companyId &&
+          other.projectId == this.projectId &&
+          other.unitId == this.unitId &&
+          other.unitLabel == this.unitLabel &&
+          other.unitCode == this.unitCode &&
+          other.startDate == this.startDate &&
+          other.endDate == this.endDate &&
+          other.active == this.active);
+}
+
+class FieldContractUnitsCompanion
+    extends UpdateCompanion<FieldContractUnitRow> {
+  final Value<String> userSub;
+  final Value<int> id;
+  final Value<int> companyId;
+  final Value<int> projectId;
+  final Value<int> unitId;
+  final Value<String> unitLabel;
+  final Value<String?> unitCode;
+  final Value<String> startDate;
+  final Value<String?> endDate;
+  final Value<bool> active;
+  final Value<int> rowid;
+  const FieldContractUnitsCompanion({
+    this.userSub = const Value.absent(),
+    this.id = const Value.absent(),
+    this.companyId = const Value.absent(),
+    this.projectId = const Value.absent(),
+    this.unitId = const Value.absent(),
+    this.unitLabel = const Value.absent(),
+    this.unitCode = const Value.absent(),
+    this.startDate = const Value.absent(),
+    this.endDate = const Value.absent(),
+    this.active = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  FieldContractUnitsCompanion.insert({
+    required String userSub,
+    required int id,
+    required int companyId,
+    required int projectId,
+    required int unitId,
+    this.unitLabel = const Value.absent(),
+    this.unitCode = const Value.absent(),
+    required String startDate,
+    this.endDate = const Value.absent(),
+    this.active = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : userSub = Value(userSub),
+       id = Value(id),
+       companyId = Value(companyId),
+       projectId = Value(projectId),
+       unitId = Value(unitId),
+       startDate = Value(startDate);
+  static Insertable<FieldContractUnitRow> custom({
+    Expression<String>? userSub,
+    Expression<int>? id,
+    Expression<int>? companyId,
+    Expression<int>? projectId,
+    Expression<int>? unitId,
+    Expression<String>? unitLabel,
+    Expression<String>? unitCode,
+    Expression<String>? startDate,
+    Expression<String>? endDate,
+    Expression<bool>? active,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (userSub != null) 'user_sub': userSub,
+      if (id != null) 'id': id,
+      if (companyId != null) 'company_id': companyId,
+      if (projectId != null) 'project_id': projectId,
+      if (unitId != null) 'unit_id': unitId,
+      if (unitLabel != null) 'unit_label': unitLabel,
+      if (unitCode != null) 'unit_code': unitCode,
+      if (startDate != null) 'start_date': startDate,
+      if (endDate != null) 'end_date': endDate,
+      if (active != null) 'active': active,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  FieldContractUnitsCompanion copyWith({
+    Value<String>? userSub,
+    Value<int>? id,
+    Value<int>? companyId,
+    Value<int>? projectId,
+    Value<int>? unitId,
+    Value<String>? unitLabel,
+    Value<String?>? unitCode,
+    Value<String>? startDate,
+    Value<String?>? endDate,
+    Value<bool>? active,
+    Value<int>? rowid,
+  }) {
+    return FieldContractUnitsCompanion(
+      userSub: userSub ?? this.userSub,
+      id: id ?? this.id,
+      companyId: companyId ?? this.companyId,
+      projectId: projectId ?? this.projectId,
+      unitId: unitId ?? this.unitId,
+      unitLabel: unitLabel ?? this.unitLabel,
+      unitCode: unitCode ?? this.unitCode,
+      startDate: startDate ?? this.startDate,
+      endDate: endDate ?? this.endDate,
+      active: active ?? this.active,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (userSub.present) {
+      map['user_sub'] = Variable<String>(userSub.value);
+    }
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (companyId.present) {
+      map['company_id'] = Variable<int>(companyId.value);
+    }
+    if (projectId.present) {
+      map['project_id'] = Variable<int>(projectId.value);
+    }
+    if (unitId.present) {
+      map['unit_id'] = Variable<int>(unitId.value);
+    }
+    if (unitLabel.present) {
+      map['unit_label'] = Variable<String>(unitLabel.value);
+    }
+    if (unitCode.present) {
+      map['unit_code'] = Variable<String>(unitCode.value);
+    }
+    if (startDate.present) {
+      map['start_date'] = Variable<String>(startDate.value);
+    }
+    if (endDate.present) {
+      map['end_date'] = Variable<String>(endDate.value);
+    }
+    if (active.present) {
+      map['active'] = Variable<bool>(active.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('FieldContractUnitsCompanion(')
+          ..write('userSub: $userSub, ')
+          ..write('id: $id, ')
+          ..write('companyId: $companyId, ')
+          ..write('projectId: $projectId, ')
+          ..write('unitId: $unitId, ')
+          ..write('unitLabel: $unitLabel, ')
+          ..write('unitCode: $unitCode, ')
+          ..write('startDate: $startDate, ')
+          ..write('endDate: $endDate, ')
+          ..write('active: $active, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $FieldOpenPosTable extends FieldOpenPos
+    with TableInfo<$FieldOpenPosTable, FieldOpenPoRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $FieldOpenPosTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _userSubMeta = const VerificationMeta(
+    'userSub',
+  );
+  @override
+  late final GeneratedColumn<String> userSub = GeneratedColumn<String>(
+    'user_sub',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _companyIdMeta = const VerificationMeta(
+    'companyId',
+  );
+  @override
+  late final GeneratedColumn<int> companyId = GeneratedColumn<int>(
+    'company_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _projectIdMeta = const VerificationMeta(
+    'projectId',
+  );
+  @override
+  late final GeneratedColumn<int> projectId = GeneratedColumn<int>(
+    'project_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _clientIdMeta = const VerificationMeta(
+    'clientId',
+  );
+  @override
+  late final GeneratedColumn<int> clientId = GeneratedColumn<int>(
+    'client_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _clientNameMeta = const VerificationMeta(
+    'clientName',
+  );
+  @override
+  late final GeneratedColumn<String> clientName = GeneratedColumn<String>(
+    'client_name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _activityDateMeta = const VerificationMeta(
+    'activityDate',
+  );
+  @override
+  late final GeneratedColumn<String> activityDate = GeneratedColumn<String>(
+    'activity_date',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _docNoMeta = const VerificationMeta('docNo');
+  @override
+  late final GeneratedColumn<String> docNo = GeneratedColumn<String>(
+    'doc_no',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _itemsJsonMeta = const VerificationMeta(
+    'itemsJson',
+  );
+  @override
+  late final GeneratedColumn<String> itemsJson = GeneratedColumn<String>(
+    'items_json',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('[]'),
+  );
+  static const VerificationMeta _poStatusMeta = const VerificationMeta(
+    'poStatus',
+  );
+  @override
+  late final GeneratedColumn<String> poStatus = GeneratedColumn<String>(
+    'po_status',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('belum_kirim'),
+  );
+  static const VerificationMeta _ageDaysMeta = const VerificationMeta(
+    'ageDays',
+  );
+  @override
+  late final GeneratedColumn<int> ageDays = GeneratedColumn<int>(
+    'age_days',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _deliveriesMeta = const VerificationMeta(
+    'deliveries',
+  );
+  @override
+  late final GeneratedColumn<int> deliveries = GeneratedColumn<int>(
+    'deliveries',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    userSub,
+    id,
+    companyId,
+    projectId,
+    clientId,
+    clientName,
+    activityDate,
+    docNo,
+    itemsJson,
+    poStatus,
+    ageDays,
+    deliveries,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'field_open_pos';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<FieldOpenPoRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('user_sub')) {
+      context.handle(
+        _userSubMeta,
+        userSub.isAcceptableOrUnknown(data['user_sub']!, _userSubMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_userSubMeta);
+    }
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('company_id')) {
+      context.handle(
+        _companyIdMeta,
+        companyId.isAcceptableOrUnknown(data['company_id']!, _companyIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_companyIdMeta);
+    }
+    if (data.containsKey('project_id')) {
+      context.handle(
+        _projectIdMeta,
+        projectId.isAcceptableOrUnknown(data['project_id']!, _projectIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_projectIdMeta);
+    }
+    if (data.containsKey('client_id')) {
+      context.handle(
+        _clientIdMeta,
+        clientId.isAcceptableOrUnknown(data['client_id']!, _clientIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_clientIdMeta);
+    }
+    if (data.containsKey('client_name')) {
+      context.handle(
+        _clientNameMeta,
+        clientName.isAcceptableOrUnknown(data['client_name']!, _clientNameMeta),
+      );
+    }
+    if (data.containsKey('activity_date')) {
+      context.handle(
+        _activityDateMeta,
+        activityDate.isAcceptableOrUnknown(
+          data['activity_date']!,
+          _activityDateMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_activityDateMeta);
+    }
+    if (data.containsKey('doc_no')) {
+      context.handle(
+        _docNoMeta,
+        docNo.isAcceptableOrUnknown(data['doc_no']!, _docNoMeta),
+      );
+    }
+    if (data.containsKey('items_json')) {
+      context.handle(
+        _itemsJsonMeta,
+        itemsJson.isAcceptableOrUnknown(data['items_json']!, _itemsJsonMeta),
+      );
+    }
+    if (data.containsKey('po_status')) {
+      context.handle(
+        _poStatusMeta,
+        poStatus.isAcceptableOrUnknown(data['po_status']!, _poStatusMeta),
+      );
+    }
+    if (data.containsKey('age_days')) {
+      context.handle(
+        _ageDaysMeta,
+        ageDays.isAcceptableOrUnknown(data['age_days']!, _ageDaysMeta),
+      );
+    }
+    if (data.containsKey('deliveries')) {
+      context.handle(
+        _deliveriesMeta,
+        deliveries.isAcceptableOrUnknown(data['deliveries']!, _deliveriesMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {userSub, id};
+  @override
+  FieldOpenPoRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return FieldOpenPoRow(
+      userSub: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}user_sub'],
+      )!,
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}id'],
+      )!,
+      companyId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}company_id'],
+      )!,
+      projectId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}project_id'],
+      )!,
+      clientId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}client_id'],
+      )!,
+      clientName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}client_name'],
+      )!,
+      activityDate: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}activity_date'],
+      )!,
+      docNo: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}doc_no'],
+      ),
+      itemsJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}items_json'],
+      )!,
+      poStatus: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}po_status'],
+      )!,
+      ageDays: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}age_days'],
+      )!,
+      deliveries: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}deliveries'],
+      )!,
+    );
+  }
+
+  @override
+  $FieldOpenPosTable createAlias(String alias) {
+    return $FieldOpenPosTable(attachedDatabase, alias);
+  }
+}
+
+class FieldOpenPoRow extends DataClass implements Insertable<FieldOpenPoRow> {
+  final String userSub;
+  final int id;
+  final int companyId;
+  final int projectId;
+  final int clientId;
+  final String clientName;
+  final String activityDate;
+  final String? docNo;
+  final String itemsJson;
+  final String poStatus;
+  final int ageDays;
+  final int deliveries;
+  const FieldOpenPoRow({
+    required this.userSub,
+    required this.id,
+    required this.companyId,
+    required this.projectId,
+    required this.clientId,
+    required this.clientName,
+    required this.activityDate,
+    this.docNo,
+    required this.itemsJson,
+    required this.poStatus,
+    required this.ageDays,
+    required this.deliveries,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['user_sub'] = Variable<String>(userSub);
+    map['id'] = Variable<int>(id);
+    map['company_id'] = Variable<int>(companyId);
+    map['project_id'] = Variable<int>(projectId);
+    map['client_id'] = Variable<int>(clientId);
+    map['client_name'] = Variable<String>(clientName);
+    map['activity_date'] = Variable<String>(activityDate);
+    if (!nullToAbsent || docNo != null) {
+      map['doc_no'] = Variable<String>(docNo);
+    }
+    map['items_json'] = Variable<String>(itemsJson);
+    map['po_status'] = Variable<String>(poStatus);
+    map['age_days'] = Variable<int>(ageDays);
+    map['deliveries'] = Variable<int>(deliveries);
+    return map;
+  }
+
+  FieldOpenPosCompanion toCompanion(bool nullToAbsent) {
+    return FieldOpenPosCompanion(
+      userSub: Value(userSub),
+      id: Value(id),
+      companyId: Value(companyId),
+      projectId: Value(projectId),
+      clientId: Value(clientId),
+      clientName: Value(clientName),
+      activityDate: Value(activityDate),
+      docNo: docNo == null && nullToAbsent
+          ? const Value.absent()
+          : Value(docNo),
+      itemsJson: Value(itemsJson),
+      poStatus: Value(poStatus),
+      ageDays: Value(ageDays),
+      deliveries: Value(deliveries),
+    );
+  }
+
+  factory FieldOpenPoRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return FieldOpenPoRow(
+      userSub: serializer.fromJson<String>(json['userSub']),
+      id: serializer.fromJson<int>(json['id']),
+      companyId: serializer.fromJson<int>(json['companyId']),
+      projectId: serializer.fromJson<int>(json['projectId']),
+      clientId: serializer.fromJson<int>(json['clientId']),
+      clientName: serializer.fromJson<String>(json['clientName']),
+      activityDate: serializer.fromJson<String>(json['activityDate']),
+      docNo: serializer.fromJson<String?>(json['docNo']),
+      itemsJson: serializer.fromJson<String>(json['itemsJson']),
+      poStatus: serializer.fromJson<String>(json['poStatus']),
+      ageDays: serializer.fromJson<int>(json['ageDays']),
+      deliveries: serializer.fromJson<int>(json['deliveries']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'userSub': serializer.toJson<String>(userSub),
+      'id': serializer.toJson<int>(id),
+      'companyId': serializer.toJson<int>(companyId),
+      'projectId': serializer.toJson<int>(projectId),
+      'clientId': serializer.toJson<int>(clientId),
+      'clientName': serializer.toJson<String>(clientName),
+      'activityDate': serializer.toJson<String>(activityDate),
+      'docNo': serializer.toJson<String?>(docNo),
+      'itemsJson': serializer.toJson<String>(itemsJson),
+      'poStatus': serializer.toJson<String>(poStatus),
+      'ageDays': serializer.toJson<int>(ageDays),
+      'deliveries': serializer.toJson<int>(deliveries),
+    };
+  }
+
+  FieldOpenPoRow copyWith({
+    String? userSub,
+    int? id,
+    int? companyId,
+    int? projectId,
+    int? clientId,
+    String? clientName,
+    String? activityDate,
+    Value<String?> docNo = const Value.absent(),
+    String? itemsJson,
+    String? poStatus,
+    int? ageDays,
+    int? deliveries,
+  }) => FieldOpenPoRow(
+    userSub: userSub ?? this.userSub,
+    id: id ?? this.id,
+    companyId: companyId ?? this.companyId,
+    projectId: projectId ?? this.projectId,
+    clientId: clientId ?? this.clientId,
+    clientName: clientName ?? this.clientName,
+    activityDate: activityDate ?? this.activityDate,
+    docNo: docNo.present ? docNo.value : this.docNo,
+    itemsJson: itemsJson ?? this.itemsJson,
+    poStatus: poStatus ?? this.poStatus,
+    ageDays: ageDays ?? this.ageDays,
+    deliveries: deliveries ?? this.deliveries,
+  );
+  FieldOpenPoRow copyWithCompanion(FieldOpenPosCompanion data) {
+    return FieldOpenPoRow(
+      userSub: data.userSub.present ? data.userSub.value : this.userSub,
+      id: data.id.present ? data.id.value : this.id,
+      companyId: data.companyId.present ? data.companyId.value : this.companyId,
+      projectId: data.projectId.present ? data.projectId.value : this.projectId,
+      clientId: data.clientId.present ? data.clientId.value : this.clientId,
+      clientName: data.clientName.present
+          ? data.clientName.value
+          : this.clientName,
+      activityDate: data.activityDate.present
+          ? data.activityDate.value
+          : this.activityDate,
+      docNo: data.docNo.present ? data.docNo.value : this.docNo,
+      itemsJson: data.itemsJson.present ? data.itemsJson.value : this.itemsJson,
+      poStatus: data.poStatus.present ? data.poStatus.value : this.poStatus,
+      ageDays: data.ageDays.present ? data.ageDays.value : this.ageDays,
+      deliveries: data.deliveries.present
+          ? data.deliveries.value
+          : this.deliveries,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('FieldOpenPoRow(')
+          ..write('userSub: $userSub, ')
+          ..write('id: $id, ')
+          ..write('companyId: $companyId, ')
+          ..write('projectId: $projectId, ')
+          ..write('clientId: $clientId, ')
+          ..write('clientName: $clientName, ')
+          ..write('activityDate: $activityDate, ')
+          ..write('docNo: $docNo, ')
+          ..write('itemsJson: $itemsJson, ')
+          ..write('poStatus: $poStatus, ')
+          ..write('ageDays: $ageDays, ')
+          ..write('deliveries: $deliveries')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    userSub,
+    id,
+    companyId,
+    projectId,
+    clientId,
+    clientName,
+    activityDate,
+    docNo,
+    itemsJson,
+    poStatus,
+    ageDays,
+    deliveries,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is FieldOpenPoRow &&
+          other.userSub == this.userSub &&
+          other.id == this.id &&
+          other.companyId == this.companyId &&
+          other.projectId == this.projectId &&
+          other.clientId == this.clientId &&
+          other.clientName == this.clientName &&
+          other.activityDate == this.activityDate &&
+          other.docNo == this.docNo &&
+          other.itemsJson == this.itemsJson &&
+          other.poStatus == this.poStatus &&
+          other.ageDays == this.ageDays &&
+          other.deliveries == this.deliveries);
+}
+
+class FieldOpenPosCompanion extends UpdateCompanion<FieldOpenPoRow> {
+  final Value<String> userSub;
+  final Value<int> id;
+  final Value<int> companyId;
+  final Value<int> projectId;
+  final Value<int> clientId;
+  final Value<String> clientName;
+  final Value<String> activityDate;
+  final Value<String?> docNo;
+  final Value<String> itemsJson;
+  final Value<String> poStatus;
+  final Value<int> ageDays;
+  final Value<int> deliveries;
+  final Value<int> rowid;
+  const FieldOpenPosCompanion({
+    this.userSub = const Value.absent(),
+    this.id = const Value.absent(),
+    this.companyId = const Value.absent(),
+    this.projectId = const Value.absent(),
+    this.clientId = const Value.absent(),
+    this.clientName = const Value.absent(),
+    this.activityDate = const Value.absent(),
+    this.docNo = const Value.absent(),
+    this.itemsJson = const Value.absent(),
+    this.poStatus = const Value.absent(),
+    this.ageDays = const Value.absent(),
+    this.deliveries = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  FieldOpenPosCompanion.insert({
+    required String userSub,
+    required int id,
+    required int companyId,
+    required int projectId,
+    required int clientId,
+    this.clientName = const Value.absent(),
+    required String activityDate,
+    this.docNo = const Value.absent(),
+    this.itemsJson = const Value.absent(),
+    this.poStatus = const Value.absent(),
+    this.ageDays = const Value.absent(),
+    this.deliveries = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : userSub = Value(userSub),
+       id = Value(id),
+       companyId = Value(companyId),
+       projectId = Value(projectId),
+       clientId = Value(clientId),
+       activityDate = Value(activityDate);
+  static Insertable<FieldOpenPoRow> custom({
+    Expression<String>? userSub,
+    Expression<int>? id,
+    Expression<int>? companyId,
+    Expression<int>? projectId,
+    Expression<int>? clientId,
+    Expression<String>? clientName,
+    Expression<String>? activityDate,
+    Expression<String>? docNo,
+    Expression<String>? itemsJson,
+    Expression<String>? poStatus,
+    Expression<int>? ageDays,
+    Expression<int>? deliveries,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (userSub != null) 'user_sub': userSub,
+      if (id != null) 'id': id,
+      if (companyId != null) 'company_id': companyId,
+      if (projectId != null) 'project_id': projectId,
+      if (clientId != null) 'client_id': clientId,
+      if (clientName != null) 'client_name': clientName,
+      if (activityDate != null) 'activity_date': activityDate,
+      if (docNo != null) 'doc_no': docNo,
+      if (itemsJson != null) 'items_json': itemsJson,
+      if (poStatus != null) 'po_status': poStatus,
+      if (ageDays != null) 'age_days': ageDays,
+      if (deliveries != null) 'deliveries': deliveries,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  FieldOpenPosCompanion copyWith({
+    Value<String>? userSub,
+    Value<int>? id,
+    Value<int>? companyId,
+    Value<int>? projectId,
+    Value<int>? clientId,
+    Value<String>? clientName,
+    Value<String>? activityDate,
+    Value<String?>? docNo,
+    Value<String>? itemsJson,
+    Value<String>? poStatus,
+    Value<int>? ageDays,
+    Value<int>? deliveries,
+    Value<int>? rowid,
+  }) {
+    return FieldOpenPosCompanion(
+      userSub: userSub ?? this.userSub,
+      id: id ?? this.id,
+      companyId: companyId ?? this.companyId,
+      projectId: projectId ?? this.projectId,
+      clientId: clientId ?? this.clientId,
+      clientName: clientName ?? this.clientName,
+      activityDate: activityDate ?? this.activityDate,
+      docNo: docNo ?? this.docNo,
+      itemsJson: itemsJson ?? this.itemsJson,
+      poStatus: poStatus ?? this.poStatus,
+      ageDays: ageDays ?? this.ageDays,
+      deliveries: deliveries ?? this.deliveries,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (userSub.present) {
+      map['user_sub'] = Variable<String>(userSub.value);
+    }
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (companyId.present) {
+      map['company_id'] = Variable<int>(companyId.value);
+    }
+    if (projectId.present) {
+      map['project_id'] = Variable<int>(projectId.value);
+    }
+    if (clientId.present) {
+      map['client_id'] = Variable<int>(clientId.value);
+    }
+    if (clientName.present) {
+      map['client_name'] = Variable<String>(clientName.value);
+    }
+    if (activityDate.present) {
+      map['activity_date'] = Variable<String>(activityDate.value);
+    }
+    if (docNo.present) {
+      map['doc_no'] = Variable<String>(docNo.value);
+    }
+    if (itemsJson.present) {
+      map['items_json'] = Variable<String>(itemsJson.value);
+    }
+    if (poStatus.present) {
+      map['po_status'] = Variable<String>(poStatus.value);
+    }
+    if (ageDays.present) {
+      map['age_days'] = Variable<int>(ageDays.value);
+    }
+    if (deliveries.present) {
+      map['deliveries'] = Variable<int>(deliveries.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('FieldOpenPosCompanion(')
+          ..write('userSub: $userSub, ')
+          ..write('id: $id, ')
+          ..write('companyId: $companyId, ')
+          ..write('projectId: $projectId, ')
+          ..write('clientId: $clientId, ')
+          ..write('clientName: $clientName, ')
+          ..write('activityDate: $activityDate, ')
+          ..write('docNo: $docNo, ')
+          ..write('itemsJson: $itemsJson, ')
+          ..write('poStatus: $poStatus, ')
+          ..write('ageDays: $ageDays, ')
+          ..write('deliveries: $deliveries, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $FieldClientsTable extends FieldClients
+    with TableInfo<$FieldClientsTable, FieldClientRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $FieldClientsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _userSubMeta = const VerificationMeta(
+    'userSub',
+  );
+  @override
+  late final GeneratedColumn<String> userSub = GeneratedColumn<String>(
+    'user_sub',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _companyIdMeta = const VerificationMeta(
+    'companyId',
+  );
+  @override
+  late final GeneratedColumn<int> companyId = GeneratedColumn<int>(
+    'company_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _nameMeta = const VerificationMeta('name');
+  @override
+  late final GeneratedColumn<String> name = GeneratedColumn<String>(
+    'name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [userSub, id, companyId, name];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'field_clients';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<FieldClientRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('user_sub')) {
+      context.handle(
+        _userSubMeta,
+        userSub.isAcceptableOrUnknown(data['user_sub']!, _userSubMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_userSubMeta);
+    }
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('company_id')) {
+      context.handle(
+        _companyIdMeta,
+        companyId.isAcceptableOrUnknown(data['company_id']!, _companyIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_companyIdMeta);
+    }
+    if (data.containsKey('name')) {
+      context.handle(
+        _nameMeta,
+        name.isAcceptableOrUnknown(data['name']!, _nameMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {userSub, id};
+  @override
+  FieldClientRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return FieldClientRow(
+      userSub: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}user_sub'],
+      )!,
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}id'],
+      )!,
+      companyId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}company_id'],
+      )!,
+      name: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}name'],
+      )!,
+    );
+  }
+
+  @override
+  $FieldClientsTable createAlias(String alias) {
+    return $FieldClientsTable(attachedDatabase, alias);
+  }
+}
+
+class FieldClientRow extends DataClass implements Insertable<FieldClientRow> {
+  final String userSub;
+  final int id;
+  final int companyId;
+  final String name;
+  const FieldClientRow({
+    required this.userSub,
+    required this.id,
+    required this.companyId,
+    required this.name,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['user_sub'] = Variable<String>(userSub);
+    map['id'] = Variable<int>(id);
+    map['company_id'] = Variable<int>(companyId);
+    map['name'] = Variable<String>(name);
+    return map;
+  }
+
+  FieldClientsCompanion toCompanion(bool nullToAbsent) {
+    return FieldClientsCompanion(
+      userSub: Value(userSub),
+      id: Value(id),
+      companyId: Value(companyId),
+      name: Value(name),
+    );
+  }
+
+  factory FieldClientRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return FieldClientRow(
+      userSub: serializer.fromJson<String>(json['userSub']),
+      id: serializer.fromJson<int>(json['id']),
+      companyId: serializer.fromJson<int>(json['companyId']),
+      name: serializer.fromJson<String>(json['name']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'userSub': serializer.toJson<String>(userSub),
+      'id': serializer.toJson<int>(id),
+      'companyId': serializer.toJson<int>(companyId),
+      'name': serializer.toJson<String>(name),
+    };
+  }
+
+  FieldClientRow copyWith({
+    String? userSub,
+    int? id,
+    int? companyId,
+    String? name,
+  }) => FieldClientRow(
+    userSub: userSub ?? this.userSub,
+    id: id ?? this.id,
+    companyId: companyId ?? this.companyId,
+    name: name ?? this.name,
+  );
+  FieldClientRow copyWithCompanion(FieldClientsCompanion data) {
+    return FieldClientRow(
+      userSub: data.userSub.present ? data.userSub.value : this.userSub,
+      id: data.id.present ? data.id.value : this.id,
+      companyId: data.companyId.present ? data.companyId.value : this.companyId,
+      name: data.name.present ? data.name.value : this.name,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('FieldClientRow(')
+          ..write('userSub: $userSub, ')
+          ..write('id: $id, ')
+          ..write('companyId: $companyId, ')
+          ..write('name: $name')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(userSub, id, companyId, name);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is FieldClientRow &&
+          other.userSub == this.userSub &&
+          other.id == this.id &&
+          other.companyId == this.companyId &&
+          other.name == this.name);
+}
+
+class FieldClientsCompanion extends UpdateCompanion<FieldClientRow> {
+  final Value<String> userSub;
+  final Value<int> id;
+  final Value<int> companyId;
+  final Value<String> name;
+  final Value<int> rowid;
+  const FieldClientsCompanion({
+    this.userSub = const Value.absent(),
+    this.id = const Value.absent(),
+    this.companyId = const Value.absent(),
+    this.name = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  FieldClientsCompanion.insert({
+    required String userSub,
+    required int id,
+    required int companyId,
+    this.name = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : userSub = Value(userSub),
+       id = Value(id),
+       companyId = Value(companyId);
+  static Insertable<FieldClientRow> custom({
+    Expression<String>? userSub,
+    Expression<int>? id,
+    Expression<int>? companyId,
+    Expression<String>? name,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (userSub != null) 'user_sub': userSub,
+      if (id != null) 'id': id,
+      if (companyId != null) 'company_id': companyId,
+      if (name != null) 'name': name,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  FieldClientsCompanion copyWith({
+    Value<String>? userSub,
+    Value<int>? id,
+    Value<int>? companyId,
+    Value<String>? name,
+    Value<int>? rowid,
+  }) {
+    return FieldClientsCompanion(
+      userSub: userSub ?? this.userSub,
+      id: id ?? this.id,
+      companyId: companyId ?? this.companyId,
+      name: name ?? this.name,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (userSub.present) {
+      map['user_sub'] = Variable<String>(userSub.value);
+    }
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (companyId.present) {
+      map['company_id'] = Variable<int>(companyId.value);
+    }
+    if (name.present) {
+      map['name'] = Variable<String>(name.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('FieldClientsCompanion(')
+          ..write('userSub: $userSub, ')
+          ..write('id: $id, ')
+          ..write('companyId: $companyId, ')
+          ..write('name: $name, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $FieldRecentTimesheetsTable extends FieldRecentTimesheets
+    with TableInfo<$FieldRecentTimesheetsTable, FieldRecentTimesheetRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $FieldRecentTimesheetsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _userSubMeta = const VerificationMeta(
+    'userSub',
+  );
+  @override
+  late final GeneratedColumn<String> userSub = GeneratedColumn<String>(
+    'user_sub',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _companyIdMeta = const VerificationMeta(
+    'companyId',
+  );
+  @override
+  late final GeneratedColumn<int> companyId = GeneratedColumn<int>(
+    'company_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _projectIdMeta = const VerificationMeta(
+    'projectId',
+  );
+  @override
+  late final GeneratedColumn<int> projectId = GeneratedColumn<int>(
+    'project_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _unitIdMeta = const VerificationMeta('unitId');
+  @override
+  late final GeneratedColumn<int> unitId = GeneratedColumn<int>(
+    'unit_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _reportDateMeta = const VerificationMeta(
+    'reportDate',
+  );
+  @override
+  late final GeneratedColumn<String> reportDate = GeneratedColumn<String>(
+    'report_date',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _hmStartMeta = const VerificationMeta(
+    'hmStart',
+  );
+  @override
+  late final GeneratedColumn<double> hmStart = GeneratedColumn<double>(
+    'hm_start',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _hmEndMeta = const VerificationMeta('hmEnd');
+  @override
+  late final GeneratedColumn<double> hmEnd = GeneratedColumn<double>(
+    'hm_end',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _operatorNameMeta = const VerificationMeta(
+    'operatorName',
+  );
+  @override
+  late final GeneratedColumn<String> operatorName = GeneratedColumn<String>(
+    'operator_name',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _locationMeta = const VerificationMeta(
+    'location',
+  );
+  @override
+  late final GeneratedColumn<String> location = GeneratedColumn<String>(
+    'location',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _fuelLitersMeta = const VerificationMeta(
+    'fuelLiters',
+  );
+  @override
+  late final GeneratedColumn<double> fuelLiters = GeneratedColumn<double>(
+    'fuel_liters',
+    aliasedName,
+    true,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    userSub,
+    id,
+    companyId,
+    projectId,
+    unitId,
+    reportDate,
+    hmStart,
+    hmEnd,
+    operatorName,
+    location,
+    fuelLiters,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'field_recent_timesheets';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<FieldRecentTimesheetRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('user_sub')) {
+      context.handle(
+        _userSubMeta,
+        userSub.isAcceptableOrUnknown(data['user_sub']!, _userSubMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_userSubMeta);
+    }
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('company_id')) {
+      context.handle(
+        _companyIdMeta,
+        companyId.isAcceptableOrUnknown(data['company_id']!, _companyIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_companyIdMeta);
+    }
+    if (data.containsKey('project_id')) {
+      context.handle(
+        _projectIdMeta,
+        projectId.isAcceptableOrUnknown(data['project_id']!, _projectIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_projectIdMeta);
+    }
+    if (data.containsKey('unit_id')) {
+      context.handle(
+        _unitIdMeta,
+        unitId.isAcceptableOrUnknown(data['unit_id']!, _unitIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_unitIdMeta);
+    }
+    if (data.containsKey('report_date')) {
+      context.handle(
+        _reportDateMeta,
+        reportDate.isAcceptableOrUnknown(data['report_date']!, _reportDateMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_reportDateMeta);
+    }
+    if (data.containsKey('hm_start')) {
+      context.handle(
+        _hmStartMeta,
+        hmStart.isAcceptableOrUnknown(data['hm_start']!, _hmStartMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_hmStartMeta);
+    }
+    if (data.containsKey('hm_end')) {
+      context.handle(
+        _hmEndMeta,
+        hmEnd.isAcceptableOrUnknown(data['hm_end']!, _hmEndMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_hmEndMeta);
+    }
+    if (data.containsKey('operator_name')) {
+      context.handle(
+        _operatorNameMeta,
+        operatorName.isAcceptableOrUnknown(
+          data['operator_name']!,
+          _operatorNameMeta,
+        ),
+      );
+    }
+    if (data.containsKey('location')) {
+      context.handle(
+        _locationMeta,
+        location.isAcceptableOrUnknown(data['location']!, _locationMeta),
+      );
+    }
+    if (data.containsKey('fuel_liters')) {
+      context.handle(
+        _fuelLitersMeta,
+        fuelLiters.isAcceptableOrUnknown(data['fuel_liters']!, _fuelLitersMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {userSub, id};
+  @override
+  FieldRecentTimesheetRow map(
+    Map<String, dynamic> data, {
+    String? tablePrefix,
+  }) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return FieldRecentTimesheetRow(
+      userSub: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}user_sub'],
+      )!,
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}id'],
+      )!,
+      companyId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}company_id'],
+      )!,
+      projectId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}project_id'],
+      )!,
+      unitId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}unit_id'],
+      )!,
+      reportDate: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}report_date'],
+      )!,
+      hmStart: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}hm_start'],
+      )!,
+      hmEnd: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}hm_end'],
+      )!,
+      operatorName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}operator_name'],
+      ),
+      location: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}location'],
+      ),
+      fuelLiters: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}fuel_liters'],
+      ),
+    );
+  }
+
+  @override
+  $FieldRecentTimesheetsTable createAlias(String alias) {
+    return $FieldRecentTimesheetsTable(attachedDatabase, alias);
+  }
+}
+
+class FieldRecentTimesheetRow extends DataClass
+    implements Insertable<FieldRecentTimesheetRow> {
+  final String userSub;
+  final int id;
+  final int companyId;
+  final int projectId;
+  final int unitId;
+  final String reportDate;
+  final double hmStart;
+  final double hmEnd;
+  final String? operatorName;
+  final String? location;
+  final double? fuelLiters;
+  const FieldRecentTimesheetRow({
+    required this.userSub,
+    required this.id,
+    required this.companyId,
+    required this.projectId,
+    required this.unitId,
+    required this.reportDate,
+    required this.hmStart,
+    required this.hmEnd,
+    this.operatorName,
+    this.location,
+    this.fuelLiters,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['user_sub'] = Variable<String>(userSub);
+    map['id'] = Variable<int>(id);
+    map['company_id'] = Variable<int>(companyId);
+    map['project_id'] = Variable<int>(projectId);
+    map['unit_id'] = Variable<int>(unitId);
+    map['report_date'] = Variable<String>(reportDate);
+    map['hm_start'] = Variable<double>(hmStart);
+    map['hm_end'] = Variable<double>(hmEnd);
+    if (!nullToAbsent || operatorName != null) {
+      map['operator_name'] = Variable<String>(operatorName);
+    }
+    if (!nullToAbsent || location != null) {
+      map['location'] = Variable<String>(location);
+    }
+    if (!nullToAbsent || fuelLiters != null) {
+      map['fuel_liters'] = Variable<double>(fuelLiters);
+    }
+    return map;
+  }
+
+  FieldRecentTimesheetsCompanion toCompanion(bool nullToAbsent) {
+    return FieldRecentTimesheetsCompanion(
+      userSub: Value(userSub),
+      id: Value(id),
+      companyId: Value(companyId),
+      projectId: Value(projectId),
+      unitId: Value(unitId),
+      reportDate: Value(reportDate),
+      hmStart: Value(hmStart),
+      hmEnd: Value(hmEnd),
+      operatorName: operatorName == null && nullToAbsent
+          ? const Value.absent()
+          : Value(operatorName),
+      location: location == null && nullToAbsent
+          ? const Value.absent()
+          : Value(location),
+      fuelLiters: fuelLiters == null && nullToAbsent
+          ? const Value.absent()
+          : Value(fuelLiters),
+    );
+  }
+
+  factory FieldRecentTimesheetRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return FieldRecentTimesheetRow(
+      userSub: serializer.fromJson<String>(json['userSub']),
+      id: serializer.fromJson<int>(json['id']),
+      companyId: serializer.fromJson<int>(json['companyId']),
+      projectId: serializer.fromJson<int>(json['projectId']),
+      unitId: serializer.fromJson<int>(json['unitId']),
+      reportDate: serializer.fromJson<String>(json['reportDate']),
+      hmStart: serializer.fromJson<double>(json['hmStart']),
+      hmEnd: serializer.fromJson<double>(json['hmEnd']),
+      operatorName: serializer.fromJson<String?>(json['operatorName']),
+      location: serializer.fromJson<String?>(json['location']),
+      fuelLiters: serializer.fromJson<double?>(json['fuelLiters']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'userSub': serializer.toJson<String>(userSub),
+      'id': serializer.toJson<int>(id),
+      'companyId': serializer.toJson<int>(companyId),
+      'projectId': serializer.toJson<int>(projectId),
+      'unitId': serializer.toJson<int>(unitId),
+      'reportDate': serializer.toJson<String>(reportDate),
+      'hmStart': serializer.toJson<double>(hmStart),
+      'hmEnd': serializer.toJson<double>(hmEnd),
+      'operatorName': serializer.toJson<String?>(operatorName),
+      'location': serializer.toJson<String?>(location),
+      'fuelLiters': serializer.toJson<double?>(fuelLiters),
+    };
+  }
+
+  FieldRecentTimesheetRow copyWith({
+    String? userSub,
+    int? id,
+    int? companyId,
+    int? projectId,
+    int? unitId,
+    String? reportDate,
+    double? hmStart,
+    double? hmEnd,
+    Value<String?> operatorName = const Value.absent(),
+    Value<String?> location = const Value.absent(),
+    Value<double?> fuelLiters = const Value.absent(),
+  }) => FieldRecentTimesheetRow(
+    userSub: userSub ?? this.userSub,
+    id: id ?? this.id,
+    companyId: companyId ?? this.companyId,
+    projectId: projectId ?? this.projectId,
+    unitId: unitId ?? this.unitId,
+    reportDate: reportDate ?? this.reportDate,
+    hmStart: hmStart ?? this.hmStart,
+    hmEnd: hmEnd ?? this.hmEnd,
+    operatorName: operatorName.present ? operatorName.value : this.operatorName,
+    location: location.present ? location.value : this.location,
+    fuelLiters: fuelLiters.present ? fuelLiters.value : this.fuelLiters,
+  );
+  FieldRecentTimesheetRow copyWithCompanion(
+    FieldRecentTimesheetsCompanion data,
+  ) {
+    return FieldRecentTimesheetRow(
+      userSub: data.userSub.present ? data.userSub.value : this.userSub,
+      id: data.id.present ? data.id.value : this.id,
+      companyId: data.companyId.present ? data.companyId.value : this.companyId,
+      projectId: data.projectId.present ? data.projectId.value : this.projectId,
+      unitId: data.unitId.present ? data.unitId.value : this.unitId,
+      reportDate: data.reportDate.present
+          ? data.reportDate.value
+          : this.reportDate,
+      hmStart: data.hmStart.present ? data.hmStart.value : this.hmStart,
+      hmEnd: data.hmEnd.present ? data.hmEnd.value : this.hmEnd,
+      operatorName: data.operatorName.present
+          ? data.operatorName.value
+          : this.operatorName,
+      location: data.location.present ? data.location.value : this.location,
+      fuelLiters: data.fuelLiters.present
+          ? data.fuelLiters.value
+          : this.fuelLiters,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('FieldRecentTimesheetRow(')
+          ..write('userSub: $userSub, ')
+          ..write('id: $id, ')
+          ..write('companyId: $companyId, ')
+          ..write('projectId: $projectId, ')
+          ..write('unitId: $unitId, ')
+          ..write('reportDate: $reportDate, ')
+          ..write('hmStart: $hmStart, ')
+          ..write('hmEnd: $hmEnd, ')
+          ..write('operatorName: $operatorName, ')
+          ..write('location: $location, ')
+          ..write('fuelLiters: $fuelLiters')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    userSub,
+    id,
+    companyId,
+    projectId,
+    unitId,
+    reportDate,
+    hmStart,
+    hmEnd,
+    operatorName,
+    location,
+    fuelLiters,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is FieldRecentTimesheetRow &&
+          other.userSub == this.userSub &&
+          other.id == this.id &&
+          other.companyId == this.companyId &&
+          other.projectId == this.projectId &&
+          other.unitId == this.unitId &&
+          other.reportDate == this.reportDate &&
+          other.hmStart == this.hmStart &&
+          other.hmEnd == this.hmEnd &&
+          other.operatorName == this.operatorName &&
+          other.location == this.location &&
+          other.fuelLiters == this.fuelLiters);
+}
+
+class FieldRecentTimesheetsCompanion
+    extends UpdateCompanion<FieldRecentTimesheetRow> {
+  final Value<String> userSub;
+  final Value<int> id;
+  final Value<int> companyId;
+  final Value<int> projectId;
+  final Value<int> unitId;
+  final Value<String> reportDate;
+  final Value<double> hmStart;
+  final Value<double> hmEnd;
+  final Value<String?> operatorName;
+  final Value<String?> location;
+  final Value<double?> fuelLiters;
+  final Value<int> rowid;
+  const FieldRecentTimesheetsCompanion({
+    this.userSub = const Value.absent(),
+    this.id = const Value.absent(),
+    this.companyId = const Value.absent(),
+    this.projectId = const Value.absent(),
+    this.unitId = const Value.absent(),
+    this.reportDate = const Value.absent(),
+    this.hmStart = const Value.absent(),
+    this.hmEnd = const Value.absent(),
+    this.operatorName = const Value.absent(),
+    this.location = const Value.absent(),
+    this.fuelLiters = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  FieldRecentTimesheetsCompanion.insert({
+    required String userSub,
+    required int id,
+    required int companyId,
+    required int projectId,
+    required int unitId,
+    required String reportDate,
+    required double hmStart,
+    required double hmEnd,
+    this.operatorName = const Value.absent(),
+    this.location = const Value.absent(),
+    this.fuelLiters = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : userSub = Value(userSub),
+       id = Value(id),
+       companyId = Value(companyId),
+       projectId = Value(projectId),
+       unitId = Value(unitId),
+       reportDate = Value(reportDate),
+       hmStart = Value(hmStart),
+       hmEnd = Value(hmEnd);
+  static Insertable<FieldRecentTimesheetRow> custom({
+    Expression<String>? userSub,
+    Expression<int>? id,
+    Expression<int>? companyId,
+    Expression<int>? projectId,
+    Expression<int>? unitId,
+    Expression<String>? reportDate,
+    Expression<double>? hmStart,
+    Expression<double>? hmEnd,
+    Expression<String>? operatorName,
+    Expression<String>? location,
+    Expression<double>? fuelLiters,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (userSub != null) 'user_sub': userSub,
+      if (id != null) 'id': id,
+      if (companyId != null) 'company_id': companyId,
+      if (projectId != null) 'project_id': projectId,
+      if (unitId != null) 'unit_id': unitId,
+      if (reportDate != null) 'report_date': reportDate,
+      if (hmStart != null) 'hm_start': hmStart,
+      if (hmEnd != null) 'hm_end': hmEnd,
+      if (operatorName != null) 'operator_name': operatorName,
+      if (location != null) 'location': location,
+      if (fuelLiters != null) 'fuel_liters': fuelLiters,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  FieldRecentTimesheetsCompanion copyWith({
+    Value<String>? userSub,
+    Value<int>? id,
+    Value<int>? companyId,
+    Value<int>? projectId,
+    Value<int>? unitId,
+    Value<String>? reportDate,
+    Value<double>? hmStart,
+    Value<double>? hmEnd,
+    Value<String?>? operatorName,
+    Value<String?>? location,
+    Value<double?>? fuelLiters,
+    Value<int>? rowid,
+  }) {
+    return FieldRecentTimesheetsCompanion(
+      userSub: userSub ?? this.userSub,
+      id: id ?? this.id,
+      companyId: companyId ?? this.companyId,
+      projectId: projectId ?? this.projectId,
+      unitId: unitId ?? this.unitId,
+      reportDate: reportDate ?? this.reportDate,
+      hmStart: hmStart ?? this.hmStart,
+      hmEnd: hmEnd ?? this.hmEnd,
+      operatorName: operatorName ?? this.operatorName,
+      location: location ?? this.location,
+      fuelLiters: fuelLiters ?? this.fuelLiters,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (userSub.present) {
+      map['user_sub'] = Variable<String>(userSub.value);
+    }
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (companyId.present) {
+      map['company_id'] = Variable<int>(companyId.value);
+    }
+    if (projectId.present) {
+      map['project_id'] = Variable<int>(projectId.value);
+    }
+    if (unitId.present) {
+      map['unit_id'] = Variable<int>(unitId.value);
+    }
+    if (reportDate.present) {
+      map['report_date'] = Variable<String>(reportDate.value);
+    }
+    if (hmStart.present) {
+      map['hm_start'] = Variable<double>(hmStart.value);
+    }
+    if (hmEnd.present) {
+      map['hm_end'] = Variable<double>(hmEnd.value);
+    }
+    if (operatorName.present) {
+      map['operator_name'] = Variable<String>(operatorName.value);
+    }
+    if (location.present) {
+      map['location'] = Variable<String>(location.value);
+    }
+    if (fuelLiters.present) {
+      map['fuel_liters'] = Variable<double>(fuelLiters.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('FieldRecentTimesheetsCompanion(')
+          ..write('userSub: $userSub, ')
+          ..write('id: $id, ')
+          ..write('companyId: $companyId, ')
+          ..write('projectId: $projectId, ')
+          ..write('unitId: $unitId, ')
+          ..write('reportDate: $reportDate, ')
+          ..write('hmStart: $hmStart, ')
+          ..write('hmEnd: $hmEnd, ')
+          ..write('operatorName: $operatorName, ')
+          ..write('location: $location, ')
+          ..write('fuelLiters: $fuelLiters, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -5741,6 +10429,15 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $KvEntriesTable kvEntries = $KvEntriesTable(this);
   late final $LocalProgressReportsTable localProgressReports =
       $LocalProgressReportsTable(this);
+  late final $LocalFieldReportsTable localFieldReports =
+      $LocalFieldReportsTable(this);
+  late final $FieldUnitsTable fieldUnits = $FieldUnitsTable(this);
+  late final $FieldContractUnitsTable fieldContractUnits =
+      $FieldContractUnitsTable(this);
+  late final $FieldOpenPosTable fieldOpenPos = $FieldOpenPosTable(this);
+  late final $FieldClientsTable fieldClients = $FieldClientsTable(this);
+  late final $FieldRecentTimesheetsTable fieldRecentTimesheets =
+      $FieldRecentTimesheetsTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -5753,6 +10450,12 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     outbox,
     kvEntries,
     localProgressReports,
+    localFieldReports,
+    fieldUnits,
+    fieldContractUnits,
+    fieldOpenPos,
+    fieldClients,
+    fieldRecentTimesheets,
   ];
 }
 
@@ -9033,6 +13736,2300 @@ typedef $$LocalProgressReportsTableProcessedTableManager =
       LocalProgressReport,
       PrefetchHooks Function()
     >;
+typedef $$LocalFieldReportsTableCreateCompanionBuilder =
+    LocalFieldReportsCompanion Function({
+      required String clientUuid,
+      required String userSub,
+      Value<int?> companyId,
+      required String reportType,
+      required int projectId,
+      Value<String> projectLabel,
+      Value<int?> unitId,
+      Value<int?> clientId,
+      required String reportDate,
+      Value<double?> hourMeter,
+      Value<String> contentJson,
+      Value<String> photoUuidsJson,
+      Value<int> serverPhotoCount,
+      Value<String?> reason,
+      Value<int?> serverId,
+      Value<int?> serverRev,
+      Value<String?> docNo,
+      Value<String?> editableUntil,
+      Value<String> syncState,
+      Value<String?> lastError,
+      Value<String?> lastErrorCode,
+      Value<String?> conflictCopyJson,
+      Value<bool> offline,
+      required DateTime createdAt,
+      required DateTime updatedAt,
+      Value<int> rowid,
+    });
+typedef $$LocalFieldReportsTableUpdateCompanionBuilder =
+    LocalFieldReportsCompanion Function({
+      Value<String> clientUuid,
+      Value<String> userSub,
+      Value<int?> companyId,
+      Value<String> reportType,
+      Value<int> projectId,
+      Value<String> projectLabel,
+      Value<int?> unitId,
+      Value<int?> clientId,
+      Value<String> reportDate,
+      Value<double?> hourMeter,
+      Value<String> contentJson,
+      Value<String> photoUuidsJson,
+      Value<int> serverPhotoCount,
+      Value<String?> reason,
+      Value<int?> serverId,
+      Value<int?> serverRev,
+      Value<String?> docNo,
+      Value<String?> editableUntil,
+      Value<String> syncState,
+      Value<String?> lastError,
+      Value<String?> lastErrorCode,
+      Value<String?> conflictCopyJson,
+      Value<bool> offline,
+      Value<DateTime> createdAt,
+      Value<DateTime> updatedAt,
+      Value<int> rowid,
+    });
+
+class $$LocalFieldReportsTableFilterComposer
+    extends Composer<_$AppDatabase, $LocalFieldReportsTable> {
+  $$LocalFieldReportsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get clientUuid => $composableBuilder(
+    column: $table.clientUuid,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get userSub => $composableBuilder(
+    column: $table.userSub,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get companyId => $composableBuilder(
+    column: $table.companyId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get reportType => $composableBuilder(
+    column: $table.reportType,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get projectId => $composableBuilder(
+    column: $table.projectId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get projectLabel => $composableBuilder(
+    column: $table.projectLabel,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get unitId => $composableBuilder(
+    column: $table.unitId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get clientId => $composableBuilder(
+    column: $table.clientId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get reportDate => $composableBuilder(
+    column: $table.reportDate,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get hourMeter => $composableBuilder(
+    column: $table.hourMeter,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get contentJson => $composableBuilder(
+    column: $table.contentJson,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get photoUuidsJson => $composableBuilder(
+    column: $table.photoUuidsJson,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get serverPhotoCount => $composableBuilder(
+    column: $table.serverPhotoCount,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get reason => $composableBuilder(
+    column: $table.reason,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get serverId => $composableBuilder(
+    column: $table.serverId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get serverRev => $composableBuilder(
+    column: $table.serverRev,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get docNo => $composableBuilder(
+    column: $table.docNo,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get editableUntil => $composableBuilder(
+    column: $table.editableUntil,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get syncState => $composableBuilder(
+    column: $table.syncState,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get lastError => $composableBuilder(
+    column: $table.lastError,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get lastErrorCode => $composableBuilder(
+    column: $table.lastErrorCode,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get conflictCopyJson => $composableBuilder(
+    column: $table.conflictCopyJson,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get offline => $composableBuilder(
+    column: $table.offline,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$LocalFieldReportsTableOrderingComposer
+    extends Composer<_$AppDatabase, $LocalFieldReportsTable> {
+  $$LocalFieldReportsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get clientUuid => $composableBuilder(
+    column: $table.clientUuid,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get userSub => $composableBuilder(
+    column: $table.userSub,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get companyId => $composableBuilder(
+    column: $table.companyId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get reportType => $composableBuilder(
+    column: $table.reportType,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get projectId => $composableBuilder(
+    column: $table.projectId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get projectLabel => $composableBuilder(
+    column: $table.projectLabel,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get unitId => $composableBuilder(
+    column: $table.unitId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get clientId => $composableBuilder(
+    column: $table.clientId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get reportDate => $composableBuilder(
+    column: $table.reportDate,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get hourMeter => $composableBuilder(
+    column: $table.hourMeter,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get contentJson => $composableBuilder(
+    column: $table.contentJson,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get photoUuidsJson => $composableBuilder(
+    column: $table.photoUuidsJson,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get serverPhotoCount => $composableBuilder(
+    column: $table.serverPhotoCount,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get reason => $composableBuilder(
+    column: $table.reason,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get serverId => $composableBuilder(
+    column: $table.serverId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get serverRev => $composableBuilder(
+    column: $table.serverRev,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get docNo => $composableBuilder(
+    column: $table.docNo,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get editableUntil => $composableBuilder(
+    column: $table.editableUntil,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get syncState => $composableBuilder(
+    column: $table.syncState,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get lastError => $composableBuilder(
+    column: $table.lastError,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get lastErrorCode => $composableBuilder(
+    column: $table.lastErrorCode,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get conflictCopyJson => $composableBuilder(
+    column: $table.conflictCopyJson,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get offline => $composableBuilder(
+    column: $table.offline,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$LocalFieldReportsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $LocalFieldReportsTable> {
+  $$LocalFieldReportsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get clientUuid => $composableBuilder(
+    column: $table.clientUuid,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get userSub =>
+      $composableBuilder(column: $table.userSub, builder: (column) => column);
+
+  GeneratedColumn<int> get companyId =>
+      $composableBuilder(column: $table.companyId, builder: (column) => column);
+
+  GeneratedColumn<String> get reportType => $composableBuilder(
+    column: $table.reportType,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get projectId =>
+      $composableBuilder(column: $table.projectId, builder: (column) => column);
+
+  GeneratedColumn<String> get projectLabel => $composableBuilder(
+    column: $table.projectLabel,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get unitId =>
+      $composableBuilder(column: $table.unitId, builder: (column) => column);
+
+  GeneratedColumn<int> get clientId =>
+      $composableBuilder(column: $table.clientId, builder: (column) => column);
+
+  GeneratedColumn<String> get reportDate => $composableBuilder(
+    column: $table.reportDate,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get hourMeter =>
+      $composableBuilder(column: $table.hourMeter, builder: (column) => column);
+
+  GeneratedColumn<String> get contentJson => $composableBuilder(
+    column: $table.contentJson,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get photoUuidsJson => $composableBuilder(
+    column: $table.photoUuidsJson,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get serverPhotoCount => $composableBuilder(
+    column: $table.serverPhotoCount,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get reason =>
+      $composableBuilder(column: $table.reason, builder: (column) => column);
+
+  GeneratedColumn<int> get serverId =>
+      $composableBuilder(column: $table.serverId, builder: (column) => column);
+
+  GeneratedColumn<int> get serverRev =>
+      $composableBuilder(column: $table.serverRev, builder: (column) => column);
+
+  GeneratedColumn<String> get docNo =>
+      $composableBuilder(column: $table.docNo, builder: (column) => column);
+
+  GeneratedColumn<String> get editableUntil => $composableBuilder(
+    column: $table.editableUntil,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get syncState =>
+      $composableBuilder(column: $table.syncState, builder: (column) => column);
+
+  GeneratedColumn<String> get lastError =>
+      $composableBuilder(column: $table.lastError, builder: (column) => column);
+
+  GeneratedColumn<String> get lastErrorCode => $composableBuilder(
+    column: $table.lastErrorCode,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get conflictCopyJson => $composableBuilder(
+    column: $table.conflictCopyJson,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get offline =>
+      $composableBuilder(column: $table.offline, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+}
+
+class $$LocalFieldReportsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $LocalFieldReportsTable,
+          LocalFieldReport,
+          $$LocalFieldReportsTableFilterComposer,
+          $$LocalFieldReportsTableOrderingComposer,
+          $$LocalFieldReportsTableAnnotationComposer,
+          $$LocalFieldReportsTableCreateCompanionBuilder,
+          $$LocalFieldReportsTableUpdateCompanionBuilder,
+          (
+            LocalFieldReport,
+            BaseReferences<
+              _$AppDatabase,
+              $LocalFieldReportsTable,
+              LocalFieldReport
+            >,
+          ),
+          LocalFieldReport,
+          PrefetchHooks Function()
+        > {
+  $$LocalFieldReportsTableTableManager(
+    _$AppDatabase db,
+    $LocalFieldReportsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$LocalFieldReportsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$LocalFieldReportsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$LocalFieldReportsTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> clientUuid = const Value.absent(),
+                Value<String> userSub = const Value.absent(),
+                Value<int?> companyId = const Value.absent(),
+                Value<String> reportType = const Value.absent(),
+                Value<int> projectId = const Value.absent(),
+                Value<String> projectLabel = const Value.absent(),
+                Value<int?> unitId = const Value.absent(),
+                Value<int?> clientId = const Value.absent(),
+                Value<String> reportDate = const Value.absent(),
+                Value<double?> hourMeter = const Value.absent(),
+                Value<String> contentJson = const Value.absent(),
+                Value<String> photoUuidsJson = const Value.absent(),
+                Value<int> serverPhotoCount = const Value.absent(),
+                Value<String?> reason = const Value.absent(),
+                Value<int?> serverId = const Value.absent(),
+                Value<int?> serverRev = const Value.absent(),
+                Value<String?> docNo = const Value.absent(),
+                Value<String?> editableUntil = const Value.absent(),
+                Value<String> syncState = const Value.absent(),
+                Value<String?> lastError = const Value.absent(),
+                Value<String?> lastErrorCode = const Value.absent(),
+                Value<String?> conflictCopyJson = const Value.absent(),
+                Value<bool> offline = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => LocalFieldReportsCompanion(
+                clientUuid: clientUuid,
+                userSub: userSub,
+                companyId: companyId,
+                reportType: reportType,
+                projectId: projectId,
+                projectLabel: projectLabel,
+                unitId: unitId,
+                clientId: clientId,
+                reportDate: reportDate,
+                hourMeter: hourMeter,
+                contentJson: contentJson,
+                photoUuidsJson: photoUuidsJson,
+                serverPhotoCount: serverPhotoCount,
+                reason: reason,
+                serverId: serverId,
+                serverRev: serverRev,
+                docNo: docNo,
+                editableUntil: editableUntil,
+                syncState: syncState,
+                lastError: lastError,
+                lastErrorCode: lastErrorCode,
+                conflictCopyJson: conflictCopyJson,
+                offline: offline,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String clientUuid,
+                required String userSub,
+                Value<int?> companyId = const Value.absent(),
+                required String reportType,
+                required int projectId,
+                Value<String> projectLabel = const Value.absent(),
+                Value<int?> unitId = const Value.absent(),
+                Value<int?> clientId = const Value.absent(),
+                required String reportDate,
+                Value<double?> hourMeter = const Value.absent(),
+                Value<String> contentJson = const Value.absent(),
+                Value<String> photoUuidsJson = const Value.absent(),
+                Value<int> serverPhotoCount = const Value.absent(),
+                Value<String?> reason = const Value.absent(),
+                Value<int?> serverId = const Value.absent(),
+                Value<int?> serverRev = const Value.absent(),
+                Value<String?> docNo = const Value.absent(),
+                Value<String?> editableUntil = const Value.absent(),
+                Value<String> syncState = const Value.absent(),
+                Value<String?> lastError = const Value.absent(),
+                Value<String?> lastErrorCode = const Value.absent(),
+                Value<String?> conflictCopyJson = const Value.absent(),
+                Value<bool> offline = const Value.absent(),
+                required DateTime createdAt,
+                required DateTime updatedAt,
+                Value<int> rowid = const Value.absent(),
+              }) => LocalFieldReportsCompanion.insert(
+                clientUuid: clientUuid,
+                userSub: userSub,
+                companyId: companyId,
+                reportType: reportType,
+                projectId: projectId,
+                projectLabel: projectLabel,
+                unitId: unitId,
+                clientId: clientId,
+                reportDate: reportDate,
+                hourMeter: hourMeter,
+                contentJson: contentJson,
+                photoUuidsJson: photoUuidsJson,
+                serverPhotoCount: serverPhotoCount,
+                reason: reason,
+                serverId: serverId,
+                serverRev: serverRev,
+                docNo: docNo,
+                editableUntil: editableUntil,
+                syncState: syncState,
+                lastError: lastError,
+                lastErrorCode: lastErrorCode,
+                conflictCopyJson: conflictCopyJson,
+                offline: offline,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$LocalFieldReportsTable, LocalFieldReport>(table),
+                  BaseReferences<
+                    _$AppDatabase,
+                    $LocalFieldReportsTable,
+                    LocalFieldReport
+                  >(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$LocalFieldReportsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $LocalFieldReportsTable,
+      LocalFieldReport,
+      $$LocalFieldReportsTableFilterComposer,
+      $$LocalFieldReportsTableOrderingComposer,
+      $$LocalFieldReportsTableAnnotationComposer,
+      $$LocalFieldReportsTableCreateCompanionBuilder,
+      $$LocalFieldReportsTableUpdateCompanionBuilder,
+      (
+        LocalFieldReport,
+        BaseReferences<
+          _$AppDatabase,
+          $LocalFieldReportsTable,
+          LocalFieldReport
+        >,
+      ),
+      LocalFieldReport,
+      PrefetchHooks Function()
+    >;
+typedef $$FieldUnitsTableCreateCompanionBuilder = FieldUnitsCompanion Function({
+  required String userSub,
+  required int id,
+  required int companyId,
+  Value<String> kind,
+  Value<String> label,
+  Value<String?> unitCode,
+  Value<String?> plateDisplay,
+  Value<String?> unitType,
+  Value<String?> brandModel,
+  Value<String?> serialNo,
+  Value<String> owner,
+  Value<int?> clientId,
+  Value<String?> clientName,
+  Value<String> status,
+  Value<double?> lastHourMeter,
+  Value<String?> lastHourMeterAt,
+  Value<bool> active,
+  Value<String?> updatedAt,
+  Value<int> rowid,
+});
+typedef $$FieldUnitsTableUpdateCompanionBuilder = FieldUnitsCompanion Function({
+  Value<String> userSub,
+  Value<int> id,
+  Value<int> companyId,
+  Value<String> kind,
+  Value<String> label,
+  Value<String?> unitCode,
+  Value<String?> plateDisplay,
+  Value<String?> unitType,
+  Value<String?> brandModel,
+  Value<String?> serialNo,
+  Value<String> owner,
+  Value<int?> clientId,
+  Value<String?> clientName,
+  Value<String> status,
+  Value<double?> lastHourMeter,
+  Value<String?> lastHourMeterAt,
+  Value<bool> active,
+  Value<String?> updatedAt,
+  Value<int> rowid,
+});
+
+class $$FieldUnitsTableFilterComposer
+    extends Composer<_$AppDatabase, $FieldUnitsTable> {
+  $$FieldUnitsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get userSub => $composableBuilder(
+    column: $table.userSub,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get companyId => $composableBuilder(
+    column: $table.companyId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get kind => $composableBuilder(
+    column: $table.kind,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get label => $composableBuilder(
+    column: $table.label,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get unitCode => $composableBuilder(
+    column: $table.unitCode,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get plateDisplay => $composableBuilder(
+    column: $table.plateDisplay,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get unitType => $composableBuilder(
+    column: $table.unitType,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get brandModel => $composableBuilder(
+    column: $table.brandModel,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get serialNo => $composableBuilder(
+    column: $table.serialNo,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get owner => $composableBuilder(
+    column: $table.owner,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get clientId => $composableBuilder(
+    column: $table.clientId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get clientName => $composableBuilder(
+    column: $table.clientName,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get status => $composableBuilder(
+    column: $table.status,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get lastHourMeter => $composableBuilder(
+    column: $table.lastHourMeter,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get lastHourMeterAt => $composableBuilder(
+    column: $table.lastHourMeterAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get active => $composableBuilder(
+    column: $table.active,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$FieldUnitsTableOrderingComposer
+    extends Composer<_$AppDatabase, $FieldUnitsTable> {
+  $$FieldUnitsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get userSub => $composableBuilder(
+    column: $table.userSub,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get companyId => $composableBuilder(
+    column: $table.companyId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get kind => $composableBuilder(
+    column: $table.kind,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get label => $composableBuilder(
+    column: $table.label,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get unitCode => $composableBuilder(
+    column: $table.unitCode,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get plateDisplay => $composableBuilder(
+    column: $table.plateDisplay,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get unitType => $composableBuilder(
+    column: $table.unitType,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get brandModel => $composableBuilder(
+    column: $table.brandModel,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get serialNo => $composableBuilder(
+    column: $table.serialNo,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get owner => $composableBuilder(
+    column: $table.owner,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get clientId => $composableBuilder(
+    column: $table.clientId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get clientName => $composableBuilder(
+    column: $table.clientName,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get status => $composableBuilder(
+    column: $table.status,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get lastHourMeter => $composableBuilder(
+    column: $table.lastHourMeter,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get lastHourMeterAt => $composableBuilder(
+    column: $table.lastHourMeterAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get active => $composableBuilder(
+    column: $table.active,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$FieldUnitsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $FieldUnitsTable> {
+  $$FieldUnitsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get userSub =>
+      $composableBuilder(column: $table.userSub, builder: (column) => column);
+
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<int> get companyId =>
+      $composableBuilder(column: $table.companyId, builder: (column) => column);
+
+  GeneratedColumn<String> get kind =>
+      $composableBuilder(column: $table.kind, builder: (column) => column);
+
+  GeneratedColumn<String> get label =>
+      $composableBuilder(column: $table.label, builder: (column) => column);
+
+  GeneratedColumn<String> get unitCode =>
+      $composableBuilder(column: $table.unitCode, builder: (column) => column);
+
+  GeneratedColumn<String> get plateDisplay => $composableBuilder(
+    column: $table.plateDisplay,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get unitType =>
+      $composableBuilder(column: $table.unitType, builder: (column) => column);
+
+  GeneratedColumn<String> get brandModel => $composableBuilder(
+    column: $table.brandModel,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get serialNo =>
+      $composableBuilder(column: $table.serialNo, builder: (column) => column);
+
+  GeneratedColumn<String> get owner =>
+      $composableBuilder(column: $table.owner, builder: (column) => column);
+
+  GeneratedColumn<int> get clientId =>
+      $composableBuilder(column: $table.clientId, builder: (column) => column);
+
+  GeneratedColumn<String> get clientName => $composableBuilder(
+    column: $table.clientName,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get status =>
+      $composableBuilder(column: $table.status, builder: (column) => column);
+
+  GeneratedColumn<double> get lastHourMeter => $composableBuilder(
+    column: $table.lastHourMeter,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get lastHourMeterAt => $composableBuilder(
+    column: $table.lastHourMeterAt,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get active =>
+      $composableBuilder(column: $table.active, builder: (column) => column);
+
+  GeneratedColumn<String> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+}
+
+class $$FieldUnitsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $FieldUnitsTable,
+          FieldUnitRow,
+          $$FieldUnitsTableFilterComposer,
+          $$FieldUnitsTableOrderingComposer,
+          $$FieldUnitsTableAnnotationComposer,
+          $$FieldUnitsTableCreateCompanionBuilder,
+          $$FieldUnitsTableUpdateCompanionBuilder,
+          (
+            FieldUnitRow,
+            BaseReferences<_$AppDatabase, $FieldUnitsTable, FieldUnitRow>,
+          ),
+          FieldUnitRow,
+          PrefetchHooks Function()
+        > {
+  $$FieldUnitsTableTableManager(_$AppDatabase db, $FieldUnitsTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$FieldUnitsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$FieldUnitsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$FieldUnitsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> userSub = const Value.absent(),
+                Value<int> id = const Value.absent(),
+                Value<int> companyId = const Value.absent(),
+                Value<String> kind = const Value.absent(),
+                Value<String> label = const Value.absent(),
+                Value<String?> unitCode = const Value.absent(),
+                Value<String?> plateDisplay = const Value.absent(),
+                Value<String?> unitType = const Value.absent(),
+                Value<String?> brandModel = const Value.absent(),
+                Value<String?> serialNo = const Value.absent(),
+                Value<String> owner = const Value.absent(),
+                Value<int?> clientId = const Value.absent(),
+                Value<String?> clientName = const Value.absent(),
+                Value<String> status = const Value.absent(),
+                Value<double?> lastHourMeter = const Value.absent(),
+                Value<String?> lastHourMeterAt = const Value.absent(),
+                Value<bool> active = const Value.absent(),
+                Value<String?> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => FieldUnitsCompanion(
+                userSub: userSub,
+                id: id,
+                companyId: companyId,
+                kind: kind,
+                label: label,
+                unitCode: unitCode,
+                plateDisplay: plateDisplay,
+                unitType: unitType,
+                brandModel: brandModel,
+                serialNo: serialNo,
+                owner: owner,
+                clientId: clientId,
+                clientName: clientName,
+                status: status,
+                lastHourMeter: lastHourMeter,
+                lastHourMeterAt: lastHourMeterAt,
+                active: active,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String userSub,
+                required int id,
+                required int companyId,
+                Value<String> kind = const Value.absent(),
+                Value<String> label = const Value.absent(),
+                Value<String?> unitCode = const Value.absent(),
+                Value<String?> plateDisplay = const Value.absent(),
+                Value<String?> unitType = const Value.absent(),
+                Value<String?> brandModel = const Value.absent(),
+                Value<String?> serialNo = const Value.absent(),
+                Value<String> owner = const Value.absent(),
+                Value<int?> clientId = const Value.absent(),
+                Value<String?> clientName = const Value.absent(),
+                Value<String> status = const Value.absent(),
+                Value<double?> lastHourMeter = const Value.absent(),
+                Value<String?> lastHourMeterAt = const Value.absent(),
+                Value<bool> active = const Value.absent(),
+                Value<String?> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => FieldUnitsCompanion.insert(
+                userSub: userSub,
+                id: id,
+                companyId: companyId,
+                kind: kind,
+                label: label,
+                unitCode: unitCode,
+                plateDisplay: plateDisplay,
+                unitType: unitType,
+                brandModel: brandModel,
+                serialNo: serialNo,
+                owner: owner,
+                clientId: clientId,
+                clientName: clientName,
+                status: status,
+                lastHourMeter: lastHourMeter,
+                lastHourMeterAt: lastHourMeterAt,
+                active: active,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$FieldUnitsTable, FieldUnitRow>(table),
+                  BaseReferences<_$AppDatabase, $FieldUnitsTable, FieldUnitRow>(
+                    db,
+                    table,
+                    e,
+                  ),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$FieldUnitsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $FieldUnitsTable,
+      FieldUnitRow,
+      $$FieldUnitsTableFilterComposer,
+      $$FieldUnitsTableOrderingComposer,
+      $$FieldUnitsTableAnnotationComposer,
+      $$FieldUnitsTableCreateCompanionBuilder,
+      $$FieldUnitsTableUpdateCompanionBuilder,
+      (
+        FieldUnitRow,
+        BaseReferences<_$AppDatabase, $FieldUnitsTable, FieldUnitRow>,
+      ),
+      FieldUnitRow,
+      PrefetchHooks Function()
+    >;
+typedef $$FieldContractUnitsTableCreateCompanionBuilder =
+    FieldContractUnitsCompanion Function({
+      required String userSub,
+      required int id,
+      required int companyId,
+      required int projectId,
+      required int unitId,
+      Value<String> unitLabel,
+      Value<String?> unitCode,
+      required String startDate,
+      Value<String?> endDate,
+      Value<bool> active,
+      Value<int> rowid,
+    });
+typedef $$FieldContractUnitsTableUpdateCompanionBuilder =
+    FieldContractUnitsCompanion Function({
+      Value<String> userSub,
+      Value<int> id,
+      Value<int> companyId,
+      Value<int> projectId,
+      Value<int> unitId,
+      Value<String> unitLabel,
+      Value<String?> unitCode,
+      Value<String> startDate,
+      Value<String?> endDate,
+      Value<bool> active,
+      Value<int> rowid,
+    });
+
+class $$FieldContractUnitsTableFilterComposer
+    extends Composer<_$AppDatabase, $FieldContractUnitsTable> {
+  $$FieldContractUnitsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get userSub => $composableBuilder(
+    column: $table.userSub,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get companyId => $composableBuilder(
+    column: $table.companyId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get projectId => $composableBuilder(
+    column: $table.projectId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get unitId => $composableBuilder(
+    column: $table.unitId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get unitLabel => $composableBuilder(
+    column: $table.unitLabel,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get unitCode => $composableBuilder(
+    column: $table.unitCode,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get startDate => $composableBuilder(
+    column: $table.startDate,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get endDate => $composableBuilder(
+    column: $table.endDate,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get active => $composableBuilder(
+    column: $table.active,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$FieldContractUnitsTableOrderingComposer
+    extends Composer<_$AppDatabase, $FieldContractUnitsTable> {
+  $$FieldContractUnitsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get userSub => $composableBuilder(
+    column: $table.userSub,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get companyId => $composableBuilder(
+    column: $table.companyId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get projectId => $composableBuilder(
+    column: $table.projectId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get unitId => $composableBuilder(
+    column: $table.unitId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get unitLabel => $composableBuilder(
+    column: $table.unitLabel,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get unitCode => $composableBuilder(
+    column: $table.unitCode,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get startDate => $composableBuilder(
+    column: $table.startDate,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get endDate => $composableBuilder(
+    column: $table.endDate,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get active => $composableBuilder(
+    column: $table.active,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$FieldContractUnitsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $FieldContractUnitsTable> {
+  $$FieldContractUnitsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get userSub =>
+      $composableBuilder(column: $table.userSub, builder: (column) => column);
+
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<int> get companyId =>
+      $composableBuilder(column: $table.companyId, builder: (column) => column);
+
+  GeneratedColumn<int> get projectId =>
+      $composableBuilder(column: $table.projectId, builder: (column) => column);
+
+  GeneratedColumn<int> get unitId =>
+      $composableBuilder(column: $table.unitId, builder: (column) => column);
+
+  GeneratedColumn<String> get unitLabel =>
+      $composableBuilder(column: $table.unitLabel, builder: (column) => column);
+
+  GeneratedColumn<String> get unitCode =>
+      $composableBuilder(column: $table.unitCode, builder: (column) => column);
+
+  GeneratedColumn<String> get startDate =>
+      $composableBuilder(column: $table.startDate, builder: (column) => column);
+
+  GeneratedColumn<String> get endDate =>
+      $composableBuilder(column: $table.endDate, builder: (column) => column);
+
+  GeneratedColumn<bool> get active =>
+      $composableBuilder(column: $table.active, builder: (column) => column);
+}
+
+class $$FieldContractUnitsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $FieldContractUnitsTable,
+          FieldContractUnitRow,
+          $$FieldContractUnitsTableFilterComposer,
+          $$FieldContractUnitsTableOrderingComposer,
+          $$FieldContractUnitsTableAnnotationComposer,
+          $$FieldContractUnitsTableCreateCompanionBuilder,
+          $$FieldContractUnitsTableUpdateCompanionBuilder,
+          (
+            FieldContractUnitRow,
+            BaseReferences<
+              _$AppDatabase,
+              $FieldContractUnitsTable,
+              FieldContractUnitRow
+            >,
+          ),
+          FieldContractUnitRow,
+          PrefetchHooks Function()
+        > {
+  $$FieldContractUnitsTableTableManager(
+    _$AppDatabase db,
+    $FieldContractUnitsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$FieldContractUnitsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$FieldContractUnitsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$FieldContractUnitsTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> userSub = const Value.absent(),
+                Value<int> id = const Value.absent(),
+                Value<int> companyId = const Value.absent(),
+                Value<int> projectId = const Value.absent(),
+                Value<int> unitId = const Value.absent(),
+                Value<String> unitLabel = const Value.absent(),
+                Value<String?> unitCode = const Value.absent(),
+                Value<String> startDate = const Value.absent(),
+                Value<String?> endDate = const Value.absent(),
+                Value<bool> active = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => FieldContractUnitsCompanion(
+                userSub: userSub,
+                id: id,
+                companyId: companyId,
+                projectId: projectId,
+                unitId: unitId,
+                unitLabel: unitLabel,
+                unitCode: unitCode,
+                startDate: startDate,
+                endDate: endDate,
+                active: active,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String userSub,
+                required int id,
+                required int companyId,
+                required int projectId,
+                required int unitId,
+                Value<String> unitLabel = const Value.absent(),
+                Value<String?> unitCode = const Value.absent(),
+                required String startDate,
+                Value<String?> endDate = const Value.absent(),
+                Value<bool> active = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => FieldContractUnitsCompanion.insert(
+                userSub: userSub,
+                id: id,
+                companyId: companyId,
+                projectId: projectId,
+                unitId: unitId,
+                unitLabel: unitLabel,
+                unitCode: unitCode,
+                startDate: startDate,
+                endDate: endDate,
+                active: active,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$FieldContractUnitsTable, FieldContractUnitRow>(
+                    table,
+                  ),
+                  BaseReferences<
+                    _$AppDatabase,
+                    $FieldContractUnitsTable,
+                    FieldContractUnitRow
+                  >(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$FieldContractUnitsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $FieldContractUnitsTable,
+      FieldContractUnitRow,
+      $$FieldContractUnitsTableFilterComposer,
+      $$FieldContractUnitsTableOrderingComposer,
+      $$FieldContractUnitsTableAnnotationComposer,
+      $$FieldContractUnitsTableCreateCompanionBuilder,
+      $$FieldContractUnitsTableUpdateCompanionBuilder,
+      (
+        FieldContractUnitRow,
+        BaseReferences<
+          _$AppDatabase,
+          $FieldContractUnitsTable,
+          FieldContractUnitRow
+        >,
+      ),
+      FieldContractUnitRow,
+      PrefetchHooks Function()
+    >;
+typedef $$FieldOpenPosTableCreateCompanionBuilder =
+    FieldOpenPosCompanion Function({
+      required String userSub,
+      required int id,
+      required int companyId,
+      required int projectId,
+      required int clientId,
+      Value<String> clientName,
+      required String activityDate,
+      Value<String?> docNo,
+      Value<String> itemsJson,
+      Value<String> poStatus,
+      Value<int> ageDays,
+      Value<int> deliveries,
+      Value<int> rowid,
+    });
+typedef $$FieldOpenPosTableUpdateCompanionBuilder =
+    FieldOpenPosCompanion Function({
+      Value<String> userSub,
+      Value<int> id,
+      Value<int> companyId,
+      Value<int> projectId,
+      Value<int> clientId,
+      Value<String> clientName,
+      Value<String> activityDate,
+      Value<String?> docNo,
+      Value<String> itemsJson,
+      Value<String> poStatus,
+      Value<int> ageDays,
+      Value<int> deliveries,
+      Value<int> rowid,
+    });
+
+class $$FieldOpenPosTableFilterComposer
+    extends Composer<_$AppDatabase, $FieldOpenPosTable> {
+  $$FieldOpenPosTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get userSub => $composableBuilder(
+    column: $table.userSub,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get companyId => $composableBuilder(
+    column: $table.companyId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get projectId => $composableBuilder(
+    column: $table.projectId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get clientId => $composableBuilder(
+    column: $table.clientId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get clientName => $composableBuilder(
+    column: $table.clientName,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get activityDate => $composableBuilder(
+    column: $table.activityDate,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get docNo => $composableBuilder(
+    column: $table.docNo,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get itemsJson => $composableBuilder(
+    column: $table.itemsJson,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get poStatus => $composableBuilder(
+    column: $table.poStatus,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get ageDays => $composableBuilder(
+    column: $table.ageDays,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get deliveries => $composableBuilder(
+    column: $table.deliveries,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$FieldOpenPosTableOrderingComposer
+    extends Composer<_$AppDatabase, $FieldOpenPosTable> {
+  $$FieldOpenPosTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get userSub => $composableBuilder(
+    column: $table.userSub,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get companyId => $composableBuilder(
+    column: $table.companyId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get projectId => $composableBuilder(
+    column: $table.projectId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get clientId => $composableBuilder(
+    column: $table.clientId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get clientName => $composableBuilder(
+    column: $table.clientName,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get activityDate => $composableBuilder(
+    column: $table.activityDate,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get docNo => $composableBuilder(
+    column: $table.docNo,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get itemsJson => $composableBuilder(
+    column: $table.itemsJson,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get poStatus => $composableBuilder(
+    column: $table.poStatus,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get ageDays => $composableBuilder(
+    column: $table.ageDays,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get deliveries => $composableBuilder(
+    column: $table.deliveries,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$FieldOpenPosTableAnnotationComposer
+    extends Composer<_$AppDatabase, $FieldOpenPosTable> {
+  $$FieldOpenPosTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get userSub =>
+      $composableBuilder(column: $table.userSub, builder: (column) => column);
+
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<int> get companyId =>
+      $composableBuilder(column: $table.companyId, builder: (column) => column);
+
+  GeneratedColumn<int> get projectId =>
+      $composableBuilder(column: $table.projectId, builder: (column) => column);
+
+  GeneratedColumn<int> get clientId =>
+      $composableBuilder(column: $table.clientId, builder: (column) => column);
+
+  GeneratedColumn<String> get clientName => $composableBuilder(
+    column: $table.clientName,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get activityDate => $composableBuilder(
+    column: $table.activityDate,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get docNo =>
+      $composableBuilder(column: $table.docNo, builder: (column) => column);
+
+  GeneratedColumn<String> get itemsJson =>
+      $composableBuilder(column: $table.itemsJson, builder: (column) => column);
+
+  GeneratedColumn<String> get poStatus =>
+      $composableBuilder(column: $table.poStatus, builder: (column) => column);
+
+  GeneratedColumn<int> get ageDays =>
+      $composableBuilder(column: $table.ageDays, builder: (column) => column);
+
+  GeneratedColumn<int> get deliveries => $composableBuilder(
+    column: $table.deliveries,
+    builder: (column) => column,
+  );
+}
+
+class $$FieldOpenPosTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $FieldOpenPosTable,
+          FieldOpenPoRow,
+          $$FieldOpenPosTableFilterComposer,
+          $$FieldOpenPosTableOrderingComposer,
+          $$FieldOpenPosTableAnnotationComposer,
+          $$FieldOpenPosTableCreateCompanionBuilder,
+          $$FieldOpenPosTableUpdateCompanionBuilder,
+          (
+            FieldOpenPoRow,
+            BaseReferences<_$AppDatabase, $FieldOpenPosTable, FieldOpenPoRow>,
+          ),
+          FieldOpenPoRow,
+          PrefetchHooks Function()
+        > {
+  $$FieldOpenPosTableTableManager(_$AppDatabase db, $FieldOpenPosTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$FieldOpenPosTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$FieldOpenPosTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$FieldOpenPosTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> userSub = const Value.absent(),
+                Value<int> id = const Value.absent(),
+                Value<int> companyId = const Value.absent(),
+                Value<int> projectId = const Value.absent(),
+                Value<int> clientId = const Value.absent(),
+                Value<String> clientName = const Value.absent(),
+                Value<String> activityDate = const Value.absent(),
+                Value<String?> docNo = const Value.absent(),
+                Value<String> itemsJson = const Value.absent(),
+                Value<String> poStatus = const Value.absent(),
+                Value<int> ageDays = const Value.absent(),
+                Value<int> deliveries = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => FieldOpenPosCompanion(
+                userSub: userSub,
+                id: id,
+                companyId: companyId,
+                projectId: projectId,
+                clientId: clientId,
+                clientName: clientName,
+                activityDate: activityDate,
+                docNo: docNo,
+                itemsJson: itemsJson,
+                poStatus: poStatus,
+                ageDays: ageDays,
+                deliveries: deliveries,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String userSub,
+                required int id,
+                required int companyId,
+                required int projectId,
+                required int clientId,
+                Value<String> clientName = const Value.absent(),
+                required String activityDate,
+                Value<String?> docNo = const Value.absent(),
+                Value<String> itemsJson = const Value.absent(),
+                Value<String> poStatus = const Value.absent(),
+                Value<int> ageDays = const Value.absent(),
+                Value<int> deliveries = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => FieldOpenPosCompanion.insert(
+                userSub: userSub,
+                id: id,
+                companyId: companyId,
+                projectId: projectId,
+                clientId: clientId,
+                clientName: clientName,
+                activityDate: activityDate,
+                docNo: docNo,
+                itemsJson: itemsJson,
+                poStatus: poStatus,
+                ageDays: ageDays,
+                deliveries: deliveries,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$FieldOpenPosTable, FieldOpenPoRow>(table),
+                  BaseReferences<
+                    _$AppDatabase,
+                    $FieldOpenPosTable,
+                    FieldOpenPoRow
+                  >(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$FieldOpenPosTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $FieldOpenPosTable,
+      FieldOpenPoRow,
+      $$FieldOpenPosTableFilterComposer,
+      $$FieldOpenPosTableOrderingComposer,
+      $$FieldOpenPosTableAnnotationComposer,
+      $$FieldOpenPosTableCreateCompanionBuilder,
+      $$FieldOpenPosTableUpdateCompanionBuilder,
+      (
+        FieldOpenPoRow,
+        BaseReferences<_$AppDatabase, $FieldOpenPosTable, FieldOpenPoRow>,
+      ),
+      FieldOpenPoRow,
+      PrefetchHooks Function()
+    >;
+typedef $$FieldClientsTableCreateCompanionBuilder =
+    FieldClientsCompanion Function({
+      required String userSub,
+      required int id,
+      required int companyId,
+      Value<String> name,
+      Value<int> rowid,
+    });
+typedef $$FieldClientsTableUpdateCompanionBuilder =
+    FieldClientsCompanion Function({
+      Value<String> userSub,
+      Value<int> id,
+      Value<int> companyId,
+      Value<String> name,
+      Value<int> rowid,
+    });
+
+class $$FieldClientsTableFilterComposer
+    extends Composer<_$AppDatabase, $FieldClientsTable> {
+  $$FieldClientsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get userSub => $composableBuilder(
+    column: $table.userSub,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get companyId => $composableBuilder(
+    column: $table.companyId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$FieldClientsTableOrderingComposer
+    extends Composer<_$AppDatabase, $FieldClientsTable> {
+  $$FieldClientsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get userSub => $composableBuilder(
+    column: $table.userSub,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get companyId => $composableBuilder(
+    column: $table.companyId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$FieldClientsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $FieldClientsTable> {
+  $$FieldClientsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get userSub =>
+      $composableBuilder(column: $table.userSub, builder: (column) => column);
+
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<int> get companyId =>
+      $composableBuilder(column: $table.companyId, builder: (column) => column);
+
+  GeneratedColumn<String> get name =>
+      $composableBuilder(column: $table.name, builder: (column) => column);
+}
+
+class $$FieldClientsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $FieldClientsTable,
+          FieldClientRow,
+          $$FieldClientsTableFilterComposer,
+          $$FieldClientsTableOrderingComposer,
+          $$FieldClientsTableAnnotationComposer,
+          $$FieldClientsTableCreateCompanionBuilder,
+          $$FieldClientsTableUpdateCompanionBuilder,
+          (
+            FieldClientRow,
+            BaseReferences<_$AppDatabase, $FieldClientsTable, FieldClientRow>,
+          ),
+          FieldClientRow,
+          PrefetchHooks Function()
+        > {
+  $$FieldClientsTableTableManager(_$AppDatabase db, $FieldClientsTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$FieldClientsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$FieldClientsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$FieldClientsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> userSub = const Value.absent(),
+                Value<int> id = const Value.absent(),
+                Value<int> companyId = const Value.absent(),
+                Value<String> name = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => FieldClientsCompanion(
+                userSub: userSub,
+                id: id,
+                companyId: companyId,
+                name: name,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String userSub,
+                required int id,
+                required int companyId,
+                Value<String> name = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => FieldClientsCompanion.insert(
+                userSub: userSub,
+                id: id,
+                companyId: companyId,
+                name: name,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$FieldClientsTable, FieldClientRow>(table),
+                  BaseReferences<
+                    _$AppDatabase,
+                    $FieldClientsTable,
+                    FieldClientRow
+                  >(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$FieldClientsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $FieldClientsTable,
+      FieldClientRow,
+      $$FieldClientsTableFilterComposer,
+      $$FieldClientsTableOrderingComposer,
+      $$FieldClientsTableAnnotationComposer,
+      $$FieldClientsTableCreateCompanionBuilder,
+      $$FieldClientsTableUpdateCompanionBuilder,
+      (
+        FieldClientRow,
+        BaseReferences<_$AppDatabase, $FieldClientsTable, FieldClientRow>,
+      ),
+      FieldClientRow,
+      PrefetchHooks Function()
+    >;
+typedef $$FieldRecentTimesheetsTableCreateCompanionBuilder =
+    FieldRecentTimesheetsCompanion Function({
+      required String userSub,
+      required int id,
+      required int companyId,
+      required int projectId,
+      required int unitId,
+      required String reportDate,
+      required double hmStart,
+      required double hmEnd,
+      Value<String?> operatorName,
+      Value<String?> location,
+      Value<double?> fuelLiters,
+      Value<int> rowid,
+    });
+typedef $$FieldRecentTimesheetsTableUpdateCompanionBuilder =
+    FieldRecentTimesheetsCompanion Function({
+      Value<String> userSub,
+      Value<int> id,
+      Value<int> companyId,
+      Value<int> projectId,
+      Value<int> unitId,
+      Value<String> reportDate,
+      Value<double> hmStart,
+      Value<double> hmEnd,
+      Value<String?> operatorName,
+      Value<String?> location,
+      Value<double?> fuelLiters,
+      Value<int> rowid,
+    });
+
+class $$FieldRecentTimesheetsTableFilterComposer
+    extends Composer<_$AppDatabase, $FieldRecentTimesheetsTable> {
+  $$FieldRecentTimesheetsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get userSub => $composableBuilder(
+    column: $table.userSub,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get companyId => $composableBuilder(
+    column: $table.companyId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get projectId => $composableBuilder(
+    column: $table.projectId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get unitId => $composableBuilder(
+    column: $table.unitId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get reportDate => $composableBuilder(
+    column: $table.reportDate,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get hmStart => $composableBuilder(
+    column: $table.hmStart,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get hmEnd => $composableBuilder(
+    column: $table.hmEnd,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get operatorName => $composableBuilder(
+    column: $table.operatorName,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get location => $composableBuilder(
+    column: $table.location,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get fuelLiters => $composableBuilder(
+    column: $table.fuelLiters,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$FieldRecentTimesheetsTableOrderingComposer
+    extends Composer<_$AppDatabase, $FieldRecentTimesheetsTable> {
+  $$FieldRecentTimesheetsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get userSub => $composableBuilder(
+    column: $table.userSub,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get companyId => $composableBuilder(
+    column: $table.companyId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get projectId => $composableBuilder(
+    column: $table.projectId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get unitId => $composableBuilder(
+    column: $table.unitId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get reportDate => $composableBuilder(
+    column: $table.reportDate,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get hmStart => $composableBuilder(
+    column: $table.hmStart,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get hmEnd => $composableBuilder(
+    column: $table.hmEnd,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get operatorName => $composableBuilder(
+    column: $table.operatorName,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get location => $composableBuilder(
+    column: $table.location,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get fuelLiters => $composableBuilder(
+    column: $table.fuelLiters,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$FieldRecentTimesheetsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $FieldRecentTimesheetsTable> {
+  $$FieldRecentTimesheetsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get userSub =>
+      $composableBuilder(column: $table.userSub, builder: (column) => column);
+
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<int> get companyId =>
+      $composableBuilder(column: $table.companyId, builder: (column) => column);
+
+  GeneratedColumn<int> get projectId =>
+      $composableBuilder(column: $table.projectId, builder: (column) => column);
+
+  GeneratedColumn<int> get unitId =>
+      $composableBuilder(column: $table.unitId, builder: (column) => column);
+
+  GeneratedColumn<String> get reportDate => $composableBuilder(
+    column: $table.reportDate,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get hmStart =>
+      $composableBuilder(column: $table.hmStart, builder: (column) => column);
+
+  GeneratedColumn<double> get hmEnd =>
+      $composableBuilder(column: $table.hmEnd, builder: (column) => column);
+
+  GeneratedColumn<String> get operatorName => $composableBuilder(
+    column: $table.operatorName,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get location =>
+      $composableBuilder(column: $table.location, builder: (column) => column);
+
+  GeneratedColumn<double> get fuelLiters => $composableBuilder(
+    column: $table.fuelLiters,
+    builder: (column) => column,
+  );
+}
+
+class $$FieldRecentTimesheetsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $FieldRecentTimesheetsTable,
+          FieldRecentTimesheetRow,
+          $$FieldRecentTimesheetsTableFilterComposer,
+          $$FieldRecentTimesheetsTableOrderingComposer,
+          $$FieldRecentTimesheetsTableAnnotationComposer,
+          $$FieldRecentTimesheetsTableCreateCompanionBuilder,
+          $$FieldRecentTimesheetsTableUpdateCompanionBuilder,
+          (
+            FieldRecentTimesheetRow,
+            BaseReferences<
+              _$AppDatabase,
+              $FieldRecentTimesheetsTable,
+              FieldRecentTimesheetRow
+            >,
+          ),
+          FieldRecentTimesheetRow,
+          PrefetchHooks Function()
+        > {
+  $$FieldRecentTimesheetsTableTableManager(
+    _$AppDatabase db,
+    $FieldRecentTimesheetsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$FieldRecentTimesheetsTableFilterComposer(
+                $db: db,
+                $table: table,
+              ),
+          createOrderingComposer: () =>
+              $$FieldRecentTimesheetsTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$FieldRecentTimesheetsTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> userSub = const Value.absent(),
+                Value<int> id = const Value.absent(),
+                Value<int> companyId = const Value.absent(),
+                Value<int> projectId = const Value.absent(),
+                Value<int> unitId = const Value.absent(),
+                Value<String> reportDate = const Value.absent(),
+                Value<double> hmStart = const Value.absent(),
+                Value<double> hmEnd = const Value.absent(),
+                Value<String?> operatorName = const Value.absent(),
+                Value<String?> location = const Value.absent(),
+                Value<double?> fuelLiters = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => FieldRecentTimesheetsCompanion(
+                userSub: userSub,
+                id: id,
+                companyId: companyId,
+                projectId: projectId,
+                unitId: unitId,
+                reportDate: reportDate,
+                hmStart: hmStart,
+                hmEnd: hmEnd,
+                operatorName: operatorName,
+                location: location,
+                fuelLiters: fuelLiters,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String userSub,
+                required int id,
+                required int companyId,
+                required int projectId,
+                required int unitId,
+                required String reportDate,
+                required double hmStart,
+                required double hmEnd,
+                Value<String?> operatorName = const Value.absent(),
+                Value<String?> location = const Value.absent(),
+                Value<double?> fuelLiters = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => FieldRecentTimesheetsCompanion.insert(
+                userSub: userSub,
+                id: id,
+                companyId: companyId,
+                projectId: projectId,
+                unitId: unitId,
+                reportDate: reportDate,
+                hmStart: hmStart,
+                hmEnd: hmEnd,
+                operatorName: operatorName,
+                location: location,
+                fuelLiters: fuelLiters,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<
+                    $FieldRecentTimesheetsTable,
+                    FieldRecentTimesheetRow
+                  >(table),
+                  BaseReferences<
+                    _$AppDatabase,
+                    $FieldRecentTimesheetsTable,
+                    FieldRecentTimesheetRow
+                  >(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$FieldRecentTimesheetsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $FieldRecentTimesheetsTable,
+      FieldRecentTimesheetRow,
+      $$FieldRecentTimesheetsTableFilterComposer,
+      $$FieldRecentTimesheetsTableOrderingComposer,
+      $$FieldRecentTimesheetsTableAnnotationComposer,
+      $$FieldRecentTimesheetsTableCreateCompanionBuilder,
+      $$FieldRecentTimesheetsTableUpdateCompanionBuilder,
+      (
+        FieldRecentTimesheetRow,
+        BaseReferences<
+          _$AppDatabase,
+          $FieldRecentTimesheetsTable,
+          FieldRecentTimesheetRow
+        >,
+      ),
+      FieldRecentTimesheetRow,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -9051,4 +16048,16 @@ class $AppDatabaseManager {
       $$KvEntriesTableTableManager(_db, _db.kvEntries);
   $$LocalProgressReportsTableTableManager get localProgressReports =>
       $$LocalProgressReportsTableTableManager(_db, _db.localProgressReports);
+  $$LocalFieldReportsTableTableManager get localFieldReports =>
+      $$LocalFieldReportsTableTableManager(_db, _db.localFieldReports);
+  $$FieldUnitsTableTableManager get fieldUnits =>
+      $$FieldUnitsTableTableManager(_db, _db.fieldUnits);
+  $$FieldContractUnitsTableTableManager get fieldContractUnits =>
+      $$FieldContractUnitsTableTableManager(_db, _db.fieldContractUnits);
+  $$FieldOpenPosTableTableManager get fieldOpenPos =>
+      $$FieldOpenPosTableTableManager(_db, _db.fieldOpenPos);
+  $$FieldClientsTableTableManager get fieldClients =>
+      $$FieldClientsTableTableManager(_db, _db.fieldClients);
+  $$FieldRecentTimesheetsTableTableManager get fieldRecentTimesheets =>
+      $$FieldRecentTimesheetsTableTableManager(_db, _db.fieldRecentTimesheets);
 }

@@ -144,6 +144,154 @@ class LocalProgressReports extends Table {
   Set<Column<Object>> get primaryKey => {clientUuid};
 }
 
+/// FR1 (schema v5, ADR 0020): a field report written on the phone — `service_report`, `unit_timesheet` or
+/// `aftersales_activity` ([reportType]) — from the autosaved draft until the server applied it. The
+/// type-specific fields live in [contentJson]; the columns beside it are the ones the app filters on
+/// (unit + date for the HM prefill, client for the aftersales list). Locked to the Keycloak `sub`.
+/// Money: no contract rate is ever stored; an aftersales value only as the reporter typed it.
+class LocalFieldReports extends Table {
+  TextColumn get clientUuid => text()();
+  TextColumn get userSub => text()();
+  IntColumn get companyId => integer().nullable()();
+
+  /// service_report | unit_timesheet | aftersales_activity
+  TextColumn get reportType => text()();
+  IntColumn get projectId => integer()();
+  TextColumn get projectLabel => text().withDefault(const Constant(''))();
+  IntColumn get unitId => integer().nullable()();
+  IntColumn get clientId => integer().nullable()();
+
+  /// Business date `YYYY-MM-DD` (company TZ).
+  TextColumn get reportDate => text()();
+
+  /// Timesheet: HM akhir; service report: HM saat servis (prefill / HM floor of later reports).
+  RealColumn get hourMeter => real().nullable()();
+  TextColumn get contentJson => text().withDefault(const Constant('{}'))();
+
+  /// Every local photo id (media_blobs, kind `field`) of the report, for clean-up.
+  TextColumn get photoUuidsJson => text().withDefault(const Constant('[]'))();
+  IntColumn get serverPhotoCount => integer().withDefault(const Constant(0))();
+  TextColumn get reason => text().nullable()();
+  IntColumn get serverId => integer().nullable()();
+  IntColumn get serverRev => integer().nullable()();
+  TextColumn get docNo => text().nullable()();
+  TextColumn get editableUntil => text().nullable()();
+
+  /// local (draft) | queued | synced | conflict | rejected
+  TextColumn get syncState => text().withDefault(const Constant('local'))();
+  TextColumn get lastError => text().nullable()();
+  TextColumn get lastErrorCode => text().nullable()();
+
+  /// `server_service_report` / `server_unit_timesheet` / `server_aftersales_activity` of a conflict / NOT_EDITABLE.
+  TextColumn get conflictCopyJson => text().nullable()();
+  BoolColumn get offline => boolean().withDefault(const Constant(false))();
+  DateTimeColumn get createdAt => dateTime()();
+  DateTimeColumn get updatedAt => dateTime()();
+
+  @override
+  Set<Column<Object>> get primaryKey => {clientUuid};
+}
+
+/// FR1 cache of `GET /units` (Unit & Kendaraan, no rates) per user — unit pickers offline.
+@DataClassName('FieldUnitRow')
+class FieldUnits extends Table {
+  TextColumn get userSub => text()();
+  IntColumn get id => integer()();
+  IntColumn get companyId => integer()();
+  TextColumn get kind => text().withDefault(const Constant('alat_berat'))();
+  TextColumn get label => text().withDefault(const Constant(''))();
+  TextColumn get unitCode => text().nullable()();
+  TextColumn get plateDisplay => text().nullable()();
+  TextColumn get unitType => text().nullable()();
+  TextColumn get brandModel => text().nullable()();
+  TextColumn get serialNo => text().nullable()();
+
+  /// sendiri | pelanggan
+  TextColumn get owner => text().withDefault(const Constant('sendiri'))();
+  IntColumn get clientId => integer().nullable()();
+  TextColumn get clientName => text().nullable()();
+
+  /// siap | rusak | menunggu_part
+  TextColumn get status => text().withDefault(const Constant('siap'))();
+  RealColumn get lastHourMeter => real().nullable()();
+  TextColumn get lastHourMeterAt => text().nullable()();
+  BoolColumn get active => boolean().withDefault(const Constant(true))();
+  TextColumn get updatedAt => text().nullable()();
+
+  @override
+  Set<Column<Object>> get primaryKey => {userSub, id};
+}
+
+/// FR1 cache of `GET /projects/{id}/contract-units` WITHOUT rate, rate basis or minimum hours (ADR 0020 §7).
+@DataClassName('FieldContractUnitRow')
+class FieldContractUnits extends Table {
+  TextColumn get userSub => text()();
+  IntColumn get id => integer()();
+  IntColumn get companyId => integer()();
+  IntColumn get projectId => integer()();
+  IntColumn get unitId => integer()();
+  TextColumn get unitLabel => text().withDefault(const Constant(''))();
+  TextColumn get unitCode => text().nullable()();
+  TextColumn get startDate => text()();
+  TextColumn get endDate => text().nullable()();
+  BoolColumn get active => boolean().withDefault(const Constant(true))();
+
+  @override
+  Set<Column<Object>> get primaryKey => {userSub, id};
+}
+
+/// FR1 cache of `GET /aftersales/open-pos` (no value: money never cached on the phone).
+@DataClassName('FieldOpenPoRow')
+class FieldOpenPos extends Table {
+  TextColumn get userSub => text()();
+  IntColumn get id => integer()();
+  IntColumn get companyId => integer()();
+  IntColumn get projectId => integer()();
+  IntColumn get clientId => integer()();
+  TextColumn get clientName => text().withDefault(const Constant(''))();
+  TextColumn get activityDate => text()();
+  TextColumn get docNo => text().nullable()();
+  TextColumn get itemsJson => text().withDefault(const Constant('[]'))();
+  TextColumn get poStatus => text().withDefault(const Constant('belum_kirim'))();
+  IntColumn get ageDays => integer().withDefault(const Constant(0))();
+  IntColumn get deliveries => integer().withDefault(const Constant(0))();
+
+  @override
+  Set<Column<Object>> get primaryKey => {userSub, id};
+}
+
+/// FR1 customers for the aftersales picker (names seen in units / POs / activities of the user's scope).
+@DataClassName('FieldClientRow')
+class FieldClients extends Table {
+  TextColumn get userSub => text()();
+  IntColumn get id => integer()();
+  IntColumn get companyId => integer()();
+  TextColumn get name => text().withDefault(const Constant(''))();
+
+  @override
+  Set<Column<Object>> get primaryKey => {userSub, id};
+}
+
+/// FR1 recent server timesheets (≈ 15 days) per user: HM awal prefill, "Salin dari kemarin", unit tabs
+/// "✓ / belum" while offline.
+@DataClassName('FieldRecentTimesheetRow')
+class FieldRecentTimesheets extends Table {
+  TextColumn get userSub => text()();
+  IntColumn get id => integer()();
+  IntColumn get companyId => integer()();
+  IntColumn get projectId => integer()();
+  IntColumn get unitId => integer()();
+  TextColumn get reportDate => text()();
+  RealColumn get hmStart => real()();
+  RealColumn get hmEnd => real()();
+  TextColumn get operatorName => text().nullable()();
+  TextColumn get location => text().nullable()();
+  RealColumn get fuelLiters => real().nullable()();
+
+  @override
+  Set<Column<Object>> get primaryKey => {userSub, id};
+}
+
 /// Offline outbox (`POST /api/v1/sync/batch` items). `opUuid` = item `client_uuid` = idempotency key.
 class Outbox extends Table {
   TextColumn get opUuid => text()();
@@ -183,12 +331,29 @@ class KvEntries extends Table {
   Set<Column<Object>> get primaryKey => {key};
 }
 
-@DriftDatabase(tables: [LocalDrafts, LocalLines, LocalReceipts, MediaBlobs, Outbox, KvEntries, LocalProgressReports])
+@DriftDatabase(
+  tables: [
+    LocalDrafts,
+    LocalLines,
+    LocalReceipts,
+    MediaBlobs,
+    Outbox,
+    KvEntries,
+    LocalProgressReports,
+    // v5 (FR1 field reports)
+    LocalFieldReports,
+    FieldUnits,
+    FieldContractUnits,
+    FieldOpenPos,
+    FieldClients,
+    FieldRecentTimesheets,
+  ],
+)
 class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
 
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 5;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -206,6 +371,16 @@ class AppDatabase extends _$AppDatabase {
       }
       // v4 (2026-10-09): urgency level of a draft, nullable — existing drafts keep NULL ("not chosen").
       if (from < 4) await m.addColumn(localDrafts, localDrafts.urgencyLevelId);
+      // v5 (FR1, ADR 0020): field reports (drafts + queue) and their offline caches. Additive only: every
+      // existing table and row stays untouched.
+      if (from < 5) {
+        await m.createTable(localFieldReports);
+        await m.createTable(fieldUnits);
+        await m.createTable(fieldContractUnits);
+        await m.createTable(fieldOpenPos);
+        await m.createTable(fieldClients);
+        await m.createTable(fieldRecentTimesheets);
+      }
     },
     beforeOpen: (details) async {
       await customStatement('PRAGMA foreign_keys = ON');
