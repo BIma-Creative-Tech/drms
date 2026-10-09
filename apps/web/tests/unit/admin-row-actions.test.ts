@@ -8,6 +8,7 @@ import { companyFieldOf } from '@/admin/company-list'
 import { rupiahText } from '@/admin/components/RupiahCell'
 import { isRupiahField, RUPIAH_CELL } from '@/admin/display-cells'
 import { canOnRow, DOCUMENT_COLLECTIONS, ROW_ACTIONS_CELL, ROW_ACTIONS_FIELD, rowActionOf, whereMatches, withRowActions } from '@/admin/row-actions'
+import { actionGlyph } from '@/admin/views/viz'
 import { migrations } from '@/migrations'
 import { up } from '@/migrations/20261009_120000_list_row_actions_column'
 
@@ -154,5 +155,17 @@ describe('list display: Rupiah amounts and empty cells', () => {
 
   it('empty list cells read "—" (Indonesian noLabel override)', () => {
     expect((config.i18n.translations as { id?: { general?: { noLabel?: string } } }).id?.general?.noLabel).toBe('—')
+  })
+})
+
+describe('custom-view link actions read as buttons (viz Card / EmptyState / KpiTile)', () => {
+  it('edit-like labels lead with a pencil, create-like with a plus, the rest trail an arrow', () => {
+    expect(actionGlyph('Ubah')).toEqual({ icon: 'edit', lead: true })
+    expect(actionGlyph('Atur titik')).toEqual({ icon: 'edit', lead: true })
+    expect(actionGlyph('Atur jadwal')).toEqual({ icon: 'edit', lead: true })
+    expect(actionGlyph('Jadwal baru')).toEqual({ icon: 'add', lead: true })
+    expect(actionGlyph('Buat jadwal')).toEqual({ icon: 'add', lead: true })
+    expect(actionGlyph('Lihat semua')).toEqual({ icon: 'arrowRight', lead: false })
+    expect(actionGlyph('Daftar')).toEqual({ icon: 'arrowRight', lead: false })
   })
 })

@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed
+
+- Admin custom views: the remaining text links become buttons — card header actions ("Jadwal baru", "Lihat semua",
+  "Rekap Kas", …) and empty-state actions are small outlined buttons with an icon (pencil for Ubah/Atur, plus for
+  Buat/…baru, arrow for navigation); the hint of clickable stat tiles ("Ubah", "Atur titik", "Daftar", "Lihat
+  rincian") reads as a button and fills on hover/focus of the tile; "← Absensi", "Progress project →" and
+  "Audit Log →" links → buttons. No arrow characters in link text any more.
+
 ## [0.6.3] - 2026-10-09
 
 Admin CMS usability (PR #30): explicit row action buttons on every list, Rupiah amounts and "—" for empty cells in
