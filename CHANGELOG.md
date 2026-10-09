@@ -6,6 +6,50 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+
+- **Field reports per project kind — P1 backend** (ADR 0020, requirements v1.3 US-60…US-68; DRMS first, behind the
+  per-PT flag **`companies.fieldReportsEnabled`, default OFF**). Web views, the service PDF and the APK screens follow
+  (P1 web / P2 APK).
+  - **Project kind** `projects.kind` (`umum` default for every existing project, `konstruksi`, `kontrak_unit`,
+    `aftersales`, `trading`): decides the available reports (kontrak_unit → timesheet + service report; aftersales →
+    service report + aftersales log); set by the Direktur or the Admin of the PT (Admin: the kind only), frozen once
+    the project has field data; wrong kind → 409 `WRONG_PROJECT_KIND`.
+  - **Unit & Kendaraan** (`vehicles` extended): heavy equipment with a unit code (unique per PT), plate optional for
+    heavy equipment, serial no., owner own fleet / customer (+ client of the same PT), system fields status (from the
+    latest service report) and last hour meter.
+  - **Contract units** (`contract-units`): own unit in a kontrak_unit project for a period with rate per hour (+ monthly
+    minimum) or per month; never active in two overlapping contracts (hook + DB trigger); rates readable only by
+    Direktur / Finance / Admin.
+  - **Service reports** (`service-reports`, numbering `SV/YYMM/####`), **unit timesheets** (`unit-timesheets`, one per
+    unit and date, HM_GAP flag, HM photo) and **aftersales activity log** (`aftersales-activities`: quotation /
+    incoming PO / delivery / invoicing / visit; deliveries move the PO status; values hidden from Staff/PM). Created by
+    **Staff assigned to the project**, the PM of the team or the Direktur (manual progress reports stay PM/Direktur);
+    reporter edits ≤ 24 h, then PM/Direktur corrections with a reason (audited); no delete; immutability, cross-PT and
+    photo-limit guards in the DB. Side effects: unit status / last HM, in-app notification to the PM on "menunggu
+    part", daily reminder for due quotation follow-ups (rule `aftersales_followup`).
+  - API v1: `/service-reports`, `/unit-timesheets`, `/aftersales-activities` (list, detail, create, edit,
+    `/{id}/corrections`), `GET /aftersales/open-pos`, `GET /units`, `GET /projects/{id}/contract-units`; reports
+    `rekap-timesheet-kontrak` (hours, availability, **billing estimate — not an invoice**) and `rekap-aftersales`
+    (registry: screen, CSV, XLSX, PDF); `GET /me` capabilities `serviceReportCreate`, `unitTimesheetCreate`,
+    `aftersalesActivityCreate` + `settings.fieldReportsEnabled`; sync items `service_report.upsert`,
+    `unit_timesheet.upsert`, `aftersales_activity.upsert` (`server_service_report` / `server_unit_timesheet` /
+    `server_aftersales_activity`). Masters: `projects.kind`, unit fields on `vehicles`.
+  - Shared UoMs M, M1, M2, M3, KG, TON, SAK, ZAK, BTG, LBR, TITIK, BH, SET, ROLL, KALENG, BKS, OH, JAM, LTR, HM (only codes
+    that do not exist yet).
+  - Admin: collections under Proyek › "Laporan lapangan" (list views); Staff may upload photos to
+    `media-progress-photos` only in a PT with field reports on.
+  - Migrations (run as `<prefix>_owner`): `20261010_100000_fr1_foundation` (kind, unit fields, contract units, flag,
+    numbering enum value, UoMs), `20261010_110000_fr1_field_reports` (three tables, SV sequence for every PT),
+    `20261010_120000_fr1_security` (triggers: window/override, no delete, identity, cross-PT, project kind, contract
+    overlap, photo limits, media owner PT, reminder rule). Additive; existing rows keep their behaviour.
+  - Docs: ADR 0020, requirements v1.3 (open client questions Q-FR-1…6), traceability rows US-60…US-68.
+
+### Changed
+
+- Report cells of type `int` show up to 2 decimals when the value is not whole (hours / HM; CSV text `1.234,5`, XLSX
+  `#,##0.00`); whole numbers unchanged.
+
 ## [0.6.4] - 2026-10-09
 
 App renamed to **RR Teams** (web + Android, display name only) and the admin CMS follow-up (PR #32): the remaining
