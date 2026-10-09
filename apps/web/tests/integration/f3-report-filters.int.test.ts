@@ -245,6 +245,11 @@ function query(pairs: Array<[string, string]>): string {
 }
 
 describe('smoke matrix: every report × every filter (JSON) and every format with all filters', () => {
+  // FR1 recaps filter on projects of their kind (kontrak_unit / aftersales): one of each in the PM's team
+  beforeAll(async () => {
+    await sysCreate('projects', { code: 'FR-K1', name: 'FR Kontrak unit', kind: 'kontrak_unit', pm: w.users.pm.id, status: 'berjalan' })
+    await sysCreate('projects', { code: 'FR-A1', name: 'FR Aftersales', kind: 'aftersales', pm: w.users.pm.id, status: 'berjalan' })
+  })
   for (const def of ALL_REPORTS) {
     it(`${def.code}`, async () => {
       const users = [w.users.owner, ...(def.roles.includes('pk-pm') ? [w.users.pm] : [])]
