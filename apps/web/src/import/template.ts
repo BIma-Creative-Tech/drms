@@ -35,7 +35,7 @@ export function standardRows(): SheetRows {
 
 function petunjuk(sample: boolean): WriteSheet {
   const rows: WriteCell[][] = [
-    [{ v: sample ? 'CONTOH FIKTIF — Impor data go-live ProyekKas (DRMS)' : 'Template impor data go-live ProyekKas (DRMS)', s: 'title' }],
+    [{ v: sample ? 'CONTOH FIKTIF — Impor data go-live RR Teams (DRMS)' : 'Template impor data go-live RR Teams (DRMS)', s: 'title' }],
     [{ v: `Versi template ${TEMPLATE_VERSION}. ${sample ? 'SEMUA DATA DI FILE INI FIKTIF (untuk uji/latihan), bukan data klien.' : 'Diisi oleh klien, diperiksa oleh Lead sebelum impor.'}`, s: 'hint' }],
     [],
     [{ v: 'Cara mengisi', s: 'bold' }],

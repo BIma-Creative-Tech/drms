@@ -111,7 +111,7 @@ export async function Dashboard(props: AdminViewServerProps) {
           </div>
         </DashHead>
         {!layout ? (
-          <EmptyState text="Akun Anda belum punya peran ProyekKas. Hubungi Admin." />
+          <EmptyState text="Akun Anda belum punya peran RR Teams. Hubungi Admin." />
         ) : (
           <ChartHover>
             <Suspense fallback={<DashboardSkeleton />}>

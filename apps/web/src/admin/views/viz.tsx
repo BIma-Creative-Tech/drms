@@ -1,5 +1,8 @@
 import React from 'react'
 
+import { Icon as Glyph } from '@/admin/modules/Icon'
+import type { IconName } from '@/admin/modules/icons'
+
 import { niceMax, periodLabel, shortRupiah } from '@/domain/reports/rules'
 import type { PillTone } from '@/domain/reports/viz'
 import { formatRupiah } from '@/lib/money'
@@ -56,8 +59,8 @@ html[data-theme='dark'] .pk-f3 {
 .pk-f3 .pk-card-h { display: flex; align-items: baseline; justify-content: space-between; gap: 8px 12px; flex-wrap: wrap; margin: 0 0 12px; }
 .pk-f3 .pk-card-h h2 { margin: 0; font-size: 16px; line-height: 1.3; }
 .pk-f3 .pk-card-h .sub { display: block; margin-top: 2px; font-size: 12px; color: var(--pk-muted-fg); font-family: var(--font-body); letter-spacing: 0; font-weight: 400; }
-.pk-f3 .pk-card-h a { font-size: 12px; font-weight: 600; color: var(--pk-primary); text-decoration: none; white-space: nowrap; }
-.pk-f3 .pk-card-h a:hover { text-decoration: underline; }
+.pk-f3 .pk-card-h { align-items: center; }
+.pk-f3 .pk-card-h .pk-btn { flex: none; }
 .pk-f3 .pk-card-b { flex: 1; min-width: 0; }
 .pk-f3 .pk-card-f { margin: 12px 0 0; font-size: 12px; color: var(--pk-muted-fg); }
 /* stat tiles */
@@ -72,7 +75,11 @@ html[data-theme='dark'] .pk-f3 {
 .pk-f3 .pk-kpi-x b { color: var(--pk-fg); font-weight: 600; }
 .pk-f3 .pk-kpi a.pk-kpi-link { position: absolute; inset: 0; border-radius: inherit; }
 .pk-f3 .pk-kpi a.pk-kpi-link:focus-visible { outline: var(--accessibility-outline); outline-offset: 2px; }
-.pk-f3 .pk-kpi .pk-kpi-more { margin-top: auto; padding-top: 6px; font-size: 12px; font-weight: 600; color: var(--pk-primary); }
+/* the whole tile is the link (a.pk-kpi-link); its hint reads as a button, not as text */
+.pk-f3 .pk-kpi .pk-kpi-more { margin-top: auto; align-self: flex-start; display: inline-flex; align-items: center; gap: 6px; min-height: 30px; padding: 0 10px; border: 1px solid color-mix(in oklab, var(--pk-primary) 45%, var(--pk-input)); border-radius: var(--style-radius-m); background: color-mix(in oklab, var(--pk-primary) 8%, var(--pk-card)); font-size: 12px; font-weight: 600; color: var(--pk-primary-hover); white-space: nowrap; }
+.pk-f3 .pk-kpi .pk-kpi-more svg { flex: none; }
+.pk-f3 .pk-kpi:has(a.pk-kpi-link:hover) .pk-kpi-more { background: var(--pk-primary); border-color: var(--pk-primary); color: var(--pk-on-primary); }
+.pk-f3 .pk-kpi:has(a.pk-kpi-link:focus-visible) .pk-kpi-more { outline: 2px solid var(--pk-ring); outline-offset: 2px; }
 .pk-f3 .pk-delta { display: block; margin: 0; font-size: 12px; line-height: 1.45; font-weight: 600; color: var(--pk-muted-fg); }
 .pk-f3 .pk-delta > span:first-child { margin-right: 4px; font-size: 10px; }
 .pk-f3 .pk-delta.good { color: var(--pk-tone-ok-text); } .pk-f3 .pk-delta.bad { color: var(--pk-tone-bad-text); }
@@ -165,8 +172,8 @@ html[data-theme='dark'] .pk-f3 {
 .pk-f3 details.pk-tv[open] summary { margin-bottom: 6px; }
 /* empty state */
 .pk-f3 .pk-es { display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 6px; padding: 20px 12px; color: var(--pk-muted-fg); font-size: 13px; min-height: 96px; }
-.pk-f3 .pk-es svg { width: 28px; height: 28px; opacity: .7; }
-.pk-f3 .pk-es a { font-weight: 600; color: var(--pk-primary); }
+.pk-f3 .pk-es > svg { width: 28px; height: 28px; opacity: .7; }
+.pk-f3 .pk-es .pk-btn { margin-top: 4px; }
 /* tooltip */
 .pk-hover-root { position: relative; }
 .pk-f3 .pk-tip { position: absolute; z-index: 20; pointer-events: none; transform: translate(12px, -50%); min-width: 150px; max-width: 280px; padding: 8px 10px; border-radius: 8px; background: var(--pk-card); color: var(--pk-fg); border: 1px solid var(--pk-border); box-shadow: 0 8px 24px -6px rgb(15 23 42 / .25); font-size: 12px; }
@@ -244,6 +251,36 @@ export function KpiRow({ children, cols = 4 }: { children: React.ReactNode; cols
   return <div className={`pk-kpis c${cols}`}>{children}</div>
 }
 
+/**
+ * Glyph of a link action from its label: edit-like ("Ubah", "Atur titik") → pencil before the text,
+ * create-like ("Buat jadwal", "Jadwal baru") → plus before, anything else ("Lihat semua", "Daftar") → arrow after.
+ */
+export function actionGlyph(label: string): { icon: IconName; lead: boolean } {
+  if (/^(ubah|atur|edit|ganti|kelola)\b/i.test(label)) return { icon: 'edit', lead: true }
+  if (/^(buat|tambah)\b|\bbaru$/i.test(label)) return { icon: 'add', lead: true }
+  return { icon: 'arrowRight', lead: false }
+}
+
+function GlyphLabel({ label }: { label: string }) {
+  const g = actionGlyph(label)
+  return (
+    <>
+      {g.lead ? <Glyph name={g.icon} size={16} /> : null}
+      <span>{label}</span>
+      {g.lead ? null : <Glyph name={g.icon} size={16} />}
+    </>
+  )
+}
+
+/** Card / empty-state action: a small outlined button (.pk-btn.sm, f3-ui.tsx), never a bare text link. */
+export function ActionLink({ href, label }: { href: string; label: string }) {
+  return (
+    <a className="pk-btn sm" href={href} data-pk-card-action>
+      <GlyphLabel label={label} />
+    </a>
+  )
+}
+
 type Span = 3 | 4 | 5 | 6 | 7 | 8 | 12
 export function Card({ id, title, sub, span = 12, action, foot, i = 0, children }: { id: string; title: string; sub?: React.ReactNode; span?: Span; action?: { href: string; label: string }; foot?: React.ReactNode; i?: number; children: React.ReactNode }) {
   const hid = `pk-card-${id}`
@@ -254,7 +291,7 @@ export function Card({ id, title, sub, span = 12, action, foot, i = 0, children 
           {title}
           {sub ? <span className="sub">{sub}</span> : null}
         </h2>
-        {action ? <a href={action.href}>{action.label} →</a> : null}
+        {action ? <ActionLink href={action.href} label={action.label} /> : null}
       </div>
       <div className="pk-card-b">{children}</div>
       {foot ? <p className="pk-card-f">{foot}</p> : null}
@@ -267,7 +304,7 @@ export function EmptyState({ text, action }: { text: string; action?: { href: st
     <div className="pk-es" data-pk-empty>
       <Icon name="empty" />
       <span>{text}</span>
-      {action ? <a href={action.href}>{action.label}</a> : null}
+      {action ? <ActionLink href={action.href} label={action.label} /> : null}
     </div>
   )
 }
@@ -384,7 +421,7 @@ export function KpiTile({
       {href ? (
         <>
           <span className="pk-kpi-more" aria-hidden>
-            {more ?? 'Lihat rincian'} →
+            <GlyphLabel label={more ?? 'Lihat rincian'} />
           </span>
           <a className="pk-kpi-link" href={href} aria-label={`${label}: ${title ?? (typeof value === 'string' ? value : '')} — ${more ?? 'lihat rincian'}`} />
         </>

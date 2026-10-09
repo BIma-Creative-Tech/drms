@@ -73,8 +73,11 @@ export async function ReportsIndex(props: AdminViewServerProps) {
           </div>
         )}
         {hasRoleAny(req, ...AUDIT_REPORT.roles) ? (
-          <p>
-            <Link href="/admin/audit-log">Audit Log →</Link>
+          <p className="pk-actions">
+            <Link className="pk-btn sm" href="/admin/audit-log" data-pk-link="audit-log">
+              <span>Audit Log</span>
+              <Icon name="arrowRight" size={16} />
+            </Link>
           </p>
         ) : null}
       </F3Root>

@@ -7,6 +7,7 @@ import React from 'react'
 import { hasRoleAny, relId } from '@/access/roles'
 import { CorrectionDialog, DefaultSchedule, GeofenceForm, HolidayAdd, ScheduleAssign, SelfieButton, type Option } from '@/admin/components/absensi/AttendanceActions'
 import { KAS_STYLE } from '@/admin/components/kas/style'
+import { Icon as Glyph } from '@/admin/modules/Icon'
 import type { DayRecap, LocationDay, LocationRef, RecapSummary, TeamTodayRow } from '@/domain/attendance/aggregate'
 import { classCounts, classifyDay, DAY_CLASSES, LEGEND, minutesText, monthWeeks, offsetText, shiftMonth, type DayClass } from '@/domain/attendance/calendar'
 import { attendanceContext, attendanceScope, employeeRef, narrowAttScope, narrowAttToCompanies, type AttScope } from '@/domain/attendance/queries'
@@ -255,7 +256,10 @@ function Failed({ props, name, title, err, req }: { props: AdminViewServerProps;
         {status && status < 500 ? msg : 'Data tidak dapat dimuat. Coba lagi.'}
       </Alert>
       <p>
-        <Link href="/admin/absensi">← Absensi</Link>
+        <Link className="pk-kbtn sm" href="/admin/absensi" data-pk-back>
+          <Glyph name="arrowLeft" size={16} />
+          Absensi
+        </Link>
       </p>
     </Frame>
   )

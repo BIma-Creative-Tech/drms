@@ -62,7 +62,7 @@ function Row({ cells, columns, style }: { cells: string[]; columns: PdfColumn[];
 
 export function ReportPdf({ d }: { d: ReportPdfData }) {
   return (
-    <Document title={pdfSafe(d.title)} author={pdfSafe(d.kop[0] ?? '')} subject={d.subject ? pdfSafe(d.subject) : undefined} creator="ProyekKas" producer="ProyekKas">
+    <Document title={pdfSafe(d.title)} author={pdfSafe(d.kop[0] ?? '')} subject={d.subject ? pdfSafe(d.subject) : undefined} creator="RR Teams" producer="RR Teams">
       <Page size="A4" orientation="landscape" style={s.page}>
         <View style={s.kopRow}>
           {d.logo ? (

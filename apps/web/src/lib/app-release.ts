@@ -120,9 +120,9 @@ export async function releaseNotesFor(version: string | null, media: string = me
   return rel && rel.manifest.version === version && rel.manifest.notes?.length ? rel.manifest.notes : null
 }
 
-/** Stable, human-facing download name: `ProyekKas-0.2.0.apk`. */
+/** Stable, human-facing download name: `RR-Teams-0.2.0.apk`. */
 export function downloadName(m: ReleaseManifest): string {
-  return `ProyekKas-${m.version}.apk`
+  return `RR-Teams-${m.version}.apk`
 }
 
 /** "24,6 MB" (Indonesian decimal comma, 1 MB = 1 000 000 bytes like Android's file manager). */

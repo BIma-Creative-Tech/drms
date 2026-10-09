@@ -22,7 +22,7 @@ class LocationException implements Exception {
     LocationProblem.serviceDisabled => 'GPS/lokasi HP mati. Nyalakan lokasi lalu coba lagi.',
     LocationProblem.permissionDenied => 'Izin lokasi belum diberikan. Izinkan akses lokasi untuk absen.',
     LocationProblem.permissionDeniedForever =>
-      'Izin lokasi ditolak permanen. Buka Pengaturan HP → Aplikasi → ProyekKas → Izin → Lokasi.',
+      'Izin lokasi ditolak permanen. Buka Pengaturan HP → Aplikasi → RR Teams → Izin → Lokasi.',
     LocationProblem.timeout => 'Sinyal GPS lemah. Pindah ke tempat terbuka lalu coba lagi.',
     LocationProblem.unavailable => 'Lokasi tidak bisa dibaca. Coba lagi.',
   };

@@ -46,7 +46,7 @@ describe('S-04 notifications: submit / withdraw / on behalf + approval email', (
 
   it('approval email: doc number + step + inbox link, no amount / requester names', () => {
     const m = approvalEmail(doc('pending_ack') as never, 'expense.pending_ack', 'https://kas.example.test/')
-    expect(m.subject).toBe('ProyekKas — Menunggu keputusan Anda: 001/PB-DRMS/IX/2026')
+    expect(m.subject).toBe('RR Teams — Menunggu keputusan Anda: 001/PB-DRMS/IX/2026')
     expect(m.text).toContain('menunggu persetujuan Anda sebagai Direktur (Diketahui)')
     expect(m.text).toContain('https://kas.example.test/admin/persetujuan')
     expect(m.text).not.toMatch(/Rp|1\.447\.500|BBM/)

@@ -8,8 +8,8 @@ import { DownloadView } from './DownloadView'
 export const dynamic = 'force-dynamic'
 
 export const metadata: Metadata = {
-  title: 'Unduh ProyekKas',
-  description: 'Unduh aplikasi Android ProyekKas untuk karyawan PT DRMS.',
+  title: 'Unduh RR Teams',
+  description: 'Unduh aplikasi Android RR Teams untuk karyawan PT DRMS.',
 }
 
 /** GET /unduh — public (no login), see DownloadView and src/lib/app-release.ts. */

@@ -41,7 +41,7 @@ export function keycloakFollowUpLines(r: Pick<ImportReport, 'mode' | 'committed'
   const on = rows.filter((x) => x.action === 'enable').map((x) => x.username)
   const done = r.mode === 'commit' && r.committed
   const verb = done ? 'dinonaktifkan' : 'akan dinonaktifkan'
-  const out = ['', `PERINGATAN KEYCLOAK (realm drms) — impor TIDAK mengubah Keycloak; perangkat & sesi web ProyekKas sudah dicabut, tetapi akun & sesi Keycloak belum:`]
+  const out = ['', `PERINGATAN KEYCLOAK (realm drms) — impor TIDAK mengubah Keycloak; perangkat & sesi web RR Teams sudah dicabut, tetapi akun & sesi Keycloak belum:`]
   if (off.length > 0) out.push(`  ${off.length} pengguna ${verb} → WAJIB disable + logout di Keycloak (runbook import-data-golive §Langkah Keycloak): ${off.join(', ')}`)
   if (on.length > 0) out.push(`  ${on.length} pengguna ${done ? 'diaktifkan kembali' : 'akan diaktifkan kembali'} → enable di Keycloak bila akunnya nonaktif: ${on.join(', ')}`)
   return out

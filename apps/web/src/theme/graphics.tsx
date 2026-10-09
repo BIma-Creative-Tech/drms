@@ -10,7 +10,7 @@ import { semantic } from './tokens'
  * because Payload also renders `Icon` into its OG image route (@payloadcms/next rest/og, satori).
  * Server components, no client JS.
  */
-export const BRAND_NAME = 'ProyekKas'
+export const BRAND_NAME = 'RR Teams'
 export const BRAND_PRODUCT = 'DRMS'
 
 const { primary, primaryForeground, accent } = semantic.light
@@ -41,7 +41,7 @@ function Mark({ size, label }: { size: number | string; label?: string }) {
 
 /** Step-nav/home icon. Payload's home link has no text of its own → the mark carries the name. */
 export function Icon() {
-  return <Mark size="100%" label={`${BRAND_NAME} ${BRAND_PRODUCT} — Semua modul`} />
+  return <Mark size="100%" label={`${BRAND_NAME} — Semua modul`} />
 }
 
 /** Login page brand block. */
@@ -51,7 +51,6 @@ export function Logo() {
       <Mark size={44} />
       <span className="pk-logo__text">
         <span className="pk-logo__name">{BRAND_NAME}</span>
-        <span className="pk-logo__product">{BRAND_PRODUCT}</span>
       </span>
     </div>
   )
