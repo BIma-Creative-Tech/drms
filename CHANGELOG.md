@@ -6,6 +6,26 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.6.3] - 2026-10-09
+
+Admin CMS usability (PR #30): explicit row action buttons on every list, Rupiah amounts and "—" for empty cells in
+lists, one button system in the custom views. Web only; APK unchanged (mobile-v0.3.4 works with it).
+
+### Changed
+
+- Admin lists: every Payload list view gets an **"Aksi"** column with a labelled button per row — **Ubah** (pencil,
+  tinted) when the user may edit that row (per PT / own draft), **Buka** for workflow documents (requests, cash entries, transfers,
+  settlements, receipts, addenda, progress reports, attendance), otherwise **Lihat**. Before, the linked first column
+  (plain text) was the only way to open a record. The column stays pinned to the right edge while a wide table
+  scrolls sideways (390 px); 32 px targets (44 px on touch), theme focus ring, contrast ≥ 4.5:1 text / ≥ 3:1 border in
+  light and dark. Accessible name = action + row title ("Ubah Proyek Jembatan").
+- Custom views: "Ubah" text links → the same button (Absensi › Jadwal: hari libur and, new, jadwal kerja); report
+  "Daftar laporan" / paging links → buttons. One button system: `.pk-btn` (reports, Akses PT, Keamanan akun) now has
+  the `.pk-kbtn` box (38 px, `.sm` 32 px, 44 px on touch, focus ring) and both get a ≥ 3:1 border.
+
+**Database migrations**: `20261009_120000_list_row_actions_column` (data only, idempotent: appends the "Aksi"
+column to saved list-column preferences that never named it; no schema change).
+
 ## [0.6.2] - 2026-10-09
 
 Fixes from the QA report 2026-10-08 (staging, tested 6–7 Oct; 31 tickets — status per ticket in

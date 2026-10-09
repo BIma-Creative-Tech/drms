@@ -3,6 +3,7 @@ import Link from 'next/link'
 import React from 'react'
 
 import { hasRoleAny } from '@/access/roles'
+import { Icon } from '@/admin/modules/Icon'
 import { writeAudit } from '@/audit/writer'
 import { exportLetterhead, PDF_MAX_ROWS } from '@/domain/reports/export'
 import { reportContext } from '@/domain/reports/kpi'
@@ -141,8 +142,11 @@ async function ReportPage({ props, def, scope, base }: { props: AdminViewServerP
     <Shell props={props} title={def.code === 'audit-log' ? 'Audit Log' : `Laporan › ${def.title}`}>
       <F3Root name={`laporan-${def.code}`}>
         {def.code === 'audit-log' ? null : (
-          <p>
-            <Link href="/admin/laporan">← Daftar laporan</Link>
+          <p className="pk-actions">
+            <Link className="pk-btn sm" href="/admin/laporan" data-pk-link="daftar-laporan">
+              <Icon name="arrowLeft" size={16} />
+              Daftar laporan
+            </Link>
           </p>
         )}
         {body}
@@ -211,9 +215,13 @@ function ReportBody({
           <ReportTable t={res.main} id={`${def.code}-main`} />
           {def.paged ? (
             <p className="pk-actions">
-              {cursor ? <a href={`${base}${q ? `?${q}` : ''}`}>« Halaman pertama</a> : null}
+              {cursor ? (
+                <a className="pk-btn sm" href={`${base}${q ? `?${q}` : ''}`} rel="first" data-pk-action="first-page">
+                  « Halaman pertama
+                </a>
+              ) : null}
               {res.next ? (
-                <a href={`${base}?${new URLSearchParams([...filterSp.entries(), ['cursor', res.next]]).toString()}`} data-pk-action="next-page">
+                <a className="pk-btn sm" href={`${base}?${new URLSearchParams([...filterSp.entries(), ['cursor', res.next]]).toString()}`} rel="next" data-pk-action="next-page">
                   Berikutnya ›
                 </a>
               ) : null}
