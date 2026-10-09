@@ -27,8 +27,7 @@ export type DraftInput = {
   projectId?: number | null
   costCenterId?: number | null
   neededDate?: string | null
-  periodFrom?: string | null
-  periodTo?: string | null
+  urgencyLevelId?: number | null
   notes?: string | null
   requesterIds?: number[]
   bankAccountId?: number | null
@@ -123,8 +122,7 @@ export async function validateContent(
     bankAccountId?: number | null
     lines: LineInputApi[]
     neededDate?: string | null
-    periodFrom?: string | null
-    periodTo?: string | null
+    urgencyLevelId?: number | null
   },
   opts: { forSubmit: boolean; creatorId: number; callerSetsRequesters?: boolean },
 ): Promise<void> {
@@ -137,10 +135,7 @@ export async function validateContent(
   if (c.projectId && c.costCenterId) errors.push({ path: 'projectId', message: 'Pilih project ATAU pusat biaya, tidak keduanya.' })
   if (opts.forSubmit && !c.projectId && !c.costCenterId) errors.push({ path: 'projectId', message: 'Project atau pusat biaya wajib diisi.' })
   if (opts.forSubmit && !(c.title ?? '').trim()) errors.push({ path: 'title', message: 'Judul wajib diisi.' })
-  for (const f of ['neededDate', 'periodFrom', 'periodTo'] as const) {
-    if (c[f] && !isBusinessDate(c[f])) errors.push({ path: f, message: 'Tanggal harus YYYY-MM-DD.' })
-  }
-  if (c.periodFrom && c.periodTo && c.periodFrom > c.periodTo) errors.push({ path: 'periodTo', message: 'Periode selesai sebelum periode mulai.' })
+  if (c.neededDate && !isBusinessDate(c.neededDate)) errors.push({ path: 'neededDate', message: 'Tanggal harus YYYY-MM-DD.' })
 
   // G10: project / cost center in the caller's scope (office roles: any active one).
   if (c.projectId) {
@@ -153,6 +148,15 @@ export async function validateContent(
     const cc = await req.payload.findByID({ collection: 'cost-centers', id: c.costCenterId, depth: 0, overrideAccess: true /* SYSTEM-READ: scope check */, req }).catch(() => null)
     if (!cc || cc.active === false || isForeign(req, relId(cc.company) ?? -1)) errors.push({ path: 'costCenterId', message: 'Pusat biaya tidak ditemukan atau nonaktif.' })
     else if (!office && !(await scope()).assignedCostCenters.includes(c.costCenterId)) fail(403, 'Pusat biaya di luar penugasan Anda.')
+  }
+
+  // Owner decision 2026-10-09: "Tingkat Urgensi" (per-PT master) replaces the activity period of Q-04.
+  if (c.urgencyLevelId) {
+    const u = await req.payload.findByID({ collection: 'urgency-levels', id: c.urgencyLevelId, depth: 0, overrideAccess: true /* SYSTEM-READ: master check */, req }).catch(() => null)
+    const uPt = relId(u?.company) ?? -1
+    if (!u || u.active === false || isForeign(req, uPt) || (company !== undefined && uPt !== company)) {
+      errors.push({ path: 'urgencyLevelId', message: 'Tingkat urgensi tidak ditemukan atau nonaktif.' })
+    }
   }
 
   // Requesters (US-40): ≥ 1 active employee; Staff/PM only for themselves (Q-09 default).
@@ -320,8 +324,7 @@ export async function createDraft(req: PayloadRequest, input: DraftInput & { typ
       project: input.projectId ?? null,
       costCenter: input.costCenterId ?? null,
       neededDate: input.neededDate ?? null,
-      periodFrom: input.periodFrom ?? null,
-      periodTo: input.periodTo ?? null,
+      urgencyLevel: input.urgencyLevelId ?? null,
       notes: input.notes ?? null,
       requesters: requesterIds,
       bankAccount: input.bankAccountId ?? null,
@@ -358,8 +361,7 @@ export async function updateDraft(req: PayloadRequest, id: number, input: DraftI
     bankAccountId: input.bankAccountId !== undefined ? input.bankAccountId : (relId(doc.bankAccount) ?? null),
     lines: input.lines ?? fromDocLines(doc),
     neededDate: input.neededDate !== undefined ? input.neededDate : doc.neededDate,
-    periodFrom: input.periodFrom !== undefined ? input.periodFrom : doc.periodFrom,
-    periodTo: input.periodTo !== undefined ? input.periodTo : doc.periodTo,
+    urgencyLevelId: input.urgencyLevelId !== undefined ? input.urgencyLevelId : (relId(doc.urgencyLevel) ?? null),
   }
   await validateContent(req, current, { forSubmit: false, creatorId: relId(doc.createdBy) ?? -1, callerSetsRequesters: input.requesterIds !== undefined && input.requesterIds.join(',') !== ids(doc.requesters).join(',') })
   const data: Record<string, unknown> = {}
@@ -368,8 +370,7 @@ export async function updateDraft(req: PayloadRequest, id: number, input: DraftI
   if (input.projectId !== undefined) data.project = input.projectId
   if (input.costCenterId !== undefined) data.costCenter = input.costCenterId
   if (input.neededDate !== undefined) data.neededDate = input.neededDate
-  if (input.periodFrom !== undefined) data.periodFrom = input.periodFrom
-  if (input.periodTo !== undefined) data.periodTo = input.periodTo
+  if (input.urgencyLevelId !== undefined) data.urgencyLevel = input.urgencyLevelId
   if (input.notes !== undefined) data.notes = input.notes
   if (input.requesterIds !== undefined) data.requesters = input.requesterIds
   if (input.bankAccountId !== undefined) data.bankAccount = input.bankAccountId
@@ -406,8 +407,7 @@ export async function resubmitAsDraft(req: PayloadRequest, id: number): Promise<
       project: relId(src.project) ?? null,
       costCenter: relId(src.costCenter) ?? null,
       neededDate: src.neededDate ?? null,
-      periodFrom: src.periodFrom ?? null,
-      periodTo: src.periodTo ?? null,
+      urgencyLevel: relId(src.urgencyLevel) ?? null,
       notes: src.notes ?? null,
       requesters: ids(src.requesters),
       bankAccount: relId(src.bankAccount) ?? null,

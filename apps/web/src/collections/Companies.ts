@@ -5,7 +5,7 @@ import { companiesWithRole, denyAll, isGroupAdmin, memberCompanies, relId } from
 import { reasonOnDeactivate, withAudit } from '@/audit/hooks'
 import { percentField, rupiahField, uuidField } from '@/fields/common'
 import { SELFIE_RETENTION_DEFAULT_MONTHS } from '@/domain/attendance/retention-policy'
-import { copyCompanyDefaults, ensureSystemCashInSources, SKIP_COMPANY_DEFAULTS } from '@/domain/company-defaults'
+import { copyCompanyDefaults, ensureDefaultUrgencyLevels, ensureSystemCashInSources, SKIP_COMPANY_DEFAULTS } from '@/domain/company-defaults'
 import { DEFAULT_TZ, isValidTimeZone } from '@/lib/time'
 
 const intField = (name: string, label: string, def: number, min: number, max: number) => ({
@@ -76,9 +76,11 @@ const copyDefaultsOnCreate: CollectionAfterChangeHook = async ({ doc, operation,
   if (choice && !choice.enabled) {
     // QA-11: even a bare PT gets the system cash-in source "Pengembalian LPJ" (the LPJ refund needs it)
     await ensureSystemCashInSources(req, doc.id as number)
+    await ensureDefaultUrgencyLevels(req, doc.id as number)
     return doc
   }
   await copyCompanyDefaults(req, doc.id as number, { from: choice?.from ?? null })
+  await ensureDefaultUrgencyLevels(req, doc.id as number)
   return doc
 }
 

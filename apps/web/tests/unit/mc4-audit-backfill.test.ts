@@ -3,6 +3,9 @@ import { beforeAll, describe, expect, it } from 'vitest'
 
 import { PER_PT_DOC_TYPES } from '@/audit/writer'
 import { PER_PT_TABLES } from '@/migrations/20260927_234849_mc1_company_columns'
+
+/** Per-PT tables created after MC1 with company_id NOT NULL from the start (their own migrations). */
+const PER_PT_TABLES_AFTER_MC1 = ['urgency_levels'] // 20261010_090000_p2s_urgency_level
 import { BY_DOC_NO, BY_ID } from '@/migrations/20261003_090000_mc4_audit_company_backfill'
 
 /**
@@ -47,7 +50,7 @@ describe('UAT MC4-04: PT tag of audit rows for every per-PT doc type', () => {
 
   it('every company_id table of the map is a per-PT table of MC1 (or the membership table)', () => {
     for (const [d, [table, column]] of Object.entries(PER_PT_DOC_TYPES)) {
-      if (column === 'company_id') expect([...PER_PT_TABLES, 'company_memberships'], d).toContain(table)
+      if (column === 'company_id') expect([...PER_PT_TABLES, 'company_memberships', ...PER_PT_TABLES_AFTER_MC1], d).toContain(table)
     }
   })
 
@@ -58,7 +61,9 @@ describe('UAT MC4-04: PT tag of audit rows for every per-PT doc type', () => {
   })
 
   it('the migration uses the same docType → table mapping as the writer (frozen copy)', () => {
-    expect(BY_ID).toEqual(PER_PT_DOC_TYPES)
+    // doc types of collections created after the backfill have no historic untagged rows
+    const AFTER_BACKFILL = ['urgency_level'] // 20261010_090000_p2s_urgency_level
+    expect(BY_ID).toEqual(Object.fromEntries(Object.entries(PER_PT_DOC_TYPES).filter(([d]) => !AFTER_BACKFILL.includes(d))))
   })
 
   it('the doc-number fallback only names per-PT number columns', () => {

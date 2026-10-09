@@ -49,6 +49,7 @@ import { StageTemplates } from './collections/StageTemplates'
 import { TeamAssignments } from './collections/TeamAssignments'
 import { Transfers } from './collections/Transfers'
 import { Uoms } from './collections/Uoms'
+import { UrgencyLevels } from './collections/UrgencyLevels'
 import { Users } from './collections/Users'
 import { Vehicles } from './collections/Vehicles'
 import { Vendors } from './collections/Vendors'
@@ -96,6 +97,7 @@ export const MASTER_COLLECTIONS = [
   ApprovalRules,
   NotificationTemplates,
   Uoms,
+  UrgencyLevels,
   Vehicles,
   CostCenters,
   DocumentSequences,

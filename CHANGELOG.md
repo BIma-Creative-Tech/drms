@@ -6,8 +6,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
-Owner decisions 2026-10-09 (roles, web attendance, LPJ for Staff). Migration `20261010_080000_p2s_operator_role`
-(adds the enum value `pk-operator`; additive, no data change).
+Owner decisions 2026-10-09 (roles, web attendance, LPJ for Staff, urgency level). Migrations
+`20261010_080000_p2s_operator_role` (enum value `pk-operator`; additive) and `20261010_090000_p2s_urgency_level`
+(**drops `expense_requests.period_from/period_to`** — values are not kept; rollback = restore the pre-deploy dump).
+
+### Removed
+
+- **"Periode kegiatan"** (periodFrom/periodTo) on expense requests and the receipt flag "di luar periode kegiatan"
+  (historic flags stay readable). Older apps may still send `periodFrom/periodTo` (REST) or `period_from/period_to`
+  (sync) — accepted and ignored.
+
+### Added (urgency)
+
+- **"Tingkat urgensi"** on expense requests: per-PT master *Master Data → Tingkat urgensi* (`urgency-levels`;
+  code, name, rank 1 = lowest, active), configurable by Admin/Direktur/Finance; every PT starts with Low / Medium /
+  High / Super (existing PTs by the migration, new PTs on creation). API: `urgencyLevelId` (REST draft),
+  `urgency_level_id` (sync draft + server copy), `urgencyLevel {id, code, name, rank}` in the request detail,
+  master type `urgency-levels` for the APK. Same-PT reference enforced by the DB trigger.
 
 ### Added
 

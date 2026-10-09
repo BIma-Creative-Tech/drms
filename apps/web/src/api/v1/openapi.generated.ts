@@ -1114,17 +1114,39 @@ export const openapiDocument = {
           "costCenter": {
             "$ref": "#/components/schemas/Ref"
           },
-          "periodFrom": {
+          "urgencyLevel": {
             "type": [
-              "string",
+              "object",
               "null"
-            ]
-          },
-          "periodTo": {
-            "type": [
-              "string",
-              "null"
-            ]
+            ],
+            "properties": {
+              "id": {
+                "type": "integer",
+                "exclusiveMinimum": 0
+              },
+              "code": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "name": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "rank": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "id"
+            ],
+            "description": "\"Tingkat urgensi\" (owner decision 2026-10-09; replaces periodFrom/periodTo)."
           },
           "notes": {
             "type": [
@@ -2010,8 +2032,7 @@ export const openapiDocument = {
           "uuid",
           "project",
           "costCenter",
-          "periodFrom",
-          "periodTo",
+          "urgencyLevel",
           "notes",
           "requesters",
           "createdBy",
@@ -2462,19 +2483,29 @@ export const openapiDocument = {
             ],
             "pattern": "^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$"
           },
+          "urgencyLevelId": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "exclusiveMinimum": 0,
+            "description": "urgency-levels id of the request PT (\"Tingkat urgensi\", owner decision 2026-10-09)."
+          },
           "periodFrom": {
             "type": [
               "string",
               "null"
             ],
-            "pattern": "^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$"
+            "pattern": "^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$",
+            "description": "Ignored since 2026-10-09: \"Periode kegiatan\" was replaced by the urgency level. Still accepted so older apps keep working."
           },
           "periodTo": {
             "type": [
               "string",
               "null"
             ],
-            "pattern": "^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$"
+            "pattern": "^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$",
+            "description": "Ignored since 2026-10-09: \"Periode kegiatan\" was replaced by the urgency level. Still accepted so older apps keep working."
           },
           "notes": {
             "type": [
@@ -2628,19 +2659,29 @@ export const openapiDocument = {
             ],
             "pattern": "^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$"
           },
+          "urgencyLevelId": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "exclusiveMinimum": 0,
+            "description": "urgency-levels id of the request PT (\"Tingkat urgensi\", owner decision 2026-10-09)."
+          },
           "periodFrom": {
             "type": [
               "string",
               "null"
             ],
-            "pattern": "^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$"
+            "pattern": "^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$",
+            "description": "Ignored since 2026-10-09: \"Periode kegiatan\" was replaced by the urgency level. Still accepted so older apps keep working."
           },
           "periodTo": {
             "type": [
               "string",
               "null"
             ],
-            "pattern": "^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$"
+            "pattern": "^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$",
+            "description": "Ignored since 2026-10-09: \"Periode kegiatan\" was replaced by the urgency level. Still accepted so older apps keep working."
           },
           "notes": {
             "type": [
@@ -4809,17 +4850,12 @@ export const openapiDocument = {
               "null"
             ]
           },
-          "period_from": {
+          "urgency_level_id": {
             "type": [
-              "string",
+              "integer",
               "null"
-            ]
-          },
-          "period_to": {
-            "type": [
-              "string",
-              "null"
-            ]
+            ],
+            "exclusiveMinimum": 0
           },
           "notes": {
             "type": [
@@ -5021,8 +5057,7 @@ export const openapiDocument = {
           "project_id",
           "cost_center_id",
           "needed_date",
-          "period_from",
-          "period_to",
+          "urgency_level_id",
           "notes",
           "requester_ids",
           "bank_account_id",
@@ -5363,19 +5398,29 @@ export const openapiDocument = {
             ],
             "pattern": "^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$"
           },
+          "urgency_level_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "exclusiveMinimum": 0,
+            "description": "urgency-levels id of the request PT (owner decision 2026-10-09)."
+          },
           "period_from": {
             "type": [
               "string",
               "null"
             ],
-            "pattern": "^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$"
+            "pattern": "^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$",
+            "description": "Ignored since 2026-10-09: \"Periode kegiatan\" was replaced by the urgency level. Still accepted so older apps keep working."
           },
           "period_to": {
             "type": [
               "string",
               "null"
             ],
-            "pattern": "^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$"
+            "pattern": "^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$",
+            "description": "Ignored since 2026-10-09: \"Periode kegiatan\" was replaced by the urgency level. Still accepted so older apps keep working."
           },
           "notes": {
             "type": [
@@ -8609,10 +8654,10 @@ export const openapiDocument = {
             "schema": {
               "type": "string",
               "pattern": "^[a-z-]+(,[a-z-]+)*$",
-              "description": "Comma separated subset of: projects, project-stages, cost-centers, expense-categories, uoms, vehicles, employees, banks, bank-accounts, work-schedules, holidays, team-assignments, vendors, cash-in-sources. Default: all."
+              "description": "Comma separated subset of: projects, project-stages, cost-centers, expense-categories, uoms, vehicles, employees, banks, bank-accounts, work-schedules, holidays, team-assignments, vendors, cash-in-sources, urgency-levels. Default: all."
             },
             "required": false,
-            "description": "Comma separated subset of: projects, project-stages, cost-centers, expense-categories, uoms, vehicles, employees, banks, bank-accounts, work-schedules, holidays, team-assignments, vendors, cash-in-sources. Default: all.",
+            "description": "Comma separated subset of: projects, project-stages, cost-centers, expense-categories, uoms, vehicles, employees, banks, bank-accounts, work-schedules, holidays, team-assignments, vendors, cash-in-sources, urgency-levels. Default: all.",
             "name": "types",
             "in": "query"
           },

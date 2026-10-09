@@ -206,7 +206,7 @@ export const MODULES: readonly ModuleDef[] = [
     icon: 'master',
     hint: 'Bank, satuan, vendor',
     manage: true,
-    sections: [{ items: [{ collection: 'banks' }, { collection: 'uoms' }, { collection: 'expense-categories' }, { collection: 'vehicles' }, { collection: 'vendors' }] }],
+    sections: [{ items: [{ collection: 'banks' }, { collection: 'uoms' }, { collection: 'expense-categories' }, { collection: 'urgency-levels' }, { collection: 'vehicles' }, { collection: 'vendors' }] }],
   },
   {
     id: 'media',

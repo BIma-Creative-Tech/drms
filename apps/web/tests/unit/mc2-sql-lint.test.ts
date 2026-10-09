@@ -23,6 +23,7 @@ const PER_PT_TABLES = [
   'cash_in_sources', 'work_schedules', 'media_selfies',
   // QA-MC4-13: the per-PT tables the lint did not know
   'approvals', 'budget_addenda', 'project_stages', 'attendance_corrections', 'employee_bank_accounts', 'company_memberships', 'document_sequence_counters',
+  'urgency_levels',
 ]
 /** Company helpers (they build `company_id IN (<bound ids>)` from the caller's scope) — a CALL, not a mention. */
 const HELPER_CALL = /\b(?:requestScopeSql|cashScopeSql|ledgerScopeSql|projectScopeSql|costCenterScopeSql|masterScopeSql|companyScopeSql|locationScopeSql|employeeCompanySql|candidateWhere|ptSql)\(/

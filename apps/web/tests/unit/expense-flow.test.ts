@@ -147,11 +147,11 @@ describe('receipt flags (US-47…US-50) — form 228 expectations', () => {
     expect(computeFlags({ ...base, tolerance: 0 }).find((f) => f.kind === 'amount_diff')).toMatchObject({ level: 'warning' })
   })
 
-  it('old receipts, activity period, Uang Muka transfer date, duplicates', () => {
+  it('old receipts, Uang Muka transfer date, duplicates; no activity-period flag any more', () => {
     const f1 = computeFlags({ ...base, receipts: [{ id: 9, lineId: 'L2', receiptDate: '2026-08-01', amount: 170_500 }] })
     expect(f1.map((f) => f.kind)).toContain('date_too_old')
-    const f2 = computeFlags({ ...base, periodFrom: '2026-09-20', periodTo: '2026-09-20' })
-    expect(f2.filter((f) => f.kind === 'date_out_of_period').map((f) => f.receiptId).sort()).toEqual([1, 3])
+    // owner decision 2026-10-09: "Periode kegiatan" replaced by "Tingkat urgensi" → date_out_of_period is never raised
+    expect(computeFlags(base).filter((f) => f.kind === 'date_out_of_period')).toEqual([])
     const f3 = computeFlags({ ...base, type: 'advance', transferDate: '2026-10-30' })
     expect(f3.filter((f) => f.kind === 'date_too_old')).toHaveLength(3)
     expect(f3.filter((f) => f.kind === 'date_after_request')).toHaveLength(0)
