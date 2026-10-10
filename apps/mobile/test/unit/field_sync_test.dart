@@ -13,6 +13,7 @@ import 'package:proyekkas/features/field_reports/application/field_service.dart'
 import 'package:proyekkas/features/field_reports/data/field_api.dart';
 import 'package:proyekkas/features/field_reports/data/field_repository.dart';
 import 'package:proyekkas/features/field_reports/domain/field_models.dart';
+import 'package:proyekkas/features/masters/data/masters_repository.dart';
 import 'package:proyekkas/features/sync/application/sync_engine.dart';
 import 'package:proyekkas/features/sync/data/outbox_repository.dart';
 import 'package:proyekkas/features/sync/data/sync_api.dart';
@@ -106,6 +107,7 @@ void main() {
         clock: clock,
         compressor: compressor,
         lock: lock,
+        masters: MastersRepository(client, db),
       );
       engine = SyncEngine(
         outbox: outbox,
@@ -500,9 +502,36 @@ void main() {
           FieldProject(id: 41, label: 'K-001', kind: ProjectKind.kontrakUnit, companyId: 3),
           FieldProject(id: 52, label: 'AS-2026', kind: ProjectKind.aftersales, companyId: 3),
         ];
-        expect(await service.refreshCaches(sub, projects, today: today), isTrue);
+        String? masterTypes;
+        server.on('GET', '/api/v1/masters', (req, body) {
+          masterTypes = req.uri.queryParameters['types'];
+          return (
+            200,
+            {
+              'serverTime': '2026-10-09T06:00:00Z',
+              'companies': [
+                {'id': 3, 'code': 'DRMS', 'defaultGeofenceRadiusM': 100, 'version': 'v1'},
+              ],
+              'sharedVersion': 's1',
+              'types': {
+                'clients': {
+                  'items': [
+                    {'id': 4, 'name': 'CV Maju Jaya', 'company': 3, 'active': true},
+                    {'id': 8, 'name': 'PT Pelanggan Baru', 'company': 3, 'active': true},
+                    {'id': 9, 'name': 'CV Nonaktif', 'company': 3, 'active': false},
+                  ],
+                  'hasMore': false,
+                },
+              },
+            },
+          );
+        });
+        // a customer cached earlier that the master no longer lists (deactivated) is dropped
+        await repo.putClients(sub, const [FieldClient(id: 9, companyId: 3, name: 'CV Nonaktif')]);
+        expect(await service.refreshCaches(sub, projects, today: today, membershipIds: [3]), isTrue);
+        expect(masterTypes, contains('clients'));
         expect(since, isNull);
-        await service.refreshCaches(sub, projects, today: today);
+        await service.refreshCaches(sub, projects, today: today, membershipIds: [3]);
         expect(since, '2026-10-09T06:00:00Z', reason: 'second pull is a delta');
         expect((await repo.contractUnits(sub, 41)).single.unitId, 9);
         final cols = await db.customSelect('PRAGMA table_info(field_contract_units)').get();
@@ -510,7 +539,12 @@ void main() {
         final poCols = await db.customSelect('PRAGMA table_info(field_open_pos)').get();
         expect(poCols.map((c) => c.read<String>('name')), isNot(contains('value')));
         expect((await repo.openPos(sub, projectId: 52)).single.docNo, 'PO-0907');
-        expect((await repo.clients(sub, companyId: 3)).map((c) => c.name), ['CV Maju Jaya', 'PT Sumber Tambang']);
+        // master `clients` (incl. a customer without any unit / PO yet) + names seen in open POs as merge source
+        expect((await repo.clients(sub, companyId: 3)).map((c) => c.name), [
+          'CV Maju Jaya',
+          'PT Pelanggan Baru',
+          'PT Sumber Tambang',
+        ]);
         final marks = await repo.timesheetMarks(sub, unitIds: [9]);
         expect(marks.single.hmEnd, 1023);
         final st = await service.timesheetStart(sub, projectId: 41, unitId: 9, date: today);

@@ -420,6 +420,13 @@ class FieldRepository {
     }
   });
 
+  /// The customers of PT [companyId] become exactly [clients] (the `clients` master of that PT merged with the
+  /// names seen in units / POs / activities); customers no longer listed (deactivated) are dropped.
+  Future<void> replaceClients(String sub, int companyId, Iterable<FieldClient> clients) => db.transaction(() async {
+    await (db.delete(db.fieldClients)..where((t) => t.userSub.equals(sub) & t.companyId.equals(companyId))).go();
+    await putClients(sub, clients);
+  });
+
   Future<List<FieldClient>> clients(String sub, {int? companyId}) async {
     final q = db.select(db.fieldClients)..where((t) => t.userSub.equals(sub));
     if (companyId != null) q.where((t) => t.companyId.equals(companyId));

@@ -4378,7 +4378,7 @@ abstract class AppLocalizations {
   /// No description provided for @fieldNoCustomers.
   ///
   /// In id, this message translates to:
-  /// **'Belum ada daftar pelanggan di HP. Buka saat online; pelanggan diambil dari unit, PO dan aktivitas project ini.'**
+  /// **'Belum ada daftar pelanggan di HP. Buka saat online untuk memuat daftar pelanggan PT (perlu ditugaskan ke project aftersales).'**
   String get fieldNoCustomers;
 
   /// No description provided for @fieldActivityKind.

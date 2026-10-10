@@ -1574,7 +1574,7 @@
   "fieldActivityEdit": "Ubah aktivitas",
   "fieldNoAftersalesProjects": "Tidak ada project aftersales untuk Anda.",
   "fieldCustomer": "Pelanggan",
-  "fieldNoCustomers": "Belum ada daftar pelanggan di HP. Buka saat online; pelanggan diambil dari unit, PO dan aktivitas project ini.",
+  "fieldNoCustomers": "Belum ada daftar pelanggan di HP. Buka saat online untuk memuat daftar pelanggan PT (perlu ditugaskan ke project aftersales).",
   "fieldActivityKind": "Jenis aktivitas",
   "fieldForPo": "Untuk PO (PO terbuka pelanggan ini)",
   "fieldNoOpenPos": "Tidak ada PO terbuka untuk pelanggan ini.",

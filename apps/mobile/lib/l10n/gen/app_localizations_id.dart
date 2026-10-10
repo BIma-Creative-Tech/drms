@@ -2406,7 +2406,7 @@ class AppLocalizationsId extends AppLocalizations {
 
   @override
   String get fieldNoCustomers =>
-      'Belum ada daftar pelanggan di HP. Buka saat online; pelanggan diambil dari unit, PO dan aktivitas project ini.';
+      'Belum ada daftar pelanggan di HP. Buka saat online untuk memuat daftar pelanggan PT (perlu ditugaskan ke project aftersales).';
 
   @override
   String get fieldActivityKind => 'Jenis aktivitas';

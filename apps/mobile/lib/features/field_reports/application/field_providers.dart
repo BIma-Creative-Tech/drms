@@ -22,6 +22,7 @@ final fieldServiceProvider = Provider(
     clock: ref.watch(deviceClockProvider),
     compressor: ref.watch(photoCompressorProvider),
     lock: ref.watch(syncLockProvider),
+    masters: ref.watch(mastersRepositoryProvider),
   ),
 );
 
@@ -86,7 +87,12 @@ final fieldCacheRefreshProvider = FutureProvider.autoDispose<bool>((ref) async {
   if (sub == null || !ref.watch(connectivityProvider)) return false;
   final projects = await ref.watch(fieldProjectsProvider.future);
   if (projects.isEmpty) return true;
-  final ok = await ref.read(fieldServiceProvider).refreshCaches(sub, projects, today: ref.read(fieldTodayProvider));
+  // Every membership PT (not only the field PTs): the masters index of the phone covers all of them.
+  final ids = ref.read(accountProfileProvider)?.companies.map((c) => c.id).toList();
+  final ok = await ref
+      .read(fieldServiceProvider)
+      .refreshCaches(sub, projects, today: ref.read(fieldTodayProvider), membershipIds: ids);
+  // Not mastersRevision: fieldProjectsProvider watches it and this provider watches the projects (loop).
   if (ok && ref.mounted) ref.read(fieldCacheRevisionProvider.notifier).bump();
   return ok;
 });

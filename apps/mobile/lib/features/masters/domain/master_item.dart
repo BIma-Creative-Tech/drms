@@ -44,8 +44,13 @@ abstract final class MasterTypes {
     urgencyLevels,
   ];
 
-  /// Everything the APK caches (expense pickers + E4 stages + E6 team assignments for on-behalf offline).
-  static const forApp = [...forExpense, projectStages, teamAssignments];
+  /// Everything the APK caches (expense pickers + E4 stages + E6 team assignments for on-behalf offline + FR1
+  /// customers).
+  /// FR1: customers of the PT for the aftersales activity picker (server ≥ 0.7; Staff get rows only when
+  /// assigned to an aftersales project of the PT).
+  static const clients = 'clients';
+
+  static const forApp = [...forExpense, projectStages, teamAssignments, clients];
 }
 
 /// Label per type (codes + names; bank accounts masked to the last 4 digits for display).
@@ -66,6 +71,7 @@ MasterItem masterFromJson(String type, Map<String, dynamic> j, {Map<int, String>
     }(),
     MasterTypes.projectStages => s('name'),
     MasterTypes.urgencyLevels => s('name'),
+    MasterTypes.clients => s('name'),
     MasterTypes.teamAssignments => '#$id',
     MasterTypes.employees => s('nickname').isNotEmpty ? '${s('name')} (${s('nickname')})' : s('name'),
     _ => s('code').isNotEmpty ? '${s('code')} — ${s('name')}' : s('name'),

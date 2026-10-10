@@ -9,6 +9,8 @@ import '../../../core/network/api_exception.dart';
 import '../../../core/time/device_clock.dart';
 import '../../../core/util/async_lock.dart';
 import '../../expense/data/draft_repository.dart';
+import '../../masters/data/masters_repository.dart';
+import '../../masters/domain/master_item.dart';
 import '../../sync/data/outbox_repository.dart';
 import '../data/field_api.dart';
 import '../data/field_repository.dart';
@@ -30,6 +32,7 @@ class FieldService {
     required this.clock,
     required this.compressor,
     required this.lock,
+    this.masters,
   });
 
   final FieldRepository repo;
@@ -39,6 +42,9 @@ class FieldService {
   final DeviceClock clock;
   final PhotoCompressor compressor;
   final AsyncLock lock;
+
+  /// Masters cache (per PT, ETag / version): source of the `clients` customer list.
+  final MastersRepository? masters;
 
   /// Rear-camera photo → JPEG ≤ 1600 px / ≤ 400 KB, EXIF dropped (ADR 0010 decision 11), stored encrypted.
   Future<String> addPhoto(String sub, Uint8List raw) async {
@@ -182,10 +188,19 @@ class FieldService {
   });
 
   /// Refreshes the offline caches of the user's field projects: units (delta), contract units (no rates),
-  /// recent timesheets (HM prefill), open POs (no value) and customers seen in units / POs / activities.
-  /// A project the server refuses (403/404) is skipped. Returns false when offline.
-  Future<bool> refreshCaches(String sub, List<FieldProject> projects, {required String today}) async {
+  /// recent timesheets (HM prefill), open POs (no value) and the customers of the aftersales picker. Customers
+  /// come from the `clients` master of each PT (refreshed here with the other masters of [membershipIds], per PT
+  /// with ETag / version like every master); customers seen in units / POs / activities are only merged in (they
+  /// are the whole list when the PT's master has none, e.g. a server without the type). A project the server
+  /// refuses (403/404/409) is skipped. Returns false when offline.
+  Future<bool> refreshCaches(
+    String sub,
+    List<FieldProject> projects, {
+    required String today,
+    List<int>? membershipIds,
+  }) async {
     final from = addDays(today, -(fieldBackdateMaxDays + 1));
+    final seen = <FieldClient>[];
     try {
       for (final p in projects) {
         try {
@@ -194,7 +209,7 @@ class FieldService {
           await repo.putUnits(sub, u.units);
           if (u.serverTime != null) await repo.setUnitsSince(sub, p.id, u.serverTime!);
           final company = p.companyId ?? u.units.firstOrNull?.companyId ?? 0;
-          await repo.putClients(sub, [
+          seen.addAll([
             for (final x in u.units)
               if (x.clientId != null) FieldClient(id: x.clientId!, companyId: x.companyId, name: x.clientName ?? ''),
           ]);
@@ -219,7 +234,7 @@ class FieldService {
               limit: 100,
               allCompanies: true,
             );
-            await repo.putClients(sub, [
+            seen.addAll([
               for (final po in pos) FieldClient(id: po.clientId, companyId: po.companyId, name: po.clientName),
               for (final a in acts.items)
                 if (a.clientId != null)
@@ -230,9 +245,52 @@ class FieldService {
           if (e.status != 403 && e.status != 404 && e.status != 409) rethrow;
         }
       }
+      await _refreshClients(sub, projects, seen, membershipIds);
       return true;
     } on NetworkException {
       return false;
+    }
+  }
+
+  /// `clients` master per PT of the aftersales projects → field_clients (master names win; the names seen in
+  /// units / POs / activities are merged in). Without master rows for a PT the seen names are only added.
+  Future<void> _refreshClients(
+    String sub,
+    List<FieldProject> projects,
+    List<FieldClient> seen,
+    List<int>? membershipIds,
+  ) async {
+    final m = masters;
+    final pts = {
+      for (final p in projects)
+        if (p.kind == ProjectKind.aftersales && p.companyId != null) p.companyId!,
+    };
+    if (m == null || pts.isEmpty) {
+      await repo.putClients(sub, seen);
+      return;
+    }
+    try {
+      await m.refresh(sub, companyIds: membershipIds);
+    } on ProblemException {
+      // masters refused (e.g. 403 of one PT): the cached list is used as it is
+    }
+    final byPt = <int, List<FieldClient>>{};
+    for (final c in (await m.cached(sub, companyIds: pts))[MasterTypes.clients] ?? const <MasterItem>[]) {
+      final pt = c.companyId;
+      if (pt == null) continue;
+      byPt.putIfAbsent(pt, () => []).add(FieldClient(id: c.id, companyId: pt, name: fStr(c.extra['name'])));
+    }
+    final others = [
+      for (final c in seen)
+        if (!byPt.containsKey(c.companyId)) c,
+    ];
+    await repo.putClients(sub, others);
+    for (final MapEntry(key: pt, value: list) in byPt.entries) {
+      await repo.replaceClients(sub, pt, [
+        for (final c in seen)
+          if (c.companyId == pt) c,
+        ...list,
+      ]);
     }
   }
 }
