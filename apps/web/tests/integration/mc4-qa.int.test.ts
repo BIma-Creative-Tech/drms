@@ -8,7 +8,7 @@ import { resetRateLimits } from '@/lib/rate-limit'
 import { DEFAULT_SEED_DATA } from '@/seed/data'
 import { seed } from '@/seed/seed'
 
-import { api, makeFlowUser, sysCreate, type FlowUser, type Res } from './flow-world'
+import { adr0013Fallback, api, makeFlowUser, sysCreate, type FlowUser, type Res } from './flow-world'
 import { addMembership, companyId, getTestPayload, installFakeKeycloak, makeUser, sqlAs, type TestUser } from './helpers'
 
 /**
@@ -68,6 +68,7 @@ beforeAll(async () => {
   })
   A = await companyId()
   B = await companyId('CQA')
+  await adr0013Fallback([A, B])
   await p.update({ collection: 'companies', id: B, data: { active: true, changeReason: 'uji MC4 QA' } as never, overrideAccess: true /* SYSTEM-WRITE: fixture */ })
   const inPt = async (company: number, collection: CollectionSlug, code: string) =>
     (await p.find({ collection, where: { and: [{ company: { equals: company } }, { code: { equals: code } }] }, limit: 1, depth: 0, overrideAccess: true /* SYSTEM-READ: fixture */ })).docs[0]!.id as number

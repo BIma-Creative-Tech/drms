@@ -1,6 +1,9 @@
 /**
  * ADR 0013 (accepted 2026-09-26, GATE 1 G1-1/G1-2): "Diketahui" is an APPROVAL by the Direktur
  * (= the existing role `pk-owner`, relabelled), followed by Finance approval; the PM only monitors.
+ * ADR 0021 (owner 2026-10-10) supersedes the decision part for expense requests: "Diketahui" may be
+ * given by the PM project (`acknowledgeBy: scope_manager` = `projects.pm`, else `cost-centers.manager`)
+ * followed by the Direktur; Finance only transfers. Budget addenda stay Direktur → Finance.
  * Pure module (unit-tested): rule validation shared by the `approval-rules` hook and the submit
  * check, and the submit-time position plan (who may decide each position, which positions are
  * skipped because their only holders are requester/creator).
@@ -33,17 +36,31 @@ export const SKIPPED_LABEL = '(tidak berlaku — pemohon)'
 
 type RuleShape = Pick<RuleInput, 'acknowledge' | 'acknowledgeBy' | 'acknowledgeRole' | 'acknowledgeUser' | 'steps'>
 
+/** ADR 0021: G1 exception of a Direktur's request filed by the PM project (snapshot / DB column value). */
+export const DIREKTUR_VIA_PM = 'direktur_via_pm' as const
+export type SelfApproval = typeof DIREKTUR_VIA_PM
+
+/** Printed in the PDF / shown in the panel when the snapshot carries the ADR 0021 G1 exception. */
+export const DIREKTUR_VIA_PM_NOTE = 'Pengajuan Direktur — diajukan oleh PM (kebijakan owner 2026-10-10)'
+
+/** Label of the ADR 0021 "Diketahui" filler (rule form, panel). */
+export const SCOPE_MANAGER_LABEL = 'PM project (manajer pusat biaya bila tanpa project)'
+
 /**
- * Why a rule may not be used under ADR 0013 (null = valid). `rolesOfUser` returns the roles of a
- * named user (acknowledgeUser / approverUser); only Direktur/Finance holders may be named.
+ * Why a rule may not be used (null = valid). `rolesOfUser` returns the roles of a named user
+ * (acknowledgeUser / approverUser); only Direktur/Finance holders may be named. ADR 0021: the PM
+ * project (`scope_manager`) may fill a REQUIRED "Diketahui" of an expense-request rule only.
  */
-export function ruleDecisionError(rule: RuleShape, rolesOfUser: (id: number) => readonly Role[] | undefined): string | null {
+export function ruleDecisionError(rule: RuleShape, rolesOfUser: (id: number) => readonly Role[] | undefined, docType: string = 'expense_request'): string | null {
   const label = (r: Role) => ROLE_LABELS[r]
   const allowed = `${label('pk-owner')} atau ${label('pk-finance')}`
   if (rule.acknowledge !== 'none') {
     const by = rule.acknowledgeBy ?? 'scope_manager'
     if (by === 'scope_manager') {
-      return `Pengisi "Diketahui Oleh" = PM project / penanggung jawab pusat biaya tidak dipakai lagi (ADR 0013: PM hanya memantau). Pilih peran ${label('pk-owner')} atau user tertentu.`
+      if (docType !== 'expense_request') {
+        return `Pengisi "Diketahui Oleh" = PM project hanya untuk aturan Pengajuan biaya (ADR 0021). Addendum RAB tetap ${label('pk-owner')} lalu ${label('pk-finance')}.`
+      }
+      if (rule.acknowledge !== 'required') return `"Diketahui" oleh PM project adalah persetujuan dan tidak boleh opsional (ADR 0021). Pilih "Wajib".`
     }
     if (by === 'role') {
       if (!rule.acknowledgeRole) return 'Pilih peran "Diketahui Oleh".'
@@ -81,13 +98,21 @@ export type PlanInput = {
   rule: RuleShape
   /** Requesters' accounts + creator (G1, Q-08). */
   excluded: ReadonlySet<number>
+  /**
+   * ADR 0021 G1 exception (`direktur_via_pm`): the accounts excluded from the "Diketahui" position
+   * (requesters only — the creator PM may approve as PM project) and from the approval steps
+   * (creator only — the requester Direktur may approve). Default: `excluded` for both.
+   */
+  ackExcluded?: ReadonlySet<number>
+  stepExcluded?: ReadonlySet<number>
   /** Active holders of the "Diketahui" position: role holders, or [the named user]. */
   ackHolders: readonly number[]
   /** Active holders per rule step, in the rule's level order (named user → [user]). */
   stepHolders: ReadonlyArray<readonly number[]>
 }
 
-const skipReason = (role: Role | null) => (role ? `pemohon/pembuat adalah satu-satunya ${ROLE_LABELS[role]}` : 'user yang ditetapkan adalah pemohon/pembuat')
+const skipReason = (role: Role | null, scopeManager = false) =>
+  role ? `pemohon/pembuat adalah satu-satunya ${ROLE_LABELS[role]}` : scopeManager ? 'PM project adalah pemohon/pembuat' : 'user yang ditetapkan adalah pemohon/pembuat'
 
 /**
  * G1-2 position plan (ADR 0013 decision 5). For every decision position (required "Diketahui" +
@@ -102,14 +127,18 @@ export function planPositions(input: PlanInput): { ok: true; plan: PositionPlan 
   const { rule, excluded } = input
   const skipped: SkippedPosition[] = []
   const pools: number[][] = []
+  const ackExcluded = input.ackExcluded ?? excluded
+  const stepExcluded = input.stepExcluded ?? excluded
+  const scopeManager = rule.acknowledgeBy === 'scope_manager'
   const ackRole = rule.acknowledgeBy === 'role' ? (rule.acknowledgeRole ?? null) : null
-  const ackUser = rule.acknowledgeBy === 'user' ? (rule.acknowledgeUser ?? null) : null
+  // ADR 0021: the PM project resolved at submit is the only holder of a scope_manager "Diketahui".
+  const ackUser = rule.acknowledgeBy === 'user' ? (rule.acknowledgeUser ?? null) : scopeManager ? (input.ackHolders[0] ?? null) : null
   let ackRequired = false
   if (rule.acknowledge === 'required') {
     const holders = [...new Set(input.ackHolders)]
     if (holders.length === 0) return { ok: false, error: noHolder('"Diketahui Oleh"', ackRole) }
-    const eligible = holders.filter((u) => !excluded.has(u))
-    if (eligible.length === 0) skipped.push({ position: 'diketahui', level: 0, role: ackRole, userId: ackUser, reason: skipReason(ackRole) })
+    const eligible = holders.filter((u) => !ackExcluded.has(u))
+    if (eligible.length === 0) skipped.push({ position: 'diketahui', level: 0, role: ackRole, userId: ackUser, reason: skipReason(ackRole, scopeManager) })
     else {
       ackRequired = true
       pools.push(eligible)
@@ -121,7 +150,7 @@ export function planPositions(input: PlanInput): { ok: true; plan: PositionPlan 
     const holders = [...new Set(input.stepHolders[i] ?? [])]
     const role = s.approverUser ? null : (s.approverRole ?? null)
     if (holders.length === 0) return { ok: false, error: noHolder(`Approval level ${s.level}`, role) }
-    const eligible = holders.filter((u) => !excluded.has(u))
+    const eligible = holders.filter((u) => !stepExcluded.has(u))
     if (eligible.length === 0) {
       skipped.push({ position: 'approval', level: s.level, role, userId: s.approverUser ?? null, reason: skipReason(role) })
       continue
@@ -133,7 +162,7 @@ export function planPositions(input: PlanInput): { ok: true; plan: PositionPlan 
     return {
       ok: false,
       error:
-        'Tidak ada pihak independen yang dapat memutuskan: pemohon/pembuat adalah satu-satunya pemegang semua posisi keputusan (Direktur dan Finance) (ADR 0013, G1). Hubungi Admin.',
+        'Tidak ada pihak independen yang dapat memutuskan: pemohon/pembuat adalah satu-satunya pemegang semua posisi keputusan (ADR 0013, G1). Hubungi Admin.',
     }
   }
   if (!distinctAssignable(pools)) {
@@ -170,7 +199,10 @@ export function isDecisionSnapshot(s: Pick<ApprovalSnapshot, 'decisionRoles'> | 
   return !!s?.decisionRoles && s.decisionRoles.length > 0
 }
 
-/** Caller lacks every decision role of an ADR 0013 snapshot (PM / Staff / Admin → refused + audited). */
+/**
+ * Caller lacks every decision role of an ADR 0013 snapshot (PM / Staff / Admin → refused + audited).
+ * ADR 0021: callers combine this with "is the PM acknowledger of this document" (`actorContext`).
+ */
 export function lacksDecisionRole(s: Pick<ApprovalSnapshot, 'decisionRoles'> | null | undefined, roles: readonly Role[]): boolean {
   if (!isDecisionSnapshot(s)) return false
   return !roles.some((r) => s!.decisionRoles!.includes(r))

@@ -126,6 +126,13 @@ export type ActorContext = {
    * neither (PM monitors only). Absent/false on legacy snapshots.
    */
   lacksDecisionRole?: boolean
+  /**
+   * ADR 0021 narrow G1 exception (`direktur_via_pm`): this caller's own involvement does not block the
+   * decision of the CURRENT step (creator PM at "Diketahui", requester Direktur at the approval step).
+   */
+  selfApprovalAllowed?: boolean
+  /** ADR 0021: the snapshot is of the PM project → Direktur model (messages only). */
+  pmFlow?: boolean
 }
 
 /** Actions that do not move the status (their own status preconditions are checked in allowedActions). */
@@ -158,7 +165,7 @@ export function allowedActions(ctx: ActorContext): Action[] {
       ? own && !ctx.hasDecision
       : office(ctx),
   )
-  const decider = !selfInvolved && !ctx.alreadyDecided && !ctx.lacksDecisionRole
+  const decider = (!selfInvolved || !!ctx.selfApprovalAllowed) && !ctx.alreadyDecided && !ctx.lacksDecisionRole
   add('acknowledge', ctx.isAcknowledger && decider)
   add('approve', ctx.matchesCurrentStep && decider)
   add('reject', decider && (ctx.status === 'pending_ack' ? ctx.isAcknowledger : ctx.matchesCurrentStep))
@@ -217,8 +224,9 @@ export function mayPerform(ctx: ActorContext, action: Action): boolean {
     case 'acknowledge':
     case 'approve':
     case 'reject':
-      // G1 / Q-08: never on one's own request; ADR 0013: only Direktur/Finance decide.
-      return !own && !ctx.lacksDecisionRole
+      // G1 / Q-08: never on one's own request (ADR 0021: except the narrow `direktur_via_pm` case);
+      // ADR 0013/0021: only Direktur/Finance, or the PM project acknowledger of THIS request, decide.
+      return (!own || !!ctx.selfApprovalAllowed) && !ctx.lacksDecisionRole
     case 'transfer':
     case 'transfer_void':
       return finance

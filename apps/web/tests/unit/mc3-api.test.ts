@@ -22,7 +22,8 @@ describe('MC3 — /me deprecated single-PT fields (released APK)', () => {
   it('capabilities per role set (same rule for the legacy union and for each PT)', () => {
     const noField = { serviceReportCreate: false, unitTimesheetCreate: false, aftersalesActivityCreate: false }
     expect(capabilitiesOf(['pk-staff'])).toEqual({ approvalInbox: false, teamMonitor: false, progressReportCreate: false, ...noField })
-    expect(capabilitiesOf(['pk-pm'])).toEqual({ approvalInbox: false, teamMonitor: true, progressReportCreate: true, ...noField })
+    // ADR 0021: the PM project approves its requests first → approval inbox
+    expect(capabilitiesOf(['pk-pm'])).toEqual({ approvalInbox: true, teamMonitor: true, progressReportCreate: true, ...noField })
     expect(capabilitiesOf(['pk-owner'])).toEqual({ approvalInbox: true, teamMonitor: false, progressReportCreate: true, ...noField })
     expect(capabilitiesOf(['pk-finance', 'pk-admin'])).toEqual({ approvalInbox: true, teamMonitor: false, progressReportCreate: false, ...noField })
     // FR1 (ADR 0020 §2): with the PT flag on, Staff / PM / Direktur may create field reports; Finance / Admin not

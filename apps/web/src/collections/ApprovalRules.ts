@@ -4,7 +4,7 @@ import { ROLES, ROLE_LABELS, denyAll, relId, type Role } from '@/access/roles'
 import { contextCompanyId, rolesOfUsersIn } from '@/domain/companies'
 import { byRole, rolesAllowed } from '@/access/policies'
 import { reasonOnAnyUpdate, withAudit } from '@/audit/hooks'
-import { isDecisionRole, ruleDecisionError } from '@/domain/expense/decision'
+import { isDecisionRole, ruleDecisionError, SCOPE_MANAGER_LABEL } from '@/domain/expense/decision'
 import { stepsError, type AckBy, type AckMode } from '@/domain/expense/rules'
 import { activeField, rupiahField } from '@/fields/common'
 import { companyField, companyHook } from '@/fields/company'
@@ -21,6 +21,7 @@ const decisionRoleOptions = ({ options }: { options: Option[] }): Option[] => op
  * SNAPSHOTTED on the request at submit — later rule changes never affect submitted requests).
  * Every change requires a reason (requirements §8). Admin C/R/U, Owner R/U, Finance R.
  * ADR 0013 (E1): decision positions only for Direktur (`pk-owner`) / Finance — see `ruleDecisionError`.
+ * ADR 0021: an expense-request rule may name the PM project for a required "Diketahui".
  */
 export const ApprovalRules: CollectionConfig = withAudit(
   {
@@ -52,8 +53,8 @@ export const ApprovalRules: CollectionConfig = withAudit(
           }
           const err = stepsError(steps)
           if (err) throw new APIError(err, 400, null, true)
-          // ADR 0013 (E1): "Diketahui" = Direktur approval, then Finance; PM/Staff never decide,
-          // "PM project / penanggung jawab" (scope_manager) is retired, Direktur is never optional.
+          // ADR 0013 (E1): "Diketahui" = Direktur approval, then Finance; Staff never decide, Direktur is
+          // never optional. ADR 0021: "PM project" (scope_manager) again for expense-request rules (required).
           const rule = {
             acknowledge: (data.acknowledge ?? originalDoc?.acknowledge ?? 'required') as AckMode,
             acknowledgeBy: (data.acknowledgeBy ?? originalDoc?.acknowledgeBy ?? 'role') as AckBy,
@@ -68,7 +69,7 @@ export const ApprovalRules: CollectionConfig = withAudit(
             const company = relId(data.company ?? originalDoc?.company) ?? (await contextCompanyId(req))
             for (const [id, v] of await rolesOfUsersIn(req, named, company)) roles.set(id, v.roles)
           }
-          const decisionErr = ruleDecisionError(rule, (id) => roles.get(id))
+          const decisionErr = ruleDecisionError(rule, (id) => roles.get(id), docType)
           if (decisionErr) throw new APIError(decisionErr, 400, null, true)
           return data
         },
@@ -109,7 +110,7 @@ export const ApprovalRules: CollectionConfig = withAudit(
       {
         name: 'acknowledge',
         type: 'select',
-        label: 'Diketahui Oleh (persetujuan Direktur)',
+        label: 'Diketahui Oleh (persetujuan pertama: PM project atau Direktur)',
         required: true,
         defaultValue: 'required',
         options: [
@@ -124,14 +125,15 @@ export const ApprovalRules: CollectionConfig = withAudit(
         label: 'Pengisi "Diketahui Oleh"',
         required: true,
         defaultValue: 'role',
-        // `scope_manager` stays in the enum so snapshots/rules saved before ADR 0013 remain readable;
-        // it can no longer be chosen (hook: 400).
+        // ADR 0021 (owner 2026-10-10): "PM project" = projects.pm of the request's project (cost center:
+        // its manager), resolved at submit; expense-request rules only, "Wajib" only (hook: 400).
         options: [
-          { label: 'PM project / penanggung jawab pusat biaya (tidak dipakai lagi — ADR 0013)', value: 'scope_manager' },
+          { label: SCOPE_MANAGER_LABEL, value: 'scope_manager' },
           { label: 'Peran tertentu', value: 'role' },
           { label: 'User tertentu', value: 'user' },
         ],
-        filterOptions: ({ options }) => options.filter((o) => (typeof o === 'string' ? o : o.value) !== 'scope_manager'),
+        filterOptions: ({ options, data }) =>
+          (data as { docType?: string } | undefined)?.docType === 'budget_addendum' ? options.filter((o) => (typeof o === 'string' ? o : o.value) !== 'scope_manager') : options,
       },
       { name: 'acknowledgeRole', type: 'select', label: 'Peran "Diketahui Oleh"', defaultValue: 'pk-owner', options: roleOptions, filterOptions: decisionRoleOptions },
       // QA-16: decision users of the rule's PT only (ADR 0013: Direktur / Finance), shown by name

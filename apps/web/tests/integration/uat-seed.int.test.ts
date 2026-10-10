@@ -1,7 +1,8 @@
 import { randomUUID } from 'node:crypto'
 
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it, onTestFinished } from 'vitest'
 
+import { DEFAULT_APPROVAL_RULES } from '@/seed/data'
 import { seed } from '@/seed/seed'
 import { parseUatUsers, seedUat, UAT_FIXTURE, type UatReport } from '@/seed/uat-seed'
 
@@ -11,7 +12,8 @@ import { api, uploadMedia, type FlowUser } from './flow-world'
 /**
  * UAT seed (src/seed/uat.ts): creates users/employees/bank account/project/assignments on top of
  * the base seed, never overwrites a real OPS-PB manager, is a no-op on re-run, and leaves staging
- * ready for a Staff request on OPS-PB whose "Diketahui" is the Direktur's approval (ADR 0013), then Finance.
+ * ready for a Staff request on OPS-PB under the seeded default rule (ADR 0021): "Diketahui" = the PM project
+ * (the cost center's manager, PM Uji), then the Direktur; Finance only transfers.
  * Fictional ".test" accounts with random Keycloak ids (no Keycloak call is made).
  */
 const USERS = parseUatUsers(
@@ -116,7 +118,7 @@ describe('UAT seed', () => {
     await expect(seedUat(p, clash)).rejects.toThrow(/email already belongs to another account/)
   })
 
-  it('Staff Uji can submit a request on OPS-PB; Direktur Uji approves ("Diketahui"), PM Uji cannot (ADR 0013), Finance Uji approves', async () => {
+  it('Staff Uji can submit a request on OPS-PB; PM Uji approves (Persetujuan PM), then Direktur Uji (ADR 0021); Finance Uji does not approve', async () => {
     const asFlow = async (email: string): Promise<FlowUser> => {
       const u = await one('users', 'email', email)
       const f = { ...(await withContext({ id: u.id as number, email, keycloakSub: '', collection: 'users' as const })), cookie: '', _strategy: 'oidcSession' } as FlowUser
@@ -133,6 +135,20 @@ describe('UAT seed', () => {
     const account = await one('employee-bank-accounts', 'accountNo', '9990001112223')
     const ksm = await one('expense-categories', 'code', 'KSM')
     const E = '/api/v1/expense-requests'
+    // ADR 0021: the staging rule after the Admin's change (= the seeded default shape), scoped to OPS-PB so that
+    // rules other files leave in the shared DB (ADR 0013 fallbacks, form 228) cannot win.
+    const p = await getTestPayload()
+    const seeded = (await p.find({ collection: 'approval-rules', where: { name: { equals: DEFAULT_APPROVAL_RULES[0].name } }, limit: 1, depth: 0, overrideAccess: true /* SYSTEM-READ: fixture */ })).docs[0]
+    expect(seeded).toMatchObject({ acknowledge: 'required', acknowledgeBy: 'scope_manager' })
+    const uatRule = await p.create({
+      collection: 'approval-rules',
+      data: { ...DEFAULT_APPROVAL_RULES[0], steps: [...DEFAULT_APPROVAL_RULES[0].steps], name: 'UAT — PM project lalu Direktur (OPS-PB)', costCenter: ccId, priority: 0 } as never,
+      overrideAccess: true, // SYSTEM-WRITE: fixture
+    })
+    onTestFinished(async () => {
+      // shared DB: other files (form 228) use OPS-PB with their own rule
+      await p.update({ collection: 'approval-rules', id: uatRule.id, data: { active: false, changeReason: 'uji selesai' } as never, overrideAccess: true /* SYSTEM-WRITE: fixture cleanup */ })
+    })
     const c = await api('POST', E, staff, {
       type: 'advance',
       title: 'Uji konsumsi lapangan',
@@ -145,12 +161,13 @@ describe('UAT seed', () => {
     expect(c.status, JSON.stringify(c.body)).toBe(201)
     const s = await api('POST', `${E}/${c.body.id}/submit`, staff, {})
     expect(s.status, JSON.stringify(s.body)).toBe(200)
-    expect(s.body).toMatchObject({ status: 'pending_ack', approvalRule: { acknowledgeRole: 'pk-owner' } })
-    expect((await api('POST', `${E}/${c.body.id}/acknowledge`, pm, {})).status).toBe(403)
-    const ack = await api('POST', `${E}/${c.body.id}/acknowledge`, direktur, {})
+    expect(s.body).toMatchObject({ status: 'pending_ack', statusLabel: 'Menunggu persetujuan PM', approvalRule: { acknowledgeBy: 'scope_manager', acknowledgerUserId: pm.id } })
+    expect((await api('POST', `${E}/${c.body.id}/acknowledge`, direktur, {})).status).toBe(403)
+    const ack = await api('POST', `${E}/${c.body.id}/acknowledge`, pm, {})
     expect(ack.status, JSON.stringify(ack.body)).toBe(200)
-    expect(ack.body.status).toBe('pending_approval')
-    const ok = await api('POST', `${E}/${c.body.id}/approve`, finance, {})
+    expect(ack.body).toMatchObject({ status: 'pending_approval', statusLabel: 'Menunggu persetujuan Direktur' })
+    expect((await api('POST', `${E}/${c.body.id}/approve`, finance, {})).status).toBe(403)
+    const ok = await api('POST', `${E}/${c.body.id}/approve`, direktur, {})
     expect(ok.status, JSON.stringify(ok.body)).toBe(200)
     expect(ok.body.status).toBe('approved')
   })

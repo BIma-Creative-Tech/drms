@@ -87,7 +87,7 @@ describe('S-01 PM monitoring dashboard (US-17)', () => {
     let d = await must(api('GET', '/api/v1/dashboard/pm', w.users.pm))
     expect(d.waitingForMe).toBe(0)
     expect(d.teamWaiting.items.find((x: { id: number }) => x.id === c.id)).toMatchObject({ waitingFor: 'direktur', status: 'pending_ack', days: 0 })
-    expect(d.teamWaiting.count).toBe(d.teamWaiting.direktur + d.teamWaiting.finance)
+    expect(d.teamWaiting.count).toBe(d.teamWaiting.pm + d.teamWaiting.direktur + d.teamWaiting.finance)
     await must(api('POST', `${E}/${c.id}/acknowledge`, w.users.owner, {}))
     d = await must(api('GET', '/api/v1/dashboard/pm', w.users.pm))
     expect(d.teamWaiting.items.find((x: { id: number }) => x.id === c.id)).toMatchObject({ waitingFor: 'finance' })

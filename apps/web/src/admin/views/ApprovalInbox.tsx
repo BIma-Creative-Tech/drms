@@ -1,6 +1,7 @@
 import type { AdminViewServerProps } from 'payload'
 import React from 'react'
 
+import { DIREKTUR_VIA_PM_NOTE } from '@/domain/expense/decision'
 import { detail } from '@/domain/expense/dto'
 import { approvalInbox } from '@/domain/expense/queues'
 import { withReqTransaction } from '@/lib/system-tx'
@@ -14,7 +15,8 @@ import { Empty, Shell, TableScroll, badge, docLink, num, rp, table, td, th } fro
 
 /**
  * "Persetujuan" (M04, US-26/US-42/US-59): requests waiting for the logged-in user's "Diketahui"
- * (ADR 0013: the Direktur's approval, "Persetujuan Direktur (Diketahui)") or Finance approval — only those the rule snapshot assigns to them (G2) and never their own (G1). Budget
+ * (ADR 0021: "Persetujuan PM" of the request's PM project; ADR 0013 snapshots: the Direktur's approval,
+ * "Persetujuan Direktur (Diketahui)") or an approval level (ADR 0021: "Persetujuan Direktur") — only those the rule snapshot assigns to them (G2) and never their own (G1). Budget
  * impact % before → after (red above company-settings.budgetWarnPct, default 85 %; cost centers
  * "tanpa anggaran", Q-24) and open validation flags. Actions call /api/v1 (profile signature, US-43).
  * S3e (S-05): each row expands to the lines, receipt photos and per-line flags (ReviewDetails); the
@@ -87,18 +89,37 @@ export async function ApprovalInbox(props: AdminViewServerProps) {
                     {r.flags.info > 0 ? <span style={badge('muted')}>{r.flags.info} info</span> : null}
                     {r.flags.warning + r.flags.info === 0 ? '—' : null}
                   </td>
-                  <td style={td}>{r.stepLabel}</td>
+                  <td style={td}>
+                    {r.stepLabel}
+                    {r.selfApproval ? <div style={{ fontSize: 11 }}>{DIREKTUR_VIA_PM_NOTE}</div> : null}
+                  </td>
                   <td style={td}>
                     {r.step === 'acknowledge' ? (
-                      // ADR 0013: "Diketahui" is the Direktur's approval → "Setujui" (legacy PM step: "Diketahui").
+                      // ADR 0013: "Diketahui" is the Direktur's approval → "Setujui"; ADR 0021: the PM project's
+                      // approval (then the Direktur) → "Setujui … sebagai PM project?" (legacy PM step: "Diketahui").
                       <ActionButton
                         url={`/api/v1/expense-requests/${r.id}/acknowledge`}
                         label={r.decisionFlow ? 'Setujui' : 'Diketahui'}
                         variant="primary"
-                        confirm={r.decisionFlow ? `Setujui ${r.docNo} sebesar ${rp(r.grandTotal)} sebagai Direktur (Diketahui)?` : `Tandai ${r.docNo} sudah diketahui?`}
+                        confirm={
+                          r.decisionBy === 'pm'
+                            ? `Setujui ${r.docNo} sebesar ${rp(r.grandTotal)} sebagai PM project? Pengajuan diteruskan ke Direktur.`
+                            : r.decisionFlow
+                              ? `Setujui ${r.docNo} sebesar ${rp(r.grandTotal)} sebagai Direktur (Diketahui)?`
+                              : `Tandai ${r.docNo} sudah diketahui?`
+                        }
                       />
                     ) : (
-                      <ActionButton url={`/api/v1/expense-requests/${r.id}/approve`} label="Setujui" variant="primary" confirm={`Setujui ${r.docNo} sebesar ${rp(r.grandTotal)}?`} />
+                      <ActionButton
+                        url={`/api/v1/expense-requests/${r.id}/approve`}
+                        label="Setujui"
+                        variant="primary"
+                        confirm={
+                          r.decisionBy === 'direktur' && r.finalStep
+                            ? `Setujui ${r.docNo} sebesar ${rp(r.grandTotal)} sebagai Direktur? Pengajuan diteruskan ke Finance untuk transfer.`
+                            : `Setujui ${r.docNo} sebesar ${rp(r.grandTotal)}?`
+                        }
+                      />
                     )}
                     <ActionButton url={`/api/v1/expense-requests/${r.id}/reject`} label="Tolak" prompt={{ field: 'reason', message: 'Alasan penolakan (wajib, minimal 3 karakter):', minLength: 3 }} />
                   </td>

@@ -4,9 +4,9 @@ import React from 'react'
 import { ownEmployees, relId } from '@/access/roles'
 import { displayName, loadVisible, today } from '@/domain/expense/common'
 import { detail } from '@/domain/expense/dto'
-import { isDecisionSnapshot, SKIPPED_LABEL } from '@/domain/expense/decision'
+import { DIREKTUR_VIA_PM, DIREKTUR_VIA_PM_NOTE, isDecisionSnapshot, SKIPPED_LABEL } from '@/domain/expense/decision'
 import type { ApprovalSnapshot } from '@/domain/expense/rules'
-import { nextActor, timeline } from '@/domain/expense/timeline'
+import { approvalStepLabel, isPmFlow, nextActor, timeline } from '@/domain/expense/timeline'
 import { formatRupiah } from '@/lib/money'
 import { withSystemTransaction } from '@/lib/system-tx'
 
@@ -71,7 +71,7 @@ export async function WorkflowPanel(props: UIFieldServerProps) {
     return null
   }
   const { d, snap, names, hasSignature, todayDate } = data
-  const steps = timeline(d.type, d.status, { skipAck: snap?.acknowledge === 'none' })
+  const steps = timeline(d.type, d.status, { skipAck: snap?.acknowledge === 'none', snapshot: snap, currentLevel: d.currentLevel ?? null })
   const next = nextActor({
     type: d.type,
     status: d.status,
@@ -192,12 +192,18 @@ export async function WorkflowPanel(props: UIFieldServerProps) {
         ) : null}
         {d.rejectReason ? <div style={{ marginTop: 6, color: 'var(--theme-error-500)' }}>Alasan ditolak: {d.rejectReason}</div> : null}
         {d.cancelReason ? <div style={{ marginTop: 6 }}>Alasan batal: {d.cancelReason}</div> : null}
+        {snap?.selfApproval === DIREKTUR_VIA_PM ? (
+          // ADR 0021: narrow G1 exception — recorded (snapshot, g1_exception, audit) and shown.
+          <div data-pk-g1-exception style={{ marginTop: 6 }}>
+            {DIREKTUR_VIA_PM_NOTE}
+          </div>
+        ) : null}
         {(snap?.skipped ?? []).length > 0 ? (
           // ADR 0013 G1-2: decision positions left out because their only holders are requester/creator.
           <div data-pk-skipped style={{ marginTop: 6 }}>
             {(snap?.skipped ?? []).map((x) => (
               <div key={`${x.position}-${x.level}`}>
-                {x.position === 'diketahui' ? 'Diketahui Oleh (Direktur)' : `Approval L${x.level}`}: {SKIPPED_LABEL} — {x.reason}
+                {x.position === 'diketahui' ? (isPmFlow(snap) ? 'Diketahui Oleh (PM project)' : 'Diketahui Oleh (Direktur)') : `Approval L${x.level}`}: {SKIPPED_LABEL} — {x.reason}
               </div>
             ))}
           </div>
@@ -208,7 +214,13 @@ export async function WorkflowPanel(props: UIFieldServerProps) {
               <li key={a.id}>
                 siklus {a.cycle} · {POSITION_LABELS[a.position] ?? a.position}
                 {a.position === 'approval' ? ` L${a.level}` : ''}: {a.actorName ?? '—'} —{' '}
-                {a.decision === 'acknowledged' && a.cycle === d.approvalCycle && isDecisionSnapshot(snap) ? 'disetujui Direktur (Diketahui)' : (DECISION_LABELS[a.decision] ?? a.decision)}
+                {a.decision === 'acknowledged' && a.cycle === d.approvalCycle && isDecisionSnapshot(snap)
+                  ? isPmFlow(snap)
+                    ? 'disetujui PM project (Diketahui)'
+                    : 'disetujui Direktur (Diketahui)'
+                  : a.decision === 'approved' && a.position === 'approval' && a.cycle === d.approvalCycle && isPmFlow(snap) && approvalStepLabel(snap, a.level) === 'Persetujuan Direktur'
+                    ? 'disetujui Direktur'
+                    : (DECISION_LABELS[a.decision] ?? a.decision)}
                 {a.onBehalf ? ' (diwakili)' : ''}
                 {a.position === 'diketahui' && a.cycle === d.approvalCycle && snap?.acknowledgeDelegatedTo ? ' (dilimpahkan)' : ''}
                 {a.reason ? ` — ${a.reason}` : ''}

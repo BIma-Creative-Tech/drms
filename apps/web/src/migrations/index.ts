@@ -42,6 +42,7 @@ import * as migration_20261010_090000_p2s_urgency_level from './20261010_090000_
 import * as migration_20261010_100000_fr1_foundation from './20261010_100000_fr1_foundation';
 import * as migration_20261010_110000_fr1_field_reports from './20261010_110000_fr1_field_reports';
 import * as migration_20261010_120000_fr1_security from './20261010_120000_fr1_security';
+import * as migration_20261010_130000_approval_pm_direktur from './20261010_130000_approval_pm_direktur';
 
 export const migrations = [
   {
@@ -263,5 +264,10 @@ export const migrations = [
     up: migration_20261010_120000_fr1_security.up,
     down: migration_20261010_120000_fr1_security.down,
     name: '20261010_120000_fr1_security',
+  },
+  {
+    up: migration_20261010_130000_approval_pm_direktur.up,
+    down: migration_20261010_130000_approval_pm_direktur.down,
+    name: '20261010_130000_approval_pm_direktur',
   },
 ];

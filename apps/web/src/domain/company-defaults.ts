@@ -172,7 +172,7 @@ const RULE_FIELDS = ['name', 'docType', 'requestType', 'minAmount', 'maxAmount',
 
 /**
  * A source rule that cannot be copied: it names rows of its own PT (category / project / cost center
- * / users), or the rules hook would refuse it today (retired `scope_manager`, non-decision roles,
+ * / users), or the rules hook would refuse it today (`scope_manager` outside expense requests, non-decision roles,
  * broken levels — possible in rules saved before ADR 0013). Skipped + reported, never a failed create
  * (a failing nested write would roll the whole PT create back).
  */
@@ -189,7 +189,7 @@ function notCopyable(r: Row): boolean {
   const max = typeof r.maxAmount === 'number' ? r.maxAmount : null
   if (max !== null && max < Number(r.minAmount ?? 0)) return true
   if (r.docType === 'budget_addendum' && (r.requestType ?? 'any') !== 'any') return true
-  return stepsError(rule.steps) !== null || ruleDecisionError(rule, () => undefined) !== null
+  return stepsError(rule.steps) !== null || ruleDecisionError(rule, () => undefined, (r.docType as string | undefined) ?? 'expense_request') !== null
 }
 
 export async function copyCompanyDefaults(req: PayloadRequest, target: number, opts: { from?: number | null; settings?: boolean } = {}): Promise<CopyDefaultsReport> {

@@ -161,7 +161,7 @@ describe('MC4-1 — "copy defaults from DRMS" when a group admin creates a PT (U
     const skipped = ((await auditRows('company', id)).find((r) => r.field === 'defaultsCopied')!.new_value?.v as Body).rules.skipped as string[]
     expect([...rules].sort()).toEqual([...srcRules].filter((n) => !skipped.includes(n)).sort())
     expect(rules.has('MC4 aturan project A')).toBe(false)
-    expect(rules.has('Default — Direktur lalu Finance (semua nominal)')).toBe(true)
+    expect(rules.has('Default — PM project lalu Direktur (semua nominal)')).toBe(true) // ADR 0021 seed default
     const doc = (await p.findByID({ collection: 'companies', id, depth: 0, overrideAccess: true /* SYSTEM-READ: assertion */ })) as unknown as Body
     expect(doc.budgetWarnPct).toBe(77) // default 85 → copied from A
     expect(doc.lpjDueDays).toBe(9) // chosen by the creator → kept

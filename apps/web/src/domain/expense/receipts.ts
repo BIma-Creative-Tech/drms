@@ -10,7 +10,7 @@ import { actorContext, fail, ids, loadRaw, loadVisible, requireAction, requireAc
 import { mayViewFlag, withFlagVisibility } from './flag-visibility'
 import { computeFlags, normalizeReceiptNo, normalizeVendor, type DuplicateHit, type FlagCategory, type FlagSpec } from './flags'
 import { grandTotal } from './lines'
-import { auditSkipped, selectAndSnapshot, writeSnapshot } from './snapshot'
+import { auditSelfApproval, auditSkipped, selectAndSnapshot, writeSnapshot } from './snapshot'
 import { isBusinessDate, INACTIVE_FOR_DUPLICATES } from './types'
 
 export type ReceiptInput = {
@@ -339,10 +339,12 @@ export async function resubmitReceipts(req: PayloadRequest, requestId: number) {
       status: needsAck ? 'pending_ack' : 'pending_approval',
       approvalRule: rule.id,
       approvalSnapshot: snapshot,
+      g1Exception: snapshot.selfApproval ?? null,
       approvalCycle: (raw.approvalCycle ?? 0) + 1,
       currentLevel: needsAck ? 0 : 1,
     })
     await auditSkipped(req, updated, snapshot)
+    await auditSelfApproval(req, updated, snapshot)
   }
   await writeSnapshot(req, updated, 'receipts_resubmit')
   await afterReceiptChange(req, requestId)

@@ -69,6 +69,7 @@ async function waitingForMe(req: PayloadRequest, top = 6) {
       status: i.status,
       statusLabel: i.statusLabel,
       step: i.step,
+      stepLabel: i.stepLabel,
       scopeName: i.scope,
       requesters: i.requesters,
       grandTotal: i.grandTotal,
@@ -299,9 +300,9 @@ export async function pmDashboard(req: PayloadRequest) {
     month: ctx.month,
     companies,
     hasScope: scope.kind === 'team' && (scope.projects.length > 0 || scope.costCenters.length > 0),
-    /** ADR 0013: always 0 for requests under the Direktur → Finance flow (PM never decides); kept for API compatibility. */
+    /** ADR 0021: the PM's own "Persetujuan PM" steps (0 on Direktur → Finance requests, ADR 0013). */
     waitingForMe: mine.count,
-    /** S3e (US-17, S-01): team requests waiting for the Direktur / Finance (monitoring, oldest first). */
+    /** S3e (US-17, S-01): team requests waiting for the PM / Direktur / Finance (oldest first). */
     teamWaiting: waiting,
     teamMonth: month,
     teamMonthByCompany: monthPt.map((m) => ({ companyId: m.companyId, ...m.value })),

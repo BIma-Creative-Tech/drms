@@ -43,7 +43,8 @@ export type NotifyEvent =
 
 const DEFAULTS: Record<NotifyEvent, { title: string; body: string }> = {
   // ADR 0013 §10: "Diketahui" is the Direktur's approval; recipients = active Direktur (pk-owner)
-  // holders minus requester/creator. pending_approval → active Finance holders (never the PM).
+  // holders minus requester/creator. pending_approval → the holders of the current level. ADR 0021
+  // snapshots: pending_ack → the PM project (PM_ACK_DEFAULT text), pending_approval → the Direktur.
   'expense.pending_ack': { title: 'Persetujuan Direktur: {docNo}', body: '{docNo} menunggu persetujuan Anda sebagai Direktur: {type} "{title}" {amount}.' },
   'expense.pending_approval': { title: 'Menunggu Approval: {docNo}', body: '{type} "{title}" {amount} menunggu persetujuan Anda.' },
   'expense.approved': { title: 'Disetujui: {docNo}', body: 'Pengajuan "{title}" {amount} disetujui.' },
@@ -62,6 +63,18 @@ const DEFAULTS: Record<NotifyEvent, { title: string; body: string }> = {
   'expense.withdrawn': { title: 'Ditarik ke Draft: {docNo}', body: 'Pengajuan "{title}" ditarik kembali ke Draft.' },
   'expense.created_on_behalf': { title: 'Pengajuan atas nama Anda: {docNo}', body: 'Draft {type} "{title}" {amount} dibuat atas nama Anda. Anda tercantum sebagai pemohon (Diajukan Oleh).' },
   'expense.team_submitted': { title: 'Pengajuan tim: {docNo}', body: '{type} "{title}" {amount} di project Anda telah diajukan dan menunggu persetujuan.' },
+}
+
+/**
+ * ADR 0021: "Diketahui" of a PM project → Direktur snapshot is the PM's approval (the Direktur hears of
+ * the request only after it, through `expense.pending_approval`; Finance after the Direktur).
+ */
+const PM_ACK_DEFAULT = { title: 'Persetujuan PM: {docNo}', body: '{docNo} menunggu persetujuan Anda sebagai PM project: {type} "{title}" {amount}.' }
+
+/** The waiting "Diketahui" is the PM project's (ADR 0021 snapshot). */
+function pmAck(doc: Doc): boolean {
+  const snap = doc.approvalSnapshot
+  return !!snap && snap.acknowledgeBy === 'scope_manager' && (snap.decisionRoles?.length ?? 0) > 0
 }
 
 /**
@@ -92,6 +105,7 @@ type Doc = {
   createdBy?: unknown
   currentLevel?: number | null
   approvalSnapshot?: ApprovalSnapshot | null
+  g1Exception?: string | null
   company?: unknown
   project?: unknown
 }
@@ -124,7 +138,9 @@ async function stepUsers(req: PayloadRequest, doc: Doc, kind: 'ack' | 'approval'
     if (step?.approverUserId) ids = [step.approverUserId]
     else if (step?.approverRole) ids = await usersWithRole(req, step.approverRole, doc)
   }
-  // G1: requesters/creator can never decide → never asked to.
+  // G1: requesters/creator can never decide → never asked to (ADR 0021: except the narrow
+  // `direktur_via_pm` exception — the creator PM / the requester Direktur hold the step).
+  if (snap.selfApproval === 'direktur_via_pm' && doc.g1Exception === 'direktur_via_pm') return ids
   const excluded = new Set(await people(req, doc))
   return ids.filter((x) => !excluded.has(x))
 }
@@ -144,6 +160,13 @@ async function teamPms(req: PayloadRequest, doc: Doc): Promise<number[]> {
   if (pms.length === 0) return []
   const requesters = new Set(await people(req, doc))
   return pms.filter((u) => !requesters.has(u))
+}
+
+/** ADR 0021: the PM project who must approve now gets `expense.pending_ack`, not also `team_submitted`. */
+function teamPmsFor(event: NotifyEvent, doc: Doc, pms: number[]): number[] {
+  if (event !== 'expense.team_submitted' || doc.status !== 'pending_ack' || !pmAck(doc)) return pms
+  const ack = doc.approvalSnapshot?.acknowledgerUserId ?? null
+  return ack === null ? pms : pms.filter((u) => u !== ack)
 }
 
 /**
@@ -302,7 +325,7 @@ export async function notifySettings(req: PayloadRequest, companyId?: number | n
  */
 export function approvalEmail(doc: Doc, event: NotifyEvent, appUrl: string | undefined): { subject: string; text: string } {
   const no = doc.docNo ?? `#${doc.id}`
-  const step = event === 'expense.pending_ack' ? 'persetujuan Anda sebagai Direktur (Diketahui)' : 'approval Anda'
+  const step = event === 'expense.pending_ack' ? (pmAck(doc) ? 'persetujuan Anda sebagai PM project' : 'persetujuan Anda sebagai Direktur (Diketahui)') : 'approval Anda'
   const base = appUrl ? `${appUrl.replace(/\/$/, '')}/admin/persetujuan` : null
   return {
     subject: `RR Teams — Menunggu keputusan Anda: ${no}`.slice(0, 200),
@@ -339,9 +362,9 @@ async function deliver(req: PayloadRequest, doc: Doc, events: Array<{ event: Not
     let to: number[] = []
     if (e.to === 'people') to = await people(req, doc)
     else if (e.to === 'finance') to = finance ??= await usersWithRole(req, 'pk-finance', doc)
-    else if (e.to === 'pm') to = pms ??= await teamPms(req, doc)
+    else if (e.to === 'pm') to = teamPmsFor(e.event, doc, (pms ??= await teamPms(req, doc)))
     else to = await stepUsers(req, doc, e.to)
-    const t = await template(req, e.event)
+    const t = e.event === 'expense.pending_ack' && pmAck(doc) ? PM_ACK_DEFAULT : await template(req, e.event)
     for (const uid of to) {
       if (uid === actor || done.has(`${e.event}:${uid}`)) continue
       done.add(`${e.event}:${uid}`)

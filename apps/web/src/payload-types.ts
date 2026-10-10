@@ -1231,6 +1231,10 @@ export interface ExpenseRequest {
     | number
     | boolean
     | null;
+  /**
+   * direktur_via_pm = pengajuan Direktur, diajukan oleh PM (kebijakan owner 2026-10-10).
+   */
+  g1Exception?: string | null;
   approvalCycle?: number | null;
   currentLevel?: number | null;
   submittedAt?: string | null;
@@ -2196,6 +2200,7 @@ export interface AuditLog {
     | 'acknowledge_delegated'
     | 'access_denied'
     | 'approval_skipped'
+    | 'approval_policy_exception'
     | 'retention_purge'
     | 'import'
     | '2fa_enabled'
@@ -3195,6 +3200,7 @@ export interface ExpenseRequestsSelect<T extends boolean = true> {
   attachments?: T;
   approvalRule?: T;
   approvalSnapshot?: T;
+  g1Exception?: T;
   approvalCycle?: T;
   currentLevel?: T;
   submittedAt?: T;

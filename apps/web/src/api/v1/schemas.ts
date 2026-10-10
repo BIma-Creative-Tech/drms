@@ -41,7 +41,7 @@ export const ImageTargets = z
 
 export const Capabilities = z
   .object({
-    approvalInbox: z.boolean().meta({ description: 'ADR 0013: holds pk-owner (label "Direktur") or pk-finance → show the approval inbox.' }),
+    approvalInbox: z.boolean().meta({ description: 'ADR 0013/0021: holds pk-owner (label "Direktur"), pk-finance or pk-pm (Persetujuan PM) → show the approval inbox.' }),
     teamMonitor: z.boolean().meta({ description: 'Holds pk-pm → team list/dashboard (monitoring only, no decisions).' }),
     progressReportCreate: z.boolean().meta({ description: 'E4: holds pk-pm (team projects) or pk-owner (all) → may create progress reports.' }),
     serviceReportCreate: z.boolean().meta({ description: 'FR1 (ADR 0020): field reports on for the PT (companies.fieldReportsEnabled) and holds pk-staff (assigned projects), pk-pm (team) or pk-owner → may create service reports on projects of kind kontrak_unit / aftersales.' }),

@@ -6,9 +6,10 @@ import { companyRefs, type CompanyRef } from '@/domain/companies'
 import { actorContext, ids, projectCommitted, settings, type RequestDoc } from './common'
 import { isDecisionSnapshot } from './decision'
 import { withFlagVisibility } from './flag-visibility'
-import { budgetImpact } from './rules'
+import { budgetImpact, lastLevel, type ApprovalSnapshot } from './rules'
 import { allowedActions } from './state'
-import { REQUEST_TYPE_LABELS, statusLabel, TRANSFER_QUEUE_WHERE } from './types'
+import { ackStepLabel, approvalStepLabel, decisionByOf, requestStatusLabel } from './timeline'
+import { REQUEST_TYPE_LABELS, TRANSFER_QUEUE_WHERE } from './types'
 
 export { TRANSFER_QUEUE_WHERE }
 
@@ -90,7 +91,7 @@ const base = (d: Populated, refs: Map<number, CompanyRef>) => ({
   type: d.type,
   typeLabel: REQUEST_TYPE_LABELS[d.type],
   status: d.status,
-  statusLabel: statusLabel(d.type, d.status),
+  statusLabel: requestStatusLabel(d.type, d.status, (d.approvalSnapshot ?? null) as ApprovalSnapshot | null, d.currentLevel ?? null),
   title: d.title,
   scope: scopeName(d),
   requesters: requesterNames(d),
@@ -119,13 +120,18 @@ export async function approvalInbox(req: PayloadRequest, f?: QueueFilter) {
     const p = d.project && typeof d.project === 'object' ? d.project : null
     const b = p ? budgetImpact(p.budget, await projectCommitted(req, p.id, d.id), d.grandTotal ?? 0) : { before: null, after: null }
     const decisionFlow = isDecisionSnapshot(d.approvalSnapshot)
+    const snap = (d.approvalSnapshot ?? null) as ApprovalSnapshot | null
     out.push({
       ...base(d, refs),
       step,
       level: d.currentLevel ?? null,
-      // ADR 0013: human label of the step (web + APK) and whether this is the Direktur → Finance flow.
-      stepLabel: step === 'acknowledge' ? (decisionFlow ? 'Persetujuan Direktur (Diketahui)' : 'Diketahui Oleh') : `Approval level ${d.currentLevel ?? 1}`,
+      // ADR 0013/0021: human label of the step (web + APK), whether this is a decision flow, who decides
+      // the step and whether approving it is final (APK decision sheet texts).
+      stepLabel: step === 'acknowledge' ? ackStepLabel(snap) : approvalStepLabel(snap, d.currentLevel ?? 1),
       decisionFlow,
+      decisionBy: decisionByOf(snap, step, step === 'acknowledge' ? 0 : (d.currentLevel ?? 1)),
+      finalStep: snap ? (step === 'acknowledge' ? lastLevel(snap) === 0 : (d.currentLevel ?? 1) >= lastLevel(snap)) : false,
+      selfApproval: snap?.selfApproval ?? null,
       budget: { basis: p?.budget ? ('project' as const) : ('none' as const), pctBefore: b.before, pctAfter: b.after, overWarn: b.after !== null && b.after > itemWarn, warnPct: itemWarn },
       flags: await flagCounts(req, d.id),
     })

@@ -140,11 +140,11 @@ describe('tile visibility per role (real config: admin.hidden + access.read + ro
     expect(k).toEqual(expect.arrayContaining(['persetujuan', 'kas', 'tutup-buku', 'buat-pengajuan', 'audit-log']))
   })
 
-  it('PM: no decisions, no cash, no audit log; progress/addendum/laporan/absensi', async () => {
+  it('PM: Persetujuan (ADR 0021: "Persetujuan PM"), no transfer/LPJ queues, no cash, no audit log; progress/addendum/laporan/absensi', async () => {
     const m = await modulesFor(['pk-pm'])
     const k = navKeys(m)
-    expect(k).toEqual(expect.arrayContaining(['progress', 'laporan-progress', 'addendum', 'laporan', 'absensi', 'buat-pengajuan']))
-    for (const no of ['persetujuan', 'antrian-transfer', 'verifikasi-lpj', 'kas', 'tutup-buku', 'audit-log']) expect(k).not.toContain(no)
+    expect(k).toEqual(expect.arrayContaining(['persetujuan', 'progress', 'laporan-progress', 'addendum', 'laporan', 'absensi', 'buat-pengajuan']))
+    for (const no of ['antrian-transfer', 'verifikasi-lpj', 'kas', 'tutup-buku', 'audit-log']) expect(k).not.toContain(no)
   })
 
   it('Admin: users/master/sistem + laporan (S3e S-23) + audit log, no cash/decisions', async () => {

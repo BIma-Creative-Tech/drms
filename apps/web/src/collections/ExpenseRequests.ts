@@ -370,6 +370,15 @@ export const ExpenseRequests: CollectionConfig = withAudit(
       // (staff/PM → the relationship input fired POST /api/approval-rules → 403 on every view).
       { name: 'approvalRule', type: 'relationship', relationTo: 'approval-rules', label: 'Aturan approval', access: system, admin: { ...ro, condition: canSeeApprovalRules } },
       { name: 'approvalSnapshot', type: 'json', label: 'Snapshot aturan approval', access: system, admin: { ...jsonView, condition: canSeeApprovalRules } },
+      {
+        // ADR 0021 (owner 2026-10-10): narrow G1 exception, set by the service at submit only (DB trigger
+        // expense_requests_g1_exception: value 'direktur_via_pm' or null, changes only at the freeze point).
+        name: 'g1Exception',
+        type: 'text',
+        label: 'Pengecualian G1',
+        access: system,
+        admin: { ...ro, condition: canSeeApprovalRules, description: 'direktur_via_pm = pengajuan Direktur, diajukan oleh PM (kebijakan owner 2026-10-10).' },
+      },
       { name: 'approvalCycle', type: 'number', label: 'Siklus approval', defaultValue: 0, access: system, admin: { ...ro, hidden: true } },
       { name: 'currentLevel', type: 'number', label: 'Level approval berjalan', access: system, admin: ro },
       { name: 'submittedAt', type: 'date', label: 'Diajukan (server)', access: system, admin: { ...ro, date: { pickerAppearance: 'dayAndTime' } } },
@@ -408,7 +417,7 @@ export const ExpenseRequests: CollectionConfig = withAudit(
   {
     docType: 'expense_request',
     // lines: per-line rows (auditLines); docNo: `number_issued` row written by allocateDocNo().
-    exclude: ['lines', 'docNo', 'contentHash', 'approvalSnapshot', 'currentLevel', 'approvalCycle', 'submittedAt', 'syncRev'],
+    exclude: ['lines', 'docNo', 'contentHash', 'approvalSnapshot', 'g1Exception', 'currentLevel', 'approvalCycle', 'submittedAt', 'syncRev'],
     docNo: (doc) => (typeof doc.docNo === 'string' ? doc.docNo : undefined),
     reasonRules: [reasonOnChange(['cancelReason'], 'Alasan wajib diisi saat membatalkan.')],
     actionFor: (c) => (c.field === 'status' ? 'status_change' : undefined),

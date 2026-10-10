@@ -50,6 +50,9 @@ export const AUDIT_ACTIONS = [
   // E1 (ADR 0013 G1-2): a decision position was skipped at submit because its only holders are the
   // requester/creator (e.g. the only Direktur is the requester).
   'approval_skipped',
+  // ADR 0021 (owner 2026-10-10): the narrow G1 exception `direktur_via_pm` was applied at submit (a
+  // Direktur's request filed by the PM project: PM approves as PM project, then the Direktur).
+  'approval_policy_exception',
   // E6 S2 (Q-33): the selfieRetention job deleted selfie files past the retention period (one
   // summary row per run, counts only).
   'retention_purge',

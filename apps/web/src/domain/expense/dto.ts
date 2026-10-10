@@ -1,18 +1,18 @@
 import type { PayloadRequest } from 'payload'
 
-import { hasRole, relId } from '@/access/roles'
+import { hasRole, relId, userId } from '@/access/roles'
 
 import { actorContext, approvalsOf, displayName, loadRaw, projectCommitted, type RequestDoc } from './common'
 import { displayUnitPrice } from './lines'
 import { budgetImpact, type ApprovalSnapshot } from './rules'
 import { allowedActions } from './state'
-import { REQUEST_TYPE_LABELS, statusLabel, FLAG_LABELS, type FlagKind } from './types'
+import { REQUEST_TYPE_LABELS, FLAG_LABELS, type FlagKind } from './types'
 import { withFlagVisibility } from './flag-visibility'
 import { receiptsOf } from './receipts'
 import { settlementOfRequest } from './lpj'
 import { shortfallSummary } from './shortfall-approval'
 import { SETTLEMENT_STATUS_LABELS } from './settlement-rules'
-import { nextActor, timeline } from './timeline'
+import { nextActor, requestStatusLabel, timeline } from './timeline'
 
 type Named = { id: number; name?: string; code?: string; email?: string; plateNo?: string; plateDisplay?: string } | null
 
@@ -32,7 +32,8 @@ export function listItem(doc: RequestDoc & { project?: unknown; costCenter?: unk
     type: doc.type,
     typeLabel: REQUEST_TYPE_LABELS[doc.type],
     status: doc.status,
-    statusLabel: statusLabel(doc.type, doc.status),
+    // ADR 0021: "Menunggu persetujuan PM" / "Menunggu persetujuan Direktur" from the request's snapshot
+    statusLabel: requestStatusLabel(doc.type, doc.status, doc.approvalSnapshot ?? null, doc.currentLevel ?? null),
     title: doc.title,
     projectId: relId(doc.project) ?? null,
     costCenterId: relId(doc.costCenter) ?? null,
@@ -101,7 +102,12 @@ export async function detail(req: PayloadRequest, id: number) {
   const snap = (doc.approvalSnapshot ?? null) as ApprovalSnapshot | null
   const lpj = doc.type === 'advance' ? await settlementOfRequest(req, id) : null
   // QA-06 / ADR 0019: shortfall vs approved + tolerance and its re-approval (office roles only)
-  const shortfall = lpj && lpj.settlementType === 'shortfall' && hasRole(req, ['pk-finance', 'pk-owner'], relId((doc as { company?: unknown }).company)) ? await shortfallSummary(req, await loadRaw(req, id), lpj) : null
+  // ADR 0021: also the PM project acknowledger of the shortfall approval (it decides "Persetujuan PM")
+  const shortfallAck = (lpj?.shortfallApprovalSnapshot as ApprovalSnapshot | null | undefined)?.acknowledgerUserId
+  const shortfall =
+    lpj && lpj.settlementType === 'shortfall' && (hasRole(req, ['pk-finance', 'pk-owner'], relId((doc as { company?: unknown }).company)) || (shortfallAck != null && shortfallAck === userId(req)))
+      ? await shortfallSummary(req, await loadRaw(req, id), lpj)
+      : null
   // F4: status timeline + "Giliran" (next expected actor) — same derivation as the web WorkflowPanel.
   const names: Record<number, string> = {}
   const nameIds = [snap?.acknowledgerUserId, ...(snap?.steps ?? []).map((s) => s.approverUserId)].filter((x): x is number => typeof x === 'number')
@@ -153,6 +159,8 @@ export async function detail(req: PayloadRequest, id: number) {
           acknowledgeRole: snap.acknowledgeRole ?? null,
           decisionRoles: snap.decisionRoles ?? [],
           skipped: snap.skipped ?? [],
+          // ADR 0021: narrow G1 exception (a Direktur's request filed by the PM project)
+          selfApproval: snap.selfApproval ?? null,
           steps: snap.steps,
           signDiajukan: snap.signDiajukan,
           signDibuat: snap.signDibuat,
@@ -255,7 +263,7 @@ export async function detail(req: PayloadRequest, id: number) {
     clientUuid: doc.clientUuid ?? null,
     createdAt: doc.createdAt ?? null,
     rev: typeof doc.syncRev === 'number' && doc.syncRev > 0 ? doc.syncRev : 1,
-    timeline: timeline(doc.type, doc.status, { skipAck: snap?.acknowledge === 'none' }),
+    timeline: timeline(doc.type, doc.status, { skipAck: snap?.acknowledge === 'none', snapshot: snap, currentLevel: doc.currentLevel ?? null }),
     nextActor: next,
   }
 }

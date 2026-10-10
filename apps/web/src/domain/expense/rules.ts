@@ -5,7 +5,7 @@
  */
 import type { Role } from '@/access/roles'
 
-import type { SkippedPosition } from './decision'
+import type { SelfApproval, SkippedPosition } from './decision'
 import type { RequestType } from './types'
 
 export type AckMode = 'required' | 'optional' | 'none'
@@ -79,6 +79,12 @@ export type ApprovalSnapshot = {
    * removed from `steps`, the rest renumbered 1..m). Printed "(tidak berlaku — pemohon)".
    */
   skipped?: SkippedPosition[]
+  /**
+   * ADR 0021 narrow G1 exception (owner decision 2026-10-10): a Direktur's own request filed by the PM
+   * project — the creator PM gives "Diketahui" (Persetujuan PM) and the requester Direktur may approve.
+   * Mirrored in `expense_requests.g1_exception` (the DB trigger allows exactly those two rows).
+   */
+  selfApproval?: SelfApproval | null
 }
 
 export type AckDelegate = 'owner' | 'admin'

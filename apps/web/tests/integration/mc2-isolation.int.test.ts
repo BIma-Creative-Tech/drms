@@ -22,7 +22,7 @@ import { seed } from '@/seed/seed'
 import config from '@/payload.config'
 
 import { pdfText } from '../fixtures/pdf-text'
-import { api, asUser, draftBody, makeFlowUser, makeWorld, ORIGIN, png, sysCreate, upload, type FlowUser, type World } from './flow-world'
+import { adr0013Fallback, api, asUser, draftBody, makeFlowUser, makeWorld, ORIGIN, png, sysCreate, upload, type FlowUser, type World } from './flow-world'
 import { accessToken, addMembership, companyId, getTestPayload, http, installLocalJwks, registerDevice, sqlAs, withContext, type TestUser } from './helpers'
 
 /**
@@ -112,6 +112,7 @@ beforeAll(async () => {
   })
   B = await companyId('CS2')
   C = await companyId('CS3')
+  await adr0013Fallback([A, B, C])
   const inPt = async (company: number, collection: CollectionSlug, code: string) =>
     (await p.find({ collection, where: { and: [{ company: { equals: company } }, { code: { equals: code } }] }, limit: 1, depth: 0, overrideAccess: true /* SYSTEM-READ: fixture */ })).docs[0]!.id as number
   X.catB = await inPt(B, 'expense-categories', 'MAT')

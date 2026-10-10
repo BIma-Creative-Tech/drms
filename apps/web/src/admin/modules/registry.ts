@@ -101,7 +101,8 @@ export const MODULES: readonly ModuleDef[] = [
     sections: [
       {
         items: [
-          { view: '/persetujuan', label: 'Persetujuan', roles: OFFICE, navKey: 'persetujuan' },
+          // ADR 0021: the PM project approves its requests first ("Persetujuan PM")
+          { view: '/persetujuan', label: 'Persetujuan', roles: OFFICE_PM, navKey: 'persetujuan' },
           { view: '/antrian-transfer', label: 'Antrian Transfer', roles: OFFICE, badge: 'transfers', navKey: 'antrian-transfer' },
           { view: '/verifikasi-lpj', label: 'Verifikasi LPJ', roles: OFFICE, badge: 'lpj', navKey: 'verifikasi-lpj' },
           { collection: 'approvals' },

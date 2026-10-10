@@ -11,7 +11,7 @@ import { down, up } from '@/migrations/20261003_090000_mc4_audit_company_backfil
 import { DEFAULT_SEED_DATA } from '@/seed/data'
 import { seed } from '@/seed/seed'
 
-import { api, asUser, makeFlowUser, sysCreate, uploadMedia, type FlowUser, type Res } from './flow-world'
+import { adr0013Fallback, api, asUser, makeFlowUser, sysCreate, uploadMedia, type FlowUser, type Res } from './flow-world'
 import { addMembership, companyId, getTestPayload, installFakeKeycloak, sqlAs, sqlError } from './helpers'
 
 /**
@@ -90,6 +90,7 @@ beforeAll(async () => {
   await seed(p, { uoms, banks, companies: [drms, { ...drms, company: { name: 'PT Contoh Audit', shortCode: 'CAU', timezone: 'Asia/Makassar' }, vehicles: [] }] })
   A = await companyId()
   B = await companyId('CAU')
+  await adr0013Fallback([A, B])
   await p.update({ collection: 'companies', id: B, data: { active: true, changeReason: 'uji MC4-04' } as never, overrideAccess: true /* SYSTEM-WRITE: fixture */ })
   const inPt = async (company: number, collection: CollectionSlug, where: Record<string, unknown>) =>
     (await p.find({ collection, where: { and: [{ company: { equals: company } }, where] } as never, limit: 1, depth: 0, overrideAccess: true /* SYSTEM-READ: fixture */ })).docs[0]!.id as number

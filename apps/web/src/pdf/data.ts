@@ -3,11 +3,12 @@ import type { PayloadRequest } from 'payload'
 import { relId } from '@/access/roles'
 import { approvalsOf, settings, type ApprovalRow, type RequestDoc } from '@/domain/expense/common'
 import { displayNames } from '@/domain/companies'
-import { SKIPPED_LABEL } from '@/domain/expense/decision'
+import { DIREKTUR_VIA_PM, DIREKTUR_VIA_PM_NOTE, SKIPPED_LABEL } from '@/domain/expense/decision'
 import { withFlagVisibility } from '@/domain/expense/flag-visibility'
 import { displayUnitPrice } from '@/domain/expense/lines'
 import { receiptsOf } from '@/domain/expense/receipts'
-import { FLAG_LABELS, REQUEST_TYPE_LABELS, statusLabel, type FlagKind } from '@/domain/expense/types'
+import { requestStatusLabel } from '@/domain/expense/timeline'
+import { FLAG_LABELS, REQUEST_TYPE_LABELS, type FlagKind } from '@/domain/expense/types'
 import { DEFAULT_TZ } from '@/lib/time'
 
 import { formatAmount, formatDateLong, formatDateShort, formatQty, formatRupiah, formatServerTime, pdfSafe, subtitleOf } from './format'
@@ -71,7 +72,8 @@ export async function buildPdfData(req: PayloadRequest, requestId: number, opts:
     { label: 'Dibuat Oleh', names: pdfSafe(creatorName), images: await sig(dibuat), time: formatServerTime(dibuat?.decidedAt, tz) },
     {
       label: 'Diketahui Oleh',
-      // ADR 0013: the Direktur's approval. F2e (legacy snapshots): delegated "Diketahui" → the actual person + "(dilimpahkan)".
+      // ADR 0013: the Direktur's approval; ADR 0021: the PM project's approval (the actual acknowledger is
+      // printed). F2e (legacy snapshots): delegated "Diketahui" → the actual person + "(dilimpahkan)".
       names: pdfSafe(diketahui?.actorName ? `${diketahui.actorName}${doc.approvalSnapshot?.acknowledgeDelegatedTo ? ' (dilimpahkan)' : ''}` : ''),
       images: diketahui?.decision === 'acknowledged' ? await sig(diketahui) : [],
       time: formatServerTime(diketahui?.decidedAt, tz),
@@ -138,7 +140,7 @@ export async function buildPdfData(req: PayloadRequest, requestId: number, opts:
     dateText: formatDateLong(doc.requestDate),
     docNo: pdfSafe(doc.docNo ?? '(belum bernomor)'),
     typeLabel: REQUEST_TYPE_LABELS[doc.type],
-    statusLabel: pdfSafe(statusLabel(doc.type, doc.status)),
+    statusLabel: pdfSafe(requestStatusLabel(doc.type, doc.status, doc.approvalSnapshot ?? null, doc.currentLevel ?? null)),
     lines: (doc.lines ?? []).map((l, i) => ({
       no: i + 1,
       description: pdfSafe(l.description ?? ''),
@@ -151,6 +153,8 @@ export async function buildPdfData(req: PayloadRequest, requestId: number, opts:
     })),
     grandTotal: formatRupiah(doc.grandTotal ?? 0),
     signatures,
+    // ADR 0021: the narrow G1 exception is printed with the signatures (who filed / who approved).
+    policyNote: doc.approvalSnapshot?.selfApproval === DIREKTUR_VIA_PM ? pdfSafe(DIREKTUR_VIA_PM_NOTE) : undefined,
     transfer: doc.bankSnapshot?.accountNo
       ? {
           bankName: pdfSafe(doc.bankSnapshot.bankName ?? ''),

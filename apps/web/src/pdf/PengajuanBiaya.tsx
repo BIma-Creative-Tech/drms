@@ -44,6 +44,8 @@ export type PdfData = {
   lines: Array<{ no: number; description: string; qty: string; uom: string; unitPrice: string; total: string; notes: string }>
   grandTotal: string
   signatures: PdfSignature[]
+  /** ADR 0021: policy note printed under the signatures (e.g. a Direktur's request filed by the PM). */
+  policyNote?: string
   transfer: { bankName: string; accountHolder: string; accountNo: string } | null
   receipts: PdfReceipt[]
   internal: boolean
@@ -240,6 +242,7 @@ export function PengajuanBiaya({ d }: { d: PdfData }) {
             <Signature key={sig.label} sig={sig} last={i === d.signatures.length - 1} />
           ))}
         </View>
+        {d.policyNote ? <Text style={s.sigNote}>{d.policyNote}</Text> : null}
 
         {d.transfer ? (
           <View style={s.transfer} wrap={false}>

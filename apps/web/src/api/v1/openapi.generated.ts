@@ -103,7 +103,7 @@ export const openapiDocument = {
             "properties": {
               "approvalInbox": {
                 "type": "boolean",
-                "description": "ADR 0013: holds pk-owner (label \"Direktur\") or pk-finance → show the approval inbox."
+                "description": "ADR 0013/0021: holds pk-owner (label \"Direktur\"), pk-finance or pk-pm (Persetujuan PM) → show the approval inbox."
               },
               "teamMonitor": {
                 "type": "boolean",
@@ -467,7 +467,7 @@ export const openapiDocument = {
         "properties": {
           "approvalInbox": {
             "type": "boolean",
-            "description": "ADR 0013: holds pk-owner (label \"Direktur\") or pk-finance → show the approval inbox."
+            "description": "ADR 0013/0021: holds pk-owner (label \"Direktur\"), pk-finance or pk-pm (Persetujuan PM) → show the approval inbox."
           },
           "teamMonitor": {
             "type": "boolean",
@@ -1427,7 +1427,7 @@ export const openapiDocument = {
                   "role",
                   "user"
                 ],
-                "description": "scope_manager only on pre-E1 snapshots (PM \"Diketahui\")."
+                "description": "ADR 0021: scope_manager with decisionRoles = \"Persetujuan PM\" by the PM project (acknowledgerUserId), then the Direktur level; scope_manager without decisionRoles = pre-E1 snapshot (PM \"Diketahui\")."
               },
               "acknowledgeRole": {
                 "type": [
@@ -1484,6 +1484,17 @@ export const openapiDocument = {
                   ]
                 },
                 "description": "ADR 0013 G1-2: positions skipped at submit because their only holders are requester/creator — show \"(tidak berlaku — pemohon)\"."
+              },
+              "selfApproval": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "enum": [
+                  "direktur_via_pm",
+                  null
+                ],
+                "description": "ADR 0021 narrow G1 exception: a Direktur's request filed by the PM project (PM approves, then the Direktur) — show \"Pengajuan Direktur — diajukan oleh PM (kebijakan owner 2026-10-10)\"."
               },
               "steps": {
                 "type": "array",
@@ -1542,6 +1553,7 @@ export const openapiDocument = {
               "acknowledgeRole",
               "decisionRoles",
               "skipped",
+              "selfApproval",
               "steps",
               "signDiajukan",
               "signDibuat"
@@ -4336,11 +4348,36 @@ export const openapiDocument = {
                 },
                 "stepLabel": {
                   "type": "string",
-                  "description": "ADR 0013: \"Persetujuan Direktur (Diketahui)\" | \"Approval level n\" (legacy PM step: \"Diketahui Oleh\")."
+                  "description": "ADR 0021: \"Persetujuan PM\" | \"Persetujuan Direktur\"; ADR 0013: \"Persetujuan Direktur (Diketahui)\" | \"Approval level n\" (legacy PM step: \"Diketahui Oleh\")."
                 },
                 "decisionFlow": {
                   "type": "boolean",
-                  "description": "ADR 0013 Direktur → Finance request (acknowledge = the Direktur approval, button \"Setujui\"); false = pre-E1 snapshot."
+                  "description": "ADR 0013/0021 decision flow (acknowledge = an approval, button \"Setujui\"); false = pre-E1 snapshot."
+                },
+                "decisionBy": {
+                  "type": "string",
+                  "enum": [
+                    "pm",
+                    "direktur",
+                    "finance",
+                    "other"
+                  ],
+                  "description": "ADR 0021: who decides this step (APK decision sheet texts): pm = PM project, direktur, finance, other (named user / legacy)."
+                },
+                "finalStep": {
+                  "type": "boolean",
+                  "description": "ADR 0021: approving this step makes the request \"Disetujui\" (Finance then transfers / verifies receipts)."
+                },
+                "selfApproval": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "enum": [
+                    "direktur_via_pm",
+                    null
+                  ],
+                  "description": "ADR 0021 narrow G1 exception (a Direktur's request filed by the PM project)."
                 },
                 "budget": {
                   "type": "object",
@@ -4415,6 +4452,9 @@ export const openapiDocument = {
                 "level",
                 "stepLabel",
                 "decisionFlow",
+                "decisionBy",
+                "finalStep",
+                "selfApproval",
                 "budget",
                 "flags"
               ]
@@ -21024,6 +21064,10 @@ export const openapiDocument = {
                                   "acknowledge"
                                 ]
                               },
+                              "stepLabel": {
+                                "type": "string",
+                                "description": "ADR 0021: \"Persetujuan PM\" / \"Persetujuan Direktur\" (ADR 0013: \"Persetujuan Direktur (Diketahui)\" / \"Approval level n\")."
+                              },
                               "scopeName": {
                                 "type": "string"
                               },
@@ -21053,6 +21097,7 @@ export const openapiDocument = {
                               "status",
                               "statusLabel",
                               "step",
+                              "stepLabel",
                               "scopeName",
                               "requesters",
                               "grandTotal",
@@ -22072,12 +22117,15 @@ export const openapiDocument = {
                     },
                     "waitingForMe": {
                       "type": "integer",
-                      "description": "ADR 0013: 0 for Direktur → Finance requests (PM monitors only); kept for compatibility."
+                      "description": "ADR 0021: requests waiting for the PM's own \"Persetujuan PM\" (PM project → Direktur rule); 0 on Direktur → Finance requests (ADR 0013)."
                     },
                     "teamWaiting": {
                       "type": "object",
                       "properties": {
                         "count": {
+                          "type": "integer"
+                        },
+                        "pm": {
                           "type": "integer"
                         },
                         "direktur": {
@@ -22126,6 +22174,7 @@ export const openapiDocument = {
                               "waitingFor": {
                                 "type": "string",
                                 "enum": [
+                                  "pm",
                                   "direktur",
                                   "finance"
                                 ]
@@ -22172,12 +22221,13 @@ export const openapiDocument = {
                       },
                       "required": [
                         "count",
+                        "pm",
                         "direktur",
                         "finance",
                         "oldestDays",
                         "items"
                       ],
-                      "description": "S3e (US-17): team requests waiting for the Direktur (Diketahui) or Finance (Approval), oldest first (max 8 items)."
+                      "description": "S3e (US-17): team requests waiting for the PM project (ADR 0021), the Direktur or Finance, oldest first (max 8 items)."
                     },
                     "teamMonth": {
                       "type": "object",
@@ -22775,6 +22825,10 @@ export const openapiDocument = {
                                   "acknowledge"
                                 ]
                               },
+                              "stepLabel": {
+                                "type": "string",
+                                "description": "ADR 0021: \"Persetujuan PM\" / \"Persetujuan Direktur\" (ADR 0013: \"Persetujuan Direktur (Diketahui)\" / \"Approval level n\")."
+                              },
                               "scopeName": {
                                 "type": "string"
                               },
@@ -22804,6 +22858,7 @@ export const openapiDocument = {
                               "status",
                               "statusLabel",
                               "step",
+                              "stepLabel",
                               "scopeName",
                               "requesters",
                               "grandTotal",

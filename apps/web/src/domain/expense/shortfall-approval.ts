@@ -1,18 +1,19 @@
 import type { PayloadRequest, Where } from 'payload'
 
-import { companiesWithRole, relId, rolesIn, userId, userRoles, type Role } from '@/access/roles'
+import { companiesWithRole, relId, ROLES, rolesIn, userId, userRoles, type Role } from '@/access/roles'
 import { writeAudit, writeAuditDetached } from '@/audit/writer'
-import { membersWithRole } from '@/domain/companies'
+import { membersWithRole, usersOfEmployees } from '@/domain/companies'
 import { notificationTemplate, pushEnabled } from '@/domain/notifications'
 import { formatRupiah } from '@/lib/money'
 import { requestMeta } from '@/lib/request-meta'
 
-import { actorContext, displayName, fail, loadRaw, loadVisible, requireActionAudited, resolveSignature, type RequestDoc, type Signature } from './common'
-import { lacksDecisionRole } from './decision'
+import { actorContext, displayName, fail, ids, loadRaw, loadVisible, requireActionAudited, resolveSignature, selfApprovalAllowed, type RequestDoc, type Signature } from './common'
+import { DIREKTUR_VIA_PM, lacksDecisionRole } from './decision'
 import { requireSettlement, settlementOfRequest, shortfallStateOf, updateSettlement, type SettlementDoc } from './lpj'
 import { lastLevel, matchesAcknowledger, matchesStep, type ApprovalSnapshot } from './rules'
 import { SHORTFALL_APPROVAL_LABELS, shortfallAllowedActions, type ShortfallAction, type ShortfallApprovalStatus, type ShortfallCtx } from './settlement-rules'
 import { involvedUserIds, selectAndSnapshot } from './snapshot'
+import { ackStepLabel, approvalStepLabel } from './timeline'
 
 /**
  * QA-06 / ADR 0019 — LPJ shortfall above the approved amount (owner decision 2026-10-08: tolerance,
@@ -64,20 +65,45 @@ async function ctxOf(req: PayloadRequest, raw: RequestDoc, s: SettlementDoc, row
   const status = s.shortfallApprovalStatus ?? null
   const caller = { id: uid, roles }
   const step = snap?.steps.find((x) => x.level === (s.shortfallApprovalLevel ?? 1))
+  const isAcknowledger = !!snap && status === 'pending_ack' && matchesAcknowledger(snap, caller)
+  const matchesCurrentStep = !!snap && status === 'pending_approval' && matchesStep(step, caller)
+  // ADR 0021: the narrow `direktur_via_pm` exception of the request also covers its shortfall decision
+  // (the DB trigger checks the request's g1_exception through settlements.request_id).
+  const exempt =
+    !!snap &&
+    !!status &&
+    (status === 'pending_ack' || status === 'pending_approval') &&
+    selfApprovalAllowed(
+      { status, approvalSnapshot: snap, g1Exception: raw.g1Exception },
+      { isCreator: relId(raw.createdBy) === uid, isRequester: await isRequesterOf(req, raw, uid), isAcknowledger, matchesCurrentStep },
+    )
   return {
     roles,
     status,
-    selfInvolved: involved.has(uid),
-    isAcknowledger: !!snap && status === 'pending_ack' && matchesAcknowledger(snap, caller),
-    matchesCurrentStep: !!snap && status === 'pending_approval' && matchesStep(step, caller),
+    selfInvolved: involved.has(uid) && !exempt,
+    isAcknowledger,
+    matchesCurrentStep,
     alreadyDecided: decisions.some((r) => relId(r.actor) === uid),
-    lacksDecisionRole: lacksDecisionRole(snap, roles),
+    // ADR 0021: the PM project decides only as the snapshot's acknowledger.
+    lacksDecisionRole: lacksDecisionRole(snap, roles) && !isAcknowledger,
   }
+}
+
+/** The caller's account belongs to one of the request's requester employees (G1 accounts). */
+async function isRequesterOf(req: PayloadRequest, raw: RequestDoc, uid: number): Promise<boolean> {
+  const emps = ids(raw.requesters)
+  return emps.length > 0 && (await usersOfEmployees(req, emps)).includes(uid)
 }
 
 // ---------------------------------------------------------------- notifications
 
 type ShortfallEvent = 'expense.shortfall_pending_ack' | 'expense.shortfall_pending_approval' | 'expense.shortfall_approved' | 'expense.shortfall_rejected'
+
+/** ADR 0021: "Diketahui" of a PM project → Direktur snapshot is the PM's approval. */
+const PM_ACK_DEFAULT = {
+  title: 'Persetujuan PM — kekurangan LPJ: {docNo}',
+  body: 'Kekurangan LPJ {docNo} membuat total transfer {amount} (disetujui {approved}). Menunggu persetujuan Anda sebagai PM project di menu Persetujuan (web).',
+}
 
 const DEFAULTS: Record<ShortfallEvent, { title: string; body: string }> = {
   'expense.shortfall_pending_ack': {
@@ -94,8 +120,12 @@ const DEFAULTS: Record<ShortfallEvent, { title: string; body: string }> = {
 
 async function notify(req: PayloadRequest, raw: RequestDoc, s: SettlementDoc, event: ShortfallEvent, to: number[]): Promise<void> {
   const actor = userId(req)
-  const exclude = await involvedUserIds(req, raw) // G1: requester/creator never get a decision request
-  const t = await notificationTemplate(req, event, DEFAULTS[event])
+  // G1: requester/creator never get a decision request — except the ADR 0021 `direktur_via_pm` holders
+  const exclude = await involvedUserIds(req, raw)
+  const snapOf = (s.shortfallApprovalSnapshot ?? null) as ApprovalSnapshot | null
+  if (snapOf?.selfApproval === DIREKTUR_VIA_PM && raw.g1Exception === DIREKTUR_VIA_PM) for (const u of to) exclude.delete(u)
+  const pmAck = event === 'expense.shortfall_pending_ack' && (s.shortfallApprovalSnapshot as ApprovalSnapshot | null)?.acknowledgeBy === 'scope_manager'
+  const t = pmAck ? PM_ACK_DEFAULT : await notificationTemplate(req, event, DEFAULTS[event])
   const vars: Record<string, string> = { docNo: raw.docNo ?? `#${raw.id}`, amount: formatRupiah(s.shortfallApprovalAmount ?? 0), approved: formatRupiah(raw.approvedAmount ?? 0) }
   const render = (x: string) => x.replace(/\{(docNo|amount|approved)\}/g, (_, k: string) => vars[k] ?? '')
   for (const uid of new Set(to)) {
@@ -160,7 +190,8 @@ export async function requestShortfallApproval(req: PayloadRequest, id: number, 
   if (!sf.aboveTolerance) fail(409, `Kekurangan masih dalam toleransi ${sf.tolerancePct}% (maks. total ${formatRupiah(sf.ceiling)}); selesaikan langsung tanpa persetujuan.`)
   if (s.shortfallApprovalStatus === 'pending_ack' || s.shortfallApprovalStatus === 'pending_approval') fail(409, 'Persetujuan kekurangan sedang berjalan.')
   if (sf.covered) fail(409, 'Kekurangan sudah disetujui; catat transfer kekurangan.')
-  const { snapshot } = await selectAndSnapshot(req, { ...raw, grandTotal: sf.totalAfter })
+  // ADR 0021: same rule as the request (PM project → Direktur); the G1 exception only when the request has it
+  const { snapshot } = await selectAndSnapshot(req, { ...raw, grandTotal: sf.totalAfter }, { allowSelfApproval: raw.g1Exception === DIREKTUR_VIA_PM })
   const needsAck = snapshot.acknowledge === 'required'
   const cycle = (s.shortfallApprovalCycle ?? 0) + 1
   const reason = note.trim()
@@ -195,7 +226,7 @@ export async function requestShortfallApproval(req: PayloadRequest, id: number, 
   return updated
 }
 
-// ---------------------------------------------------------------- decisions (Direktur → Finance)
+// ---------------------------------------------------------------- decisions (Direktur → Finance / PM project → Direktur)
 
 const STATUS_FOR: Record<ShortfallAction, ShortfallApprovalStatus[]> = {
   acknowledge: ['pending_ack'],
@@ -209,9 +240,10 @@ async function requireDecision(req: PayloadRequest, raw: RequestDoc, s: Settleme
   const audit = async (reason: string) =>
     writeAuditDetached(req, [{ action: 'access_denied', docType: 'settlement', docId: String(s.id), docNo: s.docNo ?? undefined, field: `shortfall_${action}`, newValue: { action, status: ctx.status, roles: ctx.roles }, reason }])
   // E9 rule: authorization (403) before state (409)
-  if (ctx.lacksDecisionRole || !ctx.roles.some((r) => r === 'pk-owner' || r === 'pk-finance')) {
-    await audit('hanya Direktur/Finance yang memutuskan kekurangan LPJ (ADR 0013/0019)')
-    fail(403, 'Hanya Direktur atau Finance yang dapat menyetujui atau menolak kekurangan LPJ.')
+  // ADR 0021: Direktur / Finance, or the PM project acknowledger of THIS shortfall approval
+  if (ctx.lacksDecisionRole || (!ctx.isAcknowledger && !ctx.roles.some((r) => r === 'pk-owner' || r === 'pk-finance'))) {
+    await audit('hanya PM project pengajuan ini, Direktur atau Finance yang memutuskan kekurangan LPJ (ADR 0013/0019/0021)')
+    fail(403, 'Hanya PM project dari pengajuan ini, Direktur atau Finance yang dapat menyetujui atau menolak kekurangan LPJ.')
   }
   if (ctx.selfInvolved) {
     await audit('pemohon/pembuat tidak boleh memutuskan kekurangan pengajuannya sendiri (G1)')
@@ -343,7 +375,8 @@ export type ShortfallSummary = NonNullable<Awaited<ReturnType<typeof shortfallSu
 
 /** LPJ shortfall approvals waiting for the CALLER (Direktur "Diketahui" / Finance level), oldest first. */
 export async function shortfallInbox(req: PayloadRequest, f: { companyIds?: readonly number[] } = {}) {
-  const pts = companiesWithRole(req, ['pk-owner', 'pk-finance']).filter((c) => !f.companyIds?.length || f.companyIds.includes(c))
+  // ADR 0021: the PM project (or a cost-center manager) decides the "Diketahui" of its requests too
+  const pts = companiesWithRole(req, [...ROLES]).filter((c) => !f.companyIds?.length || f.companyIds.includes(c))
   if (pts.length === 0) return { items: [] }
   const where: Where = { and: [{ shortfallApprovalStatus: { in: ['pending_ack', 'pending_approval'] } }, { status: { equals: 'verified' } }, { company: { in: pts } }] }
   const res = await req.payload.find({ collection: 'settlements', where, sort: 'updatedAt', limit: 200, depth: 0, user: req.user, overrideAccess: false, req })
@@ -364,7 +397,7 @@ export async function shortfallInbox(req: PayloadRequest, f: { companyIds?: read
       lpjNo: d.docNo ?? null,
       settlementId: d.id,
       step,
-      stepLabel: d.shortfallApprovalStatus === 'pending_ack' ? 'Persetujuan Direktur (Diketahui)' : 'Approval Finance',
+      stepLabel: shortfallStepLabel(d.shortfallApprovalStatus ?? null, (d.shortfallApprovalSnapshot ?? null) as ApprovalSnapshot | null, d.shortfallApprovalLevel ?? 1),
       approvedAmount: sf.approvedAmount,
       transferredTotal: raw.transferredTotal ?? 0,
       shortfall: sf.shortfall,
@@ -375,6 +408,13 @@ export async function shortfallInbox(req: PayloadRequest, f: { companyIds?: read
     })
   }
   return { items }
+}
+
+/** Inbox label of the waiting shortfall step (ADR 0021: "Persetujuan PM" / "Persetujuan Direktur"). */
+function shortfallStepLabel(status: ShortfallApprovalStatus | null, snap: ApprovalSnapshot | null, level: number): string {
+  if (status === 'pending_ack') return ackStepLabel(snap)
+  const label = approvalStepLabel(snap, level)
+  return label === `Approval level ${level}` ? 'Approval Finance' : label
 }
 
 export type ShortfallInboxItem = Awaited<ReturnType<typeof shortfallInbox>>['items'][number]

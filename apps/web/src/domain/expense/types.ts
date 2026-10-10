@@ -37,7 +37,8 @@ export type RequestStatus = (typeof REQUEST_STATUSES)[number]
 
 export const STATUS_LABELS: Record<RequestStatus, string> = {
   draft: 'Draft',
-  pending_ack: 'Menunggu Diketahui (Direktur)',
+  // ADR 0021: the waiting step depends on the snapshot (PM project / Direktur) — see timeline.ts requestStatusLabel
+  pending_ack: 'Menunggu Diketahui',
   pending_approval: 'Menunggu Approval',
   approved: 'Disetujui',
   receipt_revision: 'Revisi Nota',
