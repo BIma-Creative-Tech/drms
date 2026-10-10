@@ -27,7 +27,8 @@ beforeAll(async () => {
 
 describe('urgency-levels master (per PT)', () => {
   it('the existing PT has the four defaults (migration backfill), ordered by rank', async () => {
-    const r = await sqlAs('app', 'SELECT code, name, rank::int AS rank FROM urgency_levels WHERE company_id = $1 ORDER BY rank', [await companyId()])
+    // only the default codes: other suites (audit.int) add their own levels to PT #1
+    const r = await sqlAs('app', "SELECT code, name, rank::int AS rank FROM urgency_levels WHERE company_id = $1 AND code IN ('LOW', 'MEDIUM', 'HIGH', 'SUPER') ORDER BY rank", [await companyId()])
     expect(r.rows.map((x) => [x.code, x.name, x.rank])).toEqual([
       ['LOW', 'Low', 1],
       ['MEDIUM', 'Medium', 2],
