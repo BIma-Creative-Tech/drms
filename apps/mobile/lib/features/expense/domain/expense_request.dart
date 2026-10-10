@@ -171,18 +171,34 @@ abstract class ApprovalRuleInfo with _$ApprovalRuleInfo {
     required String name,
     required String acknowledge, // required | optional | none
     String? acknowledgeDelegatedTo,
-    String? acknowledgeBy, // scope_manager (pre-E1 PM) | role | user
+    String? acknowledgeBy, // scope_manager (PM project; pre-E1 or ADR 0021) | role | user
     String? acknowledgeRole, // pk-owner = Direktur (ADR 0013)
     @Default([]) List<String> decisionRoles, // [pk-owner, pk-finance]; empty = pre-E1 snapshot
     @Default([]) List<SkippedPosition> skipped,
     @Default([]) List<RuleStep> steps,
+
+    /// ADR 0021: narrow G1 exception — a Direktur's own request filed by the PM (`direktur_via_pm`).
+    String? selfApproval,
   }) = _ApprovalRuleInfo;
 
   /// Snapshot taken under ADR 0013 (Direktur "Diketahui" = approval, then Finance).
   bool get decisionFlow => decisionRoles.isNotEmpty;
 
-  /// Pre-E1 snapshot where the PM / cost-center manager gave "Diketahui".
+  /// "Diketahui" by the PM project / cost-center manager: pre-E1 snapshots and, since ADR 0021, the
+  /// "PM project → Direktur" flow (where it is the PM's approval).
   bool get legacyPmAcknowledge => acknowledgeBy == 'scope_manager';
+
+  /// ADR 0021 flow: the PM project approves first (snapshot with decision roles + scope_manager).
+  bool get pmApproval => decisionFlow && acknowledgeBy == 'scope_manager';
+
+  /// ADR 0021: Direktur request filed by the PM (owner policy 2026-10-10).
+  bool get direkturViaPm => selfApproval == 'direktur_via_pm';
+
+  /// Approver role of an approval level (null = named user / unknown).
+  String? roleOfLevel(int level) => steps.where((s) => s.level == level).firstOrNull?.approverRole;
+
+  /// Highest approval level of the snapshot (0 = no approval level left).
+  int get lastLevel => steps.fold(0, (m, s) => s.level > m ? s.level : m);
 
   bool isSkipped(SignPosition p, [int? level]) =>
       skipped.any((s) => s.position == p && (level == null || s.level == level));

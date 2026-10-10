@@ -102,18 +102,24 @@ List<TimelineStep> buildTimeline(ExpenseDetail d) {
 /// ADR 0013 G1-2 wording (web PDF/Riwayat use the same text).
 const skippedNote = '(tidak berlaku — pemohon)';
 
-/// "Diketahui" position title: Direktur approval since ADR 0013, PM on pre-E1 snapshots.
+/// "Diketahui" position title: PM project approval since ADR 0021 (checked FIRST — those snapshots
+/// also carry decision roles), Direktur approval under ADR 0013, PM on pre-E1 snapshots.
 String acknowledgeTitle(ApprovalRuleInfo? rule) {
   if (rule == null) return 'Diketahui Oleh';
+  if (rule.pmApproval) return 'Persetujuan PM';
   if (rule.decisionFlow || rule.acknowledgeRole == 'pk-owner') return 'Diketahui (Direktur)';
   if (rule.legacyPmAcknowledge) return 'Diketahui Oleh (PM / penanggung jawab)';
   return 'Diketahui Oleh';
 }
 
-/// Approval position title: Finance since ADR 0013; pre-E1 snapshots name the role of the level.
+/// Approval position title: Finance since ADR 0013; pre-E1 snapshots name the role of the level;
+/// ADR 0021 (PM project → Direktur): the Direktur level is "Persetujuan Direktur".
 String approvalTitle(ApprovalRuleInfo? rule, int level, {required bool multi}) {
   final base = multi ? 'Approval level $level' : 'Approval';
-  final role = rule?.steps.where((s) => s.level == level).firstOrNull?.approverRole;
+  final role = rule?.roleOfLevel(level);
+  if ((rule?.pmApproval ?? false) && role == 'pk-owner') {
+    return multi ? 'Persetujuan Direktur (level $level)' : 'Persetujuan Direktur';
+  }
   final label = switch (role) {
     'pk-finance' => 'Finance',
     'pk-owner' => 'Direktur',
@@ -126,7 +132,9 @@ String approvalTitle(ApprovalRuleInfo? rule, int level, {required bool multi}) {
 String currentTurn(ExpenseDetail d) => switch (d.status) {
   RequestStatus.draft => 'Pemohon — belum diajukan',
   RequestStatus.pendingAck =>
-    d.approvalRule?.legacyPmAcknowledge ?? false
+    d.approvalRule?.pmApproval ?? false
+        ? 'PM project — persetujuan PM'
+        : d.approvalRule?.legacyPmAcknowledge ?? false
         ? 'Diketahui Oleh (PM / penanggung jawab)'
         : 'Direktur — persetujuan (Diketahui)',
   RequestStatus.pendingApproval => approvalTitle(

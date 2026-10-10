@@ -2645,7 +2645,8 @@ as String?,
 /// @nodoc
 mixin _$ApprovalRuleInfo {
 
- String get name; String get acknowledge; String? get acknowledgeDelegatedTo; String? get acknowledgeBy; String? get acknowledgeRole; List<String> get decisionRoles; List<SkippedPosition> get skipped; List<RuleStep> get steps;
+ String get name; String get acknowledge; String? get acknowledgeDelegatedTo; String? get acknowledgeBy; String? get acknowledgeRole; List<String> get decisionRoles; List<SkippedPosition> get skipped; List<RuleStep> get steps;/// ADR 0021: narrow G1 exception — a Direktur's own request filed by the PM (`direktur_via_pm`).
+ String? get selfApproval;
 /// Create a copy of ApprovalRuleInfo
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -2657,20 +2658,20 @@ $ApprovalRuleInfoCopyWith<ApprovalRuleInfo> get copyWith => _$ApprovalRuleInfoCo
 @override
 bool operator ==(Object other) {
   final _this = this as ApprovalRuleInfo;
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is ApprovalRuleInfo&&(identical(other.name, _this.name) || other.name == _this.name)&&(identical(other.acknowledge, _this.acknowledge) || other.acknowledge == _this.acknowledge)&&(identical(other.acknowledgeDelegatedTo, _this.acknowledgeDelegatedTo) || other.acknowledgeDelegatedTo == _this.acknowledgeDelegatedTo)&&(identical(other.acknowledgeBy, _this.acknowledgeBy) || other.acknowledgeBy == _this.acknowledgeBy)&&(identical(other.acknowledgeRole, _this.acknowledgeRole) || other.acknowledgeRole == _this.acknowledgeRole)&&const DeepCollectionEquality().equals(other.decisionRoles, _this.decisionRoles)&&const DeepCollectionEquality().equals(other.skipped, _this.skipped)&&const DeepCollectionEquality().equals(other.steps, _this.steps));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is ApprovalRuleInfo&&(identical(other.name, _this.name) || other.name == _this.name)&&(identical(other.acknowledge, _this.acknowledge) || other.acknowledge == _this.acknowledge)&&(identical(other.acknowledgeDelegatedTo, _this.acknowledgeDelegatedTo) || other.acknowledgeDelegatedTo == _this.acknowledgeDelegatedTo)&&(identical(other.acknowledgeBy, _this.acknowledgeBy) || other.acknowledgeBy == _this.acknowledgeBy)&&(identical(other.acknowledgeRole, _this.acknowledgeRole) || other.acknowledgeRole == _this.acknowledgeRole)&&const DeepCollectionEquality().equals(other.decisionRoles, _this.decisionRoles)&&const DeepCollectionEquality().equals(other.skipped, _this.skipped)&&const DeepCollectionEquality().equals(other.steps, _this.steps)&&(identical(other.selfApproval, _this.selfApproval) || other.selfApproval == _this.selfApproval));
 }
 
 
 @override
 int get hashCode {
   final _this = this as ApprovalRuleInfo;
-  return Object.hash(runtimeType,_this.name,_this.acknowledge,_this.acknowledgeDelegatedTo,_this.acknowledgeBy,_this.acknowledgeRole,const DeepCollectionEquality().hash(_this.decisionRoles),const DeepCollectionEquality().hash(_this.skipped),const DeepCollectionEquality().hash(_this.steps));
+  return Object.hash(runtimeType,_this.name,_this.acknowledge,_this.acknowledgeDelegatedTo,_this.acknowledgeBy,_this.acknowledgeRole,const DeepCollectionEquality().hash(_this.decisionRoles),const DeepCollectionEquality().hash(_this.skipped),const DeepCollectionEquality().hash(_this.steps),_this.selfApproval);
 }
 
 @override
 String toString() {
   final _this = this as ApprovalRuleInfo;
-  return 'ApprovalRuleInfo(name: ${_this.name}, acknowledge: ${_this.acknowledge}, acknowledgeDelegatedTo: ${_this.acknowledgeDelegatedTo}, acknowledgeBy: ${_this.acknowledgeBy}, acknowledgeRole: ${_this.acknowledgeRole}, decisionRoles: ${_this.decisionRoles}, skipped: ${_this.skipped}, steps: ${_this.steps})';
+  return 'ApprovalRuleInfo(name: ${_this.name}, acknowledge: ${_this.acknowledge}, acknowledgeDelegatedTo: ${_this.acknowledgeDelegatedTo}, acknowledgeBy: ${_this.acknowledgeBy}, acknowledgeRole: ${_this.acknowledgeRole}, decisionRoles: ${_this.decisionRoles}, skipped: ${_this.skipped}, steps: ${_this.steps}, selfApproval: ${_this.selfApproval})';
 }
 
 
@@ -2681,7 +2682,7 @@ abstract mixin class $ApprovalRuleInfoCopyWith<$Res>  {
   factory $ApprovalRuleInfoCopyWith(ApprovalRuleInfo value, $Res Function(ApprovalRuleInfo) _then) = _$ApprovalRuleInfoCopyWithImpl;
 @useResult
 $Res call({
- String name, String acknowledge, String? acknowledgeDelegatedTo, String? acknowledgeBy, String? acknowledgeRole, List<String> decisionRoles, List<SkippedPosition> skipped, List<RuleStep> steps
+ String name, String acknowledge, String? acknowledgeDelegatedTo, String? acknowledgeBy, String? acknowledgeRole, List<String> decisionRoles, List<SkippedPosition> skipped, List<RuleStep> steps, String? selfApproval
 });
 
 
@@ -2698,7 +2699,7 @@ class _$ApprovalRuleInfoCopyWithImpl<$Res>
 
 /// Create a copy of ApprovalRuleInfo
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? name = null,Object? acknowledge = null,Object? acknowledgeDelegatedTo = freezed,Object? acknowledgeBy = freezed,Object? acknowledgeRole = freezed,Object? decisionRoles = null,Object? skipped = null,Object? steps = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? name = null,Object? acknowledge = null,Object? acknowledgeDelegatedTo = freezed,Object? acknowledgeBy = freezed,Object? acknowledgeRole = freezed,Object? decisionRoles = null,Object? skipped = null,Object? steps = null,Object? selfApproval = freezed,}) {
   return _then(ApprovalRuleInfo(
 name: null == name ? _self.name : name // ignore: cast_nullable_to_non_nullable
 as String,acknowledge: null == acknowledge ? _self.acknowledge : acknowledge // ignore: cast_nullable_to_non_nullable
@@ -2708,7 +2709,8 @@ as String?,acknowledgeRole: freezed == acknowledgeRole ? _self.acknowledgeRole :
 as String?,decisionRoles: null == decisionRoles ? _self.decisionRoles : decisionRoles // ignore: cast_nullable_to_non_nullable
 as List<String>,skipped: null == skipped ? _self.skipped : skipped // ignore: cast_nullable_to_non_nullable
 as List<SkippedPosition>,steps: null == steps ? _self.steps : steps // ignore: cast_nullable_to_non_nullable
-as List<RuleStep>,
+as List<RuleStep>,selfApproval: freezed == selfApproval ? _self.selfApproval : selfApproval // ignore: cast_nullable_to_non_nullable
+as String?,
   ));
 }
 
@@ -2793,10 +2795,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String name,  String acknowledge,  String? acknowledgeDelegatedTo,  String? acknowledgeBy,  String? acknowledgeRole,  List<String> decisionRoles,  List<SkippedPosition> skipped,  List<RuleStep> steps)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String name,  String acknowledge,  String? acknowledgeDelegatedTo,  String? acknowledgeBy,  String? acknowledgeRole,  List<String> decisionRoles,  List<SkippedPosition> skipped,  List<RuleStep> steps,  String? selfApproval)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _ApprovalRuleInfo() when $default != null:
-return $default(_that.name,_that.acknowledge,_that.acknowledgeDelegatedTo,_that.acknowledgeBy,_that.acknowledgeRole,_that.decisionRoles,_that.skipped,_that.steps);case _:
+return $default(_that.name,_that.acknowledge,_that.acknowledgeDelegatedTo,_that.acknowledgeBy,_that.acknowledgeRole,_that.decisionRoles,_that.skipped,_that.steps,_that.selfApproval);case _:
   return orElse();
 
 }
@@ -2814,10 +2816,10 @@ return $default(_that.name,_that.acknowledge,_that.acknowledgeDelegatedTo,_that.
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String name,  String acknowledge,  String? acknowledgeDelegatedTo,  String? acknowledgeBy,  String? acknowledgeRole,  List<String> decisionRoles,  List<SkippedPosition> skipped,  List<RuleStep> steps)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String name,  String acknowledge,  String? acknowledgeDelegatedTo,  String? acknowledgeBy,  String? acknowledgeRole,  List<String> decisionRoles,  List<SkippedPosition> skipped,  List<RuleStep> steps,  String? selfApproval)  $default,) {final _that = this;
 switch (_that) {
 case _ApprovalRuleInfo():
-return $default(_that.name,_that.acknowledge,_that.acknowledgeDelegatedTo,_that.acknowledgeBy,_that.acknowledgeRole,_that.decisionRoles,_that.skipped,_that.steps);case _:
+return $default(_that.name,_that.acknowledge,_that.acknowledgeDelegatedTo,_that.acknowledgeBy,_that.acknowledgeRole,_that.decisionRoles,_that.skipped,_that.steps,_that.selfApproval);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -2834,10 +2836,10 @@ return $default(_that.name,_that.acknowledge,_that.acknowledgeDelegatedTo,_that.
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String name,  String acknowledge,  String? acknowledgeDelegatedTo,  String? acknowledgeBy,  String? acknowledgeRole,  List<String> decisionRoles,  List<SkippedPosition> skipped,  List<RuleStep> steps)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String name,  String acknowledge,  String? acknowledgeDelegatedTo,  String? acknowledgeBy,  String? acknowledgeRole,  List<String> decisionRoles,  List<SkippedPosition> skipped,  List<RuleStep> steps,  String? selfApproval)?  $default,) {final _that = this;
 switch (_that) {
 case _ApprovalRuleInfo() when $default != null:
-return $default(_that.name,_that.acknowledge,_that.acknowledgeDelegatedTo,_that.acknowledgeBy,_that.acknowledgeRole,_that.decisionRoles,_that.skipped,_that.steps);case _:
+return $default(_that.name,_that.acknowledge,_that.acknowledgeDelegatedTo,_that.acknowledgeBy,_that.acknowledgeRole,_that.decisionRoles,_that.skipped,_that.steps,_that.selfApproval);case _:
   return null;
 
 }
@@ -2849,7 +2851,7 @@ return $default(_that.name,_that.acknowledge,_that.acknowledgeDelegatedTo,_that.
 
 
 class _ApprovalRuleInfo extends ApprovalRuleInfo {
-  const _ApprovalRuleInfo({required this.name, required this.acknowledge, this.acknowledgeDelegatedTo, this.acknowledgeBy, this.acknowledgeRole,  List<String> decisionRoles = const [],  List<SkippedPosition> skipped = const [],  List<RuleStep> steps = const []}): _decisionRoles = decisionRoles,_skipped = skipped,_steps = steps,super._();
+  const _ApprovalRuleInfo({required this.name, required this.acknowledge, this.acknowledgeDelegatedTo, this.acknowledgeBy, this.acknowledgeRole,  List<String> decisionRoles = const [],  List<SkippedPosition> skipped = const [],  List<RuleStep> steps = const [], this.selfApproval}): _decisionRoles = decisionRoles,_skipped = skipped,_steps = steps,super._();
   
 
 @override final  String name;
@@ -2878,6 +2880,8 @@ class _ApprovalRuleInfo extends ApprovalRuleInfo {
   return EqualUnmodifiableListView(_steps);
 }
 
+/// ADR 0021: narrow G1 exception — a Direktur's own request filed by the PM (`direktur_via_pm`).
+@override final  String? selfApproval;
 
 /// Create a copy of ApprovalRuleInfo
 /// with the given fields replaced by the non-null parameter values.
@@ -2889,18 +2893,18 @@ _$ApprovalRuleInfoCopyWith<_ApprovalRuleInfo> get copyWith => __$ApprovalRuleInf
 
 @override
 bool operator ==(Object other) {
-    return identical(this, other) || (other.runtimeType == runtimeType&&other is _ApprovalRuleInfo&&(identical(other.name, name) || other.name == name)&&(identical(other.acknowledge, acknowledge) || other.acknowledge == acknowledge)&&(identical(other.acknowledgeDelegatedTo, acknowledgeDelegatedTo) || other.acknowledgeDelegatedTo == acknowledgeDelegatedTo)&&(identical(other.acknowledgeBy, acknowledgeBy) || other.acknowledgeBy == acknowledgeBy)&&(identical(other.acknowledgeRole, acknowledgeRole) || other.acknowledgeRole == acknowledgeRole)&&const DeepCollectionEquality().equals(other.decisionRoles, _decisionRoles)&&const DeepCollectionEquality().equals(other.skipped, _skipped)&&const DeepCollectionEquality().equals(other.steps, _steps));
+    return identical(this, other) || (other.runtimeType == runtimeType&&other is _ApprovalRuleInfo&&(identical(other.name, name) || other.name == name)&&(identical(other.acknowledge, acknowledge) || other.acknowledge == acknowledge)&&(identical(other.acknowledgeDelegatedTo, acknowledgeDelegatedTo) || other.acknowledgeDelegatedTo == acknowledgeDelegatedTo)&&(identical(other.acknowledgeBy, acknowledgeBy) || other.acknowledgeBy == acknowledgeBy)&&(identical(other.acknowledgeRole, acknowledgeRole) || other.acknowledgeRole == acknowledgeRole)&&const DeepCollectionEquality().equals(other.decisionRoles, _decisionRoles)&&const DeepCollectionEquality().equals(other.skipped, _skipped)&&const DeepCollectionEquality().equals(other.steps, _steps)&&(identical(other.selfApproval, selfApproval) || other.selfApproval == selfApproval));
 }
 
 
 @override
 int get hashCode {
-    return Object.hash(runtimeType,name,acknowledge,acknowledgeDelegatedTo,acknowledgeBy,acknowledgeRole,const DeepCollectionEquality().hash(_decisionRoles),const DeepCollectionEquality().hash(_skipped),const DeepCollectionEquality().hash(_steps));
+    return Object.hash(runtimeType,name,acknowledge,acknowledgeDelegatedTo,acknowledgeBy,acknowledgeRole,const DeepCollectionEquality().hash(_decisionRoles),const DeepCollectionEquality().hash(_skipped),const DeepCollectionEquality().hash(_steps),selfApproval);
 }
 
 @override
 String toString() {
-    return 'ApprovalRuleInfo(name: $name, acknowledge: $acknowledge, acknowledgeDelegatedTo: $acknowledgeDelegatedTo, acknowledgeBy: $acknowledgeBy, acknowledgeRole: $acknowledgeRole, decisionRoles: $decisionRoles, skipped: $skipped, steps: $steps)';
+    return 'ApprovalRuleInfo(name: $name, acknowledge: $acknowledge, acknowledgeDelegatedTo: $acknowledgeDelegatedTo, acknowledgeBy: $acknowledgeBy, acknowledgeRole: $acknowledgeRole, decisionRoles: $decisionRoles, skipped: $skipped, steps: $steps, selfApproval: $selfApproval)';
 }
 
 
@@ -2911,7 +2915,7 @@ abstract mixin class _$ApprovalRuleInfoCopyWith<$Res> implements $ApprovalRuleIn
   factory _$ApprovalRuleInfoCopyWith(_ApprovalRuleInfo value, $Res Function(_ApprovalRuleInfo) _then) = __$ApprovalRuleInfoCopyWithImpl;
 @override @useResult
 $Res call({
- String name, String acknowledge, String? acknowledgeDelegatedTo, String? acknowledgeBy, String? acknowledgeRole, List<String> decisionRoles, List<SkippedPosition> skipped, List<RuleStep> steps
+ String name, String acknowledge, String? acknowledgeDelegatedTo, String? acknowledgeBy, String? acknowledgeRole, List<String> decisionRoles, List<SkippedPosition> skipped, List<RuleStep> steps, String? selfApproval
 });
 
 
@@ -2928,7 +2932,7 @@ class __$ApprovalRuleInfoCopyWithImpl<$Res>
 
 /// Create a copy of ApprovalRuleInfo
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? name = null,Object? acknowledge = null,Object? acknowledgeDelegatedTo = freezed,Object? acknowledgeBy = freezed,Object? acknowledgeRole = freezed,Object? decisionRoles = null,Object? skipped = null,Object? steps = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? name = null,Object? acknowledge = null,Object? acknowledgeDelegatedTo = freezed,Object? acknowledgeBy = freezed,Object? acknowledgeRole = freezed,Object? decisionRoles = null,Object? skipped = null,Object? steps = null,Object? selfApproval = freezed,}) {
   return _then(_ApprovalRuleInfo(
 name: null == name ? _self.name : name // ignore: cast_nullable_to_non_nullable
 as String,acknowledge: null == acknowledge ? _self.acknowledge : acknowledge // ignore: cast_nullable_to_non_nullable
@@ -2938,7 +2942,8 @@ as String?,acknowledgeRole: freezed == acknowledgeRole ? _self.acknowledgeRole :
 as String?,decisionRoles: null == decisionRoles ? _self._decisionRoles : decisionRoles // ignore: cast_nullable_to_non_nullable
 as List<String>,skipped: null == skipped ? _self._skipped : skipped // ignore: cast_nullable_to_non_nullable
 as List<SkippedPosition>,steps: null == steps ? _self._steps : steps // ignore: cast_nullable_to_non_nullable
-as List<RuleStep>,
+as List<RuleStep>,selfApproval: freezed == selfApproval ? _self.selfApproval : selfApproval // ignore: cast_nullable_to_non_nullable
+as String?,
   ));
 }
 

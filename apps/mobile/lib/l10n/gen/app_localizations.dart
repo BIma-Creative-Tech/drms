@@ -1618,7 +1618,7 @@ abstract class AppLocalizations {
   /// No description provided for @decisionForbidden.
   ///
   /// In id, this message translates to:
-  /// **'Anda tidak dapat memutuskan pengajuan ini. Hanya Direktur (Diketahui) dan Finance (Approval) yang memutuskan, dan hanya pada gilirannya. Data dimuat ulang.'**
+  /// **'Anda tidak dapat memutuskan pengajuan ini. Hanya PM project pengajuan ini, Direktur dan Finance yang memutuskan, masing-masing hanya pada gilirannya. Data dimuat ulang.'**
   String get decisionForbidden;
 
   /// No description provided for @decisionTitleAcknowledgeDirektur.
@@ -1638,6 +1638,42 @@ abstract class AppLocalizations {
   /// In id, this message translates to:
   /// **'Setujui (Diketahui)'**
   String get actionAcknowledgeDirektur;
+
+  /// No description provided for @decisionTitleAcknowledgePm.
+  ///
+  /// In id, this message translates to:
+  /// **'Setujui sebagai PM project'**
+  String get decisionTitleAcknowledgePm;
+
+  /// No description provided for @decisionHintPm.
+  ///
+  /// In id, this message translates to:
+  /// **'Pengajuan diteruskan ke Direktur.'**
+  String get decisionHintPm;
+
+  /// No description provided for @decisionTitleApproveDirektur.
+  ///
+  /// In id, this message translates to:
+  /// **'Setujui sebagai Direktur'**
+  String get decisionTitleApproveDirektur;
+
+  /// No description provided for @decisionHintDirekturFinal.
+  ///
+  /// In id, this message translates to:
+  /// **'Pengajuan diteruskan ke Finance untuk transfer.'**
+  String get decisionHintDirekturFinal;
+
+  /// No description provided for @actionAcknowledgePm.
+  ///
+  /// In id, this message translates to:
+  /// **'Setujui'**
+  String get actionAcknowledgePm;
+
+  /// No description provided for @direkturViaPmNote.
+  ///
+  /// In id, this message translates to:
+  /// **'Pengajuan Direktur — diajukan oleh PM (kebijakan owner 2026-10-10)'**
+  String get direkturViaPmNote;
 
   /// No description provided for @historyTitle.
   ///
@@ -1774,7 +1810,7 @@ abstract class AppLocalizations {
   /// No description provided for @teamReadOnlyHint.
   ///
   /// In id, this message translates to:
-  /// **'Pantauan tim — hanya lihat. Persetujuan dilakukan Direktur dan Finance.'**
+  /// **'Pantauan tim — hanya lihat. Pengajuan yang menunggu persetujuan Anda sebagai PM project ada di menu Persetujuan.'**
   String get teamReadOnlyHint;
 
   /// No description provided for @teamNoScope.

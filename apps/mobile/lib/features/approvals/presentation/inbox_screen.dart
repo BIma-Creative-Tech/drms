@@ -22,7 +22,7 @@ String inboxStepLabel(AppLocalizations t, InboxItem it) {
   return t.stepApprove(it.level ?? 1);
 }
 
-/// Direktur/Finance inbox (ADR 0013) with budget impact (red above the warn %, US-26) and open flags (US-59).
+/// PM project / Direktur / Finance inbox (ADR 0013, ADR 0021) with budget impact (red above the warn %, US-26) and open flags (US-59).
 /// E5: budget addenda waiting for the caller are listed above the expense requests ([AddendumInboxSection]).
 class InboxScreen extends ConsumerWidget {
   const InboxScreen({super.key});

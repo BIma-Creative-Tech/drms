@@ -70,7 +70,8 @@ abstract class Capabilities with _$Capabilities {
   /// Fallback for a `/me` cached by an app version before E1 (no `capabilities` field): the same
   /// rule the server applies (`apps/web/src/api/v1/endpoints/me.ts`).
   factory Capabilities.fromRoles(Set<Role> roles) => Capabilities(
-    approvalInbox: roles.contains(Role.owner) || roles.contains(Role.finance),
+    // ADR 0021: the PM project approves the first step of his project's requests.
+    approvalInbox: roles.contains(Role.owner) || roles.contains(Role.finance) || roles.contains(Role.pm),
     teamMonitor: roles.contains(Role.pm),
     progressReportCreate: roles.contains(Role.pm) || roles.contains(Role.owner),
   );
