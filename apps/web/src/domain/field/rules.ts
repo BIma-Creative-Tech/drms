@@ -21,21 +21,22 @@ export const PROJECT_KIND_LABELS: Record<ProjectKind, string> = {
   trading: 'Trading',
 }
 
-export const FIELD_REPORT_TYPES = ['service_report', 'unit_timesheet', 'aftersales_activity'] as const
+export const FIELD_REPORT_TYPES = ['service_report', 'unit_timesheet', 'aftersales_activity', 'daily_report'] as const
 export type FieldReportType = (typeof FIELD_REPORT_TYPES)[number]
 export const FIELD_REPORT_LABELS: Record<FieldReportType, string> = {
   service_report: 'Laporan servis unit',
   unit_timesheet: 'Timesheet unit',
   aftersales_activity: 'Aktivitas aftersales',
+  daily_report: 'Laporan harian',
 }
 
 /**
  * ADR 0020 §1: the project kind decides the field reports. Konstruksi gets the daily construction
- * report in P3 (not part of FR1); trading and umum have none.
+ * report (P3, `daily_report`); trading and umum have none.
  */
 export const REPORT_TYPES_BY_KIND: Readonly<Record<ProjectKind, readonly FieldReportType[]>> = {
   umum: [],
-  konstruksi: [],
+  konstruksi: ['daily_report'],
   kontrak_unit: ['unit_timesheet', 'service_report'],
   aftersales: ['service_report', 'aftersales_activity'],
   trading: [],
@@ -105,7 +106,7 @@ export const EDIT_WINDOW_HOURS = 24
 export const MAX_HOURS_PER_DAY = 24
 /** A report date may lie at most this many days before the day it reaches the server (offline queue). */
 export const BACKDATE_MAX_DAYS = 14
-export const MAX_PHOTOS: Readonly<Record<FieldReportType, number>> = { service_report: 10, unit_timesheet: 1, aftersales_activity: 5 }
+export const MAX_PHOTOS: Readonly<Record<FieldReportType, number>> = { service_report: 10, unit_timesheet: 1, aftersales_activity: 5, daily_report: 10 }
 /** HM / hours / litres: ≥ 0, ≤ 2 decimals. */
 export const MAX_HM = 10_000_000
 

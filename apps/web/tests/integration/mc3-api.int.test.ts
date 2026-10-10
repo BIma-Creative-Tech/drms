@@ -201,7 +201,7 @@ describe('MC3 — GET /me companies[] + deprecated single-PT fields', () => {
     expect(me.legacyCompanyId).toBe(A)
     expect([...me.roles].sort()).toEqual(['pk-finance', 'pk-pm', 'pk-staff'])
     // FR1: field-report capabilities stay false while no selected PT has companies.fieldReportsEnabled
-    expect(me.capabilities).toEqual({ approvalInbox: true, teamMonitor: true, progressReportCreate: true, serviceReportCreate: false, unitTimesheetCreate: false, aftersalesActivityCreate: false })
+    expect(me.capabilities).toEqual({ approvalInbox: true, teamMonitor: true, progressReportCreate: true, serviceReportCreate: false, unitTimesheetCreate: false, aftersalesActivityCreate: false, dailyReportCreate: false })
     expect(me.employee.id).toBe(X.empTriA)
     expect(me.settings.shortCode).toBe('DRMS')
     // narrowed read selection: companies[] still lists every membership, `selected` + legacy follow the selection
@@ -411,6 +411,22 @@ const ROUTE_CLASSES: Record<string, RouteClass> = {
   'POST /service-reports': 'named-pt',
   'POST /unit-timesheets': 'named-pt',
   'POST /aftersales-activities': 'named-pt',
+  // P3 konstruksi: RAP (per project / item) + Laporan harian
+  'GET /rap/template.xlsx': 'public', // shared uom codes only
+  'GET /projects/:id/rap': 'document',
+  'GET /projects/:id/rap.xlsx': 'document',
+  'POST /projects/:id/rap/items': 'document',
+  'PATCH /rap-items/:id': 'document',
+  'POST /projects/:id/rap/import/preview': 'document',
+  'POST /projects/:id/rap/import/commit': 'document',
+  'POST /projects/:id/rap/apply-template': 'document',
+  'POST /projects/:id/rap/save-template': 'document',
+  'GET /projects/:id/daily-recap': 'document',
+  'GET /daily-reports': 'selection',
+  'GET /daily-reports/:id': 'document',
+  'PATCH /daily-reports/:id': 'document',
+  'POST /daily-reports/:id/corrections': 'document',
+  'POST /daily-reports': 'named-pt',
 }
 
 describe('MC3 — route classes sampled across PTs', () => {

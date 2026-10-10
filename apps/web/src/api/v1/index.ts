@@ -6,6 +6,7 @@ import { ATTENDANCE_ENDPOINTS } from './endpoints/attendance'
 import { registerDeviceEndpoint, revokeDeviceEndpoint } from './endpoints/devices'
 import { healthEndpoint, healthHeadEndpoint, readyEndpoint, readyHeadEndpoint } from './endpoints/health'
 import { CASH_ENDPOINTS } from './endpoints/cash'
+import { DAILY_ENDPOINTS } from './endpoints/daily'
 import { EXPENSE_ENDPOINTS } from './endpoints/expense-requests'
 import { FIELD_ENDPOINTS } from './endpoints/field'
 import { mastersEndpoint } from './endpoints/masters'
@@ -64,4 +65,6 @@ export const v1Endpoints: Endpoint[] = [
   ...SHORTFALL_ENDPOINTS,
   // FR1 (ADR 0020): field reports per project kind — service reports, unit timesheets, aftersales log, units
   ...FIELD_ENDPOINTS,
+  // P3: konstruksi RAP (Excel import, templates) + Laporan Harian (ledger, corrections, weekly recap)
+  ...DAILY_ENDPOINTS,
 ]

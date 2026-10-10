@@ -57,9 +57,10 @@ export async function saveStageSet(req: PayloadRequest, projectId: number, body:
   const project = await requireVisibleProject(req, projectId)
   // ADR 0016 §5: roles + team scope IN THE PROJECT's PT
   const company = relId((project as { company?: unknown }).company)
-  const owner = hasRole(req, 'pk-owner', company)
+  // owner decision 2026-10-09: Admin has the Direktur's rights on stages too
+  const owner = hasRole(req, ['pk-owner', 'pk-admin'], company)
   if (!owner && !(hasRole(req, 'pk-pm', company) && (await resolveScope(req, company ?? null)).teamProjects.includes(projectId))) {
-    fail(403, 'FORBIDDEN', 'Tahapan hanya dapat diubah oleh Direktur atau PM project ini.')
+    fail(403, 'FORBIDDEN', 'Tahapan hanya dapat diubah oleh Direktur/Admin atau PM project ini.')
   }
   if (project.status === 'arsip') fail(409, 'STATE_CONFLICT', 'Project sudah diarsipkan.')
   await lockProject(req, projectId)
@@ -85,7 +86,7 @@ export async function saveStageSet(req: PayloadRequest, projectId: number, body:
   const removed = existing.filter((s) => s.active && !keep.has(s.id))
   const reactivated = input.filter((s) => s.id !== undefined && byId.get(s.id)!.active === false)
   if (!owner && (added.length > 0 || removed.length > 0 || reactivated.length > 0)) {
-    fail(403, 'FORBIDDEN', 'Menambah atau menonaktifkan tahapan hanya oleh Direktur. PM dapat mengubah nama, urutan dan bobot.')
+    fail(403, 'FORBIDDEN', 'Menambah atau menonaktifkan tahapan hanya oleh Direktur/Admin. PM dapat mengubah nama, urutan dan bobot.')
   }
   const reweighted = input.filter((s) => s.id !== undefined && round2(byId.get(s.id)!.weightPct) !== round2(s.weightPct))
   const reason = (body.reason ?? '').trim()

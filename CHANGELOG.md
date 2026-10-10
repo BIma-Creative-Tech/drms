@@ -6,6 +6,52 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added (konstruksi: RAP + Laporan harian — P3)
+
+Owner decisions 2026-10-10. Migrations `20261011_100000_p3_rap` (new tables + enum value `daily_report`, additive)
+and `20261011_110000_p3_security` (triggers, CHECKs, grants; default resource types + `LH` sequence per PT). Behind
+the same per-PT flag `fieldReportsEnabled`. The APK screens follow (mobile 0.5.0).
+
+- **RAP per konstruksi project** (`rap-items`): item code (unique per project), uraian, tahapan, jenis
+  **pekerjaan** (counts toward the stage %) or **material** (masuk / terpakai / stok only), satuan, volume, harga
+  satuan (visible only to Direktur / Admin / Finance / PM of the project), optional bobot. Edited by the Direktur /
+  Admin or the PM of the project; **locked once a daily report realised anything** — then only Direktur / Admin with
+  a reason (409 `RAP_LOCKED`). Items are deactivated, never deleted.
+  - **Excel import** (sheet RAP: kode, uraian, tahapan, jenis, satuan, volume, harga_satuan, bobot + Petunjuk, with
+    dropdowns): preview → commit of the same file (sha256, 409 `FILE_CHANGED`), idempotent by code, items missing
+    from the file deactivated, new stages (Direktur / Admin only) with weights proposed from the value share. Template
+    download and "unduh RAP project". **RAP templates** per PT (`rap-templates`: save a project's RAP, apply to an
+    empty project).
+  - **Stage progress from the RAP**: a stage with active work items is RAP-driven (`project_stages.progress_mode =
+    rap`): item % = min(realised / volume, 1); stage % weighted by value (volume × price) when every item is priced,
+    otherwise equal; project % = Σ weight × stage % as before. Manual progress reports on such a stage → 409
+    `STAGE_RAP_DRIVEN`.
+- **Laporan harian** (`daily-reports`, numbering `LH/YYMM/####`): one per project, reporter and date (409
+  `DAILY_EXISTS`); weather morning / noon / afternoon, rain and stop hours, manpower and equipment per **resource
+  type** (`resource-types` per PT; defaults Mandor, tukang, kenek, operator, excavator, molen, vibrator, dump truck),
+  volume per work item, material in / used per material item, issues, notes, ≤ 10 photos. Created by Staff assigned
+  to the project, the team PM or the Direktur (Finance / Admin read only); reporter edits ≤ 24 h, then PM / Direktur
+  corrections with a reason. Volumes are an **append-only ledger** (`daily-report-lines`, origin report / edit /
+  correction) — the DB moves the RAP realisation from it and refuses every other change. Above the RAP volume:
+  allowed with a note (400 `OVER_RAP_NOTE_REQUIRED`), flag `MELEBIHI_RAP`, in-app notification to the project PM; the
+  same item booked by another reporter that day → flag `POSSIBLE_DUPLICATE`.
+- **Weekly recap "Minggu ke-N"** (Mon–Sun from the project start): reports, worker-days, rain / stop hours per week,
+  volume per work item per week and cumulative %.
+- Web: *Proyek → Laporan lapangan → Laporan harian* (list, input, detail with volume history, edit / correction),
+  *RAP & rekap* per project (stage %, items, material stock, weekly recap, Excel import); daily reports in the project
+  timeline.
+- API v1: `GET /projects/{id}/rap`, `GET /rap/template.xlsx`, `GET /projects/{id}/rap.xlsx`,
+  `POST /projects/{id}/rap/items`, `PATCH /rap-items/{id}`, `POST /projects/{id}/rap/import/{preview,commit}`
+  (multipart), `POST /projects/{id}/rap/{apply-template,save-template}`; `/daily-reports` (list, detail incl. ledger,
+  create, edit, `/{id}/corrections`), `GET /projects/{id}/daily-recap`; `GET /me` capability `dailyReportCreate`;
+  sync item `daily_report.upsert` (`server_daily_report`).
+
+### Changed (Admin = Direktur parity, progress reports)
+
+- `/me` capability `progressReportCreate` is now true for Admin and Admin may upload progress photos (Admin may create
+  progress reports since the owner decision of 2026-10-09). Field reports stay read-only for Finance / Admin (owner
+  decision 2026-10-10).
+
 ## [0.7.0] - 2026-10-10
 
 **Field reports per project kind** (ADR 0020, requirements v1.3; DRMS first: service reports, unit timesheets with a

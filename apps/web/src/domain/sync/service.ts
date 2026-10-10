@@ -587,7 +587,7 @@ async function store(c: ItemCtx, batch: SyncBatchIn, deviceId: string, verdict: 
       action: 'sync_offline',
       docType: ATTENDANCE.has(item.type) ? 'attendance' : item.type === 'progress_report.draft_upsert' ? 'progress_report' : (FIELD_SYNC_TYPES[item.type] ?? 'expense_request'),
       docId: result.server_id ?? undefined,
-      docNo: result.server_copy?.doc_no ?? result.server_report?.doc_no ?? result.server_service_report?.doc_no ?? undefined,
+      docNo: result.server_copy?.doc_no ?? result.server_report?.doc_no ?? result.server_service_report?.doc_no ?? result.server_daily_report?.doc_no ?? undefined,
       field: item.type,
       newValue: {
         client_uuid: item.client_uuid,

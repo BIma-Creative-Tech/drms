@@ -42,6 +42,19 @@ export const ProjectStages: CollectionConfig = withAudit(
       { name: 'sequence', type: 'number', label: 'Urutan', min: 1, required: true },
       { ...percentField('progressPct', 'Progress (%)'), defaultValue: 0, access: { create: () => false, update: () => false }, admin: { readOnly: true } },
       { ...activeField(), admin: { position: 'sidebar', description: 'Nonaktif = tidak dihitung dalam bobot & progress project.' } },
+      // P3: `rap` = the stage % comes from the RAP work items (daily reports); manual progress reports are refused
+      {
+        name: 'progressMode',
+        type: 'select',
+        label: 'Sumber progress',
+        defaultValue: 'manual',
+        options: [
+          { label: 'Laporan progress (manual)', value: 'manual' },
+          { label: 'RAP + laporan harian', value: 'rap' },
+        ],
+        access: { create: () => false, update: () => false },
+        admin: { readOnly: true, position: 'sidebar' },
+      },
       uuidField(),
     ],
   },

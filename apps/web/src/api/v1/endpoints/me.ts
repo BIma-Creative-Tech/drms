@@ -30,10 +30,12 @@ export function capabilitiesOf(roles: readonly Role[], opts: { fieldReportsEnabl
   return {
     approvalInbox: roles.some((r) => r === 'pk-owner' || r === 'pk-finance'),
     teamMonitor: roles.includes('pk-pm'),
-    progressReportCreate: roles.some((r) => r === 'pk-pm' || r === 'pk-owner'),
+    progressReportCreate: roles.some((r) => r === 'pk-pm' || r === 'pk-owner' || r === 'pk-admin'),
     serviceReportCreate: field,
     unitTimesheetCreate: field,
     aftersalesActivityCreate: field,
+    // P3: Laporan harian on projects of kind konstruksi
+    dailyReportCreate: field,
   }
 }
 
