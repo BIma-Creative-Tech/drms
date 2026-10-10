@@ -13,6 +13,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - **Web login:** a "Unduh aplikasi RR Teams" link → `/unduh` next to "Pemberitahuan privasi".
 
 ### Fixed
+- **Field reports (web): HM values with a thousands dot were misread** (UAT FR T-01). The forms show "1.023"
+  (Indonesian thousands), but the parser read a single dot as a decimal point. As a result:
+  - the timesheet form rejected its own prefilled HM awal;
+  - "5.000" was saved as 5;
+  - the correction dialog quietly re-sent an untouched HM "1.030" as 1.03.
+  A single dot that groups exactly three digits now means thousands. Values that were valid before (at most two
+  decimals) are read the same as before. The APK was not affected.
 - **CI image job:** `trivy-image.sh` retries no longer leave a failed attempt's output or the retry warning in the scan
   JSON. That output made the report step's `jq` exit 5 and blocked the v0.7.0 tag images.
 
