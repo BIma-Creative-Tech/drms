@@ -18,7 +18,10 @@ void main() {
       );
     });
     addTearDown(db.close);
-    expect(db.schemaVersion, 5); // v5 (FR1 field reports) on top; the v4 column is what this test checks
+    expect(
+      db.schemaVersion,
+      6,
+    ); // v5 (FR1 field reports) + v6 (P3 RAP caches) on top; the v4 column is what this test checks
     final repo = DraftRepository(db);
     final before = await repo.load(sub, 'd-4');
     expect(before!.title, 'Makan tukang');

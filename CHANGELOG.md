@@ -10,7 +10,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 Owner decisions 2026-10-10. Migrations `20261011_100000_p3_rap` (new tables + enum value `daily_report`, additive)
 and `20261011_110000_p3_security` (triggers, CHECKs, grants; default resource types + `LH` sequence per PT). Behind
-the same per-PT flag `fieldReportsEnabled`. The APK screens follow (mobile 0.5.0).
+the same per-PT flag `fieldReportsEnabled`.
+
+APK **mobile-v0.5.0** (pubspec `0.5.0+1`, notes `docs/release-notes/apk/0.5.0.md`; needs this server): "Laporan
+Harian" for konstruksi projects in Laporan Lapangan — offline draft + `daily_report.upsert`, RAP items (no prices)
+and resource types cached from `GET /projects/{id}/rap` (`resourceTypes` added there), over-RAP warning with
+required notes, drift schema **v6** (`field_rap_items`, `field_resource_types`; additive, every v5 row kept).
 
 - **RAP per konstruksi project** (`rap-items`): item code (unique per project), uraian, tahapan, jenis
   **pekerjaan** (counts toward the stage %) or **material** (masuk / terpakai / stok only), satuan, volume, harga

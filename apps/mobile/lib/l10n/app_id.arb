@@ -1669,5 +1669,115 @@
         "type": "int"
       }
     }
-  }
+  },
+  "dailyTitle": "Laporan Harian",
+  "dailyEditTitle": "Ubah Laporan Harian",
+  "dailyWeather": "Cuaca & jam hilang",
+  "dailyMorning": "Pagi",
+  "dailyNoon": "Siang",
+  "dailyAfternoon": "Sore",
+  "dailyRainHours": "Jam hujan",
+  "dailyStopHours": "Jam kerja berhenti",
+  "dailyWorkSection": "Volume pekerjaan hari ini",
+  "dailyPickProject": "Pilih project konstruksi dulu.",
+  "dailyNoRap": "Project ini belum punya RAP di HP. Tarik ke bawah untuk memuat ulang; bila tetap kosong, minta PM/Direktur mengisi RAP di web.",
+  "dailyRealised": "Realisasi {done} / {volume} {uom}",
+  "@dailyRealised": {
+    "placeholders": {
+      "done": {
+        "type": "String"
+      },
+      "volume": {
+        "type": "String"
+      },
+      "uom": {
+        "type": "String"
+      }
+    }
+  },
+  "dailyOverRap": "Melebihi RAP: {total} dari {volume} {uom} — isi catatan.",
+  "@dailyOverRap": {
+    "placeholders": {
+      "total": {
+        "type": "String"
+      },
+      "volume": {
+        "type": "String"
+      },
+      "uom": {
+        "type": "String"
+      }
+    }
+  },
+  "dailyOverRapNotify": "Ada volume melebihi RAP: laporan tetap dikirim, ditandai \"melebihi RAP\" dan PM project diberi notifikasi.",
+  "dailyMaterialSection": "Material",
+  "dailyMaterialHelp": "Masuk = diterima di lokasi hari ini; terpakai = dipakai hari ini. Material tidak dihitung ke progress.",
+  "dailyReceived": "Masuk",
+  "dailyUsed": "Terpakai",
+  "dailyStock": "Stok {stock} {uom}",
+  "@dailyStock": {
+    "placeholders": {
+      "stock": {
+        "type": "String"
+      },
+      "uom": {
+        "type": "String"
+      }
+    }
+  },
+  "dailyManpower": "Tenaga & alat",
+  "dailyEquipment": "Alat (unit · jam kerja)",
+  "dailyHours": "Jam",
+  "dailyWorkers": "{count} pekerja",
+  "@dailyWorkers": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "dailyNoResources": "Jenis tenaga/alat belum dimuat. Tarik ke bawah saat ada sinyal.",
+  "dailyNotesSection": "Kendala, catatan & foto",
+  "dailyIssues": "Kendala",
+  "dailyNotesRequired": "Wajib karena ada volume melebihi RAP.",
+  "dailyPhoto": "Foto pekerjaan",
+  "dailyPhotos": "Foto pekerjaan ({count}/{max})",
+  "@dailyPhotos": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "max": {
+        "type": "int"
+      }
+    }
+  },
+  "dailySubmit": "Kirim laporan harian",
+  "dailySummary": "{items} item pekerjaan · {workers} pekerja · {photos} foto",
+  "@dailySummary": {
+    "placeholders": {
+      "items": {
+        "type": "int"
+      },
+      "workers": {
+        "type": "int"
+      },
+      "photos": {
+        "type": "int"
+      }
+    }
+  },
+  "dailyNoProjects": "Tidak ada project konstruksi yang bisa Anda laporkan (Staff: project yang ditugaskan; PM: project tim).",
+  "dailySameDay": "Sudah ada laporan harian Anda untuk project & tanggal ini di HP. Buka laporan itu.",
+  "dailyFlagOverRap": "Melebihi RAP",
+  "dailyFlagDuplicate": "Kemungkinan dobel",
+  "dailyWorkItem": "Volume {item}",
+  "@dailyWorkItem": {
+    "placeholders": {
+      "item": {
+        "type": "String"
+      }
+    }
+  },
+  "dailyWorkerCount": "Jumlah pekerja"
 }

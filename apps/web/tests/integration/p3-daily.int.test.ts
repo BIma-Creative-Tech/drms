@@ -90,6 +90,8 @@ describe('RAP import (PM of the project)', () => {
     expect(r.body.totals).toBeNull()
     expect(Object.keys(r.body.items[0])).not.toContain('unitPrice')
     expect(r.body.canEdit).toBe(false)
+    // APK cache: the PT's default manpower / equipment types come with the RAP
+    expect(r.body.resourceTypes.map((x: { code: string }) => x.code)).toEqual(expect.arrayContaining(['MANDOR', 'EXCAVATOR']))
     for (const u of [w.users.staffA, w.users.finance]) {
       const p = await api('PATCH', `/api/v1/rap-items/${item['A.2']}`, u, { volume: 60 })
       expect(p.status, u.email).toBe(403)

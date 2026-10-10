@@ -36,6 +36,7 @@ bool canCreateField(UserProfile? profile, FieldReportType type, int? companyId) 
     FieldReportType.serviceReport => caps.serviceReportCreate,
     FieldReportType.unitTimesheet => caps.unitTimesheetCreate,
     FieldReportType.aftersalesActivity => caps.aftersalesActivityCreate,
+    FieldReportType.dailyReport => caps.dailyReportCreate,
   };
 }
 
@@ -157,6 +158,23 @@ final fieldClientsProvider = FutureProvider.autoDispose.family<List<FieldClient>
   if (sub == null) return const [];
   ref.watch(fieldCacheRevisionProvider);
   return ref.watch(fieldRepositoryProvider).clients(sub, companyId: companyId);
+});
+
+/// P3: active RAP items of a konstruksi project (cache; no prices).
+final fieldRapItemsProvider = FutureProvider.autoDispose.family<List<RapItem>, int>((ref, projectId) async {
+  final sub = ref.watch(currentSubProvider);
+  if (sub == null) return const [];
+  ref.watch(fieldCacheRevisionProvider);
+  ref.watch(openFieldDraftsProvider);
+  return ref.watch(fieldRepositoryProvider).rapItems(sub, projectId);
+});
+
+/// P3: manpower / equipment types of PT [companyId] (cache).
+final fieldResourceTypesProvider = FutureProvider.autoDispose.family<List<ResourceType>, int>((ref, companyId) async {
+  final sub = ref.watch(currentSubProvider);
+  if (sub == null) return const [];
+  ref.watch(fieldCacheRevisionProvider);
+  return ref.watch(fieldRepositoryProvider).resourceTypes(sub, companyId);
 });
 
 /// Field reports on this phone not yet applied by the server (drafts, queued, conflicts, rejections).

@@ -22,7 +22,8 @@ mixin _$Capabilities {
 /// reports on kontrak_unit / aftersales projects. The server already folds the PT flag in.
  bool get serviceReportCreate;/// FR1: unit timesheets on kontrak_unit projects (same rule).
  bool get unitTimesheetCreate;/// FR1: aftersales activities on aftersales projects (same rule).
- bool get aftersalesActivityCreate;
+ bool get aftersalesActivityCreate;/// P3: Laporan Harian on konstruksi projects (same rule; server ≥ 0.8 — older servers omit it → false).
+ bool get dailyReportCreate;
 /// Create a copy of Capabilities
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -34,20 +35,20 @@ $CapabilitiesCopyWith<Capabilities> get copyWith => _$CapabilitiesCopyWithImpl<C
 @override
 bool operator ==(Object other) {
   final _this = this as Capabilities;
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is Capabilities&&(identical(other.approvalInbox, _this.approvalInbox) || other.approvalInbox == _this.approvalInbox)&&(identical(other.teamMonitor, _this.teamMonitor) || other.teamMonitor == _this.teamMonitor)&&(identical(other.progressReportCreate, _this.progressReportCreate) || other.progressReportCreate == _this.progressReportCreate)&&(identical(other.serviceReportCreate, _this.serviceReportCreate) || other.serviceReportCreate == _this.serviceReportCreate)&&(identical(other.unitTimesheetCreate, _this.unitTimesheetCreate) || other.unitTimesheetCreate == _this.unitTimesheetCreate)&&(identical(other.aftersalesActivityCreate, _this.aftersalesActivityCreate) || other.aftersalesActivityCreate == _this.aftersalesActivityCreate));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is Capabilities&&(identical(other.approvalInbox, _this.approvalInbox) || other.approvalInbox == _this.approvalInbox)&&(identical(other.teamMonitor, _this.teamMonitor) || other.teamMonitor == _this.teamMonitor)&&(identical(other.progressReportCreate, _this.progressReportCreate) || other.progressReportCreate == _this.progressReportCreate)&&(identical(other.serviceReportCreate, _this.serviceReportCreate) || other.serviceReportCreate == _this.serviceReportCreate)&&(identical(other.unitTimesheetCreate, _this.unitTimesheetCreate) || other.unitTimesheetCreate == _this.unitTimesheetCreate)&&(identical(other.aftersalesActivityCreate, _this.aftersalesActivityCreate) || other.aftersalesActivityCreate == _this.aftersalesActivityCreate)&&(identical(other.dailyReportCreate, _this.dailyReportCreate) || other.dailyReportCreate == _this.dailyReportCreate));
 }
 
 
 @override
 int get hashCode {
   final _this = this as Capabilities;
-  return Object.hash(runtimeType,_this.approvalInbox,_this.teamMonitor,_this.progressReportCreate,_this.serviceReportCreate,_this.unitTimesheetCreate,_this.aftersalesActivityCreate);
+  return Object.hash(runtimeType,_this.approvalInbox,_this.teamMonitor,_this.progressReportCreate,_this.serviceReportCreate,_this.unitTimesheetCreate,_this.aftersalesActivityCreate,_this.dailyReportCreate);
 }
 
 @override
 String toString() {
   final _this = this as Capabilities;
-  return 'Capabilities(approvalInbox: ${_this.approvalInbox}, teamMonitor: ${_this.teamMonitor}, progressReportCreate: ${_this.progressReportCreate}, serviceReportCreate: ${_this.serviceReportCreate}, unitTimesheetCreate: ${_this.unitTimesheetCreate}, aftersalesActivityCreate: ${_this.aftersalesActivityCreate})';
+  return 'Capabilities(approvalInbox: ${_this.approvalInbox}, teamMonitor: ${_this.teamMonitor}, progressReportCreate: ${_this.progressReportCreate}, serviceReportCreate: ${_this.serviceReportCreate}, unitTimesheetCreate: ${_this.unitTimesheetCreate}, aftersalesActivityCreate: ${_this.aftersalesActivityCreate}, dailyReportCreate: ${_this.dailyReportCreate})';
 }
 
 
@@ -58,7 +59,7 @@ abstract mixin class $CapabilitiesCopyWith<$Res>  {
   factory $CapabilitiesCopyWith(Capabilities value, $Res Function(Capabilities) _then) = _$CapabilitiesCopyWithImpl;
 @useResult
 $Res call({
- bool approvalInbox, bool teamMonitor, bool progressReportCreate, bool serviceReportCreate, bool unitTimesheetCreate, bool aftersalesActivityCreate
+ bool approvalInbox, bool teamMonitor, bool progressReportCreate, bool serviceReportCreate, bool unitTimesheetCreate, bool aftersalesActivityCreate, bool dailyReportCreate
 });
 
 
@@ -75,7 +76,7 @@ class _$CapabilitiesCopyWithImpl<$Res>
 
 /// Create a copy of Capabilities
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? approvalInbox = null,Object? teamMonitor = null,Object? progressReportCreate = null,Object? serviceReportCreate = null,Object? unitTimesheetCreate = null,Object? aftersalesActivityCreate = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? approvalInbox = null,Object? teamMonitor = null,Object? progressReportCreate = null,Object? serviceReportCreate = null,Object? unitTimesheetCreate = null,Object? aftersalesActivityCreate = null,Object? dailyReportCreate = null,}) {
   return _then(Capabilities(
 approvalInbox: null == approvalInbox ? _self.approvalInbox : approvalInbox // ignore: cast_nullable_to_non_nullable
 as bool,teamMonitor: null == teamMonitor ? _self.teamMonitor : teamMonitor // ignore: cast_nullable_to_non_nullable
@@ -83,6 +84,7 @@ as bool,progressReportCreate: null == progressReportCreate ? _self.progressRepor
 as bool,serviceReportCreate: null == serviceReportCreate ? _self.serviceReportCreate : serviceReportCreate // ignore: cast_nullable_to_non_nullable
 as bool,unitTimesheetCreate: null == unitTimesheetCreate ? _self.unitTimesheetCreate : unitTimesheetCreate // ignore: cast_nullable_to_non_nullable
 as bool,aftersalesActivityCreate: null == aftersalesActivityCreate ? _self.aftersalesActivityCreate : aftersalesActivityCreate // ignore: cast_nullable_to_non_nullable
+as bool,dailyReportCreate: null == dailyReportCreate ? _self.dailyReportCreate : dailyReportCreate // ignore: cast_nullable_to_non_nullable
 as bool,
   ));
 }
@@ -168,10 +170,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( bool approvalInbox,  bool teamMonitor,  bool progressReportCreate,  bool serviceReportCreate,  bool unitTimesheetCreate,  bool aftersalesActivityCreate)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( bool approvalInbox,  bool teamMonitor,  bool progressReportCreate,  bool serviceReportCreate,  bool unitTimesheetCreate,  bool aftersalesActivityCreate,  bool dailyReportCreate)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _Capabilities() when $default != null:
-return $default(_that.approvalInbox,_that.teamMonitor,_that.progressReportCreate,_that.serviceReportCreate,_that.unitTimesheetCreate,_that.aftersalesActivityCreate);case _:
+return $default(_that.approvalInbox,_that.teamMonitor,_that.progressReportCreate,_that.serviceReportCreate,_that.unitTimesheetCreate,_that.aftersalesActivityCreate,_that.dailyReportCreate);case _:
   return orElse();
 
 }
@@ -189,10 +191,10 @@ return $default(_that.approvalInbox,_that.teamMonitor,_that.progressReportCreate
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( bool approvalInbox,  bool teamMonitor,  bool progressReportCreate,  bool serviceReportCreate,  bool unitTimesheetCreate,  bool aftersalesActivityCreate)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( bool approvalInbox,  bool teamMonitor,  bool progressReportCreate,  bool serviceReportCreate,  bool unitTimesheetCreate,  bool aftersalesActivityCreate,  bool dailyReportCreate)  $default,) {final _that = this;
 switch (_that) {
 case _Capabilities():
-return $default(_that.approvalInbox,_that.teamMonitor,_that.progressReportCreate,_that.serviceReportCreate,_that.unitTimesheetCreate,_that.aftersalesActivityCreate);case _:
+return $default(_that.approvalInbox,_that.teamMonitor,_that.progressReportCreate,_that.serviceReportCreate,_that.unitTimesheetCreate,_that.aftersalesActivityCreate,_that.dailyReportCreate);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -209,10 +211,10 @@ return $default(_that.approvalInbox,_that.teamMonitor,_that.progressReportCreate
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( bool approvalInbox,  bool teamMonitor,  bool progressReportCreate,  bool serviceReportCreate,  bool unitTimesheetCreate,  bool aftersalesActivityCreate)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( bool approvalInbox,  bool teamMonitor,  bool progressReportCreate,  bool serviceReportCreate,  bool unitTimesheetCreate,  bool aftersalesActivityCreate,  bool dailyReportCreate)?  $default,) {final _that = this;
 switch (_that) {
 case _Capabilities() when $default != null:
-return $default(_that.approvalInbox,_that.teamMonitor,_that.progressReportCreate,_that.serviceReportCreate,_that.unitTimesheetCreate,_that.aftersalesActivityCreate);case _:
+return $default(_that.approvalInbox,_that.teamMonitor,_that.progressReportCreate,_that.serviceReportCreate,_that.unitTimesheetCreate,_that.aftersalesActivityCreate,_that.dailyReportCreate);case _:
   return null;
 
 }
@@ -224,7 +226,7 @@ return $default(_that.approvalInbox,_that.teamMonitor,_that.progressReportCreate
 
 
 class _Capabilities extends Capabilities {
-  const _Capabilities({this.approvalInbox = false, this.teamMonitor = false, this.progressReportCreate = false, this.serviceReportCreate = false, this.unitTimesheetCreate = false, this.aftersalesActivityCreate = false}): super._();
+  const _Capabilities({this.approvalInbox = false, this.teamMonitor = false, this.progressReportCreate = false, this.serviceReportCreate = false, this.unitTimesheetCreate = false, this.aftersalesActivityCreate = false, this.dailyReportCreate = false}): super._();
   
 
 /// Direktur (`pk-owner`) or Finance (`pk-finance`): "Persetujuan" inbox.
@@ -240,6 +242,8 @@ class _Capabilities extends Capabilities {
 @override@JsonKey() final  bool unitTimesheetCreate;
 /// FR1: aftersales activities on aftersales projects (same rule).
 @override@JsonKey() final  bool aftersalesActivityCreate;
+/// P3: Laporan Harian on konstruksi projects (same rule; server ≥ 0.8 — older servers omit it → false).
+@override@JsonKey() final  bool dailyReportCreate;
 
 /// Create a copy of Capabilities
 /// with the given fields replaced by the non-null parameter values.
@@ -251,18 +255,18 @@ _$CapabilitiesCopyWith<_Capabilities> get copyWith => __$CapabilitiesCopyWithImp
 
 @override
 bool operator ==(Object other) {
-    return identical(this, other) || (other.runtimeType == runtimeType&&other is _Capabilities&&(identical(other.approvalInbox, approvalInbox) || other.approvalInbox == approvalInbox)&&(identical(other.teamMonitor, teamMonitor) || other.teamMonitor == teamMonitor)&&(identical(other.progressReportCreate, progressReportCreate) || other.progressReportCreate == progressReportCreate)&&(identical(other.serviceReportCreate, serviceReportCreate) || other.serviceReportCreate == serviceReportCreate)&&(identical(other.unitTimesheetCreate, unitTimesheetCreate) || other.unitTimesheetCreate == unitTimesheetCreate)&&(identical(other.aftersalesActivityCreate, aftersalesActivityCreate) || other.aftersalesActivityCreate == aftersalesActivityCreate));
+    return identical(this, other) || (other.runtimeType == runtimeType&&other is _Capabilities&&(identical(other.approvalInbox, approvalInbox) || other.approvalInbox == approvalInbox)&&(identical(other.teamMonitor, teamMonitor) || other.teamMonitor == teamMonitor)&&(identical(other.progressReportCreate, progressReportCreate) || other.progressReportCreate == progressReportCreate)&&(identical(other.serviceReportCreate, serviceReportCreate) || other.serviceReportCreate == serviceReportCreate)&&(identical(other.unitTimesheetCreate, unitTimesheetCreate) || other.unitTimesheetCreate == unitTimesheetCreate)&&(identical(other.aftersalesActivityCreate, aftersalesActivityCreate) || other.aftersalesActivityCreate == aftersalesActivityCreate)&&(identical(other.dailyReportCreate, dailyReportCreate) || other.dailyReportCreate == dailyReportCreate));
 }
 
 
 @override
 int get hashCode {
-    return Object.hash(runtimeType,approvalInbox,teamMonitor,progressReportCreate,serviceReportCreate,unitTimesheetCreate,aftersalesActivityCreate);
+    return Object.hash(runtimeType,approvalInbox,teamMonitor,progressReportCreate,serviceReportCreate,unitTimesheetCreate,aftersalesActivityCreate,dailyReportCreate);
 }
 
 @override
 String toString() {
-    return 'Capabilities(approvalInbox: $approvalInbox, teamMonitor: $teamMonitor, progressReportCreate: $progressReportCreate, serviceReportCreate: $serviceReportCreate, unitTimesheetCreate: $unitTimesheetCreate, aftersalesActivityCreate: $aftersalesActivityCreate)';
+    return 'Capabilities(approvalInbox: $approvalInbox, teamMonitor: $teamMonitor, progressReportCreate: $progressReportCreate, serviceReportCreate: $serviceReportCreate, unitTimesheetCreate: $unitTimesheetCreate, aftersalesActivityCreate: $aftersalesActivityCreate, dailyReportCreate: $dailyReportCreate)';
 }
 
 
@@ -273,7 +277,7 @@ abstract mixin class _$CapabilitiesCopyWith<$Res> implements $CapabilitiesCopyWi
   factory _$CapabilitiesCopyWith(_Capabilities value, $Res Function(_Capabilities) _then) = __$CapabilitiesCopyWithImpl;
 @override @useResult
 $Res call({
- bool approvalInbox, bool teamMonitor, bool progressReportCreate, bool serviceReportCreate, bool unitTimesheetCreate, bool aftersalesActivityCreate
+ bool approvalInbox, bool teamMonitor, bool progressReportCreate, bool serviceReportCreate, bool unitTimesheetCreate, bool aftersalesActivityCreate, bool dailyReportCreate
 });
 
 
@@ -290,7 +294,7 @@ class __$CapabilitiesCopyWithImpl<$Res>
 
 /// Create a copy of Capabilities
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? approvalInbox = null,Object? teamMonitor = null,Object? progressReportCreate = null,Object? serviceReportCreate = null,Object? unitTimesheetCreate = null,Object? aftersalesActivityCreate = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? approvalInbox = null,Object? teamMonitor = null,Object? progressReportCreate = null,Object? serviceReportCreate = null,Object? unitTimesheetCreate = null,Object? aftersalesActivityCreate = null,Object? dailyReportCreate = null,}) {
   return _then(_Capabilities(
 approvalInbox: null == approvalInbox ? _self.approvalInbox : approvalInbox // ignore: cast_nullable_to_non_nullable
 as bool,teamMonitor: null == teamMonitor ? _self.teamMonitor : teamMonitor // ignore: cast_nullable_to_non_nullable
@@ -298,6 +302,7 @@ as bool,progressReportCreate: null == progressReportCreate ? _self.progressRepor
 as bool,serviceReportCreate: null == serviceReportCreate ? _self.serviceReportCreate : serviceReportCreate // ignore: cast_nullable_to_non_nullable
 as bool,unitTimesheetCreate: null == unitTimesheetCreate ? _self.unitTimesheetCreate : unitTimesheetCreate // ignore: cast_nullable_to_non_nullable
 as bool,aftersalesActivityCreate: null == aftersalesActivityCreate ? _self.aftersalesActivityCreate : aftersalesActivityCreate // ignore: cast_nullable_to_non_nullable
+as bool,dailyReportCreate: null == dailyReportCreate ? _self.dailyReportCreate : dailyReportCreate // ignore: cast_nullable_to_non_nullable
 as bool,
   ));
 }

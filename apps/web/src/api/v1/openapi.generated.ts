@@ -11803,6 +11803,38 @@ export const openapiDocument = {
               "overBudget"
             ],
             "description": "Price roles only."
+          },
+          "resourceTypes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "tenaga",
+                    "alat"
+                  ]
+                },
+                "code": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "kind",
+                "code",
+                "name"
+              ]
+            },
+            "description": "Active manpower / equipment types of the project's PT (daily report pickers; APK cache)."
           }
         },
         "required": [
@@ -11813,7 +11845,8 @@ export const openapiDocument = {
           "needsReason",
           "items",
           "stages",
-          "totals"
+          "totals",
+          "resourceTypes"
         ]
       },
       "RapItem": {

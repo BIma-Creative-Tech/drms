@@ -159,7 +159,22 @@ export async function loadRap(req: PayloadRequest, projectId: number) {
     items,
     stages: stageDtos,
     totals: roles.prices ? { rapValue, budget: p.budget, overBudget: rapValue !== null && p.budget !== null && rapValue > p.budget } : null,
+    // the APK caches these with the RAP: manpower / equipment types of the project's PT for the daily report
+    resourceTypes: await resourceTypesOf(req, p.company),
   }
+}
+
+async function resourceTypesOf(req: PayloadRequest, company: number): Promise<Array<{ id: number; kind: 'tenaga' | 'alat'; code: string; name: string }>> {
+  const res = await req.payload.find({
+    collection: 'resource-types',
+    where: { and: [{ company: { equals: company } }, { active: { not_equals: false } }] },
+    sort: 'code',
+    depth: 0,
+    pagination: false,
+    overrideAccess: true, // SYSTEM-READ: masters of the project's PT (caller passed the project visibility check)
+    req,
+  })
+  return (res.docs as Array<{ id: number; kind: 'tenaga' | 'alat'; code: string; name: string }>).map((d) => ({ id: d.id, kind: d.kind, code: d.code, name: d.name }))
 }
 
 async function stageModes(req: PayloadRequest, p: Pick<Project, 'id' | 'company'>): Promise<Map<number, 'manual' | 'rap'>> {

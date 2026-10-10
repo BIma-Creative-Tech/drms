@@ -2551,4 +2551,133 @@ class AppLocalizationsId extends AppLocalizations {
   String fieldNewPhotos(int count) {
     return '$count foto baru';
   }
+
+  @override
+  String get dailyTitle => 'Laporan Harian';
+
+  @override
+  String get dailyEditTitle => 'Ubah Laporan Harian';
+
+  @override
+  String get dailyWeather => 'Cuaca & jam hilang';
+
+  @override
+  String get dailyMorning => 'Pagi';
+
+  @override
+  String get dailyNoon => 'Siang';
+
+  @override
+  String get dailyAfternoon => 'Sore';
+
+  @override
+  String get dailyRainHours => 'Jam hujan';
+
+  @override
+  String get dailyStopHours => 'Jam kerja berhenti';
+
+  @override
+  String get dailyWorkSection => 'Volume pekerjaan hari ini';
+
+  @override
+  String get dailyPickProject => 'Pilih project konstruksi dulu.';
+
+  @override
+  String get dailyNoRap =>
+      'Project ini belum punya RAP di HP. Tarik ke bawah untuk memuat ulang; bila tetap kosong, minta PM/Direktur mengisi RAP di web.';
+
+  @override
+  String dailyRealised(String done, String volume, String uom) {
+    return 'Realisasi $done / $volume $uom';
+  }
+
+  @override
+  String dailyOverRap(String total, String volume, String uom) {
+    return 'Melebihi RAP: $total dari $volume $uom — isi catatan.';
+  }
+
+  @override
+  String get dailyOverRapNotify =>
+      'Ada volume melebihi RAP: laporan tetap dikirim, ditandai \"melebihi RAP\" dan PM project diberi notifikasi.';
+
+  @override
+  String get dailyMaterialSection => 'Material';
+
+  @override
+  String get dailyMaterialHelp =>
+      'Masuk = diterima di lokasi hari ini; terpakai = dipakai hari ini. Material tidak dihitung ke progress.';
+
+  @override
+  String get dailyReceived => 'Masuk';
+
+  @override
+  String get dailyUsed => 'Terpakai';
+
+  @override
+  String dailyStock(String stock, String uom) {
+    return 'Stok $stock $uom';
+  }
+
+  @override
+  String get dailyManpower => 'Tenaga & alat';
+
+  @override
+  String get dailyEquipment => 'Alat (unit · jam kerja)';
+
+  @override
+  String get dailyHours => 'Jam';
+
+  @override
+  String dailyWorkers(int count) {
+    return '$count pekerja';
+  }
+
+  @override
+  String get dailyNoResources => 'Jenis tenaga/alat belum dimuat. Tarik ke bawah saat ada sinyal.';
+
+  @override
+  String get dailyNotesSection => 'Kendala, catatan & foto';
+
+  @override
+  String get dailyIssues => 'Kendala';
+
+  @override
+  String get dailyNotesRequired => 'Wajib karena ada volume melebihi RAP.';
+
+  @override
+  String get dailyPhoto => 'Foto pekerjaan';
+
+  @override
+  String dailyPhotos(int count, int max) {
+    return 'Foto pekerjaan ($count/$max)';
+  }
+
+  @override
+  String get dailySubmit => 'Kirim laporan harian';
+
+  @override
+  String dailySummary(int items, int workers, int photos) {
+    return '$items item pekerjaan · $workers pekerja · $photos foto';
+  }
+
+  @override
+  String get dailyNoProjects =>
+      'Tidak ada project konstruksi yang bisa Anda laporkan (Staff: project yang ditugaskan; PM: project tim).';
+
+  @override
+  String get dailySameDay => 'Sudah ada laporan harian Anda untuk project & tanggal ini di HP. Buka laporan itu.';
+
+  @override
+  String get dailyFlagOverRap => 'Melebihi RAP';
+
+  @override
+  String get dailyFlagDuplicate => 'Kemungkinan dobel';
+
+  @override
+  String dailyWorkItem(String item) {
+    return 'Volume $item';
+  }
+
+  @override
+  String get dailyWorkerCount => 'Jumlah pekerja';
 }

@@ -104,6 +104,7 @@ export const Rap = z
       }),
     ),
     totals: z.object({ rapValue: z.number().nullable(), budget: z.number().nullable(), overBudget: z.boolean() }).nullable().meta({ description: 'Price roles only.' }),
+    resourceTypes: z.array(z.object({ id, kind: z.enum(['tenaga', 'alat']), code: z.string(), name: z.string() })).meta({ description: 'Active manpower / equipment types of the project\'s PT (daily report pickers; APK cache).' }),
   })
   .meta({ id: 'Rap' })
 
