@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+- **Public home page `/`** (owner 2026-10-10: `/` answered 404 and nothing linked to the APK page): app name and two
+  plain links, "Masuk" → `/admin/login` and "Unduh aplikasi Android" → `/unduh`, plus the privacy notice. No form and no
+  server action (CrowdSec CRS 920420). Not indexed (robots meta + `X-Robots-Tag` on `/`).
+- **Web login:** a "Unduh aplikasi RR Teams" link → `/unduh` next to "Pemberitahuan privasi".
+
+### Fixed
+- **CI image job:** `trivy-image.sh` retries no longer leave a failed attempt's output or the retry warning in the scan
+  JSON. That output made the report step's `jq` exit 5 and blocked the v0.7.0 tag images.
+
 ## [0.7.0] - 2026-10-10
 
 **Field reports per project kind** (ADR 0020, requirements v1.3; DRMS first: service reports, unit timesheets with a
