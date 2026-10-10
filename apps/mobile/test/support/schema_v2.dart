@@ -28,7 +28,10 @@ final schemaV3 = [
   'ALTER TABLE "local_progress_reports" ADD COLUMN "company_id" INTEGER NULL',
 ];
 
-/// An in-memory database that starts as schema [version] (1, 2 or 3) with rows from [seed], then is opened by
+/// v4 (mobile-v0.3.6, 2026-10-09): v3 + the urgency level of a draft, as drift's `addColumn` added it.
+final schemaV4 = [...schemaV3, 'ALTER TABLE "local_drafts" ADD COLUMN "urgency_level_id" INTEGER NULL'];
+
+/// An in-memory database that starts as schema [version] (1, 2, 3 or 4) with rows from [seed], then is opened by
 /// the current `AppDatabase` (runs the drift migration to the current schema version).
 AppDatabase oldPhoneDb(int version, void Function(CommonDatabase raw) seed) => AppDatabase(
   NativeDatabase.memory(
@@ -37,7 +40,8 @@ AppDatabase oldPhoneDb(int version, void Function(CommonDatabase raw) seed) => A
         for (final s in switch (version) {
           1 => schemaV1,
           2 => schemaV2,
-          _ => schemaV3,
+          3 => schemaV3,
+          _ => schemaV4,
         }) {
           raw.execute(s);
         }

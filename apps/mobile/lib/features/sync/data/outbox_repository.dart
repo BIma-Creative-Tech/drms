@@ -137,13 +137,42 @@ class OutboxRepository {
     required bool offline,
     int? baseRev,
     int? companyId,
+  }) => enqueueReport(
+    type: SyncItemType.progressReportUpsert,
+    sub: sub,
+    reportUuid: reportUuid,
+    payload: payload,
+    photoUuids: photoUuids,
+    deviceTime: deviceTime,
+    elapsedMs: elapsedMs,
+    bootId: bootId,
+    offline: offline,
+    baseRev: baseRev,
+    companyId: companyId,
+  );
+
+  /// The one open upsert item of a report of [type] — `progress_report.draft_upsert` (E4) or an FR1 field
+  /// report (`service_report.upsert`, `unit_timesheet.upsert`, `aftersales_activity.upsert`) — same rules as
+  /// [enqueueProgress].
+  Future<String> enqueueReport({
+    required String type,
+    required String sub,
+    required String reportUuid,
+    required Map<String, dynamic> payload,
+    required List<String> photoUuids,
+    required String deviceTime,
+    required int elapsedMs,
+    required String bootId,
+    required bool offline,
+    int? baseRev,
+    int? companyId,
   }) => db.transaction(() async {
     final pending =
         await (db.select(db.outbox)..where(
               (t) =>
                   t.targetUuid.equals(reportUuid) &
                   t.userSub.equals(sub) &
-                  t.type.equals(SyncItemType.progressReportUpsert) &
+                  t.type.equals(type) &
                   (t.status.equals('pending') | t.status.equals('failed')),
             ))
             .getSingleOrNull();
@@ -176,7 +205,7 @@ class OutboxRepository {
             opUuid: opUuid,
             userSub: sub,
             companyId: Value(companyId),
-            type: SyncItemType.progressReportUpsert,
+            type: type,
             targetUuid: reportUuid,
             payloadJson: jsonEncode(payload),
             baseRev: Value(baseRev),

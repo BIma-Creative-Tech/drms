@@ -58,6 +58,8 @@ Plus field reports per project kind (FR1 P1, behind the per-PT flag `fieldReport
     `aftersalesActivityCreate` + `settings.fieldReportsEnabled`; sync items `service_report.upsert`,
     `unit_timesheet.upsert`, `aftersales_activity.upsert` (`server_service_report` / `server_unit_timesheet` /
     `server_aftersales_activity`). Masters: `projects.kind`, unit fields on `vehicles`.
+  - `GET /masters?types=clients` (customer picker of the APK aftersales log; Staff only when assigned to an aftersales
+    project of the PT, else an empty list).
   - Shared UoMs M, M1, M2, M3, KG, TON, SAK, ZAK, BTG, LBR, TITIK, BH, SET, ROLL, KALENG, BKS, OH, JAM, LTR, HM (only codes
     that do not exist yet).
   - Admin: collections under Proyek › "Laporan lapangan" (list views, now "Data …"); Staff may upload photos to

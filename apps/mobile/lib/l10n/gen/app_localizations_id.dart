@@ -1943,4 +1943,612 @@ class AppLocalizationsId extends AppLocalizations {
 
   @override
   String get privacyRead => 'Baca pemberitahuan privasi';
+
+  @override
+  String get fieldHubTitle => 'Laporan Lapangan';
+
+  @override
+  String get fieldHubSub => 'Servis unit, timesheet, aftersales';
+
+  @override
+  String fieldPendingCount(int count) {
+    return '$count belum terkirim';
+  }
+
+  @override
+  String get fieldTabNew => 'Buat laporan';
+
+  @override
+  String get fieldTabHistory => 'Riwayat saya';
+
+  @override
+  String get fieldOfflineCache =>
+      'Tidak ada sinyal: data unit, kontrak dan PO dari penyimpanan HP (bisa belum terbaru). Laporan tetap bisa dibuat dan dikirim otomatis saat ada sinyal.';
+
+  @override
+  String get fieldNoProjectsHub =>
+      'Belum ada project kontrak unit atau aftersales yang ditugaskan ke Anda. Hubungi PM/Admin bila ini keliru.';
+
+  @override
+  String get fieldLocalTitle => 'Di HP ini';
+
+  @override
+  String get fieldServerTitle => 'Terkirim ke server';
+
+  @override
+  String get fieldHistoryOffline => 'Tidak ada sinyal — riwayat dari server tampil saat online.';
+
+  @override
+  String get fieldHistoryEmpty => 'Belum ada laporan lapangan Anda.';
+
+  @override
+  String fieldEditTag(String doc) {
+    return 'Ubah $doc';
+  }
+
+  @override
+  String get fieldConflictHint => 'Sudah ada perubahan di server. Ketuk untuk memilih versi yang dipakai.';
+
+  @override
+  String get fieldEditableTag => 'Bisa diubah ≤ 24 jam';
+
+  @override
+  String get fieldFlagOffline => 'Offline';
+
+  @override
+  String get fieldFlagBackdated => 'Tanggal mundur';
+
+  @override
+  String get fieldFlagHmGap => 'Selisih HM';
+
+  @override
+  String get fieldFlagBreakdown => 'Breakdown ≥ 4 jam';
+
+  @override
+  String get fieldFlagCorrected => 'Dikoreksi';
+
+  @override
+  String fieldValueShown(String value) {
+    return 'Nilai: $value';
+  }
+
+  @override
+  String fieldReporter(String name) {
+    return 'Pelapor: $name';
+  }
+
+  @override
+  String fieldEditUntil(String time) {
+    return 'Ubah (sampai $time)';
+  }
+
+  @override
+  String get fieldNotEditable => 'Sudah lewat 24 jam: perubahan hanya lewat koreksi PM/Direktur di web.';
+
+  @override
+  String get fieldNotFound => 'Laporan tidak ditemukan di HP ini.';
+
+  @override
+  String get fieldStateDraft => 'Draft';
+
+  @override
+  String get fieldStateQueued => 'Menunggu sinyal';
+
+  @override
+  String get fieldStateSent => 'Terkirim';
+
+  @override
+  String get fieldStateConflict => 'Konflik';
+
+  @override
+  String get fieldStateRejected => 'Ditolak';
+
+  @override
+  String get fieldDraftSaved => 'Draft tersimpan';
+
+  @override
+  String get fieldQueuedOnline => 'Laporan disimpan dan sedang dikirim.';
+
+  @override
+  String get fieldQueuedOffline => 'Laporan disimpan di HP dan dikirim otomatis saat ada sinyal.';
+
+  @override
+  String get fieldFixErrors => 'Periksa isian yang ditandai merah.';
+
+  @override
+  String get fieldDiscardTitle => 'Hapus draft?';
+
+  @override
+  String get fieldDiscardBody => 'Draft dan fotonya dihapus dari HP ini. Server belum menerima laporan ini.';
+
+  @override
+  String get fieldDiscarded => 'Draft dihapus.';
+
+  @override
+  String get fieldPhotoFailed => 'Foto gagal disimpan. Coba lagi.';
+
+  @override
+  String get fieldAddPhoto => 'Ambil foto';
+
+  @override
+  String fieldEditWindow(String time) {
+    return 'Bisa diubah sampai $time.';
+  }
+
+  @override
+  String get fieldEditReason => 'Alasan perubahan (opsional)';
+
+  @override
+  String get fieldEditReasonHelp => 'Tercatat di riwayat audit.';
+
+  @override
+  String get fieldSaveEdit => 'Simpan perubahan';
+
+  @override
+  String get fieldReportNotes => 'Catatan';
+
+  @override
+  String get fieldDate => 'Tanggal';
+
+  @override
+  String get fieldProjectContract => 'Project / kontrak';
+
+  @override
+  String get fieldNoProjects => 'Tidak ada project kontrak unit / aftersales untuk Anda.';
+
+  @override
+  String get fieldProjectUnavailable =>
+      'Project ini tidak lagi tersedia untuk laporan lapangan Anda (penugasan atau jenis project berubah).';
+
+  @override
+  String get fieldUnit => 'Unit';
+
+  @override
+  String get fieldPickUnit => 'Pilih unit';
+
+  @override
+  String get fieldChoose => 'Pilih';
+
+  @override
+  String get fieldChange => 'Ganti';
+
+  @override
+  String get fieldNoUnits => 'Belum ada unit untuk project ini di HP. Buka saat online untuk memuat data unit.';
+
+  @override
+  String get fieldUnitSearch => 'Cari kode unit / plat / tipe';
+
+  @override
+  String get fieldUnitNone => 'Unit tidak ditemukan.';
+
+  @override
+  String get fieldUnitOwnerOwn => 'Milik sendiri';
+
+  @override
+  String fieldUnitOwnerCustomer(String name) {
+    return 'Milik pelanggan ($name)';
+  }
+
+  @override
+  String fieldUnitLastHm(String hm) {
+    return 'HM terakhir $hm';
+  }
+
+  @override
+  String get fieldHmAtService => 'HM saat servis';
+
+  @override
+  String fieldHmLast(String hm) {
+    return 'HM terakhir unit $hm';
+  }
+
+  @override
+  String fieldHmBelow(String hm) {
+    return 'Lebih kecil dari HM terakhir unit ($hm). Server akan menolak; koreksi HM lama oleh PM/Direktur.';
+  }
+
+  @override
+  String get fieldStart => 'Mulai';
+
+  @override
+  String get fieldEnd => 'Selesai';
+
+  @override
+  String get fieldWork => 'Pekerjaan';
+
+  @override
+  String get fieldServiceType => 'Jenis servis';
+
+  @override
+  String get fieldComplaint => 'Keluhan';
+
+  @override
+  String get fieldAction => 'Tindakan / pekerjaan';
+
+  @override
+  String get fieldHelpers => 'Helper (opsional)';
+
+  @override
+  String get fieldSpareparts => 'Sparepart dipakai';
+
+  @override
+  String get fieldPartNameHeader => 'Nama / no. part';
+
+  @override
+  String get fieldPartNameHint => 'Nama sparepart';
+
+  @override
+  String get fieldPartNoHint => 'No. part (opsional)';
+
+  @override
+  String get fieldUomHint => 'set';
+
+  @override
+  String get fieldAddSparepart => 'Tambah sparepart';
+
+  @override
+  String get fieldSparepartsNote => 'Catatan saja — stok sparepart tidak dikelola di aplikasi.';
+
+  @override
+  String get fieldUnitStatusAfter => 'Status unit setelah servis';
+
+  @override
+  String fieldPmNotified(String unit) {
+    return 'PM akan diberi notifikasi: unit $unit menunggu part.';
+  }
+
+  @override
+  String get fieldPhotos => 'Foto';
+
+  @override
+  String get fieldPhotoBefore => 'Foto sebelum servis';
+
+  @override
+  String get fieldPhotoAfter => 'Foto sesudah servis';
+
+  @override
+  String fieldPhotoBeforeCount(int count) {
+    return 'Sebelum ($count)';
+  }
+
+  @override
+  String fieldPhotoAfterCount(int count) {
+    return 'Sesudah ($count)';
+  }
+
+  @override
+  String fieldPhotoLimit(int max) {
+    return 'Maksimal $max foto per laporan.';
+  }
+
+  @override
+  String fieldPhotosOnServer(int count) {
+    return '$count foto sudah ada di server (foto tidak bisa dihapus).';
+  }
+
+  @override
+  String fieldPartsCount(int count) {
+    return '$count sparepart';
+  }
+
+  @override
+  String fieldPhotoCount(int count) {
+    return '$count foto';
+  }
+
+  @override
+  String get fieldServiceTitle => 'Laporan Servis Unit';
+
+  @override
+  String get fieldServiceEditTitle => 'Ubah Laporan Servis';
+
+  @override
+  String get fieldServiceSubmit => 'Kirim laporan servis';
+
+  @override
+  String get fieldTimesheetTitle => 'Timesheet Unit';
+
+  @override
+  String get fieldTimesheetEditTitle => 'Ubah Timesheet Unit';
+
+  @override
+  String get fieldContract => 'Kontrak';
+
+  @override
+  String get fieldNoContracts => 'Tidak ada project kontrak unit untuk Anda.';
+
+  @override
+  String fieldNoContractUnits(String date) {
+    return 'Tidak ada unit kontrak yang aktif pada $date. Buka saat online untuk memuat data kontrak.';
+  }
+
+  @override
+  String get fieldTabFilled => 'terisi';
+
+  @override
+  String get fieldTabMissing => 'belum';
+
+  @override
+  String get fieldTimesheetAlreadySent =>
+      'Timesheet unit ini untuk tanggal tersebut sudah ada di server. Perubahan lewat Riwayat saya (≤ 24 jam) atau koreksi PM.';
+
+  @override
+  String get fieldHourMeter => 'Hour meter (HM)';
+
+  @override
+  String get fieldHmStart => 'HM awal';
+
+  @override
+  String get fieldHmEnd => 'HM akhir';
+
+  @override
+  String fieldHmPrefilled(String date, String hm) {
+    return 'HM awal diisi otomatis dari HM akhir $date ($hm).';
+  }
+
+  @override
+  String fieldHmUsed(String hours) {
+    return 'Selisih HM: $hours jam';
+  }
+
+  @override
+  String fieldHmGap(String hm) {
+    return 'HM awal berbeda dengan HM akhir sebelumnya ($hm). Boleh dikirim, akan ditandai \"Selisih HM\" untuk dicek PM.';
+  }
+
+  @override
+  String get fieldHmPhoto => 'Foto meter HM';
+
+  @override
+  String get fieldHmPhotoRequired => 'Foto meter HM akhir (wajib)';
+
+  @override
+  String get fieldHmPhotoFixed => 'Foto meter HM sudah di server (tidak bisa diganti).';
+
+  @override
+  String get fieldOperatingHours => 'Jam operasi';
+
+  @override
+  String get fieldWorkHours => 'Kerja';
+
+  @override
+  String get fieldStandbyHours => 'Standby';
+
+  @override
+  String get fieldBreakdownHours => 'Breakdown';
+
+  @override
+  String fieldHoursTotal(String total) {
+    return 'Total $total dari 24 jam';
+  }
+
+  @override
+  String fieldHoursOver(String total) {
+    return 'Total $total jam — melebihi 24 jam';
+  }
+
+  @override
+  String get fieldHoursLegend => 'kerja (biru) · standby (kuning) · breakdown (merah)';
+
+  @override
+  String get fieldBreakdownReason => 'Alasan breakdown';
+
+  @override
+  String get fieldBreakdownReasonHint => 'Mis. hidrolik bocor, menunggu part';
+
+  @override
+  String get fieldNoBreakdown => '— (tidak ada breakdown)';
+
+  @override
+  String fieldSuggestService(String hours) {
+    return 'Breakdown $hours jam. Sebaiknya buat laporan servis untuk unit ini.';
+  }
+
+  @override
+  String get fieldCreateServiceReport => 'Buat laporan servis';
+
+  @override
+  String get fieldOperatorFuel => 'Operator & BBM';
+
+  @override
+  String get fieldCopyYesterday => 'Salin dari kemarin';
+
+  @override
+  String get fieldCopyNone => 'Belum ada timesheet sebelumnya untuk unit ini.';
+
+  @override
+  String fieldCopied(String date) {
+    return 'Operator dan lokasi disalin dari $date.';
+  }
+
+  @override
+  String get fieldOperatorName => 'Nama operator';
+
+  @override
+  String get fieldFuel => 'BBM (liter)';
+
+  @override
+  String get fieldLocation => 'Lokasi';
+
+  @override
+  String fieldNextUnit(String unit) {
+    return 'Unit berikutnya: $unit belum diisi';
+  }
+
+  @override
+  String get fieldNextNone => 'Semua unit kontrak sudah terisi untuk tanggal ini.';
+
+  @override
+  String fieldSaveAndNext(String unit) {
+    return 'Simpan & lanjut ke $unit';
+  }
+
+  @override
+  String get fieldTimesheetSave => 'Simpan timesheet';
+
+  @override
+  String get fieldActivityTitle => 'Aktivitas Aftersales';
+
+  @override
+  String get fieldActivityEditTitle => 'Ubah Aktivitas Aftersales';
+
+  @override
+  String get fieldActivityNew => 'Aktivitas baru';
+
+  @override
+  String get fieldActivityEdit => 'Ubah aktivitas';
+
+  @override
+  String get fieldNoAftersalesProjects => 'Tidak ada project aftersales untuk Anda.';
+
+  @override
+  String get fieldCustomer => 'Pelanggan';
+
+  @override
+  String get fieldNoCustomers =>
+      'Belum ada daftar pelanggan di HP. Buka saat online untuk memuat daftar pelanggan PT (perlu ditugaskan ke project aftersales).';
+
+  @override
+  String get fieldActivityKind => 'Jenis aktivitas';
+
+  @override
+  String get fieldForPo => 'Untuk PO (PO terbuka pelanggan ini)';
+
+  @override
+  String get fieldNoOpenPos => 'Tidak ada PO terbuka untuk pelanggan ini.';
+
+  @override
+  String get fieldDocQuote => 'No. penawaran';
+
+  @override
+  String get fieldDocPo => 'No. PO';
+
+  @override
+  String get fieldDocDelivery => 'No. surat jalan';
+
+  @override
+  String get fieldDocInvoice => 'No. invoice';
+
+  @override
+  String get fieldDocOther => 'No. dokumen';
+
+  @override
+  String get fieldItems => 'Item';
+
+  @override
+  String get fieldItemsDelivered => 'Item dikirim';
+
+  @override
+  String get fieldAddItem => 'Tambah item';
+
+  @override
+  String get fieldPoDelivered => 'PO ini sudah terkirim semua';
+
+  @override
+  String get fieldPoDeliveredHelp => 'Tidak dicentang = terkirim sebagian (PO tetap terbuka).';
+
+  @override
+  String get fieldFollowUpPick => 'Tanggal follow-up (opsional)';
+
+  @override
+  String fieldFollowUpOn(String date) {
+    return 'Follow-up $date';
+  }
+
+  @override
+  String fieldFollowUpShort(String date) {
+    return 'follow-up $date';
+  }
+
+  @override
+  String get fieldFollowUpHelp => 'Anda dan PM diingatkan pada tanggal follow-up.';
+
+  @override
+  String get fieldReceiver => 'Penerima';
+
+  @override
+  String get fieldValue => 'Nilai Rp (opsional)';
+
+  @override
+  String get fieldValueHelp => 'Hanya terlihat oleh Anda dan Direktur/Finance.';
+
+  @override
+  String get fieldProofPhoto => 'Foto surat jalan / serah terima';
+
+  @override
+  String fieldProofPhotos(int count, int max) {
+    return 'Foto surat jalan / serah terima ($count/$max)';
+  }
+
+  @override
+  String get fieldActivitySubmit => 'Simpan aktivitas';
+
+  @override
+  String fieldToday(int count) {
+    return 'Hari ini ($count)';
+  }
+
+  @override
+  String get fieldTodayEmpty => 'Belum ada aktivitas pada tanggal ini.';
+
+  @override
+  String get fieldTodayOffline => 'Tidak ada sinyal — aktivitas di server tampil saat online.';
+
+  @override
+  String get fieldNeedsFollowUp => 'Perlu ditindaklanjuti';
+
+  @override
+  String fieldOpenPosCount(int count) {
+    return '$count PO belum terkirim';
+  }
+
+  @override
+  String fieldFollowUpsToday(int count) {
+    return '$count penawaran follow-up hari ini';
+  }
+
+  @override
+  String get fieldPoStatus => 'Status PO';
+
+  @override
+  String get fieldConflictTitle => 'Konflik laporan lapangan';
+
+  @override
+  String get fieldConflictGone => 'Konflik sudah selesai.';
+
+  @override
+  String get fieldUseServer => 'Pakai versi server';
+
+  @override
+  String get fieldResendMine => 'Kirim ulang versi saya';
+
+  @override
+  String get fieldNotEditableAnymore =>
+      'Sudah lewat 24 jam: versi HP tidak bisa dikirim ulang. Minta koreksi PM/Direktur.';
+
+  @override
+  String get fieldUsedServer => 'Versi server dipakai; salinan di HP dihapus.';
+
+  @override
+  String get fieldResent => 'Versi HP dikirim ulang.';
+
+  @override
+  String get fieldResendReason => 'Alasan kirim ulang';
+
+  @override
+  String get fieldResendReasonHelp => 'Wajib, min. 3 karakter (tercatat di audit).';
+
+  @override
+  String get fieldDiffers => 'berbeda';
+
+  @override
+  String get fieldServerVersion => 'Server';
+
+  @override
+  String get fieldMyVersion => 'HP ini';
+
+  @override
+  String fieldNewPhotos(int count) {
+    return '$count foto baru';
+  }
 }

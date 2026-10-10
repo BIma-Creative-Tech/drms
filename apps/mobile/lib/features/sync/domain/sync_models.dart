@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:math';
 
 import '../../../core/network/api_exception.dart';
+import '../../field_reports/domain/field_rules.dart' show fieldErrorMessage;
 
 /// Item types of the sync contract (ADR 0010 "Sync contract", schema_version 1): drafts (F4a), own
 /// attendance check-in/out (F4b), PM on-behalf attendance (E6, US-14) and progress reports (E4, US-10).
@@ -13,10 +14,18 @@ abstract final class SyncItemType {
   static const attendanceOnBehalf = 'attendance.on_behalf';
   static const progressReportUpsert = 'progress_report.draft_upsert';
 
+  /// FR1 field reports (ADR 0020): create or own edit (≤ 24 h).
+  static const serviceReportUpsert = 'service_report.upsert';
+  static const unitTimesheetUpsert = 'unit_timesheet.upsert';
+  static const aftersalesActivityUpsert = 'aftersales_activity.upsert';
+
   static bool isAttendance(String type) =>
       type == attendanceCheckIn || type == attendanceCheckOut || type == attendanceOnBehalf;
 
   static bool isProgress(String type) => type == progressReportUpsert;
+
+  static bool isField(String type) =>
+      type == serviceReportUpsert || type == unitTimesheetUpsert || type == aftersalesActivityUpsert;
 
   /// Short Indonesian label for the queue screen.
   static String label(String type) => switch (type) {
@@ -24,6 +33,9 @@ abstract final class SyncItemType {
     attendanceCheckOut => 'Absen pulang',
     attendanceOnBehalf => 'Absen oleh PM',
     progressReportUpsert => 'Laporan progress',
+    serviceReportUpsert => 'Laporan servis unit',
+    unitTimesheetUpsert => 'Timesheet unit',
+    aftersalesActivityUpsert => 'Aktivitas aftersales',
     expenseDraftDelete => 'Hapus draft',
     _ => 'Draft pengajuan',
   };
@@ -60,6 +72,7 @@ class SyncItemResult {
     this.errors = const [],
     this.serverCopy,
     this.serverReport,
+    this.serverField,
   });
 
   final String clientUuid;
@@ -73,6 +86,10 @@ class SyncItemResult {
 
   /// E4: server version of a progress report (`server_report`, on conflict / NOT_EDITABLE / applied).
   final Map<String, dynamic>? serverReport;
+
+  /// FR1: server version of a field report (`server_service_report` / `server_unit_timesheet` /
+  /// `server_aftersales_activity`; applied, conflict, NOT_EDITABLE).
+  final Map<String, dynamic>? serverField;
 
   /// A `duplicate` replays the first result; a replayed rejection/conflict keeps that meaning.
   factory SyncItemResult.fromJson(Map<String, dynamic> j) => SyncItemResult(
@@ -94,6 +111,10 @@ class SyncItemResult {
     ],
     serverCopy: j['server_copy'] is Map<String, dynamic> ? j['server_copy'] as Map<String, dynamic> : null,
     serverReport: j['server_report'] is Map<String, dynamic> ? j['server_report'] as Map<String, dynamic> : null,
+    serverField: [
+      for (final k in const ['server_service_report', 'server_unit_timesheet', 'server_aftersales_activity'])
+        if (j[k] case final Map<String, dynamic> m) m,
+    ].firstOrNull,
   );
 }
 
@@ -253,6 +274,8 @@ String rejectionMessage(List<SyncError> errors, {String? type}) {
     case privacyAckRequiredCode:
       return privacyAckRequiredMessage;
   }
+  // FR1 field reports: fixed Indonesian texts for the FR1 codes, else the server's (Indonesian) message.
+  if (type != null && SyncItemType.isField(type)) return fieldErrorMessage(e.code, e.message);
   if (type != null && (SyncItemType.isAttendance(type) || SyncItemType.isProgress(type))) {
     final m = e.message;
     if (m != null && m.isNotEmpty && e.code != 'MOCK_LOCATION') return m;
@@ -278,8 +301,9 @@ String rejectionMessage(List<SyncError> errors, {String? type}) {
 }
 
 /// Local media kind (`media_blobs.kind`) → `POST /api/v1/media/{kind}` path segment (openapi MediaKind).
+/// FR1 field photos (`field`) go to the progress-photos collection (owner types service_report / …).
 String mediaUploadPath(String localKind) => switch (localKind) {
   'selfie' => 'selfies',
-  'progress' => 'progress-photos',
+  'progress' || 'field' => 'progress-photos',
   _ => 'receipts',
 };

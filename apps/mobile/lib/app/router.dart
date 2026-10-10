@@ -21,6 +21,12 @@ import '../features/expense/presentation/draft_editor_screen.dart';
 import '../features/expense/presentation/history_screen.dart';
 import '../features/expense/presentation/request_detail_screen.dart';
 import '../features/expense/presentation/requests_screen.dart';
+import '../features/field_reports/domain/field_models.dart';
+import '../features/field_reports/presentation/aftersales_screen.dart';
+import '../features/field_reports/presentation/field_conflict_screen.dart';
+import '../features/field_reports/presentation/field_hub_screen.dart';
+import '../features/field_reports/presentation/service_report_screen.dart';
+import '../features/field_reports/presentation/timesheet_screen.dart';
 import '../features/home/presentation/home_screen.dart';
 import '../features/home/presentation/home_shell.dart';
 import '../features/notifications/presentation/notifications_screen.dart';
@@ -186,6 +192,48 @@ final routerProvider = Provider<GoRouter>((ref) {
                 builder: (_, s) => ProgressEditorRoute(reportId: int.tryParse(s.pathParameters['id'] ?? '') ?? 0),
               ),
             ],
+          ),
+        ],
+      ),
+      // FR1 "Laporan Lapangan" (ADR 0020): hub, editors per type, local draft, own edit ≤ 24 h, conflict.
+      GoRoute(
+        path: '/field',
+        builder: (_, s) => FieldHubScreen(initialTab: s.uri.queryParameters['tab'] == 'history' ? 1 : 0),
+        routes: [
+          GoRoute(
+            path: 'service/new',
+            builder: (_, s) => ServiceReportScreen(
+              projectId: int.tryParse(s.uri.queryParameters['project'] ?? ''),
+              unitId: int.tryParse(s.uri.queryParameters['unit'] ?? ''),
+            ),
+          ),
+          GoRoute(
+            path: 'timesheet/new',
+            builder: (_, s) => TimesheetScreen(
+              projectId: int.tryParse(s.uri.queryParameters['project'] ?? ''),
+              date: s.uri.queryParameters['date'],
+            ),
+          ),
+          GoRoute(
+            path: 'aftersales/new',
+            builder: (_, s) => AftersalesScreen(projectId: int.tryParse(s.uri.queryParameters['project'] ?? '')),
+          ),
+          GoRoute(
+            path: 'draft/:uuid',
+            builder: (_, s) => FieldDraftRoute(uuid: s.pathParameters['uuid'] ?? ''),
+          ),
+          GoRoute(
+            path: 'conflict/:uuid',
+            builder: (_, s) => FieldConflictScreen(uuid: s.pathParameters['uuid'] ?? ''),
+          ),
+          GoRoute(
+            path: 'edit/:type/:id',
+            builder: (_, s) {
+              final type = FieldReportType.fromSegment(s.pathParameters['type']);
+              final id = int.tryParse(s.pathParameters['id'] ?? '');
+              if (type == null || id == null) return const RouteErrorScreen();
+              return FieldEditRoute(type: type, id: id);
+            },
           ),
         ],
       ),
