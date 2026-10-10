@@ -6,11 +6,60 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+**Approval pengajuan biaya: Staff → PM project → Direktur → Finance transfer** (owner decisions 2026-10-10, ADR 0021,
+requirements v1.3 §9; supersedes the decision part of ADR 0013 for expense requests). **Staging first** — production
+only after the owner approves the UAT (`docs/proyekkas/uat/approval-pm/README.md`).
+
+**Database migration:** `20261010_130000_approval_pm_direktur` (additive): column `expense_requests.g1_exception`
+(varchar, CHECK `NULL | 'direktur_via_pm'`), audit action `approval_policy_exception`, guard trigger
+`expense_requests_g1_exception` (no value on insert; changes only at the submit freeze point), and
+`pk_approvals_before_insert` replaced (G1 unchanged except the recorded exception). Rollback: `down()` restores the
+previous trigger body and drops the guard/CHECK/column.
+
+**After the deploy the Admin must change the approval rules of every PT** (Pengaturan → Aturan approval; nothing
+changes until then): the default rule → "Default — PM project lalu Direktur (semua nominal)", Diketahui Oleh = Wajib,
+Pengisi = PM project, Level 1 = Direktur (remove the Finance level), reason "Kebijakan owner 2026-10-10: Staff → PM →
+Direktur → Finance transfer"; the inactive "> Rp 10 juta" example the same; the Addendum RAB rule unchanged. First
+check that every active project has a PM and every cost center a manager. **Requests already submitted keep their
+snapshot** and finish Direktur → Finance.
+
 ### Added
+
+- **PM project approval step** (`acknowledgeBy: scope_manager`, expense requests only): the acknowledger is resolved at
+  submit from `projects.pm` (cost-center requests: `cost-centers.manager`), an active member of the PT, and stored in
+  the snapshot; only that PM may approve/reject ("Persetujuan PM"); other PMs → 403 + `access_denied`. Missing PM →
+  409 "Project ini belum punya PM. Hubungi Admin untuk mengisi PM project." Rule option "PM project (manajer pusat
+  biaya bila tanpa project)" in Aturan approval (refused for Addendum RAB and for an optional "Diketahui").
+- **Narrow G1 exception `direktur_via_pm`:** a Direktur's request filed by the request's PM (creator = PM, every
+  requester holds Direktur in the PT) → PM approves, then the Direktur (may be the requester) approves. Server-set at
+  submit, recorded in the snapshot (`selfApproval`), `expense_requests.g1_exception`, audit
+  `approval_policy_exception`, web panel and PDF ("Pengajuan Direktur — diajukan oleh PM (kebijakan owner
+  2026-10-10)"); the DB trigger allows exactly those two positions.
+- PM: web **Persetujuan** menu, `/me` `capabilities.approvalInbox`, dashboard card "Menunggu tindakan saya"; LPJ
+  shortfall approvals (ADR 0019) where the PM is the acknowledger.
+- API (additive, APK): inbox items `decisionBy` (`pm | direktur | finance | other`) and `finalStep`; request detail
+  `approvalRule.selfApproval`; KPI `teamWaiting.waitingFor` `pm | direktur | finance`. OpenAPI regenerated.
+- APK **mobile-v0.4.1** (0.4.0 is not published yet and ships with web 0.7.0): PM labels ("Setujui sebagai PM
+  project" → "diteruskan ke Direktur"; Direktur final step → "diteruskan ke Finance untuk transfer"), approval inbox
+  for PM. Older APKs already show the server-driven buttons to the PM, with Direktur wording.
 - **Public home page `/`** (owner 2026-10-10: `/` answered 404 and nothing linked to the APK page): app name and two
   plain links, "Masuk" → `/admin/login` and "Unduh aplikasi Android" → `/unduh`, plus the privacy notice. No form and no
   server action (CrowdSec CRS 920420). Not indexed (robots meta + `X-Robots-Tag` on `/`).
 - **Web login:** a "Unduh aplikasi RR Teams" link → `/unduh` next to "Pemberitahuan privasi".
+
+### Changed
+
+- Under a PM-project rule **Finance no longer approves**: after the Direktur the request is approved (Uang Muka →
+  transfer queue; Reimburse → Finance receipt verification, then transfer). G1 unchanged: a PM who is requester/creator
+  is skipped ("(tidak berlaku — pemohon)") and the Direktur decides; the Direktur step is never skipped silently (only
+  Direktur is requester/creator → 409 "Pengajuan untuk Direktur dibuat oleh PM project. …").
+- LPJ shortfall re-approval follows the rule in force (PM → Direktur); Addendum RAB stays Direktur → Finance.
+- Labels per snapshot: "Menunggu persetujuan PM" / "Menunggu persetujuan Direktur", inbox "Persetujuan PM" /
+  "Persetujuan Direktur"; generic `pending_ack` label "Menunggu Diketahui" (ADR 0013 snapshots keep "Menunggu Diketahui
+  (Direktur)").
+- Notifications: "Persetujuan PM: {docNo}" to the PM (approval email likewise); the Direktur is notified after the PM,
+  Finance after the Direktur; `expense.team_submitted` is not sent to the PM who must approve.
+- Seed: default rule "Default — PM project lalu Direktur (semua nominal)" for fresh installs.
 
 ### Fixed
 - **CI image job:** `trivy-image.sh` retries no longer leave a failed attempt's output or the retry warning in the scan

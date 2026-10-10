@@ -1,8 +1,10 @@
 # Panduan Finance
 
-Tugas Anda di ProyekKas: **Approval** pengajuan (setelah Direktur), **verifikasi nota Reimburse**, **mencatat
+Tugas Anda di ProyekKas: **verifikasi nota Reimburse**, **mencatat
 transfer**, **verifikasi LPJ** dan penyelesaian selisih, **kas masuk/keluar manual**, **void**, **tutup buku**, dan
-**laporan**. Sebagian besar di **web**; APK untuk persetujuan cepat. Baca juga [Hal umum](README.md#hal-umum-untuk-semua-peran).
+**laporan**, serta Approval pengajuan **alur lama** dan **Addendum RAB**. Sejak 10 Okt 2026 (ADR 0021) pengajuan baru
+disetujui **PM project lalu Direktur**; Finance **tidak lagi menyetujui** — Anda menerima pengajuan yang sudah disetujui
+Direktur untuk diverifikasi notanya (Reimburse) dan ditransfer. Sebagian besar di **web**; APK untuk persetujuan cepat. Baca juga [Hal umum](README.md#hal-umum-untuk-semua-peran).
 
 Modul web (layar modul `/admin`): **Persetujuan** (Persetujuan · Antrian Transfer · Verifikasi LPJ) · **Keuangan** (Pengajuan · Kas · Transfer & LPJ · Tutup buku) · **Laporan** · **Sistem** (Audit Log) · **Dashboard** · …
 Badge merah di menu = jumlah pekerjaan menunggu.
@@ -20,9 +22,16 @@ Badge merah di menu = jumlah pekerjaan menunggu.
   `[KODE PT]`.
 - Satu transaksi (transfer, kas, tutup buku) selalu milik **satu** PT; pilihan akun kas hanya berisi akun PT itu.
 
-## 1. Approval pengajuan
+## 1. Approval pengajuan (alur lama) — dan alur baru tanpa Approval Finance
 
-Urutan: **Direktur** menyetujui dulu ("Diketahui"), baru pengajuan masuk ke Anda.
+**Alur baru (pengajuan yang diajukan setelah Admin mengubah aturan approval PT):** Staff → **PM project** →
+**Direktur** → **Disetujui**. Anda diberi tahu setelah Direktur menyetujui: Uang Muka → "Antri transfer: …" (lihat
+§3), Reimburse → "Verifikasi nota: …" (lihat §2, verifikasi nota bukan approval). Tidak ada tombol Setujui untuk
+Finance pada pengajuan ini. Bila Anda membuat pengajuan atas nama karyawan, pengajuan tetap melewati PM project dan
+Direktur.
+
+**Alur lama (pengajuan yang sudah diajukan sebelum aturan diubah — tetap selesai dengan alur lama):**
+**Direktur** menyetujui dulu ("Diketahui"), baru pengajuan masuk ke Anda untuk **Approval**.
 
 - **Web:** **Persetujuan** → periksa Jenis, Grand total, **Dampak anggaran** (merah = anggaran project sesudah
   disetujui > 85%), **Flag** → buka **Rincian baris, nota & flag** di bawah baris pengajuan (tiap baris item dengan
@@ -61,8 +70,9 @@ belum diverifikasi ada di bagian atas halaman tetapi tidak dihitung di angka men
 **Antrian Transfer** → **Siap ditransfer** (urut tanggal dibutuhkan) → **Catat transfer**:
 Akun kas, Tanggal (kosong = hari ini), **No. referensi bank**, **Bukti** (foto/PDF) → simpan.
 - Nominal otomatis = nominal disetujui; rekening tujuan dari pengajuan.
-- Kotak **"Anda juga yang menyetujui"**: Anda sendiri yang memberi Approval pada pengajuan ini. Boleh tetap
-  dicatat (tercatat di audit), tetapi bila ada Finance lain sebaiknya transfer dicatat orang lain.
+- Kotak **"Anda juga yang menyetujui"** (hanya pengajuan alur lama): Anda sendiri yang memberi Approval pada
+  pengajuan ini. Boleh tetap dicatat (tercatat di audit), tetapi bila ada Finance lain sebaiknya transfer dicatat
+  orang lain.
 - Kas keluar (KK) tercatat otomatis; status **Ditransfer**.
 - Kolom **Rekening tujuan** menandai **Terverifikasi** / **Belum diverifikasi**. Transfer ke rekening yang **belum
   diverifikasi** memunculkan dialog peringatan (bank, nomor, nama pemilik): periksa dulu dengan karyawan, lalu
@@ -92,9 +102,9 @@ Akun kas, Tanggal (kosong = hari ini), **No. referensi bank**, **Bukti** (foto/P
 4. **Kekurangan melebihi nominal disetujui + toleransi** (Pengaturan PT → *Toleransi kekurangan LPJ*, default
    **10%**): misalnya disetujui Rp 1.350.000, toleransi 10% → total transfer paling banyak Rp 1.485.000 tanpa
    persetujuan. Di atas itu, form transfer kekurangan diganti kotak **Perlu persetujuan kekurangan** → **Ajukan
-   persetujuan kekurangan** + alasan (mis. harga material naik). Total baru disetujui ulang dengan alur yang sama
-   seperti pengajuan: **Direktur** (Diketahui) lalu **Finance** — di menu **Persetujuan** (web), bagian **Kekurangan
-   LPJ di atas nominal disetujui**. Setelah disetujui, form **Transfer kekurangan & selesaikan** muncul lagi. Bila
+   persetujuan kekurangan** + alasan (mis. harga material naik). Total baru disetujui ulang dengan alur aturan
+   approval yang berlaku saat itu: alur baru **PM project** lalu **Direktur** (alur lama: Direktur lalu Finance) — di
+   menu **Persetujuan** (web), bagian **Kekurangan LPJ di atas nominal disetujui**. Setelah disetujui, form **Transfer kekurangan & selesaikan** muncul lagi. Bila
    ditolak, kotak menampilkan alasannya; Anda dapat **Ajukan ulang** dengan penjelasan baru. Persetujuan ini hanya
    di web (belum di APK).
 
