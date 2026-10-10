@@ -6,14 +6,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
-Owner decisions 2026-10-09 (roles, web attendance, LPJ for Staff, urgency level). Migrations
-`20261010_080000_p2s_operator_role` (enum value `pk-operator`; additive) and `20261010_090000_p2s_urgency_level`
-(**drops `expense_requests.period_from/period_to`** — values are not kept; rollback = restore the pre-deploy dump).
+## [0.7.0] - 2026-10-10
 
-APK **mobile-v0.3.6** (pubspec `0.3.6+1`, notes `docs/release-notes/apk/0.3.6.md`; needs this server — the APK asks
-for the master type `urgency-levels`): role Operator/Anggota (home = Absensi only), own attendance for every role,
-"Tingkat urgensi" picker on drafts (drift schema **v4**: `local_drafts.urgency_level_id`, existing drafts kept).
-Plus field reports per project kind (FR1 P1, behind the per-PT flag `fieldReportsEnabled`, default OFF) — see Added.
+**Field reports per project kind** (ADR 0020, requirements v1.3; DRMS first: service reports, unit timesheets with a
+billing estimate, aftersales activity log; web admin views + APK **mobile-v0.4.0**), plus the owner decisions of
+2026-10-09 (role Operator/Anggota, Admin = Direktur write rights on projects, PM creates projects, web self check-in,
+LPJ for Staff, "Tingkat urgensi" replacing "Periode kegiatan"). Field reports stay **OFF per PT** until
+`companies.fieldReportsEnabled` is switched on.
+
+**Database migrations** (run by `migrate`, in this order): `20261010_080000_p2s_operator_role` (enum value
+`pk-operator`; additive), `20261010_090000_p2s_urgency_level` (**drops `expense_requests.period_from/period_to` —
+the values are not kept; take the pre-deploy dump; rollback = restore it**), `20261010_100000_fr1_foundation`,
+`20261010_110000_fr1_field_reports`, `20261010_120000_fr1_security` (additive). The 0.6.4 web image does not run on
+this schema (period columns gone) — rollback is the dump, not an image swap.
+
+APK **mobile-v0.4.0** (pubspec `0.4.0+1`, notes `docs/release-notes/apk/0.4.0.md`; includes the never-tagged 0.3.6):
+Laporan Lapangan (Servis Unit, Timesheet Unit, Aktivitas Aftersales; offline, drift schema **v5**), role
+Operator/Anggota (home = Absensi only), own attendance for every role, "Tingkat urgensi" on drafts (drift **v4**).
+Needs this server (masters `urgency-levels`, `clients`; field-report sync types). Older APKs keep working (sync still
+accepts `period_from/period_to` and ignores them).
 
 ### Removed
 
