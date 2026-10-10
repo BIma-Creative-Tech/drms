@@ -6,6 +6,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+
+- **"Akun pengguna" on the employee form** (owner decision 2026-10-10, after APK attendance in a PT was refused with
+  "Akun Anda belum terhubung ke data karyawan"): picks the login account of the employee in its PT. Not a new
+  column — the link stays `company-memberships.employee` (one account ↔ one employee per PT; unique index and
+  same-PT trigger unchanged). Saving sets / clears that membership in the same transaction through the membership
+  collection (its access rule and audit `company_membership`, reason "Akun pengguna diatur dari data karyawan …"
+  unless one is given). Picker: active accounts with active access to the employee's PT and no employee yet, plus
+  the linked one. Field errors: no access in the PT ("tambahkan aksesnya di Akses PT dulu"), inactive access,
+  account already linked to another employee (named), and **403** when the caller may not change the PT's
+  memberships (only the PT Admin or a group admin may link; a Direktur still edits the other fields). Shown only to
+  memberships readers (PT Admin, group admin, the linked person). Duplicates start without an account.
+- **"Karyawan per PT"** panel on the user form (read-only): every PT access of the account the viewer may see, with
+  the linked employee ("Buka") or "Belum tertaut" + "Buat karyawan", which opens the employee create form with that
+  PT and account prefilled (`/admin/collections/employees/create?company=…&user=…`).
+- No schema change, no migration. Go-live import, `/api/v1` masters/me (whitelisted employee fields) unchanged.
+
 ## [0.7.0] - 2026-10-10
 
 **Field reports per project kind** (ADR 0020, requirements v1.3; DRMS first: service reports, unit timesheets with a
