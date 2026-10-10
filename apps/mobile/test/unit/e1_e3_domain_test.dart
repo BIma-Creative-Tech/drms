@@ -143,6 +143,10 @@ void main() {
     test('Direktur request filed by the PM: selfApproval parsed (exception note)', () {
       final d = detailFromJson(pmDetailJson(rule: pmRuleJson(selfApproval: 'direktur_via_pm')));
       expect(d.approvalRule!.direkturViaPm, isTrue);
+      expect(d.approvalRule!.direkturViaPmSelf, isFalse);
+      final self = detailFromJson(pmDetailJson(rule: pmRuleJson(selfApproval: 'direktur_via_pm_self')));
+      expect(self.approvalRule!.direkturViaPm, isTrue);
+      expect(self.approvalRule!.direkturViaPmSelf, isTrue);
       expect(detailFromJson(pmDetailJson()).approvalRule!.direkturViaPm, isFalse);
     });
 

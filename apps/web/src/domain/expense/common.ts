@@ -8,7 +8,7 @@ import { DEFAULT_TZ, localDateInTz } from '@/lib/time'
 import { getRequestTx } from '@/lib/tx'
 
 import { allowedActions, FINANCE_SELF_GUARDED, mayPerform, targets, type Action, type ActorContext } from './state'
-import { DIREKTUR_VIA_PM, isDecisionSnapshot, lacksDecisionRole } from './decision'
+import { DIREKTUR_VIA_PM_SELF, isDecisionSnapshot, isSelfApproval, lacksDecisionRole } from './decision'
 import { SHARED_FLAG_WHERE } from './flag-visibility'
 import { matchesAcknowledger, matchesStep, type ApprovalSnapshot } from './rules'
 import { BUDGET_COMMITTED, type RequestStatus, type RequestType } from './types'
@@ -184,17 +184,20 @@ export async function actorContext(req: PayloadRequest, doc: RequestDoc): Promis
 
 /**
  * ADR 0021 narrow G1 exception (`direktur_via_pm`, owner decision 2026-10-10): on a Direktur's request
- * filed by the PM project, the creator PM may decide "Diketahui" (Persetujuan PM) and a requester
- * Direktur may decide the approval step — nothing else. Both the snapshot and the request column must
+ * filed by the PM project, the creator PM may decide "Diketahui" (Persetujuan PM); a requester Direktur
+ * may decide the approval step only under `direktur_via_pm_self` (he is the PT's only Direktur, owner
+ * answer 2026-10-11 "Utamakan Direktur lain") — nothing else. Both the snapshot and the request column must
  * carry the exception (the DB trigger checks the column).
  */
 export function selfApprovalAllowed(
   doc: Pick<RequestDoc, 'status' | 'approvalSnapshot'> & { g1Exception?: string | null },
   c: { isCreator: boolean; isRequester: boolean; isAcknowledger: boolean; matchesCurrentStep: boolean },
 ): boolean {
-  if (doc.approvalSnapshot?.selfApproval !== DIREKTUR_VIA_PM || doc.g1Exception !== DIREKTUR_VIA_PM) return false
+  const exc = doc.approvalSnapshot?.selfApproval
+  if (!isSelfApproval(exc) || doc.g1Exception !== exc) return false
   if (doc.status === 'pending_ack') return c.isCreator && !c.isRequester && c.isAcknowledger
-  if (doc.status === 'pending_approval') return c.isRequester && !c.isCreator && c.matchesCurrentStep
+  // owner answer 2026-10-11: the requester Direktur decides only when he is the PT's only Direktur
+  if (doc.status === 'pending_approval') return exc === DIREKTUR_VIA_PM_SELF && c.isRequester && !c.isCreator && c.matchesCurrentStep
   return false
 }
 

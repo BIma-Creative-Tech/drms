@@ -38,10 +38,28 @@ type RuleShape = Pick<RuleInput, 'acknowledge' | 'acknowledgeBy' | 'acknowledgeR
 
 /** ADR 0021: G1 exception of a Direktur's request filed by the PM project (snapshot / DB column value). */
 export const DIREKTUR_VIA_PM = 'direktur_via_pm' as const
-export type SelfApproval = typeof DIREKTUR_VIA_PM
+/**
+ * ADR 0021, owner answer 2026-10-11 ("Utamakan Direktur lain"): the requester Direktur may approve his own
+ * request ONLY when he is the only Direktur of the PT at submit. With another active Direktur who is not a
+ * requester, the exception is `direktur_via_pm` (only the creator PM's "Diketahui" is exempt) and only the
+ * other Direktur(s) decide the Direktur step.
+ */
+export const DIREKTUR_VIA_PM_SELF = 'direktur_via_pm_self' as const
+export type SelfApproval = typeof DIREKTUR_VIA_PM | typeof DIREKTUR_VIA_PM_SELF
+export const SELF_APPROVALS: readonly SelfApproval[] = [DIREKTUR_VIA_PM, DIREKTUR_VIA_PM_SELF]
+
+export function isSelfApproval(v: unknown): v is SelfApproval {
+  return (SELF_APPROVALS as readonly unknown[]).includes(v)
+}
 
 /** Printed in the PDF / shown in the panel when the snapshot carries the ADR 0021 G1 exception. */
 export const DIREKTUR_VIA_PM_NOTE = 'Pengajuan Direktur — diajukan oleh PM (kebijakan owner 2026-10-10)'
+export const DIREKTUR_VIA_PM_SELF_NOTE = 'Pengajuan Direktur — diajukan oleh PM; disetujui Direktur pemohon karena satu-satunya Direktur PT (kebijakan owner 2026-10-10)'
+
+/** Panel / PDF / audit text of the exception (null = none). */
+export function selfApprovalNote(v: unknown): string | null {
+  return v === DIREKTUR_VIA_PM ? DIREKTUR_VIA_PM_NOTE : v === DIREKTUR_VIA_PM_SELF ? DIREKTUR_VIA_PM_SELF_NOTE : null
+}
 
 /** Label of the ADR 0021 "Diketahui" filler (rule form, panel). */
 export const SCOPE_MANAGER_LABEL = 'PM project (manajer pusat biaya bila tanpa project)'

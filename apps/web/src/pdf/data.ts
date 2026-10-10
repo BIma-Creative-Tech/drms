@@ -3,7 +3,7 @@ import type { PayloadRequest } from 'payload'
 import { relId } from '@/access/roles'
 import { approvalsOf, settings, type ApprovalRow, type RequestDoc } from '@/domain/expense/common'
 import { displayNames } from '@/domain/companies'
-import { DIREKTUR_VIA_PM, DIREKTUR_VIA_PM_NOTE, SKIPPED_LABEL } from '@/domain/expense/decision'
+import { selfApprovalNote, SKIPPED_LABEL } from '@/domain/expense/decision'
 import { withFlagVisibility } from '@/domain/expense/flag-visibility'
 import { displayUnitPrice } from '@/domain/expense/lines'
 import { receiptsOf } from '@/domain/expense/receipts'
@@ -154,7 +154,7 @@ export async function buildPdfData(req: PayloadRequest, requestId: number, opts:
     grandTotal: formatRupiah(doc.grandTotal ?? 0),
     signatures,
     // ADR 0021: the narrow G1 exception is printed with the signatures (who filed / who approved).
-    policyNote: doc.approvalSnapshot?.selfApproval === DIREKTUR_VIA_PM ? pdfSafe(DIREKTUR_VIA_PM_NOTE) : undefined,
+    policyNote: selfApprovalNote(doc.approvalSnapshot?.selfApproval) ? pdfSafe(selfApprovalNote(doc.approvalSnapshot?.selfApproval)) : undefined,
     transfer: doc.bankSnapshot?.accountNo
       ? {
           bankName: pdfSafe(doc.bankSnapshot.bankName ?? ''),

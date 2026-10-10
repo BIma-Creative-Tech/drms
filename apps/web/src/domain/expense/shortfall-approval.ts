@@ -8,7 +8,7 @@ import { formatRupiah } from '@/lib/money'
 import { requestMeta } from '@/lib/request-meta'
 
 import { actorContext, displayName, fail, ids, loadRaw, loadVisible, requireActionAudited, resolveSignature, selfApprovalAllowed, type RequestDoc, type Signature } from './common'
-import { DIREKTUR_VIA_PM, lacksDecisionRole } from './decision'
+import { DIREKTUR_VIA_PM, DIREKTUR_VIA_PM_SELF, isSelfApproval, lacksDecisionRole } from './decision'
 import { requireSettlement, settlementOfRequest, shortfallStateOf, updateSettlement, type SettlementDoc } from './lpj'
 import { lastLevel, matchesAcknowledger, matchesStep, type ApprovalSnapshot } from './rules'
 import { SHORTFALL_APPROVAL_LABELS, shortfallAllowedActions, type ShortfallAction, type ShortfallApprovalStatus, type ShortfallCtx } from './settlement-rules'
@@ -123,7 +123,11 @@ async function notify(req: PayloadRequest, raw: RequestDoc, s: SettlementDoc, ev
   // G1: requester/creator never get a decision request — except the ADR 0021 `direktur_via_pm` holders
   const exclude = await involvedUserIds(req, raw)
   const snapOf = (s.shortfallApprovalSnapshot ?? null) as ApprovalSnapshot | null
-  if (snapOf?.selfApproval === DIREKTUR_VIA_PM && raw.g1Exception === DIREKTUR_VIA_PM) for (const u of to) exclude.delete(u)
+  // creator PM at "Diketahui" (both variants); requester Direktur at the approval step only under `…_self`
+  if (isSelfApproval(snapOf?.selfApproval) && raw.g1Exception === snapOf?.selfApproval) {
+    const step = event.endsWith('pending_ack') || (event.endsWith('pending_approval') && snapOf?.selfApproval === DIREKTUR_VIA_PM_SELF)
+    if (step) for (const u of to) exclude.delete(u)
+  }
   const pmAck = event === 'expense.shortfall_pending_ack' && (s.shortfallApprovalSnapshot as ApprovalSnapshot | null)?.acknowledgeBy === 'scope_manager'
   const t = pmAck ? PM_ACK_DEFAULT : await notificationTemplate(req, event, DEFAULTS[event])
   const vars: Record<string, string> = { docNo: raw.docNo ?? `#${raw.id}`, amount: formatRupiah(s.shortfallApprovalAmount ?? 0), approved: formatRupiah(raw.approvedAmount ?? 0) }
@@ -191,7 +195,9 @@ export async function requestShortfallApproval(req: PayloadRequest, id: number, 
   if (s.shortfallApprovalStatus === 'pending_ack' || s.shortfallApprovalStatus === 'pending_approval') fail(409, 'Persetujuan kekurangan sedang berjalan.')
   if (sf.covered) fail(409, 'Kekurangan sudah disetujui; catat transfer kekurangan.')
   // ADR 0021: same rule as the request (PM project → Direktur); the G1 exception only when the request has it
-  const { snapshot } = await selectAndSnapshot(req, { ...raw, grandTotal: sf.totalAfter }, { allowSelfApproval: raw.g1Exception === DIREKTUR_VIA_PM })
+  const { snapshot } = await selectAndSnapshot(req, { ...raw, grandTotal: sf.totalAfter }, {
+    allowSelfApproval: raw.g1Exception === DIREKTUR_VIA_PM_SELF ? true : raw.g1Exception === DIREKTUR_VIA_PM ? 'pm_only' : false,
+  })
   const needsAck = snapshot.acknowledge === 'required'
   const cycle = (s.shortfallApprovalCycle ?? 0) + 1
   const reason = note.trim()

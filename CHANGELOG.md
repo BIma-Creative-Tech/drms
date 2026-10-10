@@ -11,7 +11,7 @@ requirements v1.3 §9; supersedes the decision part of ADR 0013 for expense requ
 only after the owner approves the UAT (`docs/proyekkas/uat/approval-pm/README.md`).
 
 **Database migration:** `20261010_130000_approval_pm_direktur` (additive): column `expense_requests.g1_exception`
-(varchar, CHECK `NULL | 'direktur_via_pm'`), audit action `approval_policy_exception`, guard trigger
+(varchar, CHECK `NULL | 'direktur_via_pm' | 'direktur_via_pm_self'`), audit action `approval_policy_exception`, guard trigger
 `expense_requests_g1_exception` (no value on insert; changes only at the submit freeze point), and
 `pk_approvals_before_insert` replaced (G1 unchanged except the recorded exception). Rollback: `down()` restores the
 previous trigger body and drops the guard/CHECK/column.
@@ -30,11 +30,14 @@ snapshot** and finish Direktur → Finance.
   the snapshot; only that PM may approve/reject ("Persetujuan PM"); other PMs → 403 + `access_denied`. Missing PM →
   409 "Project ini belum punya PM. Hubungi Admin untuk mengisi PM project." Rule option "PM project (manajer pusat
   biaya bila tanpa project)" in Aturan approval (refused for Addendum RAB and for an optional "Diketahui").
-- **Narrow G1 exception `direktur_via_pm`:** a Direktur's request filed by the request's PM (creator = PM, every
-  requester holds Direktur in the PT) → PM approves, then the Direktur (may be the requester) approves. Server-set at
+- **Narrow G1 exception `direktur_via_pm` / `direktur_via_pm_self`:** a Direktur's request filed by the request's PM
+  (creator = PM, every requester holds Direktur in the PT) → PM approves, then a Direktur. "Utamakan Direktur lain"
+  (owner 2026-10-11): with another active Direktur only that Direktur decides (`direktur_via_pm`; the requester → 403,
+  refused by the DB); the requester approves himself only as the PT's only Direktur (`direktur_via_pm_self`). Server-set at
   submit, recorded in the snapshot (`selfApproval`), `expense_requests.g1_exception`, audit
   `approval_policy_exception`, web panel and PDF ("Pengajuan Direktur — diajukan oleh PM (kebijakan owner
-  2026-10-10)"); the DB trigger allows exactly those two positions.
+  2026-10-10)"); the DB trigger allows exactly the creator PM's "Diketahui" and — only for `_self` — the requester's
+  approval level.
 - PM: web **Persetujuan** menu, `/me` `capabilities.approvalInbox`, dashboard card "Menunggu tindakan saya"; LPJ
   shortfall approvals (ADR 0019) where the PM is the acknowledger.
 - API (additive, APK): inbox items `decisionBy` (`pm | direktur | finance | other`) and `finalStep`; request detail

@@ -267,9 +267,12 @@ export const ExpenseRequestDetail = ExpenseRequestListItem.extend({
         .array(z.object({ position: z.enum(['diketahui', 'approval']), level: z.number().int(), role: z.string().nullable(), userId: id.nullable(), reason: z.string() }))
         .meta({ description: 'ADR 0013 G1-2: positions skipped at submit because their only holders are requester/creator — show "(tidak berlaku — pemohon)".' }),
       selfApproval: z
-        .enum(['direktur_via_pm'])
+        .enum(['direktur_via_pm', 'direktur_via_pm_self'])
         .nullable()
-        .meta({ description: 'ADR 0021 narrow G1 exception: a Direktur\'s request filed by the PM project (PM approves, then the Direktur) — show "Pengajuan Direktur — diajukan oleh PM (kebijakan owner 2026-10-10)".' }),
+        .meta({
+          description:
+            'ADR 0021 narrow G1 exception: a Direktur\'s request filed by the PM project (PM approves, then a Direktur). direktur_via_pm = another Direktur decides the Direktur step; direktur_via_pm_self = the requester Direktur may approve (only Direktur of the PT, owner 2026-10-11). Show the note "Pengajuan Direktur — diajukan oleh PM …".',
+        }),
       steps: z.array(z.object({ level: z.number().int(), approverRole: z.string().nullable(), approverUserId: id.nullable() })),
       signDiajukan: z.enum(['required', 'optional', 'none']),
       signDibuat: z.enum(['required', 'optional', 'none']),
@@ -726,7 +729,7 @@ export const ApprovalInbox = z
         decisionFlow: z.boolean().meta({ description: 'ADR 0013/0021 decision flow (acknowledge = an approval, button "Setujui"); false = pre-E1 snapshot.' }),
         decisionBy: z.enum(['pm', 'direktur', 'finance', 'other']).meta({ description: 'ADR 0021: who decides this step (APK decision sheet texts): pm = PM project, direktur, finance, other (named user / legacy).' }),
         finalStep: z.boolean().meta({ description: 'ADR 0021: approving this step makes the request "Disetujui" (Finance then transfers / verifies receipts).' }),
-        selfApproval: z.enum(['direktur_via_pm']).nullable().meta({ description: 'ADR 0021 narrow G1 exception (a Direktur\'s request filed by the PM project).' }),
+        selfApproval: z.enum(['direktur_via_pm', 'direktur_via_pm_self']).nullable().meta({ description: 'ADR 0021 narrow G1 exception (a Direktur\'s request filed by the PM project; _self = the requester Direktur is the PT\'s only Direktur).' }),
         budget: z.object({
           basis: z.enum(['project', 'none']),
           pctBefore: z.number().nullable(),

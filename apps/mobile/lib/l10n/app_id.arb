@@ -398,6 +398,7 @@
   "decisionHintDirekturFinal": "Pengajuan diteruskan ke Finance untuk transfer.",
   "actionAcknowledgePm": "Setujui",
   "direkturViaPmNote": "Pengajuan Direktur — diajukan oleh PM (kebijakan owner 2026-10-10)",
+  "direkturViaPmSelfNote": "Pengajuan Direktur — diajukan oleh PM; disetujui Direktur pemohon karena satu-satunya Direktur PT (kebijakan owner 2026-10-10)",
   "historyTitle": "Riwayat",
   "historyEmpty": "Belum ada riwayat.",
   "historyField": "Field",

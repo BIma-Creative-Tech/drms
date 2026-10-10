@@ -112,7 +112,12 @@ class _DetailBody extends StatelessWidget {
               children: [
                 const Icon(Icons.info_outline, size: 18),
                 const SizedBox(width: 6),
-                Expanded(child: Text(t.direkturViaPmNote, key: const Key('direktur-via-pm-note'))),
+                Expanded(
+                  child: Text(
+                    d.approvalRule!.direkturViaPmSelf ? t.direkturViaPmSelfNote : t.direkturViaPmNote,
+                    key: const Key('direktur-via-pm-note'),
+                  ),
+                ),
               ],
             ),
           ),

@@ -4,7 +4,7 @@ import React from 'react'
 import { ownEmployees, relId } from '@/access/roles'
 import { displayName, loadVisible, today } from '@/domain/expense/common'
 import { detail } from '@/domain/expense/dto'
-import { DIREKTUR_VIA_PM, DIREKTUR_VIA_PM_NOTE, isDecisionSnapshot, SKIPPED_LABEL } from '@/domain/expense/decision'
+import { isDecisionSnapshot, selfApprovalNote, SKIPPED_LABEL } from '@/domain/expense/decision'
 import type { ApprovalSnapshot } from '@/domain/expense/rules'
 import { approvalStepLabel, isPmFlow, nextActor, timeline } from '@/domain/expense/timeline'
 import { formatRupiah } from '@/lib/money'
@@ -192,10 +192,10 @@ export async function WorkflowPanel(props: UIFieldServerProps) {
         ) : null}
         {d.rejectReason ? <div style={{ marginTop: 6, color: 'var(--theme-error-500)' }}>Alasan ditolak: {d.rejectReason}</div> : null}
         {d.cancelReason ? <div style={{ marginTop: 6 }}>Alasan batal: {d.cancelReason}</div> : null}
-        {snap?.selfApproval === DIREKTUR_VIA_PM ? (
+        {selfApprovalNote(snap?.selfApproval) ? (
           // ADR 0021: narrow G1 exception — recorded (snapshot, g1_exception, audit) and shown.
           <div data-pk-g1-exception style={{ marginTop: 6 }}>
-            {DIREKTUR_VIA_PM_NOTE}
+            {selfApprovalNote(snap?.selfApproval)}
           </div>
         ) : null}
         {(snap?.skipped ?? []).length > 0 ? (

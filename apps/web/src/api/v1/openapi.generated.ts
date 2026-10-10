@@ -1492,9 +1492,10 @@ export const openapiDocument = {
                 ],
                 "enum": [
                   "direktur_via_pm",
+                  "direktur_via_pm_self",
                   null
                 ],
-                "description": "ADR 0021 narrow G1 exception: a Direktur's request filed by the PM project (PM approves, then the Direktur) — show \"Pengajuan Direktur — diajukan oleh PM (kebijakan owner 2026-10-10)\"."
+                "description": "ADR 0021 narrow G1 exception: a Direktur's request filed by the PM project (PM approves, then a Direktur). direktur_via_pm = another Direktur decides the Direktur step; direktur_via_pm_self = the requester Direktur may approve (only Direktur of the PT, owner 2026-10-11). Show the note \"Pengajuan Direktur — diajukan oleh PM …\"."
               },
               "steps": {
                 "type": "array",
@@ -4375,9 +4376,10 @@ export const openapiDocument = {
                   ],
                   "enum": [
                     "direktur_via_pm",
+                    "direktur_via_pm_self",
                     null
                   ],
-                  "description": "ADR 0021 narrow G1 exception (a Direktur's request filed by the PM project)."
+                  "description": "ADR 0021 narrow G1 exception (a Direktur's request filed by the PM project; _self = the requester Direktur is the PT's only Direktur)."
                 },
                 "budget": {
                   "type": "object",

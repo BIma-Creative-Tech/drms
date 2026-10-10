@@ -35,7 +35,8 @@ baru juga muncul di lonceng **Notifikasi** (bar atas, kanan) dan — bila Admin 
   tulisan **Menampilkan PT: …**). Keputusan selalu memakai peran Anda **di PT pengajuan**, dan warna merah Dampak
   anggaran memakai ambang PT itu.
 - **Pengajuan untuk Anda sendiri** dibuat oleh **PM project** atas nama Anda (Anda sebagai pemohon). PM menyetujui
-  sebagai PM project, lalu Anda (atau Direktur lain di PT itu) menyetujui. Ini pengecualian G1 yang diputuskan owner
+  sebagai PM project, lalu **Direktur lain** di PT itu yang menyetujui (Anda tidak bisa menyetujui pengajuan Anda
+  sendiri selama ada Direktur lain). Hanya bila Anda satu-satunya Direktur PT, Anda sendiri yang menyetujui. Ini pengecualian G1 yang diputuskan owner
   (10 Okt 2026), tercatat di Audit Log, panel dan PDF: "Pengajuan Direktur — diajukan oleh PM (kebijakan owner
   2026-10-10)". Bila pengajuan untuk Anda dibuat orang lain (mis. Finance/Admin) dan tidak ada Direktur lain di PT itu,
   pengiriman ditolak "Pengajuan untuk Direktur dibuat oleh PM project." — minta PM project membuatkannya.

@@ -3,22 +3,23 @@ import { type MigrateDownArgs, type MigrateUpArgs, sql } from '@payloadcms/db-po
 /**
  * ADR 0021 (owner decision 2026-10-10): approval of expense requests Staff → PM project → Direktur →
  * Finance transfer, with ONE narrow G1 exception: a Direktur's own request filed by the PM project
- * (`direktur_via_pm`). Schema part as `payload migrate:create` would generate it (snapshot in the
+ * (`direktur_via_pm` / `direktur_via_pm_self`, owner answer 2026-10-11 "Utamakan Direktur lain"). Schema part as `payload migrate:create` would generate it (snapshot in the
  * .json), written re-runnable, run as <prefix>_owner, plus hand-written guards. ADDITIVE for the
  * previous web image and every released APK (new nullable column, new enum value, triggers that only
  * act on new writes; the approval rules themselves are changed by the Admin in the UI, not here):
  *
  * 1. `audit_logs.action` += 'approval_policy_exception' (the exception was applied at submit).
- * 2. `expense_requests.g1_exception` varchar NULL, CHECK value IN ('direktur_via_pm'); system-only
+ * 2. `expense_requests.g1_exception` varchar NULL, CHECK value IN ('direktur_via_pm', 'direktur_via_pm_self'); system-only
  *    Payload field. Trigger `expense_requests_g1_exception` (BEFORE INSERT OR UPDATE; Payload's upsert-style
  *    update fires BEFORE INSERT as well): new rows carry none; the value changes only at the submit freeze point (editable status → locked status, i.e.
  *    draft → pending_*, receipt_revision → pending_*) — afterwards it is fixed with the rest of the
  *    locked content (`pk_expense_requests_guard`).
  * 3. `pk_approvals_before_insert` (CREATE OR REPLACE; body of 20261008_090000_qa_finance_integrity +
  *    this block): requester/creator still never hold a decision position (G1), EXCEPT when the request
- *    carries g1_exception = 'direktur_via_pm': exactly `position = 'diketahui' AND actor = creator`
- *    (the PM project, not a requester) and `position = 'approval' AND actor ∈ requesters` (the
- *    Direktur, not the creator). Applies to `expense_shortfall` rows through `settlements.request_id`.
+ *    carries g1_exception: 'direktur_via_pm' (another Direktur decides the Direktur step) → exactly
+ *    `position = 'diketahui' AND actor = creator` (the PM project, not a requester); 'direktur_via_pm_self'
+ *    (the requester is the PT's only Direktur) → that row and `position = 'approval' AND actor ∈ requesters`
+ *    (the Direktur, not the creator). Applies to `expense_shortfall` rows through `settlements.request_id`.
  * Rollback (down): previous trigger body restored, guard + CHECK + column dropped (the enum value stays:
  * audit_logs is append-only, ADR 0006).
  */
@@ -37,8 +38,9 @@ export async function up({ db }: MigrateUpArgs): Promise<void> {
   await db.execute(sql`
     DO $pk$
     BEGIN
+      ALTER TABLE expense_requests DROP CONSTRAINT IF EXISTS expense_requests_g1_exception_value;
       IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'expense_requests_g1_exception_value') THEN
-        ALTER TABLE expense_requests ADD CONSTRAINT expense_requests_g1_exception_value CHECK (g1_exception IS NULL OR g1_exception = 'direktur_via_pm');
+        ALTER TABLE expense_requests ADD CONSTRAINT expense_requests_g1_exception_value CHECK (g1_exception IS NULL OR g1_exception IN ('direktur_via_pm', 'direktur_via_pm_self'));
       END IF;
     END
     $pk$;
@@ -91,11 +93,12 @@ export async function up({ db }: MigrateUpArgs): Promise<void> {
           WHERE r.parent_id = rid AND r.path = 'requesters' AND m.user_id = NEW.actor_id);
         IF NEW.actor_id IS NULL OR NEW.actor_id = creator OR is_requester THEN
           -- ADR 0021: the narrow exception of a Direktur's request filed by the PM project — the creator PM
-          -- gives "Diketahui" (Persetujuan PM), a requester Direktur decides an approval level. Nothing else.
+          -- gives "Diketahui" (Persetujuan PM; both values); a requester Direktur decides an approval level only
+          -- under 'direktur_via_pm_self' (the PT's only Direktur, owner 2026-10-11). Nothing else.
           -- (coalesce: a NULL comparison must never let a row through — three-valued logic)
-          IF NOT coalesce(exc = 'direktur_via_pm' AND NEW.actor_id IS NOT NULL AND creator IS NOT NULL AND (
+          IF NOT coalesce(exc IN ('direktur_via_pm', 'direktur_via_pm_self') AND NEW.actor_id IS NOT NULL AND creator IS NOT NULL AND (
                 (NEW.position = 'diketahui' AND NEW.actor_id = creator AND NOT is_requester)
-             OR (NEW.position = 'approval' AND is_requester AND NEW.actor_id IS DISTINCT FROM creator)), false) THEN
+             OR (exc = 'direktur_via_pm_self' AND NEW.position = 'approval' AND is_requester AND NEW.actor_id IS DISTINCT FROM creator)), false) THEN
             RAISE EXCEPTION 'approvals: requester/creator cannot hold a decision position (G1)' USING ERRCODE = '42501';
           END IF;
         END IF;

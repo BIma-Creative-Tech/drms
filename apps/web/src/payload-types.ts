@@ -1232,7 +1232,7 @@ export interface ExpenseRequest {
     | boolean
     | null;
   /**
-   * direktur_via_pm = pengajuan Direktur, diajukan oleh PM (kebijakan owner 2026-10-10).
+   * direktur_via_pm = pengajuan Direktur, diajukan oleh PM (Direktur lain memutuskan); direktur_via_pm_self = idem, Direktur pemohon satu-satunya Direktur PT (kebijakan owner 2026-10-10/11).
    */
   g1Exception?: string | null;
   approvalCycle?: number | null;

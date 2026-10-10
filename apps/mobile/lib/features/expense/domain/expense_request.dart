@@ -177,7 +177,8 @@ abstract class ApprovalRuleInfo with _$ApprovalRuleInfo {
     @Default([]) List<SkippedPosition> skipped,
     @Default([]) List<RuleStep> steps,
 
-    /// ADR 0021: narrow G1 exception — a Direktur's own request filed by the PM (`direktur_via_pm`).
+    /// ADR 0021: narrow G1 exception — a Direktur's own request filed by the PM (`direktur_via_pm`; `direktur_via_pm_self` =
+    /// the requester Direktur is the PT's only Direktur and approves himself, owner 2026-10-11).
     String? selfApproval,
   }) = _ApprovalRuleInfo;
 
@@ -192,7 +193,10 @@ abstract class ApprovalRuleInfo with _$ApprovalRuleInfo {
   bool get pmApproval => decisionFlow && acknowledgeBy == 'scope_manager';
 
   /// ADR 0021: Direktur request filed by the PM (owner policy 2026-10-10).
-  bool get direkturViaPm => selfApproval == 'direktur_via_pm';
+  bool get direkturViaPm => selfApproval == 'direktur_via_pm' || selfApproval == 'direktur_via_pm_self';
+
+  /// ADR 0021 (owner 2026-10-11): the requester Direktur approves himself (only Direktur of the PT).
+  bool get direkturViaPmSelf => selfApproval == 'direktur_via_pm_self';
 
   /// Approver role of an approval level (null = named user / unknown).
   String? roleOfLevel(int level) => steps.where((s) => s.level == level).firstOrNull?.approverRole;

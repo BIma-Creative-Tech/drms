@@ -78,21 +78,30 @@ receipts, not an approval) and most notification routing already support it.
    - the creator is the resolved PM of the request (project PM, or cost-center manager) and is not a requester;
    - every requester has an account and every requester account holds **Direktur (`pk-owner`) in the request's PT**.
 
-   Effect: in the position plan the creator (PM) is not excluded from the PM position and the requester Direktur is
-   not excluded from the Direktur level (another Direktur of the PT may also decide). Recorded in four places:
-   - snapshot `selfApproval: 'direktur_via_pm'`;
-   - column `expense_requests.g1_exception = 'direktur_via_pm'` (system-only, read-only, written at submit);
+   Effect: in the position plan the creator (PM) is not excluded from the PM position. **Owner answer 2026-10-11
+   ("Utamakan Direktur lain"):** the Direktur step is decided at submit, in two variants:
+   - `direktur_via_pm` — the PT has another active Direktur who is not a requester: ONLY that Direktur (or those
+     Direktur) decide the Direktur step; the requester Direktur is refused (403 + `access_denied`, the DB trigger
+     refuses too), is not notified and does not see it in his inbox;
+   - `direktur_via_pm_self` — the requester is the PT's only Direktur: he is not excluded from the Direktur level
+     and approves his own request after the PM.
+
+   Recorded in four places:
+   - snapshot `selfApproval` (`direktur_via_pm` | `direktur_via_pm_self`);
+   - column `expense_requests.g1_exception` (same value; system-only, read-only, written at submit);
    - audit action `approval_policy_exception`;
-   - PDF and web panel note "Pengajuan Direktur — diajukan oleh PM (kebijakan owner 2026-10-10)".
+   - PDF and web panel note "Pengajuan Direktur — diajukan oleh PM (kebijakan owner 2026-10-10)"; for `_self`:
+     "… ; disetujui Direktur pemohon karena satu-satunya Direktur PT …".
 
    **DB enforcement** (migration `20261010_130000_approval_pm_direktur`):
    - `pk_approvals_before_insert` (expense requests and `expense_shortfall` through `settlements.request_id`) still
-     refuses requester/creator, except when `g1_exception = 'direktur_via_pm'` and either
-     `position = 'diketahui' AND actor = creator AND actor is not a requester`, or
-     `position = 'approval' AND actor ∈ requesters AND actor <> creator`. The addendum branch is unchanged.
+     refuses requester/creator, except: with `g1_exception` = `direktur_via_pm` or `direktur_via_pm_self`,
+     `position = 'diketahui' AND actor = creator AND actor is not a requester`; and only with
+     `direktur_via_pm_self`, `position = 'approval' AND actor ∈ requesters AND actor <> creator`. The addendum branch
+     is unchanged.
    - Trigger `expense_requests_g1_exception` (BEFORE INSERT OR UPDATE): new rows carry no exception; the value may only
      change at the submit freeze point (editable status → locked status, i.e. `draft`/`receipt_revision` → a waiting
-     status); CHECK `g1_exception IS NULL OR g1_exception = 'direktur_via_pm'`. The existing content lock
+     status); CHECK `g1_exception IS NULL OR g1_exception IN ('direktur_via_pm', 'direktur_via_pm_self')`. The existing content lock
      (`pk_expense_requests_guard`) also freezes it while the request is locked.
    - Unique index "one decision position per person per cycle" is unchanged: the PM and the Direktur are always two
      people.
@@ -100,7 +109,8 @@ receipts, not an approval) and most notification routing already support it.
 6. **LPJ shortfall re-approval (ADR 0019) follows the same rule:** PM → Direktur, decided in web **Persetujuan**
    (`shortfall-approval.ts`: decision guard by `lacksDecisionRole`/acknowledger instead of the hard-coded
    Direktur/Finance role check; the shortfall inbox includes the requests where the caller is the PM acknowledger).
-   The exception applies only when the request itself carries `g1_exception = 'direktur_via_pm'`.
+   The exception applies only as far as the request itself carries it (`direktur_via_pm` → the creator PM's
+   "Diketahui" only; `direktur_via_pm_self` → also the requester Direktur).
 
 7. **Addendum RAB is unchanged** (Direktur → Finance). `scope_manager` is refused for `budget_addendum` rules.
 
@@ -133,8 +143,9 @@ receipts, not an approval) and most notification routing already support it.
   Finance workload drops (no approval).
 - Negative: every project needs a PM (`projects.pm`) and every cost center a manager, otherwise submission is blocked
   (409). With one Direktur, his absence still stalls all requests.
-- The G1 exception weakens segregation of duties for Direktur requests: the requester Direktur approves his own
-  request after the PM. Accepted by the owner; it is narrow (exact conditions above), server-set, DB-enforced and
+- The G1 exception weakens segregation of duties for Direktur requests: the creator PM approves, and — only when he is
+  the PT's only Direktur — the requester Direktur approves his own request after the PM (owner 2026-10-11: another
+  Direktur decides whenever one exists). Accepted by the owner; it is narrow (exact conditions above), server-set, DB-enforced and
   visible in audit, panel and PDF.
 - Finance approve-vs-transfer separation (ADR 0013 O-2) no longer applies to new requests (Finance no longer approves).
 

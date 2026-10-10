@@ -138,9 +138,11 @@ async function stepUsers(req: PayloadRequest, doc: Doc, kind: 'ack' | 'approval'
     if (step?.approverUserId) ids = [step.approverUserId]
     else if (step?.approverRole) ids = await usersWithRole(req, step.approverRole, doc)
   }
-  // G1: requesters/creator can never decide → never asked to (ADR 0021: except the narrow
-  // `direktur_via_pm` exception — the creator PM / the requester Direktur hold the step).
-  if (snap.selfApproval === 'direktur_via_pm' && doc.g1Exception === 'direktur_via_pm') return ids
+  // G1: requesters/creator can never decide → never asked to (ADR 0021: except the narrow exception —
+  // the creator PM holds "Diketahui"; the requester Direktur the approval step only as the only Direktur).
+  // Owner answer 2026-10-11: the requester Direktur is asked only under `direktur_via_pm_self` (only Direktur).
+  const exempt = (snap.selfApproval === 'direktur_via_pm' || snap.selfApproval === 'direktur_via_pm_self') && doc.g1Exception === snap.selfApproval
+  if (exempt && (kind === 'ack' || snap.selfApproval === 'direktur_via_pm_self')) return ids
   const excluded = new Set(await people(req, doc))
   return ids.filter((x) => !excluded.has(x))
 }

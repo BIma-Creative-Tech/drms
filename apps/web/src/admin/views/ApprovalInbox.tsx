@@ -1,7 +1,7 @@
 import type { AdminViewServerProps } from 'payload'
 import React from 'react'
 
-import { DIREKTUR_VIA_PM_NOTE } from '@/domain/expense/decision'
+import { selfApprovalNote } from '@/domain/expense/decision'
 import { detail } from '@/domain/expense/dto'
 import { approvalInbox } from '@/domain/expense/queues'
 import { withReqTransaction } from '@/lib/system-tx'
@@ -91,7 +91,7 @@ export async function ApprovalInbox(props: AdminViewServerProps) {
                   </td>
                   <td style={td}>
                     {r.stepLabel}
-                    {r.selfApproval ? <div style={{ fontSize: 11 }}>{DIREKTUR_VIA_PM_NOTE}</div> : null}
+                    {r.selfApproval ? <div style={{ fontSize: 11 }}>{selfApprovalNote(r.selfApproval)}</div> : null}
                   </td>
                   <td style={td}>
                     {r.step === 'acknowledge' ? (

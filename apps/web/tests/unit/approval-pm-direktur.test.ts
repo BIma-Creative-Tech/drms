@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import type { Role } from '@/access/roles'
 import { selfApprovalAllowed } from '@/domain/expense/common'
-import { DIREKTUR_VIA_PM, planPositions, ruleDecisionError, type PlanInput } from '@/domain/expense/decision'
+import { DIREKTUR_VIA_PM, DIREKTUR_VIA_PM_SELF, planPositions, ruleDecisionError, selfApprovalNote, type PlanInput } from '@/domain/expense/decision'
 import type { ApprovalSnapshot } from '@/domain/expense/rules'
 import { allowedActions, mayPerform, type ActorContext } from '@/domain/expense/state'
 import { ackStepLabel, approvalStepLabel, decisionByOf, nextActor, requestStatusLabel, timeline } from '@/domain/expense/timeline'
@@ -110,17 +110,30 @@ describe('guards: the PM decides only as acknowledger; the narrow exception', ()
     expect(allowedActions(ctx({ isCreator: true, selfApprovalAllowed: true }))).toEqual(expect.arrayContaining(['acknowledge', 'reject']))
     expect(mayPerform(ctx({ isCreator: true, selfApprovalAllowed: true }), 'acknowledge')).toBe(true)
   })
-  it('selfApprovalAllowed: exactly creator-PM at pending_ack and requester-Direktur at pending_approval, snapshot AND column', () => {
-    const snap = { ...pmSnap, selfApproval: DIREKTUR_VIA_PM }
-    const doc = (status: 'pending_ack' | 'pending_approval', g1Exception: string | null = DIREKTUR_VIA_PM) => ({ status, approvalSnapshot: snap, g1Exception })
+  it('selfApprovalAllowed: creator-PM at pending_ack (both variants); requester-Direktur at pending_approval only under _self; snapshot AND column', () => {
     const c = { isCreator: false, isRequester: false, isAcknowledger: false, matchesCurrentStep: false }
-    expect(selfApprovalAllowed(doc('pending_ack'), { ...c, isCreator: true, isAcknowledger: true })).toBe(true)
-    expect(selfApprovalAllowed(doc('pending_ack', null), { ...c, isCreator: true, isAcknowledger: true })).toBe(false)
+    for (const exc of [DIREKTUR_VIA_PM, DIREKTUR_VIA_PM_SELF]) {
+      const snap = { ...pmSnap, selfApproval: exc }
+      const doc = (status: 'pending_ack' | 'pending_approval', g1Exception: string | null = exc) => ({ status, approvalSnapshot: snap, g1Exception })
+      expect(selfApprovalAllowed(doc('pending_ack'), { ...c, isCreator: true, isAcknowledger: true })).toBe(true)
+      expect(selfApprovalAllowed(doc('pending_ack', null), { ...c, isCreator: true, isAcknowledger: true })).toBe(false)
+      expect(selfApprovalAllowed(doc('pending_ack'), { ...c, isRequester: true, isAcknowledger: true })).toBe(false)
+      expect(selfApprovalAllowed(doc('pending_approval'), { ...c, isCreator: true, matchesCurrentStep: true })).toBe(false)
+      expect(selfApprovalAllowed(doc('pending_approval'), { ...c, isRequester: true, matchesCurrentStep: false })).toBe(false)
+    }
     expect(selfApprovalAllowed({ status: 'pending_ack', approvalSnapshot: pmSnap, g1Exception: DIREKTUR_VIA_PM }, { ...c, isCreator: true, isAcknowledger: true })).toBe(false)
-    expect(selfApprovalAllowed(doc('pending_ack'), { ...c, isRequester: true, isAcknowledger: true })).toBe(false)
-    expect(selfApprovalAllowed(doc('pending_approval'), { ...c, isRequester: true, matchesCurrentStep: true })).toBe(true)
-    expect(selfApprovalAllowed(doc('pending_approval'), { ...c, isCreator: true, matchesCurrentStep: true })).toBe(false)
-    expect(selfApprovalAllowed(doc('pending_approval'), { ...c, isRequester: true, matchesCurrentStep: false })).toBe(false)
+    // owner answer 2026-10-11 ("Utamakan Direktur lain"): the requester approves only as the PT's only Direktur
+    const viaPm = { status: 'pending_approval' as const, approvalSnapshot: { ...pmSnap, selfApproval: DIREKTUR_VIA_PM }, g1Exception: DIREKTUR_VIA_PM }
+    expect(selfApprovalAllowed(viaPm, { ...c, isRequester: true, matchesCurrentStep: true })).toBe(false)
+    const self = { status: 'pending_approval' as const, approvalSnapshot: { ...pmSnap, selfApproval: DIREKTUR_VIA_PM_SELF }, g1Exception: DIREKTUR_VIA_PM_SELF }
+    expect(selfApprovalAllowed(self, { ...c, isRequester: true, matchesCurrentStep: true })).toBe(true)
+    // snapshot and column must agree
+    expect(selfApprovalAllowed({ ...self, g1Exception: DIREKTUR_VIA_PM }, { ...c, isRequester: true, matchesCurrentStep: true })).toBe(false)
+  })
+  it('notes per variant', () => {
+    expect(selfApprovalNote(DIREKTUR_VIA_PM)).toBe('Pengajuan Direktur — diajukan oleh PM (kebijakan owner 2026-10-10)')
+    expect(selfApprovalNote(DIREKTUR_VIA_PM_SELF)).toMatch(/satu-satunya Direktur PT/)
+    expect(selfApprovalNote(null)).toBeNull()
   })
 })
 

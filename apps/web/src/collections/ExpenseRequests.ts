@@ -372,12 +372,12 @@ export const ExpenseRequests: CollectionConfig = withAudit(
       { name: 'approvalSnapshot', type: 'json', label: 'Snapshot aturan approval', access: system, admin: { ...jsonView, condition: canSeeApprovalRules } },
       {
         // ADR 0021 (owner 2026-10-10): narrow G1 exception, set by the service at submit only (DB trigger
-        // expense_requests_g1_exception: value 'direktur_via_pm' or null, changes only at the freeze point).
+        // expense_requests_g1_exception: value 'direktur_via_pm' | 'direktur_via_pm_self' or null, changes only at the freeze point).
         name: 'g1Exception',
         type: 'text',
         label: 'Pengecualian G1',
         access: system,
-        admin: { ...ro, condition: canSeeApprovalRules, description: 'direktur_via_pm = pengajuan Direktur, diajukan oleh PM (kebijakan owner 2026-10-10).' },
+        admin: { ...ro, condition: canSeeApprovalRules, description: 'direktur_via_pm = pengajuan Direktur, diajukan oleh PM (Direktur lain memutuskan); direktur_via_pm_self = idem, Direktur pemohon satu-satunya Direktur PT (kebijakan owner 2026-10-10/11).' },
       },
       { name: 'approvalCycle', type: 'number', label: 'Siklus approval', defaultValue: 0, access: system, admin: { ...ro, hidden: true } },
       { name: 'currentLevel', type: 'number', label: 'Level approval berjalan', access: system, admin: ro },

@@ -225,28 +225,60 @@ describe('5. Project without a PM → 409', () => {
 })
 
 describe('6. A Direktur request is filed by the PM (narrow G1 exception)', () => {
-  it('PM files for the Direktur → PM approves, the requester Direktur approves; recorded in snapshot, column, audit, PDF', async () => {
+  const approvalInsert = "INSERT INTO approvals (doc_type, request_id, cycle, position, level, actor_id, decision) VALUES ('expense_request', $1, 1, $2, $3, $4, $5)"
+
+  it('PT with another Direktur ("Utamakan Direktur lain"): PM approves, then ONLY the other Direktur; the requester Direktur → 403 + audit, DB refuses', async () => {
     const r = await submitted(w.users.pm, { requesterIds: [dirEmp], bankAccountId: accDir })
     expect(r.body).toMatchObject({ status: 'pending_ack', approvalRule: { acknowledgerUserId: w.users.pm.id, selfApproval: 'direktur_via_pm', skipped: [] } })
     expect((await sqlAs('app', 'SELECT g1_exception FROM expense_requests WHERE id = $1', [r.id])).rows[0].g1_exception).toBe('direktur_via_pm')
     expect(await audit(r.id, 'approval_policy_exception')).toEqual([expect.objectContaining({ field: 'g1Exception', reason: 'Pengajuan Direktur — diajukan oleh PM (kebijakan owner 2026-10-10)' })])
     expect(await notified(r.id, 'expense.pending_ack')).toEqual([]) // the PM submitted it himself (the actor is never notified)
     expect(await inboxItem(w.users.pm, r.id)).toMatchObject({ step: 'acknowledge', selfApproval: 'direktur_via_pm' })
-    // the requester Direktur cannot take the PM's step; the PM cannot take the Direktur's step
+    // the requester Direktur cannot take the PM's step; the DB refuses what the exception does not cover
     expect((await api('POST', `${E}/${r.id}/acknowledge`, dirReq, {}, key())).status).toBe(403)
-    // the DB refuses what the exception does not cover (creator at the approval level, requester at "Diketahui")
-    const asCreator = await sqlError('app', "INSERT INTO approvals (doc_type, request_id, cycle, position, level, actor_id, decision) VALUES ('expense_request', $1, 1, 'approval', 1, $2, 'approved')", [r.id, w.users.pm.id])
-    expect(asCreator?.message).toContain('requester/creator cannot hold a decision position')
-    const asRequester = await sqlError('app', "INSERT INTO approvals (doc_type, request_id, cycle, position, level, actor_id, decision) VALUES ('expense_request', $1, 1, 'diketahui', 0, $2, 'acknowledged')", [r.id, dirReq.id])
-    expect(asRequester?.message).toContain('requester/creator cannot hold a decision position')
+    expect((await sqlError('app', approvalInsert, [r.id, 'approval', 1, w.users.pm.id, 'approved']))?.message).toContain('requester/creator cannot hold a decision position')
+    expect((await sqlError('app', approvalInsert, [r.id, 'diketahui', 0, dirReq.id, 'acknowledged']))?.message).toContain('requester/creator cannot hold a decision position')
     // the column is fixed after submit
-    expect((await sqlError('app', "UPDATE expense_requests SET g1_exception = NULL WHERE id = $1", [r.id]))?.message).toMatch(/g1_exception|locked/)
+    expect((await sqlError('app', 'UPDATE expense_requests SET g1_exception = NULL WHERE id = $1', [r.id]))?.message).toMatch(/g1_exception|locked/)
 
     const ack = await api('POST', `${E}/${r.id}/acknowledge`, w.users.pm, {}, key())
     expect(ack.status, JSON.stringify(ack.body)).toBe(200)
     expect(ack.body.status).toBe('pending_approval')
+    // only the other Direktur(s) are asked; the requester Direktur is not
+    const appr = await notified(r.id, 'expense.pending_approval')
+    expect(appr).toEqual(expect.arrayContaining([w.users.owner.id, w.users.owner2.id]))
+    expect(appr).not.toContain(dirReq.id)
+    expect(await inboxItem(dirReq, r.id)).toBeUndefined()
+    expect(await inboxItem(w.users.owner, r.id)).toMatchObject({ step: 'approve', decisionBy: 'direktur', finalStep: true })
     expect((await api('POST', `${E}/${r.id}/approve`, w.users.pm, {}, key())).status).toBe(403)
-    expect(await inboxItem(dirReq, r.id)).toMatchObject({ step: 'approve', decisionBy: 'direktur', finalStep: true })
+    const self = await api('POST', `${E}/${r.id}/approve`, dirReq, {}, key())
+    expect(self.status, JSON.stringify(self.body)).toBe(403)
+    expect((await audit(r.id, 'access_denied')).some((d) => d.user_id === dirReq.id && d.field === 'approve')).toBe(true)
+    expect((await sqlError('app', approvalInsert, [r.id, 'approval', 1, dirReq.id, 'approved']))?.message).toContain('requester/creator cannot hold a decision position')
+
+    const ok = await api('POST', `${E}/${r.id}/approve`, w.users.owner, {}, key())
+    expect(ok.status, JSON.stringify(ok.body)).toBe(200)
+    expect(ok.body.status).toBe('approved')
+    const pos = ok.body.approvals.filter((a: { position: string }) => a.position === 'diketahui' || a.position === 'approval')
+    expect(pos.map((a: { position: string; actorId: number }) => [a.position, a.actorId])).toEqual([
+      ['diketahui', w.users.pm.id],
+      ['approval', w.users.owner.id],
+    ])
+    const pdf = await asUser(w.users.finance, (req) => buildPdfData(req, r.id, { internal: false, printedBy: 'test' }))
+    expect(pdf.policyNote).toMatch(/^Pengajuan Direktur .{1,3} diajukan oleh PM \(kebijakan owner 2026-10-10\)$/)
+  })
+
+  it('PT with a single Direktur: PM approves, then the requester Direktur approves his own request (direktur_via_pm_self)', async () => {
+    const r = await onlyActive('pk-owner', [dirReq.id], () => submitted(w.users.pm, { requesterIds: [dirEmp], bankAccountId: accDir }))
+    expect(r.body).toMatchObject({ status: 'pending_ack', approvalRule: { acknowledgerUserId: w.users.pm.id, selfApproval: 'direktur_via_pm_self', skipped: [] } })
+    expect((await sqlAs('app', 'SELECT g1_exception FROM expense_requests WHERE id = $1', [r.id])).rows[0].g1_exception).toBe('direktur_via_pm_self')
+    expect(await audit(r.id, 'approval_policy_exception')).toEqual([expect.objectContaining({ reason: expect.stringMatching(/satu-satunya Direktur PT/) })])
+    // still not the requester at "Diketahui", nor the creator at the approval level
+    expect((await sqlError('app', approvalInsert, [r.id, 'diketahui', 0, dirReq.id, 'acknowledged']))?.message).toContain('requester/creator cannot hold a decision position')
+    expect((await sqlError('app', approvalInsert, [r.id, 'approval', 1, w.users.pm.id, 'approved']))?.message).toContain('requester/creator cannot hold a decision position')
+    expect((await api('POST', `${E}/${r.id}/acknowledge`, w.users.pm, {}, key())).status).toBe(200)
+    expect(await notified(r.id, 'expense.pending_approval')).toContain(dirReq.id)
+    expect(await inboxItem(dirReq, r.id)).toMatchObject({ step: 'approve', decisionBy: 'direktur', finalStep: true, selfApproval: 'direktur_via_pm_self' })
     const ok = await api('POST', `${E}/${r.id}/approve`, dirReq, {}, key())
     expect(ok.status, JSON.stringify(ok.body)).toBe(200)
     expect(ok.body.status).toBe('approved')
@@ -256,7 +288,7 @@ describe('6. A Direktur request is filed by the PM (narrow G1 exception)', () =>
       ['approval', dirReq.id],
     ])
     const pdf = await asUser(w.users.finance, (req) => buildPdfData(req, r.id, { internal: false, printedBy: 'test' }))
-    expect(pdf.policyNote).toMatch(/^Pengajuan Direktur .{1,3} diajukan oleh PM \(kebijakan owner 2026-10-10\)$/)
+    expect(pdf.policyNote).toMatch(/satu-satunya Direktur PT/)
   })
 
   it('without the exception the DB still refuses the creator (G1): raw insert on a Staff request', async () => {

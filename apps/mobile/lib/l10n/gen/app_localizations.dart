@@ -1675,6 +1675,12 @@ abstract class AppLocalizations {
   /// **'Pengajuan Direktur — diajukan oleh PM (kebijakan owner 2026-10-10)'**
   String get direkturViaPmNote;
 
+  /// No description provided for @direkturViaPmSelfNote.
+  ///
+  /// In id, this message translates to:
+  /// **'Pengajuan Direktur — diajukan oleh PM; disetujui Direktur pemohon karena satu-satunya Direktur PT (kebijakan owner 2026-10-10)'**
+  String get direkturViaPmSelfNote;
+
   /// No description provided for @historyTitle.
   ///
   /// In id, this message translates to:
