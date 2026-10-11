@@ -14,6 +14,8 @@ import { withReqTransaction } from '@/lib/system-tx'
 import { DEFAULT_TZ } from '@/lib/time'
 
 import { KAS_STYLE } from '@/admin/components/kas/style'
+import { AutoSubmit } from '@/admin/components/list/AutoSubmit'
+import { DEFAULT_PAGE_SIZE, PAGE_SIZES, parseListQuery } from '@/admin/list-query'
 
 import { F3Root } from './f3-ui'
 import { Frame } from './frame'
@@ -47,8 +49,10 @@ export async function AddendumList(props: AdminViewServerProps) {
   const status = ADDENDUM_STATUSES.includes(sp.status as AddendumStatus) ? (sp.status as AddendumStatus) : undefined
   const project = sp.project && /^\d{1,10}$/.test(sp.project) ? Number(sp.project) : undefined
   const before = sp.sebelum && /^\d{1,10}$/.test(sp.sebelum) ? Number(sp.sebelum) : undefined
+  // DRMS 10/10 D8: text search + page size (cursor stays `sebelum`)
+  const lq = parseListQuery(props.searchParams)
   const d = await withReqTransaction(req, async () => {
-    const page = await listAddenda(req, { projectId: project, status, limit: 25, after: before })
+    const page = await listAddenda(req, { projectId: project, status, limit: lq.per, after: before, q: lq.q })
     const all = await listAddenda(req, { projectId: project, limit: 100 })
     const projects = (await req.payload.find({ collection: 'projects', sort: 'code', depth: 0, pagination: false, select: { code: true, name: true, company: true }, user: req.user, overrideAccess: false, req }).catch(() => ({ docs: [] }))).docs as Array<{ id: number; code: string; name: string; company?: unknown }>
     const inbox = await addendumInbox(req)
@@ -60,7 +64,7 @@ export async function AddendumList(props: AdminViewServerProps) {
   const projectPt = new Map(d.projects.map((p) => [p.id, relId(p.company) ?? null]))
   const pending = d.all.filter((a) => a.status === 'pending_ack' || a.status === 'pending_approval')
   const approved = d.all.filter((a) => a.status === 'approved')
-  const filtered = Boolean(status || project)
+  const filtered = Boolean(status || project || lq.q)
   const cols: Col<AddendumSummary>[] = [
     ...(pt.multi ? [{ key: 'pt', label: 'PT', cell: (a: AddendumSummary) => <PtChip pt={pt.ref(projectPt.get(a.project.id) ?? null)} /> }] : []),
     {
@@ -96,6 +100,8 @@ export async function AddendumList(props: AdminViewServerProps) {
     const u = new URLSearchParams()
     if (status) u.set('status', status)
     if (project) u.set('project', String(project))
+    if (lq.q) u.set('q', lq.q)
+    if (lq.per !== DEFAULT_PAGE_SIZE) u.set('per', String(lq.per))
     for (const [k, v] of Object.entries(extra)) u.set(k, v)
     return `/admin/addendum?${u.toString()}`
   }
@@ -133,6 +139,10 @@ export async function AddendumList(props: AdminViewServerProps) {
         </KpiRow>
       </Bento>
       <form className="pk-filter" method="get" action="/admin/addendum" role="search" aria-label="Filter addendum" data-pk-filter="addendum">
+        <label className="pk-filter__search">
+          Cari
+          <input type="search" name="q" defaultValue={lq.q} placeholder="Nomor atau alasan addendum…" maxLength={100} autoComplete="off" data-pk-search="addendum" />
+        </label>
         <label>
           Status
           <select name="status" defaultValue={status ?? ''}>
@@ -155,6 +165,16 @@ export async function AddendumList(props: AdminViewServerProps) {
             ))}
           </select>
         </label>
+        <label>
+          Per halaman
+          <select name="per" defaultValue={String(lq.per)} data-pk-page-size="addendum">
+            {PAGE_SIZES.map((n) => (
+              <option key={n} value={n}>
+                {n}
+              </option>
+            ))}
+          </select>
+        </label>
         <button type="submit" className="pk-kbtn primary">
           Terapkan
         </button>
@@ -163,6 +183,7 @@ export async function AddendumList(props: AdminViewServerProps) {
             Reset
           </Link>
         ) : null}
+        <AutoSubmit />
       </form>
       <Bento label="Daftar addendum">
         <Card id="addenda" title="Daftar addendum" sub="Terbaru dulu">
