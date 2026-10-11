@@ -667,7 +667,8 @@ export type LoanSummary = ReturnType<typeof summary>
 
 /** Detail: summary + repayments ("Pengembalian ke-n") + decision timeline + allowed actions + notes. */
 export async function loanDetail(req: PayloadRequest, doc: LoanDoc) {
-  const rows = await repaymentsOf(req, doc.id)
+  // "Pengembalian ke-n" in repayment-date order (then entry order)
+  const rows = (await repaymentsOf(req, doc.id)).sort((a, b) => a.repayDate.localeCompare(b.repayDate) || a.id - b.id)
   const decisions = await decisionsOf(req, doc.id)
   const n = await names(req, [doc], rows.flatMap((r) => [relId(r.recordedBy), relId(r.voidedBy)]).filter((x): x is number => x !== undefined))
   const ctx = await actorContext(req, doc, rows)

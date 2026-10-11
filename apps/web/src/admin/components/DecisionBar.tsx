@@ -14,6 +14,12 @@ export type DecisionBarProps = {
   canReject: boolean
   /** Turn text ("Persetujuan PM — giliran Anda"). */
   stepLabel: string
+  /** ADR 0022: API collection of the decision (default the expense requests); `/:id/{step|reject}` is appended. */
+  base?: string
+  /** Region label (screen readers). */
+  regionLabel?: string
+  /** Reject prompt (default the expense-request text). */
+  rejectPrompt?: { field: string; message: string; minLength?: number }
 }
 
 const STYLE = `
@@ -33,7 +39,7 @@ body:has([data-pk-decision-bar]) .template-default { padding-bottom: calc(var(--
  * POST /api/v1/expense-requests/:id/{acknowledge|approve|reject} with an Idempotency-Key per dialog
  * (ActionButton) and refreshes the page on success. Reject asks for a reason (≥ 3 characters).
  */
-export function DecisionBar({ id, step, label, confirm, canReject, stepLabel }: DecisionBarProps) {
+export function DecisionBar({ id, step, label, confirm, canReject, stepLabel, base = '/api/v1/expense-requests', regionLabel = 'Keputusan pengajuan', rejectPrompt = REJECT_PROMPT }: DecisionBarProps) {
   const ref = useRef<HTMLDivElement>(null)
   // The bar wraps to two rows on phones: publish its real height for the page padding above.
   useEffect(() => {
@@ -52,12 +58,12 @@ export function DecisionBar({ id, step, label, confirm, canReject, stepLabel }: 
   return (
     <>
       <style>{STYLE}</style>
-      <div ref={ref} className="pk-decide" role="region" aria-label="Keputusan pengajuan" data-pk-decision-bar>
+      <div ref={ref} className="pk-decide" role="region" aria-label={regionLabel} data-pk-decision-bar>
         <div className="pk-decide__text">
           <strong>Giliran Anda:</strong> {stepLabel}
         </div>
-        {canReject ? <ActionButton url={`/api/v1/expense-requests/${id}/reject`} label="Tolak" prompt={REJECT_PROMPT} testId="reject" /> : null}
-        {step ? <ActionButton url={`/api/v1/expense-requests/${id}/${step}`} label={label} variant="primary" confirm={confirm} testId={step} /> : null}
+        {canReject ? <ActionButton url={`${base}/${id}/reject`} label="Tolak" prompt={rejectPrompt} testId="reject" /> : null}
+        {step ? <ActionButton url={`${base}/${id}/${step}`} label={label} variant="primary" confirm={confirm} testId={step} /> : null}
       </div>
     </>
   )

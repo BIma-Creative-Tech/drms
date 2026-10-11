@@ -241,7 +241,7 @@ export const pinjamanReport: ReportDef = {
           links: docLink('nomor', 'project_loan', x.id),
           company: x.companyId,
         })),
-        totals: { nomor: `TOTAL ${totals.count} pinjaman`, nilai: totals.amount, kembali: totals.repaid, sisa: totals.outstanding },
+        totals: { nomor: `TOTAL disetujui (${totals.count} pinjaman)`, nilai: totals.amount, kembali: totals.repaid, sisa: totals.outstanding },
         empty: 'Tidak ada pinjaman antar project untuk filter ini.',
       },
       extra: [
