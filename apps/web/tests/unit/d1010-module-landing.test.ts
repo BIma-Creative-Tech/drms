@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 
 import type { Role } from '@/access/roles'
-import { landingSections, moduleForPath, moduleLandingHref, resolveModules, type ResolvedModule } from '@/admin/modules/registry'
+import { ICONS } from '@/admin/modules/icons'
+import { ITEM_ICONS, itemHref, landingSections, MODULES, moduleForPath, moduleLandingHref, resolveModules, type ResolvedModule } from '@/admin/modules/registry'
 
 /** DRMS 10/10 D9: every module with ≥ 2 visible sub-menus opens a landing page of tiles. */
 const resolve = (roles: Role[], canSee: (k: 'collection' | 'global', s: string) => boolean, canManage?: (k: 'collection' | 'global', s: string) => boolean) =>
@@ -49,5 +50,28 @@ describe('landing tiles respect permissions / hidden entities / role rules', () 
     expect(create).toMatchObject({ label: 'Buat pengajuan', hint: 'Buat baru', icon: 'add' })
     const per = resolveModules({ roles: ['pk-finance'], staffOnly: false, canSee: () => true, labelOf: (_, s) => s, badges: { transfers: 4 } }).find((m) => m.id === 'persetujuan')!
     expect(landingSections(per)[0]!.tiles.find((t) => t.navKey === 'antrian-transfer')).toMatchObject({ badge: 4 })
+  })
+})
+
+describe('landing tile icons (Lead review f)', () => {
+  it('every registry item has its own tile glyph, and every glyph exists', () => {
+    const missing: string[] = []
+    for (const m of MODULES) for (const s of m.sections) for (const it of s.items) {
+      const rel = itemHref(it).slice('/admin'.length)
+      if ('view' in it && it.label.startsWith('+')) continue
+      if (!ITEM_ICONS[rel]) missing.push(rel)
+    }
+    expect(missing).toEqual([])
+    for (const [k, v] of Object.entries(ITEM_ICONS)) expect(ICONS[v], k).toBeDefined()
+  })
+  it('tiles of a module are not all the same generic glyph', () => {
+    for (const m of resolve(['pk-admin', 'pk-finance', 'pk-owner', 'pk-pm'], () => true, () => true)) {
+      const icons = landingSections(m).flatMap((s) => s.tiles.map((t) => t.icon))
+      for (const i of icons) expect(ICONS[i]).toBeDefined()
+      expect(icons.filter((i) => i === 'document')).toEqual([])
+      if (icons.length >= 3) expect(new Set(icons).size, m.id).toBeGreaterThanOrEqual(Math.ceil(icons.length * 0.8))
+    }
+    const master = resolve(['pk-admin'], () => true, () => true).find((m) => m.id === 'master')!
+    expect(Object.fromEntries(landingSections(master)[0]!.tiles.map((t) => [t.href, t.icon]))).toMatchObject({ '/admin/collections/banks': 'tBuilding3', '/admin/collections/vehicles': 'tCar', '/admin/collections/uoms': 'tRuler' })
   })
 })

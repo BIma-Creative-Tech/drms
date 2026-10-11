@@ -466,6 +466,113 @@ export function resolveModules(input: VisibilityInput, modules: readonly ModuleD
 
 // ------------------------------------------------------------------------- landing page (D9)
 
+/**
+ * DRMS 10/10 D9 (Lead review f): glyph of each sub-menu tile on the module landing pages, keyed by the item
+ * href relative to /admin (collection list, global, custom view). Unit-tested: every registry item has one.
+ * The "+ Buat …" shortcut keeps `add`.
+ */
+export const ITEM_ICONS: Readonly<Record<string, IconName>> = {
+  // Persetujuan
+  '/persetujuan': 'approval',
+  '/antrian-transfer': 'tMoneySend',
+  '/verifikasi-lpj': 'tReceiptSearch',
+  '/collections/approvals': 'tTaskSquare',
+  // Proyek
+  '/collections/projects': 'project',
+  '/collections/budget-lines': 'tDocumentText',
+  '/collections/project-stages': 'tHierarchy',
+  '/collections/stage-templates': 'tDocumentCopy',
+  '/collections/clients': 'users',
+  '/collections/cost-centers': 'tWallet3',
+  '/collections/team-assignments': 'tPeople',
+  '/progress': 'tStatusUp',
+  '/progress/laporan': 'tChart',
+  '/collections/progress-reports': 'tChartSquare',
+  '/addendum': 'tNoteAdd',
+  '/collections/budget-addenda': 'tNote',
+  '/unit-kontrak': 'tTruck',
+  '/laporan-servis': 'tSetting3',
+  '/aftersales': 'tGraph',
+  '/aftersales/aktivitas': 'tMessageText',
+  '/collections/service-reports': 'tDocumentText1',
+  '/collections/unit-timesheets': 'tTimer1',
+  '/collections/aftersales-activities': 'tMessages',
+  '/collections/contract-units': 'tTruckTick',
+  '/laporan-harian': 'tCalendarEdit',
+  '/collections/daily-reports': 'tCalendar',
+  '/collections/daily-report-lines': 'tNote1',
+  '/collections/rap-items': 'tReceiptItem',
+  '/collections/rap-templates': 'tCopy',
+  '/collections/resource-types': 'master',
+  // Keuangan
+  '/collections/expense-requests': 'tReceiptText',
+  '/collections/expense-line-snapshots': 'tArchiveBook',
+  '/collections/receipts': 'tReceipt',
+  '/collections/receipt-flags': 'tFlag',
+  '/kas': 'tBook',
+  '/collections/cash-entries': 'tMoneyChange',
+  '/collections/cash-accounts': 'tEmptyWallet',
+  '/collections/cash-in-sources': 'tMoneyRecive',
+  '/collections/transfers': 'tCardSend',
+  '/collections/settlements': 'tClipboardText',
+  '/tutup-buku': 'tLock',
+  '/collections/period-closings': 'tArchiveTick',
+  // Absensi
+  '/absensi/absen': 'tCamera',
+  '/absensi': 'tPeople',
+  '/absensi/rekap': 'tCalendar2',
+  '/absensi/jadwal': 'tCalendar1',
+  '/collections/attendances': 'tClock',
+  '/collections/attendance-corrections': 'tCalendarEdit',
+  '/collections/work-schedules': 'tTimer',
+  '/collections/holidays': 'tSun',
+  // Laporan
+  '/laporan': 'report',
+  // Pengguna & Akses
+  '/akses-pt': 'tSecurityUser',
+  '/collections/users': 'tUser',
+  '/collections/company-memberships': 'tUserTag',
+  '/collections/employees': 'tPersonalcard',
+  '/collections/employee-bank-accounts': 'tCardTick',
+  '/collections/devices': 'tMobile',
+  '/collections/web-sessions': 'tMonitor',
+  // Master Data
+  '/collections/banks': 'tBuilding3',
+  '/collections/uoms': 'tRuler',
+  '/collections/expense-categories': 'tCategory2',
+  '/collections/urgency-levels': 'tDanger',
+  '/collections/vehicles': 'tCar',
+  '/collections/vendors': 'tShop',
+  // Media
+  '/collections/media-receipts': 'tReceipt2',
+  '/collections/media-transfer-proofs': 'tCardReceive',
+  '/collections/media-selfies': 'tCamera',
+  '/collections/media-progress-photos': 'media',
+  '/collections/media-signatures': 'tEdit2',
+  '/collections/media-company': 'tBuilding',
+  '/collections/media-attachments': 'tFolderOpen',
+  // Pengaturan
+  '/collections/companies': 'tBuilding4',
+  '/globals/company-settings': 'settings',
+  '/collections/approval-rules': 'tHierarchy2',
+  '/collections/notification-templates': 'tNotificationStatus',
+  '/collections/document-sequences': 'tDocumentCode',
+  // Sistem
+  '/audit-log': 'tShieldSearch',
+  '/collections/audit-logs': 'tData',
+  '/notifikasi': 'tNotification',
+  '/collections/notifications': 'tNotificationBing',
+  // Dashboard
+  '/dashboard': 'home',
+}
+
+/** Tile glyph of a resolved menu item (ITEM_ICONS; unknown → by kind). */
+export function itemIcon(i: Pick<ResolvedItem, 'href' | 'kind' | 'label'>, moduleIcon: IconName): IconName {
+  if (i.label.startsWith('+')) return 'add'
+  const rel = i.href.startsWith(ADMIN_ROUTE) ? i.href.slice(ADMIN_ROUTE.length) : i.href
+  return ITEM_ICONS[rel] ?? (i.kind === 'view' ? moduleIcon : i.kind === 'global' ? 'settings' : 'document')
+}
+
 /** One tile of a module landing page (same look as the launcher tiles). */
 export type LandingTile = { key: string; href: string; label: string; hint: string; icon: IconName; badge?: number; navKey?: string }
 export type LandingSection = { key: string; label?: string; tiles: LandingTile[] }
@@ -475,8 +582,7 @@ const KIND_HINT: Record<ResolvedItem['kind'], string> = { view: 'Halaman kerja',
 /**
  * Tiles of a module landing page = exactly the caller's visible menu items of that module (already
  * filtered by resolveModules: Payload read permission, visibleEntities, role rules, PT features), in
- * menu order, grouped by the menu sections. Custom work views carry the module glyph, entity lists a
- * document glyph, globals the settings glyph.
+ * menu order, grouped by the menu sections. Each tile carries its own glyph (ITEM_ICONS).
  */
 export function landingSections(m: ResolvedModule): LandingSection[] {
   return m.sections.map((s) => ({
@@ -487,7 +593,7 @@ export function landingSections(m: ResolvedModule): LandingSection[] {
       href: i.href,
       label: i.label.replace(/^\+\s*/, ''),
       hint: i.label.startsWith('+') ? 'Buat baru' : KIND_HINT[i.kind],
-      icon: i.label.startsWith('+') ? 'add' : i.kind === 'view' ? m.icon : i.kind === 'global' ? 'settings' : 'document',
+      icon: itemIcon(i, m.icon),
       ...(i.badge ? { badge: i.badge } : {}),
       ...(i.navKey ? { navKey: i.navKey } : {}),
     })),
