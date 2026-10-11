@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../app/providers.dart';
+import '../../../app/theme.dart';
 import '../../../core/connectivity/connectivity_controller.dart';
 import '../../../core/format/dates.dart';
 import '../../../core/format/rupiah.dart';
@@ -20,6 +21,7 @@ import '../domain/request_status.dart';
 import 'line_editor_screen.dart';
 import 'requests_screen.dart' show syncStateLabel;
 import 'widgets/master_picker.dart';
+import 'widgets/receipt_mismatch_chip.dart';
 import '../../companies/presentation/company_chip.dart';
 import '../../companies/presentation/company_switcher.dart';
 
@@ -475,16 +477,43 @@ class _DraftEditorScreenState extends ConsumerState<DraftEditorScreen> {
                 key: Key('line-${l.no}'),
                 child: ListTile(
                   title: Text('${l.no}. ${l.description.isEmpty ? '-' : l.description}'),
-                  subtitle: Text(
-                    [
-                      '${l.receipts.length} nota',
-                      for (final i in _issues.where((i) => i.lineNo == l.no)) i.message,
-                    ].join('\n'),
+                  // D3: same columns as the web lines table — Kategori · Qty Satuan × Harga satuan = Total.
+                  subtitle: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        [
+                          ?lineQtyPriceText(l, m),
+                          ?m[MasterTypes.categories]?.where((c) => c.id == l.categoryId).firstOrNull?.label,
+                          '${l.receipts.length} nota',
+                        ].join(' · '),
+                      ),
+                      if (l.needsUnitPrice && l.total != null)
+                        Text(
+                          t.lineNeedsUnitPriceShort,
+                          key: Key('line-${l.no}-needs-unit-price'),
+                          style: TextStyle(color: context.pk.warnText, fontWeight: FontWeight.w600),
+                        ),
+                      for (final i in _issues.where((i) => i.lineNo == l.no))
+                        Text(i.message, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+                      if (l.receiptMismatch)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: ReceiptMismatchChip(
+                            key: Key('line-${l.no}-receipt-mismatch'),
+                            receiptAmount: l.receiptAmount,
+                            total: l.computedTotal ?? l.total,
+                          ),
+                        ),
+                    ],
                   ),
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(l.total == null ? '-' : formatRupiah(l.total!)),
+                      Text(
+                        (l.computedTotal ?? l.total) == null ? '-' : formatRupiah(l.computedTotal ?? l.total!),
+                        key: Key('line-${l.no}-total'),
+                      ),
                       IconButton(
                         icon: const Icon(Icons.delete_outline),
                         onPressed: () => setState(
@@ -540,6 +569,13 @@ class _DraftEditorScreenState extends ConsumerState<DraftEditorScreen> {
       ),
     );
   }
+}
+
+/// "2 L × Rp 15.000" (Qty Satuan × Harga satuan) of a draft line; null while qty or the unit price is missing.
+String? lineQtyPriceText(DraftLine l, Map<String, List<MasterItem>> masters) {
+  if (l.qty == null || l.unitPrice == null) return null;
+  final uom = masters[MasterTypes.uoms]?.where((u) => u.id == l.uomId).firstOrNull?.label;
+  return '${formatQty(l.qty!)}${uom == null ? '' : ' $uom'} × ${formatRupiah(l.unitPrice!)}';
 }
 
 /// d1010 (8e / WA-04): the chosen account as bank · holder · masked number. The eye toggle reveals the full

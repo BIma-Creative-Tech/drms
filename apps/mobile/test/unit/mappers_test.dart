@@ -98,7 +98,8 @@ void main() {
     final lines = b['lines'] as List;
     expect(lines, hasLength(3));
     expect((lines[1] as Map)['total'], 677000);
-    expect((lines[1] as Map)['unitPrice'], 339000);
+    expect((lines[1] as Map)['unitPrice'], 338500);
+    expect((lines[1] as Map)['receiptAmount'], 676876);
     expect(b.containsKey('grandTotal'), isFalse, reason: 'server computes the grand total');
   });
 
@@ -117,12 +118,15 @@ void main() {
       'uom_id',
       'unit_price',
       'total',
+      'receipt_amount',
       'notes',
       'category_id',
       'vehicle_id',
       'receipts',
     });
     expect(l2['client_uuid'], '0192f6d0-aaaa-7bbb-8ccc-000000000012');
+    // D3: total = qty × harga satuan (2 × 338.500), "Nominal sesuai nota" beside it.
+    expect((l2['qty'], l2['unit_price'], l2['total'], l2['receipt_amount']), (2.0, 338500, 677000, 676876));
     final r = (l2['receipts'] as List).single as Map<String, dynamic>;
     expect(r['amount'], 676876);
     expect(r['receipt_date'], '2026-09-20');

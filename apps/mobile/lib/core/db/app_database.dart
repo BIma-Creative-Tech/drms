@@ -53,6 +53,9 @@ class LocalLines extends Table {
   IntColumn get uomId => integer().nullable()();
   IntColumn get unitPrice => integer().nullable()();
   IntColumn get total => integer().nullable()();
+
+  /// Schema v7 (DRMS 10/10 D3): "Nominal sesuai nota", nullable. `total` is qty × unit price from v7 on.
+  IntColumn get receiptAmount => integer().nullable()();
   IntColumn get categoryId => integer().nullable()();
   IntColumn get vehicleId => integer().nullable()();
   TextColumn get notes => text().nullable()();
@@ -398,7 +401,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
 
   @override
-  int get schemaVersion => 6;
+  int get schemaVersion => 7;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -432,6 +435,9 @@ class AppDatabase extends _$AppDatabase {
         await m.createTable(fieldRapItems);
         await m.createTable(fieldResourceTypes);
       }
+      // v7 (DRMS 10/10 D3): "Nominal sesuai nota" per line, nullable. Existing lines keep their total; a line
+      // without a unit price is completed in the line editor before it can be submitted.
+      if (from < 7) await m.addColumn(localLines, localLines.receiptAmount);
     },
     beforeOpen: (details) async {
       await customStatement('PRAGMA foreign_keys = ON');

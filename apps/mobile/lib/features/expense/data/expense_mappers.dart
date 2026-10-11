@@ -181,6 +181,8 @@ ExpenseDetail detailFromJson(Json j) {
             category: refFromJson(m['category']),
             vehiclePlate: _strN(_map(m['vehicle'])?['plateDisplay'] ?? _map(m['vehicle'])?['plateNo']),
             vehicleId: _intN(_map(m['vehicle'])?['id']),
+            receiptAmount: _intN(m['receiptAmount']),
+            receiptMismatch: m['receiptMismatch'] is bool ? m['receiptMismatch'] as bool : null,
           ),
     ],
     receipts: [
@@ -250,8 +252,8 @@ ExpenseDetail detailFromJson(Json j) {
         if (_map(f) case final m?)
           FlagInfo(
             id: _int(m['id']),
-            kind: '${m['kind'] ?? ''}',
-            kindLabel: '${m['kindLabel'] ?? m['kind'] ?? ''}',
+            kind: '${m['kind'] ?? m['code'] ?? ''}',
+            kindLabel: '${m['kindLabel'] ?? m['kind'] ?? m['code'] ?? ''}',
             level: '${m['level'] ?? 'info'}',
             status: '${m['status'] ?? ''}',
             lineNo: _intN(m['lineNo']),
@@ -327,6 +329,10 @@ SettlementInfo? settlementFromJson(Object? v) {
     submittedAt: _strN(m['submittedAt']),
     verifiedAt: _strN(m['verifiedAt']),
     settledAt: _strN(m['settledAt']),
+    // d1010 (13): LPJ photos — media ids, or objects with `id` / `imageId`.
+    photos: [
+      for (final p in _list(m['photos'])) ?(p is num ? p.toInt() : _intN(_map(p)?['id'] ?? _map(p)?['imageId'])),
+    ],
   );
 }
 
@@ -374,12 +380,15 @@ Json draftToCreateBody(DraftRequest d) => {
   'clientUuid': d.clientUuid,
 };
 
+/// D3: `total` is qty × unitPrice (the server recomputes it; a pre-D3 line without unit price sends its
+/// typed total until the user completes it).
 Json lineToInput(DraftLine l) => {
   'description': l.description.trim(),
   'qty': l.qty,
   'uomId': l.uomId,
   'unitPrice': l.unitPrice,
-  'total': l.total,
+  'total': l.computedTotal ?? l.total,
+  'receiptAmount': l.receiptAmount,
   'notes': (l.notes == null || l.notes!.trim().isEmpty) ? null : l.notes!.trim(),
   'categoryId': l.categoryId,
   'vehicleId': l.vehicleId,
@@ -414,7 +423,8 @@ Json draftToSyncPayload(DraftRequest d, {bool includeDraftId = false}) => {
         'qty': l.qty,
         'uom_id': l.uomId,
         'unit_price': l.unitPrice,
-        'total': l.total,
+        'total': l.computedTotal ?? l.total,
+        'receipt_amount': l.receiptAmount,
         'notes': (l.notes == null || l.notes!.trim().isEmpty) ? null : l.notes!.trim(),
         'category_id': l.categoryId,
         'vehicle_id': l.vehicleId,
@@ -472,6 +482,7 @@ DraftRequest draftFromServer(
         uomId: l.uom?.id,
         unitPrice: l.unitPrice,
         total: l.total,
+        receiptAmount: l.receiptAmount,
         categoryId: l.category?.id,
         vehicleId: l.vehicleId,
         notes: l.notes,

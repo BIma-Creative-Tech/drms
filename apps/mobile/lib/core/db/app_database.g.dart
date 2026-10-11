@@ -1228,6 +1228,17 @@ class $LocalLinesTable extends LocalLines
     type: DriftSqlType.int,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _receiptAmountMeta = const VerificationMeta(
+    'receiptAmount',
+  );
+  @override
+  late final GeneratedColumn<int> receiptAmount = GeneratedColumn<int>(
+    'receipt_amount',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _categoryIdMeta = const VerificationMeta(
     'categoryId',
   );
@@ -1269,6 +1280,7 @@ class $LocalLinesTable extends LocalLines
     uomId,
     unitPrice,
     total,
+    receiptAmount,
     categoryId,
     vehicleId,
     notes,
@@ -1339,6 +1351,15 @@ class $LocalLinesTable extends LocalLines
         total.isAcceptableOrUnknown(data['total']!, _totalMeta),
       );
     }
+    if (data.containsKey('receipt_amount')) {
+      context.handle(
+        _receiptAmountMeta,
+        receiptAmount.isAcceptableOrUnknown(
+          data['receipt_amount']!,
+          _receiptAmountMeta,
+        ),
+      );
+    }
     if (data.containsKey('category_id')) {
       context.handle(
         _categoryIdMeta,
@@ -1398,6 +1419,10 @@ class $LocalLinesTable extends LocalLines
         DriftSqlType.int,
         data['${effectivePrefix}total'],
       ),
+      receiptAmount: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}receipt_amount'],
+      ),
       categoryId: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
         data['${effectivePrefix}category_id'],
@@ -1428,6 +1453,9 @@ class LocalLine extends DataClass implements Insertable<LocalLine> {
   final int? uomId;
   final int? unitPrice;
   final int? total;
+
+  /// Schema v7 (DRMS 10/10 D3): "Nominal sesuai nota", nullable. `total` is qty × unit price from v7 on.
+  final int? receiptAmount;
   final int? categoryId;
   final int? vehicleId;
   final String? notes;
@@ -1440,6 +1468,7 @@ class LocalLine extends DataClass implements Insertable<LocalLine> {
     this.uomId,
     this.unitPrice,
     this.total,
+    this.receiptAmount,
     this.categoryId,
     this.vehicleId,
     this.notes,
@@ -1462,6 +1491,9 @@ class LocalLine extends DataClass implements Insertable<LocalLine> {
     }
     if (!nullToAbsent || total != null) {
       map['total'] = Variable<int>(total);
+    }
+    if (!nullToAbsent || receiptAmount != null) {
+      map['receipt_amount'] = Variable<int>(receiptAmount);
     }
     if (!nullToAbsent || categoryId != null) {
       map['category_id'] = Variable<int>(categoryId);
@@ -1491,6 +1523,9 @@ class LocalLine extends DataClass implements Insertable<LocalLine> {
       total: total == null && nullToAbsent
           ? const Value.absent()
           : Value(total),
+      receiptAmount: receiptAmount == null && nullToAbsent
+          ? const Value.absent()
+          : Value(receiptAmount),
       categoryId: categoryId == null && nullToAbsent
           ? const Value.absent()
           : Value(categoryId),
@@ -1517,6 +1552,7 @@ class LocalLine extends DataClass implements Insertable<LocalLine> {
       uomId: serializer.fromJson<int?>(json['uomId']),
       unitPrice: serializer.fromJson<int?>(json['unitPrice']),
       total: serializer.fromJson<int?>(json['total']),
+      receiptAmount: serializer.fromJson<int?>(json['receiptAmount']),
       categoryId: serializer.fromJson<int?>(json['categoryId']),
       vehicleId: serializer.fromJson<int?>(json['vehicleId']),
       notes: serializer.fromJson<String?>(json['notes']),
@@ -1534,6 +1570,7 @@ class LocalLine extends DataClass implements Insertable<LocalLine> {
       'uomId': serializer.toJson<int?>(uomId),
       'unitPrice': serializer.toJson<int?>(unitPrice),
       'total': serializer.toJson<int?>(total),
+      'receiptAmount': serializer.toJson<int?>(receiptAmount),
       'categoryId': serializer.toJson<int?>(categoryId),
       'vehicleId': serializer.toJson<int?>(vehicleId),
       'notes': serializer.toJson<String?>(notes),
@@ -1549,6 +1586,7 @@ class LocalLine extends DataClass implements Insertable<LocalLine> {
     Value<int?> uomId = const Value.absent(),
     Value<int?> unitPrice = const Value.absent(),
     Value<int?> total = const Value.absent(),
+    Value<int?> receiptAmount = const Value.absent(),
     Value<int?> categoryId = const Value.absent(),
     Value<int?> vehicleId = const Value.absent(),
     Value<String?> notes = const Value.absent(),
@@ -1561,6 +1599,9 @@ class LocalLine extends DataClass implements Insertable<LocalLine> {
     uomId: uomId.present ? uomId.value : this.uomId,
     unitPrice: unitPrice.present ? unitPrice.value : this.unitPrice,
     total: total.present ? total.value : this.total,
+    receiptAmount: receiptAmount.present
+        ? receiptAmount.value
+        : this.receiptAmount,
     categoryId: categoryId.present ? categoryId.value : this.categoryId,
     vehicleId: vehicleId.present ? vehicleId.value : this.vehicleId,
     notes: notes.present ? notes.value : this.notes,
@@ -1579,6 +1620,9 @@ class LocalLine extends DataClass implements Insertable<LocalLine> {
       uomId: data.uomId.present ? data.uomId.value : this.uomId,
       unitPrice: data.unitPrice.present ? data.unitPrice.value : this.unitPrice,
       total: data.total.present ? data.total.value : this.total,
+      receiptAmount: data.receiptAmount.present
+          ? data.receiptAmount.value
+          : this.receiptAmount,
       categoryId: data.categoryId.present
           ? data.categoryId.value
           : this.categoryId,
@@ -1598,6 +1642,7 @@ class LocalLine extends DataClass implements Insertable<LocalLine> {
           ..write('uomId: $uomId, ')
           ..write('unitPrice: $unitPrice, ')
           ..write('total: $total, ')
+          ..write('receiptAmount: $receiptAmount, ')
           ..write('categoryId: $categoryId, ')
           ..write('vehicleId: $vehicleId, ')
           ..write('notes: $notes')
@@ -1615,6 +1660,7 @@ class LocalLine extends DataClass implements Insertable<LocalLine> {
     uomId,
     unitPrice,
     total,
+    receiptAmount,
     categoryId,
     vehicleId,
     notes,
@@ -1631,6 +1677,7 @@ class LocalLine extends DataClass implements Insertable<LocalLine> {
           other.uomId == this.uomId &&
           other.unitPrice == this.unitPrice &&
           other.total == this.total &&
+          other.receiptAmount == this.receiptAmount &&
           other.categoryId == this.categoryId &&
           other.vehicleId == this.vehicleId &&
           other.notes == this.notes);
@@ -1645,6 +1692,7 @@ class LocalLinesCompanion extends UpdateCompanion<LocalLine> {
   final Value<int?> uomId;
   final Value<int?> unitPrice;
   final Value<int?> total;
+  final Value<int?> receiptAmount;
   final Value<int?> categoryId;
   final Value<int?> vehicleId;
   final Value<String?> notes;
@@ -1658,6 +1706,7 @@ class LocalLinesCompanion extends UpdateCompanion<LocalLine> {
     this.uomId = const Value.absent(),
     this.unitPrice = const Value.absent(),
     this.total = const Value.absent(),
+    this.receiptAmount = const Value.absent(),
     this.categoryId = const Value.absent(),
     this.vehicleId = const Value.absent(),
     this.notes = const Value.absent(),
@@ -1672,6 +1721,7 @@ class LocalLinesCompanion extends UpdateCompanion<LocalLine> {
     this.uomId = const Value.absent(),
     this.unitPrice = const Value.absent(),
     this.total = const Value.absent(),
+    this.receiptAmount = const Value.absent(),
     this.categoryId = const Value.absent(),
     this.vehicleId = const Value.absent(),
     this.notes = const Value.absent(),
@@ -1688,6 +1738,7 @@ class LocalLinesCompanion extends UpdateCompanion<LocalLine> {
     Expression<int>? uomId,
     Expression<int>? unitPrice,
     Expression<int>? total,
+    Expression<int>? receiptAmount,
     Expression<int>? categoryId,
     Expression<int>? vehicleId,
     Expression<String>? notes,
@@ -1702,6 +1753,7 @@ class LocalLinesCompanion extends UpdateCompanion<LocalLine> {
       if (uomId != null) 'uom_id': uomId,
       if (unitPrice != null) 'unit_price': unitPrice,
       if (total != null) 'total': total,
+      if (receiptAmount != null) 'receipt_amount': receiptAmount,
       if (categoryId != null) 'category_id': categoryId,
       if (vehicleId != null) 'vehicle_id': vehicleId,
       if (notes != null) 'notes': notes,
@@ -1718,6 +1770,7 @@ class LocalLinesCompanion extends UpdateCompanion<LocalLine> {
     Value<int?>? uomId,
     Value<int?>? unitPrice,
     Value<int?>? total,
+    Value<int?>? receiptAmount,
     Value<int?>? categoryId,
     Value<int?>? vehicleId,
     Value<String?>? notes,
@@ -1732,6 +1785,7 @@ class LocalLinesCompanion extends UpdateCompanion<LocalLine> {
       uomId: uomId ?? this.uomId,
       unitPrice: unitPrice ?? this.unitPrice,
       total: total ?? this.total,
+      receiptAmount: receiptAmount ?? this.receiptAmount,
       categoryId: categoryId ?? this.categoryId,
       vehicleId: vehicleId ?? this.vehicleId,
       notes: notes ?? this.notes,
@@ -1766,6 +1820,9 @@ class LocalLinesCompanion extends UpdateCompanion<LocalLine> {
     if (total.present) {
       map['total'] = Variable<int>(total.value);
     }
+    if (receiptAmount.present) {
+      map['receipt_amount'] = Variable<int>(receiptAmount.value);
+    }
     if (categoryId.present) {
       map['category_id'] = Variable<int>(categoryId.value);
     }
@@ -1792,6 +1849,7 @@ class LocalLinesCompanion extends UpdateCompanion<LocalLine> {
           ..write('uomId: $uomId, ')
           ..write('unitPrice: $unitPrice, ')
           ..write('total: $total, ')
+          ..write('receiptAmount: $receiptAmount, ')
           ..write('categoryId: $categoryId, ')
           ..write('vehicleId: $vehicleId, ')
           ..write('notes: $notes, ')
@@ -12402,6 +12460,7 @@ typedef $$LocalLinesTableCreateCompanionBuilder = LocalLinesCompanion Function({
   Value<int?> uomId,
   Value<int?> unitPrice,
   Value<int?> total,
+  Value<int?> receiptAmount,
   Value<int?> categoryId,
   Value<int?> vehicleId,
   Value<String?> notes,
@@ -12416,6 +12475,7 @@ typedef $$LocalLinesTableUpdateCompanionBuilder = LocalLinesCompanion Function({
   Value<int?> uomId,
   Value<int?> unitPrice,
   Value<int?> total,
+  Value<int?> receiptAmount,
   Value<int?> categoryId,
   Value<int?> vehicleId,
   Value<String?> notes,
@@ -12505,6 +12565,11 @@ class $$LocalLinesTableFilterComposer
 
   ColumnFilters<int> get total => $composableBuilder(
     column: $table.total,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get receiptAmount => $composableBuilder(
+    column: $table.receiptAmount,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -12616,6 +12681,11 @@ class $$LocalLinesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<int> get receiptAmount => $composableBuilder(
+    column: $table.receiptAmount,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<int> get categoryId => $composableBuilder(
     column: $table.categoryId,
     builder: (column) => ColumnOrderings(column),
@@ -12688,6 +12758,11 @@ class $$LocalLinesTableAnnotationComposer
 
   GeneratedColumn<int> get total =>
       $composableBuilder(column: $table.total, builder: (column) => column);
+
+  GeneratedColumn<int> get receiptAmount => $composableBuilder(
+    column: $table.receiptAmount,
+    builder: (column) => column,
+  );
 
   GeneratedColumn<int> get categoryId => $composableBuilder(
     column: $table.categoryId,
@@ -12785,6 +12860,7 @@ class $$LocalLinesTableTableManager
                 Value<int?> uomId = const Value.absent(),
                 Value<int?> unitPrice = const Value.absent(),
                 Value<int?> total = const Value.absent(),
+                Value<int?> receiptAmount = const Value.absent(),
                 Value<int?> categoryId = const Value.absent(),
                 Value<int?> vehicleId = const Value.absent(),
                 Value<String?> notes = const Value.absent(),
@@ -12798,6 +12874,7 @@ class $$LocalLinesTableTableManager
                 uomId: uomId,
                 unitPrice: unitPrice,
                 total: total,
+                receiptAmount: receiptAmount,
                 categoryId: categoryId,
                 vehicleId: vehicleId,
                 notes: notes,
@@ -12813,6 +12890,7 @@ class $$LocalLinesTableTableManager
                 Value<int?> uomId = const Value.absent(),
                 Value<int?> unitPrice = const Value.absent(),
                 Value<int?> total = const Value.absent(),
+                Value<int?> receiptAmount = const Value.absent(),
                 Value<int?> categoryId = const Value.absent(),
                 Value<int?> vehicleId = const Value.absent(),
                 Value<String?> notes = const Value.absent(),
@@ -12826,6 +12904,7 @@ class $$LocalLinesTableTableManager
                 uomId: uomId,
                 unitPrice: unitPrice,
                 total: total,
+                receiptAmount: receiptAmount,
                 categoryId: categoryId,
                 vehicleId: vehicleId,
                 notes: notes,

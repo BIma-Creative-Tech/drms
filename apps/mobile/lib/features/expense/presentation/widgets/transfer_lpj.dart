@@ -7,6 +7,7 @@ import '../../../../l10n/gen/app_localizations.dart';
 import '../../../../shared/widgets/doc_no_chip.dart';
 import '../../domain/expense_request.dart';
 import '../../domain/request_status.dart';
+import 'receipt_thumb.dart';
 
 /// Transfer status for the requester (US-08: "Ditransfer" + amount, date, bank reference; void shown
 /// with its reason). Data = `ExpenseRequestDetail.transfers` (Finance posts them on the web).
@@ -65,7 +66,7 @@ class TransferSection extends StatelessWidget {
   }
 }
 
-/// LPJ summary of an Uang Muka (T5): status, totals, difference and Finance's revision note.
+/// LPJ summary of an Pengajuan Baru (T5): status, totals, difference and Finance's revision note.
 class LpjSection extends StatelessWidget {
   const LpjSection({super.key, required this.settlement});
   final SettlementInfo settlement;
@@ -104,6 +105,27 @@ class LpjSection extends StatelessWidget {
         if (s.difference != null) row(t.lpjDifference, money(s.difference)),
         if (s.settlementTypeLabel != null) row(t.lpjSettlement, s.settlementTypeLabel!),
         if (s.usageNotes != null) row(t.lpjUsageNotes, s.usageNotes!),
+        // d1010 (13): LPJ photos, read-only here (changed only in "Kirim LPJ" while the LPJ is editable);
+        // a tap opens the shared viewer swiping through every LPJ photo.
+        if (s.photos.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          Text('${t.lpjPhotos} (${s.photos.length})', style: Theme.of(context).textTheme.bodySmall),
+          const SizedBox(height: 4),
+          Wrap(
+            key: const Key('lpj-photos'),
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final (i, id) in s.photos.indexed)
+                ReceiptThumb(
+                  key: Key('lpj-photo-$id'),
+                  imageId: id,
+                  caption: t.lpjPhotoCaption(i + 1),
+                  group: [for (final (j, p) in s.photos.indexed) (imageId: p, caption: t.lpjPhotoCaption(j + 1))],
+                ),
+            ],
+          ),
+        ],
         if (s.financeNotes != null)
           Card(
             color: Theme.of(context).colorScheme.errorContainer,

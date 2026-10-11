@@ -39,6 +39,30 @@ Rollback: each `down()` (guard bodies restored, PB sequences moved by this migra
 - **PB numbering** (owner 2026-10-11): `PB/<kode PT>/<YYMM>/0001` resets **monthly from 1 per PT** (was one running series
   from 229). The import's `nomor_pb_mulai` now only sets the first number of the go-live month (default 1). No PT code is
   built in: `{COMPANY}` is always the PT's short code (an empty one blocks numbering).
+**DRMS 10/10 Phase B-2 — APK** (`docs/proyekkas/plans/drms-1010.md` D1, D3, point 13). **Drift schema v7** (APK local DB):
+`local_lines.receipt_amount` (nullable, additive) — existing offline drafts and queued items are kept.
+
+### Changed (APK, DRMS 10/10 B-2)
+
+- **D1:** request type `advance` is shown as **"Pengajuan Baru"** (was "Uang Muka"): type switch, home tile, transfer kind,
+  dashboard KPI texts; "Reimburse" unchanged. The server's `typeLabel` still wins when sent.
+- **D3 line editor:** Qty, Satuan and Harga satuan are required (Rupiah input); **Total = Qty × Harga satuan** is shown live
+  and is read-only (rounded half up to whole rupiah, same rule as the server). New optional **"Nominal sesuai nota"** with
+  the hint that approval and transfer use the Total; a **"Selisih nota"** chip when it differs. Labels follow the web lines
+  table (Uraian, Kategori, Qty, Satuan, Harga satuan, Total, Nominal sesuai nota); the lines list shows
+  "Qty Satuan × Harga satuan · Kategori · n nota" and the computed total.
+- Request detail: "Nominal sesuai nota" per line and the "Selisih nota" chip (server `receiptMismatch`, a
+  `receipt_amount_mismatch` flag, or receiptAmount ≠ total), plus one chip in the header when any line differs.
+- Offline drafts: `receipt_amount` in `draft_upsert` lines and `receiptAmount` in the create body; `total` sent as
+  qty × unit price. A draft line saved before D3 (typed total, no unit price) still opens, keeps its old total, and asks
+  "Lengkapi Qty & Harga satuan" before it can be submitted.
+
+### Added (APK, DRMS 10/10 B-2)
+
+- **LPJ photos (point 13):** "Kirim LPJ" / "Kirim ulang LPJ" opens a screen with the usage notes and up to **10 photos**
+  (camera or gallery), compressed on the phone like receipts, uploaded via `POST /media/receipts` and sent as `photos`
+  (the whole set) with `lpj/submit`. The LPJ section of the detail shows the photos read-only; a tap opens the shared
+  photo viewer.
 
 **DRMS 10/10 integration + Lead screenshot review** (branches a-apk, a-web-shell, a-web-form, b-server merged). No new
 migration; the latest schema snapshot now matches the final schema (`migrate:create` → no changes).
