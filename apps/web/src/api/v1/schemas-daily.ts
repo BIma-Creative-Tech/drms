@@ -182,6 +182,7 @@ export const DailyReportListQuery = z
     from: businessDate.optional(),
     to: businessDate.optional(),
     mine: z.enum(['1', 'true']).optional(),
+    q: z.string().trim().max(100).optional().meta({ description: 'DRMS 10/10 D8 text search: number, issues, notes (every word must match).' }),
     limit: z.coerce.number().int().min(1).max(100).default(25),
     cursor: z.string().max(64).optional(),
     company: companyFilterParam,

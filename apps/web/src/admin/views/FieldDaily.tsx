@@ -15,6 +15,8 @@ import { fieldProjects, historyOf, mayCorrectIn, mayCreateIn, reportersOf, today
 import { loadRap } from '@/domain/rap/service'
 import { withReqTransaction } from '@/lib/system-tx'
 import { DEFAULT_TZ } from '@/lib/time'
+import { AutoSubmit } from '@/admin/components/list/AutoSubmit'
+import { DEFAULT_PAGE_SIZE, PAGE_SIZES, parseListQuery } from '@/admin/list-query'
 
 import { BtnLink, dateParam, FIELD_CREATORS, FIELD_READERS, FieldFrame, fieldGate, FlagPills, History, idParam, MetaRows, one, OpenAction, PhotoGallery, segmentNum, spOf } from './field-ui'
 import { ptView, PtChip } from './pt'
@@ -43,19 +45,23 @@ export async function FieldDailyList(props: AdminViewServerProps) {
   const req = props.initPageResult.req as PayloadRequest
   const sp = spOf(props)
   const q = { project: idParam(sp.project), reporter: idParam(sp.pelapor), from: dateParam(sp.dari), to: dateParam(sp.sampai), before: idParam(sp.sebelum) }
+  // DRMS 10/10 D8: text search + page size (shared list query; the cursor stays `sebelum`)
+  const lq = parseListQuery(props.searchParams)
   const d = await withReqTransaction(req, async () => {
-    const page = await listDailyReports(req, { projectId: q.project, reporterId: q.reporter, from: q.from, to: q.to, limit: 25, after: q.before, companyIds: gate.companies })
+    const page = await listDailyReports(req, { projectId: q.project, reporterId: q.reporter, from: q.from, to: q.to, limit: lq.per, after: q.before, companyIds: gate.companies, q: lq.q })
     const projects = await fieldProjects(req, ['konstruksi'], gate.companies, { includeArchived: true })
     const reporters = await reportersOf(req, 'daily-reports')
     return { page, projects, reporters, pt: await ptView(req) }
   })
-  const filtered = Boolean(q.project || q.reporter || q.from || q.to)
+  const filtered = Boolean(q.project || q.reporter || q.from || q.to || lq.q)
   const keep = (extra: Record<string, string>) => {
     const u = new URLSearchParams()
     if (q.project) u.set('project', String(q.project))
     if (q.reporter) u.set('pelapor', String(q.reporter))
     if (q.from) u.set('dari', q.from)
     if (q.to) u.set('sampai', q.to)
+    if (lq.q) u.set('q', lq.q)
+    if (lq.per !== DEFAULT_PAGE_SIZE) u.set('per', String(lq.per))
     for (const [k, v] of Object.entries(extra)) u.set(k, v)
     return `${listHref}?${u.toString()}`
   }
@@ -102,6 +108,10 @@ export async function FieldDailyList(props: AdminViewServerProps) {
         </div>
       </DashHead>
       <form className="pk-filter" method="get" action={listHref} role="search" aria-label="Filter laporan harian" data-pk-filter="laporan-harian">
+        <label className="pk-filter__search">
+          Cari
+          <input type="search" name="q" defaultValue={lq.q} placeholder="Nomor, kendala, catatan…" maxLength={100} autoComplete="off" data-pk-search="laporan-harian" />
+        </label>
         <label>
           Project
           <select name="project" defaultValue={q.project ? String(q.project) : ''}>
@@ -132,6 +142,16 @@ export async function FieldDailyList(props: AdminViewServerProps) {
           Sampai
           <input type="date" name="sampai" defaultValue={q.to ?? ''} />
         </label>
+        <label>
+          Per halaman
+          <select name="per" defaultValue={String(lq.per)} data-pk-page-size="laporan-harian">
+            {PAGE_SIZES.map((n) => (
+              <option key={n} value={n}>
+                {n}
+              </option>
+            ))}
+          </select>
+        </label>
         <button type="submit" className="pk-kbtn primary">
           Terapkan
         </button>
@@ -140,6 +160,7 @@ export async function FieldDailyList(props: AdminViewServerProps) {
             Reset
           </Link>
         ) : null}
+        <AutoSubmit />
       </form>
       <Bento label="Daftar laporan harian">
         {d.projects.length ? (

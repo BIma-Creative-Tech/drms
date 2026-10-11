@@ -189,7 +189,7 @@ export const listDailyReportsEndpoint = v1({
     const q = DailyReportListQuery.safeParse(Object.fromEntries(req.searchParams.entries()))
     if (!q.success) throw new HttpError(400, 'Bad Request', { errors: q.error.issues.map((i) => ({ path: i.path.map(String).join('.'), message: i.message })) })
     const d = q.data
-    const p = await listDailyReports(req, { projectId: d.project, reporterId: d.reporter, from: d.from, to: d.to, mine: d.mine !== undefined, limit: d.limit, after: decodeCursor(d.cursor), companyIds: await companyQuery(req) })
+    const p = await listDailyReports(req, { projectId: d.project, reporterId: d.reporter, from: d.from, to: d.to, mine: d.mine !== undefined, limit: d.limit, after: decodeCursor(d.cursor), companyIds: await companyQuery(req), q: d.q })
     return json({ items: p.items, nextCursor: encodeCursor(p.nextCursor) })
   },
 })

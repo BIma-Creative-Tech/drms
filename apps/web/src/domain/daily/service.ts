@@ -38,6 +38,7 @@ import { loadProjectFor, refreshRapProgress } from '@/domain/rap/service'
 import { isQty0, itemPct, round2, type LineKind, type LineOrigin } from '@/domain/rap/rules'
 import { requestMeta } from '@/lib/request-meta'
 import { getRequestTx } from '@/lib/tx'
+import { searchWhere } from '@/lib/text-search'
 
 import { DAILY_FLAGS, MAX_LINES, MAX_RESOURCES, WEATHER, weekNo, weekRangeOf, type Weather } from './rules'
 
@@ -521,7 +522,7 @@ export async function dailyDto(req: PayloadRequest, d: DailyDoc, opts: { history
   return (await dailyDtos(req, [d], opts))[0]!
 }
 
-export type DailyListFilter = { projectId?: number; reporterId?: number; from?: string; to?: string; mine?: boolean; limit: number; after?: number; companyIds?: readonly number[] }
+export type DailyListFilter = { projectId?: number; reporterId?: number; from?: string; to?: string; mine?: boolean; limit: number; after?: number; companyIds?: readonly number[]; q?: string }
 
 export async function listDailyReports(req: PayloadRequest, f: DailyListFilter): Promise<{ items: DailyDto[]; nextCursor: number | null }> {
   const and: Where[] = []
@@ -532,6 +533,8 @@ export async function listDailyReports(req: PayloadRequest, f: DailyListFilter):
   if (f.mine) and.push({ reporter: { equals: userId(req) ?? -1 } })
   if (f.after !== undefined) and.push({ id: { less_than: f.after } })
   if (f.companyIds?.length) and.push({ company: { in: [...f.companyIds] } })
+  const text = searchWhere(['docNo', 'issues', 'notes'], f.q) // DRMS 10/10 D8
+  if (text) and.push(text)
   const docs = await scopedFind<DailyDoc>(req, 'daily-reports', and, f.limit + 1, '-id')
   const page = docs.slice(0, f.limit)
   return { items: await dailyDtos(req, page), nextCursor: docs.length > f.limit ? page[page.length - 1]!.id : null }

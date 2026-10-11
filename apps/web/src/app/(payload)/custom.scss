@@ -2445,3 +2445,164 @@ $pk-modules: dashboard, persetujuan, proyek, keuangan, absensi, laporan, penggun
     font-size: 12px;
   }
 }
+
+// ---- DRMS 10/10 D8: shared table toolbar + pager of the custom views (src/admin/components/list) --------
+// Standalone (Shell views have no .pk-f3 / KAS_STYLE): the controls copy the .pk-kbtn / .pk-filter look.
+@layer payload {
+  .pk-ltb {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 12px;
+    align-items: flex-end;
+    margin: 0 0 12px;
+    padding: 12px;
+    border: 1px solid var(--pk-border);
+    border-radius: var(--style-radius-l);
+    background: var(--pk-card);
+  }
+
+  .pk-ltb__field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+    color: var(--pk-muted-fg);
+    font-size: 12px;
+    font-weight: 600;
+
+    input,
+    select {
+      min-width: 140px;
+      min-height: 36px;
+      padding: 4px 8px;
+      border: 1px solid var(--pk-input);
+      border-radius: var(--style-radius-s);
+      background: var(--theme-input-bg, var(--pk-card));
+      color: var(--pk-fg);
+      font: inherit;
+      font-size: 13px;
+      font-weight: 400;
+
+      &:focus-visible {
+        outline: 2px solid var(--pk-ring);
+        outline-offset: 1px;
+      }
+    }
+  }
+
+  .pk-ltb__search {
+    flex: 1 1 240px;
+
+    input {
+      width: 100%;
+    }
+  }
+
+  .pk-ltb__per select {
+    min-width: 84px;
+  }
+
+  .pk-ltb__actions {
+    display: flex;
+    gap: 8px;
+  }
+
+  .pk-ltb__btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 36px;
+    padding: 0 14px;
+    border: 1px solid color-mix(in oklab, var(--pk-muted-fg) 60%, var(--pk-input));
+    border-radius: var(--style-radius-m);
+    background: var(--pk-card);
+    color: var(--pk-fg);
+    font: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    white-space: nowrap;
+    text-decoration: none;
+    cursor: pointer;
+
+    &:hover:not([aria-disabled='true']) {
+      border-color: var(--pk-primary);
+      color: var(--pk-primary);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--pk-ring);
+      outline-offset: 2px;
+    }
+
+    &[aria-disabled='true'] {
+      opacity: 0.5;
+      cursor: default;
+    }
+  }
+
+  .pk-ltb__btn--ghost {
+    border-color: transparent;
+    background: transparent;
+  }
+
+  .pk-pager {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 16px;
+    align-items: center;
+    justify-content: space-between;
+    margin: 12px 0 20px;
+    color: var(--pk-muted-fg);
+    font-size: 13px;
+  }
+
+  .pk-pager__nav {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+  }
+
+  .pk-pager__page {
+    color: var(--pk-fg);
+    font-weight: 600;
+  }
+
+  @media (max-width: 640px) {
+    .pk-ltb__field {
+      flex: 1 1 calc(50% - 6px);
+
+      input,
+      select {
+        width: 100%;
+        min-width: 0;
+      }
+    }
+
+    .pk-ltb__search {
+      flex-basis: 100%;
+    }
+
+    .pk-ltb__actions {
+      flex-basis: 100%;
+    }
+  }
+
+  @media (pointer: coarse) {
+    .pk-ltb__field :is(input, select),
+    .pk-ltb__btn {
+      min-height: 44px;
+    }
+  }
+}
+
+// D8: search box inside the existing .pk-filter forms (Kas, Absensi, field reports) grows first
+@layer payload {
+  .pk-f3 form.pk-filter .pk-filter__search {
+    flex: 1 1 220px;
+
+    input {
+      width: 100%;
+    }
+  }
+}
