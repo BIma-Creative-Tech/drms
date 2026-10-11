@@ -6,6 +6,34 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+**DRMS 10/10 Phase B-2 integration + polish** (web ↔ APK consistency; owner prefers the APK layout). No new migration;
+`migrate:create` → no changes; generated files (importMap, payload-types, OpenAPI, Flutter codegen) unchanged.
+
+### Fixed (DRMS 10/10 B-2 integration)
+
+- A request locked before D3 and later sent back to an editable status (Finance rejects a receipt → **Revisi Nota**, or
+  withdraw → Draft) was refused by the new DB rule total = qty × unit price, blocking the requester. On unlock a line whose
+  unit price does not reproduce its total now gets `total ÷ qty` when exact, otherwise no unit price (keeps its total); the
+  DB rule still applies to every line with a unit price. Such a line shows **"Lengkapi Qty & Harga satuan"** (web table,
+  card and dialog; APK detail) and **Kirim pengajuan / Kirim ulang nota** stay disabled until it is completed (the server
+  also refuses `receipts-resubmit` with the line numbers).
+- Full migration rollback on a fresh DB works again: the generated `down()` of `20261011_100000_p3_rap` (and 8 older
+  migrations) dropped `payload_locked_documents_rels` FKs already removed by `DROP TABLE … CASCADE` → `IF EXISTS`.
+  (Use `payload migrate:down`; Payload 3.90 `migrate:reset` runs the downs in ascending order.)
+
+### Changed (DRMS 10/10 B-2 integration)
+
+- **Web lines at ≤ 640 px** (Draft / Revisi Nota editor and the read-only lines of the detail): one card per line like the
+  APK — "1. Uraian" + total, "Qty Satuan × Harga satuan · Kategori", "Nominal sesuai nota" + "Selisih nota" chip, receipts
+  and flags, Ubah / Hapus. Desktop keeps the table.
+- **One wording:** the lines section is **"Rincian item"** on the web form, web detail, APK draft editor and APK detail;
+  the approval step is **"Persetujuan PM"** on both.
+- **APK timeline** for the current approval snapshot (ADR 0021) reads like the web: Diajukan → Persetujuan PM →
+  Persetujuan Direktur → **Transfer Finance**; older snapshots keep their wording. Preview fixtures use the current snapshot.
+- **APK approval inbox:** badge **"Selisih nota (n)"** (`flags.receiptMismatch`), as in the web Antrian Transfer.
+- **Antrian Transfer / LPJ money form:** admin field look (labels with required marks, date-time picker with the
+  DateInput helper text, help texts, primary button) instead of unstyled native controls.
+
 **DRMS 10/10 Phase B-2 — web + server** (owner decisions D1 / D3, points 8f–8h, 13, read-only request header; PB numbering
 monthly). API contract for the APK in `docs/proyekkas/plans/drms-1010.md` ("Phase B-2 contract").
 
@@ -39,6 +67,7 @@ Rollback: each `down()` (guard bodies restored, PB sequences moved by this migra
 - **PB numbering** (owner 2026-10-11): `PB/<kode PT>/<YYMM>/0001` resets **monthly from 1 per PT** (was one running series
   from 229). The import's `nomor_pb_mulai` now only sets the first number of the go-live month (default 1). No PT code is
   built in: `{COMPANY}` is always the PT's short code (an empty one blocks numbering).
+
 **DRMS 10/10 Phase B-2 — APK** (`docs/proyekkas/plans/drms-1010.md` D1, D3, point 13). **Drift schema v7** (APK local DB):
 `local_lines.receipt_amount` (nullable, additive) — existing offline drafts and queued items are kept.
 
