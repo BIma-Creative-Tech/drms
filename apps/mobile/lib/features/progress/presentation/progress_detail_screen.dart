@@ -94,7 +94,14 @@ class ProgressDetailScreen extends ConsumerWidget {
                   Wrap(
                     spacing: 12,
                     runSpacing: 12,
-                    children: [for (final p in r.photos) ServerPhotoThumb(key: Key('photo-${p.id}'), photoId: p.id)],
+                    children: [
+                      for (final p in r.photos)
+                        ServerPhotoThumb(
+                          key: Key('photo-${p.id}'),
+                          photoId: p.id,
+                          group: [for (final x in r.photos) x.id],
+                        ),
+                    ],
                   ),
                 const Divider(height: 32),
                 row(t.progressDate, formatDateOnly(r.reportDate)),

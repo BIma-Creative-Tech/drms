@@ -5,6 +5,7 @@ import '../../../app/theme.dart';
 import '../../../core/format/dates.dart';
 import '../../../l10n/gen/app_localizations.dart';
 import '../../../shared/widgets/async_body.dart';
+import '../../../shared/widgets/photo_viewer.dart';
 import '../../dashboard/presentation/charts.dart' show periodLong;
 import '../../auth/application/auth_controller.dart';
 import '../../auth/domain/user_profile.dart';
@@ -369,12 +370,49 @@ class DayDetailSheet extends StatelessWidget {
                 subtitle: Text(
                   '${t.attendanceCheckIn}: ${localHm(l.checkIn?.time, zone)} · ${t.attendanceCheckOut}: ${localHm(l.checkOut?.time, zone)}',
                 ),
+                // d1010 (12c): check-in / check-out selfies of this location in the shared viewer.
+                trailing: l.checkIn == null && l.checkOut == null
+                    ? null
+                    : IconButton(
+                        key: Key('selfie-${l.location.kind.name}-${l.location.id}'),
+                        tooltip: t.attendanceSelfieView,
+                        icon: const Icon(Icons.photo_outlined),
+                        onPressed: () => showPhotoViewer(context, [
+                          for (final (label, mark) in [
+                            (t.attendanceCheckIn, l.checkIn),
+                            (t.attendanceCheckOut, l.checkOut),
+                          ])
+                            if (mark != null)
+                              ViewerPhoto(
+                                caption: '$label ${localHm(mark.time, zone)} · ${l.location.label}',
+                                builder: (_) => _SelfieFull(attendanceId: mark.id),
+                              ),
+                        ]),
+                      ),
               ),
           ],
         ),
       ),
     );
   }
+}
+
+class _SelfieFull extends ConsumerWidget {
+  const _SelfieFull({required this.attendanceId});
+  final int attendanceId;
+  @override
+  Widget build(BuildContext context, WidgetRef ref) => switch (ref.watch(attendanceSelfieProvider(attendanceId))) {
+    AsyncData(:final value) => Image.memory(value, fit: BoxFit.contain),
+    AsyncError() => Padding(
+      padding: const EdgeInsets.all(24),
+      child: Text(
+        AppLocalizations.of(context).attendanceSelfieUnavailable,
+        style: const TextStyle(color: Colors.white),
+        textAlign: TextAlign.center,
+      ),
+    ),
+    _ => const CircularProgressIndicator(),
+  };
 }
 
 /// MC3: own recap of which PT (the user has one employee per PT) — shown only with employees in several

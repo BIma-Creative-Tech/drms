@@ -538,7 +538,7 @@ abstract class AppLocalizations {
   /// No description provided for @timelineTitle.
   ///
   /// In id, this message translates to:
-  /// **'Posisi tanda tangan'**
+  /// **'Riwayat approval'**
   String get timelineTitle;
 
   /// No description provided for @linesTitle.
@@ -4902,6 +4902,114 @@ abstract class AppLocalizations {
   /// In id, this message translates to:
   /// **'Jumlah pekerja'**
   String get dailyWorkerCount;
+
+  /// No description provided for @sectionRequestDetails.
+  ///
+  /// In id, this message translates to:
+  /// **'Rincian pengajuan'**
+  String get sectionRequestDetails;
+
+  /// No description provided for @sectionRequester.
+  ///
+  /// In id, this message translates to:
+  /// **'Pemohon'**
+  String get sectionRequester;
+
+  /// No description provided for @bankNameLabel.
+  ///
+  /// In id, this message translates to:
+  /// **'Bank'**
+  String get bankNameLabel;
+
+  /// No description provided for @bankHolderLabel.
+  ///
+  /// In id, this message translates to:
+  /// **'Atas nama'**
+  String get bankHolderLabel;
+
+  /// No description provided for @bankNumberLabel.
+  ///
+  /// In id, this message translates to:
+  /// **'Nomor rekening'**
+  String get bankNumberLabel;
+
+  /// No description provided for @bankShowNumber.
+  ///
+  /// In id, this message translates to:
+  /// **'Tampilkan nomor rekening'**
+  String get bankShowNumber;
+
+  /// No description provided for @bankHideNumber.
+  ///
+  /// In id, this message translates to:
+  /// **'Sembunyikan nomor rekening'**
+  String get bankHideNumber;
+
+  /// No description provided for @docNoCopied.
+  ///
+  /// In id, this message translates to:
+  /// **'Nomor {docNo} disalin.'**
+  String docNoCopied(String docNo);
+
+  /// No description provided for @docNoCopyHint.
+  ///
+  /// In id, this message translates to:
+  /// **'Ketuk untuk menyalin nomor'**
+  String get docNoCopyHint;
+
+  /// No description provided for @docNoOpenHint.
+  ///
+  /// In id, this message translates to:
+  /// **'Ketuk untuk membuka dokumen'**
+  String get docNoOpenHint;
+
+  /// No description provided for @receiptOpenPhoto.
+  ///
+  /// In id, this message translates to:
+  /// **'Buka foto nota'**
+  String get receiptOpenPhoto;
+
+  /// No description provided for @receiptLineCaption.
+  ///
+  /// In id, this message translates to:
+  /// **'Baris {no}'**
+  String receiptLineCaption(int no);
+
+  /// No description provided for @attendanceSelfieView.
+  ///
+  /// In id, this message translates to:
+  /// **'Lihat selfie'**
+  String get attendanceSelfieView;
+
+  /// No description provided for @attendanceSelfieUnavailable.
+  ///
+  /// In id, this message translates to:
+  /// **'Selfie tidak tersedia (mungkin sudah melewati masa retensi).'**
+  String get attendanceSelfieUnavailable;
+
+  /// No description provided for @pickHint.
+  ///
+  /// In id, this message translates to:
+  /// **'Pilih {field}'**
+  String pickHint(String field);
+
+  /// No description provided for @pickEmployee.
+  ///
+  /// In id, this message translates to:
+  /// **'Pilih karyawan'**
+  String get pickEmployee;
+
+  /// No description provided for @pickPo.
+  ///
+  /// In id, this message translates to:
+  /// **'Pilih PO terbuka'**
+  String get pickPo;
+
+  /// No description provided for @pickLocation.
+  ///
+  /// In id, this message translates to:
+  /// **'Pilih lokasi'**
+  String get pickLocation;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {
