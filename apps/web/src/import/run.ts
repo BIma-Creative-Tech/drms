@@ -680,16 +680,26 @@ async function runCutover(x: Exec, rep: MasterReport, issues: Issue[], reason: s
   const sheet = SHEET_BY_KEY.pengaturan.name
   const pt = await companySettings(req, await x.ptId(ptCode))
   x.companyId = pt.companyId
-  // (1) PB sequence: startAt (Q-17) — used when the counter row does not exist yet
+  // (1) PB sequence (Q-17). Owner decision 2026-10-11: PB resets MONTHLY from 1 → `nomor_pb_mulai` is the first
+  // number of the GO-LIVE MONTH only (its counter row is created at that value), never the sequence's startAt
+  // (that would restart every month there). A sequence on reset "never" (Admin choice) keeps the Q-17 startAt rule.
   const { startAt: _default, ...dflt } = DEFAULT_SEQUENCES.find((d) => d.docType === 'expense_request')!
+  const where: Where = { and: [{ company: { equals: pt.companyId } }, { docType: { equals: 'expense_request' } }] }
+  const existing = await x.findOne('document-sequences', where)
+  const never = (existing?.resetPolicy ?? dflt.resetPolicy) === 'never'
   const seq = await atRow(sheet, undefined, () =>
-    x.upsert('document-sequences', { and: [{ company: { equals: pt.companyId } }, { docType: { equals: 'expense_request' } }] }, { startAt: s.pbStartAt, active: true }, { createOnly: { ...dflt, company: pt.companyId, timezone: 'Asia/Makassar' } }),
+    x.upsert('document-sequences', where, never ? { startAt: s.pbStartAt, active: true } : { active: true }, { createOnly: { ...dflt, startAt: never ? s.pbStartAt : 1, company: pt.companyId, timezone: 'Asia/Makassar' } }),
   )
   tally(rep, seq.action)
   const cfg = (await x.findOne('document-sequences', { id: { equals: seq.id } }))!
   const key = periodKey(cfg.resetPolicy as ResetPolicy, parseBusinessDate(s.goLiveDate))
   const cur = (await tx.execute(sql`SELECT next_value::int AS n FROM document_sequence_counters WHERE company_id = ${pt.companyId} AND doc_type = 'expense_request' AND period_key = ${key}`)) as unknown as { rows: Array<{ n: number }> }
-  const before = cur.rows[0]?.n ?? null
+  let before = cur.rows[0]?.n ?? null
+  if (before === null && !never && s.pbStartAt > 1) {
+    // the go-live month's counter starts at nomor_pb_mulai (audited below like a raise)
+    await tx.execute(sql`INSERT INTO document_sequence_counters (company_id, doc_type, period_key, next_value) VALUES (${pt.companyId}, 'expense_request', ${key}, 1) ON CONFLICT DO NOTHING`)
+    before = 1
+  }
   let after = before
   if (before !== null && before < s.pbStartAt) {
     // only upward (DB trigger pk_counter_monotonic) — "set next value" of ADR 0007 §1, audited
@@ -705,8 +715,9 @@ async function runCutover(x: Exec, rep: MasterReport, issues: Issue[], reason: s
     { pattern: String(cfg.pattern), padding: Number(cfg.padding ?? 0), docCode: (cfg.docCode as string) ?? undefined },
     Math.max(after ?? s.pbStartAt, s.pbStartAt),
     parseBusinessDate(s.goLiveDate),
-    settings.shortCode || 'DRMS',
+    settings.shortCode ?? '',
   )
+  if (!settings.shortCode) issues.push({ level: 'warning', sheet, message: `PT ${ptCode}: kode singkat PT kosong — nomor dokumen belum dapat diterbitkan sebelum Admin mengisinya.` })
 
   // (2) period before go-live closed (ADR 0005 §6) — the go-live month stays open
   let closedPeriod: string | null = null

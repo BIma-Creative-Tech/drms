@@ -194,12 +194,14 @@ buat/ubah aturan sementara dengan level 1 = Direktur pengganti (user bernama), l
 **Pengaturan → Penomoran dokumen**: pola nomor **per PT** dan per jenis dokumen (PB pengajuan, TRF, LPJ, KM, KK, LP,
 ADD, SV, LH), token `{seq}` `{DD}` `{MM_ROMAN}` `{YY}` `{MM}` `{YYYY}` `{COMPANY}` dll., **Reset nomor**, **Nomor awal**.
 - Sejak 12 Okt 2026 (keputusan D5) **semua** nomor memuat kode PT: pola default `<KODE>/{COMPANY}/{YY}{MM}/{seq}` 4 digit,
-  mis. `PB/DRMS/2610/0229`, `TRF/LLAS/2610/0001`. Nomor yang sudah terbit tidak berubah. Pola yang pernah Anda ubah
+  mis. `PB/DRMS/2610/0001`, `TRF/LLAS/2610/0001`. Nomor yang sudah terbit tidak berubah. Pola yang pernah Anda ubah
   sendiri tidak diubah migrasi — periksa dan sesuaikan bila perlu.
 - Tiap PT punya nomor urut sendiri. `{COMPANY}` = **Kode singkat** PT dokumen (wajib diisi; terkunci setelah PT punya
-  dokumen bernomor). PB tetap tidak di-reset (nomor lanjut dari 229); jenis lain reset tiap bulan.
-- Pengajuan DRMS di produksi dimulai dari **229** (melanjutkan nomor manual, Q-17). Nomor PB pertama PT lain diisi saat
-  impor (sheet **Perusahaan**, kolom `nomor_pb_mulai`).
+  dokumen bernomor). Sejak keputusan owner 11 Okt 2026 **semua** jenis termasuk PB di-reset **tiap bulan mulai 0001 per
+  PT** (mis. `PB/DRMS/2611/0001`, `PB/LAS/2611/0001`). Bulan saat perubahan berlaku melanjutkan setelah nomor PB tertinggi
+  yang sudah terbit di bulan itu (tidak ada nomor ganda).
+- `nomor_pb_mulai` pada impor (sheet **Perusahaan** / **Pengaturan**) hanya menentukan nomor PB pertama di **bulan
+  go-live** (bawaan 1).
 - Ubah hanya bila diminta Finance/Direktur; alasan wajib.
 - PT baru mendapat penomoran dan aturan approval standar secara otomatis: lewat **impor**, atau saat dibuat di layar
   **Perusahaan (PT)** dengan **Salin default saat dibuat** tercentang (bawaan; disalin dari DRMS atau dari PT di

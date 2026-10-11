@@ -307,7 +307,8 @@ function parseSettings(rows: CellValue[][], date1904: boolean, issues: Issue[]):
   if (!goLiveDate) issues.push({ level: 'error', sheet, row: g?.row, column: 'nilai', message: 'tanggal_golive wajib diisi dengan tanggal valid (YYYY-MM-DD).' })
   else if (!goLiveDate.endsWith('-01')) issues.push({ level: 'warning', sheet, row: g?.row, column: 'nilai', message: `Go-live ${goLiveDate} bukan tanggal 1: tutup buku hanya mengunci bulan sebelumnya; transaksi kas sebelum ${goLiveDate} tetap ditolak per akun (tanggal saldo awal).` })
   const p = values.get('nomor_pb_mulai')
-  let pbStartAt = 229
+  // owner decision 2026-10-11: PB resets monthly from 1 — a different value only for the go-live month
+  let pbStartAt = 1
   if (p && !isBlank(p.v)) {
     const n = typeof p.v === 'number' ? p.v : Number(String(p.v).trim())
     if (!Number.isSafeInteger(n) || n < 1) issues.push({ level: 'error', sheet, row: p.row, column: 'nilai', message: 'nomor_pb_mulai harus bilangan bulat ≥ 1.' })

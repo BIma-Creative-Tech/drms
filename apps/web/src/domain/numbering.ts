@@ -100,12 +100,14 @@ export function formatDocNo(
 /**
  * ADR 0007 §3 defaults (seed). D5 (owner decision DRMS 10/10, 2026-10-11): EVERY number carries the PT
  * short code, one shape `<DOC>/{COMPANY}/{YY}{MM}/{seq}` with 4 digits, e.g. `TRF/LLAS/2610/0001`.
- * Reset policies are unchanged: PB stays `never` + startAt 229 (user decision 2026-09-23: the paper
- * series continues, `PB/DRMS/2610/0229`), the others monthly. Already issued numbers are never
- * rewritten; migration 20261012_200100_d1010_data moves rows still on the old default pattern.
+ * Owner decision 2026-10-11 (DRMS 10/10 extra): PB resets MONTHLY from 1 per PT too (`PB/DRMS/2611/0001`,
+ * `PB/LAS/2611/0001` — independent counters, keyed company + doc type + month); the earlier "paper series
+ * continues, never + 229" rule (2026-09-23) is retired. `{COMPANY}` is always the PT's `shortCode`.
+ * Already issued numbers are never rewritten; migrations 20261012_200100_d1010_data (patterns) and
+ * 20261012_300200_d1010_pb_monthly (PB reset) move rows still on the default.
  */
 export const DEFAULT_SEQUENCES: ReadonlyArray<Omit<SequenceConfig, 'timezone' | 'docType'> & { docType: DocType; docCode: string }> = [
-  { docType: 'expense_request', docCode: 'PB', pattern: 'PB/{COMPANY}/{YY}{MM}/{seq}', resetPolicy: 'never', padding: 4, startAt: 229 },
+  { docType: 'expense_request', docCode: 'PB', pattern: 'PB/{COMPANY}/{YY}{MM}/{seq}', resetPolicy: 'monthly', padding: 4, startAt: 1 },
   { docType: 'transfer', docCode: 'TRF', pattern: 'TRF/{COMPANY}/{YY}{MM}/{seq}', resetPolicy: 'monthly', padding: 4, startAt: 1 },
   { docType: 'settlement', docCode: 'LPJ', pattern: 'LPJ/{COMPANY}/{YY}{MM}/{seq}', resetPolicy: 'monthly', padding: 4, startAt: 1 },
   { docType: 'cash_in', docCode: 'KM', pattern: 'KM/{COMPANY}/{YY}{MM}/{seq}', resetPolicy: 'monthly', padding: 4, startAt: 1 },

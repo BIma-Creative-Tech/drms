@@ -25,12 +25,12 @@ describe('D5 numbering: every number carries the PT short code', () => {
     }
   })
 
-  it('formats TRF/LLAS/2610/0001 and keeps PB on its running paper series (reset never, start 229)', () => {
+  it('formats TRF/LLAS/2610/0001; PB resets monthly from 1 (owner 2026-10-11)', () => {
     const d = parseBusinessDate('2026-10-11')
     expect(formatDocNo(seq('transfer'), 1, d, 'LLAS')).toBe('TRF/LLAS/2610/0001')
-    expect(seq('expense_request').resetPolicy).toBe('never')
-    expect(seq('expense_request').startAt).toBe(229)
-    expect(formatDocNo(seq('expense_request'), 229, d, 'DRMS')).toBe('PB/DRMS/2610/0229')
+    expect(seq('expense_request').resetPolicy).toBe('monthly')
+    expect(seq('expense_request').startAt).toBe(1)
+    expect(formatDocNo(seq('expense_request'), 1, d, 'DRMS')).toBe('PB/DRMS/2610/0001')
     expect(formatDocNo(seq('daily_report'), 12, parseBusinessDate('2027-01-02'), 'CS1')).toBe('LH/CS1/2701/0012')
   })
 

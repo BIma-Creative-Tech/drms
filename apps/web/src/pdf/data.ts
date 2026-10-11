@@ -38,7 +38,8 @@ export async function buildPdfData(req: PayloadRequest, requestId: number, opts:
   // ADR 0016 §6: letterhead + {COMPANY} of the document's PT
   const s = await settings(req, relId((doc as { company?: unknown }).company))
   const tz = s.timezone || process.env.TZ || DEFAULT_TZ
-  const companyCode = s.shortCode || 'DRMS'
+  // {COMPANY} = the PT's own short code only (never a hard-coded fallback; numbering refuses an empty one)
+  const companyCode = s.shortCode || ''
   const companyName = s.name || 'PT Double Rezki Makmur Sejahtera'
 
   const rows = latestCycle(await approvalsOf(req, requestId))

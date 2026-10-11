@@ -165,10 +165,10 @@ describe('MC1 — mutations are checked against the role IN THE DOCUMENT PT', ()
     expect((await sqlAs('app', 'SELECT company_id FROM expense_requests WHERE id = $1', [reqB])).rows[0].company_id).toBe(b)
     const s = await api('POST', `${E}/${reqB}/submit`, rina, {}, key())
     expect(s.status, JSON.stringify(s.body)).toBe(200)
-    // own counter per PT: the first CS1 number starts at the sequence start (229, default), whatever DRMS issued
-    expect(s.body.docNo).toMatch(/^PB\/CS1\/\d{4}\/0229$/) // D5: PT code + paper series per PT
-    const counters = await sqlAs('app', "SELECT company_id, next_value FROM document_sequence_counters WHERE doc_type = 'expense_request' AND period_key = 'ALL' AND company_id = $1", [b])
-    expect(counters.rows).toEqual([{ company_id: b, next_value: 230 }])
+    // own counter per PT and month: the first CS1 number of the month is 0001 (owner 2026-10-11), whatever DRMS issued
+    expect(s.body.docNo).toMatch(/^PB\/CS1\/\d{4}\/0001$/) // D5: PT code; monthly series per PT
+    const counters = await sqlAs('app', "SELECT company_id, next_value FROM document_sequence_counters WHERE doc_type = 'expense_request' AND company_id = $1", [b])
+    expect(counters.rows).toEqual([{ company_id: b, next_value: 2 }])
   })
 
   it('approval holders are members of the document PT: DRMS Direktur → 404 on the CS1 request; CS1 Direktur + Finance decide', async () => {

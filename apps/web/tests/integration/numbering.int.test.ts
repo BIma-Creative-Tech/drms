@@ -27,15 +27,14 @@ beforeAll(async () => {
 })
 
 /**
- * Test files share one DB (reset once per run) and the F2a flow tests also submit requests, so the
- * PB counter may already be in use when this file runs: expectations are relative to `base` —
- * which MUST be the configured startAt 229 when the counter row does not exist yet.
+ * Owner decision 2026-10-11: PB resets MONTHLY from 1 per PT. The allocations below use month 2036-09 (no other
+ * test file uses it), so its counter starts at the configured startAt 1 — `base` is read in case of a re-run.
  */
-let base = 229
+let base = 1
 const pad = (n: number) => String(n).padStart(4, '0')
 beforeAll(async () => {
-  const c = await sqlAs('app', "SELECT next_value FROM document_sequence_counters WHERE company_id = $1 AND doc_type = 'expense_request' AND period_key = 'ALL'", [cid])
-  base = c.rows[0]?.next_value ?? 229
+  const c = await sqlAs('app', "SELECT next_value FROM document_sequence_counters WHERE company_id = $1 AND doc_type = 'expense_request' AND period_key = '2036-09'", [cid])
+  base = c.rows[0]?.next_value ?? 1
 })
 
 afterAll(async () => {
@@ -43,31 +42,31 @@ afterAll(async () => {
 })
 
 describe('document numbering (ADR 0007)', () => {
-  it('first PB number continues the paper series: PB/DRMS/2609/0229 (number_issued audited in the same tx)', async () => {
+  it('first PB number of a month is PB/DRMS/3609/0001 (monthly reset from 1; number_issued audited in the same tx)', async () => {
     const counter = await sqlAs('app', "SELECT count(*)::int AS n FROM document_sequence_counters WHERE company_id = $1 AND doc_type = 'expense_request'", [cid])
-    if (counter.rows[0].n === 0) expect(base).toBe(229)
+    if (counter.rows[0].n === 0) expect(base).toBe(1)
     const p = await getTestPayload()
     const res = await withSystemTransaction(p, null, async (req: PayloadRequest) => {
-      const a = await allocateDocNo(req, 'expense_request', { companyId: cid, date: parseBusinessDate('2026-09-23'), docId: 'test-1' })
+      const a = await allocateDocNo(req, 'expense_request', { companyId: cid, date: parseBusinessDate('2036-09-23'), docId: 'test-1' })
       const r = await (await import('@/lib/tx')).getRequestTx(req)
       const tx = (await r.execute((await import('@payloadcms/db-postgres')).sql`SELECT txid_current()::text AS tx`)) as unknown as { rows: Array<{ tx: string }> }
       return { a, tx: tx.rows[0]!.tx }
     })
-    expect(res.a.docNo).toBe(`PB/DRMS/2609/${pad(base)}`)
+    expect(res.a.docNo).toBe(`PB/DRMS/3609/${pad(base)}`)
     const row = await sqlAs('app', "SELECT tx_id::text AS tx, doc_no FROM audit_logs WHERE action = 'number_issued' AND doc_id = 'test-1'")
-    expect(row.rows[0]).toEqual({ tx: res.tx, doc_no: `PB/DRMS/2609/${pad(base)}` })
+    expect(row.rows[0]).toEqual({ tx: res.tx, doc_no: `PB/DRMS/3609/${pad(base)}` })
   })
 
   it('a rolled-back allocation returns its number (no gap)', async () => {
     const p = await getTestPayload()
     await expect(
       withSystemTransaction(p, null, async (req) => {
-        await allocateDocNo(req, 'expense_request', { companyId: cid, date: parseBusinessDate('2026-09-24') })
+        await allocateDocNo(req, 'expense_request', { companyId: cid, date: parseBusinessDate('2036-09-24') })
         throw new Error('simulated failure after allocation')
       }),
     ).rejects.toThrow('simulated failure')
-    const next = await withSystemTransaction(p, null, (req) => allocateDocNo(req, 'expense_request', { companyId: cid, date: parseBusinessDate('2026-09-24') }))
-    expect(next.docNo).toBe(`PB/DRMS/2609/${pad(base + 1)}`)
+    const next = await withSystemTransaction(p, null, (req) => allocateDocNo(req, 'expense_request', { companyId: cid, date: parseBusinessDate('2036-09-24') }))
+    expect(next.docNo).toBe(`PB/DRMS/3609/${pad(base + 1)}`)
   })
 
   it('50 parallel allocations (10 failing after allocation) → committed numbers unique and gapless', async () => {
@@ -75,7 +74,7 @@ describe('document numbering (ADR 0007)', () => {
     const results = await Promise.allSettled(
       Array.from({ length: 50 }, (_, i) =>
         withSystemTransaction(p, null, async (req) => {
-          const a = await allocateDocNo(req, 'expense_request', { companyId: cid, date: parseBusinessDate('2026-09-25') })
+          const a = await allocateDocNo(req, 'expense_request', { companyId: cid, date: parseBusinessDate('2036-09-25') })
           await new Promise((r) => setTimeout(r, Math.random() * 20))
           if (i % 5 === 4) throw new Error('fail after allocation')
           return a.seq
@@ -91,13 +90,13 @@ describe('document numbering (ADR 0007)', () => {
     const sorted = [...ok].sort((a, b) => a - b)
     expect(sorted[0]).toBe(base + 2)
     expect(sorted[39]).toBe(base + 41) // gapless
-    const c = await sqlAs('app', "SELECT next_value FROM document_sequence_counters WHERE company_id = $1 AND doc_type = 'expense_request' AND period_key = 'ALL'", [cid])
+    const c = await sqlAs('app', "SELECT next_value FROM document_sequence_counters WHERE company_id = $1 AND doc_type = 'expense_request' AND period_key = '2036-09'", [cid])
     expect(c.rows[0].next_value).toBe(base + 42)
   })
 
   it('50 purely parallel allocations all succeed, unique and gapless', async () => {
     const p = await getTestPayload()
-    const seqs = await Promise.all(Array.from({ length: 50 }, () => withSystemTransaction(p, null, async (req) => (await allocateDocNo(req, 'expense_request', { companyId: cid, audit: false })).seq)))
+    const seqs = await Promise.all(Array.from({ length: 50 }, () => withSystemTransaction(p, null, async (req) => (await allocateDocNo(req, 'expense_request', { companyId: cid, date: parseBusinessDate('2036-09-26'), audit: false })).seq)))
     const sorted = [...seqs].sort((a, b) => a - b)
     expect(new Set(seqs).size).toBe(50)
     expect(sorted[49]! - sorted[0]!).toBe(49)

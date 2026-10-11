@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  companyCodeError,
   DEFAULT_SEQUENCES,
   formatDocNo,
   localDateInTz,
@@ -13,9 +14,16 @@ import {
 const EXPENSE_REQUEST_SEQUENCE = DEFAULT_SEQUENCES.find((s) => s.docType === 'expense_request')!
 
 describe('numbering (ADR 0007)', () => {
-  it('D5 default: first PB number for 2026-09-23 is PB/DRMS/2609/0229 (paper series continues, PT code inside)', () => {
-    const d = parseBusinessDate('2026-09-23')
-    expect(formatDocNo(EXPENSE_REQUEST_SEQUENCE, EXPENSE_REQUEST_SEQUENCE.startAt, d, 'DRMS')).toBe('PB/DRMS/2609/0229')
+  it('owner 2026-10-11: PB resets monthly from 1 per PT — PB/DRMS/2611/0001, PB/LAS/2611/0001, next month 0001 again', () => {
+    const nov = parseBusinessDate('2026-11-03')
+    const dec = parseBusinessDate('2026-12-01')
+    expect(EXPENSE_REQUEST_SEQUENCE.startAt).toBe(1)
+    // the {COMPANY} token is whatever short code the PT carries (no PT code is built in)
+    expect(formatDocNo(EXPENSE_REQUEST_SEQUENCE, 1, nov, 'DRMS')).toBe('PB/DRMS/2611/0001')
+    expect(formatDocNo(EXPENSE_REQUEST_SEQUENCE, 1, nov, 'LAS')).toBe('PB/LAS/2611/0001')
+    expect(periodKey(EXPENSE_REQUEST_SEQUENCE.resetPolicy, nov)).toBe('2026-11')
+    expect(periodKey(EXPENSE_REQUEST_SEQUENCE.resetPolicy, dec)).toBe('2026-12') // new month → new counter key → 0001
+    expect(companyCodeError(EXPENSE_REQUEST_SEQUENCE.pattern, '')).toMatch(/Kode singkat PT/)
   })
 
   it('still reproduces the paper form number 228/PB-DRMS/20/IX/2026 with the old client pattern (admin-configurable)', () => {
@@ -52,8 +60,9 @@ describe('numbering (ADR 0007)', () => {
     expect(() => formatDocNo(EXPENSE_REQUEST_SEQUENCE, 0, parseBusinessDate('2026-09-23'), 'DRMS')).toThrow()
   })
 
-  it('ships ADR 0007 defaults: PB never resets and starts at 229; others monthly TRF/KM/KK/LPJ/LP/ADD/SV/LH', () => {
-    expect(EXPENSE_REQUEST_SEQUENCE).toMatchObject({ resetPolicy: 'never', startAt: 229, padding: 4 })
+  it('ships ADR 0007 defaults: every sequence (PB included, owner 2026-10-11) resets monthly from 1 — PB/TRF/KM/KK/LPJ/LP/ADD/SV/LH', () => {
+    expect(EXPENSE_REQUEST_SEQUENCE).toMatchObject({ resetPolicy: 'monthly', startAt: 1, padding: 4 })
+    for (const s of DEFAULT_SEQUENCES) expect(s).toMatchObject({ resetPolicy: 'monthly', startAt: 1 })
     for (const s of DEFAULT_SEQUENCES) expect(patternError(s.pattern, s.resetPolicy)).toBeNull()
     expect(DEFAULT_SEQUENCES.map((s) => s.docCode).sort()).toEqual(['ADD', 'KK', 'KM', 'LH', 'LP', 'LPJ', 'PB', 'SV', 'TRF'])
     // FR1 (ADR 0020): Laporan servis unit, monthly; D5: with the PT short code
