@@ -6,6 +6,7 @@ import { denyDeleteLogged } from '@/domain/expense/access'
 
 import { ro } from './fields-f2'
 import { companyField, companyHook } from '@/fields/company'
+import { USER_NAME_VIEW } from '@/fields/users'
 
 /**
  * Tutup buku bulanan (ADR 0005 §6, requirements §9 "Keuangan"). One row per close; re-open (Owner,
@@ -29,9 +30,9 @@ export const PeriodClosings: CollectionConfig = {
     { name: 'period', type: 'text', label: 'Periode (YYYY-MM)', required: true, index: true, admin: ro },
     { name: 'status', type: 'select', required: true, defaultValue: 'closed', options: [{ label: 'Ditutup', value: 'closed' }, { label: 'Dibuka kembali', value: 'reopened' }], admin: ro },
     { name: 'note', type: 'text', maxLength: 500, admin: ro },
-    { name: 'closedBy', type: 'relationship', relationTo: 'users', admin: ro },
+    { name: 'closedBy', type: 'relationship', relationTo: 'users', label: 'Ditutup oleh', admin: { ...ro, components: USER_NAME_VIEW } },
     { name: 'closedAt', type: 'date', admin: { ...ro, date: { pickerAppearance: 'dayAndTime' } } },
-    { name: 'reopenedBy', type: 'relationship', relationTo: 'users', admin: ro },
+    { name: 'reopenedBy', type: 'relationship', relationTo: 'users', label: 'Dibuka kembali oleh', admin: { ...ro, components: USER_NAME_VIEW } },
     { name: 'reopenedAt', type: 'date', admin: ro },
     { name: 'reopenReason', type: 'text', maxLength: 500, admin: ro },
   ],

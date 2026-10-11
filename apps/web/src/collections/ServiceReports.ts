@@ -7,6 +7,7 @@ import { companyField, companyHook } from '@/fields/company'
 
 import { FIELD_AUDIT_EXCLUDE, fieldReportRead, fieldSystemFields, jsonView } from './field-common'
 import { businessDateField, ro } from './fields-f2'
+import { USER_NAME_VIEW } from '@/fields/users'
 
 /**
  * FR1 Laporan servis unit (`SV/YYMM/####`, ADR 0020 §5, requirements v1.3 US-60…): mechanic's report
@@ -36,7 +37,7 @@ export const ServiceReports: CollectionConfig = withAudit(
       { name: 'project', type: 'relationship', relationTo: 'projects', label: 'Project', required: true, index: true, admin: ro },
       { name: 'unit', type: 'relationship', relationTo: 'vehicles', label: 'Unit', required: true, index: true, admin: ro },
       businessDateField('reportDate', 'Tanggal', { required: true, index: true, admin: ro }),
-      { name: 'reporter', type: 'relationship', relationTo: 'users', label: 'Mekanik (pelapor)', required: true, index: true, admin: ro },
+      { name: 'reporter', type: 'relationship', relationTo: 'users', label: 'Mekanik (pelapor)', required: true, index: true, admin: { ...ro, components: USER_NAME_VIEW } },
       { name: 'helpers', type: 'text', label: 'Helper', maxLength: 200, admin: ro },
       { name: 'startTime', type: 'text', label: 'Jam mulai', maxLength: 5, admin: ro },
       { name: 'endTime', type: 'text', label: 'Jam selesai', maxLength: 5, admin: ro },

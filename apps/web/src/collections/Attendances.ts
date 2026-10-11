@@ -6,6 +6,7 @@ import { withAudit } from '@/audit/hooks'
 
 import { ro } from './fields-f2'
 import { companyField, companyHook } from '@/fields/company'
+import { USER_NAME_VIEW } from '@/fields/users'
 
 /** Read-only JSON without Monaco (CSP, config-guards.test.ts). */
 const jsonView = { readOnly: true, components: { Field: '@/components/ReadOnlyJson#ReadOnlyJson' } }
@@ -55,7 +56,7 @@ export const Attendances: CollectionConfig = withAudit(
       companyField({ derived: true }),
       { name: 'employee', type: 'relationship', relationTo: 'employees', label: 'Karyawan', required: true, index: true, admin: ro },
       // E6: empty for "diabsenkan PM" of an employee without an account (US-14, Q-29).
-      { name: 'user', type: 'relationship', relationTo: 'users', label: 'Akun', index: true, admin: ro },
+      { name: 'user', type: 'relationship', relationTo: 'users', label: 'Akun', index: true, admin: { ...ro, components: USER_NAME_VIEW } },
       {
         name: 'kind',
         type: 'select',
@@ -83,7 +84,7 @@ export const Attendances: CollectionConfig = withAudit(
         ],
         admin: ro,
       },
-      { name: 'recordedBy', type: 'relationship', relationTo: 'users', label: 'Diabsenkan oleh', index: true, admin: ro },
+      { name: 'recordedBy', type: 'relationship', relationTo: 'users', label: 'Diabsenkan oleh', index: true, admin: { ...ro, components: USER_NAME_VIEW } },
       { name: 'onBehalfReason', type: 'text', label: 'Alasan diabsenkan PM', maxLength: 500, admin: ro },
       { name: 'localDate', type: 'text', label: 'Tanggal (zona perusahaan)', required: true, index: true, admin: ro },
       { name: 'attendanceTime', type: 'date', label: 'Jam absensi', required: true, admin: { ...ro, date: { pickerAppearance: 'dayAndTime' } } },

@@ -7,6 +7,7 @@ import { companyField, companyHook } from '@/fields/company'
 
 import { FIELD_AUDIT_EXCLUDE, fieldReportRead, fieldSystemFields, jsonView } from './field-common'
 import { businessDateField, ro } from './fields-f2'
+import { USER_NAME_VIEW } from '@/fields/users'
 
 const weather = (name: string, label: string) =>
   ({ name, type: 'select' as const, label, options: WEATHER.map((v) => ({ label: WEATHER_LABELS[v], value: v })), admin: ro })
@@ -38,7 +39,7 @@ export const DailyReports: CollectionConfig = withAudit(
       { name: 'docNo', type: 'text', label: 'No. laporan', index: true, unique: true, admin: ro },
       { name: 'project', type: 'relationship', relationTo: 'projects', label: 'Project', required: true, index: true, admin: ro },
       businessDateField('reportDate', 'Tanggal', { required: true, index: true, admin: ro }),
-      { name: 'reporter', type: 'relationship', relationTo: 'users', label: 'Pelapor', required: true, index: true, admin: ro },
+      { name: 'reporter', type: 'relationship', relationTo: 'users', label: 'Pelapor', required: true, index: true, admin: { ...ro, components: USER_NAME_VIEW } },
       weather('weatherMorning', 'Cuaca pagi'),
       weather('weatherNoon', 'Cuaca siang'),
       weather('weatherAfternoon', 'Cuaca sore'),

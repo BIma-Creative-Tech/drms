@@ -68,3 +68,30 @@ export async function resolveDisplayName(payload: Partial<Pick<Payload, 'find'>>
   }
   return pickDisplayName(u, employeeName)
 }
+
+/**
+ * DRMS 10/10 integration (Lead review a): the name of ANOTHER user on a document the viewer already
+ * reads ("Dibuat oleh", "Dicatat oleh", list cells …) — the same order as the greeting: `users.name` →
+ * the employee of that user's membership in the document's PT (no PT: the lowest PT id) → email local part
+ * → "Pengguna". Payload's relationship label would show "Tanpa Judul - ID: 1" to a viewer without read
+ * access to `users`. SYSTEM-READ of one user's name / membership employee (the caller has the document).
+ */
+export async function userNameOf(payload: Pick<Payload, 'find' | 'findByID'>, userId: number, companyId?: number | null): Promise<string> {
+  const user = (await payload
+    .findByID({ collection: 'users', id: userId, depth: 0, select: { name: true, email: true }, overrideAccess: true /* SYSTEM-READ: display name */, disableErrors: true })
+    .catch(() => null)) as UserLike | null
+  if (!user) return `Pengguna #${userId}`
+  if ((user.name ?? '').trim()) return pickDisplayName(user)
+  let employeeName: string | null = null
+  try {
+    const ms = await payload.find({ collection: 'company-memberships', where: { user: { equals: userId } }, depth: 1, sort: 'company', pagination: false, select: { company: true, employee: true }, overrideAccess: true /* SYSTEM-READ: display name */ })
+    const rows = ms.docs as unknown as Array<{ company?: unknown; employee?: { name?: string | null } | number | null }>
+    const rel = (v: unknown) => (typeof v === 'number' ? v : (v as { id?: number } | null)?.id)
+    // a per-PT document shows only the employee name of THAT PT (no other PT's data, ADR 0016)
+    const ordered = typeof companyId === 'number' ? rows.filter((r) => rel(r.company) === companyId) : rows
+    employeeName = ordered.map((r) => (typeof r.employee === 'object' && r.employee ? (r.employee.name ?? '').trim() : '')).find((n) => !!n) ?? null
+  } catch {
+    employeeName = null
+  }
+  return pickDisplayName(user, employeeName)
+}

@@ -9,6 +9,7 @@ import { uuidField } from '@/fields/common'
 
 import { businessDateField, ro } from './fields-f2'
 import { companyField, companyHook } from '@/fields/company'
+import { USER_NAME_VIEW } from '@/fields/users'
 
 /**
  * T3 Transfer / pencairan (requirements v1.1 §7 T3, US-20). Amount is COPIED server-side from the
@@ -54,11 +55,11 @@ export const Transfers: CollectionConfig = withAudit(
       // Item 11 (DRMS 10/10): date AND time of the bank transfer document; `transferDate` = its date in the PT
       // time zone (reports keep using it). Null = recorded by an old client without a time ("jam tidak diketahui").
       { name: 'transferAt', type: 'date', label: 'Tanggal & jam transfer (sesuai bukti)', index: true, admin: { ...ro, date: { pickerAppearance: 'dayAndTime' } } },
-      { name: 'postedBy', type: 'relationship', relationTo: 'users', label: 'Dicatat oleh', admin: ro },
+      { name: 'postedBy', type: 'relationship', relationTo: 'users', label: 'Dicatat oleh', admin: { ...ro, components: USER_NAME_VIEW } },
       { name: 'status', type: 'select', required: true, defaultValue: 'posted', index: true, options: [{ label: 'Posted', value: 'posted' }, { label: 'Void', value: 'void' }], admin: ro },
       { name: 'cashEntry', type: 'relationship', relationTo: 'cash-entries', label: 'Kas keluar', admin: ro },
       { name: 'voidReason', type: 'text', label: 'Alasan void', admin: ro },
-      { name: 'voidedBy', type: 'relationship', relationTo: 'users', admin: ro },
+      { name: 'voidedBy', type: 'relationship', relationTo: 'users', label: 'Dibatalkan oleh', admin: { ...ro, components: USER_NAME_VIEW } },
       { name: 'voidedAt', type: 'date', admin: ro },
       uuidField(),
     ],

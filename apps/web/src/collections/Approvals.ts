@@ -6,6 +6,7 @@ import { byVisibleRequest, denyDeleteLogged } from '@/domain/expense/access'
 import { inIds } from '@/access/scope'
 import { APPROVAL_DECISIONS, APPROVAL_POSITIONS } from '@/domain/expense/types'
 import { companyField, companyHook } from '@/fields/company'
+import { USER_NAME_VIEW } from '@/fields/users'
 
 const ro = { readOnly: true }
 
@@ -49,7 +50,7 @@ export const Approvals: CollectionConfig = {
     { name: 'cycle', type: 'number', label: 'Siklus', required: true, admin: ro },
     { name: 'position', type: 'select', label: 'Posisi', required: true, options: APPROVAL_POSITIONS.map((v) => ({ label: v, value: v })), admin: ro },
     { name: 'level', type: 'number', label: 'Level', required: true, defaultValue: 0, admin: ro },
-    { name: 'actor', type: 'relationship', relationTo: 'users', label: 'User', index: true, admin: ro },
+    { name: 'actor', type: 'relationship', relationTo: 'users', label: 'User', index: true, admin: { ...ro, components: USER_NAME_VIEW } },
     { name: 'employee', type: 'relationship', relationTo: 'employees', label: 'Karyawan (Diajukan Oleh)', admin: ro },
     { name: 'actorName', type: 'text', label: 'Nama tampil', admin: ro },
     { name: 'onBehalf', type: 'checkbox', label: 'Diwakili pembuat (Q-10/Q-28)', defaultValue: false, admin: ro },

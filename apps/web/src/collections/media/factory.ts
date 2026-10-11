@@ -18,6 +18,7 @@ import { denyAll } from '@/access/roles'
 import { withAudit } from '@/audit/hooks'
 import { imageQueue, insideImageSlot } from '@/lib/image-queue'
 import { takeToken } from '@/lib/rate-limit'
+import { USER_NAME_VIEW } from '@/fields/users'
 
 const MEDIA_DIR = process.env.MEDIA_DIR ?? '/data/media'
 
@@ -183,7 +184,7 @@ export function mediaCollection(spec: MediaSpec): CollectionConfig {
       },
       hooks: { beforeOperation: [beforeOperation], beforeChange: [stamp] },
       fields: [
-        { name: 'uploadedBy', type: 'relationship', relationTo: 'users', label: 'Diunggah oleh', index: true, access: never, admin: technical },
+        { name: 'uploadedBy', type: 'relationship', relationTo: 'users', label: 'Diunggah oleh', index: true, access: never, admin: { ...technical, components: USER_NAME_VIEW } },
         { name: 'receivedAt', type: 'date', label: 'Diterima server', access: never, admin: { ...technical, date: { pickerAppearance: 'dayAndTime' } } },
         { name: 'ownerDocType', type: 'text', label: 'Jenis dokumen pemilik', index: true, access: never, admin: technical },
         { name: 'ownerDocId', type: 'text', label: 'ID dokumen pemilik', index: true, access: never, admin: technical },

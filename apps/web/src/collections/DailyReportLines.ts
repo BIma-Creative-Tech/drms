@@ -6,6 +6,7 @@ import { LINE_KIND_LABELS, LINE_KINDS, LINE_ORIGINS } from '@/domain/rap/rules'
 import { companyField, companyHook } from '@/fields/company'
 
 import { ro } from './fields-f2'
+import { USER_NAME_VIEW } from '@/fields/users'
 
 /**
  * P3 ledger of the daily reports (append-only — no UPDATE/DELETE for anyone, DB trigger p3_security):
@@ -36,6 +37,6 @@ export const DailyReportLines: CollectionConfig = {
     { name: 'qty', type: 'number', label: 'Jumlah (selisih)', required: true, admin: ro },
     { name: 'origin', type: 'select', label: 'Asal', required: true, options: LINE_ORIGINS.map((v) => ({ label: v, value: v })), admin: ro },
     { name: 'reason', type: 'text', label: 'Alasan', maxLength: 500, admin: ro },
-    { name: 'createdBy', type: 'relationship', relationTo: 'users', label: 'Oleh', required: true, admin: ro },
+    { name: 'createdBy', type: 'relationship', relationTo: 'users', label: 'Oleh', required: true, admin: { ...ro, components: USER_NAME_VIEW } },
   ],
 }

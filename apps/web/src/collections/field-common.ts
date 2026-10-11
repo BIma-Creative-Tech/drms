@@ -4,6 +4,7 @@ import { anyOf, assignedProjects, byRole, ownUser, teamProjects } from '@/access
 import { uuidField } from '@/fields/common'
 
 import { ro } from './fields-f2'
+import { USER_NAME_VIEW } from '@/fields/users'
 
 /**
  * FR1 (ADR 0020): fields + read rule shared by the field reports (service-reports, unit-timesheets,
@@ -48,7 +49,7 @@ export function fieldSystemFields(): Field[] {
     { name: 'source', type: 'select', label: 'Sumber', options: ['web', 'apk'].map((s) => ({ label: s, value: s })), admin: ro },
     { name: 'flags', type: 'json', label: 'Tanda', admin: jsonView },
     { name: 'correctedAt', type: 'date', label: 'Dikoreksi pada', admin: dt },
-    { name: 'correctedBy', type: 'relationship', relationTo: 'users', label: 'Dikoreksi oleh', admin: ro },
+    { name: 'correctedBy', type: 'relationship', relationTo: 'users', label: 'Dikoreksi oleh', admin: { ...ro, components: USER_NAME_VIEW } },
     { name: 'syncRev', type: 'number', label: 'Revisi', defaultValue: 1, admin: { ...ro, hidden: true } },
     { name: 'clientUuid', type: 'text', label: 'ID offline', unique: true, index: true, admin: { ...ro, hidden: true } },
     uuidField(),

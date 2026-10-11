@@ -6,6 +6,7 @@ import { withAudit } from '@/audit/hooks'
 import { businessDateField, ro } from './fields-f2'
 import { uuidField } from '@/fields/common'
 import { companyField, companyHook } from '@/fields/company'
+import { USER_NAME_VIEW } from '@/fields/users'
 
 /** Read-only JSON without Monaco (CSP, config-guards.test.ts). */
 const jsonView = { readOnly: true, components: { Field: '@/components/ReadOnlyJson#ReadOnlyJson' } }
@@ -59,7 +60,7 @@ export const ProgressReports: CollectionConfig = withAudit(
       { name: 'projectPctAfter', type: 'number', label: '% project sesudah', admin: ro },
       { name: 'work', type: 'textarea', label: 'Pekerjaan', required: true, maxLength: 2000, admin: ro },
       { name: 'issues', type: 'textarea', label: 'Kendala', maxLength: 2000, admin: ro },
-      { name: 'reporter', type: 'relationship', relationTo: 'users', label: 'Pelapor', required: true, index: true, admin: ro },
+      { name: 'reporter', type: 'relationship', relationTo: 'users', label: 'Pelapor', required: true, index: true, admin: { ...ro, components: USER_NAME_VIEW } },
       { name: 'photoCount', type: 'number', label: 'Jumlah foto', defaultValue: 0, admin: ro },
       { name: 'receivedAt', type: 'date', label: 'Diterima server', admin: { ...ro, date: { pickerAppearance: 'dayAndTime' } } },
       { name: 'editableUntil', type: 'date', label: 'Bisa diedit sampai', admin: { ...ro, date: { pickerAppearance: 'dayAndTime' } } },

@@ -104,3 +104,14 @@ export function userPicker(opts: { roles?: readonly Role[]; required?: boolean }
     validate: (v: unknown) => (opts.required && (v === null || v === undefined || v === '') ? 'Wajib diisi.' : true),
   } as const
 }
+
+/**
+ * DRMS 10/10 integration (Lead review a): read-only user relationships ("Dibuat oleh", "Dicatat oleh",
+ * "Pelapor" …) show the person's NAME on the form and in list columns (admin/components/users/
+ * UserNameField + UserNameCell, resolver domain/user-display-name.ts userNameOf) — Payload's own label
+ * needs read access to `users` and showed "Tanpa Judul - ID: 1" to Staff/PM/Finance.
+ */
+export const USER_NAME_VIEW = {
+  Field: '@/admin/components/users/UserNameField#UserNameField',
+  Cell: '@/admin/components/users/UserNameCell#UserNameCell',
+} as const

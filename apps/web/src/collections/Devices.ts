@@ -5,6 +5,7 @@ import { anyOf, byRoleAny, fieldRoles, ownUser, usersOfMyCompanies } from '@/acc
 import { reasonOnChange, withAudit } from '@/audit/hooks'
 import { writeAudit } from '@/audit/writer'
 import { endKeycloakDeviceSession } from '@/domain/devices'
+import { USER_NAME_VIEW } from '@/fields/users'
 
 /**
  * Device registry (ADR 0003 §5). Created only by POST /api/v1/devices/register (SYSTEM-WRITE);
@@ -125,7 +126,7 @@ export const Devices: CollectionConfig = withAudit(
       { name: 'registeredAt', type: 'date', label: 'Terdaftar', access: { update: () => false }, admin: { readOnly: true } },
       { name: 'lastSeenAt', type: 'date', label: 'Terakhir aktif', access: { update: () => false }, admin: { readOnly: true } },
       { name: 'revokedAt', type: 'date', label: 'Dicabut pada', access: { update: () => false }, admin: { readOnly: true } },
-      { name: 'revokedBy', type: 'relationship', relationTo: 'users', label: 'Dicabut oleh', access: { update: () => false }, admin: { readOnly: true } },
+      { name: 'revokedBy', type: 'relationship', relationTo: 'users', label: 'Dicabut oleh', access: { update: () => false }, admin: { readOnly: true, components: USER_NAME_VIEW } },
     ],
   },
   { docType: 'device', exclude: ['fcmToken', 'lastSeenAt', 'integrityCheckedAt'], reasonRules: [reasonOnChange(['status'], 'Alasan wajib diisi saat mencabut perangkat.')] },

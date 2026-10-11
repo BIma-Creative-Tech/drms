@@ -10,6 +10,7 @@ import { uuidField } from '@/fields/common'
 
 import { ro } from './fields-f2'
 import { companyField, companyHook } from '@/fields/company'
+import { USER_NAME_VIEW } from '@/fields/users'
 
 /**
  * T5 LPJ & settlement (requirements v1.1 §7 T5, US-08/US-21/US-22; architecture §4.3 `settlements`,
@@ -71,11 +72,11 @@ export const Settlements: CollectionConfig = withAudit(
       { name: 'financeNotes', type: 'textarea', label: 'Catatan revisi Finance', maxLength: 1000, admin: ro },
       { name: 'submitCount', type: 'number', label: 'Jumlah pengiriman', defaultValue: 0, admin: ro },
       { name: 'submittedAt', type: 'date', label: 'Dikirim (server)', admin: { ...ro, date: { pickerAppearance: 'dayAndTime' } } },
-      { name: 'submittedBy', type: 'relationship', relationTo: 'users', label: 'Dikirim oleh', admin: ro },
+      { name: 'submittedBy', type: 'relationship', relationTo: 'users', label: 'Dikirim oleh', admin: { ...ro, components: USER_NAME_VIEW } },
       { name: 'verifiedAt', type: 'date', label: 'Diverifikasi (server)', admin: { ...ro, date: { pickerAppearance: 'dayAndTime' } } },
-      { name: 'verifiedBy', type: 'relationship', relationTo: 'users', label: 'Diverifikasi oleh', admin: ro },
+      { name: 'verifiedBy', type: 'relationship', relationTo: 'users', label: 'Diverifikasi oleh', admin: { ...ro, components: USER_NAME_VIEW } },
       { name: 'settledAt', type: 'date', label: 'Diselesaikan (server)', admin: { ...ro, date: { pickerAppearance: 'dayAndTime' } } },
-      { name: 'settledBy', type: 'relationship', relationTo: 'users', label: 'Diselesaikan oleh', admin: ro },
+      { name: 'settledBy', type: 'relationship', relationTo: 'users', label: 'Diselesaikan oleh', admin: { ...ro, components: USER_NAME_VIEW } },
       { name: 'refundCashEntry', type: 'relationship', relationTo: 'cash-entries', label: 'Kas masuk pengembalian', admin: ro },
       { name: 'shortfallTransfer', type: 'relationship', relationTo: 'transfers', label: 'Transfer kekurangan', admin: ro },
       // E9 — settlement reversal (Finance): the refund KM / shortfall transfer is voided (reversal rows
@@ -83,7 +84,7 @@ export const Settlements: CollectionConfig = withAudit(
       // cleared (the previous ids stay in the audit log). DB guard: only settled → verified, reason ≥ 3.
       { name: 'reversalCount', type: 'number', label: 'Jumlah pembatalan penyelesaian', defaultValue: 0, admin: ro },
       { name: 'lastReversedAt', type: 'date', label: 'Penyelesaian terakhir dibatalkan (server)', admin: { ...ro, date: { pickerAppearance: 'dayAndTime' } } },
-      { name: 'lastReversedBy', type: 'relationship', relationTo: 'users', label: 'Dibatalkan oleh', admin: ro },
+      { name: 'lastReversedBy', type: 'relationship', relationTo: 'users', label: 'Dibatalkan oleh', admin: { ...ro, components: USER_NAME_VIEW } },
       { name: 'lastReversalReason', type: 'textarea', label: 'Alasan pembatalan penyelesaian', maxLength: 1000, admin: ro },
       // QA-06 / ADR 0019 — shortfall above approved + tolerance: re-approval of the new total through the
       // ADR 0013 engine (Direktur "Diketahui" → Finance), decision rows in `approvals` (docType

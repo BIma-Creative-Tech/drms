@@ -6,6 +6,7 @@ import { companyField, companyHook } from '@/fields/company'
 
 import { FIELD_AUDIT_EXCLUDE, fieldReportRead, fieldSystemFields } from './field-common'
 import { businessDateField, ro } from './fields-f2'
+import { USER_NAME_VIEW } from '@/fields/users'
 
 /**
  * FR1 Timesheet harian unit (ADR 0020 §5, requirements v1.3): ONE row per unit and date (unique
@@ -38,7 +39,7 @@ export const UnitTimesheets: CollectionConfig = withAudit(
       { name: 'unit', type: 'relationship', relationTo: 'vehicles', label: 'Unit', required: true, index: true, admin: ro },
       { name: 'contractUnit', type: 'relationship', relationTo: 'contract-units', label: 'Unit kontrak', required: true, index: true, admin: ro },
       businessDateField('reportDate', 'Tanggal', { required: true, index: true, admin: ro }),
-      { name: 'reporter', type: 'relationship', relationTo: 'users', label: 'Pelapor', required: true, index: true, admin: ro },
+      { name: 'reporter', type: 'relationship', relationTo: 'users', label: 'Pelapor', required: true, index: true, admin: { ...ro, components: USER_NAME_VIEW } },
       { name: 'hmStart', type: 'number', label: 'HM awal', required: true, admin: ro },
       { name: 'hmEnd', type: 'number', label: 'HM akhir', required: true, admin: ro },
       { name: 'workHours', type: 'number', label: 'Jam kerja', required: true, admin: ro },
