@@ -7,6 +7,7 @@ import { REQUEST_STATUSES, REQUEST_TYPE_LABELS, REQUEST_TYPES, statusLabel, type
 import { absensiReport } from './attendance-report'
 import { rekapAftersales, rekapTimesheetKontrak } from './field-reports'
 import { projectProgressVsBudget } from './progress'
+import { slaTransferReport } from './sla-report'
 import { auditLogCount, auditLogPage, AUDIT_PAGE, AUDIT_SOURCES, parseAuditFilter, type AuditFilter } from './audit-log'
 import {
   cashBalances,
@@ -1107,7 +1108,7 @@ function withCompanies(def: ReportDef): ReportDef {
   }
 }
 
-export const REPORTS: ReportDef[] = [rekapKas, bukuKas, pengeluaranKategori, anggaranProject, rekapPengajuan, kelengkapan, biayaKendaraan, absensiReport, rekapTimesheetKontrak, rekapAftersales].map(withCompanies)
+export const REPORTS: ReportDef[] = [rekapKas, bukuKas, pengeluaranKategori, anggaranProject, rekapPengajuan, kelengkapan, slaTransferReport, biayaKendaraan, absensiReport, rekapTimesheetKontrak, rekapAftersales].map(withCompanies)
 export const AUDIT_REPORT = withCompanies(auditLog)
 export const ALL_REPORTS: ReportDef[] = [...REPORTS, AUDIT_REPORT]
 export const REPORT_CODES = ALL_REPORTS.map((r) => r.code)

@@ -5,6 +5,7 @@ import { companyRefs, type CompanyRef } from '@/domain/companies'
 
 import { actorContext, ids, projectCommitted, settings, type RequestDoc } from './common'
 import { isDecisionSnapshot } from './decision'
+import { DEFAULT_TRANSFER_SLA_HOURS, queueAge } from './sla'
 import { withFlagVisibility } from './flag-visibility'
 import { budgetImpact, lastLevel, type ApprovalSnapshot } from './rules'
 import { allowedActions } from './state'
@@ -146,7 +147,23 @@ export async function transferQueue(req: PayloadRequest, f?: QueueFilter) {
   const items = []
   // QA-17: verification state of the destination account (the transfer asks for a confirmation when unverified)
   const verification = (v: unknown): 'verified' | 'unverified' => (v && typeof v === 'object' && (v as { verificationStatus?: string }).verificationStatus === 'verified' ? 'verified' : 'unverified')
-  for (const d of docs) items.push({ ...base(d, refs), bank: d.bankSnapshot ?? null, bankVerification: verification((d as { bankAccount?: unknown }).bankAccount), flags: await flagCounts(req, d.id) })
+  // Item 11: age since the final approval vs the PT's transfer SLA (badge "Umur sejak disetujui")
+  const slaOf = new Map<number, number>()
+  const now = new Date()
+  for (const d of docs) {
+    const cid = relId((d as { company?: unknown }).company)
+    if (cid !== undefined && !slaOf.has(cid)) slaOf.set(cid, (await settings(req, cid)).transferSlaHours ?? DEFAULT_TRANSFER_SLA_HOURS)
+    const slaHours = cid !== undefined ? slaOf.get(cid)! : DEFAULT_TRANSFER_SLA_HOURS
+    const approvedAt = (d as { approvedAt?: string | null }).approvedAt ?? null
+    const age = queueAge(approvedAt ? new Date(approvedAt) : null, now, slaHours)
+    items.push({
+      ...base(d, refs),
+      bank: d.bankSnapshot ?? null,
+      bankVerification: verification((d as { bankAccount?: unknown }).bankAccount),
+      flags: await flagCounts(req, d.id),
+      sla: { approvedAt, slaHours, ageHours: age?.hours ?? null, over: age?.over ?? false },
+    })
+  }
   // needed date ascending, requests without a date last
   items.sort((a, b) => (a.neededDate ?? '9999-12-31').localeCompare(b.neededDate ?? '9999-12-31') || a.id - b.id)
   return items
