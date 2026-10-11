@@ -158,6 +158,7 @@ export async function loadDbKeys(payload: Payload): Promise<DbKeys> {
     uoms: await codes('uoms'),
     categories: await perPt('expense-categories'),
     costCenters: await perPt('cost-centers'),
+    sites: await perPt('sites'),
     projects: await perPt('projects'),
     membershipsByUser,
     usersByEmail,
@@ -186,11 +187,11 @@ export const dateValue = (d: string | null) => (d ? `${d}T12:00:00.000Z` : null)
  * lookup is scoped to the import's PT and new master rows get it explicitly (MC2-5: `kode_pt` per row).
  */
 const PER_PT_IMPORT = new Set<CollectionSlug>([
-  'employees', 'expense-categories', 'cost-centers', 'projects', 'project-stages', 'budget-lines', 'vehicles', 'team-assignments',
+  'employees', 'expense-categories', 'cost-centers', 'sites', 'projects', 'project-stages', 'budget-lines', 'vehicles', 'team-assignments',
   'cash-accounts', 'employee-bank-accounts', 'clients', 'document-sequences', 'period-closings', 'cash-in-sources', 'approval-rules',
 ])
 /** Of those, the ones whose company is chosen on create (the others derive it from their parent). */
-const COMPANY_ON_CREATE = new Set<CollectionSlug>(['employees', 'expense-categories', 'cost-centers', 'projects', 'vehicles', 'cash-accounts', 'clients', 'document-sequences', 'period-closings', 'cash-in-sources', 'approval-rules'])
+const COMPANY_ON_CREATE = new Set<CollectionSlug>(['employees', 'expense-categories', 'cost-centers', 'sites', 'projects', 'vehicles', 'cash-accounts', 'clients', 'document-sequences', 'period-closings', 'cash-in-sources', 'approval-rules'])
 
 class Exec {
   readonly cache = new Map<string, number>()
@@ -309,7 +310,8 @@ async function atRow<T>(sheet: string, row: number | undefined, fn: () => Promis
 
 type MasterFn = (x: Exec, rep: MasterReport, issues: Issue[]) => Promise<void>
 
-const MASTERS: Array<{ key: SheetKey; rows: (d: ImportData) => number; run: MasterFn }> = [
+/** `when` (default: the sheet is in the file) decides whether a master step runs. */
+const MASTERS: Array<{ key: SheetKey; rows: (d: ImportData) => number; run: MasterFn; when?: (d: ImportData) => boolean }> = [
   {
     // MC2-5: target PTs. Existing PTs (by short code) are never modified here (identity = Master
     // Perusahaan, group admin); a new PT is created active with the default numbering + approval rules.
@@ -498,6 +500,35 @@ const MASTERS: Array<{ key: SheetKey; rows: (d: ImportData) => number; run: Mast
     },
   },
   {
+    // ADR 0023: sites (kantor cabang). Runs after PusatBiaya (default cost center) and before Project / Penugasan /
+    // AkunKas (their kode_site). Karyawan is imported earlier (users → cost-center managers depend on it), so the
+    // employees' "Site penempatan" (Karyawan.kode_site) is linked here — also when the file has no sheet Site and
+    // names existing sites. An empty kode_site never clears a link.
+    key: 'site',
+    when: (d) => d.present.includes('site') || d.employees.some((e) => e.siteCode !== null),
+    rows: (d) => d.sites.length,
+    run: async (x, rep) => {
+      for (const st of x.data.sites) {
+        const r = await atRow(rep.sheet, st._row, async () => {
+          await x.use(st)
+          return x.upsert(
+            'sites',
+            { code: { equals: st.code } },
+            { code: st.code, name: st.name, address: st.address, lat: st.lat, lng: st.lng, radiusM: st.radiusM, costCenter: st.costCenterCode ? await x.idOf('cost-centers', 'code', st.costCenterCode) : undefined, active: st.active },
+            { cacheKey: `sites:code:${st.code}` },
+          )
+        })
+        tally(rep, r.action)
+      }
+      for (const e of x.data.employees.filter((e) => e.siteCode !== null)) {
+        await atRow(SHEET_BY_KEY.karyawan.name, e._row, async () => {
+          await x.use(e)
+          return x.upsert('employees', { code: { equals: e.code } }, { homeSite: await x.idOf('sites', 'code', e.siteCode) })
+        })
+      }
+    },
+  },
+  {
     key: 'project',
     rows: (d) => d.projects.length,
     run: async (x, rep) => {
@@ -520,6 +551,7 @@ const MASTERS: Array<{ key: SheetKey; rows: (d: ImportData) => number; run: Mast
               client,
               address: p.address,
               pm: await x.userId(p.pm),
+              site: p.siteCode ? await x.idOf('sites', 'code', p.siteCode) : undefined,
               lat: p.lat,
               lng: p.lng,
               radiusM: p.radiusM,
@@ -626,12 +658,14 @@ const MASTERS: Array<{ key: SheetKey; rows: (d: ImportData) => number; run: Mast
           const employee = await x.idOf('employees', 'code', a.employeeCode)
           const project = await x.idOf('projects', 'code', a.projectCode)
           const costCenter = await x.idOf('cost-centers', 'code', a.costCenterCode)
-          const where: Where = { and: [{ employee: { equals: employee } }, project ? { project: { equals: project } } : { costCenter: { equals: costCenter } }] }
+          const site = await x.idOf('sites', 'code', a.siteCode)
+          const loc: Where = project ? { project: { equals: project } } : costCenter ? { costCenter: { equals: costCenter } } : { site: { equals: site } }
+          const where: Where = { and: [{ employee: { equals: employee } }, loc] }
           return x.upsert(
             'team-assignments',
             where,
             { roleInProject: a.role, startDate: dateValue(a.startDate), endDate: dateValue(a.endDate) },
-            { createOnly: { employee, project, costCenter }, dates: ['startDate', 'endDate'] },
+            { createOnly: { employee, project, costCenter, site }, dates: ['startDate', 'endDate'] },
           )
         })
         tally(rep, r.action)
@@ -654,6 +688,7 @@ const MASTERS: Array<{ key: SheetKey; rows: (d: ImportData) => number; run: Mast
             openingBalance: a.openingBalance,
             openingBalanceDate: x.data.settings!.goLiveDate,
             odooJournalCode: a.odooJournalCode,
+            site: a.siteCode ? await x.idOf('sites', 'code', a.siteCode) : undefined,
             active: a.active,
           })
         })
@@ -766,7 +801,7 @@ async function executePass(payload: Payload, data: ImportData, users: Map<string
   const kcFollowUp: KeycloakFollowUpRow[] = []
   const cutovers: CutoverReport[] = []
   const steps: Array<{ key: SheetKey | 'cutover'; sheet: string; rows: number; run: (x: Exec, rep: MasterReport) => Promise<void> }> = [
-    ...MASTERS.filter((m) => data.present.includes(m.key)).map((m) => ({ key: m.key, sheet: SHEET_BY_KEY[m.key].name, rows: m.rows(data), run: (x: Exec, rep: MasterReport) => m.run(x, rep, issues) })),
+    ...MASTERS.filter((m) => (m.when ? m.when(data) : data.present.includes(m.key))).map((m) => ({ key: m.key, sheet: SHEET_BY_KEY[m.key].name, rows: m.rows(data), run: (x: Exec, rep: MasterReport) => m.run(x, rep, issues) })),
     {
       key: 'cutover' as const,
       sheet: SHEET_BY_KEY.pengaturan.name,
