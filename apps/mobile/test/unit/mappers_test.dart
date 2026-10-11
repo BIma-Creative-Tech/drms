@@ -46,8 +46,8 @@ void main() {
     final p = userProfileFromJson(meJson(roles: ['pk-staff', 'pk-pm', 'unknown-role']));
     expect(p.roles, {Role.staff, Role.pm});
     expect(p.homeKind, HomeKind.pm);
-    // ADR 0013: PM monitors only (no inbox); without `capabilities` (cached pre-E1 /me) the roles decide.
-    expect(p.hasApprovalInbox, isFalse);
+    // ADR 0021: the PM project approves first (inbox); without `capabilities` (cached pre-E1 /me) the roles decide.
+    expect(p.hasApprovalInbox, isTrue);
     expect(p.hasTeamMonitor, isTrue);
     expect(p.timezone, 'Asia/Makassar');
     expect(p.imageTargets.receiptsMaxPx, 2000);

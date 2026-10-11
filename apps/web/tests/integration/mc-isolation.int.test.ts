@@ -7,7 +7,7 @@ import { closePeriod, postEntry } from '@/domain/cash/ledger'
 import { DEFAULT_SEED_DATA } from '@/seed/data'
 import { seed } from '@/seed/seed'
 
-import { api, asUser, draftBody, makeFlowUser, makeWorld, png, sysCreate, upload, type FlowUser, type World } from './flow-world'
+import { adr0013Fallback, api, asUser, draftBody, makeFlowUser, makeWorld, png, sysCreate, upload, type FlowUser, type World } from './flow-world'
 import { addMembership, auditRows, companyId, getTestPayload, sqlAs, sqlError, withContext } from './helpers'
 
 /**
@@ -46,6 +46,7 @@ beforeAll(async () => {
   const { uoms, banks, ...drms } = DEFAULT_SEED_DATA
   await seed(p, { uoms, banks, companies: [drms, { ...drms, company: { name: 'PT Contoh Satu', shortCode: 'CS1', timezone: 'Asia/Makassar' }, vehicles: [] }] })
   b = await companyId('CS1')
+  await adr0013Fallback([a, b])
   const inB = async (collection: CollectionSlug, code: string) =>
     (await p.find({ collection, where: { and: [{ company: { equals: b } }, { code: { equals: code } }] }, limit: 1, depth: 0, overrideAccess: true /* SYSTEM-READ: fixture */ })).docs[0]!.id as number
   B.catKsm = await inB('expense-categories', 'KSM')

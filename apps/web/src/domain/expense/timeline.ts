@@ -6,7 +6,7 @@
  */
 import { ROLE_LABELS, type Role } from '@/access/roles'
 
-import { isDecisionSnapshot } from './decision'
+import { DIREKTUR_ROLE, isDecisionSnapshot } from './decision'
 import { ACK_DELEGATE_ROLE, type ApprovalSnapshot } from './rules'
 import { statusLabel, type RequestStatus, type RequestType } from './types'
 
@@ -24,13 +24,13 @@ const SIDE_ANCHOR: Partial<Record<RequestStatus, RequestStatus>> = {
 
 export type TimelineStep = { status: RequestStatus; label: string; state: 'done' | 'current' | 'todo' }
 
-export function timeline(type: RequestType, status: RequestStatus, opts: { skipAck?: boolean } = {}): TimelineStep[] {
+export function timeline(type: RequestType, status: RequestStatus, opts: { skipAck?: boolean; snapshot?: LabelSnapshot | null; currentLevel?: number | null } = {}): TimelineStep[] {
   const path = STATUS_PATH[type].filter((s) => !(opts.skipAck && s === 'pending_ack'))
   const anchor = SIDE_ANCHOR[status] ?? status
   const idx = path.indexOf(anchor)
   const steps: TimelineStep[] = path.map((s, i) => ({
     status: s,
-    label: statusLabel(type, s),
+    label: requestStatusLabel(type, s, opts.snapshot ?? null, opts.currentLevel ?? null),
     state: idx < 0 ? (i === 0 ? 'done' : 'todo') : i < idx ? 'done' : i === idx ? 'current' : 'todo',
   }))
   if (SIDE_ANCHOR[status] && idx >= 0) {
@@ -45,6 +45,52 @@ export function timeline(type: RequestType, status: RequestStatus, opts: { skipA
 }
 
 export type NextActor = { who: string; what: string }
+
+type LabelSnapshot = Pick<ApprovalSnapshot, 'acknowledgeBy' | 'acknowledgeRole' | 'steps' | 'decisionRoles'>
+
+/** ADR 0021: PM project → Direktur snapshot ("Diketahui" = Persetujuan PM). */
+export function isPmFlow(snap: Pick<ApprovalSnapshot, 'acknowledgeBy' | 'decisionRoles'> | null | undefined): boolean {
+  return !!snap && snap.acknowledgeBy === 'scope_manager' && isDecisionSnapshot(snap)
+}
+
+/** Approval step of `level` decided by the Direktur role (ADR 0021 step 2). */
+function direkturStep(snap: LabelSnapshot | null | undefined, level: number): boolean {
+  const step = snap?.steps.find((s) => s.level === level)
+  return !!step && step.approverUserId === null && step.approverRole === DIREKTUR_ROLE
+}
+
+/** Label of the "Diketahui" step (inbox, panel): ADR 0021 "Persetujuan PM", ADR 0013 "Persetujuan Direktur (Diketahui)". */
+export function ackStepLabel(snap: LabelSnapshot | null | undefined): string {
+  if (isPmFlow(snap)) return 'Persetujuan PM'
+  return isDecisionSnapshot(snap) ? 'Persetujuan Direktur (Diketahui)' : 'Diketahui Oleh'
+}
+
+/** Label of approval level `level` (ADR 0021: the Direktur step → "Persetujuan Direktur"). */
+export function approvalStepLabel(snap: LabelSnapshot | null | undefined, level: number): string {
+  return direkturStep(snap, level) ? 'Persetujuan Direktur' : `Approval level ${level}`
+}
+
+/** Who decides the step (APK decision sheet texts): ADR 0021 PM / Direktur, ADR 0013 Direktur / Finance. */
+export function decisionByOf(snap: LabelSnapshot | null | undefined, step: 'acknowledge' | 'approve', level: number): 'pm' | 'direktur' | 'finance' | 'other' {
+  if (step === 'acknowledge') return isPmFlow(snap) ? 'pm' : snap?.acknowledgeBy === 'role' && snap.acknowledgeRole === DIREKTUR_ROLE ? 'direktur' : snap?.acknowledgeBy === 'role' && snap.acknowledgeRole === 'pk-finance' ? 'finance' : 'other'
+  const s = snap?.steps.find((x) => x.level === level)
+  if (!s || s.approverUserId !== null) return 'other'
+  return s.approverRole === DIREKTUR_ROLE ? 'direktur' : s.approverRole === 'pk-finance' ? 'finance' : 'other'
+}
+
+/**
+ * Status label of a request for its snapshot (ADR 0021): "Menunggu persetujuan PM" (PM project step),
+ * "Menunggu persetujuan Direktur" (a Direktur approval level); ADR 0013 snapshots keep "Menunggu
+ * Diketahui (Direktur)"; everything else = `statusLabel`.
+ */
+export function requestStatusLabel(type: RequestType, status: RequestStatus, snap: LabelSnapshot | null | undefined, currentLevel: number | null | undefined): string {
+  if (status === 'pending_ack' && snap) {
+    if (isPmFlow(snap)) return 'Menunggu persetujuan PM'
+    if (isDecisionSnapshot(snap) && snap.acknowledgeBy === 'role' && snap.acknowledgeRole === DIREKTUR_ROLE) return 'Menunggu Diketahui (Direktur)'
+  }
+  if (status === 'pending_approval' && snap && isPmFlow(snap) && direkturStep(snap, currentLevel || 1)) return 'Menunggu persetujuan Direktur'
+  return statusLabel(type, status)
+}
 
 type SnapshotLike = Pick<ApprovalSnapshot, 'acknowledge' | 'acknowledgeBy' | 'acknowledgerUserId' | 'acknowledgeRole' | 'steps' | 'acknowledgeDelegatedTo' | 'decisionRoles'>
 
@@ -72,6 +118,11 @@ export function nextActor(input: {
       if (snapshot?.acknowledgeDelegatedTo) {
         // F2e: PM / penanggung jawab is a requester/creator (or missing) → delegated step.
         return { who: ROLE_LABELS[ACK_DELEGATE_ROLE[snapshot.acknowledgeDelegatedTo]], what: 'Diketahui (dilimpahkan): tandai "Diketahui" (atau tolak)' }
+      }
+      if (isPmFlow(snapshot)) {
+        // ADR 0021: the PM project of the request (cost-center manager without a project) approves first.
+        const pm = user(snapshot?.acknowledgerUserId)
+        return { who: pm ? `${pm} (PM project)` : 'PM project', what: 'setujui sebagai PM project atau tolak' }
       }
       const who =
         user(snapshot?.acknowledgerUserId) ??

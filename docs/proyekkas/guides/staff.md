@@ -64,8 +64,10 @@ Pilih jenisnya dulu:
 ![TODO screenshot: editor pengajuan dengan baris item dan Total (pratinjau)](img/staff-editor.png)
 
 Setelah diajukan, nomor dokumen terbit (mis. `229/PB-DRMS/01/X/2026`; kode di tengah = kode PT, tiap PT punya
-nomor urut sendiri) dan status **Menunggu Diketahui (Direktur)**. Yang memutuskan adalah Direktur dan Finance **di PT
-pengajuan itu**.
+nomor urut sendiri) dan status **Menunggu persetujuan PM**. Yang memutuskan adalah **PM project** (PM di data project;
+untuk pusat biaya: manajernya) lalu **Direktur** **di PT pengajuan itu**; setelah itu Finance mentransfer (sejak 10 Okt
+2026). Pengajuan yang diajukan sebelumnya tetap diputuskan Direktur lalu Finance. Bila muncul "Project ini belum punya
+PM. Hubungi Admin untuk mengisi PM project.", minta Admin mengisi PM project itu.
 Pantau di **Pengajuan Saya** atau lonceng. Pemohon lain yang Anda cantumkan diberi tahu saat pengajuan dibuat atas
 namanya, diajukan, dan ditarik kembali; di web lonceng **Notifikasi** ada di bar atas, kanan.
 
@@ -75,7 +77,7 @@ biaya." · "Rekening tujuan wajib dipilih." · "Data master belum tersedia…" (
 
 ## 3. Mengubah, membatalkan, mengajukan ulang
 
-- **Belum diputuskan Direktur?** Buka pengajuan → **Tarik kembali ke Draft** (isi alasan) → **Ubah & ajukan di HP**
+- **Belum ada keputusan (PM/Direktur)?** Buka pengajuan → **Tarik kembali ke Draft** (isi alasan) → **Ubah & ajukan di HP**
   → Ajukan lagi. Nomor tetap sama.
 - **Tidak jadi?** **Batalkan pengajuan** (isi alasan). Setelah ada keputusan, pembatalan hanya oleh Finance/Direktur.
 - **Ditolak?** Baca alasannya → **Ajukan ulang (buat draft baru)** → perbaiki → Ajukan. Baris, pemohon, rekening,
@@ -112,8 +114,9 @@ APK hal ini tidak terjadi.
 
 ## Pertanyaan umum
 
-- *Kenapa Direktur belum menyetujui?* Notifikasi ke HP belum aktif (Direktur melihatnya di aplikasi/web, dan lewat
-  email bila diaktifkan Admin); ingatkan langsung bila mendesak.
+- *Kenapa belum disetujui?* Lihat **Giliran** di detail pengajuan (PM project atau Direktur). Notifikasi ke HP belum
+  aktif (PM/Direktur melihatnya di aplikasi/web, dan lewat email bila diaktifkan Admin); ingatkan langsung bila
+  mendesak.
 - *Nota berbeda sedikit dengan total baris?* Tidak apa-apa; sistem memberi tanda (flag) untuk diperiksa Finance.
 - *Muncul flag "Nota ganda dalam pengajuan ini"?* Foto yang sama, atau nomor nota + toko yang sama, diunggah dua kali
   di pengajuan yang sama. Hapus salah satunya bila memang dobel; bila memang satu nota untuk dua baris, biarkan —

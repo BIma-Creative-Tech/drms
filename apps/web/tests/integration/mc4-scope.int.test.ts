@@ -10,7 +10,7 @@ import { resetRateLimits } from '@/lib/rate-limit'
 import { DEFAULT_SEED_DATA } from '@/seed/data'
 import { seed } from '@/seed/seed'
 
-import { api, asUser, makeFlowUser, png, sysCreate, upload, type FlowUser, type Res } from './flow-world'
+import { adr0013Fallback, api, asUser, makeFlowUser, png, sysCreate, upload, type FlowUser, type Res } from './flow-world'
 import { addMembership, companyId, getTestPayload, installFakeKeycloak, sqlAs, withContext } from './helpers'
 
 /**
@@ -103,6 +103,7 @@ beforeAll(async () => {
   B = await companyId('SK2')
   C = await companyId('SK3')
   D = await companyId('SK4')
+  await adr0013Fallback([A, B, C, D])
   for (const c of [B, C, D]) await p.update({ collection: 'companies', id: c, data: { active: true, changeReason: 'uji aturan skop PT' } as never, overrideAccess: true /* SYSTEM-WRITE: fixture */ })
 
   const fA = await ptFixture(A, 'SKA')

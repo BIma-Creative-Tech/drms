@@ -219,6 +219,7 @@ ExpenseDetail detailFromJson(Json j) {
             acknowledgeBy: _strN(rule['acknowledgeBy']),
             acknowledgeRole: _strN(rule['acknowledgeRole']),
             decisionRoles: [for (final r in _list(rule['decisionRoles'])) '$r'],
+            selfApproval: _strN(rule['selfApproval']),
             skipped: [
               for (final k in _list(rule['skipped']))
                 if (_map(k) case final m?)

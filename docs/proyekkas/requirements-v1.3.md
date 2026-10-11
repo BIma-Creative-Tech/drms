@@ -32,6 +32,8 @@ nomor dokumen di contoh **fiktif**.
 | 8 | Sparepart **tanpa stok** (dicatat sebagai teks di laporan). | 3 | [Keputusan owner 2026-10-09] |
 | 9 | Flag per PT **Laporan lapangan aktif** (default mati). | 6 | [Keputusan owner 2026-10-09] |
 | 10 | User story US-60…US-68. | 7 | — |
+| 11 | **Alur approval pengajuan biaya:** Staff → **PM project** → **Direktur** → Finance transfer (Finance tidak lagi menyetujui). Menggantikan alur Direktur → Finance (ADR 0013) untuk pengajuan baru; Addendum RAB tetap. | 9 | [Keputusan owner 2026-10-10] |
+| 12 | Pengecualian sempit G1 **"Pengajuan Direktur — diajukan oleh PM"** (`direktur_via_pm`). User story US-69, US-70. | 9 | [Keputusan owner 2026-10-10] |
 
 ---
 
@@ -141,3 +143,53 @@ hanya untuk dokumen baru v1.3 (ADR 0020 §2).
 | Q-FR-4 | **PT LAS** dan **PT Teams** sudah ada di aplikasi, atau perlu dibuat Admin grup? | Persiapan P3 (konstruksi). |
 | Q-FR-5 | Ketersediaan % memakai jam yang dilaporkan (kerja + standby + breakdown). Perlu **jam rencana per hari** di kontrak (mis. 10 jam/hari) sebagai pembagi? | Rumus ketersediaan. |
 | Q-FR-6 | Batas tanggal laporan mundur (sekarang 14 hari) cukup untuk lokasi tanpa sinyal? | Validasi APK offline. |
+
+---
+
+## 9. Alur approval pengajuan biaya: PM project → Direktur [Diubah v1.3 atas §7 T1/T2 v1.1 dan ADR 0013] [Keputusan owner 2026-10-10]
+
+Sumber: rencana owner "Approval pengajuan biaya: Staff → PM project → Direktur → Finance transfer" (2026-10-10),
+`adr/0021-approval-pm-direktur.md`. Berlaku untuk pengajuan yang diajukan **setelah** Admin mengubah aturan approval
+PT; pengajuan yang sudah diajukan tetap memakai snapshot lamanya (Direktur → Finance, US-34).
+
+### 9.1 Alur
+
+| Langkah | Status | Siapa | Tindakan |
+|---|---|---|---|
+| 1 | Draft | Pemohon (Staff/PM/…) | Kirim pengajuan |
+| 2 | **Menunggu persetujuan PM** (`pending_ack`) | **PM project** = PM di data project (`projects.pm`); pengajuan pusat biaya: manajer pusat biaya | **Setujui** (tanda tangan) / **Tolak** (alasan wajib) |
+| 3 | **Menunggu persetujuan Direktur** (`pending_approval`, level 1) | Direktur PT | **Setujui** / **Tolak** (alasan wajib) |
+| 4 | Disetujui | Finance | Uang Muka: Antrian Transfer. Reimburse: verifikasi nota (bukan approval) lalu transfer |
+
+- Setiap penolakan: status Ditolak, alasan tersimpan, pemohon/pembuat dan PM tim diberi tahu ("Ditolak: {nomor}").
+- Notifikasi berurutan: PM saat diajukan; Direktur setelah PM menyetujui; Finance setelah Direktur menyetujui.
+- Konfigurasi oleh Admin per PT (Keuangan → Aturan approval): "Default — PM project lalu Direktur (semua nominal)" =
+  Diketahui Oleh **Wajib**, Pengisi **PM project**, Level 1 **Direktur**. Aturan Addendum RAB **tidak berubah**
+  (Direktur → Finance); pengisi "PM project" ditolak untuk Addendum RAB.
+- Kekurangan LPJ di atas nominal + toleransi (ADR 0019) disetujui ulang dengan alur yang sama: PM → Direktur.
+
+### 9.2 Aturan
+
+| # | Aturan |
+|---|---|
+| R-1 | Hanya PM **pengajuan itu** (yang tercatat saat pengajuan dikirim) yang memutuskan langkah PM. PM project lain atau PM tim yang bukan PM project → ditolak 403 dan tercatat `access_denied`. Pergantian PM project sesudah pengajuan dikirim tidak memindahkan pengajuan itu. |
+| R-2 | Project tanpa PM (atau PM bukan pengguna aktif PT) → pengiriman ditolak 409 "Project ini belum punya PM. Hubungi Admin untuk mengisi PM project." Pusat biaya tanpa manajer → 409 dengan pesan pusat biaya. |
+| R-3 | G1 tetap: pemohon/pembuat tidak memutuskan pengajuannya sendiri. PM yang mengajukan untuk dirinya sendiri (atau membuat pengajuan untuk Staff) → langkah PM dilewati dan tercatat "(tidak berlaku — pemohon)"; Direktur yang memutuskan. |
+| R-4 | Langkah Direktur **tidak pernah dilewati diam-diam**: bila satu-satunya Direktur adalah pemohon/pembuat → 409 "Pengajuan untuk Direktur dibuat oleh PM project. …". |
+| R-5 | **Pengecualian sempit G1** (`direktur_via_pm`): pengajuan untuk Direktur dibuat oleh PM project pengajuan itu (pembuat = PM, setiap pemohon memegang peran Direktur di PT itu) → PM menyetujui sebagai PM project, lalu Direktur menyetujui. **Utamakan Direktur lain (owner 2026-10-11):** bila PT punya Direktur aktif lain yang bukan pemohon, hanya Direktur lain itu yang memutuskan (`direktur_via_pm`; Direktur pemohon ditolak 403); Direktur pemohon boleh menyetujui sendiri hanya bila ia satu-satunya Direktur PT (`direktur_via_pm_self`). Ditetapkan server saat pengajuan dikirim, dicatat di snapshot, kolom `g1_exception`, audit `approval_policy_exception`, panel web dan PDF ("Pengajuan Direktur — diajukan oleh PM (kebijakan owner 2026-10-10)"). Database hanya mengizinkan dua posisi itu. |
+| R-6 | Finance tidak lagi memberi approval pada pengajuan baru; Finance tetap verifikasi nota Reimburse, transfer, LPJ. |
+
+### 9.3 Matriks akses [Diubah v1.3 atas §4 v1.1 baris "Approval pengajuan"]
+
+| Modul | Staff | PM | Finance | Direktur | Admin |
+|---|---|---|---|---|---|
+| Persetujuan pengajuan biaya (alur baru) | – | **A** (hanya pengajuan di mana ia PM project) | – (transfer) | **A** | – |
+| Persetujuan pengajuan biaya (snapshot ADR 0013) | – | – | A | A | – |
+| Addendum RAB | – | C (tim) | A | A | – |
+
+### 9.4 User story
+
+| ID | User story | Kriteria penerimaan |
+|---|---|---|
+| US-69 | Sebagai PM project, saya ingin menyetujui atau menolak pengajuan biaya di project saya sebelum Direktur, agar pengeluaran tim saya terkendali. | Pengajuan Staff → status "Menunggu persetujuan PM", PM diberi tahu; PM Setujui → "Menunggu persetujuan Direktur", Direktur diberi tahu; Direktur Setujui → Disetujui → Finance transfer (Reimburse: verifikasi nota dulu). Tolak di PM atau Direktur → Ditolak, alasan tampil, pemohon + PM diberi tahu. PM lain → 403 + audit. Project tanpa PM → 409. PM pemohon → langkah PM dilewati. Kekurangan LPJ: PM → Direktur. Addendum RAB tetap Direktur → Finance. Pengajuan lama (snapshot Direktur → Finance) tetap selesai dengan alur lama. |
+| US-70 | Sebagai Direktur, saya ingin pengajuan biaya untuk saya dibuat oleh PM project dan tetap melalui persetujuan PM lalu Direktur, dengan pengecualian G1 yang tercatat. | Dibuat PM untuk Direktur → PM menyetujui, Direktur menyetujui; pengecualian tercatat (audit, PDF, panel). Direktur membuat sendiri tanpa Direktur lain → 409. Database menolak keputusan pembuat/pemohon tanpa pengecualian. |

@@ -21,14 +21,16 @@ type UserShape = {
  * APK UI hints from a role set (ADR 0013 E1 / E4) — the same rule for the legacy top-level object
  * (roles of the selected PTs) and for each PT in `companies[]` (roles IN that PT). Decisions
  * (approval inbox) = Direktur (pk-owner) or Finance; the PM monitors the team list; progress
- * reports are created by the PM (team projects) or the Direktur. The server guards stay authoritative.
+ * reports are created by the PM (team projects) or the Direktur. ADR 0021: the PM approves its project's
+ * requests first, so the approval inbox is offered to the PM too. The server guards stay authoritative.
  */
 export function capabilitiesOf(roles: readonly Role[], opts: { fieldReportsEnabled?: boolean } = {}) {
   // FR1 (ADR 0020 §2): Staff (assigned projects), PM (team) and Direktur report in the field when the
   // PT's flag is on; WHICH report a project offers follows its kind (projects.kind, masters/units).
   const field = opts.fieldReportsEnabled === true && roles.some((r) => r === 'pk-staff' || r === 'pk-pm' || r === 'pk-owner')
   return {
-    approvalInbox: roles.some((r) => r === 'pk-owner' || r === 'pk-finance'),
+    // ADR 0021: the PM project approves first ("Persetujuan PM") — the inbox lists only its own steps
+    approvalInbox: roles.some((r) => r === 'pk-owner' || r === 'pk-finance' || r === 'pk-pm'),
     teamMonitor: roles.includes('pk-pm'),
     progressReportCreate: roles.some((r) => r === 'pk-pm' || r === 'pk-owner'),
     serviceReportCreate: field,

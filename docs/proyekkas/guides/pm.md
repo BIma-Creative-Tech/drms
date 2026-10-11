@@ -1,19 +1,49 @@
 # Panduan Project Manager (PM)
 
-Sebagai PM Anda: **memantau** pengajuan tim (tidak menyetujui — persetujuan oleh Direktur lalu Finance), membuat
-**laporan progress harian**, mengurus **absensi tim**, mengelola **penugasan tim**, dan mengajukan **addendum RAB**.
+Sebagai PM Anda: **menyetujui pengajuan biaya** pada project yang Anda pegang (langkah pertama, sebelum Direktur —
+berlaku sejak 10 Okt 2026, ADR 0021), **memantau** pengajuan tim, membuat **laporan progress harian**, mengurus
+**absensi tim**, mengelola **penugasan tim**, dan mengajukan **addendum RAB**.
 Anda juga bisa mengajukan dana untuk diri sendiri (lihat [panduan Staff](staff.md) §2–4). Baca juga
 [Hal umum](README.md#hal-umum-untuk-semua-peran).
 
 ![TODO screenshot: Beranda APK PM dengan Pantauan tim](img/pm-beranda.png)
 
-## 1. Memantau pengajuan tim
+## 1. Menyetujui pengajuan (Persetujuan PM)
 
-- **APK:** tab **Pengajuan** → **Tim**. Tertulis "Pantauan tim — hanya lihat". Buka untuk melihat status dan
-  **Giliran** (Direktur atau Finance). Tidak ada tombol Setujui/Tolak — itu memang disengaja.
-- **Web:** Beranda → kartu **Pengajuan tim menunggu keputusan** (jumlah yang menunggu **Direktur** dan **Finance**,
-  umur tertua) dan tabel di bawahnya (nomor, pemohon, project, **Menunggu** Direktur/Finance, lama dalam hari,
-  terlama dulu). Juga kartu pengajuan tim bulan ini, LPJ tim, realisasi anggaran, dan menu **Keuangan → Pengajuan
+Alur pengajuan biaya baru: **Staff mengajukan → Anda (PM project) → Direktur → Finance mentransfer**. Finance tidak
+lagi menyetujui. Yang masuk ke Anda hanya pengajuan pada project di mana Anda tercatat sebagai **PM** di data project
+(untuk pengajuan pusat biaya: bila Anda **manajer** pusat biaya itu). Status pengajuan: **Menunggu persetujuan PM**.
+
+**Di HP (APK 0.4.1):**
+1. Beranda → **Menunggu Persetujuan**. Kartu bertanda **"Persetujuan PM"**: total, **Dampak anggaran**, jumlah flag.
+2. Buka → periksa baris, nota, flag → **Setujui sebagai PM project** → pilih **Pakai tanda tangan profil** atau
+   **Tanda tangan di layar** → **Konfirmasi**. Pengajuan diteruskan ke Direktur.
+3. Atau **Tolak** dengan alasan (minimal 3 karakter). Pemohon diberi tahu "Ditolak: …" beserta alasannya.
+
+**Di web:** **Persetujuan** → buka **Rincian baris, nota & flag** → **Setujui** (konfirmasi "Setujui … sebagai PM
+project?") / **Tolak** (alasan wajib). Tanda tangan profil dipakai otomatis — unggah dulu di **Profil & tanda
+tangan**. Beranda PM juga punya kartu **Menunggu tindakan saya**.
+
+- **Notifikasi:** "Persetujuan PM: {nomor}" (lonceng; email bila Admin menyalakan email persetujuan). Untuk pengajuan
+  yang menunggu Anda, notifikasi "Pengajuan tim: …" tidak dikirim lagi (sudah diwakili notifikasi persetujuan).
+- **Pengajuan Anda sendiri** (Anda pemohon) atau pengajuan yang **Anda buat untuk Staff**: langkah PM dilewati
+  otomatis dan tercatat "(tidak berlaku — pemohon)"; Direktur yang memutuskan.
+- **Pengajuan untuk Direktur** dibuat oleh Anda (PM project) atas nama Direktur: buat pengajuan dengan Direktur sebagai
+  pemohon. Anda menyetujui sebagai PM project, lalu Direktur menyetujui. Ini pengecualian yang disetujui owner
+  (10 Okt 2026) dan tercatat di panel dan PDF: "Pengajuan Direktur — diajukan oleh PM (kebijakan owner 2026-10-10)".
+- **Kekurangan LPJ** di atas nominal disetujui + toleransi: persetujuan ulang juga lewat Anda dulu, lalu Direktur —
+  di **web → Persetujuan → Kekurangan LPJ di atas nominal disetujui**.
+- PM lain (termasuk PM penugasan tim yang bukan PM di data project) tidak bisa memutuskan: sistem menolak dan
+  mencatatnya. Pengajuan yang diajukan **sebelum** aturan baru berlaku tetap diputuskan Direktur lalu Finance.
+- Addendum RAB tidak berubah (Direktur lalu Finance).
+
+## 1a. Memantau pengajuan tim
+
+- **APK:** tab **Pengajuan** → **Tim**. Buka untuk melihat status dan **Giliran** (PM, Direktur atau Finance).
+  Tombol Setujui/Tolak hanya muncul bila giliran Anda sebagai PM project.
+- **Web:** Beranda → kartu **Pengajuan tim menunggu keputusan** (jumlah yang menunggu **PM**, **Direktur** dan
+  **Finance**, umur tertua) dan tabel di bawahnya (nomor, pemohon, project, **Menunggu** PM/Direktur/Finance, lama
+  dalam hari, terlama dulu). Juga kartu pengajuan tim bulan ini, LPJ tim, realisasi anggaran, dan menu **Keuangan → Pengajuan
   biaya**. Buka pengajuan untuk melihat baris, foto nota, dan flag per baris (bagian **Rincian untuk pemeriksa**).
 - **Notifikasi (lonceng, sejak 8 Okt 2026):** untuk pengajuan pada **project** yang Anda pegang (PM project atau
   penugasan tim sebagai PM) Anda diberi tahu saat pengajuan **diajukan** ("Pengajuan tim: …"), **ditolak**,

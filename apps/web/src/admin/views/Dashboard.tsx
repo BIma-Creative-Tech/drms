@@ -453,7 +453,7 @@ function InboxCard({ id, items, count, span, i }: { id: string; items: InboxItem
       ),
     },
     { key: 'scope', label: 'Project / pusat biaya', sec: true, cell: (r) => r.scopeName || '—' },
-    { key: 'step', label: 'Tindakan', cell: (r) => <StatusPill tone={r.overWarn ? 'warn' : 'wait'} label={`${r.step === 'approve' ? 'Approval' : 'Diketahui'}${r.overWarn ? ' · anggaran' : ''}`} /> },
+    { key: 'step', label: 'Tindakan', cell: (r) => <StatusPill tone={r.overWarn ? 'warn' : 'wait'} label={`${r.stepLabel ?? (r.step === 'approve' ? 'Approval' : 'Diketahui')}${r.overWarn ? ' · anggaran' : ''}`} /> },
     { key: 'amt', label: 'Grand total', num: true, cell: (r) => rp(r.grandTotal) },
   ]
   return (
@@ -466,7 +466,7 @@ function InboxCard({ id, items, count, span, i }: { id: string; items: InboxItem
 type TeamWaiting = Awaited<ReturnType<typeof pmDashboard>>['teamWaiting']
 type TeamWaitingRow = TeamWaiting['items'][number]
 
-/** S3e (US-17, S-01): PM monitoring card — team requests waiting for the Direktur / Finance, oldest first. */
+/** S3e (US-17, S-01): PM card — team requests waiting for the PM project / Direktur / Finance, oldest first. */
 function TeamWaitingCard({ id, data, span, i }: { id: string; data: TeamWaiting; span: 6 | 7 | 12; i: number }) {
   const cols: Col<TeamWaitingRow>[] = [
     {
@@ -483,7 +483,7 @@ function TeamWaitingCard({ id, data, span, i }: { id: string; data: TeamWaiting;
       ),
     },
     { key: 'scope', label: 'Project / pusat biaya', sec: true, cell: (r) => r.scopeName || '—' },
-    { key: 'who', label: 'Menunggu', cell: (r) => <StatusPill tone={r.days !== null && r.days > 3 ? 'warn' : 'wait'} label={r.waitingFor === 'direktur' ? 'Direktur' : 'Finance'} /> },
+    { key: 'who', label: 'Menunggu', cell: (r) => <StatusPill tone={r.days !== null && r.days > 3 ? 'warn' : 'wait'} label={r.waitingFor === 'pm' ? 'PM project' : r.waitingFor === 'direktur' ? 'Direktur' : 'Finance'} /> },
     { key: 'age', label: 'Lama', num: true, cell: (r) => (r.days === null ? '—' : <span title={r.submittedDate ?? ''}>{r.days} hari</span>) },
     { key: 'amt', label: 'Grand total', num: true, cell: (r) => rp(r.grandTotal) },
   ]
@@ -491,12 +491,12 @@ function TeamWaitingCard({ id, data, span, i }: { id: string; data: TeamWaiting;
     <Card
       id={id}
       title="Pengajuan tim menunggu keputusan"
-      sub={data.count > data.items.length ? `${data.items.length} dari ${data.count}, terlama dulu · Anda memantau, Direktur/Finance memutuskan` : 'Terlama dulu · Anda memantau, Direktur/Finance memutuskan'}
+      sub={data.count > data.items.length ? `${data.items.length} dari ${data.count}, terlama dulu · PM project lalu Direktur memutuskan` : 'Terlama dulu · PM project lalu Direktur memutuskan'}
       span={span}
       i={i}
       action={{ href: statusList(WAITING), label: 'Lihat semua' }}
     >
-      <DataTable id={id} cols={cols} rows={data.items} rowKey={(r) => r.id} caption="Pengajuan tim yang menunggu Direktur atau Finance" empty={<EmptyState text="Tidak ada pengajuan tim yang menunggu keputusan. ✓" />} />
+      <DataTable id={id} cols={cols} rows={data.items} rowKey={(r) => r.id} caption="Pengajuan tim yang menunggu PM project, Direktur atau Finance" empty={<EmptyState text="Tidak ada pengajuan tim yang menunggu keputusan. ✓" />} />
     </Card>
   )
 }
@@ -1004,20 +1004,20 @@ async function Pm({ req }: { req: PayloadRequest }) {
       </p>
       <Bento label="Ringkasan PM">
         <KpiRow>
-          {/* S3e (US-17, ADR 0013, S-01): the PM monitors — who the team's requests are waiting for (never "me"). */}
+          {/* S3e (US-17, S-01): who the team's requests are waiting for (ADR 0021: the PM project first, then the Direktur). */}
           <KpiTile
             id="team-waiting"
             icon="inbox"
             label="Pengajuan tim menunggu keputusan"
             value={`${d.teamWaiting.count}`}
-            title={`${d.teamWaiting.count} pengajuan tim menunggu Direktur/Finance`}
+            title={`${d.teamWaiting.count} pengajuan tim menunggu PM/Direktur/Finance`}
             kpi="k10-team"
             href={statusList(WAITING)}
             more="Lihat pengajuan"
             i={0}
           >
             <p className="pk-kpi-x">
-              Direktur <b>{d.teamWaiting.direktur}</b> · Finance <b>{d.teamWaiting.finance}</b>
+              PM <b>{d.teamWaiting.pm}</b> · Direktur <b>{d.teamWaiting.direktur}</b> · Finance <b>{d.teamWaiting.finance}</b>
             </p>
             <p className="pk-kpi-x">{d.teamWaiting.oldestDays !== null ? `tertua ${d.teamWaiting.oldestDays} hari` : 'Tidak ada yang menunggu ✓'}</p>
           </KpiTile>
@@ -1062,6 +1062,8 @@ async function Pm({ req }: { req: PayloadRequest }) {
         <TrendCard id="pm-trend" rows={v.requestTrend} title="Tren pengajuan tim" sub="Jumlah pengajuan per bulan, 6 bulan" span={7} i={6} />
         <CategoryCard id="pm-categories" c={v.categories} span={5} i={7} sub="Dicairkan 6 bulan terakhir, tim Anda" />
 
+        {/* ADR 0021: the PM project approves its requests first ("Persetujuan PM") */}
+        <InboxCard id="pm-inbox" items={v.inbox} count={d.waitingForMe} span={12} i={8} />
         <TeamWaitingCard id="pm-waiting" data={d.teamWaiting} span={6} i={8} />
         <Card id="team-latest" title="Pengajuan tim terbaru" span={6} i={9} action={{ href: ER, label: 'Lihat semua' }}>
           <DataTable<R>

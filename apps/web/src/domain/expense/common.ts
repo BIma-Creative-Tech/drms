@@ -8,7 +8,7 @@ import { DEFAULT_TZ, localDateInTz } from '@/lib/time'
 import { getRequestTx } from '@/lib/tx'
 
 import { allowedActions, FINANCE_SELF_GUARDED, mayPerform, targets, type Action, type ActorContext } from './state'
-import { lacksDecisionRole } from './decision'
+import { DIREKTUR_VIA_PM_SELF, isDecisionSnapshot, isSelfApproval, lacksDecisionRole } from './decision'
 import { SHARED_FLAG_WHERE } from './flag-visibility'
 import { matchesAcknowledger, matchesStep, type ApprovalSnapshot } from './rules'
 import { BUDGET_COMMITTED, type RequestStatus, type RequestType } from './types'
@@ -60,6 +60,8 @@ export type RequestDoc = {
   resubmitOf?: unknown
   cancelReason?: string | null
   rejectReason?: string | null
+  /** ADR 0021: `direktur_via_pm` when the narrow G1 exception applies (system-set at submit). */
+  g1Exception?: string | null
   clientUuid?: string | null
   /** F4: content revision of an editable request (sync `rev` / `base_rev`). */
   syncRev?: number | null
@@ -158,19 +160,45 @@ export async function actorContext(req: PayloadRequest, doc: RequestDoc): Promis
   const caller = { id: uid, roles }
   const acknowledged = rows.some((r) => r.position === 'diketahui' && r.decision === 'acknowledged')
   const step = snap?.steps.find((s) => s.level === (doc.currentLevel ?? 0))
+  const isCreator = relId(doc.createdBy) === uid
+  const isRequester = emp !== undefined && ids(doc.requesters).includes(emp)
+  const isAcknowledger =
+    !!snap && !acknowledged && (doc.status === 'pending_ack' || (doc.status === 'pending_approval' && snap.acknowledge === 'optional')) && matchesAcknowledger(snap, caller)
+  const matchesCurrentStep = doc.status === 'pending_approval' && matchesStep(step, caller)
   return {
     type: doc.type,
     status: doc.status,
     roles,
-    isCreator: relId(doc.createdBy) === uid,
-    isRequester: emp !== undefined && ids(doc.requesters).includes(emp),
+    isCreator,
+    isRequester,
     hasDecision: decisions.length > 0,
-    isAcknowledger:
-      !!snap && !acknowledged && (doc.status === 'pending_ack' || (doc.status === 'pending_approval' && snap.acknowledge === 'optional')) && matchesAcknowledger(snap, caller),
-    matchesCurrentStep: doc.status === 'pending_approval' && matchesStep(step, caller),
+    isAcknowledger,
+    matchesCurrentStep,
     alreadyDecided: decisions.some((r) => relId(r.actor) === uid && (r.position === 'diketahui' || r.position === 'approval')),
-    lacksDecisionRole: lacksDecisionRole(snap, roles),
+    pmFlow: snap?.acknowledgeBy === 'scope_manager' && isDecisionSnapshot(snap),
+    // ADR 0021: the PM project decides ONLY the request where he is the snapshot's acknowledger.
+    lacksDecisionRole: lacksDecisionRole(snap, roles) && !isAcknowledger,
+    selfApprovalAllowed: selfApprovalAllowed(doc, { isCreator, isRequester, isAcknowledger, matchesCurrentStep }),
   }
+}
+
+/**
+ * ADR 0021 narrow G1 exception (`direktur_via_pm`, owner decision 2026-10-10): on a Direktur's request
+ * filed by the PM project, the creator PM may decide "Diketahui" (Persetujuan PM); a requester Direktur
+ * may decide the approval step only under `direktur_via_pm_self` (he is the PT's only Direktur, owner
+ * answer 2026-10-11 "Utamakan Direktur lain") — nothing else. Both the snapshot and the request column must
+ * carry the exception (the DB trigger checks the column).
+ */
+export function selfApprovalAllowed(
+  doc: Pick<RequestDoc, 'status' | 'approvalSnapshot'> & { g1Exception?: string | null },
+  c: { isCreator: boolean; isRequester: boolean; isAcknowledger: boolean; matchesCurrentStep: boolean },
+): boolean {
+  const exc = doc.approvalSnapshot?.selfApproval
+  if (!isSelfApproval(exc) || doc.g1Exception !== exc) return false
+  if (doc.status === 'pending_ack') return c.isCreator && !c.isRequester && c.isAcknowledger
+  // owner answer 2026-10-11: the requester Direktur decides only when he is the PT's only Direktur
+  if (doc.status === 'pending_approval') return exc === DIREKTUR_VIA_PM_SELF && c.isRequester && !c.isCreator && c.matchesCurrentStep
+  return false
 }
 
 /**
@@ -215,10 +243,17 @@ export async function requireActionAudited(req: PayloadRequest, ctx: ActorContex
         docNo: doc.docNo ?? undefined,
         field: action,
         newValue: { action, status: ctx.status, roles: ctx.roles },
-        reason: 'hanya Direktur/Finance yang memberi keputusan (ADR 0013; PM hanya memantau)',
+        reason: ctx.pmFlow
+          ? 'hanya PM project pengajuan ini atau Direktur yang memberi keputusan (ADR 0021)'
+          : 'hanya Direktur/Finance yang memberi keputusan (ADR 0013; PM hanya memantau)',
       },
     ])
-    fail(403, 'Hanya Direktur atau Finance yang dapat menyetujui atau menolak pengajuan. PM hanya memantau.')
+    fail(
+      403,
+      ctx.pmFlow
+        ? 'Hanya PM project dari pengajuan ini atau Direktur yang dapat menyetujui atau menolak pengajuan ini.'
+        : 'Hanya Direktur atau Finance yang dapat menyetujui atau menolak pengajuan. PM hanya memantau.',
+    )
   }
   try {
     requireAction(ctx, action)

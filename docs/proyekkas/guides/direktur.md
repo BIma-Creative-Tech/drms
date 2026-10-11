@@ -1,20 +1,27 @@
 # Panduan Direktur
 
-Sebagai Direktur Anda: **menyetujui pengajuan pada langkah "Diketahui"** (langkah pertama, sebelum Finance),
+Sebagai Direktur Anda: **menyetujui pengajuan setelah PM project** (sejak 10 Okt 2026, ADR 0021; persetujuan Anda
+yang terakhir — sesudahnya Finance hanya mentransfer),
 menyetujui **addendum RAB**, mengelola **project dan tahapan**, **membuka kembali tutup buku**, dan memantau
 **dashboard** serta **laporan progress**. Direktur tidak membuat pengajuan dan tidak mencatat kas. Baca juga
 [Hal umum](README.md#hal-umum-untuk-semua-peran).
 
-## 1. Menyetujui pengajuan ("Diketahui")
+## 1. Menyetujui pengajuan (Persetujuan Direktur)
 
-Setiap pengajuan baru menunggu Anda dulu (**Menunggu Diketahui (Direktur)**), lalu diteruskan ke Finance.
+Alur pengajuan baru: **Staff → PM project → Anda → Finance mentransfer**. Setelah PM project menyetujui, pengajuan
+menunggu Anda (**Menunggu persetujuan Direktur**) dan Anda diberi tahu. Persetujuan Anda adalah keputusan terakhir:
+Uang Muka masuk Antrian Transfer, Reimburse ke verifikasi nota Finance lalu transfer. Finance tidak lagi menyetujui.
+
+Pengajuan yang diajukan **sebelum** Admin mengubah aturan approval tetap memakai alur lama: Anda menyetujui pada
+langkah "Diketahui" (**Menunggu Diketahui (Direktur)**), lalu Finance memberi Approval.
 
 **Di HP (paling cepat):**
 1. Beranda → **Menunggu Persetujuan** (angka = jumlah menunggu, termasuk addendum).
-2. Kartu bertanda **"Persetujuan Direktur (Diketahui)"**: lihat total, **Dampak anggaran** (sekarang → bila
+2. Kartu bertanda **"Persetujuan Direktur"** (alur lama: **"Persetujuan Direktur (Diketahui)"**): lihat total, **Dampak anggaran** (sekarang → bila
    disetujui; merah + ikon peringatan bila melewati batas), jumlah flag.
-3. Buka → periksa baris, nota, flag → **Setujui** → pilih **Pakai tanda tangan profil** atau **Tanda tangan di
-   layar** → **Konfirmasi**. Atau **Tolak** dengan alasan.
+3. Buka → periksa baris, nota, flag → **Setujui** (tertulis "diteruskan ke Finance untuk transfer") → pilih **Pakai
+   tanda tangan profil** atau **Tanda tangan di layar** → **Konfirmasi**. Atau **Tolak** dengan alasan; pemohon dan PM
+   diberi tahu.
 
 **Di web:** **Persetujuan** → buka **Rincian baris, nota & flag** di bawah pengajuan (baris item, foto nota, flag per
 baris) → **Setujui** / **Tolak** (tanda tangan profil dipakai otomatis; alasan tolak minimal 3 karakter). Pengajuan
@@ -27,8 +34,14 @@ baru juga muncul di lonceng **Notifikasi** (bar atas, kanan) dan — bila Admin 
   satu PT tampil (tombol PT di bar atas web / di Beranda APK), setiap baris diberi kode PT (web: kolom **PT** +
   tulisan **Menampilkan PT: …**). Keputusan selalu memakai peran Anda **di PT pengajuan**, dan warna merah Dampak
   anggaran memakai ambang PT itu.
-- Anda tidak bisa menyetujui pengajuan di mana Anda tercantum sebagai pemohon. Bila Anda satu-satunya Direktur,
-  langkah "Diketahui" dilewati otomatis dan tercatat "(tidak berlaku — pemohon)".
+- **Pengajuan untuk Anda sendiri** dibuat oleh **PM project** atas nama Anda (Anda sebagai pemohon). PM menyetujui
+  sebagai PM project, lalu **Direktur lain** di PT itu yang menyetujui (Anda tidak bisa menyetujui pengajuan Anda
+  sendiri selama ada Direktur lain). Hanya bila Anda satu-satunya Direktur PT, Anda sendiri yang menyetujui. Ini pengecualian G1 yang diputuskan owner
+  (10 Okt 2026), tercatat di Audit Log, panel dan PDF: "Pengajuan Direktur — diajukan oleh PM (kebijakan owner
+  2026-10-10)". Bila pengajuan untuk Anda dibuat orang lain (mis. Finance/Admin) dan tidak ada Direktur lain di PT itu,
+  pengiriman ditolak "Pengajuan untuk Direktur dibuat oleh PM project." — minta PM project membuatkannya.
+- Pada pengajuan alur lama Anda tidak bisa menyetujui pengajuan di mana Anda tercantum sebagai pemohon; bila Anda
+  satu-satunya Direktur, langkah "Diketahui" dilewati dan tercatat "(tidak berlaku — pemohon)".
 - Bila Anda berhalangan, semua pengajuan tertahan. Sepakati pengganti dengan Admin (aturan approval) sebelum cuti.
 - Notifikasi ke HP terkunci belum aktif — buka aplikasi beberapa kali sehari (atau minta Admin menyalakan email
   persetujuan).
@@ -44,8 +57,9 @@ Bila nota LPJ Uang Muka membuat total transfer melebihi nominal yang Anda setuju
 *Toleransi kekurangan LPJ*, default 10%), Finance tidak bisa langsung mentransfer kekurangannya. Finance mengajukan
 **persetujuan kekurangan** dengan alasan; Anda mendapat notifikasi dan keputusan ada di **web → Persetujuan →
 Kekurangan LPJ di atas nominal disetujui** (nominal disetujui, kekurangan, total transfer baru, batas tanpa
-persetujuan, alasan Finance) → **Setujui** atau **Tolak** (alasan wajib). Setelah Anda, Finance juga menyetujui
-(sama seperti pengajuan). Belum tersedia di APK — notifikasi di HP membuka detail pengajuan, keputusannya di web.
+persetujuan, alasan Finance) → **Setujui** atau **Tolak** (alasan wajib). Alurnya sama seperti pengajuan: PM project
+menyetujui dulu, lalu Anda; setelah Anda, kekurangan dapat ditransfer Finance. (Alur mengikuti aturan approval yang
+berlaku saat Finance mengajukan persetujuan kekurangan.) Belum tersedia di APK — notifikasi di HP membuka detail pengajuan, keputusannya di web.
 Toleransi diubah oleh Admin/Direktur di data PT (Pengaturan operasional).
 
 ## 3. Dashboard

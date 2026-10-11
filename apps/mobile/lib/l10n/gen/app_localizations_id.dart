@@ -817,7 +817,7 @@ class AppLocalizationsId extends AppLocalizations {
 
   @override
   String get decisionForbidden =>
-      'Anda tidak dapat memutuskan pengajuan ini. Hanya Direktur (Diketahui) dan Finance (Approval) yang memutuskan, dan hanya pada gilirannya. Data dimuat ulang.';
+      'Anda tidak dapat memutuskan pengajuan ini. Hanya PM project pengajuan ini, Direktur dan Finance yang memutuskan, masing-masing hanya pada gilirannya. Data dimuat ulang.';
 
   @override
   String get decisionTitleAcknowledgeDirektur => 'Setujui sebagai Direktur (Diketahui)';
@@ -828,6 +828,28 @@ class AppLocalizationsId extends AppLocalizations {
 
   @override
   String get actionAcknowledgeDirektur => 'Setujui (Diketahui)';
+
+  @override
+  String get decisionTitleAcknowledgePm => 'Setujui sebagai PM project';
+
+  @override
+  String get decisionHintPm => 'Pengajuan diteruskan ke Direktur.';
+
+  @override
+  String get decisionTitleApproveDirektur => 'Setujui sebagai Direktur';
+
+  @override
+  String get decisionHintDirekturFinal => 'Pengajuan diteruskan ke Finance untuk transfer.';
+
+  @override
+  String get actionAcknowledgePm => 'Setujui';
+
+  @override
+  String get direkturViaPmNote => 'Pengajuan Direktur — diajukan oleh PM (kebijakan owner 2026-10-10)';
+
+  @override
+  String get direkturViaPmSelfNote =>
+      'Pengajuan Direktur — diajukan oleh PM; disetujui Direktur pemohon karena satu-satunya Direktur PT (kebijakan owner 2026-10-10)';
 
   @override
   String get historyTitle => 'Riwayat';
@@ -896,7 +918,8 @@ class AppLocalizationsId extends AppLocalizations {
   String get tabTeam => 'Tim';
 
   @override
-  String get teamReadOnlyHint => 'Pantauan tim — hanya lihat. Persetujuan dilakukan Direktur dan Finance.';
+  String get teamReadOnlyHint =>
+      'Pantauan tim — hanya lihat. Pengajuan yang menunggu persetujuan Anda sebagai PM project ada di menu Persetujuan.';
 
   @override
   String get teamNoScope => 'Anda belum menjadi PM project atau penanggung jawab pusat biaya.';

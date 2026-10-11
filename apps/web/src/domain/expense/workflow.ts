@@ -28,7 +28,7 @@ import {
 import { fromDocLines, validateContent } from './drafts'
 import { assertEveryLineHasReceipt, recomputeFlags } from './receipts'
 import { ACK_DELEGATE_ROLE, budgetImpact, lastLevel, type AckDelegate, type ApprovalSnapshot } from './rules'
-import { auditSkipped, selectAndSnapshot, writeSnapshot } from './snapshot'
+import { auditSelfApproval, auditSkipped, selectAndSnapshot, writeSnapshot } from './snapshot'
 import type { ApprovalDecision, ApprovalPosition } from './types'
 
 export { selectAndSnapshot, writeSnapshot }
@@ -199,6 +199,8 @@ export async function submit(req: PayloadRequest, id: number, opts: SubmitOption
     bankSnapshot: { bankName: bankName ?? null, accountNo: acc.accountNo, accountHolder: acc.accountHolder },
     approvalRule: rule.id,
     approvalSnapshot: snapshot,
+    // ADR 0021: the narrow G1 exception is fixed at submit (DB guard: changes only at the freeze point).
+    g1Exception: snapshot.selfApproval ?? null,
     approvalCycle: cycle,
     currentLevel: needsAck ? 0 : 1,
   })
@@ -218,6 +220,7 @@ export async function submit(req: PayloadRequest, id: number, opts: SubmitOption
     })
   }
   await auditSkipped(req, updated, snapshot)
+  await auditSelfApproval(req, updated, snapshot)
   if (needsAck && snapshot.acknowledgeDelegatedTo) {
     // F2e: the delegation is part of the submit's audit trail (who was skipped, to whom, why).
     await writeAudit(req, [
@@ -253,8 +256,9 @@ export async function cancel(req: PayloadRequest, id: number, reason: string): P
 }
 
 /**
- * POST …/acknowledge — "Diketahui Oleh" (US-42). ADR 0013: on new requests this is the Direktur's
- * approval ("Setujui"); PM/Staff/Admin are refused and audited (`requireActionAudited`).
+ * POST …/acknowledge — "Diketahui Oleh" (US-42). ADR 0013: the Direktur's approval ("Setujui");
+ * ADR 0021: on PM project → Direktur snapshots the approval of the request's PM project ("Persetujuan
+ * PM"). Anyone else is refused and audited (`requireActionAudited`).
  */
 export async function acknowledge(req: PayloadRequest, id: number, opts: SignOpts = {}): Promise<RequestDoc> {
   const visible = await loadVisible(req, id, { lock: true })

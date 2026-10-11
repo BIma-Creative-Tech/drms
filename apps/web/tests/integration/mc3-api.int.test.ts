@@ -8,7 +8,7 @@ import { resetRateLimits } from '@/lib/rate-limit'
 import { DEFAULT_SEED_DATA } from '@/seed/data'
 import { seed } from '@/seed/seed'
 
-import { api, draftBody, makeFlowUser, makeWorld, sysCreate, type FlowUser, type Res, type World } from './flow-world'
+import { adr0013Fallback, api, draftBody, makeFlowUser, makeWorld, sysCreate, type FlowUser, type Res, type World } from './flow-world'
 import { accessToken, addMembership, companyId, getTestPayload, http, installLocalJwks, registerDevice, sqlAs, updateCompany, type TestUser } from './helpers'
 
 /**
@@ -106,6 +106,7 @@ beforeAll(async () => {
   })
   B = await companyId('CS6')
   C = await companyId('CS7')
+  await adr0013Fallback([A, B, C])
   for (const code of ['CS6', 'CS7']) await updateCompany({ active: true, changeReason: 'uji MC3' }, code)
   await updateCompany({ defaultGeofenceRadiusM: 321 }, 'CS6')
   const inPt = async (company: number, collection: CollectionSlug, code: string) =>
@@ -194,7 +195,8 @@ describe('MC3 — GET /me companies[] + deprecated single-PT fields', () => {
     expect(me.companies.map((c: Body) => c.id)).toEqual([A, B, C])
     const [a, b, c] = me.companies as Body[]
     expect(a).toMatchObject({ roles: ['pk-staff'], employeeId: X.empTriA, capabilities: { approvalInbox: false, teamMonitor: false, progressReportCreate: false } })
-    expect(b).toMatchObject({ code: 'CS6', roles: ['pk-pm', 'pk-staff'], employeeId: X.empTriB, capabilities: { approvalInbox: false, teamMonitor: true, progressReportCreate: true } })
+    // ADR 0021: the PM approves its project's requests first → approval inbox
+    expect(b).toMatchObject({ code: 'CS6', roles: ['pk-pm', 'pk-staff'], employeeId: X.empTriB, capabilities: { approvalInbox: true, teamMonitor: true, progressReportCreate: true } })
     expect(b!.settings.defaultGeofenceRadiusM).toBe(321)
     expect(c).toMatchObject({ code: 'CS7', roles: ['pk-finance'], employeeId: null, employee: null, capabilities: { approvalInbox: true, teamMonitor: false, progressReportCreate: false } })
     expect(me.activeCompanyIds).toEqual([A, B, C])

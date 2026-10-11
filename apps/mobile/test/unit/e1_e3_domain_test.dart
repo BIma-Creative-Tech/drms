@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:proyekkas/features/auth/domain/user_profile.dart';
 import 'package:proyekkas/features/dashboard/domain/dashboard.dart';
 import 'package:proyekkas/features/dashboard/presentation/charts.dart';
 import 'package:proyekkas/features/expense/data/expense_mappers.dart';
@@ -82,6 +83,85 @@ void main() {
       expect(d.approvalRule!.decisionFlow, isFalse);
       expect(buildTimeline(d)[2].title, 'Diketahui Oleh (PM / penanggung jawab)');
       expect(currentTurn(d), 'Diketahui Oleh (PM / penanggung jawab)');
+    });
+  });
+
+  group('ADR 0021: PM project → Direktur, Finance transfers', () {
+    test('PM step is current: "Persetujuan PM" before the Direktur (scope_manager checked before decisionFlow)', () {
+      final d = detailFromJson(
+        pmDetailJson(
+          approvals: [
+            {'id': 1, 'cycle': 1, 'position': 'diajukan', 'level': 0, 'actorName': 'Budi', 'decision': 'signed'},
+            {'id': 2, 'cycle': 1, 'position': 'dibuat', 'level': 0, 'actorName': 'Budi', 'decision': 'signed'},
+          ],
+        ),
+      );
+      expect(d.approvalRule!.decisionFlow, isTrue);
+      expect(d.approvalRule!.pmApproval, isTrue);
+      expect(d.approvalRule!.legacyPmAcknowledge, isTrue);
+      expect(d.statusLabel, 'Menunggu persetujuan PM');
+      final steps = buildTimeline(d);
+      expect(steps.map((s) => s.title), ['Diajukan Oleh', 'Dibuat Oleh', 'Persetujuan PM', 'Persetujuan Direktur']);
+      expect(steps[2].state, TurnState.current);
+      expect(steps[3].state, TurnState.pending);
+      expect(currentTurn(d), 'PM project — persetujuan PM');
+      expect(acknowledgeTitle(d.approvalRule), 'Persetujuan PM');
+    });
+
+    test('after the PM: the Direktur has the (final) turn, no Finance approval level', () {
+      final d = detailFromJson(pmDetailJson(status: 'pending_approval', allowed: const ['approve', 'reject']));
+      final rule = d.approvalRule!;
+      expect(rule.roleOfLevel(1), 'pk-owner');
+      expect(rule.lastLevel, 1);
+      expect(currentTurn(d), 'Persetujuan Direktur');
+      expect(buildTimeline(d).where((s) => s.title.contains('Finance')), isEmpty);
+    });
+
+    test('PM requester: PM step skipped "(tidak berlaku — pemohon)", Direktur decides', () {
+      final d = detailFromJson(
+        pmDetailJson(
+          status: 'pending_approval',
+          allowed: const ['approve', 'reject'],
+          rule: pmRuleJson(
+            skipped: [
+              {
+                'position': 'diketahui',
+                'level': 0,
+                'role': null,
+                'userId': 31,
+                'reason': 'PM project adalah pemohon/pembuat',
+              },
+            ],
+          ),
+        ),
+      );
+      final ack = buildTimeline(d).firstWhere((s) => s.title == 'Persetujuan PM');
+      expect(ack.state, TurnState.skipped);
+      expect(ack.note, skippedNote);
+    });
+
+    test('Direktur request filed by the PM: selfApproval parsed (exception note)', () {
+      final d = detailFromJson(pmDetailJson(rule: pmRuleJson(selfApproval: 'direktur_via_pm')));
+      expect(d.approvalRule!.direkturViaPm, isTrue);
+      expect(d.approvalRule!.direkturViaPmSelf, isFalse);
+      final self = detailFromJson(pmDetailJson(rule: pmRuleJson(selfApproval: 'direktur_via_pm_self')));
+      expect(self.approvalRule!.direkturViaPm, isTrue);
+      expect(self.approvalRule!.direkturViaPmSelf, isTrue);
+      expect(detailFromJson(pmDetailJson()).approvalRule!.direkturViaPm, isFalse);
+    });
+
+    test('old servers / old snapshots: no selfApproval, ADR 0013 labels unchanged', () {
+      final d = detailFromJson(e1DetailJson());
+      expect(d.approvalRule!.pmApproval, isFalse);
+      expect(d.approvalRule!.selfApproval, isNull);
+      expect(acknowledgeTitle(d.approvalRule), 'Diketahui (Direktur)');
+    });
+
+    test('pk-pm gets the approval inbox (fallback for a cached /me without capabilities)', () {
+      expect(Capabilities.fromRoles({Role.pm}).approvalInbox, isTrue);
+      expect(Capabilities.fromRoles({Role.staff}).approvalInbox, isFalse);
+      expect(Capabilities.fromRoles({Role.owner}).approvalInbox, isTrue);
+      expect(Capabilities.fromRoles({Role.finance}).approvalInbox, isTrue);
     });
   });
 
@@ -250,7 +330,8 @@ void main() {
     test('history rows parse; labels and old → new follow the web Riwayat view', () {
       final rows = [for (final i in historyJson()['items'] as List) historyFromJson(i as Map<String, dynamic>)];
       expect(rows, hasLength(3));
-      expect(historyActionLabels[rows[2].action], 'disetujui Direktur (Diketahui)');
+      expect(historyActionLabels[rows[2].action], 'disetujui (Diketahui: PM/Direktur)');
+      expect(historyActionLabels['approval_policy_exception'], 'pengecualian kebijakan (Direktur via PM)');
       expect(historyChange(rows[0]), 'draft → pending_ack');
       expect(historyChange(rows[1]), '677000 → 676876');
       expect(historyDocLabels[rows[1].docType], 'Nota');

@@ -104,6 +104,23 @@ class _DetailBody extends StatelessWidget {
             subtitle: Text(currentTurn(d), key: const Key('turn-text')),
           ),
         ),
+        // ADR 0021: narrow G1 exception, recorded on the request (audit + PDF + panel).
+        if (d.approvalRule?.direkturViaPm ?? false)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: Row(
+              children: [
+                const Icon(Icons.info_outline, size: 18),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    d.approvalRule!.direkturViaPmSelf ? t.direkturViaPmSelfNote : t.direkturViaPmNote,
+                    key: const Key('direktur-via-pm-note'),
+                  ),
+                ),
+              ],
+            ),
+          ),
         row(t.grandTotal, formatRupiah(d.grandTotal)),
         if (d.approvedAmount != null) row(t.approvedAmount, formatRupiah(d.approvedAmount!)),
         row(t.scopeLabel, scope == null ? '-' : '${scope.code ?? ''} ${scope.name ?? ''}'.trim()),
@@ -247,6 +264,7 @@ class _DecisionBar extends ConsumerWidget {
       ref.invalidate(inboxProvider);
     }
 
+    final pm = detail.approvalRule?.pmApproval ?? false;
     final direktur = detail.approvalRule?.decisionFlow ?? false;
 
     return SafeArea(
@@ -271,7 +289,9 @@ class _DecisionBar extends ConsumerWidget {
                   onPressed: () => open(canApprove ? Decision.approve : Decision.acknowledge),
                   icon: const Icon(Icons.check),
                   label: Text(
-                    canApprove ? t.actionApprove : (direktur ? t.actionAcknowledgeDirektur : t.actionAcknowledge),
+                    canApprove
+                        ? t.actionApprove
+                        : (pm ? t.actionAcknowledgePm : (direktur ? t.actionAcknowledgeDirektur : t.actionAcknowledge)),
                   ),
                 ),
               ),

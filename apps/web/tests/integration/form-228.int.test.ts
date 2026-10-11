@@ -63,12 +63,22 @@ beforeAll(async () => {
   }
   finance = await makeFlowUser(['pk-finance'], 'finance-228', null)
   m.cc = await idOf('cost-centers', 'code', FORM_228.costCenterCode)
-  // The seeded default rule (ADR 0013: Diketahui = Direktur, then Finance, every amount) scoped to OPS-PB so that
+  // An ADR 0013 rule (Diketahui = Direktur, then Finance, every amount) scoped to OPS-PB so that
   // generic rules created by other test files sharing the DB cannot win the tie.
   const def = (await p.find({ collection: 'approval-rules', where: { and: [{ company: { equals: await companyId() } }, { name: { equals: DEFAULT_APPROVAL_RULES[0].name } }] }, limit: 1, depth: 0, overrideAccess: true /* SYSTEM-READ: fixture */ })).docs[0]!
   await p.create({
     collection: 'approval-rules',
-    data: { ...DEFAULT_APPROVAL_RULES[0], steps: [...DEFAULT_APPROVAL_RULES[0].steps], name: 'Form 228 — default untuk OPS-PB', costCenter: m.cc, priority: 1 } as never,
+    // The paper form 228 was approved under ADR 0013 (Diketahui = Direktur, Approval = Finance): the golden fixture keeps
+    // that rule shape explicitly (the seeded default is PM project → Direktur since ADR 0021).
+    data: {
+      ...DEFAULT_APPROVAL_RULES[0],
+      acknowledgeBy: 'role',
+      acknowledgeRole: 'pk-owner',
+      steps: [{ level: 1, approverRole: 'pk-finance' }],
+      name: 'Form 228 — default untuk OPS-PB',
+      costCenter: m.cc,
+      priority: 1,
+    } as never,
     overrideAccess: true, // SYSTEM-WRITE: fixture
   })
   expect(def.acknowledge).toBe('required')

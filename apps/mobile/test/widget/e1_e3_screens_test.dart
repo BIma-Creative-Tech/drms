@@ -167,14 +167,17 @@ void main() {
       expect(find.byKey(const Key('kpi-by-company')), findsNothing);
     });
 
-    testWidgets('PM home: no inbox, team monitor instead', (tester) async {
+    testWidgets('PM home: approval inbox (ADR 0021: PM project approves first) + team monitor', (tester) async {
       await pumpScreen(
         tester,
         const HomeScreen(),
         auth: signedIn({Role.pm}),
-        overrides: [pmDashboardProvider.overrideWith((ref) async => PmDashboard.fromJson(pmDashboardJson()))],
+        overrides: [
+          inboxProvider.overrideWith((ref) async => inboxPage()),
+          pmDashboardProvider.overrideWith((ref) async => PmDashboard.fromJson(pmDashboardJson())),
+        ],
       );
-      expect(find.byKey(const Key('home-inbox')), findsNothing);
+      expect(find.byKey(const Key('home-inbox')), findsOneWidget);
       expect(find.byKey(const Key('kpi-pm')), findsOneWidget);
       expect(find.text('Pantauan tim'), findsOneWidget);
       expect(find.text('2 menunggu persetujuan'), findsOneWidget);
@@ -242,6 +245,29 @@ void main() {
       );
       expect(find.text('Persetujuan Direktur (Diketahui)'), findsOneWidget);
     });
+
+    testWidgets('PM inbox card: server stepLabel "Persetujuan PM"', (tester) async {
+      await pumpScreen(
+        tester,
+        const InboxScreen(),
+        auth: signedIn({Role.pm}),
+        overrides: [
+          inboxProvider.overrideWith(
+            (ref) async => inboxPage(
+              extra: {
+                'step': 'acknowledge',
+                'level': null,
+                'stepLabel': 'Persetujuan PM',
+                'decisionFlow': true,
+                'decisionBy': 'pm',
+                'finalStep': false,
+              },
+            ),
+          ),
+        ],
+      );
+      expect(find.text('Persetujuan PM'), findsOneWidget);
+    });
   });
 
   group('E1 decisions', () {
@@ -278,7 +304,78 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(api.decisions, 1);
-      expect(find.textContaining('Hanya Direktur (Diketahui) dan Finance (Approval)'), findsOneWidget);
+      expect(find.textContaining('Hanya PM project pengajuan ini, Direktur dan Finance'), findsOneWidget);
+    });
+  });
+
+  group('ADR 0021 decisions (PM project → Direktur)', () {
+    testWidgets('detail for the PM: "Setujui", timeline "Persetujuan PM" → "Persetujuan Direktur"', (tester) async {
+      await pumpScreen(
+        tester,
+        const RequestDetailScreen(id: 42),
+        auth: signedIn({Role.pm}),
+        overrides: [
+          requestDetailProvider(42).overrideWith((ref) async => detailFromJson(pmDetailJson())),
+          receiptThumbProvider(901).overrideWith((ref) => Future.error(const NetworkException())),
+        ],
+      );
+      expect(find.byKey(const Key('action-acknowledge')), findsOneWidget);
+      expect(find.text('Setujui'), findsOneWidget);
+      expect(find.text('Persetujuan PM'), findsOneWidget);
+      expect(find.text('Persetujuan Direktur'), findsWidgets);
+      expect(find.text('Menunggu persetujuan PM'), findsOneWidget);
+      expect(tester.widget<Text>(find.byKey(const Key('turn-text'))).data, 'PM project — persetujuan PM');
+      expect(find.byKey(const Key('direktur-via-pm-note')), findsNothing);
+    });
+
+    testWidgets('decision sheet for the PM: "Setujui sebagai PM project", forwarded to the Direktur', (tester) async {
+      await pumpScreen(
+        tester,
+        Scaffold(
+          body: DecisionSheet(detail: detailFromJson(pmDetailJson()), decision: Decision.acknowledge),
+        ),
+      );
+      expect(find.text('Setujui sebagai PM project'), findsWidgets);
+      expect(find.byKey(const Key('decision-hint-pm')), findsOneWidget);
+      expect(find.text('Pengajuan diteruskan ke Direktur.'), findsOneWidget);
+      expect(find.byKey(const Key('decision-hint-direktur')), findsNothing);
+    });
+
+    testWidgets('decision sheet for the Direktur (final step): forwarded to Finance for transfer', (tester) async {
+      await pumpScreen(
+        tester,
+        Scaffold(
+          body: DecisionSheet(
+            detail: detailFromJson(pmDetailJson(status: 'pending_approval', allowed: const ['approve', 'reject'])),
+            decision: Decision.approve,
+          ),
+        ),
+      );
+      expect(find.text('Setujui sebagai Direktur'), findsWidgets);
+      expect(find.byKey(const Key('decision-hint-direktur-final')), findsOneWidget);
+      expect(find.text('Pengajuan diteruskan ke Finance untuk transfer.'), findsOneWidget);
+    });
+
+    testWidgets('Direktur request filed by the PM: exception note on the detail', (tester) async {
+      await pumpScreen(
+        tester,
+        const RequestDetailScreen(id: 42),
+        auth: signedIn({Role.owner}),
+        overrides: [
+          requestDetailProvider(42).overrideWith(
+            (ref) async => detailFromJson(
+              pmDetailJson(
+                status: 'pending_approval',
+                allowed: const ['approve', 'reject'],
+                rule: pmRuleJson(selfApproval: 'direktur_via_pm'),
+              ),
+            ),
+          ),
+          receiptThumbProvider(901).overrideWith((ref) => Future.error(const NetworkException())),
+        ],
+      );
+      expect(find.byKey(const Key('direktur-via-pm-note')), findsOneWidget);
+      expect(find.text('Pengajuan Direktur — diajukan oleh PM (kebijakan owner 2026-10-10)'), findsOneWidget);
     });
   });
 
@@ -345,11 +442,11 @@ void main() {
         const HistoryScreen(id: 42),
         overrides: [expenseApiProvider.overrideWithValue(FakeExpenseApi())],
       );
-      expect(find.text('disetujui Direktur (Diketahui)'), findsOneWidget);
+      expect(find.text('disetujui (Diketahui: PM/Direktur)'), findsOneWidget);
       expect(find.text('677000 → 676876'), findsOneWidget);
       expect(find.text('Salah ketik'), findsOneWidget);
       expect(find.text('amount (baris 2)'), findsOneWidget);
-      final first = tester.getTopLeft(find.text('disetujui Direktur (Diketahui)')).dy;
+      final first = tester.getTopLeft(find.text('disetujui (Diketahui: PM/Direktur)')).dy;
       final last = tester.getTopLeft(find.text('status')).dy;
       expect(first, lessThan(last), reason: 'newest first');
     });

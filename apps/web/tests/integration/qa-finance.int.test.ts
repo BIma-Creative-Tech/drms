@@ -353,7 +353,10 @@ describe('QA-06 / ADR 0019 — shortfall above approved + tolerance needs re-app
     expect(inbox.status).toBe(200)
     expect(inbox.body.items.find((x: { requestId: number }) => x.requestId === id)).toMatchObject({ step: 'acknowledge', totalAfter: 850_000, approvedAmount: 750_000, limit: 825_000 })
     expect((await api('GET', '/api/v1/lpj-shortfall-approvals/inbox', w.users.finance)).body.items.some((x: { requestId: number }) => x.requestId === id)).toBe(false)
-    expect((await api('GET', '/api/v1/lpj-shortfall-approvals/inbox', w.users.pm)).status).toBe(403)
+    // ADR 0021: the inbox is open to every role (the PM project decides "Persetujuan PM"); this one is not the PM's step
+    const pmInbox = await api('GET', '/api/v1/lpj-shortfall-approvals/inbox', w.users.pm)
+    expect(pmInbox.status).toBe(200)
+    expect(pmInbox.body.items.some((x: { requestId: number }) => x.requestId === id)).toBe(false)
     expect((await api('POST', `${E}/${id}/lpj/shortfall-approval/acknowledge`, w.users.finance, {}, key())).status).toBe(403)
     expect((await api('POST', `${E}/${id}/lpj/shortfall-approval/approve`, w.users.finance, {}, key())).status).toBe(409)
     expect((await api('POST', `${E}/${id}/lpj/shortfall-approval/acknowledge`, w.users.pm, {}, key())).status).toBe(403)
@@ -470,7 +473,8 @@ describe('migration 20261008_090000_qa_finance_integrity', () => {
       await run('UPDATE settlements SET shortfall_approval_status = NULL, shortfall_approval_cycle = 0, shortfall_approval_snapshot = NULL, shortfall_approval_amount = NULL')
       await run('ALTER TABLE settlements ENABLE TRIGGER USER')
       await run('ALTER TABLE audit_logs DISABLE TRIGGER USER')
-      await run("DELETE FROM audit_logs WHERE action::text IN ('overdraft_confirmed', 'bank_unverified_confirmed')")
+      // + the value of a LATER migration (20261010_130000_approval_pm_direktur, ADR 0021): its rows would block the enum rebuild
+      await run("DELETE FROM audit_logs WHERE action::text IN ('overdraft_confirmed', 'bank_unverified_confirmed', 'approval_policy_exception')")
       await run('ALTER TABLE audit_logs ENABLE TRIGGER USER')
       await migrationDown({ db } as never)
       const cols = (await db.execute(sql.raw("SELECT count(*)::int AS n FROM information_schema.columns WHERE table_name = 'settlements' AND column_name LIKE 'shortfall_approval%'"))) as { rows: Array<{ n: number }> }

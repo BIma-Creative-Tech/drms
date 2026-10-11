@@ -31,29 +31,33 @@ describe('ADR 0013 labels + seeded default rule', () => {
   it('pk-owner is labelled "Direktur" (G1-1: no separate role)', () => {
     expect(ROLE_LABELS['pk-owner']).toBe('Direktur')
   })
-  it('default rule: Diketahui required by the Direktur role, then Finance level 1, all amounts; both seeded rules are valid', () => {
+  it('default rule (ADR 0021 supersedes the ADR 0013 default): PM project then Direktur level 1, all amounts; every seeded rule is valid', () => {
     const def = DEFAULT_APPROVAL_RULES[0]
-    expect(def).toMatchObject({ acknowledge: 'required', acknowledgeBy: 'role', acknowledgeRole: 'pk-owner', minAmount: 0, maxAmount: null, active: true })
-    expect(def.steps).toEqual([{ level: 1, approverRole: 'pk-finance' }])
-    for (const r of DEFAULT_APPROVAL_RULES) expect(ruleDecisionError({ ...r, steps: [...r.steps] }, rolesOf)).toBeNull()
+    expect(def).toMatchObject({ name: 'Default — PM project lalu Direktur (semua nominal)', acknowledge: 'required', acknowledgeBy: 'scope_manager', minAmount: 0, maxAmount: null, active: true })
+    expect(def.steps).toEqual([{ level: 1, approverRole: 'pk-owner' }])
+    for (const r of DEFAULT_APPROVAL_RULES) expect(ruleDecisionError({ ...r, steps: [...r.steps] }, rolesOf, r.docType)).toBeNull()
   })
 })
 
-describe('rule validation (AC-5): PM/Staff never decide, scope_manager retired, Direktur not optional', () => {
+describe('rule validation (AC-5): Staff/PM roles never decide, Direktur not optional; ADR 0021 scope_manager only for expense requests', () => {
   it.each([
     ['acknowledgeRole = pk-pm', rule({ acknowledgeRole: 'pk-pm' }), /Peran "Diketahui Oleh" harus Direktur atau Finance/],
     ['acknowledgeRole = pk-staff', rule({ acknowledgeRole: 'pk-staff' }), /Peran "Diketahui Oleh"/],
     ['approverRole = pk-pm', rule({ steps: [{ level: 1, approverRole: 'pk-pm' }] }), /Peran approver level 1/],
     ['approverRole = pk-admin', rule({ steps: [{ level: 1, approverRole: 'pk-admin' }] }), /Peran approver level 1/],
-    ['acknowledgeBy = scope_manager', rule({ acknowledgeBy: 'scope_manager', acknowledgeRole: null }), /PM hanya memantau/],
+    ['acknowledgeBy = scope_manager optional', rule({ acknowledgeBy: 'scope_manager', acknowledgeRole: null, acknowledge: 'optional' }), /PM project adalah persetujuan dan tidak boleh opsional/],
     ['optional Direktur', rule({ acknowledge: 'optional' }), /tidak boleh opsional/],
     ['named acknowledger is a PM', rule({ acknowledgeBy: 'user', acknowledgeRole: null, acknowledgeUser: PM }), /User "Diketahui Oleh" harus/],
     ['named approver is a PM', rule({ steps: [{ level: 1, approverUser: PM }] }), /Approver level 1 harus/],
   ])('%s → refused', (_n, r, msg) => {
     expect(ruleDecisionError(r, rolesOf)).toMatch(msg)
   })
-  it('valid shapes: Direktur→Finance, Finance→Finance by name, no Diketahui at all (acknowledgeBy ignored)', () => {
+  it('ADR 0021: scope_manager (PM project) is refused on an Addendum RAB rule', () => {
+    expect(ruleDecisionError(rule({ acknowledgeBy: 'scope_manager', acknowledgeRole: null }), rolesOf, 'budget_addendum')).toMatch(/hanya untuk aturan Pengajuan biaya/)
+  })
+  it('valid shapes: Direktur→Finance, Finance→Finance by name, PM project→Direktur, no Diketahui at all (acknowledgeBy ignored)', () => {
     expect(ruleDecisionError(rule(), rolesOf)).toBeNull()
+    expect(ruleDecisionError(rule({ acknowledgeBy: 'scope_manager', acknowledgeRole: null, steps: [{ level: 1, approverRole: 'pk-owner' }] }), rolesOf, 'expense_request')).toBeNull()
     expect(ruleDecisionError(rule({ acknowledgeBy: 'user', acknowledgeRole: null, acknowledgeUser: DIR_A, steps: [{ level: 1, approverUser: FIN_A }] }), rolesOf)).toBeNull()
     expect(ruleDecisionError(rule({ acknowledge: 'none', acknowledgeBy: 'scope_manager', acknowledgeRole: null }), rolesOf)).toBeNull()
   })

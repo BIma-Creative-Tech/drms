@@ -78,10 +78,45 @@ export async function makeFlowUser(roles: Role[], label: string, employee: numbe
 
 export type World = Awaited<ReturnType<typeof makeWorld>>
 
-export async function makeWorld(tag: string) {
+export const ADR0013_FALLBACK_RULE = 'Uji — Direktur lalu Finance (ADR 0013, fallback tes)'
+
+/**
+ * ADR 0021 made the SEEDED default "PM project → Direktur". Test files that are not about the approval flow
+ * (KPIs, PT isolation, …) drive requests through the ADR 0013 shape (Direktur "Diketahui" → Finance) on
+ * projects / cost centers without a world rule: this active, unscoped rule (priority 90 < seeded 100) keeps
+ * that shape in the given PTs. Idempotent. The ADR 0021 flow itself is covered by approval-pm-direktur.
+ */
+export async function adr0013Fallback(companies: number[]): Promise<void> {
+  const p = await getTestPayload()
+  for (const company of companies) {
+    const have = await p.find({ collection: 'approval-rules', where: { and: [{ company: { equals: company } }, { name: { equals: ADR0013_FALLBACK_RULE } }] }, limit: 1, depth: 0, overrideAccess: true /* SYSTEM-READ: fixture */ })
+    if (have.docs.length > 0) continue
+    await sysCreate('approval-rules', {
+      company,
+      name: ADR0013_FALLBACK_RULE,
+      docType: 'expense_request',
+      requestType: 'any',
+      minAmount: 0,
+      priority: 90,
+      acknowledge: 'required',
+      acknowledgeBy: 'role',
+      acknowledgeRole: 'pk-owner',
+      steps: [{ level: 1, approverRole: 'pk-finance' }],
+      active: true,
+    })
+  }
+}
+
+/**
+ * `rule`: 'direktur_finance' (default) = the ADR 0013 world rules (Direktur "Diketahui" → Finance levels) —
+ * kept so the old-snapshot flow stays covered; 'pm_direktur' = ADR 0021 (PM project "Diketahui" →
+ * Direktur level 1, Finance only transfers), one rule per scope for every amount.
+ */
+export async function makeWorld(tag: string, opts: { rule?: 'direktur_finance' | 'pm_direktur' } = {}) {
   const p = await getTestPayload()
   installFakeKeycloak()
   await seed(p) // masters, sequences, default approval rules (idempotent)
+  await adr0013Fallback([await companyId()])
   const code = (c: string) => `${tag}-${c}`
   // ADR 0016: masters are per PT (codes repeat across PTs) — the world lives in company #1 DRMS
   const drms = await companyId()
@@ -129,6 +164,26 @@ export async function makeWorld(tag: string) {
   const uom = { l: await ids('uoms', 'code', 'L'), bln: await ids('uoms', 'code', 'BLN'), kmr: await ids('uoms', 'code', 'KMR'), prs: await ids('uoms', 'code', 'PRS') }
   const vehicle = await sysCreate('vehicles', { plateNo: `KH ${1000 + (Date.now() % 8000)} ${tag.slice(0, 2).toUpperCase()}`, type: 'Hilux' })
   const cashInSource = await ids('cash-in-sources', 'code', 'MODAL')
+  if (opts.rule === 'pm_direktur') {
+    // World rules (priority 10, scoped), ADR 0021: "Diketahui" = the PM project (`pm`: projects.pm and the
+    // cost center's manager), then the Direktur (`owner`/`owner2`) level 1; Finance only transfers.
+    for (const scope of [{ project }, { costCenter }]) {
+      await sysCreate('approval-rules', {
+        docType: 'expense_request',
+        requestType: 'any',
+        priority: 10,
+        acknowledge: 'required',
+        acknowledgeBy: 'scope_manager',
+        acknowledgeRole: null,
+        active: true,
+        ...scope,
+        name: `${tag} rule PM→Direktur ${JSON.stringify(scope)}`,
+        minAmount: 0,
+        steps: [{ level: 1, approverRole: 'pk-owner' }],
+      })
+    }
+    return { emp, users, project, otherProject, costCenter, accA, accB, cashAccount, cat, uom, vehicle, cashInSource }
+  }
   // World rules (priority 10, scoped), ADR 0013: "Diketahui" = Direktur (pk-owner, `owner`/`owner2`)
   // approval, then Finance level 1; > 10 juta: two Finance levels (`finance` + `finance2`, Q-31 example).
   const ruleBase = { docType: 'expense_request', requestType: 'any', priority: 10, acknowledge: 'required', acknowledgeBy: 'role', acknowledgeRole: 'pk-owner', active: true }

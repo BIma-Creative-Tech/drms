@@ -36,7 +36,7 @@ const decision = (path: 'acknowledge' | 'approve') =>
   v1({
     path: `/expense-requests/:id/lpj/shortfall-approval/${path}`,
     method: 'post',
-    roles: ['pk-owner', 'pk-finance'],
+    // ADR 0021: Direktur / Finance or the PM project acknowledger — decided (403 + audit) by decideShortfall
     body: ShortfallDecisionBody,
     rateLimit: ACTION_LIMIT,
     transactional: true,
@@ -54,7 +54,7 @@ export const shortfallApproveEndpoint = decision('approve')
 export const shortfallRejectEndpoint = v1({
   path: '/expense-requests/:id/lpj/shortfall-approval/reject',
   method: 'post',
-  roles: ['pk-owner', 'pk-finance'],
+  // ADR 0021: Direktur / Finance or the PM project acknowledger — decided (403 + audit) by decideShortfall
   body: ShortfallRejectBody,
   rateLimit: ACTION_LIMIT,
   transactional: true,
@@ -70,7 +70,7 @@ export const shortfallRejectEndpoint = v1({
 export const shortfallInboxEndpoint = v1({
   path: '/lpj-shortfall-approvals/inbox',
   method: 'get',
-  roles: ['pk-owner', 'pk-finance'],
+  // ADR 0021: the PM project decides "Persetujuan PM" too; the list holds only the caller's own steps
   transactional: true,
   handler: async ({ req }) => {
     const companies = await companyQuery(req)

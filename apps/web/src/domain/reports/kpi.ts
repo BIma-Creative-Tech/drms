@@ -433,22 +433,28 @@ export async function pendingApprovals(req: PayloadRequest, scope: ReportScope) 
 }
 
 /**
- * S3e (US-17, ADR 0013, S-01): PM monitoring — team requests waiting for a decision, oldest first.
- * The PM never decides; `waitingFor` names who does: "Menunggu Direktur" (pending_ack, Diketahui =
- * Direktur approval) or "Menunggu Finance" (pending_approval). Legacy snapshots (PM "Diketahui",
- * Owner approval) are rare and labelled by status the same way.
+ * S3e (US-17, S-01): team requests waiting for a decision, oldest first. `waitingFor` names who decides
+ * now, from the request's snapshot — ADR 0021: "pm" (pending_ack, PM project → Direktur rule) then
+ * "direktur" (the Direktur level); ADR 0013 snapshots: "direktur" (pending_ack, Diketahui = Direktur
+ * approval) then "finance" (an approval level of another role). Legacy snapshots follow the same rule.
  */
-export type TeamWaitingItem = { id: number; companyId: number; docNo: string | null; title: string; type: RequestType; status: RequestStatus; waitingFor: 'direktur' | 'finance'; scopeName: string; requesters: string; grandTotal: number; submittedDate: string | null; days: number | null }
+export type TeamWaitingItem = { id: number; companyId: number; docNo: string | null; title: string; type: RequestType; status: RequestStatus; waitingFor: 'pm' | 'direktur' | 'finance'; scopeName: string; requesters: string; grandTotal: number; submittedDate: string | null; days: number | null }
+
+/** SQL: who decides the waiting step of `er` (see TeamWaitingItem.waitingFor). */
+const WAITING_FOR = sql`CASE WHEN er.status = 'pending_ack' THEN (CASE WHEN er.approval_snapshot->>'acknowledgeBy' = 'scope_manager' THEN 'pm' ELSE 'direktur' END)
+  WHEN (SELECT s->>'approverRole' FROM jsonb_array_elements(coalesce(er.approval_snapshot->'steps', '[]'::jsonb)) s
+        WHERE (s->>'level')::int = coalesce(er.current_level, 1) AND coalesce(s->>'approverUserId', '') = '' LIMIT 1) = 'pk-owner' THEN 'direktur'
+  ELSE 'finance' END`
 
 export async function teamWaiting(req: PayloadRequest, scope: ReportScope, top = 8) {
   const ctx = await reportContext(req)
   const base = sql`er.status IN ('pending_ack', 'pending_approval') AND ${requestScopeSql(scope)}`
   const [counts, list] = await inSequence(
-    () => rows(req, sql`SELECT er.status::text AS status, count(*)::int AS n, min((er.submitted_at AT TIME ZONE ${ctx.tz})::date)::text AS oldest FROM expense_requests er WHERE ${base} GROUP BY er.status`),
+    () => rows(req, sql`SELECT ${WAITING_FOR} AS wf, count(*)::int AS n, min((er.submitted_at AT TIME ZONE ${ctx.tz})::date)::text AS oldest FROM expense_requests er WHERE ${base} GROUP BY 1`),
     () =>
       rows(
         req,
-        sql`SELECT er.id, er.company_id, er.doc_no, er.title, er.type::text AS type, er.status::text AS status, coalesce(er.grand_total, 0)::text AS gt,
+        sql`SELECT er.id, er.company_id, er.doc_no, er.title, er.type::text AS type, er.status::text AS status, ${WAITING_FOR} AS wf, coalesce(er.grand_total, 0)::text AS gt,
               ((er.submitted_at AT TIME ZONE ${ctx.tz})::date)::text AS submitted,
               coalesce((SELECT string_agg(e.name, ', ' ORDER BY rr."order") FROM expense_requests_rels rr JOIN employees e ON e.id = rr.employees_id
                         WHERE rr.parent_id = er.id AND rr.path = 'requesters'), '') AS requesters,
@@ -458,7 +464,7 @@ export async function teamWaiting(req: PayloadRequest, scope: ReportScope, top =
             WHERE ${base} ORDER BY er.submitted_at ASC NULLS LAST, er.id ASC LIMIT ${top}`,
       ),
   )
-  const n = (st: string) => num(counts.find((x) => x.status === st)?.n)
+  const n = (wf: string) => num(counts.find((x) => x.wf === wf)?.n)
   const oldest = counts.map((x) => x.oldest as string | null).filter((x): x is string => !!x).sort()[0] ?? null
   const items: TeamWaitingItem[] = list.map((x) => {
     const submitted = (x.submitted as string | null) ?? null
@@ -469,7 +475,7 @@ export async function teamWaiting(req: PayloadRequest, scope: ReportScope, top =
       title: String(x.title),
       type: x.type as RequestType,
       status: x.status as RequestStatus,
-      waitingFor: x.status === 'pending_ack' ? 'direktur' : 'finance',
+      waitingFor: x.wf === 'pm' ? 'pm' : x.wf === 'direktur' ? 'direktur' : 'finance',
       scopeName: String(x.scope_name),
       requesters: String(x.requesters),
       grandTotal: num(x.gt),
@@ -477,7 +483,7 @@ export async function teamWaiting(req: PayloadRequest, scope: ReportScope, top =
       days: submitted ? daysBetween(submitted, ctx.today) : null,
     }
   })
-  return { count: n('pending_ack') + n('pending_approval'), direktur: n('pending_ack'), finance: n('pending_approval'), oldestDays: oldest ? daysBetween(oldest, ctx.today) : null, items }
+  return { count: n('pm') + n('direktur') + n('finance'), pm: n('pm'), direktur: n('direktur'), finance: n('finance'), oldestDays: oldest ? daysBetween(oldest, ctx.today) : null, items }
 }
 
 // ================================================================ K-11 transfer queue

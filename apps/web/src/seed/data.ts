@@ -94,43 +94,48 @@ export const EMPLOYEE_BANK_ACCOUNTS = [
 ]
 
 /**
- * US-34 defaults (see seed.ts), ADR 0013 (E1, GATE 1 G1-2): "Diketahui" = approval by the Direktur
- * (role `pk-owner`), then Finance approves — for every amount (no threshold yet, Q-31) + an inactive
- * example with a threshold of the same shape. Existing databases get the same content through the
- * data migration `20260926_*_e1_approval_direktur_finance` (renamed from the pre-E1 names below).
+ * US-34 defaults (see seed.ts). ADR 0021 (owner 2026-10-10, supersedes the decision part of ADR 0013 for
+ * expense requests): "Diketahui" = approval by the PM project (`scope_manager`: projects.pm, else the
+ * cost-center manager), then the Direktur (`pk-owner`) — for every amount (no threshold yet, Q-31) + an
+ * inactive example with a threshold of the same shape; Finance only transfers. Fresh installs only:
+ * existing databases keep their rules — the Admin changes them in the UI (ADR 0021 rollout; the ADR 0013
+ * names "Default — Direktur lalu Finance (semua nominal)" / "Contoh — di atas Rp 10 juta: Direktur lalu
+ * Finance" came from the data migration `20260926_*_e1_approval_direktur_finance`).
  */
 /** Name of the seeded default addendum rule (shared with the E5 migration). */
 export const ADDENDUM_DEFAULT_RULE_NAME = 'Default Addendum RAB — Direktur lalu Finance'
 
 export const DEFAULT_APPROVAL_RULES = [
   {
-    name: 'Default — Direktur lalu Finance (semua nominal)',
+    // ADR 0021 (owner decision 2026-10-10): Staff → PM project ("Diketahui" = Persetujuan PM) → Direktur;
+    // Finance only transfers (no approval level).
+    name: 'Default — PM project lalu Direktur (semua nominal)',
     docType: 'expense_request',
     requestType: 'any',
     minAmount: 0,
     maxAmount: null,
     priority: 100,
     acknowledge: 'required',
-    acknowledgeBy: 'role',
-    acknowledgeRole: 'pk-owner',
+    acknowledgeBy: 'scope_manager',
+    acknowledgeRole: null,
     signDiajukan: 'required',
     signDibuat: 'required',
-    steps: [{ level: 1, approverRole: 'pk-finance' }],
+    steps: [{ level: 1, approverRole: 'pk-owner' }],
     active: true,
   },
   {
-    name: 'Contoh — di atas Rp 10 juta: Direktur lalu Finance (Q-31, nonaktif)',
+    name: 'Contoh — di atas Rp 10 juta: PM project lalu Direktur (Q-31, nonaktif)',
     docType: 'expense_request',
     requestType: 'any',
     minAmount: 10_000_001,
     maxAmount: null,
     priority: 50,
     acknowledge: 'required',
-    acknowledgeBy: 'role',
-    acknowledgeRole: 'pk-owner',
+    acknowledgeBy: 'scope_manager',
+    acknowledgeRole: null,
     signDiajukan: 'required',
     signDibuat: 'required',
-    steps: [{ level: 1, approverRole: 'pk-finance' }],
+    steps: [{ level: 1, approverRole: 'pk-owner' }],
     active: false,
   },
   // E5 (T12, US-30): Addendum RAB through the same engine — Direktur ("Diketahui" = approval) then

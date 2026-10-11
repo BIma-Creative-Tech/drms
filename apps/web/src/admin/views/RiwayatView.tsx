@@ -17,8 +17,9 @@ const ACTION_LABELS: Record<string, string> = {
   status_change: 'status',
   void: 'void',
   sign: 'tanda tangan',
-  acknowledge: 'disetujui Direktur (Diketahui)', // ADR 0013 (pre-E1 rows: PM "Diketahui")
+  acknowledge: 'disetujui (Diketahui)', // ADR 0021: PM project; ADR 0013: Direktur (pre-E1 rows: PM "Diketahui")
   approve: 'disetujui',
+  approval_policy_exception: 'pengecualian G1 (pengajuan Direktur via PM)',
   reject: 'ditolak',
   verify: 'diverifikasi',
   number_issued: 'nomor terbit',
