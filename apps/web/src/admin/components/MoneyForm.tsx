@@ -4,6 +4,7 @@ import React, { useRef, useState } from 'react'
 
 import { postJson, problemText } from './ActionButton'
 import { OverrideDialog, overridePromptOf, type OverridePrompt } from './kas/OverrideDialog'
+import { DateInput } from './DateInput'
 
 /**
  * Finance forms of the transfer queue (T3, US-20) and the LPJ settlement (T5, US-22): cash account,
@@ -120,12 +121,12 @@ export function MoneyForm({ url, submitLabel, cashAccounts, bankRef, proof, amou
       {isTransfer ? (
         <label style={field}>
           Tanggal &amp; jam transfer (sesuai bukti)
-          <input type="datetime-local" name="transferAt" required step={60} data-pk-field="transfer-at" />
+          <DateInput type="datetime-local" name="transferAt" required step={60} data-pk-field="transfer-at" />
         </label>
       ) : (
         <label style={field}>
           Tanggal (kosong = hari ini)
-          <input type="date" name="date" />
+          <DateInput type="date" name="date" />
         </label>
       )}
       {bankRef === 'required' ? (

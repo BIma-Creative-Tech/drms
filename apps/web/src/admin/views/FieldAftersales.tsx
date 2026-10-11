@@ -22,6 +22,7 @@ import { BtnLink, dateParam, FIELD_CREATORS, FIELD_OFFICE, FIELD_READERS, FieldF
 import { ptView, PtChip } from './pt'
 import { Alert, dateId } from './progress-ui'
 import { Bento, Card, DashHead, DataTable, EmptyState, KpiRow, KpiTile, rp, rpShort, StatusPill, type Col } from './viz'
+import { DateInput } from '../components/DateInput'
 
 /**
  * FR1 aftersales spare parts (ADR 0020, plan A2; mockups Web-Aftersales + Android-Aftersales): weekly
@@ -288,11 +289,11 @@ export async function FieldActivityList(props: AdminViewServerProps) {
         </label>
         <label>
           Dari
-          <input type="date" name="dari" defaultValue={q.from ?? ''} />
+          <DateInput type="date" name="dari" defaultValue={q.from ?? ''} />
         </label>
         <label>
           Sampai
-          <input type="date" name="sampai" defaultValue={q.to ?? ''} />
+          <DateInput type="date" name="sampai" defaultValue={q.to ?? ''} />
         </label>
         <label>
           Pelanggan

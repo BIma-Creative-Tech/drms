@@ -7,6 +7,7 @@ import { parseRupiah } from '@/lib/rupiah-input'
 import { ActionDialog } from './ActionDialog'
 import { postJson, problemText, promptLabel } from './ActionButton'
 import { TableScroll } from './TableScroll'
+import { DateInput } from './DateInput'
 
 /**
  * Requester actions of the expense-request edit view (F2c, US-03…US-08): submit, withdraw/cancel
@@ -235,7 +236,7 @@ function ReceiptForm({ requestId, lines, today }: { requestId: number; lines: Re
       </label>
       <label style={field}>
         Tanggal nota
-        <input type="date" data-f="receiptDate" max={today} />
+        <DateInput type="date" data-f="receiptDate" max={today} />
       </label>
       <label style={field}>
         Nominal tercetak (Rp)

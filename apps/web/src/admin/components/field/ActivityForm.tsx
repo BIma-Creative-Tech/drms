@@ -9,6 +9,7 @@ import { RupiahInput, useRupiah } from '../RupiahInput'
 import { fieldErrors, newIdemKey, sendJson } from '../kas/client'
 import { getJson } from './client'
 import { Choice, LinesEditor, linesFrom, linesOut, PhotoPicker, usePhotos, type LineDraft } from './parts'
+import { DateInput } from '../DateInput'
 
 /**
  * FR1 web quick input "Aktivitas aftersales" (plan A2; APK mockup Android-Aftersales): customer, kind
@@ -209,7 +210,7 @@ export function ActivityForm({ projects, clients, today, minDate, initial }: { p
           <label htmlFor={id('date')}>
             Tanggal<span className="req" aria-hidden>*</span>
           </label>
-          <input id={id('date')} type="date" value={date} min={minDate} max={today} onChange={(e) => setDate(e.target.value)} aria-invalid={err('activityDate') ? true : undefined} aria-describedby={err('activityDate') ? id('activityDate-e') : undefined} />
+          <DateInput id={id('date')} type="date" value={date} min={minDate} max={today} onChange={(e) => setDate(e.target.value)} aria-invalid={err('activityDate') ? true : undefined} aria-describedby={err('activityDate') ? id('activityDate-e') : undefined} />
           {errEl('activityDate')}
         </div>
       </div>
@@ -263,7 +264,7 @@ export function ActivityForm({ projects, clients, today, minDate, initial }: { p
         {kind === 'penawaran' ? (
           <div className="pk-fld">
             <label htmlFor={id('fu')}>Tanggal follow-up</label>
-            <input id={id('fu')} type="date" value={followUp} min={date} onChange={(e) => setFollowUp(e.target.value)} aria-describedby={id('fu-h')} />
+            <DateInput id={id('fu')} type="date" value={followUp} min={date} onChange={(e) => setFollowUp(e.target.value)} aria-describedby={id('fu-h')} />
             <p className="help" id={id('fu-h')}>
               Pengingat ke Anda dan PM saat jatuh tempo.
             </p>

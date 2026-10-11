@@ -7,6 +7,7 @@ import { fmtNum } from '@/domain/field/views'
 
 import { fieldErrors, newIdemKey, sendJson } from '../kas/client'
 import { Choice, decOut, DecimalField, PhotoPicker, usePhotos } from './parts'
+import { DateInput } from '../DateInput'
 
 /**
  * P3 web input "Laporan harian" (konstruksi; same fields as the APK): project → date, weather
@@ -229,7 +230,7 @@ export function DailyReportForm({ mode, projects, itemsByProject, resourcesByCom
             <label htmlFor={id('date')}>
               Tanggal<span className="req" aria-hidden>*</span>
             </label>
-            <input id={id('date')} type="date" value={date} min={minDate} max={today} disabled={mode !== 'create'} onChange={(e) => setDate(e.target.value)} aria-invalid={err('reportDate') ? true : undefined} />
+            <DateInput id={id('date')} type="date" value={date} min={minDate} max={today} disabled={mode !== 'create'} onChange={(e) => setDate(e.target.value)} aria-invalid={err('reportDate') ? true : undefined} />
             {errEl('reportDate')}
           </div>
           <DecimalField id={id('rain')} label="Jam hujan" value={rain} onChange={setRain} max={24} error={err('rainHours')} />

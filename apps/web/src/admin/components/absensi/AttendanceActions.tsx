@@ -8,6 +8,7 @@ import { errorLine } from '@/lib/field-labels'
 
 import { newIdemKey, sendJson, uploadSelfie } from '../kas/client'
 import { CAMERA_STYLE, CameraCapture } from './CameraCapture'
+import { DateInput } from '../DateInput'
 
 /**
  * E6 web (S2) client actions of the attendance views. Same pattern as the Kas dialogs (native modal
@@ -364,7 +365,7 @@ export function HolidayAdd({ year }: { year: string }) {
     >
       <div className="pk-fld">
         <label htmlFor={`${uid}-d`}>Tanggal</label>
-        <input id={`${uid}-d`} type="date" value={date} min={`${year}-01-01`} max={`${year}-12-31`} onChange={(e) => setDate(e.target.value)} required aria-invalid={err && !date ? true : undefined} />
+        <DateInput id={`${uid}-d`} type="date" value={date} min={`${year}-01-01`} max={`${year}-12-31`} onChange={(e) => setDate(e.target.value)} required aria-invalid={err && !date ? true : undefined} />
       </div>
       <div className="pk-fld grow">
         <label htmlFor={`${uid}-n`}>Keterangan</label>

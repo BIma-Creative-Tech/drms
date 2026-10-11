@@ -22,6 +22,7 @@ import { BtnLink, dateParam, FIELD_CREATORS, FIELD_READERS, FieldFrame, fieldGat
 import { ptView, PtChip } from './pt'
 import { Alert, dateId } from './progress-ui'
 import { Bento, Card, DashHead, DataTable, EmptyState, KpiRow, KpiTile, type Col } from './viz'
+import { DateInput } from '../components/DateInput'
 
 /**
  * P3 "Laporan harian" konstruksi (owner decisions 2026-10-10; same fields as the APK): list (filters
@@ -136,11 +137,11 @@ export async function FieldDailyList(props: AdminViewServerProps) {
         </label>
         <label>
           Dari
-          <input type="date" name="dari" defaultValue={q.from ?? ''} />
+          <DateInput type="date" name="dari" defaultValue={q.from ?? ''} />
         </label>
         <label>
           Sampai
-          <input type="date" name="sampai" defaultValue={q.to ?? ''} />
+          <DateInput type="date" name="sampai" defaultValue={q.to ?? ''} />
         </label>
         <label>
           Per halaman

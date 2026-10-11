@@ -4,6 +4,7 @@ import React from 'react'
 import { isFiltered, listHref, PAGE_SIZES, type ListQuery, type PageOf } from '@/admin/list-query'
 
 import { AutoSubmit } from './AutoSubmit'
+import { DateInput } from '../DateInput'
 
 /**
  * DRMS 10/10 D8: the shared table toolbar of the custom views — search box, filters (select), optional
@@ -54,11 +55,11 @@ export function ListToolbar({ id, action, query, label, search, filters, dates, 
         <>
           <label className="pk-ltb__field">
             <span>{dates.fromLabel ?? 'Dari'}</span>
-            <input type="date" name={dates.from} defaultValue={query.filters[dates.from] ?? ''} />
+            <DateInput type="date" name={dates.from} defaultValue={query.filters[dates.from] ?? ''} />
           </label>
           <label className="pk-ltb__field">
             <span>{dates.toLabel ?? 'Sampai'}</span>
-            <input type="date" name={dates.to} defaultValue={query.filters[dates.to] ?? ''} />
+            <DateInput type="date" name={dates.to} defaultValue={query.filters[dates.to] ?? ''} />
           </label>
         </>
       ) : null}

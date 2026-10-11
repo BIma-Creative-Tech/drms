@@ -30,6 +30,7 @@ import { ptView } from './pt'
 import { Alert, dateId, dateTimeId, ProgressLegend, ProgressTable, ProgressTonePill, ProgressVsBudgetRows } from './progress-ui'
 import { Bento, Card, DashHead, DataTable, EmptyState, KpiRow, KpiTile, pctText, rp, StatusPill, TableView, type Col } from './viz'
 import { NoAccess } from './NoAccess'
+import { DateInput } from '../components/DateInput'
 
 /**
  * E4 web (plan fase1-golive §E4, US-10/US-12/US-29/US-31): project progress overview (K-09
@@ -491,11 +492,11 @@ export async function ProgressReportList(props: AdminViewServerProps) {
         </label>
         <label>
           Dari
-          <input type="date" name="dari" defaultValue={q.from ?? ''} />
+          <DateInput type="date" name="dari" defaultValue={q.from ?? ''} />
         </label>
         <label>
           Sampai
-          <input type="date" name="sampai" defaultValue={q.to ?? ''} />
+          <DateInput type="date" name="sampai" defaultValue={q.to ?? ''} />
         </label>
         <label>
           Per halaman

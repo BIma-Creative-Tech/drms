@@ -19,6 +19,7 @@ import { BtnLink, dateParam, FIELD_CREATORS, FIELD_READERS, FieldFrame, fieldGat
 import { ptView, PtChip } from './pt'
 import { Alert, dateId } from './progress-ui'
 import { Bento, Card, DashHead, DataTable, EmptyState, KpiRow, KpiTile, type Col } from './viz'
+import { DateInput } from '../components/DateInput'
 
 /**
  * FR1 "Laporan servis unit" (ADR 0020, plan A; mockups Android-Servis + Web-Timeline): list (filters
@@ -189,11 +190,11 @@ export async function FieldServiceList(props: AdminViewServerProps) {
         </label>
         <label>
           Dari
-          <input type="date" name="dari" defaultValue={q.from ?? ''} />
+          <DateInput type="date" name="dari" defaultValue={q.from ?? ''} />
         </label>
         <label>
           Sampai
-          <input type="date" name="sampai" defaultValue={q.to ?? ''} />
+          <DateInput type="date" name="sampai" defaultValue={q.to ?? ''} />
         </label>
         <label>
           Per halaman

@@ -17,6 +17,34 @@ export function formatDateLong(businessDate: string | null | undefined): string 
   return `${d} ${MONTHS_ID[m - 1]} ${y}`
 }
 
+const DAYS_ID = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu']
+
+/**
+ * DRMS 10/10 (Lead review h): helper text next to a native date input — '2026-10-12' → 'Senin, 12 Oktober
+ * 2026'. Deterministic (no locale / TZ: the weekday comes from the calendar date in UTC), so server and
+ * browser render the same text. Empty / malformed / impossible dates (2026-02-30) → ''.
+ */
+export function formatDateWeekday(businessDate: string | null | undefined): string {
+  if (!businessDate || !/^\d{4}-\d{2}-\d{2}$/.test(businessDate)) return ''
+  const [y, m, d] = businessDate.split('-').map(Number) as [number, number, number]
+  const t = new Date(Date.UTC(y, m - 1, d))
+  if (t.getUTCFullYear() !== y || t.getUTCMonth() !== m - 1 || t.getUTCDate() !== d) return ''
+  return `${DAYS_ID[t.getUTCDay()]}, ${d} ${MONTHS_ID[m - 1]} ${y}`
+}
+
+/** `<input type="datetime-local">` value '2026-10-12T14:30' → 'Senin, 12 Oktober 2026 14.30' (wall time as typed, no TZ shift). */
+export function formatDateTimeLocalHint(value: string | null | undefined): string {
+  const m = /^(\d{4}-\d{2}-\d{2})T([01]\d|2[0-3]):([0-5]\d)(?::[0-5]\d(?:\.\d+)?)?$/.exec(value ?? '')
+  if (!m) return ''
+  const day = formatDateWeekday(m[1])
+  return day ? `${day} ${m[2]}.${m[3]}` : ''
+}
+
+/** Helper text of a native date / datetime-local input value. */
+export function dateInputHint(type: 'date' | 'datetime-local', value: string | null | undefined): string {
+  return type === 'date' ? formatDateWeekday(value) : formatDateTimeLocalHint(value)
+}
+
 /** '2026-09-21' → '21/09/2026'. */
 export function formatDateShort(businessDate: string | null | undefined): string {
   if (!businessDate || !/^\d{4}-\d{2}-\d{2}$/.test(businessDate)) return ''

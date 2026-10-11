@@ -30,6 +30,7 @@ import { EditButton, PtNotAllowed } from './shared'
 import { Bento, Card, DashHead, DataTable, EmptyState, HBarList, KpiRow, KpiTile, StatusPill, TableView, VIZ_STYLE } from './viz'
 import { settings as companySettings } from '@/domain/companies'
 import { NoAccess } from './NoAccess'
+import { DateInput } from '../components/DateInput'
 
 /**
  * E6 web (plan fase1-golive E6, S2; US-09/13/14/15, Q-30/33/40): admin views of the attendance
@@ -393,7 +394,7 @@ export async function AbsensiToday(props: AdminViewServerProps) {
         </label>
         <label>
           Tanggal
-          <input type="date" name="tanggal" defaultValue={r.date} max={today} />
+          <DateInput type="date" name="tanggal" defaultValue={r.date} max={today} />
         </label>
         <PtSelect pt={pt} pts={pts} value={chosen} />
         <label>
