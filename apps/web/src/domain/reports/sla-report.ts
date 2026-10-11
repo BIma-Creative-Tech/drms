@@ -3,6 +3,7 @@ import type { PayloadRequest } from 'payload'
 
 import { formatHours, measure, monthInTz, summarize, type SlaMeasure } from '@/domain/expense/sla'
 import { REQUEST_TYPE_LABELS, type RequestType } from '@/domain/expense/types'
+import { docLink } from '@/admin/doc-links'
 import { DEFAULT_TZ } from '@/lib/time'
 
 import { reportContext, rows } from './kpi'
@@ -134,6 +135,8 @@ export function slaTables(list: SlaRow[], range: { from: string; to: string }): 
             catatan: x.m.timeKnown ? '' : 'Jam transfer tidak diketahui (waktu pencatatan)',
           },
           href: `/admin/collections/expense-requests/${x.request_id}`,
+          // DRMS 10/10 12b: the request AND the TRF number open their documents
+          links: { ...docLink('pengajuan', 'expense_request', x.request_id), ...docLink('transfer', 'transfer', x.transfer_id) },
           company: x.company_id,
         })),
         empty: 'Semua transfer dalam SLA. ✓',

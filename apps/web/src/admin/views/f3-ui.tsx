@@ -80,9 +80,11 @@ export function Placeholder({ text, id }: { text: string; id: string }) {
 
 const isNum = (c: Column) => c.type === 'money' || c.type === 'int' || c.type === 'pct'
 
-/** Report table (screen): secondary columns hidden on phones, first column links (C9). */
+/** Report table (screen): secondary columns hidden on phones, first data column links (C9), document numbers link per cell (12b). */
 export function ReportTable({ t, id }: { t: Table; id: string }) {
   if (t.rows.length === 0) return <Empty text={t.empty ?? 'Tidak ada data untuk filter ini.'} />
+  // the row link sits on the first DATA column — not on the PT column of a consolidated report (MC2)
+  const rowLinkKey = t.columns.find((c) => c.key !== 'pt')?.key
   return (
     <div className="pk-scroll">
       <table className="pk-table" data-pk-table={id}>
@@ -98,7 +100,7 @@ export function ReportTable({ t, id }: { t: Table; id: string }) {
         <tbody>
           {t.rows.map((r, i) => (
             <tr key={i}>
-              {t.columns.map((c, ci) => {
+              {t.columns.map((c) => {
                 const text = cellText(r.cells[c.key] ?? null, c.type)
                 const cls = `${isNum(c) ? 'n' : ''} ${c.primary ? '' : 'pk-secondary'}`
                 if (c.key === 'status' && typeof r.cells.status === 'string' && t.key === 'project') {
@@ -111,7 +113,10 @@ export function ReportTable({ t, id }: { t: Table; id: string }) {
                 }
                 return (
                   <td key={c.key} className={cls}>
-                    {ci === 0 && r.href ? <a href={r.href}>{text || '—'}</a> : text}
+                    {(() => {
+                      const href = r.links?.[c.key] ?? (c.key === rowLinkKey && r.href ? r.href : undefined)
+                      return href ? <a href={href}>{text || '—'}</a> : text
+                    })()}
                   </td>
                 )
               })}

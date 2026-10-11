@@ -24,3 +24,12 @@ export function docHref(docType: string | null | undefined, docId: string | numb
   if (!/^\d{1,10}$/.test(id)) return null
   return DETAIL[docType]?.(id) ?? null
 }
+
+/**
+ * Report cell link (TableRow.links, domain/reports): `{ [cellKey]: detail URL }` for a document-number
+ * cell, `{}` when the type is unknown or the id is missing — spread into a row's `links`.
+ */
+export function docLink(cellKey: string, docType: string | null | undefined, docId: unknown): Partial<Record<string, string>> {
+  const href = docHref(docType, typeof docId === 'number' || typeof docId === 'string' ? docId : null)
+  return href ? { [cellKey]: href } : {}
+}

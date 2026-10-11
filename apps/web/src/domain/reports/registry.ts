@@ -2,6 +2,7 @@ import { sql } from '@payloadcms/db-postgres'
 import type { PayloadRequest } from 'payload'
 
 import type { Role } from '@/access/roles'
+import { docLink } from '@/admin/doc-links'
 import { REQUEST_STATUSES, REQUEST_TYPE_LABELS, REQUEST_TYPES, statusLabel, type RequestStatus, type RequestType } from '@/domain/expense/types'
 
 import { absensiReport } from './attendance-report'
@@ -58,8 +59,13 @@ import {
 export type ColType = 'text' | 'money' | 'int' | 'date' | 'datetime' | 'pct'
 export type Column = { key: string; label: string; type: ColType; primary?: boolean; width?: number }
 export type Cell = string | number | null
-/** `company` = PT of the row (MC2): drives the PT column + "Subtotal per PT" when the scope spans > 1 PT. */
-export type TableRow = { cells: Record<string, Cell>; href?: string; company?: number | null }
+/**
+ * `company` = PT of the row (MC2): drives the PT column + "Subtotal per PT" when the scope spans > 1 PT.
+ * `href` = link of the row's first data column (not the PT column); `links` = per-cell links (cell key →
+ * detail URL, DRMS 10/10 12b: every document number in a report opens its document). Screen only — the
+ * JSON / CSV / XLSX / PDF exports carry the cells unchanged.
+ */
+export type TableRow = { cells: Record<string, Cell>; href?: string; links?: Partial<Record<string, string>>; company?: number | null }
 export type Table = { key: string; title: string; columns: Column[]; rows: TableRow[]; totals?: Record<string, Cell | undefined>; empty?: string }
 export type ReportResult = {
   main: Table
@@ -431,6 +437,7 @@ const bukuKas: ReportDef = {
             status: x.status === 'void' ? `void${x.void_reason ? `: ${x.void_reason}` : ''}` : 'posted',
           },
           href: x.request_id ? `/admin/collections/expense-requests/${x.request_id}` : `/admin/collections/cash-entries/${x.id}`,
+          links: { ...docLink('nomor', 'cash_entry', x.id), ...(x.request_id ? docLink('pengajuan', 'expense_request', x.request_id) : {}) },
           company: num(x.company_id),
         })),
         totals: { tanggal: 'TOTAL (semua halaman)', masuk: T('tin'), keluar: T('tout') },
@@ -716,6 +723,7 @@ const rekapPengajuan: ReportDef = {
             flag: x.openFlags,
           },
           href: `/admin/collections/expense-requests/${x.id}`,
+          links: docLink('nomor', 'expense_request', x.id),
           company: x.companyId,
         })),
         totals: { nomor: `TOTAL ${summary.total.count} pengajuan`, grandTotal: summary.total.sum },
@@ -819,6 +827,7 @@ const kelengkapan: ReportDef = {
             terlambat: a.overdue ? 'Ya' : 'Tidak',
           },
           href: `/admin/collections/expense-requests/${a.id}`,
+          links: docLink('nomor', 'expense_request', a.id),
           company: a.companyId,
         })),
         totals: { nomor: 'TOTAL', nominal: s.withoutLpj.sum },
@@ -979,6 +988,7 @@ const auditLog: ReportDef = {
             requestId: x.requestId ?? '',
           },
           href: x.docType === 'expense_request' && x.docId && /^\d+$/.test(x.docId) ? `/admin/collections/expense-requests/${x.docId}/riwayat` : undefined,
+          links: docLink('dokumen', x.docType, x.docId),
           company: x.companyId,
         })),
         empty: 'Tidak ada aktivitas untuk filter ini.',
