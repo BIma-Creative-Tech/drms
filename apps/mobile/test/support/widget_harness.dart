@@ -15,6 +15,7 @@ import 'package:proyekkas/core/network/api_exception.dart';
 import 'package:proyekkas/features/addendum/domain/addendum.dart';
 import 'package:proyekkas/features/addendum/presentation/addendum_providers.dart';
 import 'package:proyekkas/features/progress/application/progress_providers.dart';
+import 'package:proyekkas/features/projects/application/projects_providers.dart';
 import 'package:proyekkas/features/progress/domain/progress.dart';
 import 'package:proyekkas/l10n/gen/app_localizations.dart';
 
@@ -59,6 +60,7 @@ Future<void> pumpScreen(
   AppEnv? env,
   AuthController Function()? authController,
   bool stubProgress = true,
+  bool stubRap = true,
 }) async {
   await initializeDateFormatting('id');
   tester.view.physicalSize = const Size(1200, 3200);
@@ -85,6 +87,9 @@ Future<void> pumpScreen(
           projectProgressProvider.overrideWith((ref) async => throw const NetworkException()),
           addendumInboxProvider.overrideWith((ref) async => const <Addendum>[]),
         ],
+        // D4: the draft editor / line editor read the project's RAP (`GET /projects/{id}/rap`); offline-like
+        // unless a test provides the items.
+        if (stubRap) projectRapProvider.overrideWith((ref, id) async => throw const NetworkException()),
         ...overrides,
       ],
       child: MaterialApp(

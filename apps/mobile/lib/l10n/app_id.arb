@@ -1904,5 +1904,59 @@
   },
   "pickEmployee": "Pilih karyawan",
   "pickPo": "Pilih PO terbuka",
-  "pickLocation": "Pilih lokasi"
+  "pickLocation": "Pilih lokasi",
+  "fieldRapItem": "Item RAP",
+  "rapPickHint": "Pilih item RAP",
+  "rapOverBudgetChip": "Melebihi RAP",
+  "rapOverDetail": "Total {total} melebihi sisa RAP {remaining}",
+  "@rapOverDetail": {
+    "placeholders": {
+      "total": {
+        "type": "String"
+      },
+      "remaining": {
+        "type": "String"
+      }
+    }
+  },
+  "rapRemaining": "Sisa {amount}",
+  "@rapRemaining": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "rapOf": "dari {amount}",
+  "@rapOf": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "rapPickProjectFirst": "Pilih project pengajuan dulu.",
+  "rapOfflineNoBudget": "Offline: sisa anggaran RAP tampil lagi saat online.",
+  "rapNoItems": "Project ini belum punya item RAP. Hubungi PM atau Direktur.",
+  "noSearchResults": "Tidak ada yang cocok.",
+  "lineNeedsRapItem": "Baris ini belum terhubung ke item RAP. Pilih item RAP project sebelum diajukan.",
+  "lineNeedsRapItemShort": "Pilih item RAP",
+  "projectChangeClearsRap": "Item RAP pada {count} baris milik project sebelumnya dan akan dikosongkan. Tetap ganti project?",
+  "@projectChangeClearsRap": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "projectChangeConfirm": "Ganti project",
+  "draftCostCenterLegacy": "Draft ini dibuat dengan pusat biaya. Pengajuan sekarang wajib memakai project — pilih project; pusat biaya diisi Finance saat transfer.",
+  "draftLinesNeedRap": "{count} baris belum memilih item RAP — lengkapi sebelum diajukan.",
+  "@draftLinesNeedRap": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  }
 }

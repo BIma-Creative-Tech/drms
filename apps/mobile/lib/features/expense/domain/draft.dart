@@ -58,6 +58,10 @@ abstract class DraftLine with _$DraftLine {
     /// D3 "Nominal sesuai nota" (optional): what the receipt says. Approval and transfer use [total];
     /// a different value only raises the "Selisih nota" awareness flag for Finance.
     int? receiptAmount,
+
+    /// DRMS 10/10 D4: RAP item of the draft's project this line is charged to (required to submit). Null on a
+    /// line written before D4 — the editor asks to pick one.
+    int? rapItemId,
     int? categoryId,
     int? vehicleId,
     String? notes,
@@ -86,6 +90,9 @@ extension DraftLineD3 on DraftLine {
   bool get needsUnitPrice => unitPrice == null;
 
   bool get receiptMismatch => receiptAmountDiffers(receiptAmount, computedTotal ?? total);
+
+  /// D4: no RAP item chosen yet (a line written before D4, or the project changed) — submit is blocked.
+  bool get needsRapItem => rapItemId == null;
 }
 
 @freezed
@@ -99,7 +106,12 @@ abstract class DraftRequest with _$DraftRequest {
     /// PT's masters). Null = draft written before the multi-PT update, not yet assigned.
     int? companyId,
     @Default('') String title,
+
+    /// D2 (DRMS 10/10): required — every request belongs to a project (no non-project requests).
     int? projectId,
+
+    /// D2: no longer chosen by the requester (Finance sets the cost center at transfer). Kept only for drafts
+    /// written before D2; never sent to the server any more.
     int? costCenterId,
     String? neededDate,
 

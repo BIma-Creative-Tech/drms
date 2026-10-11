@@ -292,8 +292,8 @@ void main() {
       addTearDown(db.close);
       expect(
         db.schemaVersion,
-        7,
-      ); // v2 → v3 (company_id) → v4 (urgency level, 2026-10-09) → v5 (FR1 field reports) → v6 (P3) → v7 (D3)
+        8,
+      ); // v2 → v3 (company_id) → v4 (urgency level, 2026-10-09) → v5 (FR1 field reports) → v6 (P3) → v7 (D3) → v8 (D4)
       final out = await db.select(db.outbox).get();
       expect(out.map((r) => r.opUuid), unorderedEquals(['d-1', 'r-1', 'a-1']));
       expect(out.every((r) => r.companyId == null && r.status == 'pending'), isTrue);

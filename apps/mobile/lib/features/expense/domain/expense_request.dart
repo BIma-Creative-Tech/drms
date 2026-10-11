@@ -53,6 +53,9 @@ abstract class ExpenseLine with _$ExpenseLine {
 
     /// D3: server read model `receiptMismatch` (receiptAmount ≠ total); null from an older server.
     bool? receiptMismatch,
+
+    /// DRMS 10/10 D4: RAP item of the line (`rapItem {id, code, name}`); null before D4.
+    RefItem? rapItem,
   }) = _ExpenseLine;
 }
 
@@ -70,6 +73,17 @@ bool lineReceiptMismatch(ExpenseDetail d, ExpenseLine l) =>
     l.receiptMismatch ??
     (d.flags.any((f) => f.kind == receiptAmountMismatchFlag && f.lineNo == l.no) ||
         (l.receiptAmount != null && l.receiptAmount != l.total));
+
+/// D4 flag code: the line's amount is above the remaining budget of its RAP item ("Melebihi RAP"; awareness).
+const rapOverBudgetFlag = 'rap_over_budget';
+
+/// D4 "Melebihi RAP" on a line of [d] (the server's `rap_over_budget` flag of that line).
+bool lineRapOverBudget(ExpenseDetail d, ExpenseLine l) =>
+    d.flags.any((f) => f.kind == rapOverBudgetFlag && f.lineNo == l.no && f.status != 'resolved');
+
+/// D4: a line of an editable request (Draft / Revisi Nota) without a RAP item — "Pilih item RAP".
+bool lineNeedsRapItem(ExpenseDetail d, ExpenseLine l) =>
+    (d.status == RequestStatus.draft || d.status == RequestStatus.receiptRevision) && l.rapItem == null;
 
 @freezed
 abstract class ReceiptInfo with _$ReceiptInfo {

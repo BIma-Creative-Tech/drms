@@ -35,10 +35,9 @@ List<T> requesterChoices<T>(List<T> employees, int Function(T) idOf, {int? selfO
 /// Everything required before "Ajukan" (online submit).
 List<DraftIssue> validateForSubmit(DraftRequest d, {int? selfOnlyEmployee}) {
   final issues = <DraftIssue>[...validateForSave(d), ...requesterIssues(d, selfOnlyEmployee: selfOnlyEmployee)];
-  final hasProject = d.projectId != null;
-  final hasCostCenter = d.costCenterId != null;
-  if (hasProject == hasCostCenter) {
-    issues.add(const DraftIssue('scope', 'Pilih salah satu: project atau pusat biaya.'));
+  // D2: project required (no non-project requests; Finance sets the cost center at transfer).
+  if (d.projectId == null) {
+    issues.add(const DraftIssue('projectId', 'Project wajib dipilih.'));
   }
   if (d.bankAccountId == null) {
     issues.add(const DraftIssue('bankAccountId', 'Rekening tujuan wajib dipilih.'));
@@ -52,6 +51,10 @@ List<DraftIssue> validateForSubmit(DraftRequest d, {int? selfOnlyEmployee}) {
     }
     if (l.categoryId == null) {
       issues.add(DraftIssue('categoryId', 'Kategori wajib dipilih.', lineNo: l.no));
+    }
+    // D4: every line is charged to a RAP item of the project.
+    if (l.rapItemId == null) {
+      issues.add(DraftIssue('rapItemId', 'Item RAP wajib dipilih.', lineNo: l.no));
     }
     // D3: total = qty × harga satuan — both required (a pre-D3 line asks for its unit price here).
     if (l.qty == null || l.qty! <= 0) {

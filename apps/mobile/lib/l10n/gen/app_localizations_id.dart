@@ -2830,4 +2830,63 @@ class AppLocalizationsId extends AppLocalizations {
 
   @override
   String get pickLocation => 'Pilih lokasi';
+
+  @override
+  String get fieldRapItem => 'Item RAP';
+
+  @override
+  String get rapPickHint => 'Pilih item RAP';
+
+  @override
+  String get rapOverBudgetChip => 'Melebihi RAP';
+
+  @override
+  String rapOverDetail(String total, String remaining) {
+    return 'Total $total melebihi sisa RAP $remaining';
+  }
+
+  @override
+  String rapRemaining(String amount) {
+    return 'Sisa $amount';
+  }
+
+  @override
+  String rapOf(String amount) {
+    return 'dari $amount';
+  }
+
+  @override
+  String get rapPickProjectFirst => 'Pilih project pengajuan dulu.';
+
+  @override
+  String get rapOfflineNoBudget => 'Offline: sisa anggaran RAP tampil lagi saat online.';
+
+  @override
+  String get rapNoItems => 'Project ini belum punya item RAP. Hubungi PM atau Direktur.';
+
+  @override
+  String get noSearchResults => 'Tidak ada yang cocok.';
+
+  @override
+  String get lineNeedsRapItem => 'Baris ini belum terhubung ke item RAP. Pilih item RAP project sebelum diajukan.';
+
+  @override
+  String get lineNeedsRapItemShort => 'Pilih item RAP';
+
+  @override
+  String projectChangeClearsRap(int count) {
+    return 'Item RAP pada $count baris milik project sebelumnya dan akan dikosongkan. Tetap ganti project?';
+  }
+
+  @override
+  String get projectChangeConfirm => 'Ganti project';
+
+  @override
+  String get draftCostCenterLegacy =>
+      'Draft ini dibuat dengan pusat biaya. Pengajuan sekarang wajib memakai project — pilih project; pusat biaya diisi Finance saat transfer.';
+
+  @override
+  String draftLinesNeedRap(int count) {
+    return '$count baris belum memilih item RAP — lengkapi sebelum diajukan.';
+  }
 }

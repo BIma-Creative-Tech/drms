@@ -11,18 +11,23 @@ import '../../../shared/widgets/async_body.dart';
 import '../../../shared/widgets/photo_viewer.dart';
 import '../../auth/application/auth_controller.dart';
 import '../../masters/domain/master_item.dart';
+import '../../projects/application/projects_providers.dart';
 import '../data/draft_repository.dart';
 import '../domain/draft.dart';
 import '../domain/draft_validation.dart';
 import 'receipt_capture.dart';
 import 'widgets/master_picker.dart';
+import 'widgets/rap_item_picker.dart';
 import 'widgets/receipt_mismatch_chip.dart';
 
 /// Edits one line item (US-37) and its receipts (US-7/US-38). Returns the updated [DraftLine].
 class LineEditorScreen extends ConsumerStatefulWidget {
-  const LineEditorScreen({super.key, required this.line, required this.masters});
+  const LineEditorScreen({super.key, required this.line, required this.masters, this.projectId});
   final DraftLine line;
   final Map<String, List<MasterItem>> masters;
+
+  /// D4: project of the draft — the "Item RAP" picker lists its RAP items (null = no project chosen yet).
+  final int? projectId;
 
   @override
   ConsumerState<LineEditorScreen> createState() => _LineEditorScreenState();
@@ -47,6 +52,14 @@ class _LineEditorScreenState extends ConsumerState<LineEditorScreen> {
       c.dispose();
     }
     super.dispose();
+  }
+
+  /// D4: the RAP items of the project are known here (online, or cached) — the line cannot be saved without
+  /// one. Without the list (no project yet, offline without a cached list) the line is saved and submit asks.
+  bool get _rapPickable {
+    final pid = widget.projectId;
+    if (pid == null) return false;
+    return ref.read(projectRapProvider(pid)).value?.items.isNotEmpty ?? false;
   }
 
   /// D3: the total is never typed — qty × harga satuan (a pre-D3 line keeps its old total until both are
@@ -139,6 +152,13 @@ class _LineEditorScreenState extends ConsumerState<LineEditorScreen> {
             padding: const EdgeInsets.all(16),
             children: [
               // D3: a line saved before the computed total — ask for qty / satuan / harga satuan.
+              // D4: a line saved before the RAP link (or whose project changed) — pick its RAP item.
+              if (widget.line.needsRapItem && widget.line.description.isNotEmpty)
+                Card(
+                  key: const Key('line-needs-rap-item'),
+                  color: theme.colorScheme.tertiaryContainer,
+                  child: ListTile(leading: const Icon(Icons.info_outline), title: Text(t.lineNeedsRapItem)),
+                ),
               if (widget.line.needsUnitPrice && widget.line.total != null)
                 Card(
                   key: const Key('line-needs-unit-price'),
@@ -155,6 +175,15 @@ class _LineEditorScreenState extends ConsumerState<LineEditorScreen> {
                 decoration: InputDecoration(labelText: t.fieldDescription),
                 validator: req,
               ),
+              // D4: required RAP item of the draft's project (remaining budget shown; "Melebihi RAP" when above it).
+              RapItemPickerField(
+                projectId: widget.projectId,
+                value: _line.rapItemId,
+                lineTotal: current.computedTotal,
+                errorText: _tried && _line.rapItemId == null && _rapPickable ? t.required : null,
+                onChanged: (v) => setState(() => _line = _line.copyWith(rapItemId: v)),
+              ),
+              const SizedBox(height: 12),
               MasterPickerField(
                 label: t.fieldCategory,
                 items: m[MasterTypes.categories] ?? const [],
@@ -328,7 +357,7 @@ class _LineEditorScreenState extends ConsumerState<LineEditorScreen> {
                 onPressed: () {
                   setState(() => _tried = true);
                   final ok = _form.currentState?.validate() ?? false;
-                  if (!ok || _line.uomId == null) return;
+                  if (!ok || _line.uomId == null || (_line.rapItemId == null && _rapPickable)) return;
                   Navigator.of(context).pop(_collect());
                 },
                 child: Text(t.save),

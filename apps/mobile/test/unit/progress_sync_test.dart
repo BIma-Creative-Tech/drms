@@ -492,6 +492,9 @@ void main() {
     final loaded = (await r.load(sub, 'u1'))!;
     expect(loaded.pctAfter, 10);
     expect(loaded.companyId, 3);
-    expect(old.schemaVersion, 7); // + v4 urgency level (2026-10-09) + v5 FR1 field reports + v6 P3 RAP caches + v7 D3
+    expect(
+      old.schemaVersion,
+      8,
+    ); // + v4 urgency level (2026-10-09) + v5 FR1 field reports + v6 P3 RAP caches + v7 D3 + v8 D4
   });
 }

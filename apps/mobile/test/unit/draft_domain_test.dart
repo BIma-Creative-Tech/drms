@@ -73,11 +73,22 @@ void main() {
     expect(a.where((i) => i.field == 'receipts'), isEmpty);
   });
 
-  test('exactly one of project / cost center (US-53)', () {
-    final both = seedDraft().copyWith(projectId: 3);
-    expect(validateForSubmit(both).map((e) => e.field), contains('scope'));
-    final none = seedDraft().copyWith(costCenterId: null);
-    expect(validateForSubmit(none).map((e) => e.field), contains('scope'));
+  test('D2: project required, no cost center choice (no non-project requests)', () {
+    final none = seedDraft().copyWith(projectId: null, costCenterId: 7);
+    expect(validateForSubmit(none).map((e) => e.field), contains('projectId'));
+    expect(
+      validateForSubmit(seedDraft().copyWith(costCenterId: 7)),
+      isEmpty,
+      reason: 'a legacy cost center is ignored',
+    );
+  });
+
+  test('D4: every line needs a RAP item; a pre-D4 line opens but blocks submit', () {
+    final old = seedDraft().lines[1].copyWith(rapItemId: null);
+    expect(old.needsRapItem, isTrue);
+    final issues = validateForSubmit(seedDraft().copyWith(lines: [seedDraft().lines.first, old]));
+    expect(issues.map((i) => (i.field, i.lineNo)), [('rapItemId', 2)]);
+    expect(issues.single.toString(), 'Baris 2: Item RAP wajib dipilih.');
   });
 
   test('required fields: title, bank account, lines, description, category, total > 0', () {

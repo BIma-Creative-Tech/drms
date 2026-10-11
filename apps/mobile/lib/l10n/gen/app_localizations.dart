@@ -5112,6 +5112,102 @@ abstract class AppLocalizations {
   /// In id, this message translates to:
   /// **'Pilih lokasi'**
   String get pickLocation;
+
+  /// No description provided for @fieldRapItem.
+  ///
+  /// In id, this message translates to:
+  /// **'Item RAP'**
+  String get fieldRapItem;
+
+  /// No description provided for @rapPickHint.
+  ///
+  /// In id, this message translates to:
+  /// **'Pilih item RAP'**
+  String get rapPickHint;
+
+  /// No description provided for @rapOverBudgetChip.
+  ///
+  /// In id, this message translates to:
+  /// **'Melebihi RAP'**
+  String get rapOverBudgetChip;
+
+  /// No description provided for @rapOverDetail.
+  ///
+  /// In id, this message translates to:
+  /// **'Total {total} melebihi sisa RAP {remaining}'**
+  String rapOverDetail(String total, String remaining);
+
+  /// No description provided for @rapRemaining.
+  ///
+  /// In id, this message translates to:
+  /// **'Sisa {amount}'**
+  String rapRemaining(String amount);
+
+  /// No description provided for @rapOf.
+  ///
+  /// In id, this message translates to:
+  /// **'dari {amount}'**
+  String rapOf(String amount);
+
+  /// No description provided for @rapPickProjectFirst.
+  ///
+  /// In id, this message translates to:
+  /// **'Pilih project pengajuan dulu.'**
+  String get rapPickProjectFirst;
+
+  /// No description provided for @rapOfflineNoBudget.
+  ///
+  /// In id, this message translates to:
+  /// **'Offline: sisa anggaran RAP tampil lagi saat online.'**
+  String get rapOfflineNoBudget;
+
+  /// No description provided for @rapNoItems.
+  ///
+  /// In id, this message translates to:
+  /// **'Project ini belum punya item RAP. Hubungi PM atau Direktur.'**
+  String get rapNoItems;
+
+  /// No description provided for @noSearchResults.
+  ///
+  /// In id, this message translates to:
+  /// **'Tidak ada yang cocok.'**
+  String get noSearchResults;
+
+  /// No description provided for @lineNeedsRapItem.
+  ///
+  /// In id, this message translates to:
+  /// **'Baris ini belum terhubung ke item RAP. Pilih item RAP project sebelum diajukan.'**
+  String get lineNeedsRapItem;
+
+  /// No description provided for @lineNeedsRapItemShort.
+  ///
+  /// In id, this message translates to:
+  /// **'Pilih item RAP'**
+  String get lineNeedsRapItemShort;
+
+  /// No description provided for @projectChangeClearsRap.
+  ///
+  /// In id, this message translates to:
+  /// **'Item RAP pada {count} baris milik project sebelumnya dan akan dikosongkan. Tetap ganti project?'**
+  String projectChangeClearsRap(int count);
+
+  /// No description provided for @projectChangeConfirm.
+  ///
+  /// In id, this message translates to:
+  /// **'Ganti project'**
+  String get projectChangeConfirm;
+
+  /// No description provided for @draftCostCenterLegacy.
+  ///
+  /// In id, this message translates to:
+  /// **'Draft ini dibuat dengan pusat biaya. Pengajuan sekarang wajib memakai project — pilih project; pusat biaya diisi Finance saat transfer.'**
+  String get draftCostCenterLegacy;
+
+  /// No description provided for @draftLinesNeedRap.
+  ///
+  /// In id, this message translates to:
+  /// **'{count} baris belum memilih item RAP — lengkapi sebelum diajukan.'**
+  String draftLinesNeedRap(int count);
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {
