@@ -72,6 +72,10 @@ Toleransi diubah oleh Admin/Direktur di data PT (Pengaturan operasional).
   menunggu, project berjalan · merah · kuning, kelengkapan LPJ, antrian transfer). Warna anggaran dihitung dengan
   ambang **masing-masing PT** (tidak ada persentase gabungan). Nama akun kas diberi awalan `[KODE PT]`. Ingin melihat
   satu PT saja: ubah pilihan di tombol PT.
+- **RAP (sejak 11 Okt 2026):** setiap project yang punya RAB wajib punya RAP sebelum pengajuannya bisa dikirim. Kartu
+  **"Project ber-RAB belum punya RAP"** di Beranda web mendaftar project (semua jenis) yang RAP-nya masih kosong — minta
+  PM project mengisinya di tab **RAP** project (template atau impor Excel). Pengajuan yang sudah diajukan sebelumnya
+  tetap berjalan. **Monitoring RAP** menampilkan realisasi per project; "Melebihi RAP" hanya peringatan.
 - **HP Beranda "Ringkasan":** angka yang sama; ketuk bulan di grafik untuk melihat kas masuk/keluar.
 - **Progress fisik vs anggaran:** web **Progress project** / HP Beranda. Merah = anggaran terpakai jauh mendahului
   progress fisik.

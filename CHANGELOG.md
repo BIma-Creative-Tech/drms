@@ -6,6 +6,38 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+**DRMS 10/10 D4 amendment — RAP for every project with a RAB** (owner decision 2026-10-11: "RAP wajib untuk semua
+proyek yang punya RAB"; "Melebihi RAP" stays a warning). ADR 0020 amendment, plan `drms-1010.md` ("D4 amendment").
+
+**Database migrations:** `20261013_400000_d1010_rap_all` (schema: `rap_items.stage_id` nullable,
+`rap_templates.project_kind`, template item `stage_name` optional) and `20261013_400100_d1010_rap_all_guard` (a RAP
+item without stage only outside konstruksi; existing templates → kind konstruksi; logs every project with a RAB but no
+RAP — no RAP is created automatically, submitted requests stay valid).
+
+### Changed (D4 amendment)
+
+- **Submit rule:** a project of ANY kind with a RAB (and every konstruksi project, as before) needs ≥ 1 active RAP item
+  before an expense request can be submitted → 400 `projectId` **"Project belum punya RAP — hubungi PM"** (same text on
+  the web form, the APK draft editor / line editor / project RAP tab). Drafts can still be saved; every line of a project
+  with a RAP picks a RAP item. A project without RAB and without RAP stays unconstrained (the APK no longer asks for a RAP
+  item there).
+- **RAP for every project kind:** the project's **RAP tab** now also manages the RAP (Excel import / export, "Pakai
+  template", "Simpan sebagai template") for the PM and the Direktur/Admin — no longer only under Laporan harian
+  (konstruksi). Outside konstruksi the stage ("tahapan") is optional (an existing stage only, never created by an import)
+  and the RAP never drives the stage progress (manual progress reports unchanged); daily reports stay konstruksi-only.
+- **RAP templates per project kind** (`Jenis project` on the template; saved from a project = its kind; a template of
+  another kind → 400 `templateId`; outside konstruksi an unknown template stage is dropped).
+- The project kind is frozen once the project has RAP items (409 "sudah punya RAP" instead of a DB error).
+
+### Added (D4 amendment)
+
+- **Dashboard nudge:** "Project Anda belum punya RAP" (PM, team projects) and "Project ber-RAB belum punya RAP"
+  (Direktur, every project of the selected PTs) with a link to the project's RAP tab.
+- **API (APK):** `GET /projects` / `GET /projects/{id}` `rapRequired`, `rapMissing`; `GET /projects/{id}/rap`
+  `rapRequired`, `drivesProgress`, item `stage` nullable; `POST /projects/{id}/rap/items` `stageId` optional outside
+  konstruksi.
+- **Go-live import:** a warning per imported project with a RAB but no RAP; `rab` column hint mentions the RAP rule.
+
 **DRMS 10/10 Phase C — server + web** (owner decisions D2 / D4, points 2–4, 7, 10; web ↔ APK consistency). API contract
 for the APK in `docs/proyekkas/plans/drms-1010.md` ("Phase C API contract").
 
