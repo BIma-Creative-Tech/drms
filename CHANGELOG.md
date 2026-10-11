@@ -6,6 +6,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed (DRMS 10/10 follow-up — Staff see projects without money, owner 2026-10-11)
+
+- Web: Staff get the "Proyek" module — the list of their assigned projects (search / filter) and the project page
+  read-only (no Simpan): tab Proyek without RAB, tab RAP with codes, volumes and realised volume only, tab Pengajuan with
+  their own requests only; no tab Pinjaman for Staff (shown to Direktur, Admin, Finance and PM only).
+- Project money is now hidden from Staff at the API level (field read access, `access/money.ts`): `projects.budget`
+  (RAB / contract value), `rap-items.unitPrice` and the RAB % of approval rows (`approvals.budgetPctBefore/After`) are
+  readable only with a money role (Direktur, Admin, Finance, PM) in the row's PT — also through `?select=` and `depth`
+  population; a `where` / `sort` on those fields is refused. `/api/v1/projects` returns `contractValue: null` for
+  Staff; `GET /api/v1/expense-requests/{id}` returns `budget: {basis: "none", pctBefore: null, pctAfter: null}` and
+  null `approvals[].budgetPct*` for callers without a money role (the % with the request total revealed the RAB).
+- APK: "Proyek" menu for Staff (tabs Proyek / RAP / Pengajuan — own requests only, no Pinjaman); no contract value row
+  for Staff; the request detail drops the "Dampak anggaran" row for Staff instead of showing "Tanpa anggaran".
+
 **DRMS 10/10 Phase D — Pinjaman antar project (ADR 0022, owner D6 + Q-L1…Q-L7 2026-10-11).** The PM of the borrower
 project submits a loan from another project of the SAME PT (Dana or Barang/material, value in Rp, no interest, due date
 required); one Direktur decides (G1: another Direktur when the PM is a Direktur; the PT's only Direktur may approve his
