@@ -3,6 +3,7 @@ import { FieldError, useField, useForm, useFormFields } from '@payloadcms/ui'
 import type { ArrayFieldClientComponent } from 'payload'
 import React, { useEffect, useId, useMemo, useRef, useState } from 'react'
 
+import { RAP_MISSING_MESSAGE } from '@/domain/rap/rules'
 import { formatRupiah } from '@/lib/money'
 
 import { KAS_STYLE } from '../kas/style'
@@ -23,7 +24,7 @@ import { draftOf, draftTotal, formatQty, LINE_FIELD_NAMES, parseDraft, relValue,
 type Opt = { id: number; label: string; short?: string; company?: number | null; requiresVehicle?: boolean; defaultUom?: number | null; active?: boolean }
 type Masters = { uoms: Opt[]; categories: Opt[]; vehicles: Opt[]; error: string | null }
 /** D4: RAP items of the request's project (all, inactive ones only to name a stored line); `loaded` per project id. */
-type RapState = { project: number | null; items: Opt[]; loading: boolean; error: string | null }
+type RapState = { project: number | null; items: Opt[]; loading: boolean; error: string | null; required: boolean }
 
 const LIST = 'depth=0&limit=500&pagination=false&where[active][not_equals]=false'
 
@@ -61,24 +62,24 @@ function useMasters(): Masters {
  */
 function useRapItems(project: number | null): RapState {
   // the last answer, keyed by its project (state is only set from the fetch callbacks)
-  const [st, setSt] = useState<RapState>({ project: null, items: [], loading: false, error: null })
+  const [st, setSt] = useState<RapState>({ project: null, items: [], loading: false, error: null, required: false })
   useEffect(() => {
     if (project === null) return
     let alive = true
     fetch(`/api/v1/projects/${project}/rap`, { credentials: 'same-origin', headers: { Accept: 'application/json' } })
       .then(async (r) => {
         if (!r.ok) throw new Error(String(r.status))
-        const body = (await r.json()) as { items?: Array<{ id: number; code: string; description: string; active: boolean }> }
+        const body = (await r.json()) as { rapRequired?: boolean; items?: Array<{ id: number; code: string; description: string; active: boolean }> }
         if (!alive) return
-        setSt({ project, loading: false, error: null, items: (body.items ?? []).map((i) => ({ id: i.id, label: `${i.code} — ${i.description}`, short: `${i.code} ${i.description}`, active: i.active !== false })) })
+        setSt({ project, loading: false, error: null, required: body.rapRequired === true, items: (body.items ?? []).map((i) => ({ id: i.id, label: `${i.code} — ${i.description}`, short: `${i.code} ${i.description}`, active: i.active !== false })) })
       })
-      .catch(() => alive && setSt({ project, items: [], loading: false, error: 'Item RAP project gagal dimuat. Muat ulang halaman.' }))
+      .catch(() => alive && setSt({ project, items: [], loading: false, error: 'Item RAP project gagal dimuat. Muat ulang halaman.', required: false }))
     return () => {
       alive = false
     }
   }, [project])
-  if (project === null) return { project: null, items: [], loading: false, error: null }
-  return st.project === project ? st : { project, items: [], loading: true, error: null }
+  if (project === null) return { project: null, items: [], loading: false, error: null, required: false }
+  return st.project === project ? st : { project, items: [], loading: true, error: null, required: false }
 }
 
 const cell: React.CSSProperties = { padding: '8px 6px', borderBottom: '1px solid var(--theme-elevation-100)', verticalAlign: 'top', textAlign: 'left', fontSize: 13 }
@@ -160,6 +161,15 @@ export const LinesTableField: ArrayFieldClientComponent = (props) => {
         ) : null}
       </div>
       <FieldError path={path} showError={showError} message={errorMessage} />
+      {/* D4 (owner 2026-10-11): a project with a RAB (or konstruksi) needs a RAP before a request can be sent — same text as the APK */}
+      {!revision && !rap.loading && !rap.error && rap.required && rapActive.length === 0 ? (
+        <div className="pk-alert bad" role="alert" data-pk-rap-missing style={{ marginBottom: 8 }}>
+          <b aria-hidden>!</b>
+          <p>
+            <strong>{RAP_MISSING_MESSAGE}</strong>. Pengajuan ini bisa disimpan sebagai draft, tetapi baru bisa dikirim setelah PM mengisi RAP project.
+          </p>
+        </div>
+      ) : null}
       {masters.error ? <p className="pk-kerr">{masters.error}</p> : null}
       {rows.length === 0 ? (
         <div style={{ padding: 16, border: '1px dashed var(--pk-input)', borderRadius: 'var(--style-radius-m)', color: 'var(--pk-muted-fg)', fontSize: 13 }} data-pk-lines-empty>
@@ -318,7 +328,7 @@ export const LinesTableField: ArrayFieldClientComponent = (props) => {
           no={editing === 'new' ? rows.length + 1 : editing + 1}
           initial={editing === 'new' ? null : (values[editing] ?? null)}
           otherTotal={grand - (editing === 'new' ? 0 : (values[editing]?.total ?? 0))}
-          rap={{ project: state.project, items: rapActive, all: rap.items, loading: rap.loading, error: rap.error }}
+          rap={{ project: state.project, items: rapActive, all: rap.items, loading: rap.loading, error: rap.error, required: rap.required }}
           uoms={masters.uoms}
           categories={categories}
           vehicles={vehicles}
@@ -330,7 +340,7 @@ export const LinesTableField: ArrayFieldClientComponent = (props) => {
   )
 }
 
-type RapPick = { project: number | null; items: Opt[]; all: Opt[]; loading: boolean; error: string | null }
+type RapPick = { project: number | null; items: Opt[]; all: Opt[]; loading: boolean; error: string | null; required: boolean }
 
 function LineDialog(props: { no: number; initial: LineValues | null; otherTotal: number; rap: RapPick; uoms: Opt[]; categories: Opt[]; vehicles: Opt[]; onSave: (v: LineValues) => void; onClose: () => void }) {
   const ref = useRef<HTMLDialogElement>(null)
@@ -432,8 +442,8 @@ function LineDialog(props: { no: number; initial: LineValues | null; otherTotal:
                 {props.rap.error}
               </p>
             ) : props.rap.items.length === 0 ? (
-              <p className="help" data-pk-rap-hint="empty" style={{ margin: 0 }}>
-                Project ini belum punya RAP. Untuk project konstruksi, minta PM / Direktur mengisi RAP sebelum pengajuan dikirim.
+              <p className="help" data-pk-rap-hint={props.rap.required ? 'missing' : 'empty'} style={{ margin: 0 }}>
+                {props.rap.required ? RAP_MISSING_MESSAGE : 'Project ini belum punya RAP (project tanpa RAB: item RAP tidak wajib).'}
               </p>
             ) : (
               <>

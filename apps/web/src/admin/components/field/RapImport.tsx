@@ -19,7 +19,7 @@ type Preview = {
   counts: { new: number; changed: number; unchanged: number; deactivated: number }
 }
 
-export function RapImport({ projectId, needsReason }: { projectId: number; needsReason: boolean }) {
+export function RapImport({ projectId, needsReason, stageRequired = true }: { projectId: number; needsReason: boolean; stageRequired?: boolean }) {
   const router = useRouter()
   const uid = useId()
   const [file, setFile] = useState<File | null>(null)
@@ -97,7 +97,10 @@ export function RapImport({ projectId, needsReason }: { projectId: number; needs
             setPreview(null)
           }}
         />
-        <p className="help">Kolom: kode, uraian, tahapan, jenis (pekerjaan/material), satuan, volume, harga_satuan, bobot. Unduh template kosong atau RAP project sebagai contoh.</p>
+        <p className="help">
+          Kolom: kode, uraian, tahapan, jenis (pekerjaan/material), satuan, volume, harga_satuan, bobot.{' '}
+          {stageRequired ? 'Tahapan wajib (project konstruksi).' : 'Tahapan boleh kosong (bila diisi: tahapan yang sudah ada).'} Unduh template kosong atau RAP project sebagai contoh.
+        </p>
       </div>
       <div className="pk-actions">
         <button type="button" className="pk-kbtn" onClick={doPreview} disabled={!file || busy !== null} data-pk-submit="rap-preview">

@@ -18,7 +18,7 @@ import { officeScope, teamScope } from '@/domain/reports/scope'
 import { docHref } from '../doc-links'
 
 import { TeamTodayWidget } from './Absensi'
-import { RapMonitorCard } from './dashboard-rap'
+import { RapMissingCard, RapMonitorCard } from './dashboard-rap'
 import { SlaTransferCard } from './dashboard-sla'
 import { ChartHover } from './ChartHover'
 import { PageTemplate } from './frame'
@@ -695,6 +695,8 @@ async function Owner({ req, months }: { req: PayloadRequest; months: 6 | 12 }) {
         <SlaTransferCard req={req} span={12} i={8} />
         {/* DRMS 10/10 point 2–4 (D4): RAP realisation per project, items over plan → the project's RAP tab */}
         <RapMonitorCard req={req} span={12} i={8} />
+        {/* D4 (owner 2026-10-11): projects with a RAB but no RAP yet — requests blocked until a PM fills the RAP */}
+        <RapMissingCard req={req} span={12} i={8} />
         <TrendCard id="owner-trend" rows={v.requestTrend} title="Tren pengajuan" sub="Jumlah pengajuan per bulan (tanggal pengajuan)" span={6} i={8} />
         <Card id="accounts" title="Saldo per akun" sub="Akun nonaktif bersaldo 0 disembunyikan" span={3} i={9}>
           <HBarList
@@ -1072,6 +1074,8 @@ async function Pm({ req }: { req: PayloadRequest }) {
           </KpiTile>
         </KpiRow>
 
+        {/* D4 (owner 2026-10-11): nudge — team projects with a RAB but no RAP (requests cannot be submitted yet) */}
+        <RapMissingCard req={req} span={12} i={4} team />
         <ProgressVsBudgetCard id="pm-progress" data={k09} i={4} pm  pt={pt} />
         <BudgetCard id="pm-budget" projects={d.projects} warnPct={v.warnPct} span={7} i={4} pm progress={progressMap(k09)} />
         <PipelineCard id="pm-pipeline" pipeline={v.pipeline} title="Status pengajuan tim" sub="Posisi pengajuan tim saat ini" span={5} i={5} />
