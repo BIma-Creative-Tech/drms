@@ -50,6 +50,7 @@ import { ReceiptFlags } from './collections/ReceiptFlags'
 import { ServiceReports } from './collections/ServiceReports'
 import { Receipts } from './collections/Receipts'
 import { Settlements } from './collections/Settlements'
+import { Sites } from './collections/Sites'
 import { StageTemplates } from './collections/StageTemplates'
 import { TeamAssignments } from './collections/TeamAssignments'
 import { Transfers } from './collections/Transfers'
@@ -111,6 +112,8 @@ export const MASTER_COLLECTIONS = [
   UrgencyLevels,
   Vehicles,
   CostCenters,
+  // ADR 0023: kantor cabang per PT
+  Sites,
   DocumentSequences,
 ]
 

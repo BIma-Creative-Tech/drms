@@ -145,7 +145,8 @@ const REFUND = sql`coalesce((SELECT sum(c.amount) FROM cash_entries c WHERE c.ex
 
 // ================================================================ K-01 cash balance per account
 
-export type AccountBalance = { id: number; companyId: number; name: string; kind: string; active: boolean; opening: number; totalIn: number; totalOut: number; balance: number }
+/** `siteId` (ADR 0023 Q-S7): the account's site flag (petty cash of a branch), null = no site. */
+export type AccountBalance = { id: number; companyId: number; siteId: number | null; name: string; kind: string; active: boolean; opening: number; totalIn: number; totalOut: number; balance: number }
 
 /** Σ of `value(row)` per company id (per-PT breakdown of row lists), ordered by company id. */
 export function byCompany<T extends { companyId: number }>(list: readonly T[], value: (x: T) => number, companyIds?: readonly number[]): Array<{ companyId: number; total: number }> {
@@ -163,7 +164,7 @@ export function byCompany<T extends { companyId: number }>(list: readonly T[], v
 export async function cashBalances(req: PayloadRequest, scope: ReportScope, asOf: string, accountId?: number): Promise<{ accounts: AccountBalance[]; total: number; byCompany: Array<{ companyId: number; total: number }> }> {
   const r = await rows(
     req,
-    sql`SELECT a.id, a.company_id, a.name, a.kind::text AS kind, coalesce(a.active, true) AS active,
+    sql`SELECT a.id, a.company_id, a.site_id, a.name, a.kind::text AS kind, coalesce(a.active, true) AS active,
           (CASE WHEN a.opening_balance_date IS NULL OR a.opening_balance_date <= ${asOf} THEN coalesce(a.opening_balance, 0) ELSE 0 END)::text AS opening,
           coalesce(sum(e.amount) FILTER (WHERE e.direction = 'in'), 0)::text AS tin,
           coalesce(sum(e.amount) FILTER (WHERE e.direction = 'out'), 0)::text AS tout
@@ -176,7 +177,7 @@ export async function cashBalances(req: PayloadRequest, scope: ReportScope, asOf
     const opening = num(x.opening)
     const totalIn = num(x.tin)
     const totalOut = num(x.tout)
-    return { id: num(x.id), companyId: num(x.company_id), name: String(x.name), kind: String(x.kind), active: x.active !== false, opening, totalIn, totalOut, balance: opening + totalIn - totalOut }
+    return { id: num(x.id), companyId: num(x.company_id), siteId: x.site_id === null || x.site_id === undefined ? null : num(x.site_id), name: String(x.name), kind: String(x.kind), active: x.active !== false, opening, totalIn, totalOut, balance: opening + totalIn - totalOut }
   })
   return { accounts, total: accounts.reduce((s, a) => s + a.balance, 0), byCompany: byCompany(accounts, (a) => a.balance, ledgerCompanies(scope)) }
 }

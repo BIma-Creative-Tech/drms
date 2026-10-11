@@ -20,6 +20,7 @@ export const ProjectListQuery = z
     page: z.coerce.number().int().min(1).max(100_000).default(1),
     limit: z.coerce.number().int().min(1).max(100).default(20),
     company: companyFilterParam,
+    site: z.string().regex(/^\d{1,10}$/).optional().meta({ description: 'ADR 0023: only projects of this site (narrows the read scope).' }),
   })
   .meta({ id: 'ProjectListQuery' })
 
@@ -38,6 +39,7 @@ export const ProjectListItem = z
     contractValue: z.number().nullable().meta({ description: 'RAB of the project (null when not readable, e.g. Operator).' }),
     progressPct: z.number().nullable(),
     costCenter: Ref.nullable().meta({ description: 'D2: default cost center proposed to Finance at the transfer.' }),
+    site: Ref.nullable().meta({ description: 'ADR 0023: site (kantor cabang) that handles the project.' }),
     rapPlanned: z.number().nullable().meta({ description: 'D4: Σ planned RAP amount (price roles only).' }),
     rapRealised: z.number().nullable().meta({ description: 'D4: Σ approved line totals charged to RAP items (price roles only).' }),
     rapPercent: z.number().nullable().meta({ description: 'D4: rapRealised / rapPlanned × 100 (price roles only).' }),
@@ -85,3 +87,35 @@ export const CostCenterList = z
     totalDocs: z.number().int(),
   })
   .meta({ id: 'CostCenterList' })
+
+export const SiteListQuery = z
+  .object({
+    q: z.string().trim().max(100).optional().meta({ description: 'Search in kode / nama (every word must match).' }),
+    active: z.enum(['1', 'all']).optional().meta({ description: 'Default active only; `all` includes deactivated ones.' }),
+    company: companyFilterParam,
+  })
+  .meta({ id: 'SiteListQuery' })
+
+export const SiteList = z
+  .object({
+    docs: z.array(
+      z.object({
+        id,
+        code: z.string(),
+        name: z.string(),
+        companyId: z.number().int(),
+        address: z.string().nullable(),
+        lat: z.number().nullable(),
+        lng: z.number().nullable(),
+        radiusM: z.number().nullable().meta({ description: 'Effective geofence radius (own, else the PT default) when the site has a point.' }),
+        costCenter: Ref.nullable().meta({ description: 'Default (operational) cost center of the site.' }),
+        defaultWorkSchedule: z.object({ id, name: z.string() }).nullable(),
+        active: z.boolean(),
+        home: z.boolean().meta({ description: 'The caller\'s "Site penempatan" (own check-in allowed).' }),
+        assigned: z.boolean().meta({ description: 'The caller has an active site assignment today (own check-in allowed).' }),
+        team: z.boolean().meta({ description: 'The caller may record PM on-behalf here (team site).' }),
+      }),
+    ),
+    totalDocs: z.number().int(),
+  })
+  .meta({ id: 'SiteList', description: 'ADR 0023: sites (kantor cabang) of the selected PTs.' })

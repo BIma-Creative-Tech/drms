@@ -15,6 +15,7 @@ import { ProjectDetailLink as ProjectDetailLink_50199ae12722a75ff9856fb84c25b621
 import { ProjectRapTab as ProjectRapTab_477bcbaacaa37a019b46a0d40f873f32 } from '@/admin/views/ProjectTabs'
 import { ProjectRequestsTab as ProjectRequestsTab_477bcbaacaa37a019b46a0d40f873f32 } from '@/admin/views/ProjectTabs'
 import { BusinessDateField as BusinessDateField_1172137b1c1eab4696f62271d5ebbe2f } from '@/admin/components/BusinessDateField'
+import { SiteFromCostCenterLink as SiteFromCostCenterLink_57dfe94c9146c60f785b1649b36e1df1 } from '@/admin/components/SiteFromCostCenterLink'
 import { WorkflowPanel as WorkflowPanel_6fcc9de32a179d40aa1576187df45f1e } from '@/admin/components/WorkflowPanel'
 import { PdfLinks as PdfLinks_baf3bc4fa5b0188cc15c74a19f03943f } from '@/admin/components/PdfLinks'
 import { RequestTypeField as RequestTypeField_a356a4ed347478242de628aded3440b3 } from '@/admin/components/EditableOnlyFields'
@@ -105,6 +106,7 @@ export const importMap = {
   "@/admin/views/ProjectTabs#ProjectRapTab": ProjectRapTab_477bcbaacaa37a019b46a0d40f873f32,
   "@/admin/views/ProjectTabs#ProjectRequestsTab": ProjectRequestsTab_477bcbaacaa37a019b46a0d40f873f32,
   "@/admin/components/BusinessDateField#BusinessDateField": BusinessDateField_1172137b1c1eab4696f62271d5ebbe2f,
+  "@/admin/components/SiteFromCostCenterLink#SiteFromCostCenterLink": SiteFromCostCenterLink_57dfe94c9146c60f785b1649b36e1df1,
   "@/admin/components/WorkflowPanel#WorkflowPanel": WorkflowPanel_6fcc9de32a179d40aa1576187df45f1e,
   "@/admin/components/PdfLinks#PdfLinks": PdfLinks_baf3bc4fa5b0188cc15c74a19f03943f,
   "@/admin/components/EditableOnlyFields#RequestTypeField": RequestTypeField_a356a4ed347478242de628aded3440b3,

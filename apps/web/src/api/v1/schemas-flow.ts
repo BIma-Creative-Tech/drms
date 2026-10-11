@@ -588,7 +588,18 @@ export const VoidResult = z.object({ original: CashEntry, reversal: CashEntry })
 export const Balances = z
   .object({
     asOf: z.string().nullable(),
-    items: z.array(z.object({ cashAccountId: id, companyId: id, name: z.string(), openingBalance: z.number().int(), totalIn: z.number().int(), totalOut: z.number().int(), balance: z.number().int() })),
+    items: z.array(
+      z.object({
+        cashAccountId: id,
+        companyId: id,
+        siteId: id.nullable().meta({ description: 'ADR 0023 (Q-S7): site flag of the account (petty cash of a branch), null = none.' }),
+        name: z.string(),
+        openingBalance: z.number().int(),
+        totalIn: z.number().int(),
+        totalOut: z.number().int(),
+        balance: z.number().int(),
+      }),
+    ),
   })
   .meta({ id: 'Balances' })
 

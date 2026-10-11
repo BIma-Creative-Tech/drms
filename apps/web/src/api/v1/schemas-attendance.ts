@@ -26,6 +26,7 @@ export const TeamTodayQuery = z
     date: businessDate.optional().meta({ description: 'Default: today (company TZ); not in the future.' }),
     project_id: z.string().regex(/^\d{1,10}$/).optional(),
     cost_center_id: z.string().regex(/^\d{1,10}$/).optional(),
+    site_id: z.string().regex(/^\d{1,10}$/).optional().meta({ description: 'ADR 0023: narrows to a site (its home-site employees and site assignments, attendance rows of the site).' }),
     company: companyFilterParam,
   })
   .meta({ id: 'TeamTodayQuery' })
@@ -38,9 +39,9 @@ export const AttendanceCorrectBody = z
   .strict()
   .meta({ id: 'AttendanceCorrectBody' })
 
-/** Exactly one of project_id / cost_center_id (same rule as schemas-sync.ts SyncAttendancePayload). */
-const oneLocation = (v: { project_id?: number; cost_center_id?: number }) => (v.project_id === undefined) !== (v.cost_center_id === undefined)
-const oneLocationError = { message: 'Isi salah satu: project_id ATAU cost_center_id.', path: ['project_id'] }
+/** Exactly one of project_id / cost_center_id / site_id (same rule as schemas-sync.ts SyncAttendancePayload). */
+const oneLocation = (v: { project_id?: number; cost_center_id?: number; site_id?: number }) => [v.project_id, v.cost_center_id, v.site_id].filter((x) => x !== undefined).length === 1
+const oneLocationError = { message: 'Isi salah satu: project_id, cost_center_id, ATAU site_id.', path: ['project_id'] }
 
 /**
  * Web self-check-in/out (owner decision 2026-10-09, every role). The selfie is uploaded first with
@@ -49,8 +50,9 @@ const oneLocationError = { message: 'Isi salah satu: project_id ATAU cost_center
  */
 export const AttendanceCheckBody = z
   .object({
-    project_id: id.optional().meta({ description: 'Project (one of project_id / cost_center_id).' }),
+    project_id: id.optional().meta({ description: 'Project (exactly one of project_id / cost_center_id / site_id).' }),
     cost_center_id: id.optional().meta({ description: 'Cost center / operational location (E6, Q-40).' }),
+    site_id: id.optional().meta({ description: 'ADR 0023: site (kantor cabang) — allowed at the home site or with an active site assignment.' }),
     lat: z.number().min(-90).max(90),
     lng: z.number().min(-180).max(180),
     accuracy_m: z.number().min(0).max(10_000).nullable().optional().meta({ description: 'Browser GPS accuracy radius (m); up to 50 m is added to the geofence radius.' }),
@@ -63,7 +65,7 @@ export const AttendanceCheckBody = z
 export const AttendanceCheckResult = z.object({ id, localDate: businessDate }).meta({ id: 'AttendanceCheckResult' })
 
 const LocationRef = z
-  .object({ type: z.enum(['project', 'cost_center']), id, code: z.string(), name: z.string() })
+  .object({ type: z.enum(['project', 'cost_center', 'site']), id, code: z.string(), name: z.string() })
   .meta({ id: 'AttendanceLocationRef' })
 
 const Stamp = z.object({ id, time: iso, source: z.enum(['self', 'pm']), corrected: z.boolean() }).nullable()

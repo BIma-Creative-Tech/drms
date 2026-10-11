@@ -66,6 +66,8 @@ export const BookQuery = z.object({
   arah: z.enum(['masuk', 'keluar']).optional().catch(undefined),
   /** MC2: PT filter of the Kas list (a PT without Kas access simply yields no rows). */
   pt: optId,
+  /** ADR 0023 (Q-S7): rows of the cash accounts flagged with this site (petty cash of a branch). */
+  site: optId,
   status: z.enum(['posted', 'void']).optional().catch(undefined),
   /** DRMS 10/10 D8: free text over number + description, page size 20 / 50 / 100 (default 50). */
   q: z.preprocess((v) => (typeof v === 'string' && v.trim() !== '' ? v.trim() : undefined), z.string().max(100).optional()).catch(undefined),
@@ -98,6 +100,7 @@ export function bookWhere(q: BookQuery): Where | undefined {
   if (q.arah) and.push({ direction: { equals: q.arah === 'masuk' ? 'in' : 'out' } })
   if (q.status) and.push({ status: { equals: q.status } })
   if (q.pt) and.push({ company: { equals: q.pt } })
+  if (q.site) and.push({ 'cashAccount.site': { equals: q.site } })
   if (q.q) for (const t of q.q.split(/\s+/).filter(Boolean).slice(0, 5)) and.push({ or: [{ entryNo: { like: t } }, { description: { like: t } }] })
   return and.length ? { and } : undefined
 }
@@ -176,9 +179,12 @@ export function parseRupiahInput(v: string): number | null {
 
 // ---------------------------------------------------------------- DB reads
 
-export type Option = { id: number; label: string; active: boolean; companyId: number | null; openingDate?: string | null }
+/** `siteId` (accounts only, ADR 0023 Q-S7): the account's site flag. */
+export type Option = { id: number; label: string; active: boolean; companyId: number | null; openingDate?: string | null; siteId?: number | null }
 export type Lookups = {
   accounts: Option[]
+  /** ADR 0023: sites of the readable PTs (Kas "Site" filter). */
+  sites: Option[]
   projects: Option[]
   costCenters: Option[]
   categories: Array<Option & { requiresVehicle: boolean }>
@@ -186,7 +192,7 @@ export type Lookups = {
   vehicles: Option[]
 }
 
-async function all(req: PayloadRequest, collection: 'cash-accounts' | 'projects' | 'cost-centers' | 'expense-categories' | 'cash-in-sources' | 'vehicles', sort: string) {
+async function all(req: PayloadRequest, collection: 'cash-accounts' | 'projects' | 'cost-centers' | 'expense-categories' | 'cash-in-sources' | 'vehicles' | 'sites', sort: string) {
   const r = await req.payload.find({ collection, depth: 0, pagination: false, sort, user: req.user, overrideAccess: false, req })
   return r.docs as unknown as Array<Record<string, unknown>>
 }
@@ -196,8 +202,9 @@ const cid = (d: Record<string, unknown>) => relId(d.company) ?? null
 
 /** Masters for filters, labels and the forms (Finance/Owner may read all of them). */
 export async function cashLookups(req: PayloadRequest): Promise<Lookups> {
-  const [accounts, projects, costCenters, categories, sources, vehicles] = await Promise.all([
+  const [accounts, sites, projects, costCenters, categories, sources, vehicles] = await Promise.all([
     all(req, 'cash-accounts', 'name'),
+    all(req, 'sites', 'code'),
     all(req, 'projects', 'code'),
     all(req, 'cost-centers', 'code'),
     all(req, 'expense-categories', 'name'),
@@ -206,7 +213,8 @@ export async function cashLookups(req: PayloadRequest): Promise<Lookups> {
   ])
   return {
     // QA-05: the form's date `min` follows the picked account's opening-balance (go-live) date
-    accounts: accounts.map((d) => ({ id: d.id as number, companyId: cid(d), label: String(d.name ?? ''), active: d.active !== false, openingDate: (d.openingBalanceDate as string | null | undefined) ?? null })),
+    accounts: accounts.map((d) => ({ id: d.id as number, companyId: cid(d), label: String(d.name ?? ''), active: d.active !== false, openingDate: (d.openingBalanceDate as string | null | undefined) ?? null, siteId: relId(d.site) ?? null })),
+    sites: sites.map((d) => ({ id: d.id as number, companyId: cid(d), label: codeName(d), active: d.active !== false })),
     projects: projects.map((d) => ({ id: d.id as number, companyId: cid(d), label: codeName(d), active: d.status !== 'selesai' && d.status !== 'arsip' })),
     costCenters: costCenters.map((d) => ({ id: d.id as number, companyId: cid(d), label: codeName(d), active: d.active !== false })),
     categories: categories.map((d) => ({ id: d.id as number, companyId: cid(d), label: codeName(d), active: d.active !== false, requiresVehicle: d.requiresVehicle === true })),

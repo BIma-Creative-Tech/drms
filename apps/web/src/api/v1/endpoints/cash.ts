@@ -150,7 +150,10 @@ export const balancesEndpoint = v1({
     const companies = await companyQuery(req)
     const kas = kasCompanies(req)
     const companyIds = companies === undefined ? kas : companies.filter((c) => kas.includes(c))
-    return json({ asOf: asOf ?? null, items: await balances(req, asOf, { companyIds }) })
+    // ADR 0023 (Q-S7): `site` = only the accounts flagged with that site (narrows)
+    const site = req.searchParams.get('site')
+    if (site !== null && site !== '' && !/^\d{1,9}$/.test(site)) throw new HttpError(400, 'Bad Request', { detail: 'site tidak valid.' })
+    return json({ asOf: asOf ?? null, items: await balances(req, asOf, { companyIds, siteId: site ? Number(site) : undefined }) })
   },
 })
 
