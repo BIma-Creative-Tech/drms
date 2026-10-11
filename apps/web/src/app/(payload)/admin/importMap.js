@@ -1,3 +1,4 @@
+import { EmployeeLinksPanel as EmployeeLinksPanel_e15c4bf026ff3c24a4c606cd7737ec74 } from '@/admin/components/users/EmployeeLinksPanel'
 import { ActiveCell as ActiveCell_b6480d2f39a4bd4f3db4d5f70c135459 } from '@/admin/components/BoolCell'
 import { YesNoCell as YesNoCell_b6480d2f39a4bd4f3db4d5f70c135459 } from '@/admin/components/BoolCell'
 import { ServerTimeCell as ServerTimeCell_b44dfbf464a87008a587b82d265ca670 } from '@/admin/components/ServerTimeCell'
@@ -63,6 +64,7 @@ import { CollectionCards as CollectionCards_f9c02e79a4aed9a3924487c0cd4cafb1 } f
 
 /** @type import('payload').ImportMap */
 export const importMap = {
+  "@/admin/components/users/EmployeeLinksPanel#EmployeeLinksPanel": EmployeeLinksPanel_e15c4bf026ff3c24a4c606cd7737ec74,
   "@/admin/components/BoolCell#ActiveCell": ActiveCell_b6480d2f39a4bd4f3db4d5f70c135459,
   "@/admin/components/BoolCell#YesNoCell": YesNoCell_b6480d2f39a4bd4f3db4d5f70c135459,
   "@/admin/components/ServerTimeCell#ServerTimeCell": ServerTimeCell_b44dfbf464a87008a587b82d265ca670,

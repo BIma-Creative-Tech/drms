@@ -526,6 +526,10 @@ export interface Employee {
   name: string;
   nickname?: string | null;
   position?: string | null;
+  /**
+   * Akun yang login sebagai karyawan ini di PT ini (diperlukan untuk absensi di APK/web). Hanya akun yang sudah punya akses di PT ini (menu Akses PT); 1 akun hanya untuk 1 karyawan per PT. Kosongkan untuk melepas tautan.
+   */
+  userAccount?: (number | null) | User;
   phone?: string | null;
   workSchedule?: (number | null) | WorkSchedule;
   faceRefPhoto?: (number | null) | MediaSelfy;
@@ -2747,6 +2751,7 @@ export interface EmployeesSelect<T extends boolean = true> {
   name?: T;
   nickname?: T;
   position?: T;
+  userAccount?: T;
   phone?: T;
   workSchedule?: T;
   faceRefPhoto?: T;

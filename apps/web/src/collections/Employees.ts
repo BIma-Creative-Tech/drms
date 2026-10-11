@@ -8,6 +8,7 @@ import { activeField, codeField, odooRefField, uuidField } from '@/fields/common
 
 import { companyField, companyHook, pickerSameCompany, requireCompanyWhenAmbiguous } from '@/fields/company'
 import { validationError } from '@/lib/validation'
+import { adminCreatePrefill, applyUserAccount, readUserAccount, USER_ACCOUNT, userAccountOptions, userAccountReadAccess, validateUserAccount } from '@/domain/employee-user-link'
 
 /**
  * QA-MC4-14: a NEWLY set face reference photo must be a selfie of the employee's PT — one whose
@@ -36,7 +37,8 @@ const faceRefSamePt: CollectionBeforeChangeHook = async ({ data, originalDoc, re
 
 /**
  * Karyawan / staff, one row per PT (ADR 0016 D1). An employee without a user account can still be a
- * requester ("Diajukan Oleh"); the user ↔ employee link of a PT lives on `company-memberships`. Everyone with a role can list employees (requester/team pickers); phone numbers only
+ * requester ("Diajukan Oleh"); the user ↔ employee link of a PT lives on `company-memberships` and is
+ * edited here through the virtual "Akun pengguna" (domain/employee-user-link.ts). Everyone with a role can list employees (requester/team pickers); phone numbers only
  * for Admin/Owner/Finance/PM and the employee themself. Admin C/R/U, Owner R/U.
  */
 export const Employees: CollectionConfig = withAudit(
@@ -60,7 +62,10 @@ export const Employees: CollectionConfig = withAudit(
           return data
         },
       ],
-      beforeChange: [companyHook('employees', { check: [{ field: 'workSchedule', collection: 'work-schedules' }] }), faceRefSamePt],
+      // validateUserAccount after the company hook (needs the resolved PT); errors land on the field
+      beforeChange: [companyHook('employees', { check: [{ field: 'workSchedule', collection: 'work-schedules' }] }), faceRefSamePt, validateUserAccount],
+      // same req = same transaction as the employee write (create: the id exists now)
+      afterChange: [applyUserAccount],
     },
     fields: [
       {
@@ -70,12 +75,37 @@ export const Employees: CollectionConfig = withAudit(
           const own = requireCompanyWhenAmbiguous(value, opts as never)
           return own === true ? relationship(value as never, opts) : own
         },
+        // "Buat karyawan" on the user form opens /admin/collections/employees/create?company=<PT>&user=<id>
+        defaultValue: ({ req }: { req: Parameters<typeof adminCreatePrefill>[0] }) => adminCreatePrefill(req, 'employees', 'company'),
         admin: { description: 'PT tempat karyawan ini bekerja (1 data karyawan = 1 PT; orang yang bekerja di 2 PT punya 2 data karyawan). Tidak dapat diubah setelah dibuat.' },
       },
       codeField('Kode', 32, { perCompany: true }),
       { name: 'name', type: 'text', label: 'Nama lengkap', required: true, maxLength: 128 },
       { name: 'nickname', type: 'text', label: 'Nama panggilan', maxLength: 64 },
       { name: 'position', type: 'text', label: 'Jabatan', maxLength: 128 },
+      // Owner decision 2026-10-10: the login account of this employee in this PT, shown and edited on the
+      // employee form. VIRTUAL — stored only as company-memberships.employee (read/write: domain/employee-user-link.ts).
+      {
+        name: USER_ACCOUNT,
+        type: 'relationship',
+        relationTo: 'users',
+        label: 'Akun pengguna',
+        virtual: true,
+        defaultValue: ({ req }: { req: Parameters<typeof adminCreatePrefill>[0] }) => adminCreatePrefill(req, 'employees', 'user'),
+        filterOptions: userAccountOptions,
+        access: { read: userAccountReadAccess },
+        // a duplicated employee starts without an account (1 account = 1 employee per PT)
+        hooks: { afterRead: [readUserAccount], beforeDuplicate: [() => null] },
+        admin: {
+          readOnly: false, // Payload makes `virtual` fields readOnly by default (sanitize.js)
+          allowCreate: false, // accounts are created in Pengguna (Keycloak sync), access in Akses PT
+          disableBulkEdit: true,
+          disableListColumn: true,
+          disableListFilter: true,
+          description:
+            'Akun yang login sebagai karyawan ini di PT ini (diperlukan untuk absensi di APK/web). Hanya akun yang sudah punya akses di PT ini (menu Akses PT); 1 akun hanya untuk 1 karyawan per PT. Kosongkan untuk melepas tautan.',
+        },
+      },
       {
         name: 'phone',
         type: 'text',
