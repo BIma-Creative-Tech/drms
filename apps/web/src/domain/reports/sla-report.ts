@@ -33,6 +33,7 @@ type Raw = {
   title: string
   type: RequestType
   approved_at: string
+  approved_local: string
   company_id: number
   sla_hours: number | string | null
   timezone: string | null
@@ -45,7 +46,7 @@ export async function slaRows(req: PayloadRequest, scope: ReportScope, from: str
   const r = await rows<Raw>(
     req,
     sql`SELECT t.id AS transfer_id, t.doc_no AS transfer_no, t.transfer_at, t.created_at, er.id AS request_id, er.doc_no AS request_no, er.title,
-               er.type::text AS type, er.approved_at, t.company_id, c.transfer_sla_hours AS sla_hours, c.timezone
+               er.type::text AS type, er.approved_at, to_char(er.approved_at AT TIME ZONE coalesce(c.timezone, ${DEFAULT_TZ}), 'YYYY-MM-DD HH24:MI') AS approved_local, t.company_id, c.transfer_sla_hours AS sla_hours, c.timezone
           FROM transfers t
           JOIN expense_requests er ON er.id = t.request_id
           JOIN companies c ON c.id = t.company_id
@@ -58,6 +59,13 @@ export async function slaRows(req: PayloadRequest, scope: ReportScope, from: str
     const m = measure({ approvedAt: new Date(x.approved_at), transferAt: x.transfer_at ? new Date(x.transfer_at) : null, recordedAt: new Date(x.created_at), slaHours })
     return { ...x, m, slaHours, month: monthInTz(m.effectiveAt, x.timezone || process.env.TZ || DEFAULT_TZ) }
   })
+}
+
+/** 'YYYY-MM-DD HH:MM' in the PT zone (report `datetime` cells). */
+const localDateTime = (at: Date, tz: string) => {
+  const p = new Intl.DateTimeFormat('en-CA', { timeZone: tz, hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }).formatToParts(at)
+  const g = (t: string) => p.find((v) => v.type === t)?.value ?? '00'
+  return `${g('year')}-${g('month')}-${g('day')} ${g('hour')}:${g('minute')}`
 }
 
 const hoursCell = (h: number | null) => (h === null ? null : Math.round(h * 10) / 10)
@@ -119,8 +127,8 @@ export function slaTables(list: SlaRow[], range: { from: string; to: string }): 
             judul: x.title,
             jenis: REQUEST_TYPE_LABELS[x.type] ?? x.type,
             transfer: x.transfer_no ?? `#${x.transfer_id}`,
-            disetujui: x.approved_at,
-            ditransfer: x.m.effectiveAt.toISOString(),
+            disetujui: x.approved_local,
+            ditransfer: localDateTime(x.m.effectiveAt, x.timezone || process.env.TZ || DEFAULT_TZ),
             durasi: formatHours(x.m.hours),
             sla: x.slaHours,
             catatan: x.m.timeKnown ? '' : 'Jam transfer tidak diketahui (waktu pencatatan)',
