@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto'
 
 import { createLocalReq } from 'payload'
 import { renderToString } from 'react-dom/server'
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 
 import { WorkflowPanel } from '@/admin/components/WorkflowPanel'
 import { addDays } from '@/domain/expense/types'
@@ -18,6 +18,9 @@ import { api, draftBody, makeWorld, png, upload, type FlowUser, type World } fro
  * (3) each requester action happy path + one negative, (4) self-service profile signature,
  * (5) the server-rendered workflow panel (timeline, next actor, buttons only for own requests).
  */
+// DRMS 10/10 9d: the decider's panel renders the decision bar (ActionButton → useRouter)
+vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: () => {} }) }))
+
 let w: World
 const E = '/api/v1/expense-requests'
 const key = () => ({ 'Idempotency-Key': randomUUID() })
@@ -68,15 +71,16 @@ describe('F2c staff panel — access restrictions', () => {
 
 describe('F2c admin create/edit form path (generic REST) = same draft rules as /api/v1', () => {
   const lines = () => [
-    { description: 'BBM operasional', qty: 24.8, uom: w.uom.l, total: 250_000, category: w.cat.bbm, vehicle: w.vehicle },
+    { description: 'BBM operasional', qty: 25, uom: w.uom.l, unitPrice: 10_000, total: 250_000, category: w.cat.bbm, vehicle: w.vehicle },
     { description: 'Penginapan', qty: 1, uom: w.uom.kmr, total: 400_000, category: w.cat.inap },
   ]
 
-  it('Admin creates on behalf (Q-09): 2 requesters, cost center, bank account of the 2nd requester; grand total server-computed', async () => {
+  it('Admin creates on behalf (Q-09): 2 requesters, project, bank account of the 2nd requester; grand total server-computed', async () => {
+    // DRMS 10/10 D2: a project request (the form no longer offers a cost center)
     const r = await api('POST', '/api/expense-requests', w.users.admin, {
       type: 'advance',
       title: 'Perjalanan dinas (atas nama)',
-      costCenter: w.costCenter,
+      project: w.project,
       requesters: [w.emp.a, w.emp.b],
       bankAccount: w.accB,
       lines: lines(),
@@ -92,12 +96,13 @@ describe('F2c admin create/edit form path (generic REST) = same draft rules as /
     expect(s.body.approvals.find((a: { position: string }) => a.position === 'diajukan')).toMatchObject({ onBehalf: true, employeeId: w.emp.a })
   })
 
-  it('negatives: staff on behalf of someone else 403; project AND cost center 400; foreign bank account 400; project out of scope 403', async () => {
+  it('negatives: staff on behalf of someone else 403; a cost center is ignored (D2); foreign bank account 400; project out of scope 403', async () => {
     const base = { type: 'reimburse', title: 'Uji', lines: lines() }
     const onBehalf = await api('POST', '/api/expense-requests', w.users.staffA, { ...base, requesters: [w.emp.b], costCenter: w.costCenter })
     expect(onBehalf.status, JSON.stringify(onBehalf.body)).toBe(403)
     const both = await api('POST', '/api/expense-requests', w.users.admin, { ...base, project: w.project, costCenter: w.costCenter, requesters: [w.emp.a] })
-    expect(both.status).toBe(400)
+    expect(both.status, JSON.stringify(both.body)).toBe(201)
+    expect(both.body.doc.costCenter ?? null).toBeNull()
     const bank = await api('POST', '/api/expense-requests', w.users.admin, { ...base, costCenter: w.costCenter, requesters: [w.emp.b], bankAccount: w.accA })
     expect(bank.status).toBe(400)
     expect(JSON.stringify(bank.body)).toContain('bankAccount')
@@ -160,7 +165,7 @@ describe('F2c requester actions (panel request shapes)', () => {
     expect(r.body.id).not.toBe(a.id)
   })
 
-  it('Upload nota per baris (Reimburse draft): media upload + receipt → flags; Uang Muka draft → 409', async () => {
+  it('Upload nota per baris (Reimburse draft): media upload + receipt → flags; Pengajuan Baru draft → 409', async () => {
     const d = await draft(w.users.staffA, { type: 'reimburse' })
     const img = await upload('/api/v1/media/receipts', w.users.staffA, await png())
     expect(img.status).toBe(201)
@@ -181,7 +186,7 @@ describe('F2c requester actions (panel request shapes)', () => {
     expect(neg.status).toBe(409)
   })
 
-  it('Kirim LPJ / revisi / Kirim ulang LPJ (Uang Muka): usage notes required; revision note visible to the requester', async () => {
+  it('Kirim LPJ / revisi / Kirim ulang LPJ (Pengajuan Baru): usage notes required; revision note visible to the requester', async () => {
     const a = await draft()
     await api('POST', `${E}/${a.id}/submit`, w.users.staffA, {}, key())
     await api('POST', `${E}/${a.id}/acknowledge`, w.users.owner, {}, key())
@@ -227,6 +232,8 @@ describe('F2c workflow panel (server-rendered in the edit view)', () => {
     expect(html).toContain('Menunggu Diketahui')
     expect(html).toContain('data-pk-next-actor')
     expect(html).not.toContain('data-pk-panel="requester"')
+    // DRMS 10/10 9d: the decider whose turn it is gets Setujui / Tolak on the detail too
+    expect(html).toContain('data-pk-decision-bar')
     const own = await panelHtml(w.users.staffA, a.id)
     expect(own).toContain('data-pk-action="withdraw"')
     expect(own).toContain('data-pk-action="cancel"')

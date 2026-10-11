@@ -19,6 +19,7 @@ import { getRequestTx } from '@/lib/tx'
 import { isTeamPm, mayReadAddenda } from './access'
 import { addendumAllowedActions, addendumInputErrors, ADDENDUM_STATUS_LABELS, newBudget, pctOf, type AddendumAction, type AddendumActorContext, type AddendumStatus } from './rules'
 import { contextCompanyId, membersWithRole } from '@/domain/companies'
+import { searchWhere } from '@/lib/text-search'
 
 /**
  * E5 Addendum RAB (T12, US-18/US-30) — the single write path behind /api/v1/budget-addenda.
@@ -618,7 +619,7 @@ export async function addendumDetail(req: PayloadRequest, doc: AddendumDoc) {
   }
 }
 
-export type AddendumFilter = { projectId?: number; status?: AddendumStatus; mine?: boolean; limit: number; after?: number; companyIds?: readonly number[] }
+export type AddendumFilter = { projectId?: number; status?: AddendumStatus; mine?: boolean; limit: number; after?: number; companyIds?: readonly number[]; q?: string }
 
 /** List (newest first, caller scope: PM team/own, Direktur/Finance all), cursor on id. */
 export async function listAddenda(req: PayloadRequest, f: AddendumFilter): Promise<{ items: AddendumSummary[]; nextCursor: number | null }> {
@@ -629,6 +630,8 @@ export async function listAddenda(req: PayloadRequest, f: AddendumFilter): Promi
   if (f.mine) and.push({ createdBy: { equals: userId(req) ?? -1 } })
   if (f.after !== undefined) and.push({ id: { less_than: f.after } })
   if (f.companyIds?.length) and.push({ company: { in: [...f.companyIds] } }) // MC3: narrows only
+  const text = searchWhere(['docNo', 'reason'], f.q) // DRMS 10/10 D8
+  if (text) and.push(text)
   const res = await req.payload.find({
     collection: 'budget-addenda',
     where: and.length ? { and } : undefined,

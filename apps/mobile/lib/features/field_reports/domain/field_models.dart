@@ -43,10 +43,11 @@ enum ProjectKind {
 
   static ProjectKind fromCode(Object? c) => values.firstWhere((k) => k.code == c, orElse: () => umum);
 
-  /// kontrak_unit → Timesheet Unit + Servis; aftersales → Servis + Aktivitas; others: none (konstruksi: P3).
+  /// kontrak_unit → Timesheet Unit + Servis; aftersales → Servis + Aktivitas; konstruksi → Laporan Harian (P3).
   List<FieldReportType> get reportTypes => switch (this) {
     kontrakUnit => const [FieldReportType.unitTimesheet, FieldReportType.serviceReport],
     aftersales => const [FieldReportType.serviceReport, FieldReportType.aftersalesActivity],
+    konstruksi => const [FieldReportType.dailyReport],
     _ => const [],
   };
 
@@ -62,11 +63,14 @@ enum ProjectKind {
 enum FieldReportType {
   serviceReport('service_report', 'service_report.upsert', 'Laporan Servis Unit', 10),
   unitTimesheet('unit_timesheet', 'unit_timesheet.upsert', 'Timesheet Unit', 1),
-  aftersalesActivity('aftersales_activity', 'aftersales_activity.upsert', 'Aktivitas Aftersales', 5);
+  aftersalesActivity('aftersales_activity', 'aftersales_activity.upsert', 'Aktivitas Aftersales', 5),
+
+  /// P3 konstruksi: volume pekerjaan / material per item RAP, tenaga, alat, cuaca (server ≥ 0.8).
+  dailyReport('daily_report', 'daily_report.upsert', 'Laporan Harian', 10);
 
   const FieldReportType(this.code, this.syncType, this.label, this.maxPhotos);
 
-  /// `service_report` | `unit_timesheet` | `aftersales_activity` (server FieldReportType).
+  /// `service_report` | `unit_timesheet` | `aftersales_activity` | `daily_report` (server FieldReportType).
   final String code;
 
   /// Item type of `POST /sync/batch`.
@@ -87,6 +91,7 @@ enum FieldReportType {
     serviceReport => 'report_id',
     unitTimesheet => 'timesheet_id',
     aftersalesActivity => 'activity_id',
+    dailyReport => 'daily_report_id',
   };
 
   /// Payload key of the APK id of the record.
@@ -94,6 +99,7 @@ enum FieldReportType {
     serviceReport => 'report_client_uuid',
     unitTimesheet => 'timesheet_client_uuid',
     aftersalesActivity => 'activity_client_uuid',
+    dailyReport => 'daily_report_client_uuid',
   };
 
   /// `/api/v1` collection path.
@@ -101,6 +107,7 @@ enum FieldReportType {
     serviceReport => '/service-reports',
     unitTimesheet => '/unit-timesheets',
     aftersalesActivity => '/aftersales-activities',
+    dailyReport => '/daily-reports',
   };
 
   /// Route segment of the editor (`/field/<segment>/new`).
@@ -108,6 +115,7 @@ enum FieldReportType {
     serviceReport => 'service',
     unitTimesheet => 'timesheet',
     aftersalesActivity => 'aftersales',
+    dailyReport => 'daily',
   };
 
   static FieldReportType? fromSegment(String? s) => values.where((t) => t.segment == s).firstOrNull;
@@ -167,6 +175,18 @@ enum PoStatus {
   final String label;
   static PoStatus? fromCode(Object? c) => values.where((v) => v.code == c).firstOrNull;
   bool get open => this == belumKirim || this == sebagian;
+}
+
+/// Weather of a daily report part of the day (pagi / siang / sore).
+enum Weather {
+  cerah('cerah', 'Cerah'),
+  berawan('berawan', 'Berawan'),
+  hujan('hujan', 'Hujan');
+
+  const Weather(this.code, this.label);
+  final String code;
+  final String label;
+  static Weather? fromCode(Object? c) => values.where((v) => v.code == c).firstOrNull;
 }
 
 /// Local state of a field report on the phone. `local` = autosaved draft (not yet sent).
@@ -281,6 +301,7 @@ sealed class FieldContent {
     FieldReportType.serviceReport => ServiceContent.fromJson(j),
     FieldReportType.unitTimesheet => TimesheetContent.fromJson(j),
     FieldReportType.aftersalesActivity => ActivityContent.fromJson(j),
+    FieldReportType.dailyReport => DailyContent.fromJson(j),
   };
 }
 
@@ -526,6 +547,234 @@ class ActivityContent extends FieldContent {
   );
 }
 
+/// Material of one RAP item in a daily report: received / used today.
+class DailyMaterial {
+  const DailyMaterial({this.received, this.used});
+  final double? received;
+  final double? used;
+
+  bool get isBlank => (received ?? 0) == 0 && (used ?? 0) == 0;
+  Json toJson() => {'received': received, 'used': used};
+  factory DailyMaterial.fromJson(Object? v) {
+    final j = fMap(v);
+    return DailyMaterial(received: fDblN(j['received']), used: fDblN(j['used']));
+  }
+}
+
+/// Equipment of one resource type: units + working hours.
+class DailyEquipment {
+  const DailyEquipment({this.count, this.hours});
+  final int? count;
+  final double? hours;
+
+  Json toJson() => {'count': count, 'hours': hours};
+  factory DailyEquipment.fromJson(Object? v) {
+    final j = fMap(v);
+    return DailyEquipment(count: fIntN(j['count']), hours: fDblN(j['hours']));
+  }
+}
+
+Map<int, T> _byId<T>(Object? v, T Function(Object?) f) => {
+  for (final MapEntry(:key, :value) in fMap(v).entries)
+    if (int.tryParse(key) case final int id) id: f(value),
+};
+Json _idMap<T>(Map<int, T> m, Object? Function(T) f) => {for (final e in m.entries) '${e.key}': f(e.value)};
+
+/// P3 Laporan Harian (konstruksi). Volumes per RAP item are the report's TOTALS (on an edit the server books the
+/// difference to its ledger); manpower / equipment per resource type of the PT.
+class DailyContent extends FieldContent {
+  const DailyContent({
+    this.weatherMorning,
+    this.weatherNoon,
+    this.weatherAfternoon,
+    this.rainHours,
+    this.stopHours,
+    this.work = const {},
+    this.materials = const {},
+    this.manpower = const {},
+    this.equipment = const {},
+    this.issues = '',
+    this.notes = '',
+    this.photos = const [],
+    this.baseWork = const {},
+  });
+  final Weather? weatherMorning;
+  final Weather? weatherNoon;
+  final Weather? weatherAfternoon;
+  final double? rainHours;
+  final double? stopHours;
+
+  /// RAP item id (pekerjaan) → volume today.
+  final Map<int, double> work;
+
+  /// RAP item id (material) → received / used today.
+  final Map<int, DailyMaterial> materials;
+
+  /// Resource type id (tenaga) → people.
+  final Map<int, int> manpower;
+
+  /// Resource type id (alat) → units + hours.
+  final Map<int, DailyEquipment> equipment;
+  final String issues;
+  final String notes;
+  final List<String> photos;
+
+  /// Edit of a server report: the volumes the server already booked for it (over-RAP check, zeros sent).
+  final Map<int, double> baseWork;
+
+  @override
+  List<String> get photoUuids => photos;
+
+  int get workerCount => manpower.values.fold(0, (a, b) => a + b);
+  int get workItems => work.values.where((v) => v > 0).length;
+
+  DailyContent copyWith({
+    Weather? weatherMorning,
+    Weather? weatherNoon,
+    Weather? weatherAfternoon,
+    bool clearMorning = false,
+    bool clearNoon = false,
+    bool clearAfternoon = false,
+    double? rainHours,
+    bool clearRain = false,
+    double? stopHours,
+    bool clearStop = false,
+    Map<int, double>? work,
+    Map<int, DailyMaterial>? materials,
+    Map<int, int>? manpower,
+    Map<int, DailyEquipment>? equipment,
+    String? issues,
+    String? notes,
+    List<String>? photos,
+  }) => DailyContent(
+    weatherMorning: clearMorning ? null : (weatherMorning ?? this.weatherMorning),
+    weatherNoon: clearNoon ? null : (weatherNoon ?? this.weatherNoon),
+    weatherAfternoon: clearAfternoon ? null : (weatherAfternoon ?? this.weatherAfternoon),
+    rainHours: clearRain ? null : (rainHours ?? this.rainHours),
+    stopHours: clearStop ? null : (stopHours ?? this.stopHours),
+    work: work ?? this.work,
+    materials: materials ?? this.materials,
+    manpower: manpower ?? this.manpower,
+    equipment: equipment ?? this.equipment,
+    issues: issues ?? this.issues,
+    notes: notes ?? this.notes,
+    photos: photos ?? this.photos,
+    baseWork: baseWork,
+  );
+
+  @override
+  Json toJson() => {
+    'weatherMorning': weatherMorning?.code,
+    'weatherNoon': weatherNoon?.code,
+    'weatherAfternoon': weatherAfternoon?.code,
+    'rainHours': rainHours,
+    'stopHours': stopHours,
+    'work': _idMap(work, (v) => v),
+    'materials': _idMap(materials, (v) => v.toJson()),
+    'manpower': _idMap(manpower, (v) => v),
+    'equipment': _idMap(equipment, (v) => v.toJson()),
+    'issues': issues,
+    'notes': notes,
+    'photos': photos,
+    'baseWork': _idMap(baseWork, (v) => v),
+  };
+
+  factory DailyContent.fromJson(Json j) => DailyContent(
+    weatherMorning: Weather.fromCode(j['weatherMorning']),
+    weatherNoon: Weather.fromCode(j['weatherNoon']),
+    weatherAfternoon: Weather.fromCode(j['weatherAfternoon']),
+    rainHours: fDblN(j['rainHours']),
+    stopHours: fDblN(j['stopHours']),
+    work: _byId(j['work'], (v) => fDblN(v) ?? 0),
+    materials: _byId(j['materials'], DailyMaterial.fromJson),
+    manpower: _byId(j['manpower'], (v) => fInt(v)),
+    equipment: _byId(j['equipment'], DailyEquipment.fromJson),
+    issues: fStr(j['issues']),
+    notes: fStr(j['notes']),
+    photos: _strings(j['photos']),
+    baseWork: _byId(j['baseWork'], (v) => fDblN(v) ?? 0),
+  );
+}
+
+/// RAP item of a konstruksi project (cache of `GET /projects/{id}/rap`; prices are never stored).
+class RapItem {
+  const RapItem({
+    required this.id,
+    required this.companyId,
+    required this.projectId,
+    required this.code,
+    this.description = '',
+    required this.kind,
+    this.uom = '',
+    this.stageName = '',
+    this.volume = 0,
+    this.realised = 0,
+    this.received = 0,
+    this.used = 0,
+    this.sortOrder = 0,
+    this.active = true,
+  });
+  final int id;
+  final int companyId;
+  final int projectId;
+  final String code;
+  final String description;
+
+  /// `pekerjaan` (counts toward progress) | `material` (masuk / terpakai / stok).
+  final String kind;
+  final String uom;
+  final String stageName;
+  final double volume;
+  final double realised;
+  final double received;
+  final double used;
+  final int sortOrder;
+  final bool active;
+
+  bool get isWork => kind == 'pekerjaan';
+  double get stock => ((received - used) * 100).round() / 100;
+
+  /// Progress of the item 0–100 (capped).
+  double get pct => volume <= 0 ? 0 : ((realised / volume).clamp(0, 1) * 10000).round() / 100;
+
+  factory RapItem.fromJson(Json j, {required int projectId, required int companyId}) => RapItem(
+    id: fInt(j['id']),
+    companyId: companyId,
+    projectId: projectId,
+    code: fStr(j['code']),
+    description: fStr(j['description']),
+    kind: fStr(j['kind']),
+    uom: fStr(fMap(j['uom'])['code']),
+    stageName: fStr(fMap(j['stage'])['name']),
+    volume: fDblN(j['volume']) ?? 0,
+    realised: fDblN(j['realised']) ?? 0,
+    received: fDblN(j['received']) ?? 0,
+    used: fDblN(j['used']) ?? 0,
+    sortOrder: fInt(j['sortOrder']),
+    active: j['active'] != false,
+  );
+}
+
+/// Manpower / equipment type of a PT (`tenaga` | `alat`).
+class ResourceType {
+  const ResourceType({required this.id, required this.companyId, required this.kind, this.code = '', this.name = ''});
+  final int id;
+  final int companyId;
+  final String kind;
+  final String code;
+  final String name;
+
+  bool get isManpower => kind == 'tenaga';
+
+  factory ResourceType.fromJson(Json j, {required int companyId}) => ResourceType(
+    id: fInt(j['id']),
+    companyId: companyId,
+    kind: fStr(j['kind']),
+    code: fStr(j['code']),
+    name: fStr(j['name']),
+  );
+}
+
 /// A field report written or edited on the phone (row of `local_field_reports`).
 class FieldDraft {
   const FieldDraft({
@@ -585,7 +834,7 @@ class FieldDraft {
 
   int? get unitId => switch (content) {
     ServiceContent(:final unitId) || TimesheetContent(:final unitId) => unitId,
-    ActivityContent() => null,
+    ActivityContent() || DailyContent() => null,
   };
 
   int? get clientId => switch (content) {
@@ -597,7 +846,7 @@ class FieldDraft {
   double? get hourMeter => switch (content) {
     ServiceContent(:final hourMeter) => hourMeter,
     TimesheetContent(:final hmEnd) => hmEnd,
-    ActivityContent() => null,
+    ActivityContent() || DailyContent() => null,
   };
 
   int get photoTotal => serverPhotoCount + content.photoUuids.length;
@@ -605,6 +854,7 @@ class FieldDraft {
   ServiceContent get service => content as ServiceContent;
   TimesheetContent get timesheet => content as TimesheetContent;
   ActivityContent get activity => content as ActivityContent;
+  DailyContent get daily => content as DailyContent;
 
   FieldDraft copyWith({
     FieldContent? content,
@@ -659,6 +909,10 @@ class FieldDraft {
       c.clientName,
       [c.kind?.label ?? '', c.docNo.trim()].where((e) => e.isNotEmpty).join(' '),
     ].where((e) => e.isNotEmpty).join(' · '),
+    final DailyContent c => [
+      if (c.workItems > 0) '${c.workItems} item pekerjaan',
+      if (c.workerCount > 0) '${c.workerCount} pekerja',
+    ].join(' · '),
   };
 }
 
@@ -946,7 +1200,22 @@ class FieldRecord {
     if (fIntN(fMap(raw['hmPhoto'])['id']) case final int hm) hm,
   ];
 
-  List<PartLine> get parts => _lines(raw[type == FieldReportType.serviceReport ? 'spareparts' : 'items']);
+  List<PartLine> get parts => switch (type) {
+    FieldReportType.serviceReport => _lines(raw['spareparts']),
+    FieldReportType.aftersalesActivity => _lines(raw['items']),
+    _ => const [],
+  };
+
+  /// Daily report: (item, qty) of the work booked on the report.
+  List<({int id, String code, String uom, double qty})> get dailyWork => [
+    for (final w in fList(raw['work']))
+      (
+        id: fInt(fMap(fMap(w)['item'])['id']),
+        code: fStr(fMap(fMap(w)['item'])['code']),
+        uom: fStr(fMap(fMap(w)['item'])['uom']),
+        qty: fDblN(fMap(w)['qty']) ?? 0,
+      ),
+  ];
 
   /// Title line of lists.
   String get title => switch (type) {
@@ -956,6 +1225,8 @@ class FieldRecord {
     ].where((e) => e.isNotEmpty).join(' · '),
     FieldReportType.unitTimesheet => unitCode,
     FieldReportType.aftersalesActivity => [clientName, kind?.label ?? ''].where((e) => e.isNotEmpty).join(' · '),
+    FieldReportType.dailyReport =>
+      dailyWork.map((w) => '${w.code} ${fmtNum(w.qty)} ${w.uom}'.trim()).take(3).join(', '),
   };
 
   /// Second line of lists.
@@ -976,6 +1247,11 @@ class FieldRecord {
       parts.map((p) => p.summary).where((e) => e.isNotEmpty).join(', '),
       if (poStatus != null) poStatus!.label,
       if (followUpDate != null) 'follow-up $followUpDate',
+    ].where((e) => e.isNotEmpty).join(' · '),
+    FieldReportType.dailyReport => [
+      if (fInt(raw['workerCount']) > 0) '${fInt(raw['workerCount'])} pekerja',
+      if (Weather.fromCode(fMap(raw['weather'])['afternoon']) case final Weather w) 'sore ${w.label.toLowerCase()}',
+      fStr(raw['issues']),
     ].where((e) => e.isNotEmpty).join(' · '),
   };
 
@@ -1023,6 +1299,36 @@ class FieldRecord {
         receiver: fStr(raw['receiver']),
         notes: fStr(raw['notes']),
       ),
+      FieldReportType.dailyReport => () {
+        final w = fMap(raw['weather']);
+        final work = {for (final x in dailyWork) x.id: x.qty};
+        return DailyContent(
+          weatherMorning: Weather.fromCode(w['morning']),
+          weatherNoon: Weather.fromCode(w['noon']),
+          weatherAfternoon: Weather.fromCode(w['afternoon']),
+          rainHours: fDblN(raw['rainHours']),
+          stopHours: fDblN(raw['stopHours']),
+          work: work,
+          baseWork: work,
+          materials: {
+            for (final m in fList(raw['materials']))
+              fInt(fMap(fMap(m)['item'])['id']): DailyMaterial(
+                received: fDblN(fMap(m)['received']),
+                used: fDblN(fMap(m)['used']),
+              ),
+          },
+          manpower: {for (final m in fList(raw['manpower'])) fInt(fMap(m)['resourceTypeId']): fInt(fMap(m)['count'])},
+          equipment: {
+            for (final m in fList(raw['equipment']))
+              fInt(fMap(m)['resourceTypeId']): DailyEquipment(
+                count: fIntN(fMap(m)['count']),
+                hours: fDblN(fMap(m)['hours']),
+              ),
+          },
+          issues: fStr(raw['issues']),
+          notes: fStr(raw['notes']),
+        );
+      }(),
     };
     return FieldDraft(
       clientUuid: clientUuid,

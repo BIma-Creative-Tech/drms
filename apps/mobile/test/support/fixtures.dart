@@ -40,7 +40,7 @@ Map<String, dynamic> detailJson({
       'description': 'BBM',
       'qty': 1,
       'uom': {'id': 3, 'name': 'bulan'},
-      'unitPrice': null,
+      'unitPrice': 600000,
       'unitPriceDisplay': 600000,
       'total': 600000,
       'notes': null,
@@ -53,9 +53,10 @@ Map<String, dynamic> detailJson({
       'description': 'Penginapan',
       'qty': 2,
       'uom': {'id': 4, 'name': 'kamar'},
-      'unitPrice': 339000,
-      'unitPriceDisplay': 339000,
+      'unitPrice': 338500,
+      'unitPriceDisplay': 338500,
       'total': 677000,
+      'receiptAmount': 676876, // D3 "Nominal sesuai nota" ≠ total → "Selisih nota"
       'notes': null,
       'category': {'id': 2, 'name': 'Penginapan'},
       'vehicle': null,
@@ -228,6 +229,49 @@ Map<String, dynamic> e1DetailJson({
   ...detailJson(status: status, allowed: allowed, approvals: approvals),
   'statusLabel': status == 'pending_ack' ? 'Menunggu Diketahui (Direktur)' : 'Menunggu Approval',
   'approvalRule': rule ?? e1RuleJson(),
+};
+
+/// ADR 0021 rule snapshot: "Diketahui" = approval by the PM project (scope_manager, resolved user),
+/// then the Direktur at level 1; Finance only transfers.
+Map<String, dynamic> pmRuleJson({String? selfApproval, List<Map<String, dynamic>> skipped = const []}) => {
+  'id': 7,
+  'name': 'Default — PM project lalu Direktur (semua nominal)',
+  'acknowledge': skipped.any((s) => s['position'] == 'diketahui') ? 'none' : 'required',
+  'acknowledgerUserId': 31,
+  'acknowledgeDelegatedTo': null,
+  'acknowledgeDelegationReason': null,
+  'acknowledgeBy': 'scope_manager',
+  'acknowledgeRole': null,
+  'decisionRoles': ['pk-owner', 'pk-finance'],
+  'selfApproval': selfApproval,
+  'skipped': skipped,
+  'steps': [
+    {'level': 1, 'approverRole': 'pk-owner', 'approverUserId': null},
+  ],
+  'signDiajukan': 'required',
+  'signDibuat': 'required',
+};
+
+/// Detail under the ADR 0021 flow (PM project → Direktur).
+Map<String, dynamic> pmDetailJson({
+  String status = 'pending_ack',
+  List<String> allowed = const ['acknowledge', 'reject'],
+  List<Map<String, dynamic>>? approvals,
+  Map<String, dynamic>? rule,
+}) => {
+  ...detailJson(
+    status: status,
+    allowed: allowed,
+    // waiting for the PM: only the signatures exist so far
+    approvals:
+        approvals ??
+        (status == 'pending_ack'
+            ? [_appr(1, 'diajukan', 0, 'Budi', 'signed'), _appr(2, 'dibuat', 0, 'Citra', 'signed')]
+            : null),
+  ),
+  'statusLabel': status == 'pending_ack' ? 'Menunggu persetujuan PM' : 'Menunggu persetujuan Direktur',
+  'currentLevel': status == 'pending_ack' ? 0 : 1,
+  'approvalRule': rule ?? pmRuleJson(),
 };
 
 Map<String, dynamic> direkturDashboardJson() => {

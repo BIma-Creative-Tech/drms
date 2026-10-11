@@ -5,8 +5,11 @@ import { companyOf } from '@/domain/companies'
 import { resolveScope } from '@/access/scope'
 
 import { actorContext, fail, ids, loadRaw, loadVisible, requireAction, type RequestDoc } from './common'
-import { validateLines } from './lines'
+import { rapRequirement } from '@/domain/rap/budget'
+
+import { normalizeLines, validateLines } from './lines'
 import { copyReceiptsForResubmit } from './receipts'
+import { requesterUsersAllDirektur, scopeManagerOf } from './snapshot'
 import { isBusinessDate, type RequestType } from './types'
 
 export type LineInputApi = {
@@ -15,16 +18,22 @@ export type LineInputApi = {
   qty?: number | null
   uomId?: number | null
   unitPrice?: number | null
+  /** Ignored when a unit price is given (D3: server computes qty × unitPrice). */
   total?: number | null
+  /** D3 "Nominal sesuai nota" (optional, whole Rupiah ≥ 0). */
+  receiptAmount?: number | null
   notes?: string | null
   categoryId?: number | null
   vehicleId?: number | null
+  /** D4: RAP item of the request's project (required to submit when the project has a RAP). Omitted = keep the stored one. */
+  rapItemId?: number | null
 }
 
 export type DraftInput = {
   type?: RequestType
   title?: string
   projectId?: number | null
+  /** D2: no longer accepted from the requester — ignored (old APKs keep working); legacy rows keep theirs. */
   costCenterId?: number | null
   neededDate?: string | null
   urgencyLevelId?: number | null
@@ -124,7 +133,13 @@ export async function validateContent(
     neededDate?: string | null
     urgencyLevelId?: number | null
   },
-  opts: { forSubmit: boolean; creatorId: number; callerSetsRequesters?: boolean },
+  opts: {
+    forSubmit: boolean
+    creatorId: number
+    callerSetsRequesters?: boolean
+    /** D2: a legacy cost-center request submitted before (withdrawn / back to Draft) may be sent again without a project. */
+    legacyCostCenter?: boolean
+  },
 ): Promise<void> {
   const errors: Array<{ path: string; message: string }> = []
   // ADR 0016 §5: roles, scope and own employee IN THE REQUEST's PT (from its project / cost center)
@@ -133,7 +148,8 @@ export async function validateContent(
   const scope = () => resolveScope(req, company ?? null)
 
   if (c.projectId && c.costCenterId) errors.push({ path: 'projectId', message: 'Pilih project ATAU pusat biaya, tidak keduanya.' })
-  if (opts.forSubmit && !c.projectId && !c.costCenterId) errors.push({ path: 'projectId', message: 'Project atau pusat biaya wajib diisi.' })
+  // D2 (owner 2026-10-11): no non-project requests — the project is mandatory to send (legacy cost-center rows aside)
+  if (opts.forSubmit && !c.projectId && !(opts.legacyCostCenter && c.costCenterId)) errors.push({ path: 'projectId', message: 'Project wajib diisi (pengajuan tanpa project tidak dapat dikirim).' })
   if (opts.forSubmit && !(c.title ?? '').trim()) errors.push({ path: 'title', message: 'Judul wajib diisi.' })
   if (c.neededDate && !isBusinessDate(c.neededDate)) errors.push({ path: 'neededDate', message: 'Tanggal harus YYYY-MM-DD.' })
 
@@ -177,10 +193,20 @@ export async function validateContent(
   // request (also at submit, so an older draft that breaks the rule cannot be sent) and for a Staff-only
   // caller who changes the requesters of someone else's draft. Before Q-09 (clearer message for Staff).
   if (uniq.length > 0) await assertStaffSelfOnly(req, uniq, ownPt, opts)
-  if (!onBehalf) {
+  // ADR 0021 (owner decision 2026-10-10): a Direktur's own request is filed by the PM project of the
+  // request's project (cost center: its manager) on the Direktur's behalf — requesters = Direktur(s) of
+  // the PT only, creator = that PM. Approval then runs PM → Direktur under the narrow G1 exception.
+  const pmForDirektur =
+    !onBehalf &&
+    ownPt !== undefined &&
+    userId(req) === opts.creatorId &&
+    uniq.length > 0 &&
+    (await scopeManagerOf(req, { projectId: c.projectId ?? null, costCenterId: c.projectId ? null : (c.costCenterId ?? null) })) === opts.creatorId &&
+    (await requesterUsersAllDirektur(req, uniq, ownPt)) !== null
+  if (!onBehalf && !pmForDirektur) {
     const creatorEmp = ownPt !== undefined ? employeeIn(req, ownPt) : relId((req.user as { employee?: unknown } | null)?.employee)
     if (userId(req) === opts.creatorId && (creatorEmp === undefined || (uniq.length > 0 && !uniq.includes(creatorEmp)))) {
-      fail(403, 'Hanya Admin/Finance yang boleh membuat pengajuan atas nama orang lain.')
+      fail(403, 'Hanya Admin/Finance yang boleh membuat pengajuan atas nama orang lain (PM project: hanya atas nama Direktur, ADR 0021).')
     }
   }
 
@@ -195,8 +221,9 @@ export async function validateContent(
   }
 
   // Lines (US-37) + masters.
+  // D3: validated as the server will store them (total = qty × unit price; a client total is ignored)
   const lineErrors = validateLines(
-    c.lines.map((l) => ({ description: l.description, qty: l.qty, uom: l.uomId, unitPrice: l.unitPrice, total: l.total, notes: l.notes, category: l.categoryId, vehicle: l.vehicleId })),
+    normalizeLines(c.lines).map((l) => ({ description: l.description, qty: l.qty, uom: l.uomId, unitPrice: l.unitPrice, total: l.total, receiptAmount: l.receiptAmount, notes: l.notes, category: l.categoryId, vehicle: l.vehicleId })),
     { forSubmit: opts.forSubmit },
   )
   errors.push(...lineErrors.map((e) => ({ path: e.path.replace(/\.(uom|category|vehicle)$/, '.$1Id'), message: e.message })))
@@ -224,7 +251,36 @@ export async function validateContent(
       errors.push({ path: `lines.${i}.vehicleId`, message: 'Kategori ini wajib ditautkan ke kendaraan.' })
     }
   })
+  errors.push(...(await rapLineErrors(req, c.projectId ?? null, c.lines, opts.forSubmit)))
   if (errors.length > 0) fail(400, 'Data pengajuan tidak valid.', errors)
+}
+
+/**
+ * D4 (owner 2026-10-11): every line names a RAP item OF THE REQUEST's PROJECT. Draft: a chosen item must belong to the
+ * project; submit: required on every line when the project has a RAP, an inactive item must be replaced, and a
+ * konstruksi project without RAP cannot send requests yet (the PM / Direktur fills the RAP first).
+ */
+async function rapLineErrors(req: PayloadRequest, projectId: number | null, lines: LineInputApi[], forSubmit: boolean): Promise<Array<{ path: string; message: string }>> {
+  const errors: Array<{ path: string; message: string }> = []
+  const chosen = lines.some((l) => l.rapItemId)
+  if (!projectId) {
+    lines.forEach((l, i) => {
+      if (l.rapItemId) errors.push({ path: `lines.${i}.rapItemId`, message: 'Pilih project dulu, lalu item RAP dari project itu.' })
+    })
+    return errors
+  }
+  if (!chosen && !forSubmit) return errors
+  const rap = await rapRequirement(req, projectId)
+  if (forSubmit && !rap.hasRap && rap.konstruksi) {
+    errors.push({ path: 'projectId', message: 'Project konstruksi ini belum punya RAP. Minta PM / Direktur mengisi RAP project dulu.' })
+  }
+  lines.forEach((l, i) => {
+    const item = l.rapItemId ? rap.items.get(l.rapItemId) : undefined
+    if (l.rapItemId && !item) errors.push({ path: `lines.${i}.rapItemId`, message: 'Item RAP bukan item RAP project pengajuan ini.' })
+    else if (forSubmit && item && !item.active) errors.push({ path: `lines.${i}.rapItemId`, message: 'Item RAP sudah nonaktif — pilih item RAP lain.' })
+    else if (forSubmit && !l.rapItemId && rap.hasRap) errors.push({ path: `lines.${i}.rapItemId`, message: 'Item RAP wajib dipilih.' })
+  })
+  return errors
 }
 
 export const STAFF_SELF_ONLY_MESSAGE = 'Staff hanya dapat mengajukan untuk dirinya sendiri: "Diajukan Oleh" harus hanya Anda. Minta PM/Admin/Finance bila pengajuan untuk orang lain (QA-15).'
@@ -271,10 +327,12 @@ export function toDocLines(lines: LineInputApi[]) {
     qty: l.qty ?? null,
     uom: l.uomId ?? null,
     unitPrice: l.unitPrice ?? null,
-    total: l.total ?? null,
+    total: l.total ?? null, // recomputed by the collection hook (D3)
+    receiptAmount: l.receiptAmount ?? null,
     notes: l.notes ?? null,
     category: l.categoryId ?? null,
     vehicle: l.vehicleId ?? null,
+    rapItem: l.rapItemId ?? null,
   }))
 }
 
@@ -286,10 +344,21 @@ export function fromDocLines(doc: RequestDoc): LineInputApi[] {
     uomId: relId(l.uom) ?? null,
     unitPrice: l.unitPrice ?? null,
     total: l.total ?? null,
+    receiptAmount: l.receiptAmount ?? null,
     notes: l.notes ?? null,
     categoryId: relId(l.category) ?? null,
     vehicleId: relId(l.vehicle) ?? null,
+    rapItemId: relId(l.rapItem) ?? null,
   }))
+}
+
+/**
+ * D4 compatibility: a client that does not know RAP items (APK ≤ 0.7, old API callers) sends lines without
+ * `rapItemId` — a line that keeps its id keeps its stored RAP item instead of losing it. `null` clears it.
+ */
+export function keepRapItems(lines: LineInputApi[], stored: LineInputApi[]): LineInputApi[] {
+  const byId = new Map(stored.filter((l) => l.id).map((l) => [l.id as string, l.rapItemId ?? null]))
+  return lines.map((l) => (l.rapItemId === undefined && l.id && byId.has(l.id) ? { ...l, rapItemId: byId.get(l.id) ?? null } : l))
 }
 
 /** POST /expense-requests — new Draft (idempotent per clientUuid for the APK offline queue). */
@@ -311,18 +380,18 @@ export async function createDraft(req: PayloadRequest, input: DraftInput & { typ
       return { doc: existing, created: false }
     }
   }
-  const company = await draftCompany(req, input)
+  // D2: a cost center sent by an old client is ignored (the requester no longer picks one)
+  const company = await draftCompany(req, { projectId: input.projectId })
   const emp = company !== undefined ? employeeIn(req, company) : relId((req.user as { employee?: unknown } | null)?.employee)
   const requesterIds = input.requesterIds && input.requesterIds.length > 0 ? input.requesterIds : emp !== undefined ? [emp] : []
   const lines = input.lines ?? []
-  await validateContent(req, { ...input, requesterIds, lines }, { forSubmit: false, creatorId: uid })
+  await validateContent(req, { ...input, costCenterId: null, requesterIds, lines }, { forSubmit: false, creatorId: uid })
   const doc = await validated(req, () => req.payload.create({
     collection: 'expense-requests',
     data: {
       type: input.type,
       title: input.title.trim(),
       project: input.projectId ?? null,
-      costCenter: input.costCenterId ?? null,
       neededDate: input.neededDate ?? null,
       urgencyLevel: input.urgencyLevelId ?? null,
       notes: input.notes ?? null,
@@ -345,21 +414,25 @@ export async function updateDraft(req: PayloadRequest, id: number, input: DraftI
   const doc = await loadVisible(req, id, { lock: true })
   requireAction(await actorContext(req, doc), 'edit')
   if (doc.status === 'receipt_revision') {
-    const other = Object.keys(input).filter((k) => k !== 'lines' && k !== 'notes')
+    const other = Object.keys(input).filter((k) => k !== 'lines' && k !== 'notes' && k !== 'costCenterId')
     if (other.length > 0) fail(409, `Saat Revisi Nota hanya baris item yang dapat diubah (${other.join(', ')}).`)
     const known = new Set((doc.lines ?? []).map((l) => l.id))
     if ((input.lines ?? []).some((l) => !l.id || !known.has(l.id)) || (input.lines ?? []).length !== known.size) {
       fail(409, 'Saat Revisi Nota baris tidak dapat ditambah/dihapus (nota tertaut ke baris).')
     }
   }
+  // D2: `costCenterId` from the requester is ignored; a legacy draft that gets a project drops its old cost center.
+  const projectId = input.projectId !== undefined ? input.projectId : (relId(doc.project) ?? null)
+  // D4: lines without `rapItemId` (old clients) keep the stored RAP item of the same line id
+  const lines = input.lines !== undefined ? keepRapItems(input.lines, fromDocLines(doc)) : undefined
   const current = {
     type: (input.type ?? doc.type) as RequestType,
     title: input.title ?? doc.title,
-    projectId: input.projectId !== undefined ? input.projectId : (relId(doc.project) ?? null),
-    costCenterId: input.costCenterId !== undefined ? input.costCenterId : (relId(doc.costCenter) ?? null),
+    projectId,
+    costCenterId: projectId ? null : (relId(doc.costCenter) ?? null),
     requesterIds: input.requesterIds ?? ids(doc.requesters),
     bankAccountId: input.bankAccountId !== undefined ? input.bankAccountId : (relId(doc.bankAccount) ?? null),
-    lines: input.lines ?? fromDocLines(doc),
+    lines: lines ?? fromDocLines(doc),
     neededDate: input.neededDate !== undefined ? input.neededDate : doc.neededDate,
     urgencyLevelId: input.urgencyLevelId !== undefined ? input.urgencyLevelId : (relId(doc.urgencyLevel) ?? null),
   }
@@ -368,13 +441,12 @@ export async function updateDraft(req: PayloadRequest, id: number, input: DraftI
   if (input.type !== undefined) data.type = input.type
   if (input.title !== undefined) data.title = input.title.trim()
   if (input.projectId !== undefined) data.project = input.projectId
-  if (input.costCenterId !== undefined) data.costCenter = input.costCenterId
   if (input.neededDate !== undefined) data.neededDate = input.neededDate
   if (input.urgencyLevelId !== undefined) data.urgencyLevel = input.urgencyLevelId
   if (input.notes !== undefined) data.notes = input.notes
   if (input.requesterIds !== undefined) data.requesters = input.requesterIds
   if (input.bankAccountId !== undefined) data.bankAccount = input.bankAccountId
-  if (input.lines !== undefined) data.lines = toDocLines(input.lines)
+  if (lines !== undefined) data.lines = toDocLines(lines)
   if (input.attachmentIds !== undefined) data.attachments = input.attachmentIds
   const updated = await validated(req, () => req.payload.update({
     collection: 'expense-requests',
@@ -404,8 +476,8 @@ export async function resubmitAsDraft(req: PayloadRequest, id: number): Promise<
     data: {
       type: src.type,
       title: src.title,
+      // D2: a rejected legacy cost-center request is cloned WITHOUT its cost center (the requester picks a project)
       project: relId(src.project) ?? null,
-      costCenter: relId(src.costCenter) ?? null,
       neededDate: src.neededDate ?? null,
       urgencyLevel: relId(src.urgencyLevel) ?? null,
       notes: src.notes ?? null,

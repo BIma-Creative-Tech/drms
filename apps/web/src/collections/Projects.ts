@@ -1,6 +1,7 @@
 import { APIError, type CollectionBeforeChangeHook, type CollectionConfig } from 'payload'
 
 import { readOnlyFieldsGuard } from '@/access/field-guard'
+import { PROJECT_TABS } from '@/admin/config'
 import { denyAll, hasRole, isOperatorOnly } from '@/access/roles'
 import { assignedProjects, byRole, fieldRoles, rolesAllowed } from '@/access/policies'
 import { inIds } from '@/access/scope'
@@ -8,7 +9,7 @@ import { reasonOnChange, withAudit } from '@/audit/hooks'
 import { PROJECT_KIND_LABELS, PROJECT_KINDS } from '@/domain/field/rules'
 import { progressWriteGuard } from '@/domain/progress/guards'
 import { codeField, odooRefField, percentField, rupiahField, uuidField } from '@/fields/common'
-import { companyField, companyHook } from '@/fields/company'
+import { companyField, companyHook, pickerSameCompany } from '@/fields/company'
 import { userPicker } from '@/fields/users'
 
 export const PROJECT_STATUSES = [
@@ -26,6 +27,21 @@ const projectEditors = fieldRoles(...PROJECT_EDITOR_ROLES)
 
 /** FR1 (ADR 0020 §1): the project kind is set by the Direktur or the Admin of the project's PT. */
 const kindEditors = fieldRoles('pk-owner', 'pk-admin')
+
+export const PROJECT_PM_REQUIRED = 'Project Manager wajib diisi'
+
+/**
+ * DRMS 10/10 #5: the PM of a project is mandatory — on create (admin form, REST, Local API: seed,
+ * import, tests) and whenever a write SENDS `pm` (the admin form always does), so clearing it is refused
+ * too. An update that does not touch `pm` (`undefined` = not in the request, e.g. the progress
+ * recalculation writing `progressPct`) stays valid on a legacy row without a PM; the dashboard tile
+ * "Project tanpa PM" lists those rows until someone fills them in.
+ */
+export function projectPmValidate(value: unknown, { operation }: { operation?: string }): true | string {
+  if (value !== null && value !== undefined && value !== '') return true
+  if (value === undefined && operation === 'update') return true
+  return PROJECT_PM_REQUIRED
+}
 
 /**
  * FR1: a kind change is refused once the project has field reports or contract units (409).
@@ -52,7 +68,8 @@ export const Projects: CollectionConfig = withAudit(
   {
     slug: 'projects',
     labels: { singular: 'Project', plural: 'Project' },
-    admin: { useAsTitle: 'name', group: 'Proyek', defaultColumns: ['code', 'name', 'client', 'pm', 'status'] },
+    // DRMS 10/10 point 7: tabs Proyek (form) / RAP / Pengajuan (admin/config.ts PROJECT_TABS)
+    admin: { useAsTitle: 'name', group: 'Proyek', defaultColumns: ['code', 'name', 'client', 'pm', 'status'], components: { views: { edit: PROJECT_TABS } } },
     access: {
       read: byRole({
         'pk-admin': true,
@@ -72,10 +89,12 @@ export const Projects: CollectionConfig = withAudit(
       delete: denyAll,
     },
     hooks: {
-      beforeChange: [companyHook('projects', { check: [{ field: 'client', collection: 'clients' }, { field: 'pm', collection: 'users', member: true }] }), kindChangeGuard],
+      beforeChange: [companyHook('projects', { check: [{ field: 'client', collection: 'clients' }, { field: 'pm', collection: 'users', member: true }, { field: 'costCenter', collection: 'cost-centers' }] }), kindChangeGuard],
       beforeOperation: [progressWriteGuard('projects'), readOnlyFieldsGuard('projects', (req, company) => hasRole(req, PROJECT_EDITOR_ROLES, company), 'Direktur, Admin, atau PM')],
     },
     fields: [
+      // DRMS 10/10 #5: link to the custom project page (tahapan/progress); no DB column, no API value
+      { name: 'detailLink', type: 'ui', admin: { position: 'sidebar', components: { Field: '@/admin/components/ProjectDetailLink#ProjectDetailLink' } } },
       companyField(),
       { ...codeField('Kode', 32, { perCompany: true }), access: { update: projectEditors } },
       { name: 'name', type: 'text', label: 'Nama project', required: true, maxLength: 160 },
@@ -103,8 +122,22 @@ export const Projects: CollectionConfig = withAudit(
           { name: 'radiusM', type: 'number', label: 'Radius geofence (m)', min: 10, max: 5000, admin: { description: 'Kosong = radius default perusahaan (Setting perusahaan).' } },
         ],
       },
-      // QA-16: only active PMs of the project's PT, shown by name (users.displayName)
-      { name: 'pm', type: 'relationship', relationTo: 'users', label: 'Project Manager', index: true, access: { update: projectEditors }, ...userPicker({ roles: ['pk-pm'] }) },
+      // QA-16: only active PMs of the project's PT, shown by name (users.displayName).
+      // DRMS 10/10 #5: mandatory (projectPmValidate; DB NOT NULL via migration 20261012_100000_d1010_project_pm when no legacy row lacks a PM)
+      {
+        name: 'pm',
+        type: 'relationship',
+        relationTo: 'users',
+        label: 'Project Manager',
+        required: true,
+        index: true,
+        access: { update: projectEditors },
+        ...userPicker({ roles: ['pk-pm'] }),
+        validate: projectPmValidate,
+      },
+      // D2 (DRMS 10/10): default cost center of the project's money — Finance gets it pre-selected when recording a
+      // transfer (transfers.costCenter, mandatory there). Optional; same PT (companyHook check).
+      { name: 'costCenter', type: 'relationship', relationTo: 'cost-centers', label: 'Pusat biaya (default transfer)', index: true, access: { update: projectEditors }, ...pickerSameCompany(), admin: { placeholder: 'Pilih pusat biaya…', description: 'Diusulkan ke Finance saat mencatat transfer pengajuan project ini.' } },
       // RAB hidden from Operator/Anggota (attendance-only role reads its assigned project for the location only)
       { ...rupiahField('budget', 'RAB (Rp)'), access: { read: ({ req }) => !isOperatorOnly(req.user), update: projectEditors } },
       {

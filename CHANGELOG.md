@@ -6,15 +6,421 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+**DRMS 10/10 Phase C — server + web** (owner decisions D2 / D4, points 2–4, 7, 10; web ↔ APK consistency). API contract
+for the APK in `docs/proyekkas/plans/drms-1010.md` ("Phase C API contract").
+
+**Database migrations:** `20261012_400000_d1010_rap_cost_center` (schema: `expense_requests_lines.rap_item_id`,
+`transfers.cost_center_id`, `projects.cost_center_id`, flag kind `rap_over_budget`) and `20261012_400100_d1010_rap_guard`
+(content hash incl. the line RAP item — existing hashes unchanged; line RAP item of the request's project; no cost center
+on new requests, project required to send (legacy rows keep working); transfers need a cost center of their PT; manual
+cash entries stay "project OR cost center").
+
+### Added (DRMS 10/10 Phase C)
+
+- **D4 RAP realisation:** every request line names an **Item RAP** of the request's project (line dialog picker, "RAP …"
+  under the line / on the card). Required to send when the project has a RAP; a konstruksi project without RAP cannot send
+  requests. Plan (volume × harga satuan) vs realisation (approved line totals), plus transferred and verified amounts,
+  remaining and % per item and per project. Over plan → warning flag **"Melebihi RAP"** for PM / Direktur / Finance (not
+  blocking; never shown to Staff).
+- **Project detail tabs** Proyek / **RAP** / **Pengajuan** (`/admin/collections/projects/:id`, `/rap`, `/pengajuan`) with
+  search, filters and pages; RAP items as cards at phone width.
+- **Direktur dashboard: "Monitoring RAP"** — projects with RAP, % realisation, items over plan, link to the RAP tab.
+- **API (APK):** `GET /api/v1/projects`, `GET /api/v1/projects/{id}`, `GET /api/v1/cost-centers`; `GET /expense-requests`
+  filters `project`, `q`, numbered `page`; `GET /transfer-queue` with project, suggested cost center, bank, flags, SLA.
+
+### Changed (DRMS 10/10 Phase C)
+
+- **D2 no non-project requests:** the project is required to send a request; the requester no longer picks a cost center
+  (a `costCenterId` from old apps is ignored). **Finance chooses the cost center when recording the transfer** (required;
+  pre-selected from the project's new "Pusat biaya (default transfer)"); the KK carries project + cost center, so the
+  dashboard "Pusat biaya bulan ini" and the report filter `pusat` follow Finance's choice. Approval routing: project PM.
+- **Request detail sidebar** no longer repeats the header (Nomor, Status, Dibuat oleh, Grand total, dates); "Aturan
+  approval" for Finance / Admin only; "Alasan perubahan" only in Revisi Nota (a Draft at phone width ends with the lines).
+- **Verifikasi LPJ** receipts as cards at ≤ 640 px; the image lightbox skips the hidden duplicate of a thumbnail.
+
+### Added (APK, DRMS 10/10 Phase C)
+
+- APK (DRMS 10/10 Phase C): **"Proyek"** menu with tabs Proyek / RAP / Pengajuan, search, status filter and infinite
+  scroll (point 6/7, D8). Expense lines need an **"Item RAP"** with remaining budget and a **"Melebihi RAP"** warning (D4,
+  drift v8 `local_lines.rap_item_id`; roles without RAP prices see the items without amounts). Requests are project-only;
+  the requester no longer picks a cost center (D2). New **"Finance"** menu (point 10): Antrian Transfer with SLA badge and
+  "Selisih nota (n)", **"Catat transfer"** with Akun kas (active accounts only) / Tanggal & jam transfer / Pusat biaya /
+  No. referensi bank / Bukti and the overdraft / unverified-account confirmation, and a read-only Verifikasi LPJ list.
+
+### Fixed (DRMS 10/10 Phase C integration)
+
+- `GET /api/v1/cash-accounts/balances` items carry `active`; the APK transfer form no longer offers an inactive cash
+  account (or cost center), which the server refused with 400 `cashAccountId`.
+- Request detail **"Rincian item"** table (reviewers): at 1280 px the "Nota & flag" column was clipped inside a horizontal
+  scroll — fixed column widths with wrapping text, every column readable without scrolling; cards at < 640 px unchanged.
+- APK contract tests on responses captured from the Phase C server (projects, RAP with `realisedAmount`, Staff without
+  RAP money, `rapOverBudget` / `rap_over_budget`, transfer queue, transfer form pickers, `POST …/transfer`).
+
+**DRMS 10/10 Phase B-2 integration + polish** (web ↔ APK consistency; owner prefers the APK layout). No new migration;
+`migrate:create` → no changes; generated files (importMap, payload-types, OpenAPI, Flutter codegen) unchanged.
+
+### Fixed (DRMS 10/10 B-2 integration)
+
+- A request locked before D3 and later sent back to an editable status (Finance rejects a receipt → **Revisi Nota**, or
+  withdraw → Draft) was refused by the new DB rule total = qty × unit price, blocking the requester. On unlock a line whose
+  unit price does not reproduce its total now gets `total ÷ qty` when exact, otherwise no unit price (keeps its total); the
+  DB rule still applies to every line with a unit price. Such a line shows **"Lengkapi Qty & Harga satuan"** (web table,
+  card and dialog; APK detail) and **Kirim pengajuan / Kirim ulang nota** stay disabled until it is completed (the server
+  also refuses `receipts-resubmit` with the line numbers).
+- Full migration rollback on a fresh DB works again: the generated `down()` of `20261011_100000_p3_rap` (and 8 older
+  migrations) dropped `payload_locked_documents_rels` FKs already removed by `DROP TABLE … CASCADE` → `IF EXISTS`.
+  (Use `payload migrate:down`; Payload 3.90 `migrate:reset` runs the downs in ascending order.)
+
+### Changed (DRMS 10/10 B-2 integration)
+
+- **Web lines at ≤ 640 px** (Draft / Revisi Nota editor and the read-only lines of the detail): one card per line like the
+  APK — "1. Uraian" + total, "Qty Satuan × Harga satuan · Kategori", "Nominal sesuai nota" + "Selisih nota" chip, receipts
+  and flags, Ubah / Hapus. Desktop keeps the table.
+- **One wording:** the lines section is **"Rincian item"** on the web form, web detail, APK draft editor and APK detail;
+  the approval step is **"Persetujuan PM"** on both.
+- **APK timeline** for the current approval snapshot (ADR 0021) reads like the web: Diajukan → Persetujuan PM →
+  Persetujuan Direktur → **Transfer Finance**; older snapshots keep their wording. Preview fixtures use the current snapshot.
+- **APK approval inbox:** badge **"Selisih nota (n)"** (`flags.receiptMismatch`), as in the web Antrian Transfer.
+- **Antrian Transfer / LPJ money form:** admin field look (labels with required marks, date-time picker with the
+  DateInput helper text, help texts, primary button) instead of unstyled native controls.
+
+**DRMS 10/10 Phase B-2 — web + server** (owner decisions D1 / D3, points 8f–8h, 13, read-only request header; PB numbering
+monthly). API contract for the APK in `docs/proyekkas/plans/drms-1010.md` ("Phase B-2 contract").
+
+**Database migrations:** `20261012_300000_d1010_lines_lpj_photos` (schema: `expense_requests_lines.receipt_amount`, flag kind
+`receipt_amount_mismatch`, `settlements_rels` for LPJ photos, `settlements.photos_hash`), `20261012_300100_d1010_lines_guard`
+(DB guards + data: total = qty × unit price on editable requests, receipt amount in the frozen content hash — existing hashes
+unchanged —, LPJ photo set frozen at submit; editable lines without a reproducible unit price get `total ÷ qty` or stay
+"legacy" — count in the migrate log), `20261012_300200_d1010_pb_monthly` (PB sequences on the default pattern → monthly from
+1; the current month continues after its highest issued PB, audited, Admin-customised patterns untouched and logged).
+Rollback: each `down()` (guard bodies restored, PB sequences moved by this migration back to never / 229).
+
+### Changed (DRMS 10/10 B-2)
+
+- **D1:** request type `advance` is shown as **"Pengajuan Baru"** (was "Uang Muka") everywhere — forms, lists, filters,
+  Antrian Transfer, dashboard, reports and exports, PDF, notifications / reminders, approval rules, user guides; the
+  internal value `advance` and "Reimburse" are unchanged.
+- **D3 (8f–8h):** the line total is **qty × harga satuan**, computed by the server on every write (a client total is
+  ignored; qty empty = 1) and enforced by the DB on editable requests; approval / transfer use it. New per-line
+  **"Nominal sesuai nota"**: when it differs from the total, Finance sees the flag **"Selisih nota"** (info within the
+  rounding tolerance, otherwise a warning to mark "sudah diperiksa") on the request detail lines table, the Antrian Transfer
+  (badge) and Verifikasi LPJ. Old clients that send only `total` get `unit price = total ÷ qty` when exact.
+- **Web request form:** lines as a table (No, Uraian, Kategori, Qty, Satuan, Harga satuan, Total, Nominal sesuai nota,
+  Ubah / Hapus) with a "Tambah baris" dialog (live read-only total + grand total preview, Rupiah inputs); stacked cards at
+  390 px. "Harga satuan" drops "(informatif)".
+- **Submitted request (read-only):** the header shows a compact "Rincian pengajuan" summary (label: value — PT, project,
+  urgensi, tanggal, pemohon, rekening with masked number + eye toggle, keterangan, lampiran) instead of disabled inputs,
+  empty "Pilih …" placeholders and a stuck "memuat…" account preview.
+- **Point 13:** LPJ photos (max 10, images, same resize / privacy pipeline as receipts): the requester adds / removes them
+  while the LPJ is Draft / Revisi (`PUT /api/v1/expense-requests/{id}/lpj/photos`, or `photos` with Kirim LPJ); read-only
+  afterwards; shown with the lightbox on the request, the LPJ document and Verifikasi LPJ.
+- **PB numbering** (owner 2026-10-11): `PB/<kode PT>/<YYMM>/0001` resets **monthly from 1 per PT** (was one running series
+  from 229). The import's `nomor_pb_mulai` now only sets the first number of the go-live month (default 1). No PT code is
+  built in: `{COMPANY}` is always the PT's short code (an empty one blocks numbering).
+
+**DRMS 10/10 Phase B-2 — APK** (`docs/proyekkas/plans/drms-1010.md` D1, D3, point 13). **Drift schema v7** (APK local DB):
+`local_lines.receipt_amount` (nullable, additive) — existing offline drafts and queued items are kept.
+
+### Changed (APK, DRMS 10/10 B-2)
+
+- **D1:** request type `advance` is shown as **"Pengajuan Baru"** (was "Uang Muka"): type switch, home tile, transfer kind,
+  dashboard KPI texts; "Reimburse" unchanged. The server's `typeLabel` still wins when sent.
+- **D3 line editor:** Qty, Satuan and Harga satuan are required (Rupiah input); **Total = Qty × Harga satuan** is shown live
+  and is read-only (rounded half up to whole rupiah, same rule as the server). New optional **"Nominal sesuai nota"** with
+  the hint that approval and transfer use the Total; a **"Selisih nota"** chip when it differs. Labels follow the web lines
+  table (Uraian, Kategori, Qty, Satuan, Harga satuan, Total, Nominal sesuai nota); the lines list shows
+  "Qty Satuan × Harga satuan · Kategori · n nota" and the computed total.
+- Request detail: "Nominal sesuai nota" per line and the "Selisih nota" chip (server `receiptMismatch`, a
+  `receipt_amount_mismatch` flag, or receiptAmount ≠ total), plus one chip in the header when any line differs.
+- Offline drafts: `receipt_amount` in `draft_upsert` lines and `receiptAmount` in the create body; `total` sent as
+  qty × unit price. A draft line saved before D3 (typed total, no unit price) still opens, keeps its old total, and asks
+  "Lengkapi Qty & Harga satuan" before it can be submitted.
+
+### Added (APK, DRMS 10/10 B-2)
+
+- **LPJ photos (point 13):** "Kirim LPJ" / "Kirim ulang LPJ" opens a screen with the usage notes and up to **10 photos**
+  (camera or gallery), compressed on the phone like receipts, uploaded via `POST /media/receipts` and sent as `photos`
+  (the whole set) with `lpj/submit`. The LPJ section of the detail shows the photos read-only; a tap opens the shared
+  photo viewer.
+
+**DRMS 10/10 integration + Lead screenshot review** (branches a-apk, a-web-shell, a-web-form, b-server merged). No new
+migration; the latest schema snapshot now matches the final schema (`migrate:create` → no changes).
+
+### Changed (DRMS 10/10 integration)
+
+- **One status wording** (`domain/expense/types.ts`): "Menunggu persetujuan PM" / "Menunggu persetujuan Direktur" (ADR 0021)
+  in the sidebar, list column, filter options, chips, dashboard pipeline, PDF, notifications and the APK fallback labels;
+  requests submitted under an older approval snapshot keep "Menunggu Diketahui (Direktur)" / "Menunggu Approval".
+- **User names everywhere**: read-only user fields and list columns ("Dibuat oleh", "Dicatat oleh", "Pelapor",
+  "Diverifikasi oleh" …, 30 fields) show the person's name (users.name → employee in the document's PT → email local
+  part) instead of "Tanpa Judul - ID: 1".
+- Expense request detail: no "Level approval berjalan", "Sumber" or "Alasan perubahan" after submit; "Simpan" only while
+  the request is editable (new / Draft / Revisi Nota); the decision bar no longer covers the end of the page (1280 / 390 px).
+- Reports: every document number is a link (SLA Transfer: request + TRF; Buku kas: KK + request; Rekap pengajuan,
+  Kelengkapan, Audit log, aftersales PO/penawaran). Exports unchanged.
+- Module landing pages: a specific icon per sub-menu (Iconsax Bulk) instead of one generic glyph.
+- Date fields: a helper text under every native date / date-time input ("Selasa, 20 Oktober 2026") — the browser shows its
+  own locale format in the picker.
+
+### Fixed (DRMS 10/10 integration)
+
+- React hydration error on the request detail (Finance, transferred request): the "Void transfer" reason dialog rendered a
+  `<form>` inside Payload's document form.
+- Schema drift: `expense_requests.status` showed as nullable to the Postgres adapter (admin condition on a required field).
+
+**DRMS 10/10 Phase A — web shell, project form, tables** (owner feedback batch 2026-10-11,
+`docs/proyekkas/plans/drms-1010.md` items 1, 5, D8, D9).
+
+**Database migration:** `20261012_100000_d1010_project_pm` (conditional): when NO project lacks a PM →
+`projects.pm_id` NOT NULL and its FK `ON DELETE RESTRICT` (was SET NULL); otherwise nothing changes and the migration
+logs the number of projects without a PM (the deploy never fails; fill them via the dashboard tile "Project tanpa PM",
+a later migration can tighten the column). Rollback: `down()` drops NOT NULL and restores SET NULL.
+
+### Added (DRMS 10/10)
+
+- **Module landing pages (D9)**: a module with two or more visible sub-menus opens `/admin/modul/<id>` — tiles in the
+  launcher style grouped by menu section (permissions, hidden entities, role rules and PT features exactly as the top
+  bar) instead of jumping into the first sub-menu (Master Data no longer opens "Bank"). Custom views show the
+  breadcrumb "module › menu item" back to the landing page.
+- **Search, filters and pagination on the work tables (D8)**: shared toolbar (search with debounce, filters, page size
+  20/50/100, pager; the URL holds the state) on Persetujuan, Antrian Transfer (+ transfer tercatat), Verifikasi LPJ
+  (paged in the DB, was capped at 100), Buku kas (search + page size), Absensi tim hari ini (name search), Laporan
+  harian / servis / aktivitas aftersales, Progress project, Unit & kontrak, Notifikasi, Addendum RAB, Laporan progress.
+  `GET /api/v1/service-reports`, `/aftersales-activities`, `/daily-reports` accept `q` (text search). Every Payload
+  list without its own `listSearchableFields` now searches its stored text fields (code, name, number, …).
+- `GET /api/v1/me` → `displayName` (additive): the label to greet the caller with.
+- Project form: sidebar link "Buka halaman project" (tahapan/progress); the project page links back ("Data project").
+
+### Changed (DRMS 10/10)
+
+- **Greeting by name, never email (WA-14)**: launcher, avatar menu and dashboard use users.name → employee name of the
+  membership in a selected PT → email local part → "Pengguna".
+- **Project Manager mandatory**: "Project Manager wajib diisi" on create and whenever a write sends `pm` (admin form,
+  REST, Local API); updates that do not touch `pm` stay valid for legacy rows. The import (`runImport`) reports a
+  missing or Keycloak-pending project PM as an error.
+- Payload edit forms: the "Edit"/"API" document tabs are gone (API tab disabled via `hideAPIURL`, a lone tab row is
+  hidden) — one primary action "Simpan"; uniform field spacing (20 px, 16 px on phones) for every collection form.
+**DRMS 10/10 Phase A — web expense request screens** (owner feedback 2026-10-11, `docs/proyekkas/plans/drms-1010.md`
+items 8c–8e, 8i, 9a–9d, 12b, 12c; findings WA-01…WA-12, WA-15). No migration.
+
+### Changed (DRMS 10/10 Phase A, web)
+
+- **Expense request form** (create / draft): only the inputs, in the APK draft-editor order (Jenis, Judul, Project,
+  Pusat biaya, Tanggal dibutuhkan, Tingkat urgensi, Pemohon, Rekening tujuan, Keterangan, Lampiran, baris item +
+  "Total (pratinjau)"); level approval, aturan/snapshot approval, pengecualian G1, nomor/status, diajukan, alasan,
+  sumber and the money totals appear only after submit. Short panel help on create. Labels as in the APK ("Pemohon",
+  "Judul", "Lampiran", "Dibuat oleh").
+- **Date picker** for every business date (`YYYY-MM-DD` text columns, no migration): Tanggal dibutuhkan, Tanggal nota,
+  Tanggal transfer/laporan, Mulai/Selesai kontrak unit, Tanggal saldo awal, Hari libur; read-only dates as
+  "12 Oktober 2026". Line "Harga satuan" and "Total" use the shared Rupiah input (`Rp 1.250.000`, lib/rupiah-input);
+  Jumlah keeps decimals.
+- **Placeholders:** field-specific hints on the request selects ("Pilih project…", "Pilih tingkat urgensi…",
+  "Pilih pemohon…", "Pilih rekening tujuan…", "Pilih satuan…", "Pilih kategori…", "Pilih kendaraan…", PT picker
+  "Pilih PT…"); Payload's global "Pilih nilai" → "Pilih…".
+- **Rekening tujuan:** the chosen account right under the picker (bank · atas nama · `••••1234`) with an eye button;
+  after submit the same card shows the snapshot taken at submit (raw snapshot fields hidden). New
+  `GET /api/v1/bank-account-preview?request=&account=&reveal=1` — the full number only for creator/requesters and
+  Finance/Direktur/Admin of the PT (same rule as the detail DTO); foreign accounts / requests / PTs → 404.
+- **Request detail:** one lines table "Rincian pengajuan" (also for the requester; the line cards only in Draft /
+  Revisi Nota); PT on one line ("PT: DRMS — …", every document with a PT); readable vertical **Alur persetujuan**
+  (Diajukan → Persetujuan PM project / Diketahui → Persetujuan Direktur / Approval → Transfer Finance: role, planned
+  approver, Selesai / Giliran / Menunggu / Dilewati / Ditolak, actor, time, note; G1 exception as text) instead of the
+  raw JSON (raw snapshot only for Admin, folded); **Setujui / Tolak / Diketahui bar** at the bottom of the detail
+  when the server allows the decision (same endpoints, Idempotency-Key and confirmation texts as Persetujuan).
+- **Clickable numbers:** LPJ (Verifikasi LPJ), transfer (Antrian Transfer, request detail incl. KK + proof), cash /
+  request numbers in the dashboard, document numbers in the admin audit card and Riwayat.
+- **Image lightbox** for every thumbnail (receipts, progress and field-report photos, transfer and cash proofs,
+  selfie): modal, fit ↔ 100 %, previous/next in the group (keys, buttons, swipe), Esc, works at 390 px; PDFs and
+  non-images keep "Buka di tab baru".
+**DRMS 10/10 Phase B (server): numbering with the PT code (D5), transfer date-time + SLA (item 11), selfie timestamp +
+camera-only web check-in (D7 / item 14).** Database migrations `20261012_200000_d1010_schema` (additive: `transfers.transfer_at`,
+`expense_requests.approved_at`, `companies.transfer_sla_hours` default 24, `media_selfies.stamped_at` write-once, job slug
+`stampSelfie`, request guard accepts `approved_at` only on the final approval) and `20261012_200100_d1010_data`
+(document sequences still on the OLD default pattern move to `<DOC>/{COMPANY}/{YY}{MM}/{seq}`, audited; customised
+patterns kept and logged; `approved_at` backfilled from the last decision of the current cycle). The **worker must run**
+(selfie stamps are applied by the job queue).
+
 ### Added
+
+- **D5 numbering:** every default document number carries the PT short code, 4 digits — `PB/DRMS/2610/0229`,
+  `TRF/LLAS/2610/0001`, `LPJ/…`, `KM/…`, `KK/…`, `LP/…`, `ADD/…`, `SV/…`, `LH/…` (reset policies unchanged: PB never,
+  continuing from 229; others monthly). Issued numbers stay; a mid-month switch continues the same counter. Allocation
+  refuses a `{COMPANY}` pattern without a short code (409) before taking a number (ADR 0007 revision 2026-10-12).
+- **Item 11 transfer date-time:** `POST /expense-requests/{id}/transfer` accepts `transferAt` (date + time of the bank
+  proof; ISO with offset, or wall clock in the PT zone); not in the future; `transferDate` = its date in the PT zone
+  (period lock). Old clients sending only `transferDate` still work (`transferAt` null = time unknown). The web form
+  "Catat transfer" asks **Tanggal & jam transfer (sesuai bukti)** (required). Detail/API expose `transferAt` and
+  `approvedAt`.
+- **Item 11 SLA:** `expense_requests.approvedAt` set at the final approval; per-PT setting **SLA transfer (jam sejak
+  disetujui)** (default 24); Antrian Transfer badge **Umur sejak disetujui** (red when over SLA); report
+  **SLA Transfer** (`/admin/laporan/sla-transfer`, Finance/Direktur: per PT per month count, average, P90, % within SLA,
+  late transfers with links; CSV/XLSX); KPI card **SLA transfer** on the Direktur and Finance dashboards.
+- **D7 selfie timestamp:** after an attendance is recorded (APK sync, PM on-behalf, web self check-in) the worker job
+  `stampSelfie` burns a band into the stored selfie — server-accepted date + time in the PT zone (WITA/WIB/WIT), GPS
+  (5 decimals) + accuracy, project / cost center, employee, "RR Teams" — once (idempotent, `stamped_at`), same size,
+  JPEG ≤ 150 KB (ADR 0010 addendum 2026-10-12).
+
+### Changed
+
+- **Web self check-in:** the selfie comes from the live front camera only (getUserMedia → canvas; no file input /
+  gallery); without a camera or permission: "Kamera tidak tersedia — gunakan aplikasi Android".
+  `Permissions-Policy` now allows `camera=(self)` and `geolocation=(self)` (geolocation was blocked by `()`).
+
+**Approval pengajuan biaya: Staff → PM project → Direktur → Finance transfer** (owner decisions 2026-10-10, ADR 0021,
+requirements v1.3 §9; supersedes the decision part of ADR 0013 for expense requests). **Staging first** — production
+only after the owner approves the UAT (`docs/proyekkas/uat/approval-pm/README.md`).
+
+**Database migration:** `20261010_130000_approval_pm_direktur` (additive): column `expense_requests.g1_exception`
+(varchar, CHECK `NULL | 'direktur_via_pm' | 'direktur_via_pm_self'`), audit action `approval_policy_exception`, guard trigger
+`expense_requests_g1_exception` (no value on insert; changes only at the submit freeze point), and
+`pk_approvals_before_insert` replaced (G1 unchanged except the recorded exception). Rollback: `down()` restores the
+previous trigger body and drops the guard/CHECK/column.
+
+**After the deploy the Admin must change the approval rules of every PT** (Pengaturan → Aturan approval; nothing
+changes until then): the default rule → "Default — PM project lalu Direktur (semua nominal)", Diketahui Oleh = Wajib,
+Pengisi = PM project, Level 1 = Direktur (remove the Finance level), reason "Kebijakan owner 2026-10-10: Staff → PM →
+Direktur → Finance transfer"; the inactive "> Rp 10 juta" example the same; the Addendum RAB rule unchanged. First
+check that every active project has a PM and every cost center a manager. **Requests already submitted keep their
+snapshot** and finish Direktur → Finance.
+
+### Added
+
+- **PM project approval step** (`acknowledgeBy: scope_manager`, expense requests only): the acknowledger is resolved at
+  submit from `projects.pm` (cost-center requests: `cost-centers.manager`), an active member of the PT, and stored in
+  the snapshot; only that PM may approve/reject ("Persetujuan PM"); other PMs → 403 + `access_denied`. Missing PM →
+  409 "Project ini belum punya PM. Hubungi Admin untuk mengisi PM project." Rule option "PM project (manajer pusat
+  biaya bila tanpa project)" in Aturan approval (refused for Addendum RAB and for an optional "Diketahui").
+- **Narrow G1 exception `direktur_via_pm` / `direktur_via_pm_self`:** a Direktur's request filed by the request's PM
+  (creator = PM, every requester holds Direktur in the PT) → PM approves, then a Direktur. "Utamakan Direktur lain"
+  (owner 2026-10-11): with another active Direktur only that Direktur decides (`direktur_via_pm`; the requester → 403,
+  refused by the DB); the requester approves himself only as the PT's only Direktur (`direktur_via_pm_self`). Server-set at
+  submit, recorded in the snapshot (`selfApproval`), `expense_requests.g1_exception`, audit
+  `approval_policy_exception`, web panel and PDF ("Pengajuan Direktur — diajukan oleh PM (kebijakan owner
+  2026-10-10)"); the DB trigger allows exactly the creator PM's "Diketahui" and — only for `_self` — the requester's
+  approval level.
+- PM: web **Persetujuan** menu, `/me` `capabilities.approvalInbox`, dashboard card "Menunggu tindakan saya"; LPJ
+  shortfall approvals (ADR 0019) where the PM is the acknowledger.
+- API (additive, APK): inbox items `decisionBy` (`pm | direktur | finance | other`) and `finalStep`; request detail
+  `approvalRule.selfApproval`; KPI `teamWaiting.waitingFor` `pm | direktur | finance`. OpenAPI regenerated.
+- APK **mobile-v0.4.1** (0.4.0 is not published yet and ships with web 0.7.0): PM labels ("Setujui sebagai PM
+  project" → "diteruskan ke Direktur"; Direktur final step → "diteruskan ke Finance untuk transfer"), approval inbox
+  for PM. Older APKs already show the server-driven buttons to the PM, with Direktur wording.
 - **Public home page `/`** (owner 2026-10-10: `/` answered 404 and nothing linked to the APK page): app name and two
   plain links, "Masuk" → `/admin/login` and "Unduh aplikasi Android" → `/unduh`, plus the privacy notice. No form and no
   server action (CrowdSec CRS 920420). Not indexed (robots meta + `X-Robots-Tag` on `/`).
 - **Web login:** a "Unduh aplikasi RR Teams" link → `/unduh` next to "Pemberitahuan privasi".
 
+### Changed
+
+- Under a PM-project rule **Finance no longer approves**: after the Direktur the request is approved (Uang Muka →
+  transfer queue; Reimburse → Finance receipt verification, then transfer). G1 unchanged: a PM who is requester/creator
+  is skipped ("(tidak berlaku — pemohon)") and the Direktur decides; the Direktur step is never skipped silently (only
+  Direktur is requester/creator → 409 "Pengajuan untuk Direktur dibuat oleh PM project. …").
+- LPJ shortfall re-approval follows the rule in force (PM → Direktur); Addendum RAB stays Direktur → Finance.
+- Labels per snapshot: "Menunggu persetujuan PM" / "Menunggu persetujuan Direktur", inbox "Persetujuan PM" /
+  "Persetujuan Direktur"; generic `pending_ack` label "Menunggu Diketahui" (ADR 0013 snapshots keep "Menunggu Diketahui
+  (Direktur)").
+- Notifications: "Persetujuan PM: {docNo}" to the PM (approval email likewise); the Direktur is notified after the PM,
+  Finance after the Direktur; `expense.team_submitted` is not sent to the PM who must approve.
+- Seed: default rule "Default — PM project lalu Direktur (semua nominal)" for fresh installs.
+
 ### Fixed
+- **Field reports (web): HM values with a thousands dot were misread** (UAT FR T-01). The forms show "1.023"
+  (Indonesian thousands), but the parser read a single dot as a decimal point. As a result:
+  - the timesheet form rejected its own prefilled HM awal;
+  - "5.000" was saved as 5;
+  - the correction dialog quietly re-sent an untouched HM "1.030" as 1.03.
+  A single dot that groups exactly three digits now means thousands. Values that were valid before (at most two
+  decimals) are read the same as before. The APK was not affected.
 - **CI image job:** `trivy-image.sh` retries no longer leave a failed attempt's output or the retry warning in the scan
   JSON. That output made the report step's `jq` exit 5 and blocked the v0.7.0 tag images.
+
+- **"Akun pengguna" on the employee form** (owner decision 2026-10-10, after APK attendance in a PT was refused with
+  "Akun Anda belum terhubung ke data karyawan"): picks the login account of the employee in its PT. Not a new
+  column — the link stays `company-memberships.employee` (one account ↔ one employee per PT; unique index and
+  same-PT trigger unchanged). Saving sets / clears that membership in the same transaction through the membership
+  collection (its access rule and audit `company_membership`, reason "Akun pengguna diatur dari data karyawan …"
+  unless one is given). Picker: active accounts with active access to the employee's PT and no employee yet, plus
+  the linked one. Field errors: no access in the PT ("tambahkan aksesnya di Akses PT dulu"), inactive access,
+  account already linked to another employee (named), and **403** when the caller may not change the PT's
+  memberships (only the PT Admin or a group admin may link; a Direktur still edits the other fields). Shown only to
+  memberships readers (PT Admin, group admin, the linked person). Duplicates start without an account.
+- **"Karyawan per PT"** panel on the user form (read-only): every PT access of the account the viewer may see, with
+  the linked employee ("Buka") or "Belum tertaut" + "Buat karyawan", which opens the employee create form with that
+  PT and account prefilled (`/admin/collections/employees/create?company=…&user=…`).
+- No schema change, no migration. Go-live import, `/api/v1` masters/me (whitelisted employee fields) unchanged.
+### Changed (APK — DRMS 10/10 Phase A, web/APK parity; ships with the next APK build, version not bumped)
+
+- **Greeting by name (WA-14):** the home greeting / profile never shows the full e-mail address any more:
+  `/me` `displayName` (optional, parsed when the server sends it) → user name → employee name → e-mail local part →
+  "Pengguna".
+- **Request detail (WA-08/09/12):** sections "Rincian pengajuan" (now with the **PT** as "kode — nama" and
+  Keterangan), "Pemohon", "Rekening tujuan" (Bank / Atas nama / Nomor rekening, masked as the server sends it) and
+  "Riwayat approval" (was "Posisi tanda tangan"). The request number is a chip that copies the number; the TRF card
+  and the LPJ number copy theirs (there is no separate transfer / LPJ screen on the APK).
+- **Fullscreen image viewer (12c / WA-11):** one shared viewer (zoom, double-tap, swipe within the group) for
+  receipt thumbnails (request detail, across all lines; draft line receipts), progress photos, field-report and
+  daily-report photos, and — new — the check-in / check-out **selfies** in the attendance day sheet
+  (`GET /attendance/{id}/selfie`, server-side access + audit unchanged).
+- **Bank account on a new request (8e / WA-04):** after choosing the account a card shows bank · holder · masked
+  number; the eye toggle reveals the full number only when the masters delivered it to this user
+  (`employee-bank-accounts` read access); a number that arrives masked keeps the toggle hidden.
+- **Field components (8c/8d, WA-01/02/15):** Rupiah inputs group thousands while typing (`1.447.500`) on line unit
+  price / total, receipt amount, addendum amount and the aftersales "Nilai" (Rp value of the offer / PO); the line quantity accepts digits and `,`/`.` only; the
+  field-report date (service, timesheet, aftersales, daily report) is a date picker limited to the allowed dates;
+  every select shows a field-specific placeholder ("Pilih project", "Pilih rekening tujuan", …) instead of "Pilih…"
+  or an empty field.
+
+### Added (konstruksi: RAP + Laporan harian — P3)
+
+Owner decisions 2026-10-10. Migrations `20261011_100000_p3_rap` (new tables + enum value `daily_report`, additive)
+and `20261011_110000_p3_security` (triggers, CHECKs, grants; default resource types + `LH` sequence per PT). Behind
+the same per-PT flag `fieldReportsEnabled`.
+
+APK **mobile-v0.5.0** (pubspec `0.5.0+1`, notes `docs/release-notes/apk/0.5.0.md`; needs this server): "Laporan
+Harian" for konstruksi projects in Laporan Lapangan — offline draft + `daily_report.upsert`, RAP items (no prices)
+and resource types cached from `GET /projects/{id}/rap` (`resourceTypes` added there), over-RAP warning with
+required notes, drift schema **v6** (`field_rap_items`, `field_resource_types`; additive, every v5 row kept).
+
+- **RAP per konstruksi project** (`rap-items`): item code (unique per project), uraian, tahapan, jenis
+  **pekerjaan** (counts toward the stage %) or **material** (masuk / terpakai / stok only), satuan, volume, harga
+  satuan (visible only to Direktur / Admin / Finance / PM of the project), optional bobot. Edited by the Direktur /
+  Admin or the PM of the project; **locked once a daily report realised anything** — then only Direktur / Admin with
+  a reason (409 `RAP_LOCKED`). Items are deactivated, never deleted.
+  - **Excel import** (sheet RAP: kode, uraian, tahapan, jenis, satuan, volume, harga_satuan, bobot + Petunjuk, with
+    dropdowns): preview → commit of the same file (sha256, 409 `FILE_CHANGED`), idempotent by code, items missing
+    from the file deactivated, new stages (Direktur / Admin only) with weights proposed from the value share. Template
+    download and "unduh RAP project". **RAP templates** per PT (`rap-templates`: save a project's RAP, apply to an
+    empty project).
+  - **Stage progress from the RAP**: a stage with active work items is RAP-driven (`project_stages.progress_mode =
+    rap`): item % = min(realised / volume, 1); stage % weighted by value (volume × price) when every item is priced,
+    otherwise equal; project % = Σ weight × stage % as before. Manual progress reports on such a stage → 409
+    `STAGE_RAP_DRIVEN`.
+- **Laporan harian** (`daily-reports`, numbering `LH/YYMM/####`): one per project, reporter and date (409
+  `DAILY_EXISTS`); weather morning / noon / afternoon, rain and stop hours, manpower and equipment per **resource
+  type** (`resource-types` per PT; defaults Mandor, tukang, kenek, operator, excavator, molen, vibrator, dump truck),
+  volume per work item, material in / used per material item, issues, notes, ≤ 10 photos. Created by Staff assigned
+  to the project, the team PM or the Direktur (Finance / Admin read only); reporter edits ≤ 24 h, then PM / Direktur
+  corrections with a reason. Volumes are an **append-only ledger** (`daily-report-lines`, origin report / edit /
+  correction) — the DB moves the RAP realisation from it and refuses every other change. Above the RAP volume:
+  allowed with a note (400 `OVER_RAP_NOTE_REQUIRED`), flag `MELEBIHI_RAP`, in-app notification to the project PM; the
+  same item booked by another reporter that day → flag `POSSIBLE_DUPLICATE`.
+- **Weekly recap "Minggu ke-N"** (Mon–Sun from the project start): reports, worker-days, rain / stop hours per week,
+  volume per work item per week and cumulative %.
+- Web: *Proyek → Laporan lapangan → Laporan harian* (list, input, detail with volume history, edit / correction),
+  *RAP & rekap* per project (stage %, items, material stock, weekly recap, Excel import); daily reports in the project
+  timeline.
+- API v1: `GET /projects/{id}/rap`, `GET /rap/template.xlsx`, `GET /projects/{id}/rap.xlsx`,
+  `POST /projects/{id}/rap/items`, `PATCH /rap-items/{id}`, `POST /projects/{id}/rap/import/{preview,commit}`
+  (multipart), `POST /projects/{id}/rap/{apply-template,save-template}`; `/daily-reports` (list, detail incl. ledger,
+  create, edit, `/{id}/corrections`), `GET /projects/{id}/daily-recap`; `GET /me` capability `dailyReportCreate`;
+  sync item `daily_report.upsert` (`server_daily_report`).
+
+### Changed (Admin = Direktur parity, progress reports)
+
+- `/me` capability `progressReportCreate` is now true for Admin and Admin may upload progress photos (Admin may create
+  progress reports since the owner decision of 2026-10-09). Field reports stay read-only for Finance / Admin (owner
+  decision 2026-10-10).
 
 ## [0.7.0] - 2026-10-10
 

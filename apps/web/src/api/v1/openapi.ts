@@ -4,7 +4,9 @@ import { z } from 'zod'
 import { registerAddendumPaths } from './openapi-addendum'
 import { registerAttendancePaths } from './openapi-attendance'
 import { registerCompanyPaths } from './openapi-companies'
+import { registerDailyPaths } from './openapi-daily'
 import { registerFieldPaths } from './openapi-field'
+import { registerProjectPaths } from './openapi-projects'
 import { registerShortfallPaths } from './openapi-shortfall'
 import { Device, DeviceRegister, DeviceRevoke, Health, Masters, MastersQuery, Me, Problem, Ready, TestEmailQueued } from './schemas'
 import * as F from './schemas-flow'
@@ -195,7 +197,7 @@ export function buildOpenApiDocument(version: string) {
   registry.registerPath({
     method: 'get',
     path: '/expense-requests',
-    summary: 'List expense requests in the caller scope (mine | team | inbox | all), cursor paging',
+    summary: 'List expense requests in the caller scope (mine | team | inbox | all), cursor paging (or ?page=); DRMS 10/10 filters project= and q=',
     security,
     request: { headers: deviceHeader, query: F.ListQuery },
     responses: res(200, 'Page', F.ExpenseRequestList, [400, 401, 426]),
@@ -203,7 +205,7 @@ export function buildOpenApiDocument(version: string) {
   registry.registerPath({
     method: 'post',
     path: '/expense-requests',
-    summary: 'Create a Draft (Uang Muka / Reimburse); creator, status and grand total are server-set',
+    summary: 'Create a Draft (Pengajuan Baru / Reimburse); creator, status and grand total are server-set',
     security,
     request: { headers: idem, body: jsonBody(F.ExpenseRequestCreate) },
     responses: { ...res(201, 'Created', F.ExpenseRequestDetail, [400, 401, 403, 409, 422, 426, 429]), 200: { description: 'Existing draft for this clientUuid', content: { 'application/json': { schema: F.ExpenseRequestDetail } } } },
@@ -223,6 +225,14 @@ export function buildOpenApiDocument(version: string) {
     security,
     request: { headers: deviceHeader, params: idParams('id'), body: jsonBody(F.ExpenseRequestUpdate) },
     responses: detailOk(),
+  })
+  registry.registerPath({
+    method: 'get',
+    path: '/bank-account-preview',
+    summary: 'Destination account of a request form: bank · holder · masked number; full number only with reveal=1 for creator/requesters and Finance/Direktur/Admin of the PT (DRMS 10/10 8e)',
+    security,
+    request: { headers: deviceHeader, query: F.BankPreviewQuery },
+    responses: res(200, 'Account preview', F.BankPreview, [400, 401, 404, 426, 429]),
   })
   registry.registerPath({
     method: 'get',
@@ -257,21 +267,21 @@ export function buildOpenApiDocument(version: string) {
   post('/expense-requests/{id}/flags/{fid}/review', 'Finance: mark a flag "sudah diperiksa"', F.FlagReviewBody, ['id', 'fid'], detailOk())
   post(
     '/expense-requests/{id}/transfer',
-    'Finance: record the transfer (amount = approved amount, proof, bank ref) → KK posted. QA-17: destination account not verified → 409 code BANK_ACCOUNT_UNVERIFIED_CONFIRM_REQUIRED (bankAccountId, verificationStatus, bankName, accountNo, accountHolder) unless confirmUnverifiedAccount (audited bank_unverified_confirmed); QA-04: cash account balance would go below 0 → 409 code CASH_OVERDRAFT_CONFIRM_REQUIRED (cashAccountId, balance, after) unless confirmOverdraft (audited overdraft_confirmed); QA-05: date before the account opening-balance date → 400',
+    'Finance: record the transfer (amount = approved amount, proof, bank ref, DRMS 10/10 D2 cost center: costCenterId, default = the project default, none → 400) → KK posted. QA-17: destination account not verified → 409 code BANK_ACCOUNT_UNVERIFIED_CONFIRM_REQUIRED (bankAccountId, verificationStatus, bankName, accountNo, accountHolder) unless confirmUnverifiedAccount (audited bank_unverified_confirmed); QA-04: cash account balance would go below 0 → 409 code CASH_OVERDRAFT_CONFIRM_REQUIRED (cashAccountId, balance, after) unless confirmOverdraft (audited overdraft_confirmed); QA-05: date before the account opening-balance date → 400',
     F.TransferCreate, ['id'], res(201, 'Transferred', F.TransferResult, [400, 401, 403, 404, 409, 422, 426, 429]))
   post('/expense-requests/{id}/transfers/{tid}/void', 'Finance: void a transfer (reversal entry, reason)', F.ReasonBody, ['id', 'tid'], detailOk())
   registry.registerPath({
     method: 'get',
     path: '/transfer-queue',
-    summary: 'Finance/Owner: Uang Muka "Disetujui" + Reimburse "Nota Terverifikasi", by needed date (US-19); PTs where the caller is Finance/Direktur, ?company= narrows',
+    summary: 'Finance/Owner: Pengajuan Baru "Disetujui" + Reimburse "Nota Terverifikasi", by needed date (US-19); PTs where the caller is Finance/Direktur, ?company= narrows. DRMS 10/10: + project, suggested cost center (D2), bank, flags, transfer SLA',
     security,
     request: { headers: deviceHeader, query: F.CompanyFilterQuery },
-    responses: res(200, 'Queue', F.ExpenseRequestList, [400, 401, 403]),
+    responses: res(200, 'Queue', F.TransferQueueList, [400, 401, 403]),
   })
   registry.registerPath({
     method: 'get',
     path: '/lpj-queue',
-    summary: 'MC3 Finance/Owner: LPJ verification list (Uang Muka "LPJ Diajukan" / "LPJ Terverifikasi", US-21) of the PTs where the caller is Finance/Direktur, with company refs; ?company= narrows',
+    summary: 'MC3 Finance/Owner: LPJ verification list (Pengajuan Baru "LPJ Diajukan" / "LPJ Terverifikasi", US-21) of the PTs where the caller is Finance/Direktur, with company refs; ?company= narrows',
     security,
     request: { headers: deviceHeader, query: F.CompanyFilterQuery },
     responses: res(200, 'Queue', F.LpjQueue, [400, 401, 403, 426]),
@@ -348,8 +358,16 @@ export function buildOpenApiDocument(version: string) {
   })
 
   // ---- F2b: LPJ & settlement (T5), PDF, approval inbox, notifications, file download ----
-  post('/expense-requests/{id}/receipts-complete', 'Uang Muka: receipts complete → "Nota Lengkap" (LPJ draft created)', F.EmptyBody, ['id'], detailOk())
-  post('/expense-requests/{id}/lpj/submit', 'Uang Muka: submit / resubmit the LPJ (usage description; LPJ number at first submit)', F.LpjSubmitBody, ['id'], detailOk())
+  post('/expense-requests/{id}/receipts-complete', 'Pengajuan Baru: receipts complete → "Nota Lengkap" (LPJ draft created)', F.EmptyBody, ['id'], detailOk())
+  post('/expense-requests/{id}/lpj/submit', 'Pengajuan Baru: submit / resubmit the LPJ (usage description; LPJ number at first submit)', F.LpjSubmitBody, ['id'], detailOk())
+  registry.registerPath({
+    method: 'put',
+    path: '/expense-requests/{id}/lpj/photos',
+    summary: 'Point 13 (DRMS 10/10): requester sets the LPJ photo set (media-receipts ids uploaded via POST /media/receipts, images only, max 10) while the LPJ is Draft / Revisi; frozen after Kirim LPJ',
+    security,
+    request: { headers: idem, params: idParams('id'), body: jsonBody(F.LpjPhotosBody) },
+    responses: detailOk(),
+  })
   post('/expense-requests/{id}/lpj/request-revision', 'Finance: LPJ revision with a required note → "LPJ Revisi"', F.RevisionBody, ['id'], detailOk())
   post('/expense-requests/{id}/lpj/verify', 'Finance: verify the LPJ (all receipts decided; verified total = Σ valid); difference 0 → Selesai', F.EmptyBody, ['id'], detailOk())
   post(
@@ -595,6 +613,10 @@ export function buildOpenApiDocument(version: string) {
   registerShortfallPaths(registry, { security, idem, res, detail: F.ExpenseRequestDetail })
   // ---- FR1 field reports per project kind (ADR 0020) -----------------------------------------
   registerFieldPaths(registry, { security, deviceHeader, idem, res })
+  // ---- P3 konstruksi RAP + Laporan Harian -----------------------------------------------------
+  registerDailyPaths(registry, { security, deviceHeader, idem, res })
+  // ---- DRMS 10/10 Phase C: projects (APK Proyek) + cost-center picker (D2) ----------------------
+  registerProjectPaths(registry, { security, deviceHeader, res })
 
   return new OpenApiGeneratorV31(registry.definitions).generateDocument({
     openapi: '3.1.0',

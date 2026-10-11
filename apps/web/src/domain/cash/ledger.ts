@@ -170,7 +170,9 @@ async function checkOverdraft(req: PayloadRequest, account: CashAccountDoc, amou
 export async function postEntry(req: PayloadRequest, input: PostInput): Promise<CashEntryDoc> {
   if (!isBusinessDate(input.entryDate)) fail(400, 'Tanggal harus YYYY-MM-DD.')
   if (!(Number.isSafeInteger(input.amount) && input.amount > 0)) fail(400, 'Nominal harus bilangan bulat Rupiah > 0.')
-  if (input.projectId && input.costCenterId) fail(400, 'Pilih project ATAU pusat biaya.')
+  // DRMS 10/10 D2: a manual entry is charged to a project OR a cost center; an entry of a request flow (transfer KK,
+  // LPJ refund KM, their reversals) carries the request's project AND the cost center Finance chose at the transfer
+  if (input.projectId && input.costCenterId && input.sourceType === 'manual') fail(400, 'Pilih project ATAU pusat biaya.')
   const companyId = await companyOf(req, 'cash-accounts', input.cashAccountId)
   // ADR 0016 §5 (MC2 fix): a manual posting needs Finance IN THE ACCOUNT's PT (the endpoint only
   // checks "Finance in any PT"); other source types are posted by flows already checked per PT.
@@ -418,7 +420,7 @@ export async function balances(req: PayloadRequest, asOf?: string, opts: { compa
   const pts = (opts.companyIds ?? kasCompanies(req)).filter((c) => Number.isSafeInteger(c))
   if (pts.length === 0) return []
   const r = (await tx.execute(sql`
-    SELECT a.id, a.company_id, a.name,
+    SELECT a.id, a.company_id, a.name, a.active,
            (CASE WHEN a.opening_balance_date IS NULL OR a.opening_balance_date <= ${until} THEN coalesce(a.opening_balance, 0) ELSE 0 END)::text AS opening,
            coalesce(sum(CASE WHEN e.direction = 'in' THEN e.amount ELSE 0 END), 0)::text AS total_in,
            coalesce(sum(CASE WHEN e.direction = 'out' THEN e.amount ELSE 0 END), 0)::text AS total_out
@@ -428,13 +430,13 @@ export async function balances(req: PayloadRequest, asOf?: string, opts: { compa
       pts.map((c) => sql`${c}`),
       sql`, `,
     )})
-    GROUP BY a.id, a.name, a.opening_balance, a.opening_balance_date
-    ORDER BY a.id`)) as unknown as { rows: Array<{ id: number; company_id: number; name: string; opening: string; total_in: string; total_out: string }> }
+    GROUP BY a.id, a.name, a.active, a.opening_balance, a.opening_balance_date
+    ORDER BY a.id`)) as unknown as { rows: Array<{ id: number; company_id: number; name: string; active: boolean | null; opening: string; total_in: string; total_out: string }> }
   return r.rows.map((x) => {
     const opening = Number(x.opening)
     const tin = Number(x.total_in)
     const tout = Number(x.total_out)
-    return { cashAccountId: Number(x.id), companyId: Number(x.company_id), name: x.name, openingBalance: opening, totalIn: tin, totalOut: tout, balance: opening + tin - tout }
+    return { cashAccountId: Number(x.id), companyId: Number(x.company_id), name: x.name, active: x.active !== false, openingBalance: opening, totalIn: tin, totalOut: tout, balance: opening + tin - tout }
   })
 }
 

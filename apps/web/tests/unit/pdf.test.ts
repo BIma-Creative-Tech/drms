@@ -73,7 +73,7 @@ describe('PengajuanBiaya template', () => {
       expect.arrayContaining([
         '228-PB DRMS-Pengajuan Reimburse Ops Palangka Banjar keperluan Service Tronton',
         'No Uraian Jumlah Satuan Harga Satuan Total Keterangan',
-        '2 Penginapan 2 KMR 339.000 677.000',
+        '2 Penginapan 2 KMR 338.500 677.000',
         '3 Makan siang 170.500',
         'GRAND TOTAL Rp 1.447.500',
         'Diajukan Oleh Dibuat Oleh Diketahui Oleh Approval',

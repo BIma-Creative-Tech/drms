@@ -15,7 +15,7 @@ import { resetRateLimits } from '@/lib/rate-limit'
 import { DEFAULT_SEED_DATA } from '@/seed/data'
 import { seed } from '@/seed/seed'
 
-import { api, asUser, draftBody, makeFlowUser, makeWorld, sysCreate, type FlowUser, type World } from './flow-world'
+import { adr0013Fallback, api, asUser, draftBody, makeFlowUser, makeWorld, sysCreate, type FlowUser, type World } from './flow-world'
 import { addMembership, companyId, getTestPayload, sqlAs, withContext } from './helpers'
 
 /**
@@ -73,6 +73,7 @@ beforeAll(async () => {
   const { uoms, banks, ...drms } = DEFAULT_SEED_DATA
   await seed(p, { uoms, banks, companies: [drms, { ...drms, company: { name: 'PT Contoh Empat', shortCode: 'CS4', timezone: 'Asia/Makassar' }, vehicles: [] }] })
   B = await companyId('CS4')
+  await adr0013Fallback([A, B])
   const inPt = async (company: number, collection: CollectionSlug, code: string) =>
     (await p.find({ collection, where: { and: [{ company: { equals: company } }, { code: { equals: code } }] }, limit: 1, depth: 0, overrideAccess: true /* SYSTEM-READ: fixture */ })).docs[0]!.id as number
   X.catB = await inPt(B, 'expense-categories', 'MAT')

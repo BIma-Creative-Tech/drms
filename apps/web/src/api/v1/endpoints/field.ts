@@ -70,7 +70,7 @@ export const listServiceReportsEndpoint = v1({
   method: 'get',
   handler: async ({ req }) => {
     const q = query(ServiceReportListQuery, req.searchParams)
-    const p = await listServiceReports(req, { projectId: q.project, unitId: q.unit, status: q.status, reporterId: q.reporter, from: q.from, to: q.to, mine: q.mine !== undefined, limit: q.limit, after: decodeCursor(q.cursor), companyIds: await companyQuery(req) })
+    const p = await listServiceReports(req, { projectId: q.project, unitId: q.unit, status: q.status, reporterId: q.reporter, from: q.from, to: q.to, mine: q.mine !== undefined, limit: q.limit, after: decodeCursor(q.cursor), companyIds: await companyQuery(req), q: q.q })
     return json(page(p))
   },
 })
@@ -190,6 +190,7 @@ export const listActivitiesEndpoint = v1({
       limit: q.limit,
       after: decodeCursor(q.cursor),
       companyIds: await companyQuery(req),
+      q: q.q,
     })
     return json(page(p))
   },

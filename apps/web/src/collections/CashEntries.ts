@@ -10,6 +10,7 @@ import { uuidField } from '@/fields/common'
 
 import { businessDateField, ro } from './fields-f2'
 import { companyField, companyHook } from '@/fields/company'
+import { USER_NAME_VIEW } from '@/fields/users'
 
 /**
  * T6/T7 Kas masuk / keluar — own single-entry cash book (ADR 0005). CLASS B: flat, no DELETE,
@@ -67,9 +68,9 @@ export const CashEntries: CollectionConfig = withAudit(
       { name: 'reversalOf', type: 'relationship', relationTo: 'cash-entries', label: 'Jurnal balik dari', admin: ro },
       { name: 'reversedBy', type: 'relationship', relationTo: 'cash-entries', label: 'Dibalik oleh', admin: ro },
       { name: 'voidReason', type: 'text', admin: ro },
-      { name: 'voidedBy', type: 'relationship', relationTo: 'users', admin: ro },
+      { name: 'voidedBy', type: 'relationship', relationTo: 'users', label: 'Dibatalkan oleh', admin: { ...ro, components: USER_NAME_VIEW } },
       { name: 'voidedAt', type: 'date', admin: ro },
-      { name: 'postedBy', type: 'relationship', relationTo: 'users', admin: ro },
+      { name: 'postedBy', type: 'relationship', relationTo: 'users', label: 'Dicatat oleh', admin: { ...ro, components: USER_NAME_VIEW } },
       { name: 'postedAt', type: 'date', admin: { ...ro, date: { pickerAppearance: 'dayAndTime' } } },
       uuidField(),
     ],

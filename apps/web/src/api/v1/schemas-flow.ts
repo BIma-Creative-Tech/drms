@@ -29,7 +29,7 @@ const qty = z
   .max(1e9)
   .refine((v) => Math.abs(Math.round(v * 1000) - v * 1000) < 1e-6, 'maks. 3 desimal')
 
-export const RequestTypeEnum = z.enum(['advance', 'reimburse']).meta({ id: 'RequestType', description: 'advance = Uang Muka, reimburse = Reimburse' })
+export const RequestTypeEnum = z.enum(['advance', 'reimburse']).meta({ id: 'RequestType', description: 'advance = Pengajuan Baru (label until 2026-10: Uang Muka), reimburse = Reimburse' })
 export const RequestStatusEnum = z
   .enum([
     'draft',
@@ -81,21 +81,23 @@ export const LineInput = z
   .object({
     id: z.string().max(64).optional().meta({ description: 'Existing line id (keep to update a line in place; omit for new lines).' }),
     description: z.string().max(500).optional(),
-    qty: qty.nullable().optional(),
+    qty: qty.nullable().optional().meta({ description: 'Quantity (≤ 3 decimals); empty = 1. A unit (uomId) is required when qty is set.' }),
     uomId: id.nullable().optional(),
-    unitPrice: rupiah.nullable().optional().meta({ description: 'Informational only — never used to compute the total (Q-05).' }),
-    total: rupiahPos.nullable().optional().meta({ description: 'PRIMARY value entered by the user (may be rounded from the receipt).' }),
+    unitPrice: rupiah.nullable().optional().meta({ description: 'D3 (DRMS 10/10): required to submit. The line total is computed by the server: total = qty × unitPrice (qty empty = 1), rounded to whole Rupiah.' }),
+    total: rupiahPos.nullable().optional().meta({ description: 'READ-ONLY since D3: ignored when unitPrice is sent (the server computes qty × unitPrice). Compatibility for old clients that send only `total`: unitPrice = total ÷ qty when that is a whole Rupiah amount, else the line stays incomplete (cannot be submitted).' }),
+    receiptAmount: rupiah.nullable().optional().meta({ description: 'D3 "Nominal sesuai nota" (optional). When set and ≠ total, the request carries the awareness flag `receipt_amount_mismatch` ("Selisih nota") for Finance; amounts stay based on total.' }),
     notes: z.string().max(500).nullable().optional(),
     categoryId: id.nullable().optional(),
     vehicleId: id.nullable().optional(),
+    rapItemId: id.nullable().optional().meta({ description: 'D4 (DRMS 10/10): RAP item of the request project (GET /projects/{id}/rap items[].id). Required on every line to submit when the project has a RAP; a konstruksi project without RAP cannot submit. Omitted = the line (same id) keeps its stored item; null clears it.' }),
   })
   .strict()
   .meta({ id: 'ExpenseLineInput' })
 
 const draftFields = {
   title: z.string().trim().min(1).max(200),
-  projectId: id.nullable().optional(),
-  costCenterId: id.nullable().optional(),
+  projectId: id.nullable().optional().meta({ description: 'D2 (DRMS 10/10): required to submit (no non-project requests).' }),
+  costCenterId: id.nullable().optional().meta({ description: 'D2: IGNORED since DRMS 10/10 (Finance sets the cost center at the transfer). Still accepted so older apps keep working.' }),
   neededDate: businessDate.nullable().optional(),
   urgencyLevelId: id.nullable().optional().meta({ description: 'urgency-levels id of the request PT ("Tingkat urgensi", owner decision 2026-10-09).' }),
   periodFrom: businessDate.nullable().optional().meta({ description: 'Ignored since 2026-10-09: "Periode kegiatan" was replaced by the urgency level. Still accepted so older apps keep working.' }),
@@ -175,7 +177,16 @@ export const TransferCreate = z
     cashAccountId: id,
     bankRef: z.string().trim().min(1).max(64),
     proofMediaId: id.meta({ description: 'media-transfer-proofs id (POST /media/transfer-proofs).' }),
-    transferDate: businessDate.optional(),
+    transferDate: businessDate.optional().meta({ description: 'Legacy: date only (time unknown). With transferAt it must equal the date of transferAt in the PT zone.' }),
+    transferAt: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d{1,3})?)?(Z|[+-]\d{2}:\d{2})?$/, 'YYYY-MM-DDTHH:MM')
+      .optional()
+      .meta({ description: 'Item 11: date + time of the bank transfer proof. ISO 8601 with offset, or without offset = wall clock in the PT time zone. Not in the future; its date (PT zone) becomes transferDate (period lock). Omitted = old client, transfer time unknown.' }),
+    costCenterId: id
+      .nullable()
+      .optional()
+      .meta({ description: 'D2 (DRMS 10/10): cost center of the money, chosen by Finance — active, of the request PT. Omitted/null → the project default (GET /transfer-queue costCenter), else 400 (path costCenterId).' }),
     amount: rupiahPos.optional().meta({ description: 'Optional echo; must equal the approved amount (Finance cannot change it, G3).' }),
     confirmOverdraft: confirmOverdraft,
     confirmUnverifiedAccount: confirmUnverifiedAccount,
@@ -191,6 +202,9 @@ export const ListQuery = z
     limit: z.coerce.number().int().min(1).max(100).default(50),
     cursor: z.string().max(64).optional(),
     company: companyFilterParam,
+    project: z.coerce.number().int().positive().optional().meta({ description: 'DRMS 10/10: only requests of this project (project detail "Pengajuan" tab / APK).' }),
+    q: z.string().trim().max(100).optional().meta({ description: 'DRMS 10/10: search in nomor / judul (every word must match).' }),
+    page: z.coerce.number().int().min(1).max(100_000).optional().meta({ description: 'DRMS 10/10: page number (1-based) instead of the cursor — the answer then also carries page / totalPages / totalDocs.' }),
   })
   .meta({ id: 'ExpenseRequestListQuery' })
 
@@ -219,8 +233,28 @@ export const ExpenseRequestListItem = z
   .meta({ id: 'ExpenseRequestListItem' })
 
 export const ExpenseRequestList = z
-  .object({ items: z.array(ExpenseRequestListItem), nextCursor: z.string().nullable() })
+  .object({
+    items: z.array(ExpenseRequestListItem),
+    nextCursor: z.string().nullable(),
+    page: z.number().int().optional().meta({ description: 'Only with ?page=.' }),
+    totalPages: z.number().int().optional(),
+    totalDocs: z.number().int().optional(),
+  })
   .meta({ id: 'ExpenseRequestList' })
+
+const CostCenterRef = z.object({ id, code: z.string().nullish(), name: z.string().nullish() })
+
+/** DRMS 10/10: GET /transfer-queue items = list items + what the Finance transfer screen needs. */
+export const TransferQueueItem = ExpenseRequestListItem.extend({
+  project: Ref.nullable(),
+  costCenter: CostCenterRef.nullable().meta({ description: 'D2: suggested cost center of the transfer (the project default, else a legacy request\'s own); null = Finance must pick one.' }),
+  bank: z.object({ bankName: z.string().nullable(), accountNo: z.string().nullable(), accountHolder: z.string().nullable() }).nullable(),
+  bankVerification: z.enum(['verified', 'unverified']).meta({ description: 'QA-17: unverified → the transfer needs confirmUnverifiedAccount.' }),
+  flags: z.object({ warning: z.number().int(), info: z.number().int(), receiptMismatch: z.number().int() }),
+  sla: z.object({ approvedAt: z.string().nullable(), slaHours: z.number(), ageHours: z.number().nullable(), over: z.boolean() }).meta({ description: 'Item 11: age since the final approval vs the PT transfer SLA.' }),
+}).meta({ id: 'TransferQueueItem' })
+
+export const TransferQueueList = z.object({ items: z.array(TransferQueueItem), nextCursor: z.string().nullable() }).meta({ id: 'TransferQueueList' })
 
 export const ExpenseRequestDetail = ExpenseRequestListItem.extend({
   uuid: z.string().nullable(),
@@ -242,11 +276,15 @@ export const ExpenseRequestDetail = ExpenseRequestListItem.extend({
       qty: z.number().nullable(),
       uom: Ref.nullable(),
       unitPrice: rupiah.nullable(),
-      unitPriceDisplay: rupiah.nullable().meta({ description: 'unitPrice, else total ÷ qty (display only).' }),
-      total: rupiah,
+      unitPriceDisplay: rupiah.nullable().meta({ description: 'unitPrice, else total ÷ qty (display only; lines saved before D3).' }),
+      total: rupiah.meta({ description: 'Server-computed qty × unitPrice (D3). 0 = incomplete line (no unit price yet).' }),
+      receiptAmount: rupiah.nullable().meta({ description: 'D3 "Nominal sesuai nota" (null = not filled).' }),
+      receiptMismatch: z.boolean().meta({ description: 'receiptAmount set and ≠ total (live; the stored Finance flag is flags[] kind receipt_amount_mismatch).' }),
       notes: z.string().nullable(),
       category: Ref.nullable(),
       vehicle: z.object({ id, plateNo: z.string().nullish(), plateDisplay: z.string().nullish(), type: z.string().nullish() }).nullable(),
+      rapItem: Ref.nullable().meta({ description: 'D4: RAP item of the line (name = the item\'s uraian).' }),
+      rapOverBudget: z.boolean().meta({ description: 'D4: live "Melebihi RAP" (approved realisation of the item + this request > planned). Always false for callers without a RAP price role (Staff).' }),
     }),
   ),
   transferredTotal: rupiah,
@@ -260,12 +298,19 @@ export const ExpenseRequestDetail = ExpenseRequestListItem.extend({
       acknowledgerUserId: id.nullable(),
       acknowledgeDelegatedTo: z.enum(['owner', 'admin']).nullable(),
       acknowledgeDelegationReason: z.string().nullable(),
-      acknowledgeBy: z.enum(['scope_manager', 'role', 'user']).meta({ description: 'scope_manager only on pre-E1 snapshots (PM "Diketahui").' }),
+      acknowledgeBy: z.enum(['scope_manager', 'role', 'user']).meta({ description: 'ADR 0021: scope_manager with decisionRoles = "Persetujuan PM" by the PM project (acknowledgerUserId), then the Direktur level; scope_manager without decisionRoles = pre-E1 snapshot (PM "Diketahui").' }),
       acknowledgeRole: z.string().nullable().meta({ description: 'ADR 0013: pk-owner (label "Direktur") when "Diketahui" is the Direktur approval.' }),
       decisionRoles: z.array(z.string()).meta({ description: 'ADR 0013: roles that may acknowledge/approve/reject ([pk-owner, pk-finance]); empty = pre-E1 snapshot (old guards).' }),
       skipped: z
         .array(z.object({ position: z.enum(['diketahui', 'approval']), level: z.number().int(), role: z.string().nullable(), userId: id.nullable(), reason: z.string() }))
         .meta({ description: 'ADR 0013 G1-2: positions skipped at submit because their only holders are requester/creator — show "(tidak berlaku — pemohon)".' }),
+      selfApproval: z
+        .enum(['direktur_via_pm', 'direktur_via_pm_self'])
+        .nullable()
+        .meta({
+          description:
+            'ADR 0021 narrow G1 exception: a Direktur\'s request filed by the PM project (PM approves, then a Direktur). direktur_via_pm = another Direktur decides the Direktur step; direktur_via_pm_self = the requester Direktur may approve (only Direktur of the PT, owner 2026-10-11). Show the note "Pengajuan Direktur — diajukan oleh PM …".',
+        }),
       steps: z.array(z.object({ level: z.number().int(), approverRole: z.string().nullable(), approverUserId: id.nullable() })),
       signDiajukan: z.enum(['required', 'optional', 'none']),
       signDibuat: z.enum(['required', 'optional', 'none']),
@@ -308,7 +353,9 @@ export const ExpenseRequestDetail = ExpenseRequestListItem.extend({
   flags: z.array(
     z.object({
       id,
-      kind: z.enum(['amount_diff', 'date_after_request', 'date_too_old', 'date_out_of_period', 'uom_suspicious', 'duplicate']),
+      kind: z
+        .enum(['amount_diff', 'date_after_request', 'date_too_old', 'date_out_of_period', 'uom_suspicious', 'duplicate', 'receipt_amount_mismatch', 'rap_over_budget'])
+        .meta({ description: 'receipt_amount_mismatch = "Selisih nota" (D3); rap_over_budget = "Melebihi RAP" (D4, warning, not blocking; only for Direktur/Admin/Finance/PM).' }),
       kindLabel: z.string(),
       level: z.string(),
       status: z.string(),
@@ -327,6 +374,8 @@ export const ExpenseRequestDetail = ExpenseRequestListItem.extend({
       kind: z.string(),
       amount: rupiah,
       transferDate: z.string(),
+      transferAt: z.string().nullable().meta({ description: 'Item 11: date + time of the proof (UTC ISO); null = recorded without a time.' }),
+      costCenter: CostCenterRef.nullable().meta({ description: 'D2: cost center chosen by Finance (null on transfers recorded before DRMS 10/10).' }),
       bankRef: z.string(),
       status: z.string(),
       cashEntryId: id.nullable(),
@@ -342,6 +391,7 @@ export const ExpenseRequestDetail = ExpenseRequestListItem.extend({
       status: z.enum(['draft', 'submitted', 'revision', 'verified', 'settled']),
       statusLabel: z.string(),
       usageNotes: z.string().nullable(),
+      photos: z.array(id).meta({ description: 'Point 13: LPJ photo ids (media-receipts; file: GET /api/v1/media/receipts/{id}/file).' }),
       transferredTotal: rupiah.nullable(),
       receiptsTotal: rupiah.nullable().meta({ description: 'Σ active receipts (pending + valid); refreshed at every LPJ submit and — QA-09 — after every receipt add / edit / remove / valid / reject while the LPJ is open.' }),
       verifiedReceiptsTotal: rupiah.nullable(),
@@ -362,7 +412,7 @@ export const ExpenseRequestDetail = ExpenseRequestListItem.extend({
         .meta({ description: 'QA-06 / ADR 0019 (Finance/Direktur of the PT only; null otherwise or without a shortfall): shortfall vs approved + tolerance and its re-approval.' }),
     })
     .nullable()
-    .meta({ id: 'Settlement', description: 'T5 LPJ (Uang Muka only; null before "Nota Lengkap").' }),
+    .meta({ id: 'Settlement', description: 'T5 LPJ (Pengajuan Baru only; null before "Nota Lengkap").' }),
   budget: z
     .object({ basis: z.enum(['project', 'none']), pctBefore: z.number().nullable(), pctAfter: z.number().nullable() })
     .meta({ description: 'US-26 preview (committed % before → after); cost centers: "none" (Q-24).' }),
@@ -371,6 +421,7 @@ export const ExpenseRequestDetail = ExpenseRequestListItem.extend({
   resubmitOfId: id.nullable(),
   resubmitOf: z.object({ id, docNo: z.string().nullable(), title: z.string() }).nullable(),
   submittedAt: z.string().nullable(),
+  approvedAt: z.string().nullable().meta({ description: 'Item 11: final approval time (server) of the current cycle; start of the transfer SLA.' }),
   cancelReason: z.string().nullable(),
   rejectReason: z.string().nullable(),
   clientUuid: z.string().nullable(),
@@ -385,12 +436,20 @@ export const ExpenseRequestDetail = ExpenseRequestListItem.extend({
     .meta({ description: '"Giliran": who is expected to act next and what (display text, Bahasa Indonesia); null when finished.' }),
 }).meta({ id: 'ExpenseRequestDetail' })
 
+/** Point 13 (DRMS 10/10): LPJ photos = media-receipts ids uploaded by the caller (POST /api/v1/media/receipts), images only. */
+const lpjPhotos = z.array(id).max(10).meta({ description: 'Point 13: LPJ photos — media-receipts ids (POST /api/v1/media/receipts, images only), max 10. Replaces the whole set.' })
+
 export const LpjSubmitBody = z
-  .object({ usageNotes: z.string().trim().min(3).max(2000).optional().meta({ description: 'Required at the first submit; kept on resubmit when omitted.' }) })
+  .object({
+    usageNotes: z.string().trim().min(3).max(2000).optional().meta({ description: 'Required at the first submit; kept on resubmit when omitted.' }),
+    photos: lpjPhotos.optional(),
+  })
   .strict()
   .meta({ id: 'LpjSubmitBody' })
 
 export const RevisionBody = z.object({ note }).strict().meta({ id: 'LpjRevisionBody' })
+
+export const LpjPhotosBody = z.object({ photos: lpjPhotos }).strict().meta({ id: 'LpjPhotosBody', description: 'Point 13: save the LPJ photo set while the LPJ is editable (Draft / Revisi) — requester only.' })
 
 export const SettleReverseResult = z
   .object({
@@ -529,7 +588,7 @@ export const VoidResult = z.object({ original: CashEntry, reversal: CashEntry })
 export const Balances = z
   .object({
     asOf: z.string().nullable(),
-    items: z.array(z.object({ cashAccountId: id, companyId: id, name: z.string(), openingBalance: z.number().int(), totalIn: z.number().int(), totalOut: z.number().int(), balance: z.number().int() })),
+    items: z.array(z.object({ cashAccountId: id, companyId: id, name: z.string(), active: z.boolean().meta({ description: 'Inactive accounts keep their balance here but cannot take new postings (transfer form pickers hide them).' }), openingBalance: z.number().int(), totalIn: z.number().int(), totalOut: z.number().int(), balance: z.number().int() })),
   })
   .meta({ id: 'Balances' })
 
@@ -664,6 +723,26 @@ export const SignedMediaUrl = z
     ttlSeconds: z.number().int(),
   })
   .meta({ id: 'SignedMediaUrl' })
+/** DRMS 10/10 8e: destination account preview under the picker / of the submit snapshot (masked; full only on reveal for allowed callers). */
+export const BankPreviewQuery = z
+  .object({
+    request: z.coerce.number().int().positive().optional().meta({ description: 'Expense request id. Draft → live account (`account` = picker value, default the saved one); submitted → the snapshot taken at submit.' }),
+    account: z.coerce.number().int().positive().optional().meta({ description: 'Employee bank account id (picker value). Without `request`: only an account readable through the collection access.' }),
+    reveal: z.enum(['1']).optional().meta({ description: '1 = include the full number when `canReveal` (creator/requesters, Finance/Direktur/Admin of the PT — same rule as the detail DTO).' }),
+  })
+  .meta({ id: 'BankPreviewQuery' })
+
+export const BankPreview = z
+  .object({
+    source: z.enum(['account', 'snapshot']),
+    bankName: z.string().nullable(),
+    accountHolder: z.string().nullable(),
+    accountNoMasked: z.string().nullable().meta({ description: '"••••1234"' }),
+    canReveal: z.boolean(),
+    accountNo: z.string().optional().meta({ description: 'Only with reveal=1 and canReveal.' }),
+  })
+  .meta({ id: 'BankPreview' })
+
 export const PdfQuery = z.object({ variant: z.enum(['standard', 'internal']).optional().meta({ description: 'internal = with receipt validation flags (Finance/Owner/Admin).' }) }).meta({ id: 'PdfQuery' })
 
 /** MC2/MC3: short reference of a PT (queue rows). */
@@ -718,8 +797,11 @@ export const ApprovalInbox = z
         requestDate: z.string().nullable(),
         step: z.enum(['acknowledge', 'approve']),
         level: z.number().int().nullable(),
-        stepLabel: z.string().meta({ description: 'ADR 0013: "Persetujuan Direktur (Diketahui)" | "Approval level n" (legacy PM step: "Diketahui Oleh").' }),
-        decisionFlow: z.boolean().meta({ description: 'ADR 0013 Direktur → Finance request (acknowledge = the Direktur approval, button "Setujui"); false = pre-E1 snapshot.' }),
+        stepLabel: z.string().meta({ description: 'ADR 0021: "Persetujuan PM" | "Persetujuan Direktur"; ADR 0013: "Persetujuan Direktur (Diketahui)" | "Approval level n" (legacy PM step: "Diketahui Oleh").' }),
+        decisionFlow: z.boolean().meta({ description: 'ADR 0013/0021 decision flow (acknowledge = an approval, button "Setujui"); false = pre-E1 snapshot.' }),
+        decisionBy: z.enum(['pm', 'direktur', 'finance', 'other']).meta({ description: 'ADR 0021: who decides this step (APK decision sheet texts): pm = PM project, direktur, finance, other (named user / legacy).' }),
+        finalStep: z.boolean().meta({ description: 'ADR 0021: approving this step makes the request "Disetujui" (Finance then transfers / verifies receipts).' }),
+        selfApproval: z.enum(['direktur_via_pm', 'direktur_via_pm_self']).nullable().meta({ description: 'ADR 0021 narrow G1 exception (a Direktur\'s request filed by the PM project; _self = the requester Direktur is the PT\'s only Direktur).' }),
         budget: z.object({
           basis: z.enum(['project', 'none']),
           pctBefore: z.number().nullable(),
@@ -727,7 +809,7 @@ export const ApprovalInbox = z
           overWarn: z.boolean(),
           warnPct: z.number().meta({ description: 'MC2: budgetWarnPct of the request\'s PT (overWarn = pctAfter > warnPct).' }),
         }),
-        flags: z.object({ warning: z.number().int(), info: z.number().int() }),
+        flags: z.object({ warning: z.number().int(), info: z.number().int(), receiptMismatch: z.number().int().meta({ description: 'D3: lines with "Selisih nota" (receipt_amount_mismatch, open or reviewed).' }) }),
       }),
     ),
   })

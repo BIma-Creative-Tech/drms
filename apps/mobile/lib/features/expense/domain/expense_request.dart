@@ -47,8 +47,47 @@ abstract class ExpenseLine with _$ExpenseLine {
     RefItem? category,
     String? vehiclePlate,
     int? vehicleId,
+
+    /// D3 "Nominal sesuai nota" (null = not filled).
+    int? receiptAmount,
+
+    /// D3: server read model `receiptMismatch` (receiptAmount ≠ total); null from an older server.
+    bool? receiptMismatch,
+
+    /// DRMS 10/10 D4: RAP item of the line (`rapItem {id, code, name}`); null before D4.
+    RefItem? rapItem,
+
+    /// D4: server read model `rapOverBudget` (live "Melebihi RAP"; always false for Staff); null from an older server.
+    bool? rapOverBudget,
   }) = _ExpenseLine;
 }
+
+/// D3: a line saved before D3 (no reproducible unit price) in an editable request (Draft / Revisi Nota) —
+/// "Lengkapi Qty & Harga satuan"; the server refuses (re)submit until it is completed.
+bool lineNeedsCompletion(ExpenseDetail d, ExpenseLine l) =>
+    (d.status == RequestStatus.draft || d.status == RequestStatus.receiptRevision) && l.unitPrice == null;
+
+/// Flag code of D3 "Nominal sesuai nota ≠ total baris" (awareness for Finance, never blocks).
+const receiptAmountMismatchFlag = 'receipt_amount_mismatch';
+
+/// D3 "Selisih nota" on a line of [d]: the server's per-line `receiptMismatch`, a `receipt_amount_mismatch`
+/// flag of that line, or — from a server without either — receiptAmount ≠ total.
+bool lineReceiptMismatch(ExpenseDetail d, ExpenseLine l) =>
+    l.receiptMismatch ??
+    (d.flags.any((f) => f.kind == receiptAmountMismatchFlag && f.lineNo == l.no) ||
+        (l.receiptAmount != null && l.receiptAmount != l.total));
+
+/// D4 flag code: the line's amount is above the remaining budget of its RAP item ("Melebihi RAP"; awareness).
+const rapOverBudgetFlag = 'rap_over_budget';
+
+/// D4 "Melebihi RAP" on a line of [d]: the server's live `rapOverBudget` of the line or a `rap_over_budget` flag of it.
+bool lineRapOverBudget(ExpenseDetail d, ExpenseLine l) =>
+    (l.rapOverBudget ?? false) ||
+    d.flags.any((f) => f.kind == rapOverBudgetFlag && f.lineNo == l.no && f.status != 'resolved');
+
+/// D4: a line of an editable request (Draft / Revisi Nota) without a RAP item — "Pilih item RAP".
+bool lineNeedsRapItem(ExpenseDetail d, ExpenseLine l) =>
+    (d.status == RequestStatus.draft || d.status == RequestStatus.receiptRevision) && l.rapItem == null;
 
 @freezed
 abstract class ReceiptInfo with _$ReceiptInfo {
@@ -67,6 +106,9 @@ abstract class ReceiptInfo with _$ReceiptInfo {
 
 /// QA-27 (owner decision 2026-10-08): a receipt Finance marked valid is locked — the requester can no
 /// longer remove it (server answers 409 "Nota sudah divalidasi Finance"); removed ones are gone already.
+/// d1010 (13): maximum photos on one LPJ (same limit as the server).
+const maxLpjPhotos = 10;
+
 bool receiptRemovable(String status) => status != 'valid' && status != 'removed';
 
 /// Receipt status labels (server `receipts.status`).
@@ -88,6 +130,12 @@ abstract class TransferInfo with _$TransferInfo {
     required String kind, // advance | reimburse | lpj_shortfall
     required int amount,
     String? transferDate,
+
+    /// Item 11: date + time of the bank proof (UTC ISO); null = recorded without a time.
+    String? transferAt,
+
+    /// D2: cost center chosen by Finance at the transfer (null before DRMS 10/10).
+    RefItem? costCenter,
     String? bankRef,
     required String status, // posted | void
     String? voidReason,
@@ -96,14 +144,14 @@ abstract class TransferInfo with _$TransferInfo {
   bool get isVoid => status == 'void';
 
   String get kindLabel => switch (kind) {
-    'advance' => 'Uang muka',
+    'advance' => 'Pengajuan Baru', // D1 (was "Uang muka")
     'reimburse' => 'Reimburse',
     'lpj_shortfall' => 'Kekurangan LPJ',
     _ => kind,
   };
 }
 
-/// `ExpenseRequestDetail.settlement` — LPJ of an Uang Muka (T5).
+/// `ExpenseRequestDetail.settlement` — LPJ of a Pengajuan Baru (`advance`, T5).
 @freezed
 abstract class SettlementInfo with _$SettlementInfo {
   const SettlementInfo._();
@@ -123,7 +171,13 @@ abstract class SettlementInfo with _$SettlementInfo {
     String? submittedAt,
     String? verifiedAt,
     String? settledAt,
+
+    /// d1010 (13): LPJ photos (media ids, served like receipt images), at most [maxLpjPhotos].
+    @Default([]) List<int> photos,
   }) = _SettlementInfo;
+
+  /// Requester may still change the LPJ (not submitted yet, or sent back for revision).
+  bool get editable => status == 'draft' || status == 'revision';
 
   String? get settlementTypeLabel => switch (settlementType) {
     'none' => 'Pas — tanpa selisih',
@@ -171,18 +225,38 @@ abstract class ApprovalRuleInfo with _$ApprovalRuleInfo {
     required String name,
     required String acknowledge, // required | optional | none
     String? acknowledgeDelegatedTo,
-    String? acknowledgeBy, // scope_manager (pre-E1 PM) | role | user
+    String? acknowledgeBy, // scope_manager (PM project; pre-E1 or ADR 0021) | role | user
     String? acknowledgeRole, // pk-owner = Direktur (ADR 0013)
     @Default([]) List<String> decisionRoles, // [pk-owner, pk-finance]; empty = pre-E1 snapshot
     @Default([]) List<SkippedPosition> skipped,
     @Default([]) List<RuleStep> steps,
+
+    /// ADR 0021: narrow G1 exception — a Direktur's own request filed by the PM (`direktur_via_pm`; `direktur_via_pm_self` =
+    /// the requester Direktur is the PT's only Direktur and approves himself, owner 2026-10-11).
+    String? selfApproval,
   }) = _ApprovalRuleInfo;
 
   /// Snapshot taken under ADR 0013 (Direktur "Diketahui" = approval, then Finance).
   bool get decisionFlow => decisionRoles.isNotEmpty;
 
-  /// Pre-E1 snapshot where the PM / cost-center manager gave "Diketahui".
+  /// "Diketahui" by the PM project / cost-center manager: pre-E1 snapshots and, since ADR 0021, the
+  /// "PM project → Direktur" flow (where it is the PM's approval).
   bool get legacyPmAcknowledge => acknowledgeBy == 'scope_manager';
+
+  /// ADR 0021 flow: the PM project approves first (snapshot with decision roles + scope_manager).
+  bool get pmApproval => decisionFlow && acknowledgeBy == 'scope_manager';
+
+  /// ADR 0021: Direktur request filed by the PM (owner policy 2026-10-10).
+  bool get direkturViaPm => selfApproval == 'direktur_via_pm' || selfApproval == 'direktur_via_pm_self';
+
+  /// ADR 0021 (owner 2026-10-11): the requester Direktur approves himself (only Direktur of the PT).
+  bool get direkturViaPmSelf => selfApproval == 'direktur_via_pm_self';
+
+  /// Approver role of an approval level (null = named user / unknown).
+  String? roleOfLevel(int level) => steps.where((s) => s.level == level).firstOrNull?.approverRole;
+
+  /// Highest approval level of the snapshot (0 = no approval level left).
+  int get lastLevel => steps.fold(0, (m, s) => s.level > m ? s.level : m);
 
   bool isSkipped(SignPosition p, [int? level]) =>
       skipped.any((s) => s.position == p && (level == null || s.level == level));
@@ -285,6 +359,9 @@ abstract class InboxItem with _$InboxItem {
     @Default(false) bool budgetOverWarn,
     @Default(0) int warningFlags,
     @Default(0) int infoFlags,
+
+    /// D3: lines whose "Nominal sesuai nota" ≠ total (`flags.receiptMismatch`) — badge "Selisih nota (n)".
+    @Default(0) int receiptMismatchFlags,
 
     /// MC3: PT of the request (`company.id`) — chip + role check of that PT.
     int? companyId,

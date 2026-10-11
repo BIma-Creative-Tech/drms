@@ -202,7 +202,7 @@ const reportPhotoRule: Rule = async ({ req }) => {
 }
 /**
  * FR1 (ADR 0020): photos of field reports (service report / timesheet HM / aftersales activity, owner
- * types `service_report` | `unit_timesheet` | `aftersales_activity`) are readable by everyone who may
+ * types `service_report` | `unit_timesheet` | `aftersales_activity` | `daily_report`) are readable by everyone who may
  * read the owning report (Staff: assigned projects, PM: team) — same focus/list split as above.
  */
 const fieldPhotoRule: Rule = async ({ req }) => {
@@ -220,9 +220,9 @@ const progressPhotoRead: Access = byRoleAny({
   'pk-staff': anyOf(ownUser('uploadedBy'), fieldPhotoRule),
 })
 
-/** E4: PM / Direktur upload progress photos; FR1: Staff only in a PT with field reports switched on. */
+/** E4: PM / Direktur / Admin upload progress photos; FR1: Staff only in a PT with field reports switched on. */
 const progressPhotoCreate: Access = async (args) => {
-  if (hasRoleAny(args.req, 'pk-pm', 'pk-owner')) return true
+  if (hasRoleAny(args.req, 'pk-pm', 'pk-owner', 'pk-admin')) return true
   return hasRoleAny(args.req, 'pk-staff') && (await staffMayUploadFieldPhotos(args.req))
 }
 
@@ -313,7 +313,12 @@ export const MediaSelfies = mediaCollection({
   createGuard: assertSelfieUploadAllowed,
   // E6 S2 (Q-33): set by the selfieRetention job when the file was deleted from the volume. The row
   // stays as a tombstone (attendances.selfie_id is NOT NULL and append-only), without the image.
-  extraFields: [{ name: 'removedAt', type: 'date', label: 'File dihapus (retensi)', index: true, access: { update: () => false }, admin: { readOnly: true } }],
+  // D7 (DRMS 10/10, ADR 0010 addendum 2026-10-12): set once by the worker job `stampSelfie` when the timestamp
+  // band (server time in the PT zone, GPS, location, employee, "RR Teams") was burnt into the stored file.
+  extraFields: [
+    { name: 'removedAt', type: 'date', label: 'File dihapus (retensi)', index: true, access: { update: () => false }, admin: { readOnly: true } },
+    { name: 'stampedAt', type: 'date', label: 'Cap waktu dibubuhkan', access: { update: () => false }, admin: { readOnly: true, date: { pickerAppearance: 'dayAndTime' } } },
+  ],
 })
 
 export const MediaProgressPhotos = mediaCollection({

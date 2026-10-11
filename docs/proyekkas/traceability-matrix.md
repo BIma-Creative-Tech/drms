@@ -106,7 +106,7 @@ Manual UAT by the user is in progress for all rows (F2 gate pending).
 | US-06 | implemented (API + web) | `…/{id}/resubmit` → new Draft with `resubmitOf`, new number | API (`expense-flow`, `f2c-requester-web`) |
 | US-07 | implemented (API + web) | `POST /api/v1/media/receipts` + `POST …/{id}/receipts`; receipts `PATCH`/`remove` | API (`expense-flow`, `f2c-requester-web`, `media`) |
 | US-08 | implemented (API + web) | `…/{id}/receipts-complete`, `…/lpj/submit` (Uang Muka only) | API (`lpj`, `f2c-requester-web`) |
-| US-17 | implemented (API) | `GET /api/v1/expense-requests?scope=team`; PM never decides (E1/ADR 0013: acknowledge/approve/reject → 403 + `access_denied`) | API (`expense-flow`, `f2-authz-db`, `e1-approval-direktur`) |
+| US-17 | implemented (API) | `GET /api/v1/expense-requests?scope=team`; ADR 0021 (2026-10-10): the PM of the request (`projects.pm` / cost-center manager, snapshot acknowledger) approves/rejects as "Persetujuan PM"; any other PM → 403 + `access_denied` (ADR 0013 snapshots: PM never decides) | API (`expense-flow`, `f2-authz-db`, `e1-approval-direktur`) |
 | US-19 | implemented (API + web) | `GET /api/v1/transfer-queue`, `/admin/antrian-transfer` | API (`expense-flow`) |
 | US-20 | implemented (API + web) | `POST …/{id}/transfer` (amount = approved, one KK), `…/transfers/{tid}/void` | unit + API + DB (`expense-flow`, `f2-authz-db`) |
 | US-21 | implemented (API + web) | `…/lpj/request-revision`, `…/lpj/verify`, `/admin/verifikasi-lpj` | API + DB (`lpj`) |
@@ -121,7 +121,7 @@ Manual UAT by the user is in progress for all rows (F2 gate pending).
 | US-39 | implemented (API + web) | `…/receipts/{rid}/verify`, `/reject`, `…/verify-receipts`, `…/flags/{fid}/review` | unit + API (`expense-flow`, `form-228`) |
 | US-40 | implemented (API) | several requesters; no requester/creator may decide (G1, DB) | unit + API + DB (`expense-flow`, `f2-authz-db`) |
 | US-41 | implemented (API + web) | on-behalf create by Admin/Finance (Q-09), also in the admin form (F2c) | API (`expense-flow`, `f2c-requester-web`, `form-228`) |
-| US-42 | implemented (API) | `…/{id}/acknowledge` = Direktur approval (E1/ADR 0013; legacy snapshots: PM) | unit + API (`expense-flow`, `form-228`, `e1-approval-direktur`) |
+| US-42 | implemented (API) | `…/{id}/acknowledge` = PM project approval (ADR 0021); Direktur approval on ADR 0013 snapshots; PM on pre-E1 snapshots | unit + API (`expense-flow`, `form-228`, `e1-approval-direktur`) |
 | US-43 | implemented (API + web) | signature on submit/acknowledge/approve; self-service profile signature (F2c) | unit + API (`expense-flow`, `f2c-requester-web`, `files`) |
 | US-44 | implemented (API) | bank account must belong to a requester (G9), snapshot | API (`expense-flow`, `f2c-requester-web`) |
 | US-46 | implemented (web) | `GET …/{id}/pdf[?variant=internal]` (ADR 0008); layout approved by the user 2026-09-24, logo pending (Q-32) | unit (`pdf`), API golden + RSS (`form-228`), manual (layout approved) |
@@ -254,3 +254,12 @@ Branch `feat/field-reports-p1`. Web views / PDF berita acara / APK screens follo
 | US-66 | M09, M15 | reporter (≤ 24 h), PM team / Direktur (corrections) | the three report collections, `audit-logs` | `PATCH …/:id`, `POST …/:id/corrections` | web + APK | P1 | API `fr1-api.int.test.ts` (NOT_EDITABLE, correction audited); DB `fr1-db.int.test.ts` (window, override, no delete) |
 | US-67 | M13 | Finance, Direktur, Admin (estimate); PM (hours) | report `rekap-timesheet-kontrak` | `GET /api/v1/reports/rekap-timesheet-kontrak[/csv|xlsx|pdf]` | web `/admin/laporan/rekap-timesheet-kontrak` | P1 | unit `fr1-rules.test.ts` (billing, availability); API `fr1-api.int.test.ts` |
 | US-68 | M13 | Finance, Direktur, Admin (values); PM | report `rekap-aftersales` | `GET /api/v1/reports/rekap-aftersales[/…]` | web `/admin/laporan/rekap-aftersales` | P1 | API `fr1-api.int.test.ts` |
+
+## Approval PM project → Direktur (ADR 0021, requirements v1.3 §9) — 2026-10-10
+
+Branch `feat/approval-pm-direktur`. Migration `20261010_130000_approval_pm_direktur`.
+
+| US | Module | Roles | Payload collections | API | Screen | Phase | Test type |
+|---|---|---|---|---|---|---|---|
+| US-69 | M04 | PM project (snapshot acknowledger), Direktur, Finance (transfer only) | `approval-rules`, `expense-requests`, `approvals`, `notifications`, `settlements` | `POST /api/v1/expense-requests/{id}/acknowledge` (PM), `/approve` (Direktur), `/reject`; `GET /api/v1/approvals/inbox`; `GET /api/v1/me` (`capabilities.approvalInbox` for PM); LPJ shortfall `…/lpj/shortfall-approval/*` | web Persetujuan, PM dashboard, APK 0.4.1 | approval-pm | integration `approval-pm-direktur.int.test.ts` (scenarios 1–9), updated ADR 0013 suites (old snapshot still finishes) |
+| US-70 | M04, M15 | PM (creator), Direktur (requester) | `expense-requests.g1_exception`, `approvals`, `audit-logs` | submit / acknowledge / approve (unchanged paths) | web panel + PDF note | approval-pm | integration (exception recorded in audit/PDF; Direktur alone → 409; DB trigger refuses actor = creator without the exception) |

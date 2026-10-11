@@ -9,6 +9,7 @@ import '../../../l10n/gen/app_localizations.dart';
 import '../../../shared/widgets/async_body.dart';
 import '../../expense/domain/expense_request.dart';
 import '../../expense/presentation/request_detail_screen.dart' show pct;
+import '../../expense/presentation/widgets/receipt_mismatch_chip.dart';
 import '../../addendum/presentation/addendum_providers.dart';
 import '../../addendum/presentation/addendum_screens.dart';
 import '../../companies/presentation/company_chip.dart';
@@ -22,7 +23,7 @@ String inboxStepLabel(AppLocalizations t, InboxItem it) {
   return t.stepApprove(it.level ?? 1);
 }
 
-/// Direktur/Finance inbox (ADR 0013) with budget impact (red above the warn %, US-26) and open flags (US-59).
+/// PM project / Direktur / Finance inbox (ADR 0013, ADR 0021) with budget impact (red above the warn %, US-26) and open flags (US-59).
 /// E5: budget addenda waiting for the caller are listed above the expense requests ([AddendumInboxSection]).
 class InboxScreen extends ConsumerWidget {
   const InboxScreen({super.key});
@@ -157,7 +158,9 @@ class InboxCard extends StatelessWidget {
               ] else
                 Text('${t.budgetImpact}: ${t.budgetNone}', style: theme.textTheme.labelMedium),
               const SizedBox(height: 8),
-              Row(
+              Wrap(
+                crossAxisAlignment: WrapCrossAlignment.center,
+                runSpacing: 4,
                 children: [
                   Icon(
                     Icons.flag,
@@ -166,6 +169,11 @@ class InboxCard extends StatelessWidget {
                   ),
                   const SizedBox(width: 4),
                   Text(t.flagsCount(it.warningFlags, it.infoFlags), style: theme.textTheme.bodySmall),
+                  // D3: same badge as the web Antrian Transfer — lines whose "Nominal sesuai nota" ≠ total
+                  if (it.receiptMismatchFlags > 0) ...[
+                    const SizedBox(width: 8),
+                    ReceiptMismatchChip(key: Key('inbox-mismatch-${it.id}'), count: it.receiptMismatchFlags),
+                  ],
                 ],
               ),
             ],

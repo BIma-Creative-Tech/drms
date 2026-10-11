@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../app/theme.dart';
 import '../../../../core/format/dates.dart';
 import '../../../../l10n/gen/app_localizations.dart';
+import '../../../../shared/widgets/photo_viewer.dart';
 import '../../../dashboard/presentation/charts.dart' show VizColors;
 import '../../application/progress_providers.dart';
 import '../../domain/progress.dart';
@@ -172,23 +173,25 @@ class ProjectProgressCard extends StatelessWidget {
   }
 }
 
-/// Thumbnail of a server photo (authorized file endpoint, never cached on disk). Tap = full view.
+/// Thumbnail of a server photo (authorized file endpoint, never cached on disk). Tap = fullscreen viewer;
+/// [group] = ids of the photos the viewer swipes through (default: this photo only).
 class ServerPhotoThumb extends ConsumerWidget {
-  const ServerPhotoThumb({super.key, required this.photoId, this.size = 88});
+  const ServerPhotoThumb({super.key, required this.photoId, this.size = 88, this.group});
   final int photoId;
   final double size;
+  final List<int>? group;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final value = ref.watch(progressPhotoProvider((photoId, true)));
+    final ids = (group == null || !group!.contains(photoId)) ? [photoId] : group!;
     return _Thumb(
       size: size,
       bytes: value.value,
       error: value.hasError,
-      onTap: () => showDialog<void>(
-        context: context,
-        builder: (_) => _FullPhoto(child: _ServerFull(photoId: photoId)),
-      ),
+      onTap: () => showPhotoViewer(context, [
+        for (final id in ids) ViewerPhoto(builder: (_) => _ServerFull(photoId: id)),
+      ], initialIndex: ids.indexOf(photoId)),
     );
   }
 }
@@ -204,18 +207,31 @@ class _ServerFull extends ConsumerWidget {
   };
 }
 
-/// Thumbnail of a photo still on the phone (encrypted DB).
+class _LocalFull extends ConsumerWidget {
+  const _LocalFull({required this.uuid});
+  final String uuid;
+  @override
+  Widget build(BuildContext context, WidgetRef ref) => switch (ref.watch(localPhotoProvider(uuid))) {
+    AsyncData(:final value?) => Image.memory(value, fit: BoxFit.contain),
+    AsyncData() || AsyncError() => const Icon(Icons.broken_image, size: 64, color: Colors.white),
+    _ => const CircularProgressIndicator(),
+  };
+}
+
+/// Thumbnail of a photo still on the phone (encrypted DB). [group] = local ids the viewer swipes through.
 class LocalPhotoThumb extends ConsumerWidget {
-  const LocalPhotoThumb({super.key, required this.uuid, this.size = 88, this.onRemove});
+  const LocalPhotoThumb({super.key, required this.uuid, this.size = 88, this.onRemove, this.group});
   final String uuid;
   final double size;
   final VoidCallback? onRemove;
+  final List<String>? group;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final t = AppLocalizations.of(context);
     final value = ref.watch(localPhotoProvider(uuid));
     final bytes = value.value;
+    final ids = (group == null || !group!.contains(uuid)) ? [uuid] : group!;
     return Stack(
       clipBehavior: Clip.none,
       children: [
@@ -225,10 +241,9 @@ class LocalPhotoThumb extends ConsumerWidget {
           error: value.hasError || (value.hasValue && bytes == null),
           onTap: bytes == null
               ? null
-              : () => showDialog<void>(
-                  context: context,
-                  builder: (_) => _FullPhoto(child: Image.memory(bytes, fit: BoxFit.contain)),
-                ),
+              : () => showPhotoViewer(context, [
+                  for (final id in ids) ViewerPhoto(builder: (_) => _LocalFull(uuid: id)),
+                ], initialIndex: ids.indexOf(uuid)),
         ),
         if (onRemove != null)
           Positioned(
@@ -281,28 +296,6 @@ class _Thumb extends StatelessWidget {
       ),
     );
   }
-}
-
-class _FullPhoto extends StatelessWidget {
-  const _FullPhoto({required this.child});
-  final Widget child;
-  @override
-  Widget build(BuildContext context) => Dialog.fullscreen(
-    backgroundColor: Colors.black,
-    child: Stack(
-      children: [
-        Center(child: InteractiveViewer(maxScale: 5, child: child)),
-        SafeArea(
-          child: IconButton(
-            color: Colors.white,
-            tooltip: MaterialLocalizations.of(context).closeButtonTooltip,
-            icon: const Icon(Icons.close),
-            onPressed: () => Navigator.of(context).pop(),
-          ),
-        ),
-      ],
-    ),
-  );
 }
 
 /// Local report state as chip (icon + text).

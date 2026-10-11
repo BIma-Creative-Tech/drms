@@ -59,7 +59,7 @@ beforeAll(async () => {
     if (found.docs[0]) await p.update({ collection: 'document-sequences', id: found.docs[0].id, data: { ...s, active: true, changeReason: 'test fixture' }, overrideAccess: true /* SYSTEM-WRITE: fixture */ })
     else await p.create({ collection: 'document-sequences', data: { ...s, company: await companyId(), timezone: 'Asia/Makassar' }, overrideAccess: true /* SYSTEM-WRITE: fixture */ })
   }
-  const c = await sqlAs('app', "SELECT next_value FROM document_sequence_counters WHERE company_id = $1 AND doc_type = 'expense_request' AND period_key = 'ALL'", [await companyId()])
+  const c = await sqlAs('app', "SELECT next_value FROM document_sequence_counters WHERE company_id = $1 AND doc_type = 'expense_request' AND period_key = '2020-02'", [await companyId()])
   pbBefore = c.rows[0] ? Number(c.rows[0].next_value) : null
   lockBefore = (await sqlAs('app', 'SELECT pk_cash_lock_date($1::integer)::text AS d', [await companyId()])).rows[0].d // ADR 0016: lock date per PT
   finance = await makeFlowUser(['pk-finance'], 'impor-finance', null, { signature: false })
@@ -68,7 +68,7 @@ beforeAll(async () => {
 afterAll(async () => {
   const p = await getTestPayload()
   const seq = await p.find({ collection: 'document-sequences', where: { and: [{ company: { equals: await companyId() } }, { docType: { equals: 'expense_request' } }] }, overrideAccess: true /* SYSTEM-READ */ })
-  if (seq.docs[0]) await p.update({ collection: 'document-sequences', id: seq.docs[0].id, data: { startAt: 229, changeReason: 'uji impor selesai' }, overrideAccess: true /* SYSTEM-WRITE: restore */ })
+  if (seq.docs[0]) await p.update({ collection: 'document-sequences', id: seq.docs[0].id, data: { startAt: 1, changeReason: 'uji impor selesai' }, overrideAccess: true /* SYSTEM-WRITE: restore */ })
   await p.destroy()
 })
 
@@ -181,21 +181,21 @@ describe('E11 go-live import (dry-run → commit → idempotent re-run)', () => 
     expect((await sqlAs('app', "SELECT field FROM audit_logs WHERE action = 'import' AND doc_id = $1", [r.runId])).rows).toEqual([{ field: 'selesai' }])
   })
 
-  it('first PB number after cut-over = 229/PB-DRMS/<DD>/<MM>/<YYYY> (counter continues if numbers were already issued)', async () => {
+  it('first PB number of the go-live month = nomor_pb_mulai, e.g. PB/DRMS/2002/0229 (monthly series; counter continues if numbers were already issued)', async () => {
     const p = await getTestPayload()
     const cid = await companyId()
     const a = await withSystemTransaction(p, null, (req: PayloadRequest) => allocateDocNo(req, 'expense_request', { companyId: cid, date: parseBusinessDate(GO_LIVE), docId: 'impor-golive-pb' }))
     const expected = pbBefore === null || pbBefore <= 229 ? 229 : pbBefore
-    expect(a.docNo).toBe(`${expected}/PB-DRMS/01/II/2020`)
-    if (pbBefore === null) expect(a.docNo).toBe('229/PB-DRMS/01/II/2020')
+    expect(a.docNo).toBe(`PB/DRMS/2002/${String(expected).padStart(4, '0')}`)
+    if (pbBefore === null) expect(a.docNo).toBe('PB/DRMS/2002/0229')
   })
 
   it('PB start is configurable in the workbook: counter raised (only upward), audited', async () => {
-    const cur = Number((await sqlAs('app', "SELECT next_value FROM document_sequence_counters WHERE company_id = $1 AND doc_type = 'expense_request' AND period_key = 'ALL'", [await companyId()])).rows[0].next_value)
+    const cur = Number((await sqlAs('app', "SELECT next_value FROM document_sequence_counters WHERE company_id = $1 AND doc_type = 'expense_request' AND period_key = '2020-02'", [await companyId()])).rows[0].next_value)
     const target = cur + 1000
     const r = await run('commit', buildSample({ settings: { ...settings, nomor_pb_mulai: target } }))
     expect(r.ok).toBe(true)
-    expect(r.cutover).toMatchObject({ pbCounterBefore: cur, pbCounterAfter: target, firstPbNumber: `${target}/PB-DRMS/01/II/2020` })
+    expect(r.cutover).toMatchObject({ pbCounterBefore: cur, pbCounterAfter: target, firstPbNumber: `PB/DRMS/2002/${String(target).padStart(4, '0')}` })
     const cid = await companyId()
     const a = await withSystemTransaction(await getTestPayload(), null, (req) => allocateDocNo(req, 'expense_request', { companyId: cid, date: parseBusinessDate('2020-02-03') }))
     expect(a.seq).toBe(target)

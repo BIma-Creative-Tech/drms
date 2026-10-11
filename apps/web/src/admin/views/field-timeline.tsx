@@ -3,10 +3,12 @@ import Link from 'next/link'
 import React from 'react'
 
 import { ACTIVITY_KIND_LABELS, addDays, PO_STATUS_LABELS, SERVICE_TYPE_LABELS, UNIT_STATUS_LABELS, type ActivityKind, type PoStatus, type ServiceType, type UnitStatus } from '@/domain/field/rules'
+import { dailyTimelineEntries } from '@/domain/daily/timeline'
 import { listActivities } from '@/domain/field/aftersales'
 import { listServiceReports } from '@/domain/field/service'
 import { itemsText, longDate, mergeTimeline, TIMELINE_LABELS, TIMELINE_TYPES, timelineTypesFor, timelineWindow, type TimelineEntry, type TimelineType } from '@/domain/field/views'
 import { contractsOf, timesheetsOf, todayOf, type ProjectOpt } from '@/domain/field/web'
+import { withReqTransaction } from '@/lib/system-tx'
 
 import { Chips, OpenAction, type SP, one } from './field-ui'
 import { Card, EmptyState } from './viz'
@@ -20,8 +22,8 @@ import { Card, EmptyState } from './viz'
  */
 export type ExtraTimelineSource = (req: PayloadRequest, project: ProjectOpt, window: { from: string; to: string }) => Promise<TimelineEntry[]>
 
-/** P3 hook: daily construction reports register a source here (none in P1). */
-export const EXTRA_TIMELINE_SOURCES: ExtraTimelineSource[] = []
+/** P3 hook: daily construction reports (Laporan harian). */
+export const EXTRA_TIMELINE_SOURCES: ExtraTimelineSource[] = [dailyTimelineEntries]
 
 export async function ProjectTimeline({ req, project, sp, base, i = 0 }: { req: PayloadRequest; project: ProjectOpt; sp: SP; base: string; i?: number }) {
   const offered = timelineTypesFor(project.kind)
@@ -30,13 +32,14 @@ export async function ProjectTimeline({ req, project, sp, base, i = 0 }: { req: 
   const jenis = one(sp.jenis)
   const filter = (TIMELINE_TYPES as readonly string[]).includes(jenis ?? '') && offered.includes(jenis as TimelineType) ? (jenis as TimelineType) : 'semua'
   const types = filter === 'semua' ? offered : [filter]
-  const [services, timesheets, contracts, activities, extra] = await Promise.all([
+  // one transaction: the P3 source reads the daily-report ledger with raw SQL (request transaction handle)
+  const [services, timesheets, contracts, activities, extra] = await withReqTransaction(req, () => Promise.all([
     types.includes('servis') ? listServiceReports(req, { projectId: project.id, from: w.from, to: w.to, limit: 300 }) : Promise.resolve({ items: [] }),
     types.includes('timesheet') ? timesheetsOf(req, { projectIds: [project.id], from: w.from, to: w.to }) : Promise.resolve([]),
     types.includes('timesheet') ? contractsOf(req, [project.id]) : Promise.resolve([]),
     types.includes('aktivitas') ? listActivities(req, { projectId: project.id, from: w.from, to: w.to, limit: 500 }) : Promise.resolve({ items: [] }),
     Promise.all(EXTRA_TIMELINE_SOURCES.map((src) => src(req, project, w))).then((xs) => xs.flat()),
-  ])
+  ]))
   const groups = mergeTimeline({
     from: w.from,
     to: w.to,

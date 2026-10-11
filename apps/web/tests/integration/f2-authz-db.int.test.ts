@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { accessToken, auditRows, getTestPayload, http, installLocalJwks, registerDevice, sqlAs, sqlError } from './helpers'
-import { api, draftBody, makeFlowUser, makeWorld, png, upload, type World } from './flow-world'
+import { api, draftBody, legacyCostCenter, makeFlowUser, makeWorld, png, upload, type World } from './flow-world'
 
 /**
  * Architecture §7.4 negative-authorization set for the F2a collections + DB-level guards
@@ -45,8 +45,10 @@ describe('read scopes (own / team / Q-23 / all)', () => {
     expect((await api('GET', `${E}/${approvedId}`, w.users.pm)).status).toBe(200) // team
   })
 
-  it('Q-23: Staff B assigned to the cost center reads its requests (read only, bank number masked)', async () => {
-    const c = await api('POST', E, w.users.staffA, draftBody(w, { projectId: null, costCenterId: w.costCenter }))
+  it('Q-23: Staff B assigned to the cost center reads its (legacy) requests (read only, bank number masked)', async () => {
+    // DRMS 10/10 D2: cost-center requests are legacy rows (before D2)
+    const c = await api('POST', E, w.users.staffA, draftBody(w))
+    await legacyCostCenter(c.body.id, w.costCenter)
     const r = await api('GET', `${E}/${c.body.id}`, w.users.staffB)
     expect(r.status).toBe(200)
     expect(r.body.allowedActions).toEqual([])
@@ -184,7 +186,7 @@ describe('cash ledger (US-23/US-24, ADR 0005) and period closing (G5)', () => {
     expect((await api('POST', '/api/v1/cash-entries', w.users.finance, { direction: 'out', cashAccountId: w.cashAccount, amount: 1, description: 'x' })).status).toBe(400) // category required
     const out = await api('POST', '/api/v1/cash-entries', w.users.finance, { direction: 'out', entryDate: '2026-08-15', cashAccountId: w.cashAccount, amount: 250_000, description: 'Beli ATK', categoryId: w.cat.mat, projectId: w.project })
     expect(out.status, JSON.stringify(out.body)).toBe(201)
-    expect(out.body).toMatchObject({ entryNo: expect.stringMatching(/^KK\/2608\/\d{4}$/), period: '2026-08', status: 'posted', sourceType: 'manual' })
+    expect(out.body).toMatchObject({ entryNo: expect.stringMatching(/^KK\/[A-Z0-9]{2,16}\/2608\/\d{4}$/), period: '2026-08', status: 'posted', sourceType: 'manual' })
     augustEntry = out.body.id
     const bal = await api('GET', '/api/v1/cash-accounts/balances', w.users.owner)
     const mine = bal.body.items.find((b: { cashAccountId: number }) => b.cashAccountId === w.cashAccount)

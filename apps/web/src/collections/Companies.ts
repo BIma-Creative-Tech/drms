@@ -5,7 +5,7 @@ import { companiesWithRole, denyAll, isGroupAdmin, memberCompanies, relId } from
 import { reasonOnDeactivate, withAudit } from '@/audit/hooks'
 import { percentField, rupiahField, uuidField } from '@/fields/common'
 import { SELFIE_RETENTION_DEFAULT_MONTHS } from '@/domain/attendance/retention-policy'
-import { copyCompanyDefaults, ensureDefaultUrgencyLevels, ensureSystemCashInSources, SKIP_COMPANY_DEFAULTS } from '@/domain/company-defaults'
+import { copyCompanyDefaults, ensureDefaultResourceTypes, ensureDefaultUrgencyLevels, ensureSystemCashInSources, SKIP_COMPANY_DEFAULTS } from '@/domain/company-defaults'
 import { DEFAULT_TZ, isValidTimeZone } from '@/lib/time'
 
 const intField = (name: string, label: string, def: number, min: number, max: number) => ({
@@ -77,10 +77,12 @@ const copyDefaultsOnCreate: CollectionAfterChangeHook = async ({ doc, operation,
     // QA-11: even a bare PT gets the system cash-in source "Pengembalian LPJ" (the LPJ refund needs it)
     await ensureSystemCashInSources(req, doc.id as number)
     await ensureDefaultUrgencyLevels(req, doc.id as number)
+    await ensureDefaultResourceTypes(req, doc.id as number)
     return doc
   }
   await copyCompanyDefaults(req, doc.id as number, { from: choice?.from ?? null })
   await ensureDefaultUrgencyLevels(req, doc.id as number)
+  await ensureDefaultResourceTypes(req, doc.id as number)
   return doc
 }
 
@@ -116,11 +118,16 @@ export const COMPANY_SETTING_FIELDS: Field[] = [
     admin: { description: 'Kekurangan LPJ yang membuat total transfer melebihi nominal disetujui + toleransi ini harus disetujui ulang (Direktur → Finance) sebelum ditransfer.' },
   },
   intField('receiptMaxAgeDays', 'Batas umur nota (hari)', 30, 1, 365),
-  intField('reimburseAutoCloseDays', 'Tutup otomatis reimburse (hari)', 30, 1, 365),
-  // F3 (Q-F3-1, user 2026-09-24: default 7): an Uang Muka without LPJ is "LPJ terlambat" (K-12b).
+  // Item 11 (DRMS 10/10): transfer SLA = final approval → transfer (date + time of the bank proof).
   {
-    ...intField('lpjDueDays', 'Batas LPJ uang muka (hari setelah transfer)', 7, 1, 365),
-    admin: { description: 'Uang muka tanpa LPJ lebih lama dari ini tampil sebagai "LPJ terlambat" di dashboard/laporan.' },
+    ...intField('transferSlaHours', 'SLA transfer (jam sejak disetujui)', 24, 1, 720),
+    admin: { description: 'Pengajuan disetujui yang belum ditransfer lebih lama dari ini tampil merah di Antrian Transfer; dipakai laporan "SLA transfer" dan dashboard.' },
+  },
+  intField('reimburseAutoCloseDays', 'Tutup otomatis reimburse (hari)', 30, 1, 365),
+  // F3 (Q-F3-1, user 2026-09-24: default 7): a Pengajuan Baru without LPJ is "LPJ terlambat" (K-12b).
+  {
+    ...intField('lpjDueDays', 'Batas LPJ pengajuan baru (hari setelah transfer)', 7, 1, 365),
+    admin: { description: 'Pengajuan baru tanpa LPJ lebih lama dari ini tampil sebagai "LPJ terlambat" di dashboard/laporan.' },
   },
   {
     name: 'syncExpenseDraftsEnabled',
@@ -205,7 +212,7 @@ export const COMPANY_SETTING_FIELDS: Field[] = [
         type: 'row',
         fields: [
           { name: 'reminderLateProgressEnabled', type: 'checkbox', label: 'Laporan progress terlambat → PM + Direktur', defaultValue: true, admin: { description: 'Batas hari = "Batas hari laporan progress terlambat".' } },
-          { name: 'reminderLpjOverdueEnabled', type: 'checkbox', label: 'Nota/LPJ uang muka terlambat → pemohon + Finance', defaultValue: true, admin: { description: 'Batas hari = "Batas LPJ uang muka".' } },
+          { name: 'reminderLpjOverdueEnabled', type: 'checkbox', label: 'Nota/LPJ pengajuan baru terlambat → pemohon + Finance', defaultValue: true, admin: { description: 'Batas hari = "Batas LPJ pengajuan baru".' } },
         ],
       },
       {
@@ -259,7 +266,7 @@ function settingKey(f: Field): string {
   if ('fields' in f && Array.isArray(f.fields)) return f.fields.map(settingKey).find(Boolean) ?? ''
   return ''
 }
-const OPERATIONAL = ['defaultGeofenceRadiusM', 'lateReportDays', 'budgetWarnPct', 'progressWarnGapPct', 'receiptRoundingTolerance', 'shortfallTolerancePct', 'receiptMaxAgeDays', 'reimburseAutoCloseDays', 'lpjDueDays', 'syncExpenseDraftsEnabled', 'syncProgressReportsEnabled', 'fieldReportsEnabled', 'defaultWorkSchedule']
+const OPERATIONAL = ['defaultGeofenceRadiusM', 'lateReportDays', 'budgetWarnPct', 'progressWarnGapPct', 'receiptRoundingTolerance', 'shortfallTolerancePct', 'receiptMaxAgeDays', 'transferSlaHours', 'reimburseAutoCloseDays', 'lpjDueDays', 'syncExpenseDraftsEnabled', 'syncProgressReportsEnabled', 'fieldReportsEnabled', 'defaultWorkSchedule']
 const ATTENDANCE = ['syncAttendanceEnabled', 'selfieRetentionMonths', 'selfieRetentionDeleteEnabled']
 const REMINDERS = ['remindersEnabled', 'notifyRequesterStatusEnabled']
 /** COMPANY_SETTING_FIELDS in tab order; every field lands in exactly one tab (unit test). */
@@ -321,7 +328,7 @@ export const Companies: CollectionConfig = withAudit(
                     maxLength: 16,
                     admin: {
                       width: '30%',
-                      description: 'Token {COMPANY} di nomor dokumen (mis. 1/PB-CS1/27/IX/2026): huruf besar/angka, 2–16 karakter. Terkunci setelah PT ini punya dokumen bernomor.',
+                      description: 'Token {COMPANY} di setiap nomor dokumen (mis. PB/CS1/2610/0001, TRF/CS1/2610/0001): huruf besar/angka, 2–16 karakter. Terkunci setelah PT ini punya dokumen bernomor.',
                     },
                     validate: (v: unknown) => (typeof v === 'string' && SHORT_CODE_RE.test(v) ? true : 'Huruf besar/angka, 2–16 karakter (token {COMPANY}).'),
                   },

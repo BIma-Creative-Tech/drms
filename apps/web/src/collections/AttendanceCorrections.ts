@@ -6,6 +6,7 @@ import { withAudit } from '@/audit/hooks'
 
 import { ro } from './fields-f2'
 import { companyField, companyHook } from '@/fields/company'
+import { USER_NAME_VIEW } from '@/fields/users'
 
 const dt = { ...ro, date: { pickerAppearance: 'dayAndTime' as const } }
 
@@ -63,7 +64,7 @@ export const AttendanceCorrections: CollectionConfig = withAudit(
       { name: 'oldTime', type: 'date', label: 'Jam lama', required: true, admin: dt },
       { name: 'newTime', type: 'date', label: 'Jam baru', required: true, admin: dt },
       { name: 'reason', type: 'text', label: 'Alasan', required: true, maxLength: 500, admin: ro },
-      { name: 'correctedBy', type: 'relationship', relationTo: 'users', label: 'Dikoreksi oleh', required: true, index: true, admin: ro },
+      { name: 'correctedBy', type: 'relationship', relationTo: 'users', label: 'Dikoreksi oleh', required: true, index: true, admin: { ...ro, components: USER_NAME_VIEW } },
       { name: 'correctedAt', type: 'date', label: 'Waktu koreksi (server)', required: true, admin: dt },
     ],
   },

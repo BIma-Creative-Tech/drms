@@ -98,15 +98,22 @@ perangkat apa.
 
 ## Status pengajuan
 
+**Alur persetujuan (sejak 10 Okt 2026, ADR 0021):** Staff mengajukan → **PM project** menyetujui → **Direktur**
+menyetujui → **Finance** mentransfer (Reimburse: Finance memverifikasi nota dulu). Setiap langkah bisa **Tolak** dengan
+alasan; pemohon diberi tahu. Pengajuan yang sudah diajukan sebelum Admin mengubah aturan approval tetap memakai alur
+lama (Direktur lalu Finance). Addendum RAB tetap Direktur lalu Finance.
+
 | Status | Artinya | Menunggu siapa |
 |---|---|---|
 | Draft | Belum dikirim | Pemohon |
-| Menunggu Diketahui (Direktur) | Menunggu persetujuan Direktur | Direktur |
-| Menunggu Approval | Direktur sudah setuju | Finance |
-| Disetujui (Antri Transfer) | Uang Muka siap ditransfer | Finance |
+| Menunggu persetujuan PM | Alur baru (sejak 10 Okt 2026): menunggu PM project | PM project |
+| Menunggu persetujuan Direktur | Alur baru: PM sudah setuju | Direktur |
+| Menunggu Diketahui (Direktur) | Alur lama: menunggu persetujuan Direktur | Direktur |
+| Menunggu Approval | Alur lama: Direktur sudah setuju | Finance |
+| Disetujui (Antri Transfer) | Pengajuan Baru siap ditransfer | Finance |
 | Disetujui → Nota Terverifikasi (Antri Transfer) | Reimburse: nota diperiksa, lalu siap transfer | Finance |
 | Revisi Nota | Nota Reimburse ditolak Finance | Pemohon |
-| Ditransfer | Uang sudah dikirim | Uang Muka: pemohon unggah nota/LPJ · Reimburse: selesai |
+| Ditransfer | Uang sudah dikirim | Pengajuan Baru: pemohon unggah nota/LPJ · Reimburse: selesai |
 | Nota Lengkap → LPJ Diajukan | Pemohon mengirim laporan penggunaan dana | Finance |
 | LPJ Revisi | Finance minta perbaikan LPJ | Pemohon |
 | LPJ Terverifikasi | Menunggu penyelesaian selisih | Finance |
@@ -120,5 +127,8 @@ perangkat apa.
 - Panduan mengikuti perilaku aplikasi pada `develop` @ `5415f45` (2026-09-30): web **0.5.0** (multi-PT, 2FA pilihan)
   dan APK **0.3.0** (versi pubspec; tag `mobile-v0.3.0` belum dibuat pada tanggal ini). Label diperiksa terhadap
   `apps/web/src/admin/**` dan `apps/mobile/lib/l10n/app_id.arb`. Perbarui bila UAT mengubah perilaku.
+- Alur persetujuan PM project → Direktur (ADR 0021, 2026-10-10) diperbarui di panduan PM, Direktur, Finance, Admin dan
+  Staff; label APK sesuai sejak APK **0.4.1** (APK lebih lama sudah menampilkan tombol Setujui/Tolak ke PM, dengan
+  tulisan Direktur).
 - APK 0.3.0 butuh web ≥ 0.5.0 (`CHANGELOG.md`, bagian APK mobile-v0.3.0). Pemilih PT, kolom kode autentikator dan
   catatan rilis di banner APK hanya ada setelah APK 0.3.0 terpasang.

@@ -146,20 +146,62 @@ memegang akses konsol Keycloak di prod: **belum diverifikasi** — hubungi tim t
 
 ## 4. Aturan approval
 
-**Pengaturan → Aturan approval**. Aturan berlaku **per PT** (kolom **PT**). Aturan standar (ADR 0013): **Diketahui
-Oleh (persetujuan Direktur) = Wajib** oleh peran Direktur, lalu **Level 1 = Finance** — yang memutuskan adalah
-Direktur/Finance **di PT pengajuan**. Sistem menolak PM/Staff sebagai pemberi keputusan dan menolak "Diketahui"
-opsional. Setiap perubahan wajib alasan dan hanya berlaku untuk pengajuan **baru** (yang sudah diajukan memakai aturan
-lama). Direktur cuti: buat/ubah aturan sementara dengan pengganti bernama, lalu kembalikan.
+**Pengaturan → Aturan approval** (daftar koleksi grup **Keuangan**). Aturan berlaku **per PT** (kolom **PT**). Setiap
+perubahan wajib alasan dan hanya berlaku untuk pengajuan **baru** (yang sudah diajukan memakai snapshot aturan lama
+sampai selesai).
+
+**Aturan standar sejak 10 Okt 2026 (keputusan owner, ADR 0021):** pengajuan biaya disetujui **PM project** lalu
+**Direktur**; Finance hanya mentransfer.
+
+| Isian | Nilai |
+|---|---|
+| Nama aturan | Default — PM project lalu Direktur (semua nominal) |
+| Dokumen | Pengajuan biaya |
+| Diketahui Oleh | **Wajib** |
+| Pengisi "Diketahui Oleh" | **PM project (manajer pusat biaya bila tanpa project)** |
+| Level approval | **1 = Direktur** (tidak ada level Finance) |
+
+- **PM project** = isian **Project Manager** di data project; untuk pengajuan pusat biaya = **Penanggung jawab
+  (manajer)** pusat biaya. Orang itu harus pengguna aktif di PT pengajuan. Project tanpa PM → pengajuan tidak bisa
+  dikirim ("Project ini belum punya PM. Hubungi Admin untuk mengisi PM project."). **Isi PM di setiap project aktif
+  (Proyek → Project) dan manajer di setiap pusat biaya** sebelum aturan diubah.
+- "PM project" hanya untuk **pengajuan biaya** dengan Diketahui **Wajib**. Aturan **Addendum RAB** tetap **Direktur
+  (Diketahui) → Finance (Level 1)** dan tidak diubah; sistem menolak "PM project" pada aturan Addendum RAB. Level
+  approval hanya boleh Direktur/Finance (peran atau user bernama di PT itu).
+- G1 tetap berlaku: PM yang menjadi pemohon/pembuat dilewati (Direktur yang memutuskan). Pengajuan untuk Direktur
+  dibuat oleh PM project (pengecualian owner, tercatat di Audit Log `approval_policy_exception`). Bila satu-satunya
+  Direktur membuat pengajuannya sendiri, pengiriman ditolak — PM project yang membuatkannya.
+
+### 4a. Mengubah aturan setelah deploy (sekali, setiap PT: DRMS, LAS, TBK, CS1)
+
+1. Pilih PT di tombol PT bar atas. Periksa **Proyek → Project**: setiap project aktif punya **Project Manager**; dan
+   **Proyek → Data pendukung → Pusat biaya**: setiap pusat biaya punya **Penanggung jawab**.
+2. **Pengaturan → Aturan approval** → buka **"Default — Direktur lalu Finance (semua nominal)"** (PT itu).
+3. Ubah **Nama aturan** → `Default — PM project lalu Direktur (semua nominal)`.
+4. **Diketahui Oleh** = **Wajib**; **Pengisi "Diketahui Oleh"** = **PM project (manajer pusat biaya bila tanpa
+   project)**.
+5. **Level approval**: ubah level 1 menjadi **Peran approver = Direktur**; hapus level Finance (tinggal satu level).
+6. **Alasan perubahan**: `Kebijakan owner 2026-10-10: Staff → PM → Direktur → Finance transfer` → **Simpan**.
+7. Aturan contoh **"> Rp 10 juta"** (tidak aktif): ubah dengan cara yang sama agar konsisten (biarkan tidak aktif).
+8. Aturan **Addendum RAB**: **jangan diubah**.
+9. Uji: Staff mengirim satu pengajuan kecil → statusnya **Menunggu persetujuan PM**.
+
+Pengajuan yang sudah diajukan sebelum langkah ini tetap diputuskan Direktur lalu Finance (snapshot lama). Direktur cuti:
+buat/ubah aturan sementara dengan level 1 = Direktur pengganti (user bernama), lalu kembalikan.
 
 ## 5. Penomoran dokumen
 
 **Pengaturan → Penomoran dokumen**: pola nomor **per PT** dan per jenis dokumen (PB pengajuan, TRF, LPJ, KM, KK, LP,
-ADD), token `{seq}` `{DD}` `{MM_ROMAN}` `{YYYY}` `{COMPANY}` dll., **Reset nomor**, **Nomor awal**.
-- Tiap PT punya nomor urut sendiri. `{COMPANY}` = **Kode singkat** PT dokumen (mis. `229/PB-DRMS/…`,
-  `1/PB-CS1/27/IX/2026`).
-- Pengajuan DRMS di produksi dimulai dari **229** (melanjutkan nomor manual, Q-17). Nomor PB pertama PT lain diisi saat
-  impor (sheet **Perusahaan**, kolom `nomor_pb_mulai`).
+ADD, SV, LH), token `{seq}` `{DD}` `{MM_ROMAN}` `{YY}` `{MM}` `{YYYY}` `{COMPANY}` dll., **Reset nomor**, **Nomor awal**.
+- Sejak 12 Okt 2026 (keputusan D5) **semua** nomor memuat kode PT: pola default `<KODE>/{COMPANY}/{YY}{MM}/{seq}` 4 digit,
+  mis. `PB/DRMS/2610/0001`, `TRF/LLAS/2610/0001`. Nomor yang sudah terbit tidak berubah. Pola yang pernah Anda ubah
+  sendiri tidak diubah migrasi — periksa dan sesuaikan bila perlu.
+- Tiap PT punya nomor urut sendiri. `{COMPANY}` = **Kode singkat** PT dokumen (wajib diisi; terkunci setelah PT punya
+  dokumen bernomor). Sejak keputusan owner 11 Okt 2026 **semua** jenis termasuk PB di-reset **tiap bulan mulai 0001 per
+  PT** (mis. `PB/DRMS/2611/0001`, `PB/LAS/2611/0001`). Bulan saat perubahan berlaku melanjutkan setelah nomor PB tertinggi
+  yang sudah terbit di bulan itu (tidak ada nomor ganda).
+- `nomor_pb_mulai` pada impor (sheet **Perusahaan** / **Pengaturan**) hanya menentukan nomor PB pertama di **bulan
+  go-live** (bawaan 1).
 - Ubah hanya bila diminta Finance/Direktur; alasan wajib.
 - PT baru mendapat penomoran dan aturan approval standar secara otomatis: lewat **impor**, atau saat dibuat di layar
   **Perusahaan (PT)** dengan **Salin default saat dibuat** tercentang (bawaan; disalin dari DRMS atau dari PT di

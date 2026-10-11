@@ -7,6 +7,7 @@ import { FLAG_KINDS, FLAG_LABELS } from '@/domain/expense/types'
 
 import { ro } from './fields-f2'
 import { companyField, companyHook } from '@/fields/company'
+import { USER_NAME_VIEW } from '@/fields/users'
 
 const jsonView = { readOnly: true, components: { Field: '@/components/ReadOnlyJson#ReadOnlyJson' } }
 
@@ -62,7 +63,7 @@ export const ReceiptFlags: CollectionConfig = {
       ],
       admin: ro,
     },
-    { name: 'reviewedBy', type: 'relationship', relationTo: 'users', admin: ro },
+    { name: 'reviewedBy', type: 'relationship', relationTo: 'users', label: 'Ditinjau oleh', admin: { ...ro, components: USER_NAME_VIEW } },
     { name: 'reviewedAt', type: 'date', admin: ro },
     { name: 'reviewNote', type: 'text', maxLength: 500, admin: ro },
     { name: 'resolvedAt', type: 'date', admin: ro },

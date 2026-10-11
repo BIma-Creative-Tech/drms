@@ -394,7 +394,7 @@ abstract class AppLocalizations {
   /// No description provided for @actionNewAdvance.
   ///
   /// In id, this message translates to:
-  /// **'Ajukan Uang Muka'**
+  /// **'Pengajuan Baru'**
   String get actionNewAdvance;
 
   /// No description provided for @actionNewReimburse.
@@ -538,13 +538,13 @@ abstract class AppLocalizations {
   /// No description provided for @timelineTitle.
   ///
   /// In id, this message translates to:
-  /// **'Posisi tanda tangan'**
+  /// **'Riwayat approval'**
   String get timelineTitle;
 
   /// No description provided for @linesTitle.
   ///
   /// In id, this message translates to:
-  /// **'Baris item'**
+  /// **'Rincian item'**
   String get linesTitle;
 
   /// No description provided for @receiptsTitle.
@@ -808,7 +808,7 @@ abstract class AppLocalizations {
   /// No description provided for @fieldQty.
   ///
   /// In id, this message translates to:
-  /// **'Jumlah'**
+  /// **'Qty'**
   String get fieldQty;
 
   /// No description provided for @fieldUom.
@@ -847,11 +847,65 @@ abstract class AppLocalizations {
   /// **'Keterangan baris'**
   String get fieldLineNotes;
 
-  /// No description provided for @unitPriceHint.
+  /// No description provided for @lineTotalHelper.
   ///
   /// In id, this message translates to:
-  /// **'Informasi saja — total tidak dihitung otomatis.'**
-  String get unitPriceHint;
+  /// **'Qty × Harga satuan — dihitung otomatis, tidak bisa diubah.'**
+  String get lineTotalHelper;
+
+  /// No description provided for @fieldReceiptAmount.
+  ///
+  /// In id, this message translates to:
+  /// **'Nominal sesuai nota'**
+  String get fieldReceiptAmount;
+
+  /// No description provided for @receiptAmountHelper.
+  ///
+  /// In id, this message translates to:
+  /// **'Opsional. Persetujuan dan transfer tetap memakai Total (Qty × Harga satuan).'**
+  String get receiptAmountHelper;
+
+  /// No description provided for @receiptMismatchChip.
+  ///
+  /// In id, this message translates to:
+  /// **'Selisih nota'**
+  String get receiptMismatchChip;
+
+  /// No description provided for @receiptMismatchDetail.
+  ///
+  /// In id, this message translates to:
+  /// **'Nominal sesuai nota {receipt} ≠ Total {total}'**
+  String receiptMismatchDetail(String receipt, String total);
+
+  /// No description provided for @lineNeedsUnitPrice.
+  ///
+  /// In id, this message translates to:
+  /// **'Baris ini dibuat sebelum Total dihitung otomatis. Isi Qty, Satuan dan Harga satuan (total lama: {amount}).'**
+  String lineNeedsUnitPrice(String amount);
+
+  /// No description provided for @lineNeedsUnitPriceShort.
+  ///
+  /// In id, this message translates to:
+  /// **'Lengkapi Qty & Harga satuan'**
+  String get lineNeedsUnitPriceShort;
+
+  /// No description provided for @linesIncompleteResubmit.
+  ///
+  /// In id, this message translates to:
+  /// **'Lengkapi Qty & Harga satuan pada baris {lines} (Ubah di web) sebelum mengirim ulang nota.'**
+  String linesIncompleteResubmit(String lines);
+
+  /// No description provided for @receiptMismatchCount.
+  ///
+  /// In id, this message translates to:
+  /// **'Selisih nota ({count})'**
+  String receiptMismatchCount(int count);
+
+  /// No description provided for @fieldLineNo.
+  ///
+  /// In id, this message translates to:
+  /// **'No'**
+  String get fieldLineNo;
 
   /// No description provided for @receiptDiff.
   ///
@@ -1170,6 +1224,54 @@ abstract class AppLocalizations {
   /// In id, this message translates to:
   /// **'Catatan Finance'**
   String get lpjFinanceNotes;
+
+  /// No description provided for @lpjPhotos.
+  ///
+  /// In id, this message translates to:
+  /// **'Foto LPJ'**
+  String get lpjPhotos;
+
+  /// No description provided for @lpjPhotosCount.
+  ///
+  /// In id, this message translates to:
+  /// **'{count} / {max} foto'**
+  String lpjPhotosCount(int count, int max);
+
+  /// No description provided for @lpjPhotosHint.
+  ///
+  /// In id, this message translates to:
+  /// **'Opsional, maks. {max} foto (kamera atau galeri). Tidak bisa diubah setelah LPJ dikirim.'**
+  String lpjPhotosHint(int max);
+
+  /// No description provided for @lpjPhotosFull.
+  ///
+  /// In id, this message translates to:
+  /// **'Maksimal {max} foto LPJ.'**
+  String lpjPhotosFull(int max);
+
+  /// No description provided for @lpjPhotoCaption.
+  ///
+  /// In id, this message translates to:
+  /// **'Foto LPJ {no}'**
+  String lpjPhotoCaption(int no);
+
+  /// No description provided for @lpjPhotoRemove.
+  ///
+  /// In id, this message translates to:
+  /// **'Hapus foto'**
+  String get lpjPhotoRemove;
+
+  /// No description provided for @lpjPhotoCamera.
+  ///
+  /// In id, this message translates to:
+  /// **'Kamera'**
+  String get lpjPhotoCamera;
+
+  /// No description provided for @lpjUploadingPhotos.
+  ///
+  /// In id, this message translates to:
+  /// **'Mengunggah foto LPJ…'**
+  String get lpjUploadingPhotos;
 
   /// No description provided for @requesterActionsTitle.
   ///
@@ -1618,7 +1720,7 @@ abstract class AppLocalizations {
   /// No description provided for @decisionForbidden.
   ///
   /// In id, this message translates to:
-  /// **'Anda tidak dapat memutuskan pengajuan ini. Hanya Direktur (Diketahui) dan Finance (Approval) yang memutuskan, dan hanya pada gilirannya. Data dimuat ulang.'**
+  /// **'Anda tidak dapat memutuskan pengajuan ini. Hanya PM project pengajuan ini, Direktur dan Finance yang memutuskan, masing-masing hanya pada gilirannya. Data dimuat ulang.'**
   String get decisionForbidden;
 
   /// No description provided for @decisionTitleAcknowledgeDirektur.
@@ -1638,6 +1740,48 @@ abstract class AppLocalizations {
   /// In id, this message translates to:
   /// **'Setujui (Diketahui)'**
   String get actionAcknowledgeDirektur;
+
+  /// No description provided for @decisionTitleAcknowledgePm.
+  ///
+  /// In id, this message translates to:
+  /// **'Setujui sebagai PM project'**
+  String get decisionTitleAcknowledgePm;
+
+  /// No description provided for @decisionHintPm.
+  ///
+  /// In id, this message translates to:
+  /// **'Pengajuan diteruskan ke Direktur.'**
+  String get decisionHintPm;
+
+  /// No description provided for @decisionTitleApproveDirektur.
+  ///
+  /// In id, this message translates to:
+  /// **'Setujui sebagai Direktur'**
+  String get decisionTitleApproveDirektur;
+
+  /// No description provided for @decisionHintDirekturFinal.
+  ///
+  /// In id, this message translates to:
+  /// **'Pengajuan diteruskan ke Finance untuk transfer.'**
+  String get decisionHintDirekturFinal;
+
+  /// No description provided for @actionAcknowledgePm.
+  ///
+  /// In id, this message translates to:
+  /// **'Setujui'**
+  String get actionAcknowledgePm;
+
+  /// No description provided for @direkturViaPmNote.
+  ///
+  /// In id, this message translates to:
+  /// **'Pengajuan Direktur — diajukan oleh PM (kebijakan owner 2026-10-10)'**
+  String get direkturViaPmNote;
+
+  /// No description provided for @direkturViaPmSelfNote.
+  ///
+  /// In id, this message translates to:
+  /// **'Pengajuan Direktur — diajukan oleh PM; disetujui Direktur pemohon karena satu-satunya Direktur PT (kebijakan owner 2026-10-10)'**
+  String get direkturViaPmSelfNote;
 
   /// No description provided for @historyTitle.
   ///
@@ -1774,7 +1918,7 @@ abstract class AppLocalizations {
   /// No description provided for @teamReadOnlyHint.
   ///
   /// In id, this message translates to:
-  /// **'Pantauan tim — hanya lihat. Persetujuan dilakukan Direktur dan Finance.'**
+  /// **'Pantauan tim — hanya lihat. Pengajuan yang menunggu persetujuan Anda sebagai PM project ada di menu Persetujuan.'**
   String get teamReadOnlyHint;
 
   /// No description provided for @teamNoScope.
@@ -1954,7 +2098,7 @@ abstract class AppLocalizations {
   /// No description provided for @kpiAdvancesOverdue.
   ///
   /// In id, this message translates to:
-  /// **'{count} uang muka terlambat LPJ'**
+  /// **'{count} pengajuan baru terlambat LPJ'**
   String kpiAdvancesOverdue(int count);
 
   /// No description provided for @kpiTeamMonth.
@@ -2008,7 +2152,7 @@ abstract class AppLocalizations {
   /// No description provided for @kpiTeamLpj.
   ///
   /// In id, this message translates to:
-  /// **'Uang muka tim belum LPJ'**
+  /// **'Pengajuan Baru tim belum LPJ'**
   String get kpiTeamLpj;
 
   /// No description provided for @kpiLpjOverdue.
@@ -4638,6 +4782,954 @@ abstract class AppLocalizations {
   /// In id, this message translates to:
   /// **'{count} foto baru'**
   String fieldNewPhotos(int count);
+
+  /// No description provided for @dailyTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Laporan Harian'**
+  String get dailyTitle;
+
+  /// No description provided for @dailyEditTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Ubah Laporan Harian'**
+  String get dailyEditTitle;
+
+  /// No description provided for @dailyWeather.
+  ///
+  /// In id, this message translates to:
+  /// **'Cuaca & jam hilang'**
+  String get dailyWeather;
+
+  /// No description provided for @dailyMorning.
+  ///
+  /// In id, this message translates to:
+  /// **'Pagi'**
+  String get dailyMorning;
+
+  /// No description provided for @dailyNoon.
+  ///
+  /// In id, this message translates to:
+  /// **'Siang'**
+  String get dailyNoon;
+
+  /// No description provided for @dailyAfternoon.
+  ///
+  /// In id, this message translates to:
+  /// **'Sore'**
+  String get dailyAfternoon;
+
+  /// No description provided for @dailyRainHours.
+  ///
+  /// In id, this message translates to:
+  /// **'Jam hujan'**
+  String get dailyRainHours;
+
+  /// No description provided for @dailyStopHours.
+  ///
+  /// In id, this message translates to:
+  /// **'Jam kerja berhenti'**
+  String get dailyStopHours;
+
+  /// No description provided for @dailyWorkSection.
+  ///
+  /// In id, this message translates to:
+  /// **'Volume pekerjaan hari ini'**
+  String get dailyWorkSection;
+
+  /// No description provided for @dailyPickProject.
+  ///
+  /// In id, this message translates to:
+  /// **'Pilih project konstruksi dulu.'**
+  String get dailyPickProject;
+
+  /// No description provided for @dailyNoRap.
+  ///
+  /// In id, this message translates to:
+  /// **'Project ini belum punya RAP di HP. Tarik ke bawah untuk memuat ulang; bila tetap kosong, minta PM/Direktur mengisi RAP di web.'**
+  String get dailyNoRap;
+
+  /// No description provided for @dailyRealised.
+  ///
+  /// In id, this message translates to:
+  /// **'Realisasi {done} / {volume} {uom}'**
+  String dailyRealised(String done, String volume, String uom);
+
+  /// No description provided for @dailyOverRap.
+  ///
+  /// In id, this message translates to:
+  /// **'Melebihi RAP: {total} dari {volume} {uom} — isi catatan.'**
+  String dailyOverRap(String total, String volume, String uom);
+
+  /// No description provided for @dailyOverRapNotify.
+  ///
+  /// In id, this message translates to:
+  /// **'Ada volume melebihi RAP: laporan tetap dikirim, ditandai \"melebihi RAP\" dan PM project diberi notifikasi.'**
+  String get dailyOverRapNotify;
+
+  /// No description provided for @dailyMaterialSection.
+  ///
+  /// In id, this message translates to:
+  /// **'Material'**
+  String get dailyMaterialSection;
+
+  /// No description provided for @dailyMaterialHelp.
+  ///
+  /// In id, this message translates to:
+  /// **'Masuk = diterima di lokasi hari ini; terpakai = dipakai hari ini. Material tidak dihitung ke progress.'**
+  String get dailyMaterialHelp;
+
+  /// No description provided for @dailyReceived.
+  ///
+  /// In id, this message translates to:
+  /// **'Masuk'**
+  String get dailyReceived;
+
+  /// No description provided for @dailyUsed.
+  ///
+  /// In id, this message translates to:
+  /// **'Terpakai'**
+  String get dailyUsed;
+
+  /// No description provided for @dailyStock.
+  ///
+  /// In id, this message translates to:
+  /// **'Stok {stock} {uom}'**
+  String dailyStock(String stock, String uom);
+
+  /// No description provided for @dailyManpower.
+  ///
+  /// In id, this message translates to:
+  /// **'Tenaga & alat'**
+  String get dailyManpower;
+
+  /// No description provided for @dailyEquipment.
+  ///
+  /// In id, this message translates to:
+  /// **'Alat (unit · jam kerja)'**
+  String get dailyEquipment;
+
+  /// No description provided for @dailyHours.
+  ///
+  /// In id, this message translates to:
+  /// **'Jam'**
+  String get dailyHours;
+
+  /// No description provided for @dailyWorkers.
+  ///
+  /// In id, this message translates to:
+  /// **'{count} pekerja'**
+  String dailyWorkers(int count);
+
+  /// No description provided for @dailyNoResources.
+  ///
+  /// In id, this message translates to:
+  /// **'Jenis tenaga/alat belum dimuat. Tarik ke bawah saat ada sinyal.'**
+  String get dailyNoResources;
+
+  /// No description provided for @dailyNotesSection.
+  ///
+  /// In id, this message translates to:
+  /// **'Kendala, catatan & foto'**
+  String get dailyNotesSection;
+
+  /// No description provided for @dailyIssues.
+  ///
+  /// In id, this message translates to:
+  /// **'Kendala'**
+  String get dailyIssues;
+
+  /// No description provided for @dailyNotesRequired.
+  ///
+  /// In id, this message translates to:
+  /// **'Wajib karena ada volume melebihi RAP.'**
+  String get dailyNotesRequired;
+
+  /// No description provided for @dailyPhoto.
+  ///
+  /// In id, this message translates to:
+  /// **'Foto pekerjaan'**
+  String get dailyPhoto;
+
+  /// No description provided for @dailyPhotos.
+  ///
+  /// In id, this message translates to:
+  /// **'Foto pekerjaan ({count}/{max})'**
+  String dailyPhotos(int count, int max);
+
+  /// No description provided for @dailySubmit.
+  ///
+  /// In id, this message translates to:
+  /// **'Kirim laporan harian'**
+  String get dailySubmit;
+
+  /// No description provided for @dailySummary.
+  ///
+  /// In id, this message translates to:
+  /// **'{items} item pekerjaan · {workers} pekerja · {photos} foto'**
+  String dailySummary(int items, int workers, int photos);
+
+  /// No description provided for @dailyNoProjects.
+  ///
+  /// In id, this message translates to:
+  /// **'Tidak ada project konstruksi yang bisa Anda laporkan (Staff: project yang ditugaskan; PM: project tim).'**
+  String get dailyNoProjects;
+
+  /// No description provided for @dailySameDay.
+  ///
+  /// In id, this message translates to:
+  /// **'Sudah ada laporan harian Anda untuk project & tanggal ini di HP. Buka laporan itu.'**
+  String get dailySameDay;
+
+  /// No description provided for @dailyFlagOverRap.
+  ///
+  /// In id, this message translates to:
+  /// **'Melebihi RAP'**
+  String get dailyFlagOverRap;
+
+  /// No description provided for @dailyFlagDuplicate.
+  ///
+  /// In id, this message translates to:
+  /// **'Kemungkinan dobel'**
+  String get dailyFlagDuplicate;
+
+  /// No description provided for @dailyWorkItem.
+  ///
+  /// In id, this message translates to:
+  /// **'Volume {item}'**
+  String dailyWorkItem(String item);
+
+  /// No description provided for @dailyWorkerCount.
+  ///
+  /// In id, this message translates to:
+  /// **'Jumlah pekerja'**
+  String get dailyWorkerCount;
+
+  /// No description provided for @sectionRequestDetails.
+  ///
+  /// In id, this message translates to:
+  /// **'Rincian pengajuan'**
+  String get sectionRequestDetails;
+
+  /// No description provided for @sectionRequester.
+  ///
+  /// In id, this message translates to:
+  /// **'Pemohon'**
+  String get sectionRequester;
+
+  /// No description provided for @bankNameLabel.
+  ///
+  /// In id, this message translates to:
+  /// **'Bank'**
+  String get bankNameLabel;
+
+  /// No description provided for @bankHolderLabel.
+  ///
+  /// In id, this message translates to:
+  /// **'Atas nama'**
+  String get bankHolderLabel;
+
+  /// No description provided for @bankNumberLabel.
+  ///
+  /// In id, this message translates to:
+  /// **'Nomor rekening'**
+  String get bankNumberLabel;
+
+  /// No description provided for @bankShowNumber.
+  ///
+  /// In id, this message translates to:
+  /// **'Tampilkan nomor rekening'**
+  String get bankShowNumber;
+
+  /// No description provided for @bankHideNumber.
+  ///
+  /// In id, this message translates to:
+  /// **'Sembunyikan nomor rekening'**
+  String get bankHideNumber;
+
+  /// No description provided for @docNoCopied.
+  ///
+  /// In id, this message translates to:
+  /// **'Nomor {docNo} disalin.'**
+  String docNoCopied(String docNo);
+
+  /// No description provided for @docNoCopyHint.
+  ///
+  /// In id, this message translates to:
+  /// **'Ketuk untuk menyalin nomor'**
+  String get docNoCopyHint;
+
+  /// No description provided for @docNoOpenHint.
+  ///
+  /// In id, this message translates to:
+  /// **'Ketuk untuk membuka dokumen'**
+  String get docNoOpenHint;
+
+  /// No description provided for @receiptOpenPhoto.
+  ///
+  /// In id, this message translates to:
+  /// **'Buka foto nota'**
+  String get receiptOpenPhoto;
+
+  /// No description provided for @receiptLineCaption.
+  ///
+  /// In id, this message translates to:
+  /// **'Baris {no}'**
+  String receiptLineCaption(int no);
+
+  /// No description provided for @attendanceSelfieView.
+  ///
+  /// In id, this message translates to:
+  /// **'Lihat selfie'**
+  String get attendanceSelfieView;
+
+  /// No description provided for @attendanceSelfieUnavailable.
+  ///
+  /// In id, this message translates to:
+  /// **'Selfie tidak tersedia (mungkin sudah melewati masa retensi).'**
+  String get attendanceSelfieUnavailable;
+
+  /// No description provided for @pickHint.
+  ///
+  /// In id, this message translates to:
+  /// **'Pilih {field}'**
+  String pickHint(String field);
+
+  /// No description provided for @pickEmployee.
+  ///
+  /// In id, this message translates to:
+  /// **'Pilih karyawan'**
+  String get pickEmployee;
+
+  /// No description provided for @pickPo.
+  ///
+  /// In id, this message translates to:
+  /// **'Pilih PO terbuka'**
+  String get pickPo;
+
+  /// No description provided for @pickLocation.
+  ///
+  /// In id, this message translates to:
+  /// **'Pilih lokasi'**
+  String get pickLocation;
+
+  /// No description provided for @fieldRapItem.
+  ///
+  /// In id, this message translates to:
+  /// **'Item RAP'**
+  String get fieldRapItem;
+
+  /// No description provided for @rapPickHint.
+  ///
+  /// In id, this message translates to:
+  /// **'Pilih item RAP'**
+  String get rapPickHint;
+
+  /// No description provided for @rapOverBudgetChip.
+  ///
+  /// In id, this message translates to:
+  /// **'Melebihi RAP'**
+  String get rapOverBudgetChip;
+
+  /// No description provided for @rapOverDetail.
+  ///
+  /// In id, this message translates to:
+  /// **'Total {total} melebihi sisa RAP {remaining}'**
+  String rapOverDetail(String total, String remaining);
+
+  /// No description provided for @rapRemaining.
+  ///
+  /// In id, this message translates to:
+  /// **'Sisa {amount}'**
+  String rapRemaining(String amount);
+
+  /// No description provided for @rapOf.
+  ///
+  /// In id, this message translates to:
+  /// **'dari {amount}'**
+  String rapOf(String amount);
+
+  /// No description provided for @rapPickProjectFirst.
+  ///
+  /// In id, this message translates to:
+  /// **'Pilih project pengajuan dulu.'**
+  String get rapPickProjectFirst;
+
+  /// No description provided for @rapOfflineNoBudget.
+  ///
+  /// In id, this message translates to:
+  /// **'Offline: sisa anggaran RAP tampil lagi saat online.'**
+  String get rapOfflineNoBudget;
+
+  /// No description provided for @rapNoItems.
+  ///
+  /// In id, this message translates to:
+  /// **'Project ini belum punya item RAP. Hubungi PM atau Direktur.'**
+  String get rapNoItems;
+
+  /// No description provided for @noSearchResults.
+  ///
+  /// In id, this message translates to:
+  /// **'Tidak ada yang cocok.'**
+  String get noSearchResults;
+
+  /// No description provided for @lineNeedsRapItem.
+  ///
+  /// In id, this message translates to:
+  /// **'Baris ini belum terhubung ke item RAP. Pilih item RAP project sebelum diajukan.'**
+  String get lineNeedsRapItem;
+
+  /// No description provided for @lineNeedsRapItemShort.
+  ///
+  /// In id, this message translates to:
+  /// **'Pilih item RAP'**
+  String get lineNeedsRapItemShort;
+
+  /// No description provided for @projectChangeClearsRap.
+  ///
+  /// In id, this message translates to:
+  /// **'Item RAP pada {count} baris milik project sebelumnya dan akan dikosongkan. Tetap ganti project?'**
+  String projectChangeClearsRap(int count);
+
+  /// No description provided for @projectChangeConfirm.
+  ///
+  /// In id, this message translates to:
+  /// **'Ganti project'**
+  String get projectChangeConfirm;
+
+  /// No description provided for @draftCostCenterLegacy.
+  ///
+  /// In id, this message translates to:
+  /// **'Draft ini dibuat dengan pusat biaya. Pengajuan sekarang wajib memakai project — pilih project; pusat biaya diisi Finance saat transfer.'**
+  String get draftCostCenterLegacy;
+
+  /// No description provided for @draftLinesNeedRap.
+  ///
+  /// In id, this message translates to:
+  /// **'{count} baris belum memilih item RAP — lengkapi sebelum diajukan.'**
+  String draftLinesNeedRap(int count);
+
+  /// No description provided for @searchClear.
+  ///
+  /// In id, this message translates to:
+  /// **'Hapus pencarian'**
+  String get searchClear;
+
+  /// No description provided for @projectsTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Proyek'**
+  String get projectsTitle;
+
+  /// No description provided for @projectsSearchHint.
+  ///
+  /// In id, this message translates to:
+  /// **'Cari kode atau nama project…'**
+  String get projectsSearchHint;
+
+  /// No description provided for @projectStatusActive.
+  ///
+  /// In id, this message translates to:
+  /// **'Semua aktif'**
+  String get projectStatusActive;
+
+  /// No description provided for @projectsEmpty.
+  ///
+  /// In id, this message translates to:
+  /// **'Belum ada project yang dapat Anda lihat.'**
+  String get projectsEmpty;
+
+  /// No description provided for @projectsNoMatch.
+  ///
+  /// In id, this message translates to:
+  /// **'Tidak ada yang cocok dengan pencarian / filter.'**
+  String get projectsNoMatch;
+
+  /// No description provided for @projectPm.
+  ///
+  /// In id, this message translates to:
+  /// **'PM'**
+  String get projectPm;
+
+  /// No description provided for @projectRapUsed.
+  ///
+  /// In id, this message translates to:
+  /// **'Realisasi RAP'**
+  String get projectRapUsed;
+
+  /// No description provided for @projectRapOverItems.
+  ///
+  /// In id, this message translates to:
+  /// **'{count} item RAP melebihi rencana'**
+  String projectRapOverItems(int count);
+
+  /// No description provided for @projectTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Project'**
+  String get projectTitle;
+
+  /// No description provided for @projectTabInfo.
+  ///
+  /// In id, this message translates to:
+  /// **'Proyek'**
+  String get projectTabInfo;
+
+  /// No description provided for @projectTabRap.
+  ///
+  /// In id, this message translates to:
+  /// **'RAP'**
+  String get projectTabRap;
+
+  /// No description provided for @projectTabRequests.
+  ///
+  /// In id, this message translates to:
+  /// **'Pengajuan'**
+  String get projectTabRequests;
+
+  /// No description provided for @projectCode.
+  ///
+  /// In id, this message translates to:
+  /// **'Kode'**
+  String get projectCode;
+
+  /// No description provided for @projectName.
+  ///
+  /// In id, this message translates to:
+  /// **'Nama project'**
+  String get projectName;
+
+  /// No description provided for @projectKind.
+  ///
+  /// In id, this message translates to:
+  /// **'Jenis project'**
+  String get projectKind;
+
+  /// No description provided for @projectStatus.
+  ///
+  /// In id, this message translates to:
+  /// **'Status'**
+  String get projectStatus;
+
+  /// No description provided for @projectContractValue.
+  ///
+  /// In id, this message translates to:
+  /// **'Nilai kontrak (RAB)'**
+  String get projectContractValue;
+
+  /// No description provided for @projectNoCostCenter.
+  ///
+  /// In id, this message translates to:
+  /// **'Belum ada — dipilih Finance saat transfer'**
+  String get projectNoCostCenter;
+
+  /// No description provided for @projectClient.
+  ///
+  /// In id, this message translates to:
+  /// **'Klien'**
+  String get projectClient;
+
+  /// No description provided for @projectPeriod.
+  ///
+  /// In id, this message translates to:
+  /// **'Periode'**
+  String get projectPeriod;
+
+  /// No description provided for @projectProgress.
+  ///
+  /// In id, this message translates to:
+  /// **'Progress fisik'**
+  String get projectProgress;
+
+  /// No description provided for @projectAddress.
+  ///
+  /// In id, this message translates to:
+  /// **'Alamat'**
+  String get projectAddress;
+
+  /// No description provided for @projectRapSummary.
+  ///
+  /// In id, this message translates to:
+  /// **'Ringkasan RAP'**
+  String get projectRapSummary;
+
+  /// No description provided for @rapItemsCount.
+  ///
+  /// In id, this message translates to:
+  /// **'{count} item RAP'**
+  String rapItemsCount(int count);
+
+  /// No description provided for @rapPlanned.
+  ///
+  /// In id, this message translates to:
+  /// **'Rencana'**
+  String get rapPlanned;
+
+  /// No description provided for @rapRealised.
+  ///
+  /// In id, this message translates to:
+  /// **'Realisasi'**
+  String get rapRealised;
+
+  /// No description provided for @rapRemainingLabel.
+  ///
+  /// In id, this message translates to:
+  /// **'Sisa'**
+  String get rapRemainingLabel;
+
+  /// No description provided for @rapNoPrices.
+  ///
+  /// In id, this message translates to:
+  /// **'Nilai RAP hanya terlihat oleh Direktur, Admin, Finance dan PM project.'**
+  String get rapNoPrices;
+
+  /// No description provided for @rapNoItemsProject.
+  ///
+  /// In id, this message translates to:
+  /// **'Project ini belum punya item RAP.'**
+  String get rapNoItemsProject;
+
+  /// No description provided for @rapInactive.
+  ///
+  /// In id, this message translates to:
+  /// **'Nonaktif'**
+  String get rapInactive;
+
+  /// No description provided for @requestsSearchHint.
+  ///
+  /// In id, this message translates to:
+  /// **'Cari nomor atau judul…'**
+  String get requestsSearchHint;
+
+  /// No description provided for @filterStatus.
+  ///
+  /// In id, this message translates to:
+  /// **'Status'**
+  String get filterStatus;
+
+  /// No description provided for @filterAllStatuses.
+  ///
+  /// In id, this message translates to:
+  /// **'Semua status'**
+  String get filterAllStatuses;
+
+  /// No description provided for @projectNoRequests.
+  ///
+  /// In id, this message translates to:
+  /// **'Belum ada pengajuan untuk project ini.'**
+  String get projectNoRequests;
+
+  /// No description provided for @homeProjectsSub.
+  ///
+  /// In id, this message translates to:
+  /// **'Info, RAP & pengajuan'**
+  String get homeProjectsSub;
+
+  /// No description provided for @financeTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Finance'**
+  String get financeTitle;
+
+  /// No description provided for @homeFinanceSub.
+  ///
+  /// In id, this message translates to:
+  /// **'Antrian transfer & LPJ'**
+  String get homeFinanceSub;
+
+  /// No description provided for @financeQueueCount.
+  ///
+  /// In id, this message translates to:
+  /// **'{count} siap ditransfer'**
+  String financeQueueCount(int count);
+
+  /// No description provided for @transferQueueTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Antrian Transfer'**
+  String get transferQueueTitle;
+
+  /// No description provided for @lpjVerifyTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Verifikasi LPJ'**
+  String get lpjVerifyTitle;
+
+  /// No description provided for @slaAgeUnknown.
+  ///
+  /// In id, this message translates to:
+  /// **'Umur sejak disetujui: —'**
+  String get slaAgeUnknown;
+
+  /// No description provided for @slaAge.
+  ///
+  /// In id, this message translates to:
+  /// **'{age} sejak disetujui'**
+  String slaAge(String age);
+
+  /// No description provided for @slaOver.
+  ///
+  /// In id, this message translates to:
+  /// **'lewat SLA {hours} jam'**
+  String slaOver(String hours);
+
+  /// No description provided for @transferSearchHint.
+  ///
+  /// In id, this message translates to:
+  /// **'Nomor, judul, pemilik rekening…'**
+  String get transferSearchHint;
+
+  /// No description provided for @filterAllTypes.
+  ///
+  /// In id, this message translates to:
+  /// **'Semua jenis'**
+  String get filterAllTypes;
+
+  /// No description provided for @slaOverFilter.
+  ///
+  /// In id, this message translates to:
+  /// **'Lewat SLA'**
+  String get slaOverFilter;
+
+  /// No description provided for @transferQueueEmpty.
+  ///
+  /// In id, this message translates to:
+  /// **'Antrian transfer kosong.'**
+  String get transferQueueEmpty;
+
+  /// No description provided for @listShownOf.
+  ///
+  /// In id, this message translates to:
+  /// **'{shown} dari {total} pengajuan'**
+  String listShownOf(int shown, int total);
+
+  /// No description provided for @costCenterByFinance.
+  ///
+  /// In id, this message translates to:
+  /// **'dipilih Finance saat transfer'**
+  String get costCenterByFinance;
+
+  /// No description provided for @bankVerified.
+  ///
+  /// In id, this message translates to:
+  /// **'Terverifikasi'**
+  String get bankVerified;
+
+  /// No description provided for @bankUnverified.
+  ///
+  /// In id, this message translates to:
+  /// **'Belum diverifikasi'**
+  String get bankUnverified;
+
+  /// No description provided for @openFlags.
+  ///
+  /// In id, this message translates to:
+  /// **'Flag terbuka: {count}'**
+  String openFlags(int count);
+
+  /// No description provided for @transferRecord.
+  ///
+  /// In id, this message translates to:
+  /// **'Catat transfer'**
+  String get transferRecord;
+
+  /// No description provided for @lpjQueueEmpty.
+  ///
+  /// In id, this message translates to:
+  /// **'Tidak ada LPJ yang menunggu verifikasi.'**
+  String get lpjQueueEmpty;
+
+  /// No description provided for @lpjReadOnlyHint.
+  ///
+  /// In id, this message translates to:
+  /// **'Hanya lihat: buka pengajuan untuk melihat LPJ-nya. Verifikasi LPJ dilakukan di web (Verifikasi LPJ).'**
+  String get lpjReadOnlyHint;
+
+  /// No description provided for @transferNotInQueue.
+  ///
+  /// In id, this message translates to:
+  /// **'Pengajuan ini tidak lagi ada di antrian transfer (mungkin sudah ditransfer).'**
+  String get transferNotInQueue;
+
+  /// No description provided for @transferAtLabel.
+  ///
+  /// In id, this message translates to:
+  /// **'Tanggal & jam transfer'**
+  String get transferAtLabel;
+
+  /// No description provided for @transferAtHelp.
+  ///
+  /// In id, this message translates to:
+  /// **'Sesuai bukti transfer bank.'**
+  String get transferAtHelp;
+
+  /// No description provided for @transferAtHint.
+  ///
+  /// In id, this message translates to:
+  /// **'Pilih tanggal & jam'**
+  String get transferAtHint;
+
+  /// No description provided for @transferRecorded.
+  ///
+  /// In id, this message translates to:
+  /// **'Transfer tercatat.'**
+  String get transferRecorded;
+
+  /// No description provided for @transferRecordedNo.
+  ///
+  /// In id, this message translates to:
+  /// **'Transfer {no} tercatat.'**
+  String transferRecordedNo(String no);
+
+  /// No description provided for @overrideConfirm.
+  ///
+  /// In id, this message translates to:
+  /// **'Tetap simpan'**
+  String get overrideConfirm;
+
+  /// No description provided for @overrideCancelled.
+  ///
+  /// In id, this message translates to:
+  /// **'Belum disimpan — konfirmasi dibatalkan.'**
+  String get overrideCancelled;
+
+  /// No description provided for @transferAmountText.
+  ///
+  /// In id, this message translates to:
+  /// **'Transfer {amount}'**
+  String transferAmountText(String amount);
+
+  /// No description provided for @transferAmountHelp.
+  ///
+  /// In id, this message translates to:
+  /// **'Nominal disetujui — ditetapkan server, tidak dapat diubah.'**
+  String get transferAmountHelp;
+
+  /// No description provided for @bankDestination.
+  ///
+  /// In id, this message translates to:
+  /// **'Rekening tujuan'**
+  String get bankDestination;
+
+  /// No description provided for @cashAccountLabel.
+  ///
+  /// In id, this message translates to:
+  /// **'Akun kas'**
+  String get cashAccountLabel;
+
+  /// No description provided for @costCenterPickHint.
+  ///
+  /// In id, this message translates to:
+  /// **'Pilih pusat biaya…'**
+  String get costCenterPickHint;
+
+  /// No description provided for @costCenterSuggested.
+  ///
+  /// In id, this message translates to:
+  /// **'Usulan: pusat biaya default project. Ubah bila perlu.'**
+  String get costCenterSuggested;
+
+  /// No description provided for @costCenterNoDefault.
+  ///
+  /// In id, this message translates to:
+  /// **'Project belum punya pusat biaya default — pilih.'**
+  String get costCenterNoDefault;
+
+  /// No description provided for @bankRefLabel.
+  ///
+  /// In id, this message translates to:
+  /// **'No. referensi bank'**
+  String get bankRefLabel;
+
+  /// No description provided for @bankRefHint.
+  ///
+  /// In id, this message translates to:
+  /// **'mis. nomor referensi di bukti'**
+  String get bankRefHint;
+
+  /// No description provided for @transferProofLabel.
+  ///
+  /// In id, this message translates to:
+  /// **'Bukti transfer'**
+  String get transferProofLabel;
+
+  /// No description provided for @proofRetake.
+  ///
+  /// In id, this message translates to:
+  /// **'Foto ulang'**
+  String get proofRetake;
+
+  /// No description provided for @transferProofHelp.
+  ///
+  /// In id, this message translates to:
+  /// **'Foto bukti transfer bank (kamera atau galeri); dikompres sebelum diunggah.'**
+  String get transferProofHelp;
+
+  /// No description provided for @processing.
+  ///
+  /// In id, this message translates to:
+  /// **'Memproses…'**
+  String get processing;
+
+  /// No description provided for @overdraftTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Saldo akun kas akan minus'**
+  String get overdraftTitle;
+
+  /// No description provided for @overdraftFigures.
+  ///
+  /// In id, this message translates to:
+  /// **'Saldo saat ini {balance}; sesudah transaksi ini {after}.'**
+  String overdraftFigures(String balance, String after);
+
+  /// No description provided for @overdraftGeneric.
+  ///
+  /// In id, this message translates to:
+  /// **'Saldo akun akan menjadi minus.'**
+  String get overdraftGeneric;
+
+  /// No description provided for @overdraftNote.
+  ///
+  /// In id, this message translates to:
+  /// **'Pastikan dana memang tersedia (mis. setoran belum dicatat). Konfirmasi Anda tercatat di audit log.'**
+  String get overdraftNote;
+
+  /// No description provided for @unverifiedTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Rekening tujuan belum diverifikasi'**
+  String get unverifiedTitle;
+
+  /// No description provided for @unverifiedLine.
+  ///
+  /// In id, this message translates to:
+  /// **'Rekening {account} berstatus \"Belum diverifikasi\".'**
+  String unverifiedLine(String account);
+
+  /// No description provided for @unverifiedDestination.
+  ///
+  /// In id, this message translates to:
+  /// **'tujuan'**
+  String get unverifiedDestination;
+
+  /// No description provided for @unverifiedNote.
+  ///
+  /// In id, this message translates to:
+  /// **'Periksa nomor rekening dan nama pemilik dengan karyawan sebelum mentransfer. Konfirmasi Anda tercatat di audit log.'**
+  String get unverifiedNote;
+
+  /// No description provided for @proofCamera.
+  ///
+  /// In id, this message translates to:
+  /// **'Kamera'**
+  String get proofCamera;
+
+  /// No description provided for @rapOverBy.
+  ///
+  /// In id, this message translates to:
+  /// **'Lebih {amount}'**
+  String rapOverBy(String amount);
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

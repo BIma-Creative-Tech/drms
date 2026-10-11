@@ -4,14 +4,15 @@ import type { CollectionSlug, PayloadRequest } from 'payload'
 import { relId, userId } from '@/access/roles'
 import { writeAudit } from '@/audit/writer'
 import { ORPHAN_MARK } from '@/domain/media-orphans'
+import { rapOverBudgetLines } from '@/domain/rap/budget'
 import { getRequestTx } from '@/lib/tx'
 
 import { actorContext, fail, ids, loadRaw, loadVisible, requireAction, requireActionAudited, settings, today, updateRequest, type RequestDoc } from './common'
 import { mayViewFlag, withFlagVisibility } from './flag-visibility'
-import { computeFlags, normalizeReceiptNo, normalizeVendor, type DuplicateHit, type FlagCategory, type FlagSpec } from './flags'
-import { grandTotal } from './lines'
-import { auditSkipped, selectAndSnapshot, writeSnapshot } from './snapshot'
-import { isBusinessDate, INACTIVE_FOR_DUPLICATES } from './types'
+import { computeFlags, normalizeReceiptNo, normalizeVendor, rapOverFlagSpecs, type DuplicateHit, type FlagCategory, type FlagSpec } from './flags'
+import { grandTotal, lineNeedsCompletion } from './lines'
+import { auditSelfApproval, auditSkipped, selectAndSnapshot, writeSnapshot } from './snapshot'
+import { isBusinessDate, INACTIVE_FOR_DUPLICATES, type FlagKind } from './types'
 
 export type ReceiptInput = {
   lineId: string
@@ -246,7 +247,7 @@ export async function verifyReceipt(req: PayloadRequest, requestId: number, rece
 }
 
 /**
- * US-39: Finance rejects a receipt (reason) → Reimburse goes to "Revisi Nota". Uang Muka LPJ review
+ * US-39: Finance rejects a receipt (reason) → Reimburse goes to "Revisi Nota". Pengajuan Baru LPJ review
  * (US-21): the receipt is rejected (excluded from the verified total) and the request stays in
  * "LPJ Diajukan" — Finance then asks for a revision or verifies the LPJ.
  */
@@ -278,7 +279,7 @@ export async function rejectReceipt(req: PayloadRequest, requestId: number, rece
 
 /**
  * QA-09: after EVERY receipt change (add / edit / remove / valid / reject) the flags are recomputed
- * from the active receipts (pending + valid) and, on an Uang Muka whose LPJ is still open (draft /
+ * from the active receipts (pending + valid) and, on a Pengajuan Baru whose LPJ is still open (draft /
  * submitted / revision), the LPJ's provisional totals: receipts total = Σ active receipts,
  * difference = transferred − receipts total (DB: pk_settlements_guard allows exactly these two
  * columns, consistent, without a status change — migration 20261008_120000_qa_flow_receipts).
@@ -325,6 +326,15 @@ export async function resubmitReceipts(req: PayloadRequest, requestId: number) {
   const doc = await loadVisible(req, requestId, { lock: true })
   requireAction(await actorContext(req, doc), 'receipts_resubmit')
   const raw = await loadRaw(req, requestId)
+  // D3: a line saved before D3 (no reproducible unit price) is completed first — total = qty × harga satuan
+  const incomplete = (raw.lines ?? []).map((l, i) => ({ l, i })).filter(({ l }) => lineNeedsCompletion(l))
+  if (incomplete.length > 0) {
+    fail(
+      400,
+      `Lengkapi Qty & Harga satuan pada baris ${incomplete.map(({ i }) => i + 1).join(', ')} sebelum mengirim ulang nota.`,
+      incomplete.map(({ i }) => ({ path: `lines.${i}.unitPrice`, message: 'Lengkapi Qty & Harga satuan (total baris = qty × harga satuan).' })),
+    )
+  }
   await assertEveryLineHasReceipt(req, raw)
   const total = grandTotal((raw.lines ?? []).map((l) => ({ total: l.total ?? null })))
   let updated: RequestDoc
@@ -339,10 +349,12 @@ export async function resubmitReceipts(req: PayloadRequest, requestId: number) {
       status: needsAck ? 'pending_ack' : 'pending_approval',
       approvalRule: rule.id,
       approvalSnapshot: snapshot,
+      g1Exception: snapshot.selfApproval ?? null,
       approvalCycle: (raw.approvalCycle ?? 0) + 1,
       currentLevel: needsAck ? 0 : 1,
     })
     await auditSkipped(req, updated, snapshot)
+    await auditSelfApproval(req, updated, snapshot)
   }
   await writeSnapshot(req, updated, 'receipts_resubmit')
   await afterReceiptChange(req, requestId)
@@ -524,7 +536,12 @@ export async function recomputeFlags(req: PayloadRequest, requestId: number): Pr
   const doc = await loadRaw(req, requestId)
   // ADR 0016 §1: receipt tolerance / max age of the DOCUMENT's PT
   const s = await settings(req, relId((doc as { company?: unknown }).company))
-  const lines = (doc.lines ?? []).map((l, i) => ({ id: l.id, lineNo: i + 1, total: l.total ?? 0, uom: relId(l.uom) ?? null, category: relId(l.category) ?? null }))
+  const lines = (doc.lines ?? []).map((l, i) => ({ id: l.id, lineNo: i + 1, total: l.total ?? 0, uom: relId(l.uom) ?? null, category: relId(l.category) ?? null, receiptAmount: l.receiptAmount ?? null }))
+  // D4: lines charged to a RAP item that is over its planned amount (cancelled / rejected requests: nothing to warn)
+  const rapOver =
+    doc.status === 'cancelled' || doc.status === 'rejected'
+      ? []
+      : await rapOverBudgetLines(req, { requestId, projectId: relId(doc.project) ?? null, lines: (doc.lines ?? []).map((l, i) => ({ id: l.id, lineNo: i + 1, total: l.total ?? 0, rapItem: relId(l.rapItem) ?? null })) })
   const receipts = (await receiptsOf(req, requestId, true)).map((r) => ({ id: r.id, lineId: r.lineId, receiptDate: r.receiptDate, amount: r.amount }))
   const catIds = [...new Set(lines.map((l) => l.category).filter((x): x is number => x !== null))]
   const uomIds = [...new Set(lines.map((l) => l.uom).filter((x): x is number => x !== null))]
@@ -564,12 +581,23 @@ export async function recomputeFlags(req: PayloadRequest, requestId: number): Pr
     duplicates: await duplicateHits(req, requestId),
     tolerance: s.receiptRoundingTolerance ?? 1000, // Q-14 default
     maxAgeDays: s.receiptMaxAgeDays ?? 30,
+    rapOver,
   })
 
+  await persistFlags(req, doc, desired)
+  return desired
+}
+
+/**
+ * Stores the desired flag set of a request: new → `open` (audit flag_raised), vanished or changed → `resolved`.
+ * `kinds`: only flags of these kinds are compared (D4 RAP refresh at decision time touches nothing else).
+ */
+async function persistFlags(req: PayloadRequest, doc: RequestDoc, desired: FlagSpec[], kinds?: readonly FlagKind[]): Promise<void> {
+  const requestId = doc.id
   const existing = (
     await req.payload.find({
       collection: 'receipt-flags',
-      where: { and: [{ request: { equals: requestId } }, { status: { in: ['open', 'reviewed'] } }] },
+      where: { and: [{ request: { equals: requestId } }, { status: { in: ['open', 'reviewed'] } }, ...(kinds ? [{ kind: { in: [...kinds] } }] : [])] },
       depth: 0,
       pagination: false,
       overrideAccess: true, // SYSTEM-READ: current flags
@@ -634,5 +662,34 @@ export async function recomputeFlags(req: PayloadRequest, requestId: number): Pr
       })),
     )
   }
-  return desired
 }
+
+/**
+ * D4: refreshes only the "Melebihi RAP" flags of a request (RAP realisation moves when OTHER requests of the project
+ * are approved). Called before every decision on it and, after a final approval, for the project's other pending
+ * requests. Nothing else of the flag set changes.
+ */
+export async function syncRapFlags(req: PayloadRequest, requestId: number): Promise<void> {
+  const doc = await loadRaw(req, requestId)
+  const lines = (doc.lines ?? []).map((l, i) => ({ id: l.id, lineNo: i + 1, total: l.total ?? 0, rapItem: relId(l.rapItem) ?? null }))
+  const over = doc.status === 'cancelled' || doc.status === 'rejected' ? [] : await rapOverBudgetLines(req, { requestId, projectId: relId(doc.project) ?? null, lines })
+  await persistFlags(req, doc, rapOverFlagSpecs(over), ['rap_over_budget'])
+}
+
+/** D4: after request `approvedId` became committed, its project's pending requests re-check their RAP flags. */
+export async function syncProjectRapFlags(req: PayloadRequest, approvedId: number): Promise<void> {
+  const doc = await loadRaw(req, approvedId)
+  const projectId = relId(doc.project)
+  if (!projectId || !(doc.lines ?? []).some((l) => relId(l.rapItem) !== undefined)) return
+  const pending = await req.payload.find({
+    collection: 'expense-requests',
+    where: { and: [{ project: { equals: projectId } }, { status: { in: ['pending_ack', 'pending_approval'] } }, { id: { not_equals: approvedId } }] },
+    depth: 0,
+    limit: 200,
+    select: { status: true },
+    overrideAccess: true, // SYSTEM-READ: sibling requests of the project whose RAP warning may change
+    req,
+  })
+  for (const d of pending.docs) await syncRapFlags(req, d.id as number)
+}
+

@@ -54,7 +54,7 @@ describe('numbers & dates (Indonesian)', () => {
     expect(fmtNum(null)).toBe('—')
     expect(fmtNum(-2.5)).toBe('−2,5')
   })
-  it('parseDecimalId: comma = decimal, several dots = thousands, single dot = decimal', () => {
+  it('parseDecimalId: comma = decimal, several dots = thousands, single dot = thousands for 3 digits, else decimal', () => {
     expect(parseDecimalId('1.031,5')).toBe(1031.5)
     expect(parseDecimalId('7,5')).toBe(7.5)
     expect(parseDecimalId('7.5')).toBe(7.5)
@@ -64,6 +64,14 @@ describe('numbers & dates (Indonesian)', () => {
     expect(parseDecimalId('1,2,3')).toBeNaN()
     expect(parseDecimalId('-3')).toBeNaN()
     expect(parseDecimalId('abc')).toBeNaN()
+    // T-01: a single dot grouping 3 digits is thousands (fmtNum output round-trips: prefilled HM awal, correction dialog)
+    expect(parseDecimalId('1.023')).toBe(1023)
+    expect(parseDecimalId('5.000')).toBe(5000)
+    expect(parseDecimalId('999.999')).toBe(999999)
+    expect(parseDecimalId('0.125')).toBe(0.125)
+    expect(parseDecimalId('1031.5')).toBe(1031.5)
+    expect(parseDecimalId('12.5')).toBe(12.5)
+    for (const v of [1023, 1031.5, 5000, 2438, 12.25, 0.5, 999999, 1250000.75]) expect(parseDecimalId(fmtNum(v))).toBe(v)
   })
   it('month helpers, week range, long dates', () => {
     expect(monthDays('2026-02')).toHaveLength(28)

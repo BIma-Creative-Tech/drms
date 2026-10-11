@@ -89,7 +89,11 @@ export function defaultPtOf(data: Pick<ImportData, 'companies'>, db: Pick<DbKeys
 /** Effective PT of a row. */
 export const ptOf = (row: { pt: string | null }, defaultPt: string | null): string | null => row.pt ?? defaultPt
 
-export function resolveReferences(data: ImportData, db: DbKeys, kcMap: ReadonlyMap<string, string>): ResolveResult {
+/**
+ * `opts.pmRequired` (DRMS 10/10 #5, set by runImport): a project's PM must resolve to an account NOW —
+ * a PM still pending in Keycloak is an error (the project cannot be created without its PM).
+ */
+export function resolveReferences(data: ImportData, db: DbKeys, kcMap: ReadonlyMap<string, string>, opts: { pmRequired?: boolean } = {}): ResolveResult {
   const issues: Issue[] = []
   const defaultPt = defaultPtOf(data, db)
   const knownPts = new Set([...data.companies.map((c) => c.code), ...db.companies.keys()])
@@ -302,7 +306,10 @@ export function resolveReferences(data: ImportData, db: DbKeys, kcMap: ReadonlyM
       issues.push({ level: 'error', sheet: SHEET_BY_KEY[sheet].name, row, column, message: `Username "${ref}" tidak ada di sheet Pengguna.` })
       return
     }
-    if (plan.action === 'pending') {
+    if (plan.action === 'pending' && opts.pmRequired && sheet === 'project' && column === 'pm') {
+      // DRMS 10/10 #5: a project cannot be created without its PM → map the PM's Keycloak account first
+      issues.push({ level: 'error', sheet: SHEET_BY_KEY[sheet].name, row, column, message: `Project Manager wajib diisi: "${ref}" belum punya akun Keycloak — sertakan file pemetaan Keycloak untuk PM ini.` })
+    } else if (plan.action === 'pending') {
       issues.push({ level: 'warning', sheet: SHEET_BY_KEY[sheet].name, row, column, message: `"${ref}" belum punya akun Keycloak → ${column} dikosongkan dulu, terisi saat impor ulang dengan file pemetaan.` })
     }
     const u = data.users.find((x) => x.username === ref)

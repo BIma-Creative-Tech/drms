@@ -300,7 +300,13 @@ as int?,
 /// @nodoc
 mixin _$DraftLine {
 
- String get clientUuid; int get no; String get description; double? get qty; int? get uomId; int? get unitPrice; int? get total; int? get categoryId; int? get vehicleId; String? get notes; List<DraftReceipt> get receipts;
+ String get clientUuid; int get no; String get description; double? get qty; int? get uomId; int? get unitPrice;/// D3: computed = qty × [unitPrice] (see [lineTotalOf]); never typed. A draft written before D3 may
+/// still carry a typed total without a unit price ([DraftLineD3.needsUnitPrice]).
+ int? get total;/// D3 "Nominal sesuai nota" (optional): what the receipt says. Approval and transfer use [total];
+/// a different value only raises the "Selisih nota" awareness flag for Finance.
+ int? get receiptAmount;/// DRMS 10/10 D4: RAP item of the draft's project this line is charged to (required to submit). Null on a
+/// line written before D4 — the editor asks to pick one.
+ int? get rapItemId; int? get categoryId; int? get vehicleId; String? get notes; List<DraftReceipt> get receipts;
 /// Create a copy of DraftLine
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -312,20 +318,20 @@ $DraftLineCopyWith<DraftLine> get copyWith => _$DraftLineCopyWithImpl<DraftLine>
 @override
 bool operator ==(Object other) {
   final _this = this as DraftLine;
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is DraftLine&&(identical(other.clientUuid, _this.clientUuid) || other.clientUuid == _this.clientUuid)&&(identical(other.no, _this.no) || other.no == _this.no)&&(identical(other.description, _this.description) || other.description == _this.description)&&(identical(other.qty, _this.qty) || other.qty == _this.qty)&&(identical(other.uomId, _this.uomId) || other.uomId == _this.uomId)&&(identical(other.unitPrice, _this.unitPrice) || other.unitPrice == _this.unitPrice)&&(identical(other.total, _this.total) || other.total == _this.total)&&(identical(other.categoryId, _this.categoryId) || other.categoryId == _this.categoryId)&&(identical(other.vehicleId, _this.vehicleId) || other.vehicleId == _this.vehicleId)&&(identical(other.notes, _this.notes) || other.notes == _this.notes)&&const DeepCollectionEquality().equals(other.receipts, _this.receipts));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is DraftLine&&(identical(other.clientUuid, _this.clientUuid) || other.clientUuid == _this.clientUuid)&&(identical(other.no, _this.no) || other.no == _this.no)&&(identical(other.description, _this.description) || other.description == _this.description)&&(identical(other.qty, _this.qty) || other.qty == _this.qty)&&(identical(other.uomId, _this.uomId) || other.uomId == _this.uomId)&&(identical(other.unitPrice, _this.unitPrice) || other.unitPrice == _this.unitPrice)&&(identical(other.total, _this.total) || other.total == _this.total)&&(identical(other.receiptAmount, _this.receiptAmount) || other.receiptAmount == _this.receiptAmount)&&(identical(other.rapItemId, _this.rapItemId) || other.rapItemId == _this.rapItemId)&&(identical(other.categoryId, _this.categoryId) || other.categoryId == _this.categoryId)&&(identical(other.vehicleId, _this.vehicleId) || other.vehicleId == _this.vehicleId)&&(identical(other.notes, _this.notes) || other.notes == _this.notes)&&const DeepCollectionEquality().equals(other.receipts, _this.receipts));
 }
 
 
 @override
 int get hashCode {
   final _this = this as DraftLine;
-  return Object.hash(runtimeType,_this.clientUuid,_this.no,_this.description,_this.qty,_this.uomId,_this.unitPrice,_this.total,_this.categoryId,_this.vehicleId,_this.notes,const DeepCollectionEquality().hash(_this.receipts));
+  return Object.hash(runtimeType,_this.clientUuid,_this.no,_this.description,_this.qty,_this.uomId,_this.unitPrice,_this.total,_this.receiptAmount,_this.rapItemId,_this.categoryId,_this.vehicleId,_this.notes,const DeepCollectionEquality().hash(_this.receipts));
 }
 
 @override
 String toString() {
   final _this = this as DraftLine;
-  return 'DraftLine(clientUuid: ${_this.clientUuid}, no: ${_this.no}, description: ${_this.description}, qty: ${_this.qty}, uomId: ${_this.uomId}, unitPrice: ${_this.unitPrice}, total: ${_this.total}, categoryId: ${_this.categoryId}, vehicleId: ${_this.vehicleId}, notes: ${_this.notes}, receipts: ${_this.receipts})';
+  return 'DraftLine(clientUuid: ${_this.clientUuid}, no: ${_this.no}, description: ${_this.description}, qty: ${_this.qty}, uomId: ${_this.uomId}, unitPrice: ${_this.unitPrice}, total: ${_this.total}, receiptAmount: ${_this.receiptAmount}, rapItemId: ${_this.rapItemId}, categoryId: ${_this.categoryId}, vehicleId: ${_this.vehicleId}, notes: ${_this.notes}, receipts: ${_this.receipts})';
 }
 
 
@@ -336,7 +342,7 @@ abstract mixin class $DraftLineCopyWith<$Res>  {
   factory $DraftLineCopyWith(DraftLine value, $Res Function(DraftLine) _then) = _$DraftLineCopyWithImpl;
 @useResult
 $Res call({
- String clientUuid, int no, String description, double? qty, int? uomId, int? unitPrice, int? total, int? categoryId, int? vehicleId, String? notes, List<DraftReceipt> receipts
+ String clientUuid, int no, String description, double? qty, int? uomId, int? unitPrice, int? total, int? receiptAmount, int? rapItemId, int? categoryId, int? vehicleId, String? notes, List<DraftReceipt> receipts
 });
 
 
@@ -353,7 +359,7 @@ class _$DraftLineCopyWithImpl<$Res>
 
 /// Create a copy of DraftLine
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? clientUuid = null,Object? no = null,Object? description = null,Object? qty = freezed,Object? uomId = freezed,Object? unitPrice = freezed,Object? total = freezed,Object? categoryId = freezed,Object? vehicleId = freezed,Object? notes = freezed,Object? receipts = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? clientUuid = null,Object? no = null,Object? description = null,Object? qty = freezed,Object? uomId = freezed,Object? unitPrice = freezed,Object? total = freezed,Object? receiptAmount = freezed,Object? rapItemId = freezed,Object? categoryId = freezed,Object? vehicleId = freezed,Object? notes = freezed,Object? receipts = null,}) {
   return _then(DraftLine(
 clientUuid: null == clientUuid ? _self.clientUuid : clientUuid // ignore: cast_nullable_to_non_nullable
 as String,no: null == no ? _self.no : no // ignore: cast_nullable_to_non_nullable
@@ -362,6 +368,8 @@ as String,qty: freezed == qty ? _self.qty : qty // ignore: cast_nullable_to_non_
 as double?,uomId: freezed == uomId ? _self.uomId : uomId // ignore: cast_nullable_to_non_nullable
 as int?,unitPrice: freezed == unitPrice ? _self.unitPrice : unitPrice // ignore: cast_nullable_to_non_nullable
 as int?,total: freezed == total ? _self.total : total // ignore: cast_nullable_to_non_nullable
+as int?,receiptAmount: freezed == receiptAmount ? _self.receiptAmount : receiptAmount // ignore: cast_nullable_to_non_nullable
+as int?,rapItemId: freezed == rapItemId ? _self.rapItemId : rapItemId // ignore: cast_nullable_to_non_nullable
 as int?,categoryId: freezed == categoryId ? _self.categoryId : categoryId // ignore: cast_nullable_to_non_nullable
 as int?,vehicleId: freezed == vehicleId ? _self.vehicleId : vehicleId // ignore: cast_nullable_to_non_nullable
 as int?,notes: freezed == notes ? _self.notes : notes // ignore: cast_nullable_to_non_nullable
@@ -451,10 +459,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String clientUuid,  int no,  String description,  double? qty,  int? uomId,  int? unitPrice,  int? total,  int? categoryId,  int? vehicleId,  String? notes,  List<DraftReceipt> receipts)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String clientUuid,  int no,  String description,  double? qty,  int? uomId,  int? unitPrice,  int? total,  int? receiptAmount,  int? rapItemId,  int? categoryId,  int? vehicleId,  String? notes,  List<DraftReceipt> receipts)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _DraftLine() when $default != null:
-return $default(_that.clientUuid,_that.no,_that.description,_that.qty,_that.uomId,_that.unitPrice,_that.total,_that.categoryId,_that.vehicleId,_that.notes,_that.receipts);case _:
+return $default(_that.clientUuid,_that.no,_that.description,_that.qty,_that.uomId,_that.unitPrice,_that.total,_that.receiptAmount,_that.rapItemId,_that.categoryId,_that.vehicleId,_that.notes,_that.receipts);case _:
   return orElse();
 
 }
@@ -472,10 +480,10 @@ return $default(_that.clientUuid,_that.no,_that.description,_that.qty,_that.uomI
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String clientUuid,  int no,  String description,  double? qty,  int? uomId,  int? unitPrice,  int? total,  int? categoryId,  int? vehicleId,  String? notes,  List<DraftReceipt> receipts)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String clientUuid,  int no,  String description,  double? qty,  int? uomId,  int? unitPrice,  int? total,  int? receiptAmount,  int? rapItemId,  int? categoryId,  int? vehicleId,  String? notes,  List<DraftReceipt> receipts)  $default,) {final _that = this;
 switch (_that) {
 case _DraftLine():
-return $default(_that.clientUuid,_that.no,_that.description,_that.qty,_that.uomId,_that.unitPrice,_that.total,_that.categoryId,_that.vehicleId,_that.notes,_that.receipts);case _:
+return $default(_that.clientUuid,_that.no,_that.description,_that.qty,_that.uomId,_that.unitPrice,_that.total,_that.receiptAmount,_that.rapItemId,_that.categoryId,_that.vehicleId,_that.notes,_that.receipts);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -492,10 +500,10 @@ return $default(_that.clientUuid,_that.no,_that.description,_that.qty,_that.uomI
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String clientUuid,  int no,  String description,  double? qty,  int? uomId,  int? unitPrice,  int? total,  int? categoryId,  int? vehicleId,  String? notes,  List<DraftReceipt> receipts)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String clientUuid,  int no,  String description,  double? qty,  int? uomId,  int? unitPrice,  int? total,  int? receiptAmount,  int? rapItemId,  int? categoryId,  int? vehicleId,  String? notes,  List<DraftReceipt> receipts)?  $default,) {final _that = this;
 switch (_that) {
 case _DraftLine() when $default != null:
-return $default(_that.clientUuid,_that.no,_that.description,_that.qty,_that.uomId,_that.unitPrice,_that.total,_that.categoryId,_that.vehicleId,_that.notes,_that.receipts);case _:
+return $default(_that.clientUuid,_that.no,_that.description,_that.qty,_that.uomId,_that.unitPrice,_that.total,_that.receiptAmount,_that.rapItemId,_that.categoryId,_that.vehicleId,_that.notes,_that.receipts);case _:
   return null;
 
 }
@@ -507,7 +515,7 @@ return $default(_that.clientUuid,_that.no,_that.description,_that.qty,_that.uomI
 
 
 class _DraftLine implements DraftLine {
-  const _DraftLine({required this.clientUuid, required this.no, this.description = '', this.qty, this.uomId, this.unitPrice, this.total, this.categoryId, this.vehicleId, this.notes,  List<DraftReceipt> receipts = const []}): _receipts = receipts;
+  const _DraftLine({required this.clientUuid, required this.no, this.description = '', this.qty, this.uomId, this.unitPrice, this.total, this.receiptAmount, this.rapItemId, this.categoryId, this.vehicleId, this.notes,  List<DraftReceipt> receipts = const []}): _receipts = receipts;
   
 
 @override final  String clientUuid;
@@ -516,7 +524,15 @@ class _DraftLine implements DraftLine {
 @override final  double? qty;
 @override final  int? uomId;
 @override final  int? unitPrice;
+/// D3: computed = qty × [unitPrice] (see [lineTotalOf]); never typed. A draft written before D3 may
+/// still carry a typed total without a unit price ([DraftLineD3.needsUnitPrice]).
 @override final  int? total;
+/// D3 "Nominal sesuai nota" (optional): what the receipt says. Approval and transfer use [total];
+/// a different value only raises the "Selisih nota" awareness flag for Finance.
+@override final  int? receiptAmount;
+/// DRMS 10/10 D4: RAP item of the draft's project this line is charged to (required to submit). Null on a
+/// line written before D4 — the editor asks to pick one.
+@override final  int? rapItemId;
 @override final  int? categoryId;
 @override final  int? vehicleId;
 @override final  String? notes;
@@ -538,18 +554,18 @@ _$DraftLineCopyWith<_DraftLine> get copyWith => __$DraftLineCopyWithImpl<_DraftL
 
 @override
 bool operator ==(Object other) {
-    return identical(this, other) || (other.runtimeType == runtimeType&&other is _DraftLine&&(identical(other.clientUuid, clientUuid) || other.clientUuid == clientUuid)&&(identical(other.no, no) || other.no == no)&&(identical(other.description, description) || other.description == description)&&(identical(other.qty, qty) || other.qty == qty)&&(identical(other.uomId, uomId) || other.uomId == uomId)&&(identical(other.unitPrice, unitPrice) || other.unitPrice == unitPrice)&&(identical(other.total, total) || other.total == total)&&(identical(other.categoryId, categoryId) || other.categoryId == categoryId)&&(identical(other.vehicleId, vehicleId) || other.vehicleId == vehicleId)&&(identical(other.notes, notes) || other.notes == notes)&&const DeepCollectionEquality().equals(other.receipts, _receipts));
+    return identical(this, other) || (other.runtimeType == runtimeType&&other is _DraftLine&&(identical(other.clientUuid, clientUuid) || other.clientUuid == clientUuid)&&(identical(other.no, no) || other.no == no)&&(identical(other.description, description) || other.description == description)&&(identical(other.qty, qty) || other.qty == qty)&&(identical(other.uomId, uomId) || other.uomId == uomId)&&(identical(other.unitPrice, unitPrice) || other.unitPrice == unitPrice)&&(identical(other.total, total) || other.total == total)&&(identical(other.receiptAmount, receiptAmount) || other.receiptAmount == receiptAmount)&&(identical(other.rapItemId, rapItemId) || other.rapItemId == rapItemId)&&(identical(other.categoryId, categoryId) || other.categoryId == categoryId)&&(identical(other.vehicleId, vehicleId) || other.vehicleId == vehicleId)&&(identical(other.notes, notes) || other.notes == notes)&&const DeepCollectionEquality().equals(other.receipts, _receipts));
 }
 
 
 @override
 int get hashCode {
-    return Object.hash(runtimeType,clientUuid,no,description,qty,uomId,unitPrice,total,categoryId,vehicleId,notes,const DeepCollectionEquality().hash(_receipts));
+    return Object.hash(runtimeType,clientUuid,no,description,qty,uomId,unitPrice,total,receiptAmount,rapItemId,categoryId,vehicleId,notes,const DeepCollectionEquality().hash(_receipts));
 }
 
 @override
 String toString() {
-    return 'DraftLine(clientUuid: $clientUuid, no: $no, description: $description, qty: $qty, uomId: $uomId, unitPrice: $unitPrice, total: $total, categoryId: $categoryId, vehicleId: $vehicleId, notes: $notes, receipts: $receipts)';
+    return 'DraftLine(clientUuid: $clientUuid, no: $no, description: $description, qty: $qty, uomId: $uomId, unitPrice: $unitPrice, total: $total, receiptAmount: $receiptAmount, rapItemId: $rapItemId, categoryId: $categoryId, vehicleId: $vehicleId, notes: $notes, receipts: $receipts)';
 }
 
 
@@ -560,7 +576,7 @@ abstract mixin class _$DraftLineCopyWith<$Res> implements $DraftLineCopyWith<$Re
   factory _$DraftLineCopyWith(_DraftLine value, $Res Function(_DraftLine) _then) = __$DraftLineCopyWithImpl;
 @override @useResult
 $Res call({
- String clientUuid, int no, String description, double? qty, int? uomId, int? unitPrice, int? total, int? categoryId, int? vehicleId, String? notes, List<DraftReceipt> receipts
+ String clientUuid, int no, String description, double? qty, int? uomId, int? unitPrice, int? total, int? receiptAmount, int? rapItemId, int? categoryId, int? vehicleId, String? notes, List<DraftReceipt> receipts
 });
 
 
@@ -577,7 +593,7 @@ class __$DraftLineCopyWithImpl<$Res>
 
 /// Create a copy of DraftLine
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? clientUuid = null,Object? no = null,Object? description = null,Object? qty = freezed,Object? uomId = freezed,Object? unitPrice = freezed,Object? total = freezed,Object? categoryId = freezed,Object? vehicleId = freezed,Object? notes = freezed,Object? receipts = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? clientUuid = null,Object? no = null,Object? description = null,Object? qty = freezed,Object? uomId = freezed,Object? unitPrice = freezed,Object? total = freezed,Object? receiptAmount = freezed,Object? rapItemId = freezed,Object? categoryId = freezed,Object? vehicleId = freezed,Object? notes = freezed,Object? receipts = null,}) {
   return _then(_DraftLine(
 clientUuid: null == clientUuid ? _self.clientUuid : clientUuid // ignore: cast_nullable_to_non_nullable
 as String,no: null == no ? _self.no : no // ignore: cast_nullable_to_non_nullable
@@ -586,6 +602,8 @@ as String,qty: freezed == qty ? _self.qty : qty // ignore: cast_nullable_to_non_
 as double?,uomId: freezed == uomId ? _self.uomId : uomId // ignore: cast_nullable_to_non_nullable
 as int?,unitPrice: freezed == unitPrice ? _self.unitPrice : unitPrice // ignore: cast_nullable_to_non_nullable
 as int?,total: freezed == total ? _self.total : total // ignore: cast_nullable_to_non_nullable
+as int?,receiptAmount: freezed == receiptAmount ? _self.receiptAmount : receiptAmount // ignore: cast_nullable_to_non_nullable
+as int?,rapItemId: freezed == rapItemId ? _self.rapItemId : rapItemId // ignore: cast_nullable_to_non_nullable
 as int?,categoryId: freezed == categoryId ? _self.categoryId : categoryId // ignore: cast_nullable_to_non_nullable
 as int?,vehicleId: freezed == vehicleId ? _self.vehicleId : vehicleId // ignore: cast_nullable_to_non_nullable
 as int?,notes: freezed == notes ? _self.notes : notes // ignore: cast_nullable_to_non_nullable
@@ -602,7 +620,10 @@ mixin _$DraftRequest {
 
  String get clientUuid; RequestType get type;/// MC3: PT of the draft (chosen when it is created; projects / cost centers / accounts come from that
 /// PT's masters). Null = draft written before the multi-PT update, not yet assigned.
- int? get companyId; String get title; int? get projectId; int? get costCenterId; String? get neededDate;/// Owner decision 2026-10-09: "Tingkat urgensi" (`urgency-levels` master of the draft's PT).
+ int? get companyId; String get title;/// D2 (DRMS 10/10): required — every request belongs to a project (no non-project requests).
+ int? get projectId;/// D2: no longer chosen by the requester (Finance sets the cost center at transfer). Kept only for drafts
+/// written before D2; never sent to the server any more.
+ int? get costCenterId; String? get neededDate;/// Owner decision 2026-10-09: "Tingkat urgensi" (`urgency-levels` master of the draft's PT).
  int? get urgencyLevelId; String? get notes; List<int> get requesterIds; int? get bankAccountId; List<DraftLine> get lines; int? get serverId; int? get serverRev; DraftSyncState get syncState; String? get lastError; DateTime? get updatedAt;
 /// Create a copy of DraftRequest
 /// with the given fields replaced by the non-null parameter values.
@@ -825,7 +846,10 @@ class _DraftRequest extends DraftRequest {
 /// PT's masters). Null = draft written before the multi-PT update, not yet assigned.
 @override final  int? companyId;
 @override@JsonKey() final  String title;
+/// D2 (DRMS 10/10): required — every request belongs to a project (no non-project requests).
 @override final  int? projectId;
+/// D2: no longer chosen by the requester (Finance sets the cost center at transfer). Kept only for drafts
+/// written before D2; never sent to the server any more.
 @override final  int? costCenterId;
 @override final  String? neededDate;
 /// Owner decision 2026-10-09: "Tingkat urgensi" (`urgency-levels` master of the draft's PT).

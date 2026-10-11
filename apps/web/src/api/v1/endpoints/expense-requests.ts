@@ -7,14 +7,16 @@ import { actorContext, displayName, loadVisible, type RequestDoc } from '@/domai
 import { withReqTransaction } from '@/lib/system-tx'
 import { createDraft, resubmitAsDraft, updateDraft } from '@/domain/expense/drafts'
 import { withFlagVisibility } from '@/domain/expense/flag-visibility'
+import { bankPreview } from '@/domain/expense/bank-preview'
 import { detail, listItem } from '@/domain/expense/dto'
 import { addReceipt, editReceipt, rejectReceipt, removeReceipt, resubmitReceipts, reviewFlag, verifyAllReceipts, verifyReceipt } from '@/domain/expense/receipts'
 import { allowedActions } from '@/domain/expense/state'
 import { recordTransfer, voidTransfer } from '@/domain/expense/transfers'
 import { acknowledge, approve, cancel, complete, reject, submit, withdraw } from '@/domain/expense/workflow'
-import { receiptsComplete, requestLpjRevision, reverseSettlement, settle, submitLpj, verifyLpj } from '@/domain/expense/lpj'
+import { receiptsComplete, requestLpjRevision, reverseSettlement, setLpjPhotos, settle, submitLpj, verifyLpj } from '@/domain/expense/lpj'
 import { requestHistory } from '@/domain/history'
-import { approvalInbox, lpjQueue, officeQueueWhere } from '@/domain/expense/queues'
+import { approvalInbox, lpjQueue, officeQueueWhere, transferQueue } from '@/domain/expense/queues'
+import { searchWhere } from '@/lib/text-search'
 import { settlePrecheck } from '@/domain/expense/settle-precheck'
 
 import { companyQuery } from '../company-query'
@@ -22,11 +24,13 @@ import { companyQuery } from '../company-query'
 import { HttpError, json, problem, v1 } from '../http'
 import { withNamedCompany } from '../named-company'
 import {
+  BankPreviewQuery,
   EmptyBody,
   ExpenseRequestCreate,
   ExpenseRequestUpdate,
   FlagReviewBody,
   ListQuery,
+  LpjPhotosBody,
   LpjSubmitBody,
   PdfQuery,
   RevisionBody,
@@ -71,7 +75,7 @@ export const listRequestsEndpoint = v1({
   handler: async ({ req }) => {
     const q = ListQuery.safeParse(Object.fromEntries(req.searchParams.entries()))
     if (!q.success) throw new HttpError(400, 'Bad Request', { errors: q.error.issues.map((i) => ({ path: i.path.join('.'), message: i.message })) })
-    const { scope, status, type, limit, cursor } = q.data
+    const { scope, status, type, limit, cursor, project, q: text, page: pageNo } = q.data
     const and: Where[] = []
     const uid = userId(req)!
     if (scope === 'mine') {
@@ -105,6 +109,20 @@ export const listRequestsEndpoint = v1({
     if (scope === 'inbox') and.push({ status: { in: ['pending_ack', 'pending_approval'] } })
     if (status) and.push({ status: { in: status.split(',') } })
     if (type) and.push({ type: { equals: type } })
+    // DRMS 10/10 (project "Pengajuan" tab, APK project screen): one project + search in nomor / judul
+    if (project) and.push({ project: { equals: project } })
+    const search = searchWhere(['docNo', 'title'], text)
+    if (search) and.push(search)
+    if (pageNo !== undefined && scope !== 'inbox') {
+      // DRMS 10/10 D8: numbered pages (newest first) instead of the cursor
+      try {
+        const res = await req.payload.find({ collection: 'expense-requests', where: and.length ? { and } : undefined, sort: '-id', page: pageNo, limit, depth: 0, user: req.user, overrideAccess: false /* caller's read scope */, req })
+        return json({ items: (res.docs as unknown as RequestDoc[]).map((d) => listItem(d)), nextCursor: null, page: res.page ?? pageNo, totalPages: Math.max(1, res.totalPages), totalDocs: res.totalDocs })
+      } catch (err) {
+        if ((err as { status?: number }).status === 403) return json({ items: [], nextCursor: null, page: 1, totalPages: 1, totalDocs: 0 })
+        throw err
+      }
+    }
     const after = decodeCursor(cursor)
     if (after !== undefined) and.push({ id: { less_than: after } })
     let docs: RequestDoc[] = []
@@ -185,11 +203,16 @@ export const historyEndpoint = v1({
   },
 })
 
-/** GET /transfer-queue — US-19: Uang Muka "Disetujui", Reimburse "Nota Terverifikasi", by needed date. */
+/**
+ * GET /transfer-queue — US-19: Pengajuan Baru "Disetujui", Reimburse "Nota Terverifikasi", by needed date.
+ * DRMS 10/10 (APK Finance menu): + project, suggested cost center (D2), bank snapshot + verification, flag counts
+ * and the transfer SLA of the web queue (domain transferQueue).
+ */
 export const transferQueueEndpoint = v1({
   path: '/transfer-queue',
   method: 'get',
   roles: ['pk-finance', 'pk-owner'],
+  transactional: true, // queue figures use the request transaction handle
   handler: async ({ req }) => {
     const companies = await companyQuery(req)
     const res = await req.payload.find({
@@ -222,7 +245,14 @@ export const transferQueueEndpoint = v1({
       })
       items.push(listItem(d, { openWarningFlags: flags.totalDocs }))
     }
-    return json({ items, nextCursor: null })
+    const extra = new Map((await transferQueue(req, { companyIds: companies })).map((x) => [x.id, x]))
+    return json({
+      items: items.map((i) => {
+        const x = extra.get(i.id)
+        return { ...i, project: x?.project ?? null, costCenter: x?.costCenter ?? null, bank: x?.bank ?? null, bankVerification: x?.bankVerification ?? 'unverified', flags: x?.flags ?? { warning: 0, info: 0, receiptMismatch: 0 }, sla: x?.sla ?? { approvedAt: null, slaHours: 24, ageHours: null, over: false } }
+      }),
+      nextCursor: null,
+    })
   },
 })
 
@@ -238,7 +268,7 @@ export const approvalInboxEndpoint = v1({
 })
 
 /**
- * GET /lpj-queue[?company=] — US-21 LPJ verification list (Uang Muka "LPJ Diajukan" / "LPJ
+ * GET /lpj-queue[?company=] — US-21 LPJ verification list (Pengajuan Baru "LPJ Diajukan" / "LPJ
  * Terverifikasi") of the PTs where the caller is Finance / Direktur, with `company` refs (MC3-1).
  */
 export const lpjQueueEndpoint = v1({
@@ -413,10 +443,25 @@ export const voidTransferEndpoint = v1({
   },
 })
 
-// ---------------------------------------------------------------- T5 LPJ & settlement (Uang Muka)
+// ---------------------------------------------------------------- T5 LPJ & settlement (Pengajuan Baru)
 
 export const receiptsCompleteEndpoint = action('receipts-complete', EmptyBody, (req, id) => receiptsComplete(req, id))
-export const lpjSubmitEndpoint = action('lpj/submit', LpjSubmitBody, (req, id, b) => submitLpj(req, id, { usageNotes: b.usageNotes }))
+export const lpjSubmitEndpoint = action('lpj/submit', LpjSubmitBody, (req, id, b) => submitLpj(req, id, { usageNotes: b.usageNotes, photos: b.photos }))
+
+/** PUT /expense-requests/:id/lpj/photos — point 13: the requester's LPJ photo set while the LPJ is Draft / Revisi. */
+export const lpjPhotosEndpoint = v1({
+  path: '/expense-requests/:id/lpj/photos',
+  method: 'put',
+  body: LpjPhotosBody,
+  rateLimit: ACTION_LIMIT,
+  transactional: true,
+  idempotent: true,
+  handler: async ({ req, body, params }) => {
+    const id = idParam(params)
+    await setLpjPhotos(req, id, body.photos)
+    return ok(req, id)
+  },
+})
 export const lpjRevisionEndpoint = action('lpj/request-revision', RevisionBody, (req, id, b) => {
   req.context.auditReason = b.note
   return requestLpjRevision(req, id, b.note)
@@ -539,6 +584,22 @@ export const pdfEndpoint = v1({
   },
 })
 
+/**
+ * GET /bank-account-preview?request=&account=&reveal=1 (DRMS 10/10 8e) — destination account under
+ * the "Rekening tujuan" picker (draft) or of the submit snapshot: bank · holder · masked number; the
+ * full number only with reveal=1 for the people the detail DTO shows it to (domain/expense/bank-preview.ts).
+ */
+export const bankPreviewEndpoint = v1({
+  path: '/bank-account-preview',
+  method: 'get',
+  rateLimit: [60, 60_000],
+  handler: async ({ req }) => {
+    const q = BankPreviewQuery.safeParse(Object.fromEntries(req.searchParams.entries()))
+    if (!q.success) throw new HttpError(400, 'Bad Request', { errors: q.error.issues.map((i) => ({ path: i.path.join('.'), message: i.message })) })
+    return json(await bankPreview(req, { requestId: q.data.request, accountId: q.data.account, reveal: q.data.reveal === '1' }))
+  },
+})
+
 export const EXPENSE_ENDPOINTS = [
   listRequestsEndpoint,
   createRequestEndpoint,
@@ -568,11 +629,13 @@ export const EXPENSE_ENDPOINTS = [
   voidTransferEndpoint,
   receiptsCompleteEndpoint,
   lpjSubmitEndpoint,
+  lpjPhotosEndpoint,
   lpjRevisionEndpoint,
   lpjVerifyEndpoint,
   settleEndpoint,
   settlePrecheckEndpoint,
   settleReverseEndpoint,
   pdfEndpoint,
+  bankPreviewEndpoint,
 ]
 

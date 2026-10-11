@@ -369,8 +369,8 @@ export const SETTINGS = [
   },
   {
     key: 'nomor_pb_mulai',
-    label: 'Nomor urut Pengajuan Biaya (PB) pertama di sistem (Q-17: melanjutkan nomor manual, 229). Contoh hasil: 229/PB-DRMS/01/X/2026. Per PT bisa diganti di sheet Perusahaan (kolom nomor_pb_mulai).',
-    defaultValue: '229',
+    label: 'Nomor urut Pengajuan Biaya (PB) pertama di BULAN go-live (nomor PB direset tiap bulan mulai 1). Contoh hasil: PB/<kode PT>/2611/0001. Isi lebih dari 1 hanya bila bulan go-live melanjutkan nomor manual. Per PT bisa diganti di sheet Perusahaan (kolom nomor_pb_mulai).',
+    defaultValue: '1',
   },
   {
     key: 'tutup_periode_sebelum_golive',

@@ -12,11 +12,14 @@ import { contractsOf, fieldProjects, historyOf, mayCorrectIn, mayCreateIn, repor
 import { hasRoleAny } from '@/access/roles'
 import { withReqTransaction } from '@/lib/system-tx'
 import { DEFAULT_TZ } from '@/lib/time'
+import { AutoSubmit } from '@/admin/components/list/AutoSubmit'
+import { DEFAULT_PAGE_SIZE, PAGE_SIZES, parseListQuery } from '@/admin/list-query'
 
 import { BtnLink, dateParam, FIELD_CREATORS, FIELD_READERS, FieldFrame, fieldGate, FlagPills, History, idParam, MetaRows, one, OpenAction, PhotoGallery, segmentNum, spOf, UnitStatusPill } from './field-ui'
 import { ptView, PtChip } from './pt'
 import { Alert, dateId } from './progress-ui'
 import { Bento, Card, DashHead, DataTable, EmptyState, KpiRow, KpiTile, type Col } from './viz'
+import { DateInput } from '../components/DateInput'
 
 /**
  * FR1 "Laporan servis unit" (ADR 0020, plan A; mockups Android-Servis + Web-Timeline): list (filters
@@ -43,14 +46,16 @@ export async function FieldServiceList(props: AdminViewServerProps) {
     to: dateParam(sp.sampai),
     before: idParam(sp.sebelum),
   }
+  // DRMS 10/10 D8: text search + page size (shared list query; the cursor stays `sebelum`)
+  const lq = parseListQuery(props.searchParams)
   const d = await withReqTransaction(req, async () => {
-    const page = await listServiceReports(req, { projectId: q.project, unitId: q.unit, reporterId: q.reporter, status: q.status, from: q.from, to: q.to, limit: 25, after: q.before, companyIds: gate.companies })
+    const page = await listServiceReports(req, { projectId: q.project, unitId: q.unit, reporterId: q.reporter, status: q.status, from: q.from, to: q.to, limit: lq.per, after: q.before, companyIds: gate.companies, q: lq.q })
     const projects = await fieldProjects(req, ['kontrak_unit', 'aftersales'], gate.companies, { includeArchived: true })
     const units = await unitsOf(req, gate.companies)
     const reporters = await reportersOf(req, 'service-reports')
     return { page, projects, units, reporters, pt: await ptView(req) }
   })
-  const filtered = Boolean(q.project || q.unit || q.reporter || q.status || q.from || q.to)
+  const filtered = Boolean(q.project || q.unit || q.reporter || q.status || q.from || q.to || lq.q)
   const keep = (extra: Record<string, string>) => {
     const u = new URLSearchParams()
     if (q.project) u.set('project', String(q.project))
@@ -59,6 +64,8 @@ export async function FieldServiceList(props: AdminViewServerProps) {
     if (q.status) u.set('status', q.status)
     if (q.from) u.set('dari', q.from)
     if (q.to) u.set('sampai', q.to)
+    if (lq.q) u.set('q', lq.q)
+    if (lq.per !== DEFAULT_PAGE_SIZE) u.set('per', String(lq.per))
     for (const [k, v] of Object.entries(extra)) u.set(k, v)
     return `${listHref}?${u.toString()}`
   }
@@ -133,6 +140,10 @@ export async function FieldServiceList(props: AdminViewServerProps) {
         </div>
       </DashHead>
       <form className="pk-filter" method="get" action={listHref} role="search" aria-label="Filter laporan servis" data-pk-filter="laporan-servis">
+        <label className="pk-filter__search">
+          Cari
+          <input type="search" name="q" defaultValue={lq.q} placeholder="Nomor, keluhan, tindakan…" maxLength={100} autoComplete="off" data-pk-search="laporan-servis" />
+        </label>
         <label>
           Project
           <select name="project" defaultValue={q.project ? String(q.project) : ''}>
@@ -179,11 +190,21 @@ export async function FieldServiceList(props: AdminViewServerProps) {
         </label>
         <label>
           Dari
-          <input type="date" name="dari" defaultValue={q.from ?? ''} />
+          <DateInput type="date" name="dari" defaultValue={q.from ?? ''} />
         </label>
         <label>
           Sampai
-          <input type="date" name="sampai" defaultValue={q.to ?? ''} />
+          <DateInput type="date" name="sampai" defaultValue={q.to ?? ''} />
+        </label>
+        <label>
+          Per halaman
+          <select name="per" defaultValue={String(lq.per)} data-pk-page-size="laporan-servis">
+            {PAGE_SIZES.map((n) => (
+              <option key={n} value={n}>
+                {n}
+              </option>
+            ))}
+          </select>
         </label>
         <button type="submit" className="pk-kbtn primary">
           Terapkan
@@ -193,6 +214,7 @@ export async function FieldServiceList(props: AdminViewServerProps) {
             Reset
           </Link>
         ) : null}
+        <AutoSubmit />
       </form>
       <Bento label="Daftar laporan servis">
         <Card id="service-reports" title="Laporan" sub={`${d.page.items.length}${d.page.nextCursor ? '+' : ''} laporan${filtered ? ' (terfilter)' : ''}`}>

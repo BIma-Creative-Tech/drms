@@ -41,12 +41,13 @@ export const ImageTargets = z
 
 export const Capabilities = z
   .object({
-    approvalInbox: z.boolean().meta({ description: 'ADR 0013: holds pk-owner (label "Direktur") or pk-finance → show the approval inbox.' }),
+    approvalInbox: z.boolean().meta({ description: 'ADR 0013/0021: holds pk-owner (label "Direktur"), pk-finance or pk-pm (Persetujuan PM) → show the approval inbox.' }),
     teamMonitor: z.boolean().meta({ description: 'Holds pk-pm → team list/dashboard (monitoring only, no decisions).' }),
-    progressReportCreate: z.boolean().meta({ description: 'E4: holds pk-pm (team projects) or pk-owner (all) → may create progress reports.' }),
+    progressReportCreate: z.boolean().meta({ description: 'E4: holds pk-pm (team projects), pk-owner or pk-admin (all) → may create progress reports.' }),
     serviceReportCreate: z.boolean().meta({ description: 'FR1 (ADR 0020): field reports on for the PT (companies.fieldReportsEnabled) and holds pk-staff (assigned projects), pk-pm (team) or pk-owner → may create service reports on projects of kind kontrak_unit / aftersales.' }),
     unitTimesheetCreate: z.boolean().meta({ description: 'FR1: same rule → unit timesheets on projects of kind kontrak_unit.' }),
     aftersalesActivityCreate: z.boolean().meta({ description: 'FR1: same rule → aftersales activities on projects of kind aftersales.' }),
+    dailyReportCreate: z.boolean().meta({ description: 'P3: same rule → Laporan harian on projects of kind konstruksi.' }),
   })
   .meta({ id: 'Capabilities', description: 'UI hints for the APK (E1); the server guards stay authoritative.' })
 
@@ -83,6 +84,9 @@ export const Me = z
     id: z.number().int(),
     email: z.string(),
     name: z.string().nullable(),
+    displayName: z.string().min(1).meta({
+      description: 'DRMS 10/10 WA-14: label to greet/show the caller (never empty): users.name → employee name of the membership in a selected PT (lowest PT id first, then other memberships) → email local part → "Pengguna". `name` stays the stored account name.',
+    }),
     roles: z.array(RoleEnum).meta({ description: 'DEPRECATED (MC3, kept for mobile-v0.2.0): union of the roles over the SELECTED PTs. Use companies[].roles.' }),
     capabilities: Capabilities.meta({ description: 'DEPRECATED (MC3): derived from the top-level `roles` (union over the selected PTs). Use companies[].capabilities.' }),
     employee: EmployeeRef.nullable().meta({ description: 'DEPRECATED (MC3): employee of the PT `legacyCompanyId`. Use companies[].employee.' }),

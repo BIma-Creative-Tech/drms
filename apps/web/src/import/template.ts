@@ -89,7 +89,7 @@ export function buildWorkbook(content: WorkbookContent, opts: { sample?: boolean
   return writeXlsx(sheets)
 }
 
-/** Blank client template (standard banks/UoMs/categories pre-filled, PB start 229). */
+/** Blank client template (standard banks/UoMs/categories pre-filled, PB start 1 — monthly reset). */
 export function buildTemplate(): Uint8Array {
   return buildWorkbook({ settings: {}, rows: standardRows() })
 }

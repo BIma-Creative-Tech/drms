@@ -9,7 +9,7 @@ export const REQUEST_TYPES = ['advance', 'reimburse'] as const
 export type RequestType = (typeof REQUEST_TYPES)[number]
 
 export const REQUEST_TYPE_LABELS: Record<RequestType, string> = {
-  advance: 'Uang Muka',
+  advance: 'Pengajuan Baru',
   reimburse: 'Reimburse',
 }
 
@@ -35,10 +35,16 @@ export const REQUEST_STATUSES = [
 ] as const
 export type RequestStatus = (typeof REQUEST_STATUSES)[number]
 
+/**
+ * THE status wording (DRMS 10/10 integration, Lead review b) — select options, list cells, chips, the
+ * workflow panel, PDF, notifications and the APK fallback (apps/mobile request_status.dart) all read it.
+ * The waiting steps use the ADR 0021 wording (Staff → PM project → Direktur → Finance transfer); requests
+ * submitted under an older approval snapshot get LEGACY_WAITING_LABELS through timeline.ts requestStatusLabel.
+ */
 export const STATUS_LABELS: Record<RequestStatus, string> = {
   draft: 'Draft',
-  pending_ack: 'Menunggu Diketahui (Direktur)',
-  pending_approval: 'Menunggu Approval',
+  pending_ack: 'Menunggu persetujuan PM',
+  pending_approval: 'Menunggu persetujuan Direktur',
   approved: 'Disetujui',
   receipt_revision: 'Revisi Nota',
   receipts_verified: 'Nota Terverifikasi (Antri Transfer)',
@@ -52,7 +58,14 @@ export const STATUS_LABELS: Record<RequestStatus, string> = {
   cancelled: 'Dibatalkan',
 }
 
-/** Type-specific display label (Uang Muka "Disetujui (Antri Transfer)", US-19). */
+/** Waiting labels of requests whose approval snapshot is NOT the ADR 0021 PM → Direktur flow (ADR 0013 / earlier). */
+export const LEGACY_WAITING_LABELS = {
+  ackDirektur: 'Menunggu Diketahui (Direktur)',
+  ack: 'Menunggu Diketahui',
+  approval: 'Menunggu Approval',
+} as const
+
+/** Type-specific display label (Pengajuan Baru "Disetujui (Antri Transfer)", US-19). */
 export function statusLabel(type: RequestType, status: RequestStatus): string {
   if (type === 'advance' && status === 'approved') return 'Disetujui (Antri Transfer)'
   return STATUS_LABELS[status]
@@ -97,7 +110,7 @@ export type ApprovalPosition = (typeof APPROVAL_POSITIONS)[number]
 export const APPROVAL_DECISIONS = ['signed', 'acknowledged', 'approved', 'rejected'] as const
 export type ApprovalDecision = (typeof APPROVAL_DECISIONS)[number]
 
-export const FLAG_KINDS = ['amount_diff', 'date_after_request', 'date_too_old', 'date_out_of_period', 'uom_suspicious', 'duplicate'] as const
+export const FLAG_KINDS = ['amount_diff', 'date_after_request', 'date_too_old', 'date_out_of_period', 'uom_suspicious', 'duplicate', 'receipt_amount_mismatch', 'rap_over_budget'] as const
 export type FlagKind = (typeof FLAG_KINDS)[number]
 
 export const FLAG_LABELS: Record<FlagKind, string> = {
@@ -107,6 +120,10 @@ export const FLAG_LABELS: Record<FlagKind, string> = {
   date_out_of_period: 'Tanggal nota di luar periode kegiatan (lama)',
   uom_suspicious: 'Satuan tidak wajar',
   duplicate: 'Nota ganda',
+  // D3 (DRMS 10/10): "Nominal sesuai nota" of a line ≠ its total (qty × harga satuan) — awareness for Finance
+  receipt_amount_mismatch: 'Selisih nota',
+  // D4 (DRMS 10/10): the line's RAP item is (or would be) above its planned amount — warning for PM / Direktur, not blocking
+  rap_over_budget: 'Melebihi RAP',
 }
 
 export type FlagLevel = 'info' | 'warning'
@@ -129,7 +146,7 @@ export function addDays(date: string, days: number): string {
 }
 
 /**
- * US-19: requests ready to be transferred — Uang Muka "Disetujui (Antri Transfer)" + Reimburse "Nota
+ * US-19: requests ready to be transferred — Pengajuan Baru "Disetujui (Antri Transfer)" + Reimburse "Nota
  * Terverifikasi". ONE definition for the view title, the nav badge and the API count (S3e, S-07:
  * the badge used to add Reimburse still waiting for receipt verification).
  */

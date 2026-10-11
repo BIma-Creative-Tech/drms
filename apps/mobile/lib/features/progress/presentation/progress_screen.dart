@@ -227,7 +227,7 @@ class _ReportCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               if (r.photos.isNotEmpty) ...[
-                ServerPhotoThumb(photoId: r.photos.first.id, size: 64),
+                ServerPhotoThumb(photoId: r.photos.first.id, size: 64, group: [for (final p in r.photos) p.id]),
                 const SizedBox(width: 12),
               ],
               Expanded(

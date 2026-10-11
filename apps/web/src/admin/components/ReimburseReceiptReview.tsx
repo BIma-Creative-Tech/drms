@@ -148,7 +148,7 @@ function RequestReview({ d }: { d: Detail }) {
                         <tr key={r.id} data-pk-receipt={r.id}>
                           <td style={td}>
                             {r.imageId ? (
-                              <a href={`/api/v1/media/receipts/${r.imageId}/file`} target="_blank" rel="noopener noreferrer">
+                              <a href={`/api/v1/media/receipts/${r.imageId}/file`} target="_blank" rel="noopener noreferrer" data-pk-lightbox={`receipts-${d.id}`} data-pk-lightbox-title={`Nota ${r.receiptNo ?? r.id} · baris ${l.no} · ${rp(r.amount)}`}>
                                 {/* eslint-disable-next-line @next/next/no-img-element -- authenticated API file, not a static asset */}
                                 <img src={`/api/v1/media/receipts/${r.imageId}/file?variant=thumb`} alt={`Nota ${r.receiptNo ?? r.id}`} style={{ width: 80, height: 80, objectFit: 'cover' }} />
                               </a>

@@ -27,7 +27,7 @@ async function file(path: string, user: FlowUser | null) {
 
 beforeAll(async () => {
   w = await makeWorld('FI')
-  // Uang Muka of Staff A through approval and transfer; receipt uploaded after the transfer.
+  // Pengajuan Baru of Staff A through approval and transfer; receipt uploaded after the transfer.
   const c = await api('POST', E, w.users.staffA, draftBody(w))
   requestId = c.body.id
   await api('POST', `${E}/${requestId}/submit`, w.users.staffA, {})

@@ -2,11 +2,13 @@ import { sql } from '@payloadcms/db-postgres'
 import type { PayloadRequest } from 'payload'
 
 import type { Role } from '@/access/roles'
+import { docLink } from '@/admin/doc-links'
 import { REQUEST_STATUSES, REQUEST_TYPE_LABELS, REQUEST_TYPES, statusLabel, type RequestStatus, type RequestType } from '@/domain/expense/types'
 
 import { absensiReport } from './attendance-report'
 import { rekapAftersales, rekapTimesheetKontrak } from './field-reports'
 import { projectProgressVsBudget } from './progress'
+import { slaTransferReport } from './sla-report'
 import { auditLogCount, auditLogPage, AUDIT_PAGE, AUDIT_SOURCES, parseAuditFilter, type AuditFilter } from './audit-log'
 import {
   cashBalances,
@@ -57,8 +59,13 @@ import {
 export type ColType = 'text' | 'money' | 'int' | 'date' | 'datetime' | 'pct'
 export type Column = { key: string; label: string; type: ColType; primary?: boolean; width?: number }
 export type Cell = string | number | null
-/** `company` = PT of the row (MC2): drives the PT column + "Subtotal per PT" when the scope spans > 1 PT. */
-export type TableRow = { cells: Record<string, Cell>; href?: string; company?: number | null }
+/**
+ * `company` = PT of the row (MC2): drives the PT column + "Subtotal per PT" when the scope spans > 1 PT.
+ * `href` = link of the row's first data column (not the PT column); `links` = per-cell links (cell key →
+ * detail URL, DRMS 10/10 12b: every document number in a report opens its document). Screen only — the
+ * JSON / CSV / XLSX / PDF exports carry the cells unchanged.
+ */
+export type TableRow = { cells: Record<string, Cell>; href?: string; links?: Partial<Record<string, string>>; company?: number | null }
 export type Table = { key: string; title: string; columns: Column[]; rows: TableRow[]; totals?: Record<string, Cell | undefined>; empty?: string }
 export type ReportResult = {
   main: Table
@@ -430,6 +437,7 @@ const bukuKas: ReportDef = {
             status: x.status === 'void' ? `void${x.void_reason ? `: ${x.void_reason}` : ''}` : 'posted',
           },
           href: x.request_id ? `/admin/collections/expense-requests/${x.request_id}` : `/admin/collections/cash-entries/${x.id}`,
+          links: { ...docLink('nomor', 'cash_entry', x.id), ...(x.request_id ? docLink('pengajuan', 'expense_request', x.request_id) : {}) },
           company: num(x.company_id),
         })),
         totals: { tanggal: 'TOTAL (semua halaman)', masuk: T('tin'), keluar: T('tout') },
@@ -521,7 +529,7 @@ const pengeluaranKategori: ReportDef = {
         'Kategori dihitung dari baris item pengajuan (US-25). "Pengajuan" = banyak pengajuan berbeda; satu pengajuan bisa muncul di beberapa kategori.',
         basis === 'dicairkan'
           ? 'Dicairkan: pengajuan yang ditransfer dalam rentang (tanggal transfer). Selisih LPJ (pengembalian/kekurangan) tampil di dasar Realisasi, bukan di sini.'
-          : 'Realisasi: Uang Muka = nota valid saat LPJ diverifikasi; Reimburse = total baris saat nota diverifikasi (tanggal verifikasi WITA).',
+          : 'Realisasi: Pengajuan Baru = nota valid saat LPJ diverifikasi; Reimburse = total baris saat nota diverifikasi (tanggal verifikasi WITA).',
         manualShown ? 'Kas manual = kas keluar manual (posted, bukan jurnal balik) per tanggal transaksi.' : 'Tanpa kas manual (cakupan tim PM atau filter jenis pengajuan).',
       ],
       next: null,
@@ -715,6 +723,7 @@ const rekapPengajuan: ReportDef = {
             flag: x.openFlags,
           },
           href: `/admin/collections/expense-requests/${x.id}`,
+          links: docLink('nomor', 'expense_request', x.id),
           company: x.companyId,
         })),
         totals: { nomor: `TOTAL ${summary.total.count} pengajuan`, grandTotal: summary.total.sum },
@@ -780,7 +789,7 @@ const kelengkapan: ReportDef = {
   code: 'kelengkapan',
   title: 'Kelengkapan Nota/LPJ',
   kpi: 'K-12',
-  description: 'Uang muka belum LPJ (dan yang terlambat), LPJ menunggu, nota reimburse menunggu, flag peringatan terbuka.',
+  description: 'Pengajuan baru belum LPJ (dan yang terlambat), LPJ menunggu, nota reimburse menunggu, flag peringatan terbuka.',
   roles: ['pk-finance', 'pk-owner', 'pk-pm'],
   formats: ['csv', 'xlsx'],
   paged: false,
@@ -793,7 +802,7 @@ const kelengkapan: ReportDef = {
     return {
       main: {
         key: 'belum-lpj',
-        title: `Uang muka belum LPJ (terlambat bila > ${ctx.lpjDueDays} hari sejak transfer pertama)`,
+        title: `Pengajuan baru belum LPJ (terlambat bila > ${ctx.lpjDueDays} hari sejak transfer pertama)`,
         columns: [
           { key: 'nomor', label: 'Nomor', type: 'text', primary: true },
           { key: 'judul', label: 'Judul', type: 'text', width: 36 },
@@ -818,10 +827,11 @@ const kelengkapan: ReportDef = {
             terlambat: a.overdue ? 'Ya' : 'Tidak',
           },
           href: `/admin/collections/expense-requests/${a.id}`,
+          links: docLink('nomor', 'expense_request', a.id),
           company: a.companyId,
         })),
         totals: { nomor: 'TOTAL', nominal: s.withoutLpj.sum },
-        empty: 'Semua uang muka sudah ber-LPJ. ✓',
+        empty: 'Semua pengajuan baru sudah ber-LPJ. ✓',
       },
       extra: [
         {
@@ -833,19 +843,19 @@ const kelengkapan: ReportDef = {
             { key: 'nominal', label: 'Nominal (Rp)', type: 'money' },
           ],
           rows: [
-            { cells: { indikator: 'K-12a Uang muka belum LPJ', jumlah: s.withoutLpj.count, nominal: s.withoutLpj.sum } },
+            { cells: { indikator: 'K-12a Pengajuan baru belum LPJ', jumlah: s.withoutLpj.count, nominal: s.withoutLpj.sum } },
             { cells: { indikator: `K-12b LPJ terlambat (> ${ctx.lpjDueDays} hari)`, jumlah: s.overdue.count, nominal: s.overdue.sum } },
             { cells: { indikator: 'K-12c LPJ menunggu verifikasi', jumlah: s.lpjToVerify, nominal: null }, href: '/admin/verifikasi-lpj' },
             { cells: { indikator: 'K-12d LPJ menunggu penyelesaian selisih (pengembalian)', jumlah: s.lpjToSettle.count, nominal: s.lpjToSettle.refund } },
             { cells: { indikator: 'K-12d … kekurangan yang harus ditransfer', jumlah: null, nominal: s.lpjToSettle.shortfall } },
             { cells: { indikator: 'K-12e Nota reimburse menunggu verifikasi', jumlah: s.reimburseToVerify, nominal: null }, href: '/admin/antrian-transfer' },
             { cells: { indikator: 'K-12f Flag peringatan terbuka', jumlah: s.openWarnings, nominal: null } },
-            { cells: { indikator: `K-12g Uang muka ditransfer ${fmtDate(r.from)}–${fmtDate(r.to)} yang sudah LPJ`, jumlah: s.ratio.done, nominal: null } },
-            { cells: { indikator: `K-12g … dari total uang muka ditransfer`, jumlah: s.ratio.total, nominal: null } },
+            { cells: { indikator: `K-12g Pengajuan baru ditransfer ${fmtDate(r.from)}–${fmtDate(r.to)} yang sudah LPJ`, jumlah: s.ratio.done, nominal: null } },
+            { cells: { indikator: `K-12g … dari total pengajuan baru ditransfer`, jumlah: s.ratio.total, nominal: null } },
           ],
         },
       ],
-      notes: ['Umur dihitung dari tanggal transfer uang muka pertama (hari kalender, WITA). Batas diatur di Setting perusahaan › Batas LPJ.'],
+      notes: ['Umur dihitung dari tanggal transfer pengajuan baru pertama (hari kalender, WITA). Batas diatur di Setting perusahaan › Batas LPJ.'],
       next: null,
       count: s.rows.length,
     }
@@ -978,6 +988,7 @@ const auditLog: ReportDef = {
             requestId: x.requestId ?? '',
           },
           href: x.docType === 'expense_request' && x.docId && /^\d+$/.test(x.docId) ? `/admin/collections/expense-requests/${x.docId}/riwayat` : undefined,
+          links: docLink('dokumen', x.docType, x.docId),
           company: x.companyId,
         })),
         empty: 'Tidak ada aktivitas untuk filter ini.',
@@ -1107,7 +1118,7 @@ function withCompanies(def: ReportDef): ReportDef {
   }
 }
 
-export const REPORTS: ReportDef[] = [rekapKas, bukuKas, pengeluaranKategori, anggaranProject, rekapPengajuan, kelengkapan, biayaKendaraan, absensiReport, rekapTimesheetKontrak, rekapAftersales].map(withCompanies)
+export const REPORTS: ReportDef[] = [rekapKas, bukuKas, pengeluaranKategori, anggaranProject, rekapPengajuan, kelengkapan, slaTransferReport, biayaKendaraan, absensiReport, rekapTimesheetKontrak, rekapAftersales].map(withCompanies)
 export const AUDIT_REPORT = withCompanies(auditLog)
 export const ALL_REPORTS: ReportDef[] = [...REPORTS, AUDIT_REPORT]
 export const REPORT_CODES = ALL_REPORTS.map((r) => r.code)

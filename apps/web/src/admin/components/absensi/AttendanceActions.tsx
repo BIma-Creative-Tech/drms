@@ -7,6 +7,8 @@ import { geofenceError } from '@/domain/attendance/calendar'
 import { errorLine } from '@/lib/field-labels'
 
 import { newIdemKey, sendJson, uploadSelfie } from '../kas/client'
+import { CAMERA_STYLE, CameraCapture } from './CameraCapture'
+import { DateInput } from '../DateInput'
 
 /**
  * E6 web (S2) client actions of the attendance views. Same pattern as the Kas dialogs (native modal
@@ -200,8 +202,11 @@ export function SelfieButton({ attendanceId, label, available, own }: { attendan
           {!own ? <p className="desc">Data pribadi (UU PDP). Membuka selfie orang lain tercatat di audit log.</p> : null}
           <div className="pk-selfie-box">
             {shown && !failed ? (
-              // eslint-disable-next-line @next/next/no-img-element -- private, audited, no-store image from /api/v1 (next/image would cache it)
-              <img src={`/api/v1/attendance/${attendanceId}/selfie`} alt={`Selfie absensi ${label}`} onError={() => setFailed(true)} referrerPolicy="no-referrer" data-pk-selfie-img />
+              // DRMS 10/10 12c: the shared lightbox (zoom) on top of this dialog; same audited endpoint
+              <a href={`/api/v1/attendance/${attendanceId}/selfie`} target="_blank" rel="noopener noreferrer" data-pk-lightbox={`selfie-${attendanceId}`} data-pk-lightbox-title={`Selfie · ${label}`} title="Perbesar selfie">
+                {/* eslint-disable-next-line @next/next/no-img-element -- private, audited, no-store image from /api/v1 (next/image would cache it) */}
+                <img src={`/api/v1/attendance/${attendanceId}/selfie`} alt={`Selfie absensi ${label}`} onError={() => setFailed(true)} referrerPolicy="no-referrer" data-pk-selfie-img />
+              </a>
             ) : null}
             {failed ? <p className="pk-kerr">Selfie tidak tersedia (mungkin sudah melewati masa retensi).</p> : null}
           </div>
@@ -360,7 +365,7 @@ export function HolidayAdd({ year }: { year: string }) {
     >
       <div className="pk-fld">
         <label htmlFor={`${uid}-d`}>Tanggal</label>
-        <input id={`${uid}-d`} type="date" value={date} min={`${year}-01-01`} max={`${year}-12-31`} onChange={(e) => setDate(e.target.value)} required aria-invalid={err && !date ? true : undefined} />
+        <DateInput id={`${uid}-d`} type="date" value={date} min={`${year}-01-01`} max={`${year}-12-31`} onChange={(e) => setDate(e.target.value)} required aria-invalid={err && !date ? true : undefined} />
       </div>
       <div className="pk-fld grow">
         <label htmlFor={`${uid}-n`}>Keterangan</label>
@@ -463,7 +468,9 @@ function getPosition(): Promise<GeolocationPosition> {
  */
 export function SelfCheckForm({ locations, privacyBlocked }: { locations: SelfCheckLocation[]; privacyBlocked: boolean }) {
   const router = useRouter()
-  const fileRef = useRef<HTMLInputElement>(null)
+  // item 14 (DRMS 10/10): selfie from the live front camera only (CameraCapture), no file picker
+  const [photo, setPhoto] = useState<Blob | null>(null)
+  const [camKey, setCamKey] = useState(0)
   const [locKey, setLocKey] = useState(locations[0] ? `${locations[0].type}:${locations[0].id}` : '')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -474,8 +481,8 @@ export function SelfCheckForm({ locations, privacyBlocked }: { locations: SelfCh
     e.preventDefault()
     setError(null)
     if (!loc || !action) return
-    const file = fileRef.current?.files?.[0]
-    if (!file) return setError('Ambil foto selfie dulu.')
+    if (!photo) return setError('Ambil foto selfie dengan kamera dulu.')
+    const file = new File([photo], 'selfie.jpg', { type: 'image/jpeg' })
     setBusy(true)
     try {
       const pos = await getPosition()
@@ -489,7 +496,8 @@ export function SelfCheckForm({ locations, privacyBlocked }: { locations: SelfCh
       }
       const r = await sendJson('POST', `/api/v1/attendance/${action === 'check_in' ? 'check-in' : 'check-out'}`, body)
       if (!r.ok) return setError(r.error ?? 'Gagal mengirim absensi.')
-      if (fileRef.current) fileRef.current.value = ''
+      setPhoto(null)
+      setCamKey((k) => k + 1)
       router.refresh()
     } catch (err) {
       setError((err as Error).message || 'Gagal mengirim absensi.')
@@ -529,9 +537,12 @@ export function SelfCheckForm({ locations, privacyBlocked }: { locations: SelfCh
         })}
       </fieldset>
       <div className="pk-fld">
-        <label htmlFor="self-check-selfie">Foto selfie</label>
-        <input id="self-check-selfie" ref={fileRef} type="file" accept="image/*" capture="user" disabled={busy || !action} />
-        <p className="help">Di HP kamera depan langsung terbuka. Lokasi GPS diambil saat menekan tombol.</p>
+        <span className="lbl" id="self-check-selfie">
+          Foto selfie
+        </span>
+        <CameraCapture key={camKey} disabled={busy || !action} onChange={setPhoto} />
+        <p className="help">Hanya kamera langsung (bukan galeri). Server membubuhkan tanggal, jam, dan lokasi pada foto. Lokasi GPS diambil saat menekan tombol.</p>
+        <style>{CAMERA_STYLE}</style>
       </div>
       <button type="submit" className="pk-kbtn primary pk-sc-go" disabled={busy || !action} data-pk-action={action ?? 'none'}>
         {busy ? 'Mengirim…' : action === 'check_in' ? 'Absen Masuk' : action === 'check_out' ? 'Absen Pulang' : 'Sudah selesai hari ini'}

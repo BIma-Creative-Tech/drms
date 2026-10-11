@@ -53,6 +53,13 @@ class LocalLines extends Table {
   IntColumn get uomId => integer().nullable()();
   IntColumn get unitPrice => integer().nullable()();
   IntColumn get total => integer().nullable()();
+
+  /// Schema v7 (DRMS 10/10 D3): "Nominal sesuai nota", nullable. `total` is qty × unit price from v7 on.
+  IntColumn get receiptAmount => integer().nullable()();
+
+  /// Schema v8 (DRMS 10/10 D4): RAP item of the line, nullable. Lines written before v8 keep NULL and must pick
+  /// one before the draft can be submitted.
+  IntColumn get rapItemId => integer().nullable()();
   IntColumn get categoryId => integer().nullable()();
   IntColumn get vehicleId => integer().nullable()();
   TextColumn get notes => text().nullable()();
@@ -154,7 +161,7 @@ class LocalFieldReports extends Table {
   TextColumn get userSub => text()();
   IntColumn get companyId => integer().nullable()();
 
-  /// service_report | unit_timesheet | aftersales_activity
+  /// service_report | unit_timesheet | aftersales_activity | daily_report (v6)
   TextColumn get reportType => text()();
   IntColumn get projectId => integer()();
   TextColumn get projectLabel => text().withDefault(const Constant(''))();
@@ -292,6 +299,48 @@ class FieldRecentTimesheets extends Table {
   Set<Column<Object>> get primaryKey => {userSub, id};
 }
 
+/// P3 cache of `GET /projects/{id}/rap` items (konstruksi): code, stage, kind, uom, volume and realisation for
+/// the daily-report pickers WITHOUT unit prices (never stored on the phone).
+@DataClassName('FieldRapItemRow')
+class FieldRapItems extends Table {
+  TextColumn get userSub => text()();
+  IntColumn get id => integer()();
+  IntColumn get companyId => integer()();
+  IntColumn get projectId => integer()();
+  TextColumn get code => text()();
+  TextColumn get description => text().withDefault(const Constant(''))();
+
+  /// pekerjaan | material
+  TextColumn get kind => text()();
+  TextColumn get uom => text().withDefault(const Constant(''))();
+  TextColumn get stageName => text().withDefault(const Constant(''))();
+  RealColumn get volume => real().withDefault(const Constant(0))();
+  RealColumn get realised => real().withDefault(const Constant(0))();
+  RealColumn get received => real().withDefault(const Constant(0))();
+  RealColumn get used => real().withDefault(const Constant(0))();
+  IntColumn get sortOrder => integer().withDefault(const Constant(0))();
+  BoolColumn get active => boolean().withDefault(const Constant(true))();
+
+  @override
+  Set<Column<Object>> get primaryKey => {userSub, id};
+}
+
+/// P3 cache of the manpower / equipment types of a PT (`resourceTypes` of `GET /projects/{id}/rap`).
+@DataClassName('FieldResourceTypeRow')
+class FieldResourceTypes extends Table {
+  TextColumn get userSub => text()();
+  IntColumn get id => integer()();
+  IntColumn get companyId => integer()();
+
+  /// tenaga | alat
+  TextColumn get kind => text()();
+  TextColumn get code => text().withDefault(const Constant(''))();
+  TextColumn get name => text().withDefault(const Constant(''))();
+
+  @override
+  Set<Column<Object>> get primaryKey => {userSub, id};
+}
+
 /// Offline outbox (`POST /api/v1/sync/batch` items). `opUuid` = item `client_uuid` = idempotency key.
 class Outbox extends Table {
   TextColumn get opUuid => text()();
@@ -347,13 +396,16 @@ class KvEntries extends Table {
     FieldOpenPos,
     FieldClients,
     FieldRecentTimesheets,
+    // v6 (P3 konstruksi daily reports)
+    FieldRapItems,
+    FieldResourceTypes,
   ],
 )
 class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
 
   @override
-  int get schemaVersion => 5;
+  int get schemaVersion => 8;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -381,6 +433,18 @@ class AppDatabase extends _$AppDatabase {
         await m.createTable(fieldClients);
         await m.createTable(fieldRecentTimesheets);
       }
+      // v6 (P3 konstruksi): RAP items + resource types caches of the daily report. Additive only; daily reports
+      // themselves live in local_field_reports (report_type `daily_report`, content_json).
+      if (from < 6) {
+        await m.createTable(fieldRapItems);
+        await m.createTable(fieldResourceTypes);
+      }
+      // v7 (DRMS 10/10 D3): "Nominal sesuai nota" per line, nullable. Existing lines keep their total; a line
+      // without a unit price is completed in the line editor before it can be submitted.
+      if (from < 7) await m.addColumn(localLines, localLines.receiptAmount);
+      // v8 (DRMS 10/10 D4): RAP item per line, nullable. Existing lines keep NULL — the editor asks for the item
+      // ("Pilih item RAP") and submit stays blocked until every line has one.
+      if (from < 8) await m.addColumn(localLines, localLines.rapItemId);
     },
     beforeOpen: (details) async {
       await customStatement('PRAGMA foreign_keys = ON');

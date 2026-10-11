@@ -80,6 +80,7 @@ class FieldService {
           FieldReportType.serviceReport => const ServiceContent(),
           FieldReportType.unitTimesheet => const TimesheetContent(),
           FieldReportType.aftersalesActivity => const ActivityContent(),
+          FieldReportType.dailyReport => const DailyContent(),
         },
   );
 
@@ -188,7 +189,8 @@ class FieldService {
   });
 
   /// Refreshes the offline caches of the user's field projects: units (delta), contract units (no rates),
-  /// recent timesheets (HM prefill), open POs (no value) and the customers of the aftersales picker. Customers
+  /// recent timesheets (HM prefill), open POs (no value), the customers of the aftersales picker and (P3
+  /// konstruksi) the RAP items without prices + the PT's manpower / equipment types. Customers
   /// come from the `clients` master of each PT (refreshed here with the other masters of [membershipIds], per PT
   /// with ETag / version like every master); customers seen in units / POs / activities are only merged in (they
   /// are the whole list when the PT's master has none, e.g. a server without the type). A project the server
@@ -204,6 +206,13 @@ class FieldService {
     try {
       for (final p in projects) {
         try {
+          if (p.kind == ProjectKind.konstruksi) {
+            // P3: no units — the RAP items (no prices) and the PT's manpower / equipment types
+            final company = p.companyId ?? 0;
+            final rap = await api.rap(p.id, companyId: company);
+            await repo.putRap(sub, p.id, company, rap.items, rap.resources);
+            continue;
+          }
           final since = await repo.unitsSince(sub, p.id);
           final u = await api.units(projectId: p.id, updatedSince: since);
           await repo.putUnits(sub, u.units);

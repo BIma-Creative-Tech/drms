@@ -7,6 +7,7 @@ import { fmtNum } from '@/domain/field/views'
 
 import { fieldErrors, newIdemKey, sendJson } from '../kas/client'
 import { Choice, decOut, DecimalField, LinesEditor, linesOut, PhotoPicker, usePhotos, type LineDraft } from './parts'
+import { DateInput } from '../DateInput'
 
 /**
  * FR1 web input "Laporan servis unit" (plan A; same fields as the APK mockup Android-Servis): project
@@ -194,7 +195,7 @@ export function ServiceReportForm({ projects, units, unitsByProject, today, minD
             <label htmlFor={id('date')}>
               Tanggal<span className="req" aria-hidden>*</span>
             </label>
-            <input id={id('date')} type="date" value={date} min={minDate} max={today} onChange={(e) => setDate(e.target.value)} aria-invalid={err('reportDate') ? true : undefined} aria-describedby={desc('reportDate')} />
+            <DateInput id={id('date')} type="date" value={date} min={minDate} max={today} onChange={(e) => setDate(e.target.value)} aria-invalid={err('reportDate') ? true : undefined} aria-describedby={desc('reportDate')} />
             {errEl('reportDate')}
           </div>
           <DecimalField

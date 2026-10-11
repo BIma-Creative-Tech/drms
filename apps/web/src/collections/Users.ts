@@ -168,6 +168,14 @@ export const Users: CollectionConfig = withAudit(
             'PNG tanda tangan Anda (latar putih/transparan). Dipakai otomatis saat mengirim/menyetujui pengajuan. Klik "Buat Baru" untuk mengunggah, lalu Simpan.',
         },
       },
+      // Owner decision 2026-10-10: read-only overview "Karyawan per PT" (memberships → employee, "Buka" /
+      // "Buat karyawan"); the link is edited on the employee form ("Akun pengguna") or in Akses PT.
+      {
+        name: 'employeeLinks',
+        type: 'ui',
+        label: 'Karyawan per PT',
+        admin: { components: { Field: '@/admin/components/users/EmployeeLinksPanel#EmployeeLinksPanel' } },
+      },
       {
         name: 'keycloakSub',
         type: 'text',

@@ -5,17 +5,22 @@ import { hasRole, relId } from '@/access/roles'
 import { voidableTransfers } from '@/domain/cash/book'
 import { transferQueue } from '@/domain/expense/queues'
 import { approvedByCaller } from '@/domain/expense/transfers'
+import { REQUEST_TYPE_LABELS, REQUEST_TYPES } from '@/domain/expense/types'
 import { withReqTransaction } from '@/lib/system-tx'
 
+import { docHref } from '../doc-links'
 import { ReasonAction } from '../components/kas/ReasonAction'
 import { KAS_STYLE } from '../components/kas/style'
+import { ListToolbar, Pager } from '../components/list/ListToolbar'
+import { matchesQuery, paginate, parseListQuery } from '../list-query'
 import { MoneyForm } from '../components/MoneyForm'
 import { ReimburseReceiptReview, loadReimburseReview } from '../components/ReimburseReceiptReview'
+import { SlaAgeBadge } from '../components/SlaAgeBadge'
 import { accountsOf, itemCompany, PtChip, PtScopeNote, ptView } from './pt'
 import { Empty, Forbidden, Shell, TableScroll, allowed, badge, docLink, num, rp, table, td, th } from './shared'
 
 /**
- * "Antrian Transfer" (M05, US-19/US-20): Uang Muka "Disetujui (Antri Transfer)" and Reimburse
+ * "Antrian Transfer" (M05, US-19/US-20): Pengajuan Baru "Disetujui (Antri Transfer)" and Reimburse
  * "Nota Terverifikasi (Antri Transfer)", sorted by needed date, open flags shown. Finance records
  * the transfer (cash account, bank reference, proof); the amount is the approved amount (G3).
  */
@@ -23,26 +28,54 @@ export async function TransferQueue(props: AdminViewServerProps) {
   const req = props.initPageResult.req
   if (!allowed(req, ['pk-finance', 'pk-owner'])) return <Forbidden props={props} title="Antrian Transfer" roles={['pk-finance', 'pk-owner']} />
   const pt = await ptView(req)
-  const { items, review, done, mine } = await withReqTransaction(req, async () => {
-    const q = await transferQueue(req)
-    const done = await voidableTransfers(req)
+  // DRMS 10/10 D8: search / PT / jenis + pagination of both tables (URL state; `hal2` = recorded transfers)
+  const lq = parseListQuery(props.searchParams, ['pt', 'jenis'])
+  const ptId = pt.multi && pt.selected.includes(Number(lq.filters.pt)) ? Number(lq.filters.pt) : undefined
+  const { all, page, items, review, done, donePage, mine } = await withReqTransaction(req, async () => {
+    const q = await transferQueue(req, ptId ? { companyIds: [ptId] } : undefined)
+    const page = paginate(
+      q.filter((r) => (!lq.filters.jenis || r.type === lq.filters.jenis) && matchesQuery([r.docNo, r.title, r.scope, r.statusLabel, r.bank?.bankName, r.bank?.accountHolder], lq.q)),
+      lq.page,
+      lq.per,
+    )
+    const doneAll = (await voidableTransfers(req)).filter(
+      (t) => (!ptId || t.companyId === ptId) && (!lq.filters.jenis || t.requestType === lq.filters.jenis) && matchesQuery([t.transferNo, t.requestNo, t.requestTitle], lq.q),
+    )
+    const donePage = paginate(doneAll, parseListQuery(props.searchParams, [], { pageKey: 'hal2' }).page, lq.per)
     // MC2: every queue item carries its PT (`company`, mc2-contract §3) — it also picks the cash
     // accounts offered in each transfer form (never an account of another PT).
-    return { items: q, review: await loadReimburseReview(req), done, mine: await approvedByCaller(req, q.map((x) => x.id)) }
+    return { all: q.length, page, items: page.items, review: await loadReimburseReview(req), done: donePage.items, donePage, mine: await approvedByCaller(req, page.items.map((x) => x.id)) }
   })
   const canTransfer = allowed(req, ['pk-finance'])
+  // D2: cost centers of the PTs (Finance reads all of its PTs) — the transfer form's mandatory picker
+  const costCenters = canTransfer
+    ? (
+        await req.payload.find({ collection: 'cost-centers', where: { active: { not_equals: false } }, depth: 0, pagination: false, sort: 'code', select: { code: true, name: true, company: true }, user: req.user, overrideAccess: false, req })
+      ).docs.map((c) => ({ id: c.id as number, label: `${String((c as { code?: string }).code ?? '')} ${String((c as { name?: string }).name ?? '')}`.trim(), company: relId((c as { company?: unknown }).company) ?? null }))
+    : []
   const accounts = canTransfer
     ? (
         await req.payload.find({ collection: 'cash-accounts', where: { active: { not_equals: false } }, depth: 0, pagination: false, sort: 'name', select: { name: true, company: true }, user: req.user, overrideAccess: false, req })
       ).docs.map((a) => ({ id: a.id as number, name: a.name as string, company: relId((a as { company?: unknown }).company) ?? null }))
     : []
   return (
-    <Shell props={props} title={`Antrian Transfer (${items.length})`}>
+    <Shell props={props} title={`Antrian Transfer (${all})`}>
       <PtScopeNote pt={pt} />
       <ReimburseReceiptReview data={review} />
-      <h2>Siap ditransfer ({items.length})</h2>
+      <h2>Siap ditransfer ({page.total})</h2>
+      <ListToolbar
+        id="antrian-transfer"
+        action="/admin/antrian-transfer"
+        query={lq}
+        label="Cari dan saring antrian transfer"
+        search={{ placeholder: 'Nomor, judul, pemilik rekening…' }}
+        filters={[
+          pt.multi ? { key: 'pt', label: 'PT', all: 'Semua PT', options: pt.selected.map((id) => ({ value: String(id), label: pt.ref(id)?.shortCode ?? `#${id}` })) } : null,
+          { key: 'jenis', label: 'Jenis', options: REQUEST_TYPES.map((t) => ({ value: t, label: REQUEST_TYPE_LABELS[t] })) },
+        ]}
+      />
       {items.length === 0 ? (
-        <Empty text="Antrian transfer kosong." />
+        <Empty text={all === 0 ? 'Antrian transfer kosong.' : 'Tidak ada pengajuan yang cocok dengan pencarian / filter.'} />
       ) : (
         // Wide (6 columns + the transfer form): stacked cards ≤ 640px (custom.scss .pk-rtable), one
         // <tbody> per item so the item row and its form stay one card; a plain table on wider screens.
@@ -68,11 +101,19 @@ export async function TransferQueue(props: AdminViewServerProps) {
                 ) : null}
                 <td style={td} data-label="Dibutuhkan">
                   {r.neededDate ?? '—'}
+                  {/* item 11: age since the final approval vs the PT's transfer SLA */}
+                  <div style={{ marginTop: 2 }}>
+                    <SlaAgeBadge sla={r.sla} />
+                  </div>
                 </td>
                 <td style={td} data-label="Nomor / Judul" data-span="full" data-primary>
                   {docLink(r.id, r.docNo ?? `#${r.id}`)}
                   <div>{r.title}</div>
                   <div style={{ fontSize: 12 }}>{r.scope}</div>
+                  {/* D2: cost center proposed to Finance (project default) */}
+                  <div style={{ fontSize: 12, color: 'var(--pk-muted-fg)' }} data-pk-queue-cost-center={r.id}>
+                    Pusat biaya: {r.costCenter ? `${r.costCenter.code} ${r.costCenter.name}`.trim() : 'dipilih Finance saat transfer'}
+                  </div>
                 </td>
                 <td style={td} data-label="Jenis">
                   {r.statusLabel}
@@ -90,7 +131,17 @@ export async function TransferQueue(props: AdminViewServerProps) {
                   {rp(r.approvedAmount)}
                 </td>
                 <td style={td} data-label="Flag terbuka">
-                  {r.flags.warning + r.flags.info > 0 ? <span style={badge(r.flags.warning ? 'warn' : 'muted')}>{r.flags.warning + r.flags.info}</span> : '—'}
+                  {r.flags.warning + r.flags.info > 0 ? <span style={badge(r.flags.warning ? 'warn' : 'muted')}>{r.flags.warning + r.flags.info}</span> : r.flags.receiptMismatch ? null : '—'}
+                  {/* D3 (DRMS 10/10): lines whose "Nominal sesuai nota" ≠ total — awareness before the money moves */}
+                  {r.flags.receiptMismatch ? (
+                    <div style={{ marginTop: 2 }}>
+                      <a href={`${docHref('expense_request', r.id) ?? '#'}#review`} style={{ textDecoration: 'none' }}>
+                        <span style={badge('warn')} data-pk-queue-mismatch={r.id} title="Nominal sesuai nota berbeda dari total baris — lihat rincian pengajuan">
+                          Selisih nota ({r.flags.receiptMismatch})
+                        </span>
+                      </a>
+                    </div>
+                  ) : null}
                 </td>
               </tr>
               {canTransfer && hasRole(req, 'pk-finance', itemCompany(r)) ? (
@@ -110,6 +161,7 @@ export async function TransferQueue(props: AdminViewServerProps) {
                       bankRef="required"
                       proof={{ kind: 'transfer-proofs', required: true }}
                       amountText={`Transfer ${rp(r.approvedAmount)}`}
+                      costCenter={{ options: costCenters.filter((c) => c.company === itemCompany(r)), defaultId: r.costCenter?.id ?? null }}
                     />
                   </td>
                 </tr>
@@ -118,13 +170,14 @@ export async function TransferQueue(props: AdminViewServerProps) {
           ))}
         </table>
       )}
+      {items.length > 0 ? <Pager id="antrian-transfer" path="/admin/antrian-transfer" sp={props.searchParams} page={page} unit="pengajuan" /> : null}
       <style>{KAS_STYLE}</style>
       {/* E2 (US-24, T8): recorded transfers that can still be voided (request "Sudah Ditransfer"). */}
       <h2 id="transfer-tercatat" style={{ marginTop: 32 }}>
-        Transfer tercatat — dapat dibatalkan ({done.length})
+        Transfer tercatat — dapat dibatalkan ({donePage.total})
       </h2>
       <p style={{ fontSize: 13, color: 'var(--pk-muted-fg)', margin: '0 0 8px' }}>
-        Void transfer membuat jurnal balik untuk KK-nya (KK asli tetap tampil sebagai Void) dan mengembalikan pengajuan ke antrian: Uang Muka → Disetujui, Reimburse → Nota
+        Void transfer membuat jurnal balik untuk KK-nya (KK asli tetap tampil sebagai Void) dan mengembalikan pengajuan ke antrian: Pengajuan Baru → Disetujui, Reimburse → Nota
         Terverifikasi.
       </p>
       {done.length === 0 ? (
@@ -151,11 +204,13 @@ export async function TransferQueue(props: AdminViewServerProps) {
                     </td>
                   ) : null}
                   <td style={td}>{t.transferDate}</td>
-                  <td style={td}>{t.transferNo}</td>
+                  <td style={td}>
+                    <a href={docHref('transfer', t.transferId)!}>{t.transferNo}</a>
+                  </td>
                   <td style={td}>
                     {docLink(t.requestId, t.requestNo ?? `#${t.requestId}`)}
                     <div>{t.requestTitle}</div>
-                    <div style={{ fontSize: 12 }}>{t.requestType === 'advance' ? 'Uang Muka' : 'Reimburse'}</div>
+                    <div style={{ fontSize: 12 }}>{REQUEST_TYPE_LABELS[t.requestType as keyof typeof REQUEST_TYPE_LABELS] ?? t.requestType}</div>
                   </td>
                   <td style={num}>{rp(t.amount)}</td>
                   {canTransfer ? (
@@ -185,6 +240,7 @@ export async function TransferQueue(props: AdminViewServerProps) {
           </table>
         </TableScroll>
       )}
+      {done.length > 0 ? <Pager id="transfer-tercatat" path="/admin/antrian-transfer" sp={props.searchParams} page={donePage} pageKey="hal2" unit="transfer" /> : null}
     </Shell>
   )
 }

@@ -1,4 +1,4 @@
-import { APIError, type CollectionAfterChangeHook, type Condition, type CollectionBeforeChangeHook, type CollectionConfig, type Field, type FilterOptionsProps, type PayloadRequest, type Where } from 'payload'
+import { APIError, type CollectionAfterChangeHook, type Condition, type CollectionBeforeChangeHook, type CollectionConfig, type FilterOptionsProps, type PayloadRequest, type Where } from 'payload'
 
 import { RIWAYAT_TAB } from '@/admin/config'
 
@@ -9,15 +9,20 @@ import { writeAudit, type AuditRow } from '@/audit/writer'
 import { denyDeleteLogged, requestReadAccess, requestUpdateAccess } from '@/domain/expense/access'
 import { ids, type RequestDoc } from '@/domain/expense/common'
 import { CONTENT_VALIDATED, fromDocLines, validateContent } from '@/domain/expense/drafts'
-import { grandTotal, validateLines, type LineInput } from '@/domain/expense/lines'
+import { grandTotal, normalizeLines, unlockLine, validateLines, type LineInput } from '@/domain/expense/lines'
 import { diffLines, type AuditLine } from '@/domain/expense/line-audit'
-import { isBusinessDate, isContentEditable, REQUEST_STATUSES, STATUS_LABELS, type RequestStatus, type RequestType } from '@/domain/expense/types'
-import { rupiahField, uuidField } from '@/fields/common'
+import { recomputeFlags } from '@/domain/expense/receipts'
+import { isContentEditable, REQUEST_STATUSES, REQUEST_TYPE_LABELS, STATUS_LABELS, type RequestStatus, type RequestType } from '@/domain/expense/types'
+import { changeReasonField, rupiahField, uuidField } from '@/fields/common'
 import { requestMeta } from '@/lib/request-meta'
 import { forceDeferredChecks } from '@/lib/system-tx'
 import { notifyCreated, notifyTransition } from '@/domain/notifications'
 import { companyField, companyHook, pickerSameCompany, sameCompanyOptions } from '@/fields/company'
 import { validationError } from '@/lib/validation'
+
+import { draftOnly, editableInput, isDraftForm, linesCondition, linesEditable, PLACEHOLDERS, revisionOnly, shownInHeader, submittedOnly, whenSet } from './expense-request-form'
+import { businessDateField } from './fields-f2'
+import { USER_NAME_VIEW } from '@/fields/users'
 
 /**
  * T1 Pengajuan biaya (requirements v1.1 §7 T1; architecture §4.3, §5.1/§5.2).
@@ -40,21 +45,16 @@ import { validationError } from '@/lib/validation'
 
 const system = { create: fieldNever, update: fieldNever }
 
-/** Roles that may read `approval-rules` (collection read access) — the field is shown only to them. */
-const canSeeApprovalRules: Condition = (_data, _sibling, { user }) => rolesOf(user).some((r) => r === 'pk-admin' || r === 'pk-owner' || r === 'pk-finance')
-const ro = { readOnly: true }
-const jsonView = { readOnly: true, components: { Field: '@/components/ReadOnlyJson#ReadOnlyJson' } }
+/** Phase C polish: a server field kept in the sidebar only in "Revisi Nota" (and only with a value). */
+const revisionAndSet = (name: string): Condition => (d, s, c) => revisionOnly(d, s, c) && whenSet(name)(d, s, c)
 
-const businessDate = (name: string, label: string, extra: Partial<Field> = {}): Field =>
-  ({
-    name,
-    type: 'text',
-    label,
-    maxLength: 10,
-    admin: { description: 'Format YYYY-MM-DD (zona waktu perusahaan).' },
-    validate: (v: unknown) => (v === null || v === undefined || v === '' || isBusinessDate(v) ? true : 'Tanggal harus YYYY-MM-DD.'),
-    ...extra,
-  }) as Field
+/** Roles that may read `approval-rules` (collection read access) — the field is shown only to them. */
+// Phase C polish: in the sidebar for Finance / Admin only (the Direktur and PM read the approval timeline)
+const canSeeApprovalRules: Condition = (_data, _sibling, { user }) => rolesOf(user).some((r) => r === 'pk-admin' || r === 'pk-finance')
+const ro = { readOnly: true }
+const RUPIAH_FIELD = '@/admin/components/RupiahNumberField#RupiahNumberField'
+/** Read-only money as "Rp 1.250.000" (RupiahNumberField read-only mode). */
+const rupiahView = { components: { Field: RUPIAH_FIELD } }
 
 /** Picker filter of `bankAccount` (S3e, US-44): active accounts of the requesters / the creator's employee. */
 export const bankAccountOptions = ({ data, user }: Pick<FilterOptionsProps, 'data' | 'user'>): false | Where => {
@@ -67,7 +67,7 @@ export const bankAccountOptions = ({ data, user }: Pick<FilterOptionsProps, 'dat
 }
 
 /**
- * QA-15 (owner decision 2026-10-08): "Diajukan Oleh" picker — a user whose only role in the document's
+ * QA-15 (owner decision 2026-10-08): "Pemohon" (Diajukan Oleh) picker — a user whose only role in the document's
  * PT (unknown yet: in every selected PT) is Staff sees only their OWN employee; everyone else the
  * employees of the document's PT (pickerSameCompany). Server rule: drafts.ts validateContent.
  */
@@ -149,11 +149,28 @@ const beforeChange: CollectionBeforeChangeHook = async ({ data, originalDoc, ope
   }
 
   const project = relId(d.project !== undefined ? d.project : prev.project)
-  const costCenter = relId(d.costCenter !== undefined ? d.costCenter : prev.costCenter)
+  let costCenter = relId(d.costCenter !== undefined ? d.costCenter : prev.costCenter)
+  // D2: a legacy cost-center DRAFT that gets a project becomes a project request (its old cost center is dropped;
+  // the field itself is never writable by users — `access` above). Locked / Revisi Nota rows never change scope.
+  if (!transition && project !== undefined && costCenter !== undefined && (operation === 'create' || prev.status === 'draft')) {
+    d.costCenter = null
+    costCenter = undefined
+  }
   if (project !== undefined && costCenter !== undefined) {
     throw validationError(req, { collection: 'expense-requests' }, [{ path: 'project', message: 'Pilih project ATAU pusat biaya, tidak keduanya.' }])
   }
 
+  // D3: on every content write the line totals are recomputed (qty × harga satuan); a client total is ignored.
+  // Transitions do not send lines (the stored, possibly frozen rows are kept as they are).
+  if (!transition && Array.isArray(d.lines)) d.lines = normalizeLines(d.lines as LineInput[], (prev.lines ?? []) as LineInput[])
+  // D3 unlock (locked → Draft / Revisi Nota): lines whose unit price does not reproduce their total (saved before
+  // D3) get total ÷ qty when exact, else no unit price — the DB rule then holds and the requester can keep editing;
+  // such a line must be completed before the next submit (lines.ts lineNeedsCompletion).
+  if (transition && operation === 'update' && prev.status && !isContentEditable(prev.status) && isContentEditable((d.status ?? prev.status) as RequestStatus)) {
+    const prevLines = (Array.isArray(d.lines) ? d.lines : (prev.lines ?? [])) as LineInput[]
+    const unlocked = prevLines.map((l) => unlockLine(l))
+    if (unlocked.some((l, i) => l !== prevLines[i])) d.lines = unlocked
+  }
   const lines = (d.lines ?? prev.lines ?? []) as LineInput[]
   const errors = validateLines(lines, { forSubmit: false })
   if (errors.length > 0) throw validationError(req, { collection: 'expense-requests' }, errors)
@@ -201,7 +218,7 @@ const beforeChange: CollectionBeforeChangeHook = async ({ data, originalDoc, ope
       if (!list?.length) throw err
       // API field names → form field paths so the admin form marks the right inputs.
       const path = (p: string) =>
-        p.replace(/^projectId$/, 'project').replace(/^costCenterId$/, 'costCenter').replace(/^requesterIds$/, 'requesters').replace(/^bankAccountId$/, 'bankAccount').replace(/\.(uom|category|vehicle)Id$/, '.$1')
+        p.replace(/^projectId$/, 'project').replace(/^costCenterId$/, 'costCenter').replace(/^requesterIds$/, 'requesters').replace(/^bankAccountId$/, 'bankAccount').replace(/\.(uom|category|vehicle|rapItem)Id$/, '.$1')
       throw validationError(
         req,
         { collection: 'expense-requests' },
@@ -230,6 +247,9 @@ const auditLines: CollectionAfterChangeHook = async ({ doc, previousDoc, operati
     reason: typeof req.context?.auditReason === 'string' ? req.context.auditReason : undefined,
   }))
   await writeAudit(req, rows)
+  // D3: a content edit of the lines (Draft / Revisi Nota) refreshes the flags at once — "Selisih nota"
+  // (receipt_amount_mismatch) follows the requester's "Nominal sesuai nota" without waiting for submit.
+  if (operation === 'update' && context?.pkTransition !== true && rows.length > 0) await recomputeFlags(req, doc.id as number)
   // Run the deferred freeze checks NOW (Payload's commit swallows COMMIT errors, see
   // lib/system-tx.ts) so a violation fails this operation with a real error.
   await forceDeferredChecks(req)
@@ -257,7 +277,8 @@ export const ExpenseRequests: CollectionConfig = withAudit(
       group: 'Keuangan',
       defaultColumns: ['docNo', 'type', 'title', 'urgencyLevel', 'status', 'grandTotal', 'createdBy', 'updatedAt'],
       listSearchableFields: ['docNo', 'title'],
-      components: { views: { edit: RIWAYAT_TAB } },
+      // Lead review (d): "Simpan" only while the content is editable (new / Draft / Revisi Nota).
+      components: { views: { edit: RIWAYAT_TAB }, edit: { SaveButton: '@/admin/components/RequestSaveButton#RequestSaveButton' } },
     },
     access: {
       read: requestReadAccess,
@@ -266,10 +287,14 @@ export const ExpenseRequests: CollectionConfig = withAudit(
       update: requestUpdateAccess,
       delete: denyDeleteLogged('expense_request'),
     },
-    hooks: { beforeChange: [companyHook('expense-requests', { derive: [{ field: 'project', collection: 'projects' }, { field: 'costCenter', collection: 'cost-centers' }, { field: 'requesters', collection: 'employees' }], check: [{ field: 'bankAccount', collection: 'employee-bank-accounts' }, { field: 'urgencyLevel', collection: 'urgency-levels' }, { field: 'approvalRule', collection: 'approval-rules' }, { field: 'resubmitOf', collection: 'expense-requests' }, { field: 'lines', collection: 'expense-categories', sub: 'category' }, { field: 'lines', collection: 'vehicles', sub: 'vehicle' }] }), beforeChange], afterChange: [auditLines, notify] },
+    hooks: { beforeChange: [companyHook('expense-requests', { derive: [{ field: 'project', collection: 'projects' }, { field: 'costCenter', collection: 'cost-centers' }, { field: 'requesters', collection: 'employees' }], check: [{ field: 'bankAccount', collection: 'employee-bank-accounts' }, { field: 'urgencyLevel', collection: 'urgency-levels' }, { field: 'approvalRule', collection: 'approval-rules' }, { field: 'resubmitOf', collection: 'expense-requests' }, { field: 'lines', collection: 'expense-categories', sub: 'category' }, { field: 'lines', collection: 'vehicles', sub: 'vehicle' }, { field: 'lines', collection: 'rap-items', sub: 'rapItem' }] }), beforeChange], afterChange: [auditLines, notify] },
+    // DRMS 10/10 8i (WA-03/WA-10): create / draft shows only the inputs, in the APK draft editor order
+    // (Jenis, Judul, Project, Pusat biaya, Tanggal dibutuhkan, Urgensi, Pemohon, Rekening, Keterangan,
+    // Lampiran, baris + total pratinjau); system / workflow fields appear after submit (expense-request-form.ts).
     fields: [
       companyField(),
-      { name: 'docNo', type: 'text', label: 'Nomor', index: true, access: system, admin: { ...ro, position: 'sidebar' } },
+      // Phase C polish: shown in the workflow panel header (shownInHeader), not repeated in the sidebar
+      { name: 'docNo', type: 'text', label: 'Nomor', index: true, access: system, admin: { ...ro, position: 'sidebar', condition: shownInHeader } },
       // F2c: status timeline + next actor for everyone, requester actions for creator/requesters.
       { name: 'workflowPanel', type: 'ui', label: 'Status & aksi', admin: { components: { Field: '@/admin/components/WorkflowPanel#WorkflowPanel' } } },
       // M16 / US-46: "Cetak PDF" (audited API download); UI only, no column.
@@ -280,9 +305,11 @@ export const ExpenseRequests: CollectionConfig = withAudit(
         label: 'Jenis',
         required: true,
         options: [
-          { label: 'Uang Muka', value: 'advance' },
-          { label: 'Reimburse', value: 'reimburse' },
+          { label: REQUEST_TYPE_LABELS.advance, value: 'advance' },
+          { label: REQUEST_TYPE_LABELS.reimburse, value: 'reimburse' },
         ],
+        // B-2 item 3: required → no admin.condition (schema drift); the wrapper renders nothing on a locked request
+        admin: { placeholder: PLACEHOLDERS.type, components: { Field: '@/admin/components/EditableOnlyFields#RequestTypeField' } },
       },
       {
         name: 'status',
@@ -293,86 +320,131 @@ export const ExpenseRequests: CollectionConfig = withAudit(
         index: true,
         options: REQUEST_STATUSES.map((s) => ({ label: STATUS_LABELS[s], value: s })),
         access: system,
-        admin: { ...ro, position: 'sidebar' },
+        // No admin.condition here: on a required field it makes the Postgres adapter treat the column as
+        // nullable (schema drift). RequestStatusField renders nothing on a Draft form and the ADR 0021 label otherwise.
+        admin: { ...ro, position: 'sidebar', components: { Field: '@/admin/components/RequestStatusField#RequestStatusField', Cell: '@/admin/components/RequestStatusCell#RequestStatusCell' } },
       },
-      { name: 'title', type: 'text', label: 'Judul / subjek', required: true, maxLength: 200 },
-      { name: 'project', type: 'relationship', relationTo: 'projects', label: 'Project', index: true, ...pickerSameCompany() },
-      { name: 'costCenter', type: 'relationship', relationTo: 'cost-centers', label: 'Pusat biaya', index: true, ...pickerSameCompany() },
-      businessDate('requestDate', 'Tanggal pengajuan (server)', { access: system, admin: { ...ro, position: 'sidebar' } }),
-      businessDate('neededDate', 'Tanggal dibutuhkan'),
+      { name: 'title', type: 'text', label: 'Judul', required: true, maxLength: 200, admin: { components: { Field: '@/admin/components/EditableOnlyFields#RequestTitleField' } } },
+      // D2: the project is mandatory to send the request (validateContent forSubmit); its RAP items feed the line picker (D4)
+      { name: 'project', type: 'relationship', relationTo: 'projects', label: 'Project', index: true, ...pickerSameCompany(), admin: { placeholder: PLACEHOLDERS.project, description: 'Wajib diisi sebelum dikirim. Item RAP baris diambil dari project ini.', condition: editableInput('project') } },
+      // D2 (DRMS 10/10, owner 2026-10-11): no non-project requests — the requester never sets a cost center (create /
+      // update access false → a value sent by an old client is ignored); Finance sets it on the transfer
+      // (transfers.costCenter). Legacy requests keep theirs (shown read-only, never on a new form).
+      {
+        name: 'costCenter',
+        type: 'relationship',
+        relationTo: 'cost-centers',
+        label: 'Pusat biaya (lama)',
+        index: true,
+        access: { create: fieldNever, update: fieldNever },
+        ...pickerSameCompany(),
+        admin: { ...ro, description: 'Pengajuan lama tanpa project. Pengajuan baru: pusat biaya diisi Finance saat transfer.', condition: (d, s, c) => linesEditable(d as Parameters<typeof linesEditable>[0]) && whenSet('costCenter')(d, s, c) },
+      },
+      businessDateField('neededDate', 'Tanggal dibutuhkan', { admin: { condition: editableInput() } }),
       // Owner decision 2026-10-09: replaces "Periode kegiatan" (periodFrom/periodTo, Q-04).
-      { name: 'urgencyLevel', type: 'relationship', relationTo: 'urgency-levels', label: 'Tingkat urgensi', index: true, ...pickerSameCompany() },
-      { name: 'notes', type: 'textarea', label: 'Keterangan', maxLength: 2000 },
-      // QA-15: Staff-only users pick only themselves (requesterOptions); the server re-checks (validateContent)
-      { name: 'requesters', type: 'relationship', relationTo: 'employees', hasMany: true, label: 'Diajukan Oleh', admin: { isSortable: true }, ...pickerSameCompany(), filterOptions: requesterOptions },
-      { name: 'createdBy', type: 'relationship', relationTo: 'users', label: 'Dibuat Oleh', index: true, access: system, admin: { ...ro, position: 'sidebar' } },
+      { name: 'urgencyLevel', type: 'relationship', relationTo: 'urgency-levels', label: 'Tingkat urgensi', index: true, ...pickerSameCompany(), admin: { placeholder: PLACEHOLDERS.urgencyLevel, condition: editableInput('urgencyLevel') } },
+      // QA-15: Staff-only users pick only themselves (requesterOptions); the server re-checks (validateContent).
+      // WA-09: "Pemohon" as in the APK (the PDF signature box keeps "Diajukan Oleh").
+      { name: 'requesters', type: 'relationship', relationTo: 'employees', hasMany: true, label: 'Pemohon', admin: { isSortable: true, placeholder: PLACEHOLDERS.requesters, condition: editableInput() }, ...pickerSameCompany(), filterOptions: requesterOptions },
       {
         name: 'bankAccount',
         type: 'relationship',
         relationTo: 'employee-bank-accounts',
         label: 'Rekening tujuan',
-        // S3e (US-44, Q-11, S-03): the picker lists only ACTIVE accounts of the requesters ("Diajukan
-        // Oleh"; none chosen yet = the creator's own employee), like the APK. Empty on save = default
+        // S3e (US-44, Q-11, S-03): the picker lists only ACTIVE accounts of the requesters ("Pemohon";
+        // none chosen yet = the creator's own employee), like the APK. Empty on save = default
         // account of the first requester (beforeChange). G9 is still enforced by validateContent, so
         // the relationship's own filterOptions check is switched off (it would re-read the account with
         // the caller's access — a Staff cannot read a co-requester's account).
         filterOptions: bankAccountOptions,
         validate: () => true as const,
-        admin: { description: 'Hanya rekening milik pemohon. Kosongkan untuk memakai rekening default pemohon pertama.' },
+        // DRMS 10/10 8e: the picker only while Draft; afterwards the preview below shows the submit snapshot.
+        admin: { description: 'Hanya rekening milik pemohon. Kosongkan untuk memakai rekening default pemohon pertama.', placeholder: PLACEHOLDERS.bankAccount, condition: draftOnly },
       },
+      // DRMS 10/10 8e (WA-04): chosen account (draft) / snapshot (after submit) — bank · holder · masked no. + eye toggle.
+      { name: 'bankAccountPreview', type: 'ui', label: 'Rekening tujuan', admin: { condition: editableInput(), components: { Field: '@/admin/components/BankAccountPreview#BankAccountPreview' } } },
       {
         name: 'bankSnapshot',
         type: 'group',
         label: 'Rekening tujuan (snapshot saat diajukan)',
         access: system,
-        admin: ro,
+        // shown through bankAccountPreview (masked + eye toggle), never as raw fields
+        admin: { ...ro, hidden: true },
         fields: [
           { name: 'bankName', type: 'text', label: 'Bank' },
           { name: 'accountNo', type: 'text', label: 'Nomor rekening' },
           { name: 'accountHolder', type: 'text', label: 'Atas nama' },
         ],
       },
+      { name: 'notes', type: 'textarea', label: 'Keterangan', maxLength: 2000, admin: { condition: editableInput() } },
+      { name: 'attachments', type: 'upload', relationTo: 'media-attachments', hasMany: true, label: 'Lampiran', admin: { condition: editableInput() } },
       {
         name: 'lines',
         type: 'array',
-        label: 'Baris item',
+        label: 'Rincian item',
         labels: { singular: 'Baris', plural: 'Baris' },
-        // F2d UAT: Payload 3.90.1 client race — a row added while the form-state server action of
-        // the previous edit is still pending stays a skeleton.
-        admin: { description: 'Tunggu sebentar setelah mengisi field sebelum menekan Tambah Baris.' },
+        // DRMS 10/10 8f–8h (D3): a lines TABLE with "Tambah baris" / edit in a dialog (LinesTableField) instead of
+        // Payload's row cards; total = qty × harga satuan, computed (dialog preview + server hook, never typed).
+        // DRMS 10/10 9a (WA-05): editable only in Draft / Revisi Nota; otherwise the "Rincian pengajuan" table.
+        admin: { condition: linesCondition, components: { Field: '@/admin/components/lines/LinesTableField#LinesTableField' } },
         fields: [
           { name: 'description', type: 'text', label: 'Uraian', maxLength: 500 },
           {
             type: 'row',
             fields: [
-              { name: 'qty', type: 'number', label: 'Jumlah', min: 0 },
-              { name: 'uom', type: 'relationship', relationTo: 'uoms', label: 'Satuan' },
-              { name: 'unitPrice', type: 'number', label: 'Harga satuan (informatif)', min: 0 },
-              { name: 'total', type: 'number', label: 'Total (Rp)', min: 0 },
+              // qty keeps decimals (e.g. 1,5 m³); empty = 1 (D3)
+              { name: 'qty', type: 'number', label: 'Qty', min: 0 },
+              { name: 'uom', type: 'relationship', relationTo: 'uoms', label: 'Satuan', admin: { placeholder: PLACEHOLDERS.uom } },
+              { name: 'unitPrice', type: 'number', label: 'Harga satuan', min: 0, admin: { components: { Field: RUPIAH_FIELD } } },
+              // D3: server-computed (beforeChange → normalizeLines); a client value is ignored
+              { name: 'total', type: 'number', label: 'Total', min: 0, admin: { readOnly: true, components: { Field: RUPIAH_FIELD } } },
+              { name: 'receiptAmount', type: 'number', label: 'Nominal sesuai nota', min: 0, admin: { components: { Field: RUPIAH_FIELD } } },
             ],
           },
           {
             type: 'row',
             fields: [
-              { name: 'category', type: 'relationship', relationTo: 'expense-categories', label: 'Kategori' },
-              { name: 'vehicle', type: 'relationship', relationTo: 'vehicles', label: 'Kendaraan' },
+              { name: 'category', type: 'relationship', relationTo: 'expense-categories', label: 'Kategori', admin: { placeholder: PLACEHOLDERS.category } },
+              // D4 (DRMS 10/10): the RAP item of the request's project this line is charged to (required to send when the
+              // project has a RAP; realisation per item = Σ approved line totals, domain/rap/budget.ts)
+              { name: 'rapItem', type: 'relationship', relationTo: 'rap-items', label: 'Item RAP', index: true, admin: { placeholder: PLACEHOLDERS.rapItem } },
+              { name: 'vehicle', type: 'relationship', relationTo: 'vehicles', label: 'Kendaraan', admin: { placeholder: PLACEHOLDERS.vehicle } },
             ],
           },
           { name: 'notes', type: 'text', label: 'Keterangan', maxLength: 500 },
         ],
       },
-      { ...rupiahField('grandTotal', 'Grand total (Rp)'), access: system, admin: { ...ro, position: 'sidebar' } },
-      { ...rupiahField('approvedAmount', 'Nominal disetujui (Rp)'), access: system, admin: { ...ro, position: 'sidebar' } },
-      { ...rupiahField('transferredTotal', 'Total ditransfer (Rp)'), access: system, admin: { ...ro, position: 'sidebar' } },
-      { ...rupiahField('verifiedReceiptsTotal', 'Total nota terverifikasi LPJ (Rp)'), access: system, admin: { ...ro, position: 'sidebar' } },
-      { name: 'attachments', type: 'upload', relationTo: 'media-attachments', hasMany: true, label: 'Lampiran umum' },
+      { name: 'linesTotalPreview', type: 'ui', label: 'Total (pratinjau)', admin: { condition: linesCondition, components: { Field: '@/admin/components/LinesTotalPreview#LinesTotalPreview' } } },
+      // Phase C polish: Grand total is in the panel header; Tanggal / Dibuat oleh in the locked "Rincian pengajuan" — so
+      // the sidebar keeps those two only in "Revisi Nota" (editable: no summary there) and never on a Draft
+      businessDateField('requestDate', 'Tanggal pengajuan (server)', { access: system, admin: { ...ro, position: 'sidebar', condition: revisionAndSet('requestDate') } }),
+      { name: 'createdBy', type: 'relationship', relationTo: 'users', label: 'Dibuat oleh', index: true, access: system, admin: { ...ro, position: 'sidebar', condition: revisionAndSet('createdBy'), components: USER_NAME_VIEW } },
+      { ...rupiahField('grandTotal', 'Grand total (Rp)'), access: system, admin: { ...ro, ...rupiahView, position: 'sidebar', condition: shownInHeader } },
+      { ...rupiahField('approvedAmount', 'Nominal disetujui (Rp)'), access: system, admin: { ...ro, ...rupiahView, position: 'sidebar', condition: (d, s, c) => submittedOnly(d, s, c) && whenSet('approvedAmount')(d, s, c) } },
+      { ...rupiahField('transferredTotal', 'Total ditransfer (Rp)'), access: system, admin: { ...ro, ...rupiahView, position: 'sidebar', condition: submittedOnly } },
+      { ...rupiahField('verifiedReceiptsTotal', 'Total nota terverifikasi LPJ (Rp)'), access: system, admin: { ...ro, ...rupiahView, position: 'sidebar', condition: (d, s, c) => submittedOnly(d, s, c) && whenSet('verifiedReceiptsTotal')(d, s, c) } },
       // F2e UAT: office-only fields are not rendered for users who cannot read their target
       // (staff/PM → the relationship input fired POST /api/approval-rules → 403 on every view).
-      { name: 'approvalRule', type: 'relationship', relationTo: 'approval-rules', label: 'Aturan approval', access: system, admin: { ...ro, condition: canSeeApprovalRules } },
-      { name: 'approvalSnapshot', type: 'json', label: 'Snapshot aturan approval', access: system, admin: { ...jsonView, condition: canSeeApprovalRules } },
+      { name: 'approvalRule', type: 'relationship', relationTo: 'approval-rules', label: 'Aturan approval', access: system, admin: { ...ro, position: 'sidebar', condition: (data, sibling, ctx) => submittedOnly(data, sibling, ctx) && canSeeApprovalRules(data, sibling, ctx) } },
+      // DRMS 10/10 9c (WA-06): readable timeline in the workflow panel; raw JSON only for Admin, folded.
+      { name: 'approvalSnapshot', type: 'json', label: 'Snapshot aturan approval', access: system, admin: { readOnly: true, components: { Field: '@/components/ReadOnlyJson#CollapsedReadOnlyJson' }, condition: (data, _s, { user }) => !isDraftForm(data) && rolesOf(user).includes('pk-admin') } },
+      {
+        // ADR 0021 (owner 2026-10-10): narrow G1 exception, set by the service at submit only (DB trigger
+        // expense_requests_g1_exception: value 'direktur_via_pm' | 'direktur_via_pm_self' or null, changes only at the freeze point).
+        // DRMS 10/10 9c: shown as readable text in the approval timeline ("Pengajuan Direktur — diajukan oleh PM …").
+        name: 'g1Exception',
+        type: 'text',
+        label: 'Pengecualian G1',
+        access: system,
+        admin: { ...ro, hidden: true },
+      },
       { name: 'approvalCycle', type: 'number', label: 'Siklus approval', defaultValue: 0, access: system, admin: { ...ro, hidden: true } },
-      { name: 'currentLevel', type: 'number', label: 'Level approval berjalan', access: system, admin: ro },
-      { name: 'submittedAt', type: 'date', label: 'Diajukan (server)', access: system, admin: { ...ro, date: { pickerAppearance: 'dayAndTime' } } },
+      // Lead review (a): the approval timeline in the workflow panel shows the running level — no sidebar number.
+      { name: 'currentLevel', type: 'number', label: 'Level approval berjalan', access: system, admin: { ...ro, hidden: true } },
+      // Phase C polish: the approval timeline shows when it was sent / approved (shownInHeader)
+      { name: 'submittedAt', type: 'date', label: 'Diajukan (server)', access: system, admin: { ...ro, position: 'sidebar', date: { pickerAppearance: 'dayAndTime' }, condition: shownInHeader } },
+      // Item 11 (DRMS 10/10): final approval time (server) of the current cycle = start of the transfer SLA.
+      { name: 'approvedAt', type: 'date', label: 'Disetujui (server)', index: true, access: system, admin: { ...ro, position: 'sidebar', date: { pickerAppearance: 'dayAndTime' }, condition: shownInHeader } },
       { name: 'contentHash', type: 'text', label: 'Hash isi terkunci', access: system, admin: { ...ro, hidden: true } },
       {
         name: 'resubmitOf',
@@ -381,10 +453,10 @@ export const ExpenseRequests: CollectionConfig = withAudit(
         label: 'Pengajuan ulang dari',
         access: system,
         // F2e: number + title of the previous request (not only its title), read-only link.
-        admin: { ...ro, components: { Field: '@/admin/components/ResubmitOfField#ResubmitOfField' } },
+        admin: { ...ro, condition: whenSet('resubmitOf'), components: { Field: '@/admin/components/ResubmitOfField#ResubmitOfField' } },
       },
-      { name: 'cancelReason', type: 'text', label: 'Alasan batal', access: system, admin: ro },
-      { name: 'rejectReason', type: 'text', label: 'Alasan ditolak', access: system, admin: ro },
+      { name: 'cancelReason', type: 'text', label: 'Alasan batal', access: system, admin: { ...ro, condition: whenSet('cancelReason') } },
+      { name: 'rejectReason', type: 'text', label: 'Alasan ditolak', access: system, admin: { ...ro, condition: whenSet('rejectReason') } },
       {
         name: 'syncRev',
         type: 'number',
@@ -400,15 +472,19 @@ export const ExpenseRequests: CollectionConfig = withAudit(
         label: 'Sumber',
         options: ['web', 'apk', 'system', 'job'].map((s) => ({ label: s, value: s })),
         access: system,
-        admin: { ...ro, position: 'sidebar' },
+        // system field (web / apk / job) — audit + reports only, never on the form (Lead review a)
+        admin: { ...ro, hidden: true },
       },
       uuidField(),
+      // Lead review (d): "Alasan perubahan" (audit reason of a save) only where "Simpan" exists (new / Draft / Revisi Nota).
+      // Phase C polish: only in "Revisi Nota" (a Draft save needs no audit reason)
+      { ...changeReasonField(), admin: { ...changeReasonField().admin, condition: (data, s, c) => !!(data as { id?: unknown } | undefined)?.id && revisionOnly(data, s, c) } },
     ],
   },
   {
     docType: 'expense_request',
     // lines: per-line rows (auditLines); docNo: `number_issued` row written by allocateDocNo().
-    exclude: ['lines', 'docNo', 'contentHash', 'approvalSnapshot', 'currentLevel', 'approvalCycle', 'submittedAt', 'syncRev'],
+    exclude: ['lines', 'docNo', 'contentHash', 'approvalSnapshot', 'g1Exception', 'currentLevel', 'approvalCycle', 'submittedAt', 'syncRev'],
     docNo: (doc) => (typeof doc.docNo === 'string' ? doc.docNo : undefined),
     reasonRules: [reasonOnChange(['cancelReason'], 'Alasan wajib diisi saat membatalkan.')],
     actionFor: (c) => (c.field === 'status' ? 'status_change' : undefined),

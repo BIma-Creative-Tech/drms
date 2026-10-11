@@ -1,0 +1,44 @@
+{
+ "items": [
+  {
+   "id": 9,
+   "docNo": "PB/DRMS/2610/0008",
+   "type": "advance",
+   "typeLabel": "Pengajuan Baru",
+   "status": "approved",
+   "statusLabel": "Disetujui (Antri Transfer)",
+   "title": "Bekisting kolom (fiktif)",
+   "projectId": 1,
+   "costCenterId": null,
+   "grandTotal": 1200000,
+   "approvedAmount": 1200000,
+   "requestDate": "2026-10-11",
+   "neededDate": "2026-10-20",
+   "createdById": 1,
+   "updatedAt": "2026-10-11T13:04:30.088Z",
+   "companyId": 1
+  },
+  {
+   "id": 8,
+   "docNo": "PB/DRMS/2610/0007",
+   "type": "advance",
+   "typeLabel": "Pengajuan Baru",
+   "status": "pending_ack",
+   "statusLabel": "Menunggu persetujuan PM",
+   "title": "Sewa perancah tambahan (fiktif)",
+   "projectId": 1,
+   "costCenterId": null,
+   "grandTotal": 5000000,
+   "approvedAmount": null,
+   "requestDate": "2026-10-11",
+   "neededDate": "2026-10-20",
+   "createdById": 1,
+   "updatedAt": "2026-10-11T13:04:28.958Z",
+   "companyId": 1
+  }
+ ],
+ "nextCursor": null,
+ "page": 1,
+ "totalPages": 5,
+ "totalDocs": 9
+}

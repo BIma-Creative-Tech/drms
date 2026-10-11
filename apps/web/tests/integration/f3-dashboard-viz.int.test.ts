@@ -131,7 +131,7 @@ describe('office-only ledger rows', () => {
     expect(await asUser(w.users.staffA, async (req) => recentCashEntries(req, await ownScope(req), 5))).toEqual([])
   })
 
-  it('transferQueueTop: approved Uang Muka is queued; non-office scope → []', async () => {
+  it('transferQueueTop: approved Pengajuan Baru is queued; non-office scope → []', async () => {
     const q = await asUser(w.users.finance, async (req) => transferQueueTop(req, await officeScope(req), 50))
     // same K-11 set and order in plain SQL (shared DB: other files queue requests too)
     const sql = await sqlAs(
@@ -229,13 +229,13 @@ describe('module launcher + /admin/dashboard', () => {
     expect(mods.every((m) => m.badge === 0)).toBe(true)
   })
 
-  it('PM: Proyek with progress/addendum; Persetujuan only as the read-only approvals list (ADR 0013: PM monitors)', async () => {
+  it('PM: Proyek with progress/addendum; Persetujuan = the inbox (ADR 0021: Persetujuan PM) + the read-only approvals list', async () => {
     const { mods } = await modulesOf(w.users.pm)
     const proyek = mods.find((m) => m.id === 'proyek')!
     expect(proyek.sections.flatMap((s) => s.items.map((i) => i.navKey))).toEqual(expect.arrayContaining(['progress', 'addendum']))
     const per = mods.find((m) => m.id === 'persetujuan')
-    // no decision views (Persetujuan inbox / Antrian Transfer / Verifikasi LPJ are Direktur/Finance only)
-    expect(per?.sections.flatMap((s) => s.items.map((i) => i.href)) ?? []).toEqual(['/admin/collections/approvals'])
+    // Antrian Transfer / Verifikasi LPJ stay Direktur/Finance only; the inbox lists only the PM's own steps
+    expect(per?.sections.flatMap((s) => s.items.map((i) => i.href)) ?? []).toEqual(['/admin/persetujuan', '/admin/collections/approvals'])
     expect(per?.badge ?? 0).toBe(0)
   })
 })

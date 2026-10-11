@@ -95,7 +95,7 @@
       }
     }
   },
-  "actionNewAdvance": "Ajukan Uang Muka",
+  "actionNewAdvance": "Pengajuan Baru",
   "actionNewReimburse": "Ajukan Reimburse",
   "actionMyRequests": "Pengajuan Saya",
   "actionInbox": "Menunggu Persetujuan",
@@ -126,8 +126,8 @@
   "syncStateSubmitted": "Sudah diajukan",
   "detailTitle": "Detail Pengajuan",
   "turnLabel": "Giliran",
-  "timelineTitle": "Posisi tanda tangan",
-  "linesTitle": "Baris item",
+  "timelineTitle": "Riwayat approval",
+  "linesTitle": "Rincian item",
   "receiptsTitle": "Nota",
   "flagsTitle": "Flag validasi",
   "grandTotal": "Grand total",
@@ -188,14 +188,54 @@
     }
   },
   "fieldDescription": "Uraian",
-  "fieldQty": "Jumlah",
+  "fieldQty": "Qty",
   "fieldUom": "Satuan",
   "fieldUnitPrice": "Harga satuan",
   "fieldTotal": "Total",
   "fieldCategory": "Kategori",
   "fieldVehicle": "Kendaraan",
   "fieldLineNotes": "Keterangan baris",
-  "unitPriceHint": "Informasi saja — total tidak dihitung otomatis.",
+  "lineTotalHelper": "Qty × Harga satuan — dihitung otomatis, tidak bisa diubah.",
+  "fieldReceiptAmount": "Nominal sesuai nota",
+  "receiptAmountHelper": "Opsional. Persetujuan dan transfer tetap memakai Total (Qty × Harga satuan).",
+  "receiptMismatchChip": "Selisih nota",
+  "receiptMismatchDetail": "Nominal sesuai nota {receipt} ≠ Total {total}",
+  "@receiptMismatchDetail": {
+    "placeholders": {
+      "receipt": {
+        "type": "String"
+      },
+      "total": {
+        "type": "String"
+      }
+    }
+  },
+  "lineNeedsUnitPrice": "Baris ini dibuat sebelum Total dihitung otomatis. Isi Qty, Satuan dan Harga satuan (total lama: {amount}).",
+  "@lineNeedsUnitPrice": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "lineNeedsUnitPriceShort": "Lengkapi Qty & Harga satuan",
+  "linesIncompleteResubmit": "Lengkapi Qty & Harga satuan pada baris {lines} (Ubah di web) sebelum mengirim ulang nota.",
+  "@linesIncompleteResubmit": {
+    "placeholders": {
+      "lines": {
+        "type": "String"
+      }
+    }
+  },
+  "receiptMismatchCount": "Selisih nota ({count})",
+  "@receiptMismatchCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "fieldLineNo": "No",
   "receiptDiff": "Selisih total baris vs nota: {amount}",
   "@receiptDiff": {
     "placeholders": {
@@ -280,6 +320,45 @@
   "lpjSettlement": "Penyelesaian",
   "lpjUsageNotes": "Keterangan penggunaan dana",
   "lpjFinanceNotes": "Catatan Finance",
+  "lpjPhotos": "Foto LPJ",
+  "lpjPhotosCount": "{count} / {max} foto",
+  "@lpjPhotosCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "max": {
+        "type": "int"
+      }
+    }
+  },
+  "lpjPhotosHint": "Opsional, maks. {max} foto (kamera atau galeri). Tidak bisa diubah setelah LPJ dikirim.",
+  "@lpjPhotosHint": {
+    "placeholders": {
+      "max": {
+        "type": "int"
+      }
+    }
+  },
+  "lpjPhotosFull": "Maksimal {max} foto LPJ.",
+  "@lpjPhotosFull": {
+    "placeholders": {
+      "max": {
+        "type": "int"
+      }
+    }
+  },
+  "lpjPhotoCaption": "Foto LPJ {no}",
+  "@lpjPhotoCaption": {
+    "placeholders": {
+      "no": {
+        "type": "int"
+      }
+    }
+  },
+  "lpjPhotoRemove": "Hapus foto",
+  "lpjPhotoCamera": "Kamera",
+  "lpjUploadingPhotos": "Mengunggah foto LPJ…",
   "requesterActionsTitle": "Nota & LPJ",
   "addReceiptOnlineCamera": "Tambah nota (kamera)",
   "addReceiptOnlineGallery": "Tambah nota dari galeri",
@@ -388,10 +467,17 @@
   "offlineRecheck": "Ketuk untuk cek koneksi.",
   "stepAcknowledgeDirektur": "Persetujuan Direktur (Diketahui)",
   "budgetOverWarn": "Melewati batas peringatan anggaran",
-  "decisionForbidden": "Anda tidak dapat memutuskan pengajuan ini. Hanya Direktur (Diketahui) dan Finance (Approval) yang memutuskan, dan hanya pada gilirannya. Data dimuat ulang.",
+  "decisionForbidden": "Anda tidak dapat memutuskan pengajuan ini. Hanya PM project pengajuan ini, Direktur dan Finance yang memutuskan, masing-masing hanya pada gilirannya. Data dimuat ulang.",
   "decisionTitleAcknowledgeDirektur": "Setujui sebagai Direktur (Diketahui)",
   "decisionHintDirektur": "Persetujuan Direktur tercatat sebagai \"Diketahui\". Setelah itu pengajuan diteruskan ke Finance untuk Approval.",
   "actionAcknowledgeDirektur": "Setujui (Diketahui)",
+  "decisionTitleAcknowledgePm": "Setujui sebagai PM project",
+  "decisionHintPm": "Pengajuan diteruskan ke Direktur.",
+  "decisionTitleApproveDirektur": "Setujui sebagai Direktur",
+  "decisionHintDirekturFinal": "Pengajuan diteruskan ke Finance untuk transfer.",
+  "actionAcknowledgePm": "Setujui",
+  "direkturViaPmNote": "Pengajuan Direktur — diajukan oleh PM (kebijakan owner 2026-10-10)",
+  "direkturViaPmSelfNote": "Pengajuan Direktur — diajukan oleh PM; disetujui Direktur pemohon karena satu-satunya Direktur PT (kebijakan owner 2026-10-10)",
   "historyTitle": "Riwayat",
   "historyEmpty": "Belum ada riwayat.",
   "historyField": "Field",
@@ -414,7 +500,7 @@
   "resubmitConfirm": "Buat draft baru dari pengajuan yang ditolak ini?",
   "resubmitDone": "Draft baru dibuat dari pengajuan yang ditolak. Periksa, ubah bila perlu, lalu ajukan.",
   "tabTeam": "Tim",
-  "teamReadOnlyHint": "Pantauan tim — hanya lihat. Persetujuan dilakukan Direktur dan Finance.",
+  "teamReadOnlyHint": "Pantauan tim — hanya lihat. Pengajuan yang menunggu persetujuan Anda sebagai PM project ada di menu Persetujuan.",
   "teamNoScope": "Anda belum menjadi PM project atau penanggung jawab pusat biaya.",
   "kpiSummaryTitle": "Ringkasan",
   "kpiTeamTitle": "Pantauan tim",
@@ -522,7 +608,7 @@
     }
   },
   "kpiLpjToSettle": "Selisih LPJ",
-  "kpiAdvancesOverdue": "{count} uang muka terlambat LPJ",
+  "kpiAdvancesOverdue": "{count} pengajuan baru terlambat LPJ",
   "@kpiAdvancesOverdue": {
     "placeholders": {
       "count": {
@@ -582,7 +668,7 @@
       }
     }
   },
-  "kpiTeamLpj": "Uang muka tim belum LPJ",
+  "kpiTeamLpj": "Pengajuan Baru tim belum LPJ",
   "kpiLpjOverdue": "{count} terlambat",
   "@kpiLpjOverdue": {
     "placeholders": {
@@ -1667,6 +1753,386 @@
     "placeholders": {
       "count": {
         "type": "int"
+      }
+    }
+  },
+  "dailyTitle": "Laporan Harian",
+  "dailyEditTitle": "Ubah Laporan Harian",
+  "dailyWeather": "Cuaca & jam hilang",
+  "dailyMorning": "Pagi",
+  "dailyNoon": "Siang",
+  "dailyAfternoon": "Sore",
+  "dailyRainHours": "Jam hujan",
+  "dailyStopHours": "Jam kerja berhenti",
+  "dailyWorkSection": "Volume pekerjaan hari ini",
+  "dailyPickProject": "Pilih project konstruksi dulu.",
+  "dailyNoRap": "Project ini belum punya RAP di HP. Tarik ke bawah untuk memuat ulang; bila tetap kosong, minta PM/Direktur mengisi RAP di web.",
+  "dailyRealised": "Realisasi {done} / {volume} {uom}",
+  "@dailyRealised": {
+    "placeholders": {
+      "done": {
+        "type": "String"
+      },
+      "volume": {
+        "type": "String"
+      },
+      "uom": {
+        "type": "String"
+      }
+    }
+  },
+  "dailyOverRap": "Melebihi RAP: {total} dari {volume} {uom} — isi catatan.",
+  "@dailyOverRap": {
+    "placeholders": {
+      "total": {
+        "type": "String"
+      },
+      "volume": {
+        "type": "String"
+      },
+      "uom": {
+        "type": "String"
+      }
+    }
+  },
+  "dailyOverRapNotify": "Ada volume melebihi RAP: laporan tetap dikirim, ditandai \"melebihi RAP\" dan PM project diberi notifikasi.",
+  "dailyMaterialSection": "Material",
+  "dailyMaterialHelp": "Masuk = diterima di lokasi hari ini; terpakai = dipakai hari ini. Material tidak dihitung ke progress.",
+  "dailyReceived": "Masuk",
+  "dailyUsed": "Terpakai",
+  "dailyStock": "Stok {stock} {uom}",
+  "@dailyStock": {
+    "placeholders": {
+      "stock": {
+        "type": "String"
+      },
+      "uom": {
+        "type": "String"
+      }
+    }
+  },
+  "dailyManpower": "Tenaga & alat",
+  "dailyEquipment": "Alat (unit · jam kerja)",
+  "dailyHours": "Jam",
+  "dailyWorkers": "{count} pekerja",
+  "@dailyWorkers": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "dailyNoResources": "Jenis tenaga/alat belum dimuat. Tarik ke bawah saat ada sinyal.",
+  "dailyNotesSection": "Kendala, catatan & foto",
+  "dailyIssues": "Kendala",
+  "dailyNotesRequired": "Wajib karena ada volume melebihi RAP.",
+  "dailyPhoto": "Foto pekerjaan",
+  "dailyPhotos": "Foto pekerjaan ({count}/{max})",
+  "@dailyPhotos": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "max": {
+        "type": "int"
+      }
+    }
+  },
+  "dailySubmit": "Kirim laporan harian",
+  "dailySummary": "{items} item pekerjaan · {workers} pekerja · {photos} foto",
+  "@dailySummary": {
+    "placeholders": {
+      "items": {
+        "type": "int"
+      },
+      "workers": {
+        "type": "int"
+      },
+      "photos": {
+        "type": "int"
+      }
+    }
+  },
+  "dailyNoProjects": "Tidak ada project konstruksi yang bisa Anda laporkan (Staff: project yang ditugaskan; PM: project tim).",
+  "dailySameDay": "Sudah ada laporan harian Anda untuk project & tanggal ini di HP. Buka laporan itu.",
+  "dailyFlagOverRap": "Melebihi RAP",
+  "dailyFlagDuplicate": "Kemungkinan dobel",
+  "dailyWorkItem": "Volume {item}",
+  "@dailyWorkItem": {
+    "placeholders": {
+      "item": {
+        "type": "String"
+      }
+    }
+  },
+  "dailyWorkerCount": "Jumlah pekerja",
+  "sectionRequestDetails": "Rincian pengajuan",
+  "sectionRequester": "Pemohon",
+  "bankNameLabel": "Bank",
+  "bankHolderLabel": "Atas nama",
+  "bankNumberLabel": "Nomor rekening",
+  "bankShowNumber": "Tampilkan nomor rekening",
+  "bankHideNumber": "Sembunyikan nomor rekening",
+  "docNoCopied": "Nomor {docNo} disalin.",
+  "@docNoCopied": {
+    "placeholders": {
+      "docNo": {
+        "type": "String"
+      }
+    }
+  },
+  "docNoCopyHint": "Ketuk untuk menyalin nomor",
+  "docNoOpenHint": "Ketuk untuk membuka dokumen",
+  "receiptOpenPhoto": "Buka foto nota",
+  "receiptLineCaption": "Baris {no}",
+  "@receiptLineCaption": {
+    "placeholders": {
+      "no": {
+        "type": "int"
+      }
+    }
+  },
+  "attendanceSelfieView": "Lihat selfie",
+  "attendanceSelfieUnavailable": "Selfie tidak tersedia (mungkin sudah melewati masa retensi).",
+  "pickHint": "Pilih {field}",
+  "@pickHint": {
+    "placeholders": {
+      "field": {
+        "type": "String"
+      }
+    }
+  },
+  "pickEmployee": "Pilih karyawan",
+  "pickPo": "Pilih PO terbuka",
+  "pickLocation": "Pilih lokasi",
+  "fieldRapItem": "Item RAP",
+  "rapPickHint": "Pilih item RAP",
+  "rapOverBudgetChip": "Melebihi RAP",
+  "rapOverDetail": "Total {total} melebihi sisa RAP {remaining}",
+  "@rapOverDetail": {
+    "placeholders": {
+      "total": {
+        "type": "String"
+      },
+      "remaining": {
+        "type": "String"
+      }
+    }
+  },
+  "rapRemaining": "Sisa {amount}",
+  "@rapRemaining": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "rapOf": "dari {amount}",
+  "@rapOf": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "rapPickProjectFirst": "Pilih project pengajuan dulu.",
+  "rapOfflineNoBudget": "Offline: sisa anggaran RAP tampil lagi saat online.",
+  "rapNoItems": "Project ini belum punya item RAP. Hubungi PM atau Direktur.",
+  "noSearchResults": "Tidak ada yang cocok.",
+  "lineNeedsRapItem": "Baris ini belum terhubung ke item RAP. Pilih item RAP project sebelum diajukan.",
+  "lineNeedsRapItemShort": "Pilih item RAP",
+  "projectChangeClearsRap": "Item RAP pada {count} baris milik project sebelumnya dan akan dikosongkan. Tetap ganti project?",
+  "@projectChangeClearsRap": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "projectChangeConfirm": "Ganti project",
+  "draftCostCenterLegacy": "Draft ini dibuat dengan pusat biaya. Pengajuan sekarang wajib memakai project — pilih project; pusat biaya diisi Finance saat transfer.",
+  "draftLinesNeedRap": "{count} baris belum memilih item RAP — lengkapi sebelum diajukan.",
+  "@draftLinesNeedRap": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "searchClear": "Hapus pencarian",
+  "projectsTitle": "Proyek",
+  "projectsSearchHint": "Cari kode atau nama project…",
+  "projectStatusActive": "Semua aktif",
+  "projectsEmpty": "Belum ada project yang dapat Anda lihat.",
+  "projectsNoMatch": "Tidak ada yang cocok dengan pencarian / filter.",
+  "projectPm": "PM",
+  "projectRapUsed": "Realisasi RAP",
+  "projectRapOverItems": "{count} item RAP melebihi rencana",
+  "@projectRapOverItems": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "projectTitle": "Project",
+  "projectTabInfo": "Proyek",
+  "projectTabRap": "RAP",
+  "projectTabRequests": "Pengajuan",
+  "projectCode": "Kode",
+  "projectName": "Nama project",
+  "projectKind": "Jenis project",
+  "projectStatus": "Status",
+  "projectContractValue": "Nilai kontrak (RAB)",
+  "projectNoCostCenter": "Belum ada — dipilih Finance saat transfer",
+  "projectClient": "Klien",
+  "projectPeriod": "Periode",
+  "projectProgress": "Progress fisik",
+  "projectAddress": "Alamat",
+  "projectRapSummary": "Ringkasan RAP",
+  "rapItemsCount": "{count} item RAP",
+  "@rapItemsCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "rapPlanned": "Rencana",
+  "rapRealised": "Realisasi",
+  "rapRemainingLabel": "Sisa",
+  "rapNoPrices": "Nilai RAP hanya terlihat oleh Direktur, Admin, Finance dan PM project.",
+  "rapNoItemsProject": "Project ini belum punya item RAP.",
+  "rapInactive": "Nonaktif",
+  "requestsSearchHint": "Cari nomor atau judul…",
+  "filterStatus": "Status",
+  "filterAllStatuses": "Semua status",
+  "projectNoRequests": "Belum ada pengajuan untuk project ini.",
+  "homeProjectsSub": "Info, RAP & pengajuan",
+  "financeTitle": "Finance",
+  "homeFinanceSub": "Antrian transfer & LPJ",
+  "financeQueueCount": "{count} siap ditransfer",
+  "@financeQueueCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "transferQueueTitle": "Antrian Transfer",
+  "lpjVerifyTitle": "Verifikasi LPJ",
+  "slaAgeUnknown": "Umur sejak disetujui: —",
+  "slaAge": "{age} sejak disetujui",
+  "@slaAge": {
+    "placeholders": {
+      "age": {
+        "type": "String"
+      }
+    }
+  },
+  "slaOver": "lewat SLA {hours} jam",
+  "@slaOver": {
+    "placeholders": {
+      "hours": {
+        "type": "String"
+      }
+    }
+  },
+  "transferSearchHint": "Nomor, judul, pemilik rekening…",
+  "filterAllTypes": "Semua jenis",
+  "slaOverFilter": "Lewat SLA",
+  "transferQueueEmpty": "Antrian transfer kosong.",
+  "listShownOf": "{shown} dari {total} pengajuan",
+  "@listShownOf": {
+    "placeholders": {
+      "shown": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "costCenterByFinance": "dipilih Finance saat transfer",
+  "bankVerified": "Terverifikasi",
+  "bankUnverified": "Belum diverifikasi",
+  "openFlags": "Flag terbuka: {count}",
+  "@openFlags": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "transferRecord": "Catat transfer",
+  "lpjQueueEmpty": "Tidak ada LPJ yang menunggu verifikasi.",
+  "lpjReadOnlyHint": "Hanya lihat: buka pengajuan untuk melihat LPJ-nya. Verifikasi LPJ dilakukan di web (Verifikasi LPJ).",
+  "transferNotInQueue": "Pengajuan ini tidak lagi ada di antrian transfer (mungkin sudah ditransfer).",
+  "transferAtLabel": "Tanggal & jam transfer",
+  "transferAtHelp": "Sesuai bukti transfer bank.",
+  "transferAtHint": "Pilih tanggal & jam",
+  "transferRecorded": "Transfer tercatat.",
+  "transferRecordedNo": "Transfer {no} tercatat.",
+  "@transferRecordedNo": {
+    "placeholders": {
+      "no": {
+        "type": "String"
+      }
+    }
+  },
+  "overrideConfirm": "Tetap simpan",
+  "overrideCancelled": "Belum disimpan — konfirmasi dibatalkan.",
+  "transferAmountText": "Transfer {amount}",
+  "@transferAmountText": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "transferAmountHelp": "Nominal disetujui — ditetapkan server, tidak dapat diubah.",
+  "bankDestination": "Rekening tujuan",
+  "cashAccountLabel": "Akun kas",
+  "costCenterPickHint": "Pilih pusat biaya…",
+  "costCenterSuggested": "Usulan: pusat biaya default project. Ubah bila perlu.",
+  "costCenterNoDefault": "Project belum punya pusat biaya default — pilih.",
+  "bankRefLabel": "No. referensi bank",
+  "bankRefHint": "mis. nomor referensi di bukti",
+  "transferProofLabel": "Bukti transfer",
+  "proofRetake": "Foto ulang",
+  "transferProofHelp": "Foto bukti transfer bank (kamera atau galeri); dikompres sebelum diunggah.",
+  "processing": "Memproses…",
+  "overdraftTitle": "Saldo akun kas akan minus",
+  "overdraftFigures": "Saldo saat ini {balance}; sesudah transaksi ini {after}.",
+  "@overdraftFigures": {
+    "placeholders": {
+      "balance": {
+        "type": "String"
+      },
+      "after": {
+        "type": "String"
+      }
+    }
+  },
+  "overdraftGeneric": "Saldo akun akan menjadi minus.",
+  "overdraftNote": "Pastikan dana memang tersedia (mis. setoran belum dicatat). Konfirmasi Anda tercatat di audit log.",
+  "unverifiedTitle": "Rekening tujuan belum diverifikasi",
+  "unverifiedLine": "Rekening {account} berstatus \"Belum diverifikasi\".",
+  "@unverifiedLine": {
+    "placeholders": {
+      "account": {
+        "type": "String"
+      }
+    }
+  },
+  "unverifiedDestination": "tujuan",
+  "unverifiedNote": "Periksa nomor rekening dan nama pemilik dengan karyawan sebelum mentransfer. Konfirmasi Anda tercatat di audit log.",
+  "proofCamera": "Kamera",
+  "rapOverBy": "Lebih {amount}",
+  "@rapOverBy": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
       }
     }
   }

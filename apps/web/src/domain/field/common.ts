@@ -162,7 +162,7 @@ export async function replayOf<T extends FieldDoc>(req: PayloadRequest, type: Fi
 /** Row lock of a field document (serialises edits/corrections and the PO status side effects). */
 export async function lockDoc(req: PayloadRequest, type: FieldReportType, id: number): Promise<void> {
   const tx = await getRequestTx(req)
-  const table = { service_report: sql`service_reports`, unit_timesheet: sql`unit_timesheets`, aftersales_activity: sql`aftersales_activities` }[type]
+  const table = { service_report: sql`service_reports`, unit_timesheet: sql`unit_timesheets`, aftersales_activity: sql`aftersales_activities`, daily_report: sql`daily_reports` }[type]
   await tx.execute(sql`SELECT id FROM ${table} WHERE id = ${id} FOR UPDATE`)
 }
 

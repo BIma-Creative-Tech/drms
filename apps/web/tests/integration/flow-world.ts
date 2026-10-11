@@ -8,7 +8,7 @@ import { withSystemTransaction } from '@/lib/system-tx'
 import config from '@/payload.config'
 import { seed } from '@/seed/seed'
 
-import { addMembership, companyId, getTestPayload, installFakeKeycloak, webSessionCookie, withContext, type TestUser } from './helpers'
+import { addMembership, companyId, getTestPayload, installFakeKeycloak, sqlAs, webSessionCookie, withContext, type TestUser } from './helpers'
 
 /**
  * Isolated F2a test world per test file (all files share one DB): own employees, users (each with
@@ -78,10 +78,45 @@ export async function makeFlowUser(roles: Role[], label: string, employee: numbe
 
 export type World = Awaited<ReturnType<typeof makeWorld>>
 
-export async function makeWorld(tag: string) {
+export const ADR0013_FALLBACK_RULE = 'Uji — Direktur lalu Finance (ADR 0013, fallback tes)'
+
+/**
+ * ADR 0021 made the SEEDED default "PM project → Direktur". Test files that are not about the approval flow
+ * (KPIs, PT isolation, …) drive requests through the ADR 0013 shape (Direktur "Diketahui" → Finance) on
+ * projects / cost centers without a world rule: this active, unscoped rule (priority 90 < seeded 100) keeps
+ * that shape in the given PTs. Idempotent. The ADR 0021 flow itself is covered by approval-pm-direktur.
+ */
+export async function adr0013Fallback(companies: number[]): Promise<void> {
+  const p = await getTestPayload()
+  for (const company of companies) {
+    const have = await p.find({ collection: 'approval-rules', where: { and: [{ company: { equals: company } }, { name: { equals: ADR0013_FALLBACK_RULE } }] }, limit: 1, depth: 0, overrideAccess: true /* SYSTEM-READ: fixture */ })
+    if (have.docs.length > 0) continue
+    await sysCreate('approval-rules', {
+      company,
+      name: ADR0013_FALLBACK_RULE,
+      docType: 'expense_request',
+      requestType: 'any',
+      minAmount: 0,
+      priority: 90,
+      acknowledge: 'required',
+      acknowledgeBy: 'role',
+      acknowledgeRole: 'pk-owner',
+      steps: [{ level: 1, approverRole: 'pk-finance' }],
+      active: true,
+    })
+  }
+}
+
+/**
+ * `rule`: 'direktur_finance' (default) = the ADR 0013 world rules (Direktur "Diketahui" → Finance levels) —
+ * kept so the old-snapshot flow stays covered; 'pm_direktur' = ADR 0021 (PM project "Diketahui" →
+ * Direktur level 1, Finance only transfers), one rule per scope for every amount.
+ */
+export async function makeWorld(tag: string, opts: { rule?: 'direktur_finance' | 'pm_direktur' } = {}) {
   const p = await getTestPayload()
   installFakeKeycloak()
   await seed(p) // masters, sequences, default approval rules (idempotent)
+  await adr0013Fallback([await companyId()])
   const code = (c: string) => `${tag}-${c}`
   // ADR 0016: masters are per PT (codes repeat across PTs) — the world lives in company #1 DRMS
   const drms = await companyId()
@@ -108,8 +143,11 @@ export async function makeWorld(tag: string) {
     admin: await makeFlowUser(['pk-admin'], `${tag}-admin`, emp.admin),
     nosig: await makeFlowUser(['pk-staff'], `${tag}-nosig`, null, { signature: false }),
   }
-  const project = await sysCreate('projects', { code: code('P1'), name: `${tag} Project`, pm: users.pm.id, budget: 100_000_000, status: 'berjalan' })
-  const otherProject = await sysCreate('projects', { code: code('P2'), name: `${tag} Other`, pm: users.otherPm.id, budget: 50_000_000, status: 'berjalan' })
+  // DRMS 10/10 D2: Finance books a transfer on a cost center (default = the project's) — a dedicated one, so the
+  // legacy cost-center requests of the world (`costCenter`) and the project money stay apart in the reports
+  const projectCostCenter = await sysCreate('cost-centers', { code: code('PCC'), name: `${tag} Proyek` })
+  const project = await sysCreate('projects', { code: code('P1'), name: `${tag} Project`, pm: users.pm.id, budget: 100_000_000, status: 'berjalan', costCenter: projectCostCenter })
+  const otherProject = await sysCreate('projects', { code: code('P2'), name: `${tag} Other`, pm: users.otherPm.id, budget: 50_000_000, status: 'berjalan', costCenter: projectCostCenter })
   const costCenter = await sysCreate('cost-centers', { code: code('CC'), name: `${tag} Ops`, manager: users.pm.id })
   for (const e of [emp.a, emp.b]) {
     await sysCreate('team-assignments', { employee: e, project, roleInProject: 'staff' })
@@ -129,6 +167,26 @@ export async function makeWorld(tag: string) {
   const uom = { l: await ids('uoms', 'code', 'L'), bln: await ids('uoms', 'code', 'BLN'), kmr: await ids('uoms', 'code', 'KMR'), prs: await ids('uoms', 'code', 'PRS') }
   const vehicle = await sysCreate('vehicles', { plateNo: `KH ${1000 + (Date.now() % 8000)} ${tag.slice(0, 2).toUpperCase()}`, type: 'Hilux' })
   const cashInSource = await ids('cash-in-sources', 'code', 'MODAL')
+  if (opts.rule === 'pm_direktur') {
+    // World rules (priority 10, scoped), ADR 0021: "Diketahui" = the PM project (`pm`: projects.pm and the
+    // cost center's manager), then the Direktur (`owner`/`owner2`) level 1; Finance only transfers.
+    for (const scope of [{ project }, { costCenter }]) {
+      await sysCreate('approval-rules', {
+        docType: 'expense_request',
+        requestType: 'any',
+        priority: 10,
+        acknowledge: 'required',
+        acknowledgeBy: 'scope_manager',
+        acknowledgeRole: null,
+        active: true,
+        ...scope,
+        name: `${tag} rule PM→Direktur ${JSON.stringify(scope)}`,
+        minAmount: 0,
+        steps: [{ level: 1, approverRole: 'pk-owner' }],
+      })
+    }
+    return { emp, users, project, otherProject, costCenter, projectCostCenter, accA, accB, cashAccount, cat, uom, vehicle, cashInSource }
+  }
   // World rules (priority 10, scoped), ADR 0013: "Diketahui" = Direktur (pk-owner, `owner`/`owner2`)
   // approval, then Finance level 1; > 10 juta: two Finance levels (`finance` + `finance2`, Q-31 example).
   const ruleBase = { docType: 'expense_request', requestType: 'any', priority: 10, acknowledge: 'required', acknowledgeBy: 'role', acknowledgeRole: 'pk-owner', active: true }
@@ -145,7 +203,7 @@ export async function makeWorld(tag: string) {
       ],
     })
   }
-  return { emp, users, project, otherProject, costCenter, accA, accB, cashAccount, cat, uom, vehicle, cashInSource }
+  return { emp, users, project, otherProject, costCenter, projectCostCenter, accA, accB, cashAccount, cat, uom, vehicle, cashInSource }
 }
 
 // ---------------------------------------------------------------- HTTP helpers
@@ -185,6 +243,21 @@ export async function upload(path: string, user: FlowUser, bytes: Buffer, mimety
 /** Runs a domain call in its own transaction as `user` (service-level tests). */
 export async function asUser<T>(user: FlowUser | null, fn: (req: PayloadRequest) => Promise<T>): Promise<T> {
   return withSystemTransaction(await getTestPayload(), user as never, fn)
+}
+
+/**
+ * DRMS 10/10 D2: turns a Draft into a LEGACY cost-center request — no project, its own cost center, already submitted
+ * once (approval cycle ≥ 1, e.g. withdrawn) — the only kind of cost-center request that can still be sent. Since D2
+ * the app refuses to create one, so only the DB owner can (trigger expense_requests_project_rules paused for it).
+ */
+export async function legacyCostCenter(id: number, costCenter: number): Promise<void> {
+  // three statements = three transactions (the UPDATE queues deferred checks; ALTER TABLE refuses pending events)
+  await sqlAs('owner', 'ALTER TABLE expense_requests DISABLE TRIGGER expense_requests_project_rules')
+  try {
+    await sqlAs('owner', 'UPDATE expense_requests SET project_id = NULL, cost_center_id = $1, approval_cycle = greatest(coalesce(approval_cycle, 0), 1) WHERE id = $2', [costCenter, id])
+  } finally {
+    await sqlAs('owner', 'ALTER TABLE expense_requests ENABLE TRIGGER expense_requests_project_rules')
+  }
 }
 
 export function draftBody(w: World, over: Record<string, unknown> = {}) {

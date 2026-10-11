@@ -217,7 +217,7 @@ describe('403 before 409 (UAT 5.2)', () => {
 })
 
 describe('settlement reversal state rules (E9)', () => {
-  it('only an Uang Muka in "Selesai" can be reversed, back to "LPJ Terverifikasi"', () => {
+  it('only a Pengajuan Baru in "Selesai" can be reversed, back to "LPJ Terverifikasi"', () => {
     expect(targets('advance', 'completed', 'settle_reverse')).toEqual(['lpj_verified'])
     expect(targets('reimburse', 'completed', 'settle_reverse')).toEqual([])
     expect(targets('advance', 'lpj_verified', 'settle_reverse')).toEqual([])

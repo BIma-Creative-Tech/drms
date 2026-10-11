@@ -17,7 +17,7 @@ import { mediaPath } from '@/lib/media-files'
 import { resetRateLimits } from '@/lib/rate-limit'
 import { up as upLpjSource } from '@/migrations/20261008_120100_qa_flow_lpj_source'
 
-import { api, asUser, draftBody, makeFlowUser, makeWorld, png, sysCreate, upload, type FlowUser, type World } from './flow-world'
+import { api, asUser, draftBody, legacyCostCenter, makeFlowUser, makeWorld, png, sysCreate, upload, type FlowUser, type World } from './flow-world'
 import { addMembership, auditRows, companyId, getTestPayload, sqlAs, sqlError } from './helpers'
 
 // ActionButton / ReasonAction (client components) refresh through the app router; not mounted in SSR tests.
@@ -84,7 +84,7 @@ async function transferProof(): Promise<number> {
   return r.body.id
 }
 
-/** Uang Muka 750.000 (600.000 + 150.000) → approved → transferred. */
+/** Pengajuan Baru 750.000 (600.000 + 150.000) → approved → transferred. */
 async function transferredAdvance(body: Record<string, unknown> = {}) {
   const c = await ok(api('POST', E, w.users.staffA, draftBody(w, body), key()), 201)
   const id = c.id as number
@@ -386,7 +386,9 @@ describe('QA-18 — the team PM is notified (scope rule: PM role in the request 
     await ok(api('POST', `${E}/${d.id}/submit`, w.users.staffA, {}, key()))
     await ok(api('POST', `${E}/${d.id}/reject`, w.users.owner, { reason: 'tidak sesuai RAB' }, key()))
     expect(await notifications(w.users.pm, d.id)).toEqual(['expense.team_submitted', 'expense.rejected'])
-    const cc = await ok(api('POST', E, w.users.staffA, draftBody(w, { projectId: null, costCenterId: w.costCenter }), key()), 201)
+    // DRMS 10/10 D2: a cost-center request is a legacy row (before D2), sent again after a withdraw
+    const cc = await ok(api('POST', E, w.users.staffA, draftBody(w), key()), 201)
+    await legacyCostCenter(cc.id, w.costCenter)
     await ok(api('POST', `${E}/${cc.id}/submit`, w.users.staffA, {}, key()))
     expect((await notifications(w.users.pm, cc.id)).filter((e) => e === 'expense.team_submitted')).toEqual([])
     // the PM submits a request on its project (co-requester Staff A): no team copy to itself (actor + requester)

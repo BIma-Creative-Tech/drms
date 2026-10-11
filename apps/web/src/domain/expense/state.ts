@@ -1,5 +1,5 @@
 /**
- * Table-driven state machines for T1 (architecture §5.1 Uang Muka, §5.2 Reimburse, guard G6):
+ * Table-driven state machines for T1 (architecture §5.1 Pengajuan Baru, §5.2 Reimburse, guard G6):
  * the ONLY transitions the domain service performs. Status never changes through a generic field
  * edit (field access update=false + hook rejecting a status diff without a transition context).
  * Pure module (unit-tested).
@@ -26,7 +26,7 @@ export const ACTIONS = [
   'transfer_void',
   'complete',
   'resubmit',
-  // F2b — T5 LPJ & settlement (Uang Muka only, architecture §5.1/§5.3)
+  // F2b — T5 LPJ & settlement (Pengajuan Baru only, architecture §5.1/§5.3)
   'receipts_complete',
   'lpj_submit',
   'lpj_request_revision',
@@ -52,7 +52,7 @@ export const TRANSITIONS: readonly Row[] = [
   { from: ['pending_ack', 'pending_approval'], action: 'acknowledge', to: ['pending_approval'] },
   { from: ['pending_approval'], action: 'approve', to: ['pending_approval', 'approved'] },
   { from: ['pending_ack', 'pending_approval'], action: 'reject', to: ['rejected'] },
-  // Uang Muka (advance)
+  // Pengajuan Baru (advance)
   { types: ['advance'], from: ['approved'], action: 'cancel', to: ['cancelled'] },
   { types: ['advance'], from: ['approved'], action: 'transfer', to: ['transferred'] },
   { types: ['advance'], from: ['transferred'], action: 'transfer_void', to: ['approved'] },
@@ -66,7 +66,7 @@ export const TRANSITIONS: readonly Row[] = [
   { types: ['reimburse'], from: ['receipts_verified'], action: 'transfer', to: ['transferred'] },
   { types: ['reimburse'], from: ['transferred'], action: 'transfer_void', to: ['receipts_verified'] },
   { types: ['reimburse'], from: ['transferred'], action: 'complete', to: ['completed'] },
-  // Uang Muka LPJ (T5): receipts complete → LPJ submitted ⇄ revision → verified → settled.
+  // Pengajuan Baru LPJ (T5): receipts complete → LPJ submitted ⇄ revision → verified → settled.
   // lpj_verify → completed directly when the difference is 0 (nothing to settle).
   { types: ['advance'], from: ['transferred'], action: 'receipts_complete', to: ['receipts_complete'] },
   { types: ['advance'], from: ['receipts_complete', 'lpj_revision'], action: 'lpj_submit', to: ['lpj_submitted'] },
@@ -126,6 +126,13 @@ export type ActorContext = {
    * neither (PM monitors only). Absent/false on legacy snapshots.
    */
   lacksDecisionRole?: boolean
+  /**
+   * ADR 0021 narrow G1 exception (`direktur_via_pm`): this caller's own involvement does not block the
+   * decision of the CURRENT step (creator PM at "Diketahui", requester Direktur at the approval step).
+   */
+  selfApprovalAllowed?: boolean
+  /** ADR 0021: the snapshot is of the PM project → Direktur model (messages only). */
+  pmFlow?: boolean
 }
 
 /** Actions that do not move the status (their own status preconditions are checked in allowedActions). */
@@ -158,7 +165,7 @@ export function allowedActions(ctx: ActorContext): Action[] {
       ? own && !ctx.hasDecision
       : office(ctx),
   )
-  const decider = !selfInvolved && !ctx.alreadyDecided && !ctx.lacksDecisionRole
+  const decider = (!selfInvolved || !!ctx.selfApprovalAllowed) && !ctx.alreadyDecided && !ctx.lacksDecisionRole
   add('acknowledge', ctx.isAcknowledger && decider)
   add('approve', ctx.matchesCurrentStep && decider)
   add('reject', decider && (ctx.status === 'pending_ack' ? ctx.isAcknowledger : ctx.matchesCurrentStep))
@@ -169,7 +176,7 @@ export function allowedActions(ctx: ActorContext): Action[] {
     'receipt_verify',
     finance &&
       ((ctx.type === 'reimburse' && (ctx.status === 'approved' || ctx.status === 'receipts_verified')) ||
-        // LPJ review (Uang Muka): valid/rejected per receipt, no status change.
+        // LPJ review (Pengajuan Baru): valid/rejected per receipt, no status change.
         (ctx.type === 'advance' && ctx.status === 'lpj_submitted')),
   )
   add('receipt_reject', finance)
@@ -217,8 +224,9 @@ export function mayPerform(ctx: ActorContext, action: Action): boolean {
     case 'acknowledge':
     case 'approve':
     case 'reject':
-      // G1 / Q-08: never on one's own request; ADR 0013: only Direktur/Finance decide.
-      return !own && !ctx.lacksDecisionRole
+      // G1 / Q-08: never on one's own request (ADR 0021: except the narrow `direktur_via_pm` case);
+      // ADR 0013/0021: only Direktur/Finance, or the PM project acknowledger of THIS request, decide.
+      return (!own || !!ctx.selfApprovalAllowed) && !ctx.lacksDecisionRole
     case 'transfer':
     case 'transfer_void':
       return finance

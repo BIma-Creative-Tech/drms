@@ -16,6 +16,7 @@ import '../domain/field_models.dart';
 import '../domain/field_rules.dart';
 import 'service_report_screen.dart' show confirmDiscard;
 import 'widgets/field_widgets.dart';
+import '../../../shared/widgets/pick_hint.dart';
 
 /// Timesheet Unit (mockup "Android-Timesheet", ADR 0020 §5): contract + date, one tab per unit of the contract
 /// active on that date (✓ / belum), HM awal prefilled from the previous HM akhir (server or this phone), HM akhir,
@@ -439,6 +440,7 @@ class _TimesheetScreenState extends ConsumerState<TimesheetScreen> {
                 child: AsyncBody<List<FieldProject>>(
                   value: projectsAsync,
                   data: (_) => DropdownButtonFormField<int>(
+                    hint: Text(pickHintFor(t, t.fieldContract)),
                     key: const Key('timesheet-project'),
                     initialValue: projects.any((p) => p.id == _projectId) ? _projectId : null,
                     isExpanded: true,

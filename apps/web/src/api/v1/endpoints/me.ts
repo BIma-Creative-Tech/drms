@@ -2,6 +2,7 @@ import type { PayloadRequest } from 'payload'
 
 import { companyContextOf, membershipsOf, userRoles, type Membership, type Role } from '@/access/roles'
 import { appSettings, companyById, settings } from '@/domain/companies'
+import { resolveDisplayName } from '@/domain/user-display-name'
 import { privacyStatusOf } from '@/legal/privacy-notice'
 import { DEFAULT_TZ } from '@/lib/time'
 
@@ -21,19 +22,23 @@ type UserShape = {
  * APK UI hints from a role set (ADR 0013 E1 / E4) — the same rule for the legacy top-level object
  * (roles of the selected PTs) and for each PT in `companies[]` (roles IN that PT). Decisions
  * (approval inbox) = Direktur (pk-owner) or Finance; the PM monitors the team list; progress
- * reports are created by the PM (team projects) or the Direktur. The server guards stay authoritative.
+ * reports are created by the PM (team projects) or the Direktur. ADR 0021: the PM approves its project's
+ * requests first, so the approval inbox is offered to the PM too. The server guards stay authoritative.
  */
 export function capabilitiesOf(roles: readonly Role[], opts: { fieldReportsEnabled?: boolean } = {}) {
   // FR1 (ADR 0020 §2): Staff (assigned projects), PM (team) and Direktur report in the field when the
   // PT's flag is on; WHICH report a project offers follows its kind (projects.kind, masters/units).
   const field = opts.fieldReportsEnabled === true && roles.some((r) => r === 'pk-staff' || r === 'pk-pm' || r === 'pk-owner')
   return {
-    approvalInbox: roles.some((r) => r === 'pk-owner' || r === 'pk-finance'),
+    // ADR 0021: the PM project approves first ("Persetujuan PM") — the inbox lists only its own steps
+    approvalInbox: roles.some((r) => r === 'pk-owner' || r === 'pk-finance' || r === 'pk-pm'),
     teamMonitor: roles.includes('pk-pm'),
-    progressReportCreate: roles.some((r) => r === 'pk-pm' || r === 'pk-owner'),
+    progressReportCreate: roles.some((r) => r === 'pk-pm' || r === 'pk-owner' || r === 'pk-admin'),
     serviceReportCreate: field,
     unitTimesheetCreate: field,
     aftersalesActivityCreate: field,
+    // P3: Laporan harian on projects of kind konstruksi
+    dailyReportCreate: field,
   }
 }
 
@@ -135,6 +140,9 @@ export const meEndpoint = v1({
       id: u.id,
       email: u.email,
       name: u.name ?? null,
+      // DRMS 10/10 WA-14: label to greet the caller with (users.name → employee of a selected PT → email
+      // local part → "Pengguna", domain/user-display-name.ts). Additive; `name` keeps the stored account name.
+      displayName: await resolveDisplayName(req.payload, req.user),
       roles,
       capabilities: capabilitiesOf(roles, { fieldReportsEnabled: companies.some((c) => c.selected && c.settings.fieldReportsEnabled) }),
       employee: legacyEmployeeId !== null ? (employees.get(legacyEmployeeId) ?? null) : null,

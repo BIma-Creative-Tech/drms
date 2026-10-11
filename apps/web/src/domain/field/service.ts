@@ -5,6 +5,7 @@ import { SparepartLines, type SparepartLineIn } from '@/api/v1/schemas-field'
 import { parseBusinessDate } from '@/domain/numbering'
 import { allocateDocNo } from '@/domain/numbering-db'
 import { requestMeta } from '@/lib/request-meta'
+import { searchWhere } from '@/lib/text-search'
 
 import {
   checkPhotos,
@@ -300,7 +301,7 @@ export async function serviceDto(req: PayloadRequest, d: ServiceDoc): Promise<Se
   return (await serviceDtos(req, [d]))[0]!
 }
 
-export type ServiceListFilter = { projectId?: number; unitId?: number; status?: UnitStatus; reporterId?: number; from?: string; to?: string; mine?: boolean; limit: number; after?: number; companyIds?: readonly number[] }
+export type ServiceListFilter = { projectId?: number; unitId?: number; status?: UnitStatus; reporterId?: number; from?: string; to?: string; mine?: boolean; limit: number; after?: number; companyIds?: readonly number[]; q?: string }
 
 /** Newest first in the caller's read scope (collection access), cursor on id. */
 export async function listServiceReports(req: PayloadRequest, f: ServiceListFilter): Promise<{ items: ServiceDto[]; nextCursor: number | null }> {
@@ -314,13 +315,15 @@ export async function listServiceReports(req: PayloadRequest, f: ServiceListFilt
   if (f.mine) and.push({ reporter: { equals: userId(req) ?? -1 } })
   if (f.after !== undefined) and.push({ id: { less_than: f.after } })
   if (f.companyIds?.length) and.push({ company: { in: [...f.companyIds] } })
+  const text = searchWhere(['docNo', 'complaint', 'action', 'notes'], f.q) // DRMS 10/10 D8
+  if (text) and.push(text)
   const docs = await scopedFind<ServiceDoc>(req, 'service-reports', and, f.limit + 1, '-id')
   const page = docs.slice(0, f.limit)
   return { items: await serviceDtos(req, page), nextCursor: docs.length > f.limit ? page[page.length - 1]!.id : null }
 }
 
 /** Collection find with the caller's access; a role without read access gets an empty list (403 → []). */
-export async function scopedFind<T>(req: PayloadRequest, collection: 'service-reports' | 'unit-timesheets' | 'aftersales-activities', and: Where[], limit: number, sort: string): Promise<T[]> {
+export async function scopedFind<T>(req: PayloadRequest, collection: 'service-reports' | 'unit-timesheets' | 'aftersales-activities' | 'daily-reports', and: Where[], limit: number, sort: string): Promise<T[]> {
   try {
     const res = await req.payload.find({ collection, where: and.length ? { and } : undefined, sort, limit, depth: 0, user: req.user, overrideAccess: false /* caller's read scope */, req })
     return res.docs as unknown as T[]

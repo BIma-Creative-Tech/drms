@@ -9,6 +9,7 @@ import { fmtNum, hoursCheck, inPeriod, longDate } from '@/domain/field/views'
 import { fieldErrors, newIdemKey, sendJson } from '../kas/client'
 import { getJson } from './client'
 import { decOut, DecimalField, PhotoPicker, usePhotos } from './parts'
+import { DateInput } from '../DateInput'
 
 /**
  * FR1 web input "Timesheet harian unit" (plan B; fields of the APK mockup Android-Timesheet): contract
@@ -207,7 +208,7 @@ export function TimesheetForm({ projects, today, minDate, initialProject, initia
             <label htmlFor={id('date')}>
               Tanggal<span className="req" aria-hidden>*</span>
             </label>
-            <input id={id('date')} type="date" value={date} min={minDate} max={today} onChange={(e) => setDate(e.target.value)} aria-invalid={err('reportDate') ? true : undefined} aria-describedby={err('reportDate') ? id('reportDate-e') : undefined} />
+            <DateInput id={id('date')} type="date" value={date} min={minDate} max={today} onChange={(e) => setDate(e.target.value)} aria-invalid={err('reportDate') ? true : undefined} aria-describedby={err('reportDate') ? id('reportDate-e') : undefined} />
             {errEl('reportDate')}
           </div>
           <div className="pk-fld">

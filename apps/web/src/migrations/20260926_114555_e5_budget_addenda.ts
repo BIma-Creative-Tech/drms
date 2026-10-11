@@ -236,7 +236,7 @@ export async function down({ db }: MigrateDownArgs): Promise<void> {
   ALTER TABLE "payload_locked_documents_rels" DROP CONSTRAINT IF EXISTS "payload_locked_documents_rels_budget_addenda_fk"; -- already dropped by DROP TABLE … CASCADE
   
   DROP INDEX "approvals_addendum_idx";
-  DROP INDEX "payload_locked_documents_rels_budget_addenda_id_idx";
+  DROP INDEX IF EXISTS "payload_locked_documents_rels_budget_addenda_id_idx";
   ALTER TABLE "approvals" ALTER COLUMN "request_id" SET NOT NULL;
   ALTER TABLE "approvals" DROP COLUMN "addendum_id";
   ALTER TABLE "payload_locked_documents_rels" DROP COLUMN "budget_addenda_id";

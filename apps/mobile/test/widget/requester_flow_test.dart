@@ -30,7 +30,7 @@ Map<String, dynamic> advanceJson({
 }) => {
   ...detailJson(status: status, allowed: allowed, currentLevel: null),
   'type': 'advance',
-  'typeLabel': 'Uang Muka',
+  'typeLabel': 'Pengajuan Baru',
   'statusLabel': 'Ditransfer',
   'approvedAmount': 1447500,
   'transferredTotal': 1447500,
@@ -86,7 +86,7 @@ void main() {
   testWidgets('requester sees the transfer (web) with amount, date, bank ref and total', (tester) async {
     await pumpDetail(tester, advanceJson(), FakeExpenseApi());
     await scrollTo(tester, find.byKey(const Key('transfer-section')));
-    expect(find.text('Uang muka · Rp 1.447.500'), findsOneWidget);
+    expect(find.text('Pengajuan Baru · Rp 1.447.500'), findsOneWidget);
     expect(find.textContaining('TRF/2026/IX/0007 · 22 Sep 2026'), findsOneWidget);
     expect(find.textContaining('Ref. bank: MDR-889900'), findsOneWidget);
     expect(find.text('Tercatat'), findsOneWidget);
@@ -149,12 +149,12 @@ void main() {
     await scrollTo(tester, find.byKey(const Key('action-lpj-submit')));
     await tester.tap(find.text('Kirim LPJ'));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('prompt-ok')));
+    await tester.tap(find.byKey(const Key('lpj-send')));
     await tester.pumpAndSettle();
     expect(find.text('Wajib diisi (minimal 3 karakter).'), findsOneWidget);
     expect(api.adapter.calls, isEmpty);
     await tester.enterText(find.byKey(const Key('lpj-usage-notes')), 'BBM dan penginapan tim survei');
-    await tester.tap(find.byKey(const Key('prompt-ok')));
+    await tester.tap(find.byKey(const Key('lpj-send')));
     await tester.pumpAndSettle();
     expect(api.adapter.calls.single.uri.path, '/api/v1/expense-requests/42/lpj/submit');
     expect(api.adapter.calls.single.headers['Idempotency-Key'], isNotNull);
@@ -272,7 +272,7 @@ void main() {
 
   test('mapper: transfers + settlement', () {
     final d = detailFromJson(advanceJson(settlement: {'id': 3, 'status': 'submitted', 'statusLabel': 'Diajukan'}));
-    expect(d.transfers.single.kindLabel, 'Uang muka');
+    expect(d.transfers.single.kindLabel, 'Pengajuan Baru');
     expect(d.transfers.single.isVoid, isFalse);
     expect(d.transferredTotal, 1447500);
     expect(d.settlement?.statusLabel, 'Diajukan');

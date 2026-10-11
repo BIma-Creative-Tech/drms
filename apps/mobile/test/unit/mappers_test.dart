@@ -46,8 +46,8 @@ void main() {
     final p = userProfileFromJson(meJson(roles: ['pk-staff', 'pk-pm', 'unknown-role']));
     expect(p.roles, {Role.staff, Role.pm});
     expect(p.homeKind, HomeKind.pm);
-    // ADR 0013: PM monitors only (no inbox); without `capabilities` (cached pre-E1 /me) the roles decide.
-    expect(p.hasApprovalInbox, isFalse);
+    // ADR 0021: the PM project approves first (inbox); without `capabilities` (cached pre-E1 /me) the roles decide.
+    expect(p.hasApprovalInbox, isTrue);
     expect(p.hasTeamMonitor, isTrue);
     expect(p.timezone, 'Asia/Makassar');
     expect(p.imageTargets.receiptsMaxPx, 2000);
@@ -93,19 +93,23 @@ void main() {
     final b = draftToCreateBody(seedDraft());
     expect(b['type'], 'reimburse');
     expect(b['clientUuid'], '0192f6d0-aaaa-7bbb-8ccc-000000000100');
-    expect(b['costCenterId'], 7);
-    expect(b['projectId'], isNull);
+    // D2: project only — no cost center from the requester.
+    expect(b['projectId'], 9);
+    expect(b.containsKey('costCenterId'), isFalse);
     final lines = b['lines'] as List;
     expect(lines, hasLength(3));
     expect((lines[1] as Map)['total'], 677000);
-    expect((lines[1] as Map)['unitPrice'], 339000);
+    expect((lines[1] as Map)['unitPrice'], 338500);
+    expect((lines[1] as Map)['receiptAmount'], 676876);
+    expect((lines[1] as Map)['rapItemId'], 502, reason: 'D4: RAP item per line');
     expect(b.containsKey('grandTotal'), isFalse, reason: 'server computes the grand total');
   });
 
   test('draft → sync payload (SyncDraftUpsertPayload, backend 0.2.1)', () {
     final p = draftToSyncPayload(seedDraft());
     expect(p['kind'], 'reimburse');
-    expect(p['cost_center_id'], 7);
+    expect(p['project_id'], 9);
+    expect(p.containsKey('cost_center_id'), isFalse, reason: 'D2: Finance sets the cost center at transfer');
     expect(p['requester_ids'], [11, 12]);
     expect(p['client_grand_total'], 1447500);
     expect(p.containsKey('draft_client_uuid'), isFalse);
@@ -117,12 +121,17 @@ void main() {
       'uom_id',
       'unit_price',
       'total',
+      'receipt_amount',
+      'rap_item_id',
       'notes',
       'category_id',
       'vehicle_id',
       'receipts',
     });
     expect(l2['client_uuid'], '0192f6d0-aaaa-7bbb-8ccc-000000000012');
+    // D3: total = qty × harga satuan (2 × 338.500), "Nominal sesuai nota" beside it.
+    expect((l2['qty'], l2['unit_price'], l2['total'], l2['receipt_amount']), (2.0, 338500, 677000, 676876));
+    expect(l2['rap_item_id'], 502);
     final r = (l2['receipts'] as List).single as Map<String, dynamic>;
     expect(r['amount'], 676876);
     expect(r['receipt_date'], '2026-09-20');

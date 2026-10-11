@@ -11,6 +11,9 @@ import { newIdemKey, sendJson } from './client'
  * aria-describedby, busy state. One Idempotency-Key per opened dialog: a network retry of the same
  * submit is replayed by the server instead of executed twice (G15). The server re-checks role,
  * state and the reason (Zod min 3). Styles: KAS_STYLE, rendered ONCE by the host view.
+ * No <form>: the transfer void lives in the expense-request workflow panel, i.e. INSIDE Payload's document
+ * <form> — a nested <form> is invalid HTML and broke hydration of the request detail (DRMS 10/10 int., g).
+ * The confirm button submits by click; the textarea keeps Enter for new lines (same as ActionDialog).
  */
 export type ReasonActionProps = {
   url: string
@@ -49,8 +52,7 @@ export function ReasonAction({ url, label, title, description, confirmLabel, fie
   const close = () => {
     if (!busy) ref.current?.close()
   }
-  const submit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const submit = async () => {
     const v = value.trim()
     if (required && v.length < MIN) {
       setError(`${fieldLabel} wajib diisi (minimal ${MIN} karakter).`)
@@ -83,7 +85,7 @@ export function ReasonAction({ url, label, title, description, confirmLabel, fie
         {label}
       </button>
       <dialog ref={ref} className="pk-dlg" aria-labelledby={`${uid}-t`} aria-describedby={`${uid}-d`} onCancel={(e) => busy && e.preventDefault()}>
-        <form onSubmit={submit} noValidate>
+        <div role="form" aria-labelledby={`${uid}-t`}>
           <h2 id={`${uid}-t`}>{title}</h2>
           <div id={`${uid}-d`} className="desc">
             {description}
@@ -123,11 +125,11 @@ export function ReasonAction({ url, label, title, description, confirmLabel, fie
             <button type="button" className="pk-kbtn" onClick={close} disabled={busy}>
               Batal
             </button>
-            <button type="submit" className={`pk-kbtn ${variant === 'danger' ? 'danger-solid' : 'primary'}`} disabled={busy} data-pk-confirm={testId}>
+            <button type="button" onClick={() => void submit()} className={`pk-kbtn ${variant === 'danger' ? 'danger-solid' : 'primary'}`} disabled={busy} data-pk-confirm={testId}>
               {busy ? 'Memproses…' : confirmLabel}
             </button>
           </div>
-        </form>
+        </div>
       </dialog>
     </>
   )

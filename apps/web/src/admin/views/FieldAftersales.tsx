@@ -15,11 +15,14 @@ import { clientsOf, fieldProjects, historyOf, mayCorrectIn, mayCreateIn, reporte
 import { withReqTransaction } from '@/lib/system-tx'
 import { DEFAULT_TZ } from '@/lib/time'
 import { xlsxEnabled } from '@/lib/xlsx'
+import { AutoSubmit } from '@/admin/components/list/AutoSubmit'
+import { DEFAULT_PAGE_SIZE, PAGE_SIZES, parseListQuery } from '@/admin/list-query'
 
 import { BtnLink, dateParam, FIELD_CREATORS, FIELD_OFFICE, FIELD_READERS, FieldFrame, fieldGate, FlagPills, History, idParam, MetaRows, one, OpenAction, PhotoGallery, segmentNum, spOf } from './field-ui'
 import { ptView, PtChip } from './pt'
 import { Alert, dateId } from './progress-ui'
 import { Bento, Card, DashHead, DataTable, EmptyState, KpiRow, KpiTile, rp, rpShort, StatusPill, type Col } from './viz'
+import { DateInput } from '../components/DateInput'
 
 /**
  * FR1 aftersales spare parts (ADR 0020, plan A2; mockups Web-Aftersales + Android-Aftersales): weekly
@@ -234,14 +237,16 @@ export async function FieldActivityList(props: AdminViewServerProps) {
     to: dateParam(sp.sampai),
     before: idParam(sp.sebelum),
   }
+  // DRMS 10/10 D8: text search + page size (shared list query; the cursor stays `sebelum`)
+  const lq = parseListQuery(props.searchParams)
   const d = await withReqTransaction(req, async () => {
-    const page = await listActivities(req, { projectId: q.project, clientId: q.client, reporterId: q.reporter, kind: q.kind, poStatus: q.poStatus, from: q.from, to: q.to, limit: 30, after: q.before, companyIds: gate.companies })
+    const page = await listActivities(req, { projectId: q.project, clientId: q.client, reporterId: q.reporter, kind: q.kind, poStatus: q.poStatus, from: q.from, to: q.to, limit: lq.per, after: q.before, companyIds: gate.companies, q: lq.q })
     const projects = await fieldProjects(req, ['aftersales'], gate.companies, { includeArchived: true })
     const clients = await clientsOf(req, gate.companies)
     const reporters = await reportersOf(req, 'aftersales-activities')
     return { page, projects, clients, reporters, pt: await ptView(req) }
   })
-  const filtered = Boolean(q.project || q.client || q.reporter || q.kind || q.poStatus || q.from || q.to)
+  const filtered = Boolean(q.project || q.client || q.reporter || q.kind || q.poStatus || q.from || q.to || lq.q)
   const keep = (extra: Record<string, string>) => {
     const u = new URLSearchParams()
     if (q.project) u.set('project', String(q.project))
@@ -251,6 +256,8 @@ export async function FieldActivityList(props: AdminViewServerProps) {
     if (q.poStatus) u.set('status', q.poStatus)
     if (q.from) u.set('dari', q.from)
     if (q.to) u.set('sampai', q.to)
+    if (lq.q) u.set('q', lq.q)
+    if (lq.per !== DEFAULT_PAGE_SIZE) u.set('per', String(lq.per))
     for (const [k, v] of Object.entries(extra)) u.set(k, v)
     return `${listHref}?${u.toString()}`
   }
@@ -276,13 +283,17 @@ export async function FieldActivityList(props: AdminViewServerProps) {
         </div>
       </DashHead>
       <form className="pk-filter" method="get" action={listHref} role="search" aria-label="Filter aktivitas" data-pk-filter="aktivitas">
+        <label className="pk-filter__search">
+          Cari
+          <input type="search" name="q" defaultValue={lq.q} placeholder="No. dokumen, penerima, catatan…" maxLength={100} autoComplete="off" data-pk-search="aktivitas" />
+        </label>
         <label>
           Dari
-          <input type="date" name="dari" defaultValue={q.from ?? ''} />
+          <DateInput type="date" name="dari" defaultValue={q.from ?? ''} />
         </label>
         <label>
           Sampai
-          <input type="date" name="sampai" defaultValue={q.to ?? ''} />
+          <DateInput type="date" name="sampai" defaultValue={q.to ?? ''} />
         </label>
         <label>
           Pelanggan
@@ -343,6 +354,16 @@ export async function FieldActivityList(props: AdminViewServerProps) {
             </select>
           </label>
         ) : null}
+        <label>
+          Per halaman
+          <select name="per" defaultValue={String(lq.per)} data-pk-page-size="aktivitas">
+            {PAGE_SIZES.map((n) => (
+              <option key={n} value={n}>
+                {n}
+              </option>
+            ))}
+          </select>
+        </label>
         <button type="submit" className="pk-kbtn primary">
           Terapkan
         </button>
@@ -351,6 +372,7 @@ export async function FieldActivityList(props: AdminViewServerProps) {
             Reset
           </Link>
         ) : null}
+        <AutoSubmit />
       </form>
       <Bento label="Daftar aktivitas">
         <Card id="activities" title="Aktivitas" sub={`${d.page.items.length}${d.page.nextCursor ? '+' : ''} aktivitas${filtered ? ' (terfilter)' : ''}`}>

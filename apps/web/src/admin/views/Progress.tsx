@@ -4,7 +4,10 @@ import React from 'react'
 
 import { hasRoleAny } from '@/access/roles'
 import { resolveScope } from '@/access/scope'
+import { AutoSubmit } from '@/admin/components/list/AutoSubmit'
+import { ListToolbar, Pager } from '@/admin/components/list/ListToolbar'
 import { StageEditor } from '@/admin/components/progress/StageEditor'
+import { DEFAULT_PAGE_SIZE, matchesQuery, PAGE_SIZES, paginate, parseListQuery } from '@/admin/list-query'
 import { listAddenda } from '@/domain/addendum/service'
 import { settings } from '@/domain/expense/common'
 import { listReports, reportDto, type ReportDto } from '@/domain/progress/dto'
@@ -27,6 +30,7 @@ import { ptView } from './pt'
 import { Alert, dateId, dateTimeId, ProgressLegend, ProgressTable, ProgressTonePill, ProgressVsBudgetRows } from './progress-ui'
 import { Bento, Card, DashHead, DataTable, EmptyState, KpiRow, KpiTile, pctText, rp, StatusPill, TableView, type Col } from './viz'
 import { NoAccess } from './NoAccess'
+import { DateInput } from '../components/DateInput'
 
 /**
  * E4 web (plan fase1-golive §E4, US-10/US-12/US-29/US-31): project progress overview (K-09
@@ -67,6 +71,13 @@ export async function ProgressOverview(props: AdminViewServerProps) {
   const measured = rows.filter((p) => p.stagesComplete)
   const avg = measured.length ? measured.reduce((s, p) => s + p.progressPct, 0) / measured.length : null
   const isPm = !hasRoleAny(req, 'pk-owner', 'pk-finance')
+  // DRMS 10/10 D8: search (kode / nama) + status filter + pagination of the project list (KPI tiles count all)
+  const lq = parseListQuery(props.searchParams, ['status'])
+  const page = paginate(
+    rows.filter((p) => (!lq.filters.status || p.tone === lq.filters.status) && matchesQuery([p.code, p.name], lq.q)),
+    lq.page,
+    lq.per,
+  )
   return (
     <Frame props={props} name="progress">
       <ChartHover>
@@ -107,13 +118,25 @@ export async function ProgressOverview(props: AdminViewServerProps) {
             sub="K-09 · urut selisih terbesar dulu · klik project untuk tahapan & laporan"
             foot={`Selisih = % anggaran − % progress fisik. Ambang di pengaturan perusahaan (kuning > ${d.warnGapPct}%, merah > ${d.badGapPct}%). Project tanpa RAB atau tahapan belum 100% tidak dinilai.`}
           >
-            {rows.length > 0 ? <ProgressLegend warn={d.warnGapPct} bad={d.badGapPct} /> : null}
-            <ProgressVsBudgetRows id="progress-vs-budget" rows={rows} hrefOf={(p) => projectHref(p.id)} empty={isPm ? 'Anda belum ditetapkan sebagai PM project mana pun.' : 'Belum ada project.'} pt={pt} />
             {rows.length > 0 ? (
+              <ListToolbar
+                id="progress"
+                action="/admin/progress"
+                query={lq}
+                label="Cari dan saring project"
+                search={{ placeholder: 'Kode atau nama project…' }}
+                keep={{ arsip: archived ? 'ya' : undefined }}
+                filters={[{ key: 'status', label: 'Status', options: [{ value: 'ok', label: 'Sesuai' }, { value: 'warn', label: 'Perlu perhatian' }, { value: 'bad', label: 'Anggaran mendahului progress' }, { value: 'none', label: 'Belum dinilai' }] }]}
+              />
+            ) : null}
+            {rows.length > 0 ? <ProgressLegend warn={d.warnGapPct} bad={d.badGapPct} /> : null}
+            <ProgressVsBudgetRows id="progress-vs-budget" rows={page.items} hrefOf={(p) => projectHref(p.id)} empty={rows.length ? 'Tidak ada project yang cocok dengan pencarian / filter.' : isPm ? 'Anda belum ditetapkan sebagai PM project mana pun.' : 'Belum ada project.'} pt={pt} />
+            {page.items.length > 0 ? (
               <TableView>
-                <ProgressTable rows={rows} hrefOf={(p) => projectHref(p.id)} pt={pt} />
+                <ProgressTable rows={page.items} hrefOf={(p) => projectHref(p.id)} pt={pt} />
               </TableView>
             ) : null}
+            {rows.length > 0 ? <Pager id="progress" path="/admin/progress" sp={props.searchParams} page={page} unit="project" /> : null}
           </Card>
         </Bento>
       </ChartHover>
@@ -191,6 +214,10 @@ export async function ProjectProgressView(props: AdminViewServerProps) {
             </Link>
             <Link className="pk-kbtn" href={`/admin/progress/laporan?project=${project.id}`}>
               Laporan project ini
+            </Link>
+            {/* DRMS 10/10 #5: two-way link with the project form (data: kode, PM, RAB, lokasi, status) */}
+            <Link className="pk-kbtn" href={`/admin/collections/projects/${project.id}`} data-pk-link="project-form">
+              Data project
             </Link>
             {teamPm ? (
               <Link className="pk-kbtn primary" href={`/admin/addendum/baru?project=${project.id}`} data-pk-link="addendum-baru">
@@ -339,21 +366,25 @@ export async function ProgressReportList(props: AdminViewServerProps) {
   const sp = (props.searchParams ?? {}) as Record<string, string | undefined>
   const num = (v: string | undefined) => (v && /^\d{1,10}$/.test(v) ? Number(v) : undefined)
   const q = { project: num(sp.project), stage: num(sp.tahap), from: sp.dari && DATE_RE.test(sp.dari) ? sp.dari : undefined, to: sp.sampai && DATE_RE.test(sp.sampai) ? sp.sampai : undefined, before: num(sp.sebelum) }
+  // DRMS 10/10 D8: text search + page size (cursor stays `sebelum`)
+  const lq = parseListQuery(props.searchParams)
   const d = await withReqTransaction(req, async () => {
-    const page = await listReports(req, { projectId: q.project, stageId: q.stage, from: q.from, to: q.to, limit: 25, after: q.before })
+    const page = await listReports(req, { projectId: q.project, stageId: q.stage, from: q.from, to: q.to, limit: lq.per, after: q.before, q: lq.q })
     const projects = (await req.payload.find({ collection: 'projects', sort: 'code', depth: 0, pagination: false, select: { code: true, name: true }, user: req.user, overrideAccess: false, req }).catch(() => ({ docs: [] }))).docs as Array<{ id: number; code: string; name: string }>
     const stages = q.project
       ? ((await req.payload.find({ collection: 'project-stages', where: { project: { equals: q.project } }, sort: 'sequence', depth: 0, pagination: false, select: { name: true }, user: req.user, overrideAccess: false, req }).catch(() => ({ docs: [] }))).docs as Array<{ id: number; name: string }>)
       : []
     return { page, projects, stages }
   })
-  const filtered = Boolean(q.project || q.stage || q.from || q.to)
+  const filtered = Boolean(q.project || q.stage || q.from || q.to || lq.q)
   const keep = (extra: Record<string, string>) => {
     const u = new URLSearchParams()
     if (q.project) u.set('project', String(q.project))
     if (q.stage) u.set('tahap', String(q.stage))
     if (q.from) u.set('dari', q.from)
     if (q.to) u.set('sampai', q.to)
+    if (lq.q) u.set('q', lq.q)
+    if (lq.per !== DEFAULT_PAGE_SIZE) u.set('per', String(lq.per))
     for (const [k, v] of Object.entries(extra)) u.set(k, v)
     return `/admin/progress/laporan?${u.toString()}`
   }
@@ -433,6 +464,10 @@ export async function ProgressReportList(props: AdminViewServerProps) {
         </div>
       </DashHead>
       <form className="pk-filter" method="get" action="/admin/progress/laporan" role="search" aria-label="Filter laporan progress" data-pk-filter="laporan-progress">
+        <label className="pk-filter__search">
+          Cari
+          <input type="search" name="q" defaultValue={lq.q} placeholder="Nomor, pekerjaan, kendala…" maxLength={100} autoComplete="off" data-pk-search="laporan-progress" />
+        </label>
         <label>
           Project
           <select name="project" defaultValue={q.project ? String(q.project) : ''}>
@@ -457,11 +492,21 @@ export async function ProgressReportList(props: AdminViewServerProps) {
         </label>
         <label>
           Dari
-          <input type="date" name="dari" defaultValue={q.from ?? ''} />
+          <DateInput type="date" name="dari" defaultValue={q.from ?? ''} />
         </label>
         <label>
           Sampai
-          <input type="date" name="sampai" defaultValue={q.to ?? ''} />
+          <DateInput type="date" name="sampai" defaultValue={q.to ?? ''} />
+        </label>
+        <label>
+          Per halaman
+          <select name="per" defaultValue={String(lq.per)} data-pk-page-size="laporan-progress">
+            {PAGE_SIZES.map((n) => (
+              <option key={n} value={n}>
+                {n}
+              </option>
+            ))}
+          </select>
         </label>
         <button type="submit" className="pk-kbtn primary">
           Terapkan
@@ -471,6 +516,7 @@ export async function ProgressReportList(props: AdminViewServerProps) {
             Reset
           </Link>
         ) : null}
+        <AutoSubmit />
       </form>
       <Bento label="Daftar laporan progress">
         <Card id="reports" title="Laporan" sub={`${d.page.items.length}${d.page.nextCursor ? '+' : ''} laporan${filtered ? ' (terfilter)' : ''}`}>
@@ -582,14 +628,14 @@ export async function ProgressReportDetail(props: AdminViewServerProps) {
             <dd>{r.editableUntil ? `s/d ${dateTimeId(r.editableUntil, tz)} (pelapor, dengan alasan)` : '—'}</dd>
           </dl>
         </Card>
-        <Card id="report-photos" title="Foto" sub={r.photos.length ? 'Klik foto untuk ukuran penuh (tab baru)' : undefined} i={5}>
+        <Card id="report-photos" title="Foto" sub={r.photos.length ? 'Klik foto untuk memperbesar' : undefined} i={5}>
           {r.photos.length === 0 ? (
             <EmptyState text="Laporan ini tanpa foto." />
           ) : (
             <ul className="pk-gallery" data-pk-gallery={r.id}>
               {r.photos.map((p, i) => (
                 <li key={p.id}>
-                  <a href={p.url} target="_blank" rel="noopener noreferrer" aria-label={`Foto ${i + 1} dari ${r.photos.length}, buka ukuran penuh`}>
+                  <a href={p.url} target="_blank" rel="noopener noreferrer" aria-label={`Foto ${i + 1} dari ${r.photos.length}, buka ukuran penuh`} data-pk-lightbox={`progress-${r.id}`} data-pk-lightbox-title={`Foto ${i + 1} laporan ${r.docNo ?? r.id}`}>
                     {/* eslint-disable-next-line @next/next/no-img-element -- authenticated API thumbnail */}
                     <img src={p.thumbUrl} alt={`Foto ${i + 1} laporan ${r.docNo ?? r.id}`} loading="lazy" width={p.width ?? undefined} height={p.height ?? undefined} />
                   </a>

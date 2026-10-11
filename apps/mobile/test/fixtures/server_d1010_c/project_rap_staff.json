@@ -1,0 +1,189 @@
+{
+ "projectId": 1,
+ "kind": "konstruksi",
+ "locked": false,
+ "canEdit": false,
+ "needsReason": false,
+ "items": [
+  {
+   "id": 1,
+   "code": "A.1",
+   "description": "Pekerjaan beton K-250",
+   "name": "Pekerjaan beton K-250",
+   "kind": "pekerjaan",
+   "stage": {
+    "id": 1,
+    "name": "Struktur lantai 2"
+   },
+   "uom": {
+    "id": 8,
+    "code": "M3"
+   },
+   "volume": 10,
+   "qty": 10,
+   "weightPct": null,
+   "sortOrder": 1,
+   "realised": 0,
+   "received": 0,
+   "used": 0,
+   "stock": null,
+   "pct": 0,
+   "overRap": false,
+   "active": true
+  },
+  {
+   "id": 2,
+   "code": "A.2",
+   "description": "Pembesian",
+   "name": "Pembesian",
+   "kind": "pekerjaan",
+   "stage": {
+    "id": 1,
+    "name": "Struktur lantai 2"
+   },
+   "uom": {
+    "id": 8,
+    "code": "M3"
+   },
+   "volume": 5,
+   "qty": 5,
+   "weightPct": null,
+   "sortOrder": 2,
+   "realised": 0,
+   "received": 0,
+   "used": 0,
+   "stock": null,
+   "pct": 0,
+   "overRap": false,
+   "active": true
+  },
+  {
+   "id": 3,
+   "code": "B.1",
+   "description": "Konsumsi & biaya umum lapangan",
+   "name": "Konsumsi & biaya umum lapangan",
+   "kind": "pekerjaan",
+   "stage": {
+    "id": 1,
+    "name": "Struktur lantai 2"
+   },
+   "uom": {
+    "id": 8,
+    "code": "M3"
+   },
+   "volume": 1,
+   "qty": 1,
+   "weightPct": null,
+   "sortOrder": 3,
+   "realised": 0,
+   "received": 0,
+   "used": 0,
+   "stock": null,
+   "pct": 0,
+   "overRap": false,
+   "active": true
+  },
+  {
+   "id": 4,
+   "code": "B.2",
+   "description": "Sewa perancah",
+   "name": "Sewa perancah",
+   "kind": "pekerjaan",
+   "stage": {
+    "id": 1,
+    "name": "Struktur lantai 2"
+   },
+   "uom": {
+    "id": 8,
+    "code": "M3"
+   },
+   "volume": 4,
+   "qty": 4,
+   "weightPct": null,
+   "sortOrder": 4,
+   "realised": 0,
+   "received": 0,
+   "used": 0,
+   "stock": null,
+   "pct": 0,
+   "overRap": false,
+   "active": true
+  }
+ ],
+ "stages": [
+  {
+   "id": 1,
+   "name": "Struktur lantai 2",
+   "weightPct": 100,
+   "progressPct": 0,
+   "active": true,
+   "progressMode": "rap",
+   "basis": "value",
+   "workItems": 4
+  }
+ ],
+ "totals": null,
+ "budget": null,
+ "resourceTypes": [
+  {
+   "id": 10,
+   "kind": "alat",
+   "code": "DUMP-TRUCK",
+   "name": "Dump truck"
+  },
+  {
+   "id": 7,
+   "kind": "alat",
+   "code": "EXCAVATOR",
+   "name": "Excavator"
+  },
+  {
+   "id": 5,
+   "kind": "tenaga",
+   "code": "KENEK",
+   "name": "Kenek / pekerja"
+  },
+  {
+   "id": 1,
+   "kind": "tenaga",
+   "code": "MANDOR",
+   "name": "Mandor"
+  },
+  {
+   "id": 8,
+   "kind": "alat",
+   "code": "MOLEN",
+   "name": "Molen / mixer"
+  },
+  {
+   "id": 6,
+   "kind": "tenaga",
+   "code": "OPERATOR",
+   "name": "Operator alat"
+  },
+  {
+   "id": 2,
+   "kind": "tenaga",
+   "code": "TK-BATU",
+   "name": "Tukang batu"
+  },
+  {
+   "id": 3,
+   "kind": "tenaga",
+   "code": "TK-BESI",
+   "name": "Tukang besi"
+  },
+  {
+   "id": 4,
+   "kind": "tenaga",
+   "code": "TK-KAYU",
+   "name": "Tukang kayu"
+  },
+  {
+   "id": 9,
+   "kind": "alat",
+   "code": "VIBRATOR",
+   "name": "Vibrator beton"
+  }
+ ]
+}

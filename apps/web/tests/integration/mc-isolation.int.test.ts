@@ -7,7 +7,7 @@ import { closePeriod, postEntry } from '@/domain/cash/ledger'
 import { DEFAULT_SEED_DATA } from '@/seed/data'
 import { seed } from '@/seed/seed'
 
-import { api, asUser, draftBody, makeFlowUser, makeWorld, png, sysCreate, upload, type FlowUser, type World } from './flow-world'
+import { adr0013Fallback, api, asUser, draftBody, makeFlowUser, makeWorld, png, sysCreate, upload, type FlowUser, type World } from './flow-world'
 import { addMembership, auditRows, companyId, getTestPayload, sqlAs, sqlError, withContext } from './helpers'
 
 /**
@@ -46,6 +46,7 @@ beforeAll(async () => {
   const { uoms, banks, ...drms } = DEFAULT_SEED_DATA
   await seed(p, { uoms, banks, companies: [drms, { ...drms, company: { name: 'PT Contoh Satu', shortCode: 'CS1', timezone: 'Asia/Makassar' }, vehicles: [] }] })
   b = await companyId('CS1')
+  await adr0013Fallback([a, b])
   const inB = async (collection: CollectionSlug, code: string) =>
     (await p.find({ collection, where: { and: [{ company: { equals: b } }, { code: { equals: code } }] }, limit: 1, depth: 0, overrideAccess: true /* SYSTEM-READ: fixture */ })).docs[0]!.id as number
   B.catKsm = await inB('expense-categories', 'KSM')
@@ -62,7 +63,7 @@ beforeAll(async () => {
   adminB = await makeFlowUser(['pk-admin'], 'mc-admin-b', null, { company: b, groupAdmin: false })
   pmB = await makeFlowUser(['pk-pm'], 'mc-pm-b', B.empPm, { company: b })
   B.project = await sysCreate('projects', { company: b, code: 'MC-P1', name: 'Proyek CS1', pm: pmB.id, budget: 50_000_000, status: 'berjalan' })
-  B.project2 = await sysCreate('projects', { company: b, code: 'MC-P2', name: 'Proyek CS1 lain', budget: 10_000_000, status: 'berjalan' })
+  B.project2 = await sysCreate('projects', { company: b, code: 'MC-P2', name: 'Proyek CS1 lain', pm: pmB.id, budget: 10_000_000, status: 'berjalan' })
   await sysCreate('team-assignments', { employee: B.empRina, project: B.project, roleInProject: 'staff' })
   B.acc = await sysCreate('employee-bank-accounts', { employee: B.empRina, bank, accountNo: `8${Date.now() % 1e9}`, accountHolder: 'Rina Contoh', isDefault: true })
   B.cash = await sysCreate('cash-accounts', { company: b, name: 'MC Kas CS1', kind: 'bank', openingBalance: 10_000_000 })
@@ -164,10 +165,10 @@ describe('MC1 — mutations are checked against the role IN THE DOCUMENT PT', ()
     expect((await sqlAs('app', 'SELECT company_id FROM expense_requests WHERE id = $1', [reqB])).rows[0].company_id).toBe(b)
     const s = await api('POST', `${E}/${reqB}/submit`, rina, {}, key())
     expect(s.status, JSON.stringify(s.body)).toBe(200)
-    // own counter per PT: the first CS1 number starts at the sequence start (229, default), whatever DRMS issued
-    expect(s.body.docNo).toMatch(/^229\/PB-CS1\/\d{2}\/[IVX]+\/\d{4}$/)
-    const counters = await sqlAs('app', "SELECT company_id, next_value FROM document_sequence_counters WHERE doc_type = 'expense_request' AND period_key = 'ALL' AND company_id = $1", [b])
-    expect(counters.rows).toEqual([{ company_id: b, next_value: 230 }])
+    // own counter per PT and month: the first CS1 number of the month is 0001 (owner 2026-10-11), whatever DRMS issued
+    expect(s.body.docNo).toMatch(/^PB\/CS1\/\d{4}\/0001$/) // D5: PT code; monthly series per PT
+    const counters = await sqlAs('app', "SELECT company_id, next_value FROM document_sequence_counters WHERE doc_type = 'expense_request' AND company_id = $1", [b])
+    expect(counters.rows).toEqual([{ company_id: b, next_value: 2 }])
   })
 
   it('approval holders are members of the document PT: DRMS Direktur → 404 on the CS1 request; CS1 Direktur + Finance decide', async () => {
@@ -193,7 +194,7 @@ describe('MC1 — mutations are checked against the role IN THE DOCUMENT PT', ()
     expect((await api('POST', `${E}/${reqA}/acknowledge`, w.users.owner, {}, key())).status).toBe(200)
     const ok = await api('POST', `${E}/${reqA}/approve`, rina, {}, key())
     expect(ok.status, JSON.stringify(ok.body)).toBe(200)
-    expect(ok.body.docNo).toMatch(/\/PB-DRMS\//)
+    expect(ok.body.docNo).toMatch(/^PB\/DRMS\//)
   })
 
   it('a draft mixing PTs is refused (project of CS1 + category of DRMS) — app 400, before the DB trigger', async () => {
@@ -248,7 +249,7 @@ describe('MC1 — DB guards (raw SQL as the app role)', () => {
     // Rina is not Finance/Direktur of CS1 → cannot close CS1
     await expect(asUser(rina, (req) => closePeriod(req, period, 'uji', b))).rejects.toMatchObject({ status: 403 })
     const inB = await asUser(financeB, (req) => postEntry(req, { direction: 'in', entryDate: '2025-01-15', cashAccountId: B.cash, amount: 1_000, description: 'uji MC1', sourceType: 'manual' } as never))
-    expect(inB.entryNo).toMatch(/^KM\/2501\//)
+    expect(inB.entryNo).toMatch(/^KM\/[A-Z0-9]{2,16}\/2501\//)
     await expect(asUser(w.users.finance, (req) => postEntry(req, { direction: 'in', entryDate: '2025-01-15', cashAccountId: w.cashAccount, amount: 1_000, description: 'uji MC1', sourceType: 'manual' } as never))).rejects.toMatchObject({ status: 409 })
     // and the DB says the same for raw inserts (lock date of the row's company)
     const raw = await sqlError('app', `INSERT INTO cash_entries (entry_no, entry_date, direction, amount, cash_account_id, source_type, status, uuid) VALUES ('MC/X/2', '2025-01-16', 'in', 1, ${w.cashAccount}, 'manual', 'posted', gen_random_uuid()::text)`)

@@ -9,12 +9,17 @@ import { adminDashboard, financeDashboard, ownerDashboard, pmDashboard, staffDas
 import type { ProjectBudget } from '@/domain/reports/kpi'
 import { lastDay, MONTHS_SHORT, periodLabel } from '@/domain/reports/rules'
 import { delta, share, statusTone, type PipelineStage } from '@/domain/reports/viz'
+import { resolveDisplayName } from '@/domain/user-display-name'
 import { withReqTransaction } from '@/lib/system-tx'
 import { listReports } from '@/domain/progress/dto'
 import { projectProgressVsBudget, type ProjectProgress } from '@/domain/reports/progress'
 import { officeScope, teamScope } from '@/domain/reports/scope'
 
+import { docHref } from '../doc-links'
+
 import { TeamTodayWidget } from './Absensi'
+import { RapMonitorCard } from './dashboard-rap'
+import { SlaTransferCard } from './dashboard-sla'
 import { ChartHover } from './ChartHover'
 import { PageTemplate } from './frame'
 import { dateId, ProgressCell, ProgressVsBudgetCard } from './progress-ui'
@@ -453,7 +458,7 @@ function InboxCard({ id, items, count, span, i }: { id: string; items: InboxItem
       ),
     },
     { key: 'scope', label: 'Project / pusat biaya', sec: true, cell: (r) => r.scopeName || '—' },
-    { key: 'step', label: 'Tindakan', cell: (r) => <StatusPill tone={r.overWarn ? 'warn' : 'wait'} label={`${r.step === 'approve' ? 'Approval' : 'Diketahui'}${r.overWarn ? ' · anggaran' : ''}`} /> },
+    { key: 'step', label: 'Tindakan', cell: (r) => <StatusPill tone={r.overWarn ? 'warn' : 'wait'} label={`${r.stepLabel ?? (r.step === 'approve' ? 'Approval' : 'Diketahui')}${r.overWarn ? ' · anggaran' : ''}`} /> },
     { key: 'amt', label: 'Grand total', num: true, cell: (r) => rp(r.grandTotal) },
   ]
   return (
@@ -466,7 +471,7 @@ function InboxCard({ id, items, count, span, i }: { id: string; items: InboxItem
 type TeamWaiting = Awaited<ReturnType<typeof pmDashboard>>['teamWaiting']
 type TeamWaitingRow = TeamWaiting['items'][number]
 
-/** S3e (US-17, S-01): PM monitoring card — team requests waiting for the Direktur / Finance, oldest first. */
+/** S3e (US-17, S-01): PM card — team requests waiting for the PM project / Direktur / Finance, oldest first. */
 function TeamWaitingCard({ id, data, span, i }: { id: string; data: TeamWaiting; span: 6 | 7 | 12; i: number }) {
   const cols: Col<TeamWaitingRow>[] = [
     {
@@ -483,7 +488,7 @@ function TeamWaitingCard({ id, data, span, i }: { id: string; data: TeamWaiting;
       ),
     },
     { key: 'scope', label: 'Project / pusat biaya', sec: true, cell: (r) => r.scopeName || '—' },
-    { key: 'who', label: 'Menunggu', cell: (r) => <StatusPill tone={r.days !== null && r.days > 3 ? 'warn' : 'wait'} label={r.waitingFor === 'direktur' ? 'Direktur' : 'Finance'} /> },
+    { key: 'who', label: 'Menunggu', cell: (r) => <StatusPill tone={r.days !== null && r.days > 3 ? 'warn' : 'wait'} label={r.waitingFor === 'pm' ? 'PM project' : r.waitingFor === 'direktur' ? 'Direktur' : 'Finance'} /> },
     { key: 'age', label: 'Lama', num: true, cell: (r) => (r.days === null ? '—' : <span title={r.submittedDate ?? ''}>{r.days} hari</span>) },
     { key: 'amt', label: 'Grand total', num: true, cell: (r) => rp(r.grandTotal) },
   ]
@@ -491,12 +496,12 @@ function TeamWaitingCard({ id, data, span, i }: { id: string; data: TeamWaiting;
     <Card
       id={id}
       title="Pengajuan tim menunggu keputusan"
-      sub={data.count > data.items.length ? `${data.items.length} dari ${data.count}, terlama dulu · Anda memantau, Direktur/Finance memutuskan` : 'Terlama dulu · Anda memantau, Direktur/Finance memutuskan'}
+      sub={data.count > data.items.length ? `${data.items.length} dari ${data.count}, terlama dulu · PM project lalu Direktur memutuskan` : 'Terlama dulu · PM project lalu Direktur memutuskan'}
       span={span}
       i={i}
       action={{ href: statusList(WAITING), label: 'Lihat semua' }}
     >
-      <DataTable id={id} cols={cols} rows={data.items} rowKey={(r) => r.id} caption="Pengajuan tim yang menunggu Direktur atau Finance" empty={<EmptyState text="Tidak ada pengajuan tim yang menunggu keputusan. ✓" />} />
+      <DataTable id={id} cols={cols} rows={data.items} rowKey={(r) => r.id} caption="Pengajuan tim yang menunggu PM project, Direktur atau Finance" empty={<EmptyState text="Tidak ada pengajuan tim yang menunggu keputusan. ✓" />} />
     </Card>
   )
 }
@@ -513,7 +518,15 @@ function RecentCashCard({ id, rows, span, i }: { id: string; rows: CashRow[]; sp
       cell: (r) => (
         <>
           <a href={`/admin/collections/cash-entries/${r.id}`}>{r.entryNo ?? `#${r.id}`}</a>
-          <span className="sub">{r.requestDocNo ? `${r.requestDocNo} · ${r.label}` : r.label || SOURCE[r.sourceType]}</span>
+          <span className="sub">
+            {r.requestDocNo && r.requestId ? (
+              <>
+                <a href={reqHref(r.requestId)}>{r.requestDocNo}</a> · {r.label}
+              </>
+            ) : (
+              r.label || SOURCE[r.sourceType]
+            )}
+          </span>
         </>
       ),
     },
@@ -679,6 +692,9 @@ async function Owner({ req, months }: { req: PayloadRequest; months: 6 | 12 }) {
         <BudgetCard id="owner-budget" projects={d.projects} warnPct={v.warnPct} span={7} i={6} progress={progressMap(k09)} />
         <CategoryCard id="owner-categories" c={v.categories} span={5} i={7} sub={`Dicairkan ${short(v.categories.from.slice(0, 7))} – sekarang`} />
 
+        <SlaTransferCard req={req} span={12} i={8} />
+        {/* DRMS 10/10 point 2–4 (D4): RAP realisation per project, items over plan → the project's RAP tab */}
+        <RapMonitorCard req={req} span={12} i={8} />
         <TrendCard id="owner-trend" rows={v.requestTrend} title="Tren pengajuan" sub="Jumlah pengajuan per bulan (tanggal pengajuan)" span={6} i={8} />
         <Card id="accounts" title="Saldo per akun" sub="Akun nonaktif bersaldo 0 disembunyikan" span={3} i={9}>
           <HBarList
@@ -695,13 +711,13 @@ async function Owner({ req, months }: { req: PayloadRequest; months: 6 | 12 }) {
           <p className="pk-kpi-v" style={{ fontSize: 22, margin: 0 }} data-pk-kpi="k12g">
             {d.completeness.ratioDone} / {d.completeness.ratioTotal}
           </p>
-          <p className="pk-kpi-x">uang muka bulan ini sudah LPJ</p>
+          <p className="pk-kpi-x">pengajuan baru bulan ini sudah LPJ</p>
           <Meter value={d.completeness.ratioDone} max={Math.max(1, d.completeness.ratioTotal)} />
           <p className="pk-kpi-x" data-pk-kpi="k12b">
             {d.completeness.overdue > 0 ? <StatusPill tone="bad" label={`${d.completeness.overdue} LPJ terlambat`} /> : <StatusPill tone="ok" label="Tidak ada LPJ terlambat" />}
           </p>
           <p className="pk-kpi-x" data-pk-kpi="k12a">
-            <b>{d.completeness.withoutLpj}</b> uang muka belum LPJ
+            <b>{d.completeness.withoutLpj}</b> pengajuan baru belum LPJ
           </p>
           <p className="pk-kpi-x" data-pk-kpi="k12e">
             <b>{d.completeness.reimburseToVerify}</b> nota reimburse menunggu verifikasi
@@ -911,14 +927,14 @@ async function Finance({ req }: { req: PayloadRequest }) {
         </Card>
         <PipelineCard id="finance-pipeline" pipeline={v.pipeline} title="Status pengajuan" sub="Posisi semua pengajuan saat ini" span={5} i={9} />
 
-        <Card id="advances-without-lpj" title="Uang muka belum LPJ" sub={`Terlambat bila > ${d.lpjDueDays} hari sejak transfer pertama`} span={7} i={10} action={{ href: '/admin/laporan/kelengkapan', label: 'Laporan' }}>
+        <Card id="advances-without-lpj" title="Pengajuan baru belum LPJ" sub={`Terlambat bila > ${d.lpjDueDays} hari sejak transfer pertama`} span={7} i={10} action={{ href: '/admin/laporan/kelengkapan', label: 'Laporan' }}>
           <DataTable<A>
             id="advances-without-lpj"
-            caption="Uang muka belum LPJ"
+            caption="Pengajuan baru belum LPJ"
             rows={d.advancesWithoutLpj.slice(0, 8)}
             rowKey={(r) => r.id}
             rowAttrs={(r) => ({ 'data-pk-overdue': r.overdue ? 'yes' : 'no' })}
-            empty={<EmptyState text="Semua uang muka sudah ber-LPJ. ✓" />}
+            empty={<EmptyState text="Semua pengajuan baru sudah ber-LPJ. ✓" />}
             cols={[
               { key: 'no', label: 'Nomor', cell: (r) => <a href={reqHref(r.id)}>{r.docNo ?? `#${r.id}`}</a> },
               { key: 'who', label: 'Pemohon', sec: true, cell: (r) => r.requesters || '—' },
@@ -953,6 +969,7 @@ async function Finance({ req }: { req: PayloadRequest }) {
         <RecentCashCard id="finance-recent-cash" rows={v.recentCash} span={8} i={12} />
         <CategoryCard id="finance-categories" c={v.categories} span={4} i={13} sub="Dicairkan 6 bulan terakhir" />
 
+        <SlaTransferCard req={req} span={12} i={14} />
         <Card id="period-close" title="Tutup buku" span={6} i={14} action={{ href: '/admin/tutup-buku', label: 'Tutup buku' }}>
           <p className="pk-kpi-x" data-pk-kpi="last-closed" style={{ fontSize: 14 }}>
             {d.lastClosedPeriod ? (
@@ -1004,20 +1021,20 @@ async function Pm({ req }: { req: PayloadRequest }) {
       </p>
       <Bento label="Ringkasan PM">
         <KpiRow>
-          {/* S3e (US-17, ADR 0013, S-01): the PM monitors — who the team's requests are waiting for (never "me"). */}
+          {/* S3e (US-17, S-01): who the team's requests are waiting for (ADR 0021: the PM project first, then the Direktur). */}
           <KpiTile
             id="team-waiting"
             icon="inbox"
             label="Pengajuan tim menunggu keputusan"
             value={`${d.teamWaiting.count}`}
-            title={`${d.teamWaiting.count} pengajuan tim menunggu Direktur/Finance`}
+            title={`${d.teamWaiting.count} pengajuan tim menunggu PM/Direktur/Finance`}
             kpi="k10-team"
             href={statusList(WAITING)}
             more="Lihat pengajuan"
             i={0}
           >
             <p className="pk-kpi-x">
-              Direktur <b>{d.teamWaiting.direktur}</b> · Finance <b>{d.teamWaiting.finance}</b>
+              PM <b>{d.teamWaiting.pm}</b> · Direktur <b>{d.teamWaiting.direktur}</b> · Finance <b>{d.teamWaiting.finance}</b>
             </p>
             <p className="pk-kpi-x">{d.teamWaiting.oldestDays !== null ? `tertua ${d.teamWaiting.oldestDays} hari` : 'Tidak ada yang menunggu ✓'}</p>
           </KpiTile>
@@ -1038,8 +1055,8 @@ async function Pm({ req }: { req: PayloadRequest }) {
             {trendPrev ? <Delta d={delta(d.teamMonth.count, trendPrev.count)} money={false} vs={`pengajuan vs ${short(trendPrev.period)}`} /> : null}
             <Sparkline label="Pengajuan tim per bulan" values={v.requestTrend.map((x) => ({ label: short(x.period), value: x.count }))} />
           </KpiTile>
-          <KpiTile id="team-lpj" icon="doc" label="LPJ tim" value={`${d.lpj.withoutLpj}`} title={`${d.lpj.withoutLpj} uang muka belum LPJ`} kpi="k12a" href="/admin/laporan/kelengkapan" more="Laporan Kelengkapan" i={2}>
-            <p className="pk-kpi-x">uang muka belum LPJ</p>
+          <KpiTile id="team-lpj" icon="doc" label="LPJ tim" value={`${d.lpj.withoutLpj}`} title={`${d.lpj.withoutLpj} pengajuan baru belum LPJ`} kpi="k12a" href="/admin/laporan/kelengkapan" more="Laporan Kelengkapan" i={2}>
+            <p className="pk-kpi-x">pengajuan baru belum LPJ</p>
             <p className="pk-kpi-x" data-pk-kpi="k12b">
               {d.lpj.overdue > 0 ? <StatusPill tone="bad" label={`${d.lpj.overdue} terlambat`} /> : <StatusPill tone="ok" label="Tidak ada yang terlambat" />}
             </p>
@@ -1062,6 +1079,8 @@ async function Pm({ req }: { req: PayloadRequest }) {
         <TrendCard id="pm-trend" rows={v.requestTrend} title="Tren pengajuan tim" sub="Jumlah pengajuan per bulan, 6 bulan" span={7} i={6} />
         <CategoryCard id="pm-categories" c={v.categories} span={5} i={7} sub="Dicairkan 6 bulan terakhir, tim Anda" />
 
+        {/* ADR 0021: the PM project approves its requests first ("Persetujuan PM") */}
+        <InboxCard id="pm-inbox" items={v.inbox} count={d.waitingForMe} span={12} i={8} />
         <TeamWaitingCard id="pm-waiting" data={d.teamWaiting} span={6} i={8} />
         <Card id="team-latest" title="Pengajuan tim terbaru" span={6} i={9} action={{ href: ER, label: 'Lihat semua' }}>
           <DataTable<R>
@@ -1150,7 +1169,23 @@ async function Admin({ req }: { req: PayloadRequest }) {
             { key: 't', label: 'Waktu (WITA)', sort: 'descending', cell: (a) => a.localTime },
             { key: 'u', label: 'User', cell: (a) => a.userName ?? (a.userId === null ? 'sistem' : `user#${a.userId}`) },
             { key: 'a', label: 'Aksi', cell: (a) => <StatusPill tone="none" label={a.action} /> },
-            { key: 'd', label: 'Dokumen', sec: true, cell: (a) => `${a.docType} ${a.docNo ?? a.docId ?? ''}` },
+            {
+              key: 'd',
+              label: 'Dokumen',
+              sec: true,
+              // DRMS 10/10 12b: numbered documents link to their detail
+              cell: (a) => {
+                const href = docHref(a.docType, a.docId)
+                const text = a.docNo ?? a.docId ?? ''
+                return href && text ? (
+                  <>
+                    {a.docType} <a href={href}>{text}</a>
+                  </>
+                ) : (
+                  `${a.docType} ${text}`
+                )
+              },
+            },
           ]}
         />
       </Card>
@@ -1164,6 +1199,7 @@ async function Staff({ req }: { req: PayloadRequest }) {
   const d = await withReqTransaction(req, () => staffDashboard(req))
   const v = d.viz
   const user = req.user as { id: number; name?: string | null; email?: string } | null
+  const hello = await resolveDisplayName(req.payload, req.user)
   const hint: Record<string, string> = {
     draft: 'belum diajukan',
     receipt_revision: 'perbaiki nota',
@@ -1193,7 +1229,9 @@ async function Staff({ req }: { req: PayloadRequest }) {
   return (
     <>
       <div className="pk-actions" style={{ margin: '-8px 0 16px' }}>
-        <span style={{ marginRight: 'auto', color: 'var(--pk-muted-fg)' }}>Halo, {user?.name || user?.email}</span>
+        <span style={{ marginRight: 'auto', color: 'var(--pk-muted-fg)' }} data-pk-greeting>
+          Halo, {hello}
+        </span>
         <a className="pk-btn primary" href={`${ER}/create`} data-pk-action="new-request">
           + Buat pengajuan
         </a>
@@ -1273,9 +1311,10 @@ async function Staff({ req }: { req: PayloadRequest }) {
  */
 async function Operator({ req }: { req: PayloadRequest }) {
   const user = req.user as { id: number; name?: string | null; email?: string } | null
+  const hello = await resolveDisplayName(req.payload, req.user)
   return (
     <Bento label="Absensi">
-      <Card id="operator-absen" title="Absen" sub={`Halo, ${user?.name || user?.email || ''}`} span={12}>
+      <Card id="operator-absen" title="Absen" sub={`Halo, ${hello}`} span={12}>
         <div className="pk-actions">
           <Link className="pk-btn primary" href="/admin/absensi/absen">
             Absen sekarang

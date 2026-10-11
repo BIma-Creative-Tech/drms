@@ -9,6 +9,7 @@ import { CASH_MINUS_MESSAGE } from '@/lib/rupiah-input'
 import { RupiahInput, useRupiah } from '../RupiahInput'
 import { fieldErrors, newIdemKey, sendJson, uploadAttachment } from './client'
 import { OverrideDialog, overridePromptOf, type OverridePrompt } from './OverrideDialog'
+import { DateInput } from '../DateInput'
 
 /**
  * E2 form "Kas masuk / Kas keluar" (US-23) and its edit mode (ADR 0005 §5: descriptive fields
@@ -294,7 +295,7 @@ export function CashEntryForm({ mode, today, minDate, lockDate, initialDirection
               <label htmlFor={id('entryDate')}>
                 Tanggal<span className="req" aria-hidden>*</span>
               </label>
-              <input id={id('entryDate')} type="date" name="entryDate" defaultValue={today} max={today} min={later(minDate, opening)} required aria-invalid={err('entryDate') ? true : undefined} aria-describedby={described('entryDate', true)} />
+              <DateInput id={id('entryDate')} type="date" name="entryDate" defaultValue={today} max={today} min={later(minDate, opening)} required aria-invalid={err('entryDate') ? true : undefined} aria-describedby={described('entryDate', true)} />
               <p id={id('entryDate-h')} className="help">
                 {lockDate ? `Tutup buku s/d ${lockDate}: tanggal sebelumnya ditolak.` : 'Belum ada periode yang ditutup.'}
                 {opening ? ` Saldo awal akun per ${dmy(opening)}: tanggal sebelumnya ditolak.` : ''} Tidak boleh di masa depan.
@@ -322,7 +323,7 @@ export function CashEntryForm({ mode, today, minDate, lockDate, initialDirection
             {/* QA-31: locked in edit mode (ADR 0005 §5) — shown, not hidden */}
             <div className="pk-fld">
               <label htmlFor={id('entryDate')}>Tanggal</label>
-              <input id={id('entryDate')} type="date" value={entry.entryDate} disabled readOnly aria-describedby={id('locked-h')} data-pk-locked="entryDate" />
+              <DateInput id={id('entryDate')} type="date" value={entry.entryDate} disabled readOnly aria-describedby={id('locked-h')} data-pk-locked="entryDate" />
             </div>
             <div className="pk-fld">
               <label htmlFor={id('cashAccountId')}>Akun kas</label>
@@ -383,7 +384,7 @@ export function CashEntryForm({ mode, today, minDate, lockDate, initialDirection
           <label htmlFor={id('proof')}>{edit && entry.proofId ? 'Ganti bukti (opsional)' : 'Bukti (opsional)'}</label>
           {edit && entry.proofId ? (
             <p className="help" data-pk-proof-current>
-              <a href={`/api/v1/media/attachments/${entry.proofId}/file`} target="_blank" rel="noopener noreferrer">
+              <a href={`/api/v1/media/attachments/${entry.proofId}/file`} target="_blank" rel="noopener noreferrer" data-pk-lightbox="kas-proof-current" data-pk-lightbox-title="Bukti saat ini">
                 Lihat bukti saat ini
               </a>{' '}
               — pilih file baru untuk menggantinya.

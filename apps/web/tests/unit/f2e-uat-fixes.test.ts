@@ -142,15 +142,22 @@ describe('office-only fields hidden from staff (no 403 queries from the admin fo
   })
   type F = { name?: string; admin?: { condition?: (d: unknown, s: unknown, o: { user: unknown }) => boolean; components?: { Field?: unknown } } }
   const field = (slug: string, name: string) => (config.collections.find((c) => c.slug === slug)!.fields as F[]).find((f) => f.name === name)!
-  const visible = (f: F, roles: string[]) => f.admin?.condition?.({}, {}, { user: { id: 1, roles } }) ?? true
+  const visible = (f: F, roles: string[], data: unknown = {}) => f.admin?.condition?.(data, {}, { user: { id: 1, roles } }) ?? true
+  const submitted = { status: 'pending_ack' }
 
   it('"Aturan approval" + snapshot only for roles that can read approval rules; vendor master not for staff', () => {
-    for (const name of ['approvalRule', 'approvalSnapshot']) {
-      const f = field('expense-requests', name)
-      expect(visible(f, ['pk-staff']), name).toBe(false)
-      expect(visible(f, ['pk-pm']), name).toBe(false)
-      for (const r of ['pk-finance', 'pk-owner', 'pk-admin']) expect(visible(f, [r]), `${name} ${r}`).toBe(true)
-    }
+    const rule = field('expense-requests', 'approvalRule')
+    expect(visible(rule, ['pk-staff'], submitted)).toBe(false)
+    expect(visible(rule, ['pk-pm'], submitted)).toBe(false)
+    // DRMS 10/10 Phase C polish: in the sidebar for Finance / Admin only (the Direktur reads the approval timeline)
+    for (const r of ['pk-finance', 'pk-admin']) expect(visible(rule, [r], submitted), `approvalRule ${r}`).toBe(true)
+    expect(visible(rule, ['pk-owner'], submitted)).toBe(false)
+    // DRMS 10/10 9c: the raw snapshot JSON only for Admin (everyone else reads the approval timeline)
+    const snap = field('expense-requests', 'approvalSnapshot')
+    for (const r of ['pk-staff', 'pk-pm', 'pk-finance', 'pk-owner']) expect(visible(snap, [r], submitted), `approvalSnapshot ${r}`).toBe(false)
+    expect(visible(snap, ['pk-admin'], submitted)).toBe(true)
+    // DRMS 10/10 8i: neither on create / draft
+    for (const f of [rule, snap]) expect(visible(f, ['pk-admin'], { status: 'draft' })).toBe(false)
     expect(visible(field('receipts', 'vendor'), ['pk-staff'])).toBe(false)
     expect(visible(field('receipts', 'vendor'), ['pk-finance'])).toBe(true)
     expect(field('expense-requests', 'resubmitOf').admin?.components?.Field).toBe('@/admin/components/ResubmitOfField#ResubmitOfField')

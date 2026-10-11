@@ -14,6 +14,9 @@ class TimelineStep {
 
 /// Signature positions of the current approval cycle, in form order (Diajukan → Dibuat → Diketahui →
 /// Approval 1..n), with who acted and whose turn it is ("Giliran", US-05).
+/// ADR 0021 snapshots (PM project → Direktur) read exactly like the web ApprovalTimeline
+/// (`apps/web/src/domain/expense/approval-timeline.ts`): Diajukan → Persetujuan PM → Persetujuan Direktur →
+/// Transfer Finance. Older snapshots keep their wording (Diajukan Oleh / Dibuat Oleh / Diketahui / Approval).
 List<TimelineStep> buildTimeline(ExpenseDetail d) {
   final cycle = d.approvals.where((a) => a.cycle == d.approvalCycle).toList();
   ApprovalEntry? find(SignPosition p, [int? level]) {
@@ -26,15 +29,34 @@ List<TimelineStep> buildTimeline(ExpenseDetail d) {
   String actorOf(ApprovalEntry a) => '${a.actorName ?? '-'}${a.onBehalf ? ' (atas nama)' : ''}';
   final steps = <TimelineStep>[];
   final submitted = d.status != RequestStatus.draft;
+  final pmFlow = d.approvalRule?.pmApproval ?? false;
 
-  for (final pos in [SignPosition.diajukan, SignPosition.dibuat]) {
-    final a = find(pos);
-    final title = pos == SignPosition.diajukan ? 'Diajukan Oleh' : 'Dibuat Oleh';
+  if (pmFlow) {
+    // web: one "Diajukan" step; the creator is named in the note when it is someone else
+    final diajukan = find(SignPosition.diajukan);
+    final dibuat = find(SignPosition.dibuat);
+    final creatorNote = dibuat != null && dibuat.actorName != diajukan?.actorName
+        ? 'dibuat oleh ${actorOf(dibuat)}'
+        : null;
     steps.add(
-      a != null
-          ? TimelineStep(title: title, state: TurnState.done, actor: actorOf(a), at: a.decidedAt)
-          : TimelineStep(title: title, state: submitted ? TurnState.skipped : TurnState.current),
+      TimelineStep(
+        title: 'Diajukan',
+        state: submitted ? TurnState.done : TurnState.current,
+        actor: diajukan != null ? actorOf(diajukan) : null,
+        at: diajukan?.decidedAt ?? dibuat?.decidedAt,
+        note: submitted ? creatorNote : 'belum diajukan',
+      ),
     );
+  } else {
+    for (final pos in [SignPosition.diajukan, SignPosition.dibuat]) {
+      final a = find(pos);
+      final title = pos == SignPosition.diajukan ? 'Diajukan Oleh' : 'Dibuat Oleh';
+      steps.add(
+        a != null
+            ? TimelineStep(title: title, state: TurnState.done, actor: actorOf(a), at: a.decidedAt)
+            : TimelineStep(title: title, state: submitted ? TurnState.skipped : TurnState.current),
+      );
+    }
   }
 
   final rule = d.approvalRule;
@@ -96,24 +118,69 @@ List<TimelineStep> buildTimeline(ExpenseDetail d) {
   for (final _ in skippedApprovals) {
     steps.add(TimelineStep(title: approvalTitle(rule, 1, multi: false), state: TurnState.skipped, note: skippedNote));
   }
+  if (pmFlow) {
+    final rejected = steps.any((s) => s.state == TurnState.rejected);
+    steps.add(_transferStep(d, submitted: submitted, rejected: rejected));
+  }
   return steps;
+}
+
+/// ADR 0021 last step "Transfer Finance" (web approval-timeline.ts step 4): done with the posted
+/// Pengajuan Baru / Reimburse transfers, current while the request waits in the transfer queue.
+TimelineStep _transferStep(ExpenseDetail d, {required bool submitted, required bool rejected}) {
+  bool main(TransferInfo t) => t.kind == 'advance' || t.kind == 'reimburse';
+  final posted = d.transfers.where((t) => main(t) && !t.isVoid).toList();
+  final voided = d.transfers.where((t) => main(t) && t.isVoid).toList();
+  final voidNote = voided.isEmpty ? null : 'void: ${voided.map((t) => t.docNo ?? '-').join(', ')}';
+  if (posted.isNotEmpty) {
+    return TimelineStep(
+      title: 'Transfer Finance',
+      state: TurnState.done,
+      at: posted.last.transferDate,
+      note: [posted.map((t) => t.docNo ?? '-').join(', '), ?voidNote].join(' · '),
+    );
+  }
+  final queue =
+      (d.type == RequestType.advance && d.status == RequestStatus.approved) ||
+      (d.type == RequestType.reimburse && d.status == RequestStatus.receiptsVerified);
+  final ended = d.status == RequestStatus.rejected || d.status == RequestStatus.cancelled || rejected;
+  final note =
+      d.type == RequestType.reimburse &&
+          (d.status == RequestStatus.approved || d.status == RequestStatus.receiptRevision)
+      ? 'setelah nota diverifikasi Finance'
+      : voidNote;
+  return TimelineStep(
+    title: 'Transfer Finance',
+    state: !submitted
+        ? TurnState.pending
+        : queue
+        ? TurnState.current
+        : (ended ? TurnState.skipped : TurnState.pending),
+    note: note,
+  );
 }
 
 /// ADR 0013 G1-2 wording (web PDF/Riwayat use the same text).
 const skippedNote = '(tidak berlaku — pemohon)';
 
-/// "Diketahui" position title: Direktur approval since ADR 0013, PM on pre-E1 snapshots.
+/// "Diketahui" position title: PM project approval since ADR 0021 (checked FIRST — those snapshots
+/// also carry decision roles), Direktur approval under ADR 0013, PM on pre-E1 snapshots.
 String acknowledgeTitle(ApprovalRuleInfo? rule) {
   if (rule == null) return 'Diketahui Oleh';
+  if (rule.pmApproval) return 'Persetujuan PM';
   if (rule.decisionFlow || rule.acknowledgeRole == 'pk-owner') return 'Diketahui (Direktur)';
   if (rule.legacyPmAcknowledge) return 'Diketahui Oleh (PM / penanggung jawab)';
   return 'Diketahui Oleh';
 }
 
-/// Approval position title: Finance since ADR 0013; pre-E1 snapshots name the role of the level.
+/// Approval position title: Finance since ADR 0013; pre-E1 snapshots name the role of the level;
+/// ADR 0021 (PM project → Direktur): the Direktur level is "Persetujuan Direktur".
 String approvalTitle(ApprovalRuleInfo? rule, int level, {required bool multi}) {
   final base = multi ? 'Approval level $level' : 'Approval';
-  final role = rule?.steps.where((s) => s.level == level).firstOrNull?.approverRole;
+  final role = rule?.roleOfLevel(level);
+  if ((rule?.pmApproval ?? false) && role == 'pk-owner') {
+    return multi ? 'Persetujuan Direktur (level $level)' : 'Persetujuan Direktur';
+  }
   final label = switch (role) {
     'pk-finance' => 'Finance',
     'pk-owner' => 'Direktur',
@@ -126,7 +193,9 @@ String approvalTitle(ApprovalRuleInfo? rule, int level, {required bool multi}) {
 String currentTurn(ExpenseDetail d) => switch (d.status) {
   RequestStatus.draft => 'Pemohon — belum diajukan',
   RequestStatus.pendingAck =>
-    d.approvalRule?.legacyPmAcknowledge ?? false
+    d.approvalRule?.pmApproval ?? false
+        ? 'PM project — persetujuan PM'
+        : d.approvalRule?.legacyPmAcknowledge ?? false
         ? 'Diketahui Oleh (PM / penanggung jawab)'
         : 'Direktur — persetujuan (Diketahui)',
   RequestStatus.pendingApproval => approvalTitle(

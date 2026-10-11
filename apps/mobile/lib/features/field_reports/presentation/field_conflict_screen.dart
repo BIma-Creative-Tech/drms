@@ -152,6 +152,15 @@ class _FieldConflictScreenState extends ConsumerState<FieldConflictScreen> {
           (t.fieldPoStatus, PoStatus.fromCode(c['po_status'])?.label ?? '-', '-'),
           (t.fieldPhotos, '$photos', t.fieldNewPhotos(m.photoUuids.length)),
         ];
+      case final DailyContent m:
+        final serverWork = {for (final w in fList(c['work'])) fInt(fMap(w)['rap_item_id']): fDblN(fMap(w)['qty']) ?? 0};
+        final ids = {...serverWork.keys, ...m.work.keys}.toList()..sort();
+        return [
+          for (final id in ids)
+            (t.dailyWorkItem('#$id'), n(serverWork[id]), m.work[id] == null ? '-' : fmtNum(m.work[id]!)),
+          (t.dailyWorkerCount, n(c['worker_count']), '${m.workerCount}'),
+          (t.fieldPhotos, '$photos', t.fieldNewPhotos(m.photoUuids.length)),
+        ];
     }
   }
 }

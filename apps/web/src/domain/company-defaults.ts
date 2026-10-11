@@ -7,6 +7,7 @@ import { WEEKDAY_KEYS } from '@/domain/attendance/schedule'
 import { ruleDecisionError } from '@/domain/expense/decision'
 import { stepsError, type AckBy, type AckMode } from '@/domain/expense/rules'
 import { DEFAULT_SEQUENCES } from '@/domain/numbering'
+import { DEFAULT_RESOURCE_TYPES } from '@/domain/rap/rules'
 import { CASH_IN_SOURCES, DEFAULT_APPROVAL_RULES } from '@/seed/data'
 import { DEFAULT_TZ } from '@/lib/time'
 
@@ -105,6 +106,19 @@ export async function ensureDefaultUrgencyLevels(req: PayloadRequest, target: nu
   return DEFAULT_URGENCY_LEVELS.map((u) => u.code)
 }
 
+/**
+ * P3: default manpower/equipment types of PT `target` when it has none at all (never deleted → "none" =
+ * never seeded). Audited by the collection. SYSTEM-WRITE like the urgency levels.
+ */
+export async function ensureDefaultResourceTypes(req: PayloadRequest, target: number): Promise<string[]> {
+  const res = await req.payload.find({ collection: 'resource-types', where: { company: { equals: target } }, limit: 1, depth: 0, overrideAccess: true /* SYSTEM-READ: masters of the target PT */, req })
+  if (res.docs.length > 0) return []
+  for (const r of DEFAULT_RESOURCE_TYPES) {
+    await req.payload.create({ collection: 'resource-types', data: { company: target, ...r, active: true } as never, depth: 0, overrideAccess: true /* SYSTEM-WRITE: default master of a PT */, req })
+  }
+  return DEFAULT_RESOURCE_TYPES.map((r) => r.code)
+}
+
 /** req.context flag: the create comes from the seed / go-live import (they apply their own defaults). */
 export const SKIP_COMPANY_DEFAULTS = 'pkSkipCompanyDefaults'
 
@@ -172,7 +186,7 @@ const RULE_FIELDS = ['name', 'docType', 'requestType', 'minAmount', 'maxAmount',
 
 /**
  * A source rule that cannot be copied: it names rows of its own PT (category / project / cost center
- * / users), or the rules hook would refuse it today (retired `scope_manager`, non-decision roles,
+ * / users), or the rules hook would refuse it today (`scope_manager` outside expense requests, non-decision roles,
  * broken levels — possible in rules saved before ADR 0013). Skipped + reported, never a failed create
  * (a failing nested write would roll the whole PT create back).
  */
@@ -189,7 +203,7 @@ function notCopyable(r: Row): boolean {
   const max = typeof r.maxAmount === 'number' ? r.maxAmount : null
   if (max !== null && max < Number(r.minAmount ?? 0)) return true
   if (r.docType === 'budget_addendum' && (r.requestType ?? 'any') !== 'any') return true
-  return stepsError(rule.steps) !== null || ruleDecisionError(rule, () => undefined) !== null
+  return stepsError(rule.steps) !== null || ruleDecisionError(rule, () => undefined, (r.docType as string | undefined) ?? 'expense_request') !== null
 }
 
 export async function copyCompanyDefaults(req: PayloadRequest, target: number, opts: { from?: number | null; settings?: boolean } = {}): Promise<CopyDefaultsReport> {

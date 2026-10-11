@@ -62,15 +62,19 @@ abstract class Capabilities with _$Capabilities {
 
     /// FR1: aftersales activities on aftersales projects (same rule).
     @Default(false) bool aftersalesActivityCreate,
+
+    /// P3: Laporan Harian on konstruksi projects (same rule; server ≥ 0.8 — older servers omit it → false).
+    @Default(false) bool dailyReportCreate,
   }) = _Capabilities;
 
   /// FR1: any field-report create right.
-  bool get anyField => serviceReportCreate || unitTimesheetCreate || aftersalesActivityCreate;
+  bool get anyField => serviceReportCreate || unitTimesheetCreate || aftersalesActivityCreate || dailyReportCreate;
 
   /// Fallback for a `/me` cached by an app version before E1 (no `capabilities` field): the same
   /// rule the server applies (`apps/web/src/api/v1/endpoints/me.ts`).
   factory Capabilities.fromRoles(Set<Role> roles) => Capabilities(
-    approvalInbox: roles.contains(Role.owner) || roles.contains(Role.finance),
+    // ADR 0021: the PM project approves the first step of his project's requests.
+    approvalInbox: roles.contains(Role.owner) || roles.contains(Role.finance) || roles.contains(Role.pm),
     teamMonitor: roles.contains(Role.pm),
     progressReportCreate: roles.contains(Role.pm) || roles.contains(Role.owner),
   );
@@ -150,6 +154,9 @@ abstract class UserProfile with _$UserProfile {
     required int id,
     required String email,
     String? name,
+
+    /// d1010 (WA-14): greeting name resolved by the server (`/me` `displayName`); null on older servers.
+    String? serverDisplayName,
     required Set<Role> roles,
     @Default(Capabilities()) Capabilities capabilities,
     Employee? employee,
@@ -203,6 +210,7 @@ abstract class UserProfile with _$UserProfile {
         serviceReportCreate: scope.any((c) => c.capabilities.serviceReportCreate),
         unitTimesheetCreate: scope.any((c) => c.capabilities.unitTimesheetCreate),
         aftersalesActivityCreate: scope.any((c) => c.capabilities.aftersalesActivityCreate),
+        dailyReportCreate: scope.any((c) => c.capabilities.dailyReportCreate),
       ),
       employee: primary.employee,
       timezone: primary.timezone,
@@ -237,7 +245,21 @@ abstract class UserProfile with _$UserProfile {
 
   bool has(Role r) => roles.contains(r);
 
-  String get displayName => (name == null || name!.trim().isEmpty) ? email : name!;
+  /// Greeting / profile name (d1010 WA-14). Never the full e-mail address: `/me` `displayName` → `name` →
+  /// employee name (scope first, then any PT) → e-mail local part → "Pengguna".
+  String get displayName {
+    // A "name" that is itself an e-mail address is skipped (WA-14: the full address is never shown).
+    final full = [
+      serverDisplayName,
+      name,
+      employee?.name,
+      for (final c in companies) c.employee?.name,
+    ].map((v) => v?.trim() ?? '').where((s) => s.isNotEmpty && !s.contains('@')).firstOrNull;
+    if (full != null) return full;
+    final at = email.indexOf('@');
+    final local = (at < 0 ? email : email.substring(0, at)).trim();
+    return local.isEmpty ? 'Pengguna' : local;
+  }
 
   /// Direktur first, then Finance (both: approval inbox + KPI home), PM (team monitor), Staff.
   HomeKind get homeKind {
@@ -268,6 +290,13 @@ abstract class UserProfile with _$UserProfile {
 
   /// E4: progress reports are readable by PM (team), Direktur and Finance (all); Staff/Admin none.
   bool get canReadProgress => has(Role.pm) || has(Role.owner) || has(Role.finance);
+
+  /// DRMS 10/10 point 6: "Proyek" menu — PM (team projects), Direktur, Finance, Admin (all projects of their PTs);
+  /// the same roles as the web Proyek module. The server scopes the list.
+  bool get canSeeProjects => has(Role.pm) || has(Role.owner) || has(Role.finance) || has(Role.admin);
+
+  /// DRMS 10/10 point 10: "Finance" menu (transfer queue, Catat transfer, LPJ list) — role Finance.
+  bool get hasFinanceMenu => has(Role.finance);
 
   /// E4: create a progress report (server capability `progressReportCreate`).
   bool get canCreateProgress => capabilities.progressReportCreate;

@@ -45,6 +45,8 @@ UserProfile userProfileFromJson(Json j) {
     id: _int(j['id']),
     email: '${j['email'] ?? ''}',
     name: _strN(j['name']),
+    // d1010 (WA-14): optional — servers before the greeting resolver omit it.
+    serverDisplayName: _strN(j['displayName']),
     roles: roles,
     capabilities: _capabilities(caps, roles),
     employee: emp == null
@@ -77,6 +79,7 @@ Capabilities _capabilities(Json? caps, Set<Role> roles) => caps == null
         serviceReportCreate: caps['serviceReportCreate'] == true,
         unitTimesheetCreate: caps['unitTimesheetCreate'] == true,
         aftersalesActivityCreate: caps['aftersalesActivityCreate'] == true,
+        dailyReportCreate: caps['dailyReportCreate'] == true,
       );
 
 /// `GET /me` `companies[]` item (openapi `MeCompany`, MC3).
@@ -178,6 +181,12 @@ ExpenseDetail detailFromJson(Json j) {
             category: refFromJson(m['category']),
             vehiclePlate: _strN(_map(m['vehicle'])?['plateDisplay'] ?? _map(m['vehicle'])?['plateNo']),
             vehicleId: _intN(_map(m['vehicle'])?['id']),
+            receiptAmount: _intN(m['receiptAmount']),
+            receiptMismatch: m['receiptMismatch'] is bool ? m['receiptMismatch'] as bool : null,
+            // D4: `rapItem {id, code, name}`; a bare `rapItemId` from a server without the read model.
+            rapItem:
+                refFromJson(m['rapItem']) ?? (_intN(m['rapItemId']) == null ? null : RefItem(id: _int(m['rapItemId']))),
+            rapOverBudget: m['rapOverBudget'] is bool ? m['rapOverBudget'] as bool : null,
           ),
     ],
     receipts: [
@@ -219,6 +228,7 @@ ExpenseDetail detailFromJson(Json j) {
             acknowledgeBy: _strN(rule['acknowledgeBy']),
             acknowledgeRole: _strN(rule['acknowledgeRole']),
             decisionRoles: [for (final r in _list(rule['decisionRoles'])) '$r'],
+            selfApproval: _strN(rule['selfApproval']),
             skipped: [
               for (final k in _list(rule['skipped']))
                 if (_map(k) case final m?)
@@ -246,8 +256,8 @@ ExpenseDetail detailFromJson(Json j) {
         if (_map(f) case final m?)
           FlagInfo(
             id: _int(m['id']),
-            kind: '${m['kind'] ?? ''}',
-            kindLabel: '${m['kindLabel'] ?? m['kind'] ?? ''}',
+            kind: '${m['kind'] ?? m['code'] ?? ''}',
+            kindLabel: '${m['kindLabel'] ?? m['kind'] ?? m['code'] ?? ''}',
             level: '${m['level'] ?? 'info'}',
             status: '${m['status'] ?? ''}',
             lineNo: _intN(m['lineNo']),
@@ -264,6 +274,8 @@ ExpenseDetail detailFromJson(Json j) {
             kind: '${m['kind'] ?? ''}',
             amount: _int(m['amount']),
             transferDate: _strN(m['transferDate']),
+            transferAt: _strN(m['transferAt']),
+            costCenter: refFromJson(m['costCenter']),
             bankRef: _strN(m['bankRef']),
             status: '${m['status'] ?? 'posted'}',
             voidReason: _strN(m['voidReason']),
@@ -323,6 +335,10 @@ SettlementInfo? settlementFromJson(Object? v) {
     submittedAt: _strN(m['submittedAt']),
     verifiedAt: _strN(m['verifiedAt']),
     settledAt: _strN(m['settledAt']),
+    // d1010 (13): LPJ photos — media ids, or objects with `id` / `imageId`.
+    photos: [
+      for (final p in _list(m['photos'])) ?(p is num ? p.toInt() : _intN(_map(p)?['id'] ?? _map(p)?['imageId'])),
+    ],
   );
 }
 
@@ -351,6 +367,7 @@ InboxItem inboxItemFromJson(Json j) {
     budgetOverWarn: budget?['overWarn'] == true,
     warningFlags: _int(flags?['warning']),
     infoFlags: _int(flags?['info']),
+    receiptMismatchFlags: _int(flags?['receiptMismatch']),
     companyId: companyIdOf(j),
   );
 }
@@ -359,8 +376,8 @@ InboxItem inboxItemFromJson(Json j) {
 Json draftToCreateBody(DraftRequest d) => {
   'type': d.type.code,
   'title': d.title.trim(),
+  // D2: project only — the requester no longer sends a cost center (Finance sets it at transfer).
   'projectId': d.projectId,
-  'costCenterId': d.costCenterId,
   'neededDate': d.neededDate,
   'urgencyLevelId': d.urgencyLevelId,
   'notes': (d.notes == null || d.notes!.trim().isEmpty) ? null : d.notes!.trim(),
@@ -370,12 +387,16 @@ Json draftToCreateBody(DraftRequest d) => {
   'clientUuid': d.clientUuid,
 };
 
+/// D3: `total` is qty × unitPrice (the server recomputes it; a pre-D3 line without unit price sends its
+/// typed total until the user completes it).
 Json lineToInput(DraftLine l) => {
   'description': l.description.trim(),
   'qty': l.qty,
   'uomId': l.uomId,
   'unitPrice': l.unitPrice,
-  'total': l.total,
+  'total': l.computedTotal ?? l.total,
+  'receiptAmount': l.receiptAmount,
+  'rapItemId': l.rapItemId,
   'notes': (l.notes == null || l.notes!.trim().isEmpty) ? null : l.notes!.trim(),
   'categoryId': l.categoryId,
   'vehicleId': l.vehicleId,
@@ -394,7 +415,6 @@ Json draftToSyncPayload(DraftRequest d, {bool includeDraftId = false}) => {
   'kind': d.type.code,
   'title': d.title.trim(),
   'project_id': d.projectId,
-  'cost_center_id': d.costCenterId,
   'needed_date': d.neededDate,
   'urgency_level_id': d.urgencyLevelId,
   'notes': (d.notes == null || d.notes!.trim().isEmpty) ? null : d.notes!.trim(),
@@ -410,7 +430,9 @@ Json draftToSyncPayload(DraftRequest d, {bool includeDraftId = false}) => {
         'qty': l.qty,
         'uom_id': l.uomId,
         'unit_price': l.unitPrice,
-        'total': l.total,
+        'total': l.computedTotal ?? l.total,
+        'receipt_amount': l.receiptAmount,
+        'rap_item_id': l.rapItemId,
         'notes': (l.notes == null || l.notes!.trim().isEmpty) ? null : l.notes!.trim(),
         'category_id': l.categoryId,
         'vehicle_id': l.vehicleId,
@@ -468,6 +490,8 @@ DraftRequest draftFromServer(
         uomId: l.uom?.id,
         unitPrice: l.unitPrice,
         total: l.total,
+        receiptAmount: l.receiptAmount,
+        rapItemId: l.rapItem?.id,
         categoryId: l.category?.id,
         vehicleId: l.vehicleId,
         notes: l.notes,

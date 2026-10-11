@@ -30,8 +30,12 @@ export function fmtNum(v: number | null | undefined, digits = 2): string {
 
 /**
  * Decimal typed in an Indonesian form ('1.031,5', '7,5', '7.5', '1031'): a comma is the decimal mark
- * (dots are thousands); without a comma, several dots are thousands and a single dot is the decimal
- * mark. Empty → null; anything else (letters, two commas, minus) → NaN.
+ * (dots are thousands); without a comma, several dots are thousands, and a single dot is the thousands
+ * mark when it groups exactly 3 digits after a 1–3 digit integer not starting with 0 ('1.023', '5.000' —
+ * what `fmtNum` prints, so prefilled HM values round-trip; 3 decimals are never valid input, max 2), else
+ * the decimal mark ('7.5', '0.125'). Empty → null; anything else (letters, two commas, minus) → NaN.
+ * UAT FR T-01 (2026-10-10): before, '1.023' read as 1.023 — the timesheet form rejected its own HM awal
+ * prefill and the correction dialog re-sent untouched HM '1.030' as 1.03.
  */
 export function parseDecimalId(raw: string | null | undefined): number | null {
   const t = String(raw ?? '').trim().replace(/\s+/g, '')
@@ -40,7 +44,7 @@ export function parseDecimalId(raw: string | null | undefined): number | null {
   if (t.includes(',')) {
     if (t.split(',').length > 2) return Number.NaN
     s = t.replace(/\./g, '').replace(',', '.')
-  } else if ((t.match(/\./g) ?? []).length > 1) {
+  } else if ((t.match(/\./g) ?? []).length > 1 || /^[1-9]\d{0,2}\.\d{3}$/.test(t)) {
     s = t.replace(/\./g, '')
   } else {
     s = t

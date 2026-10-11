@@ -26,9 +26,9 @@ import {
   type Signature,
 } from './common'
 import { fromDocLines, validateContent } from './drafts'
-import { assertEveryLineHasReceipt, recomputeFlags } from './receipts'
+import { assertEveryLineHasReceipt, recomputeFlags, syncProjectRapFlags, syncRapFlags } from './receipts'
 import { ACK_DELEGATE_ROLE, budgetImpact, lastLevel, type AckDelegate, type ApprovalSnapshot } from './rules'
-import { auditSkipped, selectAndSnapshot, writeSnapshot } from './snapshot'
+import { auditSelfApproval, auditSkipped, selectAndSnapshot, writeSnapshot } from './snapshot'
 import type { ApprovalDecision, ApprovalPosition } from './types'
 
 export { selectAndSnapshot, writeSnapshot }
@@ -156,7 +156,8 @@ export async function submit(req: PayloadRequest, id: number, opts: SubmitOption
       neededDate: doc.neededDate,
       urgencyLevelId: relId(doc.urgencyLevel) ?? null,
     },
-    { forSubmit: true, creatorId: creator },
+    // D2: a legacy cost-center request submitted before may be sent again as it was (no project)
+    { forSubmit: true, creatorId: creator, legacyCostCenter: !relId(doc.project) && relId(doc.costCenter) !== undefined && (doc.approvalCycle ?? 0) > 0 },
   )
   if (doc.type === 'reimburse') await assertEveryLineHasReceipt(req, doc)
 
@@ -199,6 +200,8 @@ export async function submit(req: PayloadRequest, id: number, opts: SubmitOption
     bankSnapshot: { bankName: bankName ?? null, accountNo: acc.accountNo, accountHolder: acc.accountHolder },
     approvalRule: rule.id,
     approvalSnapshot: snapshot,
+    // ADR 0021: the narrow G1 exception is fixed at submit (DB guard: changes only at the freeze point).
+    g1Exception: snapshot.selfApproval ?? null,
     approvalCycle: cycle,
     currentLevel: needsAck ? 0 : 1,
   })
@@ -218,6 +221,7 @@ export async function submit(req: PayloadRequest, id: number, opts: SubmitOption
     })
   }
   await auditSkipped(req, updated, snapshot)
+  await auditSelfApproval(req, updated, snapshot)
   if (needsAck && snapshot.acknowledgeDelegatedTo) {
     // F2e: the delegation is part of the submit's audit trail (who was skipped, to whom, why).
     await writeAudit(req, [
@@ -253,8 +257,9 @@ export async function cancel(req: PayloadRequest, id: number, reason: string): P
 }
 
 /**
- * POST …/acknowledge — "Diketahui Oleh" (US-42). ADR 0013: on new requests this is the Direktur's
- * approval ("Setujui"); PM/Staff/Admin are refused and audited (`requireActionAudited`).
+ * POST …/acknowledge — "Diketahui Oleh" (US-42). ADR 0013: the Direktur's approval ("Setujui");
+ * ADR 0021: on PM project → Direktur snapshots the approval of the request's PM project ("Persetujuan
+ * PM"). Anyone else is refused and audited (`requireActionAudited`).
  */
 export async function acknowledge(req: PayloadRequest, id: number, opts: SignOpts = {}): Promise<RequestDoc> {
   const visible = await loadVisible(req, id, { lock: true })
@@ -263,6 +268,7 @@ export async function acknowledge(req: PayloadRequest, id: number, opts: SignOpt
   const caller = userId(req)!
   const sig = await requireSignature(req, caller, 'required', opts.signatureMediaId)
   const snap = doc.approvalSnapshot ?? null
+  await syncRapFlags(req, id) // D4: "Melebihi RAP" as of this decision (counted in openFlags)
   await insertApproval(req, doc, {
     position: 'diketahui',
     level: 0,
@@ -279,8 +285,9 @@ export async function acknowledge(req: PayloadRequest, id: number, opts: SignOpt
     // ADR 0013 G1-2: the only approval position was skipped (the only Finance is requester/creator) →
     // the Direktur's decision is final. Through "Menunggu Approval" so the DB rule "approvedAmount only
     // on pending_approval → approved" (G3) holds; nobody is notified for the empty level.
-    const approved = await updateRequest(req, id, { status: 'approved', approvedAmount: next.grandTotal ?? 0 })
+    const approved = await updateRequest(req, id, { status: 'approved', approvedAmount: next.grandTotal ?? 0, approvedAt: new Date().toISOString() })
     await writeSnapshot(req, approved, 'approve')
+    await syncProjectRapFlags(req, id)
     return approved
   }
   return next
@@ -299,6 +306,7 @@ export async function approve(req: PayloadRequest, id: number, opts: SignOpts = 
   const caller = userId(req)!
   const sig = await requireSignature(req, caller, 'required', opts.signatureMediaId)
   const level = doc.currentLevel ?? 1
+  await syncRapFlags(req, id) // D4: "Melebihi RAP" as of this decision (counted in openFlags)
   await insertApproval(req, doc, {
     position: 'approval',
     level,
@@ -310,8 +318,11 @@ export async function approve(req: PayloadRequest, id: number, opts: SignOpts = 
   })
   const snap = doc.approvalSnapshot as ApprovalSnapshot
   if (level < lastLevel(snap)) return updateRequest(req, id, { currentLevel: level + 1 })
-  const updated = await updateRequest(req, id, { status: 'approved', approvedAmount: doc.grandTotal ?? 0 })
+  // item 11: approvedAt = start of the transfer SLA (DB: set only on pending_approval → approved)
+  const updated = await updateRequest(req, id, { status: 'approved', approvedAmount: doc.grandTotal ?? 0, approvedAt: new Date().toISOString() })
   await writeSnapshot(req, updated, 'approve')
+  // D4: this request now counts as RAP realisation → the project's other pending requests re-check "Melebihi RAP"
+  await syncProjectRapFlags(req, id)
   return updated
 }
 

@@ -50,6 +50,9 @@ export const AUDIT_ACTIONS = [
   // E1 (ADR 0013 G1-2): a decision position was skipped at submit because its only holders are the
   // requester/creator (e.g. the only Direktur is the requester).
   'approval_skipped',
+  // ADR 0021 (owner 2026-10-10): the narrow G1 exception `direktur_via_pm` was applied at submit (a
+  // Direktur's request filed by the PM project: PM approves as PM project, then the Direktur).
+  'approval_policy_exception',
   // E6 S2 (Q-33): the selfieRetention job deleted selfie files past the retention period (one
   // summary row per run, counts only).
   'retention_purge',
@@ -143,10 +146,15 @@ export const PER_PT_DOC_TYPES: Readonly<Record<string, readonly [table: string, 
   service_report: ['service_reports', 'company_id'],
   unit_timesheet: ['unit_timesheets', 'company_id'],
   aftersales_activity: ['aftersales_activities', 'company_id'],
+  // P3: konstruksi RAP + Laporan Harian
+  daily_report: ['daily_reports', 'company_id'],
+  rap_item: ['rap_items', 'company_id'],
+  rap_template: ['rap_templates', 'company_id'],
+  resource_type: ['resource_types', 'company_id'],
 }
 
 /** Doc types added after the MC4 audit backfill (migration 20261003): absent from its frozen BY_ID copy. */
-export const POST_MC4_DOC_TYPES: readonly string[] = ['contract_unit', 'service_report', 'unit_timesheet', 'aftersales_activity']
+export const POST_MC4_DOC_TYPES: readonly string[] = ['contract_unit', 'service_report', 'unit_timesheet', 'aftersales_activity', 'daily_report', 'rap_item', 'rap_template', 'resource_type']
 
 async function derivedCompany(tx: Awaited<ReturnType<typeof getRequestTx>>, row: AuditRow, cache: Map<string, number | null>): Promise<number | null | undefined> {
   if (row.companyId !== undefined) return row.companyId

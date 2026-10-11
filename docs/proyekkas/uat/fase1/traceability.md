@@ -40,7 +40,7 @@ Setiap US IN scope punya ≥ 1 skenario non-persiapan (AC E12). Kolom **Selisih*
 | US-33 | Master data | WA-03 | – | P-03, P-04 | S-16 | |
 | US-34 | Aturan approval | WA-06 | – | P-11 | – | |
 | US-35 | Riwayat dokumen | WS-16, WD-10 | AS-12 | – | – | |
-| US-36 | Jenis Uang Muka/Reimburse | WS-03 | AS-02 | – | – | |
+| US-36 | Jenis Pengajuan Baru/Reimburse | WS-03 | AS-02 | – | – | |
 | US-37 | Baris item | WS-03 | AS-02 | – | – | |
 | US-38 | Nota saat pengajuan Reimburse | WS-07 | AS-03 | – | – | |
 | US-39 | Verifikasi nota Reimburse | WS-14, WF-04, WF-05 | – | – | – | |

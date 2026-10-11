@@ -105,6 +105,11 @@ export interface Config {
     'service-reports': ServiceReport;
     'unit-timesheets': UnitTimesheet;
     'aftersales-activities': AftersalesActivity;
+    'rap-items': RapItem;
+    'rap-templates': RapTemplate;
+    'resource-types': ResourceType;
+    'daily-reports': DailyReport;
+    'daily-report-lines': DailyReportLine;
     attendances: Attendance;
     'attendance-corrections': AttendanceCorrection;
     'progress-reports': ProgressReport;
@@ -166,6 +171,11 @@ export interface Config {
     'service-reports': ServiceReportsSelect<false> | ServiceReportsSelect<true>;
     'unit-timesheets': UnitTimesheetsSelect<false> | UnitTimesheetsSelect<true>;
     'aftersales-activities': AftersalesActivitiesSelect<false> | AftersalesActivitiesSelect<true>;
+    'rap-items': RapItemsSelect<false> | RapItemsSelect<true>;
+    'rap-templates': RapTemplatesSelect<false> | RapTemplatesSelect<true>;
+    'resource-types': ResourceTypesSelect<false> | ResourceTypesSelect<true>;
+    'daily-reports': DailyReportsSelect<false> | DailyReportsSelect<true>;
+    'daily-report-lines': DailyReportLinesSelect<false> | DailyReportLinesSelect<true>;
     attendances: AttendancesSelect<false> | AttendancesSelect<true>;
     'attendance-corrections': AttendanceCorrectionsSelect<false> | AttendanceCorrectionsSelect<true>;
     'progress-reports': ProgressReportsSelect<false> | ProgressReportsSelect<true>;
@@ -212,6 +222,7 @@ export interface Config {
       selfieRetention: TaskSelfieRetention;
       dailyReminders: TaskDailyReminders;
       mediaOrphanCleanup: TaskMediaOrphanCleanup;
+      stampSelfie: TaskStampSelfie;
       inline: {
         input: unknown;
         output: unknown;
@@ -314,7 +325,7 @@ export interface MediaSignature {
 export interface Company {
   id: number;
   /**
-   * Token {COMPANY} di nomor dokumen (mis. 1/PB-CS1/27/IX/2026): huruf besar/angka, 2–16 karakter. Terkunci setelah PT ini punya dokumen bernomor.
+   * Token {COMPANY} di setiap nomor dokumen (mis. PB/CS1/2610/0001, TRF/CS1/2610/0001): huruf besar/angka, 2–16 karakter. Terkunci setelah PT ini punya dokumen bernomor.
    */
   shortCode: string;
   name: string;
@@ -348,9 +359,13 @@ export interface Company {
    */
   shortfallTolerancePct: number;
   receiptMaxAgeDays: number;
+  /**
+   * Pengajuan disetujui yang belum ditransfer lebih lama dari ini tampil merah di Antrian Transfer; dipakai laporan "SLA transfer" dan dashboard.
+   */
+  transferSlaHours: number;
   reimburseAutoCloseDays: number;
   /**
-   * Uang muka tanpa LPJ lebih lama dari ini tampil sebagai "LPJ terlambat" di dashboard/laporan.
+   * Pengajuan baru tanpa LPJ lebih lama dari ini tampil sebagai "LPJ terlambat" di dashboard/laporan.
    */
   lpjDueDays: number;
   /**
@@ -395,7 +410,7 @@ export interface Company {
    */
   reminderLateProgressEnabled?: boolean | null;
   /**
-   * Batas hari = "Batas LPJ uang muka".
+   * Batas hari = "Batas LPJ pengajuan baru".
    */
   reminderLpjOverdueEnabled?: boolean | null;
   reminderRevisionEnabled?: boolean | null;
@@ -526,6 +541,10 @@ export interface Employee {
   name: string;
   nickname?: string | null;
   position?: string | null;
+  /**
+   * Akun yang login sebagai karyawan ini di PT ini (diperlukan untuk absensi di APK/web). Hanya akun yang sudah punya akses di PT ini (menu Akses PT); 1 akun hanya untuk 1 karyawan per PT. Kosongkan untuk melepas tautan.
+   */
+  userAccount?: (number | null) | User;
   phone?: string | null;
   workSchedule?: (number | null) | WorkSchedule;
   faceRefPhoto?: (number | null) | MediaSelfy;
@@ -559,6 +578,7 @@ export interface MediaSelfy {
   capturedAt?: string | null;
   ownerCompany?: (number | null) | Company;
   removedAt?: string | null;
+  stampedAt?: string | null;
   /**
    * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
    */
@@ -696,7 +716,11 @@ export interface Project {
    * Kosong = radius default perusahaan (Setting perusahaan).
    */
   radiusM?: number | null;
-  pm?: (number | null) | User;
+  pm: number | User;
+  /**
+   * Diusulkan ke Finance saat mencatat transfer pengajuan project ini.
+   */
+  costCenter?: (number | null) | CostCenter;
   budget?: number | null;
   startDate?: string | null;
   targetDate?: string | null;
@@ -709,6 +733,39 @@ export interface Project {
    * Referensi Odoo (diisi otomatis saat sinkronisasi ke Odoo).
    */
   odooAnalyticRef?: string | null;
+  uuid?: string | null;
+  /**
+   * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
+   */
+  changeReason?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "cost-centers".
+ */
+export interface CostCenter {
+  id: number;
+  /**
+   * Wajib bila Anda memilih lebih dari satu PT di pemilih PT; tidak dapat diubah setelah dibuat.
+   */
+  company?: (number | null) | Company;
+  code: string;
+  name: string;
+  type: 'operational' | 'department';
+  manager?: (number | null) | User;
+  lat?: number | null;
+  lng?: number | null;
+  /**
+   * Kosong = radius default perusahaan (Setting perusahaan).
+   */
+  radiusM?: number | null;
+  /**
+   * Referensi Odoo (diisi otomatis saat sinkronisasi ke Odoo).
+   */
+  odooAnalyticRef?: string | null;
+  active?: boolean | null;
   uuid?: string | null;
   /**
    * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
@@ -736,6 +793,7 @@ export interface ProjectStage {
    * Nonaktif = tidak dihitung dalam bobot & progress project.
    */
   active?: boolean | null;
+  progressMode?: ('manual' | 'rap') | null;
   uuid?: string | null;
   /**
    * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
@@ -909,39 +967,6 @@ export interface TeamAssignment {
   roleInProject: 'pm' | 'staff' | 'mandor';
   startDate?: string | null;
   endDate?: string | null;
-  /**
-   * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
-   */
-  changeReason?: string | null;
-  updatedAt: string;
-  createdAt: string;
-}
-/**
- * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "cost-centers".
- */
-export interface CostCenter {
-  id: number;
-  /**
-   * Wajib bila Anda memilih lebih dari satu PT di pemilih PT; tidak dapat diubah setelah dibuat.
-   */
-  company?: (number | null) | Company;
-  code: string;
-  name: string;
-  type: 'operational' | 'department';
-  manager?: (number | null) | User;
-  lat?: number | null;
-  lng?: number | null;
-  /**
-   * Kosong = radius default perusahaan (Setting perusahaan).
-   */
-  radiusM?: number | null;
-  /**
-   * Referensi Odoo (diisi otomatis saat sinkronisasi ke Odoo).
-   */
-  odooAnalyticRef?: string | null;
-  active?: boolean | null;
-  uuid?: string | null;
   /**
    * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
    */
@@ -1131,7 +1156,8 @@ export interface DocumentSequence {
     | 'progress_report'
     | 'budget_addendum'
     | 'reversal'
-    | 'service_report';
+    | 'service_report'
+    | 'daily_report';
   /**
    * Token {DOC}, mis. PB, TRF.
    */
@@ -1180,17 +1206,17 @@ export interface ExpenseRequest {
     | 'rejected'
     | 'cancelled';
   title: string;
-  project?: (number | null) | Project;
-  costCenter?: (number | null) | CostCenter;
-  requestDate?: string | null;
   /**
-   * Format YYYY-MM-DD (zona waktu perusahaan).
+   * Wajib diisi sebelum dikirim. Item RAP baris diambil dari project ini.
    */
+  project?: (number | null) | Project;
+  /**
+   * Pengajuan lama tanpa project. Pengajuan baru: pusat biaya diisi Finance saat transfer.
+   */
+  costCenter?: (number | null) | CostCenter;
   neededDate?: string | null;
   urgencyLevel?: (number | null) | UrgencyLevel;
-  notes?: string | null;
   requesters?: (number | Employee)[] | null;
-  createdBy?: (number | null) | User;
   /**
    * Hanya rekening milik pemohon. Kosongkan untuk memakai rekening default pemohon pertama.
    */
@@ -1200,9 +1226,8 @@ export interface ExpenseRequest {
     accountNo?: string | null;
     accountHolder?: string | null;
   };
-  /**
-   * Tunggu sebentar setelah mengisi field sebelum menekan Tambah Baris.
-   */
+  notes?: string | null;
+  attachments?: (number | MediaAttachment)[] | null;
   lines?:
     | {
         description?: string | null;
@@ -1210,17 +1235,20 @@ export interface ExpenseRequest {
         uom?: (number | null) | Uom;
         unitPrice?: number | null;
         total?: number | null;
+        receiptAmount?: number | null;
         category?: (number | null) | ExpenseCategory;
+        rapItem?: (number | null) | RapItem;
         vehicle?: (number | null) | Vehicle;
         notes?: string | null;
         id?: string | null;
       }[]
     | null;
+  requestDate?: string | null;
+  createdBy?: (number | null) | User;
   grandTotal?: number | null;
   approvedAmount?: number | null;
   transferredTotal?: number | null;
   verifiedReceiptsTotal?: number | null;
-  attachments?: (number | MediaAttachment)[] | null;
   approvalRule?: (number | null) | ApprovalRule;
   approvalSnapshot?:
     | {
@@ -1231,9 +1259,11 @@ export interface ExpenseRequest {
     | number
     | boolean
     | null;
+  g1Exception?: string | null;
   approvalCycle?: number | null;
   currentLevel?: number | null;
   submittedAt?: string | null;
+  approvedAt?: string | null;
   contentHash?: string | null;
   resubmitOf?: (number | null) | ExpenseRequest;
   cancelReason?: string | null;
@@ -1290,6 +1320,43 @@ export interface MediaAttachment {
       filename?: string | null;
     };
   };
+}
+/**
+ * Diubah dari tab RAP project atau impor Excel (bukan dari form ini).
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "rap-items".
+ */
+export interface RapItem {
+  id: number;
+  /**
+   * Mengikuti dokumen induk.
+   */
+  company?: (number | null) | Company;
+  project: number | Project;
+  stage: number | ProjectStage;
+  code: string;
+  description: string;
+  kind: 'pekerjaan' | 'material';
+  uom: number | Uom;
+  volume: number;
+  unitPrice?: number | null;
+  weightPct?: number | null;
+  sortOrder?: number | null;
+  /**
+   * Pekerjaan: Σ volume laporan harian (ledger).
+   */
+  realisedQty?: number | null;
+  receivedQty?: number | null;
+  usedQty?: number | null;
+  active?: boolean | null;
+  uuid?: string | null;
+  /**
+   * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
+   */
+  changeReason?: string | null;
+  updatedAt: string;
+  createdAt: string;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -1417,6 +1484,8 @@ export interface Settlement {
   request: number | ExpenseRequest;
   status: 'draft' | 'submitted' | 'revision' | 'verified' | 'settled';
   usageNotes?: string | null;
+  photos?: (number | MediaReceipt)[] | null;
+  photosHash?: string | null;
   transferredTotal?: number | null;
   receiptsTotal?: number | null;
   verifiedReceiptsTotal?: number | null;
@@ -1458,6 +1527,48 @@ export interface Settlement {
   changeReason?: string | null;
   updatedAt: string;
   createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "media-receipts".
+ */
+export interface MediaReceipt {
+  id: number;
+  uploadedBy?: (number | null) | User;
+  receivedAt?: string | null;
+  ownerDocType?: string | null;
+  ownerDocId?: string | null;
+  sha256Original?: string | null;
+  originalWidth?: number | null;
+  originalHeight?: number | null;
+  originalSize?: number | null;
+  capturedAt?: string | null;
+  ownerCompany?: (number | null) | Company;
+  /**
+   * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
+   */
+  changeReason?: string | null;
+  updatedAt: string;
+  createdAt: string;
+  url?: string | null;
+  thumbnailURL?: string | null;
+  filename?: string | null;
+  mimeType?: string | null;
+  filesize?: number | null;
+  width?: number | null;
+  height?: number | null;
+  focalX?: number | null;
+  focalY?: number | null;
+  sizes?: {
+    thumb?: {
+      url?: string | null;
+      width?: number | null;
+      height?: number | null;
+      mimeType?: string | null;
+      filesize?: number | null;
+      filename?: string | null;
+    };
+  };
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -1516,6 +1627,7 @@ export interface Transfer {
   kind: 'advance' | 'reimburse' | 'lpj_shortfall';
   cashAccount: number | CashAccount;
   amount: number;
+  costCenter?: (number | null) | CostCenter;
   destination?: {
     bankName?: string | null;
     accountNo?: string | null;
@@ -1524,6 +1636,7 @@ export interface Transfer {
   bankRef: string;
   proof: number | MediaTransferProof;
   transferDate: string;
+  transferAt?: string | null;
   postedBy?: (number | null) | User;
   status: 'posted' | 'void';
   cashEntry?: (number | null) | CashEntry;
@@ -1622,48 +1735,6 @@ export interface Receipt {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "media-receipts".
- */
-export interface MediaReceipt {
-  id: number;
-  uploadedBy?: (number | null) | User;
-  receivedAt?: string | null;
-  ownerDocType?: string | null;
-  ownerDocId?: string | null;
-  sha256Original?: string | null;
-  originalWidth?: number | null;
-  originalHeight?: number | null;
-  originalSize?: number | null;
-  capturedAt?: string | null;
-  ownerCompany?: (number | null) | Company;
-  /**
-   * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
-   */
-  changeReason?: string | null;
-  updatedAt: string;
-  createdAt: string;
-  url?: string | null;
-  thumbnailURL?: string | null;
-  filename?: string | null;
-  mimeType?: string | null;
-  filesize?: number | null;
-  width?: number | null;
-  height?: number | null;
-  focalX?: number | null;
-  focalY?: number | null;
-  sizes?: {
-    thumb?: {
-      url?: string | null;
-      width?: number | null;
-      height?: number | null;
-      mimeType?: string | null;
-      filesize?: number | null;
-      filename?: string | null;
-    };
-  };
-}
-/**
- * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "receipt-flags".
  */
 export interface ReceiptFlag {
@@ -1674,7 +1745,15 @@ export interface ReceiptFlag {
   company?: (number | null) | Company;
   request: number | ExpenseRequest;
   key: string;
-  kind: 'amount_diff' | 'date_after_request' | 'date_too_old' | 'date_out_of_period' | 'uom_suspicious' | 'duplicate';
+  kind:
+    | 'amount_diff'
+    | 'date_after_request'
+    | 'date_too_old'
+    | 'date_out_of_period'
+    | 'uom_suspicious'
+    | 'duplicate'
+    | 'receipt_amount_mismatch'
+    | 'rap_over_budget';
   level: 'info' | 'warning';
   lineId?: string | null;
   lineNo?: number | null;
@@ -1734,9 +1813,6 @@ export interface ContractUnit {
   company?: (number | null) | Company;
   project: number | Project;
   unit: number | Vehicle;
-  /**
-   * YYYY-MM-DD
-   */
   startDate: string;
   /**
    * Kosong = berjalan.
@@ -1934,6 +2010,154 @@ export interface AftersalesActivity {
    * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
    */
   changeReason?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "rap-templates".
+ */
+export interface RapTemplate {
+  id: number;
+  /**
+   * Wajib bila Anda memilih lebih dari satu PT di pemilih PT; tidak dapat diubah setelah dibuat.
+   */
+  company?: (number | null) | Company;
+  name: string;
+  notes?: string | null;
+  items?:
+    | {
+        code: string;
+        description: string;
+        stageName: string;
+        kind: 'pekerjaan' | 'material';
+        uomCode: string;
+        volume: number;
+        unitPrice?: number | null;
+        weightPct?: number | null;
+        id?: string | null;
+      }[]
+    | null;
+  active?: boolean | null;
+  uuid?: string | null;
+  /**
+   * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
+   */
+  changeReason?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "resource-types".
+ */
+export interface ResourceType {
+  id: number;
+  /**
+   * Wajib bila Anda memilih lebih dari satu PT di pemilih PT; tidak dapat diubah setelah dibuat.
+   */
+  company?: (number | null) | Company;
+  kind: 'tenaga' | 'alat';
+  code: string;
+  name: string;
+  active?: boolean | null;
+  uuid?: string | null;
+  /**
+   * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
+   */
+  changeReason?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * Dibuat dari aplikasi Android atau layar Laporan Harian (bukan dari form ini).
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "daily-reports".
+ */
+export interface DailyReport {
+  id: number;
+  /**
+   * Mengikuti dokumen induk.
+   */
+  company?: (number | null) | Company;
+  docNo?: string | null;
+  project: number | Project;
+  reportDate: string;
+  reporter: number | User;
+  weatherMorning?: ('cerah' | 'berawan' | 'hujan') | null;
+  weatherNoon?: ('cerah' | 'berawan' | 'hujan') | null;
+  weatherAfternoon?: ('cerah' | 'berawan' | 'hujan') | null;
+  rainHours?: number | null;
+  stopHours?: number | null;
+  manpower?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  equipment?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  workerCount?: number | null;
+  issues?: string | null;
+  notes?: string | null;
+  photoCount?: number | null;
+  receivedAt?: string | null;
+  editableUntil?: string | null;
+  deviceTime?: string | null;
+  timeTrust?: ('server' | 'estimated' | 'device_only') | null;
+  offline?: boolean | null;
+  source?: ('web' | 'apk') | null;
+  flags?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  correctedAt?: string | null;
+  correctedBy?: (number | null) | User;
+  syncRev?: number | null;
+  clientUuid?: string | null;
+  uuid?: string | null;
+  /**
+   * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
+   */
+  changeReason?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "daily-report-lines".
+ */
+export interface DailyReportLine {
+  id: number;
+  /**
+   * Mengikuti dokumen induk.
+   */
+  company?: (number | null) | Company;
+  report: number | DailyReport;
+  project: number | Project;
+  reportDate: string;
+  rapItem: number | RapItem;
+  kind: 'work' | 'material_in' | 'material_used';
+  qty: number;
+  origin: 'report' | 'edit' | 'correction';
+  reason?: string | null;
+  createdBy: number | User;
   updatedAt: string;
   createdAt: string;
 }
@@ -2196,6 +2420,7 @@ export interface AuditLog {
     | 'acknowledge_delegated'
     | 'access_denied'
     | 'approval_skipped'
+    | 'approval_policy_exception'
     | 'retention_purge'
     | 'import'
     | '2fa_enabled'
@@ -2355,7 +2580,8 @@ export interface PayloadJob {
           | 'reimburseAutoClose'
           | 'selfieRetention'
           | 'dailyReminders'
-          | 'mediaOrphanCleanup';
+          | 'mediaOrphanCleanup'
+          | 'stampSelfie';
         taskID: string;
         input?:
           | {
@@ -2397,6 +2623,7 @@ export interface PayloadJob {
         | 'selfieRetention'
         | 'dailyReminders'
         | 'mediaOrphanCleanup'
+        | 'stampSelfie'
       )
     | null;
   queue?: string | null;
@@ -2566,6 +2793,26 @@ export interface PayloadLockedDocument {
         value: number | AftersalesActivity;
       } | null)
     | ({
+        relationTo: 'rap-items';
+        value: number | RapItem;
+      } | null)
+    | ({
+        relationTo: 'rap-templates';
+        value: number | RapTemplate;
+      } | null)
+    | ({
+        relationTo: 'resource-types';
+        value: number | ResourceType;
+      } | null)
+    | ({
+        relationTo: 'daily-reports';
+        value: number | DailyReport;
+      } | null)
+    | ({
+        relationTo: 'daily-report-lines';
+        value: number | DailyReportLine;
+      } | null)
+    | ({
         relationTo: 'attendances';
         value: number | Attendance;
       } | null)
@@ -2696,6 +2943,7 @@ export interface CompaniesSelect<T extends boolean = true> {
   receiptRoundingTolerance?: T;
   shortfallTolerancePct?: T;
   receiptMaxAgeDays?: T;
+  transferSlaHours?: T;
   reimburseAutoCloseDays?: T;
   lpjDueDays?: T;
   syncExpenseDraftsEnabled?: T;
@@ -2747,6 +2995,7 @@ export interface EmployeesSelect<T extends boolean = true> {
   name?: T;
   nickname?: T;
   position?: T;
+  userAccount?: T;
   phone?: T;
   workSchedule?: T;
   faceRefPhoto?: T;
@@ -2838,6 +3087,7 @@ export interface ProjectsSelect<T extends boolean = true> {
   lng?: T;
   radiusM?: T;
   pm?: T;
+  costCenter?: T;
   budget?: T;
   startDate?: T;
   targetDate?: T;
@@ -2861,6 +3111,7 @@ export interface ProjectStagesSelect<T extends boolean = true> {
   sequence?: T;
   progressPct?: T;
   active?: T;
+  progressMode?: T;
   uuid?: T;
   changeReason?: T;
   updatedAt?: T;
@@ -3161,12 +3412,9 @@ export interface ExpenseRequestsSelect<T extends boolean = true> {
   title?: T;
   project?: T;
   costCenter?: T;
-  requestDate?: T;
   neededDate?: T;
   urgencyLevel?: T;
-  notes?: T;
   requesters?: T;
-  createdBy?: T;
   bankAccount?: T;
   bankSnapshot?:
     | T
@@ -3175,6 +3423,8 @@ export interface ExpenseRequestsSelect<T extends boolean = true> {
         accountNo?: T;
         accountHolder?: T;
       };
+  notes?: T;
+  attachments?: T;
   lines?:
     | T
     | {
@@ -3183,21 +3433,26 @@ export interface ExpenseRequestsSelect<T extends boolean = true> {
         uom?: T;
         unitPrice?: T;
         total?: T;
+        receiptAmount?: T;
         category?: T;
+        rapItem?: T;
         vehicle?: T;
         notes?: T;
         id?: T;
       };
+  requestDate?: T;
+  createdBy?: T;
   grandTotal?: T;
   approvedAmount?: T;
   transferredTotal?: T;
   verifiedReceiptsTotal?: T;
-  attachments?: T;
   approvalRule?: T;
   approvalSnapshot?: T;
+  g1Exception?: T;
   approvalCycle?: T;
   currentLevel?: T;
   submittedAt?: T;
+  approvedAt?: T;
   contentHash?: T;
   resubmitOf?: T;
   cancelReason?: T;
@@ -3326,6 +3581,7 @@ export interface TransfersSelect<T extends boolean = true> {
   kind?: T;
   cashAccount?: T;
   amount?: T;
+  costCenter?: T;
   destination?:
     | T
     | {
@@ -3336,6 +3592,7 @@ export interface TransfersSelect<T extends boolean = true> {
   bankRef?: T;
   proof?: T;
   transferDate?: T;
+  transferAt?: T;
   postedBy?: T;
   status?: T;
   cashEntry?: T;
@@ -3357,6 +3614,8 @@ export interface SettlementsSelect<T extends boolean = true> {
   request?: T;
   status?: T;
   usageNotes?: T;
+  photos?: T;
+  photosHash?: T;
   transferredTotal?: T;
   receiptsTotal?: T;
   verifiedReceiptsTotal?: T;
@@ -3569,6 +3828,128 @@ export interface AftersalesActivitiesSelect<T extends boolean = true> {
   clientUuid?: T;
   uuid?: T;
   changeReason?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "rap-items_select".
+ */
+export interface RapItemsSelect<T extends boolean = true> {
+  company?: T;
+  project?: T;
+  stage?: T;
+  code?: T;
+  description?: T;
+  kind?: T;
+  uom?: T;
+  volume?: T;
+  unitPrice?: T;
+  weightPct?: T;
+  sortOrder?: T;
+  realisedQty?: T;
+  receivedQty?: T;
+  usedQty?: T;
+  active?: T;
+  uuid?: T;
+  changeReason?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "rap-templates_select".
+ */
+export interface RapTemplatesSelect<T extends boolean = true> {
+  company?: T;
+  name?: T;
+  notes?: T;
+  items?:
+    | T
+    | {
+        code?: T;
+        description?: T;
+        stageName?: T;
+        kind?: T;
+        uomCode?: T;
+        volume?: T;
+        unitPrice?: T;
+        weightPct?: T;
+        id?: T;
+      };
+  active?: T;
+  uuid?: T;
+  changeReason?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "resource-types_select".
+ */
+export interface ResourceTypesSelect<T extends boolean = true> {
+  company?: T;
+  kind?: T;
+  code?: T;
+  name?: T;
+  active?: T;
+  uuid?: T;
+  changeReason?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "daily-reports_select".
+ */
+export interface DailyReportsSelect<T extends boolean = true> {
+  company?: T;
+  docNo?: T;
+  project?: T;
+  reportDate?: T;
+  reporter?: T;
+  weatherMorning?: T;
+  weatherNoon?: T;
+  weatherAfternoon?: T;
+  rainHours?: T;
+  stopHours?: T;
+  manpower?: T;
+  equipment?: T;
+  workerCount?: T;
+  issues?: T;
+  notes?: T;
+  photoCount?: T;
+  receivedAt?: T;
+  editableUntil?: T;
+  deviceTime?: T;
+  timeTrust?: T;
+  offline?: T;
+  source?: T;
+  flags?: T;
+  correctedAt?: T;
+  correctedBy?: T;
+  syncRev?: T;
+  clientUuid?: T;
+  uuid?: T;
+  changeReason?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "daily-report-lines_select".
+ */
+export interface DailyReportLinesSelect<T extends boolean = true> {
+  company?: T;
+  report?: T;
+  project?: T;
+  reportDate?: T;
+  rapItem?: T;
+  kind?: T;
+  qty?: T;
+  origin?: T;
+  reason?: T;
+  createdBy?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -3888,6 +4269,7 @@ export interface MediaSelfiesSelect<T extends boolean = true> {
   capturedAt?: T;
   ownerCompany?: T;
   removedAt?: T;
+  stampedAt?: T;
   changeReason?: T;
   updatedAt?: T;
   createdAt?: T;
@@ -4279,6 +4661,18 @@ export interface TaskMediaOrphanCleanup {
     candidates: number;
     deleted: number;
     dryRun: boolean;
+  };
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "TaskStampSelfie".
+ */
+export interface TaskStampSelfie {
+  input: {
+    attendanceId: number;
+  };
+  output: {
+    status: string;
   };
 }
 /**

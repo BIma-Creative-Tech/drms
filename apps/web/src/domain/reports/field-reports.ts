@@ -367,6 +367,7 @@ export const rekapAftersales: ReportDef = {
           rows: open.map((x) => ({
             company: Number(x.company_id),
             href: `/admin/aftersales/aktivitas/detail/${x.id}`,
+            ...(x.doc_no ? { links: { noPo: `/admin/aftersales/aktivitas/detail/${x.id}` } } : {}),
             cells: {
               tanggal: String(x.activity_date),
               pelanggan: String(x.client),
@@ -393,6 +394,7 @@ export const rekapAftersales: ReportDef = {
           rows: due.map((x) => ({
             company: Number(x.company_id),
             href: `/admin/aftersales/aktivitas/detail/${x.id}`,
+            ...(x.doc_no ? { links: { noPenawaran: `/admin/aftersales/aktivitas/detail/${x.id}` } } : {}),
             cells: { followUp: String(x.follow_up_date), pelanggan: String(x.client), noPenawaran: (x.doc_no as string | null) ?? null, tanggal: String(x.activity_date), project: String(x.code) },
           })),
           empty: 'Tidak ada follow-up jatuh tempo.',

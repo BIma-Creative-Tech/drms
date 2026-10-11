@@ -216,6 +216,7 @@ export async function createReport(req: PayloadRequest, input: ReportInput, timi
   const stage = stages.find((s) => s.id === input.stageId)
   if (!stage) fail(400, 'VALIDATION', 'Tahapan bukan milik project ini.', 'stageId')
   if (!stage!.active) fail(409, 'STATE_CONFLICT', 'Tahapan sudah dinonaktifkan.', 'stageId')
+  if (await isRapStage(req, input.stageId)) fail(409, 'STAGE_RAP_DRIVEN', 'Progress tahapan ini dihitung dari RAP + laporan harian, bukan laporan progress manual.', 'stageId')
   const sum = weightSum(stages)
   if (!isComplete(sum)) fail(409, 'WEIGHTS_INCOMPLETE', `Total bobot tahapan project belum 100% (sekarang ${sum}%). Lengkapi tahapan dulu.`, 'projectId')
   const pctBefore = round2(stage!.progressPct)
@@ -272,6 +273,12 @@ export async function createReport(req: PayloadRequest, input: ReportInput, timi
   return { doc: (await loadRaw(req, doc.id))!, created: true }
 }
 
+/** P3: a stage whose % comes from the RAP (progress_mode `rap`) takes no manual progress. */
+async function isRapStage(req: PayloadRequest, stageId: number): Promise<boolean> {
+  const s = (await req.payload.findByID({ collection: 'project-stages', id: stageId, depth: 0, overrideAccess: true /* SYSTEM-READ: progress mode */, req, disableErrors: true })) as { progressMode?: string | null } | null
+  return s?.progressMode === 'rap'
+}
+
 /** Latest report of a stage (by id): only this one may change the stage % on edit. */
 async function latestOfStage(req: PayloadRequest, stageId: number): Promise<number | undefined> {
   const res = await req.payload.find({
@@ -316,6 +323,7 @@ export async function editReport(req: PayloadRequest, id: number, patch: ReportP
     if ((await latestOfStage(req, stageId)) !== id) fail(409, 'STATE_CONFLICT', 'Progress hanya dapat dikoreksi pada laporan terakhir tahapan ini.', 'pctAfter')
     if (patch.pctAfter < round2(doc.pctBefore)) fail(409, 'PROGRESS_DECREASED', `Progress tidak boleh di bawah nilai sebelum laporan (${doc.pctBefore}%).`, 'pctAfter')
     data.pctAfter = round2(patch.pctAfter)
+    if (await isRapStage(req, stageId)) fail(409, 'STAGE_RAP_DRIVEN', 'Progress tahapan ini dihitung dari RAP + laporan harian, bukan laporan progress manual.', 'pctAfter')
     stageChange = round2(patch.pctAfter)
     const stages = await projectStages(req, projectId)
     data.projectPctAfter = projectProgress(stages.map((s) => (s.id === stageId ? { ...s, progressPct: stageChange! } : s)))

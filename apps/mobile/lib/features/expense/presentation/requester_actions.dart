@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../app/providers.dart';
+import '../../../app/theme.dart';
 import '../../../core/format/dates.dart';
 import '../../../core/format/rupiah.dart';
 import '../../../core/media/photo_compressor.dart';
@@ -16,10 +17,11 @@ import '../application/expense_providers.dart';
 import '../data/expense_api.dart';
 import '../domain/expense_request.dart';
 import '../domain/request_status.dart';
+import 'lpj_submit_screen.dart';
 import 'receipt_capture.dart';
 
-/// Online requester actions after approval (ADR 0010 decision 5: online-only): receipts on an Uang
-/// Muka after the transfer / in LPJ revision and on a Reimburse in receipt revision (US-07, US-38, T4),
+/// Online requester actions after approval (ADR 0010 decision 5: online-only): receipts on a Pengajuan
+/// Baru (`advance`) after the transfer / in LPJ revision and on a Reimburse in receipt revision (US-07, US-38, T4),
 /// "Nota sudah lengkap" + "Kirim LPJ" (US-08, US-21, T5), "Kirim ulang nota" and "Tandai selesai".
 /// Shown only for actions the server lists in `allowedActions`; the server re-checks every call.
 class RequesterActionsSection extends ConsumerWidget {
@@ -36,6 +38,11 @@ class RequesterActionsSection extends ConsumerWidget {
     final a = detail.allowedActions;
     final canAdd = canAddReceipts(detail);
     final lpjAgain = detail.settlement != null && (detail.settlement!.submitCount > 0);
+    // D3: a pre-D3 line needs Qty & Harga satuan before "Kirim ulang nota" (server rule; edited on the web)
+    final incomplete = [
+      for (final l in detail.lines)
+        if (lineNeedsCompletion(detail, l)) l.no,
+    ];
     final buttons = <Widget>[
       if (canAdd) ...[
         OnlineOnlyButton(
@@ -67,13 +74,20 @@ class RequesterActionsSection extends ConsumerWidget {
           icon: Icons.send,
           onPressed: () => _submitLpj(context, ref),
         ),
+      if (a.contains(RequesterAction.receiptsResubmit.code) && incomplete.isNotEmpty)
+        Text(
+          t.linesIncompleteResubmit(incomplete.join(', ')),
+          key: const Key('lines-incomplete-note'),
+          style: TextStyle(color: context.pk.warnText, fontWeight: FontWeight.w600),
+        ),
       if (a.contains(RequesterAction.receiptsResubmit.code))
         OnlineOnlyButton(
           key: const Key('action-receipts-resubmit'),
           label: t.actionReceiptsResubmit,
           icon: Icons.replay,
-          onPressed: () =>
-              _confirmAndRun(context, ref, RequesterAction.receiptsResubmit, t.actionReceiptsResubmitConfirm),
+          onPressed: incomplete.isNotEmpty
+              ? null
+              : () => _confirmAndRun(context, ref, RequesterAction.receiptsResubmit, t.actionReceiptsResubmitConfirm),
         ),
       // Finance also holds `complete`; on the phone it is the requester's "dana diterima".
       if (a.contains(RequesterAction.complete.code) && !a.contains('transfer_void'))
@@ -119,30 +133,26 @@ class RequesterActionsSection extends ConsumerWidget {
     });
   }
 
+  /// d1010 (13): usage notes + LPJ photos (camera or gallery, compressed on the phone, max 10). New photos
+  /// are uploaded first (`POST /media/receipts`, like receipts), then `lpj/submit` carries every photo id.
   Future<void> _submitLpj(BuildContext context, WidgetRef ref) async {
     final t = AppLocalizations.of(context);
     final first = (detail.settlement?.submitCount ?? 0) == 0;
-    final notes = await showDialog<String>(
-      context: context,
-      builder: (_) => _TextPromptDialog(
-        title: first ? t.actionLpjSubmit : t.actionLpjResubmit,
-        label: t.lpjUsageNotes,
-        hint: t.lpjUsageNotesHint,
-        initial: detail.settlement?.usageNotes ?? '',
-        required: first,
-        fieldKey: const Key('lpj-usage-notes'),
+    final sent = await Navigator.of(context).push<LpjSubmission>(
+      MaterialPageRoute(
+        fullscreenDialog: true,
+        builder: (_) => LpjSubmitScreen(settlement: detail.settlement, first: first),
       ),
     );
-    if (notes == null || !context.mounted) return;
+    if (sent == null || !context.mounted) return;
+    if (sent.newPhotos.isNotEmpty) showSnack(context, t.lpjUploadingPhotos);
     await _run(context, ref, () {
-      return ref
-          .read(expenseApiProvider)
-          .requesterAction(
-            detail.id,
-            RequesterAction.lpjSubmit,
-            idempotencyKey: const Uuid().v7(),
-            usageNotes: notes.trim().isEmpty ? null : notes.trim(),
-          );
+      return submitLpjWithPhotos(
+        ref.read(expenseApiProvider),
+        requestId: detail.id,
+        submission: sent,
+        idempotencyKey: const Uuid().v7(),
+      );
     });
   }
 
@@ -384,6 +394,29 @@ Future<ExpenseDetail> uploadServerReceipt(
   }, idempotencyKey: idempotencyKey);
 }
 
+/// d1010 (13): uploads the new LPJ photos (`POST /media/receipts`, same path as receipt photos), then
+/// `lpj/submit` with the usage notes and every photo id (kept + new; the server caps the LPJ at 10). The photo
+/// list is sent only when the LPJ has photos, so an LPJ without photos keeps the pre-d1010 body.
+Future<ExpenseDetail> submitLpjWithPhotos(
+  ExpenseApi api, {
+  required int requestId,
+  required LpjSubmission submission,
+  required String idempotencyKey,
+}) async {
+  final ids = [...submission.keptPhotoIds];
+  for (final jpeg in submission.newPhotos.take(lpjPhotoSlots(ids.length))) {
+    ids.add(await api.uploadMedia('receipts', jpeg, filename: 'lpj-${const Uuid().v4()}.jpg'));
+  }
+  final notes = submission.usageNotes.trim();
+  return api.requesterAction(
+    requestId,
+    RequesterAction.lpjSubmit,
+    idempotencyKey: idempotencyKey,
+    usageNotes: notes.isEmpty ? null : notes,
+    photos: ids.isEmpty && !submission.hadPhotos ? null : ids,
+  );
+}
+
 /// Soft-removes a receipt (reason required, audited server-side).
 Future<void> removeServerReceipt(BuildContext context, WidgetRef ref, ExpenseDetail d, ReceiptInfo r) async {
   final t = AppLocalizations.of(context);
@@ -414,12 +447,10 @@ class _TextPromptDialog extends StatefulWidget {
     required this.required,
     required this.fieldKey,
     this.hint,
-    this.initial = '',
   });
   final String title;
   final String label;
   final String? hint;
-  final String initial;
   final bool required;
   final Key fieldKey;
 
@@ -428,7 +459,7 @@ class _TextPromptDialog extends StatefulWidget {
 }
 
 class _TextPromptDialogState extends State<_TextPromptDialog> {
-  late final _c = TextEditingController(text: widget.initial);
+  late final _c = TextEditingController();
   String? _error;
 
   @override

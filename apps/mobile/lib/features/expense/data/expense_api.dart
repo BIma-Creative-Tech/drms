@@ -99,7 +99,7 @@ class ExpenseApi {
   );
 
   /// Soft-removes one receipt (`POST …/receipts/{rid}/remove`, reason required; US-38/T4). Allowed
-  /// while `add_receipt` is (Uang Muka after transfer / LPJ revision, Reimburse receipt revision).
+  /// while `add_receipt` is (Pengajuan Baru after transfer / LPJ revision, Reimburse receipt revision).
   Future<ExpenseDetail> removeReceipt(int requestId, int receiptId, String reason, {required String idempotencyKey}) =>
       client.run(
         (d) => d.post<dynamic>(
@@ -111,17 +111,24 @@ class ExpenseApi {
       );
 
   /// Requester-side transitions without a body field besides the optional LPJ notes:
-  /// `receipts-complete` (Uang Muka: nota lengkap), `lpj/submit` (usageNotes required at the first
-  /// submit), `receipts-resubmit` (Reimburse after receipt revision), `complete` (Reimburse done).
+  /// `receipts-complete` (Pengajuan Baru: nota lengkap), `lpj/submit` (usageNotes required at the first
+  /// submit; [photos] = LPJ photo media ids), `receipts-resubmit` (Reimburse after receipt revision), `complete` (Reimburse done).
   Future<ExpenseDetail> requesterAction(
     int requestId,
     RequesterAction action, {
     required String idempotencyKey,
     String? usageNotes,
+    List<int>? photos,
   }) => client.run(
     (d) => d.post<dynamic>(
       '/expense-requests/$requestId/${action.path}',
-      data: {if (action == RequesterAction.lpjSubmit) 'usageNotes': ?usageNotes},
+      data: {
+        if (action == RequesterAction.lpjSubmit) ...{
+          'usageNotes': ?usageNotes,
+          // d1010 (13): LPJ photos (media ids from `POST /media/receipts`, max 10) — the full set kept on the LPJ.
+          'photos': ?photos,
+        },
+      },
       options: _idem(idempotencyKey),
     ),
     (data) => detailFromJson(data as Map<String, dynamic>),

@@ -1,5 +1,5 @@
 import type { IconName } from '@/admin/modules/icons'
-import { ADMIN_ROUTE, type ResolvedModule } from '@/admin/modules/registry'
+import { activeHref, ADMIN_ROUTE, moduleLandingHref, type ResolvedModule } from '@/admin/modules/registry'
 
 /**
  * Breadcrumb line under the module bar (replaces Payload's AppHeader/StepNav row, whose home crumb
@@ -12,8 +12,11 @@ import { ADMIN_ROUTE, type ResolvedModule } from '@/admin/modules/registry'
  * - Entity routes (/collections/<slug>…, /globals/<slug>, /account): Payload's steps, or — before
  *   the view has set them (SSR, first paint) or when they belong to the previous page — a fallback
  *   from the module's own menu labels, so the line does not jump in after hydration.
- * - Custom views and the launcher set no steps → no crumbs → no row, no gap (their title is the
- *   page's h1 and the bar already names the module).
+ * - The launcher and the custom views of a single-item module set no steps → no crumbs → no row,
+ *   no gap (their title is the page's h1 and the bar already names the module).
+ * - DRMS 10/10 D9: the home crumb links the module LANDING page (module.href) when the module has
+ *   one; its custom views get "module › menu item" so every sub-menu leads back to the landing page,
+ *   and the landing page itself shows "Semua modul › module".
  * - The last crumb is the current page (no link, aria-current="page") — except the fallback entity
  *   crumb of an edit page, which stays a link until Payload names the document.
  */
@@ -63,6 +66,17 @@ export function deriveCrumbs({ pathname, module, steps, translate }: CrumbInput)
     if (label) tail = [{ label, href: route.deeper ? href : undefined }]
   } else if (route.kind === 'account') {
     tail = [{ label: 'Akun' }]
+  } else if (module?.landing) {
+    const clean = (pathname.split(/[?#]/)[0] ?? '').replace(/\/+$/, '')
+    if (clean === moduleLandingHref(module.id)) {
+      return [
+        { key: 'home', label: 'Semua modul', href: ADMIN_ROUTE, icon: 'grid' },
+        { key: 'c0', label: module.label, icon: module.icon, mod: module.id, current: true },
+      ]
+    }
+    const href = activeHref(clean, module.sections.flatMap((sec) => sec.items.map((i) => i.href)))
+    const label = href ? menuLabel(module, href) : null
+    if (href && label) tail = [{ label, href: clean !== href ? href : undefined }]
   }
   // Custom views / launcher: no steps of their own → nothing to show (and no empty row).
   if (!tail.length) return []

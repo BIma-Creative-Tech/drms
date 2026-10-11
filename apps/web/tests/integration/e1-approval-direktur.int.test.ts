@@ -140,7 +140,8 @@ describe('AC-5: approval-rules refuse PM/Staff deciders, scope_manager and an op
     ['acknowledgeRole = pk-pm', { acknowledge: 'required', acknowledgeBy: 'role', acknowledgeRole: 'pk-pm', steps: [{ level: 1, approverRole: 'pk-finance' }] }],
     ['approverRole = pk-pm', { acknowledge: 'required', acknowledgeBy: 'role', acknowledgeRole: 'pk-owner', steps: [{ level: 1, approverRole: 'pk-pm' }] }],
     ['approverRole = pk-staff', { acknowledge: 'none', acknowledgeBy: 'role', steps: [{ level: 1, approverRole: 'pk-staff' }] }],
-    ['acknowledgeBy = scope_manager', { acknowledge: 'required', acknowledgeBy: 'scope_manager', steps: [{ level: 1, approverRole: 'pk-finance' }] }],
+    // ADR 0021: "PM project" (scope_manager) is allowed again for a REQUIRED "Diketahui" of an expense-request rule
+    ['acknowledgeBy = scope_manager, optional', { acknowledge: 'optional', acknowledgeBy: 'scope_manager', steps: [{ level: 1, approverRole: 'pk-owner' }] }],
     ['optional Direktur', { acknowledge: 'optional', acknowledgeBy: 'role', acknowledgeRole: 'pk-owner', steps: [{ level: 1, approverRole: 'pk-finance' }] }],
   ])('%s → 400', async (_n, data) => {
     await expect(create({ ...base, ...data })).rejects.toMatchObject({ status: 400 })
@@ -150,13 +151,15 @@ describe('AC-5: approval-rules refuse PM/Staff deciders, scope_manager and an op
     const ok = await create({ ...base, acknowledge: 'required', acknowledgeBy: 'role', acknowledgeRole: 'pk-owner', steps: [{ level: 1, approverRole: 'pk-finance' }] })
     expect(ok.id).toBeGreaterThan(0)
   })
-  it('an active legacy rule (PM "Diketahui", written before E1) blocks new submissions with 409 instead of routing to the PM', async () => {
-    const cc = await sysCreate('cost-centers', { code: 'E1-LEG', name: 'E1 legacy', manager: w.users.pm.id })
-    const rule = await sysCreate('approval-rules', { ...base, name: 'E1 legacy rule', costCenter: cc, priority: 1, active: true, acknowledge: 'required', acknowledgeBy: 'role', acknowledgeRole: 'pk-owner', steps: [{ level: 1, approverRole: 'pk-finance' }] })
-    await sqlAs('owner', "UPDATE approval_rules SET acknowledge_by = 'scope_manager', acknowledge_role = NULL WHERE id = $1", [rule])
-    for (const e of [w.emp.a]) await sysCreate('team-assignments', { employee: e, costCenter: cc, roleInProject: 'staff' })
-    const { body } = await submitted(w.users.staffA, { projectId: undefined, costCenterId: cc }, 409)
-    expect(JSON.stringify(body)).toMatch(/tidak sesuai alur Direktur/)
+  it('an active legacy rule (PM role "Diketahui", written before E1) blocks new submissions with 409 instead of routing to the PM', async () => {
+    // DRMS 10/10 D2: requests are project requests → the legacy rule is scoped to a project (was: a cost center)
+    const proj = await sysCreate('projects', { code: 'E1-LEG', name: 'E1 legacy', pm: w.users.pm.id, status: 'berjalan' })
+    const rule = await sysCreate('approval-rules', { ...base, name: 'E1 legacy rule', project: proj, priority: 1, active: true, acknowledge: 'required', acknowledgeBy: 'role', acknowledgeRole: 'pk-owner', steps: [{ level: 1, approverRole: 'pk-finance' }] })
+    // ADR 0021 made acknowledgeBy = scope_manager valid again; a pre-E1 rule naming the PM ROLE stays invalid
+    await sqlAs('owner', "UPDATE approval_rules SET acknowledge_by = 'role', acknowledge_role = 'pk-pm' WHERE id = $1", [rule])
+    for (const e of [w.emp.a]) await sysCreate('team-assignments', { employee: e, project: proj, roleInProject: 'staff' })
+    const { body } = await submitted(w.users.staffA, { projectId: proj }, 409)
+    expect(JSON.stringify(body)).toMatch(/tidak sesuai alur persetujuan/)
   })
 })
 
@@ -240,18 +243,18 @@ describe('AC-8: requests submitted before E1 finish on their old snapshot', () =
 })
 
 describe('APK needs (E3 / AC-10 server side)', () => {
-  it('/me capabilities: approval inbox for Direktur and Finance, not for a PM-only user', async () => {
+  it('/me capabilities: approval inbox for Direktur, Finance and (ADR 0021) the PM', async () => {
     // FR1 field-report capabilities are false while DRMS has fieldReportsEnabled off (default)
-    const noField = { serviceReportCreate: false, unitTimesheetCreate: false, aftersalesActivityCreate: false }
+    const noField = { serviceReportCreate: false, unitTimesheetCreate: false, aftersalesActivityCreate: false, dailyReportCreate: false }
     const cap = async (u: FlowUser) => {
       const c = (await api('GET', '/api/v1/me', u)).body.capabilities
       expect(c).toMatchObject(noField)
-      const { serviceReportCreate: _s, unitTimesheetCreate: _u, aftersalesActivityCreate: _a, ...rest } = c
+      const { serviceReportCreate: _s, unitTimesheetCreate: _u, aftersalesActivityCreate: _a, dailyReportCreate: _d, ...rest } = c
       return rest
     }
     expect(await cap(w.users.owner)).toEqual({ approvalInbox: true, teamMonitor: false, progressReportCreate: true })
     expect(await cap(w.users.finance)).toEqual({ approvalInbox: true, teamMonitor: false, progressReportCreate: false })
-    expect(await cap(w.users.pm)).toEqual({ approvalInbox: false, teamMonitor: true, progressReportCreate: true })
+    expect(await cap(w.users.pm)).toEqual({ approvalInbox: true, teamMonitor: true, progressReportCreate: true })
     expect(await cap(w.users.staffA)).toEqual({ approvalInbox: false, teamMonitor: false, progressReportCreate: false })
   })
 })

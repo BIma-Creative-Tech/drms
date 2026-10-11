@@ -13,6 +13,7 @@ import '../../companies/presentation/company_chip.dart';
 import '../application/field_providers.dart';
 import '../domain/field_models.dart';
 import 'aftersales_screen.dart';
+import 'daily_report_screen.dart';
 import 'service_report_screen.dart';
 import 'timesheet_screen.dart';
 import 'widgets/field_widgets.dart';
@@ -130,6 +131,7 @@ IconData _icon(FieldReportType type) => switch (type) {
   FieldReportType.serviceReport => Icons.build_circle_outlined,
   FieldReportType.unitTimesheet => Icons.timer_outlined,
   FieldReportType.aftersalesActivity => Icons.local_shipping_outlined,
+  FieldReportType.dailyReport => Icons.engineering_outlined,
 };
 
 class _HistoryTab extends ConsumerWidget {
@@ -292,6 +294,8 @@ String flagLabel(AppLocalizations t, String flag) => switch (flag) {
   'HM_GAP' => t.fieldFlagHmGap,
   'BREAKDOWN_SUGGEST_SERVICE' => t.fieldFlagBreakdown,
   'CORRECTED' => t.fieldFlagCorrected,
+  'MELEBIHI_RAP' => t.dailyFlagOverRap,
+  'POSSIBLE_DUPLICATE' => t.dailyFlagDuplicate,
   _ => flag,
 };
 
@@ -381,6 +385,7 @@ Widget editorFor(FieldDraft d) => switch (d.type) {
   FieldReportType.serviceReport => ServiceReportScreen(initial: d),
   FieldReportType.unitTimesheet => TimesheetScreen(initial: d),
   FieldReportType.aftersalesActivity => AftersalesScreen(initial: d),
+  FieldReportType.dailyReport => DailyReportScreen(initial: d),
 };
 
 /// `/field/edit/:type/:id` — own edit (≤ 24 h) of a server record.

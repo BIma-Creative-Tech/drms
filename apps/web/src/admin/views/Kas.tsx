@@ -8,6 +8,8 @@ import { relId } from '@/access/roles'
 import { CashEntryForm, type CashEntryFormProps } from '@/admin/components/kas/CashEntryForm'
 import { ReasonAction } from '@/admin/components/kas/ReasonAction'
 import { KAS_STYLE } from '@/admin/components/kas/style'
+import { AutoSubmit } from '@/admin/components/list/AutoSubmit'
+import { PAGE_SIZES } from '@/admin/list-query'
 import {
   accountFlows,
   canEdit,
@@ -237,7 +239,7 @@ export async function KasBook(props: AdminViewServerProps) {
   const byPt = shown.map((c) => ({ companyId: c, total: bal.filter((a) => a.companyId === c).reduce((s, a) => s + a.balance, 0) }))
   const activeIds = new Set(lk.accounts.filter((a) => a.active).map((a) => a.id))
   const tiles = bal.filter((a) => activeIds.has(a.cashAccountId) || a.balance !== 0)
-  const filtered = Boolean(q.akun || q.periode || q.project || q.pusat || q.arah || q.status || q.pt)
+  const filtered = Boolean(q.akun || q.periode || q.project || q.pusat || q.arah || q.status || q.pt || q.q)
   const flashAcc = flash ? bal.find((a) => a.cashAccountId === relId(flash.cashAccount)) : undefined
   return (
     <Frame props={props} name="kas">
@@ -338,6 +340,11 @@ function FilterBar({ q, lk, filtered, pt, pts }: { q: BookQuery; lk: Lookups; fi
   )
   return (
     <form className="pk-filter" method="get" action="/admin/kas" role="search" aria-label="Filter buku kas" data-pk-filter="kas">
+      {/* DRMS 10/10 D8: search + page size (shared AutoSubmit: debounced, URL state) */}
+      <label className="pk-filter__search">
+        Cari
+        <input type="search" name="q" defaultValue={q.q ?? ''} placeholder="Nomor atau keterangan…" maxLength={100} autoComplete="off" data-pk-search="kas" />
+      </label>
       {pts.length > 1 ? sel('pt', 'PT', pts.map((c) => ({ id: c, label: `${ptCode(pt, c)} — ${pt.ref(c)?.name ?? ''}` })), q.pt, 'Semua PT') : null}
       {sel('akun', 'Akun', lk.accounts, q.akun, 'Semua akun')}
       <label>
@@ -362,6 +369,16 @@ function FilterBar({ q, lk, filtered, pt, pts }: { q: BookQuery; lk: Lookups; fi
           <option value="void">Void</option>
         </select>
       </label>
+      <label>
+        Per halaman
+        <select name="per" defaultValue={String(q.per ?? 50)} data-pk-page-size="kas">
+          {PAGE_SIZES.map((n) => (
+            <option key={n} value={n}>
+              {n}
+            </option>
+          ))}
+        </select>
+      </label>
       <button type="submit" className="pk-kbtn primary">
         Terapkan
       </button>
@@ -370,6 +387,7 @@ function FilterBar({ q, lk, filtered, pt, pts }: { q: BookQuery; lk: Lookups; fi
           Reset
         </Link>
       ) : null}
+      <AutoSubmit />
     </form>
   )
 }
@@ -490,7 +508,7 @@ function LedgerTable({
       cell: (r) => (
         <div className="pk-kact">
           {r.proofId ? (
-            <a className="pk-kbtn sm" href={`/api/v1/media/attachments/${r.proofId}/file`} target="_blank" rel="noopener noreferrer">
+            <a className="pk-kbtn sm" href={`/api/v1/media/attachments/${r.proofId}/file`} target="_blank" rel="noopener noreferrer" data-pk-lightbox="kas-proofs" data-pk-lightbox-title={`Bukti ${r.entryNo}`}>
               Bukti
             </a>
           ) : null}

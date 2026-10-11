@@ -7,17 +7,21 @@ import { officeQueueWhere } from '@/domain/expense/queues'
 import { SETTLEMENT_TYPE_LABELS } from '@/domain/expense/settlement-rules'
 import { withReqTransaction } from '@/lib/system-tx'
 
+import { docHref } from '../doc-links'
 import { ActionButton } from '../components/ActionButton'
 import { KAS_STYLE } from '../components/kas/style'
+import { ListToolbar, Pager } from '../components/list/ListToolbar'
 import { MoneyForm } from '../components/MoneyForm'
 import { ShortfallPanel } from '../components/ShortfallPanel'
+import { LpjPhotoGrid } from '../components/lpj/LpjPhotoGrid'
+import { pageOfFind, parseListQuery, searchWhere } from '../list-query'
 import { accountsOf, PtChip, PtScopeNote, ptView } from './pt'
 import { Empty, Forbidden, Shell, TableScroll, allowed, badge, docLink, num, rp, table, td, th } from './shared'
 
 type Detail = Awaited<ReturnType<typeof detail>>
 
 /**
- * "Verifikasi LPJ" (M06, US-21/US-22): Uang Muka in "LPJ Diajukan" — per receipt valid / tolak,
+ * "Verifikasi LPJ" (M06, US-21/US-22): Pengajuan Baru in "LPJ Diajukan" — per receipt valid / tolak,
  * revision request with a note, verification (verified total = Σ valid receipts) — and in
  * "LPJ Terverifikasi" the settlement: surplus → KM "Pengembalian LPJ", shortfall → transfer.
  * Owner sees the queue read-only; Finance acts (never on its own request, server-enforced).
@@ -27,13 +31,19 @@ export async function LpjVerification(props: AdminViewServerProps) {
   if (!allowed(req, ['pk-finance', 'pk-owner'])) return <Forbidden props={props} title="Verifikasi LPJ" roles={['pk-finance', 'pk-owner']} />
   const finance = allowed(req, ['pk-finance'])
   const pt = await ptView(req)
-  const { submitted, verified, accounts, companyOf } = await withReqTransaction(req, async () => {
+  // DRMS 10/10 D8: search (nomor / judul) + PT / tahap filters, paged in the database (URL state)
+  const lq = parseListQuery(props.searchParams, ['pt', 'tahap'])
+  const ptId = pt.multi && pt.selected.includes(Number(lq.filters.pt)) ? Number(lq.filters.pt) : undefined
+  const statuses = lq.filters.tahap === 'lpj_submitted' || lq.filters.tahap === 'lpj_verified' ? [lq.filters.tahap] : ['lpj_submitted', 'lpj_verified']
+  const text = searchWhere(['docNo', 'title'], lq.q)
+  const { submitted, verified, accounts, companyOf, page } = await withReqTransaction(req, async () => {
     const res = await req.payload.find({
       collection: 'expense-requests',
       // MC2: PTs where the caller is Finance / Direktur only (mc2-contract §3)
-      where: officeQueueWhere(req, { and: [{ type: { equals: 'advance' } }, { status: { in: ['lpj_submitted', 'lpj_verified'] } }] }),
+      where: officeQueueWhere(req, { and: [{ type: { equals: 'advance' } }, { status: { in: statuses } }, ...(text ? [text as never] : [])] }, ptId ? { companyIds: [ptId] } : undefined),
       sort: 'updatedAt',
-      limit: 100,
+      limit: lq.per,
+      page: lq.page,
       depth: 0,
       user: req.user,
       overrideAccess: false,
@@ -50,12 +60,23 @@ export async function LpjVerification(props: AdminViewServerProps) {
           company: relId((a as { company?: unknown }).company) ?? null,
         }))
       : []
-    return { submitted: all.filter((d) => d.status === 'lpj_submitted'), verified: all.filter((d) => d.status === 'lpj_verified'), accounts: acc, companyOf }
+    return { submitted: all.filter((d) => d.status === 'lpj_submitted'), verified: all.filter((d) => d.status === 'lpj_verified'), accounts: acc, companyOf, page: pageOfFind(res) }
   })
   const base = (id: number) => `/api/v1/expense-requests/${id}`
   return (
-    <Shell props={props} title={`Verifikasi LPJ (${submitted.length + verified.length})`}>
+    <Shell props={props} title={`Verifikasi LPJ (${page.total})`}>
       <PtScopeNote pt={pt} />
+      <ListToolbar
+        id="verifikasi-lpj"
+        action="/admin/verifikasi-lpj"
+        query={lq}
+        label="Cari dan saring LPJ"
+        search={{ placeholder: 'Nomor atau judul pengajuan…' }}
+        filters={[
+          pt.multi ? { key: 'pt', label: 'PT', all: 'Semua PT', options: pt.selected.map((id) => ({ value: String(id), label: pt.ref(id)?.shortCode ?? `#${id}` })) } : null,
+          { key: 'tahap', label: 'Tahap', options: [{ value: 'lpj_submitted', label: 'LPJ diajukan' }, { value: 'lpj_verified', label: 'Menunggu penyelesaian selisih' }] },
+        ]}
+      />
       <h2>LPJ diajukan ({submitted.length})</h2>
       {submitted.length === 0 ? <Empty text="Tidak ada LPJ yang menunggu verifikasi." /> : null}
       {submitted.map((d) => (
@@ -67,8 +88,10 @@ export async function LpjVerification(props: AdminViewServerProps) {
                   <PtChip pt={pt.ref(companyOf.get(d.id))} />{' '}
                 </>
               ) : null}
-              <strong>{docLink(d.id, d.docNo ?? `#${d.id}`)}</strong> — {d.title} · LPJ {d.settlement?.docNo ?? ''} · kiriman ke-{d.settlement?.submitCount ?? 1}
+              <strong>{docLink(d.id, d.docNo ?? `#${d.id}`)}</strong> — {d.title} · LPJ {d.settlement ? <a href={docHref('settlement', d.settlement.id)!}>{d.settlement.docNo ?? `#${d.settlement.id}`}</a> : ''} · kiriman ke-{d.settlement?.submitCount ?? 1}
               <div style={{ fontSize: 12 }}>Uraian penggunaan: {d.settlement?.usageNotes ?? '—'}</div>
+              {/* point 13: LPJ photos of the requester (lightbox) */}
+              {d.settlement?.photos.length ? <LpjPhotoGrid ids={d.settlement.photos} group={`lpj-photos-${d.id}`} label={`Foto LPJ ${d.settlement.docNo ?? ''}`.trim()} /> : null}
             </div>
             <div>
               Ditransfer <strong>{rp(d.transferredTotal)}</strong> · Nota <strong>{rp(d.settlement?.receiptsTotal)}</strong> · Selisih{' '}
@@ -92,6 +115,7 @@ export async function LpjVerification(props: AdminViewServerProps) {
               ))}
             </ul>
           ) : null}
+          <div className="pk-lwide">
           <TableScroll label="Nota LPJ">
             <table style={{ ...table, marginTop: 8 }}>
               <thead>
@@ -112,7 +136,7 @@ export async function LpjVerification(props: AdminViewServerProps) {
                     <tr key={r.id}>
                       <td style={td}>
                         {r.imageId ? (
-                          <a href={`/api/v1/media/receipts/${r.imageId}/file`} target="_blank" rel="noopener noreferrer">
+                          <a href={`/api/v1/media/receipts/${r.imageId}/file`} target="_blank" rel="noopener noreferrer" data-pk-lightbox={`lpj-${d.id}`} data-pk-lightbox-title={`Nota ${r.receiptNo ?? r.id} · ${rp(r.amount)}`}>
                             {/* eslint-disable-next-line @next/next/no-img-element -- authenticated API file, not a static asset */}
                             <img src={`/api/v1/media/receipts/${r.imageId}/file?variant=thumb`} alt={`Nota ${r.receiptNo ?? r.id}`} style={{ width: 80, height: 80, objectFit: 'cover' }} />
                           </a>
@@ -143,6 +167,45 @@ export async function LpjVerification(props: AdminViewServerProps) {
               </tbody>
             </table>
           </TableScroll>
+          </div>
+          {/* Phase C polish: at ≤ 640 px every receipt is a card like the request line cards (LineCard, APK layout) */}
+          <div className="pk-lcards" data-pk-lpj-cards={d.id}>
+            {d.receipts
+              .filter((r) => r.status !== 'removed')
+              .map((r) => (
+                <article key={r.id} className="pk-lcard" data-pk-lpj-receipt={r.id}>
+                  <div className="pk-lcard__head">
+                    <span className="pk-lcard__title">
+                      {r.vendorName}
+                      {r.lineNo ? <span style={{ fontWeight: 400, color: 'var(--pk-muted-fg)' }}> · baris {r.lineNo}</span> : null}
+                    </span>
+                    <span className="pk-lcard__total">{rp(r.amount)}</span>
+                  </div>
+                  <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start', marginTop: 4 }}>
+                    {r.imageId ? (
+                      <a href={`/api/v1/media/receipts/${r.imageId}/file`} target="_blank" rel="noopener noreferrer" data-pk-lightbox={`lpj-${d.id}`} data-pk-lightbox-title={`Nota ${r.receiptNo ?? r.id} · ${rp(r.amount)}`}>
+                        {/* eslint-disable-next-line @next/next/no-img-element -- authenticated API file, not a static asset */}
+                        <img src={`/api/v1/media/receipts/${r.imageId}/file?variant=thumb`} alt={`Nota ${r.receiptNo ?? r.id}`} style={{ width: 64, height: 64, objectFit: 'cover', borderRadius: 4 }} />
+                      </a>
+                    ) : null}
+                    <div style={{ minWidth: 0 }}>
+                      <div className="pk-lcard__meta">
+                        No. {r.receiptNo ?? '—'} · {r.receiptDate}
+                      </div>
+                      <div className="pk-lcard__chips" style={{ marginTop: 4 }}>
+                        <span style={badge(r.status === 'valid' ? 'ok' : r.status === 'rejected' ? 'bad' : 'muted')}>{r.status === 'valid' ? 'valid' : r.status === 'rejected' ? 'ditolak' : 'menunggu'}</span>
+                      </div>
+                    </div>
+                  </div>
+                  {finance && d.allowedActions.includes('receipt_verify') ? (
+                    <div className="pk-lcard__actions">
+                      {r.status !== 'valid' ? <ActionButton url={`${base(d.id)}/receipts/${r.id}/verify`} label="Valid" /> : null}
+                      {r.status !== 'rejected' ? <ActionButton url={`${base(d.id)}/receipts/${r.id}/reject`} label="Tolak" prompt={{ field: 'reason', message: 'Alasan nota ditolak (wajib):', minLength: 3 }} /> : null}
+                    </div>
+                  ) : null}
+                </article>
+              ))}
+          </div>
           {finance ? (
             <div style={{ marginTop: 8 }}>
               {d.allowedActions.includes('lpj_verify') ? (
@@ -169,8 +232,9 @@ export async function LpjVerification(props: AdminViewServerProps) {
                   <PtChip pt={pt.ref(companyOf.get(d.id))} />{' '}
                 </>
               ) : null}
-              <strong>{docLink(d.id, d.docNo ?? `#${d.id}`)}</strong> — {d.title} · LPJ {s.docNo}
+              <strong>{docLink(d.id, d.docNo ?? `#${d.id}`)}</strong> — {d.title} · LPJ <a href={docHref('settlement', s.id)!}>{s.docNo ?? `#${s.id}`}</a>
             </div>
+            {s.photos.length ? <LpjPhotoGrid ids={s.photos} group={`lpj-photos-${d.id}`} label={`Foto LPJ ${s.docNo ?? ''}`.trim()} size={56} /> : null}
             <div style={{ margin: '6px 0' }}>
               Ditransfer {rp(s.transferredTotal)} · Nota terverifikasi {rp(s.verifiedReceiptsTotal)} · Selisih {rp(s.difference)} —{' '}
               <strong>{s.settlementType ? SETTLEMENT_TYPE_LABELS[s.settlementType] : '—'}</strong>
@@ -204,6 +268,7 @@ export async function LpjVerification(props: AdminViewServerProps) {
         )
       })}
       <style>{KAS_STYLE}</style>
+      <Pager id="verifikasi-lpj" path="/admin/verifikasi-lpj" sp={props.searchParams} page={page} unit="LPJ" />
     </Shell>
   )
 }

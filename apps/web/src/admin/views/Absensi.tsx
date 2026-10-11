@@ -7,6 +7,8 @@ import React from 'react'
 import { hasRoleAny, ownEmployees, relId, userId } from '@/access/roles'
 import { CorrectionDialog, DefaultSchedule, GeofenceForm, HolidayAdd, ScheduleAssign, SelfCheckForm, SelfieButton, type Option, type SelfCheckLocation } from '@/admin/components/absensi/AttendanceActions'
 import { KAS_STYLE } from '@/admin/components/kas/style'
+import { AutoSubmit } from '@/admin/components/list/AutoSubmit'
+import { matchesQuery, spValue } from '@/admin/list-query'
 import { Icon as Glyph } from '@/admin/modules/Icon'
 import type { DayRecap, LocationDay, LocationRef, RecapSummary, TeamTodayRow } from '@/domain/attendance/aggregate'
 import { classCounts, classifyDay, DAY_CLASSES, LEGEND, minutesText, monthWeeks, offsetText, shiftMonth, type DayClass } from '@/domain/attendance/calendar'
@@ -28,6 +30,7 @@ import { EditButton, PtNotAllowed } from './shared'
 import { Bento, Card, DashHead, DataTable, EmptyState, HBarList, KpiRow, KpiTile, StatusPill, TableView, VIZ_STYLE } from './viz'
 import { settings as companySettings } from '@/domain/companies'
 import { NoAccess } from './NoAccess'
+import { DateInput } from '../components/DateInput'
 
 /**
  * E6 web (plan fase1-golive E6, S2; US-09/13/14/15, Q-30/33/40): admin views of the attendance
@@ -354,9 +357,11 @@ export async function AbsensiToday(props: AdminViewServerProps) {
   }
   const c = r.counts
   const month = r.date.slice(0, 7)
-  const filtered = Boolean(idParam(sp, 'project') || idParam(sp, 'pusat') || chosen)
+  // DRMS 10/10 D8: name/code search over the board (the KPI tiles keep counting the whole team)
+  const search = spValue(props.searchParams, 'q').slice(0, 100)
+  const filtered = Boolean(idParam(sp, 'project') || idParam(sp, 'pusat') || chosen || search)
   const col = (key: 'belum_absen' | 'hadir' | 'selesai', title: string, note: string) => {
-    const list = r.members.filter((m) => m.status === key)
+    const list = r.members.filter((m) => m.status === key && matchesQuery([m.employee.name, m.employee.code], search))
     return (
       <section className="pk-col" aria-labelledby={`col-${key}`} data-pk-column={key}>
         <h2 id={`col-${key}`}>
@@ -383,9 +388,13 @@ export async function AbsensiToday(props: AdminViewServerProps) {
       <DashHead title="Absensi · Tim hari ini" note={`${WD_LONG[wdOf(r.date) - 1]}, ${dayMonth(r.date)} (WITA) · ${r.scope === 'team' ? 'anggota tim di project/pusat biaya Anda' : 'semua karyawan yang ditugaskan'}${r.date === today ? '' : ' · tanggal lampau'}`} />
       <SubNav active="today" scope={scope} />
       <form className="pk-filter" method="get" action="/admin/absensi" role="search" aria-label="Filter tim hari ini" data-pk-filter="absensi-today">
+        <label className="pk-filter__search">
+          Cari
+          <input type="search" name="q" defaultValue={search} placeholder="Nama atau kode karyawan…" maxLength={100} autoComplete="off" data-pk-search="absensi-today" />
+        </label>
         <label>
           Tanggal
-          <input type="date" name="tanggal" defaultValue={r.date} max={today} />
+          <DateInput type="date" name="tanggal" defaultValue={r.date} max={today} />
         </label>
         <PtSelect pt={pt} pts={pts} value={chosen} />
         <label>
@@ -418,6 +427,7 @@ export async function AbsensiToday(props: AdminViewServerProps) {
             Hari ini
           </Link>
         ) : null}
+        <AutoSubmit />
       </form>
       {r.holidayName ? (
         <Alert tone="info" attr="holiday">

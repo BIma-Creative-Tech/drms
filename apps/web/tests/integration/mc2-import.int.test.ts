@@ -57,7 +57,7 @@ describe('MC2-5 import into a new PT', () => {
     const r = await run('dry-run')
     expect(r.issues.filter((i) => i.level === 'error')).toEqual([])
     expect(r.issues.some((i) => i.sheet === 'Perusahaan' && /PT baru/.test(i.message))).toBe(true)
-    expect(r.cutovers.map((c) => [c.pt, c.pbStartAt, c.firstPbNumber])).toEqual([[PT, 1, `1/PB-${PT}/01/VII/2019`]])
+    expect(r.cutovers.map((c) => [c.pt, c.pbStartAt, c.firstPbNumber])).toEqual([[PT, 1, `PB/${PT}/1907/0001`]])
     expect(await ptId()).toBeUndefined()
   })
 
@@ -90,7 +90,7 @@ describe('MC2-5 import into a new PT', () => {
   it('numbering of the new PT starts at its own PB start (sheet Perusahaan)', async () => {
     const id = (await ptId())!
     const a = await withSystemTransaction(await getTestPayload(), null, (req: PayloadRequest) => allocateDocNo(req, 'expense_request', { companyId: id, date: parseBusinessDate(GO_LIVE) }))
-    expect(a.docNo).toBe(`1/PB-${PT}/01/VII/2019`)
+    expect(a.docNo).toBe(`PB/${PT}/1907/0001`)
   })
 
   it('second commit is a no-op', async () => {

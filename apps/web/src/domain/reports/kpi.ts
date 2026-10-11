@@ -69,9 +69,9 @@ export const textList = (list: readonly string[]): SQL =>
 const COMMITTED = textList(BUDGET_COMMITTED)
 /** K-14 (a): request statuses "at least Ditransfer". */
 export const TRANSFERRED_OR_LATER: readonly RequestStatus[] = ['transferred', 'receipts_complete', 'lpj_submitted', 'lpj_revision', 'lpj_verified', 'completed']
-/** K-12a: Uang Muka transferred but without an LPJ yet. */
+/** K-12a: Pengajuan Baru transferred but without an LPJ yet. */
 export const ADVANCE_WITHOUT_LPJ: readonly RequestStatus[] = ['transferred', 'receipts_complete', 'lpj_revision']
-/** K-12g: Uang Muka that has an LPJ. */
+/** K-12g: Pengajuan Baru that has an LPJ. */
 export const ADVANCE_WITH_LPJ: readonly RequestStatus[] = ['lpj_submitted', 'lpj_verified', 'completed']
 
 export type Ctx = { today: string; month: string; tz: string; lpjDueDays: number; budgetWarnPct: number; budgetOverPct: number; companyName: string }
@@ -433,22 +433,28 @@ export async function pendingApprovals(req: PayloadRequest, scope: ReportScope) 
 }
 
 /**
- * S3e (US-17, ADR 0013, S-01): PM monitoring — team requests waiting for a decision, oldest first.
- * The PM never decides; `waitingFor` names who does: "Menunggu Direktur" (pending_ack, Diketahui =
- * Direktur approval) or "Menunggu Finance" (pending_approval). Legacy snapshots (PM "Diketahui",
- * Owner approval) are rare and labelled by status the same way.
+ * S3e (US-17, S-01): team requests waiting for a decision, oldest first. `waitingFor` names who decides
+ * now, from the request's snapshot — ADR 0021: "pm" (pending_ack, PM project → Direktur rule) then
+ * "direktur" (the Direktur level); ADR 0013 snapshots: "direktur" (pending_ack, Diketahui = Direktur
+ * approval) then "finance" (an approval level of another role). Legacy snapshots follow the same rule.
  */
-export type TeamWaitingItem = { id: number; companyId: number; docNo: string | null; title: string; type: RequestType; status: RequestStatus; waitingFor: 'direktur' | 'finance'; scopeName: string; requesters: string; grandTotal: number; submittedDate: string | null; days: number | null }
+export type TeamWaitingItem = { id: number; companyId: number; docNo: string | null; title: string; type: RequestType; status: RequestStatus; waitingFor: 'pm' | 'direktur' | 'finance'; scopeName: string; requesters: string; grandTotal: number; submittedDate: string | null; days: number | null }
+
+/** SQL: who decides the waiting step of `er` (see TeamWaitingItem.waitingFor). */
+const WAITING_FOR = sql`CASE WHEN er.status = 'pending_ack' THEN (CASE WHEN er.approval_snapshot->>'acknowledgeBy' = 'scope_manager' THEN 'pm' ELSE 'direktur' END)
+  WHEN (SELECT s->>'approverRole' FROM jsonb_array_elements(coalesce(er.approval_snapshot->'steps', '[]'::jsonb)) s
+        WHERE (s->>'level')::int = coalesce(er.current_level, 1) AND coalesce(s->>'approverUserId', '') = '' LIMIT 1) = 'pk-owner' THEN 'direktur'
+  ELSE 'finance' END`
 
 export async function teamWaiting(req: PayloadRequest, scope: ReportScope, top = 8) {
   const ctx = await reportContext(req)
   const base = sql`er.status IN ('pending_ack', 'pending_approval') AND ${requestScopeSql(scope)}`
   const [counts, list] = await inSequence(
-    () => rows(req, sql`SELECT er.status::text AS status, count(*)::int AS n, min((er.submitted_at AT TIME ZONE ${ctx.tz})::date)::text AS oldest FROM expense_requests er WHERE ${base} GROUP BY er.status`),
+    () => rows(req, sql`SELECT ${WAITING_FOR} AS wf, count(*)::int AS n, min((er.submitted_at AT TIME ZONE ${ctx.tz})::date)::text AS oldest FROM expense_requests er WHERE ${base} GROUP BY 1`),
     () =>
       rows(
         req,
-        sql`SELECT er.id, er.company_id, er.doc_no, er.title, er.type::text AS type, er.status::text AS status, coalesce(er.grand_total, 0)::text AS gt,
+        sql`SELECT er.id, er.company_id, er.doc_no, er.title, er.type::text AS type, er.status::text AS status, ${WAITING_FOR} AS wf, coalesce(er.grand_total, 0)::text AS gt,
               ((er.submitted_at AT TIME ZONE ${ctx.tz})::date)::text AS submitted,
               coalesce((SELECT string_agg(e.name, ', ' ORDER BY rr."order") FROM expense_requests_rels rr JOIN employees e ON e.id = rr.employees_id
                         WHERE rr.parent_id = er.id AND rr.path = 'requesters'), '') AS requesters,
@@ -458,7 +464,7 @@ export async function teamWaiting(req: PayloadRequest, scope: ReportScope, top =
             WHERE ${base} ORDER BY er.submitted_at ASC NULLS LAST, er.id ASC LIMIT ${top}`,
       ),
   )
-  const n = (st: string) => num(counts.find((x) => x.status === st)?.n)
+  const n = (wf: string) => num(counts.find((x) => x.wf === wf)?.n)
   const oldest = counts.map((x) => x.oldest as string | null).filter((x): x is string => !!x).sort()[0] ?? null
   const items: TeamWaitingItem[] = list.map((x) => {
     const submitted = (x.submitted as string | null) ?? null
@@ -469,7 +475,7 @@ export async function teamWaiting(req: PayloadRequest, scope: ReportScope, top =
       title: String(x.title),
       type: x.type as RequestType,
       status: x.status as RequestStatus,
-      waitingFor: x.status === 'pending_ack' ? 'direktur' : 'finance',
+      waitingFor: x.wf === 'pm' ? 'pm' : x.wf === 'direktur' ? 'direktur' : 'finance',
       scopeName: String(x.scope_name),
       requesters: String(x.requesters),
       grandTotal: num(x.gt),
@@ -477,7 +483,7 @@ export async function teamWaiting(req: PayloadRequest, scope: ReportScope, top =
       days: submitted ? daysBetween(submitted, ctx.today) : null,
     }
   })
-  return { count: n('pending_ack') + n('pending_approval'), direktur: n('pending_ack'), finance: n('pending_approval'), oldestDays: oldest ? daysBetween(oldest, ctx.today) : null, items }
+  return { count: n('pm') + n('direktur') + n('finance'), pm: n('pm'), direktur: n('direktur'), finance: n('finance'), oldestDays: oldest ? daysBetween(oldest, ctx.today) : null, items }
 }
 
 // ================================================================ K-11 transfer queue
@@ -517,7 +523,7 @@ export async function transferQueueSummary(req: PayloadRequest, scope: ReportSco
 
 export type AdvanceWithoutLpj = { id: number; companyId: number; docNo: string | null; title: string; requesters: string; scopeName: string; status: string; transferredTotal: number; firstTransfer: string | null; ageDays: number | null; overdue: boolean }
 
-/** K-12a/K-12b rows: Uang Muka transferred without LPJ; age from the first posted advance transfer. */
+/** K-12a/K-12b rows: Pengajuan Baru transferred without LPJ; age from the first posted advance transfer. */
 export async function advancesWithoutLpj(req: PayloadRequest, scope: ReportScope): Promise<AdvanceWithoutLpj[]> {
   const ctx = await reportContext(req)
   const ctxs = await ctxByCompany(req, scopeCompanies(scope))
@@ -553,7 +559,7 @@ export async function advancesWithoutLpj(req: PayloadRequest, scope: ReportScope
   })
 }
 
-/** K-12a…g summary. K-12g ratio over Uang Muka first transferred in [from, to]. */
+/** K-12a…g summary. K-12g ratio over Pengajuan Baru first transferred in [from, to]. */
 export async function lpjSummary(req: PayloadRequest, scope: ReportScope, from: string, to: string) {
   const rowsA = await advancesWithoutLpj(req, scope)
   const r = await rows(
@@ -602,12 +608,20 @@ export type RequestFilter = {
   requesterId?: number
 }
 
+/**
+ * DRMS 10/10 D2: a request belongs to cost center X when it is a legacy request of X or Finance recorded one of its
+ * posted transfers on X (project requests get their cost center at the transfer).
+ */
+export function requestCostCenterSql(costCenterId: number): SQL {
+  return sql`(er.cost_center_id = ${costCenterId} OR EXISTS (SELECT 1 FROM transfers tcc WHERE tcc.request_id = er.id AND tcc.status = 'posted' AND tcc.cost_center_id = ${costCenterId}))`
+}
+
 export function requestFilterSql(f: RequestFilter): SQL {
   const w: SQL[] = [sql`er.status <> 'draft'`, sql`er.request_date BETWEEN ${f.from} AND ${f.to}`]
   if (f.type) w.push(sql`er.type = ${f.type}`)
   if (f.statuses?.length) w.push(sql`er.status::text IN (${textList(f.statuses)})`)
   if (f.projectId) w.push(sql`er.project_id = ${f.projectId}`)
-  if (f.costCenterId) w.push(sql`er.cost_center_id = ${f.costCenterId}`)
+  if (f.costCenterId) w.push(requestCostCenterSql(f.costCenterId))
   if (f.categoryId) w.push(sql`EXISTS (SELECT 1 FROM expense_requests_lines l2 WHERE l2._parent_id = er.id AND l2.category_id = ${f.categoryId})`)
   if (f.requesterId) w.push(sql`EXISTS (SELECT 1 FROM expense_requests_rels r2 WHERE r2.parent_id = er.id AND r2.path = 'requesters' AND r2.employees_id = ${f.requesterId})`)
   return sql.join(w, sql` AND `)
@@ -751,7 +765,9 @@ export async function vehicleCosts(req: PayloadRequest, scope: ReportScope, f: V
 /**
  * K-15 per cost center for `period`: K-05 of its requests in the month (posted transfers by
  * transfer date − posted LPJ refunds by entry date) + manual cash-out − manual cash-in of the cost
- * center (posted, not reversal).
+ * center (posted, not reversal). DRMS 10/10 D2: a transfer counts for the cost center FINANCE chose on it
+ * (`transfers.cost_center_id`); transfers recorded before D2 keep the legacy request's own cost center. A refund
+ * follows the cost center of the request's (latest posted) transfer, likewise.
  */
 export async function costCenterMonth(req: PayloadRequest, scope: ReportScope, period: string) {
   const from = firstDay(period)
@@ -760,9 +776,10 @@ export async function costCenterMonth(req: PayloadRequest, scope: ReportScope, p
     req,
     sql`SELECT cc.id, cc.company_id, cc.code, cc.name,
           (SELECT coalesce(sum(t.amount), 0) FROM transfers t JOIN expense_requests er ON er.id = t.request_id
-            WHERE er.cost_center_id = cc.id AND t.status = 'posted' AND t.transfer_date BETWEEN ${from} AND ${to})::text AS transfers,
+            WHERE coalesce(t.cost_center_id, er.cost_center_id) = cc.id AND t.status = 'posted' AND t.transfer_date BETWEEN ${from} AND ${to})::text AS transfers,
           (SELECT coalesce(sum(c.amount), 0) FROM cash_entries c JOIN expense_requests er ON er.id = c.expense_request_id
-            WHERE er.cost_center_id = cc.id AND c.source_type = 'settlement_refund' AND c.status = 'posted' AND c.entry_date BETWEEN ${from} AND ${to})::text AS refunds,
+            WHERE coalesce((SELECT t2.cost_center_id FROM transfers t2 WHERE t2.request_id = er.id AND t2.status = 'posted' AND t2.cost_center_id IS NOT NULL ORDER BY t2.id DESC LIMIT 1), er.cost_center_id) = cc.id
+              AND c.source_type = 'settlement_refund' AND c.status = 'posted' AND c.entry_date BETWEEN ${from} AND ${to})::text AS refunds,
           (SELECT coalesce(sum(c.amount) FILTER (WHERE c.direction = 'out'), 0) FROM cash_entries c
             WHERE c.cost_center_id = cc.id AND c.source_type = 'manual' AND c.status = 'posted' AND c.period = ${period})::text AS manual_out,
           (SELECT coalesce(sum(c.amount) FILTER (WHERE c.direction = 'in'), 0) FROM cash_entries c
@@ -783,7 +800,7 @@ export type SpendFilter = { from: string; to: string; basis: 'dicairkan' | 'real
 
 /**
  * K-17. Dicairkan: line totals of requests with a posted advance/reimburse transfer dated in range
- * (allocation by line, US-25) + posted manual cash-out. Realisasi: K-06 per category (Uang Muka:
+ * (allocation by line, US-25) + posted manual cash-out. Realisasi: K-06 per category (Pengajuan Baru:
  * valid receipts per line category, dated by LPJ verification; Reimburse: line totals, dated by
  * the last valid receipt verification) + the same manual cash-out. PM scope: no manual cash.
  * Group by category (default) or by project / cost center ("lingkup").
@@ -794,7 +811,7 @@ export async function spending(req: PayloadRequest, scope: ReportScope, f: Spend
   const reqWhere: SQL[] = [requestScopeSql(scope)]
   if (f.type) reqWhere.push(sql`er.type = ${f.type}`)
   if (f.projectId) reqWhere.push(sql`er.project_id = ${f.projectId}`)
-  if (f.costCenterId) reqWhere.push(sql`er.cost_center_id = ${f.costCenterId}`)
+  if (f.costCenterId) reqWhere.push(requestCostCenterSql(f.costCenterId))
   const catWhere = f.categoryId ? sql`AND l.category_id = ${f.categoryId}` : sql``
   const manWhere: SQL[] = [sql`ce.source_type = 'manual'`, sql`ce.direction = 'out'`, sql`ce.status = 'posted'`, sql`ce.entry_date BETWEEN ${f.from} AND ${f.to}`, ledgerScopeSql(scope)]
   if (f.projectId) manWhere.push(sql`ce.project_id = ${f.projectId}`)
@@ -1053,7 +1070,7 @@ export async function recentCashEntries(req: PayloadRequest, scope: ReportScope,
 }
 
 /**
- * First rows of the transfer queue (K-11 set: Uang Muka "approved" + Reimburse "receipts_verified")
+ * First rows of the transfer queue (K-11 set: Pengajuan Baru "approved" + Reimburse "receipts_verified")
  * by needed date — Finance "Menunggu tindakan saya". Office data: scope `all` only.
  */
 export async function transferQueueTop(req: PayloadRequest, scope: ReportScope, limit: number) {

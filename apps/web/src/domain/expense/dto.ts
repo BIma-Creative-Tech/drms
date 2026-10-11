@@ -1,18 +1,19 @@
 import type { PayloadRequest } from 'payload'
 
-import { hasRole, relId } from '@/access/roles'
+import { hasRole, relId, userId } from '@/access/roles'
+import { rapOverBudgetLines } from '@/domain/rap/budget'
 
 import { actorContext, approvalsOf, displayName, loadRaw, projectCommitted, type RequestDoc } from './common'
-import { displayUnitPrice } from './lines'
+import { displayUnitPrice, receiptMismatch } from './lines'
 import { budgetImpact, type ApprovalSnapshot } from './rules'
 import { allowedActions } from './state'
-import { REQUEST_TYPE_LABELS, statusLabel, FLAG_LABELS, type FlagKind } from './types'
+import { REQUEST_TYPE_LABELS, FLAG_LABELS, type FlagKind } from './types'
 import { withFlagVisibility } from './flag-visibility'
 import { receiptsOf } from './receipts'
 import { settlementOfRequest } from './lpj'
 import { shortfallSummary } from './shortfall-approval'
 import { SETTLEMENT_STATUS_LABELS } from './settlement-rules'
-import { nextActor, timeline } from './timeline'
+import { nextActor, requestStatusLabel, timeline } from './timeline'
 
 type Named = { id: number; name?: string; code?: string; email?: string; plateNo?: string; plateDisplay?: string } | null
 
@@ -32,7 +33,8 @@ export function listItem(doc: RequestDoc & { project?: unknown; costCenter?: unk
     type: doc.type,
     typeLabel: REQUEST_TYPE_LABELS[doc.type],
     status: doc.status,
-    statusLabel: statusLabel(doc.type, doc.status),
+    // ADR 0021: "Menunggu persetujuan PM" / "Menunggu persetujuan Direktur" from the request's snapshot
+    statusLabel: requestStatusLabel(doc.type, doc.status, doc.approvalSnapshot ?? null, doc.currentLevel ?? null),
     title: doc.title,
     projectId: relId(doc.project) ?? null,
     costCenterId: relId(doc.costCenter) ?? null,
@@ -92,6 +94,31 @@ export async function detail(req: PayloadRequest, id: number) {
     })
   ).docs as unknown as Array<Record<string, unknown>>
 
+  // D4: "Melebihi RAP" (flags + live line state) only for the roles that see RAP values (owner 2026-10-10: not Staff)
+  const company = relId((doc as { company?: unknown }).company)
+  const rapViewer = hasRole(req, ['pk-owner', 'pk-admin', 'pk-finance', 'pk-pm'], company)
+  const visibleFlags = rapViewer ? flags : flags.filter((f) => f.kind !== 'rap_over_budget')
+  const rapOver = rapViewer
+    ? new Set(
+        (
+          await rapOverBudgetLines(req, {
+            requestId: id,
+            projectId: relId(doc.project) ?? null,
+            lines: (doc.lines ?? []).map((l, i) => ({ id: l.id, lineNo: i + 1, total: l.total ?? 0, rapItem: relId(l.rapItem) ?? null })),
+          })
+        ).map((o) => o.lineId),
+      )
+    : new Set<string>()
+  // D2: cost center of each transfer (set by Finance)
+  const ccIds = [...new Set(transfers.map((t) => relId(t.costCenter)).filter((x): x is number => x !== undefined))]
+  const ccNames = new Map(
+    ccIds.length
+      ? (
+          await req.payload.find({ collection: 'cost-centers', where: { id: { in: ccIds } }, depth: 0, pagination: false, select: { code: true, name: true }, overrideAccess: true /* SYSTEM-READ: names of a visible request's transfer cost centers */, req })
+        ).docs.map((c) => [c.id as number, { id: c.id as number, code: (c as { code?: string }).code ?? null, name: (c as { name?: string }).name ?? null }])
+      : [],
+  )
+
   const projectDoc = doc.project && typeof doc.project === 'object' ? (doc.project as { id: number; budget?: number | null }) : null
   let budget: { basis: 'project' | 'none'; pctBefore: number | null; pctAfter: number | null } = { basis: 'none', pctBefore: null, pctAfter: null }
   if (projectDoc) {
@@ -101,7 +128,12 @@ export async function detail(req: PayloadRequest, id: number) {
   const snap = (doc.approvalSnapshot ?? null) as ApprovalSnapshot | null
   const lpj = doc.type === 'advance' ? await settlementOfRequest(req, id) : null
   // QA-06 / ADR 0019: shortfall vs approved + tolerance and its re-approval (office roles only)
-  const shortfall = lpj && lpj.settlementType === 'shortfall' && hasRole(req, ['pk-finance', 'pk-owner'], relId((doc as { company?: unknown }).company)) ? await shortfallSummary(req, await loadRaw(req, id), lpj) : null
+  // ADR 0021: also the PM project acknowledger of the shortfall approval (it decides "Persetujuan PM")
+  const shortfallAck = (lpj?.shortfallApprovalSnapshot as ApprovalSnapshot | null | undefined)?.acknowledgerUserId
+  const shortfall =
+    lpj && lpj.settlementType === 'shortfall' && (hasRole(req, ['pk-finance', 'pk-owner'], relId((doc as { company?: unknown }).company)) || (shortfallAck != null && shortfallAck === userId(req)))
+      ? await shortfallSummary(req, await loadRaw(req, id), lpj)
+      : null
   // F4: status timeline + "Giliran" (next expected actor) — same derivation as the web WorkflowPanel.
   const names: Record<number, string> = {}
   const nameIds = [snap?.acknowledgerUserId, ...(snap?.steps ?? []).map((s) => s.approverUserId)].filter((x): x is number => typeof x === 'number')
@@ -134,9 +166,15 @@ export async function detail(req: PayloadRequest, id: number) {
       unitPrice: l.unitPrice ?? null,
       unitPriceDisplay: displayUnitPrice({ unitPrice: l.unitPrice, qty: l.qty, total: l.total }),
       total: l.total ?? 0,
+      // D3: "Nominal sesuai nota" + live mismatch (the persisted awareness flag is `flags[]` kind receipt_amount_mismatch)
+      receiptAmount: l.receiptAmount ?? null,
+      receiptMismatch: receiptMismatch(l),
       notes: l.notes ?? null,
       category: ref(l.category, (d) => ({ code: d.code, name: d.name })),
       vehicle: ref(l.vehicle, (d) => ({ plateNo: d.plateNo, plateDisplay: d.plateDisplay, type: d.type })) as Named,
+      // D4: RAP item of the line (name = the item's "uraian") + live "Melebihi RAP" for the RAP viewers (false for Staff)
+      rapItem: ref(l.rapItem, (d) => ({ code: d.code, name: d.description })) as { id: number; code?: unknown; name?: unknown } | null,
+      rapOverBudget: rapOver.has(l.id),
     })),
     transferredTotal: doc.transferredTotal ?? 0,
     approvalCycle: doc.approvalCycle ?? 0,
@@ -153,6 +191,8 @@ export async function detail(req: PayloadRequest, id: number) {
           acknowledgeRole: snap.acknowledgeRole ?? null,
           decisionRoles: snap.decisionRoles ?? [],
           skipped: snap.skipped ?? [],
+          // ADR 0021: narrow G1 exception (a Direktur's request filed by the PM project)
+          selfApproval: snap.selfApproval ?? null,
           steps: snap.steps,
           signDiajukan: snap.signDiajukan,
           signDibuat: snap.signDibuat,
@@ -188,7 +228,7 @@ export async function detail(req: PayloadRequest, id: number) {
       imageId: relId(r.image) ?? null,
       status: r.status,
     })),
-    flags: flags.map((f) => ({
+    flags: visibleFlags.map((f) => ({
       id: f.id as number,
       kind: f.kind as FlagKind,
       kindLabel: FLAG_LABELS[f.kind as FlagKind],
@@ -207,6 +247,9 @@ export async function detail(req: PayloadRequest, id: number) {
       kind: t.kind as string,
       amount: t.amount as number,
       transferDate: t.transferDate as string,
+      transferAt: (t.transferAt as string | null | undefined) ?? null,
+      // D2: cost center chosen by Finance (null on transfers recorded before D2)
+      costCenter: ccNames.get(relId(t.costCenter) ?? -1) ?? null,
       bankRef: t.bankRef as string,
       status: t.status as string,
       cashEntryId: relId(t.cashEntry) ?? null,
@@ -221,6 +264,7 @@ export async function detail(req: PayloadRequest, id: number) {
           status: lpj.status,
           statusLabel: SETTLEMENT_STATUS_LABELS[lpj.status],
           usageNotes: lpj.usageNotes ?? null,
+          photos: (lpj.photos ?? []).map((p) => relId(p)).filter((x): x is number => x !== undefined),
           transferredTotal: lpj.transferredTotal ?? null,
           receiptsTotal: lpj.receiptsTotal ?? null,
           verifiedReceiptsTotal: lpj.verifiedReceiptsTotal ?? null,
@@ -240,7 +284,7 @@ export async function detail(req: PayloadRequest, id: number) {
         }
       : null,
     budget,
-    openWarningFlags: flags.filter((f) => f.status === 'open' && f.level === 'warning').length,
+    openWarningFlags: visibleFlags.filter((f) => f.status === 'open' && f.level === 'warning').length,
     // E9: reversal only for a settled LPJ that posted a refund KM / shortfall transfer (UI hint; the service re-checks).
     allowedActions: allowedActions(ctx).filter((a) => a !== 'settle_reverse' || (lpj?.status === 'settled' && (lpj.settlementType === 'refund' || lpj.settlementType === 'shortfall'))),
     resubmitOfId: relId(doc.resubmitOf) ?? null,
@@ -250,12 +294,13 @@ export async function detail(req: PayloadRequest, id: number) {
         ? { id: (doc.resubmitOf as { id: number }).id, docNo: (doc.resubmitOf as { docNo?: string | null }).docNo ?? null, title: (doc.resubmitOf as { title?: string }).title ?? '' }
         : null,
     submittedAt: doc.submittedAt ?? null,
+    approvedAt: (doc as { approvedAt?: string | null }).approvedAt ?? null,
     cancelReason: doc.cancelReason ?? null,
     rejectReason: doc.rejectReason ?? null,
     clientUuid: doc.clientUuid ?? null,
     createdAt: doc.createdAt ?? null,
     rev: typeof doc.syncRev === 'number' && doc.syncRev > 0 ? doc.syncRev : 1,
-    timeline: timeline(doc.type, doc.status, { skipAck: snap?.acknowledge === 'none' }),
+    timeline: timeline(doc.type, doc.status, { skipAck: snap?.acknowledge === 'none', snapshot: snap, currentLevel: doc.currentLevel ?? null }),
     nextActor: next,
   }
 }

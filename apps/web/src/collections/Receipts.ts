@@ -9,11 +9,12 @@ import { uuidField } from '@/fields/common'
 
 import { businessDateField, ro } from './fields-f2'
 import { companyField, companyHook } from '@/fields/company'
+import { USER_NAME_VIEW } from '@/fields/users'
 
 /**
  * T4 Nota (requirements v1.1 §7 T4, US-07/US-38/US-39): many per request, each linked to ONE line
  * (array row id + line number). CLASS B (ADR 0006 §2): flat, no DELETE; DB trigger allows content
- * changes only while the request's receipts are editable (Reimburse: Draft/Revisi Nota; Uang Muka:
+ * changes only while the request's receipts are editable (Reimburse: Draft/Revisi Nota; Pengajuan Baru:
  * after transfer), otherwise only the verification columns. "Hapus" = status `removed` with reason.
  * Image = `media-receipts` (resized to 2000 px, original discarded, sha256 of the original kept).
  */
@@ -58,10 +59,10 @@ export const Receipts: CollectionConfig = withAudit(
       },
       { name: 'rejectReason', type: 'text', label: 'Alasan ditolak', admin: ro },
       { name: 'removeReason', type: 'text', label: 'Alasan dihapus', admin: ro },
-      { name: 'verifiedBy', type: 'relationship', relationTo: 'users', label: 'Diverifikasi oleh', admin: ro },
+      { name: 'verifiedBy', type: 'relationship', relationTo: 'users', label: 'Diverifikasi oleh', admin: { ...ro, components: USER_NAME_VIEW } },
       { name: 'verifiedAt', type: 'date', label: 'Diverifikasi', admin: ro },
       { name: 'entrySource', type: 'select', label: 'Sumber isian', defaultValue: 'manual', options: [{ label: 'Manual', value: 'manual' }, { label: 'OCR', value: 'ocr' }], admin: ro },
-      { name: 'createdBy', type: 'relationship', relationTo: 'users', label: 'Diunggah oleh', admin: ro },
+      { name: 'createdBy', type: 'relationship', relationTo: 'users', label: 'Diunggah oleh', admin: { ...ro, components: USER_NAME_VIEW } },
       // F4: APK offline id of a receipt synced with a draft (POST /api/v1/sync/batch, ADR 0010).
       { name: 'clientUuid', type: 'text', label: 'Client UUID (APK offline)', unique: true, index: true, admin: { ...ro, hidden: true } },
       uuidField(),

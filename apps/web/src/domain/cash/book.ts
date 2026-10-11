@@ -67,6 +67,9 @@ export const BookQuery = z.object({
   /** MC2: PT filter of the Kas list (a PT without Kas access simply yields no rows). */
   pt: optId,
   status: z.enum(['posted', 'void']).optional().catch(undefined),
+  /** DRMS 10/10 D8: free text over number + description, page size 20 / 50 / 100 (default 50). */
+  q: z.preprocess((v) => (typeof v === 'string' && v.trim() !== '' ? v.trim() : undefined), z.string().max(100).optional()).catch(undefined),
+  per: z.coerce.number().int().refine((n) => n === 20 || n === 50 || n === 100).optional().catch(undefined),
   hal: z.coerce.number().int().min(1).max(10_000).default(1).catch(1),
 })
 export type BookQuery = z.infer<typeof BookQuery>
@@ -95,6 +98,7 @@ export function bookWhere(q: BookQuery): Where | undefined {
   if (q.arah) and.push({ direction: { equals: q.arah === 'masuk' ? 'in' : 'out' } })
   if (q.status) and.push({ status: { equals: q.status } })
   if (q.pt) and.push({ company: { equals: q.pt } })
+  if (q.q) for (const t of q.q.split(/\s+/).filter(Boolean).slice(0, 5)) and.push({ or: [{ entryNo: { like: t } }, { description: { like: t } }] })
   return and.length ? { and } : undefined
 }
 
@@ -238,7 +242,7 @@ export type BookRow = {
 const PAGE_SIZE = 50
 
 /** One page of the ledger, newest business date first; linked reversal numbers and request numbers resolved. */
-export async function cashBookPage(req: PayloadRequest, q: BookQuery, limit = PAGE_SIZE) {
+export async function cashBookPage(req: PayloadRequest, q: BookQuery, limit = q.per ?? PAGE_SIZE) {
   const res = await req.payload.find({
     collection: 'cash-entries',
     where: bookWhere(q),

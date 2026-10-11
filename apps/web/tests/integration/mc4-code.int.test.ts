@@ -16,7 +16,7 @@ import { DEFAULT_SEED_DATA } from '@/seed/data'
 import { seed } from '@/seed/seed'
 
 import { api, asUser, draftBody, makeFlowUser, makeWorld, ORIGIN, png, sysCreate, type FlowUser, type Res, type World } from './flow-world'
-import { accessToken, addMembership, auditRows, companyId, getTestPayload, http, installLocalJwks, registerDevice, sqlAs, updateCompany, type TestUser } from './helpers'
+import { accessToken, addMembership, auditRows, companyId, fixturePm, getTestPayload, http, installLocalJwks, registerDevice, sqlAs, type TestUser, updateCompany } from './helpers'
 
 /**
  * MC4 code gaps (docs/proyekkas/mc/mc4-progress.md, ADR 0016 "Implementation notes (MC4)"):
@@ -121,7 +121,7 @@ beforeAll(async () => {
   await makeFlowUser(['pk-finance'], 'mc4-fin-b', null, { company: B }) // approver pool of B (submit needs a Finance holder)
 
   X.projectB = await sysCreate('projects', { company: B, code: 'MC4-PB', name: 'Proyek Contoh Delapan', pm: tri.id, budget: 40_000_000, status: 'berjalan' })
-  X.projectC = await sysCreate('projects', { company: C, code: 'MC4-PC', name: 'Proyek Contoh Sembilan', budget: 9_000_000, status: 'berjalan' })
+  X.projectC = await sysCreate('projects', { company: C, pm: await fixturePm(C), code: 'MC4-PC', name: 'Proyek Contoh Sembilan', budget: 9_000_000, status: 'berjalan' })
   await sysCreate('team-assignments', { employee: X.empTriA, project: w.project, roleInProject: 'staff' })
   await sysCreate('team-assignments', { employee: X.empTriB, project: X.projectB, roleInProject: 'staff' })
   X.accTriA = await sysCreate('employee-bank-accounts', { employee: X.empTriA, bank, accountNo: `84${Date.now() % 1e8}`, accountHolder: 'Tri', isDefault: true })
@@ -161,7 +161,7 @@ describe('MC4-1 — "copy defaults from DRMS" when a group admin creates a PT (U
     const skipped = ((await auditRows('company', id)).find((r) => r.field === 'defaultsCopied')!.new_value?.v as Body).rules.skipped as string[]
     expect([...rules].sort()).toEqual([...srcRules].filter((n) => !skipped.includes(n)).sort())
     expect(rules.has('MC4 aturan project A')).toBe(false)
-    expect(rules.has('Default — Direktur lalu Finance (semua nominal)')).toBe(true)
+    expect(rules.has('Default — PM project lalu Direktur (semua nominal)')).toBe(true) // ADR 0021 seed default
     const doc = (await p.findByID({ collection: 'companies', id, depth: 0, overrideAccess: true /* SYSTEM-READ: assertion */ })) as unknown as Body
     expect(doc.budgetWarnPct).toBe(77) // default 85 → copied from A
     expect(doc.lpjDueDays).toBe(9) // chosen by the creator → kept
@@ -177,9 +177,9 @@ describe('MC4-1 — "copy defaults from DRMS" when a group admin creates a PT (U
     expect(summary.tx_id).toBe(createTx)
     const seqAudit = await sqlAs('app', "SELECT count(DISTINCT doc_id)::int AS n FROM audit_logs WHERE doc_type = 'document_sequence' AND action = 'create' AND company_id = $1 AND user_id = $2", [id, groupAdmin.id])
     expect(Number(seqAudit.rows[0]?.n)).toBe(srcTypes.size)
-    // numbering works at once in the new PT: 1/PB-MC4X/…
+    // numbering works at once in the new PT: PB/MC4X/2609/0001 (D5: PT code in every number)
     const alloc = await asUser(null, (req) => allocateDocNo(req, 'expense_request', { companyId: id, date: parseBusinessDate('2026-09-30') }))
-    expect(alloc.docNo).toBe('1/PB-MC4X/30/IX/2026')
+    expect(alloc.docNo).toBe('PB/MC4X/2609/0001')
     X.mc4x = id
   })
 

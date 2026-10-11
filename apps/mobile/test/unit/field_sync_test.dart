@@ -54,7 +54,7 @@ void main() {
       raw.execute("INSERT INTO kv_entries VALUES ('masters:$sub:3', '{}')");
     });
     addTearDown(db.close);
-    expect(db.schemaVersion, 5);
+    expect(db.schemaVersion, 8); // v5 field tables; v6 (P3) + v7 (D3) + v8 (D4) on top
     final draft = (await (db.select(db.localDrafts)..where((t) => t.clientUuid.equals('d-5'))).getSingle());
     expect((draft.title, draft.urgencyLevelId, draft.companyId), ('BBM genset', 2, 3));
     expect((await OutboxRepository(db).all(sub)).single.opUuid, 'op-1');

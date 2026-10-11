@@ -6,7 +6,7 @@ import { companyById } from '@/domain/companies'
 import { DEFAULT_TZ, localDateInTz, type LocalDate } from '@/lib/time'
 import { getRequestTx } from '@/lib/tx'
 
-import { formatDocNo, periodKey, validatePattern, type ResetPolicy, type SequenceConfig } from './numbering'
+import { companyCodeError, formatDocNo, periodKey, validatePattern, type ResetPolicy, type SequenceConfig } from './numbering'
 
 export type Allocation = { docNo: string; seq: number; periodKey: string; docType: string }
 
@@ -35,8 +35,8 @@ export async function loadSequence(req: PayloadRequest, docType: string, company
 }
 
 /** `{COMPANY}` = short code of the DOCUMENT's PT (ADR 0016 §4 / ADR 0007 revision). */
-async function companyCode(req: PayloadRequest, companyId: number): Promise<string> {
-  return (await companyById(req, companyId)).shortCode
+async function companyCode(req: PayloadRequest, companyId: number): Promise<string | null> {
+  return (await companyById(req, companyId)).shortCode ?? null
 }
 
 /**
@@ -56,6 +56,10 @@ export async function allocateDocNo(
   if (!Number.isSafeInteger(companyId) || companyId <= 0) throw new Error('numbering: companyId is required (ADR 0016)')
   const cfg = await loadSequence(req, docType, companyId)
   validatePattern(cfg.pattern, cfg.resetPolicy)
+  // D5: every default pattern carries {COMPANY} → refuse BEFORE a counter value is taken (409, public)
+  const code = await companyCode(req, companyId)
+  const codeErr = companyCodeError(cfg.pattern, code)
+  if (codeErr) throw new APIError(codeErr, 409, null, true)
   const date = opts.date ?? localDateInTz(new Date(), cfg.timezone)
   const key = periodKey(cfg.resetPolicy, date)
   await tx.execute(sql`
@@ -69,7 +73,7 @@ export async function allocateDocNo(
   const row = (res as unknown as { rows: Array<{ allocated: number | string }> }).rows[0]
   if (!row) throw new Error('numbering: counter row missing')
   const seq = Number(row.allocated)
-  const docNo = formatDocNo(cfg, seq, date, await companyCode(req, companyId))
+  const docNo = formatDocNo(cfg, seq, date, code ?? '')
   if (opts.audit !== false) {
     await writeAudit(req, [
       { action: 'number_issued', docType: cfg.docType, docId: opts.docId, docNo, field: 'docNo', newValue: docNo, companyId },

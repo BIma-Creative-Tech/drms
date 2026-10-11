@@ -11,6 +11,24 @@ export const RIWAYAT_TAB = {
   },
 }
 
+/**
+ * DRMS 10/10 point 7: project detail tabs — "Proyek" (the form = default view, renamed), "RAP" (plan vs realisation,
+ * D4) and "Pengajuan" (the project's expense requests). Document views of the Projects collection.
+ */
+export const PROJECT_TABS = {
+  default: { tab: { label: 'Proyek' } },
+  rap: {
+    Component: '@/admin/views/ProjectTabs#ProjectRapTab',
+    path: '/rap' as const,
+    tab: { label: 'RAP', href: '/rap', order: 200 },
+  },
+  pengajuan: {
+    Component: '@/admin/views/ProjectTabs#ProjectRequestsTab',
+    path: '/pengajuan' as const,
+    tab: { label: 'Pengajuan', href: '/pengajuan', order: 300 },
+  },
+}
+
 export const F2_ADMIN_VIEWS = {
   approvalInbox: { Component: '@/admin/views/ApprovalInbox#ApprovalInbox', path: '/persetujuan' as const, meta: { title: 'Persetujuan' } },
   transferQueue: { Component: '@/admin/views/TransferQueue#TransferQueue', path: '/antrian-transfer' as const, meta: { title: 'Antrian Transfer' } },
@@ -112,4 +130,17 @@ export const FR1_ADMIN_VIEWS = {
   fieldActivities: { Component: '@/admin/views/FieldAftersales#FieldActivityList', path: '/aftersales/aktivitas' as const, exact: true, meta: { title: 'Aktivitas aftersales' } },
   fieldActivityNew: { Component: '@/admin/views/FieldAftersales#FieldActivityNew', path: '/aftersales/aktivitas/baru' as const, exact: true, meta: { title: 'Catat aktivitas' } },
   fieldActivity: { Component: '@/admin/views/FieldAftersales#FieldActivityDetail', path: '/aftersales/aktivitas/detail/:id' as const, exact: true, meta: { title: 'Aktivitas aftersales' } },
+  // P3 konstruksi: Laporan harian (list / input / detail incl. ?ubah=1 / ?koreksi=1) + RAP & weekly recap of a project
+  fieldDailyList: { Component: '@/admin/views/FieldDaily#FieldDailyList', path: '/laporan-harian' as const, exact: true, meta: { title: 'Laporan harian' } },
+  fieldDailyNew: { Component: '@/admin/views/FieldDaily#FieldDailyNew', path: '/laporan-harian/baru' as const, exact: true, meta: { title: 'Laporan harian baru' } },
+  fieldDaily: { Component: '@/admin/views/FieldDaily#FieldDailyDetail', path: '/laporan-harian/detail/:id' as const, exact: true, meta: { title: 'Laporan harian' } },
+  fieldDailyRap: { Component: '@/admin/views/FieldDaily#FieldDailyRap', path: '/laporan-harian/rap/:id' as const, exact: true, meta: { title: 'RAP project' } },
+}
+
+/**
+ * DRMS 10/10 D9: module landing page (tiles of the module's visible sub-menus, registry
+ * `moduleLandingHref`). Exact: `/modul/<id>` only; the view resolves visibility itself.
+ */
+export const D1010_ADMIN_VIEWS = {
+  moduleLanding: { Component: '@/admin/views/ModuleLanding#ModuleLanding', path: '/modul/:id' as const, exact: true, meta: { title: 'Modul' } },
 }

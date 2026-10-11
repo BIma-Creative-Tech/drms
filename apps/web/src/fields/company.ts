@@ -13,6 +13,8 @@ import { validationError } from '@/lib/validation'
  *   DB trigger `pk_company_*` for raw inserts.
  * The DB triggers of migration `*_mc1_security` are the final guard (`cross-company reference`).
  */
+const COMPANY_FIELD = '@/admin/components/companies/CompanyField#CompanyField'
+
 export function companyField(opts: { derived?: boolean } = {}): RelationshipField {
   return {
     name: 'company',
@@ -25,9 +27,10 @@ export function companyField(opts: { derived?: boolean } = {}): RelationshipFiel
     index: true,
     access: opts.derived ? { create: () => false, update: () => false } : { update: () => false },
     // MC2-4 (wireframe §4 "Buat baru"): a chosen PT sits at the top of the form; a derived one in the sidebar.
+    // DRMS 10/10 9b: an existing document shows "PT: <kode> — <nama>" on one line (CompanyField); create keeps the picker.
     admin: opts.derived
-      ? { position: 'sidebar', readOnly: true, description: 'Mengikuti dokumen induk.' }
-      : { description: 'Wajib bila Anda memilih lebih dari satu PT di pemilih PT; tidak dapat diubah setelah dibuat.' },
+      ? { position: 'sidebar', readOnly: true, description: 'Mengikuti dokumen induk.', components: { Field: COMPANY_FIELD } }
+      : { description: 'Wajib bila Anda memilih lebih dari satu PT di pemilih PT; tidak dapat diubah setelah dibuat.', placeholder: 'Pilih PT…', components: { Field: COMPANY_FIELD } },
   }
 }
 

@@ -7,6 +7,9 @@ import { parseRupiah } from '@/lib/rupiah-input'
 import { ActionDialog } from './ActionDialog'
 import { postJson, problemText, promptLabel } from './ActionButton'
 import { TableScroll } from './TableScroll'
+import { DateInput } from './DateInput'
+import { LpjPhotoGrid } from './lpj/LpjPhotoGrid'
+import { LpjPhotosEditor } from './lpj/LpjPhotosEditor'
 
 /**
  * Requester actions of the expense-request edit view (F2c, US-03…US-08): submit, withdraw/cancel
@@ -28,7 +31,8 @@ export type RequesterActionsProps = {
   actions: Action[]
   profileHref: string
   hasSignature: boolean
-  lines: Array<{ id: string; no: number; description: string; total: number }>
+  /** `incomplete`: D3 line without a reproducible unit price (saved before D3) — blocks (re)submit. */
+  lines: Array<{ id: string; no: number; description: string; total: number; incomplete?: boolean }>
   receipts: Array<{
     id: number
     lineId: string
@@ -52,6 +56,8 @@ export type RequesterActionsProps = {
     receiptsTotal: number | null
     difference: number | null
     submitCount: number
+    /** Point 13: LPJ photo ids (media-receipts). */
+    photos: number[]
   } | null
 }
 
@@ -235,7 +241,7 @@ function ReceiptForm({ requestId, lines, today }: { requestId: number; lines: Re
       </label>
       <label style={field}>
         Tanggal nota
-        <input type="date" data-f="receiptDate" max={today} />
+        <DateInput type="date" data-f="receiptDate" max={today} />
       </label>
       <label style={field}>
         Nominal tercetak (Rp)
@@ -291,11 +297,25 @@ function FlagList({ flags }: { flags: Flag[] }) {
 
 const RECEIPT_STATUS: Record<string, string> = { pending: 'menunggu verifikasi', valid: 'valid', rejected: 'ditolak', removed: 'dihapus' }
 
+/** D3: (re)submit while a line still needs Qty & Harga satuan — shown, but disabled (reason above it). */
+function Blocked({ label, testId }: { label: string; testId: string }) {
+  return (
+    <span style={{ display: 'inline-flex', marginRight: 6, marginBottom: 6 }}>
+      <button type="button" className={btn(true)} style={{ margin: 0 }} disabled aria-describedby="pk-lines-incomplete" data-pk-action={testId}>
+        {label}
+      </button>
+    </span>
+  )
+}
+
 export function RequesterActions(p: RequesterActionsProps) {
   const flash = useSyncExternalStore(noSubscribe, readFlashOnce, () => null)
   const has = (a: Action) => p.actions.includes(a)
   const url = base(p.id)
   const showReceipts = p.type === 'reimburse' || p.receipts.length > 0 || has('add_receipt')
+  // D3: a pre-D3 line must get Qty & Harga satuan first (server refuses submit / Kirim ulang nota as well)
+  const incomplete = p.lines.filter((l) => l.incomplete).map((l) => l.no)
+  const blocked = incomplete.length > 0 && (has('submit') || has('receipts_resubmit'))
   return (
     <div data-pk-panel="requester">
       {flash ? (
@@ -311,8 +331,14 @@ export function RequesterActions(p: RequesterActionsProps) {
             <a href={p.profileHref}>Unggah tanda tangan di profil</a>.
           </div>
         ) : null}
+        {blocked ? (
+          <div id="pk-lines-incomplete" role="note" style={{ margin: '6px 0', color: 'var(--pk-tone-warn-text)', fontWeight: 600 }} data-pk-lines-incomplete={incomplete.join(',')}>
+            Lengkapi Qty &amp; Harga satuan pada baris {incomplete.join(', ')} (tombol Ubah di Rincian item, lalu Simpan) sebelum {has('submit') ? 'mengirim pengajuan' : 'mengirim ulang nota'}.
+          </div>
+        ) : null}
         <div style={{ marginTop: 8 }}>
-          {has('submit') ? (
+          {has('submit') && blocked ? <Blocked label="Kirim pengajuan" testId="submit" /> : null}
+          {has('submit') && !blocked ? (
             <Act testId="submit" primary label="Kirim pengajuan" url={`${url}/submit`} confirm="Kirim pengajuan ini? Setelah dikirim isi terkunci (tarik kembali bila perlu mengubah)." success="Pengajuan terkirim. Nomor diterbitkan dan approver dinotifikasi." />
           ) : null}
           {has('withdraw') ? (
@@ -322,7 +348,8 @@ export function RequesterActions(p: RequesterActionsProps) {
           {has('resubmit') ? (
             <Act testId="resubmit" primary gotoNew label="Ajukan ulang (buat draft baru)" url={`${url}/resubmit`} confirm="Buat draft baru dari pengajuan yang ditolak ini?" success="Draft baru dibuat dari pengajuan yang ditolak. Periksa, ubah bila perlu, lalu kirim." />
           ) : null}
-          {has('receipts_resubmit') ? (
+          {has('receipts_resubmit') && blocked ? <Blocked label="Kirim ulang nota" testId="receipts-resubmit" /> : null}
+          {has('receipts_resubmit') && !blocked ? (
             <Act testId="receipts-resubmit" primary label="Kirim ulang nota" url={`${url}/receipts-resubmit`} confirm="Kirim ulang nota yang sudah diperbaiki ke Finance?" success="Nota dikirim ulang." />
           ) : null}
           {has('receipts_complete') ? (
@@ -362,7 +389,7 @@ export function RequesterActions(p: RequesterActionsProps) {
                     <tr key={r.id} style={{ opacity: r.status === 'removed' ? 0.5 : 1 }}>
                       <td style={{ padding: 4, verticalAlign: 'top' }}>
                         {r.imageId ? (
-                          <a href={`/api/v1/media/receipts/${r.imageId}/file`} target="_blank" rel="noopener noreferrer">
+                          <a href={`/api/v1/media/receipts/${r.imageId}/file`} target="_blank" rel="noopener noreferrer" data-pk-lightbox={`own-receipts-${p.id}`} data-pk-lightbox-title={`Nota ${r.receiptNo ?? r.id}`}>
                             {/* eslint-disable-next-line @next/next/no-img-element -- authenticated API file, not a static asset */}
                             <img src={`/api/v1/media/receipts/${r.imageId}/file?variant=thumb`} alt={`Nota ${r.receiptNo ?? r.id}`} style={{ width: 64, height: 64, objectFit: 'cover' }} />
                           </a>
@@ -412,6 +439,14 @@ export function RequesterActions(p: RequesterActionsProps) {
           {p.settlement?.financeNotes ? (
             <div style={{ marginTop: 6, padding: 8, borderLeft: '3px solid var(--pk-accent)', background: 'var(--theme-elevation-50)' }} data-pk-revision-note>
               <strong>Catatan revisi Finance:</strong> {p.settlement.financeNotes}
+            </div>
+          ) : null}
+          {/* point 13: LPJ photos — editable with the LPJ (Draft / Revisi), read-only once sent */}
+          {p.settlement && has('lpj_submit') ? <LpjPhotosEditor requestId={p.id} photos={p.settlement.photos} /> : null}
+          {p.settlement && !has('lpj_submit') && p.settlement.photos.length > 0 ? (
+            <div style={{ marginTop: 8 }}>
+              <div style={{ fontSize: 12, fontWeight: 600 }}>Foto LPJ ({p.settlement.photos.length})</div>
+              <LpjPhotoGrid ids={p.settlement.photos} group={`lpj-own-${p.id}`} label="Foto LPJ" />
             </div>
           ) : null}
           {has('lpj_submit') ? <LpjForm requestId={p.id} settlement={p.settlement} resubmit={p.status === 'lpj_revision'} /> : null}

@@ -24,7 +24,7 @@ import { resetRateLimits } from '@/lib/rate-limit'
 import config from '@/payload.config'
 
 import { companyId, getTestPayload, sqlAs } from './helpers'
-import { api, asUser, makeWorld, ORIGIN, png, sysCreate, upload, type FlowUser, type Res, type World } from './flow-world'
+import { api, asUser, legacyCostCenter, makeWorld, ORIGIN, png, sysCreate, upload, type FlowUser, type Res, type World } from './flow-world'
 
 /**
  * F3 gate (kpi-definitions.md §3): every KPI of the dashboards/reports is compared with the
@@ -82,11 +82,12 @@ async function receipt(user: FlowUser, id: number, lineId: string, amt: number, 
 type Scope = { projectId?: number; costCenterId?: number; ack: FlowUser }
 
 async function draft(type: 'advance' | 'reimburse', s: Scope, lines: Array<Record<string, unknown>>, title = `F3 ${type}`) {
-  return must(
+  const d = await must(
     call('POST', E, w.users.staffA, {
       type,
       title,
-      ...(s.projectId ? { projectId: s.projectId } : { costCenterId: s.costCenterId }),
+      // DRMS 10/10 D2: new requests are project requests; the cost-center scope is a LEGACY request (before D2)
+      projectId: s.projectId ?? w.project,
       requesterIds: [w.emp.a],
       bankAccountId: w.accA,
       neededDate: addDays(today, Math.floor(rnd() * 20) - 10),
@@ -94,6 +95,9 @@ async function draft(type: 'advance' | 'reimburse', s: Scope, lines: Array<Recor
     }),
     201,
   )
+  if (s.projectId) return d
+  await legacyCostCenter(d.id as number, s.costCenterId!)
+  return must(call('GET', `${E}/${d.id}`, w.users.staffA))
 }
 
 function randomLines(n: number) {
@@ -156,7 +160,7 @@ async function drive(target: string, type: 'advance' | 'reimburse', s: Scope, op
     await must(call('POST', `${E}/${id}/complete`, w.users.staffA, {}))
     return bump('completed_reimburse')
   }
-  // Uang Muka LPJ: receipts per line; variant exact / refund / shortfall
+  // Pengajuan Baru LPJ: receipts per line; variant exact / refund / shortfall
   const variant = target === 'lpj_refund' || target === 'lpj_verified_pending' ? -1 : target === 'lpj_shortfall' ? 1 : 0
   for (const [i, l] of lineIds.entries()) await receipt(w.users.staffA, id, l, totals[i]! + (i === 0 ? variant * 5_000 : 0), addDays(today, -1))
   await must(call('POST', `${E}/${id}/receipts-complete`, w.users.staffA, {}))
@@ -248,7 +252,7 @@ beforeAll(async () => {
     { costCenterId: w.costCenter, ack: w.users.owner },
     [
       { description: 'BBM Hilux Banjarmasin-Palangka', qty: 60, uomId: w.uom.l, total: 600_000, categoryId: w.cat.bbm, vehicleId: w.vehicle },
-      { description: 'Penginapan', qty: 2, uomId: w.uom.kmr, unitPrice: 339_000, total: 677_000, categoryId: w.cat.inap },
+      { description: 'Penginapan', qty: 2, uomId: w.uom.kmr, unitPrice: 338_500, total: 677_000, categoryId: w.cat.inap },
       { description: 'Makan siang', total: 170_500, categoryId: w.cat.ksm },
     ],
     '=HYPERLINK("http://x") Pengajuan Reimburse Ops keperluan Service Tronton',
@@ -788,7 +792,7 @@ describe('exports (Q-F3-3/Q-F3-5)', () => {
     const sp = `dari=2000-01-01&sampai=2999-12-31`
     const json = await must(call('GET', `/api/v1/reports/rekap-pengajuan?${sp}`, w.users.finance))
     const r = await download(`/api/v1/reports/rekap-pengajuan/csv?${sp}`, w.users.finance)
-    const dataLines = r.text.split('\r\n').filter((l) => /^\d+\/PB-/.test(l) || /^"?\d+\/PB-/.test(l))
+    const dataLines = r.text.split('\r\n').filter((l) => /^"?PB\//.test(l)) // D5: PB/<PT>/<YYMM>/<seq>
     expect(json.count).toBeGreaterThan(100)
     expect(dataLines.length).toBe(json.count)
   })

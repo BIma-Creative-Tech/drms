@@ -8,6 +8,7 @@ import { rupiahField, uuidField } from '@/fields/common'
 
 import { ro } from './fields-f2'
 import { companyField, companyHook } from '@/fields/company'
+import { USER_NAME_VIEW } from '@/fields/users'
 
 /** Read-only JSON without Monaco (CSP, config-guards.test.ts). */
 const jsonView = { readOnly: true, components: { Field: '@/components/ReadOnlyJson#ReadOnlyJson' } }
@@ -66,7 +67,7 @@ export const BudgetAddenda: CollectionConfig = withAudit(
       { ...rupiahField('budgetAtSubmit', 'RAB saat diajukan (Rp)'), admin: ro },
       { ...rupiahField('oldBudget', 'RAB lama (Rp)'), admin: { ...ro, description: 'Dibaca ulang saat disetujui (terkunci).' } },
       { ...rupiahField('newBudget', 'RAB baru (Rp)'), admin: ro },
-      { name: 'createdBy', type: 'relationship', relationTo: 'users', label: 'Diajukan oleh', required: true, index: true, admin: ro },
+      { name: 'createdBy', type: 'relationship', relationTo: 'users', label: 'Diajukan oleh', required: true, index: true, admin: { ...ro, components: USER_NAME_VIEW } },
       { name: 'submittedAt', type: 'date', label: 'Diajukan', admin: { ...ro, date: { pickerAppearance: 'dayAndTime' } } },
       { name: 'decidedAt', type: 'date', label: 'Diputuskan', admin: { ...ro, date: { pickerAppearance: 'dayAndTime' } } },
       { name: 'approvalRule', type: 'relationship', relationTo: 'approval-rules', label: 'Aturan approval', admin: ro },

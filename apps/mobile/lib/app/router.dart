@@ -22,7 +22,10 @@ import '../features/expense/presentation/history_screen.dart';
 import '../features/expense/presentation/request_detail_screen.dart';
 import '../features/expense/presentation/requests_screen.dart';
 import '../features/field_reports/domain/field_models.dart';
+import '../features/finance/presentation/finance_screen.dart';
+import '../features/finance/presentation/transfer_form_screen.dart';
 import '../features/field_reports/presentation/aftersales_screen.dart';
+import '../features/field_reports/presentation/daily_report_screen.dart';
 import '../features/field_reports/presentation/field_conflict_screen.dart';
 import '../features/field_reports/presentation/field_hub_screen.dart';
 import '../features/field_reports/presentation/service_report_screen.dart';
@@ -33,6 +36,8 @@ import '../features/notifications/presentation/notifications_screen.dart';
 import '../features/privacy/application/privacy_providers.dart';
 import '../features/privacy/presentation/privacy_notice_screen.dart';
 import '../features/progress/presentation/progress_conflict_screen.dart';
+import '../features/projects/presentation/project_detail_screen.dart';
+import '../features/projects/presentation/projects_screen.dart';
 import '../features/progress/presentation/progress_detail_screen.dart';
 import '../features/progress/presentation/progress_editor_screen.dart';
 import '../features/progress/presentation/progress_screen.dart';
@@ -127,6 +132,35 @@ final routerProvider = Provider<GoRouter>((ref) {
         ],
       ),
       GoRoute(path: '/notifications', builder: (_, _) => const NotificationsScreen()),
+      // DRMS 10/10 point 10: "Finance" — Antrian Transfer (`?tab=lpj` = Verifikasi LPJ) and "Catat transfer".
+      GoRoute(
+        path: '/finance',
+        builder: (_, s) => FinanceScreen(initialTab: s.uri.queryParameters['tab'] == 'lpj' ? 1 : 0),
+        routes: [
+          GoRoute(
+            path: 'transfer/:id',
+            builder: (_, s) => TransferFormRoute(id: int.tryParse(s.pathParameters['id'] ?? '') ?? 0),
+          ),
+        ],
+      ),
+      // DRMS 10/10 point 6: "Proyek" (list) → project with the tabs Proyek / RAP / Pengajuan (`?tab=rap|requests`).
+      GoRoute(
+        path: '/projects',
+        builder: (_, _) => const ProjectsScreen(),
+        routes: [
+          GoRoute(
+            path: ':id',
+            builder: (_, s) => ProjectDetailScreen(
+              id: int.tryParse(s.pathParameters['id'] ?? '') ?? 0,
+              initialTab: switch (s.uri.queryParameters['tab']) {
+                'rap' => 1,
+                'requests' => 2,
+                _ => 0,
+              },
+            ),
+          ),
+        ],
+      ),
       GoRoute(path: '/companies/unassigned', builder: (_, _) => const UnassignedScreen()),
       GoRoute(
         path: '/attendance',
@@ -217,6 +251,10 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: 'aftersales/new',
             builder: (_, s) => AftersalesScreen(projectId: int.tryParse(s.uri.queryParameters['project'] ?? '')),
+          ),
+          GoRoute(
+            path: 'daily/new',
+            builder: (_, s) => DailyReportScreen(projectId: int.tryParse(s.uri.queryParameters['project'] ?? '')),
           ),
           GoRoute(
             path: 'draft/:uuid',

@@ -65,7 +65,7 @@ opsional dijalankan) harus dibuat sebelum sesi (P-01).
 | Kategori | Transport/BBM (satuan wajar: liter, kali isi; perlu kendaraan), Penginapan, Konsumsi, Material |
 | Akun kas | **Kas Uji Bank** saldo awal Rp 50.000.000 · **Kas Kecil Uji** saldo awal Rp 5.000.000 |
 | Pengajuan contoh R1 (Reimburse) | BBM Hilux 1 **bulan** Rp 600.000 · Penginapan 2 kamar Rp 677.000 (nota Rp 676.876) · Makan siang (lump sum) Rp 170.500 → **Grand total Rp 1.447.500** |
-| Pengajuan contoh UM1 (Uang Muka) | Semen 10 sak Rp 650.000 · Pasir 1 rit Rp 797.500 → **Rp 1.447.500**; nota nanti Rp 650.000 + Rp 797.376 (selisih Rp 124 dikembalikan) |
+| Pengajuan contoh UM1 (Pengajuan Baru) | Semen 10 sak Rp 650.000 · Pasir 1 rit Rp 797.500 → **Rp 1.447.500**; nota nanti Rp 650.000 + Rp 797.376 (selisih Rp 124 dikembalikan) |
 | Foto nota / selfie / progress | Foto kertas bertulisan "NOTA UJI" / wajah penguji yang bersedia / foto lokasi uji |
 
 ## Cara mengisi

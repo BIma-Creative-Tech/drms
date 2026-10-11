@@ -8,8 +8,8 @@ import { resetRateLimits } from '@/lib/rate-limit'
 import { DEFAULT_SEED_DATA } from '@/seed/data'
 import { seed } from '@/seed/seed'
 
-import { api, draftBody, makeFlowUser, makeWorld, sysCreate, type FlowUser, type Res, type World } from './flow-world'
-import { accessToken, addMembership, companyId, getTestPayload, http, installLocalJwks, registerDevice, sqlAs, updateCompany, type TestUser } from './helpers'
+import { adr0013Fallback, api, draftBody, makeFlowUser, makeWorld, sysCreate, type FlowUser, type Res, type World } from './flow-world'
+import { accessToken, addMembership, companyId, fixturePm, getTestPayload, http, installLocalJwks, registerDevice, sqlAs, type TestUser, updateCompany } from './helpers'
 
 /**
  * MC3-1 — /api/v1 for the multi-company APK (ADR 0016 §5/§8, docs/proyekkas/mc/mc3-progress.md):
@@ -106,6 +106,7 @@ beforeAll(async () => {
   })
   B = await companyId('CS6')
   C = await companyId('CS7')
+  await adr0013Fallback([A, B, C])
   for (const code of ['CS6', 'CS7']) await updateCompany({ active: true, changeReason: 'uji MC3' }, code)
   await updateCompany({ defaultGeofenceRadiusM: 321 }, 'CS6')
   const inPt = async (company: number, collection: CollectionSlug, code: string) =>
@@ -132,7 +133,7 @@ beforeAll(async () => {
 
   X.projectB = await sysCreate('projects', { company: B, code: 'MC3-PB', name: 'Proyek Contoh Enam', pm: tri.id, budget: 40_000_000, status: 'berjalan' })
   X.projectB2 = await sysCreate('projects', { company: B, code: 'MC3-PB2', name: 'Proyek Contoh Enam titik', pm: tri.id, budget: 5_000_000, status: 'berjalan', lat: -0.5, lng: 117.1 })
-  X.projectC = await sysCreate('projects', { company: C, code: 'MC3-PC', name: 'Proyek Contoh Tujuh', budget: 9_000_000, status: 'berjalan' })
+  X.projectC = await sysCreate('projects', { company: C, pm: await fixturePm(C), code: 'MC3-PC', name: 'Proyek Contoh Tujuh', budget: 9_000_000, status: 'berjalan' })
   await sysCreate('team-assignments', { employee: X.empTriA, project: w.project, roleInProject: 'staff' })
   await sysCreate('team-assignments', { employee: X.empTriB, project: X.projectB, roleInProject: 'staff' })
   await sysCreate('team-assignments', { employee: X.empC, project: X.projectC, roleInProject: 'staff' })
@@ -194,14 +195,15 @@ describe('MC3 — GET /me companies[] + deprecated single-PT fields', () => {
     expect(me.companies.map((c: Body) => c.id)).toEqual([A, B, C])
     const [a, b, c] = me.companies as Body[]
     expect(a).toMatchObject({ roles: ['pk-staff'], employeeId: X.empTriA, capabilities: { approvalInbox: false, teamMonitor: false, progressReportCreate: false } })
-    expect(b).toMatchObject({ code: 'CS6', roles: ['pk-pm', 'pk-staff'], employeeId: X.empTriB, capabilities: { approvalInbox: false, teamMonitor: true, progressReportCreate: true } })
+    // ADR 0021: the PM approves its project's requests first → approval inbox
+    expect(b).toMatchObject({ code: 'CS6', roles: ['pk-pm', 'pk-staff'], employeeId: X.empTriB, capabilities: { approvalInbox: true, teamMonitor: true, progressReportCreate: true } })
     expect(b!.settings.defaultGeofenceRadiusM).toBe(321)
     expect(c).toMatchObject({ code: 'CS7', roles: ['pk-finance'], employeeId: null, employee: null, capabilities: { approvalInbox: true, teamMonitor: false, progressReportCreate: false } })
     expect(me.activeCompanyIds).toEqual([A, B, C])
     expect(me.legacyCompanyId).toBe(A)
     expect([...me.roles].sort()).toEqual(['pk-finance', 'pk-pm', 'pk-staff'])
     // FR1: field-report capabilities stay false while no selected PT has companies.fieldReportsEnabled
-    expect(me.capabilities).toEqual({ approvalInbox: true, teamMonitor: true, progressReportCreate: true, serviceReportCreate: false, unitTimesheetCreate: false, aftersalesActivityCreate: false })
+    expect(me.capabilities).toEqual({ approvalInbox: true, teamMonitor: true, progressReportCreate: true, serviceReportCreate: false, unitTimesheetCreate: false, aftersalesActivityCreate: false, dailyReportCreate: false })
     expect(me.employee.id).toBe(X.empTriA)
     expect(me.settings.shortCode).toBe('DRMS')
     // narrowed read selection: companies[] still lists every membership, `selected` + legacy follow the selection
@@ -353,10 +355,12 @@ const ROUTE_CLASSES: Record<string, RouteClass> = {
   'POST /expense-requests/:id/transfers/:tid/void': 'document',
   'POST /expense-requests/:id/receipts-complete': 'document',
   'POST /expense-requests/:id/lpj/submit': 'document',
+  'PUT /expense-requests/:id/lpj/photos': 'document',
   'POST /expense-requests/:id/lpj/request-revision': 'document',
   'POST /expense-requests/:id/lpj/verify': 'document',
   'POST /expense-requests/:id/settle': 'document',
   'GET /expense-requests/:id/settle/precheck': 'document', // QA-11
+  'GET /bank-account-preview': 'document', // DRMS 10/10 8e: the request (loadVisible) / the account's collection access
   'POST /expense-requests/:id/settle/reverse': 'document',
   // QA-06 / ADR 0019: LPJ shortfall re-approval
   'POST /expense-requests/:id/lpj/shortfall-approval': 'document',
@@ -411,6 +415,26 @@ const ROUTE_CLASSES: Record<string, RouteClass> = {
   'POST /service-reports': 'named-pt',
   'POST /unit-timesheets': 'named-pt',
   'POST /aftersales-activities': 'named-pt',
+  // P3 konstruksi: RAP (per project / item) + Laporan harian
+  'GET /rap/template.xlsx': 'public', // shared uom codes only
+  'GET /projects/:id/rap': 'document',
+  // DRMS 10/10 Phase C: APK projects (collection read scope ∩ selection) + the Finance cost-center picker (D2)
+  'GET /projects': 'selection',
+  'GET /projects/:id': 'document',
+  'GET /cost-centers': 'selection',
+  'GET /projects/:id/rap.xlsx': 'document',
+  'POST /projects/:id/rap/items': 'document',
+  'PATCH /rap-items/:id': 'document',
+  'POST /projects/:id/rap/import/preview': 'document',
+  'POST /projects/:id/rap/import/commit': 'document',
+  'POST /projects/:id/rap/apply-template': 'document',
+  'POST /projects/:id/rap/save-template': 'document',
+  'GET /projects/:id/daily-recap': 'document',
+  'GET /daily-reports': 'selection',
+  'GET /daily-reports/:id': 'document',
+  'PATCH /daily-reports/:id': 'document',
+  'POST /daily-reports/:id/corrections': 'document',
+  'POST /daily-reports': 'named-pt',
 }
 
 describe('MC3 — route classes sampled across PTs', () => {

@@ -1,0 +1,245 @@
+{
+ "id": 8,
+ "docNo": "PB/DRMS/2610/0007",
+ "type": "advance",
+ "typeLabel": "Pengajuan Baru",
+ "status": "pending_ack",
+ "statusLabel": "Menunggu persetujuan PM",
+ "title": "Sewa perancah tambahan (fiktif)",
+ "projectId": 1,
+ "costCenterId": null,
+ "grandTotal": 5000000,
+ "approvedAmount": null,
+ "requestDate": "2026-10-11",
+ "neededDate": "2026-10-20",
+ "createdById": 1,
+ "updatedAt": "2026-10-11T13:04:28.958Z",
+ "companyId": 1,
+ "uuid": "bb393d83-e0d6-4d82-91d4-a47ef313db52",
+ "project": {
+  "id": 1,
+  "code": "UJI-PRJ",
+  "name": "Proyek Uji"
+ },
+ "costCenter": null,
+ "urgencyLevel": null,
+ "notes": null,
+ "requesters": [
+  {
+   "id": 6,
+   "code": "UJI-STAFF",
+   "name": "Sari Staf"
+  }
+ ],
+ "createdBy": {
+  "id": 1,
+  "name": "Sari Staf"
+ },
+ "bankAccountId": 2,
+ "bank": {
+  "bankName": "Bank Mandiri",
+  "accountNo": "••••2223",
+  "accountHolder": "Sari Staf"
+ },
+ "lines": [
+  {
+   "id": "6acb895c4f3a0502a5fce2be",
+   "no": 1,
+   "description": "Sewa perancah 2 bulan",
+   "qty": 1,
+   "uom": {
+    "id": 32,
+    "code": "BLN",
+    "name": "bulan"
+   },
+   "unitPrice": 5000000,
+   "unitPriceDisplay": 5000000,
+   "total": 5000000,
+   "receiptAmount": null,
+   "receiptMismatch": false,
+   "notes": null,
+   "category": {
+    "id": 1,
+    "code": "MAT",
+    "name": "Material"
+   },
+   "vehicle": null,
+   "rapItem": {
+    "id": 4,
+    "code": "B.2",
+    "name": "Sewa perancah"
+   },
+   "rapOverBudget": true
+  }
+ ],
+ "transferredTotal": 0,
+ "approvalCycle": 1,
+ "currentLevel": 0,
+ "approvalRule": {
+  "id": 2,
+  "name": "Default — PM project lalu Direktur (semua nominal)",
+  "acknowledge": "required",
+  "acknowledgerUserId": 2,
+  "acknowledgeDelegatedTo": null,
+  "acknowledgeDelegationReason": null,
+  "acknowledgeBy": "scope_manager",
+  "acknowledgeRole": null,
+  "decisionRoles": [
+   "pk-owner",
+   "pk-finance"
+  ],
+  "skipped": [],
+  "selfApproval": null,
+  "steps": [
+   {
+    "level": 1,
+    "approverRole": "pk-owner",
+    "approverUserId": null
+   }
+  ],
+  "signDiajukan": "required",
+  "signDibuat": "required"
+ },
+ "approvals": [
+  {
+   "id": 21,
+   "cycle": 1,
+   "position": "dibuat",
+   "level": 0,
+   "actorId": 1,
+   "employeeId": null,
+   "actorName": "Sari Staf",
+   "onBehalf": false,
+   "decision": "signed",
+   "reason": null,
+   "decidedAt": "2026-10-11T13:04:29.026Z",
+   "budgetPctBefore": null,
+   "budgetPctAfter": null,
+   "openFlags": null,
+   "signatureId": 1,
+   "signatureSha256": "daa47ffcc10e0ee174fd2087471774bb0f4412792ddfef44be9adaa05ff90c8d",
+   "signatureSource": "profile"
+  },
+  {
+   "id": 22,
+   "cycle": 1,
+   "position": "diajukan",
+   "level": 0,
+   "actorId": 1,
+   "employeeId": 6,
+   "actorName": "Sari Staf",
+   "onBehalf": false,
+   "decision": "signed",
+   "reason": null,
+   "decidedAt": "2026-10-11T13:04:29.038Z",
+   "budgetPctBefore": null,
+   "budgetPctAfter": null,
+   "openFlags": null,
+   "signatureId": 1,
+   "signatureSha256": "daa47ffcc10e0ee174fd2087471774bb0f4412792ddfef44be9adaa05ff90c8d",
+   "signatureSource": "profile"
+  }
+ ],
+ "receipts": [],
+ "flags": [
+  {
+   "id": 25,
+   "kind": "rap_over_budget",
+   "kindLabel": "Melebihi RAP",
+   "level": "warning",
+   "status": "open",
+   "lineId": "6acb895c4f3a0502a5fce2be",
+   "lineNo": 1,
+   "receiptId": null,
+   "relatedRequestId": null,
+   "message": "Baris 1: item RAP B.2 Sewa perancah — realisasi + pengajuan ini melebihi nilai rencana RAP.",
+   "reviewNote": null
+  },
+  {
+   "id": 26,
+   "kind": "uom_suspicious",
+   "kindLabel": "Satuan tidak wajar",
+   "level": "warning",
+   "status": "open",
+   "lineId": "6acb895c4f3a0502a5fce2be",
+   "lineNo": 1,
+   "receiptId": null,
+   "relatedRequestId": null,
+   "message": "Satuan \"bulan\" tidak wajar untuk kategori Material.",
+   "reviewNote": null
+  }
+ ],
+ "transfers": [],
+ "verifiedReceiptsTotal": null,
+ "settlement": null,
+ "budget": {
+  "basis": "project",
+  "pctBefore": 7.38,
+  "pctAfter": 9.38
+ },
+ "openWarningFlags": 2,
+ "allowedActions": [
+  "acknowledge",
+  "reject"
+ ],
+ "resubmitOfId": null,
+ "resubmitOf": null,
+ "submittedAt": "2026-10-11T13:04:28.933Z",
+ "approvedAt": null,
+ "cancelReason": null,
+ "rejectReason": null,
+ "clientUuid": null,
+ "createdAt": "2026-10-11T13:04:28.687Z",
+ "rev": 1,
+ "timeline": [
+  {
+   "status": "draft",
+   "label": "Draft",
+   "state": "done"
+  },
+  {
+   "status": "pending_ack",
+   "label": "Menunggu persetujuan PM",
+   "state": "current"
+  },
+  {
+   "status": "pending_approval",
+   "label": "Menunggu persetujuan Direktur",
+   "state": "todo"
+  },
+  {
+   "status": "approved",
+   "label": "Disetujui (Antri Transfer)",
+   "state": "todo"
+  },
+  {
+   "status": "transferred",
+   "label": "Ditransfer",
+   "state": "todo"
+  },
+  {
+   "status": "receipts_complete",
+   "label": "Nota Lengkap",
+   "state": "todo"
+  },
+  {
+   "status": "lpj_submitted",
+   "label": "LPJ Diajukan",
+   "state": "todo"
+  },
+  {
+   "status": "lpj_verified",
+   "label": "LPJ Terverifikasi",
+   "state": "todo"
+  },
+  {
+   "status": "completed",
+   "label": "Selesai",
+   "state": "todo"
+  }
+ ],
+ "nextActor": {
+  "who": "Pandu Manajer (PM project)",
+  "what": "setujui sebagai PM project atau tolak"
+ }
+}

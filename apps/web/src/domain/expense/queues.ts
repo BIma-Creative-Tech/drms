@@ -5,10 +5,13 @@ import { companyRefs, type CompanyRef } from '@/domain/companies'
 
 import { actorContext, ids, projectCommitted, settings, type RequestDoc } from './common'
 import { isDecisionSnapshot } from './decision'
+import { DEFAULT_TRANSFER_SLA_HOURS, queueAge } from './sla'
+import { suggestedCostCenter } from './transfers'
 import { withFlagVisibility } from './flag-visibility'
-import { budgetImpact } from './rules'
+import { budgetImpact, lastLevel, type ApprovalSnapshot } from './rules'
 import { allowedActions } from './state'
-import { REQUEST_TYPE_LABELS, statusLabel, TRANSFER_QUEUE_WHERE } from './types'
+import { ackStepLabel, approvalStepLabel, decisionByOf, requestStatusLabel } from './timeline'
+import { REQUEST_TYPE_LABELS, TRANSFER_QUEUE_WHERE } from './types'
 
 export { TRANSFER_QUEUE_WHERE }
 
@@ -59,15 +62,21 @@ async function findVisible(req: PayloadRequest, where: Where, sort: string, limi
 async function flagCounts(req: PayloadRequest, requestId: number) {
   const res = await req.payload.find({
     collection: 'receipt-flags',
-    where: withFlagVisibility(req, { and: [{ request: { equals: requestId } }, { status: { equals: 'open' } }] }), // QA-MC4-06
+    where: withFlagVisibility(req, { and: [{ request: { equals: requestId } }, { status: { in: ['open', 'reviewed'] } }] }), // QA-MC4-06
     depth: 0,
     pagination: false,
-    select: { level: true },
+    select: { level: true, kind: true, status: true },
     overrideAccess: true, // SYSTEM-READ: flag counts of a visible request
     req,
   })
-  const levels = res.docs.map((d) => (d as { level?: string }).level)
-  return { warning: levels.filter((l) => l === 'warning').length, info: levels.filter((l) => l === 'info').length }
+  const rows = res.docs as unknown as Array<{ level?: string; kind?: string; status?: string }>
+  const open = rows.filter((f) => f.status === 'open').map((f) => f.level)
+  return {
+    warning: open.filter((l) => l === 'warning').length,
+    info: open.filter((l) => l === 'info').length,
+    // D3 (DRMS 10/10): lines whose "Nominal sesuai nota" ≠ total — awareness badge "Selisih nota" (also once reviewed)
+    receiptMismatch: rows.filter((f) => f.kind === 'receipt_amount_mismatch').length,
+  }
 }
 
 const scopeName = (d: Populated) => {
@@ -90,7 +99,7 @@ const base = (d: Populated, refs: Map<number, CompanyRef>) => ({
   type: d.type,
   typeLabel: REQUEST_TYPE_LABELS[d.type],
   status: d.status,
-  statusLabel: statusLabel(d.type, d.status),
+  statusLabel: requestStatusLabel(d.type, d.status, (d.approvalSnapshot ?? null) as ApprovalSnapshot | null, d.currentLevel ?? null),
   title: d.title,
   scope: scopeName(d),
   requesters: requesterNames(d),
@@ -114,18 +123,23 @@ export async function approvalInbox(req: PayloadRequest, f?: QueueFilter) {
     const itemWarn = cid !== undefined ? warnOf.get(cid)! : warnPct
     const ctx = await actorContext(req, { ...d, createdBy: relId(d.createdBy), requesters: ids(d.requesters as unknown[]) } as unknown as RequestDoc)
     const acts = allowedActions(ctx)
-    const step = acts.includes('approve') ? 'approve' : acts.includes('acknowledge') ? 'acknowledge' : null
+    const step: 'approve' | 'acknowledge' | null = acts.includes('approve') ? 'approve' : acts.includes('acknowledge') ? 'acknowledge' : null
     if (!step) continue
     const p = d.project && typeof d.project === 'object' ? d.project : null
     const b = p ? budgetImpact(p.budget, await projectCommitted(req, p.id, d.id), d.grandTotal ?? 0) : { before: null, after: null }
     const decisionFlow = isDecisionSnapshot(d.approvalSnapshot)
+    const snap = (d.approvalSnapshot ?? null) as ApprovalSnapshot | null
     out.push({
       ...base(d, refs),
       step,
       level: d.currentLevel ?? null,
-      // ADR 0013: human label of the step (web + APK) and whether this is the Direktur → Finance flow.
-      stepLabel: step === 'acknowledge' ? (decisionFlow ? 'Persetujuan Direktur (Diketahui)' : 'Diketahui Oleh') : `Approval level ${d.currentLevel ?? 1}`,
+      // ADR 0013/0021: human label of the step (web + APK), whether this is a decision flow, who decides
+      // the step and whether approving it is final (APK decision sheet texts).
+      stepLabel: step === 'acknowledge' ? ackStepLabel(snap) : approvalStepLabel(snap, d.currentLevel ?? 1),
       decisionFlow,
+      decisionBy: decisionByOf(snap, step, step === 'acknowledge' ? 0 : (d.currentLevel ?? 1)),
+      finalStep: snap ? (step === 'acknowledge' ? lastLevel(snap) === 0 : (d.currentLevel ?? 1) >= lastLevel(snap)) : false,
+      selfApproval: snap?.selfApproval ?? null,
       budget: { basis: p?.budget ? ('project' as const) : ('none' as const), pctBefore: b.before, pctAfter: b.after, overWarn: b.after !== null && b.after > itemWarn, warnPct: itemWarn },
       flags: await flagCounts(req, d.id),
     })
@@ -140,7 +154,27 @@ export async function transferQueue(req: PayloadRequest, f?: QueueFilter) {
   const items = []
   // QA-17: verification state of the destination account (the transfer asks for a confirmation when unverified)
   const verification = (v: unknown): 'verified' | 'unverified' => (v && typeof v === 'object' && (v as { verificationStatus?: string }).verificationStatus === 'verified' ? 'verified' : 'unverified')
-  for (const d of docs) items.push({ ...base(d, refs), bank: d.bankSnapshot ?? null, bankVerification: verification((d as { bankAccount?: unknown }).bankAccount), flags: await flagCounts(req, d.id) })
+  // Item 11: age since the final approval vs the PT's transfer SLA (badge "Umur sejak disetujui")
+  const slaOf = new Map<number, number>()
+  const now = new Date()
+  for (const d of docs) {
+    const cid = relId((d as { company?: unknown }).company)
+    if (cid !== undefined && !slaOf.has(cid)) slaOf.set(cid, (await settings(req, cid)).transferSlaHours ?? DEFAULT_TRANSFER_SLA_HOURS)
+    const slaHours = cid !== undefined ? slaOf.get(cid)! : DEFAULT_TRANSFER_SLA_HOURS
+    const approvedAt = (d as { approvedAt?: string | null }).approvedAt ?? null
+    const age = queueAge(approvedAt ? new Date(approvedAt) : null, now, slaHours)
+    const p = d.project && typeof d.project === 'object' ? d.project : null
+    items.push({
+      ...base(d, refs),
+      project: p ? { id: p.id, code: p.code ?? null, name: p.name ?? null } : null,
+      // D2: cost center proposed to Finance (the project's default, else a legacy request's own); null = Finance picks
+      costCenter: await suggestedCostCenter(req, { project: p?.id ?? d.project, costCenter: d.costCenter && typeof d.costCenter === 'object' ? d.costCenter.id : d.costCenter }),
+      bank: d.bankSnapshot ?? null,
+      bankVerification: verification((d as { bankAccount?: unknown }).bankAccount),
+      flags: await flagCounts(req, d.id),
+      sla: { approvedAt, slaHours, ageHours: age?.hours ?? null, over: age?.over ?? false },
+    })
+  }
   // needed date ascending, requests without a date last
   items.sort((a, b) => (a.neededDate ?? '9999-12-31').localeCompare(b.neededDate ?? '9999-12-31') || a.id - b.id)
   return items
@@ -162,7 +196,7 @@ export async function lpjQueueCount(req: PayloadRequest, f?: QueueFilter): Promi
   return r.totalDocs
 }
 
-/** US-21 LPJ verification list (Uang Muka `lpj_submitted` / `lpj_verified`), consolidated with PT refs. */
+/** US-21 LPJ verification list (Pengajuan Baru `lpj_submitted` / `lpj_verified`), consolidated with PT refs. */
 export async function lpjQueue(req: PayloadRequest, f?: QueueFilter) {
   const docs = await findVisible(req, officeQueueWhere(req, { and: [{ type: { equals: 'advance' } }, { status: { in: ['lpj_submitted', 'lpj_verified'] } }] }, f), 'updatedAt', 500)
   const refs = await refsOf(req, docs)

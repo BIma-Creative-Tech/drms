@@ -8,18 +8,25 @@ import { getRequestTx } from '@/lib/tx'
 
 import { fail, ids, type RequestDoc } from './common'
 import { displayUnitPrice } from './lines'
-import { DECISION_ROLES, planPositions, ruleDecisionError } from './decision'
+import { DECISION_ROLES, DIREKTUR_ROLE, DIREKTUR_VIA_PM, DIREKTUR_VIA_PM_SELF, planPositions, ruleDecisionError, selfApprovalNote, type SelfApproval } from './decision'
 import { buildSnapshot, selectRule, type ApprovalSnapshot, type RuleInput } from './rules'
 
 /**
- * Rule resolution at submit / re-approval (US-34, G2) under ADR 0013 (E1): "Diketahui" = approval by
- * the Direktur (`pk-owner`), then Finance; PM/Staff never decide. The rule must pass
- * `ruleDecisionError` (legacy rules → 409); the positions are planned by `planPositions` (G1-2 skip
- * rule: a position whose only holders are requester/creator is skipped and recorded; no independent
- * decision → 409). The snapshot carries `decisionRoles` (service guard) and `skipped`. Snapshots taken
- * before E1 (PM acknowledger, F2e delegation) keep working unchanged at decision time.
+ * Rule resolution at submit / re-approval (US-34, G2). ADR 0013 (E1): "Diketahui" = approval by the
+ * Direktur (`pk-owner`), then Finance. ADR 0021 (owner 2026-10-10): an expense-request rule may name
+ * the PM project instead (`acknowledgeBy: scope_manager` → `projects.pm`, else `cost-centers.manager`,
+ * an active member of the PT; missing → 409), followed by the Direktur; Finance only transfers. The rule
+ * must pass `ruleDecisionError` (legacy rules → 409); the positions are planned by `planPositions`
+ * (G1-2 skip rule: a position whose only holders are requester/creator is skipped and recorded; no
+ * independent decision → 409). The snapshot carries `decisionRoles` (service guard), `skipped` and,
+ * for the narrow ADR 0021 G1 exception, `selfApproval`. Snapshots taken earlier keep working unchanged
+ * at decision time.
  */
-export async function selectAndSnapshot(req: PayloadRequest, doc: RequestDoc): Promise<{ rule: RuleInput; snapshot: ApprovalSnapshot }> {
+export async function selectAndSnapshot(
+  req: PayloadRequest,
+  doc: RequestDoc,
+  opts: { allowSelfApproval?: boolean | 'pm_only' } = {},
+): Promise<{ rule: RuleInput; snapshot: ApprovalSnapshot }> {
   const companyId = relId((doc as { company?: unknown }).company) ?? (await contextCompanyId(req))
   const rules = await loadActiveRules(req, 'expense_request', companyId)
   const projectId = relId(doc.project) ?? null
@@ -33,23 +40,76 @@ export async function selectAndSnapshot(req: PayloadRequest, doc: RequestDoc): P
   })
   if (!rule) fail(409, 'Tidak ada aturan approval yang berlaku untuk pengajuan ini. Hubungi Admin.')
 
-  const snapshot = await snapshotForRule(req, rule, await involvedUserIds(req, doc), companyId)
+  const snapshot = await snapshotForRule(req, rule, await involvedUserIds(req, doc), companyId, {
+    projectId,
+    costCenterId,
+    creatorId: relId(doc.createdBy) ?? null,
+    requesterEmployeeIds: ids(doc.requesters),
+    allowSelfApproval: opts.allowSelfApproval ?? true,
+  })
   return { rule, snapshot }
 }
 
+/** ADR 0021: the expense request's scope (PM project resolution + the narrow G1 exception). */
+export type SnapshotScope = {
+  projectId: number | null
+  costCenterId: number | null
+  creatorId: number | null
+  requesterEmployeeIds: readonly number[]
+  /**
+   * Which ADR 0021 exception may be applied: true at submit / re-approval (either); for an LPJ shortfall
+   * only what the request itself carries (the DB trigger checks `expense_requests.g1_exception`):
+   * 'pm_only' = `direktur_via_pm` (creator PM's "Diketahui" only), false = none.
+   */
+  allowSelfApproval: boolean | 'pm_only'
+}
+
+export const MSG_PROJECT_WITHOUT_PM = 'Project ini belum punya PM. Hubungi Admin untuk mengisi PM project.'
+export const MSG_COST_CENTER_WITHOUT_MANAGER = 'Pusat biaya ini belum punya manajer (penanggung jawab). Hubungi Admin untuk mengisi manajer pusat biaya.'
+export const MSG_PM_NOT_MEMBER = 'PM project bukan pengguna aktif di PT ini. Hubungi Admin untuk memperbarui PM project.'
+export const MSG_DIREKTUR_VIA_PM =
+  'Pengajuan untuk Direktur dibuat oleh PM project (kebijakan owner 2026-10-10): persetujuan Direktur tidak boleh terlewati. Minta PM project membuat pengajuan ini atas nama Direktur.'
+
+/** PM project of the request (`projects.pm`), else the manager of its cost center (ADR 0021). */
+export async function scopeManagerOf(req: PayloadRequest, scope: Pick<SnapshotScope, 'projectId' | 'costCenterId'>): Promise<number | null> {
+  if (scope.projectId) {
+    const p = (await req.payload.findByID({ collection: 'projects', id: scope.projectId, depth: 0, select: { pm: true }, overrideAccess: true /* SYSTEM-READ: PM project (ADR 0021) */, req, disableErrors: true })) as {
+      pm?: unknown
+    } | null
+    return relId(p?.pm) ?? null
+  }
+  if (scope.costCenterId) {
+    const c = (await req.payload.findByID({ collection: 'cost-centers', id: scope.costCenterId, depth: 0, select: { manager: true }, overrideAccess: true /* SYSTEM-READ: cost-center manager (ADR 0021) */, req, disableErrors: true })) as {
+      manager?: unknown
+    } | null
+    return relId(c?.manager) ?? null
+  }
+  return null
+}
+
 /**
- * ADR 0013 snapshot of `rule` for a document whose requester/creator accounts are `excluded` (G1):
- * rule validity (legacy rules → 409), position plan (G1-2 skip rule), decision roles. Shared by
- * expense requests and budget addenda (E5). Position holders = members of the document's PT
- * (`companyId`, ADR 0016 §5; the G1-2 skip rule counts holders of that PT only).
+ * Snapshot of `rule` for a document whose requester/creator accounts are `excluded` (G1): rule validity
+ * (legacy rules → 409), position plan (G1-2 skip rule), decision roles. Shared by expense requests
+ * (with `scope`) and budget addenda (E5, no scope: Direktur → Finance only). Position holders = members
+ * of the document's PT (`companyId`, ADR 0016 §5; the G1-2 skip rule counts holders of that PT only).
  */
-export async function snapshotForRule(req: PayloadRequest, rule: RuleInput, excluded: ReadonlySet<number>, companyId: number): Promise<ApprovalSnapshot> {
-  // ADR 0013: only rules of the Direktur → Finance model may be used for NEW submissions. A rule saved
-  // before E1 (e.g. "Diketahui" by the PM) is refused here instead of being silently reinterpreted.
+export async function snapshotForRule(req: PayloadRequest, rule: RuleInput, excluded: ReadonlySet<number>, companyId: number, scope?: SnapshotScope): Promise<ApprovalSnapshot> {
+  // Only rules of the current models may be used for NEW submissions. A rule saved before E1 (e.g.
+  // "Diketahui" by a Staff role) is refused here instead of being silently reinterpreted.
   const named = [...new Set([rule.acknowledgeUser, ...rule.steps.map((s) => s.approverUser)].filter((x): x is number => typeof x === 'number'))]
   const namedUsers = await rolesOfUsersIn(req, named, companyId)
-  const ruleErr = ruleDecisionError(rule, (id) => namedUsers.get(id)?.roles)
-  if (ruleErr) fail(409, `Aturan approval "${rule.name}" tidak sesuai alur Direktur → Finance: ${ruleErr} Hubungi Admin.`)
+  const ruleErr = ruleDecisionError(rule, (id) => namedUsers.get(id)?.roles, scope ? rule.docType : 'budget_addendum')
+  if (ruleErr) fail(409, `Aturan approval "${rule.name}" tidak sesuai alur persetujuan (Direktur → Finance / PM project → Direktur): ${ruleErr} Hubungi Admin.`)
+
+  const scopeManager = rule.acknowledge === 'required' && rule.acknowledgeBy === 'scope_manager'
+  // ADR 0021: the PM project (or cost-center manager) — must exist and be an active member of the PT.
+  let pm: number | null = null
+  if (scopeManager && scope) {
+    pm = await scopeManagerOf(req, scope)
+    if (pm === null) fail(409, scope.projectId ? MSG_PROJECT_WITHOUT_PM : MSG_COST_CENTER_WITHOUT_MANAGER)
+    const m = (await rolesOfUsersIn(req, [pm], companyId)).get(pm)
+    if (!m || !m.active || m.roles.length === 0) fail(409, MSG_PM_NOT_MEMBER)
+  }
 
   const holders = async (role: Role | null | undefined, user: number | null | undefined): Promise<number[]> => {
     if (user) return namedUsers.get(user)?.active ? [user] : []
@@ -57,15 +117,47 @@ export async function snapshotForRule(req: PayloadRequest, rule: RuleInput, excl
   }
   const ackHolders =
     rule.acknowledge === 'required'
-      ? await holders(rule.acknowledgeBy === 'role' ? rule.acknowledgeRole : null, rule.acknowledgeBy === 'user' ? rule.acknowledgeUser : null)
+      ? scopeManager
+        ? pm !== null
+          ? [pm]
+          : []
+        : await holders(rule.acknowledgeBy === 'role' ? rule.acknowledgeRole : null, rule.acknowledgeBy === 'user' ? rule.acknowledgeUser : null)
       : []
   const stepHolders: number[][] = []
   for (const s of [...rule.steps].sort((a, b) => a.level - b.level)) stepHolders.push(await holders(s.approverUser ? null : s.approverRole, s.approverUser))
+
+  // ADR 0021 narrow G1 exception: a Direktur's own request filed by the PM project (creator = the PM,
+  // every requester holds Direktur in the PT) → the creator PM is not excluded from "Diketahui". Owner
+  // answer 2026-10-11 ("Utamakan Direktur lain"): when another active Direktur (not a requester) can take
+  // the Direktur step, only that Direktur decides (`direktur_via_pm`); the requester Direktur(s) are kept
+  // in the Direktur step only when no other Direktur exists (`direktur_via_pm_self`). Recorded in the
+  // snapshot, the request column `g1_exception` (DB trigger) and an `approval_policy_exception` audit row.
+  let selfApproval: SelfApproval | null = null
+  let planned = planPositions({ rule, excluded, ackHolders, stepHolders })
+  if (scopeManager && scope && scope.allowSelfApproval && pm !== null && scope.creatorId === pm) {
+    const requesters = await requesterUsersAllDirektur(req, scope.requesterEmployeeIds, companyId)
+    if (requesters && !requesters.has(pm)) {
+      const ackExcluded = new Set([...excluded].filter((u) => u !== pm))
+      const viaPm = planPositions({ rule, excluded, ackExcluded, ackHolders, stepHolders })
+      const otherDirektur = viaPm.ok && !viaPm.plan.skipped.some((x) => x.position === 'approval' && x.role === DIREKTUR_ROLE)
+      if (otherDirektur || scope.allowSelfApproval === 'pm_only') {
+        selfApproval = DIREKTUR_VIA_PM
+        planned = viaPm
+      } else {
+        selfApproval = DIREKTUR_VIA_PM_SELF
+        const stepExcluded = new Set([...excluded].filter((u) => !requesters.has(u)))
+        planned = planPositions({ rule, excluded, ackExcluded, stepExcluded, ackHolders, stepHolders })
+      }
+    }
+  }
+
   // G1-2: positions whose only holders are requester/creator are skipped (recorded); at least one
   // independent decision must remain and every remaining position needs a different person — else 409.
-  const planned = planPositions({ rule, excluded, ackHolders, stepHolders })
   if (!planned.ok) fail(409, planned.error)
   const { plan } = planned
+  // ADR 0021: under the PM project → Direktur model the Direktur's approval is never skipped silently
+  // (a Direktur's own request is filed by the PM project, see the exception above).
+  if (scopeManager && plan.skipped.some((x) => x.position === 'approval' && x.role === DIREKTUR_ROLE)) fail(409, MSG_DIREKTUR_VIA_PM)
   const optionalAckUser =
     rule.acknowledge === 'optional' && rule.acknowledgeBy === 'user' && rule.acknowledgeUser && !excluded.has(rule.acknowledgeUser) ? rule.acknowledgeUser : null
   const base = buildSnapshot(rule, plan.ackRequired ? plan.ackUserId : optionalAckUser)
@@ -75,8 +167,29 @@ export async function snapshotForRule(req: PayloadRequest, rule: RuleInput, excl
     steps: plan.steps,
     decisionRoles: [...DECISION_ROLES],
     skipped: plan.skipped,
+    ...(selfApproval ? { selfApproval } : {}),
   }
   return snapshot
+}
+
+/**
+ * ADR 0021: the accounts of the requester employees when EVERY requester has an account and every such
+ * account holds Direktur (`pk-owner`) in the PT; else null (no exception).
+ */
+export async function requesterUsersAllDirektur(req: PayloadRequest, employeeIds: readonly number[], companyId: number): Promise<Set<number> | null> {
+  if (employeeIds.length === 0) return null
+  const users = new Set<number>()
+  for (const e of employeeIds) {
+    const us = await usersOfEmployees(req, [e])
+    if (us.length === 0) return null
+    for (const u of us) users.add(u)
+  }
+  const roles = await rolesOfUsersIn(req, [...users], companyId)
+  for (const u of users) {
+    const r = roles.get(u)
+    if (!r || !r.active || !r.roles.includes(DIREKTUR_ROLE)) return null
+  }
+  return users
 }
 
 /** Active `approval-rules` of one document type IN ONE PT, mapped to the engine shape (SYSTEM-READ). */
@@ -145,6 +258,26 @@ export async function auditSkipped(req: PayloadRequest, doc: RequestDoc, snapsho
   await writeAudit(req, rows)
 }
 
+/**
+ * ADR 0021: one `approval_policy_exception` audit row when the snapshot carries the narrow G1 exception
+ * (a Direktur's request filed by the PM project) — submit / re-approval.
+ */
+export async function auditSelfApproval(req: PayloadRequest, doc: RequestDoc, snapshot: ApprovalSnapshot): Promise<void> {
+  const note = selfApprovalNote(snapshot.selfApproval)
+  if (!note) return
+  await writeAudit(req, [
+    {
+      action: 'approval_policy_exception',
+      docType: 'expense_request',
+      docId: String(doc.id),
+      docNo: doc.docNo ?? undefined,
+      field: 'g1Exception',
+      newValue: { exception: snapshot.selfApproval, pm: snapshot.acknowledgerUserId, cycle: doc.approvalCycle ?? 0 },
+      reason: note,
+    },
+  ])
+}
+
 /** Class A snapshot of the request content (ADR 0006 §2 `expense_line_snapshots`). */
 export async function writeSnapshot(req: PayloadRequest, doc: RequestDoc, reason: 'submit' | 'approve' | 'receipts_resubmit') {
   const tx = await getRequestTx(req)
@@ -182,6 +315,7 @@ export async function writeSnapshot(req: PayloadRequest, doc: RequestDoc, reason
           unitPrice: l.unitPrice ?? null,
           unitPriceDisplay: displayUnitPrice({ unitPrice: l.unitPrice, qty: l.qty, total: l.total }),
           total: l.total ?? null,
+          receiptAmount: l.receiptAmount ?? null,
           category: relId(l.category) ?? null,
           vehicle: relId(l.vehicle) ?? null,
           notes: l.notes ?? null,

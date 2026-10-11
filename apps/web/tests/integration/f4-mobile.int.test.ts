@@ -73,7 +73,8 @@ function reimbursePayload(extra: Record<string, unknown> = {}) {
   return {
     kind: 'reimburse',
     title: 'Service Tronton (offline)',
-    cost_center_id: w.costCenter,
+    // DRMS 10/10 D2: requests are project requests (a cost_center_id from an old APK is ignored)
+    project_id: w.project,
     requester_ids: [w.emp.a],
     bank_account_id: w.accA,
     needed_date: '2026-09-30',
@@ -217,9 +218,10 @@ describe('POST /api/v1/sync/batch — expense request drafts (ADR 0010)', () => 
     expect(byId.body.results[0]).toMatchObject({ status: 'rejected', errors: [expect.objectContaining({ code: 'NOT_FOUND' })], server_copy: null })
     const byUuid = await sync(otherPm, [item('expense_request.draft_upsert', { draft_client_uuid: draftUuid, title: 'curang' }, { base_rev: 3 })])
     expect(byUuid.body.results[0]).toMatchObject({ status: 'rejected', errors: [expect.objectContaining({ code: 'NOT_FOUND' })], server_copy: null })
-    // staff B is assigned to the same cost center → may read (Q-23), never edit; no server copy leaks
+    // staff B on the same project cannot read A's project request (Q-23 read applies to legacy cost-center requests
+    // only; DRMS 10/10 D2: the draft is a project request) → NOT_FOUND; no server copy leaks
     const byStaff = await sync(staffB, [item('expense_request.draft_upsert', { draft_client_uuid: draftUuid, title: 'curang' }, { base_rev: 3 })])
-    expect(byStaff.body.results[0]).toMatchObject({ status: 'rejected', errors: [expect.objectContaining({ code: 'NOT_EDITABLE' })], server_copy: null })
+    expect(byStaff.body.results[0]).toMatchObject({ status: 'rejected', errors: [expect.objectContaining({ code: 'NOT_FOUND' })], server_copy: null })
     const byPm = await sync(pm, [item('expense_request.draft_upsert', { request_id: requestId, title: 'PM edit' }, { base_rev: 3 })])
     expect(byPm.body.results[0]).toMatchObject({ status: 'rejected', errors: [expect.objectContaining({ code: 'NOT_EDITABLE' })], server_copy: null })
     const del = await sync(staffB, [item('expense_request.draft_delete', { draft_client_uuid: draftUuid })])

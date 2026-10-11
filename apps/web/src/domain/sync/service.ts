@@ -243,9 +243,11 @@ export async function draftCopy(req: PayloadRequest, id: number): Promise<SyncDr
       uom_id: relId(l.uom) ?? null,
       unit_price: l.unitPrice ?? null,
       total: l.total ?? null,
+      receipt_amount: l.receiptAmount ?? null,
       notes: l.notes ?? null,
       category_id: relId(l.category) ?? null,
       vehicle_id: relId(l.vehicle) ?? null,
+      rap_item_id: relId(l.rapItem) ?? null,
     })),
     receipts: receipts.map((r) => ({
       id: r.id,
@@ -327,9 +329,12 @@ function toDraftInput(p: SyncDraftUpsert): DraftInput {
         uomId: l.uom_id ?? null,
         unitPrice: l.unit_price ?? null,
         total: l.total ?? null,
+        receiptAmount: l.receipt_amount ?? null,
         notes: l.notes ?? null,
         categoryId: l.category_id ?? null,
         vehicleId: l.vehicle_id ?? null,
+        // D4: omitted by APK ≤ 0.7 → the line keeps its stored RAP item (updateDraft keepRapItems)
+        ...(l.rap_item_id !== undefined ? { rapItemId: l.rap_item_id } : {}),
       }),
     )
   }
@@ -353,7 +358,7 @@ async function upsertReceipts(c: ItemCtx, requestId: number, p: SyncDraftUpsert)
   const wanted = (p.lines ?? []).flatMap((l, i) => (l.receipts ?? []).map((r, j) => ({ r, lineId: l.id ?? l.client_uuid, path: `payload.lines.${i}.receipts.${j}` })))
   if (wanted.length === 0) return
   const doc = await loadRaw(req, requestId)
-  if (doc.type !== 'reimburse') reject('VALIDATION', 'Nota Uang Muka diunggah setelah transfer (LPJ), bukan pada draft.', 'payload.lines')
+  if (doc.type !== 'reimburse') reject('VALIDATION', 'Nota Pengajuan Baru diunggah setelah transfer (LPJ), bukan pada draft.', 'payload.lines')
   const seen = new Set<string>()
   for (const { r, lineId, path } of wanted) {
     if (!lineId) reject('VALIDATION', 'Baris dengan nota wajib punya id atau client_uuid.', path)
@@ -587,7 +592,7 @@ async function store(c: ItemCtx, batch: SyncBatchIn, deviceId: string, verdict: 
       action: 'sync_offline',
       docType: ATTENDANCE.has(item.type) ? 'attendance' : item.type === 'progress_report.draft_upsert' ? 'progress_report' : (FIELD_SYNC_TYPES[item.type] ?? 'expense_request'),
       docId: result.server_id ?? undefined,
-      docNo: result.server_copy?.doc_no ?? result.server_report?.doc_no ?? result.server_service_report?.doc_no ?? undefined,
+      docNo: result.server_copy?.doc_no ?? result.server_report?.doc_no ?? result.server_service_report?.doc_no ?? result.server_daily_report?.doc_no ?? undefined,
       field: item.type,
       newValue: {
         client_uuid: item.client_uuid,

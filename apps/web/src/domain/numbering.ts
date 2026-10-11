@@ -19,6 +19,8 @@ export const DOC_TYPES = [
   'reversal',
   // FR1 (ADR 0020): Laporan servis unit SV/YYMM/####
   'service_report',
+  // P3 (konstruksi): Laporan harian LH/YYMM/####
+  'daily_report',
 ] as const
 export type DocType = (typeof DOC_TYPES)[number]
 
@@ -95,14 +97,47 @@ export function formatDocNo(
   return cfg.pattern.replace(TOKEN, (t) => tokens[t] ?? t)
 }
 
-/** ADR 0007 §3 defaults (seed). PB: reset never, startAt 229 (user decision 2026-09-23). */
+/**
+ * ADR 0007 §3 defaults (seed). D5 (owner decision DRMS 10/10, 2026-10-11): EVERY number carries the PT
+ * short code, one shape `<DOC>/{COMPANY}/{YY}{MM}/{seq}` with 4 digits, e.g. `TRF/LLAS/2610/0001`.
+ * Owner decision 2026-10-11 (DRMS 10/10 extra): PB resets MONTHLY from 1 per PT too (`PB/DRMS/2611/0001`,
+ * `PB/LAS/2611/0001` — independent counters, keyed company + doc type + month); the earlier "paper series
+ * continues, never + 229" rule (2026-09-23) is retired. `{COMPANY}` is always the PT's `shortCode`.
+ * Already issued numbers are never rewritten; migrations 20261012_200100_d1010_data (patterns) and
+ * 20261012_300200_d1010_pb_monthly (PB reset) move rows still on the default.
+ */
 export const DEFAULT_SEQUENCES: ReadonlyArray<Omit<SequenceConfig, 'timezone' | 'docType'> & { docType: DocType; docCode: string }> = [
-  { docType: 'expense_request', docCode: 'PB', pattern: '{seq}/PB-{COMPANY}/{DD}/{MM_ROMAN}/{YYYY}', resetPolicy: 'never', padding: 0, startAt: 229 },
-  { docType: 'transfer', docCode: 'TRF', pattern: 'TRF/{YY}{MM}/{seq}', resetPolicy: 'monthly', padding: 4, startAt: 1 },
-  { docType: 'settlement', docCode: 'LPJ', pattern: 'LPJ/{YY}{MM}/{seq}', resetPolicy: 'monthly', padding: 4, startAt: 1 },
-  { docType: 'cash_in', docCode: 'KM', pattern: 'KM/{YY}{MM}/{seq}', resetPolicy: 'monthly', padding: 4, startAt: 1 },
-  { docType: 'cash_out', docCode: 'KK', pattern: 'KK/{YY}{MM}/{seq}', resetPolicy: 'monthly', padding: 4, startAt: 1 },
-  { docType: 'progress_report', docCode: 'LP', pattern: 'LP/{YY}{MM}/{seq}', resetPolicy: 'monthly', padding: 4, startAt: 1 },
-  { docType: 'budget_addendum', docCode: 'ADD', pattern: 'ADD/{YY}{MM}/{seq}', resetPolicy: 'monthly', padding: 4, startAt: 1 },
-  { docType: 'service_report', docCode: 'SV', pattern: 'SV/{YY}{MM}/{seq}', resetPolicy: 'monthly', padding: 4, startAt: 1 },
+  { docType: 'expense_request', docCode: 'PB', pattern: 'PB/{COMPANY}/{YY}{MM}/{seq}', resetPolicy: 'monthly', padding: 4, startAt: 1 },
+  { docType: 'transfer', docCode: 'TRF', pattern: 'TRF/{COMPANY}/{YY}{MM}/{seq}', resetPolicy: 'monthly', padding: 4, startAt: 1 },
+  { docType: 'settlement', docCode: 'LPJ', pattern: 'LPJ/{COMPANY}/{YY}{MM}/{seq}', resetPolicy: 'monthly', padding: 4, startAt: 1 },
+  { docType: 'cash_in', docCode: 'KM', pattern: 'KM/{COMPANY}/{YY}{MM}/{seq}', resetPolicy: 'monthly', padding: 4, startAt: 1 },
+  { docType: 'cash_out', docCode: 'KK', pattern: 'KK/{COMPANY}/{YY}{MM}/{seq}', resetPolicy: 'monthly', padding: 4, startAt: 1 },
+  { docType: 'progress_report', docCode: 'LP', pattern: 'LP/{COMPANY}/{YY}{MM}/{seq}', resetPolicy: 'monthly', padding: 4, startAt: 1 },
+  { docType: 'budget_addendum', docCode: 'ADD', pattern: 'ADD/{COMPANY}/{YY}{MM}/{seq}', resetPolicy: 'monthly', padding: 4, startAt: 1 },
+  { docType: 'service_report', docCode: 'SV', pattern: 'SV/{COMPANY}/{YY}{MM}/{seq}', resetPolicy: 'monthly', padding: 4, startAt: 1 },
+  // P3 konstruksi
+  { docType: 'daily_report', docCode: 'LH', pattern: 'LH/{COMPANY}/{YY}{MM}/{seq}', resetPolicy: 'monthly', padding: 4, startAt: 1 },
 ]
+
+/**
+ * D5: the default patterns BEFORE 2026-10-12 (pattern + padding per doc type). The numbering migration
+ * moves a sequence row to DEFAULT_SEQUENCES only while it still has exactly this pattern — a pattern
+ * the Admin changed is left alone (and logged).
+ */
+export const LEGACY_DEFAULT_PATTERNS: Readonly<Record<string, { pattern: string; padding: number }>> = {
+  expense_request: { pattern: '{seq}/PB-{COMPANY}/{DD}/{MM_ROMAN}/{YYYY}', padding: 0 },
+  transfer: { pattern: 'TRF/{YY}{MM}/{seq}', padding: 4 },
+  settlement: { pattern: 'LPJ/{YY}{MM}/{seq}', padding: 4 },
+  cash_in: { pattern: 'KM/{YY}{MM}/{seq}', padding: 4 },
+  cash_out: { pattern: 'KK/{YY}{MM}/{seq}', padding: 4 },
+  progress_report: { pattern: 'LP/{YY}{MM}/{seq}', padding: 4 },
+  budget_addendum: { pattern: 'ADD/{YY}{MM}/{seq}', padding: 4 },
+  service_report: { pattern: 'SV/{YY}{MM}/{seq}', padding: 4 },
+  daily_report: { pattern: 'LH/{YY}{MM}/{seq}', padding: 4 },
+}
+
+/** D5: a `{COMPANY}` token needs a non-empty PT short code (message for the Admin). */
+export function companyCodeError(pattern: string, shortCode: string | null | undefined): string | null {
+  if (!pattern.includes('{COMPANY}')) return null
+  return typeof shortCode === 'string' && shortCode.trim() !== '' ? null : 'Kode singkat PT belum diisi. Admin: isi "Kode singkat" di Perusahaan (PT) sebelum dokumen bernomor diterbitkan.'
+}

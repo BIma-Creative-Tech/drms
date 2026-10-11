@@ -660,3 +660,34 @@ Where the implementation deviates from / refines the revision above (`../mc/mc3-
 | 4 | master caches keyed per `sub` and PT | `masters:<sub>:<pt>` = `{etag, version, types}`, one `GET /masters` per membership PT with `If-None-Match` (304 keeps); shared rows de-duplicated on read; the 0.2.x key `masters:<sub>` is only used when the server sends no PTs | contract §Masters |
 | 5 | — | `COMPANY_MISMATCH` / `COMPANY_NOT_ALLOWED` per item = final rejection with one Indonesian text for all item types; batch 409 `COMPANY_REQUIRED` holds the PT-less items and remembers that the server needs a PT (`sync:company_required:<sub>`) | per-item rules of this ADR unchanged otherwise (idempotency by `client_uuid`, order inside a PT) |
 
+## Addendum 2026-10-12 — D7 attendance selfie timestamp (DRMS 10/10, item 14)
+
+Owner decision D7 (2026-10-11): the timestamp is burnt into the selfie **server-side**.
+
+- **What**: a band at the bottom of the stored JPEG — date + time of the attendance **as the server accepted it**
+  (`attendances.attendance_time`, the same value the recap uses; offline items carry the server estimate and are
+  marked "(perkiraan server)", `device_only` "(jam perangkat)") in the PT time zone (`companies.timezone`, default
+  Asia/Makassar, with WITA/WIB/WIT), GPS lat/lng (5 decimals) + accuracy, project / cost center (code + name),
+  employee (and "diabsenkan PM <name>" for on-behalf), "RR Teams". Text uses a built-in 5×7 bitmap font (the
+  node:alpine runtime has no system fonts). Same dimensions; JPEG ≤ 150 KB (quality steps down from 75 when needed).
+- **When — design choice**: the contract uploads media FIRST (`POST /api/v1/media/selfies`, §Implemented F4b) and the
+  attendance item later (batch, possibly days later offline), so the upload cannot know the accepted time, the
+  location or even whether the attendance will be accepted. Stamping at upload with "upload time" would show a time
+  that differs from the recorded attendance. Therefore the stamp is applied **when the attendance is recorded**:
+  `recordAttendance` (the single write path — APK sync check-in/out, PM on-behalf, web self check-in) queues the job
+  `stampSelfie {attendanceId}` **in the attendance's transaction** (a rejected / rolled-back item queues nothing).
+- **Where**: the jobs **worker** (`dist/worker.mjs`, ~30 s tick) re-encodes the file once — never the web process
+  (load test Q-34: image work is CPU-bound); inside the worker it still takes an image-queue slot. The file is written
+  to a temp name and renamed over the original; `media_selfies.stamped_at` is set in the same transaction.
+- **Idempotent**: a row already stamped (`stamped_at`), removed by retention (`removed_at`) or without its file is
+  skipped; DB trigger `media_selfies_stamped_protect` makes `stamped_at` write-once; retries (3, exponential) are safe.
+  Edge: a crash between the rename and the commit would leave a stamped file with `stamped_at` NULL and a later retry
+  would add a second band — accepted (rare; visible, not a data loss).
+- **Until stamped** (≤ one worker tick) viewers see the unstamped photo. `sha256Original` keeps the hash of the
+  uploaded original (the stored file is a server derivative, as before with the resize, ADR 0004).
+- **Privacy / retention**: no new personal data — the band shows data already stored on the attendance; retention
+  (Q-33, 6 months) deletes the stamped file like any selfie; the privacy notice text is unchanged. The job input holds
+  only the attendance id (no personal data in the job log).
+- **Web self check-in** takes the selfie from the live front camera only (getUserMedia → canvas, no file input /
+  gallery); `Permissions-Policy` now allows `camera=(self)` and `geolocation=(self)` (geolocation had been `()`,
+  which blocked the web check-in GPS). No camera / permission → "Kamera tidak tersedia — gunakan aplikasi Android".

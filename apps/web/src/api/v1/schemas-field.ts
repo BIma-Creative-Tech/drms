@@ -154,8 +154,11 @@ export const ServiceReportCorrection = z
   .strict()
   .meta({ id: 'ServiceReportCorrection' })
 
+/** DRMS 10/10 D8: free-text search param of the list endpoints. */
+const textQuery = z.string().trim().max(100).optional()
+
 export const ServiceReportListQuery = z
-  .object({ ...listQuery, unit: z.coerce.number().int().positive().optional(), status: UnitStatusEnum.optional().meta({ description: 'unitStatusAfter' }), reporter: z.coerce.number().int().positive().optional() })
+  .object({ ...listQuery, q: textQuery.meta({ description: 'Text search: number, complaint, action, notes (every word must match).' }), unit: z.coerce.number().int().positive().optional(), status: UnitStatusEnum.optional().meta({ description: 'unitStatusAfter' }), reporter: z.coerce.number().int().positive().optional() })
   .meta({ id: 'ServiceReportListQuery' })
 
 export const ServiceReport = z
@@ -316,6 +319,7 @@ export const AftersalesActivityListQuery = z
     kind: ActivityKindEnum.optional(),
     poStatus: PoStatusEnum.optional(),
     reporter: z.coerce.number().int().positive().optional(),
+    q: textQuery.meta({ description: 'Text search: document number, receiver, notes (every word must match).' }),
   })
   .meta({ id: 'AftersalesActivityListQuery' })
 

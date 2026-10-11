@@ -8,6 +8,8 @@ import { formatServerTime } from '@/pdf/format'
 import { DEFAULT_TZ } from '@/lib/time'
 import { withReqTransaction } from '@/lib/system-tx'
 
+import { docHref } from '../doc-links'
+
 import { Empty, TableScroll, table, td, th } from './shared'
 import { settings as companySettings } from '@/domain/companies'
 
@@ -17,8 +19,9 @@ const ACTION_LABELS: Record<string, string> = {
   status_change: 'status',
   void: 'void',
   sign: 'tanda tangan',
-  acknowledge: 'disetujui Direktur (Diketahui)', // ADR 0013 (pre-E1 rows: PM "Diketahui")
+  acknowledge: 'disetujui (Diketahui)', // ADR 0021: PM project; ADR 0013: Direktur (pre-E1 rows: PM "Diketahui")
   approve: 'disetujui',
+  approval_policy_exception: 'pengecualian G1 (pengajuan Direktur via PM)',
   reject: 'ditolak',
   verify: 'diverifikasi',
   number_issued: 'nomor terbit',
@@ -102,7 +105,7 @@ export async function RiwayatView(props: DocumentViewServerProps) {
                   </td>
                   <td style={td}>
                     {DOC_LABELS[r.docType] ?? r.docType}
-                    {r.docNo && r.docType !== 'expense_request' ? <div style={{ fontSize: 11 }}>{r.docNo}</div> : null}
+                    {r.docNo && r.docType !== 'expense_request' ? <div style={{ fontSize: 11 }}>{docHref(r.docType, r.docId) ? <a href={docHref(r.docType, r.docId)!}>{r.docNo}</a> : r.docNo}</div> : null}
                   </td>
                   <td style={td}>{ACTION_LABELS[r.action] ?? r.action}</td>
                   <td style={td}>

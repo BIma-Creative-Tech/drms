@@ -15,7 +15,7 @@ import { describe, expect, it } from 'vitest'
  */
 const ROOT = path.resolve(__dirname, '../../src')
 // QA-MC4-13: the whole of domain/expense, progress, addendum and sync (was: three single files)
-const SCAN = ['domain/reports', 'domain/reminders', 'domain/attendance', 'domain/cash', 'domain/expense', 'domain/progress', 'domain/addendum', 'domain/sync', 'domain/field']
+const SCAN = ['domain/reports', 'domain/reminders', 'domain/attendance', 'domain/cash', 'domain/expense', 'domain/progress', 'domain/addendum', 'domain/sync', 'domain/field', 'domain/daily', 'domain/rap']
 
 const PER_PT_TABLES = [
   'expense_requests', 'cash_entries', 'cash_accounts', 'projects', 'cost_centers', 'attendances', 'employees', 'team_assignments', 'transfers',
@@ -26,6 +26,8 @@ const PER_PT_TABLES = [
   'urgency_levels',
   // FR1 (ADR 0020)
   'contract_units', 'service_reports', 'unit_timesheets', 'aftersales_activities', 'clients',
+  // P3
+  'rap_items', 'rap_templates', 'resource_types', 'daily_reports', 'daily_report_lines',
 ]
 /** Company helpers (they build `company_id IN (<bound ids>)` from the caller's scope) — a CALL, not a mention. */
 const HELPER_CALL = /\b(?:requestScopeSql|cashScopeSql|ledgerScopeSql|projectScopeSql|costCenterScopeSql|masterScopeSql|companyScopeSql|locationScopeSql|employeeCompanySql|candidateWhere|ptSql)\(/
@@ -41,6 +43,7 @@ const ALLOWED: Record<string, string> = {
   'domain/attendance/web.ts#selfieState': 'by attendance ids of an already scoped list',
   'domain/attendance/record.ts#dayRowsAt': 'one employee + one location (both PT-bound, checked by recordAttendance)',
   'domain/attendance/corrections.ts#effectiveTime': 'one attendance id checked by correctAttendance',
+  'domain/attendance/stamp.ts#stampAttendanceSelfie': 'worker job (system): ONE attendance id queued by recordAttendance in that attendance transaction; no caller data is returned',
   'domain/reports/attendance-report.ts#attendanceMonth': 'employees by ids from the scoped facts (locationScopeSql)',
   'domain/reminders/service.ts#requestPeople': 'one request id of the PT run',
   'domain/reports/audit-log.ts#auditLogCount': 'where(f) adds the company predicate (companyScopeSql on a.company_id)',
@@ -54,6 +57,10 @@ const ALLOWED: Record<string, string> = {
   'domain/expense/transfers.ts#approvedByCaller': 'approvals of request ids from an already scoped queue, actor = the caller',
   'domain/progress/recalc.ts#lockProject': 'row lock (FOR UPDATE) of ONE project id checked by the caller',
   'domain/addendum/service.ts#lockAddendum': 'row lock (FOR UPDATE) of ONE addendum id; visibility is checked right after (loadVisibleAddendum)',
+  // DRMS 10/10 Phase C (D4 RAP realisation, D2 cost center filter)
+  'domain/rap/budget.ts#rapUsage': 'requests of project ids the caller already passed the project read check for (loadRap, listProjects / rapMonitoring read scope, one request\'s project); a request shares its project\'s PT (DB trigger)',
+  'domain/rap/budget.ts#rapItemRows': 'RAP items of checked project ids, or of ONE request\'s lines (same PT as the request, DB trigger)',
+  'domain/reports/kpi.ts#requestCostCenterSql': 'fragment used only inside requestScopeSql-scoped queries (requestFilterSql, spending)',
 }
 
 type Fn = { file: string; name: string; body: string }

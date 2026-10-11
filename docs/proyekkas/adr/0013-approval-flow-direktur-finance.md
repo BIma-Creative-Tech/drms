@@ -1,5 +1,10 @@
 # ADR 0013 — Approval flow: "Diketahui" by the Direktur (an approval), then Finance; PM monitors only
 
+> **Superseded in part by [ADR 0021](0021-approval-pm-direktur.md) (owner, 2026-10-10).** For expense requests the
+> flow is now PM project → Direktur, and Finance only transfers (decisions 2, 4 and 10 below no longer apply to new
+> submissions). This ADR still governs the Addendum RAB (Direktur → Finance), the G1-2 skip rule, re-approval via
+> `pending_ack`, and every request submitted under an ADR 0013 snapshot.
+
 - **Status:** accepted (GATE 1 fase1-golive, user 2026-09-26); multi-company revision proposed 2026-09-27 (ADR 0016, section "Revisi 2026-09-27")
 - **Date:** 2026-09-25
 - **Author:** Analyst (Fase 1 go-live plan, branch `docs/plan-fase1-golive`)

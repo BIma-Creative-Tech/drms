@@ -307,7 +307,8 @@ function parseSettings(rows: CellValue[][], date1904: boolean, issues: Issue[]):
   if (!goLiveDate) issues.push({ level: 'error', sheet, row: g?.row, column: 'nilai', message: 'tanggal_golive wajib diisi dengan tanggal valid (YYYY-MM-DD).' })
   else if (!goLiveDate.endsWith('-01')) issues.push({ level: 'warning', sheet, row: g?.row, column: 'nilai', message: `Go-live ${goLiveDate} bukan tanggal 1: tutup buku hanya mengunci bulan sebelumnya; transaksi kas sebelum ${goLiveDate} tetap ditolak per akun (tanggal saldo awal).` })
   const p = values.get('nomor_pb_mulai')
-  let pbStartAt = 229
+  // owner decision 2026-10-11: PB resets monthly from 1 — a different value only for the go-live month
+  let pbStartAt = 1
   if (p && !isBlank(p.v)) {
     const n = typeof p.v === 'number' ? p.v : Number(String(p.v).trim())
     if (!Number.isSafeInteger(n) || n < 1) issues.push({ level: 'error', sheet, row: p.row, column: 'nilai', message: 'nomor_pb_mulai harus bilangan bulat ≥ 1.' })
@@ -519,7 +520,8 @@ export function parseWorkbook(wb: ReadWorkbook): ParseResult {
           const g = geofenceError(p)
           if (g) issues.push({ level: 'error', sheet, row: p._row, column: 'latitude', message: g })
           if (p.startDate && p.targetDate && p.targetDate < p.startDate) issues.push({ level: 'error', sheet, row: p._row, column: 'target_selesai', message: 'Target selesai sebelum tanggal mulai.' })
-          if (!p.pm) issues.push({ level: 'warning', sheet, row: p._row, column: 'pm', message: 'Project tanpa PM: tidak ada PM yang memantau project ini.' })
+          // DRMS 10/10 #5: PM mandatory (Projects.ts validation + DB NOT NULL)
+          if (!p.pm) issues.push({ level: 'error', sheet, row: p._row, column: 'pm', message: 'Project Manager wajib diisi.' })
           if (p.lat === null) issues.push({ level: 'warning', sheet, row: p._row, column: 'latitude', message: 'Tanpa koordinat: absensi di project ini ditolak (NO_GEOFENCE).' })
         }
         break

@@ -2,7 +2,7 @@ import { Gutter } from '@payloadcms/ui'
 import type { Payload, SanitizedPermissions, TypedUser, VisibleEntities } from 'payload'
 import React from 'react'
 
-import { loadModules, navUser } from '@/admin/shell/modules-server'
+import { loadModules, loadNavUser } from '@/admin/shell/modules-server'
 
 import { LauncherGrid } from './LauncherGrid'
 
@@ -31,8 +31,7 @@ export function greeting(date: Date, timeZone = 'Asia/Makassar'): string {
 
 export async function Launcher({ payload, user, permissions, visibleEntities, i18n }: Props) {
   if (!user) return null
-  const modules = await loadModules({ payload, user, permissions, visibleEntities, i18n })
-  const who = navUser(user)
+  const [modules, who] = await Promise.all([loadModules({ payload, user, permissions, visibleEntities, i18n }), loadNavUser(payload, user)])
   return (
     <Gutter>
       <section className="pk-launcher" data-pk-launcher aria-labelledby="pk-launcher-title">
