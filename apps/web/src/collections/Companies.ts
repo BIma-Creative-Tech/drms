@@ -124,10 +124,10 @@ export const COMPANY_SETTING_FIELDS: Field[] = [
     admin: { description: 'Pengajuan disetujui yang belum ditransfer lebih lama dari ini tampil merah di Antrian Transfer; dipakai laporan "SLA transfer" dan dashboard.' },
   },
   intField('reimburseAutoCloseDays', 'Tutup otomatis reimburse (hari)', 30, 1, 365),
-  // F3 (Q-F3-1, user 2026-09-24: default 7): an Uang Muka without LPJ is "LPJ terlambat" (K-12b).
+  // F3 (Q-F3-1, user 2026-09-24: default 7): a Pengajuan Baru without LPJ is "LPJ terlambat" (K-12b).
   {
-    ...intField('lpjDueDays', 'Batas LPJ uang muka (hari setelah transfer)', 7, 1, 365),
-    admin: { description: 'Uang muka tanpa LPJ lebih lama dari ini tampil sebagai "LPJ terlambat" di dashboard/laporan.' },
+    ...intField('lpjDueDays', 'Batas LPJ pengajuan baru (hari setelah transfer)', 7, 1, 365),
+    admin: { description: 'Pengajuan baru tanpa LPJ lebih lama dari ini tampil sebagai "LPJ terlambat" di dashboard/laporan.' },
   },
   {
     name: 'syncExpenseDraftsEnabled',
@@ -212,7 +212,7 @@ export const COMPANY_SETTING_FIELDS: Field[] = [
         type: 'row',
         fields: [
           { name: 'reminderLateProgressEnabled', type: 'checkbox', label: 'Laporan progress terlambat → PM + Direktur', defaultValue: true, admin: { description: 'Batas hari = "Batas hari laporan progress terlambat".' } },
-          { name: 'reminderLpjOverdueEnabled', type: 'checkbox', label: 'Nota/LPJ uang muka terlambat → pemohon + Finance', defaultValue: true, admin: { description: 'Batas hari = "Batas LPJ uang muka".' } },
+          { name: 'reminderLpjOverdueEnabled', type: 'checkbox', label: 'Nota/LPJ pengajuan baru terlambat → pemohon + Finance', defaultValue: true, admin: { description: 'Batas hari = "Batas LPJ pengajuan baru".' } },
         ],
       },
       {

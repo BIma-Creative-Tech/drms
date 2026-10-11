@@ -64,7 +64,7 @@ async function transferredAdvance() {
   return { id, lineIds: c.lines.map((l: { id: string }) => l.id) as string[] }
 }
 
-/** Uang Muka 750.000 → LPJ verified with receipts totalling `amounts`. */
+/** Pengajuan Baru 750.000 → LPJ verified with receipts totalling `amounts`. */
 async function verifiedLpj(amounts: number[]) {
   const { id, lineIds } = await transferredAdvance()
   for (const [i, amount] of amounts.entries()) {

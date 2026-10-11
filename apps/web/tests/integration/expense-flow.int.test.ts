@@ -7,7 +7,7 @@ import { api, draftBody, makeWorld, png, upload, type World } from './flow-world
 
 /**
  * T1–T4, T6–T8 state machines through /api/v1 (cookie sessions, same handler as the Next route):
- * Uang Muka and Reimburse happy paths, withdraw/cancel/reject/resubmit, multi-level approval,
+ * Pengajuan Baru and Reimburse happy paths, withdraw/cancel/reject/resubmit, multi-level approval,
  * receipt revision + re-approval, transfer + void, audit coverage (§8) and idempotency (G15).
  */
 let w: World
@@ -45,7 +45,7 @@ async function approvedAdvance(over: Record<string, unknown> = {}) {
   return a.body
 }
 
-describe('Uang Muka (advance) — happy path', () => {
+describe('Pengajuan Baru (advance) — happy path', () => {
   let id: number
   let lineIds: string[]
 
@@ -157,7 +157,7 @@ describe('Uang Muka (advance) — happy path', () => {
     expect(again.status, JSON.stringify(again.body)).toBe(201)
   })
 
-  it('after transfer the requester adds receipts (Uang Muka window); Finance cannot change the approved amount', async () => {
+  it('after transfer the requester adds receipts (Pengajuan Baru window); Finance cannot change the approved amount', async () => {
     const d = (await api('GET', `${E}/${id}`, w.users.staffA)).body
     const add = await api('POST', `${E}/${id}/receipts`, w.users.staffA, {
       lineId: d.lines[0].id,
@@ -326,7 +326,7 @@ describe('withdraw / cancel / reject / resubmit (US-04, US-06, G7, G8)', () => {
     expect(s.body.docNo).not.toBe(first)
   })
 
-  it('cancel a Draft with reason; Finance cancels an approved Uang Muka; cancelled is terminal', async () => {
+  it('cancel a Draft with reason; Finance cancels an approved Pengajuan Baru; cancelled is terminal', async () => {
     const c = await api('POST', E, w.users.staffA, draftBody(w))
     expect((await api('POST', `${E}/${c.body.id}/cancel`, w.users.staffA, { reason: 'tidak jadi' })).body.status).toBe('cancelled')
     expect((await api('POST', `${E}/${c.body.id}/submit`, w.users.staffA, {})).status).toBe(409)

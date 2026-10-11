@@ -13,7 +13,7 @@ import { api, asUser, draftBody, makeFlowUser, makeWorld, png, upload, type Flow
  * E2 (fase1-golive §E2) acceptance criteria through the same /api/v1 endpoints the web "Kas"
  * views call (cookie session + Origin, Idempotency-Key): KM/KK numbering, saldo change, audit,
  * edit with reason, void semantics (original stays "Void", reversal row linked), void transfer
- * (Uang Muka → approved, Reimburse → receipts_verified, KK reversed), posting into a closed period
+ * (Pengajuan Baru → approved, Reimburse → receipts_verified, KK reversed), posting into a closed period
  * rejected with an Indonesian message, re-open = Direktur (pk-owner) only, per-role negatives, and
  * the read model of the views (book page links, filters, flows, voidable transfers, view guards).
  * Fictional data only. The DB is shared with other files → assertions are restricted to this
@@ -194,7 +194,7 @@ describe('E2 kas masuk / kas keluar (US-23)', () => {
 })
 
 describe('E2 void transfer (T8) — state rollback + KK reversal', () => {
-  it('Uang Muka: void → request back to approved, KK void + reversal, transferredTotal 0, listed/unlisted in the voidable list', async () => {
+  it('Pengajuan Baru: void → request back to approved, KK void + reversal, transferredTotal 0, listed/unlisted in the voidable list', async () => {
     const d = await must(api('POST', E, w.users.staffA, draftBody(w)), 201)
     await must(api('POST', `${E}/${d.id}/submit`, w.users.staffA, {}))
     await driveApproved(d.id)

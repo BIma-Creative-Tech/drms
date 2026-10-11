@@ -51,7 +51,7 @@ async function proof(): Promise<number> {
   return r.body.id
 }
 
-/** Uang Muka 750.000 (600.000 + 150.000) → approved → transferred → receipts → LPJ submitted. */
+/** Pengajuan Baru 750.000 (600.000 + 150.000) → approved → transferred → receipts → LPJ submitted. */
 async function submittedLpj(amounts: [number, number]) {
   const c = await ok(api('POST', E, w.users.staffA, draftBody(w), key()), 201)
   const id = c.id as number

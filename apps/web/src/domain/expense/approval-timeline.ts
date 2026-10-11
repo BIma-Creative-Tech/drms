@@ -177,7 +177,7 @@ export function buildApprovalTimeline(d: TimelineInput): ApprovalTimelineStep[] 
     steps.push({ key: `skipped-${s.level}`, title: s.role === DIREKTUR_ROLE ? 'Persetujuan Direktur' : s.role === 'pk-finance' ? 'Approval Finance' : pos.title, role: s.role ? ROLE_LABELS[s.role] : pos.role, planned: name(s.userId) ?? (s.role ? ROLE_LABELS[s.role] : null), state: 'skipped', actor: null, at: null, note: `${SKIPPED_LABEL} — ${s.reason}` })
   }
 
-  // 4. Transfer Finance (posted Uang Muka / Reimburse transfers; voided ones are listed in the note)
+  // 4. Transfer Finance (posted Pengajuan Baru / Reimburse transfers; voided ones are listed in the note)
   const posted = d.transfers.filter((t) => (t.kind === 'advance' || t.kind === 'reimburse') && t.status === 'posted')
   const voided = d.transfers.filter((t) => (t.kind === 'advance' || t.kind === 'reimburse') && t.status !== 'posted')
   const queue = (d.type === 'advance' && d.status === 'approved') || (d.type === 'reimburse' && d.status === 'receipts_verified')

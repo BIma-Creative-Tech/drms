@@ -97,7 +97,7 @@ export const ApprovalRules: CollectionConfig = withAudit(
         defaultValue: 'any',
         options: [
           { label: 'Semua', value: 'any' },
-          { label: 'Uang Muka', value: 'advance' },
+          { label: 'Pengajuan Baru', value: 'advance' },
           { label: 'Reimburse', value: 'reimburse' },
         ],
       },

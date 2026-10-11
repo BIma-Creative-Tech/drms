@@ -29,7 +29,7 @@ async function proof(): Promise<number> {
   return r.body.id
 }
 
-/** Uang Muka 750.000 (lines 600.000 + 150.000) → approved → transferred. */
+/** Pengajuan Baru 750.000 (lines 600.000 + 150.000) → approved → transferred. */
 async function transferredAdvance() {
   const c = await api('POST', E, w.users.staffA, draftBody(w))
   expect(c.status, JSON.stringify(c.body)).toBe(201)
@@ -233,7 +233,7 @@ describe('authz negatives and DB guards (T5)', () => {
     expect((await api('POST', `${E}/${id2}/receipts-complete`, w.users.staffB, {})).status).toBe(404) // not own, not visible
   })
 
-  it('DB: settled LPJ immutable; refund/shortfall amounts cross-checked; LPJ only for Uang Muka (raw SQL as app role)', async () => {
+  it('DB: settled LPJ immutable; refund/shortfall amounts cross-checked; LPJ only for Pengajuan Baru (raw SQL as app role)', async () => {
     const { id } = await lpjReady([600_000])
     await verifyAll(id)
     await api('POST', `${E}/${id}/lpj/verify`, w.users.finance, {}) // refund 150.000 pending

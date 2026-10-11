@@ -101,7 +101,7 @@ export async function transferMoment(req: PayloadRequest, companyId: number | un
 type TransferDoc = { id: number; docNo: string; request: unknown; amount: number; status: 'posted' | 'void'; cashEntry?: unknown; kind: string }
 
 /**
- * POST /expense-requests/{id}/transfer (US-20, T3): Uang Muka "Disetujui (Antri Transfer)" or
+ * POST /expense-requests/{id}/transfer (US-20, T3): Pengajuan Baru "Disetujui (Antri Transfer)" or
  * Reimburse "Nota Terverifikasi (Antri Transfer)". Amount copied from `approvedAmount` (G3, also
  * DB-checked on insert), destination = the request's bank snapshot (read-only), source account +
  * bank reference + proof required. Auto-posts ONE KK cash-out linked to request and transfer

@@ -85,7 +85,7 @@ export const DEFAULT_TEXTS: Record<Exclude<ReminderRule, 'late_progress'>, { tit
   },
   lpj_overdue: {
     title: 'LPJ terlambat: {docNo}',
-    body: 'Uang muka {docNo} "{title}" sudah {days} hari sejak ditransfer ({since}) tanpa nota/LPJ (batas {limit} hari). Segera ajukan LPJ.',
+    body: 'Pengajuan baru {docNo} "{title}" sudah {days} hari sejak ditransfer ({since}) tanpa nota/LPJ (batas {limit} hari). Segera ajukan LPJ.',
   },
   revision_pending: {
     title: 'Revisi menunggu: {docNo}',

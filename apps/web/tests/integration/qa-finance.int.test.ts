@@ -67,7 +67,7 @@ async function account(data: Record<string, unknown>): Promise<number> {
   return sysCreate('cash-accounts', { name: `QF akun ${randomUUID().slice(0, 6)}`, kind: 'bank', company: await companyId(), ...data })
 }
 
-/** Uang Muka 750.000 → submitted, Direktur + Finance approved (not transferred). */
+/** Pengajuan Baru 750.000 → submitted, Direktur + Finance approved (not transferred). */
 async function approvedAdvance(over: Record<string, unknown> = {}): Promise<number> {
   const c = await api('POST', E, w.users.staffA, draftBody(w, over))
   expect(c.status, JSON.stringify(c.body)).toBe(201)
@@ -297,7 +297,7 @@ async function receipt(id: number, lineId: string, amount: number) {
   expect(r.status, JSON.stringify(r.body)).toBe(201)
 }
 
-/** Uang Muka 750.000 transferred; receipts 600.000 + 250.000 = 850.000 valid; LPJ verified (shortfall 100.000 = +13,3 %). */
+/** Pengajuan Baru 750.000 transferred; receipts 600.000 + 250.000 = 850.000 valid; LPJ verified (shortfall 100.000 = +13,3 %). */
 async function verifiedShortfall(): Promise<number> {
   const id = await approvedAdvance()
   const t = await api('POST', `${E}/${id}/transfer`, w.users.finance, { cashAccountId: w.cashAccount, bankRef: `QF6-${id}`, proofMediaId: await proof() })

@@ -6,7 +6,7 @@ offline), memantau & mengabsenkan tim, mengoreksi jam absensi, dan mengajukan ad
 
 | ID | US | Prasyarat | Langkah | Hasil yang diharapkan | PASS/FAIL | Catatan |
 |---|---|---|---|---|---|---|
-| AP-01 | US-17 | Login PM | Lihat **Beranda** dan tab bawah. | Tidak ada tombol/tab **Persetujuan**; header **Pantauan tim** (Pengajuan tim bulan ini, Uang muka tim belum LPJ, Realisasi anggaran project saya); tombol Ajukan Uang Muka/Reimburse, Laporan progress, Addendum RAB, Absensi. | | |
+| AP-01 | US-17 | Login PM | Lihat **Beranda** dan tab bawah. | Tidak ada tombol/tab **Persetujuan**; header **Pantauan tim** (Pengajuan tim bulan ini, Pengajuan baru tim belum LPJ, Realisasi anggaran project saya); tombol Ajukan Pengajuan Baru/Reimburse, Laporan progress, Addendum RAB, Absensi. | | |
 | AP-02 | US-17 | Ada pengajuan Staff di PRJ-UJI-01 | **Pengajuan** → tab **Tim** → buka pengajuan Staff. | Keterangan "Pantauan tim — hanya lihat…"; detail tanpa tombol Setujui/Tolak; Giliran = Direktur atau Finance. | | |
 | AP-03 | US-10 | P-06, P-08; di lokasi PRJ-UJI-01 | **Laporan progress** → tab Laporan → **Laporan baru** (mode pesawat): project PRJ-UJI-01, tahapan Struktur, % = sebelumnya + 10, Pekerjaan "UAT pengecoran kolom", Kendala "hujan", 3 foto kamera belakang → **Simpan & kirim**. Matikan mode pesawat. | Offline: "Laporan tersimpan di HP (offline)…", status Menunggu kirim. Online: nomor `LP/YYMM/####`, tanda offline; progress project naik = bobot × kenaikan (30% × 10 = 3 poin). Web (WP-06/WD-07) menampilkan laporan & foto. | | |
 | AP-04 | US-10 | AP-03 | Laporan baru untuk Struktur dengan % di bawah nilai sekarang. Tambah foto sampai 5. | "Progress tidak boleh turun (sebelumnya X%)."; tombol Foto hilang setelah 5 foto (galeri tidak tersedia). | | |

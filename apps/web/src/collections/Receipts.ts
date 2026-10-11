@@ -14,7 +14,7 @@ import { USER_NAME_VIEW } from '@/fields/users'
 /**
  * T4 Nota (requirements v1.1 §7 T4, US-07/US-38/US-39): many per request, each linked to ONE line
  * (array row id + line number). CLASS B (ADR 0006 §2): flat, no DELETE; DB trigger allows content
- * changes only while the request's receipts are editable (Reimburse: Draft/Revisi Nota; Uang Muka:
+ * changes only while the request's receipts are editable (Reimburse: Draft/Revisi Nota; Pengajuan Baru:
  * after transfer), otherwise only the verification columns. "Hapus" = status `removed` with reason.
  * Image = `media-receipts` (resized to 2000 px, original discarded, sha256 of the original kept).
  */

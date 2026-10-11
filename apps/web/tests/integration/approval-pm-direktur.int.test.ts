@@ -92,7 +92,7 @@ async function receipt(id: number, lineId: string, amount: number, user: FlowUse
 }
 
 describe('1. Staff → PM → Direktur → Finance transfer', () => {
-  it('Uang Muka: PM notified and approves, then the Direktur; Finance only transfers', async () => {
+  it('Pengajuan Baru: PM notified and approves, then the Direktur; Finance only transfers', async () => {
     const { id, body } = await submitted()
     expect(body).toMatchObject({
       status: 'pending_ack',

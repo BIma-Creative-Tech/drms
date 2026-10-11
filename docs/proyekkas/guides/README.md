@@ -110,10 +110,10 @@ lama (Direktur lalu Finance). Addendum RAB tetap Direktur lalu Finance.
 | Menunggu persetujuan Direktur | Alur baru: PM sudah setuju | Direktur |
 | Menunggu Diketahui (Direktur) | Alur lama: menunggu persetujuan Direktur | Direktur |
 | Menunggu Approval | Alur lama: Direktur sudah setuju | Finance |
-| Disetujui (Antri Transfer) | Uang Muka siap ditransfer | Finance |
+| Disetujui (Antri Transfer) | Pengajuan Baru siap ditransfer | Finance |
 | Disetujui → Nota Terverifikasi (Antri Transfer) | Reimburse: nota diperiksa, lalu siap transfer | Finance |
 | Revisi Nota | Nota Reimburse ditolak Finance | Pemohon |
-| Ditransfer | Uang sudah dikirim | Uang Muka: pemohon unggah nota/LPJ · Reimburse: selesai |
+| Ditransfer | Uang sudah dikirim | Pengajuan Baru: pemohon unggah nota/LPJ · Reimburse: selesai |
 | Nota Lengkap → LPJ Diajukan | Pemohon mengirim laporan penggunaan dana | Finance |
 | LPJ Revisi | Finance minta perbaikan LPJ | Pemohon |
 | LPJ Terverifikasi | Menunggu penyelesaian selisih | Finance |

@@ -25,7 +25,7 @@ Badge merah di menu = jumlah pekerjaan menunggu.
 ## 1. Approval pengajuan (alur lama) — dan alur baru tanpa Approval Finance
 
 **Alur baru (pengajuan yang diajukan setelah Admin mengubah aturan approval PT):** Staff → **PM project** →
-**Direktur** → **Disetujui**. Anda diberi tahu setelah Direktur menyetujui: Uang Muka → "Antri transfer: …" (lihat
+**Direktur** → **Disetujui**. Anda diberi tahu setelah Direktur menyetujui: Pengajuan Baru → "Antri transfer: …" (lihat
 §3), Reimburse → "Verifikasi nota: …" (lihat §2, verifikasi nota bukan approval). Tidak ada tombol Setujui untuk
 Finance pada pengajuan ini. Bila Anda membuat pengajuan atas nama karyawan, pengajuan tetap melewati PM project dan
 Direktur.
@@ -90,7 +90,7 @@ tanggalnya menentukan periode (tutup buku) — **No. referensi bank**, **Bukti**
   menekannya di detail pengajuan (di bawah "Giliran: Pemohon … atau Finance"). Tanpa itu pengajuan ditutup otomatis
   setelah batas hari di Setting perusahaan.
 
-## 4. LPJ Uang Muka
+## 4. LPJ Pengajuan Baru
 
 **Verifikasi LPJ** → **LPJ diajukan**:
 1. Periksa Ditransfer / Nota / Selisih. Tiap nota **Valid**/**Tolak**. Tiap flag terbuka (mis. *Nota terlalu

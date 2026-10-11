@@ -131,7 +131,7 @@ describe('office-only ledger rows', () => {
     expect(await asUser(w.users.staffA, async (req) => recentCashEntries(req, await ownScope(req), 5))).toEqual([])
   })
 
-  it('transferQueueTop: approved Uang Muka is queued; non-office scope → []', async () => {
+  it('transferQueueTop: approved Pengajuan Baru is queued; non-office scope → []', async () => {
     const q = await asUser(w.users.finance, async (req) => transferQueueTop(req, await officeScope(req), 50))
     // same K-11 set and order in plain SQL (shared DB: other files queue requests too)
     const sql = await sqlAs(

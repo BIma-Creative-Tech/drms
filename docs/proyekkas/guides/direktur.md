@@ -10,7 +10,7 @@ menyetujui **addendum RAB**, mengelola **project dan tahapan**, **membuka kembal
 
 Alur pengajuan baru: **Staff → PM project → Anda → Finance mentransfer**. Setelah PM project menyetujui, pengajuan
 menunggu Anda (**Menunggu persetujuan Direktur**) dan Anda diberi tahu. Persetujuan Anda adalah keputusan terakhir:
-Uang Muka masuk Antrian Transfer, Reimburse ke verifikasi nota Finance lalu transfer. Finance tidak lagi menyetujui.
+Pengajuan Baru masuk Antrian Transfer, Reimburse ke verifikasi nota Finance lalu transfer. Finance tidak lagi menyetujui.
 
 Pengajuan yang diajukan **sebelum** Admin mengubah aturan approval tetap memakai alur lama: Anda menyetujui pada
 langkah "Diketahui" (**Menunggu Diketahui (Direktur)**), lalu Finance memberi Approval.
@@ -53,7 +53,7 @@ Setelah Anda, Finance juga menyetujui; RAB project bertambah otomatis dan tercat
 
 ## 2a. Kekurangan LPJ di atas nominal disetujui (web)
 
-Bila nota LPJ Uang Muka membuat total transfer melebihi nominal yang Anda setujui **+ toleransi** (Pengaturan PT →
+Bila nota LPJ Pengajuan Baru membuat total transfer melebihi nominal yang Anda setujui **+ toleransi** (Pengaturan PT →
 *Toleransi kekurangan LPJ*, default 10%), Finance tidak bisa langsung mentransfer kekurangannya. Finance mengajukan
 **persetujuan kekurangan** dengan alasan; Anda mendapat notifikasi dan keputusan ada di **web → Persetujuan →
 Kekurangan LPJ di atas nominal disetujui** (nominal disetujui, kekurangan, total transfer baru, batas tanpa

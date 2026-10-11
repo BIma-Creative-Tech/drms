@@ -177,7 +177,7 @@ describe('E7 daily reminders (fake clock)', () => {
     archived = await sysCreate('projects', { code: 's2b-ARC', name: 's2b Arsip', pm: w.users.pm.id, budget: 1_000_000, status: 'berjalan' })
     await p.update({ collection: 'projects', id: archived, data: { status: 'arsip' }, overrideAccess: true /* SYSTEM-WRITE: fixture */, context: { auditReason: 'uji arsip' } })
 
-    // (b) Uang Muka transferred 10 days ago, no LPJ.
+    // (b) Pengajuan Baru transferred 10 days ago, no LPJ.
     const c = await api('POST', E, w.users.staffA, draftBody(w))
     advance = c.body.id
     for (const [path, u] of [

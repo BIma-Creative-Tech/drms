@@ -708,13 +708,13 @@ async function Owner({ req, months }: { req: PayloadRequest; months: 6 | 12 }) {
           <p className="pk-kpi-v" style={{ fontSize: 22, margin: 0 }} data-pk-kpi="k12g">
             {d.completeness.ratioDone} / {d.completeness.ratioTotal}
           </p>
-          <p className="pk-kpi-x">uang muka bulan ini sudah LPJ</p>
+          <p className="pk-kpi-x">pengajuan baru bulan ini sudah LPJ</p>
           <Meter value={d.completeness.ratioDone} max={Math.max(1, d.completeness.ratioTotal)} />
           <p className="pk-kpi-x" data-pk-kpi="k12b">
             {d.completeness.overdue > 0 ? <StatusPill tone="bad" label={`${d.completeness.overdue} LPJ terlambat`} /> : <StatusPill tone="ok" label="Tidak ada LPJ terlambat" />}
           </p>
           <p className="pk-kpi-x" data-pk-kpi="k12a">
-            <b>{d.completeness.withoutLpj}</b> uang muka belum LPJ
+            <b>{d.completeness.withoutLpj}</b> pengajuan baru belum LPJ
           </p>
           <p className="pk-kpi-x" data-pk-kpi="k12e">
             <b>{d.completeness.reimburseToVerify}</b> nota reimburse menunggu verifikasi
@@ -924,14 +924,14 @@ async function Finance({ req }: { req: PayloadRequest }) {
         </Card>
         <PipelineCard id="finance-pipeline" pipeline={v.pipeline} title="Status pengajuan" sub="Posisi semua pengajuan saat ini" span={5} i={9} />
 
-        <Card id="advances-without-lpj" title="Uang muka belum LPJ" sub={`Terlambat bila > ${d.lpjDueDays} hari sejak transfer pertama`} span={7} i={10} action={{ href: '/admin/laporan/kelengkapan', label: 'Laporan' }}>
+        <Card id="advances-without-lpj" title="Pengajuan baru belum LPJ" sub={`Terlambat bila > ${d.lpjDueDays} hari sejak transfer pertama`} span={7} i={10} action={{ href: '/admin/laporan/kelengkapan', label: 'Laporan' }}>
           <DataTable<A>
             id="advances-without-lpj"
-            caption="Uang muka belum LPJ"
+            caption="Pengajuan baru belum LPJ"
             rows={d.advancesWithoutLpj.slice(0, 8)}
             rowKey={(r) => r.id}
             rowAttrs={(r) => ({ 'data-pk-overdue': r.overdue ? 'yes' : 'no' })}
-            empty={<EmptyState text="Semua uang muka sudah ber-LPJ. ✓" />}
+            empty={<EmptyState text="Semua pengajuan baru sudah ber-LPJ. ✓" />}
             cols={[
               { key: 'no', label: 'Nomor', cell: (r) => <a href={reqHref(r.id)}>{r.docNo ?? `#${r.id}`}</a> },
               { key: 'who', label: 'Pemohon', sec: true, cell: (r) => r.requesters || '—' },
@@ -1052,8 +1052,8 @@ async function Pm({ req }: { req: PayloadRequest }) {
             {trendPrev ? <Delta d={delta(d.teamMonth.count, trendPrev.count)} money={false} vs={`pengajuan vs ${short(trendPrev.period)}`} /> : null}
             <Sparkline label="Pengajuan tim per bulan" values={v.requestTrend.map((x) => ({ label: short(x.period), value: x.count }))} />
           </KpiTile>
-          <KpiTile id="team-lpj" icon="doc" label="LPJ tim" value={`${d.lpj.withoutLpj}`} title={`${d.lpj.withoutLpj} uang muka belum LPJ`} kpi="k12a" href="/admin/laporan/kelengkapan" more="Laporan Kelengkapan" i={2}>
-            <p className="pk-kpi-x">uang muka belum LPJ</p>
+          <KpiTile id="team-lpj" icon="doc" label="LPJ tim" value={`${d.lpj.withoutLpj}`} title={`${d.lpj.withoutLpj} pengajuan baru belum LPJ`} kpi="k12a" href="/admin/laporan/kelengkapan" more="Laporan Kelengkapan" i={2}>
+            <p className="pk-kpi-x">pengajuan baru belum LPJ</p>
             <p className="pk-kpi-x" data-pk-kpi="k12b">
               {d.lpj.overdue > 0 ? <StatusPill tone="bad" label={`${d.lpj.overdue} terlambat`} /> : <StatusPill tone="ok" label="Tidak ada yang terlambat" />}
             </p>

@@ -84,7 +84,7 @@ async function transferProof(): Promise<number> {
   return r.body.id
 }
 
-/** Uang Muka 750.000 (600.000 + 150.000) → approved → transferred. */
+/** Pengajuan Baru 750.000 (600.000 + 150.000) → approved → transferred. */
 async function transferredAdvance(body: Record<string, unknown> = {}) {
   const c = await ok(api('POST', E, w.users.staffA, draftBody(w, body), key()), 201)
   const id = c.id as number

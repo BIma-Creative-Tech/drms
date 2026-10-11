@@ -14,7 +14,7 @@ import { fromCompanies, officeScope, requestScopeSql, type ReportScope } from '.
 /**
  * Item 11 (DRMS 10/10) "SLA transfer": final approval (`approved_at`) → bank transfer (`transfer_at`,
  * date + time of the proof) per PT and month (month of the transfer in the PT zone): count, average,
- * P90, % within the PT's `transfer_sla_hours`, plus the late transfers with links. Posted Uang Muka /
+ * P90, % within the PT's `transfer_sla_hours`, plus the late transfers with links. Posted Pengajuan Baru /
  * Reimburse transfers only (LPJ shortfall transfers are no approval → transfer step). A transfer without
  * a recorded time (old client) is measured to the time it was recorded and marked.
  * Scope: Finance / Direktur of the PT (no PM team view: SLA is an office KPI).
@@ -144,7 +144,7 @@ export function slaTables(list: SlaRow[], range: { from: string; to: string }): 
     ],
     notes: [
       'Durasi = disetujui final (server) → tanggal & jam transfer sesuai bukti; bulan = bulan transfer (zona PT). SLA per PT di Perusahaan (PT) › Operasional › SLA transfer.',
-      'Hanya transfer Uang Muka / Reimburse yang masih berlaku (void tidak dihitung); P90 = 90% transfer selesai dalam durasi ini.',
+      'Hanya transfer Pengajuan Baru / Reimburse yang masih berlaku (void tidak dihitung); P90 = 90% transfer selesai dalam durasi ini.',
       ...(list.some((x) => !x.m.timeKnown) ? ['Transfer lama tanpa jam (dicatat sebelum jam transfer wajib) diukur sampai waktu pencatatannya.'] : []),
     ],
     next: null,

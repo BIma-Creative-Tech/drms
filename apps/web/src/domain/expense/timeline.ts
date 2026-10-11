@@ -1,6 +1,6 @@
 /**
  * Status timeline + "whose turn is it" for the web panel (US-05, F2c item 5). Pure module
- * (unit-tested): derived from the state machine vocabulary (architecture §5.1 Uang Muka, §5.2
+ * (unit-tested): derived from the state machine vocabulary (architecture §5.1 Pengajuan Baru, §5.2
  * Reimburse) and the approval snapshot stored at submit — never decides anything, the domain
  * service stays authoritative.
  */
@@ -136,7 +136,7 @@ export function nextActor(input: {
       return { who: `${who} — approval level ${input.currentLevel ?? 1}`, what: 'setujui atau tolak' }
     }
     case 'approved':
-      return type === 'advance' ? { who: 'Finance', what: 'catat transfer uang muka (Antrian Transfer)' } : { who: 'Finance', what: 'verifikasi nota (valid / tolak)' }
+      return type === 'advance' ? { who: 'Finance', what: 'catat transfer pengajuan baru (Antrian Transfer)' } : { who: 'Finance', what: 'verifikasi nota (valid / tolak)' }
     case 'receipt_revision':
       return { who: requester, what: 'perbaiki nota yang ditolak lalu Kirim ulang nota' }
     case 'receipts_verified':

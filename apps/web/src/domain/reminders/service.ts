@@ -20,7 +20,7 @@ import { activeCompanyIds, settingsOf } from '@/domain/companies'
  * hourly (worker, process TZ); ONE run per business day happens at/after company-settings.reminderHour
  * (company timezone). The whole run is one transaction under an advisory lock:
  *   (a) late_progress    running project without progress report ≥ lateReportDays → PM + Direktur
- *   (b) lpj_overdue      Uang Muka `transferred`/`receipts_complete`, first posted transfer > lpjDueDays
+ *   (b) lpj_overdue      Pengajuan Baru `transferred`/`receipts_complete`, first posted transfer > lpjDueDays
  *                        → requesters' accounts + creator + Finance
  *   (c) revision_pending Revisi Nota / LPJ Revisi unchanged ≥ reminderRevisionDays → requesters + creator
  *   (d) budget_threshold project commitment (K-07/K-08) ≥ budgetWarnPct / budgetOverPct → Direktur +

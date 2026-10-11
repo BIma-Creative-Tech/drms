@@ -69,9 +69,9 @@ export const textList = (list: readonly string[]): SQL =>
 const COMMITTED = textList(BUDGET_COMMITTED)
 /** K-14 (a): request statuses "at least Ditransfer". */
 export const TRANSFERRED_OR_LATER: readonly RequestStatus[] = ['transferred', 'receipts_complete', 'lpj_submitted', 'lpj_revision', 'lpj_verified', 'completed']
-/** K-12a: Uang Muka transferred but without an LPJ yet. */
+/** K-12a: Pengajuan Baru transferred but without an LPJ yet. */
 export const ADVANCE_WITHOUT_LPJ: readonly RequestStatus[] = ['transferred', 'receipts_complete', 'lpj_revision']
-/** K-12g: Uang Muka that has an LPJ. */
+/** K-12g: Pengajuan Baru that has an LPJ. */
 export const ADVANCE_WITH_LPJ: readonly RequestStatus[] = ['lpj_submitted', 'lpj_verified', 'completed']
 
 export type Ctx = { today: string; month: string; tz: string; lpjDueDays: number; budgetWarnPct: number; budgetOverPct: number; companyName: string }
@@ -523,7 +523,7 @@ export async function transferQueueSummary(req: PayloadRequest, scope: ReportSco
 
 export type AdvanceWithoutLpj = { id: number; companyId: number; docNo: string | null; title: string; requesters: string; scopeName: string; status: string; transferredTotal: number; firstTransfer: string | null; ageDays: number | null; overdue: boolean }
 
-/** K-12a/K-12b rows: Uang Muka transferred without LPJ; age from the first posted advance transfer. */
+/** K-12a/K-12b rows: Pengajuan Baru transferred without LPJ; age from the first posted advance transfer. */
 export async function advancesWithoutLpj(req: PayloadRequest, scope: ReportScope): Promise<AdvanceWithoutLpj[]> {
   const ctx = await reportContext(req)
   const ctxs = await ctxByCompany(req, scopeCompanies(scope))
@@ -559,7 +559,7 @@ export async function advancesWithoutLpj(req: PayloadRequest, scope: ReportScope
   })
 }
 
-/** K-12a…g summary. K-12g ratio over Uang Muka first transferred in [from, to]. */
+/** K-12a…g summary. K-12g ratio over Pengajuan Baru first transferred in [from, to]. */
 export async function lpjSummary(req: PayloadRequest, scope: ReportScope, from: string, to: string) {
   const rowsA = await advancesWithoutLpj(req, scope)
   const r = await rows(
@@ -789,7 +789,7 @@ export type SpendFilter = { from: string; to: string; basis: 'dicairkan' | 'real
 
 /**
  * K-17. Dicairkan: line totals of requests with a posted advance/reimburse transfer dated in range
- * (allocation by line, US-25) + posted manual cash-out. Realisasi: K-06 per category (Uang Muka:
+ * (allocation by line, US-25) + posted manual cash-out. Realisasi: K-06 per category (Pengajuan Baru:
  * valid receipts per line category, dated by LPJ verification; Reimburse: line totals, dated by
  * the last valid receipt verification) + the same manual cash-out. PM scope: no manual cash.
  * Group by category (default) or by project / cost center ("lingkup").
@@ -1059,7 +1059,7 @@ export async function recentCashEntries(req: PayloadRequest, scope: ReportScope,
 }
 
 /**
- * First rows of the transfer queue (K-11 set: Uang Muka "approved" + Reimburse "receipts_verified")
+ * First rows of the transfer queue (K-11 set: Pengajuan Baru "approved" + Reimburse "receipts_verified")
  * by needed date — Finance "Menunggu tindakan saya". Office data: scope `all` only.
  */
 export async function transferQueueTop(req: PayloadRequest, scope: ReportScope, limit: number) {

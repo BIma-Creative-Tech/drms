@@ -529,7 +529,7 @@ const pengeluaranKategori: ReportDef = {
         'Kategori dihitung dari baris item pengajuan (US-25). "Pengajuan" = banyak pengajuan berbeda; satu pengajuan bisa muncul di beberapa kategori.',
         basis === 'dicairkan'
           ? 'Dicairkan: pengajuan yang ditransfer dalam rentang (tanggal transfer). Selisih LPJ (pengembalian/kekurangan) tampil di dasar Realisasi, bukan di sini.'
-          : 'Realisasi: Uang Muka = nota valid saat LPJ diverifikasi; Reimburse = total baris saat nota diverifikasi (tanggal verifikasi WITA).',
+          : 'Realisasi: Pengajuan Baru = nota valid saat LPJ diverifikasi; Reimburse = total baris saat nota diverifikasi (tanggal verifikasi WITA).',
         manualShown ? 'Kas manual = kas keluar manual (posted, bukan jurnal balik) per tanggal transaksi.' : 'Tanpa kas manual (cakupan tim PM atau filter jenis pengajuan).',
       ],
       next: null,
@@ -789,7 +789,7 @@ const kelengkapan: ReportDef = {
   code: 'kelengkapan',
   title: 'Kelengkapan Nota/LPJ',
   kpi: 'K-12',
-  description: 'Uang muka belum LPJ (dan yang terlambat), LPJ menunggu, nota reimburse menunggu, flag peringatan terbuka.',
+  description: 'Pengajuan baru belum LPJ (dan yang terlambat), LPJ menunggu, nota reimburse menunggu, flag peringatan terbuka.',
   roles: ['pk-finance', 'pk-owner', 'pk-pm'],
   formats: ['csv', 'xlsx'],
   paged: false,
@@ -802,7 +802,7 @@ const kelengkapan: ReportDef = {
     return {
       main: {
         key: 'belum-lpj',
-        title: `Uang muka belum LPJ (terlambat bila > ${ctx.lpjDueDays} hari sejak transfer pertama)`,
+        title: `Pengajuan baru belum LPJ (terlambat bila > ${ctx.lpjDueDays} hari sejak transfer pertama)`,
         columns: [
           { key: 'nomor', label: 'Nomor', type: 'text', primary: true },
           { key: 'judul', label: 'Judul', type: 'text', width: 36 },
@@ -831,7 +831,7 @@ const kelengkapan: ReportDef = {
           company: a.companyId,
         })),
         totals: { nomor: 'TOTAL', nominal: s.withoutLpj.sum },
-        empty: 'Semua uang muka sudah ber-LPJ. ✓',
+        empty: 'Semua pengajuan baru sudah ber-LPJ. ✓',
       },
       extra: [
         {
@@ -843,19 +843,19 @@ const kelengkapan: ReportDef = {
             { key: 'nominal', label: 'Nominal (Rp)', type: 'money' },
           ],
           rows: [
-            { cells: { indikator: 'K-12a Uang muka belum LPJ', jumlah: s.withoutLpj.count, nominal: s.withoutLpj.sum } },
+            { cells: { indikator: 'K-12a Pengajuan baru belum LPJ', jumlah: s.withoutLpj.count, nominal: s.withoutLpj.sum } },
             { cells: { indikator: `K-12b LPJ terlambat (> ${ctx.lpjDueDays} hari)`, jumlah: s.overdue.count, nominal: s.overdue.sum } },
             { cells: { indikator: 'K-12c LPJ menunggu verifikasi', jumlah: s.lpjToVerify, nominal: null }, href: '/admin/verifikasi-lpj' },
             { cells: { indikator: 'K-12d LPJ menunggu penyelesaian selisih (pengembalian)', jumlah: s.lpjToSettle.count, nominal: s.lpjToSettle.refund } },
             { cells: { indikator: 'K-12d … kekurangan yang harus ditransfer', jumlah: null, nominal: s.lpjToSettle.shortfall } },
             { cells: { indikator: 'K-12e Nota reimburse menunggu verifikasi', jumlah: s.reimburseToVerify, nominal: null }, href: '/admin/antrian-transfer' },
             { cells: { indikator: 'K-12f Flag peringatan terbuka', jumlah: s.openWarnings, nominal: null } },
-            { cells: { indikator: `K-12g Uang muka ditransfer ${fmtDate(r.from)}–${fmtDate(r.to)} yang sudah LPJ`, jumlah: s.ratio.done, nominal: null } },
-            { cells: { indikator: `K-12g … dari total uang muka ditransfer`, jumlah: s.ratio.total, nominal: null } },
+            { cells: { indikator: `K-12g Pengajuan baru ditransfer ${fmtDate(r.from)}–${fmtDate(r.to)} yang sudah LPJ`, jumlah: s.ratio.done, nominal: null } },
+            { cells: { indikator: `K-12g … dari total pengajuan baru ditransfer`, jumlah: s.ratio.total, nominal: null } },
           ],
         },
       ],
-      notes: ['Umur dihitung dari tanggal transfer uang muka pertama (hari kalender, WITA). Batas diatur di Setting perusahaan › Batas LPJ.'],
+      notes: ['Umur dihitung dari tanggal transfer pengajuan baru pertama (hari kalender, WITA). Batas diatur di Setting perusahaan › Batas LPJ.'],
       next: null,
       count: s.rows.length,
     }
