@@ -7,6 +7,7 @@ import { geofenceError } from '@/domain/attendance/calendar'
 import { errorLine } from '@/lib/field-labels'
 
 import { newIdemKey, sendJson, uploadSelfie } from '../kas/client'
+import { CAMERA_STYLE, CameraCapture } from './CameraCapture'
 
 /**
  * E6 web (S2) client actions of the attendance views. Same pattern as the Kas dialogs (native modal
@@ -463,7 +464,9 @@ function getPosition(): Promise<GeolocationPosition> {
  */
 export function SelfCheckForm({ locations, privacyBlocked }: { locations: SelfCheckLocation[]; privacyBlocked: boolean }) {
   const router = useRouter()
-  const fileRef = useRef<HTMLInputElement>(null)
+  // item 14 (DRMS 10/10): selfie from the live front camera only (CameraCapture), no file picker
+  const [photo, setPhoto] = useState<Blob | null>(null)
+  const [camKey, setCamKey] = useState(0)
   const [locKey, setLocKey] = useState(locations[0] ? `${locations[0].type}:${locations[0].id}` : '')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -474,8 +477,8 @@ export function SelfCheckForm({ locations, privacyBlocked }: { locations: SelfCh
     e.preventDefault()
     setError(null)
     if (!loc || !action) return
-    const file = fileRef.current?.files?.[0]
-    if (!file) return setError('Ambil foto selfie dulu.')
+    if (!photo) return setError('Ambil foto selfie dengan kamera dulu.')
+    const file = new File([photo], 'selfie.jpg', { type: 'image/jpeg' })
     setBusy(true)
     try {
       const pos = await getPosition()
@@ -489,7 +492,8 @@ export function SelfCheckForm({ locations, privacyBlocked }: { locations: SelfCh
       }
       const r = await sendJson('POST', `/api/v1/attendance/${action === 'check_in' ? 'check-in' : 'check-out'}`, body)
       if (!r.ok) return setError(r.error ?? 'Gagal mengirim absensi.')
-      if (fileRef.current) fileRef.current.value = ''
+      setPhoto(null)
+      setCamKey((k) => k + 1)
       router.refresh()
     } catch (err) {
       setError((err as Error).message || 'Gagal mengirim absensi.')
@@ -529,9 +533,12 @@ export function SelfCheckForm({ locations, privacyBlocked }: { locations: SelfCh
         })}
       </fieldset>
       <div className="pk-fld">
-        <label htmlFor="self-check-selfie">Foto selfie</label>
-        <input id="self-check-selfie" ref={fileRef} type="file" accept="image/*" capture="user" disabled={busy || !action} />
-        <p className="help">Di HP kamera depan langsung terbuka. Lokasi GPS diambil saat menekan tombol.</p>
+        <span className="lbl" id="self-check-selfie">
+          Foto selfie
+        </span>
+        <CameraCapture key={camKey} disabled={busy || !action} onChange={setPhoto} />
+        <p className="help">Hanya kamera langsung (bukan galeri). Server membubuhkan tanggal, jam, dan lokasi pada foto. Lokasi GPS diambil saat menekan tombol.</p>
+        <style>{CAMERA_STYLE}</style>
       </div>
       <button type="submit" className="pk-kbtn primary pk-sc-go" disabled={busy || !action} data-pk-action={action ?? 'none'}>
         {busy ? 'Mengirim…' : action === 'check_in' ? 'Absen Masuk' : action === 'check_out' ? 'Absen Pulang' : 'Sudah selesai hari ini'}
