@@ -719,7 +719,8 @@ class AppLocalizationsId extends AppLocalizations {
   String get attendanceDisabled => 'Absensi dari aplikasi belum diaktifkan Admin (Setting perusahaan).';
 
   @override
-  String get attendanceNoProjects => 'Anda belum ditugaskan di project atau pusat biaya mana pun. Hubungi PM/Admin.';
+  String get attendanceNoProjects =>
+      'Anda belum ditugaskan di site, project, atau pusat biaya mana pun. Hubungi PM/Admin.';
 
   @override
   String get attendanceProject => 'Project';
@@ -1189,7 +1190,7 @@ class AppLocalizationsId extends AppLocalizations {
   String get attendanceTabTeam => 'Tim';
 
   @override
-  String get attendanceLocation => 'Lokasi (project / pusat biaya)';
+  String get attendanceLocation => 'Lokasi (site / project / pusat biaya)';
 
   @override
   String attendanceRadius(int meters) {
@@ -1204,6 +1205,15 @@ class AppLocalizationsId extends AppLocalizations {
 
   @override
   String get siteCostCenter => 'Pusat biaya';
+
+  @override
+  String get siteSite => 'Site';
+
+  @override
+  String get siteHome => 'Site penempatan';
+
+  @override
+  String get siteHomeBadge => 'Penempatan';
 
   @override
   String get distanceInside => 'Di dalam area absen';

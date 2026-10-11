@@ -28,7 +28,7 @@ import 'team_view.dart';
 /// Tabs of the attendance hub (by role).
 enum AttendanceTab { check, recap, team }
 
-/// E6 attendance hub. "Absen": own check-in/out at a project OR a cost center (US-01/02, Q-40) with
+/// E6 attendance hub. "Absen": own check-in/out at a site (ADR 0023), a project OR a cost center (US-01/02, Q-40) with
 /// geofence distance feedback — works offline; GPS + front-camera selfie are captured on the phone and
 /// queued; the server decides. "Rekap": own month (US-09). "Tim": team today (US-13) with on-behalf
 /// (US-14) and corrections (US-15). Check-in / on-behalf follow `features.syncAttendance`; the recap and
@@ -193,13 +193,14 @@ class _CheckTabState extends ConsumerState<_CheckTab> {
                       value: s.key,
                       child: Row(
                         children: [
-                          Icon(s.kind == SiteKind.project ? Icons.apartment : Icons.business, size: 18),
+                          Icon(siteKindIcon(s.kind), size: 18),
                           const SizedBox(width: 8),
                           if ((profile?.showCompanyChips ?? false) && s.companyId != null) ...[
                             CompanyChip(companyId: s.companyId),
                             const SizedBox(width: 6),
                           ],
                           Expanded(child: Text(s.label, overflow: TextOverflow.ellipsis)),
+                          if (s.home) ...[const SizedBox(width: 6), const HomeSiteBadge()],
                         ],
                       ),
                     ),
@@ -215,7 +216,7 @@ class _CheckTabState extends ConsumerState<_CheckTab> {
                 Padding(
                   padding: const EdgeInsets.only(top: 4, left: 12),
                   child: Text(
-                    '${site.kind == SiteKind.project ? t.siteProject : t.siteCostCenter}'
+                    '${site.home ? t.siteHome : siteKindLabel(t, site.kind)}'
                     '${site.radiusM == null ? '' : ' · ${t.attendanceRadius(site.radiusM!.round())}'}',
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
@@ -312,10 +313,14 @@ class _History extends ConsumerWidget {
   }
 
   static String? _siteOf(OutboxData r) {
+    // ADR 0023 (schema v9): a site item carries its site in the outbox column
+    if (r.siteId != null) return '${SiteKind.site.prefix}${r.siteId}';
     final p = _payload(r);
     final project = (p['project_id'] as num?)?.toInt();
     if (project != null) return 'p$project';
     final cc = (p['cost_center_id'] as num?)?.toInt();
-    return cc == null ? null : 'c$cc';
+    if (cc != null) return 'c$cc';
+    final site = (p['site_id'] as num?)?.toInt();
+    return site == null ? null : 's$site';
   }
 }

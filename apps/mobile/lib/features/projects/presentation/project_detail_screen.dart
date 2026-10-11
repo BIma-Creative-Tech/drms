@@ -108,6 +108,14 @@ class _InfoTab extends ConsumerWidget {
               _row(context, t.draftCompany, ptText, key: const Key('project-company')),
               _row(context, t.projectKind, projectKindLabel(p.kind)),
               _row(context, t.projectPm, p.pm?.name ?? '-', key: const Key('project-pm')),
+              // ADR 0023: the branch office handling the project (only when set)
+              if (d.site != null)
+                _row(
+                  context,
+                  t.siteSite,
+                  '${d.site!.code ?? ''} ${d.site!.name ?? ''}'.trim(),
+                  key: const Key('project-site'),
+                ),
               _row(context, t.projectStatus, p.statusText),
               _row(context, t.projectContractValue, _money(p.contractValue), key: const Key('project-contract')),
               _row(

@@ -3202,6 +3202,15 @@ class $OutboxTable extends Outbox with TableInfo<$OutboxTable, OutboxData> {
     type: DriftSqlType.int,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _siteIdMeta = const VerificationMeta('siteId');
+  @override
+  late final GeneratedColumn<int> siteId = GeneratedColumn<int>(
+    'site_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _typeMeta = const VerificationMeta('type');
   @override
   late final GeneratedColumn<String> type = GeneratedColumn<String>(
@@ -3374,6 +3383,7 @@ class $OutboxTable extends Outbox with TableInfo<$OutboxTable, OutboxData> {
     opUuid,
     userSub,
     companyId,
+    siteId,
     type,
     targetUuid,
     payloadJson,
@@ -3422,6 +3432,12 @@ class $OutboxTable extends Outbox with TableInfo<$OutboxTable, OutboxData> {
       context.handle(
         _companyIdMeta,
         companyId.isAcceptableOrUnknown(data['company_id']!, _companyIdMeta),
+      );
+    }
+    if (data.containsKey('site_id')) {
+      context.handle(
+        _siteIdMeta,
+        siteId.isAcceptableOrUnknown(data['site_id']!, _siteIdMeta),
       );
     }
     if (data.containsKey('type')) {
@@ -3564,6 +3580,10 @@ class $OutboxTable extends Outbox with TableInfo<$OutboxTable, OutboxData> {
         DriftSqlType.int,
         data['${effectivePrefix}company_id'],
       ),
+      siteId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}site_id'],
+      ),
       type: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}type'],
@@ -3640,6 +3660,11 @@ class OutboxData extends DataClass implements Insertable<OutboxData> {
   /// MC3 (schema v3): PT of the item, sent as `company_id` (the item's own PT, never the switcher
   /// selection). Null = queued before v3: assigned when the user has one PT, else held until chosen.
   final int? companyId;
+
+  /// Schema v9 (ADR 0023): site (kantor cabang) of an attendance item at a site — the same id as `payload.site_id`,
+  /// kept as a column so the attendance history resolves the location without parsing the payload. Null for every
+  /// other item (projects, cost centers, expense / report items) and for rows queued before v9.
+  final int? siteId;
   final String type;
   final String targetUuid;
   final String payloadJson;
@@ -3661,6 +3686,7 @@ class OutboxData extends DataClass implements Insertable<OutboxData> {
     required this.opUuid,
     required this.userSub,
     this.companyId,
+    this.siteId,
     required this.type,
     required this.targetUuid,
     required this.payloadJson,
@@ -3684,6 +3710,9 @@ class OutboxData extends DataClass implements Insertable<OutboxData> {
     map['user_sub'] = Variable<String>(userSub);
     if (!nullToAbsent || companyId != null) {
       map['company_id'] = Variable<int>(companyId);
+    }
+    if (!nullToAbsent || siteId != null) {
+      map['site_id'] = Variable<int>(siteId);
     }
     map['type'] = Variable<String>(type);
     map['target_uuid'] = Variable<String>(targetUuid);
@@ -3718,6 +3747,9 @@ class OutboxData extends DataClass implements Insertable<OutboxData> {
       companyId: companyId == null && nullToAbsent
           ? const Value.absent()
           : Value(companyId),
+      siteId: siteId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(siteId),
       type: Value(type),
       targetUuid: Value(targetUuid),
       payloadJson: Value(payloadJson),
@@ -3753,6 +3785,7 @@ class OutboxData extends DataClass implements Insertable<OutboxData> {
       opUuid: serializer.fromJson<String>(json['opUuid']),
       userSub: serializer.fromJson<String>(json['userSub']),
       companyId: serializer.fromJson<int?>(json['companyId']),
+      siteId: serializer.fromJson<int?>(json['siteId']),
       type: serializer.fromJson<String>(json['type']),
       targetUuid: serializer.fromJson<String>(json['targetUuid']),
       payloadJson: serializer.fromJson<String>(json['payloadJson']),
@@ -3777,6 +3810,7 @@ class OutboxData extends DataClass implements Insertable<OutboxData> {
       'opUuid': serializer.toJson<String>(opUuid),
       'userSub': serializer.toJson<String>(userSub),
       'companyId': serializer.toJson<int?>(companyId),
+      'siteId': serializer.toJson<int?>(siteId),
       'type': serializer.toJson<String>(type),
       'targetUuid': serializer.toJson<String>(targetUuid),
       'payloadJson': serializer.toJson<String>(payloadJson),
@@ -3799,6 +3833,7 @@ class OutboxData extends DataClass implements Insertable<OutboxData> {
     String? opUuid,
     String? userSub,
     Value<int?> companyId = const Value.absent(),
+    Value<int?> siteId = const Value.absent(),
     String? type,
     String? targetUuid,
     String? payloadJson,
@@ -3818,6 +3853,7 @@ class OutboxData extends DataClass implements Insertable<OutboxData> {
     opUuid: opUuid ?? this.opUuid,
     userSub: userSub ?? this.userSub,
     companyId: companyId.present ? companyId.value : this.companyId,
+    siteId: siteId.present ? siteId.value : this.siteId,
     type: type ?? this.type,
     targetUuid: targetUuid ?? this.targetUuid,
     payloadJson: payloadJson ?? this.payloadJson,
@@ -3845,6 +3881,7 @@ class OutboxData extends DataClass implements Insertable<OutboxData> {
       opUuid: data.opUuid.present ? data.opUuid.value : this.opUuid,
       userSub: data.userSub.present ? data.userSub.value : this.userSub,
       companyId: data.companyId.present ? data.companyId.value : this.companyId,
+      siteId: data.siteId.present ? data.siteId.value : this.siteId,
       type: data.type.present ? data.type.value : this.type,
       targetUuid: data.targetUuid.present
           ? data.targetUuid.value
@@ -3883,6 +3920,7 @@ class OutboxData extends DataClass implements Insertable<OutboxData> {
           ..write('opUuid: $opUuid, ')
           ..write('userSub: $userSub, ')
           ..write('companyId: $companyId, ')
+          ..write('siteId: $siteId, ')
           ..write('type: $type, ')
           ..write('targetUuid: $targetUuid, ')
           ..write('payloadJson: $payloadJson, ')
@@ -3907,6 +3945,7 @@ class OutboxData extends DataClass implements Insertable<OutboxData> {
     opUuid,
     userSub,
     companyId,
+    siteId,
     type,
     targetUuid,
     payloadJson,
@@ -3930,6 +3969,7 @@ class OutboxData extends DataClass implements Insertable<OutboxData> {
           other.opUuid == this.opUuid &&
           other.userSub == this.userSub &&
           other.companyId == this.companyId &&
+          other.siteId == this.siteId &&
           other.type == this.type &&
           other.targetUuid == this.targetUuid &&
           other.payloadJson == this.payloadJson &&
@@ -3951,6 +3991,7 @@ class OutboxCompanion extends UpdateCompanion<OutboxData> {
   final Value<String> opUuid;
   final Value<String> userSub;
   final Value<int?> companyId;
+  final Value<int?> siteId;
   final Value<String> type;
   final Value<String> targetUuid;
   final Value<String> payloadJson;
@@ -3971,6 +4012,7 @@ class OutboxCompanion extends UpdateCompanion<OutboxData> {
     this.opUuid = const Value.absent(),
     this.userSub = const Value.absent(),
     this.companyId = const Value.absent(),
+    this.siteId = const Value.absent(),
     this.type = const Value.absent(),
     this.targetUuid = const Value.absent(),
     this.payloadJson = const Value.absent(),
@@ -3992,6 +4034,7 @@ class OutboxCompanion extends UpdateCompanion<OutboxData> {
     required String opUuid,
     required String userSub,
     this.companyId = const Value.absent(),
+    this.siteId = const Value.absent(),
     required String type,
     required String targetUuid,
     required String payloadJson,
@@ -4021,6 +4064,7 @@ class OutboxCompanion extends UpdateCompanion<OutboxData> {
     Expression<String>? opUuid,
     Expression<String>? userSub,
     Expression<int>? companyId,
+    Expression<int>? siteId,
     Expression<String>? type,
     Expression<String>? targetUuid,
     Expression<String>? payloadJson,
@@ -4042,6 +4086,7 @@ class OutboxCompanion extends UpdateCompanion<OutboxData> {
       if (opUuid != null) 'op_uuid': opUuid,
       if (userSub != null) 'user_sub': userSub,
       if (companyId != null) 'company_id': companyId,
+      if (siteId != null) 'site_id': siteId,
       if (type != null) 'type': type,
       if (targetUuid != null) 'target_uuid': targetUuid,
       if (payloadJson != null) 'payload_json': payloadJson,
@@ -4065,6 +4110,7 @@ class OutboxCompanion extends UpdateCompanion<OutboxData> {
     Value<String>? opUuid,
     Value<String>? userSub,
     Value<int?>? companyId,
+    Value<int?>? siteId,
     Value<String>? type,
     Value<String>? targetUuid,
     Value<String>? payloadJson,
@@ -4086,6 +4132,7 @@ class OutboxCompanion extends UpdateCompanion<OutboxData> {
       opUuid: opUuid ?? this.opUuid,
       userSub: userSub ?? this.userSub,
       companyId: companyId ?? this.companyId,
+      siteId: siteId ?? this.siteId,
       type: type ?? this.type,
       targetUuid: targetUuid ?? this.targetUuid,
       payloadJson: payloadJson ?? this.payloadJson,
@@ -4116,6 +4163,9 @@ class OutboxCompanion extends UpdateCompanion<OutboxData> {
     }
     if (companyId.present) {
       map['company_id'] = Variable<int>(companyId.value);
+    }
+    if (siteId.present) {
+      map['site_id'] = Variable<int>(siteId.value);
     }
     if (type.present) {
       map['type'] = Variable<String>(type.value);
@@ -4174,6 +4224,7 @@ class OutboxCompanion extends UpdateCompanion<OutboxData> {
           ..write('opUuid: $opUuid, ')
           ..write('userSub: $userSub, ')
           ..write('companyId: $companyId, ')
+          ..write('siteId: $siteId, ')
           ..write('type: $type, ')
           ..write('targetUuid: $targetUuid, ')
           ..write('payloadJson: $payloadJson, ')
@@ -13886,6 +13937,7 @@ typedef $$OutboxTableCreateCompanionBuilder = OutboxCompanion Function({
   required String opUuid,
   required String userSub,
   Value<int?> companyId,
+  Value<int?> siteId,
   required String type,
   required String targetUuid,
   required String payloadJson,
@@ -13907,6 +13959,7 @@ typedef $$OutboxTableUpdateCompanionBuilder = OutboxCompanion Function({
   Value<String> opUuid,
   Value<String> userSub,
   Value<int?> companyId,
+  Value<int?> siteId,
   Value<String> type,
   Value<String> targetUuid,
   Value<String> payloadJson,
@@ -13946,6 +13999,11 @@ class $$OutboxTableFilterComposer
 
   ColumnFilters<int> get companyId => $composableBuilder(
     column: $table.companyId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get siteId => $composableBuilder(
+    column: $table.siteId,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -14049,6 +14107,11 @@ class $$OutboxTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<int> get siteId => $composableBuilder(
+    column: $table.siteId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get type => $composableBuilder(
     column: $table.type,
     builder: (column) => ColumnOrderings(column),
@@ -14143,6 +14206,9 @@ class $$OutboxTableAnnotationComposer
   GeneratedColumn<int> get companyId =>
       $composableBuilder(column: $table.companyId, builder: (column) => column);
 
+  GeneratedColumn<int> get siteId =>
+      $composableBuilder(column: $table.siteId, builder: (column) => column);
+
   GeneratedColumn<String> get type =>
       $composableBuilder(column: $table.type, builder: (column) => column);
 
@@ -14234,6 +14300,7 @@ class $$OutboxTableTableManager
                 Value<String> opUuid = const Value.absent(),
                 Value<String> userSub = const Value.absent(),
                 Value<int?> companyId = const Value.absent(),
+                Value<int?> siteId = const Value.absent(),
                 Value<String> type = const Value.absent(),
                 Value<String> targetUuid = const Value.absent(),
                 Value<String> payloadJson = const Value.absent(),
@@ -14254,6 +14321,7 @@ class $$OutboxTableTableManager
                 opUuid: opUuid,
                 userSub: userSub,
                 companyId: companyId,
+                siteId: siteId,
                 type: type,
                 targetUuid: targetUuid,
                 payloadJson: payloadJson,
@@ -14276,6 +14344,7 @@ class $$OutboxTableTableManager
                 required String opUuid,
                 required String userSub,
                 Value<int?> companyId = const Value.absent(),
+                Value<int?> siteId = const Value.absent(),
                 required String type,
                 required String targetUuid,
                 required String payloadJson,
@@ -14296,6 +14365,7 @@ class $$OutboxTableTableManager
                 opUuid: opUuid,
                 userSub: userSub,
                 companyId: companyId,
+                siteId: siteId,
                 type: type,
                 targetUuid: targetUuid,
                 payloadJson: payloadJson,

@@ -349,6 +349,11 @@ class Outbox extends Table {
   /// MC3 (schema v3): PT of the item, sent as `company_id` (the item's own PT, never the switcher
   /// selection). Null = queued before v3: assigned when the user has one PT, else held until chosen.
   IntColumn get companyId => integer().nullable()();
+
+  /// Schema v9 (ADR 0023): site (kantor cabang) of an attendance item at a site — the same id as `payload.site_id`,
+  /// kept as a column so the attendance history resolves the location without parsing the payload. Null for every
+  /// other item (projects, cost centers, expense / report items) and for rows queued before v9.
+  IntColumn get siteId => integer().nullable()();
   TextColumn get type => text()();
   TextColumn get targetUuid => text()();
   TextColumn get payloadJson => text()();
@@ -405,7 +410,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
 
   @override
-  int get schemaVersion => 8;
+  int get schemaVersion => 9;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -445,6 +450,9 @@ class AppDatabase extends _$AppDatabase {
       // v8 (DRMS 10/10 D4): RAP item per line, nullable. Existing lines keep NULL — the editor asks for the item
       // ("Pilih item RAP") and submit stays blocked until every line has one.
       if (from < 8) await m.addColumn(localLines, localLines.rapItemId);
+      // v9 (ADR 0023 sites): site of an attendance outbox item, nullable. Queued rows keep NULL (they were queued for a
+      // project or a cost center — an APK before v9 had no site locations).
+      if (from < 9) await m.addColumn(outbox, outbox.siteId);
     },
     beforeOpen: (details) async {
       await customStatement('PRAGMA foreign_keys = ON');

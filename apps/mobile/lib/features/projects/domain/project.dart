@@ -46,6 +46,7 @@ class ProjectSummary {
     this.contractValue,
     this.progressPct,
     this.costCenter,
+    this.site,
     this.rapPlanned,
     this.rapRealised,
     this.rapPercentServer,
@@ -72,6 +73,9 @@ class ProjectSummary {
 
   /// D2: default cost center of the project (proposed to Finance at the transfer).
   final RefItem? costCenter;
+
+  /// ADR 0023: the site (kantor cabang) that handles the project; null = none (or a server before sites).
+  final RefItem? site;
 
   /// D4: Σ planned / realised RAP money and % (price roles only; null otherwise).
   final int? rapPlanned;
@@ -128,6 +132,7 @@ class ProjectDetail {
   final RapSummary rap;
 
   RefItem? get costCenter => project.costCenter;
+  RefItem? get site => project.site;
 }
 
 /// One RAP item with its cost realisation (D4): `GET /projects/{id}/rap` `items[]`. Money fields are null when
