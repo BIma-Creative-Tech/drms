@@ -21,7 +21,8 @@ import 'projects_screen.dart';
 
 /// DRMS 10/10 point 6/7: one project with the tabs of the web project page — "Proyek" (info), "RAP" (items with
 /// plan / realisation / sisa / %, over budget in red) and "Pengajuan" (requests of the project, search + status
-/// filter, tap → request detail). Read-only, online.
+/// filter, tap → request detail). Read-only, online. Owner decision 2026-10-11: Staff open it too — without money
+/// (the server withholds the contract value and RAP amounts) and with only their own requests.
 /// ADR 0022: a fourth tab "Pinjaman" (inter-project loans of the project, as lender and borrower; the borrower PM
 /// creates one there) for the money roles only — Staff / Operator never see loans (owner 2026-10-10).
 class ProjectDetailScreen extends ConsumerWidget {
@@ -121,7 +122,9 @@ class _InfoTab extends ConsumerWidget {
               _row(context, t.projectKind, projectKindLabel(p.kind)),
               _row(context, t.projectPm, p.pm?.name ?? '-', key: const Key('project-pm')),
               _row(context, t.projectStatus, p.statusText),
-              _row(context, t.projectContractValue, _money(p.contractValue), key: const Key('project-contract')),
+              // owner 2026-10-11: no contract value (RAB) for Staff — the server sends null, the row is left out
+              if (p.contractValue != null || (pt?.seesProjectMoney ?? account?.seesProjectMoney ?? false))
+                _row(context, t.projectContractValue, _money(p.contractValue), key: const Key('project-contract')),
               _row(
                 context,
                 t.fieldCostCenter,
@@ -370,7 +373,11 @@ class _RequestsTabState extends ConsumerState<_RequestsTab> {
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
     final theme = Theme.of(context);
-    final provider = projectRequestsProvider((projectId: widget.id, q: _q, status: _status));
+    // owner 2026-10-11 (same as the web tab): a Staff (only role in the project's PT) sees only their own requests
+    final account = ref.watch(accountProfileProvider);
+    final companyId = ref.watch(projectDetailProvider(widget.id)).value?.project.companyId;
+    final mine = account?.company(companyId)?.staffOnly ?? account?.requestsForSelfOnly ?? false;
+    final provider = projectRequestsProvider((projectId: widget.id, q: _q, status: _status, mine: mine));
     return Column(
       children: [
         Padding(

@@ -133,18 +133,20 @@ class ProjectsApi {
     ],
   );
 
-  /// `GET /expense-requests?project=&q=&status=&page=` — requests of one project (tab "Pengajuan").
+  /// `GET /expense-requests?project=&q=&status=&page=` — requests of one project (tab "Pengajuan"); [mine] = only the
+  /// caller's own (`scope=mine`, Staff).
   Future<PageResult<ExpenseSummary>> requests(
     int projectId, {
     String q = '',
     String? status,
+    bool mine = false,
     int page = 1,
     String? cursor,
   }) => client.run(
     (d) => d.get<dynamic>(
       '/expense-requests',
       queryParameters: {
-        'scope': 'all',
+        'scope': mine ? 'mine' : 'all',
         'project': projectId,
         if (q.trim().isNotEmpty) 'q': q.trim(),
         'status': ?status,

@@ -123,8 +123,12 @@ List<TransferQueueItem> queueFixture() => [
 ];
 
 class FakeProjectsApi extends Fake implements ProjectsApi {
+  FakeProjectsApi({this.noMoney = false});
+
+  /// Answer like the server answers a Staff (owner decision 2026-10-11): no contract value, no RAP money.
+  final bool noMoney;
   final listCalls = <({String q, String? status, int page})>[];
-  final requestCalls = <({int projectId, String q, String? status, int page})>[];
+  final requestCalls = <({int projectId, String q, String? status, bool mine, int page})>[];
   int totalPages = 2;
 
   @override
@@ -151,7 +155,28 @@ class FakeProjectsApi extends Fake implements ProjectsApi {
   }
 
   @override
-  Future<ProjectDetail> detail(int id) async => projectDetailFromJson(projectDetailJson());
+  Future<ProjectDetail> detail(int id) async => projectDetailFromJson(
+    noMoney
+        ? {
+            ...projectDetailJson(),
+            'contractValue': null,
+            'rapPlanned': null,
+            'rapRealised': null,
+            'rapPercent': null,
+            'rapOverBudgetItems': null,
+            'rap': {
+              'items': 3,
+              'planned': null,
+              'realised': null,
+              'transferred': null,
+              'verified': null,
+              'remaining': null,
+              'percent': null,
+              'overBudgetItems': null,
+            },
+          }
+        : projectDetailJson(),
+  );
 
   @override
   Future<List<RapBudgetItem>> rap(int projectId) async => rapItemsFixture;
@@ -161,10 +186,11 @@ class FakeProjectsApi extends Fake implements ProjectsApi {
     int projectId, {
     String q = '',
     String? status,
+    bool mine = false,
     int page = 1,
     String? cursor,
   }) async {
-    requestCalls.add((projectId: projectId, q: q, status: status, page: page));
+    requestCalls.add((projectId: projectId, q: q, status: status, mine: mine, page: page));
     final base = detailJson(status: 'approved');
     final items = [
       {...base, 'id': 42, 'title': 'Service Tronton', 'status': 'approved', 'statusLabel': 'Disetujui'},

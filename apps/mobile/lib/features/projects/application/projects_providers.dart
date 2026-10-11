@@ -67,8 +67,9 @@ final projectDetailProvider = FutureProvider.autoDispose.family<ProjectDetail, i
   (ref, id) => ref.watch(projectsApiProvider).detail(id),
 );
 
-/// Tab "Pengajuan" of a project: `GET /expense-requests?project=` with search + status filter.
-typedef ProjectRequestsArgs = ({int projectId, String q, String? status});
+/// Tab "Pengajuan" of a project: `GET /expense-requests?project=` with search + status filter; [mine] = only the
+/// caller's own requests (Staff, owner decision 2026-10-11).
+typedef ProjectRequestsArgs = ({int projectId, String q, String? status, bool mine});
 
 final projectRequestsProvider = AsyncNotifierProvider.autoDispose
     .family<ProjectRequests, PagedState<ExpenseSummary>, ProjectRequestsArgs>(ProjectRequests.new);
@@ -79,7 +80,9 @@ class ProjectRequests extends AsyncNotifier<PagedState<ExpenseSummary>> {
 
   @override
   Future<PagedState<ExpenseSummary>> build() async {
-    final first = await ref.watch(projectsApiProvider).requests(args.projectId, q: args.q, status: args.status);
+    final first = await ref
+        .watch(projectsApiProvider)
+        .requests(args.projectId, q: args.q, status: args.status, mine: args.mine);
     return const PagedState<ExpenseSummary>().append(first);
   }
 
@@ -92,7 +95,14 @@ class ProjectRequests extends AsyncNotifier<PagedState<ExpenseSummary>> {
     try {
       final next = await ref
           .read(projectsApiProvider)
-          .requests(args.projectId, q: args.q, status: args.status, page: cur.page + 1, cursor: cur.nextCursor);
+          .requests(
+            args.projectId,
+            q: args.q,
+            status: args.status,
+            mine: args.mine,
+            page: cur.page + 1,
+            cursor: cur.nextCursor,
+          );
       state = AsyncData(cur.append(next));
     } on Object {
       state = AsyncData(cur);

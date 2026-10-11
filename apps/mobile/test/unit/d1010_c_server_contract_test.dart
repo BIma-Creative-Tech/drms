@@ -39,6 +39,8 @@ void main() {
       expect(p.rapRealised, isNull);
       expect(p.rapPercent, isNull);
       expect(p.rapOverBudgetItems, isNull);
+      // owner decision 2026-10-11: no contract value (RAB) for Staff either
+      expect(p.contractValue, isNull);
     });
 
     test('Direktur: RAP money present', () {
@@ -56,6 +58,7 @@ void main() {
       expect(s.project.id, 1);
       expect(s.rap.items, 4);
       expect([s.rap.planned, s.rap.realised, s.rap.transferred, s.rap.remaining, s.rap.percent], everyElement(isNull));
+      expect(s.project.contractValue, isNull);
       final f = projectDetailFromJson(_map('project_detail_finance'));
       final rap = _map('project_detail_finance')['rap'] as Map<String, dynamic>;
       expect(f.rap.planned, rap['planned']);
