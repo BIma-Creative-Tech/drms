@@ -152,7 +152,7 @@ export function PhotoGallery({ photos, label, empty = 'Tanpa foto.' }: { photos:
     <ul className="pk-gallery" data-pk-gallery>
       {photos.map((p, i) => (
         <li key={p.id}>
-          <a href={p.url} target="_blank" rel="noopener noreferrer" aria-label={`Foto ${i + 1} dari ${photos.length}, buka ukuran penuh`}>
+          <a href={p.url} target="_blank" rel="noopener noreferrer" aria-label={`Foto ${i + 1} dari ${photos.length}, buka ukuran penuh`} data-pk-lightbox={`photos-${photos[0]!.id}`} data-pk-lightbox-title={`Foto ${i + 1} ${label}`}>
             {/* eslint-disable-next-line @next/next/no-img-element -- authenticated API thumbnail */}
             <img src={p.thumbUrl} alt={`Foto ${i + 1} ${label}`} loading="lazy" width={p.width ?? undefined} height={p.height ?? undefined} />
           </a>

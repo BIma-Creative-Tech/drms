@@ -383,7 +383,7 @@ export function CashEntryForm({ mode, today, minDate, lockDate, initialDirection
           <label htmlFor={id('proof')}>{edit && entry.proofId ? 'Ganti bukti (opsional)' : 'Bukti (opsional)'}</label>
           {edit && entry.proofId ? (
             <p className="help" data-pk-proof-current>
-              <a href={`/api/v1/media/attachments/${entry.proofId}/file`} target="_blank" rel="noopener noreferrer">
+              <a href={`/api/v1/media/attachments/${entry.proofId}/file`} target="_blank" rel="noopener noreferrer" data-pk-lightbox="kas-proof-current" data-pk-lightbox-title="Bukti saat ini">
                 Lihat bukti saat ini
               </a>{' '}
               — pilih file baru untuk menggantinya.

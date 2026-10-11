@@ -362,7 +362,7 @@ export function RequesterActions(p: RequesterActionsProps) {
                     <tr key={r.id} style={{ opacity: r.status === 'removed' ? 0.5 : 1 }}>
                       <td style={{ padding: 4, verticalAlign: 'top' }}>
                         {r.imageId ? (
-                          <a href={`/api/v1/media/receipts/${r.imageId}/file`} target="_blank" rel="noopener noreferrer">
+                          <a href={`/api/v1/media/receipts/${r.imageId}/file`} target="_blank" rel="noopener noreferrer" data-pk-lightbox={`own-receipts-${p.id}`} data-pk-lightbox-title={`Nota ${r.receiptNo ?? r.id}`}>
                             {/* eslint-disable-next-line @next/next/no-img-element -- authenticated API file, not a static asset */}
                             <img src={`/api/v1/media/receipts/${r.imageId}/file?variant=thumb`} alt={`Nota ${r.receiptNo ?? r.id}`} style={{ width: 64, height: 64, objectFit: 'cover' }} />
                           </a>

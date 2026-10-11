@@ -582,14 +582,14 @@ export async function ProgressReportDetail(props: AdminViewServerProps) {
             <dd>{r.editableUntil ? `s/d ${dateTimeId(r.editableUntil, tz)} (pelapor, dengan alasan)` : '—'}</dd>
           </dl>
         </Card>
-        <Card id="report-photos" title="Foto" sub={r.photos.length ? 'Klik foto untuk ukuran penuh (tab baru)' : undefined} i={5}>
+        <Card id="report-photos" title="Foto" sub={r.photos.length ? 'Klik foto untuk memperbesar' : undefined} i={5}>
           {r.photos.length === 0 ? (
             <EmptyState text="Laporan ini tanpa foto." />
           ) : (
             <ul className="pk-gallery" data-pk-gallery={r.id}>
               {r.photos.map((p, i) => (
                 <li key={p.id}>
-                  <a href={p.url} target="_blank" rel="noopener noreferrer" aria-label={`Foto ${i + 1} dari ${r.photos.length}, buka ukuran penuh`}>
+                  <a href={p.url} target="_blank" rel="noopener noreferrer" aria-label={`Foto ${i + 1} dari ${r.photos.length}, buka ukuran penuh`} data-pk-lightbox={`progress-${r.id}`} data-pk-lightbox-title={`Foto ${i + 1} laporan ${r.docNo ?? r.id}`}>
                     {/* eslint-disable-next-line @next/next/no-img-element -- authenticated API thumbnail */}
                     <img src={p.thumbUrl} alt={`Foto ${i + 1} laporan ${r.docNo ?? r.id}`} loading="lazy" width={p.width ?? undefined} height={p.height ?? undefined} />
                   </a>

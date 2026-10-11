@@ -490,7 +490,7 @@ function LedgerTable({
       cell: (r) => (
         <div className="pk-kact">
           {r.proofId ? (
-            <a className="pk-kbtn sm" href={`/api/v1/media/attachments/${r.proofId}/file`} target="_blank" rel="noopener noreferrer">
+            <a className="pk-kbtn sm" href={`/api/v1/media/attachments/${r.proofId}/file`} target="_blank" rel="noopener noreferrer" data-pk-lightbox="kas-proofs" data-pk-lightbox-title={`Bukti ${r.entryNo}`}>
               Bukti
             </a>
           ) : null}

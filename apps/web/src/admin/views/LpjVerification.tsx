@@ -7,6 +7,7 @@ import { officeQueueWhere } from '@/domain/expense/queues'
 import { SETTLEMENT_TYPE_LABELS } from '@/domain/expense/settlement-rules'
 import { withReqTransaction } from '@/lib/system-tx'
 
+import { docHref } from '../doc-links'
 import { ActionButton } from '../components/ActionButton'
 import { KAS_STYLE } from '../components/kas/style'
 import { MoneyForm } from '../components/MoneyForm'
@@ -67,7 +68,7 @@ export async function LpjVerification(props: AdminViewServerProps) {
                   <PtChip pt={pt.ref(companyOf.get(d.id))} />{' '}
                 </>
               ) : null}
-              <strong>{docLink(d.id, d.docNo ?? `#${d.id}`)}</strong> — {d.title} · LPJ {d.settlement?.docNo ?? ''} · kiriman ke-{d.settlement?.submitCount ?? 1}
+              <strong>{docLink(d.id, d.docNo ?? `#${d.id}`)}</strong> — {d.title} · LPJ {d.settlement ? <a href={docHref('settlement', d.settlement.id)!}>{d.settlement.docNo ?? `#${d.settlement.id}`}</a> : ''} · kiriman ke-{d.settlement?.submitCount ?? 1}
               <div style={{ fontSize: 12 }}>Uraian penggunaan: {d.settlement?.usageNotes ?? '—'}</div>
             </div>
             <div>
@@ -112,7 +113,7 @@ export async function LpjVerification(props: AdminViewServerProps) {
                     <tr key={r.id}>
                       <td style={td}>
                         {r.imageId ? (
-                          <a href={`/api/v1/media/receipts/${r.imageId}/file`} target="_blank" rel="noopener noreferrer">
+                          <a href={`/api/v1/media/receipts/${r.imageId}/file`} target="_blank" rel="noopener noreferrer" data-pk-lightbox={`lpj-${d.id}`} data-pk-lightbox-title={`Nota ${r.receiptNo ?? r.id} · ${rp(r.amount)}`}>
                             {/* eslint-disable-next-line @next/next/no-img-element -- authenticated API file, not a static asset */}
                             <img src={`/api/v1/media/receipts/${r.imageId}/file?variant=thumb`} alt={`Nota ${r.receiptNo ?? r.id}`} style={{ width: 80, height: 80, objectFit: 'cover' }} />
                           </a>
@@ -169,7 +170,7 @@ export async function LpjVerification(props: AdminViewServerProps) {
                   <PtChip pt={pt.ref(companyOf.get(d.id))} />{' '}
                 </>
               ) : null}
-              <strong>{docLink(d.id, d.docNo ?? `#${d.id}`)}</strong> — {d.title} · LPJ {s.docNo}
+              <strong>{docLink(d.id, d.docNo ?? `#${d.id}`)}</strong> — {d.title} · LPJ <a href={docHref('settlement', s.id)!}>{s.docNo ?? `#${s.id}`}</a>
             </div>
             <div style={{ margin: '6px 0' }}>
               Ditransfer {rp(s.transferredTotal)} · Nota terverifikasi {rp(s.verifiedReceiptsTotal)} · Selisih {rp(s.difference)} —{' '}
