@@ -291,7 +291,9 @@ export const ExpenseRequests: CollectionConfig = withAudit(
         index: true,
         options: REQUEST_STATUSES.map((s) => ({ label: STATUS_LABELS[s], value: s })),
         access: system,
-        admin: { ...ro, position: 'sidebar', condition: submittedOnly },
+        // No admin.condition here: on a required field it makes the Postgres adapter treat the column as
+        // nullable (schema drift). RequestStatusField renders nothing on a Draft form and the ADR 0021 label otherwise.
+        admin: { ...ro, position: 'sidebar', components: { Field: '@/admin/components/RequestStatusField#RequestStatusField' } },
       },
       { name: 'title', type: 'text', label: 'Judul', required: true, maxLength: 200 },
       { name: 'project', type: 'relationship', relationTo: 'projects', label: 'Project', index: true, ...pickerSameCompany(), admin: { placeholder: PLACEHOLDERS.project, condition: draftOrSet('project') } },

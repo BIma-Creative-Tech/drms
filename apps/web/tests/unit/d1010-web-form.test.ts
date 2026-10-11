@@ -143,11 +143,14 @@ describe('expense request form conditions + placeholders (8d, 8i, 9a)', () => {
 
   it('create/draft hides system fields; dates use the picker, money the Rupiah input; APK labels', () => {
     const draft = { status: 'draft' }
-    for (const n of ['status', 'currentLevel', 'approvalRule', 'approvalSnapshot', 'submittedAt', 'resubmitOf', 'cancelReason', 'rejectReason', 'source', 'approvedAmount', 'transferredTotal', 'verifiedReceiptsTotal', 'docNo']) {
+    for (const n of ['currentLevel', 'approvalRule', 'approvalSnapshot', 'submittedAt', 'resubmitOf', 'cancelReason', 'rejectReason', 'source', 'approvedAmount', 'transferredTotal', 'verifiedReceiptsTotal', 'docNo']) {
       const f = byName(n)
       expect(f.admin?.condition?.(draft, {}, { user: { id: 1, roles: ['pk-admin'] } }), n).toBe(false)
     }
     for (const n of ['g1Exception', 'bankSnapshot']) expect(byName(n).admin?.hidden, n).toBe(true)
+    // status: no condition (schema drift, see below) — the sidebar component renders nothing on a Draft form
+    expect(byName('status').admin?.condition).toBeUndefined()
+    expect(byName('status').admin?.components?.Field).toBe('@/admin/components/RequestStatusField#RequestStatusField')
     expect(byName('neededDate').admin?.components?.Field).toBe('@/admin/components/BusinessDateField#BusinessDateField')
     expect(byName('unitPrice').admin?.components?.Field).toBe('@/admin/components/RupiahNumberField#RupiahNumberField')
     expect(byName('total').admin?.components?.Field).toBe('@/admin/components/RupiahNumberField#RupiahNumberField')
@@ -158,6 +161,16 @@ describe('expense request form conditions + placeholders (8d, 8i, 9a)', () => {
     // input order of the APK draft editor
     const order = (config.collections.find((c) => c.slug === 'expense-requests')!.fields as F[]).filter((f) => f.name && ['type', 'title', 'project', 'costCenter', 'neededDate', 'urgencyLevel', 'requesters', 'bankAccount', 'notes', 'attachments', 'lines', 'linesTotalPreview'].includes(f.name)).map((f) => f.name)
     expect(order).toEqual(['type', 'title', 'project', 'costCenter', 'neededDate', 'urgencyLevel', 'requesters', 'bankAccount', 'notes', 'attachments', 'lines', 'linesTotalPreview'])
+  })
+
+  it('no required column has admin.condition (the Postgres adapter would drop its NOT NULL → schema drift)', () => {
+    const misses: string[] = []
+    for (const c of config.collections) {
+      for (const f of flat(c.fields as F[])) {
+        if ((f as { required?: boolean }).required && f.admin?.condition && f.type !== 'ui') misses.push(`${c.slug}.${f.name}`)
+      }
+    }
+    expect(misses).toEqual([])
   })
 
   it('every business date field of the app uses the date picker', () => {

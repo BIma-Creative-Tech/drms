@@ -10,11 +10,12 @@ import { ActiveCell as ActiveCell_5b572f69f0b2c658d322ad3e65563a49 } from '@/adm
 import { MemberCountCell as MemberCountCell_0560bc1409d80e4fbd9f8971b0f4bccb } from '@/admin/components/companies/MemberCountCell'
 import { CompanyCell as CompanyCell_a3ad1a52c7c805d12e2b4c793adf9c6d } from '@/admin/components/companies/CompanyCell'
 import { CompanyListFilter as CompanyListFilter_b31d22e0603f5879a90d350d8ff6b31b } from '@/admin/components/companies/CompanyListFilter'
-import { ProjectDetailLink as ProjectDetailLink_50199ae12722a75ff9856fb84c25b621 } from '@/admin/components/ProjectDetailLink'
 import { CompanyField as CompanyField_d907892a7d1864bfc60310041555d48d } from '@/admin/components/companies/CompanyField'
+import { ProjectDetailLink as ProjectDetailLink_50199ae12722a75ff9856fb84c25b621 } from '@/admin/components/ProjectDetailLink'
 import { BusinessDateField as BusinessDateField_1172137b1c1eab4696f62271d5ebbe2f } from '@/admin/components/BusinessDateField'
 import { WorkflowPanel as WorkflowPanel_6fcc9de32a179d40aa1576187df45f1e } from '@/admin/components/WorkflowPanel'
 import { PdfLinks as PdfLinks_baf3bc4fa5b0188cc15c74a19f03943f } from '@/admin/components/PdfLinks'
+import { RequestStatusField as RequestStatusField_3f8d5a55b1fcbc79eb9e47f3583cb1ed } from '@/admin/components/RequestStatusField'
 import { BankAccountPreview as BankAccountPreview_1615d70b0243139e3dffd45ad2617f07 } from '@/admin/components/BankAccountPreview'
 import { RupiahNumberField as RupiahNumberField_d552ada140febbfef2d7dea921fde6df } from '@/admin/components/RupiahNumberField'
 import { LinesTotalPreview as LinesTotalPreview_981a7b2ac6e59231317266aea0a515ba } from '@/admin/components/LinesTotalPreview'
@@ -89,11 +90,12 @@ export const importMap = {
   "@/admin/components/companies/MemberCountCell#MemberCountCell": MemberCountCell_0560bc1409d80e4fbd9f8971b0f4bccb,
   "@/admin/components/companies/CompanyCell#CompanyCell": CompanyCell_a3ad1a52c7c805d12e2b4c793adf9c6d,
   "@/admin/components/companies/CompanyListFilter#CompanyListFilter": CompanyListFilter_b31d22e0603f5879a90d350d8ff6b31b,
-  "@/admin/components/ProjectDetailLink#ProjectDetailLink": ProjectDetailLink_50199ae12722a75ff9856fb84c25b621,
   "@/admin/components/companies/CompanyField#CompanyField": CompanyField_d907892a7d1864bfc60310041555d48d,
+  "@/admin/components/ProjectDetailLink#ProjectDetailLink": ProjectDetailLink_50199ae12722a75ff9856fb84c25b621,
   "@/admin/components/BusinessDateField#BusinessDateField": BusinessDateField_1172137b1c1eab4696f62271d5ebbe2f,
   "@/admin/components/WorkflowPanel#WorkflowPanel": WorkflowPanel_6fcc9de32a179d40aa1576187df45f1e,
   "@/admin/components/PdfLinks#PdfLinks": PdfLinks_baf3bc4fa5b0188cc15c74a19f03943f,
+  "@/admin/components/RequestStatusField#RequestStatusField": RequestStatusField_3f8d5a55b1fcbc79eb9e47f3583cb1ed,
   "@/admin/components/BankAccountPreview#BankAccountPreview": BankAccountPreview_1615d70b0243139e3dffd45ad2617f07,
   "@/admin/components/RupiahNumberField#RupiahNumberField": RupiahNumberField_d552ada140febbfef2d7dea921fde6df,
   "@/admin/components/LinesTotalPreview#LinesTotalPreview": LinesTotalPreview_981a7b2ac6e59231317266aea0a515ba,

@@ -6233,6 +6233,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "g1_exception": {
+          "name": "g1_exception",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": false
+        },
         "approval_cycle": {
           "name": "approval_cycle",
           "type": "numeric",
@@ -21823,6 +21829,7 @@
         "acknowledge_delegated",
         "access_denied",
         "approval_skipped",
+        "approval_policy_exception",
         "retention_purge",
         "import",
         "2fa_enabled",

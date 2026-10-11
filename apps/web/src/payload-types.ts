@@ -1186,24 +1186,21 @@ export interface ExpenseRequest {
   company?: (number | null) | Company;
   docNo?: string | null;
   type: 'advance' | 'reimburse';
-  status?:
-    | (
-        | 'draft'
-        | 'pending_ack'
-        | 'pending_approval'
-        | 'approved'
-        | 'receipt_revision'
-        | 'receipts_verified'
-        | 'transferred'
-        | 'receipts_complete'
-        | 'lpj_submitted'
-        | 'lpj_revision'
-        | 'lpj_verified'
-        | 'completed'
-        | 'rejected'
-        | 'cancelled'
-      )
-    | null;
+  status:
+    | 'draft'
+    | 'pending_ack'
+    | 'pending_approval'
+    | 'approved'
+    | 'receipt_revision'
+    | 'receipts_verified'
+    | 'transferred'
+    | 'receipts_complete'
+    | 'lpj_submitted'
+    | 'lpj_revision'
+    | 'lpj_verified'
+    | 'completed'
+    | 'rejected'
+    | 'cancelled';
   title: string;
   project?: (number | null) | Project;
   /**

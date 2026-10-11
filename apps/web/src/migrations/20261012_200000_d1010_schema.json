@@ -1992,7 +1992,7 @@
           "name": "pm_id",
           "type": "integer",
           "primaryKey": false,
-          "notNull": false
+          "notNull": true
         },
         "budget": {
           "name": "budget",
@@ -6150,12 +6150,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "request_date": {
-          "name": "request_date",
-          "type": "varchar",
-          "primaryKey": false,
-          "notNull": false
-        },
         "needed_date": {
           "name": "needed_date",
           "type": "varchar",
@@ -6164,18 +6158,6 @@
         },
         "urgency_level_id": {
           "name": "urgency_level_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "notes": {
-          "name": "notes",
-          "type": "varchar",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_by_id": {
-          "name": "created_by_id",
           "type": "integer",
           "primaryKey": false,
           "notNull": false
@@ -6201,6 +6183,24 @@
         "bank_snapshot_account_holder": {
           "name": "bank_snapshot_account_holder",
           "type": "varchar",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "notes": {
+          "name": "notes",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "request_date": {
+          "name": "request_date",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_by_id": {
+          "name": "created_by_id",
+          "type": "integer",
           "primaryKey": false,
           "notNull": false
         },
@@ -6427,11 +6427,11 @@
           "method": "btree",
           "with": {}
         },
-        "expense_requests_created_by_idx": {
-          "name": "expense_requests_created_by_idx",
+        "expense_requests_bank_account_idx": {
+          "name": "expense_requests_bank_account_idx",
           "columns": [
             {
-              "expression": "created_by_id",
+              "expression": "bank_account_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -6442,11 +6442,11 @@
           "method": "btree",
           "with": {}
         },
-        "expense_requests_bank_account_idx": {
-          "name": "expense_requests_bank_account_idx",
+        "expense_requests_created_by_idx": {
+          "name": "expense_requests_created_by_idx",
           "columns": [
             {
-              "expression": "bank_account_id",
+              "expression": "created_by_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -6616,12 +6616,12 @@
           "onDelete": "set null",
           "onUpdate": "no action"
         },
-        "expense_requests_created_by_id_users_id_fk": {
-          "name": "expense_requests_created_by_id_users_id_fk",
+        "expense_requests_bank_account_id_employee_bank_accounts_id_fk": {
+          "name": "expense_requests_bank_account_id_employee_bank_accounts_id_fk",
           "tableFrom": "expense_requests",
-          "tableTo": "users",
+          "tableTo": "employee_bank_accounts",
           "columnsFrom": [
-            "created_by_id"
+            "bank_account_id"
           ],
           "columnsTo": [
             "id"
@@ -6629,12 +6629,12 @@
           "onDelete": "set null",
           "onUpdate": "no action"
         },
-        "expense_requests_bank_account_id_employee_bank_accounts_id_fk": {
-          "name": "expense_requests_bank_account_id_employee_bank_accounts_id_fk",
+        "expense_requests_created_by_id_users_id_fk": {
+          "name": "expense_requests_created_by_id_users_id_fk",
           "tableFrom": "expense_requests",
-          "tableTo": "employee_bank_accounts",
+          "tableTo": "users",
           "columnsFrom": [
-            "bank_account_id"
+            "created_by_id"
           ],
           "columnsTo": [
             "id"
