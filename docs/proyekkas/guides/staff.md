@@ -28,6 +28,10 @@ Sebelum mulai: unggah **tanda tangan** sekali di web (**Profil & tanda tangan**)
 - **"Titik lokasi … belum diisi Admin"**: lapor Admin. (Bila titik sudah ada tetapi radius kosong, dipakai radius
   default perusahaan.) Radius ditambah toleransi akurasi GPS HP, paling banyak 50 m.
 - Tombol absen mati dengan tulisan belum diaktifkan: fitur dimatikan Admin, hubungi Admin.
+- **Cap waktu di foto:** server membubuhkan tanggal, jam (waktu absen yang diterima server, zona PT), koordinat GPS,
+  lokasi, nama Anda dan "RR Teams" di bagian bawah selfie (beberapa detik setelah absen terkirim).
+- **Absen dari web** (Absensi → Absen saya): selfie hanya dari **kamera langsung** (tombol **Buka kamera** → **Ambil
+  foto**), bukan dari galeri/file. Bila muncul *"Kamera tidak tersedia — gunakan aplikasi Android"*, absen lewat APK.
 - Lupa absen/jam salah: minta **PM** mengoreksi (Anda tidak bisa mengoreksi sendiri).
 
 **Rekap bulanan:** Absensi → tab **Rekap** → geser bulan → ketuk tanggal untuk rincian (jam masuk/pulang, terlambat).
@@ -63,8 +67,8 @@ Pilih jenisnya dulu:
 
 ![TODO screenshot: editor pengajuan dengan baris item dan Total (pratinjau)](img/staff-editor.png)
 
-Setelah diajukan, nomor dokumen terbit (mis. `229/PB-DRMS/01/X/2026`; kode di tengah = kode PT, tiap PT punya
-nomor urut sendiri) dan status **Menunggu persetujuan PM**. Yang memutuskan adalah **PM project** (PM di data project;
+Setelah diajukan, nomor dokumen terbit (mis. `PB/DRMS/2610/0229`; `DRMS` = kode PT, `2610` = tahun-bulan, tiap PT
+punya nomor urut sendiri; semua nomor dokumen lain juga memuat kode PT, mis. `TRF/DRMS/2610/0001`) dan status **Menunggu persetujuan PM**. Yang memutuskan adalah **PM project** (PM di data project;
 untuk pusat biaya: manajernya) lalu **Direktur** **di PT pengajuan itu**; setelah itu Finance mentransfer (sejak 10 Okt
 2026). Pengajuan yang diajukan sebelumnya tetap diputuskan Direktur lalu Finance. Bila muncul "Project ini belum punya
 PM. Hubungi Admin untuk mengisi PM project.", minta Admin mengisi PM project itu.

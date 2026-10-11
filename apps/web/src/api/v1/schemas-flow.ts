@@ -175,7 +175,12 @@ export const TransferCreate = z
     cashAccountId: id,
     bankRef: z.string().trim().min(1).max(64),
     proofMediaId: id.meta({ description: 'media-transfer-proofs id (POST /media/transfer-proofs).' }),
-    transferDate: businessDate.optional(),
+    transferDate: businessDate.optional().meta({ description: 'Legacy: date only (time unknown). With transferAt it must equal the date of transferAt in the PT zone.' }),
+    transferAt: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d{1,3})?)?(Z|[+-]\d{2}:\d{2})?$/, 'YYYY-MM-DDTHH:MM')
+      .optional()
+      .meta({ description: 'Item 11: date + time of the bank transfer proof. ISO 8601 with offset, or without offset = wall clock in the PT time zone. Not in the future; its date (PT zone) becomes transferDate (period lock). Omitted = old client, transfer time unknown.' }),
     amount: rupiahPos.optional().meta({ description: 'Optional echo; must equal the approved amount (Finance cannot change it, G3).' }),
     confirmOverdraft: confirmOverdraft,
     confirmUnverifiedAccount: confirmUnverifiedAccount,
@@ -334,6 +339,7 @@ export const ExpenseRequestDetail = ExpenseRequestListItem.extend({
       kind: z.string(),
       amount: rupiah,
       transferDate: z.string(),
+      transferAt: z.string().nullable().meta({ description: 'Item 11: date + time of the proof (UTC ISO); null = recorded without a time.' }),
       bankRef: z.string(),
       status: z.string(),
       cashEntryId: id.nullable(),
@@ -378,6 +384,7 @@ export const ExpenseRequestDetail = ExpenseRequestListItem.extend({
   resubmitOfId: id.nullable(),
   resubmitOf: z.object({ id, docNo: z.string().nullable(), title: z.string() }).nullable(),
   submittedAt: z.string().nullable(),
+  approvedAt: z.string().nullable().meta({ description: 'Item 11: final approval time (server) of the current cycle; start of the transfer SLA.' }),
   cancelReason: z.string().nullable(),
   rejectReason: z.string().nullable(),
   clientUuid: z.string().nullable(),

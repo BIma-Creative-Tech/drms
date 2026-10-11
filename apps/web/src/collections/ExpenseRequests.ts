@@ -390,6 +390,8 @@ export const ExpenseRequests: CollectionConfig = withAudit(
       { name: 'approvalCycle', type: 'number', label: 'Siklus approval', defaultValue: 0, access: system, admin: { ...ro, hidden: true } },
       { name: 'currentLevel', type: 'number', label: 'Level approval berjalan', access: system, admin: { ...ro, position: 'sidebar', condition: submittedOnly } },
       { name: 'submittedAt', type: 'date', label: 'Diajukan (server)', access: system, admin: { ...ro, position: 'sidebar', date: { pickerAppearance: 'dayAndTime' }, condition: whenSet('submittedAt') } },
+      // Item 11 (DRMS 10/10): final approval time (server) of the current cycle = start of the transfer SLA.
+      { name: 'approvedAt', type: 'date', label: 'Disetujui (server)', index: true, access: system, admin: { ...ro, position: 'sidebar', date: { pickerAppearance: 'dayAndTime' }, condition: whenSet('approvedAt') } },
       { name: 'contentHash', type: 'text', label: 'Hash isi terkunci', access: system, admin: { ...ro, hidden: true } },
       {
         name: 'resubmitOf',

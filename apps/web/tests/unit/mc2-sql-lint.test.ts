@@ -43,6 +43,7 @@ const ALLOWED: Record<string, string> = {
   'domain/attendance/web.ts#selfieState': 'by attendance ids of an already scoped list',
   'domain/attendance/record.ts#dayRowsAt': 'one employee + one location (both PT-bound, checked by recordAttendance)',
   'domain/attendance/corrections.ts#effectiveTime': 'one attendance id checked by correctAttendance',
+  'domain/attendance/stamp.ts#stampAttendanceSelfie': 'worker job (system): ONE attendance id queued by recordAttendance in that attendance transaction; no caller data is returned',
   'domain/reports/attendance-report.ts#attendanceMonth': 'employees by ids from the scoped facts (locationScopeSql)',
   'domain/reminders/service.ts#requestPeople': 'one request id of the PT run',
   'domain/reports/audit-log.ts#auditLogCount': 'where(f) adds the company predicate (companyScopeSql on a.company_id)',

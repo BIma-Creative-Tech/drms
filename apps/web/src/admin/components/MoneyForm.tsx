@@ -7,7 +7,7 @@ import { OverrideDialog, overridePromptOf, type OverridePrompt } from './kas/Ove
 
 /**
  * Finance forms of the transfer queue (T3, US-20) and the LPJ settlement (T5, US-22): cash account,
- * optional date, bank reference and proof upload (multipart to /api/v1/media/{kind} first, then the
+ * date (transfer: date + time of the bank proof, required — item 11), bank reference and proof upload (multipart to /api/v1/media/{kind} first, then the
  * action with the returned id). Amounts are never entered: the server copies/computes them (G3).
  * QA 2026-10-08: a 409 asking for confirmation (unverified destination account QA-17, balance below 0
  * QA-04) opens the app dialog; "Tetap simpan" re-sends the same body + flag (the proof is not re-uploaded).
@@ -41,6 +41,8 @@ export function MoneyForm({ url, submitLabel, cashAccounts, bankRef, proof, amou
   const [error, setError] = useState<string | null>(null)
   const [prompt, setPrompt] = useState<OverridePrompt | null>(null)
   const pending = useRef<Record<string, unknown> | null>(null)
+  // Item 11 (DRMS 10/10): the T3 transfer records the date AND time of the bank proof (transfer SLA).
+  const isTransfer = url.endsWith('/transfer')
   const send = async (body: Record<string, unknown>) => {
     const r = await postJson(url, body)
     if (r.ok) {
@@ -62,8 +64,15 @@ export function MoneyForm({ url, submitLabel, cashAccounts, bankRef, proof, amou
     setError(null)
     const f = new FormData(e.currentTarget)
     const body: Record<string, unknown> = { cashAccountId: Number(f.get('cashAccountId')) }
-    const date = String(f.get('date') ?? '')
-    if (date) body[url.endsWith('/transfer') ? 'transferDate' : 'date'] = date
+    if (isTransfer) {
+      // item 11: wall-clock date + time of the bank proof; the server reads it in the PT time zone
+      const at = String(f.get('transferAt') ?? '')
+      if (!at) return setError('Isi tanggal & jam transfer sesuai bukti.')
+      body.transferAt = at
+    } else {
+      const date = String(f.get('date') ?? '')
+      if (date) body.date = date
+    }
     if (bankRef === 'required') body.bankRef = String(f.get('bankRef') ?? '').trim()
     setBusy(true)
     try {
@@ -108,10 +117,17 @@ export function MoneyForm({ url, submitLabel, cashAccounts, bankRef, proof, amou
           ))}
         </select>
       </label>
-      <label style={field}>
-        Tanggal (kosong = hari ini)
-        <input type="date" name="date" />
-      </label>
+      {isTransfer ? (
+        <label style={field}>
+          Tanggal &amp; jam transfer (sesuai bukti)
+          <input type="datetime-local" name="transferAt" required step={60} data-pk-field="transfer-at" />
+        </label>
+      ) : (
+        <label style={field}>
+          Tanggal (kosong = hari ini)
+          <input type="date" name="date" />
+        </label>
+      )}
       {bankRef === 'required' ? (
         <label style={field}>
           No. referensi bank

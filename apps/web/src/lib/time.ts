@@ -47,3 +47,34 @@ export function isValidTimeZone(tz: string): boolean {
     return false
   }
 }
+
+const LOCAL_DT = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?$/
+const ZONED_DT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,3})?)?(?:Z|[+-]\d{2}:\d{2})$/
+
+/**
+ * Item 11: instant of a date-time string. With an offset/Z (ISO 8601) it is taken as is; without one
+ * ("YYYY-MM-DDTHH:MM[:SS]", e.g. an <input type="datetime-local">) it is a wall-clock time in
+ * `timeZone` (the PT zone — the browser zone may differ). Null when invalid.
+ */
+export function parseZonedDateTime(value: string, timeZone: string): Date | null {
+  if (ZONED_DT.test(value)) {
+    const d = new Date(value)
+    return Number.isNaN(d.getTime()) ? null : d
+  }
+  const m = LOCAL_DT.exec(value)
+  if (!m) return null
+  const [y, mo, d, h, mi, s] = [Number(m[1]), Number(m[2]), Number(m[3]), Number(m[4]), Number(m[5]), Number(m[6] ?? 0)]
+  if (mo < 1 || mo > 12 || h > 23 || mi > 59 || s > 59) return null
+  const wall = Date.UTC(y, mo - 1, d, h, mi, s)
+  const check = new Date(wall)
+  if (check.getUTCDate() !== d || check.getUTCMonth() !== mo - 1) return null
+  let at = wall - tzOffsetMinutes(new Date(wall), timeZone) * 60000
+  at = wall - tzOffsetMinutes(new Date(at), timeZone) * 60000 // second pass: offset at the real instant
+  return new Date(at)
+}
+
+/** "YYYY-MM-DD" of an instant in `timeZone`. */
+export function isoDateInTz(instant: Date, timeZone: string): string {
+  const d = localDateInTz(instant, timeZone)
+  return `${d.year}-${String(d.month).padStart(2, '0')}-${String(d.day).padStart(2, '0')}`
+}

@@ -7,9 +7,10 @@ import { assertAccount, assertOnOrAfterOpening, currentLockDate, postEntry, void
 import { BANK_ACCOUNT_UNVERIFIED_CONFIRM_REQUIRED, failCoded } from '@/domain/coded-error'
 import { allocateDocNo } from '@/domain/numbering-db'
 import { parseBusinessDate } from '@/domain/numbering'
+import { DEFAULT_TZ, isoDateInTz, parseZonedDateTime } from '@/lib/time'
 import { getRequestTx } from '@/lib/tx'
 
-import { actorContext, fail, loadRaw, loadVisible, requireAction, today, updateRequest } from './common'
+import { actorContext, fail, loadRaw, loadVisible, requireAction, settings, today, updateRequest } from './common'
 import { claimMedia, recomputeFlags } from './receipts'
 import { isBusinessDate } from './types'
 
@@ -18,6 +19,12 @@ export type TransferInput = {
   bankRef: string
   proofMediaId: number
   transferDate?: string
+  /**
+   * Item 11: date + time of the bank proof (ISO 8601 with offset, or "YYYY-MM-DDTHH:MM" = wall clock in
+   * the PT zone). Required by the web form; old clients sending only `transferDate` still work (the
+   * transfer then has no time: `transferAt` null, "jam tidak diketahui").
+   */
+  transferAt?: string
   /** Optional echo of the amount; must equal the approved amount (G3: Finance cannot change it). */
   amount?: number
   /** QA-04: confirm a transfer that makes the cash account balance negative (audited). */
@@ -72,6 +79,25 @@ export async function auditUnverifiedTransfer(req: PayloadRequest, t: { id: numb
   ])
 }
 
+/** Clock skew allowed between the Finance PC and the server before a time counts as "future". */
+const FUTURE_SKEW_MS = 2 * 60_000
+
+/**
+ * Item 11: `transferAt` → instant + its business date IN THE PT ZONE (null when not given). Not in the
+ * future; when `transferDate` is sent too it must be the same date. The period lock (G5, DB trigger
+ * on transfer_date) therefore applies to the date of the proof.
+ */
+export async function transferMoment(req: PayloadRequest, companyId: number | undefined, input: Pick<TransferInput, 'transferAt' | 'transferDate'>): Promise<{ instant: Date; date: string } | null> {
+  if (input.transferAt === undefined || input.transferAt === null || input.transferAt === '') return null
+  const tz = (await settings(req, companyId)).timezone || process.env.TZ || DEFAULT_TZ
+  const instant = parseZonedDateTime(input.transferAt, tz)
+  if (!instant) fail(400, 'Tanggal & jam transfer tidak valid (YYYY-MM-DDTHH:MM).')
+  if (instant!.getTime() > Date.now() + FUTURE_SKEW_MS) fail(400, 'Tanggal & jam transfer tidak boleh di masa depan.')
+  const date = isoDateInTz(instant!, tz)
+  if (input.transferDate && input.transferDate !== date) fail(400, `Tanggal transfer (${input.transferDate}) berbeda dengan tanggal pada jam transfer (${date}).`)
+  return { instant: instant!, date }
+}
+
 type TransferDoc = { id: number; docNo: string; request: unknown; amount: number; status: 'posted' | 'void'; cashEntry?: unknown; kind: string }
 
 /**
@@ -90,15 +116,17 @@ export async function recordTransfer(req: PayloadRequest, id: number, input: Tra
   if (input.amount !== undefined && input.amount !== approved) {
     fail(409, 'Nominal transfer harus sama dengan nominal yang disetujui; Finance tidak dapat mengubah nominal.')
   }
-  const todayDate = await today(req)
-  const transferDate = input.transferDate ?? todayDate
+  const companyId = relId((doc as { company?: unknown }).company)
+  const todayDate = await today(req, companyId)
+  const at = await transferMoment(req, companyId, input)
+  const transferDate = at?.date ?? input.transferDate ?? todayDate
   if (!isBusinessDate(transferDate)) fail(400, 'Tanggal transfer harus YYYY-MM-DD.')
   if (transferDate > todayDate) fail(400, 'Tanggal transfer tidak boleh di masa depan.')
   if (!input.bankRef.trim()) fail(400, 'Nomor referensi bank wajib diisi.')
   if (!doc.bankSnapshot?.accountNo) fail(409, 'Rekening tujuan belum tersimpan pada pengajuan.')
-  const account = await assertAccount(req, input.cashAccountId, relId((doc as { company?: unknown }).company)) // QA-MC4-10: account of the request's PT
+  const account = await assertAccount(req, input.cashAccountId, companyId) // QA-MC4-10: account of the request's PT
   assertOnOrAfterOpening(account, transferDate, 'transferDate') // QA-05: 400 instead of the wrapped trigger error
-  const lock = await currentLockDate(req, relId((doc as { company?: unknown }).company))
+  const lock = await currentLockDate(req, companyId)
   if (lock && transferDate <= lock) fail(409, `Periode ${transferDate.slice(0, 7)} sudah ditutup (tutup buku s/d ${lock}).`)
   const destination = await checkDestination(req, doc, input.confirmUnverifiedAccount === true) // QA-17
 
@@ -116,6 +144,7 @@ export async function recordTransfer(req: PayloadRequest, id: number, input: Tra
       bankRef: input.bankRef.trim(),
       proof: input.proofMediaId,
       transferDate,
+      transferAt: at?.instant.toISOString() ?? null,
       postedBy: userId(req),
       status: 'posted',
     } as never,

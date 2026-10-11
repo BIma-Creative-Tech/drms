@@ -62,7 +62,7 @@ describe('create + submit (US-18)', () => {
     const s = await act(w.users.pm, draft, 'submit')
     expect(s.status, JSON.stringify(s.body)).toBe(200)
     expect(s.body.status).toBe('pending_ack')
-    expect(s.body.docNo).toMatch(/^ADD\/\d{4}\/\d{4}$/)
+    expect(s.body.docNo).toMatch(/^ADD\/[A-Z0-9]{2,16}\/\d{4}\/\d{4}$/)
     expect(s.body.approvalRule).toMatchObject({ acknowledgeRole: 'pk-owner', levels: 1 })
     expect(s.body.budgetAtSubmit).toBe(100_000_000)
     const n = await sqlAs('app', "SELECT user_id FROM notifications WHERE doc_type = 'budget_addendum' AND doc_id = $1 AND event = 'addendum.pending_ack'", [String(draft)])
@@ -113,7 +113,7 @@ describe('create + submit (US-18)', () => {
 
     const projAudit = (await auditRows('project', w.project)).filter((r) => r.field === 'budget')
     expect(projAudit.at(-1)).toMatchObject({ action: 'update', old_value: { v: 100_000_000 }, new_value: { v: 107_500_000 } })
-    expect(projAudit.at(-1)!.reason).toMatch(/Addendum RAB ADD\/\d{4}\/\d{4} disetujui/)
+    expect(projAudit.at(-1)!.reason).toMatch(/Addendum RAB ADD\/[A-Z0-9]{2,16}\/\d{4}\/\d{4} disetujui/)
     const addAudit = await auditRows('budget_addendum', draft)
     const approveRow = addAudit.find((r) => r.action === 'approve')!
     const statusRow = addAudit.filter((r) => r.action === 'status_change').at(-1)!

@@ -18,6 +18,7 @@ import { officeScope, teamScope } from '@/domain/reports/scope'
 import { docHref } from '../doc-links'
 
 import { TeamTodayWidget } from './Absensi'
+import { SlaTransferCard } from './dashboard-sla'
 import { ChartHover } from './ChartHover'
 import { PageTemplate } from './frame'
 import { dateId, ProgressCell, ProgressVsBudgetCard } from './progress-ui'
@@ -690,6 +691,7 @@ async function Owner({ req, months }: { req: PayloadRequest; months: 6 | 12 }) {
         <BudgetCard id="owner-budget" projects={d.projects} warnPct={v.warnPct} span={7} i={6} progress={progressMap(k09)} />
         <CategoryCard id="owner-categories" c={v.categories} span={5} i={7} sub={`Dicairkan ${short(v.categories.from.slice(0, 7))} – sekarang`} />
 
+        <SlaTransferCard req={req} span={12} i={8} />
         <TrendCard id="owner-trend" rows={v.requestTrend} title="Tren pengajuan" sub="Jumlah pengajuan per bulan (tanggal pengajuan)" span={6} i={8} />
         <Card id="accounts" title="Saldo per akun" sub="Akun nonaktif bersaldo 0 disembunyikan" span={3} i={9}>
           <HBarList
@@ -964,6 +966,7 @@ async function Finance({ req }: { req: PayloadRequest }) {
         <RecentCashCard id="finance-recent-cash" rows={v.recentCash} span={8} i={12} />
         <CategoryCard id="finance-categories" c={v.categories} span={4} i={13} sub="Dicairkan 6 bulan terakhir" />
 
+        <SlaTransferCard req={req} span={12} i={14} />
         <Card id="period-close" title="Tutup buku" span={6} i={14} action={{ href: '/admin/tutup-buku', label: 'Tutup buku' }}>
           <p className="pk-kpi-x" data-pk-kpi="last-closed" style={{ fontSize: 14 }}>
             {d.lastClosedPeriod ? (

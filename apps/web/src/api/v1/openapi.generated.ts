@@ -1871,6 +1871,13 @@ export const openapiDocument = {
                 "transferDate": {
                   "type": "string"
                 },
+                "transferAt": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "Item 11: date + time of the proof (UTC ISO); null = recorded without a time."
+                },
                 "bankRef": {
                   "type": "string"
                 },
@@ -1904,6 +1911,7 @@ export const openapiDocument = {
                 "kind",
                 "amount",
                 "transferDate",
+                "transferAt",
                 "bankRef",
                 "status",
                 "cashEntryId",
@@ -1998,6 +2006,13 @@ export const openapiDocument = {
               "string",
               "null"
             ]
+          },
+          "approvedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Item 11: final approval time (server) of the current cycle; start of the transfer SLA."
           },
           "cancelReason": {
             "type": [
@@ -2118,6 +2133,7 @@ export const openapiDocument = {
           "resubmitOfId",
           "resubmitOf",
           "submittedAt",
+          "approvedAt",
           "cancelReason",
           "rejectReason",
           "clientUuid",
@@ -3182,7 +3198,13 @@ export const openapiDocument = {
           },
           "transferDate": {
             "type": "string",
-            "pattern": "^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$"
+            "pattern": "^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$",
+            "description": "Legacy: date only (time unknown). With transferAt it must equal the date of transferAt in the PT zone."
+          },
+          "transferAt": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}(:\\d{2}(\\.\\d{1,3})?)?(Z|[+-]\\d{2}:\\d{2})?$",
+            "description": "Item 11: date + time of the bank transfer proof. ISO 8601 with offset, or without offset = wall clock in the PT time zone. Not in the future; its date (PT zone) becomes transferDate (period lock). Omitted = old client, transfer time unknown."
           },
           "amount": {
             "type": "integer",

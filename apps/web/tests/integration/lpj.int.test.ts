@@ -86,7 +86,7 @@ describe('LPJ & settlement — surplus → KM "Pengembalian LPJ"', () => {
       statusLabel: 'LPJ Diajukan',
       settlement: { status: 'submitted', receiptsTotal: 700_000, transferredTotal: 750_000, difference: 50_000, submitCount: 1 },
     })
-    expect(r.submitted.settlement.docNo).toMatch(/^LPJ\/\d{4}\/\d{4}$/)
+    expect(r.submitted.settlement.docNo).toMatch(/^LPJ\/[A-Z0-9]{2,16}\/\d{4}\/\d{4}$/)
     const n = await api('GET', '/api/v1/notifications?unread=true', w.users.finance)
     expect(n.status).toBe(200)
     expect(n.body.items.map((x: { event: string; docId: string }) => [x.event, x.docId])).toContainEqual(['expense.lpj_submitted', String(id)])
@@ -106,7 +106,7 @@ describe('LPJ & settlement — surplus → KM "Pengembalian LPJ"', () => {
     const s = await api('POST', `${E}/${id}/settle`, w.users.finance, { cashAccountId: w.cashAccount, amount: 50_000 })
     expect(s.status, JSON.stringify(s.body)).toBe(200)
     expect(s.body).toMatchObject({ settlementType: 'refund', amount: 50_000, shortfallTransferId: null, request: { status: 'completed', statusLabel: 'Selesai', settlement: { status: 'settled' } } })
-    expect(s.body.refundCashEntryNo).toMatch(/^KM\/\d{4}\/\d{4}$/)
+    expect(s.body.refundCashEntryNo).toMatch(/^KM\/[A-Z0-9]{2,16}\/\d{4}\/\d{4}$/)
     const km = await sqlAs('app', `SELECT e.direction, e.amount::int, e.source_type, e.expense_request_id, s.code FROM cash_entries e JOIN cash_in_sources s ON s.id = e.cash_in_source_id WHERE e.id = $1`, [s.body.refundCashEntryId])
     expect(km.rows[0]).toEqual({ direction: 'in', amount: 50_000, source_type: 'settlement_refund', expense_request_id: id, code: 'LPJ' })
     // no second settlement; void of the refund entry alone is refused

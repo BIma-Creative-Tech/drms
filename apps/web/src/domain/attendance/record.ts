@@ -235,6 +235,8 @@ export async function recordAttendance(req: PayloadRequest, input: RecordInput):
     overrideAccess: true, // SYSTEM-WRITE: attendance after the server-side checks above (create is closed for HTTP)
     req,
   })
+  // D7: timestamp band burnt into the selfie by the worker (same transaction → no job for a rolled-back row)
+  await req.payload.jobs.queue({ task: 'stampSelfie', input: { attendanceId: created.id as number }, req })
   return { id: created.id as number, localDate }
 }
 

@@ -121,7 +121,7 @@ describe('F2e "Pengajuan ulang dari" shows the old number', () => {
     const id = d.body.id as number
     const s = await api('POST', `${E}/${id}/submit`, w.users.staffA, {}, key())
     const docNo = s.body.docNo as string
-    expect(docNo).toMatch(/\/PB-DRMS\//)
+    expect(docNo).toMatch(/^PB\/DRMS\//)
     expect((await api('POST', `${E}/${id}/reject`, w.users.owner, { reason: 'Lengkapi rincian material' }, key())).status).toBe(200)
     const r = await api('POST', `${E}/${id}/resubmit`, w.users.staffA, {}, key())
     expect(r.status, JSON.stringify(r.body)).toBe(201)

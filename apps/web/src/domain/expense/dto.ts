@@ -215,6 +215,7 @@ export async function detail(req: PayloadRequest, id: number) {
       kind: t.kind as string,
       amount: t.amount as number,
       transferDate: t.transferDate as string,
+      transferAt: (t.transferAt as string | null | undefined) ?? null,
       bankRef: t.bankRef as string,
       status: t.status as string,
       cashEntryId: relId(t.cashEntry) ?? null,
@@ -258,6 +259,7 @@ export async function detail(req: PayloadRequest, id: number) {
         ? { id: (doc.resubmitOf as { id: number }).id, docNo: (doc.resubmitOf as { docNo?: string | null }).docNo ?? null, title: (doc.resubmitOf as { title?: string }).title ?? '' }
         : null,
     submittedAt: doc.submittedAt ?? null,
+    approvedAt: (doc as { approvedAt?: string | null }).approvedAt ?? null,
     cancelReason: doc.cancelReason ?? null,
     rejectReason: doc.rejectReason ?? null,
     clientUuid: doc.clientUuid ?? null,

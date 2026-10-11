@@ -86,7 +86,7 @@ describe('Uang Muka (advance) — happy path', () => {
     const r = await api('POST', `${E}/${id}/submit`, w.users.staffA, {})
     expect(r.status, JSON.stringify(r.body)).toBe(200)
     expect(r.body.status).toBe('pending_ack')
-    expect(r.body.docNo).toMatch(/^\d+\/PB-DRMS\/\d{2}\/[IVX]+\/\d{4}$/)
+    expect(r.body.docNo).toMatch(/^PB\/DRMS\/\d{4}\/\d{4,}$/) // D5
     expect(r.body.approvals.map((a: { position: string }) => a.position).sort()).toEqual(['diajukan', 'dibuat'])
     expect(r.body.approvalRule).toMatchObject({
       acknowledge: 'required',
@@ -133,7 +133,7 @@ describe('Uang Muka (advance) — happy path', () => {
     expect(noProof.status).toBe(400)
     const t = await api('POST', `${E}/${id}/transfer`, w.users.finance, { cashAccountId: w.cashAccount, bankRef: 'REF-1', proofMediaId: pf, amount: 800_000 })
     expect(t.status, JSON.stringify(t.body)).toBe(201)
-    expect(t.body.transferDocNo).toMatch(/^TRF\/\d{4}\/\d{4}$/)
+    expect(t.body.transferDocNo).toMatch(/^TRF\/DRMS\/\d{4}\/\d{4}$/)
     expect(t.body.request).toMatchObject({ status: 'transferred', transferredTotal: 800_000 })
     const kk = await sqlAs('app', 'SELECT direction, amount::int, source_type, project_id, transfer_id, status FROM cash_entries WHERE id = $1', [t.body.cashEntryId])
     expect(kk.rows[0]).toEqual({ direction: 'out', amount: 800_000, source_type: 'transfer', project_id: w.project, transfer_id: t.body.transferId, status: 'posted' })

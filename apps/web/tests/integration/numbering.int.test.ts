@@ -32,6 +32,7 @@ beforeAll(async () => {
  * which MUST be the configured startAt 229 when the counter row does not exist yet.
  */
 let base = 229
+const pad = (n: number) => String(n).padStart(4, '0')
 beforeAll(async () => {
   const c = await sqlAs('app', "SELECT next_value FROM document_sequence_counters WHERE company_id = $1 AND doc_type = 'expense_request' AND period_key = 'ALL'", [cid])
   base = c.rows[0]?.next_value ?? 229
@@ -42,7 +43,7 @@ afterAll(async () => {
 })
 
 describe('document numbering (ADR 0007)', () => {
-  it('first PB number continues the paper series: 229/PB-DRMS/23/IX/2026 (number_issued audited in the same tx)', async () => {
+  it('first PB number continues the paper series: PB/DRMS/2609/0229 (number_issued audited in the same tx)', async () => {
     const counter = await sqlAs('app', "SELECT count(*)::int AS n FROM document_sequence_counters WHERE company_id = $1 AND doc_type = 'expense_request'", [cid])
     if (counter.rows[0].n === 0) expect(base).toBe(229)
     const p = await getTestPayload()
@@ -52,9 +53,9 @@ describe('document numbering (ADR 0007)', () => {
       const tx = (await r.execute((await import('@payloadcms/db-postgres')).sql`SELECT txid_current()::text AS tx`)) as unknown as { rows: Array<{ tx: string }> }
       return { a, tx: tx.rows[0]!.tx }
     })
-    expect(res.a.docNo).toBe(`${base}/PB-DRMS/23/IX/2026`)
+    expect(res.a.docNo).toBe(`PB/DRMS/2609/${pad(base)}`)
     const row = await sqlAs('app', "SELECT tx_id::text AS tx, doc_no FROM audit_logs WHERE action = 'number_issued' AND doc_id = 'test-1'")
-    expect(row.rows[0]).toEqual({ tx: res.tx, doc_no: `${base}/PB-DRMS/23/IX/2026` })
+    expect(row.rows[0]).toEqual({ tx: res.tx, doc_no: `PB/DRMS/2609/${pad(base)}` })
   })
 
   it('a rolled-back allocation returns its number (no gap)', async () => {
@@ -66,7 +67,7 @@ describe('document numbering (ADR 0007)', () => {
       }),
     ).rejects.toThrow('simulated failure')
     const next = await withSystemTransaction(p, null, (req) => allocateDocNo(req, 'expense_request', { companyId: cid, date: parseBusinessDate('2026-09-24') }))
-    expect(next.docNo).toBe(`${base + 1}/PB-DRMS/24/IX/2026`)
+    expect(next.docNo).toBe(`PB/DRMS/2609/${pad(base + 1)}`)
   })
 
   it('50 parallel allocations (10 failing after allocation) → committed numbers unique and gapless', async () => {
@@ -108,7 +109,7 @@ describe('document numbering (ADR 0007)', () => {
     // periods no other test file uses (the F2a flow tests post transfers in 2026)
     const a = await withSystemTransaction(p, null, (req) => allocateDocNo(req, 'transfer', { companyId: cid, date: parseBusinessDate('2031-09-30') }))
     const b = await withSystemTransaction(p, null, (req) => allocateDocNo(req, 'transfer', { companyId: cid, date: parseBusinessDate('2031-10-01') }))
-    expect([a.docNo, b.docNo]).toEqual(['TRF/3109/0001', 'TRF/3110/0001'])
+    expect([a.docNo, b.docNo]).toEqual(['TRF/DRMS/3109/0001', 'TRF/DRMS/3110/0001'])
   })
 
   it('refuses to allocate outside a transaction', async () => {

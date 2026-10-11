@@ -46,6 +46,8 @@ import * as migration_20261010_130000_approval_pm_direktur from './20261010_1300
 import * as migration_20261011_100000_p3_rap from './20261011_100000_p3_rap';
 import * as migration_20261011_110000_p3_security from './20261011_110000_p3_security';
 import * as migration_20261012_100000_d1010_project_pm from './20261012_100000_d1010_project_pm';
+import * as migration_20261012_200000_d1010_schema from './20261012_200000_d1010_schema';
+import * as migration_20261012_200100_d1010_data from './20261012_200100_d1010_data';
 
 export const migrations = [
   {
@@ -287,5 +289,15 @@ export const migrations = [
     up: migration_20261012_100000_d1010_project_pm.up,
     down: migration_20261012_100000_d1010_project_pm.down,
     name: '20261012_100000_d1010_project_pm',
+  },
+  {
+    up: migration_20261012_200000_d1010_schema.up,
+    down: migration_20261012_200000_d1010_schema.down,
+    name: '20261012_200000_d1010_schema',
+  },
+  {
+    up: migration_20261012_200100_d1010_data.up,
+    down: migration_20261012_200100_d1010_data.down,
+    name: '20261012_200100_d1010_data',
   },
 ];

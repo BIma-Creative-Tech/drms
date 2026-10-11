@@ -118,6 +118,11 @@ export const COMPANY_SETTING_FIELDS: Field[] = [
     admin: { description: 'Kekurangan LPJ yang membuat total transfer melebihi nominal disetujui + toleransi ini harus disetujui ulang (Direktur → Finance) sebelum ditransfer.' },
   },
   intField('receiptMaxAgeDays', 'Batas umur nota (hari)', 30, 1, 365),
+  // Item 11 (DRMS 10/10): transfer SLA = final approval → transfer (date + time of the bank proof).
+  {
+    ...intField('transferSlaHours', 'SLA transfer (jam sejak disetujui)', 24, 1, 720),
+    admin: { description: 'Pengajuan disetujui yang belum ditransfer lebih lama dari ini tampil merah di Antrian Transfer; dipakai laporan "SLA transfer" dan dashboard.' },
+  },
   intField('reimburseAutoCloseDays', 'Tutup otomatis reimburse (hari)', 30, 1, 365),
   // F3 (Q-F3-1, user 2026-09-24: default 7): an Uang Muka without LPJ is "LPJ terlambat" (K-12b).
   {
@@ -261,7 +266,7 @@ function settingKey(f: Field): string {
   if ('fields' in f && Array.isArray(f.fields)) return f.fields.map(settingKey).find(Boolean) ?? ''
   return ''
 }
-const OPERATIONAL = ['defaultGeofenceRadiusM', 'lateReportDays', 'budgetWarnPct', 'progressWarnGapPct', 'receiptRoundingTolerance', 'shortfallTolerancePct', 'receiptMaxAgeDays', 'reimburseAutoCloseDays', 'lpjDueDays', 'syncExpenseDraftsEnabled', 'syncProgressReportsEnabled', 'fieldReportsEnabled', 'defaultWorkSchedule']
+const OPERATIONAL = ['defaultGeofenceRadiusM', 'lateReportDays', 'budgetWarnPct', 'progressWarnGapPct', 'receiptRoundingTolerance', 'shortfallTolerancePct', 'receiptMaxAgeDays', 'transferSlaHours', 'reimburseAutoCloseDays', 'lpjDueDays', 'syncExpenseDraftsEnabled', 'syncProgressReportsEnabled', 'fieldReportsEnabled', 'defaultWorkSchedule']
 const ATTENDANCE = ['syncAttendanceEnabled', 'selfieRetentionMonths', 'selfieRetentionDeleteEnabled']
 const REMINDERS = ['remindersEnabled', 'notifyRequesterStatusEnabled']
 /** COMPANY_SETTING_FIELDS in tab order; every field lands in exactly one tab (unit test). */
@@ -323,7 +328,7 @@ export const Companies: CollectionConfig = withAudit(
                     maxLength: 16,
                     admin: {
                       width: '30%',
-                      description: 'Token {COMPANY} di nomor dokumen (mis. 1/PB-CS1/27/IX/2026): huruf besar/angka, 2–16 karakter. Terkunci setelah PT ini punya dokumen bernomor.',
+                      description: 'Token {COMPANY} di setiap nomor dokumen (mis. PB/CS1/2610/0001, TRF/CS1/2610/0001): huruf besar/angka, 2–16 karakter. Terkunci setelah PT ini punya dokumen bernomor.',
                     },
                     validate: (v: unknown) => (typeof v === 'string' && SHORT_CODE_RE.test(v) ? true : 'Huruf besar/angka, 2–16 karakter (token {COMPANY}).'),
                   },

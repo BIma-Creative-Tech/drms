@@ -95,7 +95,7 @@ describe('E2 kas masuk / kas keluar (US-23)', () => {
     const body = { direction: 'in', entryDate: today, cashAccountId: w.cashAccount, amount: 2_500_000, description: 'Setoran modal (fiktif)', cashInSourceId: w.cashInSource, projectId: w.project, proofId }
     const r = await api('POST', '/api/v1/cash-entries', w.users.finance, body, key)
     expect(r.status, JSON.stringify(r.body)).toBe(201)
-    expect(r.body).toMatchObject({ entryNo: expect.stringMatching(new RegExp(`^KM/${yymm}/\\d{4}$`)), direction: 'in', amount: 2_500_000, status: 'posted', sourceType: 'manual', period: today.slice(0, 7), projectId: w.project })
+    expect(r.body).toMatchObject({ entryNo: expect.stringMatching(new RegExp(`^KM/[A-Z0-9]{2,16}/${yymm}/\\d{4}$`)), direction: 'in', amount: 2_500_000, status: 'posted', sourceType: 'manual', period: today.slice(0, 7), projectId: w.project })
     km = r.body
     const again = await api('POST', '/api/v1/cash-entries', w.users.finance, body, key)
     expect(again.status).toBe(201)
@@ -112,7 +112,7 @@ describe('E2 kas masuk / kas keluar (US-23)', () => {
     const before = await balanceOf()
     const r = await api('POST', '/api/v1/cash-entries', w.users.finance, { direction: 'out', entryDate: today, cashAccountId: w.cashAccount, amount: 400_000, description: 'BBM operasional (fiktif)', categoryId: w.cat.bbm, vehicleId: w.vehicle, costCenterId: w.costCenter }, idem())
     expect(r.status, JSON.stringify(r.body)).toBe(201)
-    expect(r.body.entryNo).toMatch(new RegExp(`^KK/${yymm}/\\d{4}$`))
+    expect(r.body.entryNo).toMatch(new RegExp(`^KK/[A-Z0-9]{2,16}/${yymm}/\\d{4}$`))
     expect(r.body).toMatchObject({ vehicleId: w.vehicle, costCenterId: w.costCenter, categoryId: w.cat.bbm })
     kk = r.body
     expect(await balanceOf()).toBe(before - 400_000)
@@ -158,7 +158,7 @@ describe('E2 kas masuk / kas keluar (US-23)', () => {
     expect(v.status, JSON.stringify(v.body)).toBe(200)
     expect(v.body.original).toMatchObject({ id: km.id, entryNo: km.entryNo, status: 'void', voidReason: 'setoran batal', amount: 2_500_000, direction: 'in' })
     expect(v.body.reversal).toMatchObject({ direction: 'out', amount: 2_500_000, sourceType: 'reversal', reversalOfId: km.id, entryDate: today, status: 'posted' })
-    expect(v.body.reversal.entryNo).toMatch(new RegExp(`^KK/${yymm}/\\d{4}$`))
+    expect(v.body.reversal.entryNo).toMatch(new RegExp(`^KK/[A-Z0-9]{2,16}/${yymm}/\\d{4}$`))
     expect(v.body.original.reversedById).toBe(v.body.reversal.id)
     expect(await balanceOf()).toBe(before - 2_500_000)
     const rows = await auditRows('cash_entry', km.id)
@@ -265,7 +265,7 @@ describe('E2 tutup buku: closed period rejects postings (Indonesian message); re
       restoreClosed.push(latest)
     }
     inPrev = await must(api('POST', '/api/v1/cash-entries', w.users.finance, { direction: 'in', entryDate: `${prev}-15`, cashAccountId: w.cashAccount, amount: 100_000, description: 'Pendapatan lain (fiktif)', cashInSourceId: w.cashInSource }), 201)
-    expect(inPrev.entryNo).toMatch(new RegExp(`^KM/${prev.slice(2, 4)}${prev.slice(5, 7)}/\\d{4}$`))
+    expect(inPrev.entryNo).toMatch(new RegExp(`^KM/[A-Z0-9]{2,16}/${prev.slice(2, 4)}${prev.slice(5, 7)}/\\d{4}$`))
   })
 
   it('PM/Staff/Admin cannot close (403); Finance closes (201, audit period_close); current month cannot be closed', async () => {

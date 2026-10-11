@@ -163,7 +163,7 @@ describe('progress reports (T11, US-10)', () => {
     expect(r.status, JSON.stringify(r.body)).toBe(201)
     firstReport = r.body.id
     expect(r.body).toMatchObject({ pctBefore: 0, pctAfter: 50, projectPctBefore: 0, projectPctAfter: 15, offline: false, source: 'web', editable: true, rev: 1 })
-    expect(r.body.docNo).toMatch(/^LP\/\d{4}\/\d{4}$/)
+    expect(r.body.docNo).toMatch(/^LP\/[A-Z0-9]{2,16}\/\d{4}\/\d{4}$/)
     expect(r.body.photos.map((x: { id: number }) => x.id)).toEqual(firstPhotos)
     expect(await stagePct(stageA)).toBe(50)
     expect(await projectPct(w.project)).toBe(15)

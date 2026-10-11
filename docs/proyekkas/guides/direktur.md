@@ -66,7 +66,8 @@ Toleransi diubah oleh Admin/Direktur di data PT (Pengaturan operasional).
 
 - **Web Beranda:** Saldo kas total, Pengajuan menunggu, Pencairan bulan ini, Realisasi vs anggaran; grafik **Arus
   kas bulanan** (pilih 12 atau 6 bulan), status pengajuan, realisasi vs RAB per project, kelengkapan nota/LPJ,
-  saldo per akun. Klik kartu untuk rinciannya. Rentang tanggal bebas: **Laporan → Rekap Kas**.
+  saldo per akun, **SLA transfer** (% transfer bulan ini yang selesai dalam SLA sejak Anda/approver terakhir
+  menyetujui; rincian di **Laporan → SLA Transfer**). Klik kartu untuk rinciannya. Rentang tanggal bebas: **Laporan → Rekap Kas**.
 - **Beberapa PT:** angka besar = gabungan PT tempat Anda Direktur; di bawahnya rincian per PT (saldo kas, pengajuan
   menunggu, project berjalan · merah · kuning, kelengkapan LPJ, antrian transfer). Warna anggaran dihitung dengan
   ambang **masing-masing PT** (tidak ada persentase gabungan). Nama akun kas diberi awalan `[KODE PT]`. Ingin melihat

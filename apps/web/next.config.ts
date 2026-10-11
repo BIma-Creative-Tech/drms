@@ -47,7 +47,9 @@ const nextConfig: NextConfig = {
           { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
           {
             key: 'Permissions-Policy',
-            value: 'camera=(), microphone=(), geolocation=(), payment=(), usb=()',
+            // camera + geolocation for this origin only: web self check-in (live selfie + GPS, item 14
+            // DRMS 10/10; `geolocation=()` had blocked the GPS of the web check-in since 2026-10-09).
+            value: 'camera=(self), microphone=(), geolocation=(self), payment=(), usb=()',
           },
           { key: 'X-Frame-Options', value: 'DENY' },
           { key: 'Cross-Origin-Opener-Policy', value: 'same-origin' },

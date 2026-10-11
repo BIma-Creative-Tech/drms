@@ -283,7 +283,7 @@ export async function acknowledge(req: PayloadRequest, id: number, opts: SignOpt
     // ADR 0013 G1-2: the only approval position was skipped (the only Finance is requester/creator) →
     // the Direktur's decision is final. Through "Menunggu Approval" so the DB rule "approvedAmount only
     // on pending_approval → approved" (G3) holds; nobody is notified for the empty level.
-    const approved = await updateRequest(req, id, { status: 'approved', approvedAmount: next.grandTotal ?? 0 })
+    const approved = await updateRequest(req, id, { status: 'approved', approvedAmount: next.grandTotal ?? 0, approvedAt: new Date().toISOString() })
     await writeSnapshot(req, approved, 'approve')
     return approved
   }
@@ -314,7 +314,8 @@ export async function approve(req: PayloadRequest, id: number, opts: SignOpts = 
   })
   const snap = doc.approvalSnapshot as ApprovalSnapshot
   if (level < lastLevel(snap)) return updateRequest(req, id, { currentLevel: level + 1 })
-  const updated = await updateRequest(req, id, { status: 'approved', approvedAmount: doc.grandTotal ?? 0 })
+  // item 11: approvedAt = start of the transfer SLA (DB: set only on pending_approval → approved)
+  const updated = await updateRequest(req, id, { status: 'approved', approvedAmount: doc.grandTotal ?? 0, approvedAt: new Date().toISOString() })
   await writeSnapshot(req, updated, 'approve')
   return updated
 }

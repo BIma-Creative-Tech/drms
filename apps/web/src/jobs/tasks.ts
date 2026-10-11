@@ -2,6 +2,7 @@ import { sql } from '@payloadcms/db-postgres'
 import type { TaskConfig } from 'payload'
 
 import { purgeExpiredSelfies } from '@/domain/attendance/retention'
+import { stampAttendanceSelfie } from '@/domain/attendance/stamp'
 import { purgeOrphanMedia } from '@/domain/media-orphans'
 import { runDailyReminders } from '@/domain/reminders/service'
 import { autoCloseReimburse } from '@/domain/expense/auto-close'
@@ -185,4 +186,25 @@ export const mediaOrphanCleanupTask: TaskConfig<{
   },
 }
 
-export const tasks = [auditDailyAnchorTask, sendEmailTask, reimburseAutoCloseTask, selfieRetentionTask, dailyRemindersTask, mediaOrphanCleanupTask]
+/**
+ * D7 (DRMS 10/10, ADR 0010 addendum 2026-10-12): burns the timestamp band into the selfie of ONE attendance.
+ * Queued by recordAttendance in the attendance's transaction (rolled back with it); run by the worker so
+ * the re-encode never competes with web requests (Q-34). Idempotent (`stamped_at`); input = attendance id
+ * only (no personal data in the job log).
+ */
+export const stampSelfieTask: TaskConfig<{
+  input: { attendanceId: number }
+  output: { status: string }
+}> = {
+  slug: 'stampSelfie',
+  inputSchema: [{ name: 'attendanceId', type: 'number', required: true }],
+  outputSchema: [{ name: 'status', type: 'text', required: true }],
+  retries: { attempts: 3, backoff: { type: 'exponential', delay: 30_000 } },
+  handler: async ({ input, req }) => {
+    const r = await stampAttendanceSelfie(req.payload, input.attendanceId)
+    if (r.status !== 'stamped') req.payload.logger.info({ msg: 'selfie stamp skipped', attendanceId: input.attendanceId, status: r.status })
+    return { output: { status: r.status } }
+  },
+}
+
+export const tasks = [auditDailyAnchorTask, sendEmailTask, reimburseAutoCloseTask, selfieRetentionTask, dailyRemindersTask, mediaOrphanCleanupTask, stampSelfieTask]

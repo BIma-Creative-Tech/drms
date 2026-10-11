@@ -184,7 +184,7 @@ describe('cash ledger (US-23/US-24, ADR 0005) and period closing (G5)', () => {
     expect((await api('POST', '/api/v1/cash-entries', w.users.finance, { direction: 'out', cashAccountId: w.cashAccount, amount: 1, description: 'x' })).status).toBe(400) // category required
     const out = await api('POST', '/api/v1/cash-entries', w.users.finance, { direction: 'out', entryDate: '2026-08-15', cashAccountId: w.cashAccount, amount: 250_000, description: 'Beli ATK', categoryId: w.cat.mat, projectId: w.project })
     expect(out.status, JSON.stringify(out.body)).toBe(201)
-    expect(out.body).toMatchObject({ entryNo: expect.stringMatching(/^KK\/2608\/\d{4}$/), period: '2026-08', status: 'posted', sourceType: 'manual' })
+    expect(out.body).toMatchObject({ entryNo: expect.stringMatching(/^KK\/[A-Z0-9]{2,16}\/2608\/\d{4}$/), period: '2026-08', status: 'posted', sourceType: 'manual' })
     augustEntry = out.body.id
     const bal = await api('GET', '/api/v1/cash-accounts/balances', w.users.owner)
     const mine = bal.body.items.find((b: { cashAccountId: number }) => b.cashAccountId === w.cashAccount)

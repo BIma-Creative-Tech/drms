@@ -15,6 +15,7 @@ import { ListToolbar, Pager } from '../components/list/ListToolbar'
 import { matchesQuery, paginate, parseListQuery } from '../list-query'
 import { MoneyForm } from '../components/MoneyForm'
 import { ReimburseReceiptReview, loadReimburseReview } from '../components/ReimburseReceiptReview'
+import { SlaAgeBadge } from '../components/SlaAgeBadge'
 import { accountsOf, itemCompany, PtChip, PtScopeNote, ptView } from './pt'
 import { Empty, Forbidden, Shell, TableScroll, allowed, badge, docLink, num, rp, table, td, th } from './shared'
 
@@ -94,6 +95,10 @@ export async function TransferQueue(props: AdminViewServerProps) {
                 ) : null}
                 <td style={td} data-label="Dibutuhkan">
                   {r.neededDate ?? '—'}
+                  {/* item 11: age since the final approval vs the PT's transfer SLA */}
+                  <div style={{ marginTop: 2 }}>
+                    <SlaAgeBadge sla={r.sla} />
+                  </div>
                 </td>
                 <td style={td} data-label="Nomor / Judul" data-span="full" data-primary>
                   {docLink(r.id, r.docNo ?? `#${r.id}`)}
