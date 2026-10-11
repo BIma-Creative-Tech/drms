@@ -6,6 +6,38 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+**DRMS 10/10 Phase C — server + web** (owner decisions D2 / D4, points 2–4, 7, 10; web ↔ APK consistency). API contract
+for the APK in `docs/proyekkas/plans/drms-1010.md` ("Phase C API contract").
+
+**Database migrations:** `20261012_400000_d1010_rap_cost_center` (schema: `expense_requests_lines.rap_item_id`,
+`transfers.cost_center_id`, `projects.cost_center_id`, flag kind `rap_over_budget`) and `20261012_400100_d1010_rap_guard`
+(content hash incl. the line RAP item — existing hashes unchanged; line RAP item of the request's project; no cost center
+on new requests, project required to send (legacy rows keep working); transfers need a cost center of their PT; manual
+cash entries stay "project OR cost center").
+
+### Added (DRMS 10/10 Phase C)
+
+- **D4 RAP realisation:** every request line names an **Item RAP** of the request's project (line dialog picker, "RAP …"
+  under the line / on the card). Required to send when the project has a RAP; a konstruksi project without RAP cannot send
+  requests. Plan (volume × harga satuan) vs realisation (approved line totals), plus transferred and verified amounts,
+  remaining and % per item and per project. Over plan → warning flag **"Melebihi RAP"** for PM / Direktur / Finance (not
+  blocking; never shown to Staff).
+- **Project detail tabs** Proyek / **RAP** / **Pengajuan** (`/admin/collections/projects/:id`, `/rap`, `/pengajuan`) with
+  search, filters and pages; RAP items as cards at phone width.
+- **Direktur dashboard: "Monitoring RAP"** — projects with RAP, % realisation, items over plan, link to the RAP tab.
+- **API (APK):** `GET /api/v1/projects`, `GET /api/v1/projects/{id}`, `GET /api/v1/cost-centers`; `GET /expense-requests`
+  filters `project`, `q`, numbered `page`; `GET /transfer-queue` with project, suggested cost center, bank, flags, SLA.
+
+### Changed (DRMS 10/10 Phase C)
+
+- **D2 no non-project requests:** the project is required to send a request; the requester no longer picks a cost center
+  (a `costCenterId` from old apps is ignored). **Finance chooses the cost center when recording the transfer** (required;
+  pre-selected from the project's new "Pusat biaya (default transfer)"); the KK carries project + cost center, so the
+  dashboard "Pusat biaya bulan ini" and the report filter `pusat` follow Finance's choice. Approval routing: project PM.
+- **Request detail sidebar** no longer repeats the header (Nomor, Status, Dibuat oleh, Grand total, dates); "Aturan
+  approval" for Finance / Admin only; "Alasan perubahan" only in Revisi Nota (a Draft at phone width ends with the lines).
+- **Verifikasi LPJ** receipts as cards at ≤ 640 px; the image lightbox skips the hidden duplicate of a thumbnail.
+
 **DRMS 10/10 Phase B-2 integration + polish** (web ↔ APK consistency; owner prefers the APK layout). No new migration;
 `migrate:create` → no changes; generated files (importMap, payload-types, OpenAPI, Flutter codegen) unchanged.
 
