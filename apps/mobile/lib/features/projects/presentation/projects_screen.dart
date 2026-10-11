@@ -148,7 +148,8 @@ class ProjectCard extends StatelessWidget {
     final theme = Theme.of(context);
     final p = project;
     final pct = p.rapPercent;
-    final over = (p.rapOverBudgetItems ?? 0) > 0 || (pct ?? 0) > 100;
+    // the bar turns red only when the whole RAP is over plan; single items over plan are named below it
+    final over = (pct ?? 0) > 100;
     return Card(
       key: Key('project-${p.id}'),
       margin: const EdgeInsets.only(bottom: 10),

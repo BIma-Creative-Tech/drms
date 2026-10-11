@@ -15,6 +15,7 @@ class MasterPickerField extends StatelessWidget {
     this.allowNone = true,
     this.errorText,
     this.hint,
+    this.helperText,
   });
 
   final String label;
@@ -26,6 +27,9 @@ class MasterPickerField extends StatelessWidget {
 
   /// d1010 (8d / WA-15): field-specific placeholder; default "Pilih <label>".
   final String? hint;
+
+  /// Help line under the field (hidden while [errorText] is shown).
+  final String? helperText;
 
   @override
   Widget build(BuildContext context) {
@@ -44,6 +48,8 @@ class MasterPickerField extends StatelessWidget {
         decoration: InputDecoration(
           labelText: label,
           errorText: errorText,
+          helperText: helperText,
+          helperMaxLines: 2,
           suffixIcon: const Icon(Icons.arrow_drop_down),
         ),
         child: selected != null || value != null

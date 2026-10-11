@@ -5718,6 +5718,18 @@ abstract class AppLocalizations {
   /// In id, this message translates to:
   /// **'Periksa nomor rekening dan nama pemilik dengan karyawan sebelum mentransfer. Konfirmasi Anda tercatat di audit log.'**
   String get unverifiedNote;
+
+  /// No description provided for @proofCamera.
+  ///
+  /// In id, this message translates to:
+  /// **'Kamera'**
+  String get proofCamera;
+
+  /// No description provided for @rapOverBy.
+  ///
+  /// In id, this message translates to:
+  /// **'Lebih {amount}'**
+  String rapOverBy(String amount);
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

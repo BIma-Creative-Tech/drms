@@ -328,17 +328,10 @@ class _TransferFormScreenState extends ConsumerState<TransferFormScreen> {
                 value: _costCenterId,
                 allowNone: false,
                 errorText: issues['costCenterId'],
+                helperText: it.costCenter != null ? t.costCenterSuggested : t.costCenterNoDefault,
                 onChanged: (v) => setState(() => _costCenterId = v),
               ),
             },
-            Padding(
-              padding: const EdgeInsets.only(top: 4, left: 12),
-              child: Text(
-                it.costCenter != null ? t.costCenterSuggested : t.costCenterNoDefault,
-                key: const Key('transfer-cost-center-help'),
-                style: theme.textTheme.bodySmall,
-              ),
-            ),
             const SizedBox(height: 12),
             // 4. No. referensi bank
             TextField(
@@ -386,7 +379,7 @@ class _TransferFormScreenState extends ConsumerState<TransferFormScreen> {
                     key: const Key('transfer-proof-camera'),
                     onPressed: () => _addProof(fromCamera: true),
                     icon: const Icon(Icons.photo_camera),
-                    label: Text(_proof == null ? t.addReceiptCamera : t.proofRetake),
+                    label: Text(_proof == null ? t.proofCamera : t.proofRetake),
                   ),
                 ),
                 const SizedBox(width: 12),

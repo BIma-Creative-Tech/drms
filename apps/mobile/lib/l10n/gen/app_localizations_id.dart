@@ -3169,4 +3169,12 @@ class AppLocalizationsId extends AppLocalizations {
   @override
   String get unverifiedNote =>
       'Periksa nomor rekening dan nama pemilik dengan karyawan sebelum mentransfer. Konfirmasi Anda tercatat di audit log.';
+
+  @override
+  String get proofCamera => 'Kamera';
+
+  @override
+  String rapOverBy(String amount) {
+    return 'Lebih $amount';
+  }
 }

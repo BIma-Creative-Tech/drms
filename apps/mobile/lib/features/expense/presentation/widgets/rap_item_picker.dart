@@ -67,12 +67,14 @@ class RapProgressBar extends StatelessWidget {
   }
 }
 
-/// "Sisa Rp 250.000 dari Rp 1.000.000 · 75%" (null without money figures, e.g. offline).
+/// "Sisa Rp 250.000 dari Rp 1.000.000 · 75%" / "Lebih Rp 1.200.000 dari Rp 15.000.000 · 108%" (null without money
+/// figures, e.g. offline or a role without RAP prices).
 String? rapRemainingText(AppLocalizations t, RapBudgetItem i) {
   if (i.remaining == null) return null;
   final of = i.planned == null ? '' : ' ${t.rapOf(formatRupiah(i.planned!))}';
   final pct = i.progress == null ? '' : ' · ${((i.percent ?? (i.progress! * 100))).toStringAsFixed(0)}%';
-  return '${t.rapRemaining(formatRupiah(i.remaining!))}$of$pct';
+  final rest = i.remaining! < 0 ? t.rapOverBy(formatRupiah(-i.remaining!)) : t.rapRemaining(formatRupiah(i.remaining!));
+  return '$rest$of$pct';
 }
 
 /// D4 required "Item RAP" picker of a draft line: RAP items of the draft's project, searchable, each with its

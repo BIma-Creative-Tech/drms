@@ -145,16 +145,27 @@ class _InfoTab extends ConsumerWidget {
                         ),
                         if (rap.percent != null) ...[
                           const SizedBox(height: 6),
-                          RapProgressBar(
-                            item: RapBudgetItem(
-                              id: 0,
-                              code: '',
-                              name: '',
-                              planned: rap.planned,
-                              realised: rap.realised,
-                              remaining: rap.remaining,
-                              percent: rap.percent,
-                            ),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: RapProgressBar(
+                                  item: RapBudgetItem(
+                                    id: 0,
+                                    code: '',
+                                    name: '',
+                                    planned: rap.planned,
+                                    realised: rap.realised,
+                                    remaining: rap.remaining,
+                                    percent: rap.percent,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                '${rap.percent!.toStringAsFixed(0)}%',
+                                style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w700),
+                              ),
+                            ],
                           ),
                         ],
                         if ((rap.overBudgetItems ?? 0) > 0)

@@ -2126,5 +2126,14 @@
     }
   },
   "unverifiedDestination": "tujuan",
-  "unverifiedNote": "Periksa nomor rekening dan nama pemilik dengan karyawan sebelum mentransfer. Konfirmasi Anda tercatat di audit log."
+  "unverifiedNote": "Periksa nomor rekening dan nama pemilik dengan karyawan sebelum mentransfer. Konfirmasi Anda tercatat di audit log.",
+  "proofCamera": "Kamera",
+  "rapOverBy": "Lebih {amount}",
+  "@rapOverBy": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  }
 }
