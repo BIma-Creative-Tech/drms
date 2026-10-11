@@ -118,7 +118,7 @@ describe('UAT seed', () => {
     await expect(seedUat(p, clash)).rejects.toThrow(/email already belongs to another account/)
   })
 
-  it('Staff Uji can submit a request on OPS-PB; PM Uji approves (Persetujuan PM), then Direktur Uji (ADR 0021); Finance Uji does not approve', async () => {
+  it('Staff Uji can submit a request on the UAT project; PM Uji approves (Persetujuan PM), then Direktur Uji (ADR 0021); Finance Uji does not approve', async () => {
     const asFlow = async (email: string): Promise<FlowUser> => {
       const u = await one('users', 'email', email)
       const f = { ...(await withContext({ id: u.id as number, email, keycloakSub: '', collection: 'users' as const })), cookie: '', _strategy: 'oidcSession' } as FlowUser
@@ -135,14 +135,16 @@ describe('UAT seed', () => {
     const account = await one('employee-bank-accounts', 'accountNo', '9990001112223')
     const ksm = await one('expense-categories', 'code', 'KSM')
     const E = '/api/v1/expense-requests'
-    // ADR 0021: the staging rule after the Admin's change (= the seeded default shape), scoped to OPS-PB so that
-    // rules other files leave in the shared DB (ADR 0013 fallbacks, form 228) cannot win.
+    // ADR 0021: the staging rule after the Admin's change (= the seeded default shape), scoped to the UAT project so
+    // that rules other files leave in the shared DB (ADR 0013 fallbacks, form 228) cannot win. DRMS 10/10 D2: requests
+    // are project requests (was: on the cost center OPS-PB).
     const p = await getTestPayload()
+    const projectId = (await one('projects', 'code', UAT_FIXTURE.project.code)).id
     const seeded = (await p.find({ collection: 'approval-rules', where: { name: { equals: DEFAULT_APPROVAL_RULES[0].name } }, limit: 1, depth: 0, overrideAccess: true /* SYSTEM-READ: fixture */ })).docs[0]
     expect(seeded).toMatchObject({ acknowledge: 'required', acknowledgeBy: 'scope_manager' })
     const uatRule = await p.create({
       collection: 'approval-rules',
-      data: { ...DEFAULT_APPROVAL_RULES[0], steps: [...DEFAULT_APPROVAL_RULES[0].steps], name: 'UAT — PM project lalu Direktur (OPS-PB)', costCenter: ccId, priority: 0 } as never,
+      data: { ...DEFAULT_APPROVAL_RULES[0], steps: [...DEFAULT_APPROVAL_RULES[0].steps], name: 'UAT — PM project lalu Direktur (UJI-PRJ)', project: projectId, priority: 0 } as never,
       overrideAccess: true, // SYSTEM-WRITE: fixture
     })
     onTestFinished(async () => {
@@ -152,7 +154,7 @@ describe('UAT seed', () => {
     const c = await api('POST', E, staff, {
       type: 'advance',
       title: 'Uji konsumsi lapangan',
-      costCenterId: ccId,
+      projectId,
       requesterIds: [staff.employee],
       bankAccountId: account.id,
       neededDate: '2026-09-30',

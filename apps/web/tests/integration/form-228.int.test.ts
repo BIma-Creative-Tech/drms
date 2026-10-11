@@ -16,8 +16,8 @@ import { submit } from '@/domain/expense/workflow'
 import { normalizePlate } from '@/domain/plates'
 import { FORM_228 } from '@/seed/form-fixture'
 
-import { companyId, getTestPayload, installFakeKeycloak, sqlAs } from './helpers'
-import { api, asUser, makeFlowUser, png, upload, uploadMedia, type FlowUser } from './flow-world'
+import { companyId, fixturePm, getTestPayload, installFakeKeycloak, sqlAs } from './helpers'
+import { api, asUser, legacyCostCenter, makeFlowUser, png, sysCreate, upload, uploadMedia, type FlowUser } from './flow-world'
 import { DEFAULT_APPROVAL_RULES } from '@/seed/data'
 import { seed } from '@/seed/seed'
 
@@ -74,6 +74,9 @@ beforeAll(async () => {
   }
   finance = await makeFlowUser(['pk-finance'], 'finance-228', null)
   m.cc = await idOf('cost-centers', 'code', FORM_228.costCenterCode)
+  // DRMS 10/10 D2: new requests are project requests — the paper form 228 (on the cost center OPS-PB) is a LEGACY
+  // request: drafted on a project, then turned into the pre-D2 cost-center row (legacyCostCenter)
+  m.project = await sysCreate('projects', { code: `F228-${Date.now() % 100000}`, name: 'Form 228 (draft)', pm: await fixturePm(), status: 'berjalan' })
   // An ADR 0013 rule (Diketahui = Direktur, then Finance, every amount) scoped to OPS-PB so that
   // generic rules created by other test files sharing the DB cannot win the tie.
   const def = (await p.find({ collection: 'approval-rules', where: { and: [{ company: { equals: await companyId() } }, { name: { equals: DEFAULT_APPROVAL_RULES[0].name } }] }, limit: 1, depth: 0, overrideAccess: true /* SYSTEM-READ: fixture */ })).docs[0]!
@@ -106,7 +109,7 @@ describe('form 228/PB-DRMS/20/IX/2026 (F2 acceptance fixture)', () => {
     const r = await api('POST', '/api/v1/expense-requests', citra, {
       type: FORM_228.type,
       title: FORM_228.title,
-      costCenterId: m.cc,
+      projectId: m.project,
       requesterIds: FORM_228.requesterCodes.map((c) => emp[c]),
       bankAccountId: m.bank,
       lines: FORM_228.lines.map((l) => ({
@@ -121,6 +124,7 @@ describe('form 228/PB-DRMS/20/IX/2026 (F2 acceptance fixture)', () => {
     })
     expect(r.status, JSON.stringify(r.body)).toBe(201)
     requestId = r.body.id
+    await legacyCostCenter(requestId, m.cc!)
     lineIds = r.body.lines.map((l: { id: string }) => l.id)
     expect(r.body).toMatchObject({ status: 'draft', docNo: null, grandTotal: FORM_228.grandTotal, createdBy: { id: citra.id } })
     expect(r.body.requesters.map((x: { name: string }) => x.name)).toEqual(['Budi', 'Doni Pratama'])
@@ -238,7 +242,7 @@ describe('form 228/PB-DRMS/20/IX/2026 (F2 acceptance fixture)', () => {
     const r = await api('POST', '/api/v1/expense-requests', citra, {
       type: 'reimburse',
       title: 'Makan siang lagi',
-      costCenterId: m.cc,
+      projectId: m.project,
       requesterIds: [emp['EMP-002']],
       bankAccountId: m.bank,
       lines: [{ description: 'Makan siang', total: 170_500, categoryId: m['cat:KSM'] }],
@@ -329,7 +333,7 @@ describe('PDF "Pengajuan Biaya" — form 228 golden test (US-46, ADR 0008)', () 
   })
 
   it('Draft → 409 (no number yet)', async () => {
-    const r = await api('POST', '/api/v1/expense-requests', citra, { type: 'advance', title: 'draft pdf', costCenterId: m.cc, requesterIds: [emp['EMP-002']], bankAccountId: m.bank, lines: [{ description: 'x', total: 1000, categoryId: m['cat:KSM'] }] })
+    const r = await api('POST', '/api/v1/expense-requests', citra, { type: 'advance', title: 'draft pdf', projectId: m.project, requesterIds: [emp['EMP-002']], bankAccountId: m.bank, lines: [{ description: 'x', total: 1000, categoryId: m['cat:KSM'] }] })
     expect((await pdfGet(`/api/v1/expense-requests/${r.body.id}/pdf`, citra)).status).toBe(409)
   })
 

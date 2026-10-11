@@ -75,11 +75,12 @@ describe('F2c admin create/edit form path (generic REST) = same draft rules as /
     { description: 'Penginapan', qty: 1, uom: w.uom.kmr, total: 400_000, category: w.cat.inap },
   ]
 
-  it('Admin creates on behalf (Q-09): 2 requesters, cost center, bank account of the 2nd requester; grand total server-computed', async () => {
+  it('Admin creates on behalf (Q-09): 2 requesters, project, bank account of the 2nd requester; grand total server-computed', async () => {
+    // DRMS 10/10 D2: a project request (the form no longer offers a cost center)
     const r = await api('POST', '/api/expense-requests', w.users.admin, {
       type: 'advance',
       title: 'Perjalanan dinas (atas nama)',
-      costCenter: w.costCenter,
+      project: w.project,
       requesters: [w.emp.a, w.emp.b],
       bankAccount: w.accB,
       lines: lines(),
@@ -95,12 +96,13 @@ describe('F2c admin create/edit form path (generic REST) = same draft rules as /
     expect(s.body.approvals.find((a: { position: string }) => a.position === 'diajukan')).toMatchObject({ onBehalf: true, employeeId: w.emp.a })
   })
 
-  it('negatives: staff on behalf of someone else 403; project AND cost center 400; foreign bank account 400; project out of scope 403', async () => {
+  it('negatives: staff on behalf of someone else 403; a cost center is ignored (D2); foreign bank account 400; project out of scope 403', async () => {
     const base = { type: 'reimburse', title: 'Uji', lines: lines() }
     const onBehalf = await api('POST', '/api/expense-requests', w.users.staffA, { ...base, requesters: [w.emp.b], costCenter: w.costCenter })
     expect(onBehalf.status, JSON.stringify(onBehalf.body)).toBe(403)
     const both = await api('POST', '/api/expense-requests', w.users.admin, { ...base, project: w.project, costCenter: w.costCenter, requesters: [w.emp.a] })
-    expect(both.status).toBe(400)
+    expect(both.status, JSON.stringify(both.body)).toBe(201)
+    expect(both.body.doc.costCenter ?? null).toBeNull()
     const bank = await api('POST', '/api/expense-requests', w.users.admin, { ...base, costCenter: w.costCenter, requesters: [w.emp.b], bankAccount: w.accA })
     expect(bank.status).toBe(400)
     expect(JSON.stringify(bank.body)).toContain('bankAccount')

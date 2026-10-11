@@ -20,7 +20,7 @@ import { notifyCreated, notifyTransition } from '@/domain/notifications'
 import { companyField, companyHook, pickerSameCompany, sameCompanyOptions } from '@/fields/company'
 import { validationError } from '@/lib/validation'
 
-import { draftOnly, editableInput, isDraftForm, linesCondition, linesEditable, PLACEHOLDERS, submittedOnly, whenSet } from './expense-request-form'
+import { draftOnly, editableInput, isDraftForm, linesCondition, linesEditable, PLACEHOLDERS, revisionOnly, shownInHeader, submittedOnly, whenSet } from './expense-request-form'
 import { businessDateField } from './fields-f2'
 import { USER_NAME_VIEW } from '@/fields/users'
 
@@ -45,8 +45,12 @@ import { USER_NAME_VIEW } from '@/fields/users'
 
 const system = { create: fieldNever, update: fieldNever }
 
+/** Phase C polish: a server field kept in the sidebar only in "Revisi Nota" (and only with a value). */
+const revisionAndSet = (name: string): Condition => (d, s, c) => revisionOnly(d, s, c) && whenSet(name)(d, s, c)
+
 /** Roles that may read `approval-rules` (collection read access) — the field is shown only to them. */
-const canSeeApprovalRules: Condition = (_data, _sibling, { user }) => rolesOf(user).some((r) => r === 'pk-admin' || r === 'pk-owner' || r === 'pk-finance')
+// Phase C polish: in the sidebar for Finance / Admin only (the Direktur and PM read the approval timeline)
+const canSeeApprovalRules: Condition = (_data, _sibling, { user }) => rolesOf(user).some((r) => r === 'pk-admin' || r === 'pk-finance')
 const ro = { readOnly: true }
 const RUPIAH_FIELD = '@/admin/components/RupiahNumberField#RupiahNumberField'
 /** Read-only money as "Rp 1.250.000" (RupiahNumberField read-only mode). */
@@ -145,7 +149,13 @@ const beforeChange: CollectionBeforeChangeHook = async ({ data, originalDoc, ope
   }
 
   const project = relId(d.project !== undefined ? d.project : prev.project)
-  const costCenter = relId(d.costCenter !== undefined ? d.costCenter : prev.costCenter)
+  let costCenter = relId(d.costCenter !== undefined ? d.costCenter : prev.costCenter)
+  // D2: a legacy cost-center DRAFT that gets a project becomes a project request (its old cost center is dropped;
+  // the field itself is never writable by users — `access` above). Locked / Revisi Nota rows never change scope.
+  if (!transition && project !== undefined && costCenter !== undefined && (operation === 'create' || prev.status === 'draft')) {
+    d.costCenter = null
+    costCenter = undefined
+  }
   if (project !== undefined && costCenter !== undefined) {
     throw validationError(req, { collection: 'expense-requests' }, [{ path: 'project', message: 'Pilih project ATAU pusat biaya, tidak keduanya.' }])
   }
@@ -208,7 +218,7 @@ const beforeChange: CollectionBeforeChangeHook = async ({ data, originalDoc, ope
       if (!list?.length) throw err
       // API field names → form field paths so the admin form marks the right inputs.
       const path = (p: string) =>
-        p.replace(/^projectId$/, 'project').replace(/^costCenterId$/, 'costCenter').replace(/^requesterIds$/, 'requesters').replace(/^bankAccountId$/, 'bankAccount').replace(/\.(uom|category|vehicle)Id$/, '.$1')
+        p.replace(/^projectId$/, 'project').replace(/^costCenterId$/, 'costCenter').replace(/^requesterIds$/, 'requesters').replace(/^bankAccountId$/, 'bankAccount').replace(/\.(uom|category|vehicle|rapItem)Id$/, '.$1')
       throw validationError(
         req,
         { collection: 'expense-requests' },
@@ -277,13 +287,14 @@ export const ExpenseRequests: CollectionConfig = withAudit(
       update: requestUpdateAccess,
       delete: denyDeleteLogged('expense_request'),
     },
-    hooks: { beforeChange: [companyHook('expense-requests', { derive: [{ field: 'project', collection: 'projects' }, { field: 'costCenter', collection: 'cost-centers' }, { field: 'requesters', collection: 'employees' }], check: [{ field: 'bankAccount', collection: 'employee-bank-accounts' }, { field: 'urgencyLevel', collection: 'urgency-levels' }, { field: 'approvalRule', collection: 'approval-rules' }, { field: 'resubmitOf', collection: 'expense-requests' }, { field: 'lines', collection: 'expense-categories', sub: 'category' }, { field: 'lines', collection: 'vehicles', sub: 'vehicle' }] }), beforeChange], afterChange: [auditLines, notify] },
+    hooks: { beforeChange: [companyHook('expense-requests', { derive: [{ field: 'project', collection: 'projects' }, { field: 'costCenter', collection: 'cost-centers' }, { field: 'requesters', collection: 'employees' }], check: [{ field: 'bankAccount', collection: 'employee-bank-accounts' }, { field: 'urgencyLevel', collection: 'urgency-levels' }, { field: 'approvalRule', collection: 'approval-rules' }, { field: 'resubmitOf', collection: 'expense-requests' }, { field: 'lines', collection: 'expense-categories', sub: 'category' }, { field: 'lines', collection: 'vehicles', sub: 'vehicle' }, { field: 'lines', collection: 'rap-items', sub: 'rapItem' }] }), beforeChange], afterChange: [auditLines, notify] },
     // DRMS 10/10 8i (WA-03/WA-10): create / draft shows only the inputs, in the APK draft editor order
     // (Jenis, Judul, Project, Pusat biaya, Tanggal dibutuhkan, Urgensi, Pemohon, Rekening, Keterangan,
     // Lampiran, baris + total pratinjau); system / workflow fields appear after submit (expense-request-form.ts).
     fields: [
       companyField(),
-      { name: 'docNo', type: 'text', label: 'Nomor', index: true, access: system, admin: { ...ro, position: 'sidebar', condition: whenSet('docNo') } },
+      // Phase C polish: shown in the workflow panel header (shownInHeader), not repeated in the sidebar
+      { name: 'docNo', type: 'text', label: 'Nomor', index: true, access: system, admin: { ...ro, position: 'sidebar', condition: shownInHeader } },
       // F2c: status timeline + next actor for everyone, requester actions for creator/requesters.
       { name: 'workflowPanel', type: 'ui', label: 'Status & aksi', admin: { components: { Field: '@/admin/components/WorkflowPanel#WorkflowPanel' } } },
       // M16 / US-46: "Cetak PDF" (audited API download); UI only, no column.
@@ -314,8 +325,21 @@ export const ExpenseRequests: CollectionConfig = withAudit(
         admin: { ...ro, position: 'sidebar', components: { Field: '@/admin/components/RequestStatusField#RequestStatusField', Cell: '@/admin/components/RequestStatusCell#RequestStatusCell' } },
       },
       { name: 'title', type: 'text', label: 'Judul', required: true, maxLength: 200, admin: { components: { Field: '@/admin/components/EditableOnlyFields#RequestTitleField' } } },
-      { name: 'project', type: 'relationship', relationTo: 'projects', label: 'Project', index: true, ...pickerSameCompany(), admin: { placeholder: PLACEHOLDERS.project, condition: editableInput('project') } },
-      { name: 'costCenter', type: 'relationship', relationTo: 'cost-centers', label: 'Pusat biaya', index: true, ...pickerSameCompany(), admin: { placeholder: PLACEHOLDERS.costCenter, description: 'Isi project ATAU pusat biaya.', condition: editableInput('costCenter') } },
+      // D2: the project is mandatory to send the request (validateContent forSubmit); its RAP items feed the line picker (D4)
+      { name: 'project', type: 'relationship', relationTo: 'projects', label: 'Project', index: true, ...pickerSameCompany(), admin: { placeholder: PLACEHOLDERS.project, description: 'Wajib diisi sebelum dikirim. Item RAP baris diambil dari project ini.', condition: editableInput('project') } },
+      // D2 (DRMS 10/10, owner 2026-10-11): no non-project requests — the requester never sets a cost center (create /
+      // update access false → a value sent by an old client is ignored); Finance sets it on the transfer
+      // (transfers.costCenter). Legacy requests keep theirs (shown read-only, never on a new form).
+      {
+        name: 'costCenter',
+        type: 'relationship',
+        relationTo: 'cost-centers',
+        label: 'Pusat biaya (lama)',
+        index: true,
+        access: { create: fieldNever, update: fieldNever },
+        ...pickerSameCompany(),
+        admin: { ...ro, description: 'Pengajuan lama tanpa project. Pengajuan baru: pusat biaya diisi Finance saat transfer.', condition: (d, s, c) => linesEditable(d as Parameters<typeof linesEditable>[0]) && whenSet('costCenter')(d, s, c) },
+      },
       businessDateField('neededDate', 'Tanggal dibutuhkan', { admin: { condition: editableInput() } }),
       // Owner decision 2026-10-09: replaces "Periode kegiatan" (periodFrom/periodTo, Q-04).
       { name: 'urgencyLevel', type: 'relationship', relationTo: 'urgency-levels', label: 'Tingkat urgensi', index: true, ...pickerSameCompany(), admin: { placeholder: PLACEHOLDERS.urgencyLevel, condition: editableInput('urgencyLevel') } },
@@ -381,6 +405,9 @@ export const ExpenseRequests: CollectionConfig = withAudit(
             type: 'row',
             fields: [
               { name: 'category', type: 'relationship', relationTo: 'expense-categories', label: 'Kategori', admin: { placeholder: PLACEHOLDERS.category } },
+              // D4 (DRMS 10/10): the RAP item of the request's project this line is charged to (required to send when the
+              // project has a RAP; realisation per item = Σ approved line totals, domain/rap/budget.ts)
+              { name: 'rapItem', type: 'relationship', relationTo: 'rap-items', label: 'Item RAP', index: true, admin: { placeholder: PLACEHOLDERS.rapItem } },
               { name: 'vehicle', type: 'relationship', relationTo: 'vehicles', label: 'Kendaraan', admin: { placeholder: PLACEHOLDERS.vehicle } },
             ],
           },
@@ -388,9 +415,11 @@ export const ExpenseRequests: CollectionConfig = withAudit(
         ],
       },
       { name: 'linesTotalPreview', type: 'ui', label: 'Total (pratinjau)', admin: { condition: linesCondition, components: { Field: '@/admin/components/LinesTotalPreview#LinesTotalPreview' } } },
-      businessDateField('requestDate', 'Tanggal pengajuan (server)', { access: system, admin: { ...ro, position: 'sidebar', condition: whenSet('requestDate') } }),
-      { name: 'createdBy', type: 'relationship', relationTo: 'users', label: 'Dibuat oleh', index: true, access: system, admin: { ...ro, position: 'sidebar', condition: whenSet('createdBy'), components: USER_NAME_VIEW } },
-      { ...rupiahField('grandTotal', 'Grand total (Rp)'), access: system, admin: { ...ro, ...rupiahView, position: 'sidebar', condition: whenSet('grandTotal') } },
+      // Phase C polish: Grand total is in the panel header; Tanggal / Dibuat oleh in the locked "Rincian pengajuan" — so
+      // the sidebar keeps those two only in "Revisi Nota" (editable: no summary there) and never on a Draft
+      businessDateField('requestDate', 'Tanggal pengajuan (server)', { access: system, admin: { ...ro, position: 'sidebar', condition: revisionAndSet('requestDate') } }),
+      { name: 'createdBy', type: 'relationship', relationTo: 'users', label: 'Dibuat oleh', index: true, access: system, admin: { ...ro, position: 'sidebar', condition: revisionAndSet('createdBy'), components: USER_NAME_VIEW } },
+      { ...rupiahField('grandTotal', 'Grand total (Rp)'), access: system, admin: { ...ro, ...rupiahView, position: 'sidebar', condition: shownInHeader } },
       { ...rupiahField('approvedAmount', 'Nominal disetujui (Rp)'), access: system, admin: { ...ro, ...rupiahView, position: 'sidebar', condition: (d, s, c) => submittedOnly(d, s, c) && whenSet('approvedAmount')(d, s, c) } },
       { ...rupiahField('transferredTotal', 'Total ditransfer (Rp)'), access: system, admin: { ...ro, ...rupiahView, position: 'sidebar', condition: submittedOnly } },
       { ...rupiahField('verifiedReceiptsTotal', 'Total nota terverifikasi LPJ (Rp)'), access: system, admin: { ...ro, ...rupiahView, position: 'sidebar', condition: (d, s, c) => submittedOnly(d, s, c) && whenSet('verifiedReceiptsTotal')(d, s, c) } },
@@ -412,9 +441,10 @@ export const ExpenseRequests: CollectionConfig = withAudit(
       { name: 'approvalCycle', type: 'number', label: 'Siklus approval', defaultValue: 0, access: system, admin: { ...ro, hidden: true } },
       // Lead review (a): the approval timeline in the workflow panel shows the running level — no sidebar number.
       { name: 'currentLevel', type: 'number', label: 'Level approval berjalan', access: system, admin: { ...ro, hidden: true } },
-      { name: 'submittedAt', type: 'date', label: 'Diajukan (server)', access: system, admin: { ...ro, position: 'sidebar', date: { pickerAppearance: 'dayAndTime' }, condition: whenSet('submittedAt') } },
+      // Phase C polish: the approval timeline shows when it was sent / approved (shownInHeader)
+      { name: 'submittedAt', type: 'date', label: 'Diajukan (server)', access: system, admin: { ...ro, position: 'sidebar', date: { pickerAppearance: 'dayAndTime' }, condition: shownInHeader } },
       // Item 11 (DRMS 10/10): final approval time (server) of the current cycle = start of the transfer SLA.
-      { name: 'approvedAt', type: 'date', label: 'Disetujui (server)', index: true, access: system, admin: { ...ro, position: 'sidebar', date: { pickerAppearance: 'dayAndTime' }, condition: whenSet('approvedAt') } },
+      { name: 'approvedAt', type: 'date', label: 'Disetujui (server)', index: true, access: system, admin: { ...ro, position: 'sidebar', date: { pickerAppearance: 'dayAndTime' }, condition: shownInHeader } },
       { name: 'contentHash', type: 'text', label: 'Hash isi terkunci', access: system, admin: { ...ro, hidden: true } },
       {
         name: 'resubmitOf',
@@ -447,7 +477,8 @@ export const ExpenseRequests: CollectionConfig = withAudit(
       },
       uuidField(),
       // Lead review (d): "Alasan perubahan" (audit reason of a save) only where "Simpan" exists (new / Draft / Revisi Nota).
-      { ...changeReasonField(), admin: { ...changeReasonField().admin, condition: (data) => !!(data as { id?: unknown } | undefined)?.id && linesEditable(data as Parameters<typeof linesEditable>[0]) } },
+      // Phase C polish: only in "Revisi Nota" (a Draft save needs no audit reason)
+      { ...changeReasonField(), admin: { ...changeReasonField().admin, condition: (data, s, c) => !!(data as { id?: unknown } | undefined)?.id && revisionOnly(data, s, c) } },
     ],
   },
   {

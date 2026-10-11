@@ -36,6 +36,8 @@ export type FlagInput = {
   tolerance: number
   /** company-settings.receiptMaxAgeDays (usulan 30). */
   maxAgeDays: number
+  /** D4: lines whose RAP item is over its planned amount (domain/rap/budget.ts rapOverBudgetLines). */
+  rapOver?: ReadonlyArray<{ lineId: string; lineNo: number; itemId: number; itemCode: string; itemName: string }>
 }
 
 export type FlagSpec = {
@@ -63,6 +65,22 @@ export function normalizeVendor(v: string | null | undefined): string {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, ' ')
     .trim()
+}
+
+/**
+ * D4 (DRMS 10/10): the line's RAP item is over its planned amount (approved requests + this one). Warning for the
+ * PM / Direktur, never blocking. No amounts in the message: RAP values are not shown to Staff (owner 2026-10-10).
+ */
+export function rapOverFlagSpecs(rapOver: NonNullable<FlagInput['rapOver']>): FlagSpec[] {
+  return rapOver.map((o) => ({
+    key: `rap_over_budget:${o.lineId}`,
+    kind: 'rap_over_budget' as const,
+    level: 'warning' as const,
+    lineId: o.lineId,
+    lineNo: o.lineNo,
+    message: `Baris ${o.lineNo}: item RAP ${o.itemCode} ${o.itemName} — realisasi + pengajuan ini melebihi nilai rencana RAP.`.slice(0, 500),
+    detail: { rapItemId: o.itemId },
+  }))
 }
 
 export function computeFlags(input: FlagInput): FlagSpec[] {
@@ -104,6 +122,8 @@ export function computeFlags(input: FlagInput): FlagSpec[] {
       detail: { lineTotal: line.total, receiptAmount: line.receiptAmount, difference: diff, tolerance: input.tolerance },
     })
   }
+
+  out.push(...rapOverFlagSpecs(input.rapOver ?? []))
 
   // US-49 unusual unit per line (category's allowed UoM list; empty list = no check).
   for (const line of input.lines) {

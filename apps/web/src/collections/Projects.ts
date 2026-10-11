@@ -1,6 +1,7 @@
 import { APIError, type CollectionBeforeChangeHook, type CollectionConfig } from 'payload'
 
 import { readOnlyFieldsGuard } from '@/access/field-guard'
+import { PROJECT_TABS } from '@/admin/config'
 import { denyAll, hasRole, isOperatorOnly } from '@/access/roles'
 import { assignedProjects, byRole, fieldRoles, rolesAllowed } from '@/access/policies'
 import { inIds } from '@/access/scope'
@@ -8,7 +9,7 @@ import { reasonOnChange, withAudit } from '@/audit/hooks'
 import { PROJECT_KIND_LABELS, PROJECT_KINDS } from '@/domain/field/rules'
 import { progressWriteGuard } from '@/domain/progress/guards'
 import { codeField, odooRefField, percentField, rupiahField, uuidField } from '@/fields/common'
-import { companyField, companyHook } from '@/fields/company'
+import { companyField, companyHook, pickerSameCompany } from '@/fields/company'
 import { userPicker } from '@/fields/users'
 
 export const PROJECT_STATUSES = [
@@ -67,7 +68,8 @@ export const Projects: CollectionConfig = withAudit(
   {
     slug: 'projects',
     labels: { singular: 'Project', plural: 'Project' },
-    admin: { useAsTitle: 'name', group: 'Proyek', defaultColumns: ['code', 'name', 'client', 'pm', 'status'] },
+    // DRMS 10/10 point 7: tabs Proyek (form) / RAP / Pengajuan (admin/config.ts PROJECT_TABS)
+    admin: { useAsTitle: 'name', group: 'Proyek', defaultColumns: ['code', 'name', 'client', 'pm', 'status'], components: { views: { edit: PROJECT_TABS } } },
     access: {
       read: byRole({
         'pk-admin': true,
@@ -87,7 +89,7 @@ export const Projects: CollectionConfig = withAudit(
       delete: denyAll,
     },
     hooks: {
-      beforeChange: [companyHook('projects', { check: [{ field: 'client', collection: 'clients' }, { field: 'pm', collection: 'users', member: true }] }), kindChangeGuard],
+      beforeChange: [companyHook('projects', { check: [{ field: 'client', collection: 'clients' }, { field: 'pm', collection: 'users', member: true }, { field: 'costCenter', collection: 'cost-centers' }] }), kindChangeGuard],
       beforeOperation: [progressWriteGuard('projects'), readOnlyFieldsGuard('projects', (req, company) => hasRole(req, PROJECT_EDITOR_ROLES, company), 'Direktur, Admin, atau PM')],
     },
     fields: [
@@ -133,6 +135,9 @@ export const Projects: CollectionConfig = withAudit(
         ...userPicker({ roles: ['pk-pm'] }),
         validate: projectPmValidate,
       },
+      // D2 (DRMS 10/10): default cost center of the project's money — Finance gets it pre-selected when recording a
+      // transfer (transfers.costCenter, mandatory there). Optional; same PT (companyHook check).
+      { name: 'costCenter', type: 'relationship', relationTo: 'cost-centers', label: 'Pusat biaya (default transfer)', index: true, access: { update: projectEditors }, ...pickerSameCompany(), admin: { placeholder: 'Pilih pusat biaya…', description: 'Diusulkan ke Finance saat mencatat transfer pengajuan project ini.' } },
       // RAB hidden from Operator/Anggota (attendance-only role reads its assigned project for the location only)
       { ...rupiahField('budget', 'RAB (Rp)'), access: { read: ({ req }) => !isOperatorOnly(req.user), update: projectEditors } },
       {

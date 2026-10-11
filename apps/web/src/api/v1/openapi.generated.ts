@@ -917,6 +917,16 @@ export const openapiDocument = {
               "string",
               "null"
             ]
+          },
+          "page": {
+            "type": "integer",
+            "description": "Only with ?page=."
+          },
+          "totalPages": {
+            "type": "integer"
+          },
+          "totalDocs": {
+            "type": "integer"
           }
         },
         "required": [
@@ -1374,6 +1384,38 @@ export const openapiDocument = {
                   "required": [
                     "id"
                   ]
+                },
+                "rapItem": {
+                  "type": [
+                    "object",
+                    "null"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0
+                    },
+                    "code": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "name": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "id"
+                  ],
+                  "description": "D4: RAP item of the line (name = the item's uraian)."
+                },
+                "rapOverBudget": {
+                  "type": "boolean",
+                  "description": "D4: live \"Melebihi RAP\" (approved realisation of the item + this request > planned). Always false for callers without a RAP price role (Staff)."
                 }
               },
               "required": [
@@ -1389,7 +1431,9 @@ export const openapiDocument = {
                 "receiptMismatch",
                 "notes",
                 "category",
-                "vehicle"
+                "vehicle",
+                "rapItem",
+                "rapOverBudget"
               ]
             }
           },
@@ -1801,8 +1845,11 @@ export const openapiDocument = {
                     "date_too_old",
                     "date_out_of_period",
                     "uom_suspicious",
-                    "duplicate"
-                  ]
+                    "duplicate",
+                    "receipt_amount_mismatch",
+                    "rap_over_budget"
+                  ],
+                  "description": "receipt_amount_mismatch = \"Selisih nota\" (D3); rap_over_budget = \"Melebihi RAP\" (D4, warning, not blocking; only for Direktur/Admin/Finance/PM)."
                 },
                 "kindLabel": {
                   "type": "string"
@@ -1894,6 +1941,34 @@ export const openapiDocument = {
                   ],
                   "description": "Item 11: date + time of the proof (UTC ISO); null = recorded without a time."
                 },
+                "costCenter": {
+                  "type": [
+                    "object",
+                    "null"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0
+                    },
+                    "code": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "name": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "id"
+                  ],
+                  "description": "D2: cost center chosen by Finance (null on transfers recorded before DRMS 10/10)."
+                },
                 "bankRef": {
                   "type": "string"
                 },
@@ -1928,6 +2003,7 @@ export const openapiDocument = {
                 "amount",
                 "transferDate",
                 "transferAt",
+                "costCenter",
                 "bankRef",
                 "status",
                 "cashEntryId",
@@ -2572,14 +2648,16 @@ export const openapiDocument = {
               "integer",
               "null"
             ],
-            "exclusiveMinimum": 0
+            "exclusiveMinimum": 0,
+            "description": "D2 (DRMS 10/10): required to submit (no non-project requests)."
           },
           "costCenterId": {
             "type": [
               "integer",
               "null"
             ],
-            "exclusiveMinimum": 0
+            "exclusiveMinimum": 0,
+            "description": "D2: IGNORED since DRMS 10/10 (Finance sets the cost center at the transfer). Still accepted so older apps keep working."
           },
           "neededDate": {
             "type": [
@@ -2738,6 +2816,14 @@ export const openapiDocument = {
               "null"
             ],
             "exclusiveMinimum": 0
+          },
+          "rapItemId": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "exclusiveMinimum": 0,
+            "description": "D4 (DRMS 10/10): RAP item of the request project (GET /projects/{id}/rap items[].id). Required on every line to submit when the project has a RAP; a konstruksi project without RAP cannot submit. Omitted = the line (same id) keeps its stored item; null clears it."
           }
         },
         "additionalProperties": false
@@ -2758,14 +2844,16 @@ export const openapiDocument = {
               "integer",
               "null"
             ],
-            "exclusiveMinimum": 0
+            "exclusiveMinimum": 0,
+            "description": "D2 (DRMS 10/10): required to submit (no non-project requests)."
           },
           "costCenterId": {
             "type": [
               "integer",
               "null"
             ],
-            "exclusiveMinimum": 0
+            "exclusiveMinimum": 0,
+            "description": "D2: IGNORED since DRMS 10/10 (Finance sets the cost center at the transfer). Still accepted so older apps keep working."
           },
           "neededDate": {
             "type": [
@@ -3241,6 +3329,14 @@ export const openapiDocument = {
             "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}(:\\d{2}(\\.\\d{1,3})?)?(Z|[+-]\\d{2}:\\d{2})?$",
             "description": "Item 11: date + time of the bank transfer proof. ISO 8601 with offset, or without offset = wall clock in the PT time zone. Not in the future; its date (PT zone) becomes transferDate (period lock). Omitted = old client, transfer time unknown."
           },
+          "costCenterId": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "exclusiveMinimum": 0,
+            "description": "D2 (DRMS 10/10): cost center of the money, chosen by Finance — active, of the request PT. Omitted/null → the project default (GET /transfer-queue costCenter), else 400 (path costCenterId)."
+          },
           "amount": {
             "type": "integer",
             "minimum": 1,
@@ -3262,6 +3358,263 @@ export const openapiDocument = {
           "proofMediaId"
         ],
         "additionalProperties": false
+      },
+      "TransferQueueList": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TransferQueueItem"
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ]
+      },
+      "TransferQueueItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "exclusiveMinimum": 0
+          },
+          "docNo": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "type": {
+            "$ref": "#/components/schemas/RequestType"
+          },
+          "typeLabel": {
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/RequestStatus"
+          },
+          "statusLabel": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "projectId": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "exclusiveMinimum": 0
+          },
+          "costCenterId": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "exclusiveMinimum": 0
+          },
+          "grandTotal": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000000000000
+          },
+          "approvedAmount": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 10000000000000
+          },
+          "requestDate": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "neededDate": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "createdById": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "exclusiveMinimum": 0
+          },
+          "updatedAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "companyId": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "exclusiveMinimum": 0,
+            "description": "MC3: PT of the request (label: GET /me companies[])."
+          },
+          "openWarningFlags": {
+            "type": "integer"
+          },
+          "project": {
+            "$ref": "#/components/schemas/Ref"
+          },
+          "costCenter": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "type": "integer",
+                "exclusiveMinimum": 0
+              },
+              "code": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "name": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "id"
+            ],
+            "description": "D2: suggested cost center of the transfer (the project default, else a legacy request's own); null = Finance must pick one."
+          },
+          "bank": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "bankName": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "accountNo": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "accountHolder": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "bankName",
+              "accountNo",
+              "accountHolder"
+            ]
+          },
+          "bankVerification": {
+            "type": "string",
+            "enum": [
+              "verified",
+              "unverified"
+            ],
+            "description": "QA-17: unverified → the transfer needs confirmUnverifiedAccount."
+          },
+          "flags": {
+            "type": "object",
+            "properties": {
+              "warning": {
+                "type": "integer"
+              },
+              "info": {
+                "type": "integer"
+              },
+              "receiptMismatch": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "warning",
+              "info",
+              "receiptMismatch"
+            ]
+          },
+          "sla": {
+            "type": "object",
+            "properties": {
+              "approvedAt": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "slaHours": {
+                "type": "number"
+              },
+              "ageHours": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "over": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "approvedAt",
+              "slaHours",
+              "ageHours",
+              "over"
+            ],
+            "description": "Item 11: age since the final approval vs the PT transfer SLA."
+          }
+        },
+        "required": [
+          "id",
+          "docNo",
+          "type",
+          "typeLabel",
+          "status",
+          "statusLabel",
+          "title",
+          "projectId",
+          "costCenterId",
+          "grandTotal",
+          "approvedAmount",
+          "requestDate",
+          "neededDate",
+          "createdById",
+          "updatedAt",
+          "companyId",
+          "project",
+          "costCenter",
+          "bank",
+          "bankVerification",
+          "flags",
+          "sla"
+        ]
       },
       "LpjQueue": {
         "type": "object",
@@ -5201,6 +5554,13 @@ export const openapiDocument = {
                     "null"
                   ],
                   "exclusiveMinimum": 0
+                },
+                "rap_item_id": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "exclusiveMinimum": 0
                 }
               },
               "required": [
@@ -5214,7 +5574,8 @@ export const openapiDocument = {
                 "receipt_amount",
                 "notes",
                 "category_id",
-                "vehicle_id"
+                "vehicle_id",
+                "rap_item_id"
               ]
             }
           },
@@ -6073,7 +6434,8 @@ export const openapiDocument = {
               "integer",
               "null"
             ],
-            "exclusiveMinimum": 0
+            "exclusiveMinimum": 0,
+            "description": "D2: ignored (no non-project requests; Finance sets the cost center at the transfer). Still accepted so older apps keep working."
           },
           "needed_date": {
             "type": [
@@ -6229,6 +6591,14 @@ export const openapiDocument = {
               "null"
             ],
             "exclusiveMinimum": 0
+          },
+          "rap_item_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "exclusiveMinimum": 0,
+            "description": "D4: RAP item of the request project (rap-items id). Required to submit when the project has a RAP. Omitted (old apps) = the line keeps its stored item."
           },
           "receipts": {
             "type": "array",
@@ -12007,6 +12377,60 @@ export const openapiDocument = {
             ],
             "description": "Price roles only."
           },
+          "budget": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "planned": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "description": "Σ planned of the priced items (null: no item priced)."
+              },
+              "realised": {
+                "type": "number",
+                "description": "Σ line totals from the final approval onward."
+              },
+              "transferred": {
+                "type": "number"
+              },
+              "verified": {
+                "type": "number"
+              },
+              "remaining": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "percent": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "overBudget": {
+                "type": "boolean"
+              },
+              "overBudgetItems": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "planned",
+              "realised",
+              "transferred",
+              "verified",
+              "remaining",
+              "percent",
+              "overBudget",
+              "overBudgetItems"
+            ],
+            "description": "D4 (price roles only): Σ plan vs realisation of the items."
+          },
           "resourceTypes": {
             "type": "array",
             "items": {
@@ -12049,6 +12473,7 @@ export const openapiDocument = {
           "items",
           "stages",
           "totals",
+          "budget",
           "resourceTypes"
         ]
       },
@@ -12064,6 +12489,10 @@ export const openapiDocument = {
           },
           "description": {
             "type": "string"
+          },
+          "name": {
+            "type": "string",
+            "description": "DRMS 10/10: alias of description."
           },
           "kind": {
             "$ref": "#/components/schemas/RapKind"
@@ -12103,6 +12532,10 @@ export const openapiDocument = {
           "volume": {
             "type": "number"
           },
+          "qty": {
+            "type": "number",
+            "description": "DRMS 10/10: alias of volume."
+          },
           "unitPrice": {
             "type": [
               "number",
@@ -12116,6 +12549,43 @@ export const openapiDocument = {
               "null"
             ],
             "description": "volume × unitPrice (price roles only)."
+          },
+          "planned": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "description": "D4 (price roles only): planned amount = round(volume × unitPrice); null when unpriced."
+          },
+          "realisedAmount": {
+            "type": "number",
+            "description": "D4 (price roles only): Σ line totals of requests charged to this item from the final approval onward. (`realised` = realised QUANTITY of the daily reports.)"
+          },
+          "transferredAmount": {
+            "type": "number",
+            "description": "D4 (price roles only): Σ line totals of requests already transferred."
+          },
+          "verifiedAmount": {
+            "type": "number",
+            "description": "D4 (price roles only): Σ valid receipts of those lines after LPJ / receipt verification."
+          },
+          "remaining": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "description": "D4 (price roles only): planned − realisedAmount."
+          },
+          "percent": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "description": "D4 (price roles only): realisedAmount / planned × 100 (2 decimals)."
+          },
+          "overBudget": {
+            "type": "boolean",
+            "description": "D4 (price roles only): realisedAmount > planned (\"Melebihi RAP\")."
           },
           "weightPct": {
             "type": [
@@ -12161,10 +12631,12 @@ export const openapiDocument = {
           "id",
           "code",
           "description",
+          "name",
           "kind",
           "stage",
           "uom",
           "volume",
+          "qty",
           "weightPct",
           "sortOrder",
           "realised",
@@ -13555,6 +14027,478 @@ export const openapiDocument = {
           "items"
         ],
         "description": "\"Minggu ke-N\": Mon–Sun weeks from the project start."
+      },
+      "ProjectList": {
+        "type": "object",
+        "properties": {
+          "docs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProjectListItem"
+            }
+          },
+          "totalDocs": {
+            "type": "integer"
+          },
+          "page": {
+            "type": "integer"
+          },
+          "totalPages": {
+            "type": "integer"
+          },
+          "limit": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "docs",
+          "totalDocs",
+          "page",
+          "totalPages",
+          "limit"
+        ]
+      },
+      "ProjectListItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "exclusiveMinimum": 0
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "description": "umum | konstruksi | kontrak_unit | aftersales | trading"
+          },
+          "companyId": {
+            "type": "integer",
+            "exclusiveMinimum": 0
+          },
+          "pm": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "type": "integer",
+                "exclusiveMinimum": 0
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "name"
+            ]
+          },
+          "status": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "statusLabel": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "contractValue": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "description": "RAB of the project (null when not readable, e.g. Operator)."
+          },
+          "progressPct": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "costCenter": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "type": "integer",
+                "exclusiveMinimum": 0
+              },
+              "code": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "code",
+              "name"
+            ],
+            "description": "D2: default cost center proposed to Finance at the transfer."
+          },
+          "rapPlanned": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "description": "D4: Σ planned RAP amount (price roles only)."
+          },
+          "rapRealised": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "description": "D4: Σ approved line totals charged to RAP items (price roles only)."
+          },
+          "rapPercent": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "description": "D4: rapRealised / rapPlanned × 100 (price roles only)."
+          },
+          "rapOverBudgetItems": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "D4: RAP items over plan (price roles only)."
+          },
+          "rapItems": {
+            "type": "integer",
+            "description": "RAP items (active + deactivated with realisation)."
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "name",
+          "kind",
+          "companyId",
+          "pm",
+          "status",
+          "statusLabel",
+          "contractValue",
+          "progressPct",
+          "costCenter",
+          "rapPlanned",
+          "rapRealised",
+          "rapPercent",
+          "rapOverBudgetItems",
+          "rapItems"
+        ]
+      },
+      "ProjectDetail": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "exclusiveMinimum": 0
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "description": "umum | konstruksi | kontrak_unit | aftersales | trading"
+          },
+          "companyId": {
+            "type": "integer",
+            "exclusiveMinimum": 0
+          },
+          "pm": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "type": "integer",
+                "exclusiveMinimum": 0
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "name"
+            ]
+          },
+          "status": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "statusLabel": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "contractValue": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "description": "RAB of the project (null when not readable, e.g. Operator)."
+          },
+          "progressPct": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "costCenter": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "type": "integer",
+                "exclusiveMinimum": 0
+              },
+              "code": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "code",
+              "name"
+            ],
+            "description": "D2: default cost center proposed to Finance at the transfer."
+          },
+          "rapPlanned": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "description": "D4: Σ planned RAP amount (price roles only)."
+          },
+          "rapRealised": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "description": "D4: Σ approved line totals charged to RAP items (price roles only)."
+          },
+          "rapPercent": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "description": "D4: rapRealised / rapPlanned × 100 (price roles only)."
+          },
+          "rapOverBudgetItems": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "D4: RAP items over plan (price roles only)."
+          },
+          "rapItems": {
+            "type": "integer",
+            "description": "RAP items (active + deactivated with realisation)."
+          },
+          "client": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "type": "integer",
+                "exclusiveMinimum": 0
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "name"
+            ]
+          },
+          "address": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "startDate": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "targetDate": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "rap": {
+            "$ref": "#/components/schemas/ProjectRapSummary"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "name",
+          "kind",
+          "companyId",
+          "pm",
+          "status",
+          "statusLabel",
+          "contractValue",
+          "progressPct",
+          "costCenter",
+          "rapPlanned",
+          "rapRealised",
+          "rapPercent",
+          "rapOverBudgetItems",
+          "rapItems",
+          "client",
+          "address",
+          "startDate",
+          "targetDate",
+          "rap"
+        ]
+      },
+      "ProjectRapSummary": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "integer"
+          },
+          "planned": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "realised": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "transferred": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "verified": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "remaining": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "percent": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "overBudgetItems": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "planned",
+          "realised",
+          "transferred",
+          "verified",
+          "remaining",
+          "percent",
+          "overBudgetItems"
+        ],
+        "description": "D4: money fields null without a price role."
+      },
+      "CostCenterList": {
+        "type": "object",
+        "properties": {
+          "docs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                "code": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "type": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "companyId": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "exclusiveMinimum": 0
+                },
+                "active": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "id",
+                "code",
+                "name",
+                "type",
+                "companyId",
+                "active"
+              ]
+            }
+          },
+          "totalDocs": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "docs",
+          "totalDocs"
+        ]
       }
     },
     "parameters": {
@@ -14341,7 +15285,7 @@ export const openapiDocument = {
     },
     "/expense-requests": {
       "get": {
-        "summary": "List expense requests in the caller scope (mine | team | inbox | all), cursor paging",
+        "summary": "List expense requests in the caller scope (mine | team | inbox | all), cursor paging (or ?page=); DRMS 10/10 filters project= and q=",
         "security": [
           {
             "bearer": []
@@ -14413,6 +15357,40 @@ export const openapiDocument = {
             "required": false,
             "description": "MC3: PT filter (comma separated ids). Only narrows the effective selection (X-Company-Ids / cookie ∩ memberships); a PT outside it → 403 COMPANY_NOT_ALLOWED.",
             "name": "company",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "description": "DRMS 10/10: only requests of this project (project detail \"Pengajuan\" tab / APK)."
+            },
+            "required": false,
+            "description": "DRMS 10/10: only requests of this project (project detail \"Pengajuan\" tab / APK).",
+            "name": "project",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 100,
+              "description": "DRMS 10/10: search in nomor / judul (every word must match)."
+            },
+            "required": false,
+            "description": "DRMS 10/10: search in nomor / judul (every word must match).",
+            "name": "q",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100000,
+              "description": "DRMS 10/10: page number (1-based) instead of the cursor — the answer then also carries page / totalPages / totalDocs."
+            },
+            "required": false,
+            "description": "DRMS 10/10: page number (1-based) instead of the cursor — the answer then also carries page / totalPages / totalDocs.",
+            "name": "page",
             "in": "query"
           },
           {
@@ -17522,7 +18500,7 @@ export const openapiDocument = {
     },
     "/expense-requests/{id}/transfer": {
       "post": {
-        "summary": "Finance: record the transfer (amount = approved amount, proof, bank ref) → KK posted. QA-17: destination account not verified → 409 code BANK_ACCOUNT_UNVERIFIED_CONFIRM_REQUIRED (bankAccountId, verificationStatus, bankName, accountNo, accountHolder) unless confirmUnverifiedAccount (audited bank_unverified_confirmed); QA-04: cash account balance would go below 0 → 409 code CASH_OVERDRAFT_CONFIRM_REQUIRED (cashAccountId, balance, after) unless confirmOverdraft (audited overdraft_confirmed); QA-05: date before the account opening-balance date → 400",
+        "summary": "Finance: record the transfer (amount = approved amount, proof, bank ref, DRMS 10/10 D2 cost center: costCenterId, default = the project default, none → 400) → KK posted. QA-17: destination account not verified → 409 code BANK_ACCOUNT_UNVERIFIED_CONFIRM_REQUIRED (bankAccountId, verificationStatus, bankName, accountNo, accountHolder) unless confirmUnverifiedAccount (audited bank_unverified_confirmed); QA-04: cash account balance would go below 0 → 409 code CASH_OVERDRAFT_CONFIRM_REQUIRED (cashAccountId, balance, after) unless confirmOverdraft (audited overdraft_confirmed); QA-05: date before the account opening-balance date → 400",
         "security": [
           {
             "bearer": []
@@ -17831,7 +18809,7 @@ export const openapiDocument = {
     },
     "/transfer-queue": {
       "get": {
-        "summary": "Finance/Owner: Pengajuan Baru \"Disetujui\" + Reimburse \"Nota Terverifikasi\", by needed date (US-19); PTs where the caller is Finance/Direktur, ?company= narrows",
+        "summary": "Finance/Owner: Pengajuan Baru \"Disetujui\" + Reimburse \"Nota Terverifikasi\", by needed date (US-19); PTs where the caller is Finance/Direktur, ?company= narrows. DRMS 10/10: + project, suggested cost center (D2), bank, flags, transfer SLA",
         "security": [
           {
             "bearer": []
@@ -17883,7 +18861,7 @@ export const openapiDocument = {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ExpenseRequestList"
+                  "$ref": "#/components/schemas/TransferQueueList"
                 }
               }
             }
@@ -34198,6 +35176,367 @@ export const openapiDocument = {
             }
           },
           "404": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/projects": {
+      "get": {
+        "summary": "DRMS 10/10: projects in the caller's read scope (Staff: assigned = the projects they can submit to; PM: team; Direktur/Finance/Admin: all of the selected PTs), paged (page/limit), search q (kode/nama), status filter (default: not arsip); RAP plan vs realisation for the price roles only",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 100,
+              "description": "Search in kode / nama (every word must match)."
+            },
+            "required": false,
+            "description": "Search in kode / nama (every word must match).",
+            "name": "q",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^(perencanaan|berjalan|ditunda|selesai|arsip)(,(perencanaan|berjalan|ditunda|selesai|arsip))*$",
+              "description": "Comma separated statuses. Default: every status except arsip."
+            },
+            "required": false,
+            "description": "Comma separated statuses. Default: every status except arsip.",
+            "name": "status",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100000,
+              "default": 1
+            },
+            "required": false,
+            "name": "page",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            },
+            "required": false,
+            "name": "limit",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9]\\d{0,8}(,[1-9]\\d{0,8})*$",
+              "description": "MC3: PT filter (comma separated ids). Only narrows the effective selection (X-Company-Ids / cookie ∩ memberships); a PT outside it → 403 COMPANY_NOT_ALLOWED."
+            },
+            "required": false,
+            "description": "MC3: PT filter (comma separated ids). Only narrows the effective selection (X-Company-Ids / cookie ∩ memberships); a PT outside it → 403 COMPANY_NOT_ALLOWED.",
+            "name": "company",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": true,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "APK version; below company minimum → 426."
+            },
+            "required": false,
+            "description": "APK version; below company minimum → 426.",
+            "name": "X-App-Version",
+            "in": "header"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Page",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectList"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/projects/{id}": {
+      "get": {
+        "summary": "DRMS 10/10: one visible project (else 404) — PM, client, default cost center (D2), RAP summary (D4, money for the price roles only)",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d+$"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": true,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "APK version; below company minimum → 426."
+            },
+            "required": false,
+            "description": "APK version; below company minimum → 426.",
+            "name": "X-App-Version",
+            "in": "header"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Project",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/cost-centers": {
+      "get": {
+        "summary": "DRMS 10/10 D2: cost centers the caller may read (Finance: all of the selected PTs) — picker of the transfer cost center; active only unless active=all",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            },
+            "required": false,
+            "name": "q",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "1",
+                "all"
+              ],
+              "description": "Default active only; `all` includes deactivated ones."
+            },
+            "required": false,
+            "description": "Default active only; `all` includes deactivated ones.",
+            "name": "active",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9]\\d{0,8}(,[1-9]\\d{0,8})*$",
+              "description": "MC3: PT filter (comma separated ids). Only narrows the effective selection (X-Company-Ids / cookie ∩ memberships); a PT outside it → 403 COMPANY_NOT_ALLOWED."
+            },
+            "required": false,
+            "description": "MC3: PT filter (comma separated ids). Only narrows the effective selection (X-Company-Ids / cookie ∩ memberships); a PT outside it → 403 COMPANY_NOT_ALLOWED.",
+            "name": "company",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": true,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "APK version; below company minimum → 426."
+            },
+            "required": false,
+            "description": "APK version; below company minimum → 426.",
+            "name": "X-App-Version",
+            "in": "header"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Cost centers",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CostCenterList"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
             "description": "Problem",
             "content": {
               "application/problem+json": {

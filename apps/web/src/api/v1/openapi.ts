@@ -6,6 +6,7 @@ import { registerAttendancePaths } from './openapi-attendance'
 import { registerCompanyPaths } from './openapi-companies'
 import { registerDailyPaths } from './openapi-daily'
 import { registerFieldPaths } from './openapi-field'
+import { registerProjectPaths } from './openapi-projects'
 import { registerShortfallPaths } from './openapi-shortfall'
 import { Device, DeviceRegister, DeviceRevoke, Health, Masters, MastersQuery, Me, Problem, Ready, TestEmailQueued } from './schemas'
 import * as F from './schemas-flow'
@@ -196,7 +197,7 @@ export function buildOpenApiDocument(version: string) {
   registry.registerPath({
     method: 'get',
     path: '/expense-requests',
-    summary: 'List expense requests in the caller scope (mine | team | inbox | all), cursor paging',
+    summary: 'List expense requests in the caller scope (mine | team | inbox | all), cursor paging (or ?page=); DRMS 10/10 filters project= and q=',
     security,
     request: { headers: deviceHeader, query: F.ListQuery },
     responses: res(200, 'Page', F.ExpenseRequestList, [400, 401, 426]),
@@ -266,16 +267,16 @@ export function buildOpenApiDocument(version: string) {
   post('/expense-requests/{id}/flags/{fid}/review', 'Finance: mark a flag "sudah diperiksa"', F.FlagReviewBody, ['id', 'fid'], detailOk())
   post(
     '/expense-requests/{id}/transfer',
-    'Finance: record the transfer (amount = approved amount, proof, bank ref) → KK posted. QA-17: destination account not verified → 409 code BANK_ACCOUNT_UNVERIFIED_CONFIRM_REQUIRED (bankAccountId, verificationStatus, bankName, accountNo, accountHolder) unless confirmUnverifiedAccount (audited bank_unverified_confirmed); QA-04: cash account balance would go below 0 → 409 code CASH_OVERDRAFT_CONFIRM_REQUIRED (cashAccountId, balance, after) unless confirmOverdraft (audited overdraft_confirmed); QA-05: date before the account opening-balance date → 400',
+    'Finance: record the transfer (amount = approved amount, proof, bank ref, DRMS 10/10 D2 cost center: costCenterId, default = the project default, none → 400) → KK posted. QA-17: destination account not verified → 409 code BANK_ACCOUNT_UNVERIFIED_CONFIRM_REQUIRED (bankAccountId, verificationStatus, bankName, accountNo, accountHolder) unless confirmUnverifiedAccount (audited bank_unverified_confirmed); QA-04: cash account balance would go below 0 → 409 code CASH_OVERDRAFT_CONFIRM_REQUIRED (cashAccountId, balance, after) unless confirmOverdraft (audited overdraft_confirmed); QA-05: date before the account opening-balance date → 400',
     F.TransferCreate, ['id'], res(201, 'Transferred', F.TransferResult, [400, 401, 403, 404, 409, 422, 426, 429]))
   post('/expense-requests/{id}/transfers/{tid}/void', 'Finance: void a transfer (reversal entry, reason)', F.ReasonBody, ['id', 'tid'], detailOk())
   registry.registerPath({
     method: 'get',
     path: '/transfer-queue',
-    summary: 'Finance/Owner: Pengajuan Baru "Disetujui" + Reimburse "Nota Terverifikasi", by needed date (US-19); PTs where the caller is Finance/Direktur, ?company= narrows',
+    summary: 'Finance/Owner: Pengajuan Baru "Disetujui" + Reimburse "Nota Terverifikasi", by needed date (US-19); PTs where the caller is Finance/Direktur, ?company= narrows. DRMS 10/10: + project, suggested cost center (D2), bank, flags, transfer SLA',
     security,
     request: { headers: deviceHeader, query: F.CompanyFilterQuery },
-    responses: res(200, 'Queue', F.ExpenseRequestList, [400, 401, 403]),
+    responses: res(200, 'Queue', F.TransferQueueList, [400, 401, 403]),
   })
   registry.registerPath({
     method: 'get',
@@ -614,6 +615,8 @@ export function buildOpenApiDocument(version: string) {
   registerFieldPaths(registry, { security, deviceHeader, idem, res })
   // ---- P3 konstruksi RAP + Laporan Harian -----------------------------------------------------
   registerDailyPaths(registry, { security, deviceHeader, idem, res })
+  // ---- DRMS 10/10 Phase C: projects (APK Proyek) + cost-center picker (D2) ----------------------
+  registerProjectPaths(registry, { security, deviceHeader, res })
 
   return new OpenApiGeneratorV31(registry.definitions).generateDocument({
     openapi: '3.1.0',

@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { accessToken, auditRows, getTestPayload, http, installLocalJwks, registerDevice, sqlAs, sqlError } from './helpers'
-import { api, draftBody, makeFlowUser, makeWorld, png, upload, type World } from './flow-world'
+import { api, draftBody, legacyCostCenter, makeFlowUser, makeWorld, png, upload, type World } from './flow-world'
 
 /**
  * Architecture §7.4 negative-authorization set for the F2a collections + DB-level guards
@@ -45,8 +45,10 @@ describe('read scopes (own / team / Q-23 / all)', () => {
     expect((await api('GET', `${E}/${approvedId}`, w.users.pm)).status).toBe(200) // team
   })
 
-  it('Q-23: Staff B assigned to the cost center reads its requests (read only, bank number masked)', async () => {
-    const c = await api('POST', E, w.users.staffA, draftBody(w, { projectId: null, costCenterId: w.costCenter }))
+  it('Q-23: Staff B assigned to the cost center reads its (legacy) requests (read only, bank number masked)', async () => {
+    // DRMS 10/10 D2: cost-center requests are legacy rows (before D2)
+    const c = await api('POST', E, w.users.staffA, draftBody(w))
+    await legacyCostCenter(c.body.id, w.costCenter)
     const r = await api('GET', `${E}/${c.body.id}`, w.users.staffB)
     expect(r.status).toBe(200)
     expect(r.body.allowedActions).toEqual([])

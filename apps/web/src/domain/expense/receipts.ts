@@ -4,14 +4,15 @@ import type { CollectionSlug, PayloadRequest } from 'payload'
 import { relId, userId } from '@/access/roles'
 import { writeAudit } from '@/audit/writer'
 import { ORPHAN_MARK } from '@/domain/media-orphans'
+import { rapOverBudgetLines } from '@/domain/rap/budget'
 import { getRequestTx } from '@/lib/tx'
 
 import { actorContext, fail, ids, loadRaw, loadVisible, requireAction, requireActionAudited, settings, today, updateRequest, type RequestDoc } from './common'
 import { mayViewFlag, withFlagVisibility } from './flag-visibility'
-import { computeFlags, normalizeReceiptNo, normalizeVendor, type DuplicateHit, type FlagCategory, type FlagSpec } from './flags'
+import { computeFlags, normalizeReceiptNo, normalizeVendor, rapOverFlagSpecs, type DuplicateHit, type FlagCategory, type FlagSpec } from './flags'
 import { grandTotal, lineNeedsCompletion } from './lines'
 import { auditSelfApproval, auditSkipped, selectAndSnapshot, writeSnapshot } from './snapshot'
-import { isBusinessDate, INACTIVE_FOR_DUPLICATES } from './types'
+import { isBusinessDate, INACTIVE_FOR_DUPLICATES, type FlagKind } from './types'
 
 export type ReceiptInput = {
   lineId: string
@@ -536,6 +537,11 @@ export async function recomputeFlags(req: PayloadRequest, requestId: number): Pr
   // ADR 0016 §1: receipt tolerance / max age of the DOCUMENT's PT
   const s = await settings(req, relId((doc as { company?: unknown }).company))
   const lines = (doc.lines ?? []).map((l, i) => ({ id: l.id, lineNo: i + 1, total: l.total ?? 0, uom: relId(l.uom) ?? null, category: relId(l.category) ?? null, receiptAmount: l.receiptAmount ?? null }))
+  // D4: lines charged to a RAP item that is over its planned amount (cancelled / rejected requests: nothing to warn)
+  const rapOver =
+    doc.status === 'cancelled' || doc.status === 'rejected'
+      ? []
+      : await rapOverBudgetLines(req, { requestId, projectId: relId(doc.project) ?? null, lines: (doc.lines ?? []).map((l, i) => ({ id: l.id, lineNo: i + 1, total: l.total ?? 0, rapItem: relId(l.rapItem) ?? null })) })
   const receipts = (await receiptsOf(req, requestId, true)).map((r) => ({ id: r.id, lineId: r.lineId, receiptDate: r.receiptDate, amount: r.amount }))
   const catIds = [...new Set(lines.map((l) => l.category).filter((x): x is number => x !== null))]
   const uomIds = [...new Set(lines.map((l) => l.uom).filter((x): x is number => x !== null))]
@@ -575,12 +581,23 @@ export async function recomputeFlags(req: PayloadRequest, requestId: number): Pr
     duplicates: await duplicateHits(req, requestId),
     tolerance: s.receiptRoundingTolerance ?? 1000, // Q-14 default
     maxAgeDays: s.receiptMaxAgeDays ?? 30,
+    rapOver,
   })
 
+  await persistFlags(req, doc, desired)
+  return desired
+}
+
+/**
+ * Stores the desired flag set of a request: new → `open` (audit flag_raised), vanished or changed → `resolved`.
+ * `kinds`: only flags of these kinds are compared (D4 RAP refresh at decision time touches nothing else).
+ */
+async function persistFlags(req: PayloadRequest, doc: RequestDoc, desired: FlagSpec[], kinds?: readonly FlagKind[]): Promise<void> {
+  const requestId = doc.id
   const existing = (
     await req.payload.find({
       collection: 'receipt-flags',
-      where: { and: [{ request: { equals: requestId } }, { status: { in: ['open', 'reviewed'] } }] },
+      where: { and: [{ request: { equals: requestId } }, { status: { in: ['open', 'reviewed'] } }, ...(kinds ? [{ kind: { in: [...kinds] } }] : [])] },
       depth: 0,
       pagination: false,
       overrideAccess: true, // SYSTEM-READ: current flags
@@ -645,5 +662,34 @@ export async function recomputeFlags(req: PayloadRequest, requestId: number): Pr
       })),
     )
   }
-  return desired
 }
+
+/**
+ * D4: refreshes only the "Melebihi RAP" flags of a request (RAP realisation moves when OTHER requests of the project
+ * are approved). Called before every decision on it and, after a final approval, for the project's other pending
+ * requests. Nothing else of the flag set changes.
+ */
+export async function syncRapFlags(req: PayloadRequest, requestId: number): Promise<void> {
+  const doc = await loadRaw(req, requestId)
+  const lines = (doc.lines ?? []).map((l, i) => ({ id: l.id, lineNo: i + 1, total: l.total ?? 0, rapItem: relId(l.rapItem) ?? null }))
+  const over = doc.status === 'cancelled' || doc.status === 'rejected' ? [] : await rapOverBudgetLines(req, { requestId, projectId: relId(doc.project) ?? null, lines })
+  await persistFlags(req, doc, rapOverFlagSpecs(over), ['rap_over_budget'])
+}
+
+/** D4: after request `approvedId` became committed, its project's pending requests re-check their RAP flags. */
+export async function syncProjectRapFlags(req: PayloadRequest, approvedId: number): Promise<void> {
+  const doc = await loadRaw(req, approvedId)
+  const projectId = relId(doc.project)
+  if (!projectId || !(doc.lines ?? []).some((l) => relId(l.rapItem) !== undefined)) return
+  const pending = await req.payload.find({
+    collection: 'expense-requests',
+    where: { and: [{ project: { equals: projectId } }, { status: { in: ['pending_ack', 'pending_approval'] } }, { id: { not_equals: approvedId } }] },
+    depth: 0,
+    limit: 200,
+    select: { status: true },
+    overrideAccess: true, // SYSTEM-READ: sibling requests of the project whose RAP warning may change
+    req,
+  })
+  for (const d of pending.docs) await syncRapFlags(req, d.id as number)
+}
+

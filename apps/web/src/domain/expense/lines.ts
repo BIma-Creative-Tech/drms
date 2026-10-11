@@ -22,6 +22,8 @@ export type LineInput = {
   notes?: string | null
   category?: number | null
   vehicle?: number | null
+  /** D4 (DRMS 10/10): RAP item of the request's project (rap-items id). */
+  rapItem?: number | null
 }
 
 export type LineError = { path: string; message: string }

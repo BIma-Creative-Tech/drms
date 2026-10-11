@@ -82,6 +82,7 @@ export const SyncLineInput = z
     notes: z.string().max(500).nullable().optional(),
     category_id: id.nullable().optional(),
     vehicle_id: id.nullable().optional(),
+    rap_item_id: id.nullable().optional().meta({ description: 'D4: RAP item of the request project (rap-items id). Required to submit when the project has a RAP. Omitted (old apps) = the line keeps its stored item.' }),
     receipts: z.array(SyncReceiptInput).max(20).optional().meta({ description: 'Reimburse drafts only. Upserted by client_uuid; receipts missing here are NOT removed.' }),
   })
   .strict()
@@ -94,7 +95,7 @@ export const SyncDraftUpsertPayload = z
     kind: z.enum(['advance', 'reimburse']).optional().meta({ description: 'Required for a new draft. advance = Pengajuan Baru.' }),
     title: z.string().trim().min(1).max(200).optional().meta({ description: 'Required for a new draft.' }),
     project_id: id.nullable().optional(),
-    cost_center_id: id.nullable().optional(),
+    cost_center_id: id.nullable().optional().meta({ description: 'D2: ignored (no non-project requests; Finance sets the cost center at the transfer). Still accepted so older apps keep working.' }),
     needed_date: businessDate.nullable().optional(),
     urgency_level_id: id.nullable().optional().meta({ description: 'urgency-levels id of the request PT (owner decision 2026-10-09).' }),
     period_from: businessDate.nullable().optional().meta({ description: 'Ignored since 2026-10-09: "Periode kegiatan" was replaced by the urgency level. Still accepted so older apps keep working.' }),
@@ -435,6 +436,7 @@ export const SyncDraftCopy = z
         notes: z.string().nullable(),
         category_id: id.nullable(),
         vehicle_id: id.nullable(),
+        rap_item_id: id.nullable(),
       }),
     ),
     receipts: z.array(

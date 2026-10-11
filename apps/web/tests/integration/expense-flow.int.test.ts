@@ -180,7 +180,8 @@ describe('Reimburse — receipts at submission, revision, re-approval, verificat
   let d: Record<string, any> // eslint-disable-line @typescript-eslint/no-explicit-any
 
   it('submit without a receipt on every line → 409 (US-38); with receipts → Menunggu Diketahui', async () => {
-    const c = await api('POST', E, w.users.staffA, draftBody(w, { type: 'reimburse', projectId: null, costCenterId: w.costCenter }))
+    // DRMS 10/10 D2: every request is a project request (was: on the cost center)
+    const c = await api('POST', E, w.users.staffA, draftBody(w, { type: 'reimburse' }))
     expect(c.status, JSON.stringify(c.body)).toBe(201)
     id = c.body.id
     const r0 = await api('POST', `${E}/${id}/receipts`, w.users.staffA, {
@@ -271,7 +272,7 @@ describe('Reimburse — receipts at submission, revision, re-approval, verificat
     const t = await api('POST', `${E}/${id}/transfer`, w.users.finance, { cashAccountId: w.cashAccount, bankRef: 'RB-1', proofMediaId: await proof() })
     expect(t.status, JSON.stringify(t.body)).toBe(201)
     expect(t.body.request.transferredTotal).toBe(740_000)
-    expect((await api('POST', `${E}/${id}/complete`, w.users.staffB, {})).status).toBe(403) // not own (Q-23 lets B read, not act)
+    expect((await api('POST', `${E}/${id}/complete`, w.users.staffB, {})).status).toBe(404) // D2: a project request — Staff B (not a requester) cannot read it (Q-23 read = legacy cost-center requests)
     const done = await api('POST', `${E}/${id}/complete`, w.users.staffA, {})
     expect(done.body.status).toBe('completed')
   })
@@ -338,8 +339,10 @@ describe('withdraw / cancel / reject / resubmit (US-04, US-06, G7, G8)', () => {
 
 describe('draft validation (US-03, US-40, US-44, US-53, G9, G10, Q-09, Q-22)', () => {
   it('rejects bad input server-side', async () => {
+    // DRMS 10/10 D2: a cost center from the requester is ignored (old APKs), no longer "project XOR cost center"
     const both = await api('POST', E, w.users.staffA, draftBody(w, { costCenterId: w.costCenter }))
-    expect(both.status).toBe(400)
+    expect(both.status).toBe(201)
+    expect(both.body).toMatchObject({ projectId: w.project, costCenterId: null })
     const foreignAcc = await api('POST', E, w.users.staffA, draftBody(w, { bankAccountId: w.accB }))
     expect(foreignAcc.status).toBe(400)
     expect(foreignAcc.body.errors[0].message).toMatch(/salah satu pemohon/)

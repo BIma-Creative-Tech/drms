@@ -55,7 +55,7 @@ const body = (lines: Line[]) => lines.map((l) => ({ id: l.id, description: l.des
 describe('D3 legacy line on a request sent back to Revisi Nota', () => {
   it('approved Reimburse with pre-D3 lines → Finance rejects a receipt → Revisi Nota (not blocked by the DB rule)', async () => {
     resetRateLimits()
-    const c = await api('POST', E, w.users.staffA, draftBody(w, { type: 'reimburse', projectId: null, costCenterId: w.costCenter }))
+    const c = await api('POST', E, w.users.staffA, draftBody(w, { type: 'reimburse' })) // DRMS 10/10 D2: a project request
     expect(c.status, JSON.stringify(c.body)).toBe(201)
     id = c.body.id
     expect((await receipt(c.body.lines[0].id, 600_000, 'L-1')).status).toBe(201)

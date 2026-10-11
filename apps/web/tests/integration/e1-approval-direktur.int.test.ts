@@ -152,12 +152,13 @@ describe('AC-5: approval-rules refuse PM/Staff deciders, scope_manager and an op
     expect(ok.id).toBeGreaterThan(0)
   })
   it('an active legacy rule (PM role "Diketahui", written before E1) blocks new submissions with 409 instead of routing to the PM', async () => {
-    const cc = await sysCreate('cost-centers', { code: 'E1-LEG', name: 'E1 legacy', manager: w.users.pm.id })
-    const rule = await sysCreate('approval-rules', { ...base, name: 'E1 legacy rule', costCenter: cc, priority: 1, active: true, acknowledge: 'required', acknowledgeBy: 'role', acknowledgeRole: 'pk-owner', steps: [{ level: 1, approverRole: 'pk-finance' }] })
+    // DRMS 10/10 D2: requests are project requests → the legacy rule is scoped to a project (was: a cost center)
+    const proj = await sysCreate('projects', { code: 'E1-LEG', name: 'E1 legacy', pm: w.users.pm.id, status: 'berjalan' })
+    const rule = await sysCreate('approval-rules', { ...base, name: 'E1 legacy rule', project: proj, priority: 1, active: true, acknowledge: 'required', acknowledgeBy: 'role', acknowledgeRole: 'pk-owner', steps: [{ level: 1, approverRole: 'pk-finance' }] })
     // ADR 0021 made acknowledgeBy = scope_manager valid again; a pre-E1 rule naming the PM ROLE stays invalid
     await sqlAs('owner', "UPDATE approval_rules SET acknowledge_by = 'role', acknowledge_role = 'pk-pm' WHERE id = $1", [rule])
-    for (const e of [w.emp.a]) await sysCreate('team-assignments', { employee: e, costCenter: cc, roleInProject: 'staff' })
-    const { body } = await submitted(w.users.staffA, { projectId: undefined, costCenterId: cc }, 409)
+    for (const e of [w.emp.a]) await sysCreate('team-assignments', { employee: e, project: proj, roleInProject: 'staff' })
+    const { body } = await submitted(w.users.staffA, { projectId: proj }, 409)
     expect(JSON.stringify(body)).toMatch(/tidak sesuai alur persetujuan/)
   })
 })

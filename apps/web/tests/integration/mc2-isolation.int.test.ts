@@ -141,7 +141,9 @@ beforeAll(async () => {
   staffC = await makeFlowUser(['pk-staff'], 'mc2-staff-c', X.empC, { company: C })
   financeC = await makeFlowUser(['pk-finance'], 'mc2-finance-c', null, { company: C })
 
-  X.projectB = await sysCreate('projects', { company: B, code: 'MC2-PB', name: 'Proyek Contoh Dua', pm: dual.id, budget: 40_000_000, status: 'berjalan' })
+  // DRMS 10/10 D2: Finance books the transfer on a cost center (default = the project's)
+  X.ccB = await sysCreate('cost-centers', { company: B, code: 'MC2-CCB', name: 'Pusat biaya B' })
+  X.projectB = await sysCreate('projects', { company: B, code: 'MC2-PB', name: 'Proyek Contoh Dua', pm: dual.id, budget: 40_000_000, status: 'berjalan', costCenter: X.ccB })
   X.projectB2 = await sysCreate('projects', { company: B, pm: await fixturePm(B), code: 'MC2-PB2', name: 'Proyek Contoh Dua lain', budget: 5_000_000, status: 'berjalan' })
   X.projectC = await sysCreate('projects', { company: C, pm: await fixturePm(C), code: 'MC2-PC', name: 'Proyek Contoh Tiga', budget: 1_000_000, status: 'berjalan' })
   for (const [emp, project] of [

@@ -608,12 +608,20 @@ export type RequestFilter = {
   requesterId?: number
 }
 
+/**
+ * DRMS 10/10 D2: a request belongs to cost center X when it is a legacy request of X or Finance recorded one of its
+ * posted transfers on X (project requests get their cost center at the transfer).
+ */
+export function requestCostCenterSql(costCenterId: number): SQL {
+  return sql`(er.cost_center_id = ${costCenterId} OR EXISTS (SELECT 1 FROM transfers tcc WHERE tcc.request_id = er.id AND tcc.status = 'posted' AND tcc.cost_center_id = ${costCenterId}))`
+}
+
 export function requestFilterSql(f: RequestFilter): SQL {
   const w: SQL[] = [sql`er.status <> 'draft'`, sql`er.request_date BETWEEN ${f.from} AND ${f.to}`]
   if (f.type) w.push(sql`er.type = ${f.type}`)
   if (f.statuses?.length) w.push(sql`er.status::text IN (${textList(f.statuses)})`)
   if (f.projectId) w.push(sql`er.project_id = ${f.projectId}`)
-  if (f.costCenterId) w.push(sql`er.cost_center_id = ${f.costCenterId}`)
+  if (f.costCenterId) w.push(requestCostCenterSql(f.costCenterId))
   if (f.categoryId) w.push(sql`EXISTS (SELECT 1 FROM expense_requests_lines l2 WHERE l2._parent_id = er.id AND l2.category_id = ${f.categoryId})`)
   if (f.requesterId) w.push(sql`EXISTS (SELECT 1 FROM expense_requests_rels r2 WHERE r2.parent_id = er.id AND r2.path = 'requesters' AND r2.employees_id = ${f.requesterId})`)
   return sql.join(w, sql` AND `)
@@ -757,7 +765,9 @@ export async function vehicleCosts(req: PayloadRequest, scope: ReportScope, f: V
 /**
  * K-15 per cost center for `period`: K-05 of its requests in the month (posted transfers by
  * transfer date − posted LPJ refunds by entry date) + manual cash-out − manual cash-in of the cost
- * center (posted, not reversal).
+ * center (posted, not reversal). DRMS 10/10 D2: a transfer counts for the cost center FINANCE chose on it
+ * (`transfers.cost_center_id`); transfers recorded before D2 keep the legacy request's own cost center. A refund
+ * follows the cost center of the request's (latest posted) transfer, likewise.
  */
 export async function costCenterMonth(req: PayloadRequest, scope: ReportScope, period: string) {
   const from = firstDay(period)
@@ -766,9 +776,10 @@ export async function costCenterMonth(req: PayloadRequest, scope: ReportScope, p
     req,
     sql`SELECT cc.id, cc.company_id, cc.code, cc.name,
           (SELECT coalesce(sum(t.amount), 0) FROM transfers t JOIN expense_requests er ON er.id = t.request_id
-            WHERE er.cost_center_id = cc.id AND t.status = 'posted' AND t.transfer_date BETWEEN ${from} AND ${to})::text AS transfers,
+            WHERE coalesce(t.cost_center_id, er.cost_center_id) = cc.id AND t.status = 'posted' AND t.transfer_date BETWEEN ${from} AND ${to})::text AS transfers,
           (SELECT coalesce(sum(c.amount), 0) FROM cash_entries c JOIN expense_requests er ON er.id = c.expense_request_id
-            WHERE er.cost_center_id = cc.id AND c.source_type = 'settlement_refund' AND c.status = 'posted' AND c.entry_date BETWEEN ${from} AND ${to})::text AS refunds,
+            WHERE coalesce((SELECT t2.cost_center_id FROM transfers t2 WHERE t2.request_id = er.id AND t2.status = 'posted' AND t2.cost_center_id IS NOT NULL ORDER BY t2.id DESC LIMIT 1), er.cost_center_id) = cc.id
+              AND c.source_type = 'settlement_refund' AND c.status = 'posted' AND c.entry_date BETWEEN ${from} AND ${to})::text AS refunds,
           (SELECT coalesce(sum(c.amount) FILTER (WHERE c.direction = 'out'), 0) FROM cash_entries c
             WHERE c.cost_center_id = cc.id AND c.source_type = 'manual' AND c.status = 'posted' AND c.period = ${period})::text AS manual_out,
           (SELECT coalesce(sum(c.amount) FILTER (WHERE c.direction = 'in'), 0) FROM cash_entries c
@@ -800,7 +811,7 @@ export async function spending(req: PayloadRequest, scope: ReportScope, f: Spend
   const reqWhere: SQL[] = [requestScopeSql(scope)]
   if (f.type) reqWhere.push(sql`er.type = ${f.type}`)
   if (f.projectId) reqWhere.push(sql`er.project_id = ${f.projectId}`)
-  if (f.costCenterId) reqWhere.push(sql`er.cost_center_id = ${f.costCenterId}`)
+  if (f.costCenterId) reqWhere.push(requestCostCenterSql(f.costCenterId))
   const catWhere = f.categoryId ? sql`AND l.category_id = ${f.categoryId}` : sql``
   const manWhere: SQL[] = [sql`ce.source_type = 'manual'`, sql`ce.direction = 'out'`, sql`ce.status = 'posted'`, sql`ce.entry_date BETWEEN ${f.from} AND ${f.to}`, ledgerScopeSql(scope)]
   if (f.projectId) manWhere.push(sql`ce.project_id = ${f.projectId}`)

@@ -11,6 +11,7 @@ import { lockProject, projectStages, recalcProjectProgress, setStageProgress, ty
 import { requireVisibleProject, saveStageSet } from '@/domain/progress/stages'
 import { getRequestTx } from '@/lib/tx'
 
+import { rapItemMoney, sumRapMoney, type RapMoney } from './budget'
 import { isQty, itemPct, normUom, round2, stagePct, stockOf, type RapKind } from './rules'
 import { parseRapWorkbook, type RapIssue, type RapRow } from './workbook'
 
@@ -94,12 +95,28 @@ export type RapItemDto = {
   id: number
   code: string
   description: string
+  /** DRMS 10/10 contract alias of `description`. */
+  name: string
   kind: RapKind
   stage: { id: number; name: string }
   uom: { id: number; code: string }
   volume: number
+  /** DRMS 10/10 contract alias of `volume`. */
+  qty: number
   unitPrice?: number | null
   value?: number | null
+  /**
+   * D4 money (price roles only): planned = volume × harga satuan, realisedAmount = Σ approved line totals (from the
+   * final Direktur approval), transferredAmount / verifiedAmount, remaining = planned − realisedAmount, percent.
+   * `realised` (above) stays the realised QUANTITY of the daily reports (P3).
+   */
+  planned?: number | null
+  realisedAmount?: number
+  transferredAmount?: number
+  verifiedAmount?: number
+  remaining?: number | null
+  percent?: number | null
+  overBudget?: boolean
   weightPct: number | null
   sortOrder: number
   realised: number
@@ -111,7 +128,7 @@ export type RapItemDto = {
   active: boolean
 }
 
-export function itemDto(r: ItemRow, prices: boolean): RapItemDto {
+export function itemDto(r: ItemRow, prices: boolean, money?: RapMoney): RapItemDto {
   const volume = num(r.volume)
   const realised = num(r.realised_qty)
   const price = numN(r.unit_price)
@@ -119,11 +136,16 @@ export function itemDto(r: ItemRow, prices: boolean): RapItemDto {
     id: r.id,
     code: r.code,
     description: r.description,
+    name: r.description,
     kind: r.kind,
     stage: { id: r.stage_id, name: r.stage_name },
     uom: { id: r.uom_id, code: r.uom_code },
     volume,
+    qty: volume,
     ...(prices ? { unitPrice: price, value: price === null ? null : Math.round(volume * price) } : {}),
+    ...(prices && money
+      ? { planned: money.planned, realisedAmount: money.realised, transferredAmount: money.transferred, verifiedAmount: money.verified, remaining: money.remaining, percent: money.percent, overBudget: money.overBudget }
+      : {}),
     weightPct: numN(r.weight_pct),
     sortOrder: num(r.sort_order),
     realised,
@@ -143,7 +165,9 @@ export async function loadRap(req: PayloadRequest, projectId: number) {
   const p = await loadProjectFor(req, projectId)
   const roles = await rapRoles(req, p)
   const [rows, stages, locked, modes] = [await itemRows(req, p), await projectStages(req, projectId), await isRapLocked(req, p), await stageModes(req, p)]
-  const items = rows.map((r) => itemDto(r, roles.prices))
+  // D4: plan vs realisation in money per item (price roles only)
+  const money = roles.prices ? await rapItemMoney(req, [projectId]) : null
+  const items = rows.map((r) => itemDto(r, roles.prices, money?.get(r.id)))
   const stageDtos: RapStageDto[] = stages.map((s) => {
     const work = rows.filter((r) => r.stage_id === s.id && r.kind === 'pekerjaan')
     const res = stagePct(work.map((r) => ({ volume: num(r.volume), realised: num(r.realised_qty), unitPrice: numN(r.unit_price), active: r.active !== false })))
@@ -159,6 +183,8 @@ export async function loadRap(req: PayloadRequest, projectId: number) {
     items,
     stages: stageDtos,
     totals: roles.prices ? { rapValue, budget: p.budget, overBudget: rapValue !== null && p.budget !== null && rapValue > p.budget } : null,
+    // D4: Σ plan vs realisation of the items (active ones, plus deactivated items that carry realisation)
+    budget: money ? sumRapMoney([...money.values()].filter((m) => m.active || m.realised > 0)) : null,
     // the APK caches these with the RAP: manpower / equipment types of the project's PT for the daily report
     resourceTypes: await resourceTypesOf(req, p.company),
   }

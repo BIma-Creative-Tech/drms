@@ -40,9 +40,9 @@ afterAll(async () => {
   await (await getTestPayload()).destroy()
 })
 
-/** Draft by `creator` (Admin/Finance, Q-09) for the PM as requester on a cost center; submitted. */
-async function pmRequest(creator: FlowUser, costCenterId: number, submitStatus = 200) {
-  const d = await api('POST', E, creator, draftBody(w, { projectId: undefined, costCenterId, requesterIds: [w.emp.pm], bankAccountId: accPm }), key())
+/** Draft by `creator` (Admin/Finance, Q-09) for the PM as requester on HIS project (DRMS 10/10 D2: was his cost center); submitted. */
+async function pmRequest(creator: FlowUser, submitStatus = 200) {
+  const d = await api('POST', E, creator, draftBody(w, { requesterIds: [w.emp.pm], bankAccountId: accPm }), key())
   expect(d.status, JSON.stringify(d.body)).toBe(201)
   const s = await api('POST', `${E}/${d.body.id}/submit`, creator, {}, key())
   expect(s.status, JSON.stringify(s.body)).toBe(submitStatus)
@@ -57,8 +57,8 @@ async function panelHtml(user: FlowUser, id: number): Promise<string> {
 
 describe('F2e acknowledger delegation — LEGACY snapshots only (ADR 0013 supersedes it for new requests)', () => {
   it('a pre-E1 request whose "Diketahui" was delegated to the Owner (PM = requester) still completes: delegate acknowledges, another Owner approves, PDF "(dilimpahkan)"', async () => {
-    // Submitted before E1: the PM (requester) on his cost center → "Diketahui" delegated to the Owners.
-    const { id } = await pmRequest(w.users.admin, w.costCenter)
+    // Submitted before E1: the PM (requester) on his project → "Diketahui" delegated to the Owners.
+    const { id } = await pmRequest(w.users.admin)
     expect((await api('POST', `${E}/${id}/withdraw`, w.users.admin, { reason: 'simulasi pra-E1' }, key())).status).toBe(200)
     const legacy = {
       ruleId: 1,
@@ -108,7 +108,7 @@ describe('F2e acknowledger delegation — LEGACY snapshots only (ADR 0013 supers
   })
 
   it('new requests: PM as requester no longer triggers a delegation — the Direktur approves as for everyone', async () => {
-    const { submit } = await pmRequest(w.users.admin, w.costCenter)
+    const { submit } = await pmRequest(w.users.admin)
     expect(submit.body.status).toBe('pending_ack')
     expect(submit.body.approvalRule).toMatchObject({ acknowledgeBy: 'role', acknowledgeRole: 'pk-owner', acknowledgeDelegatedTo: null, skipped: [] })
     expect((await auditRows('expense_request', submit.body.id)).some((r) => r.action === 'acknowledge_delegated')).toBe(false)

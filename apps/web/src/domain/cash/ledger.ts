@@ -170,7 +170,9 @@ async function checkOverdraft(req: PayloadRequest, account: CashAccountDoc, amou
 export async function postEntry(req: PayloadRequest, input: PostInput): Promise<CashEntryDoc> {
   if (!isBusinessDate(input.entryDate)) fail(400, 'Tanggal harus YYYY-MM-DD.')
   if (!(Number.isSafeInteger(input.amount) && input.amount > 0)) fail(400, 'Nominal harus bilangan bulat Rupiah > 0.')
-  if (input.projectId && input.costCenterId) fail(400, 'Pilih project ATAU pusat biaya.')
+  // DRMS 10/10 D2: a manual entry is charged to a project OR a cost center; an entry of a request flow (transfer KK,
+  // LPJ refund KM, their reversals) carries the request's project AND the cost center Finance chose at the transfer
+  if (input.projectId && input.costCenterId && input.sourceType === 'manual') fail(400, 'Pilih project ATAU pusat biaya.')
   const companyId = await companyOf(req, 'cash-accounts', input.cashAccountId)
   // ADR 0016 §5 (MC2 fix): a manual posting needs Finance IN THE ACCOUNT's PT (the endpoint only
   // checks "Finance in any PT"); other source types are posted by flows already checked per PT.

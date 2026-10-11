@@ -717,6 +717,10 @@ export interface Project {
    */
   radiusM?: number | null;
   pm: number | User;
+  /**
+   * Diusulkan ke Finance saat mencatat transfer pengajuan project ini.
+   */
+  costCenter?: (number | null) | CostCenter;
   budget?: number | null;
   startDate?: string | null;
   targetDate?: string | null;
@@ -729,6 +733,39 @@ export interface Project {
    * Referensi Odoo (diisi otomatis saat sinkronisasi ke Odoo).
    */
   odooAnalyticRef?: string | null;
+  uuid?: string | null;
+  /**
+   * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
+   */
+  changeReason?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "cost-centers".
+ */
+export interface CostCenter {
+  id: number;
+  /**
+   * Wajib bila Anda memilih lebih dari satu PT di pemilih PT; tidak dapat diubah setelah dibuat.
+   */
+  company?: (number | null) | Company;
+  code: string;
+  name: string;
+  type: 'operational' | 'department';
+  manager?: (number | null) | User;
+  lat?: number | null;
+  lng?: number | null;
+  /**
+   * Kosong = radius default perusahaan (Setting perusahaan).
+   */
+  radiusM?: number | null;
+  /**
+   * Referensi Odoo (diisi otomatis saat sinkronisasi ke Odoo).
+   */
+  odooAnalyticRef?: string | null;
+  active?: boolean | null;
   uuid?: string | null;
   /**
    * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
@@ -930,39 +967,6 @@ export interface TeamAssignment {
   roleInProject: 'pm' | 'staff' | 'mandor';
   startDate?: string | null;
   endDate?: string | null;
-  /**
-   * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
-   */
-  changeReason?: string | null;
-  updatedAt: string;
-  createdAt: string;
-}
-/**
- * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "cost-centers".
- */
-export interface CostCenter {
-  id: number;
-  /**
-   * Wajib bila Anda memilih lebih dari satu PT di pemilih PT; tidak dapat diubah setelah dibuat.
-   */
-  company?: (number | null) | Company;
-  code: string;
-  name: string;
-  type: 'operational' | 'department';
-  manager?: (number | null) | User;
-  lat?: number | null;
-  lng?: number | null;
-  /**
-   * Kosong = radius default perusahaan (Setting perusahaan).
-   */
-  radiusM?: number | null;
-  /**
-   * Referensi Odoo (diisi otomatis saat sinkronisasi ke Odoo).
-   */
-  odooAnalyticRef?: string | null;
-  active?: boolean | null;
-  uuid?: string | null;
   /**
    * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
    */
@@ -1202,9 +1206,12 @@ export interface ExpenseRequest {
     | 'rejected'
     | 'cancelled';
   title: string;
+  /**
+   * Wajib diisi sebelum dikirim. Item RAP baris diambil dari project ini.
+   */
   project?: (number | null) | Project;
   /**
-   * Isi project ATAU pusat biaya.
+   * Pengajuan lama tanpa project. Pengajuan baru: pusat biaya diisi Finance saat transfer.
    */
   costCenter?: (number | null) | CostCenter;
   neededDate?: string | null;
@@ -1230,6 +1237,7 @@ export interface ExpenseRequest {
         total?: number | null;
         receiptAmount?: number | null;
         category?: (number | null) | ExpenseCategory;
+        rapItem?: (number | null) | RapItem;
         vehicle?: (number | null) | Vehicle;
         notes?: string | null;
         id?: string | null;
@@ -1312,6 +1320,43 @@ export interface MediaAttachment {
       filename?: string | null;
     };
   };
+}
+/**
+ * Diubah dari tab RAP project atau impor Excel (bukan dari form ini).
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "rap-items".
+ */
+export interface RapItem {
+  id: number;
+  /**
+   * Mengikuti dokumen induk.
+   */
+  company?: (number | null) | Company;
+  project: number | Project;
+  stage: number | ProjectStage;
+  code: string;
+  description: string;
+  kind: 'pekerjaan' | 'material';
+  uom: number | Uom;
+  volume: number;
+  unitPrice?: number | null;
+  weightPct?: number | null;
+  sortOrder?: number | null;
+  /**
+   * Pekerjaan: Σ volume laporan harian (ledger).
+   */
+  realisedQty?: number | null;
+  receivedQty?: number | null;
+  usedQty?: number | null;
+  active?: boolean | null;
+  uuid?: string | null;
+  /**
+   * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
+   */
+  changeReason?: string | null;
+  updatedAt: string;
+  createdAt: string;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -1582,6 +1627,7 @@ export interface Transfer {
   kind: 'advance' | 'reimburse' | 'lpj_shortfall';
   cashAccount: number | CashAccount;
   amount: number;
+  costCenter?: (number | null) | CostCenter;
   destination?: {
     bankName?: string | null;
     accountNo?: string | null;
@@ -1706,7 +1752,8 @@ export interface ReceiptFlag {
     | 'date_out_of_period'
     | 'uom_suspicious'
     | 'duplicate'
-    | 'receipt_amount_mismatch';
+    | 'receipt_amount_mismatch'
+    | 'rap_over_budget';
   level: 'info' | 'warning';
   lineId?: string | null;
   lineNo?: number | null;
@@ -1958,43 +2005,6 @@ export interface AftersalesActivity {
   correctedBy?: (number | null) | User;
   syncRev?: number | null;
   clientUuid?: string | null;
-  uuid?: string | null;
-  /**
-   * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
-   */
-  changeReason?: string | null;
-  updatedAt: string;
-  createdAt: string;
-}
-/**
- * Diubah dari tab RAP project atau impor Excel (bukan dari form ini).
- *
- * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "rap-items".
- */
-export interface RapItem {
-  id: number;
-  /**
-   * Mengikuti dokumen induk.
-   */
-  company?: (number | null) | Company;
-  project: number | Project;
-  stage: number | ProjectStage;
-  code: string;
-  description: string;
-  kind: 'pekerjaan' | 'material';
-  uom: number | Uom;
-  volume: number;
-  unitPrice?: number | null;
-  weightPct?: number | null;
-  sortOrder?: number | null;
-  /**
-   * Pekerjaan: Σ volume laporan harian (ledger).
-   */
-  realisedQty?: number | null;
-  receivedQty?: number | null;
-  usedQty?: number | null;
-  active?: boolean | null;
   uuid?: string | null;
   /**
    * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
@@ -3077,6 +3087,7 @@ export interface ProjectsSelect<T extends boolean = true> {
   lng?: T;
   radiusM?: T;
   pm?: T;
+  costCenter?: T;
   budget?: T;
   startDate?: T;
   targetDate?: T;
@@ -3424,6 +3435,7 @@ export interface ExpenseRequestsSelect<T extends boolean = true> {
         total?: T;
         receiptAmount?: T;
         category?: T;
+        rapItem?: T;
         vehicle?: T;
         notes?: T;
         id?: T;
@@ -3569,6 +3581,7 @@ export interface TransfersSelect<T extends boolean = true> {
   kind?: T;
   cashAccount?: T;
   amount?: T;
+  costCenter?: T;
   destination?:
     | T
     | {

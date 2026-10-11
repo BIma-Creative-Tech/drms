@@ -247,6 +247,7 @@ export async function draftCopy(req: PayloadRequest, id: number): Promise<SyncDr
       notes: l.notes ?? null,
       category_id: relId(l.category) ?? null,
       vehicle_id: relId(l.vehicle) ?? null,
+      rap_item_id: relId(l.rapItem) ?? null,
     })),
     receipts: receipts.map((r) => ({
       id: r.id,
@@ -332,6 +333,8 @@ function toDraftInput(p: SyncDraftUpsert): DraftInput {
         notes: l.notes ?? null,
         categoryId: l.category_id ?? null,
         vehicleId: l.vehicle_id ?? null,
+        // D4: omitted by APK ≤ 0.7 → the line keeps its stored RAP item (updateDraft keepRapItems)
+        ...(l.rap_item_id !== undefined ? { rapItemId: l.rap_item_id } : {}),
       }),
     )
   }

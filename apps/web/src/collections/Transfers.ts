@@ -22,7 +22,7 @@ export const Transfers: CollectionConfig = withAudit(
   {
     slug: 'transfers',
     labels: { singular: 'Transfer', plural: 'Transfer' },
-    admin: { group: 'Keuangan', useAsTitle: 'docNo', defaultColumns: ['docNo', 'request', 'kind', 'amount', 'transferAt', 'status'], components: { views: { edit: RIWAYAT_TAB } } },
+    admin: { group: 'Keuangan', useAsTitle: 'docNo', defaultColumns: ['docNo', 'request', 'kind', 'amount', 'costCenter', 'transferAt', 'status'], components: { views: { edit: RIWAYAT_TAB } } },
     access: {
       // Finance/Owner/Admin: all rows of their PTs; requesters own; PM team (via the request scope).
       read: byVisibleRequest('request'),
@@ -30,7 +30,7 @@ export const Transfers: CollectionConfig = withAudit(
       update: denyAll,
       delete: denyDeleteLogged('transfer'),
     },
-    hooks: { beforeChange: [companyHook('transfers', { derive: [{ field: 'request', collection: 'expense-requests' }], check: [{ field: 'cashAccount', collection: 'cash-accounts' }, { field: 'cashEntry', collection: 'cash-entries' }] })] },
+    hooks: { beforeChange: [companyHook('transfers', { derive: [{ field: 'request', collection: 'expense-requests' }], check: [{ field: 'cashAccount', collection: 'cash-accounts' }, { field: 'cashEntry', collection: 'cash-entries' }, { field: 'costCenter', collection: 'cost-centers' }] })] },
     fields: [
       companyField({ derived: true }),
       { name: 'docNo', type: 'text', label: 'Nomor', index: true, admin: ro },
@@ -38,6 +38,9 @@ export const Transfers: CollectionConfig = withAudit(
       { name: 'kind', type: 'select', required: true, options: ['advance', 'reimburse', 'lpj_shortfall'].map((v) => ({ label: v, value: v })), admin: ro },
       { name: 'cashAccount', type: 'relationship', relationTo: 'cash-accounts', label: 'Akun kas sumber', required: true, admin: ro },
       { name: 'amount', type: 'number', label: 'Nominal (Rp)', required: true, admin: ro },
+      // D2 (DRMS 10/10): cost center set by Finance when recording the transfer (mandatory for advance / reimburse,
+      // DB trigger transfers_guard_cost_center; default = the project's cost center). Immutable like the row.
+      { name: 'costCenter', type: 'relationship', relationTo: 'cost-centers', label: 'Pusat biaya', index: true, admin: ro },
       {
         name: 'destination',
         type: 'group',

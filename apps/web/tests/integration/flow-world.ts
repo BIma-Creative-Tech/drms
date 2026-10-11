@@ -8,7 +8,7 @@ import { withSystemTransaction } from '@/lib/system-tx'
 import config from '@/payload.config'
 import { seed } from '@/seed/seed'
 
-import { addMembership, companyId, getTestPayload, installFakeKeycloak, webSessionCookie, withContext, type TestUser } from './helpers'
+import { addMembership, companyId, getTestPayload, installFakeKeycloak, sqlAs, webSessionCookie, withContext, type TestUser } from './helpers'
 
 /**
  * Isolated F2a test world per test file (all files share one DB): own employees, users (each with
@@ -143,8 +143,11 @@ export async function makeWorld(tag: string, opts: { rule?: 'direktur_finance' |
     admin: await makeFlowUser(['pk-admin'], `${tag}-admin`, emp.admin),
     nosig: await makeFlowUser(['pk-staff'], `${tag}-nosig`, null, { signature: false }),
   }
-  const project = await sysCreate('projects', { code: code('P1'), name: `${tag} Project`, pm: users.pm.id, budget: 100_000_000, status: 'berjalan' })
-  const otherProject = await sysCreate('projects', { code: code('P2'), name: `${tag} Other`, pm: users.otherPm.id, budget: 50_000_000, status: 'berjalan' })
+  // DRMS 10/10 D2: Finance books a transfer on a cost center (default = the project's) — a dedicated one, so the
+  // legacy cost-center requests of the world (`costCenter`) and the project money stay apart in the reports
+  const projectCostCenter = await sysCreate('cost-centers', { code: code('PCC'), name: `${tag} Proyek` })
+  const project = await sysCreate('projects', { code: code('P1'), name: `${tag} Project`, pm: users.pm.id, budget: 100_000_000, status: 'berjalan', costCenter: projectCostCenter })
+  const otherProject = await sysCreate('projects', { code: code('P2'), name: `${tag} Other`, pm: users.otherPm.id, budget: 50_000_000, status: 'berjalan', costCenter: projectCostCenter })
   const costCenter = await sysCreate('cost-centers', { code: code('CC'), name: `${tag} Ops`, manager: users.pm.id })
   for (const e of [emp.a, emp.b]) {
     await sysCreate('team-assignments', { employee: e, project, roleInProject: 'staff' })
@@ -182,7 +185,7 @@ export async function makeWorld(tag: string, opts: { rule?: 'direktur_finance' |
         steps: [{ level: 1, approverRole: 'pk-owner' }],
       })
     }
-    return { emp, users, project, otherProject, costCenter, accA, accB, cashAccount, cat, uom, vehicle, cashInSource }
+    return { emp, users, project, otherProject, costCenter, projectCostCenter, accA, accB, cashAccount, cat, uom, vehicle, cashInSource }
   }
   // World rules (priority 10, scoped), ADR 0013: "Diketahui" = Direktur (pk-owner, `owner`/`owner2`)
   // approval, then Finance level 1; > 10 juta: two Finance levels (`finance` + `finance2`, Q-31 example).
@@ -200,7 +203,7 @@ export async function makeWorld(tag: string, opts: { rule?: 'direktur_finance' |
       ],
     })
   }
-  return { emp, users, project, otherProject, costCenter, accA, accB, cashAccount, cat, uom, vehicle, cashInSource }
+  return { emp, users, project, otherProject, costCenter, projectCostCenter, accA, accB, cashAccount, cat, uom, vehicle, cashInSource }
 }
 
 // ---------------------------------------------------------------- HTTP helpers
@@ -240,6 +243,21 @@ export async function upload(path: string, user: FlowUser, bytes: Buffer, mimety
 /** Runs a domain call in its own transaction as `user` (service-level tests). */
 export async function asUser<T>(user: FlowUser | null, fn: (req: PayloadRequest) => Promise<T>): Promise<T> {
   return withSystemTransaction(await getTestPayload(), user as never, fn)
+}
+
+/**
+ * DRMS 10/10 D2: turns a Draft into a LEGACY cost-center request — no project, its own cost center, already submitted
+ * once (approval cycle ≥ 1, e.g. withdrawn) — the only kind of cost-center request that can still be sent. Since D2
+ * the app refuses to create one, so only the DB owner can (trigger expense_requests_project_rules paused for it).
+ */
+export async function legacyCostCenter(id: number, costCenter: number): Promise<void> {
+  // three statements = three transactions (the UPDATE queues deferred checks; ALTER TABLE refuses pending events)
+  await sqlAs('owner', 'ALTER TABLE expense_requests DISABLE TRIGGER expense_requests_project_rules')
+  try {
+    await sqlAs('owner', 'UPDATE expense_requests SET project_id = NULL, cost_center_id = $1, approval_cycle = greatest(coalesce(approval_cycle, 0), 1) WHERE id = $2', [costCenter, id])
+  } finally {
+    await sqlAs('owner', 'ALTER TABLE expense_requests ENABLE TRIGGER expense_requests_project_rules')
+  }
 }
 
 export function draftBody(w: World, over: Record<string, unknown> = {}) {

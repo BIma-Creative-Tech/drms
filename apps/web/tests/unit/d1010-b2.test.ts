@@ -56,9 +56,9 @@ describe('D3: line dialog helpers (LinesTableField)', () => {
   it('live total = qty × harga satuan; requires every field the submit needs', () => {
     expect(draftTotal({ qty: '24,8', unitPrice: '24.200' })).toBe(600_160)
     expect(draftTotal({ qty: '', unitPrice: '1.000' })).toBeNull()
-    const ok = parseDraft({ description: ' Solar ', qty: '20', uom: '3', unitPrice: '10.000', receiptAmount: '199.500', category: '7', vehicle: '9', notes: '' }, { requiresVehicle: true })
-    expect(ok.values).toEqual({ description: 'Solar', qty: 20, uom: 3, unitPrice: 10_000, total: 200_000, receiptAmount: 199_500, category: 7, vehicle: 9, notes: '' })
-    const bad = parseDraft({ description: '', qty: '0', uom: '', unitPrice: '1,5', receiptAmount: '-1', category: '', vehicle: '', notes: '' }, { requiresVehicle: true })
+    const ok = parseDraft({ description: ' Solar ', qty: '20', uom: '3', unitPrice: '10.000', receiptAmount: '199.500', category: '7', vehicle: '9', notes: '', rapItem: '' }, { requiresVehicle: true })
+    expect(ok.values).toEqual({ description: 'Solar', qty: 20, uom: 3, unitPrice: 10_000, total: 200_000, receiptAmount: 199_500, category: 7, vehicle: 9, notes: '', rapItem: null })
+    const bad = parseDraft({ description: '', qty: '0', uom: '', unitPrice: '1,5', receiptAmount: '-1', category: '', vehicle: '', notes: '', rapItem: '' }, { requiresVehicle: true })
     expect(Object.keys(bad.errors).sort()).toEqual(['category', 'description', 'qty', 'receiptAmount', 'unitPrice', 'uom', 'vehicle'])
     expect(bad.values).toBeNull()
   })

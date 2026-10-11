@@ -15,7 +15,8 @@ import { recordTransfer, voidTransfer } from '@/domain/expense/transfers'
 import { acknowledge, approve, cancel, complete, reject, submit, withdraw } from '@/domain/expense/workflow'
 import { receiptsComplete, requestLpjRevision, reverseSettlement, setLpjPhotos, settle, submitLpj, verifyLpj } from '@/domain/expense/lpj'
 import { requestHistory } from '@/domain/history'
-import { approvalInbox, lpjQueue, officeQueueWhere } from '@/domain/expense/queues'
+import { approvalInbox, lpjQueue, officeQueueWhere, transferQueue } from '@/domain/expense/queues'
+import { searchWhere } from '@/lib/text-search'
 import { settlePrecheck } from '@/domain/expense/settle-precheck'
 
 import { companyQuery } from '../company-query'
@@ -74,7 +75,7 @@ export const listRequestsEndpoint = v1({
   handler: async ({ req }) => {
     const q = ListQuery.safeParse(Object.fromEntries(req.searchParams.entries()))
     if (!q.success) throw new HttpError(400, 'Bad Request', { errors: q.error.issues.map((i) => ({ path: i.path.join('.'), message: i.message })) })
-    const { scope, status, type, limit, cursor } = q.data
+    const { scope, status, type, limit, cursor, project, q: text, page: pageNo } = q.data
     const and: Where[] = []
     const uid = userId(req)!
     if (scope === 'mine') {
@@ -108,6 +109,20 @@ export const listRequestsEndpoint = v1({
     if (scope === 'inbox') and.push({ status: { in: ['pending_ack', 'pending_approval'] } })
     if (status) and.push({ status: { in: status.split(',') } })
     if (type) and.push({ type: { equals: type } })
+    // DRMS 10/10 (project "Pengajuan" tab, APK project screen): one project + search in nomor / judul
+    if (project) and.push({ project: { equals: project } })
+    const search = searchWhere(['docNo', 'title'], text)
+    if (search) and.push(search)
+    if (pageNo !== undefined && scope !== 'inbox') {
+      // DRMS 10/10 D8: numbered pages (newest first) instead of the cursor
+      try {
+        const res = await req.payload.find({ collection: 'expense-requests', where: and.length ? { and } : undefined, sort: '-id', page: pageNo, limit, depth: 0, user: req.user, overrideAccess: false /* caller's read scope */, req })
+        return json({ items: (res.docs as unknown as RequestDoc[]).map((d) => listItem(d)), nextCursor: null, page: res.page ?? pageNo, totalPages: Math.max(1, res.totalPages), totalDocs: res.totalDocs })
+      } catch (err) {
+        if ((err as { status?: number }).status === 403) return json({ items: [], nextCursor: null, page: 1, totalPages: 1, totalDocs: 0 })
+        throw err
+      }
+    }
     const after = decodeCursor(cursor)
     if (after !== undefined) and.push({ id: { less_than: after } })
     let docs: RequestDoc[] = []
@@ -188,11 +203,16 @@ export const historyEndpoint = v1({
   },
 })
 
-/** GET /transfer-queue — US-19: Pengajuan Baru "Disetujui", Reimburse "Nota Terverifikasi", by needed date. */
+/**
+ * GET /transfer-queue — US-19: Pengajuan Baru "Disetujui", Reimburse "Nota Terverifikasi", by needed date.
+ * DRMS 10/10 (APK Finance menu): + project, suggested cost center (D2), bank snapshot + verification, flag counts
+ * and the transfer SLA of the web queue (domain transferQueue).
+ */
 export const transferQueueEndpoint = v1({
   path: '/transfer-queue',
   method: 'get',
   roles: ['pk-finance', 'pk-owner'],
+  transactional: true, // queue figures use the request transaction handle
   handler: async ({ req }) => {
     const companies = await companyQuery(req)
     const res = await req.payload.find({
@@ -225,7 +245,14 @@ export const transferQueueEndpoint = v1({
       })
       items.push(listItem(d, { openWarningFlags: flags.totalDocs }))
     }
-    return json({ items, nextCursor: null })
+    const extra = new Map((await transferQueue(req, { companyIds: companies })).map((x) => [x.id, x]))
+    return json({
+      items: items.map((i) => {
+        const x = extra.get(i.id)
+        return { ...i, project: x?.project ?? null, costCenter: x?.costCenter ?? null, bank: x?.bank ?? null, bankVerification: x?.bankVerification ?? 'unverified', flags: x?.flags ?? { warning: 0, info: 0, receiptMismatch: 0 }, sla: x?.sla ?? { approvedAt: null, slaHours: 24, ageHours: null, over: false } }
+      }),
+      nextCursor: null,
+    })
   },
 })
 

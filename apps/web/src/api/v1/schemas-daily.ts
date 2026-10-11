@@ -60,17 +60,40 @@ export const RapItemUpdate = z
   .strict()
   .meta({ id: 'RapItemUpdate' })
 
+/** D4 (DRMS 10/10): plan vs realisation in money (price roles only). */
+export const RapBudget = z
+  .object({
+    planned: z.number().nullable().meta({ description: 'Σ planned of the priced items (null: no item priced).' }),
+    realised: z.number().meta({ description: 'Σ line totals from the final approval onward.' }),
+    transferred: z.number(),
+    verified: z.number(),
+    remaining: z.number().nullable(),
+    percent: z.number().nullable(),
+    overBudget: z.boolean(),
+    overBudgetItems: z.number().int(),
+  })
+  .meta({ id: 'RapBudget' })
+
 export const RapItem = z
   .object({
     id,
     code: z.string(),
     description: z.string(),
+    name: z.string().meta({ description: 'DRMS 10/10: alias of description.' }),
     kind: RapKindEnum,
     stage: z.object({ id, name: z.string() }),
     uom: z.object({ id, code: z.string() }),
     volume: z.number(),
+    qty: z.number().meta({ description: 'DRMS 10/10: alias of volume.' }),
     unitPrice: z.number().nullable().optional().meta({ description: 'Price roles only.' }),
     value: z.number().nullable().optional().meta({ description: 'volume × unitPrice (price roles only).' }),
+    planned: z.number().nullable().optional().meta({ description: 'D4 (price roles only): planned amount = round(volume × unitPrice); null when unpriced.' }),
+    realisedAmount: z.number().optional().meta({ description: 'D4 (price roles only): Σ line totals of requests charged to this item from the final approval onward. (`realised` = realised QUANTITY of the daily reports.)' }),
+    transferredAmount: z.number().optional().meta({ description: 'D4 (price roles only): Σ line totals of requests already transferred.' }),
+    verifiedAmount: z.number().optional().meta({ description: 'D4 (price roles only): Σ valid receipts of those lines after LPJ / receipt verification.' }),
+    remaining: z.number().nullable().optional().meta({ description: 'D4 (price roles only): planned − realisedAmount.' }),
+    percent: z.number().nullable().optional().meta({ description: 'D4 (price roles only): realisedAmount / planned × 100 (2 decimals).' }),
+    overBudget: z.boolean().optional().meta({ description: 'D4 (price roles only): realisedAmount > planned ("Melebihi RAP").' }),
     weightPct: z.number().nullable(),
     sortOrder: z.number(),
     realised: z.number().meta({ description: 'Σ work volume of the daily reports (pekerjaan).' }),
@@ -104,6 +127,7 @@ export const Rap = z
       }),
     ),
     totals: z.object({ rapValue: z.number().nullable(), budget: z.number().nullable(), overBudget: z.boolean() }).nullable().meta({ description: 'Price roles only.' }),
+    budget: RapBudget.nullable().meta({ description: 'D4 (price roles only): Σ plan vs realisation of the items.' }),
     resourceTypes: z.array(z.object({ id, kind: z.enum(['tenaga', 'alat']), code: z.string(), name: z.string() })).meta({ description: 'Active manpower / equipment types of the project\'s PT (daily report pickers; APK cache).' }),
   })
   .meta({ id: 'Rap' })

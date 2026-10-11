@@ -57,6 +57,10 @@ const ALLOWED: Record<string, string> = {
   'domain/expense/transfers.ts#approvedByCaller': 'approvals of request ids from an already scoped queue, actor = the caller',
   'domain/progress/recalc.ts#lockProject': 'row lock (FOR UPDATE) of ONE project id checked by the caller',
   'domain/addendum/service.ts#lockAddendum': 'row lock (FOR UPDATE) of ONE addendum id; visibility is checked right after (loadVisibleAddendum)',
+  // DRMS 10/10 Phase C (D4 RAP realisation, D2 cost center filter)
+  'domain/rap/budget.ts#rapUsage': 'requests of project ids the caller already passed the project read check for (loadRap, listProjects / rapMonitoring read scope, one request\'s project); a request shares its project\'s PT (DB trigger)',
+  'domain/rap/budget.ts#rapItemRows': 'RAP items of checked project ids, or of ONE request\'s lines (same PT as the request, DB trigger)',
+  'domain/reports/kpi.ts#requestCostCenterSql': 'fragment used only inside requestScopeSql-scoped queries (requestFilterSql, spending)',
 }
 
 type Fn = { file: string; name: string; body: string }

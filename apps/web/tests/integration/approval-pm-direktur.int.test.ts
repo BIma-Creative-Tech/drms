@@ -11,7 +11,7 @@ import { resetRateLimits } from '@/lib/rate-limit'
 import { buildPdfData } from '@/pdf/data'
 
 import { auditRows, getTestPayload, sqlAs, sqlError } from './helpers'
-import { api, asUser, draftBody, makeFlowUser, makeWorld, png, sysCreate, upload, type FlowUser, type World } from './flow-world'
+import { api, asUser, draftBody, legacyCostCenter, makeFlowUser, makeWorld, png, sysCreate, upload, type FlowUser, type World } from './flow-world'
 
 /**
  * ADR 0021 (owner decision 2026-10-10) through the real API: Staff → PM project ("Diketahui" =
@@ -139,10 +139,12 @@ describe('1. Staff → PM → Direktur → Finance transfer', () => {
     expect(pdf.policyNote).toBeUndefined()
   })
 
-  it('Reimburse (cost center → its manager): PM → Direktur → Finance verifies receipts (not an approval) → transfer', async () => {
-    const c = await api('POST', E, w.users.staffA, draftBody(w, { type: 'reimburse', projectId: null, costCenterId: w.costCenter }), key())
+  it('LEGACY Reimburse (cost center → its manager): PM → Direktur → Finance verifies receipts (not an approval) → transfer', async () => {
+    // DRMS 10/10 D2: cost-center requests exist only from before D2 (legacy row, sent again after a withdraw)
+    const c = await api('POST', E, w.users.staffA, draftBody(w, { type: 'reimburse' }), key())
     expect(c.status, JSON.stringify(c.body)).toBe(201)
     const id = c.body.id as number
+    await legacyCostCenter(id, w.costCenter)
     await receipt(id, c.body.lines[0].id, 600_000)
     await receipt(id, c.body.lines[1].id, 150_000)
     const s = await api('POST', `${E}/${id}/submit`, w.users.staffA, {}, key())

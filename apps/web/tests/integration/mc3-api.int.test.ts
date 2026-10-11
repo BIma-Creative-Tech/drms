@@ -418,6 +418,10 @@ const ROUTE_CLASSES: Record<string, RouteClass> = {
   // P3 konstruksi: RAP (per project / item) + Laporan harian
   'GET /rap/template.xlsx': 'public', // shared uom codes only
   'GET /projects/:id/rap': 'document',
+  // DRMS 10/10 Phase C: APK projects (collection read scope ∩ selection) + the Finance cost-center picker (D2)
+  'GET /projects': 'selection',
+  'GET /projects/:id': 'document',
+  'GET /cost-centers': 'selection',
   'GET /projects/:id/rap.xlsx': 'document',
   'POST /projects/:id/rap/items': 'document',
   'PATCH /rap-items/:id': 'document',

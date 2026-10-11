@@ -1,6 +1,7 @@
 import type { PayloadRequest } from 'payload'
 
 import { hasRole, relId, userId } from '@/access/roles'
+import { rapOverBudgetLines } from '@/domain/rap/budget'
 
 import { actorContext, approvalsOf, displayName, loadRaw, projectCommitted, type RequestDoc } from './common'
 import { displayUnitPrice, receiptMismatch } from './lines'
@@ -93,6 +94,31 @@ export async function detail(req: PayloadRequest, id: number) {
     })
   ).docs as unknown as Array<Record<string, unknown>>
 
+  // D4: "Melebihi RAP" (flags + live line state) only for the roles that see RAP values (owner 2026-10-10: not Staff)
+  const company = relId((doc as { company?: unknown }).company)
+  const rapViewer = hasRole(req, ['pk-owner', 'pk-admin', 'pk-finance', 'pk-pm'], company)
+  const visibleFlags = rapViewer ? flags : flags.filter((f) => f.kind !== 'rap_over_budget')
+  const rapOver = rapViewer
+    ? new Set(
+        (
+          await rapOverBudgetLines(req, {
+            requestId: id,
+            projectId: relId(doc.project) ?? null,
+            lines: (doc.lines ?? []).map((l, i) => ({ id: l.id, lineNo: i + 1, total: l.total ?? 0, rapItem: relId(l.rapItem) ?? null })),
+          })
+        ).map((o) => o.lineId),
+      )
+    : new Set<string>()
+  // D2: cost center of each transfer (set by Finance)
+  const ccIds = [...new Set(transfers.map((t) => relId(t.costCenter)).filter((x): x is number => x !== undefined))]
+  const ccNames = new Map(
+    ccIds.length
+      ? (
+          await req.payload.find({ collection: 'cost-centers', where: { id: { in: ccIds } }, depth: 0, pagination: false, select: { code: true, name: true }, overrideAccess: true /* SYSTEM-READ: names of a visible request's transfer cost centers */, req })
+        ).docs.map((c) => [c.id as number, { id: c.id as number, code: (c as { code?: string }).code ?? null, name: (c as { name?: string }).name ?? null }])
+      : [],
+  )
+
   const projectDoc = doc.project && typeof doc.project === 'object' ? (doc.project as { id: number; budget?: number | null }) : null
   let budget: { basis: 'project' | 'none'; pctBefore: number | null; pctAfter: number | null } = { basis: 'none', pctBefore: null, pctAfter: null }
   if (projectDoc) {
@@ -146,6 +172,9 @@ export async function detail(req: PayloadRequest, id: number) {
       notes: l.notes ?? null,
       category: ref(l.category, (d) => ({ code: d.code, name: d.name })),
       vehicle: ref(l.vehicle, (d) => ({ plateNo: d.plateNo, plateDisplay: d.plateDisplay, type: d.type })) as Named,
+      // D4: RAP item of the line (name = the item's "uraian") + live "Melebihi RAP" for the RAP viewers (false for Staff)
+      rapItem: ref(l.rapItem, (d) => ({ code: d.code, name: d.description })) as { id: number; code?: unknown; name?: unknown } | null,
+      rapOverBudget: rapOver.has(l.id),
     })),
     transferredTotal: doc.transferredTotal ?? 0,
     approvalCycle: doc.approvalCycle ?? 0,
@@ -199,7 +228,7 @@ export async function detail(req: PayloadRequest, id: number) {
       imageId: relId(r.image) ?? null,
       status: r.status,
     })),
-    flags: flags.map((f) => ({
+    flags: visibleFlags.map((f) => ({
       id: f.id as number,
       kind: f.kind as FlagKind,
       kindLabel: FLAG_LABELS[f.kind as FlagKind],
@@ -219,6 +248,8 @@ export async function detail(req: PayloadRequest, id: number) {
       amount: t.amount as number,
       transferDate: t.transferDate as string,
       transferAt: (t.transferAt as string | null | undefined) ?? null,
+      // D2: cost center chosen by Finance (null on transfers recorded before D2)
+      costCenter: ccNames.get(relId(t.costCenter) ?? -1) ?? null,
       bankRef: t.bankRef as string,
       status: t.status as string,
       cashEntryId: relId(t.cashEntry) ?? null,
@@ -253,7 +284,7 @@ export async function detail(req: PayloadRequest, id: number) {
         }
       : null,
     budget,
-    openWarningFlags: flags.filter((f) => f.status === 'open' && f.level === 'warning').length,
+    openWarningFlags: visibleFlags.filter((f) => f.status === 'open' && f.level === 'warning').length,
     // E9: reversal only for a settled LPJ that posted a refund KM / shortfall transfer (UI hint; the service re-checks).
     allowedActions: allowedActions(ctx).filter((a) => a !== 'settle_reverse' || (lpj?.status === 'settled' && (lpj.settlementType === 'refund' || lpj.settlementType === 'shortfall'))),
     resubmitOfId: relId(doc.resubmitOf) ?? null,

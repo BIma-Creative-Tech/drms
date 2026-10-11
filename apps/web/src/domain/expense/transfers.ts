@@ -25,6 +25,11 @@ export type TransferInput = {
    * transfer then has no time: `transferAt` null, "jam tidak diketahui").
    */
   transferAt?: string
+  /**
+   * D2 (DRMS 10/10): cost center of the money, chosen by Finance (mandatory). Omitted → the project's default cost
+   * center (projects.costCenter), else a legacy request's own cost center; none → 400.
+   */
+  costCenterId?: number | null
   /** Optional echo of the amount; must equal the approved amount (G3: Finance cannot change it). */
   amount?: number
   /** QA-04: confirm a transfer that makes the cash account balance negative (audited). */
@@ -98,6 +103,50 @@ export async function transferMoment(req: PayloadRequest, companyId: number | un
   return { instant: instant!, date }
 }
 
+/**
+ * D2: the transfer's cost center — Finance's choice, else the default of the request's project, else (legacy) the
+ * request's own cost center. Must be an ACTIVE cost center of the request's PT.
+ */
+export async function transferCostCenter(req: PayloadRequest, doc: { project?: unknown; costCenter?: unknown }, companyId: number | undefined, chosen: number | null): Promise<number> {
+  let id = chosen
+  if (id === null) id = (await suggestedCostCenter(req, doc))?.id ?? null
+  if (id === null) fail(400, 'Pusat biaya wajib dipilih (Finance menentukan pusat biaya saat transfer).', [{ path: 'costCenterId', message: 'Pusat biaya wajib dipilih.' }])
+  const cc = (await req.payload.findByID({ collection: 'cost-centers', id: id!, depth: 0, overrideAccess: true /* SYSTEM-READ: PT + active checked below */, req, disableErrors: true })) as { company?: unknown; active?: boolean | null } | null
+  if (!cc || cc.active === false || (companyId !== undefined && relId(cc.company) !== companyId)) {
+    fail(400, 'Pusat biaya tidak ditemukan, nonaktif, atau bukan pusat biaya PT pengajuan ini.', [{ path: 'costCenterId', message: 'Pusat biaya tidak valid.' }])
+  }
+  return id!
+}
+
+/** D2: cost center proposed to Finance — the project's default (projects.costCenter), else a legacy request's own. */
+export async function suggestedCostCenter(req: PayloadRequest, doc: { project?: unknown; costCenter?: unknown }): Promise<{ id: number; code: string; name: string } | null> {
+  const projectId = relId(doc.project)
+  let id: number | undefined
+  if (projectId !== undefined) {
+    const p = (await req.payload.findByID({ collection: 'projects', id: projectId, depth: 0, select: { costCenter: true }, overrideAccess: true /* SYSTEM-READ: default cost center of the request's project */, req, disableErrors: true })) as { costCenter?: unknown } | null
+    id = relId(p?.costCenter)
+  }
+  id ??= relId(doc.costCenter)
+  if (id === undefined) return null
+  const cc = (await req.payload.findByID({ collection: 'cost-centers', id, depth: 0, select: { code: true, name: true, active: true }, overrideAccess: true /* SYSTEM-READ: name of the suggestion */, req, disableErrors: true })) as { code?: string; name?: string; active?: boolean | null } | null
+  return cc && cc.active !== false ? { id, code: cc.code ?? '', name: cc.name ?? '' } : null
+}
+
+/** D2: cost center of the request's latest posted advance / reimburse transfer (null for legacy transfers). */
+export async function requestTransferCostCenter(req: PayloadRequest, requestId: number): Promise<number | null> {
+  const t = await req.payload.find({
+    collection: 'transfers',
+    where: { and: [{ request: { equals: requestId } }, { status: { equals: 'posted' } }, { kind: { in: ['advance', 'reimburse'] } }] },
+    sort: '-id',
+    limit: 1,
+    depth: 0,
+    select: { costCenter: true },
+    overrideAccess: true, // SYSTEM-READ: cost center of the request's transfer
+    req,
+  })
+  return relId((t.docs[0] as { costCenter?: unknown } | undefined)?.costCenter) ?? null
+}
+
 type TransferDoc = { id: number; docNo: string; request: unknown; amount: number; status: 'posted' | 'void'; cashEntry?: unknown; kind: string }
 
 /**
@@ -128,6 +177,7 @@ export async function recordTransfer(req: PayloadRequest, id: number, input: Tra
   assertOnOrAfterOpening(account, transferDate, 'transferDate') // QA-05: 400 instead of the wrapped trigger error
   const lock = await currentLockDate(req, companyId)
   if (lock && transferDate <= lock) fail(409, `Periode ${transferDate.slice(0, 7)} sudah ditutup (tutup buku s/d ${lock}).`)
+  const costCenterId = await transferCostCenter(req, doc, companyId, input.costCenterId ?? null) // D2
   const destination = await checkDestination(req, doc, input.confirmUnverifiedAccount === true) // QA-17
 
   const { docNo } = await allocateDocNo(req, 'transfer', { companyId: relId((doc as { company?: unknown }).company)!, date: parseBusinessDate(transferDate) })
@@ -140,6 +190,7 @@ export async function recordTransfer(req: PayloadRequest, id: number, input: Tra
       kind: doc.type,
       cashAccount: input.cashAccountId,
       amount: approved,
+      costCenter: costCenterId,
       destination: { ...doc.bankSnapshot },
       bankRef: input.bankRef.trim(),
       proof: input.proofMediaId,
@@ -160,7 +211,7 @@ export async function recordTransfer(req: PayloadRequest, id: number, input: Tra
     amount: approved,
     categoryId: categories.length === 1 ? categories[0] : null,
     projectId: relId(doc.project) ?? null,
-    costCenterId: relId(doc.costCenter) ?? null,
+    costCenterId, // D2: the cost center Finance chose (legacy request: its own one)
     description: `Transfer ${docNo} — ${doc.docNo ?? ''} ${doc.title}`.slice(0, 1000),
     sourceType: 'transfer',
     expenseRequestId: id,

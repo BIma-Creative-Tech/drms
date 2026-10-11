@@ -29,6 +29,8 @@ export type LineDoc = {
   notes?: string | null
   category?: unknown
   vehicle?: unknown
+  /** D4: RAP item (rap-items) of the request's project. */
+  rapItem?: unknown
 }
 
 export type RequestDoc = {

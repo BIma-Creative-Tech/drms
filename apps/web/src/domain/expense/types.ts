@@ -110,7 +110,7 @@ export type ApprovalPosition = (typeof APPROVAL_POSITIONS)[number]
 export const APPROVAL_DECISIONS = ['signed', 'acknowledged', 'approved', 'rejected'] as const
 export type ApprovalDecision = (typeof APPROVAL_DECISIONS)[number]
 
-export const FLAG_KINDS = ['amount_diff', 'date_after_request', 'date_too_old', 'date_out_of_period', 'uom_suspicious', 'duplicate', 'receipt_amount_mismatch'] as const
+export const FLAG_KINDS = ['amount_diff', 'date_after_request', 'date_too_old', 'date_out_of_period', 'uom_suspicious', 'duplicate', 'receipt_amount_mismatch', 'rap_over_budget'] as const
 export type FlagKind = (typeof FLAG_KINDS)[number]
 
 export const FLAG_LABELS: Record<FlagKind, string> = {
@@ -122,6 +122,8 @@ export const FLAG_LABELS: Record<FlagKind, string> = {
   duplicate: 'Nota ganda',
   // D3 (DRMS 10/10): "Nominal sesuai nota" of a line ≠ its total (qty × harga satuan) — awareness for Finance
   receipt_amount_mismatch: 'Selisih nota',
+  // D4 (DRMS 10/10): the line's RAP item is (or would be) above its planned amount — warning for PM / Direktur, not blocking
+  rap_over_budget: 'Melebihi RAP',
 }
 
 export type FlagLevel = 'info' | 'warning'

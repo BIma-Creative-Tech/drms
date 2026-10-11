@@ -26,7 +26,7 @@ import {
   type Signature,
 } from './common'
 import { fromDocLines, validateContent } from './drafts'
-import { assertEveryLineHasReceipt, recomputeFlags } from './receipts'
+import { assertEveryLineHasReceipt, recomputeFlags, syncProjectRapFlags, syncRapFlags } from './receipts'
 import { ACK_DELEGATE_ROLE, budgetImpact, lastLevel, type AckDelegate, type ApprovalSnapshot } from './rules'
 import { auditSelfApproval, auditSkipped, selectAndSnapshot, writeSnapshot } from './snapshot'
 import type { ApprovalDecision, ApprovalPosition } from './types'
@@ -156,7 +156,8 @@ export async function submit(req: PayloadRequest, id: number, opts: SubmitOption
       neededDate: doc.neededDate,
       urgencyLevelId: relId(doc.urgencyLevel) ?? null,
     },
-    { forSubmit: true, creatorId: creator },
+    // D2: a legacy cost-center request submitted before may be sent again as it was (no project)
+    { forSubmit: true, creatorId: creator, legacyCostCenter: !relId(doc.project) && relId(doc.costCenter) !== undefined && (doc.approvalCycle ?? 0) > 0 },
   )
   if (doc.type === 'reimburse') await assertEveryLineHasReceipt(req, doc)
 
@@ -267,6 +268,7 @@ export async function acknowledge(req: PayloadRequest, id: number, opts: SignOpt
   const caller = userId(req)!
   const sig = await requireSignature(req, caller, 'required', opts.signatureMediaId)
   const snap = doc.approvalSnapshot ?? null
+  await syncRapFlags(req, id) // D4: "Melebihi RAP" as of this decision (counted in openFlags)
   await insertApproval(req, doc, {
     position: 'diketahui',
     level: 0,
@@ -285,6 +287,7 @@ export async function acknowledge(req: PayloadRequest, id: number, opts: SignOpt
     // on pending_approval → approved" (G3) holds; nobody is notified for the empty level.
     const approved = await updateRequest(req, id, { status: 'approved', approvedAmount: next.grandTotal ?? 0, approvedAt: new Date().toISOString() })
     await writeSnapshot(req, approved, 'approve')
+    await syncProjectRapFlags(req, id)
     return approved
   }
   return next
@@ -303,6 +306,7 @@ export async function approve(req: PayloadRequest, id: number, opts: SignOpts = 
   const caller = userId(req)!
   const sig = await requireSignature(req, caller, 'required', opts.signatureMediaId)
   const level = doc.currentLevel ?? 1
+  await syncRapFlags(req, id) // D4: "Melebihi RAP" as of this decision (counted in openFlags)
   await insertApproval(req, doc, {
     position: 'approval',
     level,
@@ -317,6 +321,8 @@ export async function approve(req: PayloadRequest, id: number, opts: SignOpts = 
   // item 11: approvedAt = start of the transfer SLA (DB: set only on pending_approval → approved)
   const updated = await updateRequest(req, id, { status: 'approved', approvedAmount: doc.grandTotal ?? 0, approvedAt: new Date().toISOString() })
   await writeSnapshot(req, updated, 'approve')
+  // D4: this request now counts as RAP realisation → the project's other pending requests re-check "Melebihi RAP"
+  await syncProjectRapFlags(req, id)
   return updated
 }
 

@@ -89,14 +89,15 @@ export const LineInput = z
     notes: z.string().max(500).nullable().optional(),
     categoryId: id.nullable().optional(),
     vehicleId: id.nullable().optional(),
+    rapItemId: id.nullable().optional().meta({ description: 'D4 (DRMS 10/10): RAP item of the request project (GET /projects/{id}/rap items[].id). Required on every line to submit when the project has a RAP; a konstruksi project without RAP cannot submit. Omitted = the line (same id) keeps its stored item; null clears it.' }),
   })
   .strict()
   .meta({ id: 'ExpenseLineInput' })
 
 const draftFields = {
   title: z.string().trim().min(1).max(200),
-  projectId: id.nullable().optional(),
-  costCenterId: id.nullable().optional(),
+  projectId: id.nullable().optional().meta({ description: 'D2 (DRMS 10/10): required to submit (no non-project requests).' }),
+  costCenterId: id.nullable().optional().meta({ description: 'D2: IGNORED since DRMS 10/10 (Finance sets the cost center at the transfer). Still accepted so older apps keep working.' }),
   neededDate: businessDate.nullable().optional(),
   urgencyLevelId: id.nullable().optional().meta({ description: 'urgency-levels id of the request PT ("Tingkat urgensi", owner decision 2026-10-09).' }),
   periodFrom: businessDate.nullable().optional().meta({ description: 'Ignored since 2026-10-09: "Periode kegiatan" was replaced by the urgency level. Still accepted so older apps keep working.' }),
@@ -182,6 +183,10 @@ export const TransferCreate = z
       .regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d{1,3})?)?(Z|[+-]\d{2}:\d{2})?$/, 'YYYY-MM-DDTHH:MM')
       .optional()
       .meta({ description: 'Item 11: date + time of the bank transfer proof. ISO 8601 with offset, or without offset = wall clock in the PT time zone. Not in the future; its date (PT zone) becomes transferDate (period lock). Omitted = old client, transfer time unknown.' }),
+    costCenterId: id
+      .nullable()
+      .optional()
+      .meta({ description: 'D2 (DRMS 10/10): cost center of the money, chosen by Finance — active, of the request PT. Omitted/null → the project default (GET /transfer-queue costCenter), else 400 (path costCenterId).' }),
     amount: rupiahPos.optional().meta({ description: 'Optional echo; must equal the approved amount (Finance cannot change it, G3).' }),
     confirmOverdraft: confirmOverdraft,
     confirmUnverifiedAccount: confirmUnverifiedAccount,
@@ -197,6 +202,9 @@ export const ListQuery = z
     limit: z.coerce.number().int().min(1).max(100).default(50),
     cursor: z.string().max(64).optional(),
     company: companyFilterParam,
+    project: z.coerce.number().int().positive().optional().meta({ description: 'DRMS 10/10: only requests of this project (project detail "Pengajuan" tab / APK).' }),
+    q: z.string().trim().max(100).optional().meta({ description: 'DRMS 10/10: search in nomor / judul (every word must match).' }),
+    page: z.coerce.number().int().min(1).max(100_000).optional().meta({ description: 'DRMS 10/10: page number (1-based) instead of the cursor — the answer then also carries page / totalPages / totalDocs.' }),
   })
   .meta({ id: 'ExpenseRequestListQuery' })
 
@@ -225,8 +233,28 @@ export const ExpenseRequestListItem = z
   .meta({ id: 'ExpenseRequestListItem' })
 
 export const ExpenseRequestList = z
-  .object({ items: z.array(ExpenseRequestListItem), nextCursor: z.string().nullable() })
+  .object({
+    items: z.array(ExpenseRequestListItem),
+    nextCursor: z.string().nullable(),
+    page: z.number().int().optional().meta({ description: 'Only with ?page=.' }),
+    totalPages: z.number().int().optional(),
+    totalDocs: z.number().int().optional(),
+  })
   .meta({ id: 'ExpenseRequestList' })
+
+const CostCenterRef = z.object({ id, code: z.string().nullish(), name: z.string().nullish() })
+
+/** DRMS 10/10: GET /transfer-queue items = list items + what the Finance transfer screen needs. */
+export const TransferQueueItem = ExpenseRequestListItem.extend({
+  project: Ref.nullable(),
+  costCenter: CostCenterRef.nullable().meta({ description: 'D2: suggested cost center of the transfer (the project default, else a legacy request\'s own); null = Finance must pick one.' }),
+  bank: z.object({ bankName: z.string().nullable(), accountNo: z.string().nullable(), accountHolder: z.string().nullable() }).nullable(),
+  bankVerification: z.enum(['verified', 'unverified']).meta({ description: 'QA-17: unverified → the transfer needs confirmUnverifiedAccount.' }),
+  flags: z.object({ warning: z.number().int(), info: z.number().int(), receiptMismatch: z.number().int() }),
+  sla: z.object({ approvedAt: z.string().nullable(), slaHours: z.number(), ageHours: z.number().nullable(), over: z.boolean() }).meta({ description: 'Item 11: age since the final approval vs the PT transfer SLA.' }),
+}).meta({ id: 'TransferQueueItem' })
+
+export const TransferQueueList = z.object({ items: z.array(TransferQueueItem), nextCursor: z.string().nullable() }).meta({ id: 'TransferQueueList' })
 
 export const ExpenseRequestDetail = ExpenseRequestListItem.extend({
   uuid: z.string().nullable(),
@@ -255,6 +283,8 @@ export const ExpenseRequestDetail = ExpenseRequestListItem.extend({
       notes: z.string().nullable(),
       category: Ref.nullable(),
       vehicle: z.object({ id, plateNo: z.string().nullish(), plateDisplay: z.string().nullish(), type: z.string().nullish() }).nullable(),
+      rapItem: Ref.nullable().meta({ description: 'D4: RAP item of the line (name = the item\'s uraian).' }),
+      rapOverBudget: z.boolean().meta({ description: 'D4: live "Melebihi RAP" (approved realisation of the item + this request > planned). Always false for callers without a RAP price role (Staff).' }),
     }),
   ),
   transferredTotal: rupiah,
@@ -323,7 +353,9 @@ export const ExpenseRequestDetail = ExpenseRequestListItem.extend({
   flags: z.array(
     z.object({
       id,
-      kind: z.enum(['amount_diff', 'date_after_request', 'date_too_old', 'date_out_of_period', 'uom_suspicious', 'duplicate']),
+      kind: z
+        .enum(['amount_diff', 'date_after_request', 'date_too_old', 'date_out_of_period', 'uom_suspicious', 'duplicate', 'receipt_amount_mismatch', 'rap_over_budget'])
+        .meta({ description: 'receipt_amount_mismatch = "Selisih nota" (D3); rap_over_budget = "Melebihi RAP" (D4, warning, not blocking; only for Direktur/Admin/Finance/PM).' }),
       kindLabel: z.string(),
       level: z.string(),
       status: z.string(),
@@ -343,6 +375,7 @@ export const ExpenseRequestDetail = ExpenseRequestListItem.extend({
       amount: rupiah,
       transferDate: z.string(),
       transferAt: z.string().nullable().meta({ description: 'Item 11: date + time of the proof (UTC ISO); null = recorded without a time.' }),
+      costCenter: CostCenterRef.nullable().meta({ description: 'D2: cost center chosen by Finance (null on transfers recorded before DRMS 10/10).' }),
       bankRef: z.string(),
       status: z.string(),
       cashEntryId: id.nullable(),

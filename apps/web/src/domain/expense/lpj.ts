@@ -11,7 +11,7 @@ import { parseBusinessDate } from '@/domain/numbering'
 import { actorContext, fail, loadRaw, loadVisible, requireAction, requireActionAudited, settings, today, updateRequest, type RequestDoc } from './common'
 import { claimMedia, receiptsOf, recomputeFlags } from './receipts'
 import { settlementOf, shortfallCheck, type SettlementStatus, type SettlementType, type ShortfallApprovalStatus } from './settlement-rules'
-import { auditUnverifiedTransfer, checkDestination } from './transfers'
+import { auditUnverifiedTransfer, checkDestination, requestTransferCostCenter } from './transfers'
 import { isBusinessDate } from './types'
 
 /**
@@ -320,7 +320,8 @@ export async function settle(req: PayloadRequest, id: number, input: SettleInput
       amount: st.amount,
       cashInSourceId: sourceId,
       projectId: relId(raw.project) ?? null,
-      costCenterId: relId(raw.costCenter) ?? null,
+      // D2: the cost center of the request's transfer (chosen by Finance), legacy requests: their own
+      costCenterId: (await requestTransferCostCenter(req, id)) ?? relId(raw.costCenter) ?? null,
       description: `Pengembalian LPJ ${label}`,
       proofId: input.proofMediaId ?? null,
       sourceType: 'settlement_refund',
@@ -344,6 +345,8 @@ export async function settle(req: PayloadRequest, id: number, input: SettleInput
         kind: 'lpj_shortfall',
         cashAccount: input.cashAccountId,
         amount: st.amount,
+        // D2: same cost center as the request's posted transfer (chosen by Finance then)
+        costCenter: await requestTransferCostCenter(req, id),
         destination: { ...raw.bankSnapshot },
         bankRef,
         proof: input.proofMediaId,
@@ -363,7 +366,7 @@ export async function settle(req: PayloadRequest, id: number, input: SettleInput
       amount: st.amount,
       categoryId: categories.length === 1 ? categories[0] : null,
       projectId: relId(raw.project) ?? null,
-      costCenterId: relId(raw.costCenter) ?? null,
+      costCenterId: (await requestTransferCostCenter(req, id)) ?? relId(raw.costCenter) ?? null,
       description: `Transfer kekurangan LPJ ${docNo} — ${label}`.slice(0, 1000),
       sourceType: 'transfer',
       expenseRequestId: id,

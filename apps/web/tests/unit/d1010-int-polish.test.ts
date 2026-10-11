@@ -76,7 +76,8 @@ describe('(a) user names instead of "Tanpa Judul - ID: n"', () => {
     expect(by('source').admin?.hidden).toBe(true)
     expect(by('createdBy').admin?.components?.Field).toBe(USER_NAME_VIEW.Field)
     const reason = by('changeReason').admin?.condition as (d: unknown, s: unknown, c: unknown) => boolean
-    expect([reason({ status: 'draft' }, {}, {}), reason({ id: 1, status: 'draft' }, {}, {}), reason({ id: 1, status: 'receipt_revision' }, {}, {}), reason({ id: 1, status: 'pending_ack' }, {}, {})]).toEqual([false, true, true, false])
+    // Phase C polish: "Alasan perubahan" only in Revisi Nota (a Draft save needs no audit reason)
+    expect([reason({ status: 'draft' }, {}, {}), reason({ id: 1, status: 'draft' }, {}, {}), reason({ id: 1, status: 'receipt_revision' }, {}, {}), reason({ id: 1, status: 'pending_ack' }, {}, {})]).toEqual([false, false, true, false])
     expect(by('status').admin?.components?.Cell).toBe('@/admin/components/RequestStatusCell#RequestStatusCell')
     expect((er.admin.components?.edit as { SaveButton?: unknown } | undefined)?.SaveButton).toBe('@/admin/components/RequestSaveButton#RequestSaveButton')
     // Edit/API tabs: the API tab is off on every collection (web shell)

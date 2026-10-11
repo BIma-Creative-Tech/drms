@@ -18,6 +18,7 @@ import { meCompaniesEndpoint } from './endpoints/me-companies'
 import { openapiEndpoint } from './endpoints/openapi'
 import { privacyAckEndpoint, privacyNoticeEndpoint } from './endpoints/privacy'
 import { PROGRESS_ENDPOINTS } from './endpoints/progress'
+import { PROJECT_ENDPOINTS } from './endpoints/projects'
 import { REPORT_ENDPOINTS } from './endpoints/reports'
 import { SHORTFALL_ENDPOINTS } from './endpoints/shortfall'
 import { appConfigEndpoint } from './endpoints/app'
@@ -67,4 +68,6 @@ export const v1Endpoints: Endpoint[] = [
   ...FIELD_ENDPOINTS,
   // P3: konstruksi RAP (Excel import, templates) + Laporan Harian (ledger, corrections, weekly recap)
   ...DAILY_ENDPOINTS,
+  // DRMS 10/10 Phase C: project list / detail (APK Proyek) + cost-center picker (D2) — after /projects/progress
+  ...PROJECT_ENDPOINTS,
 ]

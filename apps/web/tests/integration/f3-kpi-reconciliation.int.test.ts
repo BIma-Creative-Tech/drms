@@ -24,7 +24,7 @@ import { resetRateLimits } from '@/lib/rate-limit'
 import config from '@/payload.config'
 
 import { companyId, getTestPayload, sqlAs } from './helpers'
-import { api, asUser, makeWorld, ORIGIN, png, sysCreate, upload, type FlowUser, type Res, type World } from './flow-world'
+import { api, asUser, legacyCostCenter, makeWorld, ORIGIN, png, sysCreate, upload, type FlowUser, type Res, type World } from './flow-world'
 
 /**
  * F3 gate (kpi-definitions.md §3): every KPI of the dashboards/reports is compared with the
@@ -82,11 +82,12 @@ async function receipt(user: FlowUser, id: number, lineId: string, amt: number, 
 type Scope = { projectId?: number; costCenterId?: number; ack: FlowUser }
 
 async function draft(type: 'advance' | 'reimburse', s: Scope, lines: Array<Record<string, unknown>>, title = `F3 ${type}`) {
-  return must(
+  const d = await must(
     call('POST', E, w.users.staffA, {
       type,
       title,
-      ...(s.projectId ? { projectId: s.projectId } : { costCenterId: s.costCenterId }),
+      // DRMS 10/10 D2: new requests are project requests; the cost-center scope is a LEGACY request (before D2)
+      projectId: s.projectId ?? w.project,
       requesterIds: [w.emp.a],
       bankAccountId: w.accA,
       neededDate: addDays(today, Math.floor(rnd() * 20) - 10),
@@ -94,6 +95,9 @@ async function draft(type: 'advance' | 'reimburse', s: Scope, lines: Array<Recor
     }),
     201,
   )
+  if (s.projectId) return d
+  await legacyCostCenter(d.id as number, s.costCenterId!)
+  return must(call('GET', `${E}/${d.id}`, w.users.staffA))
 }
 
 function randomLines(n: number) {
