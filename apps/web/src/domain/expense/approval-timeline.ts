@@ -25,7 +25,7 @@ export const TIMELINE_STATE_LABELS: Record<TimelineState, string> = {
 
 export type ApprovalTimelineStep = {
   key: string
-  /** Position title ("Persetujuan PM project", "Persetujuan Direktur", "Transfer Finance"). */
+  /** Position title ("Persetujuan PM", "Persetujuan Direktur", "Transfer Finance"). */
   title: string
   /** Role / position holder of the step ("PM project", "Direktur", "Finance", "Pemohon"). */
   role: string
@@ -80,7 +80,7 @@ const DELEGATE_LABELS: Record<AckDelegate, string> = { owner: ROLE_LABELS['pk-ow
 
 /** Title + role of the "Diketahui" position (APK acknowledgeTitle). */
 export function ackPosition(s: TimelineSnapshot | null): { title: string; role: string } {
-  if (pmFlow(s)) return { title: 'Persetujuan PM project', role: 'PM project' }
+  if (pmFlow(s)) return { title: 'Persetujuan PM', role: 'PM project' }
   if (s && (isDecisionSnapshot(s) || s.acknowledgeRole === DIREKTUR_ROLE)) return { title: 'Persetujuan Direktur (Diketahui)', role: ROLE_LABELS[DIREKTUR_ROLE] }
   if (s?.acknowledgeBy === 'scope_manager') return { title: 'Diketahui (PM / penanggung jawab)', role: 'PM / penanggung jawab' }
   if (s?.acknowledgeBy === 'role' && s.acknowledgeRole) return { title: 'Diketahui Oleh', role: ROLE_LABELS[s.acknowledgeRole] }
@@ -129,7 +129,7 @@ export function buildApprovalTimeline(d: TimelineInput): ApprovalTimelineStep[] 
     note: submitted ? creatorNote : ['belum diajukan', creatorNote].filter(Boolean).join(' · '),
   })
 
-  // 2. Persetujuan PM project / Diketahui
+  // 2. Persetujuan PM / Diketahui
   const ack = ackPosition(snap)
   const ackSkipped = snap?.skipped?.find((x) => x.position === 'diketahui')
   if (ackSkipped) {

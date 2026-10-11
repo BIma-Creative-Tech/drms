@@ -114,7 +114,7 @@ describe('9a/9c/9d workflow panel', () => {
 
     const pm = await panelHtml(w.users.pm, id)
     expect(pm).toContain('data-pk-approval-timeline')
-    expect(pm).toContain('Persetujuan PM project')
+    expect(pm).toContain('Persetujuan PM<')
     expect(pm).toMatch(/data-pk-step="diketahui" data-pk-step-state="current"/)
     expect(pm).toContain('data-pk-decision-bar')
     expect(pm).toContain('data-pk-action="acknowledge"')

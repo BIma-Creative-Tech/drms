@@ -1,7 +1,11 @@
 import React from 'react'
 
 import type { detail } from '@/domain/expense/dto'
+import { isContentEditable } from '@/domain/expense/types'
 import { formatRupiah } from '@/lib/money'
+
+import { formatQty } from './lines/line-form'
+import { LineCard } from './lines/LineCard'
 
 type Detail = Awaited<ReturnType<typeof detail>>
 
@@ -13,6 +17,8 @@ type Detail = Awaited<ReturnType<typeof detail>>
  * row) and by the request detail panel for every reader who is not the requester/creator (Direktur,
  * Finance, PM monitoring, Admin). Pure server-rendered markup (no actions — decisions stay in the
  * inbox, flag review in the Finance work views).
+ *
+ * DRMS 10/10 B-2: at ≤ 640 px every line is an APK-style card (LineCard) instead of the wide table.
  *
  * Flag count definition (shared with the decision rows `approvals.openFlags`): flags with status
  * "Terbuka", both levels (peringatan + info); "Sudah diperiksa" and "Tidak berlaku lagi" are shown
@@ -59,7 +65,36 @@ function Flags({ flags }: { flags: Detail['flags'] }) {
   )
 }
 
+const named = (v: unknown, k: string): string | null => (v && typeof v === 'object' && k in v && (v as Record<string, unknown>)[k] ? String((v as Record<string, unknown>)[k]) : null)
+
+/** "2 L × Rp 339.000" — Qty Satuan × Harga satuan (APK line card meta). */
+function qtyPrice(l: Detail['lines'][number]): string {
+  const uom = named(l.uom, 'name') ?? named(l.uom, 'code')
+  const price = l.unitPrice ?? l.unitPriceDisplay
+  return `${formatQty(l.qty ?? 1)}${uom ? ` ${uom}` : ''}${price === null ? '' : ` × ${rp(price)}`}`
+}
+
+function Receipt({ r, d, lineNo }: { r: Detail['receipts'][number]; d: Detail; lineNo: number }) {
+  return (
+    <div style={{ display: 'flex', gap: 6, alignItems: 'flex-start', marginBottom: 4 }} data-pk-review-receipt={r.id}>
+      {r.imageId ? (
+        <a href={`/api/v1/media/receipts/${r.imageId}/file`} target="_blank" rel="noopener noreferrer" title="Buka foto nota (ukuran penuh)" data-pk-lightbox={`receipts-${d.id}`} data-pk-lightbox-title={`Nota ${r.receiptNo ?? r.id} · baris ${lineNo} · ${rp(r.amount)}`}>
+          {/* eslint-disable-next-line @next/next/no-img-element -- authenticated API file, not a static asset */}
+          <img src={`/api/v1/media/receipts/${r.imageId}/file?variant=thumb`} alt={`Foto nota ${r.receiptNo ?? r.id}, baris ${lineNo}`} loading="lazy" style={{ width: 56, height: 56, objectFit: 'cover', borderRadius: 4 }} />
+        </a>
+      ) : null}
+      <div>
+        {r.vendorName} · No. {r.receiptNo ?? '—'} · {r.receiptDate}
+        <div>
+          <strong>{rp(r.amount)}</strong> <span style={pill(RECEIPT_STATUS[r.status]?.tone ?? 'muted')}>{RECEIPT_STATUS[r.status]?.text ?? r.status}</span>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export function ReviewDetails({ d, title = 'Rincian untuk pemeriksa' }: { d: Detail; title?: string }) {
+  const editable = isContentEditable(d.status)
   const receipts = d.receipts.filter((r) => r.status !== 'removed')
   const counts = openFlagCounts(d.flags)
   const requestFlags = d.flags.filter((f) => !f.lineId || !d.lines.some((l) => l.id === f.lineId))
@@ -81,7 +116,7 @@ export function ReviewDetails({ d, title = 'Rincian untuk pemeriksa' }: { d: Det
           <span>· Nota menyusul setelah dana ditransfer (Pengajuan Baru).</span>
         )}
       </div>
-      <div style={{ overflowX: 'auto' }}>
+      <div className="pk-lwide" style={{ overflowX: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
           <thead>
             <tr>
@@ -128,20 +163,7 @@ export function ReviewDetails({ d, title = 'Rincian untuk pemeriksa' }: { d: Det
                   <td style={cell}>
                     {rs.length === 0 ? <span style={{ color: 'var(--theme-elevation-600)' }}>{needsReceipts ? 'Belum ada nota.' : '—'}</span> : null}
                     {rs.map((r) => (
-                      <div key={r.id} style={{ display: 'flex', gap: 6, alignItems: 'flex-start', marginBottom: 4 }} data-pk-review-receipt={r.id}>
-                        {r.imageId ? (
-                          <a href={`/api/v1/media/receipts/${r.imageId}/file`} target="_blank" rel="noopener noreferrer" title="Buka foto nota (ukuran penuh)" data-pk-lightbox={`receipts-${d.id}`} data-pk-lightbox-title={`Nota ${r.receiptNo ?? r.id} · baris ${l.no} · ${rp(r.amount)}`}>
-                            {/* eslint-disable-next-line @next/next/no-img-element -- authenticated API file, not a static asset */}
-                            <img src={`/api/v1/media/receipts/${r.imageId}/file?variant=thumb`} alt={`Foto nota ${r.receiptNo ?? r.id}, baris ${l.no}`} loading="lazy" style={{ width: 56, height: 56, objectFit: 'cover', borderRadius: 4 }} />
-                          </a>
-                        ) : null}
-                        <div>
-                          {r.vendorName} · No. {r.receiptNo ?? '—'} · {r.receiptDate}
-                          <div>
-                            <strong>{rp(r.amount)}</strong> <span style={pill(RECEIPT_STATUS[r.status]?.tone ?? 'muted')}>{RECEIPT_STATUS[r.status]?.text ?? r.status}</span>
-                          </div>
-                        </div>
-                      </div>
+                      <Receipt key={r.id} r={r} d={d} lineNo={l.no} />
                     ))}
                     {rs.length > 0 ? (
                       <div style={{ fontSize: 11 }}>
@@ -156,6 +178,42 @@ export function ReviewDetails({ d, title = 'Rincian untuk pemeriksa' }: { d: Det
             })}
           </tbody>
         </table>
+      </div>
+      <div className="pk-lcards" data-pk-review-cards>
+        {d.lines.map((l) => {
+          const rs = receipts.filter((r) => r.lineId === l.id)
+          const sum = rs.filter((r) => r.status !== 'rejected').reduce((s, r) => s + r.amount, 0)
+          return (
+            <LineCard
+              key={l.id}
+              no={l.no}
+              description={l.description}
+              total={l.total}
+              qtyPrice={qtyPrice(l)}
+              category={named(l.category, 'name')}
+              vehicle={named(l.vehicle, 'plateDisplay')}
+              notes={l.notes}
+              receiptAmount={l.receiptAmount}
+              mismatch={l.receiptMismatch}
+              needsCompletion={editable && l.unitPrice === null}
+            >
+              {rs.length > 0 ? (
+                <div style={{ marginTop: 4 }}>
+                  {rs.map((r) => (
+                    <Receipt key={r.id} r={r} d={d} lineNo={l.no} />
+                  ))}
+                  <div style={{ fontSize: 11 }}>
+                    Nota {rp(sum)}
+                    {sum !== l.total ? ` · selisih ${rp(l.total - sum)}` : ' · sesuai'}
+                  </div>
+                </div>
+              ) : needsReceipts ? (
+                <div className="pk-lcard__meta">Belum ada nota.</div>
+              ) : null}
+              <Flags flags={d.flags.filter((f) => f.lineId === l.id)} />
+            </LineCard>
+          )
+        })}
       </div>
       {requestFlags.length > 0 ? (
         <div style={{ marginTop: 6 }}>

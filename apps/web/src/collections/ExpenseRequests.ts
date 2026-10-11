@@ -357,7 +357,7 @@ export const ExpenseRequests: CollectionConfig = withAudit(
       {
         name: 'lines',
         type: 'array',
-        label: 'Baris item',
+        label: 'Rincian item',
         labels: { singular: 'Baris', plural: 'Baris' },
         // DRMS 10/10 8f–8h (D3): a lines TABLE with "Tambah baris" / edit in a dialog (LinesTableField) instead of
         // Payload's row cards; total = qty × harga satuan, computed (dialog preview + server hook, never typed).

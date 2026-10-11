@@ -307,7 +307,7 @@ export async function WorkflowPanel(props: UIFieldServerProps) {
         // S3e (US-26/US-59, S-05): lines, receipts and per-line flags. DRMS 10/10 9a: ONE lines table
         // for everyone incl. the requester; the Payload line cards are hidden after submit.
         <section style={box} id="review" data-pk-section="review">
-          <ReviewDetails d={d} title="Baris item" />
+          <ReviewDetails d={d} title="Rincian item" />
         </section>
       ) : null}
       {!own && d.settlement ? (
@@ -332,7 +332,7 @@ export async function WorkflowPanel(props: UIFieldServerProps) {
           profileHref={`/admin/collections/users/${req.user.id}`}
           hasSignature={hasSignature}
           today={todayDate}
-          lines={d.lines.map((l) => ({ id: l.id, no: l.no, description: l.description ?? '', total: l.total }))}
+          lines={d.lines.map((l) => ({ id: l.id, no: l.no, description: l.description ?? '', total: l.total, incomplete: isContentEditable(d.status) && l.unitPrice === null }))}
           receipts={d.receipts.map((r) => ({
             ...r,
             flags: d.flags.filter((f) => f.receiptId === r.id).map((f) => ({ id: f.id, label: f.kindLabel, level: f.level, message: f.message, status: f.status })),

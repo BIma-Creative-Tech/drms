@@ -24,7 +24,7 @@ const LABELS: Record<string, string> = {
   neededDate: 'Tanggal dibutuhkan',
   urgencyLevel: 'Tingkat urgensi',
   urgencyLevelId: 'Tingkat urgensi',
-  lines: 'Baris item',
+  lines: 'Rincian item',
   lineId: 'Baris item',
   project: 'Project',
   projectId: 'Project',

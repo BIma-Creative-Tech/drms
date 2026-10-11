@@ -6,6 +6,7 @@ import React, { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { formatRupiah } from '@/lib/money'
 
 import { KAS_STYLE } from '../kas/style'
+import { LineCard } from './LineCard'
 import { RupiahInput, useRupiah } from '../RupiahInput'
 import { draftOf, draftTotal, formatQty, LINE_FIELD_NAMES, parseDraft, relValue, rowValues, type LineDraft, type LineDraftErrors, type LineValues } from './line-form'
 
@@ -15,8 +16,9 @@ import { draftOf, draftTotal, formatQty, LINE_FIELD_NAMES, parseDraft, relValue,
  * fields and order. Replaces Payload's row cards for `lines` on the Draft / Revisi Nota form; the rows stay
  * ordinary Payload form state (`lines.<i>.<field>`), so Simpan, server validation errors and the audit work as
  * before. Total = qty × harga satuan, shown live and read-only (the server recomputes it, lines.ts). At ≤ 640 px
- * the table becomes stacked cards (custom.scss .pk-rtable). In "Revisi Nota" lines cannot be added or removed
- * (receipts are linked to them) — only edited.
+ * every line is an APK-style card (LineCard; owner: the APK layout wins). In "Revisi Nota" lines cannot be added
+ * or removed (receipts are linked to them) — only edited. A line saved before D3 (no unit price) shows
+ * "Lengkapi Qty & Harga satuan"; the request cannot be sent until it is completed (server rule).
  */
 type Opt = { id: number; label: string; short?: string; company?: number | null; requiresVehicle?: boolean; defaultUom?: number | null }
 type Masters = { uoms: Opt[]; categories: Opt[]; vehicles: Opt[]; error: string | null }
@@ -117,7 +119,7 @@ export const LinesTableField: ArrayFieldClientComponent = (props) => {
       <style>{STYLE}</style>
       <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 8 }}>
         <div>
-          <strong style={{ fontSize: 15 }}>Baris item</strong>{' '}
+          <strong style={{ fontSize: 15 }}>Rincian item</strong>{' '}
           <span style={{ fontSize: 12, color: 'var(--pk-muted-fg)' }}>Total baris = qty × harga satuan (dihitung otomatis).</span>
         </div>
         {!revision ? (
@@ -133,8 +135,9 @@ export const LinesTableField: ArrayFieldClientComponent = (props) => {
           Belum ada baris. Tekan <strong>Tambah baris</strong> untuk mengisi uraian, qty, satuan dan harga satuan.
         </div>
       ) : (
-        <div style={{ overflowX: 'auto' }}>
-        <table className="pk-rtable" style={{ width: '100%', borderCollapse: 'collapse' }}>
+        <>
+        <div className="pk-lwide" style={{ overflowX: 'auto' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
             <tr>
               <th style={head}>No</th>
@@ -165,6 +168,13 @@ export const LinesTableField: ArrayFieldClientComponent = (props) => {
                     {v.description || <em style={{ color: 'var(--pk-muted-fg)' }}>(tanpa uraian)</em>}
                     {v.vehicle ? <div style={{ fontSize: 12, fontWeight: 400 }}>Kendaraan {nameOf(vehicles, v.vehicle)}</div> : null}
                     {v.notes ? <div style={{ fontSize: 12, fontWeight: 400, color: 'var(--pk-muted-fg)' }}>{v.notes}</div> : null}
+                    {v.unitPrice === null ? (
+                      <div>
+                        <span className="pk-lchip pk-lchip--todo" data-pk-line-incomplete={i + 1}>
+                          Lengkapi Qty &amp; Harga satuan
+                        </span>
+                      </div>
+                    ) : null}
                     {errs.length > 0 ? <div className="rowerr">{errs.join(' ')}</div> : null}
                   </td>
                   <td style={cell} data-label="Kategori">
@@ -219,6 +229,45 @@ export const LinesTableField: ArrayFieldClientComponent = (props) => {
           })}
         </table>
         </div>
+        <div className="pk-lcards" data-pk-lines-cards>
+          {values.map((v, i) => (
+            <LineCard
+              key={rows[i]?.id ?? i}
+              no={i + 1}
+              description={v.description}
+              total={v.total}
+              qtyPrice={`${v.qty === null ? '1' : formatQty(v.qty)}${v.uom ? ` ${nameOf(masters.uoms, v.uom, true)}` : ''}${v.unitPrice === null ? '' : ` × ${rp(v.unitPrice)}`}`}
+              category={v.category === null ? null : nameOf(categories, v.category)}
+              vehicle={v.vehicle ? nameOf(vehicles, v.vehicle) : null}
+              notes={v.notes || null}
+              receiptAmount={v.receiptAmount}
+              mismatch={v.receiptAmount !== null && v.total !== null && v.receiptAmount !== v.total}
+              needsCompletion={v.unitPrice === null}
+              error={rowErrors(i).join(' ') || null}
+              actions={
+                <>
+                  <button type="button" className="pk-kbtn sm" onClick={() => setEditing(i)} data-pk-action={`line-card-edit-${i + 1}`} aria-label={`Ubah baris ${i + 1}`}>
+                    Ubah
+                  </button>
+                  {!revision ? (
+                    <button
+                      type="button"
+                      className="pk-kbtn sm danger"
+                      onClick={() => {
+                        removeFieldRow({ path, rowIndex: i })
+                        setModified(true)
+                      }}
+                      aria-label={`Hapus baris ${i + 1}`}
+                    >
+                      Hapus
+                    </button>
+                  ) : null}
+                </>
+              }
+            />
+          ))}
+        </div>
+        </>
       )}
       {editing !== null ? (
         <LineDialog
@@ -306,6 +355,12 @@ function LineDialog(props: { no: number; initial: LineValues | null; otherTotal:
         <h2 id={`${uid}-t`} style={{ margin: 0, fontSize: 18 }}>
           {props.initial ? `Ubah baris ${props.no}` : `Tambah baris ${props.no}`}
         </h2>
+        {props.initial && props.initial.unitPrice === null && props.initial.total !== null ? (
+          // pre-D3 line (APK: lineNeedsUnitPrice) — the stored total stays until Qty & Harga satuan are filled
+          <p className="help" role="note" style={{ margin: 0, color: 'var(--pk-tone-warn-text)', fontWeight: 600 }} data-pk-line-legacy>
+            Baris ini dibuat sebelum Total dihitung otomatis. Isi Qty, Satuan dan Harga satuan (total lama: {formatRupiah(props.initial.total)}).
+          </p>
+        ) : null}
         <div className="pk-kgrid">
           <div className="pk-fld full">
             <label htmlFor={`${uid}-desc`}>

@@ -12,7 +12,7 @@ export type DecisionBarProps = {
   label: string
   confirm: string
   canReject: boolean
-  /** Turn text ("Persetujuan PM project — giliran Anda"). */
+  /** Turn text ("Persetujuan PM — giliran Anda"). */
   stepLabel: string
 }
 

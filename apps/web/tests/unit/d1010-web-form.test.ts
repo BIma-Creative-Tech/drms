@@ -43,7 +43,7 @@ const states = (i: TimelineInput) => buildApprovalTimeline(i).map((s) => `${s.ke
 describe('approval timeline (9c, mirrors APK turn_timeline.dart)', () => {
   it('PM project → Direktur → Transfer Finance, PM has the turn; planned approver named', () => {
     const steps = buildApprovalTimeline(base())
-    expect(steps.map((s) => s.title)).toEqual(['Diajukan', 'Persetujuan PM project', 'Persetujuan Direktur', 'Transfer Finance'])
+    expect(steps.map((s) => s.title)).toEqual(['Diajukan', 'Persetujuan PM', 'Persetujuan Direktur', 'Transfer Finance'])
     expect(states(base())).toEqual(['diajukan:done', 'diketahui:current', 'approval-1:pending', 'transfer:pending'])
     expect(steps[1]).toMatchObject({ role: 'PM project', planned: 'Pak Budi', actor: null })
     expect(steps[2]).toMatchObject({ role: 'Direktur', planned: 'Direktur' })

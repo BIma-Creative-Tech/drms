@@ -152,7 +152,7 @@ describe('QA-21 messages in the user language, no raw paths / internal codes', (
     expect(fieldLabel('lines.2.uomId')).toBe('Baris 3 · Satuan')
     expect(fieldLabel('items.0.company_id')).toBe('Baris 1 · PT')
     expect(fieldLabel('payload.lines.0.receipts.1')).toBeNull()
-    expect(errorLine({ path: 'lines', message: 'Minimal 1 baris item.' })).toBe('Baris item: Minimal 1 baris item.')
+    expect(errorLine({ path: 'lines', message: 'Minimal 1 baris item.' })).toBe('Rincian item: Minimal 1 baris item.')
     expect(errorLine({ path: 'somethingInternal', message: 'Wajib.' })).toBe('Wajib.')
   })
 

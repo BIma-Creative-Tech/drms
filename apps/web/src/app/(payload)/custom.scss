@@ -2606,3 +2606,97 @@ $pk-modules: dashboard, persetujuan, proyek, keuangan, absensi, laporan, penggun
     }
   }
 }
+
+// ---- DRMS 10/10 B-2 integration: expense-request lines (editor + read-only "Rincian item") ---------------------
+// Owner prefers the APK layout: ≤ 640 px every line is a card (components/lines/LineCard.tsx), desktop keeps the table.
+@layer payload {
+  .pk-lcards {
+    display: none;
+  }
+
+  .pk-lcard {
+    display: grid;
+    gap: 4px;
+    padding: 12px;
+    border: 1px solid var(--pk-border);
+    border-radius: var(--style-radius-l);
+    background: var(--pk-card);
+    box-shadow: var(--pk-shadow);
+    font-size: 13px;
+    line-height: 1.45;
+  }
+
+  .pk-lcard__head {
+    display: flex;
+    gap: 12px;
+    align-items: baseline;
+    justify-content: space-between;
+  }
+
+  .pk-lcard__title {
+    min-width: 0;
+    font-weight: 600;
+    overflow-wrap: anywhere;
+  }
+
+  .pk-lcard__total {
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  .pk-lcard__meta {
+    color: var(--pk-muted-fg);
+    overflow-wrap: anywhere;
+  }
+
+  .pk-lcard__err {
+    color: var(--pk-tone-bad-text);
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  .pk-lcard__chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .pk-lcard__actions {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+    margin-top: 4px;
+  }
+
+  .pk-lchip {
+    display: inline-block;
+    padding: 1px 8px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  .pk-lchip--warn {
+    background: var(--pk-tone-warn);
+    color: #ffffff; // ≥ 4.5:1 on every --pk-tone-warn
+  }
+
+  .pk-lchip--todo {
+    border: 1px solid var(--pk-tone-warn);
+    color: var(--pk-tone-warn-text);
+    background: var(--pk-card);
+  }
+
+  @media (max-width: 640px) {
+    .pk-lwide {
+      display: none;
+    }
+
+    .pk-lcards {
+      display: grid;
+      gap: 10px;
+    }
+  }
+}
