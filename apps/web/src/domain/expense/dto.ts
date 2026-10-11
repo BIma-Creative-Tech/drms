@@ -121,7 +121,8 @@ export async function detail(req: PayloadRequest, id: number) {
 
   const projectDoc = doc.project && typeof doc.project === 'object' ? (doc.project as { id: number; budget?: number | null }) : null
   let budget: { basis: 'project' | 'none'; pctBefore: number | null; pctAfter: number | null } = { basis: 'none', pctBefore: null, pctAfter: null }
-  if (projectDoc) {
+  // owner 2026-10-11: the committed-% of the RAB (with the request total it reveals the RAB) only for the money roles
+  if (projectDoc && rapViewer) {
     const b = budgetImpact(projectDoc.budget, await projectCommitted(req, projectDoc.id, id), doc.grandTotal ?? 0)
     budget = { basis: projectDoc.budget ? 'project' : 'none', pctBefore: b.before, pctAfter: b.after }
   }
@@ -210,8 +211,8 @@ export async function detail(req: PayloadRequest, id: number) {
       decision: a.decision,
       reason: a.reason ?? null,
       decidedAt: a.decidedAt ?? null,
-      budgetPctBefore: a.budgetPctBefore ?? null,
-      budgetPctAfter: a.budgetPctAfter ?? null,
+      budgetPctBefore: rapViewer ? (a.budgetPctBefore ?? null) : null,
+      budgetPctAfter: rapViewer ? (a.budgetPctAfter ?? null) : null,
       openFlags: a.openFlags ?? null,
       signatureId: relId(a.signature) ?? null,
       signatureSha256: a.signatureSha256 ?? null,

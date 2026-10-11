@@ -1,5 +1,6 @@
 import type { Access, CollectionConfig, Where } from 'payload'
 
+import { moneyRead } from '@/access/money'
 import { denyAll } from '@/access/roles'
 import { visibleAddendumIds } from '@/domain/addendum/access'
 import { visibleLoanIds } from '@/domain/loans/access'
@@ -10,6 +11,7 @@ import { companyField, companyHook } from '@/fields/company'
 import { USER_NAME_VIEW } from '@/fields/users'
 
 const ro = { readOnly: true }
+const budgetPctRead = moneyRead('approvals')
 
 /**
  * T2 Approval & tanda tangan (requirements v1.1 §7 T2, US-26/US-40…US-43, architecture G1/G2).
@@ -62,8 +64,9 @@ export const Approvals: CollectionConfig = {
     { name: 'decision', type: 'select', label: 'Keputusan', required: true, options: APPROVAL_DECISIONS.map((v) => ({ label: v, value: v })), admin: ro },
     { name: 'reason', type: 'text', label: 'Alasan', admin: ro },
     { name: 'decidedAt', type: 'date', label: 'Waktu server', admin: { ...ro, date: { pickerAppearance: 'dayAndTime' } } },
-    { name: 'budgetPctBefore', type: 'number', label: '% anggaran sebelum', admin: ro },
-    { name: 'budgetPctAfter', type: 'number', label: '% anggaran sesudah', admin: ro },
+    // owner 2026-10-11: % of the RAB (with the request total it reveals the RAB) — money roles of the row's PT only
+    { name: 'budgetPctBefore', type: 'number', label: '% anggaran sebelum', access: { read: budgetPctRead }, admin: ro },
+    { name: 'budgetPctAfter', type: 'number', label: '% anggaran sesudah', access: { read: budgetPctRead }, admin: ro },
     { name: 'openFlags', type: 'number', label: 'Flag terbuka saat keputusan', admin: ro },
     { name: 'signature', type: 'upload', relationTo: 'media-signatures', label: 'Tanda tangan', admin: ro },
     { name: 'signatureSha256', type: 'text', label: 'SHA-256 tanda tangan', admin: ro },

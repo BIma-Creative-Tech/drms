@@ -3,6 +3,11 @@
  * through the generated import map (payload generate:importmap). No React import here — collection
  * configs are also loaded by the worker and the OpenAPI generator.
  */
+import type { PayloadRequest } from 'payload'
+
+import { MONEY_ROLES } from '@/access/money'
+import { hasRoleAny } from '@/access/roles'
+
 export const RIWAYAT_TAB = {
   riwayat: {
     Component: '@/admin/views/RiwayatView#RiwayatView',
@@ -27,11 +32,12 @@ export const PROJECT_TABS = {
     path: '/pengajuan' as const,
     tab: { label: 'Pengajuan', href: '/pengajuan', order: 300 },
   },
-  // ADR 0022 §8: "Pinjaman antar project" of this project (as lender and as borrower)
+  // ADR 0022 §8: "Pinjaman antar project" of this project (as lender and as borrower). Owner 2026-10-11: no tab for
+  // Staff (loans are money; the view itself re-checks the roles and shows nothing without them).
   pinjaman: {
     Component: '@/admin/views/Loans#ProjectLoansTab',
     path: '/pinjaman' as const,
-    tab: { label: 'Pinjaman', href: '/pinjaman', order: 400 },
+    tab: { label: 'Pinjaman', href: '/pinjaman', order: 400, condition: ({ req }: { req: Pick<PayloadRequest, 'user'> }) => hasRoleAny(req, ...MONEY_ROLES) },
   },
 }
 

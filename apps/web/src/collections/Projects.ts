@@ -2,7 +2,8 @@ import { APIError, type CollectionBeforeChangeHook, type CollectionConfig } from
 
 import { readOnlyFieldsGuard } from '@/access/field-guard'
 import { PROJECT_TABS } from '@/admin/config'
-import { denyAll, hasRole, isOperatorOnly } from '@/access/roles'
+import { moneyRead } from '@/access/money'
+import { denyAll, hasRole } from '@/access/roles'
 import { assignedProjects, byRole, fieldRoles, rolesAllowed } from '@/access/policies'
 import { inIds } from '@/access/scope'
 import { reasonOnChange, withAudit } from '@/audit/hooks'
@@ -138,8 +139,9 @@ export const Projects: CollectionConfig = withAudit(
       // D2 (DRMS 10/10): default cost center of the project's money — Finance gets it pre-selected when recording a
       // transfer (transfers.costCenter, mandatory there). Optional; same PT (companyHook check).
       { name: 'costCenter', type: 'relationship', relationTo: 'cost-centers', label: 'Pusat biaya (default transfer)', index: true, access: { update: projectEditors }, ...pickerSameCompany(), admin: { placeholder: 'Pilih pusat biaya…', description: 'Diusulkan ke Finance saat mencatat transfer pengajuan project ini.' } },
-      // RAB hidden from Operator/Anggota (attendance-only role reads its assigned project for the location only)
-      { ...rupiahField('budget', 'RAB (Rp)'), access: { read: ({ req }) => !isOperatorOnly(req.user), update: projectEditors } },
+      // RAB = contract value: money roles of the project's PT only (owner 2026-10-11: hidden from Staff on web, API and
+      // APK; Operator/Anggota reads its assigned project for the attendance location only) — access/money.ts
+      { ...rupiahField('budget', 'RAB (Rp)'), access: { read: moneyRead('projects'), update: projectEditors } },
       {
         type: 'row',
         fields: [

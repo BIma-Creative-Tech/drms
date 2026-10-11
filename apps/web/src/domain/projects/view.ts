@@ -66,7 +66,7 @@ async function items(req: PayloadRequest, docs: ProjectDoc[]) {
       pm: pm !== undefined ? { id: pm, name: names.get(pm) ?? `user#${pm}` } : null,
       status: d.status ?? null,
       statusLabel: d.status ? (STATUS_LABEL[d.status] ?? d.status) : null,
-      // RAB of the project (null when the caller may not read it, e.g. Operator/Anggota)
+      // RAB of the project: null for callers without a money role in its PT (field access, access/money.ts: Staff, Operator)
       contractValue: typeof d.budget === 'number' ? d.budget : null,
       progressPct: typeof d.progressPct === 'number' ? d.progressPct : null,
       costCenter: ccs.get(relId(d.costCenter) ?? -1) ?? null,
