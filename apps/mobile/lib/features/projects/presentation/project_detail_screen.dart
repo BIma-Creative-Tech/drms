@@ -13,6 +13,8 @@ import '../../companies/presentation/company_chip.dart';
 import '../../expense/domain/expense_request.dart';
 import '../../expense/domain/request_status.dart';
 import '../../expense/presentation/widgets/rap_item_picker.dart';
+import '../../auth/domain/user_profile.dart';
+import '../../loans/presentation/loan_screens.dart';
 import '../application/projects_providers.dart';
 import '../domain/project.dart';
 import 'projects_screen.dart';
@@ -20,6 +22,8 @@ import 'projects_screen.dart';
 /// DRMS 10/10 point 6/7: one project with the tabs of the web project page — "Proyek" (info), "RAP" (items with
 /// plan / realisation / sisa / %, over budget in red) and "Pengajuan" (requests of the project, search + status
 /// filter, tap → request detail). Read-only, online.
+/// ADR 0022: a fourth tab "Pinjaman" (inter-project loans of the project, as lender and borrower; the borrower PM
+/// creates one there) for the money roles only — Staff / Operator never see loans (owner 2026-10-10).
 class ProjectDetailScreen extends ConsumerWidget {
   const ProjectDetailScreen({super.key, required this.id, this.initialTab = 0});
   final int id;
@@ -29,17 +33,24 @@ class ProjectDetailScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final t = AppLocalizations.of(context);
     final head = ref.watch(projectDetailProvider(id)).value?.project;
+    final p = ref.watch(currentProfileProvider);
+    final loans = p != null && [Role.pm, Role.owner, Role.finance, Role.admin].any(p.has);
+    final tabs = loans ? 4 : 3;
     return DefaultTabController(
-      length: 3,
-      initialIndex: initialTab.clamp(0, 2),
+      length: tabs,
+      initialIndex: initialTab.clamp(0, tabs - 1),
       child: Scaffold(
         appBar: AppBar(
           title: Text(head?.code ?? t.projectTitle, overflow: TextOverflow.ellipsis),
           bottom: TabBar(
+            // four tabs do not fit 360–390 dp without truncating "Pengajuan"
+            isScrollable: loans,
+            tabAlignment: loans ? TabAlignment.start : null,
             tabs: [
               Tab(key: const Key('tab-project-info'), text: t.projectTabInfo),
               Tab(key: const Key('tab-project-rap'), text: t.projectTabRap),
               Tab(key: const Key('tab-project-requests'), text: t.projectTabRequests),
+              if (loans) Tab(key: const Key('tab-project-loans'), text: t.loanTab),
             ],
           ),
         ),
@@ -48,6 +59,7 @@ class ProjectDetailScreen extends ConsumerWidget {
             _InfoTab(id: id),
             _RapTab(id: id),
             _RequestsTab(id: id),
+            if (loans) ProjectLoansTab(projectId: id),
           ],
         ),
       ),
