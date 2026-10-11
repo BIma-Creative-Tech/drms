@@ -113,7 +113,7 @@ describe('create + submit (US-18)', () => {
 
     const projAudit = (await auditRows('project', w.project)).filter((r) => r.field === 'budget')
     expect(projAudit.at(-1)).toMatchObject({ action: 'update', old_value: { v: 100_000_000 }, new_value: { v: 107_500_000 } })
-    expect(projAudit.at(-1)!.reason).toMatch(/Addendum RAB ADD\/\d{4}\/\d{4} disetujui/)
+    expect(projAudit.at(-1)!.reason).toMatch(/Addendum RAB ADD\/[A-Z0-9]{2,16}\/\d{4}\/\d{4} disetujui/)
     const addAudit = await auditRows('budget_addendum', draft)
     const approveRow = addAudit.find((r) => r.action === 'approve')!
     const statusRow = addAudit.filter((r) => r.action === 'status_change').at(-1)!

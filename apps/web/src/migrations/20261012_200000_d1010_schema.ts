@@ -39,7 +39,7 @@ export async function up({ db }: MigrateUpArgs): Promise<void> {
 
     CREATE TRIGGER media_selfies_stamped_protect BEFORE UPDATE ON media_selfies FOR EACH ROW EXECUTE FUNCTION pk_protect_columns('stamped_at');
 
-    -- F2b body + 'approved_at' (item 11)
+    -- F2b body (verbatim, incl. the verified_receipts_total rule) + 'approved_at' (item 11)
     CREATE OR REPLACE FUNCTION pk_expense_requests_guard() RETURNS trigger LANGUAGE plpgsql AS $fn$
     DECLARE
       wl text[] := ARRAY['status', 'updated_at', 'current_level', 'approved_amount', 'content_hash',
@@ -72,6 +72,10 @@ export async function up({ db }: MigrateUpArgs): Promise<void> {
       END IF;
       IF NEW.status = 'approved' AND OLD.status = 'pending_approval' AND NEW.approved_amount IS DISTINCT FROM NEW.grand_total THEN
         RAISE EXCEPTION 'expense_requests %: approved_amount must equal grand_total', OLD.id USING ERRCODE = '42501';
+      END IF;
+      IF NEW.verified_receipts_total IS DISTINCT FROM OLD.verified_receipts_total
+         AND NOT (OLD.status = 'lpj_submitted' AND NEW.status IN ('lpj_verified', 'completed')) THEN
+        RAISE EXCEPTION 'expense_requests %: verified_receipts_total changes only on LPJ verification', OLD.id USING ERRCODE = '42501';
       END IF;
       RETURN NEW;
     END
@@ -108,6 +112,10 @@ export async function down({ db }: MigrateDownArgs): Promise<void> {
       END IF;
       IF NEW.status = 'approved' AND OLD.status = 'pending_approval' AND NEW.approved_amount IS DISTINCT FROM NEW.grand_total THEN
         RAISE EXCEPTION 'expense_requests %: approved_amount must equal grand_total', OLD.id USING ERRCODE = '42501';
+      END IF;
+      IF NEW.verified_receipts_total IS DISTINCT FROM OLD.verified_receipts_total
+         AND NOT (OLD.status = 'lpj_submitted' AND NEW.status IN ('lpj_verified', 'completed')) THEN
+        RAISE EXCEPTION 'expense_requests %: verified_receipts_total changes only on LPJ verification', OLD.id USING ERRCODE = '42501';
       END IF;
       RETURN NEW;
     END

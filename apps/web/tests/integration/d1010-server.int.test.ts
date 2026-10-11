@@ -278,8 +278,9 @@ describe('D7: selfie stamped once by the worker job', () => {
     // DB: stamped_at is write-once
     expect((await sqlError('app', `UPDATE media_selfies SET stamped_at = now() WHERE id = ${selfieId}`))?.code).toBe('42501')
     // the queued job runs the same code path (worker)
-    await p.jobs.run({ queue: 'default', limit: 50 })
-    const done = (await sqlAs('app', "SELECT completed_at, has_error FROM payload_jobs WHERE task_slug = 'stampSelfie' AND (input->>'attendanceId')::int = $1", [attendanceId])).rows[0]
+    const jobId = (await sqlAs('app', "SELECT id FROM payload_jobs WHERE task_slug = 'stampSelfie' AND (input->>'attendanceId')::int = $1", [attendanceId])).rows[0].id
+    await p.jobs.runByID({ id: jobId })
+    const done = (await sqlAs('app', 'SELECT completed_at, has_error FROM payload_jobs WHERE id = $1', [jobId])).rows[0]
     expect(done.has_error).toBe(false)
     expect(done.completed_at).not.toBeNull()
   })

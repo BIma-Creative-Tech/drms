@@ -35,7 +35,17 @@ let requestId: number
 let lineIds: string[] = []
 let counterBefore: number | null
 
+// D5 (2026-10-12): the default PB pattern is now PB/{COMPANY}/{YY}{MM}/{seq}; this golden test registers the paper
+// form under its paper number, i.e. with the client's former pattern (still configurable), restored afterwards.
+const PAPER_PB = { pattern: '{seq}/PB-{COMPANY}/{DD}/{MM_ROMAN}/{YYYY}', padding: 0 }
+async function pbSequence(data: { pattern: string; padding: number }) {
+  const p = await getTestPayload()
+  const s = (await p.find({ collection: 'document-sequences', where: { and: [{ company: { equals: await companyId() } }, { docType: { equals: 'expense_request' } }] }, limit: 1, overrideAccess: true /* SYSTEM-READ: fixture */ })).docs[0]!
+  await p.update({ collection: 'document-sequences', id: s.id, data: { ...data, changeReason: 'uji formulir 228' } as never, overrideAccess: true /* SYSTEM-WRITE: fixture */ })
+}
+
 afterAll(async () => {
+  await pbSequence({ pattern: 'PB/{COMPANY}/{YY}{MM}/{seq}', padding: 4 })
   await (await getTestPayload()).destroy()
 })
 
@@ -51,6 +61,7 @@ beforeAll(async () => {
   const p = await getTestPayload()
   installFakeKeycloak()
   await seed(p)
+  await pbSequence(PAPER_PB)
   for (const c of ['EMP-001', 'EMP-002', 'EMP-003', 'EMP-004', 'EMP-005']) emp[c] = await idOf('employees', 'code', c)
   citra = await makeFlowUser(['pk-admin'], 'citra', emp['EMP-003']!, { signature: false })
   // ADR 0013 (E1): "Diketahui Oleh" = Direktur (pk-owner) approval, "Approval" = Finance.

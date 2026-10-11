@@ -34,7 +34,7 @@ describe('migration data', () => {
     expect(v).toMatchObject({ kind: 'kendaraan', owner: 'sendiri', status: 'siap' })
     expect(v.display_name).toMatch(/^KH /)
     const seq = await sqlAs('app', "SELECT pattern, reset_policy::text AS r, padding FROM document_sequences WHERE doc_type = 'service_report' AND company_id = $1", [await companyId()])
-    expect(seq.rows[0]).toMatchObject({ pattern: 'SV/{COMPANY}/{YY}{MM}/{seq}', r: 'monthly' // D5 (migration 20261012_200100_d1010_data) })
+    expect(seq.rows[0]).toMatchObject({ pattern: 'SV/{COMPANY}/{YY}{MM}/{seq}', r: 'monthly' }) // D5 (migration 20261012_200100_d1010_data)
     const u = await sqlAs('app', "SELECT code, count(*)::int AS n FROM uoms WHERE code IN ('M3', 'HM', 'LTR', 'L', 'OH', 'TITIK') GROUP BY code ORDER BY code")
     expect(u.rows.map((r) => [r.code, r.n])).toEqual([['HM', 1], ['L', 1], ['LTR', 1], ['M3', 1], ['OH', 1], ['TITIK', 1]])
     const flag = (await sqlAs('app', 'SELECT field_reports_enabled FROM companies ORDER BY id LIMIT 1')).rows[0]

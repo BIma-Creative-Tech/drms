@@ -115,7 +115,7 @@ describe('service reports', () => {
     expect(r.status, JSON.stringify(r.body)).toBe(201)
     svId = r.body.id
     const yymm = `${w.today.slice(2, 4)}${w.today.slice(5, 7)}`
-    expect(r.body.docNo).toMatch(new RegExp(`^SV/[A-Z0-9]{2,16}/${yymm}/\\d{4}$`) // D5: PT short code)
+    expect(r.body.docNo).toMatch(new RegExp(`^SV/[A-Z0-9]{2,16}/${yymm}/\\d{4}$`)) // D5: PT short code
     expect(r.body).toMatchObject({ reportDate: w.today, unitStatusAfter: 'menunggu_part', hourMeter: 1200, editable: true, project: { kind: 'kontrak_unit' } })
     expect(r.body.photos).toHaveLength(2)
     expect(r.body.spareparts[0]).toMatchObject({ name: 'Seal kit boom', qty: 1 })
