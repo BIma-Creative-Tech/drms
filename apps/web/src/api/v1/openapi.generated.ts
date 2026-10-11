@@ -91,6 +91,11 @@ export const openapiDocument = {
               "null"
             ]
           },
+          "displayName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "DRMS 10/10 WA-14: label to greet/show the caller (never empty): users.name → employee name of the membership in a selected PT (lowest PT id first, then other memberships) → email local part → \"Pengguna\". `name` stays the stored account name."
+          },
           "roles": {
             "type": "array",
             "items": {
@@ -298,6 +303,7 @@ export const openapiDocument = {
           "id",
           "email",
           "name",
+          "displayName",
           "roles",
           "capabilities",
           "employee",

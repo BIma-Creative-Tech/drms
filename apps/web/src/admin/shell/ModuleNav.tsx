@@ -6,7 +6,7 @@ import { PrivacyGate } from '@/admin/components/privacy/PrivacyGate'
 import { LogoutButton } from '@/components/LogoutButton'
 
 import { ModuleBar } from './ModuleBar'
-import { loadModules, loadSwitcher, navUser } from './modules-server'
+import { loadModules, loadNavUser, loadSwitcher } from './modules-server'
 
 /**
  * admin.components.Nav (Payload 3.90.1 templates/Default: rendered on EVERY page that uses the
@@ -27,10 +27,10 @@ type Props = {
 
 export async function ModuleNav({ payload, user, permissions, visibleEntities, i18n }: Props) {
   if (!payload?.config || !user) return null
-  const [modules, companies] = await Promise.all([loadModules({ payload, user, permissions, visibleEntities, i18n }), loadSwitcher(payload, user)])
+  const [modules, companies, who] = await Promise.all([loadModules({ payload, user, permissions, visibleEntities, i18n }), loadSwitcher(payload, user), loadNavUser(payload, user)])
   return (
     <>
-      <ModuleBar modules={modules} user={navUser(user)} companies={companies} bell={<NotificationBell payload={payload} user={user} />} logout={<LogoutButton />} />
+      <ModuleBar modules={modules} user={who} companies={companies} bell={<NotificationBell payload={payload} user={user} />} logout={<LogoutButton />} />
       {/* ADR 0018 (Q-46): non-dismissable privacy-notice interstitial until the current version is acknowledged */}
       <PrivacyGate user={user as { privacyAckVersion?: unknown }} />
     </>

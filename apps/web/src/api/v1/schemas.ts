@@ -84,6 +84,9 @@ export const Me = z
     id: z.number().int(),
     email: z.string(),
     name: z.string().nullable(),
+    displayName: z.string().min(1).meta({
+      description: 'DRMS 10/10 WA-14: label to greet/show the caller (never empty): users.name → employee name of the membership in a selected PT (lowest PT id first, then other memberships) → email local part → "Pengguna". `name` stays the stored account name.',
+    }),
     roles: z.array(RoleEnum).meta({ description: 'DEPRECATED (MC3, kept for mobile-v0.2.0): union of the roles over the SELECTED PTs. Use companies[].roles.' }),
     capabilities: Capabilities.meta({ description: 'DEPRECATED (MC3): derived from the top-level `roles` (union over the selected PTs). Use companies[].capabilities.' }),
     employee: EmployeeRef.nullable().meta({ description: 'DEPRECATED (MC3): employee of the PT `legacyCompanyId`. Use companies[].employee.' }),

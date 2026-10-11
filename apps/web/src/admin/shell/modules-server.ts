@@ -4,6 +4,7 @@ import type { Payload, SanitizedPermissions, TypedUser, VisibleEntities } from '
 import { companyContextOf, isOperatorOnly, isStaffOnly, membershipsOf, ROLE_LABELS, rolesOf, type Role } from '@/access/roles'
 import { resolveModules, type BadgeKey, type FeatureKey, type ResolvedModule } from '@/admin/modules/registry'
 import { TRANSFER_QUEUE_WHERE } from '@/domain/expense/types'
+import { pickDisplayName, resolveDisplayName } from '@/domain/user-display-name'
 
 import { normalizeSelection, type SwitcherState } from './company-switcher'
 
@@ -49,10 +50,11 @@ export async function loadUnread(payload: Pick<Payload, 'count'>, user: TypedUse
 
 export type NavUser = { id: number | string; name: string; email: string; roles: Role[]; roleLabel: string; staffOnly: boolean; operatorOnly: boolean; initials: string }
 
-export function navUser(user: TypedUser): NavUser {
+/** `displayName` = resolveDisplayName() (WA-14: name, never email); omitted → the sync part of the rule. */
+export function navUser(user: TypedUser, displayName?: string): NavUser {
   const u = user as unknown as { id: number | string; name?: string | null; email?: string | null }
   const roles = rolesOf(user)
-  const name = (u.name ?? '').trim() || (u.email ?? '').split('@')[0] || 'Pengguna'
+  const name = displayName?.trim() || pickDisplayName(u)
   const initials =
     name
       .split(/[\s._-]+/)
@@ -70,6 +72,11 @@ export function navUser(user: TypedUser): NavUser {
     operatorOnly: isOperatorOnly(user),
     initials,
   }
+}
+
+/** navUser with the employee-name fallback (DRMS 10/10 WA-14) — launcher greeting + avatar menu. */
+export async function loadNavUser(payload: Partial<Pick<Payload, 'find'>>, user: TypedUser): Promise<NavUser> {
+  return navUser(user, await resolveDisplayName(payload, user))
 }
 
 /**
