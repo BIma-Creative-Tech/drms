@@ -166,7 +166,7 @@ describe('MC1 — mutations are checked against the role IN THE DOCUMENT PT', ()
     const s = await api('POST', `${E}/${reqB}/submit`, rina, {}, key())
     expect(s.status, JSON.stringify(s.body)).toBe(200)
     // own counter per PT: the first CS1 number starts at the sequence start (229, default), whatever DRMS issued
-    expect(s.body.docNo).toMatch(/^229\/PB-CS1\/\d{2}\/[IVX]+\/\d{4}$/)
+    expect(s.body.docNo).toMatch(/^PB\/CS1\/\d{4}\/0229$/) // D5: PT code + paper series per PT
     const counters = await sqlAs('app', "SELECT company_id, next_value FROM document_sequence_counters WHERE doc_type = 'expense_request' AND period_key = 'ALL' AND company_id = $1", [b])
     expect(counters.rows).toEqual([{ company_id: b, next_value: 230 }])
   })
@@ -194,7 +194,7 @@ describe('MC1 — mutations are checked against the role IN THE DOCUMENT PT', ()
     expect((await api('POST', `${E}/${reqA}/acknowledge`, w.users.owner, {}, key())).status).toBe(200)
     const ok = await api('POST', `${E}/${reqA}/approve`, rina, {}, key())
     expect(ok.status, JSON.stringify(ok.body)).toBe(200)
-    expect(ok.body.docNo).toMatch(/\/PB-DRMS\//)
+    expect(ok.body.docNo).toMatch(/^PB\/DRMS\//)
   })
 
   it('a draft mixing PTs is refused (project of CS1 + category of DRMS) — app 400, before the DB trigger', async () => {
@@ -249,7 +249,7 @@ describe('MC1 — DB guards (raw SQL as the app role)', () => {
     // Rina is not Finance/Direktur of CS1 → cannot close CS1
     await expect(asUser(rina, (req) => closePeriod(req, period, 'uji', b))).rejects.toMatchObject({ status: 403 })
     const inB = await asUser(financeB, (req) => postEntry(req, { direction: 'in', entryDate: '2025-01-15', cashAccountId: B.cash, amount: 1_000, description: 'uji MC1', sourceType: 'manual' } as never))
-    expect(inB.entryNo).toMatch(/^KM\/2501\//)
+    expect(inB.entryNo).toMatch(/^KM\/[A-Z0-9]{2,16}\/2501\//)
     await expect(asUser(w.users.finance, (req) => postEntry(req, { direction: 'in', entryDate: '2025-01-15', cashAccountId: w.cashAccount, amount: 1_000, description: 'uji MC1', sourceType: 'manual' } as never))).rejects.toMatchObject({ status: 409 })
     // and the DB says the same for raw inserts (lock date of the row's company)
     const raw = await sqlError('app', `INSERT INTO cash_entries (entry_no, entry_date, direction, amount, cash_account_id, source_type, status, uuid) VALUES ('MC/X/2', '2025-01-16', 'in', 1, ${w.cashAccount}, 'manual', 'posted', gen_random_uuid()::text)`)

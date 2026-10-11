@@ -788,7 +788,7 @@ describe('exports (Q-F3-3/Q-F3-5)', () => {
     const sp = `dari=2000-01-01&sampai=2999-12-31`
     const json = await must(call('GET', `/api/v1/reports/rekap-pengajuan?${sp}`, w.users.finance))
     const r = await download(`/api/v1/reports/rekap-pengajuan/csv?${sp}`, w.users.finance)
-    const dataLines = r.text.split('\r\n').filter((l) => /^\d+\/PB-/.test(l) || /^"?\d+\/PB-/.test(l))
+    const dataLines = r.text.split('\r\n').filter((l) => /^"?PB\//.test(l)) // D5: PB/<PT>/<YYMM>/<seq>
     expect(json.count).toBeGreaterThan(100)
     expect(dataLines.length).toBe(json.count)
   })

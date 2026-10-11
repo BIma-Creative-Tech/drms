@@ -177,9 +177,9 @@ describe('MC4-1 — "copy defaults from DRMS" when a group admin creates a PT (U
     expect(summary.tx_id).toBe(createTx)
     const seqAudit = await sqlAs('app', "SELECT count(DISTINCT doc_id)::int AS n FROM audit_logs WHERE doc_type = 'document_sequence' AND action = 'create' AND company_id = $1 AND user_id = $2", [id, groupAdmin.id])
     expect(Number(seqAudit.rows[0]?.n)).toBe(srcTypes.size)
-    // numbering works at once in the new PT: 1/PB-MC4X/…
+    // numbering works at once in the new PT: PB/MC4X/2609/0001 (D5: PT code in every number)
     const alloc = await asUser(null, (req) => allocateDocNo(req, 'expense_request', { companyId: id, date: parseBusinessDate('2026-09-30') }))
-    expect(alloc.docNo).toBe('1/PB-MC4X/30/IX/2026')
+    expect(alloc.docNo).toBe('PB/MC4X/2609/0001')
     X.mc4x = id
   })
 

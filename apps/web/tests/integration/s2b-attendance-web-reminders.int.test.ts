@@ -224,7 +224,7 @@ describe('E7 daily reminders (fake clock)', () => {
     expect(await notifs('progress.late_report', w.project)).toEqual([])
     const lpj = await notifs('reminder.lpj_overdue', advance)
     expect(users(lpj)).toEqual([...new Set([w.users.staffA.id, ...(await finance())])].sort((a, b) => a - b))
-    expect(lpj[0]!.title).toMatch(/^LPJ terlambat: \d+\/PB-/)
+    expect(lpj[0]!.title).toMatch(/^LPJ terlambat: PB\//)
     // same day again: the run marker stops the tick
     expect((await runDailyReminders(p, { now: atWita(addDays(today, 1), '09:05') })).status).toBe('already_ran')
   })

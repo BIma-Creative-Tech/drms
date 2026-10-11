@@ -68,7 +68,10 @@ Angka di menu **Antrian Transfer** = jumlah **Siap ditransfer** (sama dengan jud
 belum diverifikasi ada di bagian atas halaman tetapi tidak dihitung di angka menu.
 
 **Antrian Transfer** → **Siap ditransfer** (urut tanggal dibutuhkan) → **Catat transfer**:
-Akun kas, Tanggal (kosong = hari ini), **No. referensi bank**, **Bukti** (foto/PDF) → simpan.
+Akun kas, **Tanggal & jam transfer (sesuai bukti)** — wajib, tidak boleh di masa depan, dibaca dalam zona waktu PT;
+tanggalnya menentukan periode (tutup buku) — **No. referensi bank**, **Bukti** (foto/PDF) → simpan.
+- **Umur sejak disetujui** (di bawah tanggal dibutuhkan): hijau = masih dalam **SLA transfer** PT (default 24 jam sejak
+  persetujuan final; diatur Admin/Direktur di Perusahaan (PT) › Operasional › SLA transfer), **merah** = sudah lewat SLA.
 - Nominal otomatis = nominal disetujui; rekening tujuan dari pengajuan.
 - Kotak **"Anda juga yang menyetujui"** (hanya pengajuan alur lama): Anda sendiri yang memberi Approval pada
   pengajuan ini. Boleh tetap dicatat (tercatat di audit), tetapi bila ada Finance lain sebaiknya transfer dicatat
@@ -156,7 +159,8 @@ halaman. Menutup buku satu PT **tidak** mengunci PT lain — ulangi untuk setiap
 go-live muncul kolom **Saldo awal akun baru**. Perbandingan "vs akhir <bulan>" di Beranda memakai angka yang sama.
 
 **Laporan**: Rekap Kas · Buku Kas · Pengeluaran per Kategori · Anggaran Project · Rekap Pengajuan · Kelengkapan
-Nota/LPJ · Biaya per Kendaraan · Laporan Absensi. Atur filter → unduh **CSV**, **Excel (.xlsx)** atau **PDF**
+Nota/LPJ · **SLA Transfer** (disetujui → ditransfer per PT per bulan: jumlah, rata-rata, P90, % dalam SLA, daftar yang
+terlambat) · Biaya per Kendaraan · Laporan Absensi. Atur filter → unduh **CSV**, **Excel (.xlsx)** atau **PDF**
 (Excel maks. 10.000 baris, PDF maks. 500 baris). **Audit Log** untuk menelusuri siapa melakukan apa.
 
 **Laporan beberapa PT:** filter **PT** (hanya muncul bila Anda punya akses ke lebih dari satu PT) mempersempit

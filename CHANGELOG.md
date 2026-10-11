@@ -6,6 +6,40 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+**DRMS 10/10 Phase B (server): numbering with the PT code (D5), transfer date-time + SLA (item 11), selfie timestamp +
+camera-only web check-in (D7 / item 14).** Database migrations `20261012_200000_d1010_schema` (additive: `transfers.transfer_at`,
+`expense_requests.approved_at`, `companies.transfer_sla_hours` default 24, `media_selfies.stamped_at` write-once, job slug
+`stampSelfie`, request guard accepts `approved_at` only on the final approval) and `20261012_200100_d1010_data`
+(document sequences still on the OLD default pattern move to `<DOC>/{COMPANY}/{YY}{MM}/{seq}`, audited; customised
+patterns kept and logged; `approved_at` backfilled from the last decision of the current cycle). The **worker must run**
+(selfie stamps are applied by the job queue).
+
+### Added
+
+- **D5 numbering:** every default document number carries the PT short code, 4 digits — `PB/DRMS/2610/0229`,
+  `TRF/LLAS/2610/0001`, `LPJ/…`, `KM/…`, `KK/…`, `LP/…`, `ADD/…`, `SV/…`, `LH/…` (reset policies unchanged: PB never,
+  continuing from 229; others monthly). Issued numbers stay; a mid-month switch continues the same counter. Allocation
+  refuses a `{COMPANY}` pattern without a short code (409) before taking a number (ADR 0007 revision 2026-10-12).
+- **Item 11 transfer date-time:** `POST /expense-requests/{id}/transfer` accepts `transferAt` (date + time of the bank
+  proof; ISO with offset, or wall clock in the PT zone); not in the future; `transferDate` = its date in the PT zone
+  (period lock). Old clients sending only `transferDate` still work (`transferAt` null = time unknown). The web form
+  "Catat transfer" asks **Tanggal & jam transfer (sesuai bukti)** (required). Detail/API expose `transferAt` and
+  `approvedAt`.
+- **Item 11 SLA:** `expense_requests.approvedAt` set at the final approval; per-PT setting **SLA transfer (jam sejak
+  disetujui)** (default 24); Antrian Transfer badge **Umur sejak disetujui** (red when over SLA); report
+  **SLA Transfer** (`/admin/laporan/sla-transfer`, Finance/Direktur: per PT per month count, average, P90, % within SLA,
+  late transfers with links; CSV/XLSX); KPI card **SLA transfer** on the Direktur and Finance dashboards.
+- **D7 selfie timestamp:** after an attendance is recorded (APK sync, PM on-behalf, web self check-in) the worker job
+  `stampSelfie` burns a band into the stored selfie — server-accepted date + time in the PT zone (WITA/WIB/WIT), GPS
+  (5 decimals) + accuracy, project / cost center, employee, "RR Teams" — once (idempotent, `stamped_at`), same size,
+  JPEG ≤ 150 KB (ADR 0010 addendum 2026-10-12).
+
+### Changed
+
+- **Web self check-in:** the selfie comes from the live front camera only (getUserMedia → canvas; no file input /
+  gallery); without a camera or permission: "Kamera tidak tersedia — gunakan aplikasi Android".
+  `Permissions-Policy` now allows `camera=(self)` and `geolocation=(self)` (geolocation was blocked by `()`).
+
 **Approval pengajuan biaya: Staff → PM project → Direktur → Finance transfer** (owner decisions 2026-10-10, ADR 0021,
 requirements v1.3 §9; supersedes the decision part of ADR 0013 for expense requests). **Staging first** — production
 only after the owner approves the UAT (`docs/proyekkas/uat/approval-pm/README.md`).

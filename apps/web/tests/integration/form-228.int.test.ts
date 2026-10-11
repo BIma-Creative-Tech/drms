@@ -213,7 +213,7 @@ describe('form 228/PB-DRMS/20/IX/2026 (F2 acceptance fixture)', () => {
     const t = await api('POST', `/api/v1/expense-requests/${requestId}/transfer`, finance, { cashAccountId: acct, bankRef: 'MDR-228-001', proofMediaId: proof.body.id, confirmUnverifiedAccount: true, confirmOverdraft: true }) // QA-04: seeded account starts at 0
     expect(t.status, JSON.stringify(t.body)).toBe(201)
     expect(t.body.request).toMatchObject({ status: 'transferred', transferredTotal: 1_447_500 })
-    expect(t.body.cashEntryNo).toMatch(/^KK\/\d{4}\/\d{4}$/)
+    expect(t.body.cashEntryNo).toMatch(/^KK\/[A-Z0-9]{2,16}\/\d{4}\/\d{4}$/)
     const kk = await sqlAs('app', 'SELECT direction, amount::int, source_type, expense_request_id, cost_center_id FROM cash_entries WHERE id = $1', [t.body.cashEntryId])
     expect(kk.rows[0]).toEqual({ direction: 'out', amount: 1_447_500, source_type: 'transfer', expense_request_id: requestId, cost_center_id: m.cc })
 

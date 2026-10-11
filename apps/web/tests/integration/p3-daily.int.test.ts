@@ -119,7 +119,7 @@ describe('daily reports', () => {
     expect(r.status, JSON.stringify(r.body)).toBe(201)
     lhStaff = r.body.id
     const yymm = `${w.today.slice(2, 4)}${w.today.slice(5, 7)}`
-    expect(r.body.docNo).toMatch(new RegExp(`^LH/${yymm}/\\d{4}$`))
+    expect(r.body.docNo).toMatch(new RegExp(`^LH/[A-Z0-9]{2,16}/${yymm}/\\d{4}$`) // D5: PT short code)
     expect(r.body).toMatchObject({ reportDate: w.today, editable: true, project: { kind: 'konstruksi' } })
     expect(r.body.work.map((x: { item: { code: string }; qty: number }) => [x.item.code, x.qty]).sort()).toEqual([
       ['A.1', 40],
