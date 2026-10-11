@@ -143,7 +143,9 @@ describe('labels (snapshot-aware)', () => {
     expect(requestStatusLabel('advance', 'pending_approval', pmSnap, 1)).toBe('Menunggu persetujuan Direktur')
     expect(requestStatusLabel('advance', 'pending_ack', oldSnap, 0)).toBe('Menunggu Diketahui (Direktur)')
     expect(requestStatusLabel('advance', 'pending_approval', oldSnap, 1)).toBe('Menunggu Approval')
-    expect(requestStatusLabel('advance', 'pending_ack', null, null)).toBe('Menunggu Diketahui')
+    // no snapshot (list rows, reminders) = the ONE wording of types.ts (ADR 0021)
+    expect(requestStatusLabel('advance', 'pending_ack', null, null)).toBe('Menunggu persetujuan PM')
+    expect(requestStatusLabel('advance', 'pending_approval', null, null)).toBe('Menunggu persetujuan Direktur')
     expect(requestStatusLabel('advance', 'approved', pmSnap, 1)).toBe('Disetujui (Antri Transfer)')
   })
   it('inbox step labels + who decides', () => {

@@ -52,7 +52,7 @@ export const KAS_STYLE = `
 .pk-dlg[open] { animation: pk-dlg-in .18s ease-out; }
 @keyframes pk-dlg-in { from { opacity: 0; transform: translateY(8px) scale(.98); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) { .pk-dlg[open] { animation: none; } .pk-kbtn { transition: none; } }
-.pk-dlg form { display: grid; gap: 14px; padding: 20px; }
+.pk-dlg form, .pk-dlg [role="form"] { display: grid; gap: 14px; padding: 20px; }
 .pk-dlg h2 { margin: 0; font-size: 18px; line-height: 1.3; }
 .pk-dlg .desc { margin: 0; font-size: 13px; color: var(--pk-muted-fg); line-height: 1.5; }
 .pk-dlg .foot { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }

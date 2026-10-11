@@ -5,7 +5,8 @@ import { formatRupiah } from '@/lib/money'
 import { DEFAULT_TZ, startOfLocalDay } from '@/lib/time'
 
 import type { ApprovalSnapshot } from './expense/rules'
-import { REQUEST_TYPE_LABELS, statusLabel, type RequestStatus, type RequestType } from './expense/types'
+import { requestStatusLabel } from './expense/timeline'
+import { REQUEST_TYPE_LABELS, type RequestStatus, type RequestType } from './expense/types'
 import { contextCompanyId, membersWithRole, settings, usersOfEmployees } from '@/domain/companies'
 
 /**
@@ -283,7 +284,7 @@ export function renderTemplate(tpl: string, doc: Doc): string {
     docNo: doc.docNo ?? `#${doc.id}`,
     title: doc.title,
     amount: formatRupiah(doc.approvedAmount ?? doc.grandTotal ?? 0),
-    status: statusLabel(doc.type, doc.status),
+    status: requestStatusLabel(doc.type, doc.status, doc.approvalSnapshot ?? null, doc.currentLevel ?? null),
     type: REQUEST_TYPE_LABELS[doc.type],
   }
   return tpl.replace(/\{(docNo|title|amount|status|type)\}/g, (_, k: string) => vars[k] ?? '')

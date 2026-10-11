@@ -8,7 +8,7 @@ import { ROLE_LABELS, type Role } from '@/access/roles'
 
 import { DIREKTUR_ROLE, isDecisionSnapshot } from './decision'
 import { ACK_DELEGATE_ROLE, type ApprovalSnapshot } from './rules'
-import { statusLabel, type RequestStatus, type RequestType } from './types'
+import { LEGACY_WAITING_LABELS, statusLabel, type RequestStatus, type RequestType } from './types'
 
 /** Happy-path order per type (branches — rejected/cancelled/revisions — are shown as the current step). */
 export const STATUS_PATH: Record<RequestType, RequestStatus[]> = {
@@ -79,16 +79,16 @@ export function decisionByOf(snap: LabelSnapshot | null | undefined, step: 'ackn
 }
 
 /**
- * Status label of a request for its snapshot (ADR 0021): "Menunggu persetujuan PM" (PM project step),
- * "Menunggu persetujuan Direktur" (a Direktur approval level); ADR 0013 snapshots keep "Menunggu
- * Diketahui (Direktur)"; everything else = `statusLabel`.
+ * Status label of a request for its snapshot. ADR 0021 (PM project → Direktur) = STATUS_LABELS
+ * ("Menunggu persetujuan PM" / "Menunggu persetujuan Direktur"); older snapshots keep their wording
+ * (LEGACY_WAITING_LABELS: "Menunggu Diketahui (Direktur)", "Menunggu Diketahui", "Menunggu Approval").
+ * No snapshot (list rows without it, reminders) = `statusLabel`. One source: domain/expense/types.ts.
  */
 export function requestStatusLabel(type: RequestType, status: RequestStatus, snap: LabelSnapshot | null | undefined, currentLevel: number | null | undefined): string {
-  if (status === 'pending_ack' && snap) {
-    if (isPmFlow(snap)) return 'Menunggu persetujuan PM'
-    if (isDecisionSnapshot(snap) && snap.acknowledgeBy === 'role' && snap.acknowledgeRole === DIREKTUR_ROLE) return 'Menunggu Diketahui (Direktur)'
+  if (status === 'pending_ack' && snap && !isPmFlow(snap)) {
+    return isDecisionSnapshot(snap) && snap.acknowledgeBy === 'role' && snap.acknowledgeRole === DIREKTUR_ROLE ? LEGACY_WAITING_LABELS.ackDirektur : LEGACY_WAITING_LABELS.ack
   }
-  if (status === 'pending_approval' && snap && isPmFlow(snap) && direkturStep(snap, currentLevel || 1)) return 'Menunggu persetujuan Direktur'
+  if (status === 'pending_approval' && snap && !(isPmFlow(snap) && direkturStep(snap, currentLevel || 1))) return LEGACY_WAITING_LABELS.approval
   return statusLabel(type, status)
 }
 

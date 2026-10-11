@@ -35,11 +35,16 @@ export const REQUEST_STATUSES = [
 ] as const
 export type RequestStatus = (typeof REQUEST_STATUSES)[number]
 
+/**
+ * THE status wording (DRMS 10/10 integration, Lead review b) — select options, list cells, chips, the
+ * workflow panel, PDF, notifications and the APK fallback (apps/mobile request_status.dart) all read it.
+ * The waiting steps use the ADR 0021 wording (Staff → PM project → Direktur → Finance transfer); requests
+ * submitted under an older approval snapshot get LEGACY_WAITING_LABELS through timeline.ts requestStatusLabel.
+ */
 export const STATUS_LABELS: Record<RequestStatus, string> = {
   draft: 'Draft',
-  // ADR 0021: the waiting step depends on the snapshot (PM project / Direktur) — see timeline.ts requestStatusLabel
-  pending_ack: 'Menunggu Diketahui',
-  pending_approval: 'Menunggu Approval',
+  pending_ack: 'Menunggu persetujuan PM',
+  pending_approval: 'Menunggu persetujuan Direktur',
   approved: 'Disetujui',
   receipt_revision: 'Revisi Nota',
   receipts_verified: 'Nota Terverifikasi (Antri Transfer)',
@@ -52,6 +57,13 @@ export const STATUS_LABELS: Record<RequestStatus, string> = {
   rejected: 'Ditolak',
   cancelled: 'Dibatalkan',
 }
+
+/** Waiting labels of requests whose approval snapshot is NOT the ADR 0021 PM → Direktur flow (ADR 0013 / earlier). */
+export const LEGACY_WAITING_LABELS = {
+  ackDirektur: 'Menunggu Diketahui (Direktur)',
+  ack: 'Menunggu Diketahui',
+  approval: 'Menunggu Approval',
+} as const
 
 /** Type-specific display label (Uang Muka "Disetujui (Antri Transfer)", US-19). */
 export function statusLabel(type: RequestType, status: RequestStatus): string {

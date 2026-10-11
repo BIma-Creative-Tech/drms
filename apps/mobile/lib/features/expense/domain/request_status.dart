@@ -10,13 +10,14 @@ enum RequestType {
 }
 
 /// Status codes of openapi `RequestStatus`; labels are a fallback — the server's `statusLabel` wins.
+/// Same wording as the web (`apps/web/src/domain/expense/types.ts` STATUS_LABELS, ADR 0021).
 enum RequestStatus {
   draft('draft', 'Draft'),
-  pendingAck('pending_ack', 'Menunggu Diketahui'),
-  pendingApproval('pending_approval', 'Menunggu Approval'),
+  pendingAck('pending_ack', 'Menunggu persetujuan PM'),
+  pendingApproval('pending_approval', 'Menunggu persetujuan Direktur'),
   approved('approved', 'Disetujui'),
   receiptRevision('receipt_revision', 'Revisi Nota'),
-  receiptsVerified('receipts_verified', 'Nota Terverifikasi'),
+  receiptsVerified('receipts_verified', 'Nota Terverifikasi (Antri Transfer)'),
   transferred('transferred', 'Ditransfer'),
   receiptsComplete('receipts_complete', 'Nota Lengkap'),
   lpjSubmitted('lpj_submitted', 'LPJ Diajukan'),

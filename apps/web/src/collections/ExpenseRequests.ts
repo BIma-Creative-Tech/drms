@@ -12,15 +12,16 @@ import { CONTENT_VALIDATED, fromDocLines, validateContent } from '@/domain/expen
 import { grandTotal, validateLines, type LineInput } from '@/domain/expense/lines'
 import { diffLines, type AuditLine } from '@/domain/expense/line-audit'
 import { isContentEditable, REQUEST_STATUSES, STATUS_LABELS, type RequestStatus, type RequestType } from '@/domain/expense/types'
-import { rupiahField, uuidField } from '@/fields/common'
+import { changeReasonField, rupiahField, uuidField } from '@/fields/common'
 import { requestMeta } from '@/lib/request-meta'
 import { forceDeferredChecks } from '@/lib/system-tx'
 import { notifyCreated, notifyTransition } from '@/domain/notifications'
 import { companyField, companyHook, pickerSameCompany, sameCompanyOptions } from '@/fields/company'
 import { validationError } from '@/lib/validation'
 
-import { draftOnly, draftOrSet, isDraftForm, linesCondition, PLACEHOLDERS, submittedOnly, whenSet } from './expense-request-form'
+import { draftOnly, draftOrSet, isDraftForm, linesCondition, linesEditable, PLACEHOLDERS, submittedOnly, whenSet } from './expense-request-form'
 import { businessDateField } from './fields-f2'
+import { USER_NAME_VIEW } from '@/fields/users'
 
 /**
  * T1 Pengajuan biaya (requirements v1.1 §7 T1; architecture §4.3, §5.1/§5.2).
@@ -251,7 +252,8 @@ export const ExpenseRequests: CollectionConfig = withAudit(
       group: 'Keuangan',
       defaultColumns: ['docNo', 'type', 'title', 'urgencyLevel', 'status', 'grandTotal', 'createdBy', 'updatedAt'],
       listSearchableFields: ['docNo', 'title'],
-      components: { views: { edit: RIWAYAT_TAB } },
+      // Lead review (d): "Simpan" only while the content is editable (new / Draft / Revisi Nota).
+      components: { views: { edit: RIWAYAT_TAB }, edit: { SaveButton: '@/admin/components/RequestSaveButton#RequestSaveButton' } },
     },
     access: {
       read: requestReadAccess,
@@ -293,7 +295,7 @@ export const ExpenseRequests: CollectionConfig = withAudit(
         access: system,
         // No admin.condition here: on a required field it makes the Postgres adapter treat the column as
         // nullable (schema drift). RequestStatusField renders nothing on a Draft form and the ADR 0021 label otherwise.
-        admin: { ...ro, position: 'sidebar', components: { Field: '@/admin/components/RequestStatusField#RequestStatusField' } },
+        admin: { ...ro, position: 'sidebar', components: { Field: '@/admin/components/RequestStatusField#RequestStatusField', Cell: '@/admin/components/RequestStatusCell#RequestStatusCell' } },
       },
       { name: 'title', type: 'text', label: 'Judul', required: true, maxLength: 200 },
       { name: 'project', type: 'relationship', relationTo: 'projects', label: 'Project', index: true, ...pickerSameCompany(), admin: { placeholder: PLACEHOLDERS.project, condition: draftOrSet('project') } },
@@ -369,7 +371,7 @@ export const ExpenseRequests: CollectionConfig = withAudit(
       },
       { name: 'linesTotalPreview', type: 'ui', label: 'Total (pratinjau)', admin: { condition: linesCondition, components: { Field: '@/admin/components/LinesTotalPreview#LinesTotalPreview' } } },
       businessDateField('requestDate', 'Tanggal pengajuan (server)', { access: system, admin: { ...ro, position: 'sidebar', condition: whenSet('requestDate') } }),
-      { name: 'createdBy', type: 'relationship', relationTo: 'users', label: 'Dibuat oleh', index: true, access: system, admin: { ...ro, position: 'sidebar', condition: whenSet('createdBy') } },
+      { name: 'createdBy', type: 'relationship', relationTo: 'users', label: 'Dibuat oleh', index: true, access: system, admin: { ...ro, position: 'sidebar', condition: whenSet('createdBy'), components: USER_NAME_VIEW } },
       { ...rupiahField('grandTotal', 'Grand total (Rp)'), access: system, admin: { ...ro, ...rupiahView, position: 'sidebar', condition: whenSet('grandTotal') } },
       { ...rupiahField('approvedAmount', 'Nominal disetujui (Rp)'), access: system, admin: { ...ro, ...rupiahView, position: 'sidebar', condition: (d, s, c) => submittedOnly(d, s, c) && whenSet('approvedAmount')(d, s, c) } },
       { ...rupiahField('transferredTotal', 'Total ditransfer (Rp)'), access: system, admin: { ...ro, ...rupiahView, position: 'sidebar', condition: submittedOnly } },
@@ -390,7 +392,8 @@ export const ExpenseRequests: CollectionConfig = withAudit(
         admin: { ...ro, hidden: true },
       },
       { name: 'approvalCycle', type: 'number', label: 'Siklus approval', defaultValue: 0, access: system, admin: { ...ro, hidden: true } },
-      { name: 'currentLevel', type: 'number', label: 'Level approval berjalan', access: system, admin: { ...ro, position: 'sidebar', condition: submittedOnly } },
+      // Lead review (a): the approval timeline in the workflow panel shows the running level — no sidebar number.
+      { name: 'currentLevel', type: 'number', label: 'Level approval berjalan', access: system, admin: { ...ro, hidden: true } },
       { name: 'submittedAt', type: 'date', label: 'Diajukan (server)', access: system, admin: { ...ro, position: 'sidebar', date: { pickerAppearance: 'dayAndTime' }, condition: whenSet('submittedAt') } },
       // Item 11 (DRMS 10/10): final approval time (server) of the current cycle = start of the transfer SLA.
       { name: 'approvedAt', type: 'date', label: 'Disetujui (server)', index: true, access: system, admin: { ...ro, position: 'sidebar', date: { pickerAppearance: 'dayAndTime' }, condition: whenSet('approvedAt') } },
@@ -421,9 +424,12 @@ export const ExpenseRequests: CollectionConfig = withAudit(
         label: 'Sumber',
         options: ['web', 'apk', 'system', 'job'].map((s) => ({ label: s, value: s })),
         access: system,
-        admin: { ...ro, position: 'sidebar', condition: submittedOnly },
+        // system field (web / apk / job) — audit + reports only, never on the form (Lead review a)
+        admin: { ...ro, hidden: true },
       },
       uuidField(),
+      // Lead review (d): "Alasan perubahan" (audit reason of a save) only where "Simpan" exists (new / Draft / Revisi Nota).
+      { ...changeReasonField(), admin: { ...changeReasonField().admin, condition: (data) => !!(data as { id?: unknown } | undefined)?.id && linesEditable(data as Parameters<typeof linesEditable>[0]) } },
     ],
   },
   {

@@ -3,7 +3,7 @@
  * unit-tested (tests/unit/f3-dashboard-viz.test.ts) and bundled into the OpenAPI generator.
  * Queries live in kpi.ts; this module only groups/folds rows the queries return.
  */
-import type { RequestStatus, RequestType } from '@/domain/expense/types'
+import { STATUS_LABELS, type RequestStatus, type RequestType } from '@/domain/expense/types'
 
 // ---------------------------------------------------------------- request pipeline (K-13)
 
@@ -13,8 +13,8 @@ import type { RequestStatus, RequestType } from '@/domain/expense/types'
  * apart from the ordered stages. Draft is never counted (K-13: `status <> 'draft'`).
  */
 export const PIPELINE_STAGES = [
-  { key: 'ack', label: 'Menunggu Diketahui', statuses: ['pending_ack'] },
-  { key: 'approval', label: 'Menunggu Approval', statuses: ['pending_approval'] },
+  { key: 'ack', label: STATUS_LABELS.pending_ack, statuses: ['pending_ack'] },
+  { key: 'approval', label: STATUS_LABELS.pending_approval, statuses: ['pending_approval'] },
   { key: 'queue', label: 'Antri transfer', statuses: ['approved', 'receipt_revision', 'receipts_verified'] },
   { key: 'lpj', label: 'Ditransfer / proses LPJ', statuses: ['transferred', 'receipts_complete', 'lpj_submitted', 'lpj_revision'] },
   { key: 'done', label: 'Selesai', statuses: ['lpj_verified', 'completed'] },
