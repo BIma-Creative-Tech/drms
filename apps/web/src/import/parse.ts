@@ -519,7 +519,8 @@ export function parseWorkbook(wb: ReadWorkbook): ParseResult {
           const g = geofenceError(p)
           if (g) issues.push({ level: 'error', sheet, row: p._row, column: 'latitude', message: g })
           if (p.startDate && p.targetDate && p.targetDate < p.startDate) issues.push({ level: 'error', sheet, row: p._row, column: 'target_selesai', message: 'Target selesai sebelum tanggal mulai.' })
-          if (!p.pm) issues.push({ level: 'warning', sheet, row: p._row, column: 'pm', message: 'Project tanpa PM: tidak ada PM yang memantau project ini.' })
+          // DRMS 10/10 #5: PM mandatory (Projects.ts validation + DB NOT NULL)
+          if (!p.pm) issues.push({ level: 'error', sheet, row: p._row, column: 'pm', message: 'Project Manager wajib diisi.' })
           if (p.lat === null) issues.push({ level: 'warning', sheet, row: p._row, column: 'latitude', message: 'Tanpa koordinat: absensi di project ini ditolak (NO_GEOFENCE).' })
         }
         break

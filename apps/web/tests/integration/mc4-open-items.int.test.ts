@@ -10,7 +10,7 @@ import { DEFAULT_SEED_DATA } from '@/seed/data'
 import { seed } from '@/seed/seed'
 
 import { api, makeFlowUser, sysCreate, upload, type FlowUser, type Res } from './flow-world'
-import { accessToken, addMembership, companyId, getTestPayload, http, installFakeKeycloak, installLocalJwks, registerDevice, updateCompany, type TestUser } from './helpers'
+import { accessToken, addMembership, companyId, fixturePm, getTestPayload, http, installFakeKeycloak, installLocalJwks, registerDevice, type TestUser, updateCompany } from './helpers'
 
 /**
  * MC4 QA open items (`docs/proyekkas/qa/mc4-qa-report.md` §2, ADR 0016 "Scope rule" 2026-10-02):
@@ -107,9 +107,9 @@ beforeAll(async () => {
   for (const c of ['OB2', 'OB3']) await updateCompany({ active: true, changeReason: 'uji temuan MC4 terbuka' }, c)
 
   const geo = { lat: -2.21, lng: 113.91, radiusM: 150 }
-  X.projA = await sysCreate('projects', { company: A, code: `OBA-${tag}`, name: 'Proyek OB A', budget: 500_000_000, status: 'berjalan', ...geo })
-  X.projB = await sysCreate('projects', { company: B, code: `OBB-${tag}`, name: 'Proyek OB B', budget: 500_000_000, status: 'berjalan', ...geo })
-  X.projC = await sysCreate('projects', { company: C, code: `OBC-${tag}`, name: 'Proyek OB C', budget: 500_000_000, status: 'berjalan', ...geo })
+  X.projA = await sysCreate('projects', { company: A, pm: await fixturePm(A), code: `OBA-${tag}`, name: 'Proyek OB A', budget: 500_000_000, status: 'berjalan', ...geo })
+  X.projB = await sysCreate('projects', { company: B, pm: await fixturePm(B), code: `OBB-${tag}`, name: 'Proyek OB B', budget: 500_000_000, status: 'berjalan', ...geo })
+  X.projC = await sysCreate('projects', { company: C, pm: await fixturePm(C), code: `OBC-${tag}`, name: 'Proyek OB C', budget: 500_000_000, status: 'berjalan', ...geo })
   X.catA = await inPt(A, 'expense-categories', 'MAT')
   X.catB = await inPt(B, 'expense-categories', 'MAT')
   const eA = await employee(A, 'OBA1', 'Karyawan OB A', X.projA)

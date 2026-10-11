@@ -64,9 +64,9 @@ describe('spec + template (MC2-5)', () => {
         buildSample({
           rows: {
             project: [
-              { kode_pt: 'DRMS', kode: 'P-1', nama: 'A' },
-              { kode_pt: 'CS1', kode: 'P-1', nama: 'B' },
-              { kode_pt: 'CS1', kode: 'P-1', nama: 'C' },
+              { kode_pt: 'DRMS', kode: 'P-1', nama: 'A', pm: 'candra.contoh' },
+              { kode_pt: 'CS1', kode: 'P-1', nama: 'B', pm: 'candra.contoh' },
+              { kode_pt: 'CS1', kode: 'P-1', nama: 'C', pm: 'candra.contoh' },
             ],
           },
         }),

@@ -859,7 +859,7 @@ export async function runImport(payload: Payload, input: ImportInput): Promise<I
   }
   report.issues.push(...parsed.issues)
   const data = parsed.data
-  const resolved = resolveReferences(data, await loadDbKeys(payload), input.kcMap ?? new Map())
+  const resolved = resolveReferences(data, await loadDbKeys(payload), input.kcMap ?? new Map(), { pmRequired: true })
   report.issues.push(...resolved.issues)
   report.keycloakUsers = keycloakUsers(data, resolved.users)
   if (hasErrors(report.issues) || !data.settings) return done()

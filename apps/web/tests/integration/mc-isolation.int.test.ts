@@ -63,7 +63,7 @@ beforeAll(async () => {
   adminB = await makeFlowUser(['pk-admin'], 'mc-admin-b', null, { company: b, groupAdmin: false })
   pmB = await makeFlowUser(['pk-pm'], 'mc-pm-b', B.empPm, { company: b })
   B.project = await sysCreate('projects', { company: b, code: 'MC-P1', name: 'Proyek CS1', pm: pmB.id, budget: 50_000_000, status: 'berjalan' })
-  B.project2 = await sysCreate('projects', { company: b, code: 'MC-P2', name: 'Proyek CS1 lain', budget: 10_000_000, status: 'berjalan' })
+  B.project2 = await sysCreate('projects', { company: b, code: 'MC-P2', name: 'Proyek CS1 lain', pm: pmB.id, budget: 10_000_000, status: 'berjalan' })
   await sysCreate('team-assignments', { employee: B.empRina, project: B.project, roleInProject: 'staff' })
   B.acc = await sysCreate('employee-bank-accounts', { employee: B.empRina, bank, accountNo: `8${Date.now() % 1e9}`, accountHolder: 'Rina Contoh', isDefault: true })
   B.cash = await sysCreate('cash-accounts', { company: b, name: 'MC Kas CS1', kind: 'bank', openingBalance: 10_000_000 })

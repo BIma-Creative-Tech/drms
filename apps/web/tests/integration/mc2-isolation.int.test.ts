@@ -23,7 +23,7 @@ import config from '@/payload.config'
 
 import { pdfText } from '../fixtures/pdf-text'
 import { adr0013Fallback, api, asUser, draftBody, makeFlowUser, makeWorld, ORIGIN, png, sysCreate, upload, type FlowUser, type World } from './flow-world'
-import { accessToken, addMembership, companyId, getTestPayload, http, installLocalJwks, registerDevice, sqlAs, withContext, type TestUser } from './helpers'
+import { accessToken, addMembership, companyId, fixturePm, getTestPayload, http, installLocalJwks, registerDevice, sqlAs, type TestUser, withContext } from './helpers'
 
 /**
  * MC2 isolation + consolidation suite (ADR 0016 §5–§8, requirements v1.2 §5/§6, US-MC-06/10/11):
@@ -142,8 +142,8 @@ beforeAll(async () => {
   financeC = await makeFlowUser(['pk-finance'], 'mc2-finance-c', null, { company: C })
 
   X.projectB = await sysCreate('projects', { company: B, code: 'MC2-PB', name: 'Proyek Contoh Dua', pm: dual.id, budget: 40_000_000, status: 'berjalan' })
-  X.projectB2 = await sysCreate('projects', { company: B, code: 'MC2-PB2', name: 'Proyek Contoh Dua lain', budget: 5_000_000, status: 'berjalan' })
-  X.projectC = await sysCreate('projects', { company: C, code: 'MC2-PC', name: 'Proyek Contoh Tiga', budget: 1_000_000, status: 'berjalan' })
+  X.projectB2 = await sysCreate('projects', { company: B, pm: await fixturePm(B), code: 'MC2-PB2', name: 'Proyek Contoh Dua lain', budget: 5_000_000, status: 'berjalan' })
+  X.projectC = await sysCreate('projects', { company: C, pm: await fixturePm(C), code: 'MC2-PC', name: 'Proyek Contoh Tiga', budget: 1_000_000, status: 'berjalan' })
   for (const [emp, project] of [
     [X.empB, X.projectB],
     [X.empC, X.projectC],

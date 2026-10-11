@@ -192,6 +192,10 @@ export async function ProjectProgressView(props: AdminViewServerProps) {
             <Link className="pk-kbtn" href={`/admin/progress/laporan?project=${project.id}`}>
               Laporan project ini
             </Link>
+            {/* DRMS 10/10 #5: two-way link with the project form (data: kode, PM, RAB, lokasi, status) */}
+            <Link className="pk-kbtn" href={`/admin/collections/projects/${project.id}`} data-pk-link="project-form">
+              Data project
+            </Link>
             {teamPm ? (
               <Link className="pk-kbtn primary" href={`/admin/addendum/baru?project=${project.id}`} data-pk-link="addendum-baru">
                 + Ajukan addendum RAB

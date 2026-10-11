@@ -2305,3 +2305,143 @@ $pk-modules: dashboard, persetujuan, proyek, keuangan, absensi, laporan, penggun
     text-transform: uppercase;
   }
 }
+
+// ---- DRMS 10/10 #5: Payload edit forms — one primary action, uniform spacing (every collection/global) --
+// Scoped to Payload's document view classes (.doc-header / .doc-controls / .document-fields), so the
+// custom views are untouched. Payload's own rules live in @layer payload-default (lower priority).
+@layer payload {
+  // A lone view tab ("Edit" — the API tab is hidden via admin.hideAPIURL, src/admin/edit-view.ts) is
+  // not a step: hide the tab row. Real extra tabs (Riwayat, Versi) keep it.
+  .doc-tabs:not(:has(.doc-tab ~ .doc-tab)) {
+    display: none;
+  }
+
+  .doc-header {
+    padding-bottom: 4px;
+  }
+
+  // "Simpan" / "Buat" = the page's primary action, sized like the shell buttons (.pk-kbtn: 38 px, 13 px/600).
+  .doc-controls__controls {
+    gap: 8px;
+    align-items: center;
+
+    .btn {
+      min-height: 38px;
+      margin: 0;
+      padding-block: 0;
+      padding-inline: 16px;
+      font-size: 13px;
+    }
+  }
+
+  .doc-controls__wrapper {
+    min-height: 56px;
+  }
+
+  // One field rhythm for main column, rows and sidebar: 20 px between fields (16 px on phones),
+  // descriptions 6 px under their control.
+  .document-fields {
+    --pk-field-gap: 20px;
+
+    .render-fields {
+      --spacing-field: var(--pk-field-gap);
+    }
+
+    // a row is one field of the column: its own bottom margin only (Payload adds a second one on .row__fields)
+    .render-fields > .field-type.row {
+      margin-bottom: var(--pk-field-gap);
+    }
+
+    .field-type.row .row__fields {
+      row-gap: var(--pk-field-gap);
+
+      &:has(> *:nth-child(1)) {
+        margin-bottom: 0;
+      }
+
+      // .row__fields is a .render-fields too: its children got the column margin → uneven gap below rows
+      > .field-type {
+        margin-bottom: 0;
+      }
+    }
+
+    .field-description {
+      margin-top: 6px;
+      line-height: 1.45;
+    }
+
+    .field-type > .field-label,
+    .field-type .field-label {
+      margin-bottom: 6px;
+    }
+  }
+
+  .document-fields__edit {
+    padding-top: 24px;
+  }
+
+  .document-fields__sidebar-fields {
+    gap: var(--pk-field-gap, 20px);
+    padding-top: 24px;
+  }
+
+  @media (max-width: 1024px) {
+    // Payload stacks rows as blocks without any gap between the stacked fields
+    .document-fields .field-type.row .row__fields {
+      display: flex;
+      flex-direction: column;
+      gap: var(--pk-field-gap);
+    }
+  }
+
+  @media (max-width: 768px) {
+    .document-fields {
+      --pk-field-gap: 16px;
+    }
+
+    .document-fields__edit,
+    .document-fields__sidebar-fields {
+      padding-top: 16px;
+    }
+
+    // stacked sidebar: same gap below the last main field as between fields
+    .document-fields__sidebar-wrap {
+      margin-top: var(--pk-field-gap);
+      padding-top: var(--pk-field-gap);
+      border-top: 1px solid var(--pk-border);
+    }
+  }
+
+  // Link panel in a form sidebar (ProjectDetailLink): to the custom page of the same record.
+  .pk-doclink {
+    margin-bottom: var(--pk-field-gap, 20px);
+    padding: 12px 14px;
+    border: 1px solid color-mix(in oklab, var(--pk-primary) 35%, var(--pk-border));
+    border-radius: var(--style-radius-m);
+    background: color-mix(in oklab, var(--pk-primary) 6%, var(--pk-card));
+  }
+
+  .pk-doclink__a {
+    display: inline-flex;
+    gap: 8px;
+    align-items: center;
+    color: var(--pk-primary-hover);
+    font-weight: 600;
+    text-decoration: none;
+
+    &:hover {
+      text-decoration: underline;
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--pk-ring);
+      outline-offset: 2px;
+    }
+  }
+
+  .pk-doclink__hint {
+    margin: 4px 0 0;
+    color: var(--pk-muted-fg);
+    font-size: 12px;
+  }
+}

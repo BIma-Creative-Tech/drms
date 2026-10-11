@@ -10,6 +10,7 @@ import { withStaffHiddenGlobals, withStaffPanelVisibility } from './access/panel
 import { withDisplayCells } from './admin/display-cells'
 import { withCompanyListUi } from './admin/company-list'
 import { withRowActions } from './admin/row-actions'
+import { withoutApiTab, withoutGlobalApiTab } from './admin/edit-view'
 import { ACCOUNT_ADMIN_VIEWS, D1010_ADMIN_VIEWS, E2_ADMIN_VIEWS, E6_ADMIN_VIEWS, F2_ADMIN_VIEWS, F3_ADMIN_VIEWS, FR1_ADMIN_VIEWS, MC2_ADMIN_VIEWS, S2A_ADMIN_VIEWS, S3E_ADMIN_VIEWS } from './admin/config'
 import { v1Endpoints } from './api/v1'
 import { Attendances } from './collections/Attendances'
@@ -159,8 +160,8 @@ export default buildConfig({
   // E9 B-1 (G-21): non-object REST bodies (form/text, JSON arrays) → 400 before any hook runs.
   // MC2-4: PT column (short-code chip) + PT filter chips on every list with a `company` column.
   // QA-29 / QA-25: boolean cells "Aktif/Nonaktif" / "Ya/Tidak", server timestamps as fixed WITA text.
-  collections: withBodyGuard(withStaffPanelVisibility(withCompanyListUi(withRowActions(withDisplayCells([Users, Companies, CompanyMemberships, ...MASTER_COLLECTIONS, ...FLOW_COLLECTIONS, ...FIELD_COLLECTIONS, Attendances, AttendanceCorrections, ProgressReports, BudgetAddenda, Notifications, Devices, WebSessions, AuditLogs, ...MEDIA_COLLECTIONS]))))),
-  globals: withGlobalBodyGuard(withStaffHiddenGlobals([CompanySettings])),
+  collections: withoutApiTab(withBodyGuard(withStaffPanelVisibility(withCompanyListUi(withRowActions(withDisplayCells([Users, Companies, CompanyMemberships, ...MASTER_COLLECTIONS, ...FLOW_COLLECTIONS, ...FIELD_COLLECTIONS, Attendances, AttendanceCorrections, ProgressReports, BudgetAddenda, Notifications, Devices, WebSessions, AuditLogs, ...MEDIA_COLLECTIONS])))))),
+  globals: withoutGlobalApiTab(withGlobalBodyGuard(withStaffHiddenGlobals([CompanySettings]))),
   // Admin UI in Bahasa Indonesia (ADR 0001 §5; @payloadcms/translations/languages/id @3.90.1).
   // empty list cells: "—" (as in the custom views) instead of Payload's "<Tidak ada Klien>" in every row
   i18n: { supportedLanguages: { id }, fallbackLanguage: 'id', translations: { id: { general: { noLabel: '—' } } } },

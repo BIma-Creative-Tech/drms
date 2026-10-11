@@ -16,7 +16,7 @@ import { DEFAULT_SEED_DATA } from '@/seed/data'
 import { seed } from '@/seed/seed'
 
 import { api, asUser, draftBody, makeFlowUser, makeWorld, ORIGIN, png, sysCreate, type FlowUser, type Res, type World } from './flow-world'
-import { accessToken, addMembership, auditRows, companyId, getTestPayload, http, installLocalJwks, registerDevice, sqlAs, updateCompany, type TestUser } from './helpers'
+import { accessToken, addMembership, auditRows, companyId, fixturePm, getTestPayload, http, installLocalJwks, registerDevice, sqlAs, type TestUser, updateCompany } from './helpers'
 
 /**
  * MC4 code gaps (docs/proyekkas/mc/mc4-progress.md, ADR 0016 "Implementation notes (MC4)"):
@@ -121,7 +121,7 @@ beforeAll(async () => {
   await makeFlowUser(['pk-finance'], 'mc4-fin-b', null, { company: B }) // approver pool of B (submit needs a Finance holder)
 
   X.projectB = await sysCreate('projects', { company: B, code: 'MC4-PB', name: 'Proyek Contoh Delapan', pm: tri.id, budget: 40_000_000, status: 'berjalan' })
-  X.projectC = await sysCreate('projects', { company: C, code: 'MC4-PC', name: 'Proyek Contoh Sembilan', budget: 9_000_000, status: 'berjalan' })
+  X.projectC = await sysCreate('projects', { company: C, pm: await fixturePm(C), code: 'MC4-PC', name: 'Proyek Contoh Sembilan', budget: 9_000_000, status: 'berjalan' })
   await sysCreate('team-assignments', { employee: X.empTriA, project: w.project, roleInProject: 'staff' })
   await sysCreate('team-assignments', { employee: X.empTriB, project: X.projectB, roleInProject: 'staff' })
   X.accTriA = await sysCreate('employee-bank-accounts', { employee: X.empTriA, bank, accountNo: `84${Date.now() % 1e8}`, accountHolder: 'Tri', isDefault: true })

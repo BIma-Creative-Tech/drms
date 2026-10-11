@@ -9,7 +9,7 @@ import { DEFAULT_SEED_DATA } from '@/seed/data'
 import { seed } from '@/seed/seed'
 
 import { adr0013Fallback, api, makeFlowUser, sysCreate, type FlowUser, type Res } from './flow-world'
-import { addMembership, companyId, getTestPayload, installFakeKeycloak, makeUser, sqlAs, type TestUser } from './helpers'
+import { addMembership, companyId, fixturePm, getTestPayload, installFakeKeycloak, makeUser, sqlAs, type TestUser } from './helpers'
 
 /**
  * MC4 QA security review (docs/proyekkas/qa/mc4-qa-report.md, ADR 0016 risk #8 "IDOR across PTs").
@@ -77,7 +77,7 @@ beforeAll(async () => {
 
   X.empB = await sysCreate('employees', { company: B, code: 'QA-B1', name: 'Karyawan Contoh QA' })
   X.empSelfB = await sysCreate('employees', { company: B, code: 'QA-B2', name: 'Admin A sebagai Staff B' })
-  X.projectB = await sysCreate('projects', { company: B, code: 'QA-PB', name: 'Proyek Contoh QA', budget: 10_000_000, status: 'berjalan' })
+  X.projectB = await sysCreate('projects', { company: B, pm: await fixturePm(B), code: 'QA-PB', name: 'Proyek Contoh QA', budget: 10_000_000, status: 'berjalan' })
 
   finA = await makeFlowUser(['pk-finance'], 'qa-fin-a', null, { signature: false })
   ownerA = await makeFlowUser(['pk-owner'], 'qa-owner-a', null, { signature: false })
@@ -243,7 +243,7 @@ describe('QA-MC4-04: one media file is authorised against its own owner document
   beforeAll(async () => {
     p = await getTestPayload()
     X.empStaffA = await sysCreate('employees', { company: A, code: 'QA-A3', name: 'Staff A QA' })
-    X.projectA = await sysCreate('projects', { company: A, code: 'QA-PA', name: 'Proyek A QA', budget: 1_000_000, status: 'berjalan' })
+    X.projectA = await sysCreate('projects', { company: A, pm: await fixturePm(A), code: 'QA-PA', name: 'Proyek A QA', budget: 1_000_000, status: 'berjalan' })
     X.selfieA = await selfieAttendance(A, X.empStaffA!, X.projectA!, onlyA, '2026-09-01')
     X.selfieB = await selfieAttendance(B, X.empStaffB!, X.projectB!, staffB, '2026-09-02')
     const bytes = await jpeg(77)

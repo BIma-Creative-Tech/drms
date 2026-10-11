@@ -192,6 +192,10 @@ describe('resolve (E11 import): references and Keycloak link plan', () => {
     expect([...res.users.values()].every((u) => u.action === 'pending')).toBe(true)
     expect(res.issues.filter((i) => i.level === 'error')).toEqual([])
     expect(res.issues.some((i) => i.sheet === 'Project' && i.column === 'pm' && i.level === 'warning')).toBe(true)
+    // DRMS 10/10 #5 (runImport): a project PM must exist now → a pending PM is an error, other references stay warnings
+    const strict = resolveReferences(r.data, emptyDbKeys(), new Map(), { pmRequired: true })
+    expect(strict.issues.filter((i) => i.level === 'error').length).toBeGreaterThan(0)
+    expect(strict.issues.filter((i) => i.level === 'error').every((i) => i.sheet === 'Project' && i.column === 'pm' && /Project Manager wajib diisi/.test(i.message))).toBe(true)
     const mapped = resolveReferences(r.data, emptyDbKeys(), new Map([['candra.contoh', '11111111-1111-4111-8111-111111111111']]))
     expect(mapped.users.get('candra.contoh')).toMatchObject({ action: 'create', sub: '11111111-1111-4111-8111-111111111111' })
     expect(mapped.users.get('dewi.fiktif')).toMatchObject({ action: 'pending', email: `dewi.fiktif@${PLACEHOLDER_EMAIL_DOMAIN}` })

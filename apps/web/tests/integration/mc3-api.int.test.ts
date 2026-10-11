@@ -9,7 +9,7 @@ import { DEFAULT_SEED_DATA } from '@/seed/data'
 import { seed } from '@/seed/seed'
 
 import { adr0013Fallback, api, draftBody, makeFlowUser, makeWorld, sysCreate, type FlowUser, type Res, type World } from './flow-world'
-import { accessToken, addMembership, companyId, getTestPayload, http, installLocalJwks, registerDevice, sqlAs, updateCompany, type TestUser } from './helpers'
+import { accessToken, addMembership, companyId, fixturePm, getTestPayload, http, installLocalJwks, registerDevice, sqlAs, type TestUser, updateCompany } from './helpers'
 
 /**
  * MC3-1 — /api/v1 for the multi-company APK (ADR 0016 §5/§8, docs/proyekkas/mc/mc3-progress.md):
@@ -133,7 +133,7 @@ beforeAll(async () => {
 
   X.projectB = await sysCreate('projects', { company: B, code: 'MC3-PB', name: 'Proyek Contoh Enam', pm: tri.id, budget: 40_000_000, status: 'berjalan' })
   X.projectB2 = await sysCreate('projects', { company: B, code: 'MC3-PB2', name: 'Proyek Contoh Enam titik', pm: tri.id, budget: 5_000_000, status: 'berjalan', lat: -0.5, lng: 117.1 })
-  X.projectC = await sysCreate('projects', { company: C, code: 'MC3-PC', name: 'Proyek Contoh Tujuh', budget: 9_000_000, status: 'berjalan' })
+  X.projectC = await sysCreate('projects', { company: C, pm: await fixturePm(C), code: 'MC3-PC', name: 'Proyek Contoh Tujuh', budget: 9_000_000, status: 'berjalan' })
   await sysCreate('team-assignments', { employee: X.empTriA, project: w.project, roleInProject: 'staff' })
   await sysCreate('team-assignments', { employee: X.empTriB, project: X.projectB, roleInProject: 'staff' })
   await sysCreate('team-assignments', { employee: X.empC, project: X.projectC, roleInProject: 'staff' })
