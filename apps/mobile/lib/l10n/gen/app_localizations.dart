@@ -1777,6 +1777,30 @@ abstract class AppLocalizations {
   /// **'Pengajuan Direktur — diajukan oleh PM (kebijakan owner 2026-10-10)'**
   String get direkturViaPmNote;
 
+  /// No description provided for @noApprovalNote.
+  ///
+  /// In id, this message translates to:
+  /// **'Tanpa persetujuan — pengajuan Direktur (kebijakan PT)'**
+  String get noApprovalNote;
+
+  /// No description provided for @noApprovalBadge.
+  ///
+  /// In id, this message translates to:
+  /// **'Tanpa persetujuan (Direktur)'**
+  String get noApprovalBadge;
+
+  /// No description provided for @draftDirekturNoApprovalInfo.
+  ///
+  /// In id, this message translates to:
+  /// **'Pengajuan Anda langsung ke antrian transfer Finance'**
+  String get draftDirekturNoApprovalInfo;
+
+  /// No description provided for @draftDirekturNoApprovalHint.
+  ///
+  /// In id, this message translates to:
+  /// **'Tanpa persetujuan — kebijakan PT; Finance tetap memeriksa sebelum transfer.'**
+  String get draftDirekturNoApprovalHint;
+
   /// No description provided for @direkturViaPmSelfNote.
   ///
   /// In id, this message translates to:

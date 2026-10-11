@@ -29,8 +29,19 @@ List<DraftIssue> requesterIssues(DraftRequest d, {int? selfOnlyEmployee}) => [
 ];
 
 /// QA-15: employees a user may pick as requester — own employee only for a Staff-only user.
-List<T> requesterChoices<T>(List<T> employees, int Function(T) idOf, {int? selfOnlyEmployee}) =>
-    selfOnlyEmployee == null ? employees : employees.where((e) => idOf(e) == selfOnlyEmployee).toList();
+/// ADR 0024 (owner 2026-10-11): a Direktur files his own request himself — a Direktur employee ([isDirektur],
+/// masters `employees.direktur`) is offered only to that Direktur ([ownEmployee]), never to a PM / Admin / Finance.
+List<T> requesterChoices<T>(
+  List<T> employees,
+  int Function(T) idOf, {
+  int? selfOnlyEmployee,
+  bool Function(T)? isDirektur,
+  int? ownEmployee,
+}) {
+  if (selfOnlyEmployee != null) return employees.where((e) => idOf(e) == selfOnlyEmployee).toList();
+  if (isDirektur == null) return employees;
+  return employees.where((e) => !isDirektur(e) || idOf(e) == ownEmployee).toList();
+}
 
 /// Everything required before "Ajukan" (online submit).
 List<DraftIssue> validateForSubmit(DraftRequest d, {int? selfOnlyEmployee}) {

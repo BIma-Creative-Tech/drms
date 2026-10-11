@@ -915,6 +915,19 @@ class AppLocalizationsId extends AppLocalizations {
   String get direkturViaPmNote => 'Pengajuan Direktur — diajukan oleh PM (kebijakan owner 2026-10-10)';
 
   @override
+  String get noApprovalNote => 'Tanpa persetujuan — pengajuan Direktur (kebijakan PT)';
+
+  @override
+  String get noApprovalBadge => 'Tanpa persetujuan (Direktur)';
+
+  @override
+  String get draftDirekturNoApprovalInfo => 'Pengajuan Anda langsung ke antrian transfer Finance';
+
+  @override
+  String get draftDirekturNoApprovalHint =>
+      'Tanpa persetujuan — kebijakan PT; Finance tetap memeriksa sebelum transfer.';
+
+  @override
   String get direkturViaPmSelfNote =>
       'Pengajuan Direktur — diajukan oleh PM; disetujui Direktur pemohon karena satu-satunya Direktur PT (kebijakan owner 2026-10-10)';
 

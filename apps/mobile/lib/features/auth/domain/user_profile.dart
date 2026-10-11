@@ -123,6 +123,10 @@ abstract class CompanyMembership with _$CompanyMembership {
     Employee? employee,
     @Default(Capabilities()) Capabilities capabilities,
     @Default(CompanySettings()) CompanySettings settings,
+
+    /// ADR 0024: Direktur in this PT and the PT has the zero-step rule "Pengajuan Direktur" — the Direktur's own
+    /// requests go straight to the Finance transfer queue (hint for the request form; the server decides at submit).
+    @Default(false) bool ownRequestNoApproval,
   }) = _CompanyMembership;
 
   bool has(Role r) => roles.contains(r);
@@ -131,7 +135,8 @@ abstract class CompanyMembership with _$CompanyMembership {
   bool get hasFieldReports => settings.fieldReportsEnabled && capabilities.anyField;
 
   /// Same rule as [UserProfile.canCreateRequests], applied to the roles IN this PT.
-  bool get canCreateRequests => has(Role.staff) || has(Role.pm) || has(Role.admin);
+  /// ADR 0024 (owner 2026-10-11): the Direktur files his own requests (straight to the Finance transfer queue).
+  bool get canCreateRequests => has(Role.staff) || has(Role.pm) || has(Role.admin) || has(Role.owner);
 
   /// "DRMS — Direktur, Finance" (switcher rows).
   String get roleLabels => [
@@ -282,7 +287,8 @@ abstract class UserProfile with _$UserProfile {
   ].join(', ');
 
   /// Who may create requests on the APK (requirements §4: Staff and PM create own requests).
-  bool get canCreateRequests => has(Role.staff) || has(Role.pm) || has(Role.admin);
+  /// ADR 0024 (owner 2026-10-11): the Direktur files his own requests (straight to the Finance transfer queue).
+  bool get canCreateRequests => has(Role.staff) || has(Role.pm) || has(Role.admin) || has(Role.owner);
 
   /// QA-15 (owner decision 2026-10-08): only role Staff (use on [forCompany] of the draft's PT) → requests
   /// for themselves only ("Diajukan Oleh" = own employee). PM / Admin / Finance may add others (Q-09).
