@@ -2050,7 +2050,7 @@
               "pctBefore",
               "pctAfter"
             ],
-            "description": "US-26 preview (committed % before → after); cost centers: \"none\" (Q-24)."
+            "description": "US-26 preview (committed % before → after); cost centers: \"none\" (Q-24). Owner 2026-10-11: \"none\" + nulls for callers without a money role in the PT (Staff) — the % with the total would reveal the RAB."
           },
           "allowedActions": {
             "type": "array",
@@ -14119,7 +14119,7 @@
               "number",
               "null"
             ],
-            "description": "RAB of the project (null when not readable, e.g. Operator)."
+            "description": "RAB of the project; null without a money role in its PT (Direktur, Admin, Finance, PM) — Staff and Operator never get it (owner 2026-10-11)."
           },
           "progressPct": {
             "type": [
@@ -14260,7 +14260,7 @@
               "number",
               "null"
             ],
-            "description": "RAB of the project (null when not readable, e.g. Operator)."
+            "description": "RAB of the project; null without a money role in its PT (Direktur, Admin, Finance, PM) — Staff and Operator never get it (owner 2026-10-11)."
           },
           "progressPct": {
             "type": [
