@@ -25,8 +25,14 @@ type Detail = Awaited<ReturnType<typeof detail>>
  * but not counted.
  */
 const rp = (v: number | null | undefined) => (v === null || v === undefined ? '—' : formatRupiah(v))
-const cell: React.CSSProperties = { padding: '4px 6px', borderBottom: '1px solid var(--theme-elevation-100)', verticalAlign: 'top', textAlign: 'left' }
-const numCell: React.CSSProperties = { ...cell, textAlign: 'right', whiteSpace: 'nowrap' }
+// Fixed layout + wrapping (DRMS 10/10 C-int): at 1280 px the main column is ~730 px wide — every column, the
+// "Nota & flag" one included, has to fit without a horizontal scroll. The scroll stays only as a fallback below
+// TABLE_MIN (between the card breakpoint 640 px and ~1100 px).
+const cell: React.CSSProperties = { padding: '4px 6px', borderBottom: '1px solid var(--theme-elevation-100)', verticalAlign: 'top', textAlign: 'left', overflowWrap: 'break-word' }
+const numCell: React.CSSProperties = { ...cell, padding: '4px 4px', textAlign: 'right', overflowWrap: 'normal' }
+const TABLE_MIN = 680
+/** Column widths (%), in the order No · Uraian · Kategori · Qty · Harga satuan · Total · Nominal sesuai nota · Nota & flag. */
+const COLS = [4.5, 16, 10, 7.5, 13, 13.5, 13.5, 22] as const
 const pill = (tone: 'warn' | 'muted' | 'ok' | 'bad'): React.CSSProperties => ({
   display: 'inline-block',
   padding: '0 6px',
@@ -83,7 +89,7 @@ function Receipt({ r, d, lineNo }: { r: Detail['receipts'][number]; d: Detail; l
           <img src={`/api/v1/media/receipts/${r.imageId}/file?variant=thumb`} alt={`Foto nota ${r.receiptNo ?? r.id}, baris ${lineNo}`} loading="lazy" style={{ width: 56, height: 56, objectFit: 'cover', borderRadius: 4 }} />
         </a>
       ) : null}
-      <div>
+      <div style={{ minWidth: 0 }}>
         {r.vendorName} · No. {r.receiptNo ?? '—'} · {r.receiptDate}
         <div>
           <strong>{rp(r.amount)}</strong> <span style={pill(RECEIPT_STATUS[r.status]?.tone ?? 'muted')}>{RECEIPT_STATUS[r.status]?.text ?? r.status}</span>
@@ -117,17 +123,22 @@ export function ReviewDetails({ d, title = 'Rincian untuk pemeriksa' }: { d: Det
         )}
       </div>
       <div className="pk-lwide" style={{ overflowX: 'auto' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+        <table style={{ width: '100%', minWidth: TABLE_MIN, tableLayout: 'fixed', borderCollapse: 'collapse', fontSize: 12 }} data-pk-review-table>
+          <colgroup>
+            {COLS.map((w, i) => (
+              <col key={i} style={{ width: `${w}%` }} />
+            ))}
+          </colgroup>
           <thead>
             <tr>
               <th style={cell}>No</th>
-              <th style={{ ...cell, minWidth: 140 }}>Uraian</th>
+              <th style={cell}>Uraian</th>
               <th style={cell}>Kategori</th>
               <th style={numCell}>Qty</th>
               <th style={numCell}>Harga satuan</th>
               <th style={numCell}>Total</th>
               <th style={numCell}>Nominal sesuai nota</th>
-              <th style={{ ...cell, minWidth: 220 }}>Nota &amp; flag</th>
+              <th style={cell}>Nota &amp; flag</th>
             </tr>
           </thead>
           <tbody>
