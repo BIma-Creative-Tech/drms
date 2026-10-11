@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { isLocked, lockDate, periodEnd } from '@/domain/cash/periods'
 import { computeFlags, normalizeReceiptNo, normalizeVendor, type FlagInput } from '@/domain/expense/flags'
 import { diffLines } from '@/domain/expense/line-audit'
-import { computeLineTotal, displayUnitPrice, grandTotal, normalizeLines, receiptMismatch, validateLines } from '@/domain/expense/lines'
+import { computeLineTotal, displayUnitPrice, grandTotal, lineNeedsCompletion, normalizeLines, receiptMismatch, unlockLine, validateLines } from '@/domain/expense/lines'
 import { budgetImpact, buildSnapshot, matchesAcknowledger, matchesStep, selectRule, stepsError, type RuleInput } from '@/domain/expense/rules'
 import { allowedActions, assertTransition, targets, TransitionError, type ActorContext } from '@/domain/expense/state'
 import { addDays, isBusinessDate, receiptsEditable, statusLabel } from '@/domain/expense/types'
@@ -121,6 +121,17 @@ describe('lines (US-37; D3 DRMS 10/10: total = qty × harga satuan, computed)', 
     expect(validateLines([{ description: 'x', qty: 24.8, uom: 1, total: 250_000, category: 1 }], { forSubmit: true }).map((e) => e.path)).toEqual(['lines.0.unitPrice'])
     expect(receiptMismatch({ total: 678_000, receiptAmount: 677_000 })).toBe(true)
     expect(receiptMismatch({ total: 678_000, receiptAmount: null })).toBe(false)
+  })
+  it('unlock of a pre-D3 locked line: exact total ÷ qty → unit price; otherwise no unit price; total never changes', () => {
+    const exact = { id: 'a', qty: 10, unitPrice: 59_999, total: 600_000 }
+    expect(lineNeedsCompletion(exact)).toBe(true)
+    expect(unlockLine(exact)).toEqual({ ...exact, unitPrice: 60_000 })
+    expect(unlockLine({ qty: 7, unitPrice: 21_429, total: 150_000 })).toMatchObject({ unitPrice: null, total: 150_000 })
+    expect(unlockLine({ qty: null, unitPrice: null, total: 150_000 })).toMatchObject({ unitPrice: 150_000, total: 150_000 })
+    const complete = { qty: 2, unitPrice: 339_000, total: 678_000 }
+    expect(lineNeedsCompletion(complete)).toBe(false)
+    expect(unlockLine(complete)).toBe(complete) // same object: nothing to write
+    expect(lineNeedsCompletion({ qty: 24.8, unitPrice: null, total: 250_000 })).toBe(true)
   })
   it('lump sum line accepted; display unit price = total ÷ qty when empty (legacy rows)', () => {
     expect(displayUnitPrice({ unitPrice: null, qty: null, total: 170_500 })).toBeNull()

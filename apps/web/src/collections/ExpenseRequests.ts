@@ -9,7 +9,7 @@ import { writeAudit, type AuditRow } from '@/audit/writer'
 import { denyDeleteLogged, requestReadAccess, requestUpdateAccess } from '@/domain/expense/access'
 import { ids, type RequestDoc } from '@/domain/expense/common'
 import { CONTENT_VALIDATED, fromDocLines, validateContent } from '@/domain/expense/drafts'
-import { grandTotal, normalizeLines, validateLines, type LineInput } from '@/domain/expense/lines'
+import { grandTotal, normalizeLines, unlockLine, validateLines, type LineInput } from '@/domain/expense/lines'
 import { diffLines, type AuditLine } from '@/domain/expense/line-audit'
 import { recomputeFlags } from '@/domain/expense/receipts'
 import { isContentEditable, REQUEST_STATUSES, REQUEST_TYPE_LABELS, STATUS_LABELS, type RequestStatus, type RequestType } from '@/domain/expense/types'
@@ -153,6 +153,14 @@ const beforeChange: CollectionBeforeChangeHook = async ({ data, originalDoc, ope
   // D3: on every content write the line totals are recomputed (qty × harga satuan); a client total is ignored.
   // Transitions do not send lines (the stored, possibly frozen rows are kept as they are).
   if (!transition && Array.isArray(d.lines)) d.lines = normalizeLines(d.lines as LineInput[], (prev.lines ?? []) as LineInput[])
+  // D3 unlock (locked → Draft / Revisi Nota): lines whose unit price does not reproduce their total (saved before
+  // D3) get total ÷ qty when exact, else no unit price — the DB rule then holds and the requester can keep editing;
+  // such a line must be completed before the next submit (lines.ts lineNeedsCompletion).
+  if (transition && operation === 'update' && prev.status && !isContentEditable(prev.status) && isContentEditable((d.status ?? prev.status) as RequestStatus)) {
+    const prevLines = (Array.isArray(d.lines) ? d.lines : (prev.lines ?? [])) as LineInput[]
+    const unlocked = prevLines.map((l) => unlockLine(l))
+    if (unlocked.some((l, i) => l !== prevLines[i])) d.lines = unlocked
+  }
   const lines = (d.lines ?? prev.lines ?? []) as LineInput[]
   const errors = validateLines(lines, { forSubmit: false })
   if (errors.length > 0) throw validationError(req, { collection: 'expense-requests' }, errors)

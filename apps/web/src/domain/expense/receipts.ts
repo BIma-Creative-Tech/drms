@@ -9,7 +9,7 @@ import { getRequestTx } from '@/lib/tx'
 import { actorContext, fail, ids, loadRaw, loadVisible, requireAction, requireActionAudited, settings, today, updateRequest, type RequestDoc } from './common'
 import { mayViewFlag, withFlagVisibility } from './flag-visibility'
 import { computeFlags, normalizeReceiptNo, normalizeVendor, type DuplicateHit, type FlagCategory, type FlagSpec } from './flags'
-import { grandTotal } from './lines'
+import { grandTotal, lineNeedsCompletion } from './lines'
 import { auditSelfApproval, auditSkipped, selectAndSnapshot, writeSnapshot } from './snapshot'
 import { isBusinessDate, INACTIVE_FOR_DUPLICATES } from './types'
 
@@ -325,6 +325,15 @@ export async function resubmitReceipts(req: PayloadRequest, requestId: number) {
   const doc = await loadVisible(req, requestId, { lock: true })
   requireAction(await actorContext(req, doc), 'receipts_resubmit')
   const raw = await loadRaw(req, requestId)
+  // D3: a line saved before D3 (no reproducible unit price) is completed first — total = qty × harga satuan
+  const incomplete = (raw.lines ?? []).map((l, i) => ({ l, i })).filter(({ l }) => lineNeedsCompletion(l))
+  if (incomplete.length > 0) {
+    fail(
+      400,
+      `Lengkapi Qty & Harga satuan pada baris ${incomplete.map(({ i }) => i + 1).join(', ')} sebelum mengirim ulang nota.`,
+      incomplete.map(({ i }) => ({ path: `lines.${i}.unitPrice`, message: 'Lengkapi Qty & Harga satuan (total baris = qty × harga satuan).' })),
+    )
+  }
   await assertEveryLineHasReceipt(req, raw)
   const total = grandTotal((raw.lines ?? []).map((l) => ({ total: l.total ?? null })))
   let updated: RequestDoc

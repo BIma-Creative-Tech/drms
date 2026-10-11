@@ -124,6 +124,30 @@ export function normalizeLines<T extends LineInput>(lines: readonly T[], prev: r
   })
 }
 
+/**
+ * D3 "Lengkapi Qty & Harga satuan": the line has no unit price, or its unit price does not reproduce its total
+ * (saved before D3, or frozen while the unit price was informational). Such a line cannot be (re)submitted until
+ * the requester completes it; the stored total is kept meanwhile.
+ */
+export function lineNeedsCompletion(l: Pick<LineInput, 'qty' | 'unitPrice' | 'total'>): boolean {
+  return !isInt(l.unitPrice) || !isInt(l.total) || computeLineTotal(l.qty, l.unitPrice) !== l.total
+}
+
+/**
+ * D3: a locked request goes back to an editable status (Revisi Nota, withdraw → Draft). Its lines may predate D3
+ * (unit price informational / empty), and an editable request must satisfy total = qty × unit price for every line
+ * WITH a unit price (DB `pk_expense_frozen_check`). A line that does not: unit price = total ÷ qty when that is
+ * exact, else no unit price (legacy — keeps its total, "Lengkapi Qty & Harga satuan" before submit). Totals, qty
+ * and complete lines are never changed, so the approved amount stays the same.
+ */
+export function unlockLine<T extends LineInput>(l: T): T {
+  if (!lineNeedsCompletion(l) || !isInt(l.total)) return l
+  const q = l.qty === null || l.qty === undefined ? 1 : l.qty
+  const up = isValidQty(q) ? Math.round(l.total / q) : null
+  const exact = up !== null && computeLineTotal(q, up) === l.total ? up : null
+  return exact === l.unitPrice ? l : { ...l, unitPrice: exact }
+}
+
 /** "Selisih nota": the line's receipt amount is set and differs from its total. */
 export function receiptMismatch(l: Pick<LineInput, 'receiptAmount' | 'total'>): boolean {
   return isInt(l.receiptAmount) && isInt(l.total) && l.receiptAmount !== l.total
