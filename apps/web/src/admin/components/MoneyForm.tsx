@@ -1,10 +1,11 @@
 'use client'
 import { useRouter } from 'next/navigation'
-import React, { useRef, useState } from 'react'
+import React, { useId, useRef, useState } from 'react'
 
 import { postJson, problemText } from './ActionButton'
 import { OverrideDialog, overridePromptOf, type OverridePrompt } from './kas/OverrideDialog'
 import { DateInput } from './DateInput'
+import { KAS_STYLE } from './kas/style'
 
 /**
  * Finance forms of the transfer queue (T3, US-20) and the LPJ settlement (T5, US-22): cash account,
@@ -27,6 +28,14 @@ export type MoneyFormProps = {
   precheckUrl?: string
 }
 
+/** B-2 integration: the money form in the admin field look (KAS_STYLE .pk-fld), one row on desktop, stacked on a phone. */
+const MFORM_STYLE = `
+.pk-mform { display: grid; gap: 12px; padding: 12px; border: 1px solid var(--pk-border); border-radius: var(--style-radius-m); background: var(--pk-muted-bg); }
+.pk-mform__amount { font-size: 15px; font-variant-numeric: tabular-nums; }
+.pk-mform__grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px 16px; align-items: start; }
+.pk-mform .pk-fld :is(input, select) { background: var(--theme-input-bg, var(--pk-card)); }
+`
+
 async function uploadProof(kind: string, file: File): Promise<number> {
   const fd = new FormData()
   fd.append('file', file)
@@ -44,6 +53,7 @@ export function MoneyForm({ url, submitLabel, cashAccounts, bankRef, proof, amou
   const pending = useRef<Record<string, unknown> | null>(null)
   // Item 11 (DRMS 10/10): the T3 transfer records the date AND time of the bank proof (transfer SLA).
   const isTransfer = url.endsWith('/transfer')
+  const uid = useId()
   const send = async (body: Record<string, unknown>) => {
     const r = await postJson(url, body)
     if (r.ok) {
@@ -103,48 +113,73 @@ export function MoneyForm({ url, submitLabel, cashAccounts, bankRef, proof, amou
       setBusy(false)
     }
   }
-  const field: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 2, fontSize: 12 }
   return (
     <>
-    <form onSubmit={onSubmit} style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'flex-end' }}>
-      <strong style={{ alignSelf: 'center' }}>{amountText}</strong>
-      <label style={field}>
-        Akun kas
-        <select name="cashAccountId" required defaultValue={cashAccounts[0]?.id}>
-          {cashAccounts.map((a) => (
-            <option key={a.id} value={a.id}>
-              {a.name}
-            </option>
-          ))}
-        </select>
-      </label>
-      {isTransfer ? (
-        <label style={field}>
-          Tanggal &amp; jam transfer (sesuai bukti)
-          <DateInput type="datetime-local" name="transferAt" required step={60} data-pk-field="transfer-at" />
-        </label>
-      ) : (
-        <label style={field}>
-          Tanggal (kosong = hari ini)
-          <DateInput type="date" name="date" />
-        </label>
-      )}
-      {bankRef === 'required' ? (
-        <label style={field}>
-          No. referensi bank
-          <input type="text" name="bankRef" required maxLength={64} />
-        </label>
-      ) : null}
-      {proof ? (
-        <label style={field}>
-          {proof.required ? 'Bukti (wajib)' : 'Bukti (opsional)'}
-          <input type="file" name="proof" accept={proof.kind === 'transfer-proofs' ? 'image/jpeg,image/png,application/pdf' : 'image/jpeg,image/png,application/pdf'} required={proof.required} />
-        </label>
-      ) : null}
-      <button type="submit" className="btn btn--style-primary btn--size-small" style={{ margin: 0 }} disabled={busy}>
-        {busy ? 'Memproses…' : submitLabel}
-      </button>
-      {error ? <span style={{ color: 'var(--theme-error-500)', fontSize: 12, width: '100%' }} role="alert">{error}</span> : null}
+    <style href="pk-kas-style" precedence="default">
+      {KAS_STYLE}
+    </style>
+    <style href="pk-mform-style" precedence="default">
+      {MFORM_STYLE}
+    </style>
+    <form onSubmit={onSubmit} className="pk-mform" data-pk-money-form>
+      <strong className="pk-mform__amount">{amountText}</strong>
+      <div className="pk-mform__grid">
+        <div className="pk-fld">
+          <label htmlFor={`${uid}-acc`}>
+            Akun kas<span className="req" aria-hidden>*</span>
+          </label>
+          <select id={`${uid}-acc`} name="cashAccountId" required defaultValue={cashAccounts[0]?.id}>
+            {cashAccounts.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.name}
+              </option>
+            ))}
+          </select>
+        </div>
+        {isTransfer ? (
+          <div className="pk-fld">
+            <label htmlFor={`${uid}-at`}>
+              Tanggal &amp; jam transfer<span className="req" aria-hidden>*</span>
+            </label>
+            <DateInput id={`${uid}-at`} type="datetime-local" name="transferAt" required step={60} data-pk-field="transfer-at" hintClassName="help" />
+            <p className="help">Sesuai bukti transfer bank.</p>
+          </div>
+        ) : (
+          <div className="pk-fld">
+            <label htmlFor={`${uid}-date`}>Tanggal</label>
+            <DateInput id={`${uid}-date`} type="date" name="date" hintClassName="help" />
+            <p className="help">Kosong = hari ini.</p>
+          </div>
+        )}
+        {bankRef === 'required' ? (
+          <div className="pk-fld">
+            <label htmlFor={`${uid}-ref`}>
+              No. referensi bank<span className="req" aria-hidden>*</span>
+            </label>
+            <input id={`${uid}-ref`} type="text" name="bankRef" required maxLength={64} placeholder="mis. nomor referensi di bukti" autoComplete="off" />
+          </div>
+        ) : null}
+        {proof ? (
+          <div className="pk-fld">
+            <label htmlFor={`${uid}-proof`}>
+              {proof.required ? 'Bukti' : 'Bukti (opsional)'}
+              {proof.required ? <span className="req" aria-hidden>*</span> : null}
+            </label>
+            <input id={`${uid}-proof`} type="file" name="proof" accept="image/jpeg,image/png,application/pdf" required={proof.required} />
+            <p className="help">JPG, PNG atau PDF.</p>
+          </div>
+        ) : null}
+      </div>
+      <div className="pk-kact">
+        <button type="submit" className="pk-kbtn primary" disabled={busy} data-pk-action="money-submit">
+          {busy ? 'Memproses…' : submitLabel}
+        </button>
+        {error ? (
+          <span className="pk-kerr" role="alert">
+            {error}
+          </span>
+        ) : null}
+      </div>
     </form>
     <OverrideDialog
       prompt={prompt}
