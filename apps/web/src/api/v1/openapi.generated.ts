@@ -396,6 +396,10 @@ export const openapiDocument = {
           "capabilities": {
             "$ref": "#/components/schemas/Capabilities"
           },
+          "ownRequestNoApproval": {
+            "type": "boolean",
+            "description": "ADR 0024: the caller is Direktur in this PT and the PT has an active rule \"Pengajuan Direktur\" (Peran pemohon = Direktur, no approval level) — the APK shows \"Pengajuan Anda langsung ke antrian transfer Finance\" on the request form. Hint only; the rule is chosen at submit."
+          },
           "settings": {
             "type": "object",
             "properties": {
@@ -448,6 +452,7 @@ export const openapiDocument = {
           "employeeId",
           "employee",
           "capabilities",
+          "ownRequestNoApproval",
           "settings"
         ]
       },
@@ -725,7 +730,7 @@ export const openapiDocument = {
       "MasterItem": {
         "type": "object",
         "additionalProperties": {},
-        "description": "Whitelisted fields per type (id, updatedAt, active, …) plus MC3 `company` (PT id; null for shared masters) and `shared` (true for banks, uoms, holidays)."
+        "description": "Whitelisted fields per type (id, updatedAt, active, …) plus MC3 `company` (PT id; null for shared masters) and `shared` (true for banks, uoms, holidays). ADR 0024: `employees` items carry `direktur` (bool: the account holds Direktur in that PT — not offered as requester to others)."
       },
       "Device": {
         "type": "object",
@@ -1569,9 +1574,10 @@ export const openapiDocument = {
                 "enum": [
                   "direktur_via_pm",
                   "direktur_via_pm_self",
+                  "direktur_no_approval",
                   null
                 ],
-                "description": "ADR 0021 narrow G1 exception: a Direktur's request filed by the PM project (PM approves, then a Direktur). direktur_via_pm = another Direktur decides the Direktur step; direktur_via_pm_self = the requester Direktur may approve (only Direktur of the PT, owner 2026-10-11). Show the note \"Pengajuan Direktur — diajukan oleh PM …\"."
+                "description": "G1 exception of the snapshot. ADR 0024 (owner 2026-10-11): direktur_no_approval = a Direktur's OWN request under a zero-step rule — no approval step at all, straight to the Finance transfer queue; show the step \"Persetujuan\" (skipped) with the note \"Tanpa persetujuan — pengajuan Direktur (kebijakan PT)\" and status \"Tanpa persetujuan (Antri Transfer)\". Legacy ADR 0021 (no longer set for new requests): a Direktur's request filed by the PM project (PM approves, then a Direktur). direktur_via_pm = another Direktur decides the Direktur step; direktur_via_pm_self = the requester Direktur may approve (only Direktur of the PT, owner 2026-10-11). Show the note \"Pengajuan Direktur — diajukan oleh PM …\"."
               },
               "steps": {
                 "type": "array",
@@ -2457,6 +2463,10 @@ export const openapiDocument = {
                   "null"
                 ]
               },
+              "noApproval": {
+                "type": "boolean",
+                "description": "ADR 0024: the shortfall of a Direktur's own request was approved without a decision (kebijakan PT; audited)."
+              },
               "amount": {
                 "type": [
                   "integer",
@@ -2563,6 +2573,7 @@ export const openapiDocument = {
               "settleAllowed",
               "status",
               "statusLabel",
+              "noApproval",
               "amount",
               "cycle",
               "level",
@@ -3589,6 +3600,10 @@ export const openapiDocument = {
               "over"
             ],
             "description": "Item 11: age since the final approval vs the PT transfer SLA."
+          },
+          "noApproval": {
+            "type": "boolean",
+            "description": "ADR 0024: a Direktur's own request without any approval (kebijakan PT) — show the badge \"Tanpa persetujuan (Direktur)\"; Finance's transfer checks are the only check."
           }
         },
         "required": [
@@ -3613,7 +3628,8 @@ export const openapiDocument = {
           "bank",
           "bankVerification",
           "flags",
-          "sla"
+          "sla",
+          "noApproval"
         ]
       },
       "LpjQueue": {
@@ -4883,7 +4899,7 @@ export const openapiDocument = {
                     "direktur_via_pm_self",
                     null
                   ],
-                  "description": "ADR 0021 narrow G1 exception (a Direktur's request filed by the PM project; _self = the requester Direktur is the PT's only Direktur)."
+                  "description": "ADR 0021 narrow G1 exception (a Direktur's request filed by the PM project; _self = the requester Direktur is the PT's only Direktur). Legacy since ADR 0024 (a request without approval never reaches the inbox)."
                 },
                 "budget": {
                   "type": "object",

@@ -53,6 +53,9 @@ import * as migration_20261012_300100_d1010_lines_guard from './20261012_300100_
 import * as migration_20261012_300200_d1010_pb_monthly from './20261012_300200_d1010_pb_monthly';
 import * as migration_20261012_400000_d1010_rap_cost_center from './20261012_400000_d1010_rap_cost_center';
 import * as migration_20261012_400100_d1010_rap_guard from './20261012_400100_d1010_rap_guard';
+import * as migration_20261013_300000_d1010_approval_config from './20261013_300000_d1010_approval_config';
+import * as migration_20261013_300000_d1010_approval_config_guard from './20261013_300000_d1010_approval_config_guard';
+import * as migration_20261013_300000_d1010_approval_config_data from './20261013_300000_d1010_approval_config_data';
 
 export const migrations = [
   {
@@ -329,5 +332,20 @@ export const migrations = [
     up: migration_20261012_400100_d1010_rap_guard.up,
     down: migration_20261012_400100_d1010_rap_guard.down,
     name: '20261012_400100_d1010_rap_guard',
+  },
+  {
+    up: migration_20261013_300000_d1010_approval_config.up,
+    down: migration_20261013_300000_d1010_approval_config.down,
+    name: '20261013_300000_d1010_approval_config',
+  },
+  {
+    up: migration_20261013_300000_d1010_approval_config_guard.up,
+    down: migration_20261013_300000_d1010_approval_config_guard.down,
+    name: '20261013_300000_d1010_approval_config_guard',
+  },
+  {
+    up: migration_20261013_300000_d1010_approval_config_data.up,
+    down: migration_20261013_300000_d1010_approval_config_data.down,
+    name: '20261013_300000_d1010_approval_config_data',
   },
 ];

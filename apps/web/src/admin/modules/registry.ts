@@ -82,8 +82,8 @@ const OFFICE_PM_ADMIN: readonly Role[] = [...OFFICE_PM, 'pk-admin']
 const OFFICE_ADMIN: readonly Role[] = [...OFFICE, 'pk-admin']
 /** FR1 (ADR 0020 §2): field reports are read by every role (rows narrowed by access); recaps office + PM. */
 const FIELD_ALL: readonly Role[] = [...OFFICE_PM_ADMIN, 'pk-staff']
-/** Creating requests: Staff/PM/Admin/Finance (collection create access, Q-09). */
-export const CREATOR_ROLES: readonly Role[] = ['pk-staff', 'pk-pm', 'pk-admin', 'pk-finance']
+/** Creating requests: Staff/PM/Admin/Finance (collection create access, Q-09); ADR 0024: the Direktur (own requests). */
+export const CREATOR_ROLES: readonly Role[] = ['pk-staff', 'pk-pm', 'pk-admin', 'pk-finance', 'pk-owner']
 
 export const MODULES: readonly ModuleDef[] = [
   {

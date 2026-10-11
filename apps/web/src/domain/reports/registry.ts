@@ -3,7 +3,8 @@ import type { PayloadRequest } from 'payload'
 
 import type { Role } from '@/access/roles'
 import { docLink } from '@/admin/doc-links'
-import { REQUEST_STATUSES, REQUEST_TYPE_LABELS, REQUEST_TYPES, statusLabel, type RequestStatus, type RequestType } from '@/domain/expense/types'
+import { NO_APPROVAL_NOTE } from '@/domain/expense/decision'
+import { NO_APPROVAL_STATUS_LABELS, REQUEST_STATUSES, REQUEST_TYPE_LABELS, REQUEST_TYPES, statusLabel, type RequestStatus, type RequestType } from '@/domain/expense/types'
 
 import { absensiReport } from './attendance-report'
 import { rekapAftersales, rekapTimesheetKontrak } from './field-reports'
@@ -701,6 +702,8 @@ const rekapPengajuan: ReportDef = {
           { key: 'lingkup', label: 'Project / pusat biaya', type: 'text' },
           { key: 'pemohon', label: 'Pemohon', type: 'text' },
           { key: 'status', label: 'Status', type: 'text', primary: true },
+          // ADR 0024: the audited exception is visible in the report (a Direktur's own request without approval)
+          { key: 'persetujuan', label: 'Persetujuan', type: 'text' },
           { key: 'grandTotal', label: 'Grand total (Rp)', type: 'money', primary: true },
           { key: 'disetujui', label: 'Disetujui (Rp)', type: 'money' },
           { key: 'dicairkan', label: 'Dicairkan (Rp)', type: 'money' },
@@ -715,7 +718,8 @@ const rekapPengajuan: ReportDef = {
             judul: x.title,
             lingkup: x.scopeName,
             pemohon: x.requesters,
-            status: statusLabel(x.type, x.status),
+            status: x.noApproval && x.status === 'approved' ? NO_APPROVAL_STATUS_LABELS[x.type] : statusLabel(x.type, x.status),
+            persetujuan: x.noApproval ? NO_APPROVAL_NOTE : '',
             grandTotal: x.grandTotal,
             disetujui: x.approvedAmount,
             dicairkan: x.disbursed,

@@ -4,13 +4,15 @@ import { ROLES, ROLE_LABELS, denyAll, relId, type Role } from '@/access/roles'
 import { contextCompanyId, rolesOfUsersIn } from '@/domain/companies'
 import { byRole, rolesAllowed } from '@/access/policies'
 import { reasonOnAnyUpdate, withAudit } from '@/audit/hooks'
-import { isDecisionRole, ruleDecisionError, SCOPE_MANAGER_LABEL } from '@/domain/expense/decision'
+import { isDecisionRole, REQUESTER_ROLE_OPTIONS, ruleDecisionError, SCOPE_MANAGER_LABEL } from '@/domain/expense/decision'
 import { stepsError, type AckBy, type AckMode } from '@/domain/expense/rules'
 import { activeField, rupiahField } from '@/fields/common'
 import { companyField, companyHook } from '@/fields/company'
 import { userPicker } from '@/fields/users'
 
 const roleOptions = ROLES.map((r) => ({ label: ROLE_LABELS[r], value: r }))
+/** ADR 0024 "Peran pemohon": Direktur, PM, Staff, Finance, Admin (Operator never files expense requests). */
+const requesterRoleOptions = REQUESTER_ROLE_OPTIONS.map((r) => ({ label: ROLE_LABELS[r], value: r }))
 /** ADR 0013: only Direktur/Finance are offered for decision positions (the DB enum keeps every role). */
 const decisionRoleOptions = ({ options }: { options: Option[] }): Option[] => options.filter((o) => isDecisionRole(typeof o === 'string' ? o : o.value))
 
@@ -22,12 +24,15 @@ const decisionRoleOptions = ({ options }: { options: Option[] }): Option[] => op
  * Every change requires a reason (requirements §8). Admin C/R/U, Owner R/U, Finance R.
  * ADR 0013 (E1): decision positions only for Direktur (`pk-owner`) / Finance — see `ruleDecisionError`.
  * ADR 0021: an expense-request rule may name the PM project for a required "Diketahui".
+ * ADR 0024 (owner 2026-10-11): condition "Peran pemohon" (every requester holds one of the roles in the PT;
+ * empty = any) and zero approval levels ("Tanpa persetujuan — langsung ke antrian transfer Finance") ONLY
+ * when the requester role is exactly Direktur — hook (400) + DB trigger `approval_rules_zero_step`.
  */
 export const ApprovalRules: CollectionConfig = withAudit(
   {
     slug: 'approval-rules',
     labels: { singular: 'Aturan approval', plural: 'Aturan approval' },
-    admin: { useAsTitle: 'name', group: 'Keuangan', defaultColumns: ['name', 'docType', 'requestType', 'minAmount', 'maxAmount', 'active'] },
+    admin: { useAsTitle: 'name', group: 'Keuangan', defaultColumns: ['name', 'docType', 'requesterRoles', 'priority', 'requestType', 'minAmount', 'maxAmount', 'active'] },
     access: {
       read: byRole({ 'pk-admin': true, 'pk-owner': true, 'pk-finance': true }),
       create: rolesAllowed('pk-admin'),
@@ -51,7 +56,9 @@ export const ApprovalRules: CollectionConfig = withAudit(
             if ((data.requestType ?? originalDoc?.requestType ?? 'any') !== 'any') throw new APIError('Aturan Addendum RAB: jenis pengajuan harus "Semua".', 400, null, true)
             if (relId(data.category !== undefined ? data.category : originalDoc?.category)) throw new APIError('Aturan Addendum RAB tidak memakai kategori biaya.', 400, null, true)
           }
-          const err = stepsError(steps)
+          // ADR 0024: zero steps only for "Peran pemohon = Direktur" (ruleDecisionError → zeroStepRuleError)
+          const requesterRoles = ((data.requesterRoles !== undefined ? data.requesterRoles : originalDoc?.requesterRoles) ?? []) as Role[]
+          const err = stepsError(steps, { allowEmpty: true })
           if (err) throw new APIError(err, 400, null, true)
           // ADR 0013 (E1): "Diketahui" = Direktur approval, then Finance; Staff never decide, Direktur is
           // never optional. ADR 0021: "PM project" (scope_manager) again for expense-request rules (required).
@@ -61,6 +68,7 @@ export const ApprovalRules: CollectionConfig = withAudit(
             acknowledgeRole: (data.acknowledgeRole !== undefined ? data.acknowledgeRole : originalDoc?.acknowledgeRole) as Role | null | undefined,
             acknowledgeUser: relId(data.acknowledgeUser !== undefined ? data.acknowledgeUser : originalDoc?.acknowledgeUser) ?? null,
             steps,
+            requesterRoles,
           }
           const named = [rule.acknowledgeUser, ...steps.map((s) => s.approverUser)].filter((x): x is number => typeof x === 'number')
           // ADR 0016 §5: roles of the named users IN THE RULE's PT (memberships).
@@ -106,7 +114,16 @@ export const ApprovalRules: CollectionConfig = withAudit(
       { name: 'category', type: 'relationship', relationTo: 'expense-categories', label: 'Kategori (opsional)' },
       { name: 'project', type: 'relationship', relationTo: 'projects', label: 'Project (opsional)' },
       { name: 'costCenter', type: 'relationship', relationTo: 'cost-centers', label: 'Pusat biaya (opsional)' },
-      { name: 'priority', type: 'number', label: 'Prioritas', defaultValue: 100, min: 0, admin: { description: 'Angka kecil dievaluasi lebih dulu.' } },
+      {
+        // ADR 0024 (owner 2026-10-11): rule selection by the requester's role IN THE PT (every requester)
+        name: 'requesterRoles',
+        type: 'select',
+        hasMany: true,
+        label: 'Peran pemohon',
+        options: requesterRoleOptions,
+        admin: { description: 'Aturan berlaku bila SETIAP pemohon memegang salah satu peran ini di PT pengajuan. Kosong = semua pemohon.' },
+      },
+      { name: 'priority', type: 'number', label: 'Prioritas', defaultValue: 100, min: 0, admin: { description: 'Angka kecil dievaluasi lebih dulu (aturan "Pengajuan Direktur" = 10, default = 100).' } },
       {
         name: 'acknowledge',
         type: 'select',
@@ -162,11 +179,15 @@ export const ApprovalRules: CollectionConfig = withAudit(
           { label: 'Tidak dipakai', value: 'none' },
         ],
       },
+      // ADR 0024: explanation + live preview of the rule ("Contoh: pengajuan oleh Direktur → langsung ke Finance")
+      { name: 'rulePreview', type: 'ui', label: 'Penjelasan aturan', admin: { components: { Field: '@/admin/components/ApprovalRulePreview#ApprovalRulePreview' } } },
       {
         name: 'steps',
         type: 'array',
         label: 'Level approval',
-        minRows: 1,
+        labels: { singular: 'Level', plural: 'Level' },
+        // ADR 0024: 0 rows = "Tanpa persetujuan — langsung ke antrian transfer Finance" (Peran pemohon = Direktur only)
+        admin: { description: 'Kosongkan HANYA untuk aturan Peran pemohon = Direktur: "Tanpa persetujuan — langsung ke antrian transfer Finance".' },
         fields: [
           { name: 'level', type: 'number', label: 'Level', required: true, min: 1 },
           { name: 'approverRole', type: 'select', label: 'Peran approver', options: roleOptions, filterOptions: decisionRoleOptions },

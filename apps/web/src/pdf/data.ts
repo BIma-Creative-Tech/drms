@@ -3,7 +3,7 @@ import type { PayloadRequest } from 'payload'
 import { relId } from '@/access/roles'
 import { approvalsOf, settings, type ApprovalRow, type RequestDoc } from '@/domain/expense/common'
 import { displayNames } from '@/domain/companies'
-import { selfApprovalNote, SKIPPED_LABEL } from '@/domain/expense/decision'
+import { isNoApproval, NO_APPROVAL_PDF_LABEL, selfApprovalNote, SKIPPED_LABEL } from '@/domain/expense/decision'
 import { withFlagVisibility } from '@/domain/expense/flag-visibility'
 import { displayUnitPrice } from '@/domain/expense/lines'
 import { receiptsOf } from '@/domain/expense/receipts'
@@ -59,6 +59,7 @@ export async function buildPdfData(req: PayloadRequest, requestId: number, opts:
   const skipped = doc.approvalSnapshot?.skipped ?? []
   const skippedAck = skipped.some((x) => x.position === 'diketahui')
   const skippedApproval = skipped.some((x) => x.position === 'approval') && (doc.approvalSnapshot?.steps.length ?? 0) === 0
+  const noApproval = isNoApproval(doc.approvalSnapshot)
   const approvalImages: PdfImage[] = []
   for (const a of approvals.slice(-2)) approvalImages.push(...(await sig(a)))
 
@@ -79,7 +80,8 @@ export async function buildPdfData(req: PayloadRequest, requestId: number, opts:
       images: diketahui?.decision === 'acknowledged' ? await sig(diketahui) : [],
       time: formatServerTime(diketahui?.decidedAt, tz),
       // ADR 0013 G1-2: the only Direktur was requester/creator → the position did not apply.
-      note: diketahui?.decision === 'rejected' ? 'DITOLAK' : !diketahui && skippedAck ? pdfSafe(SKIPPED_LABEL) : undefined,
+      // ADR 0024: a Direktur's own request without approval → no decision position applies.
+      note: diketahui?.decision === 'rejected' ? 'DITOLAK' : !diketahui && skippedAck ? pdfSafe(SKIPPED_LABEL) : !diketahui && noApproval ? pdfSafe(NO_APPROVAL_PDF_LABEL) : undefined,
     },
     {
       label: 'Approval',
@@ -90,6 +92,8 @@ export async function buildPdfData(req: PayloadRequest, requestId: number, opts:
         ? 'DITOLAK'
         : approvals.length === 0 && skippedApproval
           ? pdfSafe(SKIPPED_LABEL)
+          : approvals.length === 0 && noApproval
+            ? pdfSafe(NO_APPROVAL_PDF_LABEL)
           : approvals.length > 1
             ? `${approvals.length} level`
             : undefined,
@@ -154,7 +158,7 @@ export async function buildPdfData(req: PayloadRequest, requestId: number, opts:
     })),
     grandTotal: formatRupiah(doc.grandTotal ?? 0),
     signatures,
-    // ADR 0021: the narrow G1 exception is printed with the signatures (who filed / who approved).
+    // ADR 0021 / 0024: the G1 exception is printed with the signatures (who filed / who approved, or none).
     policyNote: selfApprovalNote(doc.approvalSnapshot?.selfApproval) ? pdfSafe(selfApprovalNote(doc.approvalSnapshot?.selfApproval)) : undefined,
     transfer: doc.bankSnapshot?.accountNo
       ? {

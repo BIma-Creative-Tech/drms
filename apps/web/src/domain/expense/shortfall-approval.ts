@@ -8,11 +8,11 @@ import { formatRupiah } from '@/lib/money'
 import { requestMeta } from '@/lib/request-meta'
 
 import { actorContext, displayName, fail, ids, loadRaw, loadVisible, requireActionAudited, resolveSignature, selfApprovalAllowed, type RequestDoc, type Signature } from './common'
-import { DIREKTUR_VIA_PM, DIREKTUR_VIA_PM_SELF, isSelfApproval, lacksDecisionRole } from './decision'
+import { DIREKTUR_VIA_PM_SELF, isNoApproval, isSelfApproval, lacksDecisionRole, NO_APPROVAL_NOTE } from './decision'
 import { requireSettlement, settlementOfRequest, shortfallStateOf, updateSettlement, type SettlementDoc } from './lpj'
 import { lastLevel, matchesAcknowledger, matchesStep, type ApprovalSnapshot } from './rules'
 import { SHORTFALL_APPROVAL_LABELS, shortfallAllowedActions, type ShortfallAction, type ShortfallApprovalStatus, type ShortfallCtx } from './settlement-rules'
-import { involvedUserIds, selectAndSnapshot } from './snapshot'
+import { involvedUserIds, legacyExceptionOf, selectAndSnapshot } from './snapshot'
 import { ackStepLabel, approvalStepLabel } from './timeline'
 
 /**
@@ -27,6 +27,9 @@ import { ackStepLabel, approvalStepLabel } from './timeline'
  * again with a new justification). Web only: the APK inbox lists requests in pending_ack /
  * pending_approval and is not changed (ADR 0019 §APK). Every write in the caller's transaction.
  */
+
+/** ADR 0024: status text of a shortfall that needed no approval (a Direktur's own request). */
+export const SHORTFALL_NO_APPROVAL_LABEL = 'Kekurangan tanpa persetujuan — pengajuan Direktur (kebijakan PT)'
 
 export type ShortfallDecisionRow = {
   id: number
@@ -194,10 +197,9 @@ export async function requestShortfallApproval(req: PayloadRequest, id: number, 
   if (!sf.aboveTolerance) fail(409, `Kekurangan masih dalam toleransi ${sf.tolerancePct}% (maks. total ${formatRupiah(sf.ceiling)}); selesaikan langsung tanpa persetujuan.`)
   if (s.shortfallApprovalStatus === 'pending_ack' || s.shortfallApprovalStatus === 'pending_approval') fail(409, 'Persetujuan kekurangan sedang berjalan.')
   if (sf.covered) fail(409, 'Kekurangan sudah disetujui; catat transfer kekurangan.')
-  // ADR 0021: same rule as the request (PM project → Direktur); the G1 exception only when the request has it
-  const { snapshot } = await selectAndSnapshot(req, { ...raw, grandTotal: sf.totalAfter }, {
-    allowSelfApproval: raw.g1Exception === DIREKTUR_VIA_PM_SELF ? true : raw.g1Exception === DIREKTUR_VIA_PM ? 'pm_only' : false,
-  })
+  // ADR 0021: same rule as the request (PM project → Direktur); the ADR 0021 exception only when the request
+  // has it. ADR 0024: a Direktur's own request under the zero-step rule → no approval for the shortfall either.
+  const { snapshot } = await selectAndSnapshot(req, { ...raw, grandTotal: sf.totalAfter }, { legacy: legacyExceptionOf(raw.g1Exception) })
   const needsAck = snapshot.acknowledge === 'required'
   const cycle = (s.shortfallApprovalCycle ?? 0) + 1
   const reason = note.trim()
@@ -228,6 +230,21 @@ export async function requestShortfallApproval(req: PayloadRequest, id: number, 
       reason: x.reason,
     })),
   )
+  if (isNoApproval(snapshot)) {
+    // ADR 0024: recorded like the request's own exception, then approved without a decision row (same cycle)
+    await writeAudit(req, [
+      {
+        action: 'approval_policy_exception',
+        docType: 'settlement',
+        docId: String(s.id),
+        docNo: s.docNo ?? undefined,
+        field: 'shortfallApproval',
+        newValue: { exception: snapshot.selfApproval, rule: snapshot.ruleId, ruleName: snapshot.ruleName, cycle, amount: sf.totalAfter, requestId: raw.id },
+        reason: NO_APPROVAL_NOTE,
+      },
+    ])
+    return finalize(req, raw, updated)
+  }
   await notifyStep(req, raw, updated)
   return updated
 }
@@ -358,6 +375,7 @@ export async function shortfallSummary(req: PayloadRequest, raw: RequestDoc, s: 
   const rows = (s.shortfallApprovalCycle ?? 0) > 0 ? await shortfallDecisions(req, s.id) : []
   const ctx = await ctxOf(req, raw, s, rows)
   const status = s.shortfallApprovalStatus ?? null
+  const noApproval = isNoApproval(s.shortfallApprovalSnapshot as ApprovalSnapshot | null)
   return {
     approvedAmount: sf.approvedAmount,
     tolerancePct: sf.tolerancePct,
@@ -366,7 +384,9 @@ export async function shortfallSummary(req: PayloadRequest, raw: RequestDoc, s: 
     aboveTolerance: sf.aboveTolerance,
     settleAllowed: s.status === 'verified' ? sf.allowed : null,
     status,
-    statusLabel: status ? SHORTFALL_APPROVAL_LABELS[status] : null,
+    // ADR 0024: the shortfall of a Direktur's own request without approval
+    statusLabel: status === 'approved' && noApproval ? SHORTFALL_NO_APPROVAL_LABEL : status ? SHORTFALL_APPROVAL_LABELS[status] : null,
+    noApproval,
     amount: s.shortfallApprovalAmount ?? null,
     cycle: s.shortfallApprovalCycle ?? 0,
     level: s.shortfallApprovalLevel ?? null,

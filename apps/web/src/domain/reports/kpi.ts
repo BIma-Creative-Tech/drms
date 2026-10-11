@@ -533,7 +533,8 @@ export async function advancesWithoutLpj(req: PayloadRequest, scope: ReportScope
           (SELECT min(t.transfer_date) FROM transfers t WHERE t.request_id = er.id AND t.status = 'posted' AND t.kind = 'advance') AS first_transfer,
           coalesce((SELECT string_agg(e.name, ', ' ORDER BY rr."order") FROM expense_requests_rels rr JOIN employees e ON e.id = rr.employees_id
                     WHERE rr.parent_id = er.id AND rr.path = 'requesters'), '') AS requesters,
-          coalesce(p.code || ' ' || p.name, cc.code || ' ' || cc.name, '') AS scope_name
+          coalesce(p.code || ' ' || p.name, cc.code || ' ' || cc.name, '') AS scope_name,
+          coalesce(er.g1_exception = 'direktur_no_approval', false) AS no_approval
         FROM expense_requests er
         LEFT JOIN projects p ON p.id = er.project_id LEFT JOIN cost_centers cc ON cc.id = er.cost_center_id
         WHERE er.type = 'advance' AND er.status::text IN (${textList(ADVANCE_WITHOUT_LPJ)}) AND ${requestScopeSql(scope)}
@@ -643,6 +644,8 @@ export type RequestRow = {
   refund: number
   realized: number
   openFlags: number
+  /** ADR 0024: a Direktur's own request without approval (`g1_exception = direktur_no_approval`). */
+  noApproval: boolean
 }
 
 /** K-13 rows (keyset by id descending; `after` = last id of the previous page). */
@@ -655,7 +658,8 @@ export async function requestRows(req: PayloadRequest, scope: ReportScope, f: Re
           (SELECT count(*) FROM receipt_flags f WHERE f.request_id = er.id AND f.status = 'open' AND ${flagVisibleSql(req, sql`f.related_company_id`)})::int AS flags,
           coalesce((SELECT string_agg(e.name, ', ' ORDER BY rr."order") FROM expense_requests_rels rr JOIN employees e ON e.id = rr.employees_id
                     WHERE rr.parent_id = er.id AND rr.path = 'requesters'), '') AS requesters,
-          coalesce(p.code || ' ' || p.name, cc.code || ' ' || cc.name, '') AS scope_name
+          coalesce(p.code || ' ' || p.name, cc.code || ' ' || cc.name, '') AS scope_name,
+          coalesce(er.g1_exception = 'direktur_no_approval', false) AS no_approval
         FROM expense_requests er
         LEFT JOIN projects p ON p.id = er.project_id LEFT JOIN cost_centers cc ON cc.id = er.cost_center_id
         WHERE ${requestScopeSql(scope)} AND ${requestFilterSql(f)} ${page.after ? sql`AND er.id < ${page.after}` : sql``}
@@ -677,6 +681,7 @@ export async function requestRows(req: PayloadRequest, scope: ReportScope, f: Re
     refund: num(x.rf),
     realized: num(x.rl),
     openFlags: num(x.flags),
+    noApproval: x.no_approval === true,
   }))
 }
 
@@ -1081,7 +1086,8 @@ export async function transferQueueTop(req: PayloadRequest, scope: ReportScope, 
     req,
     sql`SELECT er.id, er.company_id, er.doc_no, er.title, er.type::text AS type, er.status::text AS status, er.needed_date,
           coalesce(er.approved_amount, er.grand_total, 0)::text AS amount,
-          coalesce(p.code || ' ' || p.name, cc.code || ' ' || cc.name, '') AS scope_name
+          coalesce(p.code || ' ' || p.name, cc.code || ' ' || cc.name, '') AS scope_name,
+          coalesce(er.g1_exception = 'direktur_no_approval', false) AS no_approval
         FROM expense_requests er
         LEFT JOIN projects p ON p.id = er.project_id LEFT JOIN cost_centers cc ON cc.id = er.cost_center_id
         WHERE ((er.type = 'advance' AND er.status = 'approved') OR (er.type = 'reimburse' AND er.status = 'receipts_verified')) AND ${companyScopeSql(sql`er.company_id`, pts)}
