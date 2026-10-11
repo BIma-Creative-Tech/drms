@@ -6,6 +6,40 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+**DRMS 10/10 Phase B-2 — web + server** (owner decisions D1 / D3, points 8f–8h, 13, read-only request header; PB numbering
+monthly). API contract for the APK in `docs/proyekkas/plans/drms-1010.md` ("Phase B-2 contract").
+
+**Database migrations:** `20261012_300000_d1010_lines_lpj_photos` (schema: `expense_requests_lines.receipt_amount`, flag kind
+`receipt_amount_mismatch`, `settlements_rels` for LPJ photos, `settlements.photos_hash`), `20261012_300100_d1010_lines_guard`
+(DB guards + data: total = qty × unit price on editable requests, receipt amount in the frozen content hash — existing hashes
+unchanged —, LPJ photo set frozen at submit; editable lines without a reproducible unit price get `total ÷ qty` or stay
+"legacy" — count in the migrate log), `20261012_300200_d1010_pb_monthly` (PB sequences on the default pattern → monthly from
+1; the current month continues after its highest issued PB, audited, Admin-customised patterns untouched and logged).
+Rollback: each `down()` (guard bodies restored, PB sequences moved by this migration back to never / 229).
+
+### Changed (DRMS 10/10 B-2)
+
+- **D1:** request type `advance` is shown as **"Pengajuan Baru"** (was "Uang Muka") everywhere — forms, lists, filters,
+  Antrian Transfer, dashboard, reports and exports, PDF, notifications / reminders, approval rules, user guides; the
+  internal value `advance` and "Reimburse" are unchanged.
+- **D3 (8f–8h):** the line total is **qty × harga satuan**, computed by the server on every write (a client total is
+  ignored; qty empty = 1) and enforced by the DB on editable requests; approval / transfer use it. New per-line
+  **"Nominal sesuai nota"**: when it differs from the total, Finance sees the flag **"Selisih nota"** (info within the
+  rounding tolerance, otherwise a warning to mark "sudah diperiksa") on the request detail lines table, the Antrian Transfer
+  (badge) and Verifikasi LPJ. Old clients that send only `total` get `unit price = total ÷ qty` when exact.
+- **Web request form:** lines as a table (No, Uraian, Kategori, Qty, Satuan, Harga satuan, Total, Nominal sesuai nota,
+  Ubah / Hapus) with a "Tambah baris" dialog (live read-only total + grand total preview, Rupiah inputs); stacked cards at
+  390 px. "Harga satuan" drops "(informatif)".
+- **Submitted request (read-only):** the header shows a compact "Rincian pengajuan" summary (label: value — PT, project,
+  urgensi, tanggal, pemohon, rekening with masked number + eye toggle, keterangan, lampiran) instead of disabled inputs,
+  empty "Pilih …" placeholders and a stuck "memuat…" account preview.
+- **Point 13:** LPJ photos (max 10, images, same resize / privacy pipeline as receipts): the requester adds / removes them
+  while the LPJ is Draft / Revisi (`PUT /api/v1/expense-requests/{id}/lpj/photos`, or `photos` with Kirim LPJ); read-only
+  afterwards; shown with the lightbox on the request, the LPJ document and Verifikasi LPJ.
+- **PB numbering** (owner 2026-10-11): `PB/<kode PT>/<YYMM>/0001` resets **monthly from 1 per PT** (was one running series
+  from 229). The import's `nomor_pb_mulai` now only sets the first number of the go-live month (default 1). No PT code is
+  built in: `{COMPANY}` is always the PT's short code (an empty one blocks numbering).
+
 **DRMS 10/10 integration + Lead screenshot review** (branches a-apk, a-web-shell, a-web-form, b-server merged). No new
 migration; the latest schema snapshot now matches the final schema (`migrate:create` → no changes).
 

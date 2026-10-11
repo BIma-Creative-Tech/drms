@@ -1,11 +1,11 @@
 # Panduan Staff Lapangan
 
-Anda memakai ProyekKas untuk: **absen** (masuk/pulang dengan lokasi dan selfie), **mengajukan dana** (Uang Muka atau
+Anda memakai ProyekKas untuk: **absen** (masuk/pulang dengan lokasi dan selfie), **mengajukan dana** (Pengajuan Baru atau
 Reimburse), **mengunggah nota**, dan **mengirim LPJ**. Semua bisa dari HP. Baca juga [Hal umum](README.md#hal-umum-untuk-semua-peran).
 
 Sebelum mulai: unggah **tanda tangan** sekali di web (**Profil & tanda tangan**).
 
-![TODO screenshot: Beranda APK Staff (Ajukan Uang Muka, Ajukan Reimburse, Pengajuan Saya, Absensi)](img/staff-beranda.png)
+![TODO screenshot: Beranda APK Staff (Ajukan Pengajuan Baru, Ajukan Reimburse, Pengajuan Saya, Absensi)](img/staff-beranda.png)
 
 ## 1. Absen masuk dan pulang (APK)
 
@@ -46,10 +46,10 @@ Pilih jenisnya dulu:
 
 | Jenis | Kapan | Nota |
 |---|---|---|
-| **Uang Muka** | Butuh uang **sebelum** belanja | Diunggah **setelah** uang ditransfer, lalu kirim LPJ |
+| **Pengajuan Baru** | Butuh uang **sebelum** belanja | Diunggah **setelah** uang ditransfer, lalu kirim LPJ |
 | **Reimburse** | Sudah bayar **dengan uang sendiri** | **Wajib** dilampirkan saat mengajukan (tiap baris minimal 1 nota) |
 
-1. Beranda → **Ajukan Uang Muka** atau **Ajukan Reimburse**. Bila Anda bekerja di lebih dari satu PT, muncul
+1. Beranda → **Ajukan Pengajuan Baru** atau **Ajukan Reimburse**. Bila Anda bekerja di lebih dari satu PT, muncul
    **Untuk PT mana?** → ketuk PT tempat biaya ini dibebankan. Di editor tertulis **PT: …**. (Pesan "Anda tidak bisa
    membuat pengajuan di PT yang dipilih. Ganti PT di beranda." = ubah pilihan PT di Beranda dulu.)
 2. Isi **Judul**, pilih **Project** *atau* **Pusat biaya** (salah satu saja), **Tanggal dibutuhkan**.
@@ -59,16 +59,18 @@ Pilih jenisnya dulu:
    untuk dirinya sendiri…" — hapus nama lain lalu ajukan lagi.
 4. **Rekening tujuan**: pilih rekening salah satu pemohon (di web daftar juga hanya berisi rekening pemohon; bila
    dikosongkan di web, dipakai rekening default pemohon pertama).
-5. **Tambah baris** untuk tiap barang/biaya: Uraian, Kategori, (Jumlah, Satuan), **Total**, Kendaraan (bila BBM/servis).
-   *Total* adalah angka yang Anda isi (boleh dibulatkan dari nota); harga satuan hanya informasi.
+5. **Tambah baris** untuk tiap barang/biaya: Uraian, Kategori, **Qty**, **Satuan**, **Harga satuan**, Kendaraan (bila
+   BBM/servis). **Total = qty × harga satuan** dihitung otomatis dan tidak bisa diubah (keputusan owner D3, 11 Okt 2026);
+   pengajuan, persetujuan dan transfer memakai total ini. Bila nota sudah ada dan nilainya berbeda, isi **Nominal sesuai
+   nota** — Finance akan melihat tanda **Selisih nota** (pengajuan tetap memakai total).
 6. Reimburse: di tiap baris tekan **Foto nota (kamera)** atau **Dari galeri**, isi nomor nota, toko, tanggal, nominal.
    Tanggal nota tidak boleh setelah hari ini (pesan "Tanggal nota tidak boleh di masa depan").
 7. **Simpan draft** (bisa tanpa sinyal) → saat online tekan **Ajukan** → konfirmasi.
 
 ![TODO screenshot: editor pengajuan dengan baris item dan Total (pratinjau)](img/staff-editor.png)
 
-Setelah diajukan, nomor dokumen terbit (mis. `PB/DRMS/2610/0229`; `DRMS` = kode PT, `2610` = tahun-bulan, tiap PT
-punya nomor urut sendiri; semua nomor dokumen lain juga memuat kode PT, mis. `TRF/DRMS/2610/0001`) dan status **Menunggu persetujuan PM**. Yang memutuskan adalah **PM project** (PM di data project;
+Setelah diajukan, nomor dokumen terbit (mis. `PB/DRMS/2611/0001`; `DRMS` = kode PT, `2611` = tahun-bulan, tiap PT
+punya nomor urut sendiri yang mulai dari 0001 lagi setiap bulan; semua nomor dokumen lain juga memuat kode PT, mis. `TRF/DRMS/2610/0001`) dan status **Menunggu persetujuan PM**. Yang memutuskan adalah **PM project** (PM di data project;
 untuk pusat biaya: manajernya) lalu **Direktur** **di PT pengajuan itu**; setelah itu Finance mentransfer (sejak 10 Okt
 2026). Pengajuan yang diajukan sebelumnya tetap diputuskan Direktur lalu Finance. Bila muncul "Project ini belum punya
 PM. Hubungi Admin untuk mengisi PM project.", minta Admin mengisi PM project itu.
@@ -90,14 +92,15 @@ biaya." · "Rekening tujuan wajib dipilih." · "Data master belum tersedia…" (
 - **Revisi Nota** (Reimburse): Finance menolak salah satu nota. Buka pengajuan (APK atau web) → hapus nota yang
   ditolak → unggah pengganti → **Kirim ulang nota**. Bila total berubah, pengajuan disetujui ulang.
 
-## 4. Nota dan LPJ Uang Muka
+## 4. Nota dan LPJ Pengajuan Baru
 
 1. Setelah status **Ditransfer**, belanjakan dana dan simpan notanya.
 2. Buka pengajuan → **Nota & LPJ** → **Tambah nota (kamera)** per baris. Salah foto? Ikon hapus → isi alasan.
    Nota yang sudah **Valid** (divalidasi Finance) terkunci: tidak ada ikon hapus, dan server menolak dengan pesan
    "Nota sudah divalidasi Finance". Hanya nota yang menunggu verifikasi atau ditolak yang bisa dihapus/diganti.
 3. Semua nota sudah masuk → **Nota sudah lengkap**.
-4. **Kirim LPJ**: tulis uraian penggunaan dana → Konfirmasi.
+4. **Kirim LPJ**: tulis uraian penggunaan dana, tambahkan **Foto LPJ** bila perlu (foto barang / lokasi, maks. 10;
+   bisa ditambah atau dihapus sampai LPJ dikirim, dan lagi saat Finance meminta revisi) → Konfirmasi.
 5. Bila Finance meminta revisi, baca **Catatan Finance**, perbaiki nota, **Kirim ulang LPJ**.
 6. Sisa dana dikembalikan ke kas / kekurangan ditransfer oleh Finance → status **Selesai**.
 
@@ -111,10 +114,10 @@ Menu Anda: **Daftar pengajuan**, **Rekap absensi saya**, **+ Buat pengajuan**, *
 Di web Anda juga bisa **Cetak PDF Pengajuan Biaya** (tombol di samping kanan pengajuan yang sudah bernomor) —
 PDF tidak tersedia di APK. Kop dan logo PDF mengikuti PT pengajuan. Di web, form **+ Buat pengajuan** punya kolom
 **PT** di atas — wajib dipilih bila pemilih PT Anda berisi lebih dari satu PT, dan tidak bisa diubah setelah dibuat.
-Di form web, isian baris item dimuat dari server: setelah mengisi kolom, **tunggu sebentar (±1–3 detik) sebelum
-menekan Tambah Baris**, dan tunggu sampai kolom baris baru tampil. Menekan terlalu cepat dapat menghasilkan baris
-tanpa kolom (keterbatasan Payload CMS, QA-10/QA-26) — bila itu terjadi, muat ulang halaman (isian yang belum disimpan perlu diisi ulang). Di
-APK hal ini tidak terjadi.
+Di form web, baris item tampil sebagai **tabel** (No, Uraian, Kategori, Qty, Satuan, Harga satuan, Total, Nominal sesuai
+nota). **+ Tambah baris** dan **Ubah** membuka jendela isian yang sama seperti di APK; total baris dan grand total
+langsung terlihat. Tekan **Simpan** pada form untuk menyimpan draft. Setelah diajukan, bagian atas berubah menjadi
+ringkasan **Rincian pengajuan** (hanya baca).
 
 ## Pertanyaan umum
 
