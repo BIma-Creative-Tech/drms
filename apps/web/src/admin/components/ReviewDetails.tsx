@@ -78,7 +78,7 @@ export function ReviewDetails({ d, title = 'Rincian untuk pemeriksa' }: { d: Det
             {receiptTotal !== d.grandTotal ? ` (selisih ${rp(d.grandTotal - receiptTotal)})` : ''}
           </span>
         ) : (
-          <span>· Nota menyusul setelah dana ditransfer (Uang Muka).</span>
+          <span>· Nota menyusul setelah dana ditransfer (Pengajuan Baru).</span>
         )}
       </div>
       <div style={{ overflowX: 'auto' }}>
@@ -86,11 +86,13 @@ export function ReviewDetails({ d, title = 'Rincian untuk pemeriksa' }: { d: Det
           <thead>
             <tr>
               <th style={cell}>No</th>
-              <th style={cell}>Uraian</th>
+              <th style={{ ...cell, minWidth: 140 }}>Uraian</th>
               <th style={cell}>Kategori</th>
               <th style={numCell}>Qty</th>
+              <th style={numCell}>Harga satuan</th>
               <th style={numCell}>Total</th>
-              <th style={cell}>Nota &amp; flag</th>
+              <th style={numCell}>Nominal sesuai nota</th>
+              <th style={{ ...cell, minWidth: 220 }}>Nota &amp; flag</th>
             </tr>
           </thead>
           <tbody>
@@ -110,7 +112,19 @@ export function ReviewDetails({ d, title = 'Rincian untuk pemeriksa' }: { d: Det
                   <td style={numCell}>
                     {l.qty ?? '—'} {l.uom && 'code' in l.uom ? String(l.uom.code ?? '') : ''}
                   </td>
-                  <td style={numCell}>{rp(l.total)}</td>
+                  <td style={numCell}>{rp(l.unitPrice ?? l.unitPriceDisplay)}</td>
+                  <td style={{ ...numCell, fontWeight: 600 }}>{rp(l.total)}</td>
+                  <td style={numCell} data-pk-receipt-amount={l.no}>
+                    {rp(l.receiptAmount)}
+                    {/* D3: "Nominal sesuai nota" ≠ total → awareness for Finance (flag receipt_amount_mismatch below) */}
+                    {l.receiptMismatch ? (
+                      <div>
+                        <span style={pill('warn')} data-pk-line-mismatch={l.no} title="Nominal sesuai nota berbeda dari total baris">
+                          Selisih nota {rp(Math.abs(l.total - (l.receiptAmount ?? 0)))}
+                        </span>
+                      </div>
+                    ) : null}
+                  </td>
                   <td style={cell}>
                     {rs.length === 0 ? <span style={{ color: 'var(--theme-elevation-600)' }}>{needsReceipts ? 'Belum ada nota.' : '—'}</span> : null}
                     {rs.map((r) => (

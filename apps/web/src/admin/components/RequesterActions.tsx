@@ -8,6 +8,8 @@ import { ActionDialog } from './ActionDialog'
 import { postJson, problemText, promptLabel } from './ActionButton'
 import { TableScroll } from './TableScroll'
 import { DateInput } from './DateInput'
+import { LpjPhotoGrid } from './lpj/LpjPhotoGrid'
+import { LpjPhotosEditor } from './lpj/LpjPhotosEditor'
 
 /**
  * Requester actions of the expense-request edit view (F2c, US-03…US-08): submit, withdraw/cancel
@@ -53,6 +55,8 @@ export type RequesterActionsProps = {
     receiptsTotal: number | null
     difference: number | null
     submitCount: number
+    /** Point 13: LPJ photo ids (media-receipts). */
+    photos: number[]
   } | null
 }
 
@@ -413,6 +417,14 @@ export function RequesterActions(p: RequesterActionsProps) {
           {p.settlement?.financeNotes ? (
             <div style={{ marginTop: 6, padding: 8, borderLeft: '3px solid var(--pk-accent)', background: 'var(--theme-elevation-50)' }} data-pk-revision-note>
               <strong>Catatan revisi Finance:</strong> {p.settlement.financeNotes}
+            </div>
+          ) : null}
+          {/* point 13: LPJ photos — editable with the LPJ (Draft / Revisi), read-only once sent */}
+          {p.settlement && has('lpj_submit') ? <LpjPhotosEditor requestId={p.id} photos={p.settlement.photos} /> : null}
+          {p.settlement && !has('lpj_submit') && p.settlement.photos.length > 0 ? (
+            <div style={{ marginTop: 8 }}>
+              <div style={{ fontSize: 12, fontWeight: 600 }}>Foto LPJ ({p.settlement.photos.length})</div>
+              <LpjPhotoGrid ids={p.settlement.photos} group={`lpj-own-${p.id}`} label="Foto LPJ" />
             </div>
           ) : null}
           {has('lpj_submit') ? <LpjForm requestId={p.id} settlement={p.settlement} resubmit={p.status === 'lpj_revision'} /> : null}

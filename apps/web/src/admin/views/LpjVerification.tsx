@@ -13,6 +13,7 @@ import { KAS_STYLE } from '../components/kas/style'
 import { ListToolbar, Pager } from '../components/list/ListToolbar'
 import { MoneyForm } from '../components/MoneyForm'
 import { ShortfallPanel } from '../components/ShortfallPanel'
+import { LpjPhotoGrid } from '../components/lpj/LpjPhotoGrid'
 import { pageOfFind, parseListQuery, searchWhere } from '../list-query'
 import { accountsOf, PtChip, PtScopeNote, ptView } from './pt'
 import { Empty, Forbidden, Shell, TableScroll, allowed, badge, docLink, num, rp, table, td, th } from './shared'
@@ -20,7 +21,7 @@ import { Empty, Forbidden, Shell, TableScroll, allowed, badge, docLink, num, rp,
 type Detail = Awaited<ReturnType<typeof detail>>
 
 /**
- * "Verifikasi LPJ" (M06, US-21/US-22): Uang Muka in "LPJ Diajukan" — per receipt valid / tolak,
+ * "Verifikasi LPJ" (M06, US-21/US-22): Pengajuan Baru in "LPJ Diajukan" — per receipt valid / tolak,
  * revision request with a note, verification (verified total = Σ valid receipts) — and in
  * "LPJ Terverifikasi" the settlement: surplus → KM "Pengembalian LPJ", shortfall → transfer.
  * Owner sees the queue read-only; Finance acts (never on its own request, server-enforced).
@@ -89,6 +90,8 @@ export async function LpjVerification(props: AdminViewServerProps) {
               ) : null}
               <strong>{docLink(d.id, d.docNo ?? `#${d.id}`)}</strong> — {d.title} · LPJ {d.settlement ? <a href={docHref('settlement', d.settlement.id)!}>{d.settlement.docNo ?? `#${d.settlement.id}`}</a> : ''} · kiriman ke-{d.settlement?.submitCount ?? 1}
               <div style={{ fontSize: 12 }}>Uraian penggunaan: {d.settlement?.usageNotes ?? '—'}</div>
+              {/* point 13: LPJ photos of the requester (lightbox) */}
+              {d.settlement?.photos.length ? <LpjPhotoGrid ids={d.settlement.photos} group={`lpj-photos-${d.id}`} label={`Foto LPJ ${d.settlement.docNo ?? ''}`.trim()} /> : null}
             </div>
             <div>
               Ditransfer <strong>{rp(d.transferredTotal)}</strong> · Nota <strong>{rp(d.settlement?.receiptsTotal)}</strong> · Selisih{' '}
@@ -191,6 +194,7 @@ export async function LpjVerification(props: AdminViewServerProps) {
               ) : null}
               <strong>{docLink(d.id, d.docNo ?? `#${d.id}`)}</strong> — {d.title} · LPJ <a href={docHref('settlement', s.id)!}>{s.docNo ?? `#${s.id}`}</a>
             </div>
+            {s.photos.length ? <LpjPhotoGrid ids={s.photos} group={`lpj-photos-${d.id}`} label={`Foto LPJ ${s.docNo ?? ''}`.trim()} size={56} /> : null}
             <div style={{ margin: '6px 0' }}>
               Ditransfer {rp(s.transferredTotal)} · Nota terverifikasi {rp(s.verifiedReceiptsTotal)} · Selisih {rp(s.difference)} —{' '}
               <strong>{s.settlementType ? SETTLEMENT_TYPE_LABELS[s.settlementType] : '—'}</strong>

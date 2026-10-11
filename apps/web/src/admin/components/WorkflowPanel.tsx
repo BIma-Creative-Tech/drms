@@ -4,7 +4,8 @@ import React from 'react'
 import { hasRole, ownEmployees, relId } from '@/access/roles'
 import { companyById } from '@/domain/companies'
 import { buildApprovalTimeline, g1ExceptionText } from '@/domain/expense/approval-timeline'
-import { displayName, loadVisible, today } from '@/domain/expense/common'
+import { displayName, ids, loadVisible, today } from '@/domain/expense/common'
+import { isContentEditable } from '@/domain/expense/types'
 import { detail } from '@/domain/expense/dto'
 import { isDecisionSnapshot } from '@/domain/expense/decision'
 import { decisionText } from '@/domain/expense/decision-texts'
@@ -19,6 +20,8 @@ import { ReasonAction } from './kas/ReasonAction'
 import { KAS_STYLE } from './kas/style'
 import { Act, RequesterActions, type RequesterActionsProps } from './RequesterActions'
 import { ReviewDetails } from './ReviewDetails'
+import { RequestSummary } from './request/RequestSummary'
+import { LpjPhotoGrid } from './lpj/LpjPhotoGrid'
 
 type Detail = Awaited<ReturnType<typeof detail>>
 
@@ -57,7 +60,17 @@ export async function WorkflowPanel(props: UIFieldServerProps) {
       </div>
     )
   }
-  let data: { d: Detail; snap: ApprovalSnapshot | null; names: Record<number, string>; hasSignature: boolean; todayDate: string; tz: string; office: boolean } | null = null
+  let data: {
+    d: Detail
+    snap: ApprovalSnapshot | null
+    names: Record<number, string>
+    hasSignature: boolean
+    todayDate: string
+    tz: string
+    office: boolean
+    ptName: string | null
+    attachments: Array<{ id: number; name: string }>
+  } | null = null
   try {
     data = await withSystemTransaction(req.payload, req.user, async (r) => {
       const doc = await loadVisible(r, docId)
@@ -68,10 +81,18 @@ export async function WorkflowPanel(props: UIFieldServerProps) {
       for (const u of new Set(userIds)) names[u] = await displayName(r, u)
       const me = await r.payload.findByID({ collection: 'users', id: req.user!.id as number, depth: 0, overrideAccess: true /* SYSTEM-READ: own profile signature flag */, req: r })
       const company = relId((doc as { company?: unknown }).company)
-      const tz = company !== undefined ? ((await companyById(r, company)).timezone ?? 'Asia/Makassar') : 'Asia/Makassar'
+      const pt = company !== undefined ? await companyById(r, company) : null
+      const tz = pt?.timezone ?? 'Asia/Makassar'
+      // B-2 item 3: "Lampiran" of the read-only summary (file names; the files open through the authorized media endpoint)
+      const attIds = ids((doc as { attachments?: unknown[] | null }).attachments ?? null)
+      const attachments = attIds.length
+        ? (
+            await r.payload.find({ collection: 'media-attachments', where: { id: { in: attIds } }, depth: 0, pagination: false, select: { filename: true }, overrideAccess: true /* SYSTEM-READ: names of a visible request's attachments */, req: r })
+          ).docs.map((m) => ({ id: m.id as number, name: String((m as { filename?: string }).filename ?? `Lampiran #${String(m.id)}`) }))
+        : []
       // KK (cash entries) are readable by Finance/Direktur/Admin of the PT only → link them only for those
       const office = hasRole(r, ['pk-finance', 'pk-owner', 'pk-admin'], company)
-      return { d, snap, names, hasSignature: relId(me.signature) !== undefined, todayDate: await today(r, company), tz, office }
+      return { d, snap, names, hasSignature: relId(me.signature) !== undefined, todayDate: await today(r, company), tz, office, ptName: pt ? [pt.shortCode, pt.name].filter(Boolean).join(' · ') : null, attachments }
     })
   } catch (err) {
     // Not visible (404) → the document view itself already denies; anything else is logged.
@@ -79,7 +100,7 @@ export async function WorkflowPanel(props: UIFieldServerProps) {
     if (status !== 404) req.payload.logger.error({ msg: 'workflow panel failed', id: docId, err: (err as Error).message })
     return null
   }
-  const { d, snap, names, hasSignature, todayDate, tz, office } = data
+  const { d, snap, names, hasSignature, todayDate, tz, office, ptName, attachments } = data
   const steps = timeline(d.type, d.status, { skipAck: snap?.acknowledge === 'none', snapshot: snap, currentLevel: d.currentLevel ?? null })
   const next = nextActor({
     type: d.type,
@@ -278,11 +299,27 @@ export async function WorkflowPanel(props: UIFieldServerProps) {
           </details>
         ) : null}
       </section>
+      {!isContentEditable(d.status) ? (
+        // B-2 item 3: header of a locked request as a read-only summary (the header inputs are hidden then)
+        <RequestSummary d={d} ptName={ptName} attachments={attachments} canRevealBank={own || office} />
+      ) : null}
       {d.status !== 'draft' ? (
         // S3e (US-26/US-59, S-05): lines, receipts and per-line flags. DRMS 10/10 9a: ONE lines table
-        // ("Rincian pengajuan") for everyone incl. the requester; the Payload line cards are hidden after submit.
-        <section style={box} data-pk-section="review">
-          <ReviewDetails d={d} title="Rincian pengajuan" />
+        // for everyone incl. the requester; the Payload line cards are hidden after submit.
+        <section style={box} id="review" data-pk-section="review">
+          <ReviewDetails d={d} title="Baris item" />
+        </section>
+      ) : null}
+      {!own && d.settlement ? (
+        // point 13: the LPJ (incl. its photos) for office readers of the request; the requester sees it in its panel
+        <section style={box} data-pk-section="lpj">
+          <strong>
+            LPJ{' '}
+            {d.settlement.docNo ? <a href={`/admin/collections/settlements/${d.settlement.id}`}>{d.settlement.docNo}</a> : null}
+          </strong>{' '}
+          · {d.settlement.statusLabel} · total nota {rp(d.settlement.receiptsTotal)} · selisih {rp(d.settlement.difference)}
+          {d.settlement.usageNotes ? <div style={{ marginTop: 4 }}>Uraian penggunaan: {d.settlement.usageNotes}</div> : null}
+          <LpjPhotoGrid ids={d.settlement.photos} group={`lpj-photos-${d.id}`} label="Foto LPJ" />
         </section>
       ) : null}
       {decideStep || canReject ? <DecisionBar id={d.id} step={decideStep} label={decision?.label ?? 'Setujui'} confirm={decision?.confirm ?? ''} canReject={canReject} stepLabel={decideLabel} /> : null}
@@ -303,7 +340,7 @@ export async function WorkflowPanel(props: UIFieldServerProps) {
           requestFlags={d.flags.filter((f) => f.receiptId === null).map((f) => ({ id: f.id, label: f.kindLabel, level: f.level, message: f.message, status: f.status, lineNo: f.lineNo }))}
           settlement={
             d.settlement
-              ? { docNo: d.settlement.docNo, statusLabel: d.settlement.statusLabel, usageNotes: d.settlement.usageNotes, financeNotes: d.settlement.financeNotes, receiptsTotal: d.settlement.receiptsTotal, difference: d.settlement.difference, submitCount: d.settlement.submitCount }
+              ? { docNo: d.settlement.docNo, statusLabel: d.settlement.statusLabel, usageNotes: d.settlement.usageNotes, financeNotes: d.settlement.financeNotes, receiptsTotal: d.settlement.receiptsTotal, difference: d.settlement.difference, submitCount: d.settlement.submitCount, photos: d.settlement.photos }
               : null
           }
         />

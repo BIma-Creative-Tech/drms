@@ -20,7 +20,7 @@ import { accountsOf, itemCompany, PtChip, PtScopeNote, ptView } from './pt'
 import { Empty, Forbidden, Shell, TableScroll, allowed, badge, docLink, num, rp, table, td, th } from './shared'
 
 /**
- * "Antrian Transfer" (M05, US-19/US-20): Uang Muka "Disetujui (Antri Transfer)" and Reimburse
+ * "Antrian Transfer" (M05, US-19/US-20): Pengajuan Baru "Disetujui (Antri Transfer)" and Reimburse
  * "Nota Terverifikasi (Antri Transfer)", sorted by needed date, open flags shown. Finance records
  * the transfer (cash account, bank reference, proof); the amount is the approved amount (G3).
  */
@@ -121,7 +121,17 @@ export async function TransferQueue(props: AdminViewServerProps) {
                   {rp(r.approvedAmount)}
                 </td>
                 <td style={td} data-label="Flag terbuka">
-                  {r.flags.warning + r.flags.info > 0 ? <span style={badge(r.flags.warning ? 'warn' : 'muted')}>{r.flags.warning + r.flags.info}</span> : '—'}
+                  {r.flags.warning + r.flags.info > 0 ? <span style={badge(r.flags.warning ? 'warn' : 'muted')}>{r.flags.warning + r.flags.info}</span> : r.flags.receiptMismatch ? null : '—'}
+                  {/* D3 (DRMS 10/10): lines whose "Nominal sesuai nota" ≠ total — awareness before the money moves */}
+                  {r.flags.receiptMismatch ? (
+                    <div style={{ marginTop: 2 }}>
+                      <a href={`${docHref('expense_request', r.id) ?? '#'}#review`} style={{ textDecoration: 'none' }}>
+                        <span style={badge('warn')} data-pk-queue-mismatch={r.id} title="Nominal sesuai nota berbeda dari total baris — lihat rincian pengajuan">
+                          Selisih nota ({r.flags.receiptMismatch})
+                        </span>
+                      </a>
+                    </div>
+                  ) : null}
                 </td>
               </tr>
               {canTransfer && hasRole(req, 'pk-finance', itemCompany(r)) ? (
@@ -156,7 +166,7 @@ export async function TransferQueue(props: AdminViewServerProps) {
         Transfer tercatat — dapat dibatalkan ({donePage.total})
       </h2>
       <p style={{ fontSize: 13, color: 'var(--pk-muted-fg)', margin: '0 0 8px' }}>
-        Void transfer membuat jurnal balik untuk KK-nya (KK asli tetap tampil sebagai Void) dan mengembalikan pengajuan ke antrian: Uang Muka → Disetujui, Reimburse → Nota
+        Void transfer membuat jurnal balik untuk KK-nya (KK asli tetap tampil sebagai Void) dan mengembalikan pengajuan ke antrian: Pengajuan Baru → Disetujui, Reimburse → Nota
         Terverifikasi.
       </p>
       {done.length === 0 ? (
@@ -189,7 +199,7 @@ export async function TransferQueue(props: AdminViewServerProps) {
                   <td style={td}>
                     {docLink(t.requestId, t.requestNo ?? `#${t.requestId}`)}
                     <div>{t.requestTitle}</div>
-                    <div style={{ fontSize: 12 }}>{t.requestType === 'advance' ? 'Uang Muka' : 'Reimburse'}</div>
+                    <div style={{ fontSize: 12 }}>{REQUEST_TYPE_LABELS[t.requestType as keyof typeof REQUEST_TYPE_LABELS] ?? t.requestType}</div>
                   </td>
                   <td style={num}>{rp(t.amount)}</td>
                   {canTransfer ? (

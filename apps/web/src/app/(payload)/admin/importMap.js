@@ -15,10 +15,13 @@ import { ProjectDetailLink as ProjectDetailLink_50199ae12722a75ff9856fb84c25b621
 import { BusinessDateField as BusinessDateField_1172137b1c1eab4696f62271d5ebbe2f } from '@/admin/components/BusinessDateField'
 import { WorkflowPanel as WorkflowPanel_6fcc9de32a179d40aa1576187df45f1e } from '@/admin/components/WorkflowPanel'
 import { PdfLinks as PdfLinks_baf3bc4fa5b0188cc15c74a19f03943f } from '@/admin/components/PdfLinks'
+import { RequestTypeField as RequestTypeField_a356a4ed347478242de628aded3440b3 } from '@/admin/components/EditableOnlyFields'
 import { RequestStatusCell as RequestStatusCell_08836769fece85e42fb05beb6c632414 } from '@/admin/components/RequestStatusCell'
 import { RequestStatusField as RequestStatusField_3f8d5a55b1fcbc79eb9e47f3583cb1ed } from '@/admin/components/RequestStatusField'
+import { RequestTitleField as RequestTitleField_a356a4ed347478242de628aded3440b3 } from '@/admin/components/EditableOnlyFields'
 import { BankAccountPreview as BankAccountPreview_1615d70b0243139e3dffd45ad2617f07 } from '@/admin/components/BankAccountPreview'
 import { RupiahNumberField as RupiahNumberField_d552ada140febbfef2d7dea921fde6df } from '@/admin/components/RupiahNumberField'
+import { LinesTableField as LinesTableField_652f9839b87cfebdbb6f1faba6b58e18 } from '@/admin/components/lines/LinesTableField'
 import { LinesTotalPreview as LinesTotalPreview_981a7b2ac6e59231317266aea0a515ba } from '@/admin/components/LinesTotalPreview'
 import { UserNameCell as UserNameCell_5104a3a36f4740029b1c68f279f156e4 } from '@/admin/components/users/UserNameCell'
 import { UserNameField as UserNameField_578d1739bee7e5d282b9062a1999065a } from '@/admin/components/users/UserNameField'
@@ -27,6 +30,7 @@ import { ResubmitOfField as ResubmitOfField_c0f3cc59bdb1242c0f258beab78a7cba } f
 import { RequestSaveButton as RequestSaveButton_9e183711f74532522cef1d85bd571903 } from '@/admin/components/RequestSaveButton'
 import { RiwayatView as RiwayatView_5fd51ea07b7ad6c5f81167eb6f8e8f96 } from '@/admin/views/RiwayatView'
 import { ReadOnlyJson as ReadOnlyJson_08329374a86bb7164f48836797d5c216 } from '@/components/ReadOnlyJson'
+import { LpjPhotosField as LpjPhotosField_da4aadc1a83b594722baeb7300b4761c } from '@/admin/components/LpjPhotosField'
 import { ModuleNav as ModuleNav_a975bb2dde1c2e03760e9af25ce7c88f } from '@/admin/shell/ModuleNav'
 import { LogoutButton as LogoutButton_db9ac62598c46d0f1db201f6af05442e } from '@/components/LogoutButton'
 import { Icon as Icon_bbc58174e2e54453bd848c29fea2f58a } from '@/theme/graphics'
@@ -99,10 +103,13 @@ export const importMap = {
   "@/admin/components/BusinessDateField#BusinessDateField": BusinessDateField_1172137b1c1eab4696f62271d5ebbe2f,
   "@/admin/components/WorkflowPanel#WorkflowPanel": WorkflowPanel_6fcc9de32a179d40aa1576187df45f1e,
   "@/admin/components/PdfLinks#PdfLinks": PdfLinks_baf3bc4fa5b0188cc15c74a19f03943f,
+  "@/admin/components/EditableOnlyFields#RequestTypeField": RequestTypeField_a356a4ed347478242de628aded3440b3,
   "@/admin/components/RequestStatusCell#RequestStatusCell": RequestStatusCell_08836769fece85e42fb05beb6c632414,
   "@/admin/components/RequestStatusField#RequestStatusField": RequestStatusField_3f8d5a55b1fcbc79eb9e47f3583cb1ed,
+  "@/admin/components/EditableOnlyFields#RequestTitleField": RequestTitleField_a356a4ed347478242de628aded3440b3,
   "@/admin/components/BankAccountPreview#BankAccountPreview": BankAccountPreview_1615d70b0243139e3dffd45ad2617f07,
   "@/admin/components/RupiahNumberField#RupiahNumberField": RupiahNumberField_d552ada140febbfef2d7dea921fde6df,
+  "@/admin/components/lines/LinesTableField#LinesTableField": LinesTableField_652f9839b87cfebdbb6f1faba6b58e18,
   "@/admin/components/LinesTotalPreview#LinesTotalPreview": LinesTotalPreview_981a7b2ac6e59231317266aea0a515ba,
   "@/admin/components/users/UserNameCell#UserNameCell": UserNameCell_5104a3a36f4740029b1c68f279f156e4,
   "@/admin/components/users/UserNameField#UserNameField": UserNameField_578d1739bee7e5d282b9062a1999065a,
@@ -111,6 +118,7 @@ export const importMap = {
   "@/admin/components/RequestSaveButton#RequestSaveButton": RequestSaveButton_9e183711f74532522cef1d85bd571903,
   "@/admin/views/RiwayatView#RiwayatView": RiwayatView_5fd51ea07b7ad6c5f81167eb6f8e8f96,
   "@/components/ReadOnlyJson#ReadOnlyJson": ReadOnlyJson_08329374a86bb7164f48836797d5c216,
+  "@/admin/components/LpjPhotosField#LpjPhotosField": LpjPhotosField_da4aadc1a83b594722baeb7300b4761c,
   "@/admin/shell/ModuleNav#ModuleNav": ModuleNav_a975bb2dde1c2e03760e9af25ce7c88f,
   "@/components/LogoutButton#LogoutButton": LogoutButton_db9ac62598c46d0f1db201f6af05442e,
   "@/theme/graphics#Icon": Icon_bbc58174e2e54453bd848c29fea2f58a,
