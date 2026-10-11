@@ -4189,6 +4189,10 @@ export const openapiDocument = {
                 "name": {
                   "type": "string"
                 },
+                "active": {
+                  "type": "boolean",
+                  "description": "Inactive accounts keep their balance here but cannot take new postings (transfer form pickers hide them)."
+                },
                 "openingBalance": {
                   "type": "integer"
                 },
@@ -4206,6 +4210,7 @@ export const openapiDocument = {
                 "cashAccountId",
                 "companyId",
                 "name",
+                "active",
                 "openingBalance",
                 "totalIn",
                 "totalOut",

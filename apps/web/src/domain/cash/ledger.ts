@@ -420,7 +420,7 @@ export async function balances(req: PayloadRequest, asOf?: string, opts: { compa
   const pts = (opts.companyIds ?? kasCompanies(req)).filter((c) => Number.isSafeInteger(c))
   if (pts.length === 0) return []
   const r = (await tx.execute(sql`
-    SELECT a.id, a.company_id, a.name,
+    SELECT a.id, a.company_id, a.name, a.active,
            (CASE WHEN a.opening_balance_date IS NULL OR a.opening_balance_date <= ${until} THEN coalesce(a.opening_balance, 0) ELSE 0 END)::text AS opening,
            coalesce(sum(CASE WHEN e.direction = 'in' THEN e.amount ELSE 0 END), 0)::text AS total_in,
            coalesce(sum(CASE WHEN e.direction = 'out' THEN e.amount ELSE 0 END), 0)::text AS total_out
@@ -430,13 +430,13 @@ export async function balances(req: PayloadRequest, asOf?: string, opts: { compa
       pts.map((c) => sql`${c}`),
       sql`, `,
     )})
-    GROUP BY a.id, a.name, a.opening_balance, a.opening_balance_date
-    ORDER BY a.id`)) as unknown as { rows: Array<{ id: number; company_id: number; name: string; opening: string; total_in: string; total_out: string }> }
+    GROUP BY a.id, a.name, a.active, a.opening_balance, a.opening_balance_date
+    ORDER BY a.id`)) as unknown as { rows: Array<{ id: number; company_id: number; name: string; active: boolean | null; opening: string; total_in: string; total_out: string }> }
   return r.rows.map((x) => {
     const opening = Number(x.opening)
     const tin = Number(x.total_in)
     const tout = Number(x.total_out)
-    return { cashAccountId: Number(x.id), companyId: Number(x.company_id), name: x.name, openingBalance: opening, totalIn: tin, totalOut: tout, balance: opening + tin - tout }
+    return { cashAccountId: Number(x.id), companyId: Number(x.company_id), name: x.name, active: x.active !== false, openingBalance: opening, totalIn: tin, totalOut: tout, balance: opening + tin - tout }
   })
 }
 

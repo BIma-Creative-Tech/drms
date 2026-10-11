@@ -204,4 +204,17 @@ describe('APK: projects, cost centers, request list filters', () => {
     const none = await api('GET', `${E}?project=${kon}&q=tidak-ada-judul-ini`, w.users.owner)
     expect(none.body.items).toEqual([])
   })
+
+  it('APK transfer form pickers: inactive cash accounts are marked (active: false), inactive cost centers left out', async () => {
+    const tag = `DC${Date.now() % 100000}`
+    const oldCash = await sysCreate('cash-accounts', { name: `${tag} Kas lama`, kind: 'cash', openingBalance: 0, active: false })
+    const oldCc = await sysCreate('cost-centers', { code: `${tag}-OLD`, name: 'Pusat biaya lama', active: false })
+    const bal = await api('GET', '/api/v1/cash-accounts/balances', w.users.finance)
+    expect(bal.status, JSON.stringify(bal.body)).toBe(200)
+    const byId = (id: number) => bal.body.items.find((x: { cashAccountId: number }) => x.cashAccountId === id)
+    expect(byId(oldCash)).toMatchObject({ active: false, balance: 0 })
+    expect(byId(w.cashAccount)).toMatchObject({ active: true })
+    expect((await api('GET', '/api/v1/cost-centers', w.users.finance)).body.docs.map((c: { id: number }) => c.id)).not.toContain(oldCc)
+    expect((await api('GET', '/api/v1/cost-centers?active=all', w.users.finance)).body.docs).toEqual(expect.arrayContaining([expect.objectContaining({ id: oldCc, active: false })]))
+  })
 })

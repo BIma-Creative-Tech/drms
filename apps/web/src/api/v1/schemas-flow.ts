@@ -588,7 +588,7 @@ export const VoidResult = z.object({ original: CashEntry, reversal: CashEntry })
 export const Balances = z
   .object({
     asOf: z.string().nullable(),
-    items: z.array(z.object({ cashAccountId: id, companyId: id, name: z.string(), openingBalance: z.number().int(), totalIn: z.number().int(), totalOut: z.number().int(), balance: z.number().int() })),
+    items: z.array(z.object({ cashAccountId: id, companyId: id, name: z.string(), active: z.boolean().meta({ description: 'Inactive accounts keep their balance here but cannot take new postings (transfer form pickers hide them).' }), openingBalance: z.number().int(), totalIn: z.number().int(), totalOut: z.number().int(), balance: z.number().int() })),
   })
   .meta({ id: 'Balances' })
 
