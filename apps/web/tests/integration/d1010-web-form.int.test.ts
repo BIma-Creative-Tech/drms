@@ -22,6 +22,7 @@ vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: () => {} }) }))
 
 let w: World
 let otherPtFinance: FlowUser
+let otherPt = 0
 const E = '/api/v1/expense-requests'
 const P = '/api/v1/bank-account-preview'
 const key = () => ({ 'Idempotency-Key': randomUUID() })
@@ -29,14 +30,17 @@ const key = () => ({ 'Idempotency-Key': randomUUID() })
 beforeAll(async () => {
   w = await makeWorld('DWF', { rule: 'pm_direktur' })
   // Finance of ANOTHER PT (ADR 0016 §5: no rights in the request's PT)
-  const other = await sysCreate('companies', { name: 'PT Uji D1010', shortCode: `D1${Date.now() % 1000}`, timezone: 'Asia/Makassar' })
-  otherPtFinance = await makeFlowUser(['pk-finance'], 'dwf-fin-other', null, { company: other })
+  otherPt = await sysCreate('companies', { name: 'PT Uji D1010', shortCode: `D1${Date.now() % 1000}`, timezone: 'Asia/Makassar' })
+  otherPtFinance = await makeFlowUser(['pk-finance'], 'dwf-fin-other', null, { company: otherPt })
 })
 
 beforeEach(() => resetRateLimits())
 
 afterAll(async () => {
-  await (await getTestPayload()).destroy()
+  const p = await getTestPayload()
+  // every other test file assumes the single-company default (same as mc-isolation)
+  if (otherPt) await p.update({ collection: 'companies', id: otherPt, data: { active: false, changeReason: 'uji D1010 selesai' }, overrideAccess: true /* SYSTEM-WRITE: restore the single-company default */ })
+  await p.destroy()
 })
 
 async function draft(user: FlowUser = w.users.staffA, over: Record<string, unknown> = {}) {
