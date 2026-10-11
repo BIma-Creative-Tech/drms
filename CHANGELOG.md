@@ -6,6 +6,39 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+**DRMS 10/10 Phase A — web shell, project form, tables** (owner feedback batch 2026-10-11,
+`docs/proyekkas/plans/drms-1010.md` items 1, 5, D8, D9).
+
+**Database migration:** `20261012_100000_d1010_project_pm` (conditional): when NO project lacks a PM →
+`projects.pm_id` NOT NULL and its FK `ON DELETE RESTRICT` (was SET NULL); otherwise nothing changes and the migration
+logs the number of projects without a PM (the deploy never fails; fill them via the dashboard tile "Project tanpa PM",
+a later migration can tighten the column). Rollback: `down()` drops NOT NULL and restores SET NULL.
+
+### Added (DRMS 10/10)
+
+- **Module landing pages (D9)**: a module with two or more visible sub-menus opens `/admin/modul/<id>` — tiles in the
+  launcher style grouped by menu section (permissions, hidden entities, role rules and PT features exactly as the top
+  bar) instead of jumping into the first sub-menu (Master Data no longer opens "Bank"). Custom views show the
+  breadcrumb "module › menu item" back to the landing page.
+- **Search, filters and pagination on the work tables (D8)**: shared toolbar (search with debounce, filters, page size
+  20/50/100, pager; the URL holds the state) on Persetujuan, Antrian Transfer (+ transfer tercatat), Verifikasi LPJ
+  (paged in the DB, was capped at 100), Buku kas (search + page size), Absensi tim hari ini (name search), Laporan
+  harian / servis / aktivitas aftersales, Progress project, Unit & kontrak, Notifikasi, Addendum RAB, Laporan progress.
+  `GET /api/v1/service-reports`, `/aftersales-activities`, `/daily-reports` accept `q` (text search). Every Payload
+  list without its own `listSearchableFields` now searches its stored text fields (code, name, number, …).
+- `GET /api/v1/me` → `displayName` (additive): the label to greet the caller with.
+- Project form: sidebar link "Buka halaman project" (tahapan/progress); the project page links back ("Data project").
+
+### Changed (DRMS 10/10)
+
+- **Greeting by name, never email (WA-14)**: launcher, avatar menu and dashboard use users.name → employee name of the
+  membership in a selected PT → email local part → "Pengguna".
+- **Project Manager mandatory**: "Project Manager wajib diisi" on create and whenever a write sends `pm` (admin form,
+  REST, Local API); updates that do not touch `pm` stay valid for legacy rows. The import (`runImport`) reports a
+  missing or Keycloak-pending project PM as an error.
+- Payload edit forms: the "Edit"/"API" document tabs are gone (API tab disabled via `hideAPIURL`, a lone tab row is
+  hidden) — one primary action "Simpan"; uniform field spacing (20 px, 16 px on phones) for every collection form.
+
 **Approval pengajuan biaya: Staff → PM project → Direktur → Finance transfer** (owner decisions 2026-10-10, ADR 0021,
 requirements v1.3 §9; supersedes the decision part of ADR 0013 for expense requests). **Staging first** — production
 only after the owner approves the UAT (`docs/proyekkas/uat/approval-pm/README.md`).
