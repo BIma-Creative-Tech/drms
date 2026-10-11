@@ -11,6 +11,24 @@ export const RIWAYAT_TAB = {
   },
 }
 
+/**
+ * DRMS 10/10 point 7: project detail tabs — "Proyek" (the form = default view, renamed), "RAP" (plan vs realisation,
+ * D4) and "Pengajuan" (the project's expense requests). Document views of the Projects collection.
+ */
+export const PROJECT_TABS = {
+  default: { tab: { label: 'Proyek' } },
+  rap: {
+    Component: '@/admin/views/ProjectTabs#ProjectRapTab',
+    path: '/rap' as const,
+    tab: { label: 'RAP', href: '/rap', order: 200 },
+  },
+  pengajuan: {
+    Component: '@/admin/views/ProjectTabs#ProjectRequestsTab',
+    path: '/pengajuan' as const,
+    tab: { label: 'Pengajuan', href: '/pengajuan', order: 300 },
+  },
+}
+
 export const F2_ADMIN_VIEWS = {
   approvalInbox: { Component: '@/admin/views/ApprovalInbox#ApprovalInbox', path: '/persetujuan' as const, meta: { title: 'Persetujuan' } },
   transferQueue: { Component: '@/admin/views/TransferQueue#TransferQueue', path: '/antrian-transfer' as const, meta: { title: 'Antrian Transfer' } },

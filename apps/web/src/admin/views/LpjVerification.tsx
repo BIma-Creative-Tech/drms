@@ -115,6 +115,7 @@ export async function LpjVerification(props: AdminViewServerProps) {
               ))}
             </ul>
           ) : null}
+          <div className="pk-lwide">
           <TableScroll label="Nota LPJ">
             <table style={{ ...table, marginTop: 8 }}>
               <thead>
@@ -166,6 +167,45 @@ export async function LpjVerification(props: AdminViewServerProps) {
               </tbody>
             </table>
           </TableScroll>
+          </div>
+          {/* Phase C polish: at ≤ 640 px every receipt is a card like the request line cards (LineCard, APK layout) */}
+          <div className="pk-lcards" data-pk-lpj-cards={d.id}>
+            {d.receipts
+              .filter((r) => r.status !== 'removed')
+              .map((r) => (
+                <article key={r.id} className="pk-lcard" data-pk-lpj-receipt={r.id}>
+                  <div className="pk-lcard__head">
+                    <span className="pk-lcard__title">
+                      {r.vendorName}
+                      {r.lineNo ? <span style={{ fontWeight: 400, color: 'var(--pk-muted-fg)' }}> · baris {r.lineNo}</span> : null}
+                    </span>
+                    <span className="pk-lcard__total">{rp(r.amount)}</span>
+                  </div>
+                  <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start', marginTop: 4 }}>
+                    {r.imageId ? (
+                      <a href={`/api/v1/media/receipts/${r.imageId}/file`} target="_blank" rel="noopener noreferrer" data-pk-lightbox={`lpj-${d.id}`} data-pk-lightbox-title={`Nota ${r.receiptNo ?? r.id} · ${rp(r.amount)}`}>
+                        {/* eslint-disable-next-line @next/next/no-img-element -- authenticated API file, not a static asset */}
+                        <img src={`/api/v1/media/receipts/${r.imageId}/file?variant=thumb`} alt={`Nota ${r.receiptNo ?? r.id}`} style={{ width: 64, height: 64, objectFit: 'cover', borderRadius: 4 }} />
+                      </a>
+                    ) : null}
+                    <div style={{ minWidth: 0 }}>
+                      <div className="pk-lcard__meta">
+                        No. {r.receiptNo ?? '—'} · {r.receiptDate}
+                      </div>
+                      <div className="pk-lcard__chips" style={{ marginTop: 4 }}>
+                        <span style={badge(r.status === 'valid' ? 'ok' : r.status === 'rejected' ? 'bad' : 'muted')}>{r.status === 'valid' ? 'valid' : r.status === 'rejected' ? 'ditolak' : 'menunggu'}</span>
+                      </div>
+                    </div>
+                  </div>
+                  {finance && d.allowedActions.includes('receipt_verify') ? (
+                    <div className="pk-lcard__actions">
+                      {r.status !== 'valid' ? <ActionButton url={`${base(d.id)}/receipts/${r.id}/verify`} label="Valid" /> : null}
+                      {r.status !== 'rejected' ? <ActionButton url={`${base(d.id)}/receipts/${r.id}/reject`} label="Tolak" prompt={{ field: 'reason', message: 'Alasan nota ditolak (wajib):', minLength: 3 }} /> : null}
+                    </div>
+                  ) : null}
+                </article>
+              ))}
+          </div>
           {finance ? (
             <div style={{ marginTop: 8 }}>
               {d.allowedActions.includes('lpj_verify') ? (

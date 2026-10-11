@@ -31,6 +31,9 @@ export function RequestSummary({ d, ptName, attachments, canRevealBank }: { d: D
   add('Judul', d.title, 'title')
   add('PT', ptName, 'company')
   add(d.project ? 'Project' : 'Pusat biaya', scope, 'scope')
+  // D2 (DRMS 10/10): cost center chosen by Finance on the (latest posted) transfer
+  const cc = [...d.transfers].reverse().find((t) => t.status === 'posted' && t.costCenter)?.costCenter
+  if (d.project && cc) add('Pusat biaya', named(cc), 'costCenter')
   add('Tingkat urgensi', d.urgencyLevel && 'name' in d.urgencyLevel ? String(d.urgencyLevel.name ?? '') : '', 'urgency')
   add('Tanggal pengajuan', d.requestDate ? formatDateLong(d.requestDate) : '', 'requestDate')
   add('Tanggal dibutuhkan', d.neededDate ? formatDateLong(d.neededDate) : '', 'neededDate')

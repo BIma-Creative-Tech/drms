@@ -142,6 +142,19 @@ export function ReviewDetails({ d, title = 'Rincian untuk pemeriksa' }: { d: Det
                     {l.description ?? '—'}
                     {l.vehicle && 'plateDisplay' in l.vehicle && l.vehicle.plateDisplay ? <div style={{ fontSize: 11 }}>Kendaraan {String(l.vehicle.plateDisplay)}</div> : null}
                     {l.notes ? <div style={{ fontSize: 11 }}>{l.notes}</div> : null}
+                    {/* D4: RAP item of the line + live "Melebihi RAP" (only for the RAP viewers, DTO) */}
+                    {l.rapItem ? (
+                      <div style={{ fontSize: 11 }} data-pk-line-rap={l.no}>
+                        RAP {[named(l.rapItem, 'code'), named(l.rapItem, 'name')].filter(Boolean).join(' ')}
+                      </div>
+                    ) : null}
+                    {l.rapOverBudget ? (
+                      <div>
+                        <span style={pill('warn')} data-pk-line-over-rap={l.no} title="Realisasi item RAP ini + pengajuan ini melebihi rencana RAP">
+                          Melebihi RAP
+                        </span>
+                      </div>
+                    ) : null}
                   </td>
                   <td style={cell}>{l.category && 'name' in l.category ? String(l.category.name ?? '') : '—'}</td>
                   <td style={numCell}>
@@ -192,6 +205,8 @@ export function ReviewDetails({ d, title = 'Rincian untuk pemeriksa' }: { d: Det
               qtyPrice={qtyPrice(l)}
               category={named(l.category, 'name')}
               vehicle={named(l.vehicle, 'plateDisplay')}
+              rap={l.rapItem ? [named(l.rapItem, 'code'), named(l.rapItem, 'name')].filter(Boolean).join(' ') : null}
+              overBudget={l.rapOverBudget}
               notes={l.notes}
               receiptAmount={l.receiptAmount}
               mismatch={l.receiptMismatch}

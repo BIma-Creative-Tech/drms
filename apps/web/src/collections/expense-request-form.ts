@@ -35,6 +35,17 @@ export function editableInput(name?: string): Condition {
   return (data, sibling, ctx) => linesEditable(data as FormData) && (!name || draftOrSet(name)(data, sibling, ctx))
 }
 
+/**
+ * DRMS 10/10 Phase C polish: the sidebar no longer repeats what the workflow panel header ("Nomor · Jenis", status
+ * chip, grand total) and the read-only "Rincian pengajuan" already show (Nomor, Status, Dibuat oleh, Grand total,
+ * Tanggal pengajuan / diajukan / disetujui) — on every status, so a Draft at phone width no longer ends with these
+ * server fields either. The values stay in the document, the API and the PDF.
+ */
+export const shownInHeader: Condition = () => false
+
+/** "Alasan perubahan" (audit reason of a save): only in "Revisi Nota" — the Draft needs none (Phase C polish). */
+export const revisionOnly: Condition = (data) => (data as FormData)?.status === 'receipt_revision'
+
 /** Field shown only when it has a value (docNo before the first submit is empty). */
 export function whenSet(name: string): Condition {
   return (data) => {
@@ -63,5 +74,6 @@ export const PLACEHOLDERS = {
   uom: 'Pilih satuan…',
   category: 'Pilih kategori…',
   vehicle: 'Pilih kendaraan…',
+  rapItem: 'Pilih item RAP…',
   company: 'Pilih PT…',
 } as const

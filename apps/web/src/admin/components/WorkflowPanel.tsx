@@ -263,6 +263,7 @@ export async function WorkflowPanel(props: UIFieldServerProps) {
             {d.transfers.map((t) => (
               <li key={t.id}>
                 Transfer <a href={`/admin/collections/transfers/${t.id}`}>{t.docNo}</a> · {t.transferDate} · {rp(t.amount)}
+                {t.costCenter ? ` · ${[t.costCenter.code, t.costCenter.name].filter(Boolean).join(' ')}` : ''}
                 {t.status !== 'posted' ? ` · ${t.status === 'void' ? 'Void' : t.status}` : ''}
                 {t.cashEntryId && office ? (
                   <>

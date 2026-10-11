@@ -26,6 +26,11 @@ export type MoneyFormProps = {
    * error is shown without leaving an orphan file behind.
    */
   precheckUrl?: string
+  /**
+   * D2 (DRMS 10/10): transfer only — Finance picks the cost center of the money (required); `defaultId` = the
+   * project's default cost center (pre-selected, may be changed).
+   */
+  costCenter?: { options: Array<{ id: number; label: string }>; defaultId: number | null }
 }
 
 /** B-2 integration: the money form in the admin field look (KAS_STYLE .pk-fld), one row on desktop, stacked on a phone. */
@@ -45,7 +50,7 @@ async function uploadProof(kind: string, file: File): Promise<number> {
   return (data as { id: number }).id
 }
 
-export function MoneyForm({ url, submitLabel, cashAccounts, bankRef, proof, amountText, precheckUrl }: MoneyFormProps) {
+export function MoneyForm({ url, submitLabel, cashAccounts, bankRef, proof, amountText, precheckUrl, costCenter }: MoneyFormProps) {
   const router = useRouter()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -80,6 +85,12 @@ export function MoneyForm({ url, submitLabel, cashAccounts, bankRef, proof, amou
       const at = String(f.get('transferAt') ?? '')
       if (!at) return setError('Isi tanggal & jam transfer sesuai bukti.')
       body.transferAt = at
+      if (costCenter) {
+        // D2: cost center chosen by Finance (mandatory)
+        const cc = Number(f.get('costCenterId') ?? '')
+        if (!cc) return setError('Pilih pusat biaya.')
+        body.costCenterId = cc
+      }
     } else {
       const date = String(f.get('date') ?? '')
       if (date) body.date = date
@@ -151,6 +162,22 @@ export function MoneyForm({ url, submitLabel, cashAccounts, bankRef, proof, amou
             <p className="help">Kosong = hari ini.</p>
           </div>
         )}
+        {isTransfer && costCenter ? (
+          <div className="pk-fld">
+            <label htmlFor={`${uid}-cc`}>
+              Pusat biaya<span className="req" aria-hidden>*</span>
+            </label>
+            <select id={`${uid}-cc`} name="costCenterId" required defaultValue={costCenter.defaultId ?? ''} data-pk-field="transfer-cost-center">
+              <option value="">Pilih pusat biaya…</option>
+              {costCenter.options.map((o) => (
+                <option key={o.id} value={o.id}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+            <p className="help">{costCenter.defaultId ? 'Usulan: pusat biaya default project. Ubah bila perlu.' : 'Project belum punya pusat biaya default — pilih.'}</p>
+          </div>
+        ) : null}
         {bankRef === 'required' ? (
           <div className="pk-fld">
             <label htmlFor={`${uid}-ref`}>

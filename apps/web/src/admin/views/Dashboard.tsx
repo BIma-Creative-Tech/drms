@@ -18,6 +18,7 @@ import { officeScope, teamScope } from '@/domain/reports/scope'
 import { docHref } from '../doc-links'
 
 import { TeamTodayWidget } from './Absensi'
+import { RapMonitorCard } from './dashboard-rap'
 import { SlaTransferCard } from './dashboard-sla'
 import { ChartHover } from './ChartHover'
 import { PageTemplate } from './frame'
@@ -692,6 +693,8 @@ async function Owner({ req, months }: { req: PayloadRequest; months: 6 | 12 }) {
         <CategoryCard id="owner-categories" c={v.categories} span={5} i={7} sub={`Dicairkan ${short(v.categories.from.slice(0, 7))} – sekarang`} />
 
         <SlaTransferCard req={req} span={12} i={8} />
+        {/* DRMS 10/10 point 2–4 (D4): RAP realisation per project, items over plan → the project's RAP tab */}
+        <RapMonitorCard req={req} span={12} i={8} />
         <TrendCard id="owner-trend" rows={v.requestTrend} title="Tren pengajuan" sub="Jumlah pengajuan per bulan (tanggal pengajuan)" span={6} i={8} />
         <Card id="accounts" title="Saldo per akun" sub="Akun nonaktif bersaldo 0 disembunyikan" span={3} i={9}>
           <HBarList

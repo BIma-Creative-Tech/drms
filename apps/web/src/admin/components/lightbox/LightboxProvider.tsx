@@ -57,7 +57,8 @@ export function LightboxProvider({ children }: { children?: React.ReactNode }) {
       const a = (e.target as Element | null)?.closest?.(`a[${LIGHTBOX_ATTR}]`)
       if (!(a instanceof HTMLAnchorElement)) return
       const group = a.getAttribute(LIGHTBOX_ATTR) ?? ''
-      const members = [...document.querySelectorAll<HTMLAnchorElement>(`a[${LIGHTBOX_ATTR}]`)].filter((x) => x.getAttribute(LIGHTBOX_ATTR) === group)
+      // only the rendered copies: the desktop table and the ≤ 640 px cards carry the same thumbnails (one is display:none)
+      const members = [...document.querySelectorAll<HTMLAnchorElement>(`a[${LIGHTBOX_ATTR}]`)].filter((x) => x.getAttribute(LIGHTBOX_ATTR) === group && (x === a || x.getClientRects().length > 0))
       const titleOf = (x: HTMLAnchorElement) => x.dataset.pkLightboxTitle || x.querySelector('img')?.alt || x.getAttribute('aria-label') || x.textContent?.trim() || 'Gambar'
       const g = collect(members.map((x) => ({ href: x.href, title: titleOf(x) })), a.href, members.indexOf(a))
       e.preventDefault()

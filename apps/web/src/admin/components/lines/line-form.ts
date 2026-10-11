@@ -9,7 +9,7 @@ import { groupRupiah, parseRupiah } from '@/lib/rupiah-input'
 export { computeLineTotal }
 
 /** Line fields of the Payload form state (`lines.<i>.<name>`). */
-export const LINE_FIELD_NAMES = ['description', 'qty', 'uom', 'unitPrice', 'total', 'receiptAmount', 'category', 'vehicle', 'notes'] as const
+export const LINE_FIELD_NAMES = ['description', 'qty', 'uom', 'unitPrice', 'total', 'receiptAmount', 'category', 'vehicle', 'notes', 'rapItem'] as const
 export type LineFieldName = (typeof LINE_FIELD_NAMES)[number]
 
 export type LineValues = {
@@ -22,6 +22,8 @@ export type LineValues = {
   category: number | null
   vehicle: number | null
   notes: string
+  /** D4: RAP item of the request's project. */
+  rapItem: number | null
 }
 
 /** Text of the dialog inputs (what the user typed). */
@@ -34,6 +36,7 @@ export type LineDraft = {
   category: string
   vehicle: string
   notes: string
+  rapItem: string
 }
 
 export type LineDraftErrors = Partial<Record<keyof LineDraft, string>>
@@ -64,6 +67,7 @@ export function rowValues(fields: Record<string, { value?: unknown } | undefined
     category: relValue(v('category')),
     vehicle: relValue(v('vehicle')),
     notes: typeof v('notes') === 'string' ? (v('notes') as string) : '',
+    rapItem: relValue(v('rapItem')),
   }
 }
 
@@ -91,6 +95,7 @@ export function draftOf(v: LineValues | null): LineDraft {
     category: v?.category ? String(v.category) : '',
     vehicle: v?.vehicle ? String(v.vehicle) : '',
     notes: v?.notes ?? '',
+    rapItem: v?.rapItem ? String(v.rapItem) : '',
   }
 }
 
@@ -98,7 +103,7 @@ export function draftOf(v: LineValues | null): LineDraft {
  * Dialog → line values + errors. The dialog asks for everything the submit needs (uraian, kategori, qty,
  * satuan, harga satuan; kendaraan when the category requires it), so a saved row is always sendable.
  */
-export function parseDraft(d: LineDraft, opts: { requiresVehicle?: boolean } = {}): { values: LineValues | null; errors: LineDraftErrors } {
+export function parseDraft(d: LineDraft, opts: { requiresVehicle?: boolean; rapRequired?: boolean } = {}): { values: LineValues | null; errors: LineDraftErrors } {
   const errors: LineDraftErrors = {}
   const description = d.description.trim()
   if (!description) errors.description = 'Uraian wajib diisi.'
@@ -118,11 +123,14 @@ export function parseDraft(d: LineDraft, opts: { requiresVehicle?: boolean } = {
   const vehicle = relValue(d.vehicle)
   if (opts.requiresVehicle && vehicle === null) errors.vehicle = 'Kategori ini wajib ditautkan ke kendaraan.'
   if (d.notes.length > 500) errors.notes = 'Keterangan maksimal 500 karakter.'
+  // D4: the project has a RAP → every line names one of its items (the server checks the item's project)
+  const rapItem = relValue(d.rapItem)
+  if (opts.rapRequired && rapItem === null) errors.rapItem = 'Item RAP wajib dipilih.'
   const total = qty !== null && !Number.isNaN(qty) ? computeLineTotal(qty, up.value) : null
   if (!errors.qty && !errors.unitPrice && total === null) errors.unitPrice = 'Total baris terlalu besar.'
   if (Object.keys(errors).length > 0) return { values: null, errors }
   return {
-    values: { description, qty, uom, unitPrice: up.value, total, receiptAmount: ra.value, category, vehicle: opts.requiresVehicle || vehicle !== null ? vehicle : null, notes: d.notes.trim() },
+    values: { description, qty, uom, unitPrice: up.value, total, receiptAmount: ra.value, category, vehicle: opts.requiresVehicle || vehicle !== null ? vehicle : null, notes: d.notes.trim(), rapItem },
     errors,
   }
 }

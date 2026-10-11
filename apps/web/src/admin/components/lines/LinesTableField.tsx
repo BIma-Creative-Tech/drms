@@ -20,8 +20,10 @@ import { draftOf, draftTotal, formatQty, LINE_FIELD_NAMES, parseDraft, relValue,
  * or removed (receipts are linked to them) — only edited. A line saved before D3 (no unit price) shows
  * "Lengkapi Qty & Harga satuan"; the request cannot be sent until it is completed (server rule).
  */
-type Opt = { id: number; label: string; short?: string; company?: number | null; requiresVehicle?: boolean; defaultUom?: number | null }
+type Opt = { id: number; label: string; short?: string; company?: number | null; requiresVehicle?: boolean; defaultUom?: number | null; active?: boolean }
 type Masters = { uoms: Opt[]; categories: Opt[]; vehicles: Opt[]; error: string | null }
+/** D4: RAP items of the request's project (all, inactive ones only to name a stored line); `loaded` per project id. */
+type RapState = { project: number | null; items: Opt[]; loading: boolean; error: string | null }
 
 const LIST = 'depth=0&limit=500&pagination=false&where[active][not_equals]=false'
 
@@ -53,6 +55,32 @@ function useMasters(): Masters {
   return m
 }
 
+/**
+ * D4 (DRMS 10/10): the RAP items of the chosen project for the line picker — GET /api/v1/projects/{id}/rap (project
+ * visibility re-checked by the server; quantities only, no prices for Staff). No project → no list.
+ */
+function useRapItems(project: number | null): RapState {
+  // the last answer, keyed by its project (state is only set from the fetch callbacks)
+  const [st, setSt] = useState<RapState>({ project: null, items: [], loading: false, error: null })
+  useEffect(() => {
+    if (project === null) return
+    let alive = true
+    fetch(`/api/v1/projects/${project}/rap`, { credentials: 'same-origin', headers: { Accept: 'application/json' } })
+      .then(async (r) => {
+        if (!r.ok) throw new Error(String(r.status))
+        const body = (await r.json()) as { items?: Array<{ id: number; code: string; description: string; active: boolean }> }
+        if (!alive) return
+        setSt({ project, loading: false, error: null, items: (body.items ?? []).map((i) => ({ id: i.id, label: `${i.code} — ${i.description}`, short: `${i.code} ${i.description}`, active: i.active !== false })) })
+      })
+      .catch(() => alive && setSt({ project, items: [], loading: false, error: 'Item RAP project gagal dimuat. Muat ulang halaman.' }))
+    return () => {
+      alive = false
+    }
+  }, [project])
+  if (project === null) return { project: null, items: [], loading: false, error: null }
+  return st.project === project ? st : { project, items: [], loading: true, error: null }
+}
+
 const cell: React.CSSProperties = { padding: '8px 6px', borderBottom: '1px solid var(--theme-elevation-100)', verticalAlign: 'top', textAlign: 'left', fontSize: 13 }
 const numCell: React.CSSProperties = { ...cell, textAlign: 'right', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }
 const head: React.CSSProperties = { ...cell, fontSize: 12, fontWeight: 600, color: 'var(--pk-muted-fg)', borderBottom: '1px solid var(--theme-elevation-150)' }
@@ -77,6 +105,7 @@ export const LinesTableField: ArrayFieldClientComponent = (props) => {
     JSON.stringify({
       status: f.status?.value ?? null,
       company: relValue(f.company?.value),
+      project: relValue(f.project?.value),
       lines: Object.fromEntries(
         Object.entries(f)
           .filter(([k]) => k.startsWith(`${path}.`))
@@ -84,11 +113,13 @@ export const LinesTableField: ArrayFieldClientComponent = (props) => {
       ),
     }),
   )
-  const state = useMemo(() => JSON.parse(snapshot) as { status: string | null; company: number | null; lines: Record<string, { value: unknown; error: string | null }> }, [snapshot])
+  const state = useMemo(() => JSON.parse(snapshot) as { status: string | null; company: number | null; project: number | null; lines: Record<string, { value: unknown; error: string | null }> }, [snapshot])
   const values: LineValues[] = rows.map((_, i) => rowValues(state.lines, path, i))
   const rowErrors = (i: number) => LINE_FIELD_NAMES.map((f) => state.lines[`${path}.${i}.${f}`]?.error).filter((e): e is string => Boolean(e))
   const revision = state.status === 'receipt_revision'
   const masters = useMasters()
+  const rap = useRapItems(state.project)
+  const rapActive = rap.items.filter((o) => o.active !== false)
   const categories = masters.categories.filter((c) => state.company === null || c.company === null || c.company === undefined || c.company === state.company)
   const vehicles = masters.vehicles.filter((v) => state.company === null || v.company === null || v.company === undefined || v.company === state.company)
   const nameOf = (list: Opt[], id: number | null, short = false) => {
@@ -167,6 +198,17 @@ export const LinesTableField: ArrayFieldClientComponent = (props) => {
                   <td style={{ ...cell, minWidth: 110 }} data-label="Uraian" data-span="full" data-primary>
                     {v.description || <em style={{ color: 'var(--pk-muted-fg)' }}>(tanpa uraian)</em>}
                     {v.vehicle ? <div style={{ fontSize: 12, fontWeight: 400 }}>Kendaraan {nameOf(vehicles, v.vehicle)}</div> : null}
+                    {v.rapItem ? (
+                      <div style={{ fontSize: 12, fontWeight: 400 }} data-pk-line-rap={i + 1}>
+                        RAP {nameOf(rap.items, v.rapItem, true)}
+                      </div>
+                    ) : rapActive.length > 0 ? (
+                      <div>
+                        <span className="pk-lchip pk-lchip--todo" data-pk-line-rap-missing={i + 1}>
+                          Pilih item RAP
+                        </span>
+                      </div>
+                    ) : null}
                     {v.notes ? <div style={{ fontSize: 12, fontWeight: 400, color: 'var(--pk-muted-fg)' }}>{v.notes}</div> : null}
                     {v.unitPrice === null ? (
                       <div>
@@ -239,10 +281,11 @@ export const LinesTableField: ArrayFieldClientComponent = (props) => {
               qtyPrice={`${v.qty === null ? '1' : formatQty(v.qty)}${v.uom ? ` ${nameOf(masters.uoms, v.uom, true)}` : ''}${v.unitPrice === null ? '' : ` × ${rp(v.unitPrice)}`}`}
               category={v.category === null ? null : nameOf(categories, v.category)}
               vehicle={v.vehicle ? nameOf(vehicles, v.vehicle) : null}
+              rap={v.rapItem ? nameOf(rap.items, v.rapItem, true) : null}
               notes={v.notes || null}
               receiptAmount={v.receiptAmount}
               mismatch={v.receiptAmount !== null && v.total !== null && v.receiptAmount !== v.total}
-              needsCompletion={v.unitPrice === null}
+              needsCompletion={v.unitPrice === null || (rapActive.length > 0 && v.rapItem === null)}
               error={rowErrors(i).join(' ') || null}
               actions={
                 <>
@@ -275,6 +318,7 @@ export const LinesTableField: ArrayFieldClientComponent = (props) => {
           no={editing === 'new' ? rows.length + 1 : editing + 1}
           initial={editing === 'new' ? null : (values[editing] ?? null)}
           otherTotal={grand - (editing === 'new' ? 0 : (values[editing]?.total ?? 0))}
+          rap={{ project: state.project, items: rapActive, all: rap.items, loading: rap.loading, error: rap.error }}
           uoms={masters.uoms}
           categories={categories}
           vehicles={vehicles}
@@ -286,7 +330,9 @@ export const LinesTableField: ArrayFieldClientComponent = (props) => {
   )
 }
 
-function LineDialog(props: { no: number; initial: LineValues | null; otherTotal: number; uoms: Opt[]; categories: Opt[]; vehicles: Opt[]; onSave: (v: LineValues) => void; onClose: () => void }) {
+type RapPick = { project: number | null; items: Opt[]; all: Opt[]; loading: boolean; error: string | null }
+
+function LineDialog(props: { no: number; initial: LineValues | null; otherTotal: number; rap: RapPick; uoms: Opt[]; categories: Opt[]; vehicles: Opt[]; onSave: (v: LineValues) => void; onClose: () => void }) {
   const ref = useRef<HTMLDialogElement>(null)
   const uid = useId()
   const [d, setD] = useState<LineDraft>(() => draftOf(props.initial))
@@ -324,7 +370,7 @@ function LineDialog(props: { no: number; initial: LineValues | null; otherTotal:
   const submit = () => {
     price.touch()
     nota.touch()
-    const r = parseDraft(draft, { requiresVehicle: needsVehicle })
+    const r = parseDraft(draft, { requiresVehicle: needsVehicle, rapRequired: props.rap.items.length > 0 })
     if (!r.values) {
       setErrors(r.errors)
       return
@@ -368,6 +414,41 @@ function LineDialog(props: { no: number; initial: LineValues | null; otherTotal:
             </label>
             <input id={`${uid}-desc`} type="text" value={d.description} onChange={set('description')} maxLength={500} autoFocus placeholder="mis. Semen 50 kg" data-pk-line-field="description" {...aria('description')} />
             {err('description')}
+          </div>
+          <div className="pk-fld full">
+            <label htmlFor={`${uid}-rap`}>
+              Item RAP{props.rap.items.length > 0 ? <span className="req" aria-hidden>*</span> : null}
+            </label>
+            {props.rap.project === null ? (
+              <p className="help" data-pk-rap-hint="no-project" style={{ margin: 0 }}>
+                Pilih <strong>Project</strong> pengajuan dulu — item RAP diambil dari project itu.
+              </p>
+            ) : props.rap.loading ? (
+              <p className="help" style={{ margin: 0 }}>
+                Memuat item RAP…
+              </p>
+            ) : props.rap.error ? (
+              <p className="err" role="alert">
+                {props.rap.error}
+              </p>
+            ) : props.rap.items.length === 0 ? (
+              <p className="help" data-pk-rap-hint="empty" style={{ margin: 0 }}>
+                Project ini belum punya RAP. Untuk project konstruksi, minta PM / Direktur mengisi RAP sebelum pengajuan dikirim.
+              </p>
+            ) : (
+              <>
+                <select id={`${uid}-rap`} value={d.rapItem} onChange={set('rapItem')} data-pk-line-field="rapItem" {...aria('rapItem')}>
+                  <option value="">Pilih item RAP…</option>
+                  {[...props.rap.items, ...props.rap.all.filter((o) => o.active === false && String(o.id) === d.rapItem)].map((o) => (
+                    <option key={o.id} value={o.id}>
+                      {o.label}
+                      {o.active === false ? ' (nonaktif)' : ''}
+                    </option>
+                  ))}
+                </select>
+                {err('rapItem') ?? <p className="help">Biaya baris ini dibebankan ke item RAP ini (realisasi RAP).</p>}
+              </>
+            )}
           </div>
           <div className="pk-fld">
             <label htmlFor={`${uid}-cat`}>
