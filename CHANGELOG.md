@@ -6,6 +6,31 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+**DRMS 10/10 integration + Lead screenshot review** (branches a-apk, a-web-shell, a-web-form, b-server merged). No new
+migration; the latest schema snapshot now matches the final schema (`migrate:create` → no changes).
+
+### Changed (DRMS 10/10 integration)
+
+- **One status wording** (`domain/expense/types.ts`): "Menunggu persetujuan PM" / "Menunggu persetujuan Direktur" (ADR 0021)
+  in the sidebar, list column, filter options, chips, dashboard pipeline, PDF, notifications and the APK fallback labels;
+  requests submitted under an older approval snapshot keep "Menunggu Diketahui (Direktur)" / "Menunggu Approval".
+- **User names everywhere**: read-only user fields and list columns ("Dibuat oleh", "Dicatat oleh", "Pelapor",
+  "Diverifikasi oleh" …, 30 fields) show the person's name (users.name → employee in the document's PT → email local
+  part) instead of "Tanpa Judul - ID: 1".
+- Expense request detail: no "Level approval berjalan", "Sumber" or "Alasan perubahan" after submit; "Simpan" only while
+  the request is editable (new / Draft / Revisi Nota); the decision bar no longer covers the end of the page (1280 / 390 px).
+- Reports: every document number is a link (SLA Transfer: request + TRF; Buku kas: KK + request; Rekap pengajuan,
+  Kelengkapan, Audit log, aftersales PO/penawaran). Exports unchanged.
+- Module landing pages: a specific icon per sub-menu (Iconsax Bulk) instead of one generic glyph.
+- Date fields: a helper text under every native date / date-time input ("Selasa, 20 Oktober 2026") — the browser shows its
+  own locale format in the picker.
+
+### Fixed (DRMS 10/10 integration)
+
+- React hydration error on the request detail (Finance, transferred request): the "Void transfer" reason dialog rendered a
+  `<form>` inside Payload's document form.
+- Schema drift: `expense_requests.status` showed as nullable to the Postgres adapter (admin condition on a required field).
+
 **DRMS 10/10 Phase A — web shell, project form, tables** (owner feedback batch 2026-10-11,
 `docs/proyekkas/plans/drms-1010.md` items 1, 5, D8, D9).
 
