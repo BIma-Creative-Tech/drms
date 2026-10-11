@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -550,9 +549,11 @@ class _AftersalesScreenState extends ConsumerState<AftersalesScreen> {
                       key: const Key('activity-value'),
                       controller: _value,
                       keyboardType: TextInputType.number,
-                      inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.]'))],
+                      // d1010 (8c): money (Rp value of the offer / PO) — the same Rupiah input as the other money fields.
+                      inputFormatters: const [RupiahInputFormatter()],
                       decoration: InputDecoration(
                         labelText: t.fieldValue,
+                        prefixText: 'Rp ',
                         errorText: _errors['value'],
                         helperText: t.fieldValueHelp,
                         helperMaxLines: 3,

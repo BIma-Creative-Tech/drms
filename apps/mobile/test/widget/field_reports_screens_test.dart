@@ -490,7 +490,12 @@ void main() {
       await tester.enterText(find.byKey(const Key('activity-doc')), 'SJ-0441');
       await tester.tap(find.byKey(const Key('activity-po-delivered')));
       await tester.enterText(find.byKey(const Key('activity-receiver')), 'Budi');
-      await tester.enterText(find.byKey(const Key('activity-value')), '3.100.000');
+      // d1010 (8c): Rupiah input — raw digits are grouped while typing, `Rp` prefix
+      await tester.enterText(find.byKey(const Key('activity-value')), '3100000');
+      await tester.pump();
+      final value = tester.widget<TextField>(find.byKey(const Key('activity-value')));
+      expect(value.controller!.text, '3.100.000');
+      expect(value.decoration!.prefixText, 'Rp ');
       await tester.ensureVisible(find.byKey(const Key('activity-add-photo')));
       await tester.tap(find.byKey(const Key('activity-add-photo')));
       await tester.pumpAndSettle();

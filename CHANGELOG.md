@@ -106,7 +106,7 @@ snapshot** and finish Direktur → Finance.
   number; the eye toggle reveals the full number only when the masters delivered it to this user
   (`employee-bank-accounts` read access); a number that arrives masked keeps the toggle hidden.
 - **Field components (8c/8d, WA-01/02/15):** Rupiah inputs group thousands while typing (`1.447.500`) on line unit
-  price / total, receipt amount and addendum amount; the line quantity accepts digits and `,`/`.` only; the
+  price / total, receipt amount, addendum amount and the aftersales "Nilai" (Rp value of the offer / PO); the line quantity accepts digits and `,`/`.` only; the
   field-report date (service, timesheet, aftersales, daily report) is a date picker limited to the allowed dates;
   every select shows a field-specific placeholder ("Pilih project", "Pilih rekening tujuan", …) instead of "Pilih…"
   or an empty field.
