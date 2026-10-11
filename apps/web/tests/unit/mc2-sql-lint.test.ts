@@ -28,9 +28,11 @@ const PER_PT_TABLES = [
   'contract_units', 'service_reports', 'unit_timesheets', 'aftersales_activities', 'clients',
   // P3
   'rap_items', 'rap_templates', 'resource_types', 'daily_reports', 'daily_report_lines',
+  // ADR 0023
+  'sites',
 ]
 /** Company helpers (they build `company_id IN (<bound ids>)` from the caller's scope) — a CALL, not a mention. */
-const HELPER_CALL = /\b(?:requestScopeSql|cashScopeSql|ledgerScopeSql|projectScopeSql|costCenterScopeSql|masterScopeSql|companyScopeSql|locationScopeSql|employeeCompanySql|candidateWhere|ptSql)\(/
+const HELPER_CALL = /\b(?:requestScopeSql|cashScopeSql|ledgerScopeSql|projectScopeSql|costCenterScopeSql|masterScopeSql|companyScopeSql|locationScopeSql|employeeCompanySql|candidateWhere|ptSql|siteScopeSql|homeSiteScopeSql)\(/
 /** An explicit company predicate against a bound parameter. */
 const BOUND_COMPANY = /\bcompany_id\s*(?:=\s*ANY\s*\(|=|IN\b)\s*\(?\s*\$\{/i
 const hasCompanyPredicate = (body: string) => HELPER_CALL.test(body) || BOUND_COMPANY.test(body)
@@ -61,6 +63,9 @@ const ALLOWED: Record<string, string> = {
   'domain/rap/budget.ts#rapUsage': 'requests of project ids the caller already passed the project read check for (loadRap, listProjects / rapMonitoring read scope, one request\'s project); a request shares its project\'s PT (DB trigger)',
   'domain/rap/budget.ts#rapItemRows': 'RAP items of checked project ids, or of ONE request\'s lines (same PT as the request, DB trigger)',
   'domain/reports/kpi.ts#requestCostCenterSql': 'fragment used only inside requestScopeSql-scoped queries (requestFilterSql, spending)',
+  // ADR 0023 site filter: AND-ed fragments of orCompanies (each part is `company_id = <PT> AND …` already)
+  'domain/reports/scope.ts#projectOfSitesSql': 'site narrowing fragment, used only inside the company-bound parts of orCompanies (requestScopeSql, cashScopeSql) — it only narrows',
+  'domain/reports/scope.ts#accountOfSitesSql': 'site narrowing fragment, used only inside the company-bound parts of orCompanies (cashScopeSql, ledgerScopeSql) — it only narrows',
 }
 
 type Fn = { file: string; name: string; body: string }

@@ -30,6 +30,8 @@ const WITH_COMPANY = [
   'contract-units', 'service-reports', 'unit-timesheets', 'aftersales-activities',
   // P3 konstruksi RAP + Laporan Harian
   'rap-items', 'rap-templates', 'resource-types', 'daily-reports', 'daily-report-lines',
+  // ADR 0023 sites (kantor cabang)
+  'sites',
 ].sort()
 
 describe('PT column + PT filter on list views', () => {

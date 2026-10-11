@@ -6,7 +6,7 @@ import { PER_PT_TABLES } from '@/migrations/20260927_234849_mc1_company_columns'
 import { FR1_PER_PT_TABLES } from '@/migrations/20261010_120000_fr1_security'
 
 /** Per-PT tables created after MC1 with company_id NOT NULL from the start (their own migrations). */
-const PER_PT_TABLES_AFTER_MC1 = ['urgency_levels', 'rap_items', 'rap_templates', 'resource_types', 'daily_reports'] // 20261010_090000_p2s_urgency_level, 20261011_100000_p3_rap
+const PER_PT_TABLES_AFTER_MC1 = ['urgency_levels', 'rap_items', 'rap_templates', 'resource_types', 'daily_reports', 'sites'] // 20261010_090000_p2s_urgency_level, 20261011_100000_p3_rap, 20261013_200100_d1010_sites_guard
 import { BY_DOC_NO, BY_ID } from '@/migrations/20261003_090000_mc4_audit_company_backfill'
 
 /**
