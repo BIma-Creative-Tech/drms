@@ -20,6 +20,7 @@ import '../../companies/presentation/unassigned_screen.dart';
 import '../../dashboard/presentation/kpi_home.dart';
 import '../../expense/domain/request_status.dart';
 import '../../field_reports/application/field_providers.dart';
+import '../../finance/application/finance_providers.dart';
 import '../../notifications/application/notifications_providers.dart';
 import '../../notifications/presentation/notifications_screen.dart';
 import '../../progress/application/progress_providers.dart';
@@ -45,6 +46,7 @@ class HomeScreen extends ConsumerWidget {
     final expenseInbox = profile.hasApprovalInbox ? ref.watch(inboxProvider).value?.items.length : null;
     final addendumInbox = profile.hasApprovalInbox ? (ref.watch(addendumInboxProvider).value?.length ?? 0) : 0;
     final inboxCount = expenseInbox == null ? null : expenseInbox + addendumInbox;
+    final transferCount = profile.hasFinanceMenu ? ref.watch(transferQueueProvider).value?.length : null;
     // FR1: reports of this phone not yet on the server (drafts, waiting for signal, conflicts, rejections).
     final openField = profile.hasFieldReports ? (ref.watch(openFieldDraftsProvider).value?.length ?? 0) : 0;
 
@@ -83,6 +85,27 @@ class HomeScreen extends ConsumerWidget {
           icon: PkIcons.requests,
           label: kind == HomeKind.direktur || kind == HomeKind.finance ? t.actionAllRequests : t.actionMyRequests,
           onPressed: () => context.go('/requests'),
+        ),
+      // DRMS 10/10 point 10: "Finance" (Antrian Transfer + Catat transfer, Verifikasi LPJ list) for role Finance.
+      if (profile.hasFinanceMenu)
+        ModuleTile(
+          key: const Key('home-finance'),
+          module: PkModule.keuangan,
+          icon: PkIcons.finance,
+          label: t.financeTitle,
+          subtitle: transferCount == null || transferCount == 0 ? t.homeFinanceSub : t.financeQueueCount(transferCount),
+          badge: transferCount == null || transferCount == 0 ? null : '$transferCount',
+          onPressed: () => context.push('/finance'),
+        ),
+      // DRMS 10/10 point 6: "Proyek" (list, RAP, requests per project) — same roles as the web Proyek module.
+      if (profile.canSeeProjects)
+        ModuleTile(
+          key: const Key('home-projects'),
+          module: PkModule.proyek,
+          icon: PkIcons.project,
+          label: t.projectsTitle,
+          subtitle: t.homeProjectsSub,
+          onPressed: () => context.push('/projects'),
         ),
       if (profile.canReadProgress)
         ModuleTile(
@@ -161,6 +184,7 @@ class HomeScreen extends ConsumerWidget {
           ref.invalidate(financeDashboardProvider);
           ref.invalidate(pmDashboardProvider);
           ref.invalidate(projectProgressProvider);
+          if (profile.hasFinanceMenu) ref.invalidate(transferQueueProvider);
         },
         child: ListView(
           padding: const EdgeInsets.fromLTRB(16, 20, 16, 24),

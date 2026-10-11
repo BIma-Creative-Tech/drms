@@ -12,8 +12,11 @@ import 'receipt_thumb.dart';
 /// Transfer status for the requester (US-08: "Ditransfer" + amount, date, bank reference; void shown
 /// with its reason). Data = `ExpenseRequestDetail.transfers` (Finance posts them on the web).
 class TransferSection extends StatelessWidget {
-  const TransferSection({super.key, required this.detail});
+  const TransferSection({super.key, required this.detail, this.zone});
   final ExpenseDetail detail;
+
+  /// Time zone of the request's PT (transfer time display).
+  final String? zone;
 
   static bool visibleFor(ExpenseDetail d) =>
       d.transfers.isNotEmpty ||
@@ -44,7 +47,11 @@ class TransferSection extends StatelessWidget {
               title: Text('${tr.kindLabel} · ${formatRupiah(tr.amount)}'),
               subtitle: Text(
                 [
-                  '${tr.docNo ?? '-'} · ${formatDateOnly(tr.transferDate)}',
+                  // item 11: date + time of the proof when recorded with a time
+                  '${tr.docNo ?? '-'} · ${tr.transferAt != null ? formatServerDateTime(tr.transferAt, zone: zone) : formatDateOnly(tr.transferDate)}',
+                  // D2: cost center chosen by Finance
+                  if (tr.costCenter != null)
+                    '${t.fieldCostCenter}: ${'${tr.costCenter!.code ?? ''} ${tr.costCenter!.name ?? ''}'.trim()}',
                   if (tr.bankRef != null) '${t.transferRef}: ${tr.bankRef}',
                   if (tr.isVoid && tr.voidReason != null) t.transferVoidReason(tr.voidReason!),
                 ].join('\n'),

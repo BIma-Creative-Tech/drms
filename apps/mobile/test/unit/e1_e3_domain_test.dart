@@ -174,6 +174,9 @@ void main() {
       'rev': 7,
       'clientUuid': null,
       'bankAccountId': 21,
+      // D2/D4: project request, the line charged to a RAP item.
+      'project': {'id': 9, 'code': 'PRJ-09', 'name': 'Jalan Tambang Blok B'},
+      'costCenter': null,
       'lines': [
         {
           'id': '66f0a1b2c3d4e5f601234567', // web-created line: Payload row id, not a UUID
@@ -185,6 +188,7 @@ void main() {
           'total': 600000,
           'category': {'id': 1, 'name': 'BBM'},
           'vehicle': {'id': 5, 'plateNo': 'DA1234XY'},
+          'rapItem': {'id': 501, 'code': 'A.1', 'name': 'BBM alat berat'},
         },
       ],
       'receipts': [
@@ -224,6 +228,7 @@ void main() {
       final line = d.lines.single;
       expect(line.clientUuid, '66f0a1b2c3d4e5f601234567');
       expect(line.vehicleId, 5);
+      expect((d.projectId, line.rapItemId), (9, 501));
       expect(line.receipts.single.isServerReceipt, isTrue);
       expect(line.receipts.single.serverReceiptId, 501);
       expect(d.mediaUuids, isEmpty, reason: 'no local photo to upload');

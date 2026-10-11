@@ -2830,4 +2830,351 @@ class AppLocalizationsId extends AppLocalizations {
 
   @override
   String get pickLocation => 'Pilih lokasi';
+
+  @override
+  String get fieldRapItem => 'Item RAP';
+
+  @override
+  String get rapPickHint => 'Pilih item RAP';
+
+  @override
+  String get rapOverBudgetChip => 'Melebihi RAP';
+
+  @override
+  String rapOverDetail(String total, String remaining) {
+    return 'Total $total melebihi sisa RAP $remaining';
+  }
+
+  @override
+  String rapRemaining(String amount) {
+    return 'Sisa $amount';
+  }
+
+  @override
+  String rapOf(String amount) {
+    return 'dari $amount';
+  }
+
+  @override
+  String get rapPickProjectFirst => 'Pilih project pengajuan dulu.';
+
+  @override
+  String get rapOfflineNoBudget => 'Offline: sisa anggaran RAP tampil lagi saat online.';
+
+  @override
+  String get rapNoItems => 'Project ini belum punya item RAP. Hubungi PM atau Direktur.';
+
+  @override
+  String get noSearchResults => 'Tidak ada yang cocok.';
+
+  @override
+  String get lineNeedsRapItem => 'Baris ini belum terhubung ke item RAP. Pilih item RAP project sebelum diajukan.';
+
+  @override
+  String get lineNeedsRapItemShort => 'Pilih item RAP';
+
+  @override
+  String projectChangeClearsRap(int count) {
+    return 'Item RAP pada $count baris milik project sebelumnya dan akan dikosongkan. Tetap ganti project?';
+  }
+
+  @override
+  String get projectChangeConfirm => 'Ganti project';
+
+  @override
+  String get draftCostCenterLegacy =>
+      'Draft ini dibuat dengan pusat biaya. Pengajuan sekarang wajib memakai project — pilih project; pusat biaya diisi Finance saat transfer.';
+
+  @override
+  String draftLinesNeedRap(int count) {
+    return '$count baris belum memilih item RAP — lengkapi sebelum diajukan.';
+  }
+
+  @override
+  String get searchClear => 'Hapus pencarian';
+
+  @override
+  String get projectsTitle => 'Proyek';
+
+  @override
+  String get projectsSearchHint => 'Cari kode atau nama project…';
+
+  @override
+  String get projectStatusActive => 'Semua aktif';
+
+  @override
+  String get projectsEmpty => 'Belum ada project yang dapat Anda lihat.';
+
+  @override
+  String get projectsNoMatch => 'Tidak ada yang cocok dengan pencarian / filter.';
+
+  @override
+  String get projectPm => 'PM';
+
+  @override
+  String get projectRapUsed => 'Realisasi RAP';
+
+  @override
+  String projectRapOverItems(int count) {
+    return '$count item RAP melebihi rencana';
+  }
+
+  @override
+  String get projectTitle => 'Project';
+
+  @override
+  String get projectTabInfo => 'Proyek';
+
+  @override
+  String get projectTabRap => 'RAP';
+
+  @override
+  String get projectTabRequests => 'Pengajuan';
+
+  @override
+  String get projectCode => 'Kode';
+
+  @override
+  String get projectName => 'Nama project';
+
+  @override
+  String get projectKind => 'Jenis project';
+
+  @override
+  String get projectStatus => 'Status';
+
+  @override
+  String get projectContractValue => 'Nilai kontrak (RAB)';
+
+  @override
+  String get projectNoCostCenter => 'Belum ada — dipilih Finance saat transfer';
+
+  @override
+  String get projectClient => 'Klien';
+
+  @override
+  String get projectPeriod => 'Periode';
+
+  @override
+  String get projectProgress => 'Progress fisik';
+
+  @override
+  String get projectAddress => 'Alamat';
+
+  @override
+  String get projectRapSummary => 'Ringkasan RAP';
+
+  @override
+  String rapItemsCount(int count) {
+    return '$count item RAP';
+  }
+
+  @override
+  String get rapPlanned => 'Rencana';
+
+  @override
+  String get rapRealised => 'Realisasi';
+
+  @override
+  String get rapRemainingLabel => 'Sisa';
+
+  @override
+  String get rapNoPrices => 'Nilai RAP hanya terlihat oleh Direktur, Admin, Finance dan PM project.';
+
+  @override
+  String get rapNoItemsProject => 'Project ini belum punya item RAP.';
+
+  @override
+  String get rapInactive => 'Nonaktif';
+
+  @override
+  String get requestsSearchHint => 'Cari nomor atau judul…';
+
+  @override
+  String get filterStatus => 'Status';
+
+  @override
+  String get filterAllStatuses => 'Semua status';
+
+  @override
+  String get projectNoRequests => 'Belum ada pengajuan untuk project ini.';
+
+  @override
+  String get homeProjectsSub => 'Info, RAP & pengajuan';
+
+  @override
+  String get financeTitle => 'Finance';
+
+  @override
+  String get homeFinanceSub => 'Antrian transfer & LPJ';
+
+  @override
+  String financeQueueCount(int count) {
+    return '$count siap ditransfer';
+  }
+
+  @override
+  String get transferQueueTitle => 'Antrian Transfer';
+
+  @override
+  String get lpjVerifyTitle => 'Verifikasi LPJ';
+
+  @override
+  String get slaAgeUnknown => 'Umur sejak disetujui: —';
+
+  @override
+  String slaAge(String age) {
+    return '$age sejak disetujui';
+  }
+
+  @override
+  String slaOver(String hours) {
+    return 'lewat SLA $hours jam';
+  }
+
+  @override
+  String get transferSearchHint => 'Nomor, judul, pemilik rekening…';
+
+  @override
+  String get filterAllTypes => 'Semua jenis';
+
+  @override
+  String get slaOverFilter => 'Lewat SLA';
+
+  @override
+  String get transferQueueEmpty => 'Antrian transfer kosong.';
+
+  @override
+  String listShownOf(int shown, int total) {
+    return '$shown dari $total pengajuan';
+  }
+
+  @override
+  String get costCenterByFinance => 'dipilih Finance saat transfer';
+
+  @override
+  String get bankVerified => 'Terverifikasi';
+
+  @override
+  String get bankUnverified => 'Belum diverifikasi';
+
+  @override
+  String openFlags(int count) {
+    return 'Flag terbuka: $count';
+  }
+
+  @override
+  String get transferRecord => 'Catat transfer';
+
+  @override
+  String get lpjQueueEmpty => 'Tidak ada LPJ yang menunggu verifikasi.';
+
+  @override
+  String get lpjReadOnlyHint =>
+      'Hanya lihat: buka pengajuan untuk melihat LPJ-nya. Verifikasi LPJ dilakukan di web (Verifikasi LPJ).';
+
+  @override
+  String get transferNotInQueue => 'Pengajuan ini tidak lagi ada di antrian transfer (mungkin sudah ditransfer).';
+
+  @override
+  String get transferAtLabel => 'Tanggal & jam transfer';
+
+  @override
+  String get transferAtHelp => 'Sesuai bukti transfer bank.';
+
+  @override
+  String get transferAtHint => 'Pilih tanggal & jam';
+
+  @override
+  String get transferRecorded => 'Transfer tercatat.';
+
+  @override
+  String transferRecordedNo(String no) {
+    return 'Transfer $no tercatat.';
+  }
+
+  @override
+  String get overrideConfirm => 'Tetap simpan';
+
+  @override
+  String get overrideCancelled => 'Belum disimpan — konfirmasi dibatalkan.';
+
+  @override
+  String transferAmountText(String amount) {
+    return 'Transfer $amount';
+  }
+
+  @override
+  String get transferAmountHelp => 'Nominal disetujui — ditetapkan server, tidak dapat diubah.';
+
+  @override
+  String get bankDestination => 'Rekening tujuan';
+
+  @override
+  String get cashAccountLabel => 'Akun kas';
+
+  @override
+  String get costCenterPickHint => 'Pilih pusat biaya…';
+
+  @override
+  String get costCenterSuggested => 'Usulan: pusat biaya default project. Ubah bila perlu.';
+
+  @override
+  String get costCenterNoDefault => 'Project belum punya pusat biaya default — pilih.';
+
+  @override
+  String get bankRefLabel => 'No. referensi bank';
+
+  @override
+  String get bankRefHint => 'mis. nomor referensi di bukti';
+
+  @override
+  String get transferProofLabel => 'Bukti transfer';
+
+  @override
+  String get proofRetake => 'Foto ulang';
+
+  @override
+  String get transferProofHelp => 'Foto bukti transfer bank (kamera atau galeri); dikompres sebelum diunggah.';
+
+  @override
+  String get processing => 'Memproses…';
+
+  @override
+  String get overdraftTitle => 'Saldo akun kas akan minus';
+
+  @override
+  String overdraftFigures(String balance, String after) {
+    return 'Saldo saat ini $balance; sesudah transaksi ini $after.';
+  }
+
+  @override
+  String get overdraftGeneric => 'Saldo akun akan menjadi minus.';
+
+  @override
+  String get overdraftNote =>
+      'Pastikan dana memang tersedia (mis. setoran belum dicatat). Konfirmasi Anda tercatat di audit log.';
+
+  @override
+  String get unverifiedTitle => 'Rekening tujuan belum diverifikasi';
+
+  @override
+  String unverifiedLine(String account) {
+    return 'Rekening $account berstatus \"Belum diverifikasi\".';
+  }
+
+  @override
+  String get unverifiedDestination => 'tujuan';
+
+  @override
+  String get unverifiedNote =>
+      'Periksa nomor rekening dan nama pemilik dengan karyawan sebelum mentransfer. Konfirmasi Anda tercatat di audit log.';
+
+  @override
+  String get proofCamera => 'Kamera';
+
+  @override
+  String rapOverBy(String amount) {
+    return 'Lebih $amount';
+  }
 }

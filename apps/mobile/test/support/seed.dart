@@ -5,11 +5,12 @@ import 'package:proyekkas/features/expense/domain/request_status.dart';
 /// 3 lines 600.000 + 677.000 + 170.500 = Rp 1.447.500. Names/ids are fictional.
 /// DRMS 10/10 D3: every line has qty × harga satuan = total; line 2's receipt says Rp 676.876
 /// ("Nominal sesuai nota" → "Selisih nota").
+/// DRMS 10/10 D2/D4: project 9 (no cost center from the requester); every line picks a RAP item (501…503).
 DraftRequest seedDraft({RequestType type = RequestType.reimburse, bool withReceipts = true}) => DraftRequest(
   clientUuid: '0192f6d0-aaaa-7bbb-8ccc-000000000100',
   type: type,
   title: 'Pengajuan Reimburse Ops Palangka Banjar keperluan Service Tronton',
-  costCenterId: 7,
+  projectId: 9,
   neededDate: '2026-09-22',
   requesterIds: const [11, 12],
   bankAccountId: 21,
@@ -22,6 +23,7 @@ DraftRequest seedDraft({RequestType type = RequestType.reimburse, bool withRecei
       uomId: 3,
       unitPrice: 600000,
       total: 600000,
+      rapItemId: 501,
       categoryId: 1,
       vehicleId: 5,
       receipts: [
@@ -46,6 +48,7 @@ DraftRequest seedDraft({RequestType type = RequestType.reimburse, bool withRecei
       unitPrice: 338500,
       total: 677000,
       receiptAmount: 676876,
+      rapItemId: 502,
       categoryId: 2,
       receipts: [
         if (withReceipts)
@@ -67,6 +70,7 @@ DraftRequest seedDraft({RequestType type = RequestType.reimburse, bool withRecei
       uomId: 3,
       unitPrice: 170500,
       total: 170500,
+      rapItemId: 503,
       categoryId: 3,
       receipts: [
         if (withReceipts)

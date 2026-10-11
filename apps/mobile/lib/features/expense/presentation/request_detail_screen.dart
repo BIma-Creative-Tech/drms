@@ -17,6 +17,7 @@ import '../application/expense_providers.dart';
 import '../domain/expense_request.dart';
 import '../domain/turn_timeline.dart';
 import 'requester_actions.dart';
+import 'widgets/rap_item_picker.dart';
 import 'widgets/receipt_mismatch_chip.dart';
 import 'widgets/receipt_thumb.dart';
 import 'widgets/transfer_lpj.dart';
@@ -89,7 +90,7 @@ class _DetailBody extends ConsumerWidget {
       padding: const EdgeInsets.only(top: 16, bottom: 4),
       child: Text(title, style: theme.textTheme.titleMedium),
     );
-    final scope = d.project ?? d.costCenter;
+    String refText(RefItem r) => '${r.code ?? ''} ${r.name ?? ''}'.trim();
     final over = (d.budget.pctAfter ?? 0) > 85;
     // d1010 (WA-08): PT inline as "shortCode — name" (the membership's name; the code alone for a PT the
     // user is no longer a member of).
@@ -119,6 +120,8 @@ class _DetailBody extends ConsumerWidget {
             // D3: at least one line's "Nominal sesuai nota" differs from its total (details on the line).
             if (d.lines.any((l) => lineReceiptMismatch(d, l)))
               const ReceiptMismatchChip(key: Key('detail-receipt-mismatch')),
+            // D4: at least one line is above the remaining budget of its RAP item.
+            if (d.lines.any((l) => lineRapOverBudget(d, l))) const RapOverBudgetChip(key: Key('detail-rap-over')),
           ],
         ),
         Card(
@@ -150,7 +153,9 @@ class _DetailBody extends ConsumerWidget {
         if (ptText != null) row(t.draftCompany, ptText, key: const Key('detail-company')),
         row(t.grandTotal, formatRupiah(d.grandTotal)),
         if (d.approvedAmount != null) row(t.approvedAmount, formatRupiah(d.approvedAmount!)),
-        row(t.scopeLabel, scope == null ? '-' : '${scope.code ?? ''} ${scope.name ?? ''}'.trim()),
+        // D2: project of the request; the cost center is Finance's (set at transfer) — shown once known.
+        row(t.fieldProject, d.project == null ? '-' : refText(d.project!), key: const Key('detail-project')),
+        if (d.costCenter != null) row(t.fieldCostCenter, refText(d.costCenter!), key: const Key('detail-cost-center')),
         if (d.urgencyLevel != null) row(t.fieldUrgency, d.urgencyLevel!.name ?? '-'),
         if (d.requestDate != null) row(t.requestDate, formatDateOnly(d.requestDate)),
         row(t.neededDate, formatDateOnly(d.neededDate)),
@@ -182,7 +187,7 @@ class _DetailBody extends ConsumerWidget {
           // Masked by the server unless this user may see the full number (dto.ts maskAccountNo).
           if (d.bankAccountNo != null) row(t.bankNumberLabel, d.bankAccountNo!, key: const Key('detail-bank-no')),
         ],
-        if (TransferSection.visibleFor(d)) TransferSection(detail: d),
+        if (TransferSection.visibleFor(d)) TransferSection(detail: d, zone: zone),
         if (d.settlement != null) LpjSection(settlement: d.settlement!),
         RequestLifecycleActions(detail: d),
         RequesterActionsSection(detail: d),
@@ -213,6 +218,12 @@ class _DetailBody extends ConsumerWidget {
       ],
     );
   }
+}
+
+/// D4: "A.1 — Solar alat berat" (`#501` when the server sent the id only).
+String rapRefLabel(RefItem r) {
+  final s = [?r.code, ?r.name].where((e) => e.isNotEmpty).join(' — ');
+  return s.isEmpty ? '#${r.id}' : s;
 }
 
 /// Viewer caption of a receipt photo: "Baris 2 · Toko Maju · No. 123 · Rp 600.000".
@@ -260,6 +271,20 @@ class _LineCard extends ConsumerWidget {
               ],
             ),
             Text(meta, key: Key('line-${line.no}-meta')),
+            // D4: RAP item the line is charged to.
+            if (line.rapItem != null)
+              Text('${t.fieldRapItem}: ${rapRefLabel(line.rapItem!)}', key: Key('line-${line.no}-rap'))
+            else if (lineNeedsRapItem(detail, line))
+              Text(
+                t.lineNeedsRapItemShort,
+                key: Key('line-${line.no}-needs-rap'),
+                style: TextStyle(color: context.pk.warnText, fontWeight: FontWeight.w600),
+              ),
+            if (lineRapOverBudget(detail, line))
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: RapOverBudgetChip(key: Key('line-${line.no}-rap-over')),
+              ),
             // D3: "Nominal sesuai nota" beside the computed total; "Selisih nota" when they differ.
             if (line.receiptAmount != null)
               Text(
@@ -325,6 +350,23 @@ class _DecisionBar extends ConsumerWidget {
     final canAck = a.contains('acknowledge');
     final canApprove = a.contains('approve');
     final canReject = a.contains('reject');
+    // DRMS 10/10 point 10: Finance records the transfer from the APK too (same form as the Finance menu).
+    if (a.contains('transfer') && !canAck && !canApprove && !canReject) {
+      return SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+          child: FilledButton.icon(
+            key: const Key('action-transfer'),
+            onPressed: () async {
+              await context.push<bool>('/finance/transfer/${detail.id}');
+              ref.invalidate(requestDetailProvider(detail.id));
+            },
+            icon: const Icon(Icons.account_balance),
+            label: Text(t.transferRecord),
+          ),
+        ),
+      );
+    }
     if (!canAck && !canApprove && !canReject) return const SizedBox.shrink();
 
     Future<void> open(Decision decision) async {

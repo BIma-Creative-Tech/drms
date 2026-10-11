@@ -31,7 +31,7 @@ void main() {
       );
     });
     addTearDown(db.close);
-    expect(db.schemaVersion, 7);
+    expect(db.schemaVersion, 8);
     final repo = DraftRepository(db);
     final before = await repo.load(sub, 'd-7');
     expect(before!.lines, hasLength(2));
@@ -42,12 +42,15 @@ void main() {
     expect(validateForSubmit(before).where((i) => i.lineNo == 2).map((i) => i.field).toSet(), {
       'qty',
       'unitPrice',
+      'rapItemId', // D4 (schema v8)
     }, reason: 'old draft opens, but must be completed (prompt to fill harga satuan)');
 
+    // D2/D4 (v8): a project instead of the cost center, a RAP item per line.
     final fixed = before.copyWith(
+      projectId: 9,
       lines: [
-        solar.copyWith(receiptAmount: 299500),
-        makan.copyWith(qty: 1, uomId: 3, unitPrice: 170500, total: 170500),
+        solar.copyWith(receiptAmount: 299500, rapItemId: 501),
+        makan.copyWith(qty: 1, uomId: 3, unitPrice: 170500, total: 170500, rapItemId: 503),
       ],
     );
     await repo.save(sub, fixed);

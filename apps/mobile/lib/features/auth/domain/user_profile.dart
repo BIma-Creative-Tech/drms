@@ -291,6 +291,13 @@ abstract class UserProfile with _$UserProfile {
   /// E4: progress reports are readable by PM (team), Direktur and Finance (all); Staff/Admin none.
   bool get canReadProgress => has(Role.pm) || has(Role.owner) || has(Role.finance);
 
+  /// DRMS 10/10 point 6: "Proyek" menu — PM (team projects), Direktur, Finance, Admin (all projects of their PTs);
+  /// the same roles as the web Proyek module. The server scopes the list.
+  bool get canSeeProjects => has(Role.pm) || has(Role.owner) || has(Role.finance) || has(Role.admin);
+
+  /// DRMS 10/10 point 10: "Finance" menu (transfer queue, Catat transfer, LPJ list) — role Finance.
+  bool get hasFinanceMenu => has(Role.finance);
+
   /// E4: create a progress report (server capability `progressReportCreate`).
   bool get canCreateProgress => capabilities.progressReportCreate;
 

@@ -56,6 +56,10 @@ class LocalLines extends Table {
 
   /// Schema v7 (DRMS 10/10 D3): "Nominal sesuai nota", nullable. `total` is qty × unit price from v7 on.
   IntColumn get receiptAmount => integer().nullable()();
+
+  /// Schema v8 (DRMS 10/10 D4): RAP item of the line, nullable. Lines written before v8 keep NULL and must pick
+  /// one before the draft can be submitted.
+  IntColumn get rapItemId => integer().nullable()();
   IntColumn get categoryId => integer().nullable()();
   IntColumn get vehicleId => integer().nullable()();
   TextColumn get notes => text().nullable()();
@@ -401,7 +405,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
 
   @override
-  int get schemaVersion => 7;
+  int get schemaVersion => 8;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -438,6 +442,9 @@ class AppDatabase extends _$AppDatabase {
       // v7 (DRMS 10/10 D3): "Nominal sesuai nota" per line, nullable. Existing lines keep their total; a line
       // without a unit price is completed in the line editor before it can be submitted.
       if (from < 7) await m.addColumn(localLines, localLines.receiptAmount);
+      // v8 (DRMS 10/10 D4): RAP item per line, nullable. Existing lines keep NULL — the editor asks for the item
+      // ("Pilih item RAP") and submit stays blocked until every line has one.
+      if (from < 8) await m.addColumn(localLines, localLines.rapItemId);
     },
     beforeOpen: (details) async {
       await customStatement('PRAGMA foreign_keys = ON');

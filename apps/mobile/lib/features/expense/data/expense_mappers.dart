@@ -183,6 +183,10 @@ ExpenseDetail detailFromJson(Json j) {
             vehicleId: _intN(_map(m['vehicle'])?['id']),
             receiptAmount: _intN(m['receiptAmount']),
             receiptMismatch: m['receiptMismatch'] is bool ? m['receiptMismatch'] as bool : null,
+            // D4: `rapItem {id, code, name}`; a bare `rapItemId` from a server without the read model.
+            rapItem:
+                refFromJson(m['rapItem']) ?? (_intN(m['rapItemId']) == null ? null : RefItem(id: _int(m['rapItemId']))),
+            rapOverBudget: m['rapOverBudget'] is bool ? m['rapOverBudget'] as bool : null,
           ),
     ],
     receipts: [
@@ -270,6 +274,8 @@ ExpenseDetail detailFromJson(Json j) {
             kind: '${m['kind'] ?? ''}',
             amount: _int(m['amount']),
             transferDate: _strN(m['transferDate']),
+            transferAt: _strN(m['transferAt']),
+            costCenter: refFromJson(m['costCenter']),
             bankRef: _strN(m['bankRef']),
             status: '${m['status'] ?? 'posted'}',
             voidReason: _strN(m['voidReason']),
@@ -370,8 +376,8 @@ InboxItem inboxItemFromJson(Json j) {
 Json draftToCreateBody(DraftRequest d) => {
   'type': d.type.code,
   'title': d.title.trim(),
+  // D2: project only — the requester no longer sends a cost center (Finance sets it at transfer).
   'projectId': d.projectId,
-  'costCenterId': d.costCenterId,
   'neededDate': d.neededDate,
   'urgencyLevelId': d.urgencyLevelId,
   'notes': (d.notes == null || d.notes!.trim().isEmpty) ? null : d.notes!.trim(),
@@ -390,6 +396,7 @@ Json lineToInput(DraftLine l) => {
   'unitPrice': l.unitPrice,
   'total': l.computedTotal ?? l.total,
   'receiptAmount': l.receiptAmount,
+  'rapItemId': l.rapItemId,
   'notes': (l.notes == null || l.notes!.trim().isEmpty) ? null : l.notes!.trim(),
   'categoryId': l.categoryId,
   'vehicleId': l.vehicleId,
@@ -408,7 +415,6 @@ Json draftToSyncPayload(DraftRequest d, {bool includeDraftId = false}) => {
   'kind': d.type.code,
   'title': d.title.trim(),
   'project_id': d.projectId,
-  'cost_center_id': d.costCenterId,
   'needed_date': d.neededDate,
   'urgency_level_id': d.urgencyLevelId,
   'notes': (d.notes == null || d.notes!.trim().isEmpty) ? null : d.notes!.trim(),
@@ -426,6 +432,7 @@ Json draftToSyncPayload(DraftRequest d, {bool includeDraftId = false}) => {
         'unit_price': l.unitPrice,
         'total': l.computedTotal ?? l.total,
         'receipt_amount': l.receiptAmount,
+        'rap_item_id': l.rapItemId,
         'notes': (l.notes == null || l.notes!.trim().isEmpty) ? null : l.notes!.trim(),
         'category_id': l.categoryId,
         'vehicle_id': l.vehicleId,
@@ -484,6 +491,7 @@ DraftRequest draftFromServer(
         unitPrice: l.unitPrice,
         total: l.total,
         receiptAmount: l.receiptAmount,
+        rapItemId: l.rapItem?.id,
         categoryId: l.category?.id,
         vehicleId: l.vehicleId,
         notes: l.notes,

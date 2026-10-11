@@ -12,6 +12,7 @@ import '../../../shared/widgets/async_body.dart';
 import '../../../shared/widgets/online_only_button.dart';
 import '../../auth/application/auth_controller.dart';
 import '../../masters/domain/master_item.dart';
+import '../../projects/application/projects_providers.dart';
 import '../../sync/application/sync_coordinator.dart';
 import '../application/draft_service.dart';
 import '../application/expense_providers.dart';
@@ -21,6 +22,7 @@ import '../domain/request_status.dart';
 import 'line_editor_screen.dart';
 import 'requests_screen.dart' show syncStateLabel;
 import 'widgets/master_picker.dart';
+import 'widgets/rap_item_picker.dart';
 import 'widgets/receipt_mismatch_chip.dart';
 import '../../companies/presentation/company_chip.dart';
 import '../../companies/presentation/company_switcher.dart';
@@ -133,7 +135,6 @@ class _DraftEditorScreenState extends ConsumerState<DraftEditorScreen> {
   late DraftRequest _d = widget.initial;
   late final _title = TextEditingController(text: widget.initial.title);
   late final _notes = TextEditingController(text: widget.initial.notes ?? '');
-  late bool _useProject = widget.initial.costCenterId == null;
   bool _busy = false;
   List<DraftIssue> _issues = const [];
 
@@ -144,17 +145,42 @@ class _DraftEditorScreenState extends ConsumerState<DraftEditorScreen> {
     super.dispose();
   }
 
+  /// D2: the requester never chooses a cost center (Finance does at transfer); a pre-D2 draft drops it here.
   DraftRequest _collect() => _d.copyWith(
     title: _title.text,
     notes: _notes.text.trim().isEmpty ? null : _notes.text.trim(),
-    projectId: _useProject ? _d.projectId : null,
-    costCenterId: _useProject ? null : _d.costCenterId,
+    costCenterId: null,
   );
+
+  /// D4: RAP items belong to the project — a new project clears the RAP item of every line (after a confirm).
+  Future<void> _setProject(int? id) async {
+    if (id == _d.projectId) return;
+    final linked = _d.lines.where((l) => l.rapItemId != null).length;
+    if (linked > 0) {
+      final t = AppLocalizations.of(context);
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (c) => AlertDialog(
+          content: Text(t.projectChangeClearsRap(linked)),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(c, false), child: Text(t.cancel)),
+            FilledButton(
+              key: const Key('project-change-confirm'),
+              onPressed: () => Navigator.pop(c, true),
+              child: Text(t.projectChangeConfirm),
+            ),
+          ],
+        ),
+      );
+      if (ok != true || !mounted) return;
+    }
+    setState(() => _d = _d.copyWith(projectId: id, lines: [for (final l in _d.lines) l.copyWith(rapItemId: null)]));
+  }
 
   Future<void> _editLine(DraftLine line, {bool isNew = false}) async {
     final updated = await Navigator.of(context).push<DraftLine>(
       MaterialPageRoute(
-        builder: (_) => LineEditorScreen(line: line, masters: widget.masters),
+        builder: (_) => LineEditorScreen(line: line, masters: widget.masters, projectId: _d.projectId),
       ),
     );
     if (updated == null) return;
@@ -282,6 +308,9 @@ class _DraftEditorScreenState extends ConsumerState<DraftEditorScreen> {
         .toList();
     String? issueFor(String field) => _issues.where((i) => i.field == field && i.lineNo == null).firstOrNull?.message;
     final editableType = _d.serverId == null;
+    // D4: RAP items of the chosen project (labels + live remaining budget on the line cards).
+    final rap = _d.projectId == null ? null : ref.watch(projectRapProvider(_d.projectId!)).value;
+    final linesWithoutRap = _d.lines.where((l) => l.needsRapItem).length;
 
     return Scaffold(
       appBar: AppBar(
@@ -336,30 +365,21 @@ class _DraftEditorScreenState extends ConsumerState<DraftEditorScreen> {
               maxLength: 200,
               decoration: InputDecoration(labelText: t.fieldTitle, errorText: issueFor('title')),
             ),
-            SegmentedButton<bool>(
-              segments: [
-                ButtonSegment(value: true, label: Text(t.scopeProject)),
-                ButtonSegment(value: false, label: Text(t.scopeCostCenter)),
-              ],
-              selected: {_useProject},
-              onSelectionChanged: (s) => setState(() => _useProject = s.first),
+            // D2 (DRMS 10/10): project required, no cost center choice (Finance sets it at transfer).
+            MasterPickerField(
+              key: const Key('draft-project'),
+              label: t.fieldProject,
+              items: m[MasterTypes.projects] ?? const [],
+              value: _d.projectId,
+              allowNone: false,
+              errorText: issueFor('projectId'),
+              onChanged: _setProject,
             ),
-            const SizedBox(height: 8),
-            if (_useProject)
-              MasterPickerField(
-                label: t.fieldProject,
-                items: m[MasterTypes.projects] ?? const [],
-                value: _d.projectId,
-                errorText: issueFor('scope'),
-                onChanged: (v) => setState(() => _d = _d.copyWith(projectId: v)),
-              )
-            else
-              MasterPickerField(
-                label: t.fieldCostCenter,
-                items: m[MasterTypes.costCenters] ?? const [],
-                value: _d.costCenterId,
-                errorText: issueFor('scope'),
-                onChanged: (v) => setState(() => _d = _d.copyWith(costCenterId: v)),
+            if (_d.projectId == null && widget.initial.costCenterId != null)
+              Padding(
+                key: const Key('draft-cost-center-legacy'),
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(t.draftCostCenterLegacy, style: TextStyle(color: context.pk.warnText)),
               ),
             const SizedBox(height: 12),
             ListTile(
@@ -470,6 +490,15 @@ class _DraftEditorScreenState extends ConsumerState<DraftEditorScreen> {
                 ),
               ],
             ),
+            if (linesWithoutRap > 0)
+              Card(
+                key: const Key('draft-lines-need-rap'),
+                color: Theme.of(context).colorScheme.tertiaryContainer,
+                child: ListTile(
+                  leading: const Icon(Icons.info_outline),
+                  title: Text(t.draftLinesNeedRap(linesWithoutRap)),
+                ),
+              ),
             if (issueFor('lines') != null)
               Text(issueFor('lines')!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
             for (final l in _d.lines)
@@ -488,11 +517,28 @@ class _DraftEditorScreenState extends ConsumerState<DraftEditorScreen> {
                           '${l.receipts.length} nota',
                         ].join(' · '),
                       ),
+                      // D4: RAP item of the line ("Pilih item RAP" until chosen).
+                      if (l.rapItemId != null)
+                        Text(
+                          '${t.fieldRapItem}: ${rap?.byId(l.rapItemId)?.label ?? '#${l.rapItemId}'}',
+                          key: Key('line-${l.no}-rap'),
+                        )
+                      else
+                        Text(
+                          t.lineNeedsRapItemShort,
+                          key: Key('line-${l.no}-needs-rap'),
+                          style: TextStyle(color: context.pk.warnText, fontWeight: FontWeight.w600),
+                        ),
                       if (l.needsUnitPrice && l.total != null)
                         Text(
                           t.lineNeedsUnitPriceShort,
                           key: Key('line-${l.no}-needs-unit-price'),
                           style: TextStyle(color: context.pk.warnText, fontWeight: FontWeight.w600),
+                        ),
+                      if (rap?.byId(l.rapItemId)?.exceeds(l.computedTotal) ?? false)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: RapOverBudgetChip(key: Key('line-${l.no}-rap-over')),
                         ),
                       for (final i in _issues.where((i) => i.lineNo == l.no))
                         Text(i.message, style: TextStyle(color: Theme.of(context).colorScheme.error)),

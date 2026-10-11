@@ -49,7 +49,10 @@ final schemaV6 = [
   r'''CREATE TABLE "field_resource_types" ("user_sub" TEXT NOT NULL, "id" INTEGER NOT NULL, "company_id" INTEGER NOT NULL, "kind" TEXT NOT NULL, "code" TEXT NOT NULL DEFAULT '', "name" TEXT NOT NULL DEFAULT '', PRIMARY KEY ("user_sub", "id"))''',
 ];
 
-/// An in-memory database that starts as schema [version] (1 … 6) with rows from [seed], then is opened by
+/// v7 (DRMS 10/10 D3, mobile-v0.5.x): v6 + "Nominal sesuai nota" per line, as drift's `addColumn` added it.
+final schemaV7 = [...schemaV6, 'ALTER TABLE "local_lines" ADD COLUMN "receipt_amount" INTEGER NULL'];
+
+/// An in-memory database that starts as schema [version] (1 … 7) with rows from [seed], then is opened by
 /// the current `AppDatabase` (runs the drift migration to the current schema version).
 AppDatabase oldPhoneDb(int version, void Function(CommonDatabase raw) seed) => AppDatabase(
   NativeDatabase.memory(
@@ -61,7 +64,8 @@ AppDatabase oldPhoneDb(int version, void Function(CommonDatabase raw) seed) => A
           3 => schemaV3,
           4 => schemaV4,
           5 => schemaV5,
-          _ => schemaV6,
+          6 => schemaV6,
+          _ => schemaV7,
         }) {
           raw.execute(s);
         }
