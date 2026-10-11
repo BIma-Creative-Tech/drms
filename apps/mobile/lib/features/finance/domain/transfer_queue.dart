@@ -140,11 +140,15 @@ TransferQueueItem transferQueueItemFromJson(Map<String, dynamic> j) {
 
 /// Cash account of a PT (`GET /cash-accounts/balances` items).
 class CashAccountOption {
-  const CashAccountOption({required this.id, required this.name, this.companyId, this.balance});
+  const CashAccountOption({required this.id, required this.name, this.companyId, this.balance, this.active = true});
   final int id;
   final String name;
   final int? companyId;
   final int? balance;
+
+  /// Inactive accounts keep their balance in the list but take no new transfer (server 400 `cashAccountId`);
+  /// a server without the field lists active ones only as far as the APK knows → true.
+  final bool active;
 }
 
 CashAccountOption cashAccountFromJson(Map<String, dynamic> j) => CashAccountOption(
@@ -152,6 +156,7 @@ CashAccountOption cashAccountFromJson(Map<String, dynamic> j) => CashAccountOpti
   name: '${j['name'] ?? ''}',
   companyId: _intN(j['companyId']),
   balance: _intN(j['balance']),
+  active: j['active'] != false,
 );
 
 /// `GET /cost-centers` `docs[]`.

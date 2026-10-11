@@ -1,0 +1,295 @@
+{
+ "request": {
+  "id": 9,
+  "docNo": "PB/DRMS/2610/0008",
+  "type": "advance",
+  "typeLabel": "Pengajuan Baru",
+  "status": "transferred",
+  "statusLabel": "Ditransfer",
+  "title": "Bekisting kolom (fiktif)",
+  "projectId": 1,
+  "costCenterId": null,
+  "grandTotal": 1200000,
+  "approvedAmount": 1200000,
+  "requestDate": "2026-10-11",
+  "neededDate": "2026-10-20",
+  "createdById": 1,
+  "updatedAt": "2026-10-11T13:04:31.067Z",
+  "companyId": 1,
+  "uuid": "fecd77db-0ad8-4c71-9737-77c698452a16",
+  "project": {
+   "id": 1,
+   "code": "UJI-PRJ",
+   "name": "Proyek Uji"
+  },
+  "costCenter": null,
+  "urgencyLevel": null,
+  "notes": null,
+  "requesters": [
+   {
+    "id": 6,
+    "code": "UJI-STAFF",
+    "name": "Sari Staf"
+   }
+  ],
+  "createdBy": {
+   "id": 1,
+   "name": "Sari Staf"
+  },
+  "bankAccountId": 2,
+  "bank": {
+   "bankName": "Bank Mandiri",
+   "accountNo": "9990001112223",
+   "accountHolder": "Sari Staf"
+  },
+  "lines": [
+   {
+    "id": "6acb895d4f3a0502a5fce2bf",
+    "no": 1,
+    "description": "Multipleks 12 mm",
+    "qty": 10,
+    "uom": {
+     "id": 32,
+     "code": "BLN",
+     "name": "bulan"
+    },
+    "unitPrice": 120000,
+    "unitPriceDisplay": 120000,
+    "total": 1200000,
+    "receiptAmount": null,
+    "receiptMismatch": false,
+    "notes": null,
+    "category": {
+     "id": 1,
+     "code": "MAT",
+     "name": "Material"
+    },
+    "vehicle": null,
+    "rapItem": {
+     "id": 1,
+     "code": "A.1",
+     "name": "Pekerjaan beton K-250"
+    },
+    "rapOverBudget": false
+   }
+  ],
+  "transferredTotal": 1200000,
+  "approvalCycle": 1,
+  "currentLevel": 1,
+  "approvalRule": {
+   "id": 2,
+   "name": "Default — PM project lalu Direktur (semua nominal)",
+   "acknowledge": "required",
+   "acknowledgerUserId": 2,
+   "acknowledgeDelegatedTo": null,
+   "acknowledgeDelegationReason": null,
+   "acknowledgeBy": "scope_manager",
+   "acknowledgeRole": null,
+   "decisionRoles": [
+    "pk-owner",
+    "pk-finance"
+   ],
+   "skipped": [],
+   "selfApproval": null,
+   "steps": [
+    {
+     "level": 1,
+     "approverRole": "pk-owner",
+     "approverUserId": null
+    }
+   ],
+   "signDiajukan": "required",
+   "signDibuat": "required"
+  },
+  "approvals": [
+   {
+    "id": 23,
+    "cycle": 1,
+    "position": "dibuat",
+    "level": 0,
+    "actorId": 1,
+    "employeeId": null,
+    "actorName": "Sari Staf",
+    "onBehalf": false,
+    "decision": "signed",
+    "reason": null,
+    "decidedAt": "2026-10-11T13:04:29.580Z",
+    "budgetPctBefore": null,
+    "budgetPctAfter": null,
+    "openFlags": null,
+    "signatureId": 1,
+    "signatureSha256": "daa47ffcc10e0ee174fd2087471774bb0f4412792ddfef44be9adaa05ff90c8d",
+    "signatureSource": "profile"
+   },
+   {
+    "id": 24,
+    "cycle": 1,
+    "position": "diajukan",
+    "level": 0,
+    "actorId": 1,
+    "employeeId": 6,
+    "actorName": "Sari Staf",
+    "onBehalf": false,
+    "decision": "signed",
+    "reason": null,
+    "decidedAt": "2026-10-11T13:04:29.595Z",
+    "budgetPctBefore": null,
+    "budgetPctAfter": null,
+    "openFlags": null,
+    "signatureId": 1,
+    "signatureSha256": "daa47ffcc10e0ee174fd2087471774bb0f4412792ddfef44be9adaa05ff90c8d",
+    "signatureSource": "profile"
+   },
+   {
+    "id": 25,
+    "cycle": 1,
+    "position": "diketahui",
+    "level": 0,
+    "actorId": 2,
+    "employeeId": null,
+    "actorName": "Pandu Manajer",
+    "onBehalf": false,
+    "decision": "acknowledged",
+    "reason": null,
+    "decidedAt": "2026-10-11T13:04:29.798Z",
+    "budgetPctBefore": 6.9,
+    "budgetPctAfter": 7.38,
+    "openFlags": 1,
+    "signatureId": 2,
+    "signatureSha256": "daa47ffcc10e0ee174fd2087471774bb0f4412792ddfef44be9adaa05ff90c8d",
+    "signatureSource": "profile"
+   },
+   {
+    "id": 26,
+    "cycle": 1,
+    "position": "approval",
+    "level": 1,
+    "actorId": 4,
+    "employeeId": null,
+    "actorName": "Dedi Direktur",
+    "onBehalf": false,
+    "decision": "approved",
+    "reason": null,
+    "decidedAt": "2026-10-11T13:04:30.068Z",
+    "budgetPctBefore": 6.9,
+    "budgetPctAfter": 7.38,
+    "openFlags": 1,
+    "signatureId": 4,
+    "signatureSha256": "daa47ffcc10e0ee174fd2087471774bb0f4412792ddfef44be9adaa05ff90c8d",
+    "signatureSource": "profile"
+   }
+  ],
+  "receipts": [],
+  "flags": [
+   {
+    "id": 27,
+    "kind": "uom_suspicious",
+    "kindLabel": "Satuan tidak wajar",
+    "level": "warning",
+    "status": "open",
+    "lineId": "6acb895d4f3a0502a5fce2bf",
+    "lineNo": 1,
+    "receiptId": null,
+    "relatedRequestId": null,
+    "message": "Satuan \"bulan\" tidak wajar untuk kategori Material.",
+    "reviewNote": null
+   }
+  ],
+  "transfers": [
+   {
+    "id": 4,
+    "docNo": "TRF/DRMS/2610/0004",
+    "kind": "advance",
+    "amount": 1200000,
+    "transferDate": "2026-10-11",
+    "transferAt": "2026-10-11T12:54:00.000Z",
+    "costCenter": {
+     "id": 1,
+     "code": "OPS-PB",
+     "name": "Ops Palangka Banjar"
+    },
+    "bankRef": "MDR-CINT-01",
+    "status": "posted",
+    "cashEntryId": 4,
+    "proofId": 4,
+    "voidReason": null
+   }
+  ],
+  "verifiedReceiptsTotal": null,
+  "settlement": null,
+  "budget": {
+   "basis": "project",
+   "pctBefore": 6.9,
+   "pctAfter": 7.38
+  },
+  "openWarningFlags": 1,
+  "allowedActions": [
+   "review_flag",
+   "transfer_void"
+  ],
+  "resubmitOfId": null,
+  "resubmitOf": null,
+  "submittedAt": "2026-10-11T13:04:29.467Z",
+  "approvedAt": "2026-10-11T13:04:30.077Z",
+  "cancelReason": null,
+  "rejectReason": null,
+  "clientUuid": null,
+  "createdAt": "2026-10-11T13:04:29.255Z",
+  "rev": 1,
+  "timeline": [
+   {
+    "status": "draft",
+    "label": "Draft",
+    "state": "done"
+   },
+   {
+    "status": "pending_ack",
+    "label": "Menunggu persetujuan PM",
+    "state": "done"
+   },
+   {
+    "status": "pending_approval",
+    "label": "Menunggu persetujuan Direktur",
+    "state": "done"
+   },
+   {
+    "status": "approved",
+    "label": "Disetujui (Antri Transfer)",
+    "state": "done"
+   },
+   {
+    "status": "transferred",
+    "label": "Ditransfer",
+    "state": "current"
+   },
+   {
+    "status": "receipts_complete",
+    "label": "Nota Lengkap",
+    "state": "todo"
+   },
+   {
+    "status": "lpj_submitted",
+    "label": "LPJ Diajukan",
+    "state": "todo"
+   },
+   {
+    "status": "lpj_verified",
+    "label": "LPJ Terverifikasi",
+    "state": "todo"
+   },
+   {
+    "status": "completed",
+    "label": "Selesai",
+    "state": "todo"
+   }
+  ],
+  "nextActor": {
+   "who": "Pemohon (Sari Staf)",
+   "what": "upload nota per baris, lalu tandai Nota lengkap"
+  }
+ },
+ "transferId": 4,
+ "transferDocNo": "TRF/DRMS/2610/0004",
+ "cashEntryId": 4,
+ "cashEntryNo": "KK/DRMS/2610/0004"
+}

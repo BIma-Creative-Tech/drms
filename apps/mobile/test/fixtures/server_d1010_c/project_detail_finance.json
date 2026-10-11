@@ -1,0 +1,39 @@
+{
+ "id": 1,
+ "code": "UJI-PRJ",
+ "name": "Proyek Uji",
+ "kind": "konstruksi",
+ "companyId": 1,
+ "pm": {
+  "id": 2,
+  "name": "Pandu Manajer"
+ },
+ "status": "berjalan",
+ "statusLabel": "Berjalan",
+ "contractValue": 250000000,
+ "progressPct": 0,
+ "costCenter": {
+  "id": 1,
+  "code": "OPS-PB",
+  "name": "Ops Palangka Banjar"
+ },
+ "rapPlanned": 19500000,
+ "rapRealised": 18453000,
+ "rapPercent": 94.63,
+ "rapOverBudgetItems": 1,
+ "rapItems": 4,
+ "client": null,
+ "address": null,
+ "startDate": null,
+ "targetDate": null,
+ "rap": {
+  "items": 4,
+  "planned": 19500000,
+  "realised": 18453000,
+  "transferred": 11902000,
+  "verified": 0,
+  "remaining": 1047000,
+  "percent": 94.63,
+  "overBudgetItems": 1
+ }
+}

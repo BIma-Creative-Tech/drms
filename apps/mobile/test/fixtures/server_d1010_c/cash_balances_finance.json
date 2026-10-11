@@ -1,0 +1,35 @@
+{
+ "asOf": null,
+ "items": [
+  {
+   "cashAccountId": 1,
+   "companyId": 1,
+   "name": "Kas Kecil",
+   "active": true,
+   "openingBalance": 0,
+   "totalIn": 0,
+   "totalOut": 1200000,
+   "balance": -1200000
+  },
+  {
+   "cashAccountId": 2,
+   "companyId": 1,
+   "name": "Bank Operasional",
+   "active": true,
+   "openingBalance": 0,
+   "totalIn": 0,
+   "totalOut": 10702000,
+   "balance": -10702000
+  },
+  {
+   "cashAccountId": 3,
+   "companyId": 1,
+   "name": "Kas lama (nonaktif)",
+   "active": false,
+   "openingBalance": 0,
+   "totalIn": 0,
+   "totalOut": 0,
+   "balance": 0
+  }
+ ]
+}

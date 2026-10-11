@@ -24,7 +24,9 @@ class FinanceApi {
     ],
   );
 
-  /// Cash accounts of PT [companyId] (`GET /cash-accounts/balances?company=`; Finance / Direktur).
+  /// Active cash accounts of PT [companyId] (`GET /cash-accounts/balances?company=`; Finance / Direktur). The
+  /// balances list also carries inactive accounts (`active: false`) — they cannot take a transfer, so the picker
+  /// never offers them.
   Future<List<CashAccountOption>> cashAccounts(int? companyId) => client.run(
     (d) => d.get<dynamic>(
       '/cash-accounts/balances',
@@ -34,7 +36,7 @@ class FinanceApi {
     (data) => [
       for (final i in _list(_map(data)?['items']))
         if (_map(i) case final j?) cashAccountFromJson(j),
-    ],
+    ].where((a) => a.active).toList(),
   );
 
   /// Active cost centers of PT [companyId] (`GET /cost-centers?company=&q=`, D2 picker).
@@ -46,7 +48,8 @@ class FinanceApi {
     ),
     (data) => [
       for (final i in _list(_map(data)?['docs'] ?? _map(data)?['items']))
-        if (_map(i) case final j?) costCenterFromJson(j),
+        // the server lists active ones unless `active=all`; never offer an inactive one (400 at the transfer)
+        if (_map(i) case final j? when j['active'] != false) costCenterFromJson(j),
     ],
   );
 
