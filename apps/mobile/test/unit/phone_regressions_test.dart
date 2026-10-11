@@ -132,6 +132,16 @@ AppEnv _env() => AppEnv(
   loginMode: LoginMode.password,
 );
 
+/// Waits (real time) until [condition] holds. The probe tests depend on short real timers, so a
+/// fixed delay fails on a loaded CI host; polling with a generous deadline does not.
+Future<void> _until(bool Function() condition, {Duration timeout = const Duration(seconds: 10)}) async {
+  final deadline = DateTime.now().add(timeout);
+  while (!condition() && DateTime.now().isBefore(deadline)) {
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+  }
+  await pumpEventQueue();
+}
+
 void main() {
   group('A. online state', () {
     ProviderContainer container(Connectivity platform, {required Future<bool> Function() probe}) {
@@ -195,13 +205,23 @@ void main() {
     });
 
     test('a wrong `none` is corrected by the /health probe without any user action', () async {
-      final c = container(platform([ConnectivityResult.none]), probe: () async => true);
+      // The server stays unreachable until the test opens the gate, so "still offline" is checked
+      // deterministically instead of racing the probe timer.
+      final serverUp = Completer<void>();
+      final c = container(
+        platform([ConnectivityResult.none]),
+        probe: () async {
+          await serverUp.future;
+          return true;
+        },
+      );
       var again = 0;
       c.read(onlineAgainProvider).listen((_) => again++);
       c.read(connectivityProvider);
       await pumpEventQueue();
       expect(c.read(connectivityProvider), isFalse);
-      await Future<void>.delayed(const Duration(milliseconds: 60));
+      serverUp.complete();
+      await _until(() => c.read(connectivityProvider));
       expect(c.read(connectivityProvider), isTrue);
       expect(again, 1, reason: 'coming back online triggers a sync run');
     });
@@ -220,11 +240,11 @@ void main() {
       await pumpEventQueue();
       c.read(connectivityProvider.notifier).reportServerReachable(false);
       expect(c.read(connectivityProvider), isFalse);
-      await Future<void>.delayed(const Duration(milliseconds: 70));
+      await _until(() => probes >= 2);
       expect(probes, greaterThanOrEqualTo(2));
       expect(c.read(connectivityProvider), isFalse);
       up = true;
-      await Future<void>.delayed(const Duration(milliseconds: 50));
+      await _until(() => c.read(connectivityProvider));
       expect(c.read(connectivityProvider), isTrue);
     });
 
