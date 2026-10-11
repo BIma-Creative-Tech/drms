@@ -38,6 +38,24 @@ cash entries stay "project OR cost center").
   approval" for Finance / Admin only; "Alasan perubahan" only in Revisi Nota (a Draft at phone width ends with the lines).
 - **Verifikasi LPJ** receipts as cards at ≤ 640 px; the image lightbox skips the hidden duplicate of a thumbnail.
 
+### Added (APK, DRMS 10/10 Phase C)
+
+- APK (DRMS 10/10 Phase C): **"Proyek"** menu with tabs Proyek / RAP / Pengajuan, search, status filter and infinite
+  scroll (point 6/7, D8). Expense lines need an **"Item RAP"** with remaining budget and a **"Melebihi RAP"** warning (D4,
+  drift v8 `local_lines.rap_item_id`; roles without RAP prices see the items without amounts). Requests are project-only;
+  the requester no longer picks a cost center (D2). New **"Finance"** menu (point 10): Antrian Transfer with SLA badge and
+  "Selisih nota (n)", **"Catat transfer"** with Akun kas (active accounts only) / Tanggal & jam transfer / Pusat biaya /
+  No. referensi bank / Bukti and the overdraft / unverified-account confirmation, and a read-only Verifikasi LPJ list.
+
+### Fixed (DRMS 10/10 Phase C integration)
+
+- `GET /api/v1/cash-accounts/balances` items carry `active`; the APK transfer form no longer offers an inactive cash
+  account (or cost center), which the server refused with 400 `cashAccountId`.
+- Request detail **"Rincian item"** table (reviewers): at 1280 px the "Nota & flag" column was clipped inside a horizontal
+  scroll — fixed column widths with wrapping text, every column readable without scrolling; cards at < 640 px unchanged.
+- APK contract tests on responses captured from the Phase C server (projects, RAP with `realisedAmount`, Staff without
+  RAP money, `rapOverBudget` / `rap_over_budget`, transfer queue, transfer form pickers, `POST …/transfer`).
+
 **DRMS 10/10 Phase B-2 integration + polish** (web ↔ APK consistency; owner prefers the APK layout). No new migration;
 `migrate:create` → no changes; generated files (importMap, payload-types, OpenAPI, Flutter codegen) unchanged.
 
