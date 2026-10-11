@@ -1180,33 +1180,33 @@ export interface ExpenseRequest {
   company?: (number | null) | Company;
   docNo?: string | null;
   type: 'advance' | 'reimburse';
-  status:
-    | 'draft'
-    | 'pending_ack'
-    | 'pending_approval'
-    | 'approved'
-    | 'receipt_revision'
-    | 'receipts_verified'
-    | 'transferred'
-    | 'receipts_complete'
-    | 'lpj_submitted'
-    | 'lpj_revision'
-    | 'lpj_verified'
-    | 'completed'
-    | 'rejected'
-    | 'cancelled';
+  status?:
+    | (
+        | 'draft'
+        | 'pending_ack'
+        | 'pending_approval'
+        | 'approved'
+        | 'receipt_revision'
+        | 'receipts_verified'
+        | 'transferred'
+        | 'receipts_complete'
+        | 'lpj_submitted'
+        | 'lpj_revision'
+        | 'lpj_verified'
+        | 'completed'
+        | 'rejected'
+        | 'cancelled'
+      )
+    | null;
   title: string;
   project?: (number | null) | Project;
-  costCenter?: (number | null) | CostCenter;
-  requestDate?: string | null;
   /**
-   * Format YYYY-MM-DD (zona waktu perusahaan).
+   * Isi project ATAU pusat biaya.
    */
+  costCenter?: (number | null) | CostCenter;
   neededDate?: string | null;
   urgencyLevel?: (number | null) | UrgencyLevel;
-  notes?: string | null;
   requesters?: (number | Employee)[] | null;
-  createdBy?: (number | null) | User;
   /**
    * Hanya rekening milik pemohon. Kosongkan untuk memakai rekening default pemohon pertama.
    */
@@ -1216,6 +1216,8 @@ export interface ExpenseRequest {
     accountNo?: string | null;
     accountHolder?: string | null;
   };
+  notes?: string | null;
+  attachments?: (number | MediaAttachment)[] | null;
   /**
    * Tunggu sebentar setelah mengisi field sebelum menekan Tambah Baris.
    */
@@ -1232,11 +1234,12 @@ export interface ExpenseRequest {
         id?: string | null;
       }[]
     | null;
+  requestDate?: string | null;
+  createdBy?: (number | null) | User;
   grandTotal?: number | null;
   approvedAmount?: number | null;
   transferredTotal?: number | null;
   verifiedReceiptsTotal?: number | null;
-  attachments?: (number | MediaAttachment)[] | null;
   approvalRule?: (number | null) | ApprovalRule;
   approvalSnapshot?:
     | {
@@ -1247,9 +1250,6 @@ export interface ExpenseRequest {
     | number
     | boolean
     | null;
-  /**
-   * direktur_via_pm = pengajuan Direktur, diajukan oleh PM (Direktur lain memutuskan); direktur_via_pm_self = idem, Direktur pemohon satu-satunya Direktur PT (kebijakan owner 2026-10-10/11).
-   */
   g1Exception?: string | null;
   approvalCycle?: number | null;
   currentLevel?: number | null;
@@ -1754,9 +1754,6 @@ export interface ContractUnit {
   company?: (number | null) | Company;
   project: number | Project;
   unit: number | Vehicle;
-  /**
-   * YYYY-MM-DD
-   */
   startDate: string;
   /**
    * Kosong = berjalan.
@@ -3389,12 +3386,9 @@ export interface ExpenseRequestsSelect<T extends boolean = true> {
   title?: T;
   project?: T;
   costCenter?: T;
-  requestDate?: T;
   neededDate?: T;
   urgencyLevel?: T;
-  notes?: T;
   requesters?: T;
-  createdBy?: T;
   bankAccount?: T;
   bankSnapshot?:
     | T
@@ -3403,6 +3397,8 @@ export interface ExpenseRequestsSelect<T extends boolean = true> {
         accountNo?: T;
         accountHolder?: T;
       };
+  notes?: T;
+  attachments?: T;
   lines?:
     | T
     | {
@@ -3416,11 +3412,12 @@ export interface ExpenseRequestsSelect<T extends boolean = true> {
         notes?: T;
         id?: T;
       };
+  requestDate?: T;
+  createdBy?: T;
   grandTotal?: T;
   approvedAmount?: T;
   transferredTotal?: T;
   verifiedReceiptsTotal?: T;
-  attachments?: T;
   approvalRule?: T;
   approvalSnapshot?: T;
   g1Exception?: T;
