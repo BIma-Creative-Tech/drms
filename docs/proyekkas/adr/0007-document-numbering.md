@@ -150,6 +150,28 @@ None.
   Q-54 — configuration only.
 - The S3b go-live cut-over (`import/run.ts`, `nomor_pb_mulai`) becomes per PT (workbook column `kode_pt`).
 
+## Revisi 2026-10-12 (D5, DRMS 10/10)
+
+Owner decision D5 (2026-10-11, `../plans/drms-1010.md`): **every** document number carries the PT short code.
+This closes Q-54 (cross-PT repetition of `TRF/2609/0001`) by configuration, as foreseen above.
+
+- **New defaults** (`DEFAULT_SEQUENCES`, `apps/web/src/domain/numbering.ts`): one shape
+  `<DOC>/{COMPANY}/{YY}{MM}/{seq}` with 4 digits — `PB/DRMS/2610/0229`, `TRF/LLAS/2610/0001`, `LPJ/…`, `KM/…`,
+  `KK/…`, `LP/…`, `ADD/…`, `SV/…`, `LH/…`. **Reset policies are unchanged**: PB stays `never` with `startAt` 229
+  (decision 2026-09-23: the paper series continues; the go-live import `nomor_pb_mulai` keeps working), the others
+  monthly. An Admin may still switch PB to monthly in Sistem › Penomoran dokumen (then set "Nomor awal" 1).
+- **Existing PTs**: data migration `20261012_200100_d1010_data` moves a `document_sequences` row only while it still has
+  exactly the old default pattern of its doc type (and PB padding 0 → 4); every move is audited (`update`, field
+  `pattern`, source `system`); patterns an Admin customised are left alone and listed in the migrate log
+  (`customisedKept`). New PTs get the new defaults via "Salin default" (copied from the source PT) or the built-in list.
+- **Issued numbers stay** (never rewritten). Counters are keyed `(company_id, doc_type, period_key)` — the pattern is
+  not part of the key — so a mid-month switch continues the same counter (`TRF/2610/0005` → `TRF/DRMS/2610/0006`);
+  the new shape can never equal an old-shape string, and `doc_no` stays unique per `(company_id, …)`.
+- **Empty short code**: impossible (`companies_short_code` CHECK `^[A-Z0-9]{2,16}$` + collection validation); as a
+  defence in depth `allocateDocNo` refuses a `{COMPANY}` pattern without a code with 409 "Kode singkat PT belum diisi"
+  BEFORE taking a counter value.
+- APK: no number parsing (numbers are opaque strings; test fixtures keep the historical paper number).
+
 ## Revision history
 
 - **2026-09-23 (F0 gate):** accepted by user.
@@ -169,3 +191,4 @@ None.
   (upward only, audited `update` field `nextValue` with the import reason), a counter already beyond it is left
   unchanged (warning). Runbook `runbooks/import-data-golive.md`. Status stays accepted.
 - **2026-09-27 (ADR 0016, multi-company):** section "Revisi 2026-09-27 (ADR 0016)" added (proposed; takes effect with phase MC). Status stays accepted.
+- **2026-10-12 (D5, DRMS 10/10):** section "Revisi 2026-10-12 (D5)" added — all defaults carry `{COMPANY}`; migration of untouched default patterns; reset policies unchanged. Status stays accepted.
