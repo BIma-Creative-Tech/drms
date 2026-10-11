@@ -200,8 +200,11 @@ export function SelfieButton({ attendanceId, label, available, own }: { attendan
           {!own ? <p className="desc">Data pribadi (UU PDP). Membuka selfie orang lain tercatat di audit log.</p> : null}
           <div className="pk-selfie-box">
             {shown && !failed ? (
-              // eslint-disable-next-line @next/next/no-img-element -- private, audited, no-store image from /api/v1 (next/image would cache it)
-              <img src={`/api/v1/attendance/${attendanceId}/selfie`} alt={`Selfie absensi ${label}`} onError={() => setFailed(true)} referrerPolicy="no-referrer" data-pk-selfie-img />
+              // DRMS 10/10 12c: the shared lightbox (zoom) on top of this dialog; same audited endpoint
+              <a href={`/api/v1/attendance/${attendanceId}/selfie`} target="_blank" rel="noopener noreferrer" data-pk-lightbox={`selfie-${attendanceId}`} data-pk-lightbox-title={`Selfie · ${label}`} title="Perbesar selfie">
+                {/* eslint-disable-next-line @next/next/no-img-element -- private, audited, no-store image from /api/v1 (next/image would cache it) */}
+                <img src={`/api/v1/attendance/${attendanceId}/selfie`} alt={`Selfie absensi ${label}`} onError={() => setFailed(true)} referrerPolicy="no-referrer" data-pk-selfie-img />
+              </a>
             ) : null}
             {failed ? <p className="pk-kerr">Selfie tidak tersedia (mungkin sudah melewati masa retensi).</p> : null}
           </div>

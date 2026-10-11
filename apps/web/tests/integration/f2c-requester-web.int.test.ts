@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto'
 
 import { createLocalReq } from 'payload'
 import { renderToString } from 'react-dom/server'
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 
 import { WorkflowPanel } from '@/admin/components/WorkflowPanel'
 import { addDays } from '@/domain/expense/types'
@@ -18,6 +18,9 @@ import { api, draftBody, makeWorld, png, upload, type FlowUser, type World } fro
  * (3) each requester action happy path + one negative, (4) self-service profile signature,
  * (5) the server-rendered workflow panel (timeline, next actor, buttons only for own requests).
  */
+// DRMS 10/10 9d: the decider's panel renders the decision bar (ActionButton → useRouter)
+vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: () => {} }) }))
+
 let w: World
 const E = '/api/v1/expense-requests'
 const key = () => ({ 'Idempotency-Key': randomUUID() })
@@ -227,6 +230,8 @@ describe('F2c workflow panel (server-rendered in the edit view)', () => {
     expect(html).toContain('Menunggu Diketahui')
     expect(html).toContain('data-pk-next-actor')
     expect(html).not.toContain('data-pk-panel="requester"')
+    // DRMS 10/10 9d: the decider whose turn it is gets Setujui / Tolak on the detail too
+    expect(html).toContain('data-pk-decision-bar')
     const own = await panelHtml(w.users.staffA, a.id)
     expect(own).toContain('data-pk-action="withdraw"')
     expect(own).toContain('data-pk-action="cancel"')

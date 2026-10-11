@@ -671,6 +671,26 @@ export const SignedMediaUrl = z
     ttlSeconds: z.number().int(),
   })
   .meta({ id: 'SignedMediaUrl' })
+/** DRMS 10/10 8e: destination account preview under the picker / of the submit snapshot (masked; full only on reveal for allowed callers). */
+export const BankPreviewQuery = z
+  .object({
+    request: z.coerce.number().int().positive().optional().meta({ description: 'Expense request id. Draft → live account (`account` = picker value, default the saved one); submitted → the snapshot taken at submit.' }),
+    account: z.coerce.number().int().positive().optional().meta({ description: 'Employee bank account id (picker value). Without `request`: only an account readable through the collection access.' }),
+    reveal: z.enum(['1']).optional().meta({ description: '1 = include the full number when `canReveal` (creator/requesters, Finance/Direktur/Admin of the PT — same rule as the detail DTO).' }),
+  })
+  .meta({ id: 'BankPreviewQuery' })
+
+export const BankPreview = z
+  .object({
+    source: z.enum(['account', 'snapshot']),
+    bankName: z.string().nullable(),
+    accountHolder: z.string().nullable(),
+    accountNoMasked: z.string().nullable().meta({ description: '"••••1234"' }),
+    canReveal: z.boolean(),
+    accountNo: z.string().optional().meta({ description: 'Only with reveal=1 and canReveal.' }),
+  })
+  .meta({ id: 'BankPreview' })
+
 export const PdfQuery = z.object({ variant: z.enum(['standard', 'internal']).optional().meta({ description: 'internal = with receipt validation flags (Finance/Owner/Admin).' }) }).meta({ id: 'PdfQuery' })
 
 /** MC2/MC3: short reference of a PT (queue rows). */

@@ -116,7 +116,7 @@ export function ReviewDetails({ d, title = 'Rincian untuk pemeriksa' }: { d: Det
                     {rs.map((r) => (
                       <div key={r.id} style={{ display: 'flex', gap: 6, alignItems: 'flex-start', marginBottom: 4 }} data-pk-review-receipt={r.id}>
                         {r.imageId ? (
-                          <a href={`/api/v1/media/receipts/${r.imageId}/file`} target="_blank" rel="noopener noreferrer" title="Buka foto nota (ukuran penuh)">
+                          <a href={`/api/v1/media/receipts/${r.imageId}/file`} target="_blank" rel="noopener noreferrer" title="Buka foto nota (ukuran penuh)" data-pk-lightbox={`receipts-${d.id}`} data-pk-lightbox-title={`Nota ${r.receiptNo ?? r.id} · baris ${l.no} · ${rp(r.amount)}`}>
                             {/* eslint-disable-next-line @next/next/no-img-element -- authenticated API file, not a static asset */}
                             <img src={`/api/v1/media/receipts/${r.imageId}/file?variant=thumb`} alt={`Foto nota ${r.receiptNo ?? r.id}, baris ${l.no}`} loading="lazy" style={{ width: 56, height: 56, objectFit: 'cover', borderRadius: 4 }} />
                           </a>

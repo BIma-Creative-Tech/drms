@@ -2790,6 +2790,51 @@ export const openapiDocument = {
         "additionalProperties": false,
         "description": "Draft only. Omitted fields stay unchanged; `lines` replaces all lines."
       },
+      "BankPreview": {
+        "type": "object",
+        "properties": {
+          "source": {
+            "type": "string",
+            "enum": [
+              "account",
+              "snapshot"
+            ]
+          },
+          "bankName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "accountHolder": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "accountNoMasked": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "\"••••1234\""
+          },
+          "canReveal": {
+            "type": "boolean"
+          },
+          "accountNo": {
+            "type": "string",
+            "description": "Only with reveal=1 and canReveal."
+          }
+        },
+        "required": [
+          "source",
+          "bankName",
+          "accountHolder",
+          "accountNoMasked",
+          "canReveal"
+        ]
+      },
       "History": {
         "type": "object",
         "properties": {
@@ -14673,6 +14718,142 @@ export const openapiDocument = {
             }
           },
           "422": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/bank-account-preview": {
+      "get": {
+        "summary": "Destination account of a request form: bank · holder · masked number; full number only with reveal=1 for creator/requesters and Finance/Direktur/Admin of the PT (DRMS 10/10 8e)",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "description": "Expense request id. Draft → live account (`account` = picker value, default the saved one); submitted → the snapshot taken at submit."
+            },
+            "required": false,
+            "description": "Expense request id. Draft → live account (`account` = picker value, default the saved one); submitted → the snapshot taken at submit.",
+            "name": "request",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "description": "Employee bank account id (picker value). Without `request`: only an account readable through the collection access."
+            },
+            "required": false,
+            "description": "Employee bank account id (picker value). Without `request`: only an account readable through the collection access.",
+            "name": "account",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "1"
+              ],
+              "description": "1 = include the full number when `canReveal` (creator/requesters, Finance/Direktur/Admin of the PT — same rule as the detail DTO)."
+            },
+            "required": false,
+            "description": "1 = include the full number when `canReveal` (creator/requesters, Finance/Direktur/Admin of the PT — same rule as the detail DTO).",
+            "name": "reveal",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": true,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "APK version; below company minimum → 426."
+            },
+            "required": false,
+            "description": "APK version; below company minimum → 426.",
+            "name": "X-App-Version",
+            "in": "header"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Account preview",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BankPreview"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
             "description": "Problem",
             "content": {
               "application/problem+json": {

@@ -15,6 +15,8 @@ import { listReports } from '@/domain/progress/dto'
 import { projectProgressVsBudget, type ProjectProgress } from '@/domain/reports/progress'
 import { officeScope, teamScope } from '@/domain/reports/scope'
 
+import { docHref } from '../doc-links'
+
 import { TeamTodayWidget } from './Absensi'
 import { ChartHover } from './ChartHover'
 import { PageTemplate } from './frame'
@@ -514,7 +516,15 @@ function RecentCashCard({ id, rows, span, i }: { id: string; rows: CashRow[]; sp
       cell: (r) => (
         <>
           <a href={`/admin/collections/cash-entries/${r.id}`}>{r.entryNo ?? `#${r.id}`}</a>
-          <span className="sub">{r.requestDocNo ? `${r.requestDocNo} · ${r.label}` : r.label || SOURCE[r.sourceType]}</span>
+          <span className="sub">
+            {r.requestDocNo && r.requestId ? (
+              <>
+                <a href={reqHref(r.requestId)}>{r.requestDocNo}</a> · {r.label}
+              </>
+            ) : (
+              r.label || SOURCE[r.sourceType]
+            )}
+          </span>
         </>
       ),
     },
@@ -1153,7 +1163,23 @@ async function Admin({ req }: { req: PayloadRequest }) {
             { key: 't', label: 'Waktu (WITA)', sort: 'descending', cell: (a) => a.localTime },
             { key: 'u', label: 'User', cell: (a) => a.userName ?? (a.userId === null ? 'sistem' : `user#${a.userId}`) },
             { key: 'a', label: 'Aksi', cell: (a) => <StatusPill tone="none" label={a.action} /> },
-            { key: 'd', label: 'Dokumen', sec: true, cell: (a) => `${a.docType} ${a.docNo ?? a.docId ?? ''}` },
+            {
+              key: 'd',
+              label: 'Dokumen',
+              sec: true,
+              // DRMS 10/10 12b: numbered documents link to their detail
+              cell: (a) => {
+                const href = docHref(a.docType, a.docId)
+                const text = a.docNo ?? a.docId ?? ''
+                return href && text ? (
+                  <>
+                    {a.docType} <a href={href}>{text}</a>
+                  </>
+                ) : (
+                  `${a.docType} ${text}`
+                )
+              },
+            },
           ]}
         />
       </Card>

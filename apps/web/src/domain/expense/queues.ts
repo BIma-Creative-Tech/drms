@@ -115,7 +115,7 @@ export async function approvalInbox(req: PayloadRequest, f?: QueueFilter) {
     const itemWarn = cid !== undefined ? warnOf.get(cid)! : warnPct
     const ctx = await actorContext(req, { ...d, createdBy: relId(d.createdBy), requesters: ids(d.requesters as unknown[]) } as unknown as RequestDoc)
     const acts = allowedActions(ctx)
-    const step = acts.includes('approve') ? 'approve' : acts.includes('acknowledge') ? 'acknowledge' : null
+    const step: 'approve' | 'acknowledge' | null = acts.includes('approve') ? 'approve' : acts.includes('acknowledge') ? 'acknowledge' : null
     if (!step) continue
     const p = d.project && typeof d.project === 'object' ? d.project : null
     const b = p ? budgetImpact(p.budget, await projectCommitted(req, p.id, d.id), d.grandTotal ?? 0) : { before: null, after: null }

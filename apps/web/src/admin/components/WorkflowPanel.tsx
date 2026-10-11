@@ -1,15 +1,20 @@
 import type { UIFieldServerProps } from 'payload'
 import React from 'react'
 
-import { ownEmployees, relId } from '@/access/roles'
+import { hasRole, ownEmployees, relId } from '@/access/roles'
+import { companyById } from '@/domain/companies'
+import { buildApprovalTimeline, g1ExceptionText } from '@/domain/expense/approval-timeline'
 import { displayName, loadVisible, today } from '@/domain/expense/common'
 import { detail } from '@/domain/expense/dto'
-import { isDecisionSnapshot, selfApprovalNote, SKIPPED_LABEL } from '@/domain/expense/decision'
-import type { ApprovalSnapshot } from '@/domain/expense/rules'
-import { approvalStepLabel, isPmFlow, nextActor, timeline } from '@/domain/expense/timeline'
+import { isDecisionSnapshot } from '@/domain/expense/decision'
+import { decisionText } from '@/domain/expense/decision-texts'
+import { lastLevel, type ApprovalSnapshot } from '@/domain/expense/rules'
+import { ackStepLabel, approvalStepLabel, decisionByOf, nextActor, timeline } from '@/domain/expense/timeline'
 import { formatRupiah } from '@/lib/money'
 import { withSystemTransaction } from '@/lib/system-tx'
 
+import { ApprovalTimeline } from './ApprovalTimeline'
+import { DecisionBar } from './DecisionBar'
 import { ReasonAction } from './kas/ReasonAction'
 import { KAS_STYLE } from './kas/style'
 import { Act, RequesterActions, type RequesterActionsProps } from './RequesterActions'
@@ -46,13 +51,13 @@ export async function WorkflowPanel(props: UIFieldServerProps) {
   const docId = Number(id)
   if (!id || !Number.isSafeInteger(docId) || !req.user) {
     return (
-      <div className="field-type" style={{ fontSize: 13, color: 'var(--theme-elevation-700)' }}>
-        Isi data pengajuan lalu klik <strong>Simpan</strong> (tersimpan sebagai Draft). Setelah tersimpan, tombol <em>Kirim pengajuan</em>, upload nota dan status
-        muncul di sini. Grand total dihitung server dari total baris.
+      // DRMS 10/10 8i: short help on create (the APK editor shows none).
+      <div className="field-type" data-pk-panel="workflow-create" style={{ fontSize: 13, color: 'var(--theme-elevation-700)' }}>
+        Isi lalu <strong>Simpan</strong> sebagai Draft; tombol <em>Kirim pengajuan</em> muncul setelah tersimpan.
       </div>
     )
   }
-  let data: { d: Detail; snap: ApprovalSnapshot | null; names: Record<number, string>; hasSignature: boolean; todayDate: string } | null = null
+  let data: { d: Detail; snap: ApprovalSnapshot | null; names: Record<number, string>; hasSignature: boolean; todayDate: string; tz: string; office: boolean } | null = null
   try {
     data = await withSystemTransaction(req.payload, req.user, async (r) => {
       const doc = await loadVisible(r, docId)
@@ -62,7 +67,11 @@ export async function WorkflowPanel(props: UIFieldServerProps) {
       const userIds = [snap?.acknowledgerUserId, ...(snap?.steps ?? []).map((s) => s.approverUserId)].filter((x): x is number => typeof x === 'number')
       for (const u of new Set(userIds)) names[u] = await displayName(r, u)
       const me = await r.payload.findByID({ collection: 'users', id: req.user!.id as number, depth: 0, overrideAccess: true /* SYSTEM-READ: own profile signature flag */, req: r })
-      return { d, snap, names, hasSignature: relId(me.signature) !== undefined, todayDate: await today(r, relId((doc as { company?: unknown }).company)) }
+      const company = relId((doc as { company?: unknown }).company)
+      const tz = company !== undefined ? ((await companyById(r, company)).timezone ?? 'Asia/Makassar') : 'Asia/Makassar'
+      // KK (cash entries) are readable by Finance/Direktur/Admin of the PT only → link them only for those
+      const office = hasRole(r, ['pk-finance', 'pk-owner', 'pk-admin'], company)
+      return { d, snap, names, hasSignature: relId(me.signature) !== undefined, todayDate: await today(r, company), tz, office }
     })
   } catch (err) {
     // Not visible (404) → the document view itself already denies; anything else is logged.
@@ -70,7 +79,7 @@ export async function WorkflowPanel(props: UIFieldServerProps) {
     if (status !== 404) req.payload.logger.error({ msg: 'workflow panel failed', id: docId, err: (err as Error).message })
     return null
   }
-  const { d, snap, names, hasSignature, todayDate } = data
+  const { d, snap, names, hasSignature, todayDate, tz, office } = data
   const steps = timeline(d.type, d.status, { skipAck: snap?.acknowledge === 'none', snapshot: snap, currentLevel: d.currentLevel ?? null })
   const next = nextActor({
     type: d.type,
@@ -85,6 +94,36 @@ export async function WorkflowPanel(props: UIFieldServerProps) {
   const own = isOwn(d, req.user)
   const acts = (own ? d.allowedActions.filter((a) => (REQUESTER_ACTIONS as readonly string[]).includes(a)) : []) as RequesterActionsProps['actions']
   const box: React.CSSProperties = { border: '1px solid var(--theme-elevation-150)', borderRadius: 4, padding: 12, marginBottom: 16, fontSize: 13 }
+  // DRMS 10/10 9c: readable approval timeline (APK turn_timeline.dart) instead of the raw snapshot.
+  const approvalSteps = buildApprovalTimeline({
+    type: d.type,
+    status: d.status,
+    approvalCycle: d.approvalCycle,
+    currentLevel: d.currentLevel,
+    submittedAt: d.submittedAt,
+    snapshot: snap,
+    approvals: d.approvals,
+    transfers: d.transfers,
+    requesters: d.requesters.map((r) => (r && 'name' in r ? String(r.name ?? '') : '')).filter(Boolean).join(', '),
+    createdBy: d.createdBy && 'name' in d.createdBy ? String(d.createdBy.name ?? '') : null,
+    names,
+  })
+  const olderDecisions = d.approvals.filter((a) => a.cycle !== d.approvalCycle)
+  // DRMS 10/10 9d: decision bar when the server allows a decision now (same texts as the inbox).
+  const decideStep = d.allowedActions.includes('approve') ? 'approve' : d.allowedActions.includes('acknowledge') ? 'acknowledge' : null
+  const canReject = d.allowedActions.includes('reject')
+  const level = d.currentLevel ?? 1
+  const decision = decideStep
+    ? decisionText({
+        step: decideStep,
+        docNo: d.docNo,
+        grandTotal: d.grandTotal,
+        decisionFlow: isDecisionSnapshot(snap),
+        decisionBy: decisionByOf(snap, decideStep, decideStep === 'acknowledge' ? 0 : level),
+        finalStep: snap ? (decideStep === 'acknowledge' ? lastLevel(snap) === 0 : level >= lastLevel(snap)) : false,
+      })
+    : null
+  const decideLabel = decideStep === 'approve' || (!decideStep && d.status === 'pending_approval') ? approvalStepLabel(snap, level) : ackStepLabel(snap)
   return (
     <div className="field-type" data-pk-panel="workflow">
       <section style={box}>
@@ -192,49 +231,61 @@ export async function WorkflowPanel(props: UIFieldServerProps) {
         ) : null}
         {d.rejectReason ? <div style={{ marginTop: 6, color: 'var(--theme-error-500)' }}>Alasan ditolak: {d.rejectReason}</div> : null}
         {d.cancelReason ? <div style={{ marginTop: 6 }}>Alasan batal: {d.cancelReason}</div> : null}
-        {selfApprovalNote(snap?.selfApproval) ? (
-          // ADR 0021: narrow G1 exception — recorded (snapshot, g1_exception, audit) and shown.
-          <div data-pk-g1-exception style={{ marginTop: 6 }}>
-            {selfApprovalNote(snap?.selfApproval)}
+        {d.status !== 'draft' ? (
+          <div style={{ marginTop: 12, paddingTop: 10, borderTop: '1px solid var(--theme-elevation-100)' }}>
+            <ApprovalTimeline steps={approvalSteps} tz={tz} note={g1ExceptionText(snap?.selfApproval)} />
           </div>
         ) : null}
-        {(snap?.skipped ?? []).length > 0 ? (
-          // ADR 0013 G1-2: decision positions left out because their only holders are requester/creator.
-          <div data-pk-skipped style={{ marginTop: 6 }}>
-            {(snap?.skipped ?? []).map((x) => (
-              <div key={`${x.position}-${x.level}`}>
-                {x.position === 'diketahui' ? (isPmFlow(snap) ? 'Diketahui Oleh (PM project)' : 'Diketahui Oleh (Direktur)') : `Approval L${x.level}`}: {SKIPPED_LABEL} — {x.reason}
-              </div>
-            ))}
-          </div>
-        ) : null}
-        {d.approvals.length > 0 ? (
-          <ul style={{ margin: '8px 0 0', paddingLeft: 18, fontSize: 12 }}>
-            {d.approvals.map((a) => (
-              <li key={a.id}>
-                siklus {a.cycle} · {POSITION_LABELS[a.position] ?? a.position}
-                {a.position === 'approval' ? ` L${a.level}` : ''}: {a.actorName ?? '—'} —{' '}
-                {a.decision === 'acknowledged' && a.cycle === d.approvalCycle && isDecisionSnapshot(snap)
-                  ? isPmFlow(snap)
-                    ? 'disetujui PM project (Diketahui)'
-                    : 'disetujui Direktur (Diketahui)'
-                  : a.decision === 'approved' && a.position === 'approval' && a.cycle === d.approvalCycle && isPmFlow(snap) && approvalStepLabel(snap, a.level) === 'Persetujuan Direktur'
-                    ? 'disetujui Direktur'
-                    : (DECISION_LABELS[a.decision] ?? a.decision)}
-                {a.onBehalf ? ' (diwakili)' : ''}
-                {a.position === 'diketahui' && a.cycle === d.approvalCycle && snap?.acknowledgeDelegatedTo ? ' (dilimpahkan)' : ''}
-                {a.reason ? ` — ${a.reason}` : ''}
+        {d.transfers.length > 0 ? (
+          // DRMS 10/10 12b: transfer (TRF) and its cash-out (KK) numbers link to their detail.
+          <ul style={{ margin: '8px 0 0', paddingLeft: 18, fontSize: 12 }} data-pk-transfers>
+            {d.transfers.map((t) => (
+              <li key={t.id}>
+                Transfer <a href={`/admin/collections/transfers/${t.id}`}>{t.docNo}</a> · {t.transferDate} · {rp(t.amount)}
+                {t.status !== 'posted' ? ` · ${t.status === 'void' ? 'Void' : t.status}` : ''}
+                {t.cashEntryId && office ? (
+                  <>
+                    {' '}
+                    · <a href={`/admin/collections/cash-entries/${t.cashEntryId}`}>KK</a>
+                  </>
+                ) : null}
+                {t.proofId ? (
+                  <>
+                    {' '}
+                    ·{' '}
+                    <a href={`/api/v1/media/transfer-proofs/${t.proofId}/file`} target="_blank" rel="noopener noreferrer" data-pk-lightbox={`transfer-${d.id}`} data-pk-lightbox-title={`Bukti transfer ${t.docNo}`}>
+                      bukti
+                    </a>
+                  </>
+                ) : null}
               </li>
             ))}
           </ul>
         ) : null}
+        {olderDecisions.length > 0 ? (
+          <details style={{ marginTop: 8, fontSize: 12 }}>
+            <summary style={{ cursor: 'pointer' }}>Keputusan siklus sebelumnya ({olderDecisions.length})</summary>
+            <ul style={{ margin: '6px 0 0', paddingLeft: 18 }}>
+              {olderDecisions.map((a) => (
+                <li key={a.id}>
+                  siklus {a.cycle} · {POSITION_LABELS[a.position] ?? a.position}
+                  {a.position === 'approval' ? ` L${a.level}` : ''}: {a.actorName ?? '—'} — {DECISION_LABELS[a.decision] ?? a.decision}
+                  {a.onBehalf ? ' (diwakili)' : ''}
+                  {a.reason ? ` — ${a.reason}` : ''}
+                </li>
+              ))}
+            </ul>
+          </details>
+        ) : null}
       </section>
-      {!own && d.status !== 'draft' ? (
-        // S3e (US-26/US-59, S-05): deciders / Finance / PM see lines, receipts and per-line flags here too.
+      {d.status !== 'draft' ? (
+        // S3e (US-26/US-59, S-05): lines, receipts and per-line flags. DRMS 10/10 9a: ONE lines table
+        // ("Rincian pengajuan") for everyone incl. the requester; the Payload line cards are hidden after submit.
         <section style={box} data-pk-section="review">
-          <ReviewDetails d={d} />
+          <ReviewDetails d={d} title="Rincian pengajuan" />
         </section>
       ) : null}
+      {decideStep || canReject ? <DecisionBar id={d.id} step={decideStep} label={decision?.label ?? 'Setujui'} confirm={decision?.confirm ?? ''} canReject={canReject} stepLabel={decideLabel} /> : null}
       {own ? (
         <RequesterActions
           id={d.id}
@@ -268,7 +319,7 @@ function isOwn(d: Detail, user: { id?: unknown }): boolean {
   return d.requesters.some((r) => r?.id !== undefined && emps.includes(r.id))
 }
 
-const POSITION_LABELS: Record<string, string> = { diajukan: 'Diajukan Oleh', dibuat: 'Dibuat Oleh', diketahui: 'Diketahui Oleh', approval: 'Approval' }
+const POSITION_LABELS: Record<string, string> = { diajukan: 'Pemohon', dibuat: 'Dibuat oleh', diketahui: 'Diketahui', approval: 'Approval' }
 const DECISION_LABELS: Record<string, string> = { signed: 'tanda tangan', acknowledged: 'diketahui', approved: 'disetujui', rejected: 'ditolak' }
 
 export default WorkflowPanel

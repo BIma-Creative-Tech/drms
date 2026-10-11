@@ -8,6 +8,7 @@ import { approvedByCaller } from '@/domain/expense/transfers'
 import { REQUEST_TYPE_LABELS, REQUEST_TYPES } from '@/domain/expense/types'
 import { withReqTransaction } from '@/lib/system-tx'
 
+import { docHref } from '../doc-links'
 import { ReasonAction } from '../components/kas/ReasonAction'
 import { KAS_STYLE } from '../components/kas/style'
 import { ListToolbar, Pager } from '../components/list/ListToolbar'
@@ -177,7 +178,9 @@ export async function TransferQueue(props: AdminViewServerProps) {
                     </td>
                   ) : null}
                   <td style={td}>{t.transferDate}</td>
-                  <td style={td}>{t.transferNo}</td>
+                  <td style={td}>
+                    <a href={docHref('transfer', t.transferId)!}>{t.transferNo}</a>
+                  </td>
                   <td style={td}>
                     {docLink(t.requestId, t.requestNo ?? `#${t.requestId}`)}
                     <div>{t.requestTitle}</div>

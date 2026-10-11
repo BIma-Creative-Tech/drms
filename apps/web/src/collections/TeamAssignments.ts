@@ -53,15 +53,16 @@ export const TeamAssignments: CollectionConfig = withAudit(
     hooks: { beforeChange: [companyHook('team-assignments', { derive: [{ field: 'employee', collection: 'employees' }], check: [{ field: 'project', collection: 'projects' }, { field: 'costCenter', collection: 'cost-centers' }] }), guard] },
     fields: [
       companyField({ derived: true }),
-      { name: 'employee', type: 'relationship', relationTo: 'employees', label: 'Karyawan', required: true, index: true, ...pickerSameCompany({ required: true }) },
-      { name: 'project', type: 'relationship', relationTo: 'projects', label: 'Project', index: true, ...pickerSameCompany() },
-      { name: 'costCenter', type: 'relationship', relationTo: 'cost-centers', label: 'Pusat biaya', index: true, ...pickerSameCompany() },
+      { name: 'employee', type: 'relationship', relationTo: 'employees', label: 'Karyawan', required: true, index: true, ...pickerSameCompany({ required: true }), admin: { placeholder: 'Pilih karyawan…' } },
+      { name: 'project', type: 'relationship', relationTo: 'projects', label: 'Project', index: true, ...pickerSameCompany(), admin: { placeholder: 'Pilih project…' } },
+      { name: 'costCenter', type: 'relationship', relationTo: 'cost-centers', label: 'Pusat biaya', index: true, ...pickerSameCompany(), admin: { placeholder: 'Pilih pusat biaya…' } },
       {
         name: 'roleInProject',
         type: 'select',
         label: 'Peran',
         required: true,
         defaultValue: 'staff',
+        admin: { placeholder: 'Pilih peran…' },
         options: [
           { label: 'PM', value: 'pm' },
           { label: 'Staff', value: 'staff' },

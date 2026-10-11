@@ -2,6 +2,7 @@ import type { AdminViewServerProps } from 'payload'
 import React from 'react'
 
 import { selfApprovalNote } from '@/domain/expense/decision'
+import { decisionText, REJECT_PROMPT } from '@/domain/expense/decision-texts'
 import { detail } from '@/domain/expense/dto'
 import { approvalInbox } from '@/domain/expense/queues'
 import { REQUEST_TYPE_LABELS, REQUEST_TYPES } from '@/domain/expense/types'
@@ -75,7 +76,7 @@ export async function ApprovalInbox(props: AdminViewServerProps) {
                 <th style={th}>Nomor / Judul</th>
                 <th style={th}>Jenis</th>
                 <th style={th}>Project / Pusat biaya</th>
-                <th style={th}>Diajukan oleh</th>
+                <th style={th}>Pemohon</th>
                 <th style={{ ...th, textAlign: 'right' }}>Grand total</th>
                 <th style={th}>Dampak anggaran</th>
                 <th style={th}>Flag</th>
@@ -119,34 +120,12 @@ export async function ApprovalInbox(props: AdminViewServerProps) {
                     {r.selfApproval ? <div style={{ fontSize: 11 }}>{selfApprovalNote(r.selfApproval)}</div> : null}
                   </td>
                   <td style={td}>
-                    {r.step === 'acknowledge' ? (
-                      // ADR 0013: "Diketahui" is the Direktur's approval → "Setujui"; ADR 0021: the PM project's
-                      // approval (then the Direktur) → "Setujui … sebagai PM project?" (legacy PM step: "Diketahui").
-                      <ActionButton
-                        url={`/api/v1/expense-requests/${r.id}/acknowledge`}
-                        label={r.decisionFlow ? 'Setujui' : 'Diketahui'}
-                        variant="primary"
-                        confirm={
-                          r.decisionBy === 'pm'
-                            ? `Setujui ${r.docNo} sebesar ${rp(r.grandTotal)} sebagai PM project? Pengajuan diteruskan ke Direktur.`
-                            : r.decisionFlow
-                              ? `Setujui ${r.docNo} sebesar ${rp(r.grandTotal)} sebagai Direktur (Diketahui)?`
-                              : `Tandai ${r.docNo} sudah diketahui?`
-                        }
-                      />
-                    ) : (
-                      <ActionButton
-                        url={`/api/v1/expense-requests/${r.id}/approve`}
-                        label="Setujui"
-                        variant="primary"
-                        confirm={
-                          r.decisionBy === 'direktur' && r.finalStep
-                            ? `Setujui ${r.docNo} sebesar ${rp(r.grandTotal)} sebagai Direktur? Pengajuan diteruskan ke Finance untuk transfer.`
-                            : `Setujui ${r.docNo} sebesar ${rp(r.grandTotal)}?`
-                        }
-                      />
-                    )}
-                    <ActionButton url={`/api/v1/expense-requests/${r.id}/reject`} label="Tolak" prompt={{ field: 'reason', message: 'Alasan penolakan (wajib, minimal 3 karakter):', minLength: 3 }} />
+                    {(() => {
+                      // ADR 0013/0021 labels + confirmations, shared with the request detail (decision-texts.ts)
+                      const t = decisionText({ step: r.step, docNo: r.docNo, grandTotal: r.grandTotal, decisionFlow: r.decisionFlow, decisionBy: r.decisionBy, finalStep: r.finalStep })
+                      return <ActionButton url={`/api/v1/expense-requests/${r.id}/${r.step}`} label={t.label} variant="primary" confirm={t.confirm} />
+                    })()}
+                    <ActionButton url={`/api/v1/expense-requests/${r.id}/reject`} label="Tolak" prompt={REJECT_PROMPT} />
                   </td>
                 </tr>
                 {details.get(r.id) ? (

@@ -1,4 +1,4 @@
-import { APIError, type CollectionAfterChangeHook, type Condition, type CollectionBeforeChangeHook, type CollectionConfig, type Field, type FilterOptionsProps, type PayloadRequest, type Where } from 'payload'
+import { APIError, type CollectionAfterChangeHook, type Condition, type CollectionBeforeChangeHook, type CollectionConfig, type FilterOptionsProps, type PayloadRequest, type Where } from 'payload'
 
 import { RIWAYAT_TAB } from '@/admin/config'
 
@@ -11,13 +11,16 @@ import { ids, type RequestDoc } from '@/domain/expense/common'
 import { CONTENT_VALIDATED, fromDocLines, validateContent } from '@/domain/expense/drafts'
 import { grandTotal, validateLines, type LineInput } from '@/domain/expense/lines'
 import { diffLines, type AuditLine } from '@/domain/expense/line-audit'
-import { isBusinessDate, isContentEditable, REQUEST_STATUSES, STATUS_LABELS, type RequestStatus, type RequestType } from '@/domain/expense/types'
+import { isContentEditable, REQUEST_STATUSES, STATUS_LABELS, type RequestStatus, type RequestType } from '@/domain/expense/types'
 import { rupiahField, uuidField } from '@/fields/common'
 import { requestMeta } from '@/lib/request-meta'
 import { forceDeferredChecks } from '@/lib/system-tx'
 import { notifyCreated, notifyTransition } from '@/domain/notifications'
 import { companyField, companyHook, pickerSameCompany, sameCompanyOptions } from '@/fields/company'
 import { validationError } from '@/lib/validation'
+
+import { draftOnly, draftOrSet, isDraftForm, linesCondition, PLACEHOLDERS, submittedOnly, whenSet } from './expense-request-form'
+import { businessDateField } from './fields-f2'
 
 /**
  * T1 Pengajuan biaya (requirements v1.1 §7 T1; architecture §4.3, §5.1/§5.2).
@@ -43,18 +46,9 @@ const system = { create: fieldNever, update: fieldNever }
 /** Roles that may read `approval-rules` (collection read access) — the field is shown only to them. */
 const canSeeApprovalRules: Condition = (_data, _sibling, { user }) => rolesOf(user).some((r) => r === 'pk-admin' || r === 'pk-owner' || r === 'pk-finance')
 const ro = { readOnly: true }
-const jsonView = { readOnly: true, components: { Field: '@/components/ReadOnlyJson#ReadOnlyJson' } }
-
-const businessDate = (name: string, label: string, extra: Partial<Field> = {}): Field =>
-  ({
-    name,
-    type: 'text',
-    label,
-    maxLength: 10,
-    admin: { description: 'Format YYYY-MM-DD (zona waktu perusahaan).' },
-    validate: (v: unknown) => (v === null || v === undefined || v === '' || isBusinessDate(v) ? true : 'Tanggal harus YYYY-MM-DD.'),
-    ...extra,
-  }) as Field
+const RUPIAH_FIELD = '@/admin/components/RupiahNumberField#RupiahNumberField'
+/** Read-only money as "Rp 1.250.000" (RupiahNumberField read-only mode). */
+const rupiahView = { components: { Field: RUPIAH_FIELD } }
 
 /** Picker filter of `bankAccount` (S3e, US-44): active accounts of the requesters / the creator's employee. */
 export const bankAccountOptions = ({ data, user }: Pick<FilterOptionsProps, 'data' | 'user'>): false | Where => {
@@ -67,7 +61,7 @@ export const bankAccountOptions = ({ data, user }: Pick<FilterOptionsProps, 'dat
 }
 
 /**
- * QA-15 (owner decision 2026-10-08): "Diajukan Oleh" picker — a user whose only role in the document's
+ * QA-15 (owner decision 2026-10-08): "Pemohon" (Diajukan Oleh) picker — a user whose only role in the document's
  * PT (unknown yet: in every selected PT) is Staff sees only their OWN employee; everyone else the
  * employees of the document's PT (pickerSameCompany). Server rule: drafts.ts validateContent.
  */
@@ -267,9 +261,12 @@ export const ExpenseRequests: CollectionConfig = withAudit(
       delete: denyDeleteLogged('expense_request'),
     },
     hooks: { beforeChange: [companyHook('expense-requests', { derive: [{ field: 'project', collection: 'projects' }, { field: 'costCenter', collection: 'cost-centers' }, { field: 'requesters', collection: 'employees' }], check: [{ field: 'bankAccount', collection: 'employee-bank-accounts' }, { field: 'urgencyLevel', collection: 'urgency-levels' }, { field: 'approvalRule', collection: 'approval-rules' }, { field: 'resubmitOf', collection: 'expense-requests' }, { field: 'lines', collection: 'expense-categories', sub: 'category' }, { field: 'lines', collection: 'vehicles', sub: 'vehicle' }] }), beforeChange], afterChange: [auditLines, notify] },
+    // DRMS 10/10 8i (WA-03/WA-10): create / draft shows only the inputs, in the APK draft editor order
+    // (Jenis, Judul, Project, Pusat biaya, Tanggal dibutuhkan, Urgensi, Pemohon, Rekening, Keterangan,
+    // Lampiran, baris + total pratinjau); system / workflow fields appear after submit (expense-request-form.ts).
     fields: [
       companyField(),
-      { name: 'docNo', type: 'text', label: 'Nomor', index: true, access: system, admin: { ...ro, position: 'sidebar' } },
+      { name: 'docNo', type: 'text', label: 'Nomor', index: true, access: system, admin: { ...ro, position: 'sidebar', condition: whenSet('docNo') } },
       // F2c: status timeline + next actor for everyone, requester actions for creator/requesters.
       { name: 'workflowPanel', type: 'ui', label: 'Status & aksi', admin: { components: { Field: '@/admin/components/WorkflowPanel#WorkflowPanel' } } },
       // M16 / US-46: "Cetak PDF" (audited API download); UI only, no column.
@@ -283,6 +280,7 @@ export const ExpenseRequests: CollectionConfig = withAudit(
           { label: 'Uang Muka', value: 'advance' },
           { label: 'Reimburse', value: 'reimburse' },
         ],
+        admin: { placeholder: PLACEHOLDERS.type },
       },
       {
         name: 'status',
@@ -293,45 +291,49 @@ export const ExpenseRequests: CollectionConfig = withAudit(
         index: true,
         options: REQUEST_STATUSES.map((s) => ({ label: STATUS_LABELS[s], value: s })),
         access: system,
-        admin: { ...ro, position: 'sidebar' },
+        admin: { ...ro, position: 'sidebar', condition: submittedOnly },
       },
-      { name: 'title', type: 'text', label: 'Judul / subjek', required: true, maxLength: 200 },
-      { name: 'project', type: 'relationship', relationTo: 'projects', label: 'Project', index: true, ...pickerSameCompany() },
-      { name: 'costCenter', type: 'relationship', relationTo: 'cost-centers', label: 'Pusat biaya', index: true, ...pickerSameCompany() },
-      businessDate('requestDate', 'Tanggal pengajuan (server)', { access: system, admin: { ...ro, position: 'sidebar' } }),
-      businessDate('neededDate', 'Tanggal dibutuhkan'),
+      { name: 'title', type: 'text', label: 'Judul', required: true, maxLength: 200 },
+      { name: 'project', type: 'relationship', relationTo: 'projects', label: 'Project', index: true, ...pickerSameCompany(), admin: { placeholder: PLACEHOLDERS.project, condition: draftOrSet('project') } },
+      { name: 'costCenter', type: 'relationship', relationTo: 'cost-centers', label: 'Pusat biaya', index: true, ...pickerSameCompany(), admin: { placeholder: PLACEHOLDERS.costCenter, description: 'Isi project ATAU pusat biaya.', condition: draftOrSet('costCenter') } },
+      businessDateField('neededDate', 'Tanggal dibutuhkan'),
       // Owner decision 2026-10-09: replaces "Periode kegiatan" (periodFrom/periodTo, Q-04).
-      { name: 'urgencyLevel', type: 'relationship', relationTo: 'urgency-levels', label: 'Tingkat urgensi', index: true, ...pickerSameCompany() },
-      { name: 'notes', type: 'textarea', label: 'Keterangan', maxLength: 2000 },
-      // QA-15: Staff-only users pick only themselves (requesterOptions); the server re-checks (validateContent)
-      { name: 'requesters', type: 'relationship', relationTo: 'employees', hasMany: true, label: 'Diajukan Oleh', admin: { isSortable: true }, ...pickerSameCompany(), filterOptions: requesterOptions },
-      { name: 'createdBy', type: 'relationship', relationTo: 'users', label: 'Dibuat Oleh', index: true, access: system, admin: { ...ro, position: 'sidebar' } },
+      { name: 'urgencyLevel', type: 'relationship', relationTo: 'urgency-levels', label: 'Tingkat urgensi', index: true, ...pickerSameCompany(), admin: { placeholder: PLACEHOLDERS.urgencyLevel, condition: draftOrSet('urgencyLevel') } },
+      // QA-15: Staff-only users pick only themselves (requesterOptions); the server re-checks (validateContent).
+      // WA-09: "Pemohon" as in the APK (the PDF signature box keeps "Diajukan Oleh").
+      { name: 'requesters', type: 'relationship', relationTo: 'employees', hasMany: true, label: 'Pemohon', admin: { isSortable: true, placeholder: PLACEHOLDERS.requesters }, ...pickerSameCompany(), filterOptions: requesterOptions },
       {
         name: 'bankAccount',
         type: 'relationship',
         relationTo: 'employee-bank-accounts',
         label: 'Rekening tujuan',
-        // S3e (US-44, Q-11, S-03): the picker lists only ACTIVE accounts of the requesters ("Diajukan
-        // Oleh"; none chosen yet = the creator's own employee), like the APK. Empty on save = default
+        // S3e (US-44, Q-11, S-03): the picker lists only ACTIVE accounts of the requesters ("Pemohon";
+        // none chosen yet = the creator's own employee), like the APK. Empty on save = default
         // account of the first requester (beforeChange). G9 is still enforced by validateContent, so
         // the relationship's own filterOptions check is switched off (it would re-read the account with
         // the caller's access — a Staff cannot read a co-requester's account).
         filterOptions: bankAccountOptions,
         validate: () => true as const,
-        admin: { description: 'Hanya rekening milik pemohon. Kosongkan untuk memakai rekening default pemohon pertama.' },
+        // DRMS 10/10 8e: the picker only while Draft; afterwards the preview below shows the submit snapshot.
+        admin: { description: 'Hanya rekening milik pemohon. Kosongkan untuk memakai rekening default pemohon pertama.', placeholder: PLACEHOLDERS.bankAccount, condition: draftOnly },
       },
+      // DRMS 10/10 8e (WA-04): chosen account (draft) / snapshot (after submit) — bank · holder · masked no. + eye toggle.
+      { name: 'bankAccountPreview', type: 'ui', label: 'Rekening tujuan', admin: { components: { Field: '@/admin/components/BankAccountPreview#BankAccountPreview' } } },
       {
         name: 'bankSnapshot',
         type: 'group',
         label: 'Rekening tujuan (snapshot saat diajukan)',
         access: system,
-        admin: ro,
+        // shown through bankAccountPreview (masked + eye toggle), never as raw fields
+        admin: { ...ro, hidden: true },
         fields: [
           { name: 'bankName', type: 'text', label: 'Bank' },
           { name: 'accountNo', type: 'text', label: 'Nomor rekening' },
           { name: 'accountHolder', type: 'text', label: 'Atas nama' },
         ],
       },
+      { name: 'notes', type: 'textarea', label: 'Keterangan', maxLength: 2000, admin: { condition: (d, s, c) => linesCondition(d, s, c) || whenSet('notes')(d, s, c) } },
+      { name: 'attachments', type: 'upload', relationTo: 'media-attachments', hasMany: true, label: 'Lampiran', admin: { condition: (d, s, c) => linesCondition(d, s, c) || whenSet('attachments')(d, s, c) } },
       {
         name: 'lines',
         type: 'array',
@@ -339,49 +341,55 @@ export const ExpenseRequests: CollectionConfig = withAudit(
         labels: { singular: 'Baris', plural: 'Baris' },
         // F2d UAT: Payload 3.90.1 client race — a row added while the form-state server action of
         // the previous edit is still pending stays a skeleton.
-        admin: { description: 'Tunggu sebentar setelah mengisi field sebelum menekan Tambah Baris.' },
+        // DRMS 10/10 9a (WA-05): editable cards only in Draft / Revisi Nota; otherwise the "Rincian pengajuan" table.
+        admin: { description: 'Tunggu sebentar setelah mengisi field sebelum menekan Tambah Baris.', condition: linesCondition },
         fields: [
           { name: 'description', type: 'text', label: 'Uraian', maxLength: 500 },
           {
             type: 'row',
             fields: [
+              // qty keeps decimals (e.g. 1,5 m³) → Payload number input; money → Rupiah input (8c, WA-02)
               { name: 'qty', type: 'number', label: 'Jumlah', min: 0 },
-              { name: 'uom', type: 'relationship', relationTo: 'uoms', label: 'Satuan' },
-              { name: 'unitPrice', type: 'number', label: 'Harga satuan (informatif)', min: 0 },
-              { name: 'total', type: 'number', label: 'Total (Rp)', min: 0 },
+              { name: 'uom', type: 'relationship', relationTo: 'uoms', label: 'Satuan', admin: { placeholder: PLACEHOLDERS.uom } },
+              { name: 'unitPrice', type: 'number', label: 'Harga satuan (informatif)', min: 0, admin: { components: { Field: RUPIAH_FIELD } } },
+              { name: 'total', type: 'number', label: 'Total', min: 0, admin: { components: { Field: RUPIAH_FIELD } } },
             ],
           },
           {
             type: 'row',
             fields: [
-              { name: 'category', type: 'relationship', relationTo: 'expense-categories', label: 'Kategori' },
-              { name: 'vehicle', type: 'relationship', relationTo: 'vehicles', label: 'Kendaraan' },
+              { name: 'category', type: 'relationship', relationTo: 'expense-categories', label: 'Kategori', admin: { placeholder: PLACEHOLDERS.category } },
+              { name: 'vehicle', type: 'relationship', relationTo: 'vehicles', label: 'Kendaraan', admin: { placeholder: PLACEHOLDERS.vehicle } },
             ],
           },
           { name: 'notes', type: 'text', label: 'Keterangan', maxLength: 500 },
         ],
       },
-      { ...rupiahField('grandTotal', 'Grand total (Rp)'), access: system, admin: { ...ro, position: 'sidebar' } },
-      { ...rupiahField('approvedAmount', 'Nominal disetujui (Rp)'), access: system, admin: { ...ro, position: 'sidebar' } },
-      { ...rupiahField('transferredTotal', 'Total ditransfer (Rp)'), access: system, admin: { ...ro, position: 'sidebar' } },
-      { ...rupiahField('verifiedReceiptsTotal', 'Total nota terverifikasi LPJ (Rp)'), access: system, admin: { ...ro, position: 'sidebar' } },
-      { name: 'attachments', type: 'upload', relationTo: 'media-attachments', hasMany: true, label: 'Lampiran umum' },
+      { name: 'linesTotalPreview', type: 'ui', label: 'Total (pratinjau)', admin: { condition: linesCondition, components: { Field: '@/admin/components/LinesTotalPreview#LinesTotalPreview' } } },
+      businessDateField('requestDate', 'Tanggal pengajuan (server)', { access: system, admin: { ...ro, position: 'sidebar', condition: whenSet('requestDate') } }),
+      { name: 'createdBy', type: 'relationship', relationTo: 'users', label: 'Dibuat oleh', index: true, access: system, admin: { ...ro, position: 'sidebar', condition: whenSet('createdBy') } },
+      { ...rupiahField('grandTotal', 'Grand total (Rp)'), access: system, admin: { ...ro, ...rupiahView, position: 'sidebar', condition: whenSet('grandTotal') } },
+      { ...rupiahField('approvedAmount', 'Nominal disetujui (Rp)'), access: system, admin: { ...ro, ...rupiahView, position: 'sidebar', condition: (d, s, c) => submittedOnly(d, s, c) && whenSet('approvedAmount')(d, s, c) } },
+      { ...rupiahField('transferredTotal', 'Total ditransfer (Rp)'), access: system, admin: { ...ro, ...rupiahView, position: 'sidebar', condition: submittedOnly } },
+      { ...rupiahField('verifiedReceiptsTotal', 'Total nota terverifikasi LPJ (Rp)'), access: system, admin: { ...ro, ...rupiahView, position: 'sidebar', condition: (d, s, c) => submittedOnly(d, s, c) && whenSet('verifiedReceiptsTotal')(d, s, c) } },
       // F2e UAT: office-only fields are not rendered for users who cannot read their target
       // (staff/PM → the relationship input fired POST /api/approval-rules → 403 on every view).
-      { name: 'approvalRule', type: 'relationship', relationTo: 'approval-rules', label: 'Aturan approval', access: system, admin: { ...ro, condition: canSeeApprovalRules } },
-      { name: 'approvalSnapshot', type: 'json', label: 'Snapshot aturan approval', access: system, admin: { ...jsonView, condition: canSeeApprovalRules } },
+      { name: 'approvalRule', type: 'relationship', relationTo: 'approval-rules', label: 'Aturan approval', access: system, admin: { ...ro, position: 'sidebar', condition: (data, sibling, ctx) => submittedOnly(data, sibling, ctx) && canSeeApprovalRules(data, sibling, ctx) } },
+      // DRMS 10/10 9c (WA-06): readable timeline in the workflow panel; raw JSON only for Admin, folded.
+      { name: 'approvalSnapshot', type: 'json', label: 'Snapshot aturan approval', access: system, admin: { readOnly: true, components: { Field: '@/components/ReadOnlyJson#CollapsedReadOnlyJson' }, condition: (data, _s, { user }) => !isDraftForm(data) && rolesOf(user).includes('pk-admin') } },
       {
         // ADR 0021 (owner 2026-10-10): narrow G1 exception, set by the service at submit only (DB trigger
         // expense_requests_g1_exception: value 'direktur_via_pm' | 'direktur_via_pm_self' or null, changes only at the freeze point).
+        // DRMS 10/10 9c: shown as readable text in the approval timeline ("Pengajuan Direktur — diajukan oleh PM …").
         name: 'g1Exception',
         type: 'text',
         label: 'Pengecualian G1',
         access: system,
-        admin: { ...ro, condition: canSeeApprovalRules, description: 'direktur_via_pm = pengajuan Direktur, diajukan oleh PM (Direktur lain memutuskan); direktur_via_pm_self = idem, Direktur pemohon satu-satunya Direktur PT (kebijakan owner 2026-10-10/11).' },
+        admin: { ...ro, hidden: true },
       },
       { name: 'approvalCycle', type: 'number', label: 'Siklus approval', defaultValue: 0, access: system, admin: { ...ro, hidden: true } },
-      { name: 'currentLevel', type: 'number', label: 'Level approval berjalan', access: system, admin: ro },
-      { name: 'submittedAt', type: 'date', label: 'Diajukan (server)', access: system, admin: { ...ro, date: { pickerAppearance: 'dayAndTime' } } },
+      { name: 'currentLevel', type: 'number', label: 'Level approval berjalan', access: system, admin: { ...ro, position: 'sidebar', condition: submittedOnly } },
+      { name: 'submittedAt', type: 'date', label: 'Diajukan (server)', access: system, admin: { ...ro, position: 'sidebar', date: { pickerAppearance: 'dayAndTime' }, condition: whenSet('submittedAt') } },
       { name: 'contentHash', type: 'text', label: 'Hash isi terkunci', access: system, admin: { ...ro, hidden: true } },
       {
         name: 'resubmitOf',
@@ -390,10 +398,10 @@ export const ExpenseRequests: CollectionConfig = withAudit(
         label: 'Pengajuan ulang dari',
         access: system,
         // F2e: number + title of the previous request (not only its title), read-only link.
-        admin: { ...ro, components: { Field: '@/admin/components/ResubmitOfField#ResubmitOfField' } },
+        admin: { ...ro, condition: whenSet('resubmitOf'), components: { Field: '@/admin/components/ResubmitOfField#ResubmitOfField' } },
       },
-      { name: 'cancelReason', type: 'text', label: 'Alasan batal', access: system, admin: ro },
-      { name: 'rejectReason', type: 'text', label: 'Alasan ditolak', access: system, admin: ro },
+      { name: 'cancelReason', type: 'text', label: 'Alasan batal', access: system, admin: { ...ro, condition: whenSet('cancelReason') } },
+      { name: 'rejectReason', type: 'text', label: 'Alasan ditolak', access: system, admin: { ...ro, condition: whenSet('rejectReason') } },
       {
         name: 'syncRev',
         type: 'number',
@@ -409,7 +417,7 @@ export const ExpenseRequests: CollectionConfig = withAudit(
         label: 'Sumber',
         options: ['web', 'apk', 'system', 'job'].map((s) => ({ label: s, value: s })),
         access: system,
-        admin: { ...ro, position: 'sidebar' },
+        admin: { ...ro, position: 'sidebar', condition: submittedOnly },
       },
       uuidField(),
     ],

@@ -38,6 +38,38 @@ a later migration can tighten the column). Rollback: `down()` drops NOT NULL and
   missing or Keycloak-pending project PM as an error.
 - Payload edit forms: the "Edit"/"API" document tabs are gone (API tab disabled via `hideAPIURL`, a lone tab row is
   hidden) — one primary action "Simpan"; uniform field spacing (20 px, 16 px on phones) for every collection form.
+**DRMS 10/10 Phase A — web expense request screens** (owner feedback 2026-10-11, `docs/proyekkas/plans/drms-1010.md`
+items 8c–8e, 8i, 9a–9d, 12b, 12c; findings WA-01…WA-12, WA-15). No migration.
+
+### Changed (DRMS 10/10 Phase A, web)
+
+- **Expense request form** (create / draft): only the inputs, in the APK draft-editor order (Jenis, Judul, Project,
+  Pusat biaya, Tanggal dibutuhkan, Tingkat urgensi, Pemohon, Rekening tujuan, Keterangan, Lampiran, baris item +
+  "Total (pratinjau)"); level approval, aturan/snapshot approval, pengecualian G1, nomor/status, diajukan, alasan,
+  sumber and the money totals appear only after submit. Short panel help on create. Labels as in the APK ("Pemohon",
+  "Judul", "Lampiran", "Dibuat oleh").
+- **Date picker** for every business date (`YYYY-MM-DD` text columns, no migration): Tanggal dibutuhkan, Tanggal nota,
+  Tanggal transfer/laporan, Mulai/Selesai kontrak unit, Tanggal saldo awal, Hari libur; read-only dates as
+  "12 Oktober 2026". Line "Harga satuan" and "Total" use the shared Rupiah input (`Rp 1.250.000`, lib/rupiah-input);
+  Jumlah keeps decimals.
+- **Placeholders:** field-specific hints on the request selects ("Pilih project…", "Pilih tingkat urgensi…",
+  "Pilih pemohon…", "Pilih rekening tujuan…", "Pilih satuan…", "Pilih kategori…", "Pilih kendaraan…", PT picker
+  "Pilih PT…"); Payload's global "Pilih nilai" → "Pilih…".
+- **Rekening tujuan:** the chosen account right under the picker (bank · atas nama · `••••1234`) with an eye button;
+  after submit the same card shows the snapshot taken at submit (raw snapshot fields hidden). New
+  `GET /api/v1/bank-account-preview?request=&account=&reveal=1` — the full number only for creator/requesters and
+  Finance/Direktur/Admin of the PT (same rule as the detail DTO); foreign accounts / requests / PTs → 404.
+- **Request detail:** one lines table "Rincian pengajuan" (also for the requester; the line cards only in Draft /
+  Revisi Nota); PT on one line ("PT: DRMS — …", every document with a PT); readable vertical **Alur persetujuan**
+  (Diajukan → Persetujuan PM project / Diketahui → Persetujuan Direktur / Approval → Transfer Finance: role, planned
+  approver, Selesai / Giliran / Menunggu / Dilewati / Ditolak, actor, time, note; G1 exception as text) instead of the
+  raw JSON (raw snapshot only for Admin, folded); **Setujui / Tolak / Diketahui bar** at the bottom of the detail
+  when the server allows the decision (same endpoints, Idempotency-Key and confirmation texts as Persetujuan).
+- **Clickable numbers:** LPJ (Verifikasi LPJ), transfer (Antrian Transfer, request detail incl. KK + proof), cash /
+  request numbers in the dashboard, document numbers in the admin audit card and Riwayat.
+- **Image lightbox** for every thumbnail (receipts, progress and field-report photos, transfer and cash proofs,
+  selfie): modal, fit ↔ 100 %, previous/next in the group (keys, buttons, swipe), Esc, works at 390 px; PDFs and
+  non-images keep "Buka di tab baru".
 
 **Approval pengajuan biaya: Staff → PM project → Direktur → Finance transfer** (owner decisions 2026-10-10, ADR 0021,
 requirements v1.3 §9; supersedes the decision part of ADR 0013 for expense requests). **Staging first** — production
