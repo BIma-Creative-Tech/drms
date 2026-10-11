@@ -34,12 +34,16 @@ baru juga muncul di lonceng **Notifikasi** (bar atas, kanan) dan — bila Admin 
   satu PT tampil (tombol PT di bar atas web / di Beranda APK), setiap baris diberi kode PT (web: kolom **PT** +
   tulisan **Menampilkan PT: …**). Keputusan selalu memakai peran Anda **di PT pengajuan**, dan warna merah Dampak
   anggaran memakai ambang PT itu.
-- **Pengajuan untuk Anda sendiri** dibuat oleh **PM project** atas nama Anda (Anda sebagai pemohon). PM menyetujui
-  sebagai PM project, lalu **Direktur lain** di PT itu yang menyetujui (Anda tidak bisa menyetujui pengajuan Anda
-  sendiri selama ada Direktur lain). Hanya bila Anda satu-satunya Direktur PT, Anda sendiri yang menyetujui. Ini pengecualian G1 yang diputuskan owner
-  (10 Okt 2026), tercatat di Audit Log, panel dan PDF: "Pengajuan Direktur — diajukan oleh PM (kebijakan owner
-  2026-10-10)". Bila pengajuan untuk Anda dibuat orang lain (mis. Finance/Admin) dan tidak ada Direktur lain di PT itu,
-  pengiriman ditolak "Pengajuan untuk Direktur dibuat oleh PM project." — minta PM project membuatkannya.
+- **Pengajuan Anda sendiri** (sejak 11 Okt 2026, keputusan owner, ADR 0024): buat dan kirim sendiri (web atau APK,
+  Anda sebagai pemohon). Dengan aturan **"Pengajuan Direktur"** pengajuan **langsung ke antrian transfer Finance tanpa
+  persetujuan** — tidak ada PM, tidak ada Direktur lain. Status: **Tanpa persetujuan (Antri Transfer)** (Reimburse:
+  **Tanpa persetujuan (Verifikasi Nota)**); di alur persetujuan, panel, PDF dan laporan Rekap Pengajuan tercatat
+  "Tanpa persetujuan — pengajuan Direktur (kebijakan PT)" dan di Audit Log (`approval_policy_exception`). Finance tetap
+  memeriksa rekening, nota dan saldo sebelum mentransfer. APK menampilkan "Pengajuan Anda langsung ke antrian transfer
+  Finance" di formulir. Kekurangan LPJ pengajuan Anda juga tanpa persetujuan (tercatat). PM / Admin / Finance **tidak
+  lagi** membuat pengajuan atas nama Anda (ditolak).
+- Pengajuan untuk Anda yang dulu dibuat PM project (sebelum 11 Okt 2026) tetap selesai dengan alur lama dan tulisan
+  lama "Pengajuan Direktur — diajukan oleh PM (kebijakan owner 2026-10-10)".
 - Pada pengajuan alur lama Anda tidak bisa menyetujui pengajuan di mana Anda tercantum sebagai pemohon; bila Anda
   satu-satunya Direktur, langkah "Diketahui" dilewati dan tercatat "(tidak berlaku — pemohon)".
 - Bila Anda berhalangan, semua pengajuan tertahan. Sepakati pengganti dengan Admin (aturan approval) sebelum cuti.

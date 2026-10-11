@@ -30,6 +30,13 @@ Badge merah di menu = jumlah pekerjaan menunggu.
 Finance pada pengajuan ini. Bila Anda membuat pengajuan atas nama karyawan, pengajuan tetap melewati PM project dan
 Direktur.
 
+**Pengajuan Direktur sendiri (sejak 11 Okt 2026, ADR 0024):** langsung masuk **Antrian Transfer** (Reimburse: verifikasi
+nota) **tanpa persetujuan**, ditandai **"Tanpa persetujuan (Direktur)"** di antrian (web + APK) dan "Tanpa persetujuan —
+pengajuan Direktur (kebijakan PT)" di detail, PDF dan Rekap Pengajuan (kolom **Persetujuan**). **Anda satu-satunya
+pemeriksa sebelum uang keluar**: periksa rekening (terverifikasi?), flag/selisih nota dan saldo seperti biasa.
+Kekurangan LPJ pengajuan seperti ini disetujui otomatis saat Anda memintanya (tercatat di Audit Log). Pengajuan
+Direktur yang dibuat Admin/Finance atas namanya ditolak saat dikirim — minta Direktur mengajukan sendiri.
+
 **Alur lama (pengajuan yang sudah diajukan sebelum aturan diubah — tetap selesai dengan alur lama):**
 **Direktur** menyetujui dulu ("Diketahui"), baru pengajuan masuk ke Anda untuk **Approval**.
 
