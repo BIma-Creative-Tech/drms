@@ -3,6 +3,7 @@ import type { PayloadRequest, Where } from 'payload'
 import { relId } from '@/access/roles'
 import { displayNames } from '@/domain/companies'
 import { projectRapSummaries, type ProjectRapSummary } from '@/domain/rap/budget'
+import { rapRequiredFor } from '@/domain/rap/rules'
 import { rapRoles } from '@/domain/rap/service'
 import { searchWhere } from '@/lib/text-search'
 import { PROJECT_STATUSES } from '@/collections/Projects'
@@ -48,9 +49,16 @@ async function ccRefs(req: PayloadRequest, docs: ProjectDoc[]): Promise<Map<numb
   return new Map(res.docs.map((c) => [c.id as number, { id: c.id as number, code: String((c as { code?: string }).code ?? ''), name: String((c as { name?: string }).name ?? '') }]))
 }
 
+/** RAB of the projects regardless of the caller's field access (D4 rule input; the amount itself is not returned). */
+async function budgetsOf(req: PayloadRequest, docs: ProjectDoc[]): Promise<Map<number, number | null>> {
+  if (docs.length === 0) return new Map()
+  const res = await req.payload.find({ collection: 'projects', where: { id: { in: docs.map((d) => d.id) } }, depth: 0, pagination: false, select: { budget: true }, overrideAccess: true /* SYSTEM-READ: RAB of the visible projects for the D4 RAP rule */, req })
+  return new Map(res.docs.map((d) => [d.id as number, typeof (d as { budget?: unknown }).budget === 'number' ? ((d as { budget: number }).budget) : null]))
+}
+
 async function items(req: PayloadRequest, docs: ProjectDoc[]) {
   const pmIds = docs.map((d) => relId(d.pm)).filter((x): x is number => x !== undefined)
-  const [names, ccs, rap] = [await displayNames(req, pmIds), await ccRefs(req, docs), await projectRapSummaries(req, docs.map((d) => d.id))]
+  const [names, ccs, rap, budgets] = [await displayNames(req, pmIds), await ccRefs(req, docs), await projectRapSummaries(req, docs.map((d) => d.id)), await budgetsOf(req, docs)]
   const out = []
   for (const d of docs) {
     const company = relId(d.company) ?? -1
@@ -75,6 +83,9 @@ async function items(req: PayloadRequest, docs: ProjectDoc[]) {
       rapPercent: prices ? (s?.percent ?? null) : null,
       rapOverBudgetItems: prices ? (s?.overBudgetItems ?? 0) : null,
       rapItems: s?.items ?? 0,
+      // DRMS 10/10 D4 (owner 2026-10-11): a project with a RAB (or konstruksi) needs a RAP before requests can be sent
+      rapRequired: rapRequiredFor({ kind: d.kind ?? 'umum', budget: budgets.get(d.id) ?? null }),
+      rapMissing: rapRequiredFor({ kind: d.kind ?? 'umum', budget: budgets.get(d.id) ?? null }) && (s?.activeItems ?? 0) === 0,
     })
   }
   return out

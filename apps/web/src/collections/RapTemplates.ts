@@ -3,20 +3,21 @@ import type { CollectionConfig } from 'payload'
 import { denyAll } from '@/access/roles'
 import { byRole, rolesAllowed } from '@/access/policies'
 import { reasonOnDeactivate, withAudit } from '@/audit/hooks'
+import { PROJECT_KIND_LABELS, PROJECT_KINDS } from '@/domain/field/rules'
 import { RAP_KIND_LABELS, RAP_KINDS } from '@/domain/rap/rules'
 import { activeField, uuidField } from '@/fields/common'
 import { companyField, companyHook } from '@/fields/company'
 
 /**
  * P3 RAP template per PT (owner decision 2026-10-10): applied to a project without RAP, or saved from a
- * project's RAP. Stages by name, units by code (resolved when applied). Cross-PT reuse goes through the
+ * project's RAP. Since DRMS 10/10 D4 (2026-10-11) per project kind (`projectKind`, empty = any kind). Stages by name, units by code (resolved when applied). Cross-PT reuse goes through the
  * Excel file. The `items` array is rewritten on every update (Payload child table → DELETE grant).
  */
 export const RapTemplates: CollectionConfig = withAudit(
   {
     slug: 'rap-templates',
     labels: { singular: 'Template RAP', plural: 'Template RAP' },
-    admin: { useAsTitle: 'name', group: 'Proyek', defaultColumns: ['name', 'active', 'updatedAt'] },
+    admin: { useAsTitle: 'name', group: 'Proyek', defaultColumns: ['name', 'projectKind', 'active', 'updatedAt'] },
     access: {
       read: byRole({ 'pk-admin': true, 'pk-owner': true, 'pk-finance': true, 'pk-pm': true }),
       create: rolesAllowed('pk-admin', 'pk-owner', 'pk-pm'),
@@ -27,6 +28,15 @@ export const RapTemplates: CollectionConfig = withAudit(
     fields: [
       companyField(),
       { name: 'name', type: 'text', label: 'Nama template', required: true, index: true, maxLength: 128 },
+      {
+        // DRMS 10/10 D4 (2026-10-11): RAP for every project kind with a RAB → templates per project kind (empty = any kind)
+        name: 'projectKind',
+        type: 'select',
+        label: 'Jenis project',
+        index: true,
+        options: PROJECT_KINDS.map((v) => ({ label: PROJECT_KIND_LABELS[v], value: v })),
+        admin: { description: 'Template hanya ditawarkan untuk project jenis ini. Kosong = semua jenis.' },
+      },
       { name: 'notes', type: 'textarea', label: 'Keterangan', maxLength: 1000 },
       {
         name: 'items',
@@ -37,7 +47,7 @@ export const RapTemplates: CollectionConfig = withAudit(
         fields: [
           { name: 'code', type: 'text', label: 'Kode', required: true, maxLength: 32 },
           { name: 'description', type: 'text', label: 'Uraian', required: true, maxLength: 300 },
-          { name: 'stageName', type: 'text', label: 'Tahapan', required: true, maxLength: 128 },
+          { name: 'stageName', type: 'text', label: 'Tahapan', maxLength: 128, admin: { description: 'Wajib untuk template konstruksi; jenis lain boleh kosong.' } },
           { name: 'kind', type: 'select', label: 'Jenis', required: true, options: RAP_KINDS.map((v) => ({ label: RAP_KIND_LABELS[v], value: v })) },
           { name: 'uomCode', type: 'text', label: 'Satuan (kode)', required: true, maxLength: 16 },
           { name: 'volume', type: 'number', label: 'Volume', required: true, min: 0 },

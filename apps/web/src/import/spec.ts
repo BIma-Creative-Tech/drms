@@ -273,7 +273,7 @@ export const SHEETS: SheetSpec[] = [
       { key: 'alamat', type: 'text', maxLength: 500, hint: 'Opsional.', width: 28 },
       { key: 'pm', type: 'username', hint: 'Username PM (sheet Pengguna).', ref: { sheet: 'pengguna', col: 'username' }, width: 16 },
       ...coord(),
-      { key: 'rab', type: 'money', min: 0, hint: 'RAB total (Rupiah, bilangan bulat). Kosong = jumlah sheet RAB project ini.', width: 16 },
+      { key: 'rab', type: 'money', min: 0, hint: 'RAB total (Rupiah, bilangan bulat). Kosong = jumlah sheet RAB project ini. Project ber-RAB wajib punya RAP sebelum pengajuan dikirim: isi RAP setelah impor (tab RAP project).', width: 16 },
       { key: 'tanggal_mulai', type: 'date', hint: 'Format YYYY-MM-DD atau DD/MM/YYYY.', width: 13 },
       { key: 'target_selesai', type: 'date', hint: 'Format YYYY-MM-DD atau DD/MM/YYYY.', width: 13 },
       { key: 'status', type: 'enum', hint: 'Perencanaan, Berjalan, Ditunda, Selesai. Kosong = Berjalan.', options: PROJECT_STATUS, width: 13 },

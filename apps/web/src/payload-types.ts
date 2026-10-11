@@ -1334,7 +1334,7 @@ export interface RapItem {
    */
   company?: (number | null) | Company;
   project: number | Project;
-  stage: number | ProjectStage;
+  stage?: (number | null) | ProjectStage;
   code: string;
   description: string;
   kind: 'pekerjaan' | 'material';
@@ -2024,12 +2024,19 @@ export interface RapTemplate {
    */
   company?: (number | null) | Company;
   name: string;
+  /**
+   * Template hanya ditawarkan untuk project jenis ini. Kosong = semua jenis.
+   */
+  projectKind?: ('umum' | 'konstruksi' | 'kontrak_unit' | 'aftersales' | 'trading') | null;
   notes?: string | null;
   items?:
     | {
         code: string;
         description: string;
-        stageName: string;
+        /**
+         * Wajib untuk template konstruksi; jenis lain boleh kosong.
+         */
+        stageName?: string | null;
         kind: 'pekerjaan' | 'material';
         uomCode: string;
         volume: number;
@@ -3863,6 +3870,7 @@ export interface RapItemsSelect<T extends boolean = true> {
 export interface RapTemplatesSelect<T extends boolean = true> {
   company?: T;
   name?: T;
+  projectKind?: T;
   notes?: T;
   items?:
     | T

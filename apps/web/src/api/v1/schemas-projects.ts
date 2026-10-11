@@ -43,6 +43,8 @@ export const ProjectListItem = z
     rapPercent: z.number().nullable().meta({ description: 'D4: rapRealised / rapPlanned × 100 (price roles only).' }),
     rapOverBudgetItems: z.number().int().nullable().meta({ description: 'D4: RAP items over plan (price roles only).' }),
     rapItems: z.number().int().meta({ description: 'RAP items (active + deactivated with realisation).' }),
+    rapRequired: z.boolean().meta({ description: 'DRMS 10/10 D4 (owner 2026-10-11): the project has a RAB (or is konstruksi) → ≥ 1 active RAP item is required before a request can be submitted.' }),
+    rapMissing: z.boolean().meta({ description: 'rapRequired and no active RAP item yet → submit is refused ("Project belum punya RAP — hubungi PM").' }),
   })
   .meta({ id: 'ProjectListItem' })
 

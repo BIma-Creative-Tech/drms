@@ -12285,6 +12285,14 @@ export const openapiDocument = {
           "kind": {
             "type": "string"
           },
+          "rapRequired": {
+            "type": "boolean",
+            "description": "DRMS 10/10 D4 (owner 2026-10-11): the project has a RAB (or is konstruksi) → it needs ≥ 1 active item before a request can be submitted (\"Project belum punya RAP — hubungi PM\")."
+          },
+          "drivesProgress": {
+            "type": "boolean",
+            "description": "konstruksi only: work items drive the stage % (daily reports). Other kinds: cost plan only, stage optional, progress manual."
+          },
           "locked": {
             "type": "boolean"
           },
@@ -12472,6 +12480,8 @@ export const openapiDocument = {
         "required": [
           "projectId",
           "kind",
+          "rapRequired",
+          "drivesProgress",
           "locked",
           "canEdit",
           "needsReason",
@@ -12503,7 +12513,10 @@ export const openapiDocument = {
             "$ref": "#/components/schemas/RapKind"
           },
           "stage": {
-            "type": "object",
+            "type": [
+              "object",
+              "null"
+            ],
             "properties": {
               "id": {
                 "type": "integer",
@@ -12516,7 +12529,8 @@ export const openapiDocument = {
             "required": [
               "id",
               "name"
-            ]
+            ],
+            "description": "null: item without stage (allowed outside konstruksi, DRMS 10/10 D4)."
           },
           "uom": {
             "type": "object",
@@ -12676,9 +12690,12 @@ export const openapiDocument = {
             "maxLength": 300
           },
           "stageId": {
-            "type": "integer",
+            "type": [
+              "integer",
+              "null"
+            ],
             "exclusiveMinimum": 0,
-            "description": "Stage of the same project."
+            "description": "Stage of the same project. Required for konstruksi (400 stageId); other kinds may omit it (DRMS 10/10 D4) and clear it with null."
           },
           "kind": {
             "$ref": "#/components/schemas/RapKind"
@@ -12723,7 +12740,6 @@ export const openapiDocument = {
         "required": [
           "code",
           "description",
-          "stageId",
           "kind",
           "uomId",
           "volume"
@@ -12745,9 +12761,12 @@ export const openapiDocument = {
             "maxLength": 300
           },
           "stageId": {
-            "type": "integer",
+            "type": [
+              "integer",
+              "null"
+            ],
             "exclusiveMinimum": 0,
-            "description": "Stage of the same project."
+            "description": "Stage of the same project. Required for konstruksi (400 stageId); other kinds may omit it (DRMS 10/10 D4) and clear it with null."
           },
           "kind": {
             "type": "string",
@@ -14183,6 +14202,14 @@ export const openapiDocument = {
           "rapItems": {
             "type": "integer",
             "description": "RAP items (active + deactivated with realisation)."
+          },
+          "rapRequired": {
+            "type": "boolean",
+            "description": "DRMS 10/10 D4 (owner 2026-10-11): the project has a RAB (or is konstruksi) → ≥ 1 active RAP item is required before a request can be submitted."
+          },
+          "rapMissing": {
+            "type": "boolean",
+            "description": "rapRequired and no active RAP item yet → submit is refused (\"Project belum punya RAP — hubungi PM\")."
           }
         },
         "required": [
@@ -14201,7 +14228,9 @@ export const openapiDocument = {
           "rapRealised",
           "rapPercent",
           "rapOverBudgetItems",
-          "rapItems"
+          "rapItems",
+          "rapRequired",
+          "rapMissing"
         ]
       },
       "ProjectDetail": {
@@ -14325,6 +14354,14 @@ export const openapiDocument = {
             "type": "integer",
             "description": "RAP items (active + deactivated with realisation)."
           },
+          "rapRequired": {
+            "type": "boolean",
+            "description": "DRMS 10/10 D4 (owner 2026-10-11): the project has a RAB (or is konstruksi) → ≥ 1 active RAP item is required before a request can be submitted."
+          },
+          "rapMissing": {
+            "type": "boolean",
+            "description": "rapRequired and no active RAP item yet → submit is refused (\"Project belum punya RAP — hubungi PM\")."
+          },
           "client": {
             "type": [
               "object",
@@ -14383,6 +14420,8 @@ export const openapiDocument = {
           "rapPercent",
           "rapOverBudgetItems",
           "rapItems",
+          "rapRequired",
+          "rapMissing",
           "client",
           "address",
           "startDate",
@@ -33384,7 +33423,7 @@ export const openapiDocument = {
     },
     "/projects/{id}/rap": {
       "get": {
-        "summary": "P3 RAP of a konstruksi project: items (realised / received / used / stock / %), stage summary (progressMode rap|manual, basis value|equal), lock state; prices and totals only for Direktur/Admin/Finance and the project PM",
+        "summary": "P3 RAP of a project (every kind since DRMS 10/10 D4; konstruksi: stage-driven progress): items (realised / received / used / stock / %), stage summary (progressMode rap|manual, basis value|equal), lock state, rapRequired; prices and totals only for Direktur/Admin/Finance and the project PM",
         "security": [
           {
             "bearer": []
@@ -33552,7 +33591,7 @@ export const openapiDocument = {
     },
     "/projects/{id}/rap/items": {
       "post": {
-        "summary": "P3 add a RAP item: Direktur/Admin or the project PM; locked RAP (realisation exists) → Direktur/Admin with reason (409 RAP_LOCKED); 409 DUPLICATE_CODE / WRONG_PROJECT_KIND",
+        "summary": "P3 add a RAP item (any project kind; stageId required for konstruksi): Direktur/Admin or the project PM; locked RAP (realisation exists) → Direktur/Admin with reason (409 RAP_LOCKED); 409 DUPLICATE_CODE",
         "security": [
           {
             "bearer": []
@@ -33967,7 +34006,7 @@ export const openapiDocument = {
     },
     "/projects/{id}/rap/import/commit": {
       "post": {
-        "summary": "P3 RAP Excel import — commit the previewed file (409 FILE_CHANGED); idempotent by kode; items missing from the file are deactivated; new stages only for Direktur/Admin",
+        "summary": "P3 RAP Excel import — commit the previewed file (409 FILE_CHANGED); idempotent by kode; items missing from the file are deactivated; konstruksi: new stages only for Direktur/Admin; other kinds: tahapan optional, existing stages only",
         "security": [
           {
             "bearer": []
@@ -34097,7 +34136,7 @@ export const openapiDocument = {
     },
     "/projects/{id}/rap/apply-template": {
       "post": {
-        "summary": "P3 fill an EMPTY RAP from a RAP template of the same PT (409 STATE_CONFLICT when items exist)",
+        "summary": "P3 fill an EMPTY RAP from a RAP template of the same PT and project kind (template without kind = any kind; 400 templateId otherwise; 409 STATE_CONFLICT when items exist)",
         "security": [
           {
             "bearer": []
