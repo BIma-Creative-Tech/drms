@@ -60,14 +60,14 @@ export async function fieldProjects(req: PayloadRequest, kinds: readonly Project
  * One document the caller may read, or null — `find` by id instead of findByID: a findByID that throws
  * NotFound/Forbidden makes Payload kill the request transaction, which the view still needs.
  */
-async function findVisible(req: PayloadRequest, collection: 'projects' | 'vehicles' | 'service-reports' | 'unit-timesheets' | 'aftersales-activities', id: number, select?: Record<string, true>): Promise<(Record<string, unknown> & { id: number }) | null> {
+async function findVisible(req: PayloadRequest, collection: 'projects' | 'vehicles' | 'service-reports' | 'unit-timesheets' | 'aftersales-activities' | 'daily-reports', id: number, select?: Record<string, true>): Promise<(Record<string, unknown> & { id: number }) | null> {
   const r = await req.payload.find({ collection, where: { id: { equals: id } }, limit: 1, depth: 0, pagination: false, ...(select ? { select } : {}), user: req.user, overrideAccess: false /* caller's read scope */, req })
   return (r.docs[0] as unknown as (Record<string, unknown> & { id: number }) | undefined) ?? null
 }
 
 /** A field report the caller may read (collection access), or null. */
 export async function visibleFieldDoc<T>(req: PayloadRequest, type: FieldReportType, id: number): Promise<T | null> {
-  const collection = type === 'service_report' ? 'service-reports' : type === 'unit_timesheet' ? 'unit-timesheets' : 'aftersales-activities'
+  const collection = ({ service_report: 'service-reports', unit_timesheet: 'unit-timesheets', aftersales_activity: 'aftersales-activities', daily_report: 'daily-reports' } as const)[type]
   return (await findVisible(req, collection, id)) as T | null
 }
 
@@ -206,7 +206,7 @@ export async function clientsOf(req: PayloadRequest, companies: readonly number[
 }
 
 /** Reporters of a field collection the caller can see (filter "Mekanik / pelapor"). */
-export async function reportersOf(req: PayloadRequest, collection: 'service-reports' | 'unit-timesheets' | 'aftersales-activities'): Promise<Array<{ id: number; name: string }>> {
+export async function reportersOf(req: PayloadRequest, collection: 'service-reports' | 'unit-timesheets' | 'aftersales-activities' | 'daily-reports'): Promise<Array<{ id: number; name: string }>> {
   const docs = await scopedFind<{ reporter?: unknown }>(req, collection, [], 2000, '-id')
   const ids = [...new Set(docs.map((d) => relId(d.reporter)).filter((x): x is number => x !== undefined))]
   const names = await displayNames(req, ids)

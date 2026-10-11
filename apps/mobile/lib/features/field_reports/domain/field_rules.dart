@@ -246,10 +246,75 @@ Map<String, String> validateActivity(FieldDraft d, {required String today}) {
   return e;
 }
 
-Map<String, String> validateField(FieldDraft d, {required String today, double? hmFloorValue}) => switch (d.type) {
+/// Work items of [c] that go above their RAP volume with this report (realisation − the report's booked value +
+/// the new value > volume, and the value grew). Allowed by the server, but only with notes (OVER_RAP_NOTE_REQUIRED).
+List<RapItem> overRapItems(DailyContent c, Map<int, RapItem> items) => [
+  for (final MapEntry(key: id, value: qty) in c.work.entries)
+    if (items[id] case final RapItem it
+        when it.isWork && qty > (c.baseWork[id] ?? 0) && it.realised - (c.baseWork[id] ?? 0) + qty > it.volume + 1e-9)
+      it,
+];
+
+/// Laporan Harian (P3): hours 0–24, volumes ≥ 0 (2 decimals) on items of the right kind, manpower / equipment
+/// 1–9999, notes required above the RAP volume, at least something to report on create.
+Map<String, String> validateDaily(FieldDraft d, {required String today, Map<int, RapItem> items = const {}}) {
+  final c = d.daily;
+  final e = _common(d, today);
+  if (c.rainHours != null && !_dec2(c.rainHours!, maxHoursPerDay)) e['rainHours'] = 'Jam hujan 0–24 (maks. 2 desimal).';
+  if (c.stopHours != null && !_dec2(c.stopHours!, maxHoursPerDay)) {
+    e['stopHours'] = 'Jam berhenti 0–24 (maks. 2 desimal).';
+  }
+  for (final MapEntry(key: id, value: v) in c.work.entries) {
+    final it = items[id];
+    if (!_dec2(v, 1e8)) {
+      e['work'] = 'Volume ${it?.code ?? ''} harus angka ≥ 0 (maks. 2 desimal).'.replaceAll('  ', ' ');
+    } else if (it != null && !it.isWork) {
+      e['work'] = '${it.code} adalah material, bukan pekerjaan.';
+    }
+  }
+  for (final MapEntry(key: id, value: m) in c.materials.entries) {
+    final it = items[id];
+    for (final v in [m.received, m.used]) {
+      if (v != null && !_dec2(v, 1e8)) {
+        e['materials'] = 'Material ${it?.code ?? ''}: angka ≥ 0 (maks. 2 desimal).'.replaceAll('  ', ' ');
+      }
+    }
+  }
+  for (final v in c.manpower.values) {
+    if (v < 0 || v > 9999) e['manpower'] = 'Jumlah tenaga 0–9999.';
+  }
+  for (final v in c.equipment.values) {
+    if ((v.count ?? 0) < 0 || (v.count ?? 0) > 9999) e['equipment'] = 'Jumlah alat 0–9999.';
+    if (v.hours != null && !_dec2(v.hours!, maxHoursPerDay)) e['equipment'] = 'Jam alat 0–24 (maks. 2 desimal).';
+  }
+  final over = overRapItems(c, items);
+  if (over.isNotEmpty && c.notes.trim().isEmpty) {
+    e['notes'] = 'Volume melebihi RAP (${over.map((i) => i.code).join(', ')}): isi catatan penjelasan.';
+  }
+  final empty =
+      c.workItems == 0 &&
+      c.materials.values.every((m) => m.isBlank) &&
+      c.workerCount == 0 &&
+      c.issues.trim().isEmpty &&
+      c.notes.trim().isEmpty;
+  if (!d.isEdit && empty) e['work'] = 'Isi minimal satu volume pekerjaan, material, tenaga, kendala atau catatan.';
+  final lenErrors = {'issues': _len(c.issues, 2000, 'Kendala'), 'notes': _len(c.notes, 2000, 'Catatan')};
+  lenErrors.forEach((k, v) {
+    if (v != null) e[k] = v;
+  });
+  return e;
+}
+
+Map<String, String> validateField(
+  FieldDraft d, {
+  required String today,
+  double? hmFloorValue,
+  Map<int, RapItem> rapItems = const {},
+}) => switch (d.type) {
   FieldReportType.serviceReport => validateService(d, today: today, floor: hmFloorValue),
   FieldReportType.unitTimesheet => validateTimesheet(d, today: today),
   FieldReportType.aftersalesActivity => validateActivity(d, today: today),
+  FieldReportType.dailyReport => validateDaily(d, today: today, items: rapItems),
 };
 
 String? _t(String v) => v.trim().isEmpty ? null : v.trim();
@@ -321,6 +386,40 @@ Json fieldSyncPayload(FieldDraft d) {
         'reason': ?reason,
         progressPhotosPlaceholderKey: c.photoUuids,
       };
+    case final DailyContent c:
+      return {
+        ...head,
+        if (!d.isEdit) 'report_date': d.reportDate,
+        'weather_morning': c.weatherMorning?.code,
+        'weather_noon': c.weatherNoon?.code,
+        'weather_afternoon': c.weatherAfternoon?.code,
+        'rain_hours': c.rainHours == null ? null : _r2(c.rainHours!),
+        'stop_hours': c.stopHours == null ? null : _r2(c.stopHours!),
+        // new report: only booked values; edit: every value that is or was booked (0 removes it)
+        'work': [
+          for (final MapEntry(key: id, value: v) in c.work.entries)
+            if (v > 0 || (c.baseWork[id] ?? 0) != 0) {'rap_item_id': id, 'qty': _r2(v)},
+          for (final MapEntry(key: id, value: v) in c.baseWork.entries)
+            if (v != 0 && !c.work.containsKey(id)) {'rap_item_id': id, 'qty': 0},
+        ],
+        'materials': [
+          for (final MapEntry(key: id, value: m) in c.materials.entries)
+            if (!m.isBlank || d.isEdit) {'rap_item_id': id, 'received': _r2(m.received ?? 0), 'used': _r2(m.used ?? 0)},
+        ],
+        'manpower': [
+          for (final MapEntry(key: id, value: n) in c.manpower.entries)
+            if (n > 0) {'resource_type_id': id, 'count': n},
+        ],
+        'equipment': [
+          for (final MapEntry(key: id, value: q) in c.equipment.entries)
+            if ((q.count ?? 0) > 0)
+              {'resource_type_id': id, 'count': q.count, 'hours': q.hours == null ? null : _r2(q.hours!)},
+        ],
+        'issues': _t(c.issues),
+        'notes': _t(c.notes),
+        'reason': ?reason,
+        progressPhotosPlaceholderKey: c.photoUuids,
+      };
   }
 }
 
@@ -329,7 +428,7 @@ Json fieldSyncPayload(FieldDraft d) {
 String fieldErrorMessage(String? code, String? serverMessage) {
   final known = switch (code) {
     'FEATURE_DISABLED' => 'Laporan lapangan belum diaktifkan untuk PT ini. Hubungi Admin/Direktur.',
-    'WRONG_PROJECT_KIND' => 'Jenis laporan ini tidak tersedia untuk jenis project tersebut (timesheet hanya kontrak unit, aktivitas hanya aftersales).',
+    'WRONG_PROJECT_KIND' => 'Jenis laporan ini tidak tersedia untuk jenis project tersebut (timesheet hanya kontrak unit, aktivitas hanya aftersales, laporan harian hanya konstruksi).',
     'HM_DECREASED' =>
       'HM lebih kecil dari HM terakhir unit. Periksa angka HM; HM lama hanya bisa dikoreksi PM/Direktur.',
     'NOT_IN_CONTRACT' => 'Unit tidak ada di kontrak aktif project ini pada tanggal tersebut.',
@@ -339,10 +438,13 @@ String fieldErrorMessage(String? code, String? serverMessage) {
     'CLIENT_UUID_CONFLICT' => 'ID laporan bentrok dengan data pengguna lain. Buat laporan baru.',
     'NOT_EDITABLE' => 'Laporan hanya bisa diubah pelapornya dalam 24 jam. Setelah itu minta koreksi PM/Direktur.',
     'FORBIDDEN' => 'Anda tidak ditugaskan ke project ini atau tidak berhak membuat laporan ini.',
-    'PHOTO_LIMIT' => 'Jumlah foto melebihi batas (servis 10, timesheet 1 foto HM, aftersales 5).',
+    'PHOTO_LIMIT' => 'Jumlah foto melebihi batas (servis & laporan harian 10, timesheet 1 foto HM, aftersales 5).',
     'MEDIA_IN_USE' => 'Foto sudah dipakai di laporan lain. Ambil foto baru.',
     'MEDIA_MISSING' => 'Foto belum diterima server. Coba kirim lagi.',
     'NOT_FOUND' => 'Data (project/unit/pelanggan/PO) tidak ditemukan atau tidak bisa Anda akses.',
+    'DAILY_EXISTS' =>
+      'Laporan harian Anda untuk project dan tanggal ini sudah ada. Ubah laporan itu (≤ 24 jam) atau minta koreksi PM.',
+    'OVER_RAP_NOTE_REQUIRED' => 'Volume melebihi RAP: isi catatan penjelasan lalu kirim lagi.',
     _ => null,
   };
   if (known != null) return known;

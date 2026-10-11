@@ -142,6 +142,13 @@ export const MODULES: readonly ModuleDef[] = [
           { collection: 'unit-timesheets', label: 'Data timesheet unit' },
           { collection: 'aftersales-activities', label: 'Data aktivitas aftersales' },
           { collection: 'contract-units' },
+          // P3 konstruksi: Laporan Harian + RAP
+          { view: '/laporan-harian', label: 'Laporan harian', roles: FIELD_ALL, feature: 'fieldReports', navKey: 'laporan-harian' },
+          { collection: 'daily-reports', label: 'Data laporan harian' },
+          { collection: 'daily-report-lines', label: 'Data baris laporan harian' },
+          { collection: 'rap-items', label: 'Data item RAP' },
+          { collection: 'rap-templates' },
+          { collection: 'resource-types' },
         ],
       },
     ],

@@ -3,7 +3,7 @@ description: "RR Teams — aplikasi Android DRMS (pengajuan biaya, approval, abs
 publish_to: 'none'
 
 # X.Y.Z+N — N (versionCode) is overridden by CI with --build-number (ADR 0010 decision 13).
-version: 0.4.1+1
+version: 0.5.0+1
 
 environment:
   sdk: ">=3.13.4 <4.0.0"

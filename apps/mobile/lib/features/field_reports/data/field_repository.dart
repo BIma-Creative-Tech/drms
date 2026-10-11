@@ -210,6 +210,7 @@ class FieldRepository {
 
   /// After a delivery: the recent-timesheet cache gets the new timesheet, the unit cache its HM / status.
   Future<void> _learn(String sub, FieldDraft d, Json? copy, int? serverId) async {
+    if (d.content case final DailyContent c) return _learnDaily(sub, c);
     final unitId = d.unitId;
     final company = d.companyId;
     if (d.content case final TimesheetContent c when unitId != null && company != null && c.hmEnd != null) {
@@ -529,6 +530,108 @@ class FieldRepository {
       for (final r in rows)
         if (r.clientUuid != excludeUuid) (r.reportDate, r.hourMeter!),
     ];
+  }
+
+  /// P3: replaces the RAP items of [projectId] (full pull; prices are never part of the row) and the resource
+  /// types of its PT.
+  Future<void> putRap(String sub, int projectId, int companyId, List<RapItem> items, List<ResourceType> resources) =>
+      db.transaction(() async {
+        await (db.delete(db.fieldRapItems)..where((t) => t.userSub.equals(sub) & t.projectId.equals(projectId))).go();
+        await (db.delete(
+          db.fieldResourceTypes,
+        )..where((t) => t.userSub.equals(sub) & t.companyId.equals(companyId))).go();
+        await db.batch((b) {
+          for (final i in items) {
+            b.insert(
+              db.fieldRapItems,
+              FieldRapItemsCompanion.insert(
+                userSub: sub,
+                id: i.id,
+                companyId: companyId,
+                projectId: projectId,
+                code: i.code,
+                description: Value(i.description),
+                kind: i.kind,
+                uom: Value(i.uom),
+                stageName: Value(i.stageName),
+                volume: Value(i.volume),
+                realised: Value(i.realised),
+                received: Value(i.received),
+                used: Value(i.used),
+                sortOrder: Value(i.sortOrder),
+                active: Value(i.active),
+              ),
+              mode: InsertMode.insertOrReplace,
+            );
+          }
+          for (final r in resources) {
+            b.insert(
+              db.fieldResourceTypes,
+              FieldResourceTypesCompanion.insert(
+                userSub: sub,
+                id: r.id,
+                companyId: companyId,
+                kind: r.kind,
+                code: Value(r.code),
+                name: Value(r.name),
+              ),
+              mode: InsertMode.insertOrReplace,
+            );
+          }
+        });
+      });
+
+  /// Active RAP items of [projectId] in stage / RAP order.
+  Future<List<RapItem>> rapItems(String sub, int projectId) async {
+    final rows =
+        await (db.select(db.fieldRapItems)
+              ..where((t) => t.userSub.equals(sub) & t.projectId.equals(projectId) & t.active.equals(true))
+              ..orderBy([(t) => OrderingTerm.asc(t.sortOrder), (t) => OrderingTerm.asc(t.code)]))
+            .get();
+    return [
+      for (final r in rows)
+        RapItem(
+          id: r.id,
+          companyId: r.companyId,
+          projectId: r.projectId,
+          code: r.code,
+          description: r.description,
+          kind: r.kind,
+          uom: r.uom,
+          stageName: r.stageName,
+          volume: r.volume,
+          realised: r.realised,
+          received: r.received,
+          used: r.used,
+          sortOrder: r.sortOrder,
+          active: r.active,
+        ),
+    ];
+  }
+
+  Future<List<ResourceType>> resourceTypes(String sub, int companyId) async {
+    final rows =
+        await (db.select(db.fieldResourceTypes)
+              ..where((t) => t.userSub.equals(sub) & t.companyId.equals(companyId))
+              ..orderBy([(t) => OrderingTerm.asc(t.code)]))
+            .get();
+    return [
+      for (final r in rows) ResourceType(id: r.id, companyId: r.companyId, kind: r.kind, code: r.code, name: r.name),
+    ];
+  }
+
+  /// After a delivered daily report: the realisation of its work items moves on (so the next report's
+  /// over-RAP hint is right while offline).
+  Future<void> _learnDaily(String sub, DailyContent c) async {
+    for (final MapEntry(key: id, value: qty) in c.work.entries) {
+      final delta = qty - (c.baseWork[id] ?? 0);
+      if (delta == 0) continue;
+      await db.customUpdate(
+        'UPDATE field_rap_items SET realised = realised + ? WHERE user_sub = ? AND id = ?',
+        variables: [Variable.withReal(delta), Variable.withString(sub), Variable.withInt(id)],
+        updates: {db.fieldRapItems},
+      );
+    }
   }
 
   /// Delta-sync marker of `GET /units?project=` (server time of the last pull).

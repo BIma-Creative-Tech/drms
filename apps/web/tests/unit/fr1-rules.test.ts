@@ -28,10 +28,11 @@ import { reminderSettingsOf } from '@/domain/reminders/rules'
 
 /** FR1 (ADR 0020) pure rules: project kinds, unit master, HM, hours, billing estimate, availability, PO status. */
 describe('FR1 project kinds → report types (ADR 0020 §1)', () => {
-  it('kontrak_unit → timesheet + servis; aftersales → servis + aktivitas; others none', () => {
+  it('kontrak_unit → timesheet + servis; aftersales → servis + aktivitas; konstruksi → laporan harian (P3); others none', () => {
     expect(reportTypesFor('kontrak_unit')).toEqual(['unit_timesheet', 'service_report'])
     expect(reportTypesFor('aftersales')).toEqual(['service_report', 'aftersales_activity'])
-    for (const k of ['umum', 'konstruksi', 'trading']) expect(reportTypesFor(k), k).toEqual([])
+    expect(reportTypesFor('konstruksi')).toEqual(['daily_report'])
+    for (const k of ['umum', 'trading']) expect(reportTypesFor(k), k).toEqual([])
     expect(kindAllows('aftersales', 'unit_timesheet')).toBe(false)
     expect(kindAllows('kontrak_unit', 'aftersales_activity')).toBe(false)
     expect(kindOf(null)).toBe('umum')

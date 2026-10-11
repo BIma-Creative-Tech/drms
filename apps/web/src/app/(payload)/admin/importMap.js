@@ -60,6 +60,10 @@ import { FieldAftersalesRecap as FieldAftersalesRecap_5c4757a0e1a870290c655f812a
 import { FieldActivityList as FieldActivityList_5c4757a0e1a870290c655f812acb2805 } from '@/admin/views/FieldAftersales'
 import { FieldActivityNew as FieldActivityNew_5c4757a0e1a870290c655f812acb2805 } from '@/admin/views/FieldAftersales'
 import { FieldActivityDetail as FieldActivityDetail_5c4757a0e1a870290c655f812acb2805 } from '@/admin/views/FieldAftersales'
+import { FieldDailyList as FieldDailyList_ded092a2d290d4acb50f0fbf9f77715a } from '@/admin/views/FieldDaily'
+import { FieldDailyNew as FieldDailyNew_ded092a2d290d4acb50f0fbf9f77715a } from '@/admin/views/FieldDaily'
+import { FieldDailyDetail as FieldDailyDetail_ded092a2d290d4acb50f0fbf9f77715a } from '@/admin/views/FieldDaily'
+import { FieldDailyRap as FieldDailyRap_ded092a2d290d4acb50f0fbf9f77715a } from '@/admin/views/FieldDaily'
 import { CollectionCards as CollectionCards_f9c02e79a4aed9a3924487c0cd4cafb1 } from '@payloadcms/next/rsc'
 
 /** @type import('payload').ImportMap */
@@ -126,5 +130,9 @@ export const importMap = {
   "@/admin/views/FieldAftersales#FieldActivityList": FieldActivityList_5c4757a0e1a870290c655f812acb2805,
   "@/admin/views/FieldAftersales#FieldActivityNew": FieldActivityNew_5c4757a0e1a870290c655f812acb2805,
   "@/admin/views/FieldAftersales#FieldActivityDetail": FieldActivityDetail_5c4757a0e1a870290c655f812acb2805,
+  "@/admin/views/FieldDaily#FieldDailyList": FieldDailyList_ded092a2d290d4acb50f0fbf9f77715a,
+  "@/admin/views/FieldDaily#FieldDailyNew": FieldDailyNew_ded092a2d290d4acb50f0fbf9f77715a,
+  "@/admin/views/FieldDaily#FieldDailyDetail": FieldDailyDetail_ded092a2d290d4acb50f0fbf9f77715a,
+  "@/admin/views/FieldDaily#FieldDailyRap": FieldDailyRap_ded092a2d290d4acb50f0fbf9f77715a,
   "@payloadcms/next/rsc#CollectionCards": CollectionCards_f9c02e79a4aed9a3924487c0cd4cafb1
 }

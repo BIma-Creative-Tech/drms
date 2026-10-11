@@ -32,10 +32,12 @@ export function capabilitiesOf(roles: readonly Role[], opts: { fieldReportsEnabl
     // ADR 0021: the PM project approves first ("Persetujuan PM") — the inbox lists only its own steps
     approvalInbox: roles.some((r) => r === 'pk-owner' || r === 'pk-finance' || r === 'pk-pm'),
     teamMonitor: roles.includes('pk-pm'),
-    progressReportCreate: roles.some((r) => r === 'pk-pm' || r === 'pk-owner'),
+    progressReportCreate: roles.some((r) => r === 'pk-pm' || r === 'pk-owner' || r === 'pk-admin'),
     serviceReportCreate: field,
     unitTimesheetCreate: field,
     aftersalesActivityCreate: field,
+    // P3: Laporan harian on projects of kind konstruksi
+    dailyReportCreate: field,
   }
 }
 

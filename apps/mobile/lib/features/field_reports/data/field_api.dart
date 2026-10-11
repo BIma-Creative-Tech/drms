@@ -71,6 +71,18 @@ class FieldApi {
     ],
   );
 
+  /// P3 `GET /projects/{id}/rap` — RAP items (prices dropped while parsing) + the PT's resource types.
+  Future<({List<RapItem> items, List<ResourceType> resources})> rap(int projectId, {required int companyId}) =>
+      client.run((d) => d.get<dynamic>('/projects/$projectId/rap', options: ApiClient.allCompanies()), (data) {
+        final j = data as Json;
+        return (
+          items: [
+            for (final i in fList(j['items'])) RapItem.fromJson(fMap(i), projectId: projectId, companyId: companyId),
+          ],
+          resources: [for (final r in fList(j['resourceTypes'])) ResourceType.fromJson(fMap(r), companyId: companyId)],
+        );
+      });
+
   /// `GET /aftersales/open-pos?project=` — incoming POs still to deliver (oldest first).
   Future<List<FieldOpenPo>> openPos({required int projectId, int? clientId}) => client.run(
     (d) => d.get<dynamic>(

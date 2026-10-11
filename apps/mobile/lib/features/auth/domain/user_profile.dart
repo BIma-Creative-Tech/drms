@@ -62,10 +62,13 @@ abstract class Capabilities with _$Capabilities {
 
     /// FR1: aftersales activities on aftersales projects (same rule).
     @Default(false) bool aftersalesActivityCreate,
+
+    /// P3: Laporan Harian on konstruksi projects (same rule; server ≥ 0.8 — older servers omit it → false).
+    @Default(false) bool dailyReportCreate,
   }) = _Capabilities;
 
   /// FR1: any field-report create right.
-  bool get anyField => serviceReportCreate || unitTimesheetCreate || aftersalesActivityCreate;
+  bool get anyField => serviceReportCreate || unitTimesheetCreate || aftersalesActivityCreate || dailyReportCreate;
 
   /// Fallback for a `/me` cached by an app version before E1 (no `capabilities` field): the same
   /// rule the server applies (`apps/web/src/api/v1/endpoints/me.ts`).
@@ -204,6 +207,7 @@ abstract class UserProfile with _$UserProfile {
         serviceReportCreate: scope.any((c) => c.capabilities.serviceReportCreate),
         unitTimesheetCreate: scope.any((c) => c.capabilities.unitTimesheetCreate),
         aftersalesActivityCreate: scope.any((c) => c.capabilities.aftersalesActivityCreate),
+        dailyReportCreate: scope.any((c) => c.capabilities.dailyReportCreate),
       ),
       employee: primary.employee,
       timezone: primary.timezone,

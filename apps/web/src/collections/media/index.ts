@@ -202,7 +202,7 @@ const reportPhotoRule: Rule = async ({ req }) => {
 }
 /**
  * FR1 (ADR 0020): photos of field reports (service report / timesheet HM / aftersales activity, owner
- * types `service_report` | `unit_timesheet` | `aftersales_activity`) are readable by everyone who may
+ * types `service_report` | `unit_timesheet` | `aftersales_activity` | `daily_report`) are readable by everyone who may
  * read the owning report (Staff: assigned projects, PM: team) — same focus/list split as above.
  */
 const fieldPhotoRule: Rule = async ({ req }) => {
@@ -220,9 +220,9 @@ const progressPhotoRead: Access = byRoleAny({
   'pk-staff': anyOf(ownUser('uploadedBy'), fieldPhotoRule),
 })
 
-/** E4: PM / Direktur upload progress photos; FR1: Staff only in a PT with field reports switched on. */
+/** E4: PM / Direktur / Admin upload progress photos; FR1: Staff only in a PT with field reports switched on. */
 const progressPhotoCreate: Access = async (args) => {
-  if (hasRoleAny(args.req, 'pk-pm', 'pk-owner')) return true
+  if (hasRoleAny(args.req, 'pk-pm', 'pk-owner', 'pk-admin')) return true
   return hasRoleAny(args.req, 'pk-staff') && (await staffMayUploadFieldPhotos(args.req))
 }
 

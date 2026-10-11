@@ -110,7 +110,7 @@
               },
               "progressReportCreate": {
                 "type": "boolean",
-                "description": "E4: holds pk-pm (team projects) or pk-owner (all) → may create progress reports."
+                "description": "E4: holds pk-pm (team projects), pk-owner or pk-admin (all) → may create progress reports."
               },
               "serviceReportCreate": {
                 "type": "boolean",
@@ -123,6 +123,10 @@
               "aftersalesActivityCreate": {
                 "type": "boolean",
                 "description": "FR1: same rule → aftersales activities on projects of kind aftersales."
+              },
+              "dailyReportCreate": {
+                "type": "boolean",
+                "description": "P3: same rule → Laporan harian on projects of kind konstruksi."
               }
             },
             "required": [
@@ -131,7 +135,8 @@
               "progressReportCreate",
               "serviceReportCreate",
               "unitTimesheetCreate",
-              "aftersalesActivityCreate"
+              "aftersalesActivityCreate",
+              "dailyReportCreate"
             ],
             "description": "DEPRECATED (MC3): derived from the top-level `roles` (union over the selected PTs). Use companies[].capabilities."
           },
@@ -474,7 +479,7 @@
           },
           "progressReportCreate": {
             "type": "boolean",
-            "description": "E4: holds pk-pm (team projects) or pk-owner (all) → may create progress reports."
+            "description": "E4: holds pk-pm (team projects), pk-owner or pk-admin (all) → may create progress reports."
           },
           "serviceReportCreate": {
             "type": "boolean",
@@ -487,6 +492,10 @@
           "aftersalesActivityCreate": {
             "type": "boolean",
             "description": "FR1: same rule → aftersales activities on projects of kind aftersales."
+          },
+          "dailyReportCreate": {
+            "type": "boolean",
+            "description": "P3: same rule → Laporan harian on projects of kind konstruksi."
           }
         },
         "required": [
@@ -495,7 +504,8 @@
           "progressReportCreate",
           "serviceReportCreate",
           "unitTimesheetCreate",
-          "aftersalesActivityCreate"
+          "aftersalesActivityCreate",
+          "dailyReportCreate"
         ],
         "description": "UI hints for the APK (E1); the server guards stay authoritative."
       },
@@ -4811,7 +4821,7 @@
             "items": {
               "type": "string"
             },
-            "description": "OFFLINE, CLOCK_SKEW, CLIENT_TOTAL_MISMATCH, ALREADY_CANCELLED, DEVICE_TIME_ONLY; FR1 also BACKDATED, HM_GAP, BREAKDOWN_SUGGEST_SERVICE."
+            "description": "OFFLINE, CLOCK_SKEW, CLIENT_TOTAL_MISMATCH, ALREADY_CANCELLED, DEVICE_TIME_ONLY; FR1 also BACKDATED, HM_GAP, BREAKDOWN_SUGGEST_SERVICE; P3 also MELEBIHI_RAP, POSSIBLE_DUPLICATE."
           },
           "errors": {
             "type": "array",
@@ -4820,7 +4830,7 @@
               "properties": {
                 "code": {
                   "type": "string",
-                  "description": "VALIDATION, NOT_EDITABLE, STALE_REV (conflict), NOT_FOUND, FORBIDDEN, MEDIA_MISSING, CLIENT_UUID_CONFLICT, COMPANY_NOT_ALLOWED (MC3: company_id is not an active membership of the caller), COMPANY_MISMATCH (MC3: the PT derived from the item references ≠ company_id — or ≠ the only PT of a caller without company_id; only for a PT the caller is mapped to — a reference in another PT is answered like a missing one, QA-MC4-14), FEATURE_DISABLED, DEPENDENCY_FAILED, DEPENDENCY_PENDING, STATE_CONFLICT, INTEGRITY, UNSUPPORTED, INTERNAL; attendance: MOCK_LOCATION, OUTSIDE_GEOFENCE, NOT_ASSIGNED, NO_GEOFENCE, ALREADY_CHECKED_IN, NO_CHECK_IN, ALREADY_CHECKED_OUT (on_behalf also FORBIDDEN: not a PM / not a team location / own attendance), PRIVACY_ACK_REQUIRED (ADR 0018: while the app setting minAppVersion ≥ 0.3.3, the caller — for on_behalf the PM — has not acknowledged the current privacy notice; final, never retry: show the notice, POST /me/privacy-ack, record again); progress reports: WEIGHTS_INCOMPLETE, PROGRESS_DECREASED, PHOTO_LIMIT, MEDIA_IN_USE; FR1 field reports: FEATURE_DISABLED, WRONG_PROJECT_KIND, HM_DECREASED, NOT_IN_CONTRACT, DUPLICATE_DATE, PO_CLOSED, PHOTO_LIMIT, MEDIA_IN_USE."
+                  "description": "VALIDATION, NOT_EDITABLE, STALE_REV (conflict), NOT_FOUND, FORBIDDEN, MEDIA_MISSING, CLIENT_UUID_CONFLICT, COMPANY_NOT_ALLOWED (MC3: company_id is not an active membership of the caller), COMPANY_MISMATCH (MC3: the PT derived from the item references ≠ company_id — or ≠ the only PT of a caller without company_id; only for a PT the caller is mapped to — a reference in another PT is answered like a missing one, QA-MC4-14), FEATURE_DISABLED, DEPENDENCY_FAILED, DEPENDENCY_PENDING, STATE_CONFLICT, INTEGRITY, UNSUPPORTED, INTERNAL; attendance: MOCK_LOCATION, OUTSIDE_GEOFENCE, NOT_ASSIGNED, NO_GEOFENCE, ALREADY_CHECKED_IN, NO_CHECK_IN, ALREADY_CHECKED_OUT (on_behalf also FORBIDDEN: not a PM / not a team location / own attendance), PRIVACY_ACK_REQUIRED (ADR 0018: while the app setting minAppVersion ≥ 0.3.3, the caller — for on_behalf the PM — has not acknowledged the current privacy notice; final, never retry: show the notice, POST /me/privacy-ack, record again); progress reports: WEIGHTS_INCOMPLETE, PROGRESS_DECREASED, PHOTO_LIMIT, MEDIA_IN_USE; FR1 field reports: FEATURE_DISABLED, WRONG_PROJECT_KIND, HM_DECREASED, NOT_IN_CONTRACT, DUPLICATE_DATE, PO_CLOSED, PHOTO_LIMIT, MEDIA_IN_USE; P3 daily reports: DAILY_EXISTS, OVER_RAP_NOTE_REQUIRED."
                 },
                 "field": {
                   "type": "string"
@@ -4856,6 +4866,9 @@
           },
           "server_aftersales_activity": {
             "$ref": "#/components/schemas/SyncAftersalesActivityCopy"
+          },
+          "server_daily_report": {
+            "$ref": "#/components/schemas/SyncDailyReportCopy"
           }
         },
         "required": [
@@ -5548,6 +5561,130 @@
         ],
         "description": "Server version of an aftersales activity (server wins on conflict; the value is not echoed)."
       },
+      "SyncDailyReportCopy": {
+        "type": [
+          "object",
+          "null"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "exclusiveMinimum": 0
+          },
+          "client_uuid": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "rev": {
+            "type": "integer"
+          },
+          "doc_no": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "project_id": {
+            "type": "integer",
+            "exclusiveMinimum": 0
+          },
+          "report_date": {
+            "type": "string"
+          },
+          "work": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "rap_item_id": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                "qty": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "rap_item_id",
+                "qty"
+              ]
+            }
+          },
+          "materials": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "rap_item_id": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                "received": {
+                  "type": "number"
+                },
+                "used": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "rap_item_id",
+                "received",
+                "used"
+              ]
+            }
+          },
+          "worker_count": {
+            "type": "integer"
+          },
+          "photo_media_ids": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "exclusiveMinimum": 0
+            }
+          },
+          "flags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "offline": {
+            "type": "boolean"
+          },
+          "editable_until": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "updated_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "client_uuid",
+          "rev",
+          "doc_no",
+          "project_id",
+          "report_date",
+          "work",
+          "materials",
+          "worker_count",
+          "photo_media_ids",
+          "flags",
+          "offline",
+          "editable_until",
+          "updated_at"
+        ],
+        "description": "Server version of a daily report (server wins on conflict); work / materials = current ledger sums."
+      },
       "SyncBatch": {
         "type": "object",
         "properties": {
@@ -5709,11 +5846,14 @@
                 "$ref": "#/components/schemas/SyncAftersalesActivityPayload"
               },
               {
+                "$ref": "#/components/schemas/SyncDailyReportPayload"
+              },
+              {
                 "type": "object",
                 "additionalProperties": {}
               }
             ],
-            "description": "Type specific: expense_request.draft_upsert → SyncDraftUpsertPayload, expense_request.draft_delete → SyncDraftDeletePayload, attendance.check_in / attendance.check_out → SyncAttendancePayload, attendance.on_behalf → SyncOnBehalfPayload, progress_report.draft_upsert → SyncProgressReportPayload, service_report.upsert → SyncServiceReportPayload, unit_timesheet.upsert → SyncUnitTimesheetPayload, aftersales_activity.upsert → SyncAftersalesActivityPayload; other types: free-form until supported."
+            "description": "Type specific: expense_request.draft_upsert → SyncDraftUpsertPayload, expense_request.draft_delete → SyncDraftDeletePayload, attendance.check_in / attendance.check_out → SyncAttendancePayload, attendance.on_behalf → SyncOnBehalfPayload, progress_report.draft_upsert → SyncProgressReportPayload, service_report.upsert → SyncServiceReportPayload, unit_timesheet.upsert → SyncUnitTimesheetPayload, aftersales_activity.upsert → SyncAftersalesActivityPayload, daily_report.upsert → SyncDailyReportPayload; other types: free-form until supported."
           }
         },
         "required": [
@@ -5738,9 +5878,10 @@
           "progress_report.draft_upsert",
           "service_report.upsert",
           "unit_timesheet.upsert",
-          "aftersales_activity.upsert"
+          "aftersales_activity.upsert",
+          "daily_report.upsert"
         ],
-        "description": "attendance.on_behalf (US-14, E6): PM only. progress_report.draft_upsert (E4) = create or edit (≤ 24 h) of a progress report (company-settings.syncProgressReportsEnabled). FR1 (ADR 0020): service_report.upsert / unit_timesheet.upsert / aftersales_activity.upsert = create or edit (reporter, ≤ 24 h) of a field report (companies.fieldReportsEnabled; creates otherwise FEATURE_DISABLED)."
+        "description": "attendance.on_behalf (US-14, E6): PM only. progress_report.draft_upsert (E4) = create or edit (≤ 24 h) of a progress report (company-settings.syncProgressReportsEnabled). FR1 (ADR 0020): service_report.upsert / unit_timesheet.upsert / aftersales_activity.upsert = create or edit (reporter, ≤ 24 h) of a field report (companies.fieldReportsEnabled; creates otherwise FEATURE_DISABLED). P3: daily_report.upsert = Laporan harian of a konstruksi project (same rules)."
       },
       "SyncDraftUpsertPayload": {
         "type": "object",
@@ -6616,6 +6757,203 @@
         "required": [
           "name",
           "qty"
+        ],
+        "additionalProperties": false
+      },
+      "SyncDailyReportPayload": {
+        "type": "object",
+        "properties": {
+          "daily_report_id": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "description": "Server id (edit of a report created online)."
+          },
+          "daily_report_client_uuid": {
+            "type": "string",
+            "format": "uuid",
+            "description": "APK id of the report (default: the client_uuid of the item that created it)."
+          },
+          "project_id": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "description": "Required for a new report (kind konstruksi)."
+          },
+          "report_date": {
+            "type": "string",
+            "pattern": "^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$",
+            "description": "Default: the company-TZ date of the time that counts. Cannot change."
+          },
+          "weather_morning": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "cerah",
+              "berawan",
+              "hujan",
+              null
+            ]
+          },
+          "weather_noon": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "cerah",
+              "berawan",
+              "hujan",
+              null
+            ]
+          },
+          "weather_afternoon": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "cerah",
+              "berawan",
+              "hujan",
+              null
+            ]
+          },
+          "rain_hours": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 24
+          },
+          "stop_hours": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 24
+          },
+          "work": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "rap_item_id": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                "qty": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 100000000
+                }
+              },
+              "required": [
+                "rap_item_id",
+                "qty"
+              ],
+              "additionalProperties": false
+            },
+            "maxItems": 300
+          },
+          "materials": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "rap_item_id": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                "received": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 100000000
+                },
+                "used": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 100000000
+                }
+              },
+              "required": [
+                "rap_item_id"
+              ],
+              "additionalProperties": false
+            },
+            "maxItems": 300
+          },
+          "manpower": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SyncDailyResource"
+            },
+            "maxItems": 60
+          },
+          "equipment": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SyncDailyResource"
+            },
+            "maxItems": 60
+          },
+          "issues": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 2000
+          },
+          "notes": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 2000
+          },
+          "photo_media_ids": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "exclusiveMinimum": 0
+            },
+            "maxItems": 10,
+            "description": "On an edit: ids not yet on the report are added (photos are never removed)."
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 1000
+          }
+        },
+        "additionalProperties": false
+      },
+      "SyncDailyResource": {
+        "type": "object",
+        "properties": {
+          "resource_type_id": {
+            "type": "integer",
+            "exclusiveMinimum": 0
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9999
+          },
+          "hours": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 24
+          }
+        },
+        "required": [
+          "resource_type_id",
+          "count"
         ],
         "additionalProperties": false
       },
@@ -11399,6 +11737,1662 @@
           "ratesVisible",
           "notes"
         ]
+      },
+      "Rap": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "integer",
+            "exclusiveMinimum": 0
+          },
+          "kind": {
+            "type": "string"
+          },
+          "locked": {
+            "type": "boolean"
+          },
+          "canEdit": {
+            "type": "boolean"
+          },
+          "needsReason": {
+            "type": "boolean"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RapItem"
+            }
+          },
+          "stages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                "name": {
+                  "type": "string"
+                },
+                "weightPct": {
+                  "type": "number"
+                },
+                "progressPct": {
+                  "type": "number"
+                },
+                "active": {
+                  "type": "boolean"
+                },
+                "progressMode": {
+                  "type": "string",
+                  "enum": [
+                    "manual",
+                    "rap"
+                  ]
+                },
+                "basis": {
+                  "type": "string",
+                  "enum": [
+                    "value",
+                    "equal",
+                    "none"
+                  ],
+                  "description": "value = weighted by volume × price (all work items priced), equal otherwise."
+                },
+                "workItems": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "weightPct",
+                "progressPct",
+                "active",
+                "progressMode",
+                "basis",
+                "workItems"
+              ]
+            }
+          },
+          "totals": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "rapValue": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "budget": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "overBudget": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "rapValue",
+              "budget",
+              "overBudget"
+            ],
+            "description": "Price roles only."
+          },
+          "resourceTypes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "tenaga",
+                    "alat"
+                  ]
+                },
+                "code": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "kind",
+                "code",
+                "name"
+              ]
+            },
+            "description": "Active manpower / equipment types of the project's PT (daily report pickers; APK cache)."
+          }
+        },
+        "required": [
+          "projectId",
+          "kind",
+          "locked",
+          "canEdit",
+          "needsReason",
+          "items",
+          "stages",
+          "totals",
+          "resourceTypes"
+        ]
+      },
+      "RapItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "exclusiveMinimum": 0
+          },
+          "code": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/RapKind"
+          },
+          "stage": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "exclusiveMinimum": 0
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "name"
+            ]
+          },
+          "uom": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "exclusiveMinimum": 0
+              },
+              "code": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "code"
+            ]
+          },
+          "volume": {
+            "type": "number"
+          },
+          "unitPrice": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "description": "Price roles only."
+          },
+          "value": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "description": "volume × unitPrice (price roles only)."
+          },
+          "weightPct": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "sortOrder": {
+            "type": "number"
+          },
+          "realised": {
+            "type": "number",
+            "description": "Σ work volume of the daily reports (pekerjaan)."
+          },
+          "received": {
+            "type": "number"
+          },
+          "used": {
+            "type": "number"
+          },
+          "stock": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "description": "material: received − used."
+          },
+          "pct": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "description": "pekerjaan: min(realised / volume, 1) × 100."
+          },
+          "overRap": {
+            "type": "boolean"
+          },
+          "active": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "description",
+          "kind",
+          "stage",
+          "uom",
+          "volume",
+          "weightPct",
+          "sortOrder",
+          "realised",
+          "received",
+          "used",
+          "stock",
+          "pct",
+          "overRap",
+          "active"
+        ]
+      },
+      "RapKind": {
+        "type": "string",
+        "enum": [
+          "pekerjaan",
+          "material"
+        ],
+        "description": "pekerjaan counts toward the stage %; material only masuk / terpakai / stok."
+      },
+      "RapItemCreate": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 32,
+            "description": "Unique per project (409 DUPLICATE_CODE)."
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300
+          },
+          "stageId": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "description": "Stage of the same project."
+          },
+          "kind": {
+            "$ref": "#/components/schemas/RapKind"
+          },
+          "uomId": {
+            "type": "integer",
+            "exclusiveMinimum": 0
+          },
+          "volume": {
+            "type": "number",
+            "minimum": 0.01,
+            "maximum": 100000000
+          },
+          "unitPrice": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 10000000000000
+          },
+          "weightPct": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 100
+          },
+          "sortOrder": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100000
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 1000,
+            "description": "Required once the RAP is locked (any daily-report realisation): Direktur/Admin only (409 RAP_LOCKED otherwise)."
+          }
+        },
+        "required": [
+          "code",
+          "description",
+          "stageId",
+          "kind",
+          "uomId",
+          "volume"
+        ],
+        "additionalProperties": false
+      },
+      "RapItemUpdate": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 32,
+            "description": "Unique per project (409 DUPLICATE_CODE)."
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300
+          },
+          "stageId": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "description": "Stage of the same project."
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "pekerjaan",
+              "material"
+            ],
+            "description": "Cannot change (400)."
+          },
+          "uomId": {
+            "type": "integer",
+            "exclusiveMinimum": 0
+          },
+          "volume": {
+            "type": "number",
+            "minimum": 0.01,
+            "maximum": 100000000
+          },
+          "unitPrice": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 10000000000000
+          },
+          "weightPct": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 100
+          },
+          "sortOrder": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100000
+          },
+          "active": {
+            "type": "boolean",
+            "description": "false = deactivate (items are never deleted)."
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 1000,
+            "description": "Required once the RAP is locked (any daily-report realisation): Direktur/Admin only (409 RAP_LOCKED otherwise)."
+          }
+        },
+        "additionalProperties": false
+      },
+      "RapPreview": {
+        "type": "object",
+        "properties": {
+          "fileHash": {
+            "type": "string"
+          },
+          "locked": {
+            "type": "boolean"
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "row": {
+                  "type": "integer"
+                },
+                "code": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "new",
+                    "changed",
+                    "unchanged"
+                  ]
+                },
+                "changes": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": [
+                "row",
+                "code",
+                "status",
+                "changes"
+              ]
+            }
+          },
+          "deactivated": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "string"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "hasRealisation": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "code",
+                "description",
+                "hasRealisation"
+              ]
+            }
+          },
+          "newStages": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "issues": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "row": {
+                  "type": "integer"
+                },
+                "column": {
+                  "type": "string"
+                },
+                "message": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "message"
+              ]
+            }
+          },
+          "counts": {
+            "type": "object",
+            "properties": {
+              "new": {
+                "type": "integer"
+              },
+              "changed": {
+                "type": "integer"
+              },
+              "unchanged": {
+                "type": "integer"
+              },
+              "deactivated": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "new",
+              "changed",
+              "unchanged",
+              "deactivated"
+            ]
+          }
+        },
+        "required": [
+          "fileHash",
+          "locked",
+          "rows",
+          "deactivated",
+          "newStages",
+          "issues",
+          "counts"
+        ]
+      },
+      "RapApplyTemplate": {
+        "type": "object",
+        "properties": {
+          "templateId": {
+            "type": "integer",
+            "exclusiveMinimum": 0
+          }
+        },
+        "required": [
+          "templateId"
+        ],
+        "additionalProperties": false
+      },
+      "RapTemplateSaved": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "exclusiveMinimum": 0
+          },
+          "name": {
+            "type": "string"
+          },
+          "items": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "items"
+        ]
+      },
+      "RapSaveTemplate": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 128
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "additionalProperties": false
+      },
+      "DailyReportList": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DailyReport"
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ]
+      },
+      "DailyReport": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "exclusiveMinimum": 0
+          },
+          "uuid": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "companyId": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "exclusiveMinimum": 0
+          },
+          "docNo": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "LH/YYMM/####"
+          },
+          "project": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "exclusiveMinimum": 0
+              },
+              "code": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "name": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "kind": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "code",
+              "name",
+              "kind"
+            ]
+          },
+          "reportDate": {
+            "type": "string"
+          },
+          "reporter": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "exclusiveMinimum": 0
+              },
+              "name": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "name"
+            ]
+          },
+          "weather": {
+            "type": "object",
+            "properties": {
+              "morning": {
+                "$ref": "#/components/schemas/Weather"
+              },
+              "noon": {
+                "$ref": "#/components/schemas/Weather"
+              },
+              "afternoon": {
+                "$ref": "#/components/schemas/Weather"
+              }
+            },
+            "required": [
+              "morning",
+              "noon",
+              "afternoon"
+            ]
+          },
+          "rainHours": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "stopHours": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "work": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "item": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "description": {
+                      "type": "string"
+                    },
+                    "kind": {
+                      "type": "string"
+                    },
+                    "uom": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "code",
+                    "description",
+                    "kind",
+                    "uom"
+                  ]
+                },
+                "qty": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "item",
+                "qty"
+              ]
+            }
+          },
+          "materials": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "item": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "description": {
+                      "type": "string"
+                    },
+                    "kind": {
+                      "type": "string"
+                    },
+                    "uom": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "code",
+                    "description",
+                    "kind",
+                    "uom"
+                  ]
+                },
+                "received": {
+                  "type": "number"
+                },
+                "used": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "item",
+                "received",
+                "used"
+              ]
+            }
+          },
+          "manpower": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "resourceTypeId": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                "name": {
+                  "type": "string"
+                },
+                "count": {
+                  "type": "integer"
+                },
+                "hours": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "resourceTypeId",
+                "name",
+                "count"
+              ]
+            }
+          },
+          "equipment": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "resourceTypeId": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                "name": {
+                  "type": "string"
+                },
+                "count": {
+                  "type": "integer"
+                },
+                "hours": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "resourceTypeId",
+                "name",
+                "count"
+              ]
+            }
+          },
+          "workerCount": {
+            "type": "integer"
+          },
+          "issues": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "notes": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "photos": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                "width": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "height": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "filesize": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "url": {
+                  "type": "string"
+                },
+                "thumbUrl": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "width",
+                "height",
+                "filesize",
+                "url",
+                "thumbUrl"
+              ]
+            }
+          },
+          "offline": {
+            "type": "boolean"
+          },
+          "timeTrust": {
+            "type": "string",
+            "enum": [
+              "server",
+              "estimated",
+              "device_only"
+            ]
+          },
+          "source": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "web",
+              "apk",
+              null
+            ]
+          },
+          "flags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "MELEBIHI_RAP, POSSIBLE_DUPLICATE, BACKDATED, CORRECTED, OFFLINE, DEVICE_TIME_ONLY, CLOCK_SKEW."
+          },
+          "receivedAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "editableUntil": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "editable": {
+            "type": "boolean"
+          },
+          "correctedAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "correctedBy": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "type": "integer",
+                "exclusiveMinimum": 0
+              },
+              "name": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "name"
+            ]
+          },
+          "rev": {
+            "type": "integer"
+          },
+          "clientUuid": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "createdAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "ledger": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                "item": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "description": {
+                      "type": "string"
+                    },
+                    "kind": {
+                      "type": "string"
+                    },
+                    "uom": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "code",
+                    "description",
+                    "kind",
+                    "uom"
+                  ]
+                },
+                "kind": {
+                  "$ref": "#/components/schemas/DailyLineKind"
+                },
+                "qty": {
+                  "type": "number"
+                },
+                "origin": {
+                  "$ref": "#/components/schemas/DailyLineOrigin"
+                },
+                "reason": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "by": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0
+                    },
+                    "name": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name"
+                  ]
+                },
+                "at": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "item",
+                "kind",
+                "qty",
+                "origin",
+                "reason",
+                "by",
+                "at"
+              ]
+            },
+            "description": "Detail only: every ledger line (append-only history)."
+          }
+        },
+        "required": [
+          "id",
+          "uuid",
+          "companyId",
+          "docNo",
+          "project",
+          "reportDate",
+          "reporter",
+          "weather",
+          "rainHours",
+          "stopHours",
+          "work",
+          "materials",
+          "manpower",
+          "equipment",
+          "workerCount",
+          "issues",
+          "notes",
+          "photos",
+          "offline",
+          "timeTrust",
+          "source",
+          "flags",
+          "receivedAt",
+          "editableUntil",
+          "editable",
+          "correctedAt",
+          "correctedBy",
+          "rev",
+          "clientUuid",
+          "createdAt"
+        ]
+      },
+      "Weather": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "enum": [
+          "cerah",
+          "berawan",
+          "hujan",
+          null
+        ]
+      },
+      "DailyLineKind": {
+        "type": "string",
+        "enum": [
+          "work",
+          "material_in",
+          "material_used"
+        ]
+      },
+      "DailyLineOrigin": {
+        "type": "string",
+        "enum": [
+          "report",
+          "edit",
+          "correction"
+        ]
+      },
+      "DailyReportCreate": {
+        "type": "object",
+        "properties": {
+          "company": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "description": "MC4: explicit PT (companies id) of the new record. Must be one of your PTs where you hold the role this create needs (else 403 COMPANY_NOT_ALLOWED) and the PT of the referenced project / cost center / cash account (else 400 COMPANY_MISMATCH; a reference in a PT you are not mapped to is answered like a missing one). Omitted = derived from the references, else your only selected PT (unchanged behaviour of APK 0.2.x / 0.3.0)."
+          },
+          "projectId": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "description": "Project of kind konstruksi (else 409 WRONG_PROJECT_KIND)."
+          },
+          "reportDate": {
+            "type": "string",
+            "pattern": "^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$",
+            "description": "Default: today (company TZ). Not in the future, ≤ 14 days back. One per project, reporter and date (409 DAILY_EXISTS)."
+          },
+          "weather": {
+            "type": "object",
+            "properties": {
+              "morning": {
+                "$ref": "#/components/schemas/Weather"
+              },
+              "noon": {
+                "$ref": "#/components/schemas/Weather"
+              },
+              "afternoon": {
+                "$ref": "#/components/schemas/Weather"
+              }
+            },
+            "additionalProperties": false
+          },
+          "rainHours": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 24
+          },
+          "stopHours": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 24
+          },
+          "work": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DailyWorkIn"
+            },
+            "maxItems": 300
+          },
+          "materials": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DailyMaterialIn"
+            },
+            "maxItems": 300
+          },
+          "manpower": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DailyResourceIn"
+            },
+            "maxItems": 60
+          },
+          "equipment": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DailyResourceIn"
+            },
+            "maxItems": 60
+          },
+          "issues": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 2000,
+            "description": "Kendala."
+          },
+          "notes": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 2000,
+            "description": "Required when a work item goes above its RAP volume (400 OVER_RAP_NOTE_REQUIRED)."
+          },
+          "photoIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "exclusiveMinimum": 0
+            },
+            "maxItems": 10
+          },
+          "clientUuid": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Client id; a replay by the same reporter returns the existing report (200); another user → 409 CLIENT_UUID_CONFLICT."
+          }
+        },
+        "required": [
+          "projectId"
+        ],
+        "additionalProperties": false
+      },
+      "DailyWorkIn": {
+        "type": "object",
+        "properties": {
+          "rapItemId": {
+            "type": "integer",
+            "exclusiveMinimum": 0
+          },
+          "qty": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100000000
+          }
+        },
+        "required": [
+          "rapItemId",
+          "qty"
+        ],
+        "additionalProperties": false,
+        "description": "Volume pekerjaan today (item kind pekerjaan). 0 removes a booked value on edit."
+      },
+      "DailyMaterialIn": {
+        "type": "object",
+        "properties": {
+          "rapItemId": {
+            "type": "integer",
+            "exclusiveMinimum": 0
+          },
+          "received": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100000000
+          },
+          "used": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100000000
+          }
+        },
+        "required": [
+          "rapItemId"
+        ],
+        "additionalProperties": false
+      },
+      "DailyResourceIn": {
+        "type": "object",
+        "properties": {
+          "resourceTypeId": {
+            "type": "integer",
+            "exclusiveMinimum": 0
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9999
+          },
+          "hours": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 24
+          }
+        },
+        "required": [
+          "resourceTypeId",
+          "count"
+        ],
+        "additionalProperties": false,
+        "description": "resource-types of the PT (tenaga for manpower, alat for equipment)."
+      },
+      "DailyReportUpdate": {
+        "type": "object",
+        "properties": {
+          "weather": {
+            "type": "object",
+            "properties": {
+              "morning": {
+                "$ref": "#/components/schemas/Weather"
+              },
+              "noon": {
+                "$ref": "#/components/schemas/Weather"
+              },
+              "afternoon": {
+                "$ref": "#/components/schemas/Weather"
+              }
+            },
+            "additionalProperties": false
+          },
+          "rainHours": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 24
+          },
+          "stopHours": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 24
+          },
+          "work": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DailyWorkIn"
+            },
+            "maxItems": 300
+          },
+          "materials": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DailyMaterialIn"
+            },
+            "maxItems": 300
+          },
+          "manpower": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DailyResourceIn"
+            },
+            "maxItems": 60
+          },
+          "equipment": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DailyResourceIn"
+            },
+            "maxItems": 60
+          },
+          "issues": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 2000,
+            "description": "Kendala."
+          },
+          "notes": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 2000,
+            "description": "Required when a work item goes above its RAP volume (400 OVER_RAP_NOTE_REQUIRED)."
+          },
+          "addPhotoIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "exclusiveMinimum": 0
+            },
+            "maxItems": 10,
+            "description": "Photos to add (total ≤ 10)."
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 1000
+          }
+        },
+        "additionalProperties": false,
+        "description": "Reporter within 24 h. work/materials, when sent, are the full new values of the listed items; the difference is booked to the ledger (origin edit)."
+      },
+      "DailyReportCorrection": {
+        "type": "object",
+        "properties": {
+          "weather": {
+            "type": "object",
+            "properties": {
+              "morning": {
+                "$ref": "#/components/schemas/Weather"
+              },
+              "noon": {
+                "$ref": "#/components/schemas/Weather"
+              },
+              "afternoon": {
+                "$ref": "#/components/schemas/Weather"
+              }
+            },
+            "additionalProperties": false
+          },
+          "rainHours": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 24
+          },
+          "stopHours": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 24
+          },
+          "work": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DailyWorkIn"
+            },
+            "maxItems": 300
+          },
+          "materials": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DailyMaterialIn"
+            },
+            "maxItems": 300
+          },
+          "manpower": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DailyResourceIn"
+            },
+            "maxItems": 60
+          },
+          "equipment": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DailyResourceIn"
+            },
+            "maxItems": 60
+          },
+          "issues": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 2000,
+            "description": "Kendala."
+          },
+          "notes": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 2000,
+            "description": "Required when a work item goes above its RAP volume (400 OVER_RAP_NOTE_REQUIRED)."
+          },
+          "addPhotoIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "exclusiveMinimum": 0
+            },
+            "maxItems": 10,
+            "description": "Photos to add (total ≤ 10)."
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 1000,
+            "description": "Required: PM of the project team or the Direktur, any time (ledger origin correction, flag CORRECTED)."
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "additionalProperties": false
+      },
+      "DailyRecap": {
+        "type": "object",
+        "properties": {
+          "project": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "exclusiveMinimum": 0
+              },
+              "startDate": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "startDate"
+            ]
+          },
+          "weeks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "week": {
+                  "type": "integer"
+                },
+                "from": {
+                  "type": "string"
+                },
+                "to": {
+                  "type": "string"
+                },
+                "reports": {
+                  "type": "integer"
+                },
+                "workerDays": {
+                  "type": "integer"
+                },
+                "rainHours": {
+                  "type": "number"
+                },
+                "stopHours": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "week",
+                "from",
+                "to",
+                "reports",
+                "workerDays",
+                "rainHours",
+                "stopHours"
+              ]
+            }
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                "code": {
+                  "type": "string"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "uom": {
+                  "type": "string"
+                },
+                "volume": {
+                  "type": "number"
+                },
+                "perWeek": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "number"
+                  }
+                },
+                "realised": {
+                  "type": "number"
+                },
+                "pct": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "id",
+                "code",
+                "description",
+                "uom",
+                "volume",
+                "perWeek",
+                "realised",
+                "pct"
+              ]
+            }
+          }
+        },
+        "required": [
+          "project",
+          "weeks",
+          "items"
+        ],
+        "description": "\"Minggu ke-N\": Mon–Sun weeks from the project start."
       }
     },
     "parameters": {
@@ -29898,6 +31892,1816 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ContractUnitList"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/projects/{id}/rap": {
+      "get": {
+        "summary": "P3 RAP of a konstruksi project: items (realised / received / used / stock / %), stage summary (progressMode rap|manual, basis value|equal), lock state; prices and totals only for Direktur/Admin/Finance and the project PM",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d+$"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": true,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "APK version; below company minimum → 426."
+            },
+            "required": false,
+            "description": "APK version; below company minimum → 426.",
+            "name": "X-App-Version",
+            "in": "header"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "RAP",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Rap"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/rap/template.xlsx": {
+      "get": {
+        "summary": "P3 empty RAP Excel template (sheet RAP: kode, uraian, tahapan, jenis, satuan, volume, harga_satuan, bobot + Petunjuk)",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Excel (.xlsx)",
+            "content": {
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "429": {
+            "description": "Too Many Requests"
+          }
+        }
+      }
+    },
+    "/projects/{id}/rap.xlsx": {
+      "get": {
+        "summary": "P3 the project's active RAP items in the import format (harga_satuan empty without the price roles)",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d+$"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Excel (.xlsx)",
+            "content": {
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "429": {
+            "description": "Too Many Requests"
+          }
+        }
+      }
+    },
+    "/projects/{id}/rap/items": {
+      "post": {
+        "summary": "P3 add a RAP item: Direktur/Admin or the project PM; locked RAP (realisation exists) → Direktur/Admin with reason (409 RAP_LOCKED); 409 DUPLICATE_CODE / WRONG_PROJECT_KIND",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d+$"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": false,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422."
+            },
+            "required": false,
+            "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422.",
+            "name": "Idempotency-Key",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RapItemCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "RAP item",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RapItem"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/rap-items/{id}": {
+      "patch": {
+        "summary": "P3 edit / deactivate a RAP item (same roles and lock as create; kind never changes)",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d+$"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": false,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422."
+            },
+            "required": false,
+            "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422.",
+            "name": "Idempotency-Key",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RapItemUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "RAP item",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RapItem"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/projects/{id}/rap/import/preview": {
+      "post": {
+        "summary": "P3 RAP Excel import — preview (no write): new / changed / unchanged per kode, items to deactivate, new stages, issues; returns fileHash for the commit",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d+$"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": ".xlsx ≤ 2 MB (413 above)"
+                  }
+                },
+                "required": [
+                  "file"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Preview",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RapPreview"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/projects/{id}/rap/import/commit": {
+      "post": {
+        "summary": "P3 RAP Excel import — commit the previewed file (409 FILE_CHANGED); idempotent by kode; items missing from the file are deactivated; new stages only for Direktur/Admin",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d+$"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": ".xlsx ≤ 2 MB (413 above)"
+                  },
+                  "_payload": {
+                    "type": "string",
+                    "description": "JSON: multipart: field \"file\" (.xlsx) + \"_payload\" (this JSON). fileHash = the preview's sha256 (409 FILE_CHANGED)."
+                  }
+                },
+                "required": [
+                  "file",
+                  "_payload"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "RAP",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Rap"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/projects/{id}/rap/apply-template": {
+      "post": {
+        "summary": "P3 fill an EMPTY RAP from a RAP template of the same PT (409 STATE_CONFLICT when items exist)",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d+$"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": false,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422."
+            },
+            "required": false,
+            "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422.",
+            "name": "Idempotency-Key",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RapApplyTemplate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "RAP",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Rap"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/projects/{id}/rap/save-template": {
+      "post": {
+        "summary": "P3 save the project's active RAP items as a template of the PT (Direktur/Admin or project PM)",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d+$"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": false,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422."
+            },
+            "required": false,
+            "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422.",
+            "name": "Idempotency-Key",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RapSaveTemplate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Template",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RapTemplateSaved"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/daily-reports": {
+      "get": {
+        "summary": "P3 Laporan harian: list, newest first, in the caller's read scope (Staff: assigned projects + own; PM: team + own; Direktur/Finance/Admin: all of the PT)",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0
+            },
+            "required": false,
+            "name": "project",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0
+            },
+            "required": false,
+            "name": "reporter",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$"
+            },
+            "required": false,
+            "name": "from",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$"
+            },
+            "required": false,
+            "name": "to",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "1",
+                "true"
+              ]
+            },
+            "required": false,
+            "name": "mine",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 25
+            },
+            "required": false,
+            "name": "limit",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 64
+            },
+            "required": false,
+            "name": "cursor",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9]\\d{0,8}(,[1-9]\\d{0,8})*$",
+              "description": "MC3: PT filter (comma separated ids). Only narrows the effective selection (X-Company-Ids / cookie ∩ memberships); a PT outside it → 403 COMPANY_NOT_ALLOWED."
+            },
+            "required": false,
+            "description": "MC3: PT filter (comma separated ids). Only narrows the effective selection (X-Company-Ids / cookie ∩ memberships); a PT outside it → 403 COMPANY_NOT_ALLOWED.",
+            "name": "company",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": true,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "APK version; below company minimum → 426."
+            },
+            "required": false,
+            "description": "APK version; below company minimum → 426.",
+            "name": "X-App-Version",
+            "in": "header"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Page",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DailyReportList"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "P3 Laporan harian (LH/YYMM/####), project kind konstruksi: weather, manpower / equipment, volume pekerjaan and material per RAP item, issues, photos ≤ 10. One per project, reporter and date (409 DAILY_EXISTS). Above the RAP volume: allowed with notes (400 OVER_RAP_NOTE_REQUIRED), flag MELEBIHI_RAP, PM notified; same item booked by another reporter that day → flag POSSIBLE_DUPLICATE. Stage % of RAP-driven stages and the project % are recomputed",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CompanyIds"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": false,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422."
+            },
+            "required": false,
+            "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422.",
+            "name": "Idempotency-Key",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DailyReportCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Daily report (replayed clientUuid)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DailyReport"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Daily report",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DailyReport"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/daily-reports/{id}": {
+      "get": {
+        "summary": "P3 Laporan harian: detail incl. the append-only ledger (404 outside the read scope)",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d+$"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": true,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "APK version; below company minimum → 426."
+            },
+            "required": false,
+            "description": "APK version; below company minimum → 426.",
+            "name": "X-App-Version",
+            "in": "header"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Daily report",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DailyReport"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "summary": "P3 Laporan harian: edit by the reporter within 24 h (409 NOT_EDITABLE after); differences are booked to the ledger (origin edit)",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d+$"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": false,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422."
+            },
+            "required": false,
+            "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422.",
+            "name": "Idempotency-Key",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DailyReportUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Daily report",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DailyReport"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/daily-reports/{id}/corrections": {
+      "post": {
+        "summary": "P3 Laporan harian: correction by the PM of the project team or the Direktur, any time, reason required (ledger origin correction, flag CORRECTED)",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d+$"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": false,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422."
+            },
+            "required": false,
+            "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422.",
+            "name": "Idempotency-Key",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DailyReportCorrection"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Daily report",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DailyReport"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/projects/{id}/daily-recap": {
+      "get": {
+        "summary": "P3 weekly recap \"Minggu ke-N\" (Mon–Sun from the project start): reports, worker-days, rain / stop hours per week; volume per work item per week and cumulative %",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d+$"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": true,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "APK version; below company minimum → 426."
+            },
+            "required": false,
+            "description": "APK version; below company minimum → 426.",
+            "name": "X-App-Version",
+            "in": "header"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Recap",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DailyRecap"
                 }
               }
             }

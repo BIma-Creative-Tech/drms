@@ -416,6 +416,8 @@ export function notificationHref(docType: string | null | undefined, docId: stri
       return `/admin/unit-kontrak/timesheet/detail/${docId}`
     case 'aftersales_activity':
       return `/admin/aftersales/aktivitas/detail/${docId}`
+    case 'daily_report':
+      return `/admin/laporan-harian/detail/${docId}`
     default:
       return null
   }

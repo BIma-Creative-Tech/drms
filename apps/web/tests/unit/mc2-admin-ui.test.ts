@@ -28,6 +28,8 @@ const WITH_COMPANY = [
   'urgency-levels',
   // FR1 (ADR 0020)
   'contract-units', 'service-reports', 'unit-timesheets', 'aftersales-activities',
+  // P3 konstruksi RAP + Laporan Harian
+  'rap-items', 'rap-templates', 'resource-types', 'daily-reports', 'daily-report-lines',
 ].sort()
 
 describe('PT column + PT filter on list views', () => {

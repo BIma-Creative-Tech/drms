@@ -112,4 +112,9 @@ export const FR1_ADMIN_VIEWS = {
   fieldActivities: { Component: '@/admin/views/FieldAftersales#FieldActivityList', path: '/aftersales/aktivitas' as const, exact: true, meta: { title: 'Aktivitas aftersales' } },
   fieldActivityNew: { Component: '@/admin/views/FieldAftersales#FieldActivityNew', path: '/aftersales/aktivitas/baru' as const, exact: true, meta: { title: 'Catat aktivitas' } },
   fieldActivity: { Component: '@/admin/views/FieldAftersales#FieldActivityDetail', path: '/aftersales/aktivitas/detail/:id' as const, exact: true, meta: { title: 'Aktivitas aftersales' } },
+  // P3 konstruksi: Laporan harian (list / input / detail incl. ?ubah=1 / ?koreksi=1) + RAP & weekly recap of a project
+  fieldDailyList: { Component: '@/admin/views/FieldDaily#FieldDailyList', path: '/laporan-harian' as const, exact: true, meta: { title: 'Laporan harian' } },
+  fieldDailyNew: { Component: '@/admin/views/FieldDaily#FieldDailyNew', path: '/laporan-harian/baru' as const, exact: true, meta: { title: 'Laporan harian baru' } },
+  fieldDaily: { Component: '@/admin/views/FieldDaily#FieldDailyDetail', path: '/laporan-harian/detail/:id' as const, exact: true, meta: { title: 'Laporan harian' } },
+  fieldDailyRap: { Component: '@/admin/views/FieldDaily#FieldDailyRap', path: '/laporan-harian/rap/:id' as const, exact: true, meta: { title: 'RAP project' } },
 }

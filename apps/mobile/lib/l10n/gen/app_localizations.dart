@@ -4680,6 +4680,228 @@ abstract class AppLocalizations {
   /// In id, this message translates to:
   /// **'{count} foto baru'**
   String fieldNewPhotos(int count);
+
+  /// No description provided for @dailyTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Laporan Harian'**
+  String get dailyTitle;
+
+  /// No description provided for @dailyEditTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Ubah Laporan Harian'**
+  String get dailyEditTitle;
+
+  /// No description provided for @dailyWeather.
+  ///
+  /// In id, this message translates to:
+  /// **'Cuaca & jam hilang'**
+  String get dailyWeather;
+
+  /// No description provided for @dailyMorning.
+  ///
+  /// In id, this message translates to:
+  /// **'Pagi'**
+  String get dailyMorning;
+
+  /// No description provided for @dailyNoon.
+  ///
+  /// In id, this message translates to:
+  /// **'Siang'**
+  String get dailyNoon;
+
+  /// No description provided for @dailyAfternoon.
+  ///
+  /// In id, this message translates to:
+  /// **'Sore'**
+  String get dailyAfternoon;
+
+  /// No description provided for @dailyRainHours.
+  ///
+  /// In id, this message translates to:
+  /// **'Jam hujan'**
+  String get dailyRainHours;
+
+  /// No description provided for @dailyStopHours.
+  ///
+  /// In id, this message translates to:
+  /// **'Jam kerja berhenti'**
+  String get dailyStopHours;
+
+  /// No description provided for @dailyWorkSection.
+  ///
+  /// In id, this message translates to:
+  /// **'Volume pekerjaan hari ini'**
+  String get dailyWorkSection;
+
+  /// No description provided for @dailyPickProject.
+  ///
+  /// In id, this message translates to:
+  /// **'Pilih project konstruksi dulu.'**
+  String get dailyPickProject;
+
+  /// No description provided for @dailyNoRap.
+  ///
+  /// In id, this message translates to:
+  /// **'Project ini belum punya RAP di HP. Tarik ke bawah untuk memuat ulang; bila tetap kosong, minta PM/Direktur mengisi RAP di web.'**
+  String get dailyNoRap;
+
+  /// No description provided for @dailyRealised.
+  ///
+  /// In id, this message translates to:
+  /// **'Realisasi {done} / {volume} {uom}'**
+  String dailyRealised(String done, String volume, String uom);
+
+  /// No description provided for @dailyOverRap.
+  ///
+  /// In id, this message translates to:
+  /// **'Melebihi RAP: {total} dari {volume} {uom} — isi catatan.'**
+  String dailyOverRap(String total, String volume, String uom);
+
+  /// No description provided for @dailyOverRapNotify.
+  ///
+  /// In id, this message translates to:
+  /// **'Ada volume melebihi RAP: laporan tetap dikirim, ditandai \"melebihi RAP\" dan PM project diberi notifikasi.'**
+  String get dailyOverRapNotify;
+
+  /// No description provided for @dailyMaterialSection.
+  ///
+  /// In id, this message translates to:
+  /// **'Material'**
+  String get dailyMaterialSection;
+
+  /// No description provided for @dailyMaterialHelp.
+  ///
+  /// In id, this message translates to:
+  /// **'Masuk = diterima di lokasi hari ini; terpakai = dipakai hari ini. Material tidak dihitung ke progress.'**
+  String get dailyMaterialHelp;
+
+  /// No description provided for @dailyReceived.
+  ///
+  /// In id, this message translates to:
+  /// **'Masuk'**
+  String get dailyReceived;
+
+  /// No description provided for @dailyUsed.
+  ///
+  /// In id, this message translates to:
+  /// **'Terpakai'**
+  String get dailyUsed;
+
+  /// No description provided for @dailyStock.
+  ///
+  /// In id, this message translates to:
+  /// **'Stok {stock} {uom}'**
+  String dailyStock(String stock, String uom);
+
+  /// No description provided for @dailyManpower.
+  ///
+  /// In id, this message translates to:
+  /// **'Tenaga & alat'**
+  String get dailyManpower;
+
+  /// No description provided for @dailyEquipment.
+  ///
+  /// In id, this message translates to:
+  /// **'Alat (unit · jam kerja)'**
+  String get dailyEquipment;
+
+  /// No description provided for @dailyHours.
+  ///
+  /// In id, this message translates to:
+  /// **'Jam'**
+  String get dailyHours;
+
+  /// No description provided for @dailyWorkers.
+  ///
+  /// In id, this message translates to:
+  /// **'{count} pekerja'**
+  String dailyWorkers(int count);
+
+  /// No description provided for @dailyNoResources.
+  ///
+  /// In id, this message translates to:
+  /// **'Jenis tenaga/alat belum dimuat. Tarik ke bawah saat ada sinyal.'**
+  String get dailyNoResources;
+
+  /// No description provided for @dailyNotesSection.
+  ///
+  /// In id, this message translates to:
+  /// **'Kendala, catatan & foto'**
+  String get dailyNotesSection;
+
+  /// No description provided for @dailyIssues.
+  ///
+  /// In id, this message translates to:
+  /// **'Kendala'**
+  String get dailyIssues;
+
+  /// No description provided for @dailyNotesRequired.
+  ///
+  /// In id, this message translates to:
+  /// **'Wajib karena ada volume melebihi RAP.'**
+  String get dailyNotesRequired;
+
+  /// No description provided for @dailyPhoto.
+  ///
+  /// In id, this message translates to:
+  /// **'Foto pekerjaan'**
+  String get dailyPhoto;
+
+  /// No description provided for @dailyPhotos.
+  ///
+  /// In id, this message translates to:
+  /// **'Foto pekerjaan ({count}/{max})'**
+  String dailyPhotos(int count, int max);
+
+  /// No description provided for @dailySubmit.
+  ///
+  /// In id, this message translates to:
+  /// **'Kirim laporan harian'**
+  String get dailySubmit;
+
+  /// No description provided for @dailySummary.
+  ///
+  /// In id, this message translates to:
+  /// **'{items} item pekerjaan · {workers} pekerja · {photos} foto'**
+  String dailySummary(int items, int workers, int photos);
+
+  /// No description provided for @dailyNoProjects.
+  ///
+  /// In id, this message translates to:
+  /// **'Tidak ada project konstruksi yang bisa Anda laporkan (Staff: project yang ditugaskan; PM: project tim).'**
+  String get dailyNoProjects;
+
+  /// No description provided for @dailySameDay.
+  ///
+  /// In id, this message translates to:
+  /// **'Sudah ada laporan harian Anda untuk project & tanggal ini di HP. Buka laporan itu.'**
+  String get dailySameDay;
+
+  /// No description provided for @dailyFlagOverRap.
+  ///
+  /// In id, this message translates to:
+  /// **'Melebihi RAP'**
+  String get dailyFlagOverRap;
+
+  /// No description provided for @dailyFlagDuplicate.
+  ///
+  /// In id, this message translates to:
+  /// **'Kemungkinan dobel'**
+  String get dailyFlagDuplicate;
+
+  /// No description provided for @dailyWorkItem.
+  ///
+  /// In id, this message translates to:
+  /// **'Volume {item}'**
+  String dailyWorkItem(String item);
+
+  /// No description provided for @dailyWorkerCount.
+  ///
+  /// In id, this message translates to:
+  /// **'Jumlah pekerja'**
+  String get dailyWorkerCount;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

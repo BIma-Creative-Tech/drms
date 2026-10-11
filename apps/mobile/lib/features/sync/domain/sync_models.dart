@@ -19,13 +19,19 @@ abstract final class SyncItemType {
   static const unitTimesheetUpsert = 'unit_timesheet.upsert';
   static const aftersalesActivityUpsert = 'aftersales_activity.upsert';
 
+  /// P3 konstruksi Laporan Harian (server ≥ 0.8).
+  static const dailyReportUpsert = 'daily_report.upsert';
+
   static bool isAttendance(String type) =>
       type == attendanceCheckIn || type == attendanceCheckOut || type == attendanceOnBehalf;
 
   static bool isProgress(String type) => type == progressReportUpsert;
 
   static bool isField(String type) =>
-      type == serviceReportUpsert || type == unitTimesheetUpsert || type == aftersalesActivityUpsert;
+      type == serviceReportUpsert ||
+      type == unitTimesheetUpsert ||
+      type == aftersalesActivityUpsert ||
+      type == dailyReportUpsert;
 
   /// Short Indonesian label for the queue screen.
   static String label(String type) => switch (type) {
@@ -36,6 +42,7 @@ abstract final class SyncItemType {
     serviceReportUpsert => 'Laporan servis unit',
     unitTimesheetUpsert => 'Timesheet unit',
     aftersalesActivityUpsert => 'Aktivitas aftersales',
+    dailyReportUpsert => 'Laporan harian',
     expenseDraftDelete => 'Hapus draft',
     _ => 'Draft pengajuan',
   };
@@ -112,7 +119,12 @@ class SyncItemResult {
     serverCopy: j['server_copy'] is Map<String, dynamic> ? j['server_copy'] as Map<String, dynamic> : null,
     serverReport: j['server_report'] is Map<String, dynamic> ? j['server_report'] as Map<String, dynamic> : null,
     serverField: [
-      for (final k in const ['server_service_report', 'server_unit_timesheet', 'server_aftersales_activity'])
+      for (final k in const [
+        'server_service_report',
+        'server_unit_timesheet',
+        'server_aftersales_activity',
+        'server_daily_report',
+      ])
         if (j[k] case final Map<String, dynamic> m) m,
     ].firstOrNull,
   );

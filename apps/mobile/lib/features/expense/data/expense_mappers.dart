@@ -77,6 +77,7 @@ Capabilities _capabilities(Json? caps, Set<Role> roles) => caps == null
         serviceReportCreate: caps['serviceReportCreate'] == true,
         unitTimesheetCreate: caps['unitTimesheetCreate'] == true,
         aftersalesActivityCreate: caps['aftersalesActivityCreate'] == true,
+        dailyReportCreate: caps['dailyReportCreate'] == true,
       );
 
 /// `GET /me` `companies[]` item (openapi `MeCompany`, MC3).

@@ -244,11 +244,11 @@ describe('AC-8: requests submitted before E1 finish on their old snapshot', () =
 describe('APK needs (E3 / AC-10 server side)', () => {
   it('/me capabilities: approval inbox for Direktur, Finance and (ADR 0021) the PM', async () => {
     // FR1 field-report capabilities are false while DRMS has fieldReportsEnabled off (default)
-    const noField = { serviceReportCreate: false, unitTimesheetCreate: false, aftersalesActivityCreate: false }
+    const noField = { serviceReportCreate: false, unitTimesheetCreate: false, aftersalesActivityCreate: false, dailyReportCreate: false }
     const cap = async (u: FlowUser) => {
       const c = (await api('GET', '/api/v1/me', u)).body.capabilities
       expect(c).toMatchObject(noField)
-      const { serviceReportCreate: _s, unitTimesheetCreate: _u, aftersalesActivityCreate: _a, ...rest } = c
+      const { serviceReportCreate: _s, unitTimesheetCreate: _u, aftersalesActivityCreate: _a, dailyReportCreate: _d, ...rest } = c
       return rest
     }
     expect(await cap(w.users.owner)).toEqual({ approvalInbox: true, teamMonitor: false, progressReportCreate: true })

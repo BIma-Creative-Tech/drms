@@ -6363,7 +6363,7 @@ class LocalFieldReport extends DataClass
   final String userSub;
   final int? companyId;
 
-  /// service_report | unit_timesheet | aftersales_activity
+  /// service_report | unit_timesheet | aftersales_activity | daily_report (v6)
   final String reportType;
   final int projectId;
   final String projectLabel;
@@ -10418,6 +10418,1237 @@ class FieldRecentTimesheetsCompanion
   }
 }
 
+class $FieldRapItemsTable extends FieldRapItems
+    with TableInfo<$FieldRapItemsTable, FieldRapItemRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $FieldRapItemsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _userSubMeta = const VerificationMeta(
+    'userSub',
+  );
+  @override
+  late final GeneratedColumn<String> userSub = GeneratedColumn<String>(
+    'user_sub',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _companyIdMeta = const VerificationMeta(
+    'companyId',
+  );
+  @override
+  late final GeneratedColumn<int> companyId = GeneratedColumn<int>(
+    'company_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _projectIdMeta = const VerificationMeta(
+    'projectId',
+  );
+  @override
+  late final GeneratedColumn<int> projectId = GeneratedColumn<int>(
+    'project_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _codeMeta = const VerificationMeta('code');
+  @override
+  late final GeneratedColumn<String> code = GeneratedColumn<String>(
+    'code',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _descriptionMeta = const VerificationMeta(
+    'description',
+  );
+  @override
+  late final GeneratedColumn<String> description = GeneratedColumn<String>(
+    'description',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _kindMeta = const VerificationMeta('kind');
+  @override
+  late final GeneratedColumn<String> kind = GeneratedColumn<String>(
+    'kind',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _uomMeta = const VerificationMeta('uom');
+  @override
+  late final GeneratedColumn<String> uom = GeneratedColumn<String>(
+    'uom',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _stageNameMeta = const VerificationMeta(
+    'stageName',
+  );
+  @override
+  late final GeneratedColumn<String> stageName = GeneratedColumn<String>(
+    'stage_name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _volumeMeta = const VerificationMeta('volume');
+  @override
+  late final GeneratedColumn<double> volume = GeneratedColumn<double>(
+    'volume',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _realisedMeta = const VerificationMeta(
+    'realised',
+  );
+  @override
+  late final GeneratedColumn<double> realised = GeneratedColumn<double>(
+    'realised',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _receivedMeta = const VerificationMeta(
+    'received',
+  );
+  @override
+  late final GeneratedColumn<double> received = GeneratedColumn<double>(
+    'received',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _usedMeta = const VerificationMeta('used');
+  @override
+  late final GeneratedColumn<double> used = GeneratedColumn<double>(
+    'used',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _sortOrderMeta = const VerificationMeta(
+    'sortOrder',
+  );
+  @override
+  late final GeneratedColumn<int> sortOrder = GeneratedColumn<int>(
+    'sort_order',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _activeMeta = const VerificationMeta('active');
+  @override
+  late final GeneratedColumn<bool> active = GeneratedColumn<bool>(
+    'active',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("active" IN (0, 1))',
+    ),
+    defaultValue: const Constant(true),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    userSub,
+    id,
+    companyId,
+    projectId,
+    code,
+    description,
+    kind,
+    uom,
+    stageName,
+    volume,
+    realised,
+    received,
+    used,
+    sortOrder,
+    active,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'field_rap_items';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<FieldRapItemRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('user_sub')) {
+      context.handle(
+        _userSubMeta,
+        userSub.isAcceptableOrUnknown(data['user_sub']!, _userSubMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_userSubMeta);
+    }
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('company_id')) {
+      context.handle(
+        _companyIdMeta,
+        companyId.isAcceptableOrUnknown(data['company_id']!, _companyIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_companyIdMeta);
+    }
+    if (data.containsKey('project_id')) {
+      context.handle(
+        _projectIdMeta,
+        projectId.isAcceptableOrUnknown(data['project_id']!, _projectIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_projectIdMeta);
+    }
+    if (data.containsKey('code')) {
+      context.handle(
+        _codeMeta,
+        code.isAcceptableOrUnknown(data['code']!, _codeMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_codeMeta);
+    }
+    if (data.containsKey('description')) {
+      context.handle(
+        _descriptionMeta,
+        description.isAcceptableOrUnknown(
+          data['description']!,
+          _descriptionMeta,
+        ),
+      );
+    }
+    if (data.containsKey('kind')) {
+      context.handle(
+        _kindMeta,
+        kind.isAcceptableOrUnknown(data['kind']!, _kindMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_kindMeta);
+    }
+    if (data.containsKey('uom')) {
+      context.handle(
+        _uomMeta,
+        uom.isAcceptableOrUnknown(data['uom']!, _uomMeta),
+      );
+    }
+    if (data.containsKey('stage_name')) {
+      context.handle(
+        _stageNameMeta,
+        stageName.isAcceptableOrUnknown(data['stage_name']!, _stageNameMeta),
+      );
+    }
+    if (data.containsKey('volume')) {
+      context.handle(
+        _volumeMeta,
+        volume.isAcceptableOrUnknown(data['volume']!, _volumeMeta),
+      );
+    }
+    if (data.containsKey('realised')) {
+      context.handle(
+        _realisedMeta,
+        realised.isAcceptableOrUnknown(data['realised']!, _realisedMeta),
+      );
+    }
+    if (data.containsKey('received')) {
+      context.handle(
+        _receivedMeta,
+        received.isAcceptableOrUnknown(data['received']!, _receivedMeta),
+      );
+    }
+    if (data.containsKey('used')) {
+      context.handle(
+        _usedMeta,
+        used.isAcceptableOrUnknown(data['used']!, _usedMeta),
+      );
+    }
+    if (data.containsKey('sort_order')) {
+      context.handle(
+        _sortOrderMeta,
+        sortOrder.isAcceptableOrUnknown(data['sort_order']!, _sortOrderMeta),
+      );
+    }
+    if (data.containsKey('active')) {
+      context.handle(
+        _activeMeta,
+        active.isAcceptableOrUnknown(data['active']!, _activeMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {userSub, id};
+  @override
+  FieldRapItemRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return FieldRapItemRow(
+      userSub: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}user_sub'],
+      )!,
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}id'],
+      )!,
+      companyId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}company_id'],
+      )!,
+      projectId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}project_id'],
+      )!,
+      code: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}code'],
+      )!,
+      description: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}description'],
+      )!,
+      kind: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}kind'],
+      )!,
+      uom: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}uom'],
+      )!,
+      stageName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}stage_name'],
+      )!,
+      volume: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}volume'],
+      )!,
+      realised: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}realised'],
+      )!,
+      received: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}received'],
+      )!,
+      used: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}used'],
+      )!,
+      sortOrder: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}sort_order'],
+      )!,
+      active: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}active'],
+      )!,
+    );
+  }
+
+  @override
+  $FieldRapItemsTable createAlias(String alias) {
+    return $FieldRapItemsTable(attachedDatabase, alias);
+  }
+}
+
+class FieldRapItemRow extends DataClass implements Insertable<FieldRapItemRow> {
+  final String userSub;
+  final int id;
+  final int companyId;
+  final int projectId;
+  final String code;
+  final String description;
+
+  /// pekerjaan | material
+  final String kind;
+  final String uom;
+  final String stageName;
+  final double volume;
+  final double realised;
+  final double received;
+  final double used;
+  final int sortOrder;
+  final bool active;
+  const FieldRapItemRow({
+    required this.userSub,
+    required this.id,
+    required this.companyId,
+    required this.projectId,
+    required this.code,
+    required this.description,
+    required this.kind,
+    required this.uom,
+    required this.stageName,
+    required this.volume,
+    required this.realised,
+    required this.received,
+    required this.used,
+    required this.sortOrder,
+    required this.active,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['user_sub'] = Variable<String>(userSub);
+    map['id'] = Variable<int>(id);
+    map['company_id'] = Variable<int>(companyId);
+    map['project_id'] = Variable<int>(projectId);
+    map['code'] = Variable<String>(code);
+    map['description'] = Variable<String>(description);
+    map['kind'] = Variable<String>(kind);
+    map['uom'] = Variable<String>(uom);
+    map['stage_name'] = Variable<String>(stageName);
+    map['volume'] = Variable<double>(volume);
+    map['realised'] = Variable<double>(realised);
+    map['received'] = Variable<double>(received);
+    map['used'] = Variable<double>(used);
+    map['sort_order'] = Variable<int>(sortOrder);
+    map['active'] = Variable<bool>(active);
+    return map;
+  }
+
+  FieldRapItemsCompanion toCompanion(bool nullToAbsent) {
+    return FieldRapItemsCompanion(
+      userSub: Value(userSub),
+      id: Value(id),
+      companyId: Value(companyId),
+      projectId: Value(projectId),
+      code: Value(code),
+      description: Value(description),
+      kind: Value(kind),
+      uom: Value(uom),
+      stageName: Value(stageName),
+      volume: Value(volume),
+      realised: Value(realised),
+      received: Value(received),
+      used: Value(used),
+      sortOrder: Value(sortOrder),
+      active: Value(active),
+    );
+  }
+
+  factory FieldRapItemRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return FieldRapItemRow(
+      userSub: serializer.fromJson<String>(json['userSub']),
+      id: serializer.fromJson<int>(json['id']),
+      companyId: serializer.fromJson<int>(json['companyId']),
+      projectId: serializer.fromJson<int>(json['projectId']),
+      code: serializer.fromJson<String>(json['code']),
+      description: serializer.fromJson<String>(json['description']),
+      kind: serializer.fromJson<String>(json['kind']),
+      uom: serializer.fromJson<String>(json['uom']),
+      stageName: serializer.fromJson<String>(json['stageName']),
+      volume: serializer.fromJson<double>(json['volume']),
+      realised: serializer.fromJson<double>(json['realised']),
+      received: serializer.fromJson<double>(json['received']),
+      used: serializer.fromJson<double>(json['used']),
+      sortOrder: serializer.fromJson<int>(json['sortOrder']),
+      active: serializer.fromJson<bool>(json['active']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'userSub': serializer.toJson<String>(userSub),
+      'id': serializer.toJson<int>(id),
+      'companyId': serializer.toJson<int>(companyId),
+      'projectId': serializer.toJson<int>(projectId),
+      'code': serializer.toJson<String>(code),
+      'description': serializer.toJson<String>(description),
+      'kind': serializer.toJson<String>(kind),
+      'uom': serializer.toJson<String>(uom),
+      'stageName': serializer.toJson<String>(stageName),
+      'volume': serializer.toJson<double>(volume),
+      'realised': serializer.toJson<double>(realised),
+      'received': serializer.toJson<double>(received),
+      'used': serializer.toJson<double>(used),
+      'sortOrder': serializer.toJson<int>(sortOrder),
+      'active': serializer.toJson<bool>(active),
+    };
+  }
+
+  FieldRapItemRow copyWith({
+    String? userSub,
+    int? id,
+    int? companyId,
+    int? projectId,
+    String? code,
+    String? description,
+    String? kind,
+    String? uom,
+    String? stageName,
+    double? volume,
+    double? realised,
+    double? received,
+    double? used,
+    int? sortOrder,
+    bool? active,
+  }) => FieldRapItemRow(
+    userSub: userSub ?? this.userSub,
+    id: id ?? this.id,
+    companyId: companyId ?? this.companyId,
+    projectId: projectId ?? this.projectId,
+    code: code ?? this.code,
+    description: description ?? this.description,
+    kind: kind ?? this.kind,
+    uom: uom ?? this.uom,
+    stageName: stageName ?? this.stageName,
+    volume: volume ?? this.volume,
+    realised: realised ?? this.realised,
+    received: received ?? this.received,
+    used: used ?? this.used,
+    sortOrder: sortOrder ?? this.sortOrder,
+    active: active ?? this.active,
+  );
+  FieldRapItemRow copyWithCompanion(FieldRapItemsCompanion data) {
+    return FieldRapItemRow(
+      userSub: data.userSub.present ? data.userSub.value : this.userSub,
+      id: data.id.present ? data.id.value : this.id,
+      companyId: data.companyId.present ? data.companyId.value : this.companyId,
+      projectId: data.projectId.present ? data.projectId.value : this.projectId,
+      code: data.code.present ? data.code.value : this.code,
+      description: data.description.present
+          ? data.description.value
+          : this.description,
+      kind: data.kind.present ? data.kind.value : this.kind,
+      uom: data.uom.present ? data.uom.value : this.uom,
+      stageName: data.stageName.present ? data.stageName.value : this.stageName,
+      volume: data.volume.present ? data.volume.value : this.volume,
+      realised: data.realised.present ? data.realised.value : this.realised,
+      received: data.received.present ? data.received.value : this.received,
+      used: data.used.present ? data.used.value : this.used,
+      sortOrder: data.sortOrder.present ? data.sortOrder.value : this.sortOrder,
+      active: data.active.present ? data.active.value : this.active,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('FieldRapItemRow(')
+          ..write('userSub: $userSub, ')
+          ..write('id: $id, ')
+          ..write('companyId: $companyId, ')
+          ..write('projectId: $projectId, ')
+          ..write('code: $code, ')
+          ..write('description: $description, ')
+          ..write('kind: $kind, ')
+          ..write('uom: $uom, ')
+          ..write('stageName: $stageName, ')
+          ..write('volume: $volume, ')
+          ..write('realised: $realised, ')
+          ..write('received: $received, ')
+          ..write('used: $used, ')
+          ..write('sortOrder: $sortOrder, ')
+          ..write('active: $active')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    userSub,
+    id,
+    companyId,
+    projectId,
+    code,
+    description,
+    kind,
+    uom,
+    stageName,
+    volume,
+    realised,
+    received,
+    used,
+    sortOrder,
+    active,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is FieldRapItemRow &&
+          other.userSub == this.userSub &&
+          other.id == this.id &&
+          other.companyId == this.companyId &&
+          other.projectId == this.projectId &&
+          other.code == this.code &&
+          other.description == this.description &&
+          other.kind == this.kind &&
+          other.uom == this.uom &&
+          other.stageName == this.stageName &&
+          other.volume == this.volume &&
+          other.realised == this.realised &&
+          other.received == this.received &&
+          other.used == this.used &&
+          other.sortOrder == this.sortOrder &&
+          other.active == this.active);
+}
+
+class FieldRapItemsCompanion extends UpdateCompanion<FieldRapItemRow> {
+  final Value<String> userSub;
+  final Value<int> id;
+  final Value<int> companyId;
+  final Value<int> projectId;
+  final Value<String> code;
+  final Value<String> description;
+  final Value<String> kind;
+  final Value<String> uom;
+  final Value<String> stageName;
+  final Value<double> volume;
+  final Value<double> realised;
+  final Value<double> received;
+  final Value<double> used;
+  final Value<int> sortOrder;
+  final Value<bool> active;
+  final Value<int> rowid;
+  const FieldRapItemsCompanion({
+    this.userSub = const Value.absent(),
+    this.id = const Value.absent(),
+    this.companyId = const Value.absent(),
+    this.projectId = const Value.absent(),
+    this.code = const Value.absent(),
+    this.description = const Value.absent(),
+    this.kind = const Value.absent(),
+    this.uom = const Value.absent(),
+    this.stageName = const Value.absent(),
+    this.volume = const Value.absent(),
+    this.realised = const Value.absent(),
+    this.received = const Value.absent(),
+    this.used = const Value.absent(),
+    this.sortOrder = const Value.absent(),
+    this.active = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  FieldRapItemsCompanion.insert({
+    required String userSub,
+    required int id,
+    required int companyId,
+    required int projectId,
+    required String code,
+    this.description = const Value.absent(),
+    required String kind,
+    this.uom = const Value.absent(),
+    this.stageName = const Value.absent(),
+    this.volume = const Value.absent(),
+    this.realised = const Value.absent(),
+    this.received = const Value.absent(),
+    this.used = const Value.absent(),
+    this.sortOrder = const Value.absent(),
+    this.active = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : userSub = Value(userSub),
+       id = Value(id),
+       companyId = Value(companyId),
+       projectId = Value(projectId),
+       code = Value(code),
+       kind = Value(kind);
+  static Insertable<FieldRapItemRow> custom({
+    Expression<String>? userSub,
+    Expression<int>? id,
+    Expression<int>? companyId,
+    Expression<int>? projectId,
+    Expression<String>? code,
+    Expression<String>? description,
+    Expression<String>? kind,
+    Expression<String>? uom,
+    Expression<String>? stageName,
+    Expression<double>? volume,
+    Expression<double>? realised,
+    Expression<double>? received,
+    Expression<double>? used,
+    Expression<int>? sortOrder,
+    Expression<bool>? active,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (userSub != null) 'user_sub': userSub,
+      if (id != null) 'id': id,
+      if (companyId != null) 'company_id': companyId,
+      if (projectId != null) 'project_id': projectId,
+      if (code != null) 'code': code,
+      if (description != null) 'description': description,
+      if (kind != null) 'kind': kind,
+      if (uom != null) 'uom': uom,
+      if (stageName != null) 'stage_name': stageName,
+      if (volume != null) 'volume': volume,
+      if (realised != null) 'realised': realised,
+      if (received != null) 'received': received,
+      if (used != null) 'used': used,
+      if (sortOrder != null) 'sort_order': sortOrder,
+      if (active != null) 'active': active,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  FieldRapItemsCompanion copyWith({
+    Value<String>? userSub,
+    Value<int>? id,
+    Value<int>? companyId,
+    Value<int>? projectId,
+    Value<String>? code,
+    Value<String>? description,
+    Value<String>? kind,
+    Value<String>? uom,
+    Value<String>? stageName,
+    Value<double>? volume,
+    Value<double>? realised,
+    Value<double>? received,
+    Value<double>? used,
+    Value<int>? sortOrder,
+    Value<bool>? active,
+    Value<int>? rowid,
+  }) {
+    return FieldRapItemsCompanion(
+      userSub: userSub ?? this.userSub,
+      id: id ?? this.id,
+      companyId: companyId ?? this.companyId,
+      projectId: projectId ?? this.projectId,
+      code: code ?? this.code,
+      description: description ?? this.description,
+      kind: kind ?? this.kind,
+      uom: uom ?? this.uom,
+      stageName: stageName ?? this.stageName,
+      volume: volume ?? this.volume,
+      realised: realised ?? this.realised,
+      received: received ?? this.received,
+      used: used ?? this.used,
+      sortOrder: sortOrder ?? this.sortOrder,
+      active: active ?? this.active,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (userSub.present) {
+      map['user_sub'] = Variable<String>(userSub.value);
+    }
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (companyId.present) {
+      map['company_id'] = Variable<int>(companyId.value);
+    }
+    if (projectId.present) {
+      map['project_id'] = Variable<int>(projectId.value);
+    }
+    if (code.present) {
+      map['code'] = Variable<String>(code.value);
+    }
+    if (description.present) {
+      map['description'] = Variable<String>(description.value);
+    }
+    if (kind.present) {
+      map['kind'] = Variable<String>(kind.value);
+    }
+    if (uom.present) {
+      map['uom'] = Variable<String>(uom.value);
+    }
+    if (stageName.present) {
+      map['stage_name'] = Variable<String>(stageName.value);
+    }
+    if (volume.present) {
+      map['volume'] = Variable<double>(volume.value);
+    }
+    if (realised.present) {
+      map['realised'] = Variable<double>(realised.value);
+    }
+    if (received.present) {
+      map['received'] = Variable<double>(received.value);
+    }
+    if (used.present) {
+      map['used'] = Variable<double>(used.value);
+    }
+    if (sortOrder.present) {
+      map['sort_order'] = Variable<int>(sortOrder.value);
+    }
+    if (active.present) {
+      map['active'] = Variable<bool>(active.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('FieldRapItemsCompanion(')
+          ..write('userSub: $userSub, ')
+          ..write('id: $id, ')
+          ..write('companyId: $companyId, ')
+          ..write('projectId: $projectId, ')
+          ..write('code: $code, ')
+          ..write('description: $description, ')
+          ..write('kind: $kind, ')
+          ..write('uom: $uom, ')
+          ..write('stageName: $stageName, ')
+          ..write('volume: $volume, ')
+          ..write('realised: $realised, ')
+          ..write('received: $received, ')
+          ..write('used: $used, ')
+          ..write('sortOrder: $sortOrder, ')
+          ..write('active: $active, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $FieldResourceTypesTable extends FieldResourceTypes
+    with TableInfo<$FieldResourceTypesTable, FieldResourceTypeRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $FieldResourceTypesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _userSubMeta = const VerificationMeta(
+    'userSub',
+  );
+  @override
+  late final GeneratedColumn<String> userSub = GeneratedColumn<String>(
+    'user_sub',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _companyIdMeta = const VerificationMeta(
+    'companyId',
+  );
+  @override
+  late final GeneratedColumn<int> companyId = GeneratedColumn<int>(
+    'company_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _kindMeta = const VerificationMeta('kind');
+  @override
+  late final GeneratedColumn<String> kind = GeneratedColumn<String>(
+    'kind',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _codeMeta = const VerificationMeta('code');
+  @override
+  late final GeneratedColumn<String> code = GeneratedColumn<String>(
+    'code',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _nameMeta = const VerificationMeta('name');
+  @override
+  late final GeneratedColumn<String> name = GeneratedColumn<String>(
+    'name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    userSub,
+    id,
+    companyId,
+    kind,
+    code,
+    name,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'field_resource_types';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<FieldResourceTypeRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('user_sub')) {
+      context.handle(
+        _userSubMeta,
+        userSub.isAcceptableOrUnknown(data['user_sub']!, _userSubMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_userSubMeta);
+    }
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('company_id')) {
+      context.handle(
+        _companyIdMeta,
+        companyId.isAcceptableOrUnknown(data['company_id']!, _companyIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_companyIdMeta);
+    }
+    if (data.containsKey('kind')) {
+      context.handle(
+        _kindMeta,
+        kind.isAcceptableOrUnknown(data['kind']!, _kindMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_kindMeta);
+    }
+    if (data.containsKey('code')) {
+      context.handle(
+        _codeMeta,
+        code.isAcceptableOrUnknown(data['code']!, _codeMeta),
+      );
+    }
+    if (data.containsKey('name')) {
+      context.handle(
+        _nameMeta,
+        name.isAcceptableOrUnknown(data['name']!, _nameMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {userSub, id};
+  @override
+  FieldResourceTypeRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return FieldResourceTypeRow(
+      userSub: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}user_sub'],
+      )!,
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}id'],
+      )!,
+      companyId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}company_id'],
+      )!,
+      kind: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}kind'],
+      )!,
+      code: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}code'],
+      )!,
+      name: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}name'],
+      )!,
+    );
+  }
+
+  @override
+  $FieldResourceTypesTable createAlias(String alias) {
+    return $FieldResourceTypesTable(attachedDatabase, alias);
+  }
+}
+
+class FieldResourceTypeRow extends DataClass
+    implements Insertable<FieldResourceTypeRow> {
+  final String userSub;
+  final int id;
+  final int companyId;
+
+  /// tenaga | alat
+  final String kind;
+  final String code;
+  final String name;
+  const FieldResourceTypeRow({
+    required this.userSub,
+    required this.id,
+    required this.companyId,
+    required this.kind,
+    required this.code,
+    required this.name,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['user_sub'] = Variable<String>(userSub);
+    map['id'] = Variable<int>(id);
+    map['company_id'] = Variable<int>(companyId);
+    map['kind'] = Variable<String>(kind);
+    map['code'] = Variable<String>(code);
+    map['name'] = Variable<String>(name);
+    return map;
+  }
+
+  FieldResourceTypesCompanion toCompanion(bool nullToAbsent) {
+    return FieldResourceTypesCompanion(
+      userSub: Value(userSub),
+      id: Value(id),
+      companyId: Value(companyId),
+      kind: Value(kind),
+      code: Value(code),
+      name: Value(name),
+    );
+  }
+
+  factory FieldResourceTypeRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return FieldResourceTypeRow(
+      userSub: serializer.fromJson<String>(json['userSub']),
+      id: serializer.fromJson<int>(json['id']),
+      companyId: serializer.fromJson<int>(json['companyId']),
+      kind: serializer.fromJson<String>(json['kind']),
+      code: serializer.fromJson<String>(json['code']),
+      name: serializer.fromJson<String>(json['name']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'userSub': serializer.toJson<String>(userSub),
+      'id': serializer.toJson<int>(id),
+      'companyId': serializer.toJson<int>(companyId),
+      'kind': serializer.toJson<String>(kind),
+      'code': serializer.toJson<String>(code),
+      'name': serializer.toJson<String>(name),
+    };
+  }
+
+  FieldResourceTypeRow copyWith({
+    String? userSub,
+    int? id,
+    int? companyId,
+    String? kind,
+    String? code,
+    String? name,
+  }) => FieldResourceTypeRow(
+    userSub: userSub ?? this.userSub,
+    id: id ?? this.id,
+    companyId: companyId ?? this.companyId,
+    kind: kind ?? this.kind,
+    code: code ?? this.code,
+    name: name ?? this.name,
+  );
+  FieldResourceTypeRow copyWithCompanion(FieldResourceTypesCompanion data) {
+    return FieldResourceTypeRow(
+      userSub: data.userSub.present ? data.userSub.value : this.userSub,
+      id: data.id.present ? data.id.value : this.id,
+      companyId: data.companyId.present ? data.companyId.value : this.companyId,
+      kind: data.kind.present ? data.kind.value : this.kind,
+      code: data.code.present ? data.code.value : this.code,
+      name: data.name.present ? data.name.value : this.name,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('FieldResourceTypeRow(')
+          ..write('userSub: $userSub, ')
+          ..write('id: $id, ')
+          ..write('companyId: $companyId, ')
+          ..write('kind: $kind, ')
+          ..write('code: $code, ')
+          ..write('name: $name')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(userSub, id, companyId, kind, code, name);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is FieldResourceTypeRow &&
+          other.userSub == this.userSub &&
+          other.id == this.id &&
+          other.companyId == this.companyId &&
+          other.kind == this.kind &&
+          other.code == this.code &&
+          other.name == this.name);
+}
+
+class FieldResourceTypesCompanion
+    extends UpdateCompanion<FieldResourceTypeRow> {
+  final Value<String> userSub;
+  final Value<int> id;
+  final Value<int> companyId;
+  final Value<String> kind;
+  final Value<String> code;
+  final Value<String> name;
+  final Value<int> rowid;
+  const FieldResourceTypesCompanion({
+    this.userSub = const Value.absent(),
+    this.id = const Value.absent(),
+    this.companyId = const Value.absent(),
+    this.kind = const Value.absent(),
+    this.code = const Value.absent(),
+    this.name = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  FieldResourceTypesCompanion.insert({
+    required String userSub,
+    required int id,
+    required int companyId,
+    required String kind,
+    this.code = const Value.absent(),
+    this.name = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : userSub = Value(userSub),
+       id = Value(id),
+       companyId = Value(companyId),
+       kind = Value(kind);
+  static Insertable<FieldResourceTypeRow> custom({
+    Expression<String>? userSub,
+    Expression<int>? id,
+    Expression<int>? companyId,
+    Expression<String>? kind,
+    Expression<String>? code,
+    Expression<String>? name,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (userSub != null) 'user_sub': userSub,
+      if (id != null) 'id': id,
+      if (companyId != null) 'company_id': companyId,
+      if (kind != null) 'kind': kind,
+      if (code != null) 'code': code,
+      if (name != null) 'name': name,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  FieldResourceTypesCompanion copyWith({
+    Value<String>? userSub,
+    Value<int>? id,
+    Value<int>? companyId,
+    Value<String>? kind,
+    Value<String>? code,
+    Value<String>? name,
+    Value<int>? rowid,
+  }) {
+    return FieldResourceTypesCompanion(
+      userSub: userSub ?? this.userSub,
+      id: id ?? this.id,
+      companyId: companyId ?? this.companyId,
+      kind: kind ?? this.kind,
+      code: code ?? this.code,
+      name: name ?? this.name,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (userSub.present) {
+      map['user_sub'] = Variable<String>(userSub.value);
+    }
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (companyId.present) {
+      map['company_id'] = Variable<int>(companyId.value);
+    }
+    if (kind.present) {
+      map['kind'] = Variable<String>(kind.value);
+    }
+    if (code.present) {
+      map['code'] = Variable<String>(code.value);
+    }
+    if (name.present) {
+      map['name'] = Variable<String>(name.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('FieldResourceTypesCompanion(')
+          ..write('userSub: $userSub, ')
+          ..write('id: $id, ')
+          ..write('companyId: $companyId, ')
+          ..write('kind: $kind, ')
+          ..write('code: $code, ')
+          ..write('name: $name, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -10438,6 +11669,9 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $FieldClientsTable fieldClients = $FieldClientsTable(this);
   late final $FieldRecentTimesheetsTable fieldRecentTimesheets =
       $FieldRecentTimesheetsTable(this);
+  late final $FieldRapItemsTable fieldRapItems = $FieldRapItemsTable(this);
+  late final $FieldResourceTypesTable fieldResourceTypes =
+      $FieldResourceTypesTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -10456,6 +11690,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     fieldOpenPos,
     fieldClients,
     fieldRecentTimesheets,
+    fieldRapItems,
+    fieldResourceTypes,
   ];
 }
 
@@ -16030,6 +17266,650 @@ typedef $$FieldRecentTimesheetsTableProcessedTableManager =
       FieldRecentTimesheetRow,
       PrefetchHooks Function()
     >;
+typedef $$FieldRapItemsTableCreateCompanionBuilder =
+    FieldRapItemsCompanion Function({
+      required String userSub,
+      required int id,
+      required int companyId,
+      required int projectId,
+      required String code,
+      Value<String> description,
+      required String kind,
+      Value<String> uom,
+      Value<String> stageName,
+      Value<double> volume,
+      Value<double> realised,
+      Value<double> received,
+      Value<double> used,
+      Value<int> sortOrder,
+      Value<bool> active,
+      Value<int> rowid,
+    });
+typedef $$FieldRapItemsTableUpdateCompanionBuilder =
+    FieldRapItemsCompanion Function({
+      Value<String> userSub,
+      Value<int> id,
+      Value<int> companyId,
+      Value<int> projectId,
+      Value<String> code,
+      Value<String> description,
+      Value<String> kind,
+      Value<String> uom,
+      Value<String> stageName,
+      Value<double> volume,
+      Value<double> realised,
+      Value<double> received,
+      Value<double> used,
+      Value<int> sortOrder,
+      Value<bool> active,
+      Value<int> rowid,
+    });
+
+class $$FieldRapItemsTableFilterComposer
+    extends Composer<_$AppDatabase, $FieldRapItemsTable> {
+  $$FieldRapItemsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get userSub => $composableBuilder(
+    column: $table.userSub,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get companyId => $composableBuilder(
+    column: $table.companyId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get projectId => $composableBuilder(
+    column: $table.projectId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get code => $composableBuilder(
+    column: $table.code,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get description => $composableBuilder(
+    column: $table.description,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get kind => $composableBuilder(
+    column: $table.kind,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get uom => $composableBuilder(
+    column: $table.uom,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get stageName => $composableBuilder(
+    column: $table.stageName,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get volume => $composableBuilder(
+    column: $table.volume,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get realised => $composableBuilder(
+    column: $table.realised,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get received => $composableBuilder(
+    column: $table.received,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get used => $composableBuilder(
+    column: $table.used,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get sortOrder => $composableBuilder(
+    column: $table.sortOrder,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get active => $composableBuilder(
+    column: $table.active,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$FieldRapItemsTableOrderingComposer
+    extends Composer<_$AppDatabase, $FieldRapItemsTable> {
+  $$FieldRapItemsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get userSub => $composableBuilder(
+    column: $table.userSub,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get companyId => $composableBuilder(
+    column: $table.companyId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get projectId => $composableBuilder(
+    column: $table.projectId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get code => $composableBuilder(
+    column: $table.code,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get description => $composableBuilder(
+    column: $table.description,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get kind => $composableBuilder(
+    column: $table.kind,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get uom => $composableBuilder(
+    column: $table.uom,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get stageName => $composableBuilder(
+    column: $table.stageName,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get volume => $composableBuilder(
+    column: $table.volume,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get realised => $composableBuilder(
+    column: $table.realised,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get received => $composableBuilder(
+    column: $table.received,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get used => $composableBuilder(
+    column: $table.used,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get sortOrder => $composableBuilder(
+    column: $table.sortOrder,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get active => $composableBuilder(
+    column: $table.active,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$FieldRapItemsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $FieldRapItemsTable> {
+  $$FieldRapItemsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get userSub =>
+      $composableBuilder(column: $table.userSub, builder: (column) => column);
+
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<int> get companyId =>
+      $composableBuilder(column: $table.companyId, builder: (column) => column);
+
+  GeneratedColumn<int> get projectId =>
+      $composableBuilder(column: $table.projectId, builder: (column) => column);
+
+  GeneratedColumn<String> get code =>
+      $composableBuilder(column: $table.code, builder: (column) => column);
+
+  GeneratedColumn<String> get description => $composableBuilder(
+    column: $table.description,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get kind =>
+      $composableBuilder(column: $table.kind, builder: (column) => column);
+
+  GeneratedColumn<String> get uom =>
+      $composableBuilder(column: $table.uom, builder: (column) => column);
+
+  GeneratedColumn<String> get stageName =>
+      $composableBuilder(column: $table.stageName, builder: (column) => column);
+
+  GeneratedColumn<double> get volume =>
+      $composableBuilder(column: $table.volume, builder: (column) => column);
+
+  GeneratedColumn<double> get realised =>
+      $composableBuilder(column: $table.realised, builder: (column) => column);
+
+  GeneratedColumn<double> get received =>
+      $composableBuilder(column: $table.received, builder: (column) => column);
+
+  GeneratedColumn<double> get used =>
+      $composableBuilder(column: $table.used, builder: (column) => column);
+
+  GeneratedColumn<int> get sortOrder =>
+      $composableBuilder(column: $table.sortOrder, builder: (column) => column);
+
+  GeneratedColumn<bool> get active =>
+      $composableBuilder(column: $table.active, builder: (column) => column);
+}
+
+class $$FieldRapItemsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $FieldRapItemsTable,
+          FieldRapItemRow,
+          $$FieldRapItemsTableFilterComposer,
+          $$FieldRapItemsTableOrderingComposer,
+          $$FieldRapItemsTableAnnotationComposer,
+          $$FieldRapItemsTableCreateCompanionBuilder,
+          $$FieldRapItemsTableUpdateCompanionBuilder,
+          (
+            FieldRapItemRow,
+            BaseReferences<_$AppDatabase, $FieldRapItemsTable, FieldRapItemRow>,
+          ),
+          FieldRapItemRow,
+          PrefetchHooks Function()
+        > {
+  $$FieldRapItemsTableTableManager(_$AppDatabase db, $FieldRapItemsTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$FieldRapItemsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$FieldRapItemsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$FieldRapItemsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> userSub = const Value.absent(),
+                Value<int> id = const Value.absent(),
+                Value<int> companyId = const Value.absent(),
+                Value<int> projectId = const Value.absent(),
+                Value<String> code = const Value.absent(),
+                Value<String> description = const Value.absent(),
+                Value<String> kind = const Value.absent(),
+                Value<String> uom = const Value.absent(),
+                Value<String> stageName = const Value.absent(),
+                Value<double> volume = const Value.absent(),
+                Value<double> realised = const Value.absent(),
+                Value<double> received = const Value.absent(),
+                Value<double> used = const Value.absent(),
+                Value<int> sortOrder = const Value.absent(),
+                Value<bool> active = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => FieldRapItemsCompanion(
+                userSub: userSub,
+                id: id,
+                companyId: companyId,
+                projectId: projectId,
+                code: code,
+                description: description,
+                kind: kind,
+                uom: uom,
+                stageName: stageName,
+                volume: volume,
+                realised: realised,
+                received: received,
+                used: used,
+                sortOrder: sortOrder,
+                active: active,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String userSub,
+                required int id,
+                required int companyId,
+                required int projectId,
+                required String code,
+                Value<String> description = const Value.absent(),
+                required String kind,
+                Value<String> uom = const Value.absent(),
+                Value<String> stageName = const Value.absent(),
+                Value<double> volume = const Value.absent(),
+                Value<double> realised = const Value.absent(),
+                Value<double> received = const Value.absent(),
+                Value<double> used = const Value.absent(),
+                Value<int> sortOrder = const Value.absent(),
+                Value<bool> active = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => FieldRapItemsCompanion.insert(
+                userSub: userSub,
+                id: id,
+                companyId: companyId,
+                projectId: projectId,
+                code: code,
+                description: description,
+                kind: kind,
+                uom: uom,
+                stageName: stageName,
+                volume: volume,
+                realised: realised,
+                received: received,
+                used: used,
+                sortOrder: sortOrder,
+                active: active,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$FieldRapItemsTable, FieldRapItemRow>(table),
+                  BaseReferences<
+                    _$AppDatabase,
+                    $FieldRapItemsTable,
+                    FieldRapItemRow
+                  >(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$FieldRapItemsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $FieldRapItemsTable,
+      FieldRapItemRow,
+      $$FieldRapItemsTableFilterComposer,
+      $$FieldRapItemsTableOrderingComposer,
+      $$FieldRapItemsTableAnnotationComposer,
+      $$FieldRapItemsTableCreateCompanionBuilder,
+      $$FieldRapItemsTableUpdateCompanionBuilder,
+      (
+        FieldRapItemRow,
+        BaseReferences<_$AppDatabase, $FieldRapItemsTable, FieldRapItemRow>,
+      ),
+      FieldRapItemRow,
+      PrefetchHooks Function()
+    >;
+typedef $$FieldResourceTypesTableCreateCompanionBuilder =
+    FieldResourceTypesCompanion Function({
+      required String userSub,
+      required int id,
+      required int companyId,
+      required String kind,
+      Value<String> code,
+      Value<String> name,
+      Value<int> rowid,
+    });
+typedef $$FieldResourceTypesTableUpdateCompanionBuilder =
+    FieldResourceTypesCompanion Function({
+      Value<String> userSub,
+      Value<int> id,
+      Value<int> companyId,
+      Value<String> kind,
+      Value<String> code,
+      Value<String> name,
+      Value<int> rowid,
+    });
+
+class $$FieldResourceTypesTableFilterComposer
+    extends Composer<_$AppDatabase, $FieldResourceTypesTable> {
+  $$FieldResourceTypesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get userSub => $composableBuilder(
+    column: $table.userSub,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get companyId => $composableBuilder(
+    column: $table.companyId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get kind => $composableBuilder(
+    column: $table.kind,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get code => $composableBuilder(
+    column: $table.code,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$FieldResourceTypesTableOrderingComposer
+    extends Composer<_$AppDatabase, $FieldResourceTypesTable> {
+  $$FieldResourceTypesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get userSub => $composableBuilder(
+    column: $table.userSub,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get companyId => $composableBuilder(
+    column: $table.companyId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get kind => $composableBuilder(
+    column: $table.kind,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get code => $composableBuilder(
+    column: $table.code,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$FieldResourceTypesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $FieldResourceTypesTable> {
+  $$FieldResourceTypesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get userSub =>
+      $composableBuilder(column: $table.userSub, builder: (column) => column);
+
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<int> get companyId =>
+      $composableBuilder(column: $table.companyId, builder: (column) => column);
+
+  GeneratedColumn<String> get kind =>
+      $composableBuilder(column: $table.kind, builder: (column) => column);
+
+  GeneratedColumn<String> get code =>
+      $composableBuilder(column: $table.code, builder: (column) => column);
+
+  GeneratedColumn<String> get name =>
+      $composableBuilder(column: $table.name, builder: (column) => column);
+}
+
+class $$FieldResourceTypesTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $FieldResourceTypesTable,
+          FieldResourceTypeRow,
+          $$FieldResourceTypesTableFilterComposer,
+          $$FieldResourceTypesTableOrderingComposer,
+          $$FieldResourceTypesTableAnnotationComposer,
+          $$FieldResourceTypesTableCreateCompanionBuilder,
+          $$FieldResourceTypesTableUpdateCompanionBuilder,
+          (
+            FieldResourceTypeRow,
+            BaseReferences<
+              _$AppDatabase,
+              $FieldResourceTypesTable,
+              FieldResourceTypeRow
+            >,
+          ),
+          FieldResourceTypeRow,
+          PrefetchHooks Function()
+        > {
+  $$FieldResourceTypesTableTableManager(
+    _$AppDatabase db,
+    $FieldResourceTypesTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$FieldResourceTypesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$FieldResourceTypesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$FieldResourceTypesTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> userSub = const Value.absent(),
+                Value<int> id = const Value.absent(),
+                Value<int> companyId = const Value.absent(),
+                Value<String> kind = const Value.absent(),
+                Value<String> code = const Value.absent(),
+                Value<String> name = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => FieldResourceTypesCompanion(
+                userSub: userSub,
+                id: id,
+                companyId: companyId,
+                kind: kind,
+                code: code,
+                name: name,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String userSub,
+                required int id,
+                required int companyId,
+                required String kind,
+                Value<String> code = const Value.absent(),
+                Value<String> name = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => FieldResourceTypesCompanion.insert(
+                userSub: userSub,
+                id: id,
+                companyId: companyId,
+                kind: kind,
+                code: code,
+                name: name,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$FieldResourceTypesTable, FieldResourceTypeRow>(
+                    table,
+                  ),
+                  BaseReferences<
+                    _$AppDatabase,
+                    $FieldResourceTypesTable,
+                    FieldResourceTypeRow
+                  >(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$FieldResourceTypesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $FieldResourceTypesTable,
+      FieldResourceTypeRow,
+      $$FieldResourceTypesTableFilterComposer,
+      $$FieldResourceTypesTableOrderingComposer,
+      $$FieldResourceTypesTableAnnotationComposer,
+      $$FieldResourceTypesTableCreateCompanionBuilder,
+      $$FieldResourceTypesTableUpdateCompanionBuilder,
+      (
+        FieldResourceTypeRow,
+        BaseReferences<
+          _$AppDatabase,
+          $FieldResourceTypesTable,
+          FieldResourceTypeRow
+        >,
+      ),
+      FieldResourceTypeRow,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -16060,4 +17940,8 @@ class $AppDatabaseManager {
       $$FieldClientsTableTableManager(_db, _db.fieldClients);
   $$FieldRecentTimesheetsTableTableManager get fieldRecentTimesheets =>
       $$FieldRecentTimesheetsTableTableManager(_db, _db.fieldRecentTimesheets);
+  $$FieldRapItemsTableTableManager get fieldRapItems =>
+      $$FieldRapItemsTableTableManager(_db, _db.fieldRapItems);
+  $$FieldResourceTypesTableTableManager get fieldResourceTypes =>
+      $$FieldResourceTypesTableTableManager(_db, _db.fieldResourceTypes);
 }

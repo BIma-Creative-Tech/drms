@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { registerAddendumPaths } from './openapi-addendum'
 import { registerAttendancePaths } from './openapi-attendance'
 import { registerCompanyPaths } from './openapi-companies'
+import { registerDailyPaths } from './openapi-daily'
 import { registerFieldPaths } from './openapi-field'
 import { registerShortfallPaths } from './openapi-shortfall'
 import { Device, DeviceRegister, DeviceRevoke, Health, Masters, MastersQuery, Me, Problem, Ready, TestEmailQueued } from './schemas'
@@ -595,6 +596,8 @@ export function buildOpenApiDocument(version: string) {
   registerShortfallPaths(registry, { security, idem, res, detail: F.ExpenseRequestDetail })
   // ---- FR1 field reports per project kind (ADR 0020) -----------------------------------------
   registerFieldPaths(registry, { security, deviceHeader, idem, res })
+  // ---- P3 konstruksi RAP + Laporan Harian -----------------------------------------------------
+  registerDailyPaths(registry, { security, deviceHeader, idem, res })
 
   return new OpenApiGeneratorV31(registry.definitions).generateDocument({
     openapi: '3.1.0',

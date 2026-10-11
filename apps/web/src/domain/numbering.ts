@@ -19,6 +19,8 @@ export const DOC_TYPES = [
   'reversal',
   // FR1 (ADR 0020): Laporan servis unit SV/YYMM/####
   'service_report',
+  // P3 (konstruksi): Laporan harian LH/YYMM/####
+  'daily_report',
 ] as const
 export type DocType = (typeof DOC_TYPES)[number]
 
@@ -105,4 +107,6 @@ export const DEFAULT_SEQUENCES: ReadonlyArray<Omit<SequenceConfig, 'timezone' | 
   { docType: 'progress_report', docCode: 'LP', pattern: 'LP/{YY}{MM}/{seq}', resetPolicy: 'monthly', padding: 4, startAt: 1 },
   { docType: 'budget_addendum', docCode: 'ADD', pattern: 'ADD/{YY}{MM}/{seq}', resetPolicy: 'monthly', padding: 4, startAt: 1 },
   { docType: 'service_report', docCode: 'SV', pattern: 'SV/{YY}{MM}/{seq}', resetPolicy: 'monthly', padding: 4, startAt: 1 },
+  // P3 konstruksi
+  { docType: 'daily_report', docCode: 'LH', pattern: 'LH/{YY}{MM}/{seq}', resetPolicy: 'monthly', padding: 4, startAt: 1 },
 ]

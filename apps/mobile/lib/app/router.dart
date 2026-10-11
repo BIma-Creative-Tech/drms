@@ -23,6 +23,7 @@ import '../features/expense/presentation/request_detail_screen.dart';
 import '../features/expense/presentation/requests_screen.dart';
 import '../features/field_reports/domain/field_models.dart';
 import '../features/field_reports/presentation/aftersales_screen.dart';
+import '../features/field_reports/presentation/daily_report_screen.dart';
 import '../features/field_reports/presentation/field_conflict_screen.dart';
 import '../features/field_reports/presentation/field_hub_screen.dart';
 import '../features/field_reports/presentation/service_report_screen.dart';
@@ -217,6 +218,10 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: 'aftersales/new',
             builder: (_, s) => AftersalesScreen(projectId: int.tryParse(s.uri.queryParameters['project'] ?? '')),
+          ),
+          GoRoute(
+            path: 'daily/new',
+            builder: (_, s) => DailyReportScreen(projectId: int.tryParse(s.uri.queryParameters['project'] ?? '')),
           ),
           GoRoute(
             path: 'draft/:uuid',

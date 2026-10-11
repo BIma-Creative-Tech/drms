@@ -23,6 +23,7 @@ export const FIELD_COLLECTIONS: Readonly<Record<FieldReportType, CollectionSlug>
   service_report: 'service-reports',
   unit_timesheet: 'unit-timesheets',
   aftersales_activity: 'aftersales-activities',
+  daily_report: 'daily-reports',
 }
 
 /** May the caller CREATE field reports for `projectId` (its PT's roles + scope)? Kind/flag checked by the caller. */

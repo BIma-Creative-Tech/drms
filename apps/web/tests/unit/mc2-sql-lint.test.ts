@@ -15,7 +15,7 @@ import { describe, expect, it } from 'vitest'
  */
 const ROOT = path.resolve(__dirname, '../../src')
 // QA-MC4-13: the whole of domain/expense, progress, addendum and sync (was: three single files)
-const SCAN = ['domain/reports', 'domain/reminders', 'domain/attendance', 'domain/cash', 'domain/expense', 'domain/progress', 'domain/addendum', 'domain/sync', 'domain/field']
+const SCAN = ['domain/reports', 'domain/reminders', 'domain/attendance', 'domain/cash', 'domain/expense', 'domain/progress', 'domain/addendum', 'domain/sync', 'domain/field', 'domain/daily', 'domain/rap']
 
 const PER_PT_TABLES = [
   'expense_requests', 'cash_entries', 'cash_accounts', 'projects', 'cost_centers', 'attendances', 'employees', 'team_assignments', 'transfers',
@@ -26,6 +26,8 @@ const PER_PT_TABLES = [
   'urgency_levels',
   // FR1 (ADR 0020)
   'contract_units', 'service_reports', 'unit_timesheets', 'aftersales_activities', 'clients',
+  // P3
+  'rap_items', 'rap_templates', 'resource_types', 'daily_reports', 'daily_report_lines',
 ]
 /** Company helpers (they build `company_id IN (<bound ids>)` from the caller's scope) — a CALL, not a mention. */
 const HELPER_CALL = /\b(?:requestScopeSql|cashScopeSql|ledgerScopeSql|projectScopeSql|costCenterScopeSql|masterScopeSql|companyScopeSql|locationScopeSql|employeeCompanySql|candidateWhere|ptSql)\(/

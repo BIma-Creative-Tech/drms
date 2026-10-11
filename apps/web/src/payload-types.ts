@@ -105,6 +105,11 @@ export interface Config {
     'service-reports': ServiceReport;
     'unit-timesheets': UnitTimesheet;
     'aftersales-activities': AftersalesActivity;
+    'rap-items': RapItem;
+    'rap-templates': RapTemplate;
+    'resource-types': ResourceType;
+    'daily-reports': DailyReport;
+    'daily-report-lines': DailyReportLine;
     attendances: Attendance;
     'attendance-corrections': AttendanceCorrection;
     'progress-reports': ProgressReport;
@@ -166,6 +171,11 @@ export interface Config {
     'service-reports': ServiceReportsSelect<false> | ServiceReportsSelect<true>;
     'unit-timesheets': UnitTimesheetsSelect<false> | UnitTimesheetsSelect<true>;
     'aftersales-activities': AftersalesActivitiesSelect<false> | AftersalesActivitiesSelect<true>;
+    'rap-items': RapItemsSelect<false> | RapItemsSelect<true>;
+    'rap-templates': RapTemplatesSelect<false> | RapTemplatesSelect<true>;
+    'resource-types': ResourceTypesSelect<false> | ResourceTypesSelect<true>;
+    'daily-reports': DailyReportsSelect<false> | DailyReportsSelect<true>;
+    'daily-report-lines': DailyReportLinesSelect<false> | DailyReportLinesSelect<true>;
     attendances: AttendancesSelect<false> | AttendancesSelect<true>;
     'attendance-corrections': AttendanceCorrectionsSelect<false> | AttendanceCorrectionsSelect<true>;
     'progress-reports': ProgressReportsSelect<false> | ProgressReportsSelect<true>;
@@ -740,6 +750,7 @@ export interface ProjectStage {
    * Nonaktif = tidak dihitung dalam bobot & progress project.
    */
   active?: boolean | null;
+  progressMode?: ('manual' | 'rap') | null;
   uuid?: string | null;
   /**
    * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
@@ -1135,7 +1146,8 @@ export interface DocumentSequence {
     | 'progress_report'
     | 'budget_addendum'
     | 'reversal'
-    | 'service_report';
+    | 'service_report'
+    | 'daily_report';
   /**
    * Token {DOC}, mis. PB, TRF.
    */
@@ -1946,6 +1958,191 @@ export interface AftersalesActivity {
   createdAt: string;
 }
 /**
+ * Diubah dari tab RAP project atau impor Excel (bukan dari form ini).
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "rap-items".
+ */
+export interface RapItem {
+  id: number;
+  /**
+   * Mengikuti dokumen induk.
+   */
+  company?: (number | null) | Company;
+  project: number | Project;
+  stage: number | ProjectStage;
+  code: string;
+  description: string;
+  kind: 'pekerjaan' | 'material';
+  uom: number | Uom;
+  volume: number;
+  unitPrice?: number | null;
+  weightPct?: number | null;
+  sortOrder?: number | null;
+  /**
+   * Pekerjaan: Σ volume laporan harian (ledger).
+   */
+  realisedQty?: number | null;
+  receivedQty?: number | null;
+  usedQty?: number | null;
+  active?: boolean | null;
+  uuid?: string | null;
+  /**
+   * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
+   */
+  changeReason?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "rap-templates".
+ */
+export interface RapTemplate {
+  id: number;
+  /**
+   * Wajib bila Anda memilih lebih dari satu PT di pemilih PT; tidak dapat diubah setelah dibuat.
+   */
+  company?: (number | null) | Company;
+  name: string;
+  notes?: string | null;
+  items?:
+    | {
+        code: string;
+        description: string;
+        stageName: string;
+        kind: 'pekerjaan' | 'material';
+        uomCode: string;
+        volume: number;
+        unitPrice?: number | null;
+        weightPct?: number | null;
+        id?: string | null;
+      }[]
+    | null;
+  active?: boolean | null;
+  uuid?: string | null;
+  /**
+   * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
+   */
+  changeReason?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "resource-types".
+ */
+export interface ResourceType {
+  id: number;
+  /**
+   * Wajib bila Anda memilih lebih dari satu PT di pemilih PT; tidak dapat diubah setelah dibuat.
+   */
+  company?: (number | null) | Company;
+  kind: 'tenaga' | 'alat';
+  code: string;
+  name: string;
+  active?: boolean | null;
+  uuid?: string | null;
+  /**
+   * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
+   */
+  changeReason?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * Dibuat dari aplikasi Android atau layar Laporan Harian (bukan dari form ini).
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "daily-reports".
+ */
+export interface DailyReport {
+  id: number;
+  /**
+   * Mengikuti dokumen induk.
+   */
+  company?: (number | null) | Company;
+  docNo?: string | null;
+  project: number | Project;
+  reportDate: string;
+  reporter: number | User;
+  weatherMorning?: ('cerah' | 'berawan' | 'hujan') | null;
+  weatherNoon?: ('cerah' | 'berawan' | 'hujan') | null;
+  weatherAfternoon?: ('cerah' | 'berawan' | 'hujan') | null;
+  rainHours?: number | null;
+  stopHours?: number | null;
+  manpower?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  equipment?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  workerCount?: number | null;
+  issues?: string | null;
+  notes?: string | null;
+  photoCount?: number | null;
+  receivedAt?: string | null;
+  editableUntil?: string | null;
+  deviceTime?: string | null;
+  timeTrust?: ('server' | 'estimated' | 'device_only') | null;
+  offline?: boolean | null;
+  source?: ('web' | 'apk') | null;
+  flags?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  correctedAt?: string | null;
+  correctedBy?: (number | null) | User;
+  syncRev?: number | null;
+  clientUuid?: string | null;
+  uuid?: string | null;
+  /**
+   * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
+   */
+  changeReason?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "daily-report-lines".
+ */
+export interface DailyReportLine {
+  id: number;
+  /**
+   * Mengikuti dokumen induk.
+   */
+  company?: (number | null) | Company;
+  report: number | DailyReport;
+  project: number | Project;
+  reportDate: string;
+  rapItem: number | RapItem;
+  kind: 'work' | 'material_in' | 'material_used';
+  qty: number;
+  origin: 'report' | 'edit' | 'correction';
+  reason?: string | null;
+  createdBy: number | User;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "attendances".
  */
@@ -2575,6 +2772,26 @@ export interface PayloadLockedDocument {
         value: number | AftersalesActivity;
       } | null)
     | ({
+        relationTo: 'rap-items';
+        value: number | RapItem;
+      } | null)
+    | ({
+        relationTo: 'rap-templates';
+        value: number | RapTemplate;
+      } | null)
+    | ({
+        relationTo: 'resource-types';
+        value: number | ResourceType;
+      } | null)
+    | ({
+        relationTo: 'daily-reports';
+        value: number | DailyReport;
+      } | null)
+    | ({
+        relationTo: 'daily-report-lines';
+        value: number | DailyReportLine;
+      } | null)
+    | ({
         relationTo: 'attendances';
         value: number | Attendance;
       } | null)
@@ -2871,6 +3088,7 @@ export interface ProjectStagesSelect<T extends boolean = true> {
   sequence?: T;
   progressPct?: T;
   active?: T;
+  progressMode?: T;
   uuid?: T;
   changeReason?: T;
   updatedAt?: T;
@@ -3580,6 +3798,128 @@ export interface AftersalesActivitiesSelect<T extends boolean = true> {
   clientUuid?: T;
   uuid?: T;
   changeReason?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "rap-items_select".
+ */
+export interface RapItemsSelect<T extends boolean = true> {
+  company?: T;
+  project?: T;
+  stage?: T;
+  code?: T;
+  description?: T;
+  kind?: T;
+  uom?: T;
+  volume?: T;
+  unitPrice?: T;
+  weightPct?: T;
+  sortOrder?: T;
+  realisedQty?: T;
+  receivedQty?: T;
+  usedQty?: T;
+  active?: T;
+  uuid?: T;
+  changeReason?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "rap-templates_select".
+ */
+export interface RapTemplatesSelect<T extends boolean = true> {
+  company?: T;
+  name?: T;
+  notes?: T;
+  items?:
+    | T
+    | {
+        code?: T;
+        description?: T;
+        stageName?: T;
+        kind?: T;
+        uomCode?: T;
+        volume?: T;
+        unitPrice?: T;
+        weightPct?: T;
+        id?: T;
+      };
+  active?: T;
+  uuid?: T;
+  changeReason?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "resource-types_select".
+ */
+export interface ResourceTypesSelect<T extends boolean = true> {
+  company?: T;
+  kind?: T;
+  code?: T;
+  name?: T;
+  active?: T;
+  uuid?: T;
+  changeReason?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "daily-reports_select".
+ */
+export interface DailyReportsSelect<T extends boolean = true> {
+  company?: T;
+  docNo?: T;
+  project?: T;
+  reportDate?: T;
+  reporter?: T;
+  weatherMorning?: T;
+  weatherNoon?: T;
+  weatherAfternoon?: T;
+  rainHours?: T;
+  stopHours?: T;
+  manpower?: T;
+  equipment?: T;
+  workerCount?: T;
+  issues?: T;
+  notes?: T;
+  photoCount?: T;
+  receivedAt?: T;
+  editableUntil?: T;
+  deviceTime?: T;
+  timeTrust?: T;
+  offline?: T;
+  source?: T;
+  flags?: T;
+  correctedAt?: T;
+  correctedBy?: T;
+  syncRev?: T;
+  clientUuid?: T;
+  uuid?: T;
+  changeReason?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "daily-report-lines_select".
+ */
+export interface DailyReportLinesSelect<T extends boolean = true> {
+  company?: T;
+  report?: T;
+  project?: T;
+  reportDate?: T;
+  rapItem?: T;
+  kind?: T;
+  qty?: T;
+  origin?: T;
+  reason?: T;
+  createdBy?: T;
   updatedAt?: T;
   createdAt?: T;
 }
