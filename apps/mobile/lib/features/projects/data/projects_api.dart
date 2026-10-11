@@ -33,34 +33,48 @@ PageResult<T> pageFromJson<T>(Object? data, T Function(Map<String, dynamic>) ite
   );
 }
 
-ProjectSummary projectFromJson(Map<String, dynamic> j) {
-  final pm = _map(j['pm']);
-  final rap = _map(j['rap']);
-  return ProjectSummary(
-    id: _intN(j['id']) ?? 0,
-    code: '${j['code'] ?? ''}',
-    name: '${j['name'] ?? ''}',
-    companyId: companyIdOf(j),
-    pm: pm == null || _intN(pm['id']) == null ? null : RefItem(id: _intN(pm['id'])!, name: _strN(pm['name'])),
-    status: _strN(j['status']),
-    statusLabel: _strN(j['statusLabel']),
-    contractValue: _intN(j['contractValue']),
-    rapPlanned: _intN(j['rapPlanned'] ?? rap?['planned']),
-    rapRealised: _intN(j['rapRealised'] ?? rap?['realised']),
-  );
+RefItem? _ref(Object? v) {
+  final m = _map(v);
+  final id = _intN(m?['id']);
+  return id == null ? null : RefItem(id: id, code: _strN(m!['code']), name: _strN(m['name']));
 }
 
+ProjectSummary projectFromJson(Map<String, dynamic> j) => ProjectSummary(
+  id: _intN(j['id']) ?? 0,
+  code: '${j['code'] ?? ''}',
+  name: '${j['name'] ?? ''}',
+  kind: _strN(j['kind']),
+  companyId: companyIdOf(j),
+  pm: _ref(j['pm']),
+  status: _strN(j['status']),
+  statusLabel: _strN(j['statusLabel']),
+  contractValue: _intN(j['contractValue']),
+  progressPct: _dblN(j['progressPct']),
+  costCenter: _ref(j['costCenter']),
+  rapPlanned: _intN(j['rapPlanned'] ?? _map(j['rap'])?['planned']),
+  rapRealised: _intN(j['rapRealised'] ?? _map(j['rap'])?['realised']),
+  rapPercentServer: _dblN(j['rapPercent'] ?? _map(j['rap'])?['percent']),
+  rapOverBudgetItems: _intN(j['rapOverBudgetItems'] ?? _map(j['rap'])?['overBudgetItems']),
+  rapItems: _intN(j['rapItems'] ?? _map(j['rap'])?['items']) ?? 0,
+);
+
 ProjectDetail projectDetailFromJson(Map<String, dynamic> j) {
-  final rap = _map(j['rap']) ?? _map(j['rapSummary']);
-  final cc = _map(j['costCenter']);
+  final rap = _map(j['rap']) ?? const <String, dynamic>{};
   return ProjectDetail(
     project: projectFromJson(j),
-    companyName: _strN(_map(j['company'])?['name']),
-    costCenter: cc == null || _intN(cc['id']) == null
-        ? null
-        : RefItem(id: _intN(cc['id'])!, code: _strN(cc['code']), name: _strN(cc['name'])),
-    rapRemaining: _intN(j['rapRemaining'] ?? rap?['remaining']),
-    rapItems: _intN(rap?['items'] ?? rap?['count']),
+    client: _ref(j['client']),
+    address: _strN(j['address']),
+    startDate: _strN(j['startDate']),
+    targetDate: _strN(j['targetDate']),
+    rap: RapSummary(
+      items: _intN(rap['items']) ?? 0,
+      planned: _intN(rap['planned']),
+      realised: _intN(rap['realised']),
+      transferred: _intN(rap['transferred']),
+      remaining: _intN(rap['remaining']),
+      percent: _dblN(rap['percent']),
+      overBudgetItems: _intN(rap['overBudgetItems']),
+    ),
   );
 }
 
@@ -69,8 +83,8 @@ ProjectDetail projectDetailFromJson(Map<String, dynamic> j) {
 RapBudgetItem rapBudgetItemFromJson(Map<String, dynamic> j) {
   final uom = j['uom'];
   final planned = _intN(j['planned'] ?? j['value']);
-  // `realised` of the P3 shape is a quantity (daily reports); the money realisation comes with `planned`.
-  final realised = _intN(j['realisedAmount'] ?? (j.containsKey('planned') ? j['realised'] : null));
+  // `realised` stays the realised QUANTITY of the daily reports (P3); the money is `realisedAmount` (D4).
+  final realised = _intN(j['realisedAmount']);
   final remaining = _intN(j['remaining']) ?? (planned == null ? null : planned - (realised ?? 0));
   return RapBudgetItem(
     id: _intN(j['id']) ?? 0,
@@ -83,6 +97,7 @@ RapBudgetItem rapBudgetItemFromJson(Map<String, dynamic> j) {
     realised: realised,
     remaining: remaining,
     percent: _dblN(j['percent']),
+    active: j['active'] != false,
   );
 }
 
@@ -108,12 +123,13 @@ class ProjectsApi {
     (data) => projectDetailFromJson(_map(data) ?? const {}),
   );
 
-  /// `GET /projects/{id}/rap` — active items with plan / realisation / remaining.
+  /// `GET /projects/{id}/rap` — items with plan / realisation / remaining (deactivated ones too when they carry
+  /// realisation; see [RapBudgetItem.active]).
   Future<List<RapBudgetItem>> rap(int projectId) => client.run(
     (d) => d.get<dynamic>('/projects/$projectId/rap', options: ApiClient.allCompanies()),
     (data) => [
       for (final i in _list(_map(data)?['items']))
-        if (_map(i) case final j? when j['active'] != false) rapBudgetItemFromJson(j),
+        if (_map(i) case final j?) rapBudgetItemFromJson(j),
     ],
   );
 

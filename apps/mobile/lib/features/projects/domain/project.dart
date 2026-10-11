@@ -22,24 +22,41 @@ enum ProjectStatus {
   static String labelOf(String? code) => fromCode(code)?.label ?? (code ?? '-');
 }
 
-/// `GET /projects` `docs[]` and the header of `GET /projects/{id}`.
+/// Project kind labels (web `PROJECT_KIND_LABELS`).
+String projectKindLabel(String? kind) => switch (kind) {
+  'umum' => 'Umum',
+  'konstruksi' => 'Konstruksi',
+  'kontrak_unit' => 'Kontrak unit (sewa alat)',
+  'aftersales' => 'Aftersales (servis & sparepart)',
+  'trading' => 'Trading',
+  _ => kind ?? '-',
+};
+
+/// `GET /projects` `docs[]` (openapi `ProjectListItem`).
 class ProjectSummary {
   const ProjectSummary({
     required this.id,
     required this.code,
     required this.name,
+    this.kind,
     this.companyId,
     this.pm,
     this.status,
     this.statusLabel,
     this.contractValue,
+    this.progressPct,
+    this.costCenter,
     this.rapPlanned,
     this.rapRealised,
+    this.rapPercentServer,
+    this.rapOverBudgetItems,
+    this.rapItems = 0,
   });
 
   final int id;
   final String code;
   final String name;
+  final String? kind;
 
   /// PT of the project (chip when the scope spans several PTs).
   final int? companyId;
@@ -47,36 +64,70 @@ class ProjectSummary {
   final String? status;
   final String? statusLabel;
 
-  /// Nilai kontrak (null when the server withholds it from this role).
+  /// Nilai kontrak = RAB of the project (null when the server withholds it).
   final int? contractValue;
 
-  /// RAP total planned / realised (money; null when not visible to this role).
+  /// Physical progress % (E4).
+  final double? progressPct;
+
+  /// D2: default cost center of the project (proposed to Finance at the transfer).
+  final RefItem? costCenter;
+
+  /// D4: Σ planned / realised RAP money and % (price roles only; null otherwise).
   final int? rapPlanned;
   final int? rapRealised;
+  final double? rapPercentServer;
+  final int? rapOverBudgetItems;
+  final int rapItems;
 
   String get label => code.isEmpty ? name : '$code — $name';
   String get statusText => statusLabel ?? ProjectStatus.labelOf(status);
 
   /// Realisation vs plan in % (null without a plan).
   double? get rapPercent =>
-      rapPlanned == null || rapPlanned == 0 || rapRealised == null ? null : rapRealised! * 100 / rapPlanned!;
+      rapPercentServer ??
+      (rapPlanned == null || rapPlanned == 0 || rapRealised == null ? null : rapRealised! * 100 / rapPlanned!);
 }
 
-/// `GET /projects/{id}`: summary + cost center + RAP summary.
+/// RAP money summary of a project (openapi `ProjectRapSummary`; money null without a price role).
+class RapSummary {
+  const RapSummary({
+    this.items = 0,
+    this.planned,
+    this.realised,
+    this.transferred,
+    this.remaining,
+    this.percent,
+    this.overBudgetItems,
+  });
+  final int items;
+  final int? planned;
+  final int? realised;
+  final int? transferred;
+  final int? remaining;
+  final double? percent;
+  final int? overBudgetItems;
+}
+
+/// `GET /projects/{id}` (openapi `ProjectDetail`).
 class ProjectDetail {
-  const ProjectDetail({required this.project, this.companyName, this.costCenter, this.rapRemaining, this.rapItems});
+  const ProjectDetail({
+    required this.project,
+    this.client,
+    this.address,
+    this.startDate,
+    this.targetDate,
+    this.rap = const RapSummary(),
+  });
 
   final ProjectSummary project;
+  final RefItem? client;
+  final String? address;
+  final String? startDate;
+  final String? targetDate;
+  final RapSummary rap;
 
-  /// PT name as the server sends it (`company.name`); the membership name is used when absent.
-  final String? companyName;
-
-  /// Pusat biaya of the project (`costCenter {id, name}` or null).
-  final RefItem? costCenter;
-
-  /// RAP summary: remaining budget and number of items (null when not sent / not visible).
-  final int? rapRemaining;
-  final int? rapItems;
+  RefItem? get costCenter => project.costCenter;
 }
 
 /// One RAP item with its cost realisation (D4): `GET /projects/{id}/rap` `items[]`. Money fields are null when
@@ -94,11 +145,15 @@ class RapBudgetItem {
     this.realised,
     this.remaining,
     this.percent,
+    this.active = true,
   });
 
   final int id;
   final String code;
   final String name;
+
+  /// Deactivated items still come with their realisation (RAP tab); the line picker offers active ones only.
+  final bool active;
   final String uom;
   final double? qty;
   final int? unitPrice;

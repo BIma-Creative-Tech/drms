@@ -48,7 +48,14 @@ class FieldError {
 }
 
 class ProblemException extends ApiException {
-  const ProblemException({required this.status, this.title, this.detail, this.code, this.errors = const []});
+  const ProblemException({
+    required this.status,
+    this.title,
+    this.detail,
+    this.code,
+    this.errors = const [],
+    this.body = const {},
+  });
 
   final int status;
 
@@ -57,6 +64,9 @@ class ProblemException extends ApiException {
   final String? title;
   final String? detail;
   final List<FieldError> errors;
+
+  /// The whole problem body (extra members such as `balance` / `after` of a confirmable 409).
+  final Map<String, dynamic> body;
 
   @override
   String get message {
@@ -99,6 +109,7 @@ class ProblemException extends ApiException {
         detail: body['detail'] as String?,
         code: body['code'] is String ? body['code'] as String : null,
         errors: errs,
+        body: body,
       );
     }
     return ProblemException(status: status);

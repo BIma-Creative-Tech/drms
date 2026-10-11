@@ -56,6 +56,9 @@ abstract class ExpenseLine with _$ExpenseLine {
 
     /// DRMS 10/10 D4: RAP item of the line (`rapItem {id, code, name}`); null before D4.
     RefItem? rapItem,
+
+    /// D4: server read model `rapOverBudget` (live "Melebihi RAP"; always false for Staff); null from an older server.
+    bool? rapOverBudget,
   }) = _ExpenseLine;
 }
 
@@ -77,8 +80,9 @@ bool lineReceiptMismatch(ExpenseDetail d, ExpenseLine l) =>
 /// D4 flag code: the line's amount is above the remaining budget of its RAP item ("Melebihi RAP"; awareness).
 const rapOverBudgetFlag = 'rap_over_budget';
 
-/// D4 "Melebihi RAP" on a line of [d] (the server's `rap_over_budget` flag of that line).
+/// D4 "Melebihi RAP" on a line of [d]: the server's live `rapOverBudget` of the line or a `rap_over_budget` flag of it.
 bool lineRapOverBudget(ExpenseDetail d, ExpenseLine l) =>
+    (l.rapOverBudget ?? false) ||
     d.flags.any((f) => f.kind == rapOverBudgetFlag && f.lineNo == l.no && f.status != 'resolved');
 
 /// D4: a line of an editable request (Draft / Revisi Nota) without a RAP item — "Pilih item RAP".
@@ -126,6 +130,12 @@ abstract class TransferInfo with _$TransferInfo {
     required String kind, // advance | reimburse | lpj_shortfall
     required int amount,
     String? transferDate,
+
+    /// Item 11: date + time of the bank proof (UTC ISO); null = recorded without a time.
+    String? transferAt,
+
+    /// D2: cost center chosen by Finance at the transfer (null before DRMS 10/10).
+    RefItem? costCenter,
     String? bankRef,
     required String status, // posted | void
     String? voidReason,

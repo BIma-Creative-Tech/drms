@@ -186,6 +186,7 @@ ExpenseDetail detailFromJson(Json j) {
             // D4: `rapItem {id, code, name}`; a bare `rapItemId` from a server without the read model.
             rapItem:
                 refFromJson(m['rapItem']) ?? (_intN(m['rapItemId']) == null ? null : RefItem(id: _int(m['rapItemId']))),
+            rapOverBudget: m['rapOverBudget'] is bool ? m['rapOverBudget'] as bool : null,
           ),
     ],
     receipts: [
@@ -273,6 +274,8 @@ ExpenseDetail detailFromJson(Json j) {
             kind: '${m['kind'] ?? ''}',
             amount: _int(m['amount']),
             transferDate: _strN(m['transferDate']),
+            transferAt: _strN(m['transferAt']),
+            costCenter: refFromJson(m['costCenter']),
             bankRef: _strN(m['bankRef']),
             status: '${m['status'] ?? 'posted'}',
             voidReason: _strN(m['voidReason']),

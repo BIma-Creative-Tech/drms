@@ -1958,5 +1958,173 @@
         "type": "int"
       }
     }
-  }
+  },
+  "searchClear": "Hapus pencarian",
+  "projectsTitle": "Proyek",
+  "projectsSearchHint": "Cari kode atau nama project…",
+  "projectStatusActive": "Semua aktif",
+  "projectsEmpty": "Belum ada project yang dapat Anda lihat.",
+  "projectsNoMatch": "Tidak ada yang cocok dengan pencarian / filter.",
+  "projectPm": "PM",
+  "projectRapUsed": "Realisasi RAP",
+  "projectRapOverItems": "{count} item RAP melebihi rencana",
+  "@projectRapOverItems": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "projectTitle": "Project",
+  "projectTabInfo": "Proyek",
+  "projectTabRap": "RAP",
+  "projectTabRequests": "Pengajuan",
+  "projectCode": "Kode",
+  "projectName": "Nama project",
+  "projectKind": "Jenis project",
+  "projectStatus": "Status",
+  "projectContractValue": "Nilai kontrak (RAB)",
+  "projectNoCostCenter": "Belum ada — dipilih Finance saat transfer",
+  "projectClient": "Klien",
+  "projectPeriod": "Periode",
+  "projectProgress": "Progress fisik",
+  "projectAddress": "Alamat",
+  "projectRapSummary": "Ringkasan RAP",
+  "rapItemsCount": "{count} item RAP",
+  "@rapItemsCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "rapPlanned": "Rencana",
+  "rapRealised": "Realisasi",
+  "rapRemainingLabel": "Sisa",
+  "rapNoPrices": "Nilai RAP hanya terlihat oleh Direktur, Admin, Finance dan PM project.",
+  "rapNoItemsProject": "Project ini belum punya item RAP.",
+  "rapInactive": "Nonaktif",
+  "requestsSearchHint": "Cari nomor atau judul…",
+  "filterStatus": "Status",
+  "filterAllStatuses": "Semua status",
+  "projectNoRequests": "Belum ada pengajuan untuk project ini.",
+  "homeProjectsSub": "Info, RAP & pengajuan",
+  "financeTitle": "Finance",
+  "homeFinanceSub": "Antrian transfer & LPJ",
+  "financeQueueCount": "{count} siap ditransfer",
+  "@financeQueueCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "transferQueueTitle": "Antrian Transfer",
+  "lpjVerifyTitle": "Verifikasi LPJ",
+  "slaAgeUnknown": "Umur sejak disetujui: —",
+  "slaAge": "{age} sejak disetujui",
+  "@slaAge": {
+    "placeholders": {
+      "age": {
+        "type": "String"
+      }
+    }
+  },
+  "slaOver": "lewat SLA {hours} jam",
+  "@slaOver": {
+    "placeholders": {
+      "hours": {
+        "type": "String"
+      }
+    }
+  },
+  "transferSearchHint": "Nomor, judul, pemilik rekening…",
+  "filterAllTypes": "Semua jenis",
+  "slaOverFilter": "Lewat SLA",
+  "transferQueueEmpty": "Antrian transfer kosong.",
+  "listShownOf": "{shown} dari {total} pengajuan",
+  "@listShownOf": {
+    "placeholders": {
+      "shown": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "costCenterByFinance": "dipilih Finance saat transfer",
+  "bankVerified": "Terverifikasi",
+  "bankUnverified": "Belum diverifikasi",
+  "openFlags": "Flag terbuka: {count}",
+  "@openFlags": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "transferRecord": "Catat transfer",
+  "lpjQueueEmpty": "Tidak ada LPJ yang menunggu verifikasi.",
+  "lpjReadOnlyHint": "Hanya lihat: buka pengajuan untuk melihat LPJ-nya. Verifikasi LPJ dilakukan di web (Verifikasi LPJ).",
+  "transferNotInQueue": "Pengajuan ini tidak lagi ada di antrian transfer (mungkin sudah ditransfer).",
+  "transferAtLabel": "Tanggal & jam transfer",
+  "transferAtHelp": "Sesuai bukti transfer bank.",
+  "transferAtHint": "Pilih tanggal & jam",
+  "transferRecorded": "Transfer tercatat.",
+  "transferRecordedNo": "Transfer {no} tercatat.",
+  "@transferRecordedNo": {
+    "placeholders": {
+      "no": {
+        "type": "String"
+      }
+    }
+  },
+  "overrideConfirm": "Tetap simpan",
+  "overrideCancelled": "Belum disimpan — konfirmasi dibatalkan.",
+  "transferAmountText": "Transfer {amount}",
+  "@transferAmountText": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "transferAmountHelp": "Nominal disetujui — ditetapkan server, tidak dapat diubah.",
+  "bankDestination": "Rekening tujuan",
+  "cashAccountLabel": "Akun kas",
+  "costCenterPickHint": "Pilih pusat biaya…",
+  "costCenterSuggested": "Usulan: pusat biaya default project. Ubah bila perlu.",
+  "costCenterNoDefault": "Project belum punya pusat biaya default — pilih.",
+  "bankRefLabel": "No. referensi bank",
+  "bankRefHint": "mis. nomor referensi di bukti",
+  "transferProofLabel": "Bukti transfer",
+  "proofRetake": "Foto ulang",
+  "transferProofHelp": "Foto bukti transfer bank (kamera atau galeri); dikompres sebelum diunggah.",
+  "processing": "Memproses…",
+  "overdraftTitle": "Saldo akun kas akan minus",
+  "overdraftFigures": "Saldo saat ini {balance}; sesudah transaksi ini {after}.",
+  "@overdraftFigures": {
+    "placeholders": {
+      "balance": {
+        "type": "String"
+      },
+      "after": {
+        "type": "String"
+      }
+    }
+  },
+  "overdraftGeneric": "Saldo akun akan menjadi minus.",
+  "overdraftNote": "Pastikan dana memang tersedia (mis. setoran belum dicatat). Konfirmasi Anda tercatat di audit log.",
+  "unverifiedTitle": "Rekening tujuan belum diverifikasi",
+  "unverifiedLine": "Rekening {account} berstatus \"Belum diverifikasi\".",
+  "@unverifiedLine": {
+    "placeholders": {
+      "account": {
+        "type": "String"
+      }
+    }
+  },
+  "unverifiedDestination": "tujuan",
+  "unverifiedNote": "Periksa nomor rekening dan nama pemilik dengan karyawan sebelum mentransfer. Konfirmasi Anda tercatat di audit log."
 }

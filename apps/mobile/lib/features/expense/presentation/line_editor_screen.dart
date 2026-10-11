@@ -59,7 +59,7 @@ class _LineEditorScreenState extends ConsumerState<LineEditorScreen> {
   bool get _rapPickable {
     final pid = widget.projectId;
     if (pid == null) return false;
-    return ref.read(projectRapProvider(pid)).value?.items.isNotEmpty ?? false;
+    return ref.read(projectRapProvider(pid)).value?.pickable.isNotEmpty ?? false;
   }
 
   /// D3: the total is never typed — qty × harga satuan (a pre-D3 line keeps its old total until both are

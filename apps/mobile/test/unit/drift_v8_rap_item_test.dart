@@ -89,7 +89,8 @@ void main() {
       'qty': 1000,
       'unitPrice': 15000,
       'planned': 15000000,
-      'realised': 16200000,
+      'realised': 950, // litres from daily reports (P3 quantity)
+      'realisedAmount': 16200000,
       'remaining': -1200000,
       'percent': 108,
     });

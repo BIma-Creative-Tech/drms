@@ -110,6 +110,9 @@ class RapLoad {
   final bool offline;
 
   RapBudgetItem? byId(int? id) => id == null ? null : items.where((i) => i.id == id).firstOrNull;
+
+  /// Items a line may be charged to (active ones).
+  List<RapBudgetItem> get pickable => items.where((i) => i.active).toList();
 }
 
 /// kv key of the offline RAP item list of [projectId] (per user, no money).
@@ -123,7 +126,13 @@ final projectRapProvider = FutureProvider.autoDispose.family<RapLoad, int>((ref,
   try {
     final items = await ref.watch(projectsApiProvider).rap(projectId);
     if (sub != null) {
-      await db.kvPut(rapCacheKey(sub, projectId), jsonEncode([for (final i in items) i.toCacheJson()]));
+      await db.kvPut(
+        rapCacheKey(sub, projectId),
+        jsonEncode([
+          for (final i in items)
+            if (i.active) i.toCacheJson(),
+        ]),
+      );
     }
     return RapLoad(items);
   } on NetworkException {

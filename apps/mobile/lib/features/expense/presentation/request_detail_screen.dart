@@ -187,7 +187,7 @@ class _DetailBody extends ConsumerWidget {
           // Masked by the server unless this user may see the full number (dto.ts maskAccountNo).
           if (d.bankAccountNo != null) row(t.bankNumberLabel, d.bankAccountNo!, key: const Key('detail-bank-no')),
         ],
-        if (TransferSection.visibleFor(d)) TransferSection(detail: d),
+        if (TransferSection.visibleFor(d)) TransferSection(detail: d, zone: zone),
         if (d.settlement != null) LpjSection(settlement: d.settlement!),
         RequestLifecycleActions(detail: d),
         RequesterActionsSection(detail: d),
@@ -350,6 +350,23 @@ class _DecisionBar extends ConsumerWidget {
     final canAck = a.contains('acknowledge');
     final canApprove = a.contains('approve');
     final canReject = a.contains('reject');
+    // DRMS 10/10 point 10: Finance records the transfer from the APK too (same form as the Finance menu).
+    if (a.contains('transfer') && !canAck && !canApprove && !canReject) {
+      return SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+          child: FilledButton.icon(
+            key: const Key('action-transfer'),
+            onPressed: () async {
+              await context.push<bool>('/finance/transfer/${detail.id}');
+              ref.invalidate(requestDetailProvider(detail.id));
+            },
+            icon: const Icon(Icons.account_balance),
+            label: Text(t.transferRecord),
+          ),
+        ),
+      );
+    }
     if (!canAck && !canApprove && !canReject) return const SizedBox.shrink();
 
     Future<void> open(Decision decision) async {

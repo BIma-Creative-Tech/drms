@@ -110,7 +110,7 @@ class RapItemPickerField extends ConsumerWidget {
       helper = errorText == null ? async_body.errorText(err) : null;
     } else if (selected != null) {
       helper = remaining ?? (data!.offline ? t.rapOfflineNoBudget : null);
-    } else if (data != null && data.items.isEmpty) {
+    } else if (data != null && data.pickable.isEmpty) {
       helper = t.rapNoItems;
     }
     return Column(
@@ -118,12 +118,12 @@ class RapItemPickerField extends ConsumerWidget {
       children: [
         InkWell(
           key: const Key('line-rap-item'),
-          onTap: data == null || data.items.isEmpty
+          onTap: data == null || data.pickable.isEmpty
               ? (load is AsyncError && pid != null ? () => ref.invalidate(projectRapProvider(pid)) : null)
               : () async {
                   final picked = await showDialog<int>(
                     context: context,
-                    builder: (_) => _RapPickerDialog(items: data.items, offline: data.offline, lineTotal: lineTotal),
+                    builder: (_) => _RapPickerDialog(items: data.pickable, offline: data.offline, lineTotal: lineTotal),
                   );
                   if (picked != null) onChanged(picked);
                 },
