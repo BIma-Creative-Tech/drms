@@ -359,6 +359,7 @@ const ROUTE_CLASSES: Record<string, RouteClass> = {
   'POST /expense-requests/:id/lpj/verify': 'document',
   'POST /expense-requests/:id/settle': 'document',
   'GET /expense-requests/:id/settle/precheck': 'document', // QA-11
+  'GET /bank-account-preview': 'document', // DRMS 10/10 8e: the request (loadVisible) / the account's collection access
   'POST /expense-requests/:id/settle/reverse': 'document',
   // QA-06 / ADR 0019: LPJ shortfall re-approval
   'POST /expense-requests/:id/lpj/shortfall-approval': 'document',

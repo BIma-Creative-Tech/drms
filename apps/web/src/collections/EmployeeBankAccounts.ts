@@ -49,8 +49,8 @@ export const EmployeeBankAccounts: CollectionConfig = withAudit(
     },
     fields: [
       companyField({ derived: true }),
-      { name: 'employee', type: 'relationship', relationTo: 'employees', label: 'Karyawan', required: true, index: true, ...pickerSameCompany({ required: true }) },
-      { name: 'bank', type: 'relationship', relationTo: 'banks', label: 'Bank', required: true },
+      { name: 'employee', type: 'relationship', relationTo: 'employees', label: 'Karyawan', required: true, index: true, ...pickerSameCompany({ required: true }), admin: { placeholder: 'Pilih karyawan…' } },
+      { name: 'bank', type: 'relationship', relationTo: 'banks', label: 'Bank', required: true, admin: { placeholder: 'Pilih bank…' } },
       {
         name: 'accountNo',
         type: 'text',
