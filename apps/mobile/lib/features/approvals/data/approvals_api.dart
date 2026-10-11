@@ -26,7 +26,7 @@ class ApprovalsApi {
     ], (m['budgetWarnPct'] as num?)?.toDouble() ?? 85);
   });
 
-  /// MC3 `GET /lpj-queue` (US-21): Uang Muka "LPJ Diajukan" / "LPJ Terverifikasi" of the PTs where the
+  /// MC3 `GET /lpj-queue` (US-21): Pengajuan Baru "LPJ Diajukan" / "LPJ Terverifikasi" of the PTs where the
   /// caller is Finance / Direktur (PT switcher selection), each with its PT.
   Future<List<ExpenseSummary>> lpjQueue() => client.run(
     (d) => d.get<dynamic>('/lpj-queue'),

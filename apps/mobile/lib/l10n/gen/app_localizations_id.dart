@@ -177,7 +177,7 @@ class AppLocalizationsId extends AppLocalizations {
   }
 
   @override
-  String get actionNewAdvance => 'Ajukan Uang Muka';
+  String get actionNewAdvance => 'Pengajuan Baru';
 
   @override
   String get actionNewReimburse => 'Ajukan Reimburse';
@@ -391,7 +391,7 @@ class AppLocalizationsId extends AppLocalizations {
   String get fieldDescription => 'Uraian';
 
   @override
-  String get fieldQty => 'Jumlah';
+  String get fieldQty => 'Qty';
 
   @override
   String get fieldUom => 'Satuan';
@@ -412,7 +412,32 @@ class AppLocalizationsId extends AppLocalizations {
   String get fieldLineNotes => 'Keterangan baris';
 
   @override
-  String get unitPriceHint => 'Informasi saja — total tidak dihitung otomatis.';
+  String get lineTotalHelper => 'Qty × Harga satuan — dihitung otomatis, tidak bisa diubah.';
+
+  @override
+  String get fieldReceiptAmount => 'Nominal sesuai nota';
+
+  @override
+  String get receiptAmountHelper => 'Opsional. Persetujuan dan transfer tetap memakai Total (Qty × Harga satuan).';
+
+  @override
+  String get receiptMismatchChip => 'Selisih nota';
+
+  @override
+  String receiptMismatchDetail(String receipt, String total) {
+    return 'Nominal sesuai nota $receipt ≠ Total $total';
+  }
+
+  @override
+  String lineNeedsUnitPrice(String amount) {
+    return 'Baris ini dibuat sebelum Total dihitung otomatis. Isi Qty, Satuan dan Harga satuan (total lama: $amount).';
+  }
+
+  @override
+  String get lineNeedsUnitPriceShort => 'Lengkapi Qty & Harga satuan';
+
+  @override
+  String get fieldLineNo => 'No';
 
   @override
   String receiptDiff(String amount) {
@@ -580,6 +605,38 @@ class AppLocalizationsId extends AppLocalizations {
 
   @override
   String get lpjFinanceNotes => 'Catatan Finance';
+
+  @override
+  String get lpjPhotos => 'Foto LPJ';
+
+  @override
+  String lpjPhotosCount(int count, int max) {
+    return '$count / $max foto';
+  }
+
+  @override
+  String lpjPhotosHint(int max) {
+    return 'Opsional, maks. $max foto (kamera atau galeri). Tidak bisa diubah setelah LPJ dikirim.';
+  }
+
+  @override
+  String lpjPhotosFull(int max) {
+    return 'Maksimal $max foto LPJ.';
+  }
+
+  @override
+  String lpjPhotoCaption(int no) {
+    return 'Foto LPJ $no';
+  }
+
+  @override
+  String get lpjPhotoRemove => 'Hapus foto';
+
+  @override
+  String get lpjPhotoCamera => 'Kamera';
+
+  @override
+  String get lpjUploadingPhotos => 'Mengunggah foto LPJ…';
 
   @override
   String get requesterActionsTitle => 'Nota & LPJ';
@@ -1029,7 +1086,7 @@ class AppLocalizationsId extends AppLocalizations {
 
   @override
   String kpiAdvancesOverdue(int count) {
-    return '$count uang muka terlambat LPJ';
+    return '$count pengajuan baru terlambat LPJ';
   }
 
   @override
@@ -1067,7 +1124,7 @@ class AppLocalizationsId extends AppLocalizations {
   }
 
   @override
-  String get kpiTeamLpj => 'Uang muka tim belum LPJ';
+  String get kpiTeamLpj => 'Pengajuan Baru tim belum LPJ';
 
   @override
   String kpiLpjOverdue(int count) {

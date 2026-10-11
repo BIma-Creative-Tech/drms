@@ -50,12 +50,42 @@ abstract class DraftLine with _$DraftLine {
     double? qty,
     int? uomId,
     int? unitPrice,
+
+    /// D3: computed = qty × [unitPrice] (see [lineTotalOf]); never typed. A draft written before D3 may
+    /// still carry a typed total without a unit price ([DraftLineD3.needsUnitPrice]).
     int? total,
+
+    /// D3 "Nominal sesuai nota" (optional): what the receipt says. Approval and transfer use [total];
+    /// a different value only raises the "Selisih nota" awareness flag for Finance.
+    int? receiptAmount,
     int? categoryId,
     int? vehicleId,
     String? notes,
     @Default([]) List<DraftReceipt> receipts,
   }) = _DraftLine;
+}
+
+/// DRMS 10/10 D3: line total = qty × harga satuan in whole rupiah (qty has at most 3 decimals; half a
+/// rupiah rounds up). Null while qty or the unit price is missing. The server computes the official value.
+int? lineTotalOf(double? qty, int? unitPrice) {
+  if (qty == null || unitPrice == null || !qty.isFinite || qty <= 0 || unitPrice < 0) return null;
+  final milli = BigInt.from((qty * 1000).round());
+  final total = (milli * BigInt.from(unitPrice) + BigInt.from(500)) ~/ BigInt.from(1000);
+  return total.isValidInt ? total.toInt() : null;
+}
+
+/// "Nominal sesuai nota" differs from the computed line total (D3 awareness flag "Selisih nota").
+bool receiptAmountDiffers(int? receiptAmount, int? total) =>
+    receiptAmount != null && total != null && receiptAmount != total;
+
+extension DraftLineD3 on DraftLine {
+  /// qty × harga satuan (null while one of them is missing).
+  int? get computedTotal => lineTotalOf(qty, unitPrice);
+
+  /// A line saved before D3 (typed total, no unit price): the editor asks to fill qty and harga satuan.
+  bool get needsUnitPrice => unitPrice == null;
+
+  bool get receiptMismatch => receiptAmountDiffers(receiptAmount, computedTotal ?? total);
 }
 
 @freezed
@@ -87,7 +117,7 @@ abstract class DraftRequest with _$DraftRequest {
   }) = _DraftRequest;
 
   /// Preview only — the server computes the official grand total (US-03, US-37).
-  int get previewGrandTotal => lines.fold(0, (sum, l) => sum + (l.total ?? 0));
+  int get previewGrandTotal => lines.fold(0, (sum, l) => sum + (l.computedTotal ?? l.total ?? 0));
 
   int get receiptCount => lines.fold(0, (n, l) => n + l.receipts.length);
 

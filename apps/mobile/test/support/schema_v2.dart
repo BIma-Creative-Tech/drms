@@ -42,7 +42,14 @@ final schemaV5 = [
   r'''CREATE TABLE "local_field_reports" ("client_uuid" TEXT NOT NULL, "user_sub" TEXT NOT NULL, "company_id" INTEGER NULL, "report_type" TEXT NOT NULL, "project_id" INTEGER NOT NULL, "project_label" TEXT NOT NULL DEFAULT '', "unit_id" INTEGER NULL, "client_id" INTEGER NULL, "report_date" TEXT NOT NULL, "hour_meter" REAL NULL, "content_json" TEXT NOT NULL DEFAULT '{}', "photo_uuids_json" TEXT NOT NULL DEFAULT '[]', "server_photo_count" INTEGER NOT NULL DEFAULT 0, "reason" TEXT NULL, "server_id" INTEGER NULL, "server_rev" INTEGER NULL, "doc_no" TEXT NULL, "editable_until" TEXT NULL, "sync_state" TEXT NOT NULL DEFAULT 'local', "last_error" TEXT NULL, "last_error_code" TEXT NULL, "conflict_copy_json" TEXT NULL, "offline" INTEGER NOT NULL DEFAULT 0 CHECK ("offline" IN (0, 1)), "created_at" INTEGER NOT NULL, "updated_at" INTEGER NOT NULL, PRIMARY KEY ("client_uuid"))''',
 ];
 
-/// An in-memory database that starts as schema [version] (1 … 5) with rows from [seed], then is opened by
+/// v6 (P3 konstruksi, mobile-v0.5.x): v5 + the RAP / resource-type caches as drift created them.
+final schemaV6 = [
+  ...schemaV5,
+  r'''CREATE TABLE "field_rap_items" ("user_sub" TEXT NOT NULL, "id" INTEGER NOT NULL, "company_id" INTEGER NOT NULL, "project_id" INTEGER NOT NULL, "code" TEXT NOT NULL, "description" TEXT NOT NULL DEFAULT '', "kind" TEXT NOT NULL, "uom" TEXT NOT NULL DEFAULT '', "stage_name" TEXT NOT NULL DEFAULT '', "volume" REAL NOT NULL DEFAULT 0.0, "realised" REAL NOT NULL DEFAULT 0.0, "received" REAL NOT NULL DEFAULT 0.0, "used" REAL NOT NULL DEFAULT 0.0, "sort_order" INTEGER NOT NULL DEFAULT 0, "active" INTEGER NOT NULL DEFAULT 1 CHECK ("active" IN (0, 1)), PRIMARY KEY ("user_sub", "id"))''',
+  r'''CREATE TABLE "field_resource_types" ("user_sub" TEXT NOT NULL, "id" INTEGER NOT NULL, "company_id" INTEGER NOT NULL, "kind" TEXT NOT NULL, "code" TEXT NOT NULL DEFAULT '', "name" TEXT NOT NULL DEFAULT '', PRIMARY KEY ("user_sub", "id"))''',
+];
+
+/// An in-memory database that starts as schema [version] (1 … 6) with rows from [seed], then is opened by
 /// the current `AppDatabase` (runs the drift migration to the current schema version).
 AppDatabase oldPhoneDb(int version, void Function(CommonDatabase raw) seed) => AppDatabase(
   NativeDatabase.memory(
@@ -53,7 +60,8 @@ AppDatabase oldPhoneDb(int version, void Function(CommonDatabase raw) seed) => A
           2 => schemaV2,
           3 => schemaV3,
           4 => schemaV4,
-          _ => schemaV5,
+          5 => schemaV5,
+          _ => schemaV6,
         }) {
           raw.execute(s);
         }

@@ -9,6 +9,9 @@ String formatRupiah(int amount) {
   return '${sign}Rp ${_grouping.format(amount.abs())}';
 }
 
+/// Line quantity without a trailing ".0", decimal comma (`2`, `24,8`).
+String formatQty(double q) => q.toString().replaceAll(RegExp(r'\.0$'), '').replaceAll('.', ',');
+
 /// Parses user input such as `1.447.500`, `Rp 1.447.500` or `1447500` into integer rupiah.
 /// Returns null for empty/invalid input or fractions (rupiah has no decimals in ProyekKas).
 int? parseRupiah(String input) {

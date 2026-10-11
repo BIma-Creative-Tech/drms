@@ -95,7 +95,7 @@
       }
     }
   },
-  "actionNewAdvance": "Ajukan Uang Muka",
+  "actionNewAdvance": "Pengajuan Baru",
   "actionNewReimburse": "Ajukan Reimburse",
   "actionMyRequests": "Pengajuan Saya",
   "actionInbox": "Menunggu Persetujuan",
@@ -188,14 +188,38 @@
     }
   },
   "fieldDescription": "Uraian",
-  "fieldQty": "Jumlah",
+  "fieldQty": "Qty",
   "fieldUom": "Satuan",
   "fieldUnitPrice": "Harga satuan",
   "fieldTotal": "Total",
   "fieldCategory": "Kategori",
   "fieldVehicle": "Kendaraan",
   "fieldLineNotes": "Keterangan baris",
-  "unitPriceHint": "Informasi saja — total tidak dihitung otomatis.",
+  "lineTotalHelper": "Qty × Harga satuan — dihitung otomatis, tidak bisa diubah.",
+  "fieldReceiptAmount": "Nominal sesuai nota",
+  "receiptAmountHelper": "Opsional. Persetujuan dan transfer tetap memakai Total (Qty × Harga satuan).",
+  "receiptMismatchChip": "Selisih nota",
+  "receiptMismatchDetail": "Nominal sesuai nota {receipt} ≠ Total {total}",
+  "@receiptMismatchDetail": {
+    "placeholders": {
+      "receipt": {
+        "type": "String"
+      },
+      "total": {
+        "type": "String"
+      }
+    }
+  },
+  "lineNeedsUnitPrice": "Baris ini dibuat sebelum Total dihitung otomatis. Isi Qty, Satuan dan Harga satuan (total lama: {amount}).",
+  "@lineNeedsUnitPrice": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "lineNeedsUnitPriceShort": "Lengkapi Qty & Harga satuan",
+  "fieldLineNo": "No",
   "receiptDiff": "Selisih total baris vs nota: {amount}",
   "@receiptDiff": {
     "placeholders": {
@@ -280,6 +304,45 @@
   "lpjSettlement": "Penyelesaian",
   "lpjUsageNotes": "Keterangan penggunaan dana",
   "lpjFinanceNotes": "Catatan Finance",
+  "lpjPhotos": "Foto LPJ",
+  "lpjPhotosCount": "{count} / {max} foto",
+  "@lpjPhotosCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "max": {
+        "type": "int"
+      }
+    }
+  },
+  "lpjPhotosHint": "Opsional, maks. {max} foto (kamera atau galeri). Tidak bisa diubah setelah LPJ dikirim.",
+  "@lpjPhotosHint": {
+    "placeholders": {
+      "max": {
+        "type": "int"
+      }
+    }
+  },
+  "lpjPhotosFull": "Maksimal {max} foto LPJ.",
+  "@lpjPhotosFull": {
+    "placeholders": {
+      "max": {
+        "type": "int"
+      }
+    }
+  },
+  "lpjPhotoCaption": "Foto LPJ {no}",
+  "@lpjPhotoCaption": {
+    "placeholders": {
+      "no": {
+        "type": "int"
+      }
+    }
+  },
+  "lpjPhotoRemove": "Hapus foto",
+  "lpjPhotoCamera": "Kamera",
+  "lpjUploadingPhotos": "Mengunggah foto LPJ…",
   "requesterActionsTitle": "Nota & LPJ",
   "addReceiptOnlineCamera": "Tambah nota (kamera)",
   "addReceiptOnlineGallery": "Tambah nota dari galeri",
@@ -529,7 +592,7 @@
     }
   },
   "kpiLpjToSettle": "Selisih LPJ",
-  "kpiAdvancesOverdue": "{count} uang muka terlambat LPJ",
+  "kpiAdvancesOverdue": "{count} pengajuan baru terlambat LPJ",
   "@kpiAdvancesOverdue": {
     "placeholders": {
       "count": {
@@ -589,7 +652,7 @@
       }
     }
   },
-  "kpiTeamLpj": "Uang muka tim belum LPJ",
+  "kpiTeamLpj": "Pengajuan Baru tim belum LPJ",
   "kpiLpjOverdue": "{count} terlambat",
   "@kpiLpjOverdue": {
     "placeholders": {

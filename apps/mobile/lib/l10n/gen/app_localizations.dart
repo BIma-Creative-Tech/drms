@@ -394,7 +394,7 @@ abstract class AppLocalizations {
   /// No description provided for @actionNewAdvance.
   ///
   /// In id, this message translates to:
-  /// **'Ajukan Uang Muka'**
+  /// **'Pengajuan Baru'**
   String get actionNewAdvance;
 
   /// No description provided for @actionNewReimburse.
@@ -808,7 +808,7 @@ abstract class AppLocalizations {
   /// No description provided for @fieldQty.
   ///
   /// In id, this message translates to:
-  /// **'Jumlah'**
+  /// **'Qty'**
   String get fieldQty;
 
   /// No description provided for @fieldUom.
@@ -847,11 +847,53 @@ abstract class AppLocalizations {
   /// **'Keterangan baris'**
   String get fieldLineNotes;
 
-  /// No description provided for @unitPriceHint.
+  /// No description provided for @lineTotalHelper.
   ///
   /// In id, this message translates to:
-  /// **'Informasi saja — total tidak dihitung otomatis.'**
-  String get unitPriceHint;
+  /// **'Qty × Harga satuan — dihitung otomatis, tidak bisa diubah.'**
+  String get lineTotalHelper;
+
+  /// No description provided for @fieldReceiptAmount.
+  ///
+  /// In id, this message translates to:
+  /// **'Nominal sesuai nota'**
+  String get fieldReceiptAmount;
+
+  /// No description provided for @receiptAmountHelper.
+  ///
+  /// In id, this message translates to:
+  /// **'Opsional. Persetujuan dan transfer tetap memakai Total (Qty × Harga satuan).'**
+  String get receiptAmountHelper;
+
+  /// No description provided for @receiptMismatchChip.
+  ///
+  /// In id, this message translates to:
+  /// **'Selisih nota'**
+  String get receiptMismatchChip;
+
+  /// No description provided for @receiptMismatchDetail.
+  ///
+  /// In id, this message translates to:
+  /// **'Nominal sesuai nota {receipt} ≠ Total {total}'**
+  String receiptMismatchDetail(String receipt, String total);
+
+  /// No description provided for @lineNeedsUnitPrice.
+  ///
+  /// In id, this message translates to:
+  /// **'Baris ini dibuat sebelum Total dihitung otomatis. Isi Qty, Satuan dan Harga satuan (total lama: {amount}).'**
+  String lineNeedsUnitPrice(String amount);
+
+  /// No description provided for @lineNeedsUnitPriceShort.
+  ///
+  /// In id, this message translates to:
+  /// **'Lengkapi Qty & Harga satuan'**
+  String get lineNeedsUnitPriceShort;
+
+  /// No description provided for @fieldLineNo.
+  ///
+  /// In id, this message translates to:
+  /// **'No'**
+  String get fieldLineNo;
 
   /// No description provided for @receiptDiff.
   ///
@@ -1170,6 +1212,54 @@ abstract class AppLocalizations {
   /// In id, this message translates to:
   /// **'Catatan Finance'**
   String get lpjFinanceNotes;
+
+  /// No description provided for @lpjPhotos.
+  ///
+  /// In id, this message translates to:
+  /// **'Foto LPJ'**
+  String get lpjPhotos;
+
+  /// No description provided for @lpjPhotosCount.
+  ///
+  /// In id, this message translates to:
+  /// **'{count} / {max} foto'**
+  String lpjPhotosCount(int count, int max);
+
+  /// No description provided for @lpjPhotosHint.
+  ///
+  /// In id, this message translates to:
+  /// **'Opsional, maks. {max} foto (kamera atau galeri). Tidak bisa diubah setelah LPJ dikirim.'**
+  String lpjPhotosHint(int max);
+
+  /// No description provided for @lpjPhotosFull.
+  ///
+  /// In id, this message translates to:
+  /// **'Maksimal {max} foto LPJ.'**
+  String lpjPhotosFull(int max);
+
+  /// No description provided for @lpjPhotoCaption.
+  ///
+  /// In id, this message translates to:
+  /// **'Foto LPJ {no}'**
+  String lpjPhotoCaption(int no);
+
+  /// No description provided for @lpjPhotoRemove.
+  ///
+  /// In id, this message translates to:
+  /// **'Hapus foto'**
+  String get lpjPhotoRemove;
+
+  /// No description provided for @lpjPhotoCamera.
+  ///
+  /// In id, this message translates to:
+  /// **'Kamera'**
+  String get lpjPhotoCamera;
+
+  /// No description provided for @lpjUploadingPhotos.
+  ///
+  /// In id, this message translates to:
+  /// **'Mengunggah foto LPJ…'**
+  String get lpjUploadingPhotos;
 
   /// No description provided for @requesterActionsTitle.
   ///
@@ -1996,7 +2086,7 @@ abstract class AppLocalizations {
   /// No description provided for @kpiAdvancesOverdue.
   ///
   /// In id, this message translates to:
-  /// **'{count} uang muka terlambat LPJ'**
+  /// **'{count} pengajuan baru terlambat LPJ'**
   String kpiAdvancesOverdue(int count);
 
   /// No description provided for @kpiTeamMonth.
@@ -2050,7 +2140,7 @@ abstract class AppLocalizations {
   /// No description provided for @kpiTeamLpj.
   ///
   /// In id, this message translates to:
-  /// **'Uang muka tim belum LPJ'**
+  /// **'Pengajuan Baru tim belum LPJ'**
   String get kpiTeamLpj;
 
   /// No description provided for @kpiLpjOverdue.

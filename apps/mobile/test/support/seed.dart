@@ -3,6 +3,8 @@ import 'package:proyekkas/features/expense/domain/request_status.dart';
 
 /// Fictional seed mirroring the structure of client form 228/PB-DRMS/20/IX/2026 (ADR 0010 Example B):
 /// 3 lines 600.000 + 677.000 + 170.500 = Rp 1.447.500. Names/ids are fictional.
+/// DRMS 10/10 D3: every line has qty × harga satuan = total; line 2's receipt says Rp 676.876
+/// ("Nominal sesuai nota" → "Selisih nota").
 DraftRequest seedDraft({RequestType type = RequestType.reimburse, bool withReceipts = true}) => DraftRequest(
   clientUuid: '0192f6d0-aaaa-7bbb-8ccc-000000000100',
   type: type,
@@ -18,6 +20,7 @@ DraftRequest seedDraft({RequestType type = RequestType.reimburse, bool withRecei
       description: 'BBM Hilux Banjarmasin-Palangka',
       qty: 1,
       uomId: 3,
+      unitPrice: 600000,
       total: 600000,
       categoryId: 1,
       vehicleId: 5,
@@ -40,8 +43,9 @@ DraftRequest seedDraft({RequestType type = RequestType.reimburse, bool withRecei
       description: 'Penginapan',
       qty: 2,
       uomId: 4,
-      unitPrice: 339000,
+      unitPrice: 338500,
       total: 677000,
+      receiptAmount: 676876,
       categoryId: 2,
       receipts: [
         if (withReceipts)
@@ -59,6 +63,9 @@ DraftRequest seedDraft({RequestType type = RequestType.reimburse, bool withRecei
       clientUuid: '0192f6d0-aaaa-7bbb-8ccc-000000000013',
       no: 3,
       description: 'Makan siang',
+      qty: 1,
+      uomId: 3,
+      unitPrice: 170500,
       total: 170500,
       categoryId: 3,
       receipts: [

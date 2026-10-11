@@ -95,7 +95,7 @@ void seedV2(dynamic raw) {
   const ts = 1790000000; // drift stores DateTime as unix seconds
   raw.execute(
     'INSERT INTO local_drafts (client_uuid, user_sub, type, title, cost_center_id, requester_ids_json, sync_state, '
-    "created_at, updated_at) VALUES ('d-1', '$sub', 'advance', 'Uang muka BBM', 7, '[12]', 'queued', $ts, $ts)",
+    "created_at, updated_at) VALUES ('d-1', '$sub', 'advance', 'Pengajuan BBM', 7, '[12]', 'queued', $ts, $ts)",
   );
   raw.execute(
     "INSERT INTO local_lines (client_uuid, draft_uuid, no, description, total) VALUES ('l-1', 'd-1', 1, 'BBM', 500000)",
@@ -105,7 +105,7 @@ void seedV2(dynamic raw) {
     "created_at, updated_at) VALUES ('r-1', '$sub', 70, 31, 40, 'Pengecoran', 'queued', ${ts + 1}, ${ts + 1})",
   );
   for (final (op, type, target, payload, t) in [
-    ('d-1', SyncItemType.expenseDraftUpsert, 'd-1', '{"kind":"advance","title":"Uang muka BBM"}', ts),
+    ('d-1', SyncItemType.expenseDraftUpsert, 'd-1', '{"kind":"advance","title":"Pengajuan BBM"}', ts),
     ('r-1', SyncItemType.progressReportUpsert, 'r-1', '{"project_id":70,"stage_id":31,"pct_after":40}', ts + 1),
     ('a-1', SyncItemType.attendanceCheckIn, 'a-1', '{"project_id":70}', ts + 2),
   ]) {
@@ -292,12 +292,12 @@ void main() {
       addTearDown(db.close);
       expect(
         db.schemaVersion,
-        6,
-      ); // v2 → v3 (company_id) → v4 (urgency level, 2026-10-09) → v5 (FR1 field reports) → v6 (P3)
+        7,
+      ); // v2 → v3 (company_id) → v4 (urgency level, 2026-10-09) → v5 (FR1 field reports) → v6 (P3) → v7 (D3)
       final out = await db.select(db.outbox).get();
       expect(out.map((r) => r.opUuid), unorderedEquals(['d-1', 'r-1', 'a-1']));
       expect(out.every((r) => r.companyId == null && r.status == 'pending'), isTrue);
-      expect(out.firstWhere((r) => r.opUuid == 'd-1').payloadJson, contains('Uang muka BBM'));
+      expect(out.firstWhere((r) => r.opUuid == 'd-1').payloadJson, contains('Pengajuan BBM'));
       final draft = await DraftRepository(db).load(sub, 'd-1');
       expect(draft!.companyId, isNull);
       expect(draft.lines.single.total, 500000);

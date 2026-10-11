@@ -1,5 +1,6 @@
+/// DRMS 10/10 D1 (owner 2026-10-11): `advance` is shown as "Pengajuan Baru" (was "Uang Muka"); the code is unchanged.
 enum RequestType {
-  advance('advance', 'Uang Muka'),
+  advance('advance', 'Pengajuan Baru'),
   reimburse('reimburse', 'Reimburse');
 
   const RequestType(this.code, this.label);

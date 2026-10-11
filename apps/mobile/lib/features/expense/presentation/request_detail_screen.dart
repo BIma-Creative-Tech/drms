@@ -17,6 +17,7 @@ import '../application/expense_providers.dart';
 import '../domain/expense_request.dart';
 import '../domain/turn_timeline.dart';
 import 'requester_actions.dart';
+import 'widgets/receipt_mismatch_chip.dart';
 import 'widgets/receipt_thumb.dart';
 import 'widgets/transfer_lpj.dart';
 import 'widgets/timeline_view.dart';
@@ -115,6 +116,9 @@ class _DetailBody extends ConsumerWidget {
             Chip(label: Text(d.typeLabel)),
             Chip(label: Text(d.statusLabel)),
             if (d.docNo != null) DocNoChip(docNo: d.docNo!),
+            // D3: at least one line's "Nominal sesuai nota" differs from its total (details on the line).
+            if (d.lines.any((l) => lineReceiptMismatch(d, l)))
+              const ReceiptMismatchChip(key: Key('detail-receipt-mismatch')),
           ],
         ),
         Card(
@@ -232,10 +236,12 @@ class _LineCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final t = AppLocalizations.of(context);
     final canRemove = RequesterActionsSection.canAddReceipts(detail) && ref.watch(connectivityProvider);
-    final qty = line.qty == null
-        ? ''
-        : '${line.qty!.toString().replaceAll(RegExp(r'\.0$'), '')} ${line.uom?.name ?? ''} · ';
-    final unit = line.unitPriceDisplay == null ? '' : '@ ${formatRupiah(line.unitPriceDisplay!)} · ';
+    // D3: same columns as the web lines table — Qty Satuan × Harga satuan · Kategori · Kendaraan.
+    final price = line.unitPrice ?? line.unitPriceDisplay;
+    final qtyUom = line.qty == null ? null : '${formatQty(line.qty!)} ${line.uom?.name ?? ''}'.trim();
+    final qtyPrice = [?qtyUom, if (price != null) formatRupiah(price)].join(' × ');
+    final meta = [if (qtyPrice.isNotEmpty) qtyPrice, ?line.category?.name, ?line.vehiclePlate].join(' · ');
+    final mismatch = lineReceiptMismatch(detail, line);
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(12),
@@ -253,7 +259,22 @@ class _LineCard extends ConsumerWidget {
                 Text(formatRupiah(line.total), style: const TextStyle(fontWeight: FontWeight.bold)),
               ],
             ),
-            Text('$qty$unit${line.category?.name ?? ''}${line.vehiclePlate != null ? ' · ${line.vehiclePlate}' : ''}'),
+            Text(meta, key: Key('line-${line.no}-meta')),
+            // D3: "Nominal sesuai nota" beside the computed total; "Selisih nota" when they differ.
+            if (line.receiptAmount != null)
+              Text(
+                '${t.fieldReceiptAmount}: ${formatRupiah(line.receiptAmount!)}',
+                key: Key('line-${line.no}-receipt-amount'),
+              ),
+            if (mismatch)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: ReceiptMismatchChip(
+                  key: Key('line-${line.no}-receipt-mismatch'),
+                  receiptAmount: line.receiptAmount,
+                  total: line.total,
+                ),
+              ),
             if (line.notes != null) Text(line.notes!, style: Theme.of(context).textTheme.bodySmall),
             if (receipts.isNotEmpty) const SizedBox(height: 8),
             for (final r in receipts)

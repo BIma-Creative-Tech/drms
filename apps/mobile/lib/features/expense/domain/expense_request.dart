@@ -47,8 +47,24 @@ abstract class ExpenseLine with _$ExpenseLine {
     RefItem? category,
     String? vehiclePlate,
     int? vehicleId,
+
+    /// D3 "Nominal sesuai nota" (null = not filled).
+    int? receiptAmount,
+
+    /// D3: server read model `receiptMismatch` (receiptAmount ≠ total); null from an older server.
+    bool? receiptMismatch,
   }) = _ExpenseLine;
 }
+
+/// Flag code of D3 "Nominal sesuai nota ≠ total baris" (awareness for Finance, never blocks).
+const receiptAmountMismatchFlag = 'receipt_amount_mismatch';
+
+/// D3 "Selisih nota" on a line of [d]: the server's per-line `receiptMismatch`, a `receipt_amount_mismatch`
+/// flag of that line, or — from a server without either — receiptAmount ≠ total.
+bool lineReceiptMismatch(ExpenseDetail d, ExpenseLine l) =>
+    l.receiptMismatch ??
+    (d.flags.any((f) => f.kind == receiptAmountMismatchFlag && f.lineNo == l.no) ||
+        (l.receiptAmount != null && l.receiptAmount != l.total));
 
 @freezed
 abstract class ReceiptInfo with _$ReceiptInfo {
@@ -67,6 +83,9 @@ abstract class ReceiptInfo with _$ReceiptInfo {
 
 /// QA-27 (owner decision 2026-10-08): a receipt Finance marked valid is locked — the requester can no
 /// longer remove it (server answers 409 "Nota sudah divalidasi Finance"); removed ones are gone already.
+/// d1010 (13): maximum photos on one LPJ (same limit as the server).
+const maxLpjPhotos = 10;
+
 bool receiptRemovable(String status) => status != 'valid' && status != 'removed';
 
 /// Receipt status labels (server `receipts.status`).
@@ -96,14 +115,14 @@ abstract class TransferInfo with _$TransferInfo {
   bool get isVoid => status == 'void';
 
   String get kindLabel => switch (kind) {
-    'advance' => 'Uang muka',
+    'advance' => 'Pengajuan Baru', // D1 (was "Uang muka")
     'reimburse' => 'Reimburse',
     'lpj_shortfall' => 'Kekurangan LPJ',
     _ => kind,
   };
 }
 
-/// `ExpenseRequestDetail.settlement` — LPJ of an Uang Muka (T5).
+/// `ExpenseRequestDetail.settlement` — LPJ of a Pengajuan Baru (`advance`, T5).
 @freezed
 abstract class SettlementInfo with _$SettlementInfo {
   const SettlementInfo._();
@@ -123,7 +142,13 @@ abstract class SettlementInfo with _$SettlementInfo {
     String? submittedAt,
     String? verifiedAt,
     String? settledAt,
+
+    /// d1010 (13): LPJ photos (media ids, served like receipt images), at most [maxLpjPhotos].
+    @Default([]) List<int> photos,
   }) = _SettlementInfo;
+
+  /// Requester may still change the LPJ (not submitted yet, or sent back for revision).
+  bool get editable => status == 'draft' || status == 'revision';
 
   String? get settlementTypeLabel => switch (settlementType) {
     'none' => 'Pas — tanpa selisih',

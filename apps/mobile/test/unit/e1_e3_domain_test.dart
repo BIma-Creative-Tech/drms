@@ -178,7 +178,7 @@ void main() {
           'description': 'BBM',
           'qty': 1,
           'uom': {'id': 3, 'name': 'bulan'},
-          'unitPrice': null,
+          'unitPrice': 600000,
           'total': 600000,
           'category': {'id': 1, 'name': 'BBM'},
           'vehicle': {'id': 5, 'plateNo': 'DA1234XY'},

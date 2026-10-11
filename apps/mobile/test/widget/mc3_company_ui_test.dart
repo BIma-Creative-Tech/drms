@@ -220,7 +220,7 @@ void main() {
               'type': 'advance',
               'status': 'lpj_submitted',
               'statusLabel': 'LPJ Diajukan',
-              'title': 'Uang muka survey',
+              'title': 'Biaya survey',
               'grandTotal': 1000000,
               'approvedAmount': 900000,
             }),

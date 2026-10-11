@@ -53,11 +53,18 @@ List<DraftIssue> validateForSubmit(DraftRequest d, {int? selfOnlyEmployee}) {
     if (l.categoryId == null) {
       issues.add(DraftIssue('categoryId', 'Kategori wajib dipilih.', lineNo: l.no));
     }
-    if (l.total == null || l.total! <= 0) {
-      issues.add(DraftIssue('total', 'Total harus lebih dari 0.', lineNo: l.no));
+    // D3: total = qty × harga satuan — both required (a pre-D3 line asks for its unit price here).
+    if (l.qty == null || l.qty! <= 0) {
+      issues.add(DraftIssue('qty', 'Qty wajib diisi (lebih dari 0).', lineNo: l.no));
+    } else if (l.uomId == null) {
+      issues.add(DraftIssue('uomId', 'Satuan wajib dipilih.', lineNo: l.no));
     }
-    if (l.qty != null && l.qty! <= 0) {
-      issues.add(DraftIssue('qty', 'Jumlah harus lebih dari 0.', lineNo: l.no));
+    if (l.unitPrice == null) {
+      issues.add(DraftIssue('unitPrice', 'Harga satuan wajib diisi.', lineNo: l.no));
+    } else if (l.unitPrice! <= 0) {
+      issues.add(DraftIssue('unitPrice', 'Harga satuan harus lebih dari 0.', lineNo: l.no));
+    } else if ((l.computedTotal ?? 0) <= 0) {
+      issues.add(DraftIssue('total', 'Total harus lebih dari 0.', lineNo: l.no));
     }
     if (d.type == RequestType.reimburse && l.receipts.isEmpty) {
       issues.add(DraftIssue('receipts', 'Reimburse wajib melampirkan minimal 1 nota.', lineNo: l.no));
@@ -80,4 +87,4 @@ List<DraftLine> renumber(List<DraftLine> lines) => [
 ];
 
 /// Line total vs. Σ receipts (US-47 preview; the server computes the real flag with its tolerance).
-int receiptDifference(DraftLine l) => (l.total ?? 0) - l.receipts.fold(0, (s, r) => s + r.amount);
+int receiptDifference(DraftLine l) => (l.computedTotal ?? l.total ?? 0) - l.receipts.fold(0, (s, r) => s + r.amount);

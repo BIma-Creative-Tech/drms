@@ -16,6 +16,7 @@ import '../domain/draft.dart';
 import '../domain/draft_validation.dart';
 import 'receipt_capture.dart';
 import 'widgets/master_picker.dart';
+import 'widgets/receipt_mismatch_chip.dart';
 
 /// Edits one line item (US-37) and its receipts (US-7/US-38). Returns the updated [DraftLine].
 class LineEditorScreen extends ConsumerStatefulWidget {
@@ -33,25 +34,33 @@ class _LineEditorScreenState extends ConsumerState<LineEditorScreen> {
   late final _desc = TextEditingController(text: widget.line.description);
   late final _qty = TextEditingController(text: widget.line.qty?.toString().replaceAll(RegExp(r'\.0$'), '') ?? '');
   late final _unit = TextEditingController(text: groupRupiah(widget.line.unitPrice));
-  late final _total = TextEditingController(text: groupRupiah(widget.line.total));
+  late final _receiptAmount = TextEditingController(text: groupRupiah(widget.line.receiptAmount));
   late final _notes = TextEditingController(text: widget.line.notes ?? '');
   bool _busy = false;
 
+  /// Set by "Simpan": pickers outside the Form (Satuan) show their error from then on.
+  bool _tried = false;
+
   @override
   void dispose() {
-    for (final c in [_desc, _qty, _unit, _total, _notes]) {
+    for (final c in [_desc, _qty, _unit, _receiptAmount, _notes]) {
       c.dispose();
     }
     super.dispose();
   }
 
-  DraftLine _collect() => _line.copyWith(
-    description: _desc.text.trim(),
-    qty: double.tryParse(_qty.text.replaceAll(',', '.')),
-    unitPrice: parseRupiah(_unit.text),
-    total: parseRupiah(_total.text),
-    notes: _notes.text.trim().isEmpty ? null : _notes.text.trim(),
-  );
+  /// D3: the total is never typed — qty × harga satuan (a pre-D3 line keeps its old total until both are
+  /// filled).
+  DraftLine _collect() {
+    final l = _line.copyWith(
+      description: _desc.text.trim(),
+      qty: double.tryParse(_qty.text.replaceAll(',', '.')),
+      unitPrice: parseRupiah(_unit.text),
+      receiptAmount: parseRupiah(_receiptAmount.text),
+      notes: _notes.text.trim().isEmpty ? null : _notes.text.trim(),
+    );
+    return l.copyWith(total: l.computedTotal ?? (l.unitPrice == null ? widget.line.total : null));
+  }
 
   Future<void> _addReceipt({required bool fromCamera}) async {
     final t = AppLocalizations.of(context);
@@ -71,7 +80,10 @@ class _LineEditorScreenState extends ConsumerState<LineEditorScreen> {
       final fields = await showDialog<ReceiptFields>(
         context: context,
         barrierDismissible: false,
-        builder: (_) => ReceiptDetailsDialog(photo: photo.bytes, defaultAmount: parseRupiah(_total.text)),
+        builder: (_) => ReceiptDetailsDialog(
+          photo: photo.bytes,
+          defaultAmount: parseRupiah(_receiptAmount.text) ?? _collect().computedTotal,
+        ),
       );
       final receipt = fields == null
           ? null
@@ -102,7 +114,14 @@ class _LineEditorScreenState extends ConsumerState<LineEditorScreen> {
     final m = widget.masters;
     final current = _collect();
     final diff = receiptDifference(current);
+    final theme = Theme.of(context);
     String? req(String? v) => (v == null || v.trim().isEmpty) ? t.required : null;
+    String? qty(String? v) {
+      if (v == null || v.trim().isEmpty) return t.required;
+      final q = double.tryParse(v.replaceAll(',', '.'));
+      return (q == null || q <= 0) ? t.invalidAmount : null;
+    }
+
     String? money(String? v, {bool required = false}) {
       if (v == null || v.trim().isEmpty) return required ? t.required : null;
       final p = parseRupiah(v);
@@ -119,6 +138,16 @@ class _LineEditorScreenState extends ConsumerState<LineEditorScreen> {
           child: ListView(
             padding: const EdgeInsets.all(16),
             children: [
+              // D3: a line saved before the computed total — ask for qty / satuan / harga satuan.
+              if (widget.line.needsUnitPrice && widget.line.total != null)
+                Card(
+                  key: const Key('line-needs-unit-price'),
+                  color: theme.colorScheme.tertiaryContainer,
+                  child: ListTile(
+                    leading: const Icon(Icons.info_outline),
+                    title: Text(t.lineNeedsUnitPrice(formatRupiah(widget.line.total!))),
+                  ),
+                ),
               TextFormField(
                 key: const Key('line-description'),
                 controller: _desc,
@@ -142,6 +171,8 @@ class _LineEditorScreenState extends ConsumerState<LineEditorScreen> {
                       keyboardType: const TextInputType.numberWithOptions(decimal: true),
                       inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]'))],
                       decoration: InputDecoration(labelText: t.fieldQty),
+                      validator: qty,
+                      onChanged: (_) => setState(() {}),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -150,6 +181,7 @@ class _LineEditorScreenState extends ConsumerState<LineEditorScreen> {
                       label: t.fieldUom,
                       items: m[MasterTypes.uoms] ?? const [],
                       value: _line.uomId,
+                      errorText: _tried && _line.uomId == null ? t.required : null,
                       onChanged: (v) => setState(() => _line = _line.copyWith(uomId: v)),
                     ),
                   ),
@@ -161,23 +193,56 @@ class _LineEditorScreenState extends ConsumerState<LineEditorScreen> {
                 controller: _unit,
                 keyboardType: TextInputType.number,
                 inputFormatters: const [RupiahInputFormatter()],
-                decoration: InputDecoration(
-                  labelText: t.fieldUnitPrice,
-                  helperText: t.unitPriceHint,
-                  prefixText: 'Rp ',
-                ),
-                validator: (v) => money(v),
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                key: const Key('line-total'),
-                controller: _total,
-                keyboardType: TextInputType.number,
-                inputFormatters: const [RupiahInputFormatter()],
-                decoration: InputDecoration(labelText: t.fieldTotal, prefixText: 'Rp '),
+                decoration: InputDecoration(labelText: t.fieldUnitPrice, prefixText: 'Rp '),
                 validator: (v) => money(v, required: true),
                 onChanged: (_) => setState(() {}),
               ),
+              const SizedBox(height: 12),
+              // D3: Total = Qty × Harga satuan, shown live, read-only (not an input).
+              InputDecorator(
+                decoration: InputDecoration(
+                  labelText: t.fieldTotal,
+                  helperText: t.lineTotalHelper,
+                  helperMaxLines: 2,
+                  filled: true,
+                  enabled: false,
+                ),
+                child: Text(
+                  current.computedTotal == null ? '-' : formatRupiah(current.computedTotal!),
+                  key: const Key('line-total'),
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                key: const Key('line-receipt-amount'),
+                controller: _receiptAmount,
+                keyboardType: TextInputType.number,
+                inputFormatters: const [RupiahInputFormatter()],
+                decoration: InputDecoration(
+                  labelText: t.fieldReceiptAmount,
+                  helperText: t.receiptAmountHelper,
+                  helperMaxLines: 2,
+                  prefixText: 'Rp ',
+                ),
+                validator: (v) => money(v),
+                onChanged: (_) => setState(() {}),
+              ),
+              if (current.receiptMismatch)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: ReceiptMismatchChip(
+                      key: const Key('line-receipt-mismatch'),
+                      receiptAmount: current.receiptAmount,
+                      total: current.computedTotal,
+                    ),
+                  ),
+                ),
               const SizedBox(height: 12),
               MasterPickerField(
                 label: t.fieldVehicle,
@@ -261,7 +326,9 @@ class _LineEditorScreenState extends ConsumerState<LineEditorScreen> {
               FilledButton(
                 key: const Key('line-save'),
                 onPressed: () {
-                  if (!(_form.currentState?.validate() ?? false)) return;
+                  setState(() => _tried = true);
+                  final ok = _form.currentState?.validate() ?? false;
+                  if (!ok || _line.uomId == null) return;
                   Navigator.of(context).pop(_collect());
                 },
                 child: Text(t.save),
