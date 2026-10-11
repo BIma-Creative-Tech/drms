@@ -4,6 +4,7 @@ import '../../../../app/theme.dart';
 import '../../../../core/format/dates.dart';
 import '../../../../core/format/rupiah.dart';
 import '../../../../l10n/gen/app_localizations.dart';
+import '../../../../shared/widgets/doc_no_chip.dart';
 import '../../domain/expense_request.dart';
 import '../../domain/request_status.dart';
 
@@ -32,6 +33,9 @@ class TransferSection extends StatelessWidget {
         for (final tr in detail.transfers)
           Card(
             child: ListTile(
+              key: Key('transfer-${tr.id}'),
+              // d1010 (12b): no transfer screen on the APK — a tap copies the TRF number.
+              onTap: tr.docNo == null ? null : () => DocNoChip.copy(context, tr.docNo!),
               leading: Icon(
                 tr.isVoid ? Icons.money_off : Icons.account_balance,
                 color: tr.isVoid ? context.pk.badText : context.pk.okText,
@@ -88,6 +92,12 @@ class LpjSection extends StatelessWidget {
         const Divider(height: 32),
         Text(t.lpjTitle, style: Theme.of(context).textTheme.titleMedium),
         row(t.lpjStatus, [s.docNo, s.statusLabel].whereType<String>().join(' · '), key: const Key('lpj-status')),
+        // d1010 (12b): the LPJ lives on this screen (no separate APK screen) — the chip copies its number.
+        if (s.docNo != null)
+          Align(
+            alignment: Alignment.centerLeft,
+            child: DocNoChip(docNo: s.docNo!),
+          ),
         row(t.transferTotal, money(s.transferredTotal)),
         row(t.lpjReceiptsTotal, money(s.receiptsTotal)),
         if (s.verifiedReceiptsTotal != null) row(t.lpjVerifiedTotal, money(s.verifiedReceiptsTotal)),

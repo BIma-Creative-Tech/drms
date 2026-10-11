@@ -14,6 +14,7 @@ import '../application/field_providers.dart';
 import '../domain/field_models.dart';
 import '../domain/field_rules.dart';
 import 'widgets/field_widgets.dart';
+import '../../../shared/widgets/pick_hint.dart';
 
 /// Laporan Servis Unit (mockup "Android-Servis", ADR 0020 §5): project / contract, unit (search by code or
 /// plate), date (today, ≤ 14 days back), HM (not below the unit's last HM), start/end, service type, complaint,
@@ -361,6 +362,7 @@ class _ServiceReportScreenState extends ConsumerState<ServiceReportScreen> {
           AsyncBody<List<FieldProject>>(
             value: projectsAsync,
             data: (_) => DropdownButtonFormField<int>(
+              hint: Text(pickHintFor(t, t.fieldProjectContract)),
               key: const Key('service-project'),
               initialValue: projects.any((p) => p.id == _projectId) ? _projectId : null,
               isExpanded: true,

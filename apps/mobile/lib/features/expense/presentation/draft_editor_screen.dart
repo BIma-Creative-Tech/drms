@@ -410,6 +410,7 @@ class _DraftEditorScreenState extends ConsumerState<DraftEditorScreen> {
                         builder: (c) => AlertDialog(
                           content: MasterPickerField(
                             label: t.fieldRequesters,
+                            hint: t.pickEmployee,
                             items: employees,
                             value: null,
                             allowNone: false,
@@ -441,6 +442,12 @@ class _DraftEditorScreenState extends ConsumerState<DraftEditorScreen> {
               errorText: issueFor('bankAccountId'),
               onChanged: (v) => setState(() => _d = _d.copyWith(bankAccountId: v)),
             ),
+            if (accounts.where((a) => a.id == _d.bankAccountId).firstOrNull case final acc?)
+              BankAccountPreview(
+                key: ValueKey('bank-preview-${acc.id}'),
+                account: acc,
+                banks: m[MasterTypes.banks] ?? const [],
+              ),
             const SizedBox(height: 12),
             TextField(
               controller: _notes,
@@ -530,6 +537,61 @@ class _DraftEditorScreenState extends ConsumerState<DraftEditorScreen> {
             const SizedBox(height: 32),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// d1010 (8e / WA-04): the chosen account as bank · holder · masked number. The eye toggle reveals the full
+/// number only when the masters gave it to this user (`bank-accounts` = `employee-bank-accounts` read access:
+/// own accounts for Staff/PM, all for Finance/Direktur/Admin); a number that arrives masked keeps the toggle
+/// hidden.
+class BankAccountPreview extends StatefulWidget {
+  const BankAccountPreview({super.key, required this.account, required this.banks});
+  final MasterItem account;
+  final List<MasterItem> banks;
+
+  @override
+  State<BankAccountPreview> createState() => _BankAccountPreviewState();
+}
+
+class _BankAccountPreviewState extends State<BankAccountPreview> {
+  bool _show = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final x = widget.account.extra;
+    final no = '${x['accountNo'] ?? ''}'.trim();
+    final full = RegExp(r'^[0-9]{5,34}$').hasMatch(no);
+    final masked = full ? '•••• ${no.substring(no.length - 4)}' : no;
+    final bankId = (x['bank'] as num?)?.toInt();
+    final bank = widget.banks.where((b) => b.id == bankId).firstOrNull;
+    final bankName = bank == null ? '' : '${bank.extra['name'] ?? bank.label}';
+    final holder = '${x['accountHolder'] ?? ''}';
+    final title = [bankName, holder].where((e) => e.isNotEmpty).join(' · ');
+    return Card(
+      key: const Key('bank-preview'),
+      margin: const EdgeInsets.only(top: 8),
+      color: theme.colorScheme.surfaceContainerLow,
+      child: ListTile(
+        leading: const Icon(Icons.account_balance),
+        // Masters cached before the bank fields were read: the picker label.
+        title: Text(title.isEmpty ? widget.account.label : title, key: const Key('bank-preview-title')),
+        subtitle: Text(
+          _show && full ? no : (masked.isEmpty ? '-' : masked),
+          key: const Key('bank-preview-number'),
+          style: theme.textTheme.bodyLarge?.copyWith(fontFeatures: const [FontFeature.tabularFigures()]),
+        ),
+        trailing: full
+            ? IconButton(
+                key: const Key('bank-preview-toggle'),
+                tooltip: _show ? t.bankHideNumber : t.bankShowNumber,
+                icon: Icon(_show ? Icons.visibility_off : Icons.visibility),
+                onPressed: () => setState(() => _show = !_show),
+              )
+            : null,
       ),
     );
   }

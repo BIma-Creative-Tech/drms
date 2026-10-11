@@ -140,6 +140,7 @@ class _OnBehalfScreenState extends ConsumerState<OnBehalfScreen> {
               InfoCard(text: t.onBehalfIntro),
               if (list.isEmpty) InfoCard(text: t.onBehalfNoTeam, error: true),
               DropdownButtonFormField<int>(
+                hint: Text(t.pickEmployee),
                 key: const Key('on-behalf-employee'),
                 initialValue: who?.employeeId,
                 isExpanded: true,
@@ -155,6 +156,7 @@ class _OnBehalfScreenState extends ConsumerState<OnBehalfScreen> {
               const SizedBox(height: 12),
               if (who != null)
                 DropdownButtonFormField<String>(
+                  hint: Text(t.pickLocation),
                   key: const Key('on-behalf-site'),
                   initialValue: site?.key,
                   isExpanded: true,

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../l10n/gen/app_localizations.dart';
+import '../../../../shared/widgets/pick_hint.dart';
 import '../../../masters/domain/master_item.dart';
 
 /// Tap-to-open searchable picker for master data (works offline from the cached masters).
@@ -13,6 +14,7 @@ class MasterPickerField extends StatelessWidget {
     required this.onChanged,
     this.allowNone = true,
     this.errorText,
+    this.hint,
   });
 
   final String label;
@@ -22,9 +24,13 @@ class MasterPickerField extends StatelessWidget {
   final bool allowNone;
   final String? errorText;
 
+  /// d1010 (8d / WA-15): field-specific placeholder; default "Pilih <label>".
+  final String? hint;
+
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
+    final theme = Theme.of(context);
     final selected = items.where((i) => i.id == value).firstOrNull;
     return InkWell(
       onTap: () async {
@@ -40,7 +46,9 @@ class MasterPickerField extends StatelessWidget {
           errorText: errorText,
           suffixIcon: const Icon(Icons.arrow_drop_down),
         ),
-        child: Text(selected?.label ?? (value == null ? t.choose : '#$value')),
+        child: selected != null || value != null
+            ? Text(selected?.label ?? '#$value')
+            : Text(hint ?? pickHintFor(t, label), style: theme.textTheme.bodyLarge?.copyWith(color: theme.hintColor)),
       ),
     );
   }

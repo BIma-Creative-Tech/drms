@@ -182,6 +182,7 @@ class _CheckTabState extends ConsumerState<_CheckTab> {
               InfoCard(text: t.attendanceNoProjects, error: true)
             else ...[
               DropdownButtonFormField<String>(
+                hint: Text(t.pickLocation),
                 key: const Key('attendance-project'),
                 initialValue: site?.key,
                 isExpanded: true,

@@ -89,6 +89,28 @@ snapshot** and finish Direktur → Finance.
   the linked employee ("Buka") or "Belum tertaut" + "Buat karyawan", which opens the employee create form with that
   PT and account prefilled (`/admin/collections/employees/create?company=…&user=…`).
 - No schema change, no migration. Go-live import, `/api/v1` masters/me (whitelisted employee fields) unchanged.
+### Changed (APK — DRMS 10/10 Phase A, web/APK parity; ships with the next APK build, version not bumped)
+
+- **Greeting by name (WA-14):** the home greeting / profile never shows the full e-mail address any more:
+  `/me` `displayName` (optional, parsed when the server sends it) → user name → employee name → e-mail local part →
+  "Pengguna".
+- **Request detail (WA-08/09/12):** sections "Rincian pengajuan" (now with the **PT** as "kode — nama" and
+  Keterangan), "Pemohon", "Rekening tujuan" (Bank / Atas nama / Nomor rekening, masked as the server sends it) and
+  "Riwayat approval" (was "Posisi tanda tangan"). The request number is a chip that copies the number; the TRF card
+  and the LPJ number copy theirs (there is no separate transfer / LPJ screen on the APK).
+- **Fullscreen image viewer (12c / WA-11):** one shared viewer (zoom, double-tap, swipe within the group) for
+  receipt thumbnails (request detail, across all lines; draft line receipts), progress photos, field-report and
+  daily-report photos, and — new — the check-in / check-out **selfies** in the attendance day sheet
+  (`GET /attendance/{id}/selfie`, server-side access + audit unchanged).
+- **Bank account on a new request (8e / WA-04):** after choosing the account a card shows bank · holder · masked
+  number; the eye toggle reveals the full number only when the masters delivered it to this user
+  (`employee-bank-accounts` read access); a number that arrives masked keeps the toggle hidden.
+- **Field components (8c/8d, WA-01/02/15):** Rupiah inputs group thousands while typing (`1.447.500`) on line unit
+  price / total, receipt amount, addendum amount and the aftersales "Nilai" (Rp value of the offer / PO); the line quantity accepts digits and `,`/`.` only; the
+  field-report date (service, timesheet, aftersales, daily report) is a date picker limited to the allowed dates;
+  every select shows a field-specific placeholder ("Pilih project", "Pilih rekening tujuan", …) instead of "Pilih…"
+  or an empty field.
+
 ### Added (konstruksi: RAP + Laporan harian — P3)
 
 Owner decisions 2026-10-10. Migrations `20261011_100000_p3_rap` (new tables + enum value `daily_report`, additive)

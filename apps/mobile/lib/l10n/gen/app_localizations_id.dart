@@ -251,7 +251,7 @@ class AppLocalizationsId extends AppLocalizations {
   String get turnLabel => 'Giliran';
 
   @override
-  String get timelineTitle => 'Posisi tanda tangan';
+  String get timelineTitle => 'Riwayat approval';
 
   @override
   String get linesTitle => 'Baris item';
@@ -2703,4 +2703,64 @@ class AppLocalizationsId extends AppLocalizations {
 
   @override
   String get dailyWorkerCount => 'Jumlah pekerja';
+
+  @override
+  String get sectionRequestDetails => 'Rincian pengajuan';
+
+  @override
+  String get sectionRequester => 'Pemohon';
+
+  @override
+  String get bankNameLabel => 'Bank';
+
+  @override
+  String get bankHolderLabel => 'Atas nama';
+
+  @override
+  String get bankNumberLabel => 'Nomor rekening';
+
+  @override
+  String get bankShowNumber => 'Tampilkan nomor rekening';
+
+  @override
+  String get bankHideNumber => 'Sembunyikan nomor rekening';
+
+  @override
+  String docNoCopied(String docNo) {
+    return 'Nomor $docNo disalin.';
+  }
+
+  @override
+  String get docNoCopyHint => 'Ketuk untuk menyalin nomor';
+
+  @override
+  String get docNoOpenHint => 'Ketuk untuk membuka dokumen';
+
+  @override
+  String get receiptOpenPhoto => 'Buka foto nota';
+
+  @override
+  String receiptLineCaption(int no) {
+    return 'Baris $no';
+  }
+
+  @override
+  String get attendanceSelfieView => 'Lihat selfie';
+
+  @override
+  String get attendanceSelfieUnavailable => 'Selfie tidak tersedia (mungkin sudah melewati masa retensi).';
+
+  @override
+  String pickHint(String field) {
+    return 'Pilih $field';
+  }
+
+  @override
+  String get pickEmployee => 'Pilih karyawan';
+
+  @override
+  String get pickPo => 'Pilih PO terbuka';
+
+  @override
+  String get pickLocation => 'Pilih lokasi';
 }

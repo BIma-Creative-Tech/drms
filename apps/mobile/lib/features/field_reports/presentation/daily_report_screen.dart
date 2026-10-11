@@ -15,6 +15,7 @@ import '../domain/field_models.dart';
 import '../domain/field_rules.dart';
 import 'service_report_screen.dart' show confirmDiscard;
 import 'widgets/field_widgets.dart';
+import '../../../shared/widgets/pick_hint.dart';
 
 /// P3 Laporan Harian (konstruksi; owner decisions 2026-10-10) — same fields as the web form, simple and
 /// offline-first: project + date, weather pagi / siang / sore, rain / stop hours, volume pekerjaan per RAP item
@@ -295,6 +296,7 @@ class _DailyReportScreenState extends ConsumerState<DailyReportScreen> {
               AsyncBody<List<FieldProject>>(
                 value: projectsAsync,
                 data: (_) => DropdownButtonFormField<int>(
+                  hint: Text(pickHintFor(t, t.fieldProject)),
                   key: const Key('daily-project'),
                   initialValue: projects.any((p) => p.id == _projectId) ? _projectId : null,
                   isExpanded: true,

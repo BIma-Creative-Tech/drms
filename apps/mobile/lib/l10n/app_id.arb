@@ -126,7 +126,7 @@
   "syncStateSubmitted": "Sudah diajukan",
   "detailTitle": "Detail Pengajuan",
   "turnLabel": "Giliran",
-  "timelineTitle": "Posisi tanda tangan",
+  "timelineTitle": "Riwayat approval",
   "linesTitle": "Baris item",
   "receiptsTitle": "Nota",
   "flagsTitle": "Flag validasi",
@@ -1786,5 +1786,44 @@
       }
     }
   },
-  "dailyWorkerCount": "Jumlah pekerja"
+  "dailyWorkerCount": "Jumlah pekerja",
+  "sectionRequestDetails": "Rincian pengajuan",
+  "sectionRequester": "Pemohon",
+  "bankNameLabel": "Bank",
+  "bankHolderLabel": "Atas nama",
+  "bankNumberLabel": "Nomor rekening",
+  "bankShowNumber": "Tampilkan nomor rekening",
+  "bankHideNumber": "Sembunyikan nomor rekening",
+  "docNoCopied": "Nomor {docNo} disalin.",
+  "@docNoCopied": {
+    "placeholders": {
+      "docNo": {
+        "type": "String"
+      }
+    }
+  },
+  "docNoCopyHint": "Ketuk untuk menyalin nomor",
+  "docNoOpenHint": "Ketuk untuk membuka dokumen",
+  "receiptOpenPhoto": "Buka foto nota",
+  "receiptLineCaption": "Baris {no}",
+  "@receiptLineCaption": {
+    "placeholders": {
+      "no": {
+        "type": "int"
+      }
+    }
+  },
+  "attendanceSelfieView": "Lihat selfie",
+  "attendanceSelfieUnavailable": "Selfie tidak tersedia (mungkin sudah melewati masa retensi).",
+  "pickHint": "Pilih {field}",
+  "@pickHint": {
+    "placeholders": {
+      "field": {
+        "type": "String"
+      }
+    }
+  },
+  "pickEmployee": "Pilih karyawan",
+  "pickPo": "Pilih PO terbuka",
+  "pickLocation": "Pilih lokasi"
 }

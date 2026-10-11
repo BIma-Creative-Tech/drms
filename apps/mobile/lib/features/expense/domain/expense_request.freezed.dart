@@ -2645,7 +2645,8 @@ as String?,
 /// @nodoc
 mixin _$ApprovalRuleInfo {
 
- String get name; String get acknowledge; String? get acknowledgeDelegatedTo; String? get acknowledgeBy; String? get acknowledgeRole; List<String> get decisionRoles; List<SkippedPosition> get skipped; List<RuleStep> get steps;/// ADR 0021: narrow G1 exception — a Direktur's own request filed by the PM (`direktur_via_pm`).
+ String get name; String get acknowledge; String? get acknowledgeDelegatedTo; String? get acknowledgeBy; String? get acknowledgeRole; List<String> get decisionRoles; List<SkippedPosition> get skipped; List<RuleStep> get steps;/// ADR 0021: narrow G1 exception — a Direktur's own request filed by the PM (`direktur_via_pm`; `direktur_via_pm_self` =
+/// the requester Direktur is the PT's only Direktur and approves himself, owner 2026-10-11).
  String? get selfApproval;
 /// Create a copy of ApprovalRuleInfo
 /// with the given fields replaced by the non-null parameter values.
@@ -2880,7 +2881,8 @@ class _ApprovalRuleInfo extends ApprovalRuleInfo {
   return EqualUnmodifiableListView(_steps);
 }
 
-/// ADR 0021: narrow G1 exception — a Direktur's own request filed by the PM (`direktur_via_pm`).
+/// ADR 0021: narrow G1 exception — a Direktur's own request filed by the PM (`direktur_via_pm`; `direktur_via_pm_self` =
+/// the requester Direktur is the PT's only Direktur and approves himself, owner 2026-10-11).
 @override final  String? selfApproval;
 
 /// Create a copy of ApprovalRuleInfo

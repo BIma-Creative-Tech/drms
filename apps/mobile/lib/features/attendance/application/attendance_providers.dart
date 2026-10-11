@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/providers.dart';
@@ -31,4 +33,10 @@ final attendanceRecapProvider = FutureProvider.autoDispose.family<AttendanceReca
 /// US-13 team presence (today by default).
 final teamTodayProvider = FutureProvider.autoDispose.family<TeamToday, String?>(
   (ref, date) => ref.watch(attendanceApiProvider).teamToday(date: date),
+);
+
+/// d1010 (12c): selfie of one attendance (authorized endpoint; own, or PM tim / Finance / Direktur / Admin —
+/// the server decides and audits; never cached on disk).
+final attendanceSelfieProvider = FutureProvider.autoDispose.family<Uint8List, int>(
+  (ref, attendanceId) => ref.watch(attendanceApiProvider).selfie(attendanceId),
 );

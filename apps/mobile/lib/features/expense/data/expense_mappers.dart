@@ -45,6 +45,8 @@ UserProfile userProfileFromJson(Json j) {
     id: _int(j['id']),
     email: '${j['email'] ?? ''}',
     name: _strN(j['name']),
+    // d1010 (WA-14): optional — servers before the greeting resolver omit it.
+    serverDisplayName: _strN(j['displayName']),
     roles: roles,
     capabilities: _capabilities(caps, roles),
     employee: emp == null
