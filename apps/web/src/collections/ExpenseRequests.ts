@@ -19,7 +19,7 @@ import { notifyCreated, notifyTransition } from '@/domain/notifications'
 import { companyField, companyHook, pickerSameCompany, sameCompanyOptions } from '@/fields/company'
 import { validationError } from '@/lib/validation'
 
-import { draftOnly, isDraftForm, linesCondition, PLACEHOLDERS, submittedOnly, whenSet } from './expense-request-form'
+import { draftOnly, draftOrSet, isDraftForm, linesCondition, PLACEHOLDERS, submittedOnly, whenSet } from './expense-request-form'
 import { businessDateField } from './fields-f2'
 
 /**
@@ -47,6 +47,8 @@ const system = { create: fieldNever, update: fieldNever }
 const canSeeApprovalRules: Condition = (_data, _sibling, { user }) => rolesOf(user).some((r) => r === 'pk-admin' || r === 'pk-owner' || r === 'pk-finance')
 const ro = { readOnly: true }
 const RUPIAH_FIELD = '@/admin/components/RupiahNumberField#RupiahNumberField'
+/** Read-only money as "Rp 1.250.000" (RupiahNumberField read-only mode). */
+const rupiahView = { components: { Field: RUPIAH_FIELD } }
 
 /** Picker filter of `bankAccount` (S3e, US-44): active accounts of the requesters / the creator's employee. */
 export const bankAccountOptions = ({ data, user }: Pick<FilterOptionsProps, 'data' | 'user'>): false | Where => {
@@ -292,11 +294,11 @@ export const ExpenseRequests: CollectionConfig = withAudit(
         admin: { ...ro, position: 'sidebar', condition: submittedOnly },
       },
       { name: 'title', type: 'text', label: 'Judul', required: true, maxLength: 200 },
-      { name: 'project', type: 'relationship', relationTo: 'projects', label: 'Project', index: true, ...pickerSameCompany(), admin: { placeholder: PLACEHOLDERS.project } },
-      { name: 'costCenter', type: 'relationship', relationTo: 'cost-centers', label: 'Pusat biaya', index: true, ...pickerSameCompany(), admin: { placeholder: PLACEHOLDERS.costCenter, description: 'Isi project ATAU pusat biaya.' } },
+      { name: 'project', type: 'relationship', relationTo: 'projects', label: 'Project', index: true, ...pickerSameCompany(), admin: { placeholder: PLACEHOLDERS.project, condition: draftOrSet('project') } },
+      { name: 'costCenter', type: 'relationship', relationTo: 'cost-centers', label: 'Pusat biaya', index: true, ...pickerSameCompany(), admin: { placeholder: PLACEHOLDERS.costCenter, description: 'Isi project ATAU pusat biaya.', condition: draftOrSet('costCenter') } },
       businessDateField('neededDate', 'Tanggal dibutuhkan'),
       // Owner decision 2026-10-09: replaces "Periode kegiatan" (periodFrom/periodTo, Q-04).
-      { name: 'urgencyLevel', type: 'relationship', relationTo: 'urgency-levels', label: 'Tingkat urgensi', index: true, ...pickerSameCompany(), admin: { placeholder: PLACEHOLDERS.urgencyLevel } },
+      { name: 'urgencyLevel', type: 'relationship', relationTo: 'urgency-levels', label: 'Tingkat urgensi', index: true, ...pickerSameCompany(), admin: { placeholder: PLACEHOLDERS.urgencyLevel, condition: draftOrSet('urgencyLevel') } },
       // QA-15: Staff-only users pick only themselves (requesterOptions); the server re-checks (validateContent).
       // WA-09: "Pemohon" as in the APK (the PDF signature box keeps "Diajukan Oleh").
       { name: 'requesters', type: 'relationship', relationTo: 'employees', hasMany: true, label: 'Pemohon', admin: { isSortable: true, placeholder: PLACEHOLDERS.requesters }, ...pickerSameCompany(), filterOptions: requesterOptions },
@@ -330,8 +332,8 @@ export const ExpenseRequests: CollectionConfig = withAudit(
           { name: 'accountHolder', type: 'text', label: 'Atas nama' },
         ],
       },
-      { name: 'notes', type: 'textarea', label: 'Keterangan', maxLength: 2000 },
-      { name: 'attachments', type: 'upload', relationTo: 'media-attachments', hasMany: true, label: 'Lampiran' },
+      { name: 'notes', type: 'textarea', label: 'Keterangan', maxLength: 2000, admin: { condition: (d, s, c) => linesCondition(d, s, c) || whenSet('notes')(d, s, c) } },
+      { name: 'attachments', type: 'upload', relationTo: 'media-attachments', hasMany: true, label: 'Lampiran', admin: { condition: (d, s, c) => linesCondition(d, s, c) || whenSet('attachments')(d, s, c) } },
       {
         name: 'lines',
         type: 'array',
@@ -366,10 +368,10 @@ export const ExpenseRequests: CollectionConfig = withAudit(
       { name: 'linesTotalPreview', type: 'ui', label: 'Total (pratinjau)', admin: { condition: linesCondition, components: { Field: '@/admin/components/LinesTotalPreview#LinesTotalPreview' } } },
       businessDateField('requestDate', 'Tanggal pengajuan (server)', { access: system, admin: { ...ro, position: 'sidebar', condition: whenSet('requestDate') } }),
       { name: 'createdBy', type: 'relationship', relationTo: 'users', label: 'Dibuat oleh', index: true, access: system, admin: { ...ro, position: 'sidebar', condition: whenSet('createdBy') } },
-      { ...rupiahField('grandTotal', 'Grand total (Rp)'), access: system, admin: { ...ro, position: 'sidebar', condition: whenSet('grandTotal') } },
-      { ...rupiahField('approvedAmount', 'Nominal disetujui (Rp)'), access: system, admin: { ...ro, position: 'sidebar', condition: submittedOnly } },
-      { ...rupiahField('transferredTotal', 'Total ditransfer (Rp)'), access: system, admin: { ...ro, position: 'sidebar', condition: submittedOnly } },
-      { ...rupiahField('verifiedReceiptsTotal', 'Total nota terverifikasi LPJ (Rp)'), access: system, admin: { ...ro, position: 'sidebar', condition: submittedOnly } },
+      { ...rupiahField('grandTotal', 'Grand total'), access: system, admin: { ...ro, ...rupiahView, position: 'sidebar', condition: whenSet('grandTotal') } },
+      { ...rupiahField('approvedAmount', 'Nominal disetujui'), access: system, admin: { ...ro, ...rupiahView, position: 'sidebar', condition: (d, s, c) => submittedOnly(d, s, c) && whenSet('approvedAmount')(d, s, c) } },
+      { ...rupiahField('transferredTotal', 'Total ditransfer'), access: system, admin: { ...ro, ...rupiahView, position: 'sidebar', condition: submittedOnly } },
+      { ...rupiahField('verifiedReceiptsTotal', 'Total nota terverifikasi LPJ'), access: system, admin: { ...ro, ...rupiahView, position: 'sidebar', condition: (d, s, c) => submittedOnly(d, s, c) && whenSet('verifiedReceiptsTotal')(d, s, c) } },
       // F2e UAT: office-only fields are not rendered for users who cannot read their target
       // (staff/PM → the relationship input fired POST /api/approval-rules → 403 on every view).
       { name: 'approvalRule', type: 'relationship', relationTo: 'approval-rules', label: 'Aturan approval', access: system, admin: { ...ro, position: 'sidebar', condition: (data, sibling, ctx) => submittedOnly(data, sibling, ctx) && canSeeApprovalRules(data, sibling, ctx) } },

@@ -30,8 +30,14 @@ export const linesCondition: Condition = (data) => linesEditable(data as FormDat
 export function whenSet(name: string): Condition {
   return (data) => {
     const v = (data as Record<string, unknown> | undefined)?.[name]
-    return v !== undefined && v !== null && v !== ''
+    return v !== undefined && v !== null && v !== '' && !(Array.isArray(v) && v.length === 0)
   }
+}
+
+/** Draft: always (an input); after submit only when filled (no empty read-only pickers such as "Pilih pusat biaya…"). */
+export function draftOrSet(name: string): Condition {
+  const set = whenSet(name)
+  return (data, sibling, ctx) => isDraftForm(data as FormData) || set(data, sibling, ctx)
 }
 
 /**
