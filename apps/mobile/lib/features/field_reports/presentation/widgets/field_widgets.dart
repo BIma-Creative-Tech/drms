@@ -478,7 +478,12 @@ class PhotoGroup extends StatelessWidget {
           runSpacing: 8,
           children: [
             for (final p in photos)
-              LocalPhotoThumb(uuid: p, size: size, onRemove: onRemove == null ? null : () => onRemove!(p)),
+              LocalPhotoThumb(
+                uuid: p,
+                size: size,
+                group: photos,
+                onRemove: onRemove == null ? null : () => onRemove!(p),
+              ),
             if (canAdd)
               SizedBox.square(
                 dimension: size,
@@ -499,7 +504,8 @@ class PhotoGroup extends StatelessWidget {
   }
 }
 
-/// Dropdown of the allowed report dates (today, ≤ 14 days back).
+/// Report date (today, ≤ 14 days back). d1010 (8c / WA-01): a date picker like every other date field of the
+/// APK — only the allowed dates are selectable (plus the stored date of an edited report).
 class FieldDateField extends StatelessWidget {
   const FieldDateField({
     super.key,
@@ -517,19 +523,30 @@ class FieldDateField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final options = dates.contains(value) ? dates : [value, ...dates];
-    return DropdownButtonFormField<String>(
-      initialValue: value,
-      isExpanded: true,
-      decoration: InputDecoration(labelText: label, errorText: errorText),
-      items: [
-        for (final d in options)
-          DropdownMenuItem(
-            value: d,
-            child: Text(fieldDateLabel(d), overflow: TextOverflow.ellipsis),
-          ),
-      ],
-      onChanged: onChanged == null ? null : (v) => v == null ? null : onChanged!(v),
+    final options = {value, ...dates}.where((d) => DateTime.tryParse(d) != null).toList()..sort();
+    Future<void> pick() async {
+      if (options.isEmpty) return;
+      final picked = await showDatePicker(
+        context: context,
+        initialDate: DateTime.tryParse(value) ?? DateTime.parse(options.last),
+        firstDate: DateTime.parse(options.first),
+        lastDate: DateTime.parse(options.last),
+        selectableDayPredicate: (d) => options.contains(toYmd(d)),
+      );
+      if (picked != null) onChanged?.call(toYmd(picked));
+    }
+
+    return InkWell(
+      onTap: onChanged == null ? null : pick,
+      child: InputDecorator(
+        decoration: InputDecoration(
+          labelText: label,
+          errorText: errorText,
+          enabled: onChanged != null,
+          suffixIcon: const Icon(Icons.calendar_today),
+        ),
+        child: Text(fieldDateLabel(value), overflow: TextOverflow.ellipsis),
+      ),
     );
   }
 }

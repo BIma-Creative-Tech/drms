@@ -8,6 +8,7 @@ import '../../../core/format/rupiah.dart';
 import '../../../core/media/photo_compressor.dart';
 import '../../../l10n/gen/app_localizations.dart';
 import '../../../shared/widgets/async_body.dart';
+import '../../../shared/widgets/photo_viewer.dart';
 import '../../auth/application/auth_controller.dart';
 import '../../masters/domain/master_item.dart';
 import '../data/draft_repository.dart';
@@ -31,8 +32,8 @@ class _LineEditorScreenState extends ConsumerState<LineEditorScreen> {
   late DraftLine _line = widget.line;
   late final _desc = TextEditingController(text: widget.line.description);
   late final _qty = TextEditingController(text: widget.line.qty?.toString().replaceAll(RegExp(r'\.0$'), '') ?? '');
-  late final _unit = TextEditingController(text: widget.line.unitPrice == null ? '' : '${widget.line.unitPrice}');
-  late final _total = TextEditingController(text: widget.line.total == null ? '' : '${widget.line.total}');
+  late final _unit = TextEditingController(text: groupRupiah(widget.line.unitPrice));
+  late final _total = TextEditingController(text: groupRupiah(widget.line.total));
   late final _notes = TextEditingController(text: widget.line.notes ?? '');
   bool _busy = false;
 
@@ -139,6 +140,7 @@ class _LineEditorScreenState extends ConsumerState<LineEditorScreen> {
                       key: const Key('line-qty'),
                       controller: _qty,
                       keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]'))],
                       decoration: InputDecoration(labelText: t.fieldQty),
                     ),
                   ),
@@ -155,9 +157,10 @@ class _LineEditorScreenState extends ConsumerState<LineEditorScreen> {
               ),
               const SizedBox(height: 12),
               TextFormField(
+                key: const Key('line-unit-price'),
                 controller: _unit,
                 keyboardType: TextInputType.number,
-                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                inputFormatters: const [RupiahInputFormatter()],
                 decoration: InputDecoration(
                   labelText: t.fieldUnitPrice,
                   helperText: t.unitPriceHint,
@@ -170,7 +173,7 @@ class _LineEditorScreenState extends ConsumerState<LineEditorScreen> {
                 key: const Key('line-total'),
                 controller: _total,
                 keyboardType: TextInputType.number,
-                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                inputFormatters: const [RupiahInputFormatter()],
                 decoration: InputDecoration(labelText: t.fieldTotal, prefixText: 'Rp '),
                 validator: (v) => money(v, required: true),
                 onChanged: (_) => setState(() {}),
@@ -192,7 +195,16 @@ class _LineEditorScreenState extends ConsumerState<LineEditorScreen> {
               Text(t.receiptsTitle, style: Theme.of(context).textTheme.titleMedium),
               for (final r in _line.receipts)
                 ListTile(
-                  leading: const Icon(Icons.receipt),
+                  // d1010 (12c): local photo thumbnail, tap = fullscreen viewer over this line's local receipts.
+                  leading: r.isServerReceipt
+                      ? const Icon(Icons.receipt)
+                      : _DraftReceiptThumb(
+                          uuid: r.mediaUuid,
+                          group: [
+                            for (final x in _line.receipts)
+                              if (!x.isServerReceipt) (uuid: x.mediaUuid, caption: x.vendorName),
+                          ],
+                        ),
                   title: Text(r.vendorName),
                   subtitle: Text(
                     '${r.receiptNo ?? '-'} · ${formatDateOnly(r.receiptDate)}${r.receiptTime != null ? ' ${r.receiptTime}' : ''}'
@@ -256,6 +268,47 @@ class _LineEditorScreenState extends ConsumerState<LineEditorScreen> {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Bytes of a local draft photo (encrypted DB); null once purged after the upload.
+final _draftMediaProvider = FutureProvider.autoDispose.family<Uint8List?, String>(
+  (ref, uuid) async => (await ref.watch(draftRepositoryProvider).media(uuid))?.bytes,
+);
+
+class _DraftReceiptThumb extends ConsumerWidget {
+  const _DraftReceiptThumb({required this.uuid, required this.group});
+  final String uuid;
+  final List<({String uuid, String caption})> group;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final bytes = ref.watch(_draftMediaProvider(uuid)).value;
+    if (bytes == null) return const SizedBox.square(dimension: 48, child: Icon(Icons.receipt));
+    return SizedBox.square(
+      dimension: 48,
+      child: Material(
+        borderRadius: BorderRadius.circular(6),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          key: Key('draft-receipt-thumb-$uuid'),
+          onTap: () => showPhotoViewer(context, [
+            for (final p in group)
+              ViewerPhoto(
+                caption: p.caption,
+                builder: (_) => Consumer(
+                  builder: (_, ref, _) => switch (ref.watch(_draftMediaProvider(p.uuid))) {
+                    AsyncData(:final value?) => Image.memory(value, fit: BoxFit.contain),
+                    AsyncLoading() => const CircularProgressIndicator(),
+                    _ => const Icon(Icons.broken_image, size: 64, color: Colors.white),
+                  },
+                ),
+              ),
+          ], initialIndex: group.indexWhere((p) => p.uuid == uuid)),
+          child: Image.memory(bytes, fit: BoxFit.cover, gaplessPlayback: true),
         ),
       ),
     );

@@ -18,6 +18,7 @@ import '../application/progress_providers.dart';
 import '../application/progress_service.dart';
 import '../domain/progress.dart';
 import 'widgets/progress_widgets.dart';
+import '../../../shared/widgets/pick_hint.dart';
 
 typedef ProgressPhotoCapture = Future<Uint8List?> Function(BuildContext context);
 
@@ -314,6 +315,7 @@ class _ProgressEditorScreenState extends ConsumerState<ProgressEditorScreen> {
           AsyncBody<List<MasterItem>>(
             value: projects,
             data: (list) => DropdownButtonFormField<int>(
+              hint: Text(pickHintFor(t, t.progressProject)),
               key: const Key('progress-project'),
               initialValue: list.any((p) => p.id == _projectId) ? _projectId : null,
               isExpanded: true,
@@ -363,6 +365,7 @@ class _ProgressEditorScreenState extends ConsumerState<ProgressEditorScreen> {
                     if (!set.fromCache && !set.complete && !_isEdit)
                       _Info(text: t.progressStagesIncomplete(fmtPct(set.weightSum)), warn: true),
                     DropdownButtonFormField<int>(
+                      hint: Text(pickHintFor(t, t.progressStage)),
                       key: const Key('progress-stage'),
                       initialValue: active.any((s) => s.id == _stageId) ? _stageId : null,
                       isExpanded: true,
@@ -434,6 +437,7 @@ class _ProgressEditorScreenState extends ConsumerState<ProgressEditorScreen> {
               for (final p in _photos)
                 LocalPhotoThumb(
                   uuid: p,
+                  group: _photos,
                   onRemove: _busy ? null : () => setState(() => _photos = [..._photos]..remove(p)),
                 ),
               if (remaining > 0)

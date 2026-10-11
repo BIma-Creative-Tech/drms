@@ -17,6 +17,7 @@ import '../domain/field_models.dart';
 import '../domain/field_rules.dart';
 import 'service_report_screen.dart' show confirmDiscard;
 import 'widgets/field_widgets.dart';
+import '../../../shared/widgets/pick_hint.dart';
 
 /// Aktivitas Aftersales (mockup "Android-Aftersales", ADR 0020 §5, plan A2): quick daily log per customer —
 /// customer, kind (penawaran / PO masuk / pengiriman / penagihan / kunjungan / lainnya), the open PO of that
@@ -347,6 +348,7 @@ class _AftersalesScreenState extends ConsumerState<AftersalesScreen> {
             AsyncBody<List<FieldProject>>(
               value: projectsAsync,
               data: (_) => DropdownButtonFormField<int>(
+                hint: Text(pickHintFor(t, t.fieldProject)),
                 key: const Key('activity-project'),
                 initialValue: projects.any((p) => p.id == _projectId) ? _projectId : null,
                 isExpanded: true,
@@ -404,6 +406,7 @@ class _AftersalesScreenState extends ConsumerState<AftersalesScreen> {
             highlight: true,
             children: [
               DropdownButtonFormField<int>(
+                hint: Text(pickHintFor(t, t.fieldCustomer)),
                 key: const Key('activity-client'),
                 initialValue: clientOptions.any((c) => c.id == _clientId) ? _clientId : null,
                 isExpanded: true,
@@ -459,6 +462,7 @@ class _AftersalesScreenState extends ConsumerState<AftersalesScreen> {
               const SizedBox(height: 12),
               if (refersToPo) ...[
                 DropdownButtonFormField<int>(
+                  hint: Text(t.pickPo),
                   key: const Key('activity-po'),
                   initialValue: pos.any((p) => p.id == _poId) ? _poId : null,
                   isExpanded: true,

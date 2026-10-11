@@ -19,6 +19,7 @@ import '../../progress/application/progress_providers.dart';
 import '../domain/addendum.dart';
 import 'addendum_providers.dart';
 import 'addendum_widgets.dart';
+import '../../../shared/widgets/pick_hint.dart';
 
 /// Inbox section (Direktur / Finance): addenda waiting for the caller. Hidden when empty or unreachable (an
 /// older server without E5 answers 404) so the expense inbox below stays usable.
@@ -240,6 +241,7 @@ class _AddendumCreateScreenState extends ConsumerState<AddendumCreateScreen> {
             AsyncBody<List<MasterItem>>(
               value: projects,
               data: (list) => DropdownButtonFormField<int>(
+                hint: Text(pickHintFor(t, t.progressProject)),
                 key: const Key('addendum-project'),
                 initialValue: _projectId,
                 isExpanded: true,
@@ -263,6 +265,7 @@ class _AddendumCreateScreenState extends ConsumerState<AddendumCreateScreen> {
             key: const Key('addendum-amount'),
             controller: _amount,
             keyboardType: TextInputType.number,
+            inputFormatters: const [RupiahInputFormatter()],
             decoration: InputDecoration(
               labelText: t.addendumAddition,
               prefixText: 'Rp ',

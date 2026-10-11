@@ -59,7 +59,7 @@ class _ReceiptDetailsDialogState extends State<ReceiptDetailsDialog> {
   final _form = GlobalKey<FormState>();
   final _no = TextEditingController();
   final _vendor = TextEditingController();
-  late final _amount = TextEditingController(text: widget.defaultAmount?.toString() ?? '');
+  late final _amount = TextEditingController(text: groupRupiah(widget.defaultAmount));
   DateTime _date = DateTime.now();
   TimeOfDay? _time;
 
@@ -99,7 +99,7 @@ class _ReceiptDetailsDialogState extends State<ReceiptDetailsDialog> {
                 key: const Key('receipt-amount'),
                 controller: _amount,
                 keyboardType: TextInputType.number,
-                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                inputFormatters: const [RupiahInputFormatter()],
                 decoration: InputDecoration(labelText: t.receiptAmount, prefixText: 'Rp '),
                 validator: (v) => (parseRupiah(v ?? '') ?? 0) <= 0 ? t.invalidAmount : null,
               ),
