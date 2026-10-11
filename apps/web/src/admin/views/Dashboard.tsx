@@ -13,7 +13,8 @@ import { resolveDisplayName } from '@/domain/user-display-name'
 import { withReqTransaction } from '@/lib/system-tx'
 import { listReports } from '@/domain/progress/dto'
 import { projectProgressVsBudget, type ProjectProgress } from '@/domain/reports/progress'
-import { officeScope, teamScope } from '@/domain/reports/scope'
+import { narrowToSite, officeScope, teamScope } from '@/domain/reports/scope'
+import type { SiteCash, SiteOption, SiteSummary } from '@/domain/reports/sites'
 
 import { docHref } from '../doc-links'
 
@@ -89,6 +90,9 @@ export async function Dashboard(props: AdminViewServerProps) {
   const asked = typeof sp.peran === 'string' ? (sp.peran as Layout) : undefined
   const layout: Layout | undefined = asked && layouts.includes(asked) ? asked : layouts[0]
   const months: 6 | 12 = sp.bulan === '6' ? 6 : 12
+  // ADR 0023 §5: dashboard "Site" filter (owner / finance / PM layouts; only narrows, the server re-checks the scope)
+  const siteId = typeof sp.site === 'string' && /^\d{1,9}$/.test(sp.site) ? Number(sp.site) : undefined
+  const siteQs = siteId ? `&site=${siteId}` : ''
   return (
     <Gutter>
       <F3Root name={`beranda-${layout ?? 'none'}`}>
@@ -106,10 +110,10 @@ export async function Dashboard(props: AdminViewServerProps) {
             ) : null}
             {layout === 'owner' ? (
               <nav className="pk-tabs" aria-label="Rentang grafik" style={{ margin: 0 }}>
-                <Link href="/admin/dashboard?peran=owner&bulan=12" aria-current={months === 12 ? 'page' : undefined}>
+                <Link href={`/admin/dashboard?peran=owner&bulan=12${siteQs}`} aria-current={months === 12 ? 'page' : undefined}>
                   12 bulan
                 </Link>
-                <Link href="/admin/dashboard?peran=owner&bulan=6" aria-current={months === 6 ? 'page' : undefined}>
+                <Link href={`/admin/dashboard?peran=owner&bulan=6${siteQs}`} aria-current={months === 6 ? 'page' : undefined}>
                   6 bulan
                 </Link>
               </nav>
@@ -121,7 +125,7 @@ export async function Dashboard(props: AdminViewServerProps) {
         ) : (
           <ChartHover>
             <Suspense fallback={<DashboardSkeleton />}>
-              <Body layout={layout} req={req} months={months} />
+              <Body layout={layout} req={req} months={months} siteId={siteId} />
             </Suspense>
           </ChartHover>
         )}
@@ -130,16 +134,16 @@ export async function Dashboard(props: AdminViewServerProps) {
   )
 }
 
-async function Body({ layout, req, months }: { layout: Layout; req: PayloadRequest; months: 6 | 12 }) {
+async function Body({ layout, req, months, siteId }: { layout: Layout; req: PayloadRequest; months: 6 | 12; siteId?: number }) {
   try {
     switch (layout) {
       // awaited here (not rendered as <Owner/>) so a failing query is caught by this try
       case 'owner':
-        return await Owner({ req, months })
+        return await Owner({ req, months, siteId })
       case 'finance':
-        return await Finance({ req })
+        return await Finance({ req, siteId })
       case 'pm':
-        return await Pm({ req })
+        return await Pm({ req, siteId })
       case 'admin':
         return await Admin({ req })
       case 'operator':
@@ -155,6 +159,80 @@ async function Body({ layout, req, months }: { layout: Layout; req: PayloadReque
 }
 
 // ---------------------------------------------------------------- shared pieces
+
+/**
+ * ADR 0023 §5: "Site" filter of the owner / finance / PM dashboards (plain GET form, works without JS). Hidden while
+ * the PTs have no site. The chosen site narrows every scope-based card; queues and closings stay per PT.
+ */
+function SiteFilter({ layout, sites, selected, months }: { layout: Layout; sites: SiteOption[]; selected: number | null; months?: 6 | 12 }) {
+  const shown = sites.filter((x) => x.active || x.id === selected)
+  if (shown.length === 0) return null
+  const href = (site: number | null) => `/admin/dashboard?peran=${layout}${months ? `&bulan=${months}` : ''}${site ? `&site=${site}` : ''}`
+  const cur = shown.find((x) => x.id === selected)
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', margin: '0 0 12px' }} data-pk-filter="dashboard-site">
+      <span className="pk-note" style={{ margin: 0 }}>
+        Site:
+      </span>
+      <nav className="pk-tabs" aria-label="Filter site" style={{ margin: 0, flexWrap: 'wrap' }}>
+        <Link href={href(null)} aria-current={selected ? undefined : 'page'} data-pk-site="all">
+          Semua site
+        </Link>
+        {shown.map((x) => (
+          <Link key={x.id} href={href(x.id)} aria-current={x.id === selected ? 'page' : undefined} title={x.name} data-pk-site={x.id}>
+            {x.name}
+          </Link>
+        ))}
+      </nav>
+      {cur ? <span className="pk-note" style={{ margin: 0 }} data-pk-site-active={cur.id}>Hanya project site ini dan akun kas berflag site ini.</span> : null}
+    </div>
+  )
+}
+
+/** ADR 0023 Q-S7: K-01 per site (accounts flagged with the site; "Tanpa site" = the rest). */
+function SiteCashCard({ id, rows, span, i }: { id: string; rows: SiteCash[]; span: 3 | 4 | 6; i: number }) {
+  if (rows.length === 0) return null
+  return (
+    <Card id={id} title="Saldo kas per site" sub="Akun kas/bank dengan flag site" span={span} i={i} action={{ href: '/admin/collections/cash-accounts', label: 'Akun' }}>
+      <HBarList
+        id={id}
+        fmt={rpShort}
+        exact={rp}
+        empty="Belum ada akun kas."
+        items={rows.map((r) => ({
+          key: String(r.siteId ?? 'none'),
+          label: `${r.name} · ${r.accounts} akun`,
+          value: Math.max(0, r.balance),
+          ...(r.siteId ? { href: `/admin/laporan/rekap-kas?${where({ site: String(r.siteId) })}` } : {}),
+          attrs: { 'data-pk-site-cash': String(r.siteId ?? 'none') },
+        }))}
+      />
+    </Card>
+  )
+}
+
+/** ADR 0023 §5: Direktur "per site" breakdown (running projects, attendance today, disbursed this month, cash). */
+function SiteSummaryCard({ rows, span, i }: { rows: SiteSummary[]; span: 8 | 12; i: number }) {
+  if (rows.length === 0) return null
+  return (
+    <Card id="site-summary" title="Ringkasan per site" sub="Project berjalan, hadir hari ini, pencairan bulan ini, saldo kas site" span={span} i={i}>
+      <DataTable
+        id="site-summary"
+        caption="Ringkasan per site"
+        rows={rows}
+        rowKey={(r) => String(r.siteId)}
+        empty={<EmptyState text="Belum ada site." />}
+        cols={[
+          { key: 's', label: 'Site', cell: (r) => <a href={`/admin/dashboard?peran=owner&site=${r.siteId}`}>{`${r.code} ${r.name}`}</a> },
+          { key: 'p', label: 'Project berjalan', num: true, cell: (r) => String(r.projectsRunning) },
+          { key: 'a', label: 'Hadir hari ini', num: true, cell: (r) => <a href={`/admin/absensi?${where({ site: String(r.siteId) })}`}>{r.attendanceToday}</a> },
+          { key: 'd', label: 'Pencairan bulan ini', num: true, cell: (r) => rpShort(r.disbursedMonth) },
+          { key: 'c', label: 'Saldo kas site', num: true, cell: (r) => rpShort(r.balance) },
+        ]}
+      />
+    </Card>
+  )
+}
 
 const prevOf = <T,>(xs: T[]) => (xs.length > 1 ? xs[xs.length - 2]! : null)
 const lastOf = <T,>(xs: T[]) => xs[xs.length - 1]!
@@ -602,11 +680,11 @@ function LatestProgressReports({ rows }: { rows: Awaited<ReturnType<typeof listR
 
 // ---------------------------------------------------------------- Owner (wireframe §1)
 
-async function Owner({ req, months }: { req: PayloadRequest; months: 6 | 12 }) {
-  const d = await withReqTransaction(req, () => ownerDashboard(req, { months }))
+async function Owner({ req, months, siteId }: { req: PayloadRequest; months: 6 | 12; siteId?: number }) {
+  const d = await withReqTransaction(req, () => ownerDashboard(req, { months, siteId }))
   // MC2: per-PT rows of the payload (`mc2-contract.md` §2, typed — Σ byCompany = combined total)
   const pt = await ptView(req)
-  const k09 = await withReqTransaction(req, async () => projectProgressVsBudget(req, await officeScope(req)))
+  const k09 = await withReqTransaction(req, async () => projectProgressVsBudget(req, narrowToSite(await officeScope(req), d.sites.selected)))
   const v = d.viz
   const bal = v.balanceTrend
   const balPrev = prevOf(bal)
@@ -626,6 +704,7 @@ async function Owner({ req, months }: { req: PayloadRequest; months: 6 | 12 }) {
       <p className="pk-note" style={{ margin: '-8px 0 16px' }}>
         Per {d.asOf} (WITA) · grafik {d.cashFlow.months} bulan terakhir · warna anggaran dari Komitmen.{pt.multi ? ' Angka besar = gabungan PT tempat Anda Direktur; rincian per PT di bawahnya.' : ''}
       </p>
+      <SiteFilter layout="owner" sites={d.sites.options} selected={d.sites.selected} months={months} />
       <Bento label="Ringkasan Direktur">
         <KpiRow>
           <KpiTile id="cash" hero icon="wallet" label="Saldo kas total" value={rpShort(d.cash.total)} title={rp(d.cash.total)} kpi="k01-total" href={rekapKasMonth(d.month)} more="Rekap Kas" i={0}>
@@ -728,6 +807,8 @@ async function Owner({ req, months }: { req: PayloadRequest; months: 6 | 12 }) {
           <PerPt pt={pt} rows={d.completeness.byCompany} label="Kelengkapan LPJ" render={(r) => `${r.ratioDone}/${r.ratioTotal} · ${r.overdue} terlambat`} />
         </Card>
 
+        <SiteCashCard id="owner-site-cash" rows={d.sites.cash} span={4} i={10} />
+        <SiteSummaryCard rows={d.sites.summary} span={8} i={10} />
         <ProgressVsBudgetCard id="owner-progress" data={k09} i={11}  pt={pt} />
         <InboxCard id="owner-inbox" items={v.inbox} count={a.waitingForMe} span={6} i={11} />
         <RecentCashCard id="owner-recent-cash" rows={v.recentCash} span={6} i={12} />
@@ -784,10 +865,10 @@ async function Owner({ req, months }: { req: PayloadRequest; months: 6 | 12 }) {
 
 // ---------------------------------------------------------------- Finance (wireframe §2)
 
-async function Finance({ req }: { req: PayloadRequest }) {
-  const d = await withReqTransaction(req, () => financeDashboard(req))
+async function Finance({ req, siteId }: { req: PayloadRequest; siteId?: number }) {
+  const d = await withReqTransaction(req, () => financeDashboard(req, { siteId }))
   const pt = await ptView(req)
-  const k09 = await withReqTransaction(req, async () => projectProgressVsBudget(req, await officeScope(req)))
+  const k09 = await withReqTransaction(req, async () => projectProgressVsBudget(req, narrowToSite(await officeScope(req), d.sites.selected)))
   const v = d.viz
   const flows = d.cashFlow.rows
   const cur = lastOf(flows)
@@ -801,6 +882,7 @@ async function Finance({ req }: { req: PayloadRequest }) {
       <p className="pk-note" style={{ margin: '-8px 0 16px' }}>
         Per {d.asOf} (WITA) · buku kas termasuk koreksi void.{pt.multi ? ' Angka besar = gabungan PT tempat Anda Finance.' : ''}
       </p>
+      <SiteFilter layout="finance" sites={d.sites.options} selected={d.sites.selected} />
       <Bento label="Ringkasan Finance">
         <KpiRow cols={6}>
           <KpiTile id="cash" icon="wallet" label="Saldo kas total" value={rpShort(d.cashTotal)} title={rp(d.cashTotal)} kpi="k01-total" href="#pk-card-accounts" more="Saldo per akun" i={0}>
@@ -996,6 +1078,7 @@ async function Finance({ req }: { req: PayloadRequest }) {
             </a>
           </div>
         </Card>
+        <SiteCashCard id="finance-site-cash" rows={d.sites.cash} span={6} i={16} />
       </Bento>
     </>
   )
@@ -1003,10 +1086,10 @@ async function Finance({ req }: { req: PayloadRequest }) {
 
 // ---------------------------------------------------------------- PM (wireframe §3, monitoring)
 
-async function Pm({ req }: { req: PayloadRequest }) {
-  const d = await withReqTransaction(req, () => pmDashboard(req))
+async function Pm({ req, siteId }: { req: PayloadRequest; siteId?: number }) {
+  const d = await withReqTransaction(req, () => pmDashboard(req, { siteId }))
   const pt = await ptView(req)
-  const k09 = await withReqTransaction(req, async () => projectProgressVsBudget(req, await teamScope(req)))
+  const k09 = await withReqTransaction(req, async () => projectProgressVsBudget(req, narrowToSite(await teamScope(req), d.sites.selected)))
   const latestReports = await withReqTransaction(req, async () => (await listReports(req, { projectId: undefined, limit: 5 })).items)
   const v = d.viz
   const monthStart = `${d.month}-01`
@@ -1019,6 +1102,7 @@ async function Pm({ req }: { req: PayloadRequest }) {
       <p className="pk-note" style={{ margin: '-8px 0 16px' }}>
         Per {d.asOf} (WITA) · hanya project/pusat biaya tim Anda.
       </p>
+      <SiteFilter layout="pm" sites={d.sites.options} selected={d.sites.selected} />
       <Bento label="Ringkasan PM">
         <KpiRow>
           {/* S3e (US-17, S-01): who the team's requests are waiting for (ADR 0021: the PM project first, then the Direktur). */}
