@@ -51,6 +51,8 @@ class ProjectSummary {
     this.rapPercentServer,
     this.rapOverBudgetItems,
     this.rapItems = 0,
+    this.rapRequired = false,
+    this.rapMissing = false,
   });
 
   final int id;
@@ -79,6 +81,12 @@ class ProjectSummary {
   final double? rapPercentServer;
   final int? rapOverBudgetItems;
   final int rapItems;
+
+  /// D4 (owner 2026-10-11): the project has a RAB (or is konstruksi) → a RAP is required before requests can be sent.
+  final bool rapRequired;
+
+  /// [rapRequired] and no active RAP item yet → requests cannot be submitted ("Project belum punya RAP — hubungi PM").
+  final bool rapMissing;
 
   String get label => code.isEmpty ? name : '$code — $name';
   String get statusText => statusLabel ?? ProjectStatus.labelOf(status);

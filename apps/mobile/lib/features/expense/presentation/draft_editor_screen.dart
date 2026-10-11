@@ -237,10 +237,19 @@ class _DraftEditorScreenState extends ConsumerState<DraftEditorScreen> {
     return p.employee?.id ?? -1;
   }
 
+  /// D4: the RAP rule of the chosen project as far as the phone knows it (offline / not loaded → strict).
+  RapCheck _rapCheck() {
+    final pid = _d.projectId;
+    final rap = pid == null ? null : ref.read(projectRapProvider(pid)).value;
+    if (rap == null || rap.offline) return RapCheck.strict;
+    if (rap.missing) return RapCheck.missing;
+    return rap.pickable.isEmpty ? RapCheck.optional : RapCheck.strict;
+  }
+
   Future<void> _submit() async {
     final t = AppLocalizations.of(context);
     final draft = _collect();
-    final issues = validateForSubmit(draft, selfOnlyEmployee: _selfOnlyEmployee());
+    final issues = validateForSubmit(draft, selfOnlyEmployee: _selfOnlyEmployee(), rap: _rapCheck());
     setState(() => _issues = issues);
     if (issues.isNotEmpty) return;
     final ok = await showDialog<bool>(
@@ -263,7 +272,7 @@ class _DraftEditorScreenState extends ConsumerState<DraftEditorScreen> {
     if (sub == null) return;
     setState(() => _busy = true);
     try {
-      final detail = await ref.read(draftServiceProvider).submit(sub, _d);
+      final detail = await ref.read(draftServiceProvider).submit(sub, _d, rap: _rapCheck());
       if (!mounted) return;
       showSnack(context, t.submitted);
       ref.invalidate(requestListProvider('mine'));
@@ -310,7 +319,9 @@ class _DraftEditorScreenState extends ConsumerState<DraftEditorScreen> {
     final editableType = _d.serverId == null;
     // D4: RAP items of the chosen project (labels + live remaining budget on the line cards).
     final rap = _d.projectId == null ? null : ref.watch(projectRapProvider(_d.projectId!)).value;
-    final linesWithoutRap = _d.lines.where((l) => l.needsRapItem).length;
+    // a project without any RAP item (and not required to have one) has nothing to pick
+    final rapPickable = rap == null || rap.pickable.isNotEmpty;
+    final linesWithoutRap = rapPickable ? _d.lines.where((l) => l.needsRapItem).length : 0;
 
     return Scaffold(
       appBar: AppBar(
@@ -375,6 +386,27 @@ class _DraftEditorScreenState extends ConsumerState<DraftEditorScreen> {
               errorText: issueFor('projectId'),
               onChanged: _setProject,
             ),
+            // D4 (owner 2026-10-11): project with a RAB but no RAP → submit refused; same text as the web form
+            if (rap != null && rap.missing)
+              Card(
+                key: const Key('draft-rap-missing'),
+                margin: const EdgeInsets.only(top: 4),
+                color: Theme.of(context).colorScheme.errorContainer,
+                child: ListTile(
+                  leading: Icon(Icons.block, color: Theme.of(context).colorScheme.onErrorContainer),
+                  title: Text(
+                    t.rapMissingBlock,
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      color: Theme.of(context).colorScheme.onErrorContainer,
+                    ),
+                  ),
+                  subtitle: Text(
+                    t.rapMissingBlockDetail,
+                    style: TextStyle(color: Theme.of(context).colorScheme.onErrorContainer),
+                  ),
+                ),
+              ),
             if (_d.projectId == null && widget.initial.costCenterId != null)
               Padding(
                 key: const Key('draft-cost-center-legacy'),
@@ -523,7 +555,7 @@ class _DraftEditorScreenState extends ConsumerState<DraftEditorScreen> {
                           '${t.fieldRapItem}: ${rap?.byId(l.rapItemId)?.label ?? '#${l.rapItemId}'}',
                           key: Key('line-${l.no}-rap'),
                         )
-                      else
+                      else if (rapPickable)
                         Text(
                           t.lineNeedsRapItemShort,
                           key: Key('line-${l.no}-needs-rap'),

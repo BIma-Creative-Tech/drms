@@ -56,6 +56,8 @@ ProjectSummary projectFromJson(Map<String, dynamic> j) => ProjectSummary(
   rapPercentServer: _dblN(j['rapPercent'] ?? _map(j['rap'])?['percent']),
   rapOverBudgetItems: _intN(j['rapOverBudgetItems'] ?? _map(j['rap'])?['overBudgetItems']),
   rapItems: _intN(j['rapItems'] ?? _map(j['rap'])?['items']) ?? 0,
+  rapRequired: j['rapRequired'] == true,
+  rapMissing: j['rapMissing'] == true,
 );
 
 ProjectDetail projectDetailFromJson(Map<String, dynamic> j) {
@@ -124,13 +126,16 @@ class ProjectsApi {
   );
 
   /// `GET /projects/{id}/rap` — items with plan / realisation / remaining (deactivated ones too when they carry
-  /// realisation; see [RapBudgetItem.active]).
-  Future<List<RapBudgetItem>> rap(int projectId) => client.run(
+  /// realisation; see [RapBudgetItem.active]) and D4 `rapRequired` (project with a RAB; older servers: false).
+  Future<({List<RapBudgetItem> items, bool required})> rap(int projectId) => client.run(
     (d) => d.get<dynamic>('/projects/$projectId/rap', options: ApiClient.allCompanies()),
-    (data) => [
-      for (final i in _list(_map(data)?['items']))
-        if (_map(i) case final j?) rapBudgetItemFromJson(j),
-    ],
+    (data) => (
+      items: [
+        for (final i in _list(_map(data)?['items']))
+          if (_map(i) case final j?) rapBudgetItemFromJson(j),
+      ],
+      required: _map(data)?['rapRequired'] == true,
+    ),
   );
 
   /// `GET /expense-requests?project=&q=&status=&page=` — requests of one project (tab "Pengajuan").

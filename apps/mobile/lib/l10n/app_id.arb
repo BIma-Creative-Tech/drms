@@ -1937,7 +1937,13 @@
   },
   "rapPickProjectFirst": "Pilih project pengajuan dulu.",
   "rapOfflineNoBudget": "Offline: sisa anggaran RAP tampil lagi saat online.",
-  "rapNoItems": "Project ini belum punya item RAP. Hubungi PM atau Direktur.",
+  "rapNoItems": "Project ini belum punya RAP (project tanpa RAB: item RAP tidak wajib).",
+  "rapMissingBlock": "Project belum punya RAP — hubungi PM",
+  "@rapMissingBlock": {
+    "description": "D4 (owner 2026-10-11): project with a RAB but no RAP — submit is refused. Same text as the server and the web."
+  },
+  "rapMissingBlockDetail": "Pengajuan ini bisa disimpan sebagai draft, tetapi baru bisa dikirim setelah PM mengisi RAP project.",
+  "rapMissingProjectDetail": "Project ini punya RAB, jadi wajib punya RAP: pengajuan project ini baru bisa dikirim setelah PM / Direktur mengisi RAP.",
   "noSearchResults": "Tidak ada yang cocok.",
   "lineNeedsRapItem": "Baris ini belum terhubung ke item RAP. Pilih item RAP project sebelum diajukan.",
   "lineNeedsRapItemShort": "Pilih item RAP",

@@ -5164,8 +5164,26 @@ abstract class AppLocalizations {
   /// No description provided for @rapNoItems.
   ///
   /// In id, this message translates to:
-  /// **'Project ini belum punya item RAP. Hubungi PM atau Direktur.'**
+  /// **'Project ini belum punya RAP (project tanpa RAB: item RAP tidak wajib).'**
   String get rapNoItems;
+
+  /// D4 (owner 2026-10-11): project with a RAB but no RAP — submit is refused. Same text as the server and the web.
+  ///
+  /// In id, this message translates to:
+  /// **'Project belum punya RAP — hubungi PM'**
+  String get rapMissingBlock;
+
+  /// No description provided for @rapMissingBlockDetail.
+  ///
+  /// In id, this message translates to:
+  /// **'Pengajuan ini bisa disimpan sebagai draft, tetapi baru bisa dikirim setelah PM mengisi RAP project.'**
+  String get rapMissingBlockDetail;
+
+  /// No description provided for @rapMissingProjectDetail.
+  ///
+  /// In id, this message translates to:
+  /// **'Project ini punya RAB, jadi wajib punya RAP: pengajuan project ini baru bisa dikirim setelah PM / Direktur mengisi RAP.'**
+  String get rapMissingProjectDetail;
 
   /// No description provided for @noSearchResults.
   ///
