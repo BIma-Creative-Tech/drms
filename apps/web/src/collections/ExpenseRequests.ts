@@ -368,10 +368,10 @@ export const ExpenseRequests: CollectionConfig = withAudit(
       { name: 'linesTotalPreview', type: 'ui', label: 'Total (pratinjau)', admin: { condition: linesCondition, components: { Field: '@/admin/components/LinesTotalPreview#LinesTotalPreview' } } },
       businessDateField('requestDate', 'Tanggal pengajuan (server)', { access: system, admin: { ...ro, position: 'sidebar', condition: whenSet('requestDate') } }),
       { name: 'createdBy', type: 'relationship', relationTo: 'users', label: 'Dibuat oleh', index: true, access: system, admin: { ...ro, position: 'sidebar', condition: whenSet('createdBy') } },
-      { ...rupiahField('grandTotal', 'Grand total'), access: system, admin: { ...ro, ...rupiahView, position: 'sidebar', condition: whenSet('grandTotal') } },
-      { ...rupiahField('approvedAmount', 'Nominal disetujui'), access: system, admin: { ...ro, ...rupiahView, position: 'sidebar', condition: (d, s, c) => submittedOnly(d, s, c) && whenSet('approvedAmount')(d, s, c) } },
-      { ...rupiahField('transferredTotal', 'Total ditransfer'), access: system, admin: { ...ro, ...rupiahView, position: 'sidebar', condition: submittedOnly } },
-      { ...rupiahField('verifiedReceiptsTotal', 'Total nota terverifikasi LPJ'), access: system, admin: { ...ro, ...rupiahView, position: 'sidebar', condition: (d, s, c) => submittedOnly(d, s, c) && whenSet('verifiedReceiptsTotal')(d, s, c) } },
+      { ...rupiahField('grandTotal', 'Grand total (Rp)'), access: system, admin: { ...ro, ...rupiahView, position: 'sidebar', condition: whenSet('grandTotal') } },
+      { ...rupiahField('approvedAmount', 'Nominal disetujui (Rp)'), access: system, admin: { ...ro, ...rupiahView, position: 'sidebar', condition: (d, s, c) => submittedOnly(d, s, c) && whenSet('approvedAmount')(d, s, c) } },
+      { ...rupiahField('transferredTotal', 'Total ditransfer (Rp)'), access: system, admin: { ...ro, ...rupiahView, position: 'sidebar', condition: submittedOnly } },
+      { ...rupiahField('verifiedReceiptsTotal', 'Total nota terverifikasi LPJ (Rp)'), access: system, admin: { ...ro, ...rupiahView, position: 'sidebar', condition: (d, s, c) => submittedOnly(d, s, c) && whenSet('verifiedReceiptsTotal')(d, s, c) } },
       // F2e UAT: office-only fields are not rendered for users who cannot read their target
       // (staff/PM → the relationship input fired POST /api/approval-rules → 403 on every view).
       { name: 'approvalRule', type: 'relationship', relationTo: 'approval-rules', label: 'Aturan approval', access: system, admin: { ...ro, position: 'sidebar', condition: (data, sibling, ctx) => submittedOnly(data, sibling, ctx) && canSeeApprovalRules(data, sibling, ctx) } },
