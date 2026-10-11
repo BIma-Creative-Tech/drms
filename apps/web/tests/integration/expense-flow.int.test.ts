@@ -64,7 +64,7 @@ describe('Pengajuan Baru (advance) — happy path', () => {
     const r = await api('PATCH', `${E}/${id}`, w.users.staffA, {
       lines: [
         { id: lineIds[0], description: 'Semen', qty: 12, uomId: w.uom.l, total: 720_000, categoryId: w.cat.mat },
-        { description: 'Pasir', total: 80_000, categoryId: w.cat.mat },
+        { description: 'Pasir', total: 80_000, categoryId: w.cat.mat, rapItemId: w.rap.project },
       ],
     })
     expect(r.status, JSON.stringify(r.body)).toBe(200)

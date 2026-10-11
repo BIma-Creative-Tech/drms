@@ -223,7 +223,8 @@ describe('5. Project without a PM → 409', () => {
     await sqlAs('owner', 'ALTER TABLE projects ALTER COLUMN pm_id SET NOT NULL')
   })
   it('submit is blocked with a clear message; the request stays Draft', async () => {
-    const noPm = await sysCreate('projects', { code: 'APM-NOPM', name: 'APM tanpa PM', pm: w.users.pm.id, budget: 10_000_000, status: 'berjalan' })
+    // no RAB: D4 (2026-10-11) would otherwise refuse the submit first ("Project belum punya RAP")
+    const noPm = await sysCreate('projects', { code: 'APM-NOPM', name: 'APM tanpa PM', pm: w.users.pm.id, status: 'berjalan' })
     await sqlAs('owner', 'ALTER TABLE projects ALTER COLUMN pm_id DROP NOT NULL')
     await sqlAs('owner', 'UPDATE projects SET pm_id = NULL WHERE id = $1', [noPm])
     await sysCreate('approval-rules', { docType: 'expense_request', requestType: 'any', priority: 10, acknowledge: 'required', acknowledgeBy: 'scope_manager', acknowledgeRole: null, active: true, project: noPm, name: 'APM rule tanpa PM', minAmount: 0, steps: [{ level: 1, approverRole: 'pk-owner' }] })

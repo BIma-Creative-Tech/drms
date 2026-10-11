@@ -10,6 +10,8 @@ import { createWebSession } from '@/auth/sessions'
 import { setJwksForTests } from '@/auth/strategies'
 import config from '@/payload.config'
 
+import { withFixtureRap } from './fixture-rap'
+
 export const ALL_ROLES: Role[] = ['pk-staff', 'pk-pm', 'pk-finance', 'pk-owner', 'pk-admin']
 
 let payload: Payload | undefined
@@ -157,7 +159,7 @@ export async function http(
   let body: string | undefined
   if (opts.json !== undefined) {
     headers.set('Content-Type', 'application/json')
-    body = JSON.stringify(opts.json)
+    body = JSON.stringify(withFixtureRap(opts.json)) // D4: lines charged to the fixture RAP item of the project
   }
   const request = new Request(`http://localhost:3000${path}`, { method, headers, body })
   const res = await handleEndpoints({ config, request })

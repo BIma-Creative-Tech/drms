@@ -7,7 +7,7 @@ import { seed } from '@/seed/seed'
 import { parseUatUsers, seedUat, UAT_FIXTURE, type UatReport } from '@/seed/uat-seed'
 
 import { auditRows, companyId, getTestPayload, installFakeKeycloak, makeUser, webSessionCookie, withContext } from './helpers'
-import { api, uploadMedia, type FlowUser } from './flow-world'
+import { api, sysRapItem, uploadMedia, type FlowUser } from './flow-world'
 
 /**
  * UAT seed (src/seed/uat.ts): creates users/employees/bank account/project/assignments on top of
@@ -158,7 +158,8 @@ describe('UAT seed', () => {
       requesterIds: [staff.employee],
       bankAccountId: account.id,
       neededDate: '2026-09-30',
-      lines: [{ description: 'Makan siang tim', total: 150_000, categoryId: ksm.id }],
+      // D4 (2026-10-11): the UAT project has a RAB → it needs a RAP item (the seed creates none — a PM fills it)
+      lines: [{ description: 'Makan siang tim', total: 150_000, categoryId: ksm.id, rapItemId: await sysRapItem(projectId) }],
     })
     expect(c.status, JSON.stringify(c.body)).toBe(201)
     const s = await api('POST', `${E}/${c.body.id}/submit`, staff, {})
