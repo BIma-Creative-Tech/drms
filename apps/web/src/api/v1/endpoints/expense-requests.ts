@@ -7,6 +7,7 @@ import { actorContext, displayName, loadVisible, type RequestDoc } from '@/domai
 import { withReqTransaction } from '@/lib/system-tx'
 import { createDraft, resubmitAsDraft, updateDraft } from '@/domain/expense/drafts'
 import { withFlagVisibility } from '@/domain/expense/flag-visibility'
+import { bankPreview } from '@/domain/expense/bank-preview'
 import { detail, listItem } from '@/domain/expense/dto'
 import { addReceipt, editReceipt, rejectReceipt, removeReceipt, resubmitReceipts, reviewFlag, verifyAllReceipts, verifyReceipt } from '@/domain/expense/receipts'
 import { allowedActions } from '@/domain/expense/state'
@@ -22,6 +23,7 @@ import { companyQuery } from '../company-query'
 import { HttpError, json, problem, v1 } from '../http'
 import { withNamedCompany } from '../named-company'
 import {
+  BankPreviewQuery,
   EmptyBody,
   ExpenseRequestCreate,
   ExpenseRequestUpdate,
@@ -539,6 +541,22 @@ export const pdfEndpoint = v1({
   },
 })
 
+/**
+ * GET /bank-account-preview?request=&account=&reveal=1 (DRMS 10/10 8e) — destination account under
+ * the "Rekening tujuan" picker (draft) or of the submit snapshot: bank · holder · masked number; the
+ * full number only with reveal=1 for the people the detail DTO shows it to (domain/expense/bank-preview.ts).
+ */
+export const bankPreviewEndpoint = v1({
+  path: '/bank-account-preview',
+  method: 'get',
+  rateLimit: [60, 60_000],
+  handler: async ({ req }) => {
+    const q = BankPreviewQuery.safeParse(Object.fromEntries(req.searchParams.entries()))
+    if (!q.success) throw new HttpError(400, 'Bad Request', { errors: q.error.issues.map((i) => ({ path: i.path.join('.'), message: i.message })) })
+    return json(await bankPreview(req, { requestId: q.data.request, accountId: q.data.account, reveal: q.data.reveal === '1' }))
+  },
+})
+
 export const EXPENSE_ENDPOINTS = [
   listRequestsEndpoint,
   createRequestEndpoint,
@@ -574,5 +592,6 @@ export const EXPENSE_ENDPOINTS = [
   settlePrecheckEndpoint,
   settleReverseEndpoint,
   pdfEndpoint,
+  bankPreviewEndpoint,
 ]
 

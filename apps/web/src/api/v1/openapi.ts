@@ -227,6 +227,14 @@ export function buildOpenApiDocument(version: string) {
   })
   registry.registerPath({
     method: 'get',
+    path: '/bank-account-preview',
+    summary: 'Destination account of a request form: bank · holder · masked number; full number only with reveal=1 for creator/requesters and Finance/Direktur/Admin of the PT (DRMS 10/10 8e)',
+    security,
+    request: { headers: deviceHeader, query: F.BankPreviewQuery },
+    responses: res(200, 'Account preview', F.BankPreview, [400, 401, 404, 426, 429]),
+  })
+  registry.registerPath({
+    method: 'get',
     path: '/expense-requests/{id}/history',
     summary: 'Audit history of the request ("Riwayat", US-35)',
     security,
