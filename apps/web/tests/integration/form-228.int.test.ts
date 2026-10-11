@@ -124,7 +124,7 @@ describe('form 228/PB-DRMS/20/IX/2026 (F2 acceptance fixture)', () => {
     lineIds = r.body.lines.map((l: { id: string }) => l.id)
     expect(r.body).toMatchObject({ status: 'draft', docNo: null, grandTotal: FORM_228.grandTotal, createdBy: { id: citra.id } })
     expect(r.body.requesters.map((x: { name: string }) => x.name)).toEqual(['Budi', 'Doni Pratama'])
-    expect(r.body.lines.map((l: { unitPriceDisplay: number | null }) => l.unitPriceDisplay)).toEqual([600_000, 339_000, null])
+    expect(r.body.lines.map((l: { unitPriceDisplay: number | null }) => l.unitPriceDisplay)).toEqual([600_000, 338_500, 170_500]) // D3: unit price derived from a total-only line
   })
 
   it('receipts are attached per line (Reimburse: required before submit, US-38)', async () => {
@@ -286,8 +286,8 @@ describe('PDF "Pengajuan Biaya" — form 228 golden test (US-46, ADR 0008)', () 
         'PT DOUBLE REZKI MAKMUR SEJAHTERA',
         '228-PB DRMS-Pengajuan Reimburse Ops Palangka Banjar keperluan Service Tronton',
         'No Uraian Jumlah Satuan Harga Satuan Total Keterangan',
-        '2 Penginapan 2 kamar 339.000 677.000',
-        '3 Makan siang 170.500',
+        '2 Penginapan 2 kamar 338.500 677.000',
+        '3 Makan siang 170.500 170.500', // D3: unit price derived from the total-only line
         'GRAND TOTAL Rp 1.447.500',
         'Diajukan Oleh Dibuat Oleh Diketahui Oleh Approval',
         'Budi, Doni Pratama Citra Budi Hartono Sari',

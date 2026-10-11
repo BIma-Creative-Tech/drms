@@ -1041,7 +1041,7 @@ export const openapiDocument = {
           "advance",
           "reimburse"
         ],
-        "description": "advance = Uang Muka, reimburse = Reimburse"
+        "description": "advance = Pengajuan Baru (label until 2026-10: Uang Muka), reimburse = Reimburse"
       },
       "RequestStatus": {
         "type": "string",
@@ -1312,12 +1312,26 @@ export const openapiDocument = {
                   ],
                   "minimum": 0,
                   "maximum": 10000000000000,
-                  "description": "unitPrice, else total ÷ qty (display only)."
+                  "description": "unitPrice, else total ÷ qty (display only; lines saved before D3)."
                 },
                 "total": {
                   "type": "integer",
                   "minimum": 0,
-                  "maximum": 10000000000000
+                  "maximum": 10000000000000,
+                  "description": "Server-computed qty × unitPrice (D3). 0 = incomplete line (no unit price yet)."
+                },
+                "receiptAmount": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "minimum": 0,
+                  "maximum": 10000000000000,
+                  "description": "D3 \"Nominal sesuai nota\" (null = not filled)."
+                },
+                "receiptMismatch": {
+                  "type": "boolean",
+                  "description": "receiptAmount set and ≠ total (live; the stored Finance flag is flags[] kind receipt_amount_mismatch)."
                 },
                 "notes": {
                   "type": [
@@ -1371,6 +1385,8 @@ export const openapiDocument = {
                 "unitPrice",
                 "unitPriceDisplay",
                 "total",
+                "receiptAmount",
+                "receiptMismatch",
                 "notes",
                 "category",
                 "vehicle"
@@ -2205,6 +2221,14 @@ export const openapiDocument = {
               "null"
             ]
           },
+          "photos": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "exclusiveMinimum": 0
+            },
+            "description": "Point 13: LPJ photo ids (media-receipts; file: GET /api/v1/media/receipts/{id}/file)."
+          },
           "transferredTotal": {
             "type": [
               "integer",
@@ -2480,6 +2504,7 @@ export const openapiDocument = {
           "status",
           "statusLabel",
           "usageNotes",
+          "photos",
           "transferredTotal",
           "receiptsTotal",
           "verifiedReceiptsTotal",
@@ -2496,7 +2521,7 @@ export const openapiDocument = {
           "lastReversedAt",
           "lastReversalReason"
         ],
-        "description": "T5 LPJ (Uang Muka only; null before \"Nota Lengkap\")."
+        "description": "T5 LPJ (Pengajuan Baru only; null before \"Nota Lengkap\")."
       },
       "RequestAction": {
         "type": "string",
@@ -2656,7 +2681,8 @@ export const openapiDocument = {
               "null"
             ],
             "exclusiveMinimum": 0,
-            "maximum": 1000000000
+            "maximum": 1000000000,
+            "description": "Quantity (≤ 3 decimals); empty = 1. A unit (uomId) is required when qty is set."
           },
           "uomId": {
             "type": [
@@ -2672,7 +2698,7 @@ export const openapiDocument = {
             ],
             "minimum": 0,
             "maximum": 10000000000000,
-            "description": "Informational only — never used to compute the total (Q-05)."
+            "description": "D3 (DRMS 10/10): required to submit. The line total is computed by the server: total = qty × unitPrice (qty empty = 1), rounded to whole Rupiah."
           },
           "total": {
             "type": [
@@ -2681,7 +2707,16 @@ export const openapiDocument = {
             ],
             "minimum": 1,
             "maximum": 10000000000000,
-            "description": "PRIMARY value entered by the user (may be rounded from the receipt)."
+            "description": "READ-ONLY since D3: ignored when unitPrice is sent (the server computes qty × unitPrice). Compatibility for old clients that send only `total`: unitPrice = total ÷ qty when that is a whole Rupiah amount, else the line stays incomplete (cannot be submitted)."
+          },
+          "receiptAmount": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 10000000000000,
+            "description": "D3 \"Nominal sesuai nota\" (optional). When set and ≠ total, the request carries the awareness flag `receipt_amount_mismatch` (\"Selisih nota\") for Finance; amounts stay based on total."
           },
           "notes": {
             "type": [
@@ -4100,9 +4135,37 @@ export const openapiDocument = {
             "minLength": 3,
             "maxLength": 2000,
             "description": "Required at the first submit; kept on resubmit when omitted."
+          },
+          "photos": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "exclusiveMinimum": 0
+            },
+            "maxItems": 10,
+            "description": "Point 13: LPJ photos — media-receipts ids (POST /api/v1/media/receipts, images only), max 10. Replaces the whole set."
           }
         },
         "additionalProperties": false
+      },
+      "LpjPhotosBody": {
+        "type": "object",
+        "properties": {
+          "photos": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "exclusiveMinimum": 0
+            },
+            "maxItems": 10,
+            "description": "Point 13: LPJ photos — media-receipts ids (POST /api/v1/media/receipts, images only), max 10. Replaces the whole set."
+          }
+        },
+        "required": [
+          "photos"
+        ],
+        "additionalProperties": false,
+        "description": "Point 13: save the LPJ photo set while the LPJ is editable (Draft / Revisi) — requester only."
       },
       "LpjRevisionBody": {
         "type": "object",
@@ -4510,11 +4573,16 @@ export const openapiDocument = {
                     },
                     "info": {
                       "type": "integer"
+                    },
+                    "receiptMismatch": {
+                      "type": "integer",
+                      "description": "D3: lines with \"Selisih nota\" (receipt_amount_mismatch, open or reviewed)."
                     }
                   },
                   "required": [
                     "warning",
-                    "info"
+                    "info",
+                    "receiptMismatch"
                   ]
                 }
               },
@@ -5106,6 +5174,14 @@ export const openapiDocument = {
                   "minimum": 0,
                   "maximum": 10000000000000
                 },
+                "receipt_amount": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "minimum": 0,
+                  "maximum": 10000000000000
+                },
                 "notes": {
                   "type": [
                     "string",
@@ -5135,6 +5211,7 @@ export const openapiDocument = {
                 "uom_id",
                 "unit_price",
                 "total",
+                "receipt_amount",
                 "notes",
                 "category_id",
                 "vehicle_id"
@@ -5976,7 +6053,7 @@ export const openapiDocument = {
               "advance",
               "reimburse"
             ],
-            "description": "Required for a new draft. advance = Uang Muka."
+            "description": "Required for a new draft. advance = Pengajuan Baru."
           },
           "title": {
             "type": "string",
@@ -6111,7 +6188,8 @@ export const openapiDocument = {
               "null"
             ],
             "minimum": 0,
-            "maximum": 10000000000000
+            "maximum": 10000000000000,
+            "description": "D3: required to submit; total = qty × unit_price (qty empty = 1), computed by the server."
           },
           "total": {
             "type": [
@@ -6119,7 +6197,17 @@ export const openapiDocument = {
               "null"
             ],
             "minimum": 1,
-            "maximum": 10000000000000
+            "maximum": 10000000000000,
+            "description": "Ignored when unit_price is sent (D3). Old apps sending only total: unit_price = total ÷ qty when exact."
+          },
+          "receipt_amount": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 10000000000000,
+            "description": "D3 \"Nominal sesuai nota\" (optional)."
           },
           "notes": {
             "type": [
@@ -14292,7 +14380,7 @@ export const openapiDocument = {
               "$ref": "#/components/schemas/RequestType"
             },
             "required": false,
-            "description": "advance = Uang Muka, reimburse = Reimburse",
+            "description": "advance = Pengajuan Baru (label until 2026-10: Uang Muka), reimburse = Reimburse",
             "name": "type",
             "in": "query"
           },
@@ -14396,7 +14484,7 @@ export const openapiDocument = {
         }
       },
       "post": {
-        "summary": "Create a Draft (Uang Muka / Reimburse); creator, status and grand total are server-set",
+        "summary": "Create a Draft (Pengajuan Baru / Reimburse); creator, status and grand total are server-set",
         "security": [
           {
             "bearer": []
@@ -17743,7 +17831,7 @@ export const openapiDocument = {
     },
     "/transfer-queue": {
       "get": {
-        "summary": "Finance/Owner: Uang Muka \"Disetujui\" + Reimburse \"Nota Terverifikasi\", by needed date (US-19); PTs where the caller is Finance/Direktur, ?company= narrows",
+        "summary": "Finance/Owner: Pengajuan Baru \"Disetujui\" + Reimburse \"Nota Terverifikasi\", by needed date (US-19); PTs where the caller is Finance/Direktur, ?company= narrows",
         "security": [
           {
             "bearer": []
@@ -17835,7 +17923,7 @@ export const openapiDocument = {
     },
     "/lpj-queue": {
       "get": {
-        "summary": "MC3 Finance/Owner: LPJ verification list (Uang Muka \"LPJ Diajukan\" / \"LPJ Terverifikasi\", US-21) of the PTs where the caller is Finance/Direktur, with company refs; ?company= narrows",
+        "summary": "MC3 Finance/Owner: LPJ verification list (Pengajuan Baru \"LPJ Diajukan\" / \"LPJ Terverifikasi\", US-21) of the PTs where the caller is Finance/Direktur, with company refs; ?company= narrows",
         "security": [
           {
             "bearer": []
@@ -19200,7 +19288,7 @@ export const openapiDocument = {
     },
     "/expense-requests/{id}/receipts-complete": {
       "post": {
-        "summary": "Uang Muka: receipts complete → \"Nota Lengkap\" (LPJ draft created)",
+        "summary": "Pengajuan Baru: receipts complete → \"Nota Lengkap\" (LPJ draft created)",
         "security": [
           {
             "bearer": []
@@ -19350,7 +19438,7 @@ export const openapiDocument = {
     },
     "/expense-requests/{id}/lpj/submit": {
       "post": {
-        "summary": "Uang Muka: submit / resubmit the LPJ (usage description; LPJ number at first submit)",
+        "summary": "Pengajuan Baru: submit / resubmit the LPJ (usage description; LPJ number at first submit)",
         "security": [
           {
             "bearer": []
@@ -19400,6 +19488,156 @@ export const openapiDocument = {
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/LpjSubmitBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Request after the action",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExpenseRequestDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/expense-requests/{id}/lpj/photos": {
+      "put": {
+        "summary": "Point 13 (DRMS 10/10): requester sets the LPJ photo set (media-receipts ids uploaded via POST /media/receipts, images only, max 10) while the LPJ is Draft / Revisi; frozen after Kirim LPJ",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d+$"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": false,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422."
+            },
+            "required": false,
+            "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422.",
+            "name": "Idempotency-Key",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LpjPhotosBody"
               }
             }
           }

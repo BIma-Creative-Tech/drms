@@ -5,7 +5,7 @@ import { companyOf } from '@/domain/companies'
 import { resolveScope } from '@/access/scope'
 
 import { actorContext, fail, ids, loadRaw, loadVisible, requireAction, type RequestDoc } from './common'
-import { validateLines } from './lines'
+import { normalizeLines, validateLines } from './lines'
 import { copyReceiptsForResubmit } from './receipts'
 import { requesterUsersAllDirektur, scopeManagerOf } from './snapshot'
 import { isBusinessDate, type RequestType } from './types'
@@ -16,7 +16,10 @@ export type LineInputApi = {
   qty?: number | null
   uomId?: number | null
   unitPrice?: number | null
+  /** Ignored when a unit price is given (D3: server computes qty × unitPrice). */
   total?: number | null
+  /** D3 "Nominal sesuai nota" (optional, whole Rupiah ≥ 0). */
+  receiptAmount?: number | null
   notes?: string | null
   categoryId?: number | null
   vehicleId?: number | null
@@ -206,8 +209,9 @@ export async function validateContent(
   }
 
   // Lines (US-37) + masters.
+  // D3: validated as the server will store them (total = qty × unit price; a client total is ignored)
   const lineErrors = validateLines(
-    c.lines.map((l) => ({ description: l.description, qty: l.qty, uom: l.uomId, unitPrice: l.unitPrice, total: l.total, notes: l.notes, category: l.categoryId, vehicle: l.vehicleId })),
+    normalizeLines(c.lines).map((l) => ({ description: l.description, qty: l.qty, uom: l.uomId, unitPrice: l.unitPrice, total: l.total, receiptAmount: l.receiptAmount, notes: l.notes, category: l.categoryId, vehicle: l.vehicleId })),
     { forSubmit: opts.forSubmit },
   )
   errors.push(...lineErrors.map((e) => ({ path: e.path.replace(/\.(uom|category|vehicle)$/, '.$1Id'), message: e.message })))
@@ -282,7 +286,8 @@ export function toDocLines(lines: LineInputApi[]) {
     qty: l.qty ?? null,
     uom: l.uomId ?? null,
     unitPrice: l.unitPrice ?? null,
-    total: l.total ?? null,
+    total: l.total ?? null, // recomputed by the collection hook (D3)
+    receiptAmount: l.receiptAmount ?? null,
     notes: l.notes ?? null,
     category: l.categoryId ?? null,
     vehicle: l.vehicleId ?? null,
@@ -297,6 +302,7 @@ export function fromDocLines(doc: RequestDoc): LineInputApi[] {
     uomId: relId(l.uom) ?? null,
     unitPrice: l.unitPrice ?? null,
     total: l.total ?? null,
+    receiptAmount: l.receiptAmount ?? null,
     notes: l.notes ?? null,
     categoryId: relId(l.category) ?? null,
     vehicleId: relId(l.vehicle) ?? null,

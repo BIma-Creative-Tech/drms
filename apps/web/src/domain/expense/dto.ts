@@ -3,7 +3,7 @@ import type { PayloadRequest } from 'payload'
 import { hasRole, relId, userId } from '@/access/roles'
 
 import { actorContext, approvalsOf, displayName, loadRaw, projectCommitted, type RequestDoc } from './common'
-import { displayUnitPrice } from './lines'
+import { displayUnitPrice, receiptMismatch } from './lines'
 import { budgetImpact, type ApprovalSnapshot } from './rules'
 import { allowedActions } from './state'
 import { REQUEST_TYPE_LABELS, FLAG_LABELS, type FlagKind } from './types'
@@ -140,6 +140,9 @@ export async function detail(req: PayloadRequest, id: number) {
       unitPrice: l.unitPrice ?? null,
       unitPriceDisplay: displayUnitPrice({ unitPrice: l.unitPrice, qty: l.qty, total: l.total }),
       total: l.total ?? 0,
+      // D3: "Nominal sesuai nota" + live mismatch (the persisted awareness flag is `flags[]` kind receipt_amount_mismatch)
+      receiptAmount: l.receiptAmount ?? null,
+      receiptMismatch: receiptMismatch(l),
       notes: l.notes ?? null,
       category: ref(l.category, (d) => ({ code: d.code, name: d.name })),
       vehicle: ref(l.vehicle, (d) => ({ plateNo: d.plateNo, plateDisplay: d.plateDisplay, type: d.type })) as Named,
@@ -230,6 +233,7 @@ export async function detail(req: PayloadRequest, id: number) {
           status: lpj.status,
           statusLabel: SETTLEMENT_STATUS_LABELS[lpj.status],
           usageNotes: lpj.usageNotes ?? null,
+          photos: (lpj.photos ?? []).map((p) => relId(p)).filter((x): x is number => x !== undefined),
           transferredTotal: lpj.transferredTotal ?? null,
           receiptsTotal: lpj.receiptsTotal ?? null,
           verifiedReceiptsTotal: lpj.verifiedReceiptsTotal ?? null,

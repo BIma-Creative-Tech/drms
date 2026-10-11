@@ -71,7 +71,7 @@ describe('F2c staff panel — access restrictions', () => {
 
 describe('F2c admin create/edit form path (generic REST) = same draft rules as /api/v1', () => {
   const lines = () => [
-    { description: 'BBM operasional', qty: 24.8, uom: w.uom.l, total: 250_000, category: w.cat.bbm, vehicle: w.vehicle },
+    { description: 'BBM operasional', qty: 25, uom: w.uom.l, unitPrice: 10_000, total: 250_000, category: w.cat.bbm, vehicle: w.vehicle },
     { description: 'Penginapan', qty: 1, uom: w.uom.kmr, total: 400_000, category: w.cat.inap },
   ]
 
@@ -163,7 +163,7 @@ describe('F2c requester actions (panel request shapes)', () => {
     expect(r.body.id).not.toBe(a.id)
   })
 
-  it('Upload nota per baris (Reimburse draft): media upload + receipt → flags; Uang Muka draft → 409', async () => {
+  it('Upload nota per baris (Reimburse draft): media upload + receipt → flags; Pengajuan Baru draft → 409', async () => {
     const d = await draft(w.users.staffA, { type: 'reimburse' })
     const img = await upload('/api/v1/media/receipts', w.users.staffA, await png())
     expect(img.status).toBe(201)
@@ -184,7 +184,7 @@ describe('F2c requester actions (panel request shapes)', () => {
     expect(neg.status).toBe(409)
   })
 
-  it('Kirim LPJ / revisi / Kirim ulang LPJ (Uang Muka): usage notes required; revision note visible to the requester', async () => {
+  it('Kirim LPJ / revisi / Kirim ulang LPJ (Pengajuan Baru): usage notes required; revision note visible to the requester', async () => {
     const a = await draft()
     await api('POST', `${E}/${a.id}/submit`, w.users.staffA, {}, key())
     await api('POST', `${E}/${a.id}/acknowledge`, w.users.owner, {}, key())

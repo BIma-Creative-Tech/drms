@@ -9,9 +9,10 @@ import { writeAudit, type AuditRow } from '@/audit/writer'
 import { denyDeleteLogged, requestReadAccess, requestUpdateAccess } from '@/domain/expense/access'
 import { ids, type RequestDoc } from '@/domain/expense/common'
 import { CONTENT_VALIDATED, fromDocLines, validateContent } from '@/domain/expense/drafts'
-import { grandTotal, validateLines, type LineInput } from '@/domain/expense/lines'
+import { grandTotal, normalizeLines, validateLines, type LineInput } from '@/domain/expense/lines'
 import { diffLines, type AuditLine } from '@/domain/expense/line-audit'
-import { isContentEditable, REQUEST_STATUSES, STATUS_LABELS, type RequestStatus, type RequestType } from '@/domain/expense/types'
+import { recomputeFlags } from '@/domain/expense/receipts'
+import { isContentEditable, REQUEST_STATUSES, REQUEST_TYPE_LABELS, STATUS_LABELS, type RequestStatus, type RequestType } from '@/domain/expense/types'
 import { changeReasonField, rupiahField, uuidField } from '@/fields/common'
 import { requestMeta } from '@/lib/request-meta'
 import { forceDeferredChecks } from '@/lib/system-tx'
@@ -19,7 +20,7 @@ import { notifyCreated, notifyTransition } from '@/domain/notifications'
 import { companyField, companyHook, pickerSameCompany, sameCompanyOptions } from '@/fields/company'
 import { validationError } from '@/lib/validation'
 
-import { draftOnly, draftOrSet, isDraftForm, linesCondition, linesEditable, PLACEHOLDERS, submittedOnly, whenSet } from './expense-request-form'
+import { draftOnly, editableInput, isDraftForm, linesCondition, linesEditable, PLACEHOLDERS, submittedOnly, whenSet } from './expense-request-form'
 import { businessDateField } from './fields-f2'
 import { USER_NAME_VIEW } from '@/fields/users'
 
@@ -149,6 +150,9 @@ const beforeChange: CollectionBeforeChangeHook = async ({ data, originalDoc, ope
     throw validationError(req, { collection: 'expense-requests' }, [{ path: 'project', message: 'Pilih project ATAU pusat biaya, tidak keduanya.' }])
   }
 
+  // D3: on every content write the line totals are recomputed (qty × harga satuan); a client total is ignored.
+  // Transitions do not send lines (the stored, possibly frozen rows are kept as they are).
+  if (!transition && Array.isArray(d.lines)) d.lines = normalizeLines(d.lines as LineInput[], (prev.lines ?? []) as LineInput[])
   const lines = (d.lines ?? prev.lines ?? []) as LineInput[]
   const errors = validateLines(lines, { forSubmit: false })
   if (errors.length > 0) throw validationError(req, { collection: 'expense-requests' }, errors)
@@ -225,6 +229,9 @@ const auditLines: CollectionAfterChangeHook = async ({ doc, previousDoc, operati
     reason: typeof req.context?.auditReason === 'string' ? req.context.auditReason : undefined,
   }))
   await writeAudit(req, rows)
+  // D3: a content edit of the lines (Draft / Revisi Nota) refreshes the flags at once — "Selisih nota"
+  // (receipt_amount_mismatch) follows the requester's "Nominal sesuai nota" without waiting for submit.
+  if (operation === 'update' && context?.pkTransition !== true && rows.length > 0) await recomputeFlags(req, doc.id as number)
   // Run the deferred freeze checks NOW (Payload's commit swallows COMMIT errors, see
   // lib/system-tx.ts) so a violation fails this operation with a real error.
   await forceDeferredChecks(req)
@@ -279,10 +286,11 @@ export const ExpenseRequests: CollectionConfig = withAudit(
         label: 'Jenis',
         required: true,
         options: [
-          { label: 'Uang Muka', value: 'advance' },
-          { label: 'Reimburse', value: 'reimburse' },
+          { label: REQUEST_TYPE_LABELS.advance, value: 'advance' },
+          { label: REQUEST_TYPE_LABELS.reimburse, value: 'reimburse' },
         ],
-        admin: { placeholder: PLACEHOLDERS.type },
+        // B-2 item 3: required → no admin.condition (schema drift); the wrapper renders nothing on a locked request
+        admin: { placeholder: PLACEHOLDERS.type, components: { Field: '@/admin/components/EditableOnlyFields#RequestTypeField' } },
       },
       {
         name: 'status',
@@ -297,15 +305,15 @@ export const ExpenseRequests: CollectionConfig = withAudit(
         // nullable (schema drift). RequestStatusField renders nothing on a Draft form and the ADR 0021 label otherwise.
         admin: { ...ro, position: 'sidebar', components: { Field: '@/admin/components/RequestStatusField#RequestStatusField', Cell: '@/admin/components/RequestStatusCell#RequestStatusCell' } },
       },
-      { name: 'title', type: 'text', label: 'Judul', required: true, maxLength: 200 },
-      { name: 'project', type: 'relationship', relationTo: 'projects', label: 'Project', index: true, ...pickerSameCompany(), admin: { placeholder: PLACEHOLDERS.project, condition: draftOrSet('project') } },
-      { name: 'costCenter', type: 'relationship', relationTo: 'cost-centers', label: 'Pusat biaya', index: true, ...pickerSameCompany(), admin: { placeholder: PLACEHOLDERS.costCenter, description: 'Isi project ATAU pusat biaya.', condition: draftOrSet('costCenter') } },
-      businessDateField('neededDate', 'Tanggal dibutuhkan'),
+      { name: 'title', type: 'text', label: 'Judul', required: true, maxLength: 200, admin: { components: { Field: '@/admin/components/EditableOnlyFields#RequestTitleField' } } },
+      { name: 'project', type: 'relationship', relationTo: 'projects', label: 'Project', index: true, ...pickerSameCompany(), admin: { placeholder: PLACEHOLDERS.project, condition: editableInput('project') } },
+      { name: 'costCenter', type: 'relationship', relationTo: 'cost-centers', label: 'Pusat biaya', index: true, ...pickerSameCompany(), admin: { placeholder: PLACEHOLDERS.costCenter, description: 'Isi project ATAU pusat biaya.', condition: editableInput('costCenter') } },
+      businessDateField('neededDate', 'Tanggal dibutuhkan', { admin: { condition: editableInput() } }),
       // Owner decision 2026-10-09: replaces "Periode kegiatan" (periodFrom/periodTo, Q-04).
-      { name: 'urgencyLevel', type: 'relationship', relationTo: 'urgency-levels', label: 'Tingkat urgensi', index: true, ...pickerSameCompany(), admin: { placeholder: PLACEHOLDERS.urgencyLevel, condition: draftOrSet('urgencyLevel') } },
+      { name: 'urgencyLevel', type: 'relationship', relationTo: 'urgency-levels', label: 'Tingkat urgensi', index: true, ...pickerSameCompany(), admin: { placeholder: PLACEHOLDERS.urgencyLevel, condition: editableInput('urgencyLevel') } },
       // QA-15: Staff-only users pick only themselves (requesterOptions); the server re-checks (validateContent).
       // WA-09: "Pemohon" as in the APK (the PDF signature box keeps "Diajukan Oleh").
-      { name: 'requesters', type: 'relationship', relationTo: 'employees', hasMany: true, label: 'Pemohon', admin: { isSortable: true, placeholder: PLACEHOLDERS.requesters }, ...pickerSameCompany(), filterOptions: requesterOptions },
+      { name: 'requesters', type: 'relationship', relationTo: 'employees', hasMany: true, label: 'Pemohon', admin: { isSortable: true, placeholder: PLACEHOLDERS.requesters, condition: editableInput() }, ...pickerSameCompany(), filterOptions: requesterOptions },
       {
         name: 'bankAccount',
         type: 'relationship',
@@ -322,7 +330,7 @@ export const ExpenseRequests: CollectionConfig = withAudit(
         admin: { description: 'Hanya rekening milik pemohon. Kosongkan untuk memakai rekening default pemohon pertama.', placeholder: PLACEHOLDERS.bankAccount, condition: draftOnly },
       },
       // DRMS 10/10 8e (WA-04): chosen account (draft) / snapshot (after submit) — bank · holder · masked no. + eye toggle.
-      { name: 'bankAccountPreview', type: 'ui', label: 'Rekening tujuan', admin: { components: { Field: '@/admin/components/BankAccountPreview#BankAccountPreview' } } },
+      { name: 'bankAccountPreview', type: 'ui', label: 'Rekening tujuan', admin: { condition: editableInput(), components: { Field: '@/admin/components/BankAccountPreview#BankAccountPreview' } } },
       {
         name: 'bankSnapshot',
         type: 'group',
@@ -336,27 +344,29 @@ export const ExpenseRequests: CollectionConfig = withAudit(
           { name: 'accountHolder', type: 'text', label: 'Atas nama' },
         ],
       },
-      { name: 'notes', type: 'textarea', label: 'Keterangan', maxLength: 2000, admin: { condition: (d, s, c) => linesCondition(d, s, c) || whenSet('notes')(d, s, c) } },
-      { name: 'attachments', type: 'upload', relationTo: 'media-attachments', hasMany: true, label: 'Lampiran', admin: { condition: (d, s, c) => linesCondition(d, s, c) || whenSet('attachments')(d, s, c) } },
+      { name: 'notes', type: 'textarea', label: 'Keterangan', maxLength: 2000, admin: { condition: editableInput() } },
+      { name: 'attachments', type: 'upload', relationTo: 'media-attachments', hasMany: true, label: 'Lampiran', admin: { condition: editableInput() } },
       {
         name: 'lines',
         type: 'array',
         label: 'Baris item',
         labels: { singular: 'Baris', plural: 'Baris' },
-        // F2d UAT: Payload 3.90.1 client race — a row added while the form-state server action of
-        // the previous edit is still pending stays a skeleton.
-        // DRMS 10/10 9a (WA-05): editable cards only in Draft / Revisi Nota; otherwise the "Rincian pengajuan" table.
-        admin: { description: 'Tunggu sebentar setelah mengisi field sebelum menekan Tambah Baris.', condition: linesCondition },
+        // DRMS 10/10 8f–8h (D3): a lines TABLE with "Tambah baris" / edit in a dialog (LinesTableField) instead of
+        // Payload's row cards; total = qty × harga satuan, computed (dialog preview + server hook, never typed).
+        // DRMS 10/10 9a (WA-05): editable only in Draft / Revisi Nota; otherwise the "Rincian pengajuan" table.
+        admin: { condition: linesCondition, components: { Field: '@/admin/components/lines/LinesTableField#LinesTableField' } },
         fields: [
           { name: 'description', type: 'text', label: 'Uraian', maxLength: 500 },
           {
             type: 'row',
             fields: [
-              // qty keeps decimals (e.g. 1,5 m³) → Payload number input; money → Rupiah input (8c, WA-02)
-              { name: 'qty', type: 'number', label: 'Jumlah', min: 0 },
+              // qty keeps decimals (e.g. 1,5 m³); empty = 1 (D3)
+              { name: 'qty', type: 'number', label: 'Qty', min: 0 },
               { name: 'uom', type: 'relationship', relationTo: 'uoms', label: 'Satuan', admin: { placeholder: PLACEHOLDERS.uom } },
-              { name: 'unitPrice', type: 'number', label: 'Harga satuan (informatif)', min: 0, admin: { components: { Field: RUPIAH_FIELD } } },
-              { name: 'total', type: 'number', label: 'Total', min: 0, admin: { components: { Field: RUPIAH_FIELD } } },
+              { name: 'unitPrice', type: 'number', label: 'Harga satuan', min: 0, admin: { components: { Field: RUPIAH_FIELD } } },
+              // D3: server-computed (beforeChange → normalizeLines); a client value is ignored
+              { name: 'total', type: 'number', label: 'Total', min: 0, admin: { readOnly: true, components: { Field: RUPIAH_FIELD } } },
+              { name: 'receiptAmount', type: 'number', label: 'Nominal sesuai nota', min: 0, admin: { components: { Field: RUPIAH_FIELD } } },
             ],
           },
           {

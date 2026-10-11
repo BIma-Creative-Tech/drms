@@ -246,7 +246,7 @@ export async function verifyReceipt(req: PayloadRequest, requestId: number, rece
 }
 
 /**
- * US-39: Finance rejects a receipt (reason) → Reimburse goes to "Revisi Nota". Uang Muka LPJ review
+ * US-39: Finance rejects a receipt (reason) → Reimburse goes to "Revisi Nota". Pengajuan Baru LPJ review
  * (US-21): the receipt is rejected (excluded from the verified total) and the request stays in
  * "LPJ Diajukan" — Finance then asks for a revision or verifies the LPJ.
  */
@@ -278,7 +278,7 @@ export async function rejectReceipt(req: PayloadRequest, requestId: number, rece
 
 /**
  * QA-09: after EVERY receipt change (add / edit / remove / valid / reject) the flags are recomputed
- * from the active receipts (pending + valid) and, on an Uang Muka whose LPJ is still open (draft /
+ * from the active receipts (pending + valid) and, on a Pengajuan Baru whose LPJ is still open (draft /
  * submitted / revision), the LPJ's provisional totals: receipts total = Σ active receipts,
  * difference = transferred − receipts total (DB: pk_settlements_guard allows exactly these two
  * columns, consistent, without a status change — migration 20261008_120000_qa_flow_receipts).
@@ -526,7 +526,7 @@ export async function recomputeFlags(req: PayloadRequest, requestId: number): Pr
   const doc = await loadRaw(req, requestId)
   // ADR 0016 §1: receipt tolerance / max age of the DOCUMENT's PT
   const s = await settings(req, relId((doc as { company?: unknown }).company))
-  const lines = (doc.lines ?? []).map((l, i) => ({ id: l.id, lineNo: i + 1, total: l.total ?? 0, uom: relId(l.uom) ?? null, category: relId(l.category) ?? null }))
+  const lines = (doc.lines ?? []).map((l, i) => ({ id: l.id, lineNo: i + 1, total: l.total ?? 0, uom: relId(l.uom) ?? null, category: relId(l.category) ?? null, receiptAmount: l.receiptAmount ?? null }))
   const receipts = (await receiptsOf(req, requestId, true)).map((r) => ({ id: r.id, lineId: r.lineId, receiptDate: r.receiptDate, amount: r.amount }))
   const catIds = [...new Set(lines.map((l) => l.category).filter((x): x is number => x !== null))]
   const uomIds = [...new Set(lines.map((l) => l.uom).filter((x): x is number => x !== null))]

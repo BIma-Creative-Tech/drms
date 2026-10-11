@@ -44,6 +44,7 @@ const LABELS: Record<string, string> = {
   uom: 'Satuan',
   qty: 'Jumlah',
   unitPrice: 'Harga satuan',
+  receiptAmount: 'Nominal sesuai nota',
   proofId: 'Bukti',
   proofMediaId: 'Bukti transfer',
   imageId: 'Foto nota',

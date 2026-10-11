@@ -48,6 +48,8 @@ import * as migration_20261011_110000_p3_security from './20261011_110000_p3_sec
 import * as migration_20261012_100000_d1010_project_pm from './20261012_100000_d1010_project_pm';
 import * as migration_20261012_200000_d1010_schema from './20261012_200000_d1010_schema';
 import * as migration_20261012_200100_d1010_data from './20261012_200100_d1010_data';
+import * as migration_20261012_300000_d1010_lines_lpj_photos from './20261012_300000_d1010_lines_lpj_photos';
+import * as migration_20261012_300100_d1010_lines_guard from './20261012_300100_d1010_lines_guard';
 import * as migration_20261012_300200_d1010_pb_monthly from './20261012_300200_d1010_pb_monthly';
 
 export const migrations = [
@@ -300,6 +302,16 @@ export const migrations = [
     up: migration_20261012_200100_d1010_data.up,
     down: migration_20261012_200100_d1010_data.down,
     name: '20261012_200100_d1010_data',
+  },
+  {
+    up: migration_20261012_300000_d1010_lines_lpj_photos.up,
+    down: migration_20261012_300000_d1010_lines_lpj_photos.down,
+    name: '20261012_300000_d1010_lines_lpj_photos',
+  },
+  {
+    up: migration_20261012_300100_d1010_lines_guard.up,
+    down: migration_20261012_300100_d1010_lines_guard.down,
+    name: '20261012_300100_d1010_lines_guard',
   },
   {
     up: migration_20261012_300200_d1010_pb_monthly.up,

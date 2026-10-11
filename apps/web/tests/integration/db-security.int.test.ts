@@ -72,6 +72,7 @@ describe('grants (least privilege)', () => {
       'payload_preferences',
       'payload_preferences_rels',
       'rap_templates_items', // P3: RAP template lines (array rewritten on update)
+      'settlements_rels', // DRMS 10/10 point 13: LPJ photos (hasMany rewritten on update; frozen by settlements_photos_frozen)
       'stage_templates_items',
       'sync_receipts', // F4: purge of expired sync results (30 days, ADR 0010)
     ])

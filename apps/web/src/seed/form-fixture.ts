@@ -6,7 +6,9 @@
  * seq 228 / 20-09-2026 WITHOUT touching the live PB counter (go-live continues at 229).
  *
  * Expected: grand total Rp 1.447.500 (600.000 + 677.000 + 170.500; line 2 = user-rounded hotel
- * bill 676.876, Q-05 answered). Flags: hotel diff Rp 124 → info (tolerance Rp 1.000, Q-14);
+ * bill 676.876). D3 (DRMS 10/10): the line total is qty × harga satuan, so line 2 is entered as
+ * 2 × 338.500 (the paper showed an informational 339.000); lines 1 and 3 carry only the total → the
+ * server derives the unit price (total ÷ qty). Flags: hotel diff Rp 124 → info (tolerance Rp 1.000, Q-14);
  * receipts dated 21/09 after the 20/09 request date → date_after_request (Q-04: TGL = submit
  * date); BBM unit "bulan" → uom_suspicious (BBM allowed: liter, kali isi — Q-20).
  */
@@ -27,7 +29,7 @@ export const FORM_228 = {
   grandTotal: 1_447_500,
   lines: [
     { description: 'BBM Hilux Banjarmasin-Palangka', qty: 1, uomCode: 'BLN', unitPrice: null, total: 600_000, categoryCode: 'BBM', vehiclePlate: 'DA1234XY' },
-    { description: 'Penginapan', qty: 2, uomCode: 'KMR', unitPrice: 339_000, total: 677_000, categoryCode: 'INAP', vehiclePlate: null },
+    { description: 'Penginapan', qty: 2, uomCode: 'KMR', unitPrice: 338_500, total: 677_000, categoryCode: 'INAP', vehiclePlate: null },
     { description: 'Makan siang', qty: null, uomCode: null, unitPrice: null, total: 170_500, categoryCode: 'KSM', vehiclePlate: null },
   ],
   receipts: [

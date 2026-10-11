@@ -25,6 +25,7 @@ export type LineDoc = {
   uom?: unknown
   unitPrice?: number | null
   total?: number | null
+  receiptAmount?: number | null
   notes?: string | null
   category?: unknown
   vehicle?: unknown

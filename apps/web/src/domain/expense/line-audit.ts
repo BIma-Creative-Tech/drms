@@ -7,7 +7,7 @@ import { normalizeValue } from '@/audit/hooks'
 
 export type AuditLine = Record<string, unknown> & { id?: string | null }
 
-export const LINE_FIELDS = ['description', 'qty', 'uom', 'unitPrice', 'total', 'category', 'vehicle', 'notes'] as const
+export const LINE_FIELDS = ['description', 'qty', 'uom', 'unitPrice', 'total', 'receiptAmount', 'category', 'vehicle', 'notes'] as const
 
 export type LineChange = {
   kind: 'added' | 'removed' | 'changed'

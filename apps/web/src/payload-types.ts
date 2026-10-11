@@ -365,7 +365,7 @@ export interface Company {
   transferSlaHours: number;
   reimburseAutoCloseDays: number;
   /**
-   * Uang muka tanpa LPJ lebih lama dari ini tampil sebagai "LPJ terlambat" di dashboard/laporan.
+   * Pengajuan baru tanpa LPJ lebih lama dari ini tampil sebagai "LPJ terlambat" di dashboard/laporan.
    */
   lpjDueDays: number;
   /**
@@ -410,7 +410,7 @@ export interface Company {
    */
   reminderLateProgressEnabled?: boolean | null;
   /**
-   * Batas hari = "Batas LPJ uang muka".
+   * Batas hari = "Batas LPJ pengajuan baru".
    */
   reminderLpjOverdueEnabled?: boolean | null;
   reminderRevisionEnabled?: boolean | null;
@@ -1221,9 +1221,6 @@ export interface ExpenseRequest {
   };
   notes?: string | null;
   attachments?: (number | MediaAttachment)[] | null;
-  /**
-   * Tunggu sebentar setelah mengisi field sebelum menekan Tambah Baris.
-   */
   lines?:
     | {
         description?: string | null;
@@ -1231,6 +1228,7 @@ export interface ExpenseRequest {
         uom?: (number | null) | Uom;
         unitPrice?: number | null;
         total?: number | null;
+        receiptAmount?: number | null;
         category?: (number | null) | ExpenseCategory;
         vehicle?: (number | null) | Vehicle;
         notes?: string | null;
@@ -1441,6 +1439,8 @@ export interface Settlement {
   request: number | ExpenseRequest;
   status: 'draft' | 'submitted' | 'revision' | 'verified' | 'settled';
   usageNotes?: string | null;
+  photos?: (number | MediaReceipt)[] | null;
+  photosHash?: string | null;
   transferredTotal?: number | null;
   receiptsTotal?: number | null;
   verifiedReceiptsTotal?: number | null;
@@ -1482,6 +1482,48 @@ export interface Settlement {
   changeReason?: string | null;
   updatedAt: string;
   createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "media-receipts".
+ */
+export interface MediaReceipt {
+  id: number;
+  uploadedBy?: (number | null) | User;
+  receivedAt?: string | null;
+  ownerDocType?: string | null;
+  ownerDocId?: string | null;
+  sha256Original?: string | null;
+  originalWidth?: number | null;
+  originalHeight?: number | null;
+  originalSize?: number | null;
+  capturedAt?: string | null;
+  ownerCompany?: (number | null) | Company;
+  /**
+   * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
+   */
+  changeReason?: string | null;
+  updatedAt: string;
+  createdAt: string;
+  url?: string | null;
+  thumbnailURL?: string | null;
+  filename?: string | null;
+  mimeType?: string | null;
+  filesize?: number | null;
+  width?: number | null;
+  height?: number | null;
+  focalX?: number | null;
+  focalY?: number | null;
+  sizes?: {
+    thumb?: {
+      url?: string | null;
+      width?: number | null;
+      height?: number | null;
+      mimeType?: string | null;
+      filesize?: number | null;
+      filename?: string | null;
+    };
+  };
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -1647,48 +1689,6 @@ export interface Receipt {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "media-receipts".
- */
-export interface MediaReceipt {
-  id: number;
-  uploadedBy?: (number | null) | User;
-  receivedAt?: string | null;
-  ownerDocType?: string | null;
-  ownerDocId?: string | null;
-  sha256Original?: string | null;
-  originalWidth?: number | null;
-  originalHeight?: number | null;
-  originalSize?: number | null;
-  capturedAt?: string | null;
-  ownerCompany?: (number | null) | Company;
-  /**
-   * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
-   */
-  changeReason?: string | null;
-  updatedAt: string;
-  createdAt: string;
-  url?: string | null;
-  thumbnailURL?: string | null;
-  filename?: string | null;
-  mimeType?: string | null;
-  filesize?: number | null;
-  width?: number | null;
-  height?: number | null;
-  focalX?: number | null;
-  focalY?: number | null;
-  sizes?: {
-    thumb?: {
-      url?: string | null;
-      width?: number | null;
-      height?: number | null;
-      mimeType?: string | null;
-      filesize?: number | null;
-      filename?: string | null;
-    };
-  };
-}
-/**
- * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "receipt-flags".
  */
 export interface ReceiptFlag {
@@ -1699,7 +1699,14 @@ export interface ReceiptFlag {
   company?: (number | null) | Company;
   request: number | ExpenseRequest;
   key: string;
-  kind: 'amount_diff' | 'date_after_request' | 'date_too_old' | 'date_out_of_period' | 'uom_suspicious' | 'duplicate';
+  kind:
+    | 'amount_diff'
+    | 'date_after_request'
+    | 'date_too_old'
+    | 'date_out_of_period'
+    | 'uom_suspicious'
+    | 'duplicate'
+    | 'receipt_amount_mismatch';
   level: 'info' | 'warning';
   lineId?: string | null;
   lineNo?: number | null;
@@ -3415,6 +3422,7 @@ export interface ExpenseRequestsSelect<T extends boolean = true> {
         uom?: T;
         unitPrice?: T;
         total?: T;
+        receiptAmount?: T;
         category?: T;
         vehicle?: T;
         notes?: T;
@@ -3593,6 +3601,8 @@ export interface SettlementsSelect<T extends boolean = true> {
   request?: T;
   status?: T;
   usageNotes?: T;
+  photos?: T;
+  photosHash?: T;
   transferredTotal?: T;
   receiptsTotal?: T;
   verifiedReceiptsTotal?: T;

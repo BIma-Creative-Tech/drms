@@ -16,7 +16,7 @@ import { isBusinessDate } from './types'
 
 /**
  * T5 LPJ & settlement service (requirements v1.1 §7 T5, US-08/US-21/US-22; architecture §5.1,
- * §5.3; ADR 0005 §3). Uang Muka only — the state table rejects every LPJ action on Reimburse.
+ * §5.3; ADR 0005 §3). Pengajuan Baru only — the state table rejects every LPJ action on Reimburse.
  * Every function runs inside the caller's request transaction (row lock on the request first),
  * writes through Local API with SYSTEM-WRITE after the guards, and relies on the DB triggers
  * (pk_settlements_guard, pk_transfers_guard, pk_cash_entries_guard) as the last line of defence.
@@ -27,6 +27,8 @@ export type SettlementDoc = {
   request: unknown
   status: SettlementStatus
   usageNotes?: string | null
+  /** Point 13: LPJ photo ids (media-receipts). */
+  photos?: unknown[] | null
   transferredTotal?: number | null
   receiptsTotal?: number | null
   verifiedReceiptsTotal?: number | null
@@ -85,6 +87,33 @@ export async function requireSettlement(req: PayloadRequest, requestId: number, 
 
 const sum = (xs: Array<{ amount: number }>) => xs.reduce((a, r) => a + r.amount, 0)
 
+/** Point 13: max LPJ photos (same as the APK picker). */
+export const MAX_LPJ_PHOTOS = 10
+
+/**
+ * PUT …/lpj/photos (point 13, DRMS 10/10) — the requester sets the LPJ photo set while the LPJ is editable
+ * (Draft at "Nota Lengkap", Revisi at "LPJ Revisi"; same guard as Kirim LPJ). Photos = media-receipts uploaded
+ * by the caller (images only), each claimed for the request (media read access follows the request). A
+ * photo removed from the set stays claimed (audit trail), never reusable in another document.
+ */
+export async function setLpjPhotos(req: PayloadRequest, id: number, photos: number[], opts: { locked?: boolean } = {}): Promise<SettlementDoc> {
+  if (!opts.locked) {
+    const doc = await loadVisible(req, id, { lock: true })
+    requireAction(await actorContext(req, doc), 'lpj_submit')
+  }
+  const s = await requireSettlement(req, id, ['draft', 'revision'])
+  const uniq = [...new Set(photos)]
+  if (uniq.length !== photos.length) fail(400, 'Foto LPJ tidak boleh ganda.', [{ path: 'photos', message: 'Foto ganda.' }])
+  if (uniq.length > MAX_LPJ_PHOTOS) fail(400, `Maksimal ${MAX_LPJ_PHOTOS} foto LPJ.`, [{ path: 'photos', message: `Maksimal ${MAX_LPJ_PHOTOS} foto.` }])
+  const current = new Set((s.photos ?? []).map((p) => relId(p)).filter((x): x is number => x !== undefined))
+  for (const m of uniq) {
+    // already part of this LPJ → kept as is; new → must be the caller's own unclaimed (or this request's) upload
+    if (!current.has(m)) await claimMedia(req, 'media-receipts', m, id)
+  }
+  if (uniq.length === current.size && uniq.every((m) => current.has(m))) return s
+  return updateSettlement(req, s.id, { photos: uniq })
+}
+
 /**
  * POST …/receipts-complete — "Ditransfer" → "Nota Lengkap" (architecture §5.1 DT → NL):
  * requester side declares the receipts complete (min 1 active receipt); the LPJ document is
@@ -114,9 +143,11 @@ export async function receiptsComplete(req: PayloadRequest, id: number): Promise
  * Σ active receipts (pending + valid), provisional difference = transferred − receipts total.
  * LPJ number allocated at the FIRST submit (ADR 0007). Flags recomputed (architecture §5.6).
  */
-export async function submitLpj(req: PayloadRequest, id: number, input: { usageNotes?: string | null }) {
+export async function submitLpj(req: PayloadRequest, id: number, input: { usageNotes?: string | null; photos?: number[] }) {
   const doc = await loadVisible(req, id, { lock: true })
   requireAction(await actorContext(req, doc), 'lpj_submit')
+  // point 13: photos sent with the submit are saved BEFORE the status change (the DB freezes the set at submit)
+  if (input.photos !== undefined) await setLpjPhotos(req, id, input.photos, { locked: true })
   const s = await requireSettlement(req, id, ['draft', 'revision'])
   const usageNotes = (input.usageNotes ?? '').trim() || s.usageNotes || ''
   if (usageNotes.length < 3) fail(400, 'Uraian penggunaan dana wajib diisi.', [{ path: 'usageNotes', message: 'Wajib diisi.' }])

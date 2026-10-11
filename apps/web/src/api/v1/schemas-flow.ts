@@ -29,7 +29,7 @@ const qty = z
   .max(1e9)
   .refine((v) => Math.abs(Math.round(v * 1000) - v * 1000) < 1e-6, 'maks. 3 desimal')
 
-export const RequestTypeEnum = z.enum(['advance', 'reimburse']).meta({ id: 'RequestType', description: 'advance = Uang Muka, reimburse = Reimburse' })
+export const RequestTypeEnum = z.enum(['advance', 'reimburse']).meta({ id: 'RequestType', description: 'advance = Pengajuan Baru (label until 2026-10: Uang Muka), reimburse = Reimburse' })
 export const RequestStatusEnum = z
   .enum([
     'draft',
@@ -81,10 +81,11 @@ export const LineInput = z
   .object({
     id: z.string().max(64).optional().meta({ description: 'Existing line id (keep to update a line in place; omit for new lines).' }),
     description: z.string().max(500).optional(),
-    qty: qty.nullable().optional(),
+    qty: qty.nullable().optional().meta({ description: 'Quantity (≤ 3 decimals); empty = 1. A unit (uomId) is required when qty is set.' }),
     uomId: id.nullable().optional(),
-    unitPrice: rupiah.nullable().optional().meta({ description: 'Informational only — never used to compute the total (Q-05).' }),
-    total: rupiahPos.nullable().optional().meta({ description: 'PRIMARY value entered by the user (may be rounded from the receipt).' }),
+    unitPrice: rupiah.nullable().optional().meta({ description: 'D3 (DRMS 10/10): required to submit. The line total is computed by the server: total = qty × unitPrice (qty empty = 1), rounded to whole Rupiah.' }),
+    total: rupiahPos.nullable().optional().meta({ description: 'READ-ONLY since D3: ignored when unitPrice is sent (the server computes qty × unitPrice). Compatibility for old clients that send only `total`: unitPrice = total ÷ qty when that is a whole Rupiah amount, else the line stays incomplete (cannot be submitted).' }),
+    receiptAmount: rupiah.nullable().optional().meta({ description: 'D3 "Nominal sesuai nota" (optional). When set and ≠ total, the request carries the awareness flag `receipt_amount_mismatch` ("Selisih nota") for Finance; amounts stay based on total.' }),
     notes: z.string().max(500).nullable().optional(),
     categoryId: id.nullable().optional(),
     vehicleId: id.nullable().optional(),
@@ -247,8 +248,10 @@ export const ExpenseRequestDetail = ExpenseRequestListItem.extend({
       qty: z.number().nullable(),
       uom: Ref.nullable(),
       unitPrice: rupiah.nullable(),
-      unitPriceDisplay: rupiah.nullable().meta({ description: 'unitPrice, else total ÷ qty (display only).' }),
-      total: rupiah,
+      unitPriceDisplay: rupiah.nullable().meta({ description: 'unitPrice, else total ÷ qty (display only; lines saved before D3).' }),
+      total: rupiah.meta({ description: 'Server-computed qty × unitPrice (D3). 0 = incomplete line (no unit price yet).' }),
+      receiptAmount: rupiah.nullable().meta({ description: 'D3 "Nominal sesuai nota" (null = not filled).' }),
+      receiptMismatch: z.boolean().meta({ description: 'receiptAmount set and ≠ total (live; the stored Finance flag is flags[] kind receipt_amount_mismatch).' }),
       notes: z.string().nullable(),
       category: Ref.nullable(),
       vehicle: z.object({ id, plateNo: z.string().nullish(), plateDisplay: z.string().nullish(), type: z.string().nullish() }).nullable(),
@@ -355,6 +358,7 @@ export const ExpenseRequestDetail = ExpenseRequestListItem.extend({
       status: z.enum(['draft', 'submitted', 'revision', 'verified', 'settled']),
       statusLabel: z.string(),
       usageNotes: z.string().nullable(),
+      photos: z.array(id).meta({ description: 'Point 13: LPJ photo ids (media-receipts; file: GET /api/v1/media/receipts/{id}/file).' }),
       transferredTotal: rupiah.nullable(),
       receiptsTotal: rupiah.nullable().meta({ description: 'Σ active receipts (pending + valid); refreshed at every LPJ submit and — QA-09 — after every receipt add / edit / remove / valid / reject while the LPJ is open.' }),
       verifiedReceiptsTotal: rupiah.nullable(),
@@ -375,7 +379,7 @@ export const ExpenseRequestDetail = ExpenseRequestListItem.extend({
         .meta({ description: 'QA-06 / ADR 0019 (Finance/Direktur of the PT only; null otherwise or without a shortfall): shortfall vs approved + tolerance and its re-approval.' }),
     })
     .nullable()
-    .meta({ id: 'Settlement', description: 'T5 LPJ (Uang Muka only; null before "Nota Lengkap").' }),
+    .meta({ id: 'Settlement', description: 'T5 LPJ (Pengajuan Baru only; null before "Nota Lengkap").' }),
   budget: z
     .object({ basis: z.enum(['project', 'none']), pctBefore: z.number().nullable(), pctAfter: z.number().nullable() })
     .meta({ description: 'US-26 preview (committed % before → after); cost centers: "none" (Q-24).' }),
@@ -399,12 +403,20 @@ export const ExpenseRequestDetail = ExpenseRequestListItem.extend({
     .meta({ description: '"Giliran": who is expected to act next and what (display text, Bahasa Indonesia); null when finished.' }),
 }).meta({ id: 'ExpenseRequestDetail' })
 
+/** Point 13 (DRMS 10/10): LPJ photos = media-receipts ids uploaded by the caller (POST /api/v1/media/receipts), images only. */
+const lpjPhotos = z.array(id).max(10).meta({ description: 'Point 13: LPJ photos — media-receipts ids (POST /api/v1/media/receipts, images only), max 10. Replaces the whole set.' })
+
 export const LpjSubmitBody = z
-  .object({ usageNotes: z.string().trim().min(3).max(2000).optional().meta({ description: 'Required at the first submit; kept on resubmit when omitted.' }) })
+  .object({
+    usageNotes: z.string().trim().min(3).max(2000).optional().meta({ description: 'Required at the first submit; kept on resubmit when omitted.' }),
+    photos: lpjPhotos.optional(),
+  })
   .strict()
   .meta({ id: 'LpjSubmitBody' })
 
 export const RevisionBody = z.object({ note }).strict().meta({ id: 'LpjRevisionBody' })
+
+export const LpjPhotosBody = z.object({ photos: lpjPhotos }).strict().meta({ id: 'LpjPhotosBody', description: 'Point 13: save the LPJ photo set while the LPJ is editable (Draft / Revisi) — requester only.' })
 
 export const SettleReverseResult = z
   .object({
@@ -764,7 +776,7 @@ export const ApprovalInbox = z
           overWarn: z.boolean(),
           warnPct: z.number().meta({ description: 'MC2: budgetWarnPct of the request\'s PT (overWarn = pctAfter > warnPct).' }),
         }),
-        flags: z.object({ warning: z.number().int(), info: z.number().int() }),
+        flags: z.object({ warning: z.number().int(), info: z.number().int(), receiptMismatch: z.number().int().meta({ description: 'D3: lines with "Selisih nota" (receipt_amount_mismatch, open or reviewed).' }) }),
       }),
     ),
   })

@@ -156,7 +156,7 @@ async function drive(target: string, type: 'advance' | 'reimburse', s: Scope, op
     await must(call('POST', `${E}/${id}/complete`, w.users.staffA, {}))
     return bump('completed_reimburse')
   }
-  // Uang Muka LPJ: receipts per line; variant exact / refund / shortfall
+  // Pengajuan Baru LPJ: receipts per line; variant exact / refund / shortfall
   const variant = target === 'lpj_refund' || target === 'lpj_verified_pending' ? -1 : target === 'lpj_shortfall' ? 1 : 0
   for (const [i, l] of lineIds.entries()) await receipt(w.users.staffA, id, l, totals[i]! + (i === 0 ? variant * 5_000 : 0), addDays(today, -1))
   await must(call('POST', `${E}/${id}/receipts-complete`, w.users.staffA, {}))
@@ -248,7 +248,7 @@ beforeAll(async () => {
     { costCenterId: w.costCenter, ack: w.users.owner },
     [
       { description: 'BBM Hilux Banjarmasin-Palangka', qty: 60, uomId: w.uom.l, total: 600_000, categoryId: w.cat.bbm, vehicleId: w.vehicle },
-      { description: 'Penginapan', qty: 2, uomId: w.uom.kmr, unitPrice: 339_000, total: 677_000, categoryId: w.cat.inap },
+      { description: 'Penginapan', qty: 2, uomId: w.uom.kmr, unitPrice: 338_500, total: 677_000, categoryId: w.cat.inap },
       { description: 'Makan siang', total: 170_500, categoryId: w.cat.ksm },
     ],
     '=HYPERLINK("http://x") Pengajuan Reimburse Ops keperluan Service Tronton',

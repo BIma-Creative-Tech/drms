@@ -10,7 +10,7 @@ import { formatRupiah } from '@/lib/money'
 
 import { addDays, type FlagKind, type FlagLevel, type RequestType } from './types'
 
-export type FlagLine = { id: string; lineNo: number; total: number; uom?: number | null; category?: number | null }
+export type FlagLine = { id: string; lineNo: number; total: number; uom?: number | null; category?: number | null; receiptAmount?: number | null }
 export type FlagReceipt = { id: number; lineId: string; receiptDate: string; amount: number }
 export type FlagCategory = { id: number; name: string; allowedUoms: number[] }
 /**
@@ -24,7 +24,7 @@ export type FlagInput = {
   type: RequestType
   /** Reimburse: tanggal pengajuan (server date of submit, or today while Draft) — Q-04 default. */
   requestDate: string
-  /** Uang Muka: date of the (first) posted transfer, if any. */
+  /** Pengajuan Baru: date of the (first) posted transfer, if any. */
   transferDate?: string | null
   lines: FlagLine[]
   /** Active receipts only (not rejected/removed). */
@@ -85,6 +85,23 @@ export function computeFlags(input: FlagInput): FlagSpec[] {
       lineNo: line.lineNo,
       message: `Selisih ${formatRupiah(Math.abs(diff))} (baris ${formatRupiah(line.total)}, nota ${formatRupiah(sum)}; toleransi ${formatRupiah(input.tolerance)}).`,
       detail: { lineTotal: line.total, receiptsTotal: sum, difference: diff, tolerance: input.tolerance },
+    })
+  }
+
+  // D3 (DRMS 10/10): the requester's "Nominal sesuai nota" differs from the computed line total
+  // (qty × harga satuan). Awareness only — approval and transfer stay on the total. Level like US-47:
+  // within the rounding tolerance → info, else warning (Finance marks it "sudah diperiksa").
+  for (const line of input.lines) {
+    if (typeof line.receiptAmount !== 'number' || line.receiptAmount === line.total) continue
+    const diff = line.total - line.receiptAmount
+    out.push({
+      key: `receipt_amount_mismatch:${line.id}`,
+      kind: 'receipt_amount_mismatch',
+      level: Math.abs(diff) <= input.tolerance ? 'info' : 'warning',
+      lineId: line.id,
+      lineNo: line.lineNo,
+      message: `Baris ${line.lineNo}: total ${formatRupiah(line.total)}, nominal nota ${formatRupiah(line.receiptAmount)}, selisih ${formatRupiah(Math.abs(diff))}${diff > 0 ? ' (nota lebih kecil)' : ' (nota lebih besar)'}.`,
+      detail: { lineTotal: line.total, receiptAmount: line.receiptAmount, difference: diff, tolerance: input.tolerance },
     })
   }
 

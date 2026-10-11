@@ -13,7 +13,7 @@ import { addReceipt, editReceipt, rejectReceipt, removeReceipt, resubmitReceipts
 import { allowedActions } from '@/domain/expense/state'
 import { recordTransfer, voidTransfer } from '@/domain/expense/transfers'
 import { acknowledge, approve, cancel, complete, reject, submit, withdraw } from '@/domain/expense/workflow'
-import { receiptsComplete, requestLpjRevision, reverseSettlement, settle, submitLpj, verifyLpj } from '@/domain/expense/lpj'
+import { receiptsComplete, requestLpjRevision, reverseSettlement, setLpjPhotos, settle, submitLpj, verifyLpj } from '@/domain/expense/lpj'
 import { requestHistory } from '@/domain/history'
 import { approvalInbox, lpjQueue, officeQueueWhere } from '@/domain/expense/queues'
 import { settlePrecheck } from '@/domain/expense/settle-precheck'
@@ -29,6 +29,7 @@ import {
   ExpenseRequestUpdate,
   FlagReviewBody,
   ListQuery,
+  LpjPhotosBody,
   LpjSubmitBody,
   PdfQuery,
   RevisionBody,
@@ -187,7 +188,7 @@ export const historyEndpoint = v1({
   },
 })
 
-/** GET /transfer-queue — US-19: Uang Muka "Disetujui", Reimburse "Nota Terverifikasi", by needed date. */
+/** GET /transfer-queue — US-19: Pengajuan Baru "Disetujui", Reimburse "Nota Terverifikasi", by needed date. */
 export const transferQueueEndpoint = v1({
   path: '/transfer-queue',
   method: 'get',
@@ -240,7 +241,7 @@ export const approvalInboxEndpoint = v1({
 })
 
 /**
- * GET /lpj-queue[?company=] — US-21 LPJ verification list (Uang Muka "LPJ Diajukan" / "LPJ
+ * GET /lpj-queue[?company=] — US-21 LPJ verification list (Pengajuan Baru "LPJ Diajukan" / "LPJ
  * Terverifikasi") of the PTs where the caller is Finance / Direktur, with `company` refs (MC3-1).
  */
 export const lpjQueueEndpoint = v1({
@@ -415,10 +416,25 @@ export const voidTransferEndpoint = v1({
   },
 })
 
-// ---------------------------------------------------------------- T5 LPJ & settlement (Uang Muka)
+// ---------------------------------------------------------------- T5 LPJ & settlement (Pengajuan Baru)
 
 export const receiptsCompleteEndpoint = action('receipts-complete', EmptyBody, (req, id) => receiptsComplete(req, id))
-export const lpjSubmitEndpoint = action('lpj/submit', LpjSubmitBody, (req, id, b) => submitLpj(req, id, { usageNotes: b.usageNotes }))
+export const lpjSubmitEndpoint = action('lpj/submit', LpjSubmitBody, (req, id, b) => submitLpj(req, id, { usageNotes: b.usageNotes, photos: b.photos }))
+
+/** PUT /expense-requests/:id/lpj/photos — point 13: the requester's LPJ photo set while the LPJ is Draft / Revisi. */
+export const lpjPhotosEndpoint = v1({
+  path: '/expense-requests/:id/lpj/photos',
+  method: 'put',
+  body: LpjPhotosBody,
+  rateLimit: ACTION_LIMIT,
+  transactional: true,
+  idempotent: true,
+  handler: async ({ req, body, params }) => {
+    const id = idParam(params)
+    await setLpjPhotos(req, id, body.photos)
+    return ok(req, id)
+  },
+})
 export const lpjRevisionEndpoint = action('lpj/request-revision', RevisionBody, (req, id, b) => {
   req.context.auditReason = b.note
   return requestLpjRevision(req, id, b.note)
@@ -586,6 +602,7 @@ export const EXPENSE_ENDPOINTS = [
   voidTransferEndpoint,
   receiptsCompleteEndpoint,
   lpjSubmitEndpoint,
+  lpjPhotosEndpoint,
   lpjRevisionEndpoint,
   lpjVerifyEndpoint,
   settleEndpoint,

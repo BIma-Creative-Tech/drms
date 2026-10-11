@@ -26,6 +26,15 @@ export function linesEditable(data: FormData): boolean {
 }
 export const linesCondition: Condition = (data) => linesEditable(data as FormData)
 
+/**
+ * DRMS 10/10 B-2 (item 3): an input of the request header — shown only while the content is editable (new /
+ * Draft / Revisi Nota); on a locked request the workflow panel shows the read-only "Rincian pengajuan" summary
+ * instead (label: value, no empty pickers, no loading inputs). `name` given: in Revisi Nota only when filled.
+ */
+export function editableInput(name?: string): Condition {
+  return (data, sibling, ctx) => linesEditable(data as FormData) && (!name || draftOrSet(name)(data, sibling, ctx))
+}
+
 /** Field shown only when it has a value (docNo before the first submit is empty). */
 export function whenSet(name: string): Condition {
   return (data) => {

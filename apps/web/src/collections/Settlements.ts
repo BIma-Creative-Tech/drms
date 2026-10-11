@@ -14,7 +14,7 @@ import { USER_NAME_VIEW } from '@/fields/users'
 
 /**
  * T5 LPJ & settlement (requirements v1.1 §7 T5, US-08/US-21/US-22; architecture §4.3 `settlements`,
- * §5.3). Uang Muka only, one row per request, created when the requester declares the receipts
+ * §5.3). Pengajuan Baru only, one row per request, created when the requester declares the receipts
  * complete ("Nota Lengkap"). LPJ number (`LPJ/YYMM/####`, ADR 0007) at the first submit.
  * difference = transferredTotal − verifiedReceiptsTotal: > 0 → staff returns the rest (KM
  * "Pengembalian LPJ", ADR 0005 §3), < 0 → shortfall transfer (T3 `lpj_shortfall` + KK), 0 → none.
@@ -54,6 +54,20 @@ export const Settlements: CollectionConfig = withAudit(
         admin: ro,
       },
       { name: 'usageNotes', type: 'textarea', label: 'Uraian penggunaan dana', maxLength: 2000, admin: ro },
+      // Point 13 (DRMS 10/10): LPJ photos (site / goods), same pipeline + privacy as receipts (media-receipts:
+      // re-encoded ≤ 1600 px, EXIF stripped, owner-linked → readable like the request). Requester adds/removes
+      // them while the LPJ is Draft / Revisi (service lpj.ts setLpjPhotos); frozen afterwards
+      // (DB: settlements_photos_frozen compares the set with `photos_hash` taken at submit).
+      {
+        name: 'photos',
+        type: 'upload',
+        relationTo: 'media-receipts',
+        hasMany: true,
+        maxRows: 10,
+        label: 'Foto LPJ',
+        admin: { ...ro, components: { Field: '@/admin/components/LpjPhotosField#LpjPhotosField' } },
+      },
+      { name: 'photosHash', type: 'text', label: 'Hash foto LPJ terkunci', admin: { ...ro, hidden: true } },
       { name: 'transferredTotal', type: 'number', label: 'Total ditransfer (Rp)', admin: ro },
       { name: 'receiptsTotal', type: 'number', label: 'Total nota diajukan (Rp)', admin: ro },
       { name: 'verifiedReceiptsTotal', type: 'number', label: 'Total nota terverifikasi (Rp)', admin: ro },
@@ -108,7 +122,7 @@ export const Settlements: CollectionConfig = withAudit(
   {
     docType: 'settlement',
     docNo: (d) => (typeof d.docNo === 'string' ? d.docNo : undefined),
-    exclude: ['submitCount', 'reversalCount', 'shortfallApprovalSnapshot'],
+    exclude: ['submitCount', 'reversalCount', 'shortfallApprovalSnapshot', 'photosHash'],
     reasonRules: [reasonOnChange(['financeNotes'], 'Catatan revisi wajib diisi (G7).')],
     actionFor: (c) => (c.field === 'status' ? 'status_change' : undefined),
   },

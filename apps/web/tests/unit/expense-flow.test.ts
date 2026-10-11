@@ -3,14 +3,14 @@ import { describe, expect, it } from 'vitest'
 import { isLocked, lockDate, periodEnd } from '@/domain/cash/periods'
 import { computeFlags, normalizeReceiptNo, normalizeVendor, type FlagInput } from '@/domain/expense/flags'
 import { diffLines } from '@/domain/expense/line-audit'
-import { displayUnitPrice, grandTotal, validateLines } from '@/domain/expense/lines'
+import { computeLineTotal, displayUnitPrice, grandTotal, normalizeLines, receiptMismatch, validateLines } from '@/domain/expense/lines'
 import { budgetImpact, buildSnapshot, matchesAcknowledger, matchesStep, selectRule, stepsError, type RuleInput } from '@/domain/expense/rules'
 import { allowedActions, assertTransition, targets, TransitionError, type ActorContext } from '@/domain/expense/state'
 import { addDays, isBusinessDate, receiptsEditable, statusLabel } from '@/domain/expense/types'
 import { formatRupiah } from '@/lib/money'
 import { FORM_228 } from '@/seed/form-fixture'
 
-describe('state machines (architecture §5.1 Uang Muka / §5.2 Reimburse, G6)', () => {
+describe('state machines (architecture §5.1 Pengajuan Baru / §5.2 Reimburse, G6)', () => {
   it('shared approval path', () => {
     for (const t of ['advance', 'reimburse'] as const) {
       expect(targets(t, 'draft', 'submit').sort()).toEqual(['pending_ack', 'pending_approval'])
@@ -21,7 +21,7 @@ describe('state machines (architecture §5.1 Uang Muka / §5.2 Reimburse, G6)', 
     }
   })
 
-  it('Uang Muka: approved → transferred ⇄ approved (void); no receipt verification step', () => {
+  it('Pengajuan Baru: approved → transferred ⇄ approved (void); no receipt verification step', () => {
     expect(targets('advance', 'approved', 'transfer')).toEqual(['transferred'])
     expect(targets('advance', 'transferred', 'transfer_void')).toEqual(['approved'])
     expect(targets('advance', 'approved', 'verify_receipts')).toEqual([])
@@ -93,14 +93,36 @@ describe('state machines (architecture §5.1 Uang Muka / §5.2 Reimburse, G6)', 
   })
 })
 
-describe('lines (US-37, Q-05 answered: total primary, unit price informational)', () => {
-  const lines = FORM_228.lines.map((l) => ({ description: l.description, qty: l.qty, uom: l.uomCode ? 1 : null, unitPrice: l.unitPrice, total: l.total, category: 1 }))
-  it('form 228 grand total = Rp 1.447.500 even though 2 × 339.000 ≠ 677.000', () => {
+describe('lines (US-37; D3 DRMS 10/10: total = qty × harga satuan, computed)', () => {
+  const lines = normalizeLines(FORM_228.lines.map((l) => ({ description: l.description, qty: l.qty, uom: l.uomCode ? 1 : null, unitPrice: l.unitPrice, total: l.total, category: 1 })))
+  it('form 228 grand total = Rp 1.447.500 (2 × 338.500; total-only lines get unit price = total ÷ qty)', () => {
+    expect(lines.map((l) => [l.unitPrice, l.total])).toEqual([
+      [600_000, 600_000],
+      [338_500, 677_000],
+      [170_500, 170_500],
+    ])
     expect(grandTotal(lines)).toBe(1_447_500)
     expect(formatRupiah(grandTotal(lines))).toBe('Rp 1.447.500')
     expect(validateLines(lines, { forSubmit: true })).toEqual([])
   })
-  it('lump sum line accepted; display unit price = total ÷ qty when empty', () => {
+  it('the client total is ignored once a unit price is given; qty empty = 1; decimals rounded half-up', () => {
+    expect(normalizeLines([{ qty: 2, unitPrice: 339_000, total: 677_000 }])[0]).toMatchObject({ unitPrice: 339_000, total: 678_000 })
+    expect(normalizeLines([{ qty: null, unitPrice: 150_000, total: 1 }])[0]!.total).toBe(150_000)
+    expect(computeLineTotal(24.8, 24_200)).toBe(600_160) // K10: Pertamina 24,80 L × 24.200
+    expect(computeLineTotal(1.005, 1_000)).toBe(1_005)
+    expect(computeLineTotal(0.5, 3)).toBe(2) // 1,5 → 2 (half-up)
+    expect(computeLineTotal(1.23456, 1_000)).toBeNull()
+    expect(computeLineTotal(1, null)).toBeNull()
+  })
+  it('total-only compatibility: exact division → unit price; otherwise the line stays incomplete (cannot be sent)', () => {
+    expect(normalizeLines([{ qty: 24.8, total: 250_000 }])[0]).toMatchObject({ unitPrice: null, total: null })
+    const legacy = normalizeLines([{ id: 'a', qty: 24.8, total: 250_000 }], [{ id: 'a', qty: 24.8, unitPrice: null, total: 250_000 }])[0]!
+    expect(legacy).toMatchObject({ unitPrice: null, total: 250_000 }) // unchanged legacy row keeps its total
+    expect(validateLines([{ description: 'x', qty: 24.8, uom: 1, total: 250_000, category: 1 }], { forSubmit: true }).map((e) => e.path)).toEqual(['lines.0.unitPrice'])
+    expect(receiptMismatch({ total: 678_000, receiptAmount: 677_000 })).toBe(true)
+    expect(receiptMismatch({ total: 678_000, receiptAmount: null })).toBe(false)
+  })
+  it('lump sum line accepted; display unit price = total ÷ qty when empty (legacy rows)', () => {
     expect(displayUnitPrice({ unitPrice: null, qty: null, total: 170_500 })).toBeNull()
     expect(displayUnitPrice({ unitPrice: null, qty: 2, total: 677_000 })).toBe(338_500)
     expect(displayUnitPrice({ unitPrice: 339_000, qty: 2, total: 677_000 })).toBe(339_000)
@@ -108,9 +130,9 @@ describe('lines (US-37, Q-05 answered: total primary, unit price informational)'
   it('rejects malformed values; completeness only for submit', () => {
     expect(validateLines([], { forSubmit: true }).map((e) => e.path)).toContain('lines')
     expect(validateLines([], { forSubmit: false })).toEqual([])
-    const bad = validateLines([{ description: 'x', total: 10.5, qty: 1.23456, unitPrice: -1, category: 1 }], { forSubmit: true }).map((e) => e.path)
-    expect(bad).toEqual(expect.arrayContaining(['lines.0.total', 'lines.0.qty', 'lines.0.unitPrice', 'lines.0.uom']))
-    expect(validateLines([{ description: 'x' }], { forSubmit: true }).map((e) => e.path)).toEqual(expect.arrayContaining(['lines.0.total', 'lines.0.category']))
+    const bad = validateLines([{ description: 'x', total: 10.5, qty: 1.23456, unitPrice: -1, receiptAmount: -5, category: 1 }], { forSubmit: true }).map((e) => e.path)
+    expect(bad).toEqual(expect.arrayContaining(['lines.0.total', 'lines.0.qty', 'lines.0.unitPrice', 'lines.0.uom', 'lines.0.receiptAmount']))
+    expect(validateLines([{ description: 'x' }], { forSubmit: true }).map((e) => e.path)).toEqual(expect.arrayContaining(['lines.0.total', 'lines.0.unitPrice', 'lines.0.category']))
   })
 })
 
@@ -147,7 +169,7 @@ describe('receipt flags (US-47…US-50) — form 228 expectations', () => {
     expect(computeFlags({ ...base, tolerance: 0 }).find((f) => f.kind === 'amount_diff')).toMatchObject({ level: 'warning' })
   })
 
-  it('old receipts, Uang Muka transfer date, duplicates; no activity-period flag any more', () => {
+  it('old receipts, Pengajuan Baru transfer date, duplicates; no activity-period flag any more', () => {
     const f1 = computeFlags({ ...base, receipts: [{ id: 9, lineId: 'L2', receiptDate: '2026-08-01', amount: 170_500 }] })
     expect(f1.map((f) => f.kind)).toContain('date_too_old')
     // owner decision 2026-10-09: "Periode kegiatan" replaced by "Tingkat urgensi" → date_out_of_period is never raised

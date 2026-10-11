@@ -61,15 +61,21 @@ async function findVisible(req: PayloadRequest, where: Where, sort: string, limi
 async function flagCounts(req: PayloadRequest, requestId: number) {
   const res = await req.payload.find({
     collection: 'receipt-flags',
-    where: withFlagVisibility(req, { and: [{ request: { equals: requestId } }, { status: { equals: 'open' } }] }), // QA-MC4-06
+    where: withFlagVisibility(req, { and: [{ request: { equals: requestId } }, { status: { in: ['open', 'reviewed'] } }] }), // QA-MC4-06
     depth: 0,
     pagination: false,
-    select: { level: true },
+    select: { level: true, kind: true, status: true },
     overrideAccess: true, // SYSTEM-READ: flag counts of a visible request
     req,
   })
-  const levels = res.docs.map((d) => (d as { level?: string }).level)
-  return { warning: levels.filter((l) => l === 'warning').length, info: levels.filter((l) => l === 'info').length }
+  const rows = res.docs as unknown as Array<{ level?: string; kind?: string; status?: string }>
+  const open = rows.filter((f) => f.status === 'open').map((f) => f.level)
+  return {
+    warning: open.filter((l) => l === 'warning').length,
+    info: open.filter((l) => l === 'info').length,
+    // D3 (DRMS 10/10): lines whose "Nominal sesuai nota" ≠ total — awareness badge "Selisih nota" (also once reviewed)
+    receiptMismatch: rows.filter((f) => f.kind === 'receipt_amount_mismatch').length,
+  }
 }
 
 const scopeName = (d: Populated) => {
@@ -185,7 +191,7 @@ export async function lpjQueueCount(req: PayloadRequest, f?: QueueFilter): Promi
   return r.totalDocs
 }
 
-/** US-21 LPJ verification list (Uang Muka `lpj_submitted` / `lpj_verified`), consolidated with PT refs. */
+/** US-21 LPJ verification list (Pengajuan Baru `lpj_submitted` / `lpj_verified`), consolidated with PT refs. */
 export async function lpjQueue(req: PayloadRequest, f?: QueueFilter) {
   const docs = await findVisible(req, officeQueueWhere(req, { and: [{ type: { equals: 'advance' } }, { status: { in: ['lpj_submitted', 'lpj_verified'] } }] }, f), 'updatedAt', 500)
   const refs = await refsOf(req, docs)

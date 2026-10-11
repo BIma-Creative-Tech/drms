@@ -204,7 +204,7 @@ export function buildOpenApiDocument(version: string) {
   registry.registerPath({
     method: 'post',
     path: '/expense-requests',
-    summary: 'Create a Draft (Uang Muka / Reimburse); creator, status and grand total are server-set',
+    summary: 'Create a Draft (Pengajuan Baru / Reimburse); creator, status and grand total are server-set',
     security,
     request: { headers: idem, body: jsonBody(F.ExpenseRequestCreate) },
     responses: { ...res(201, 'Created', F.ExpenseRequestDetail, [400, 401, 403, 409, 422, 426, 429]), 200: { description: 'Existing draft for this clientUuid', content: { 'application/json': { schema: F.ExpenseRequestDetail } } } },
@@ -272,7 +272,7 @@ export function buildOpenApiDocument(version: string) {
   registry.registerPath({
     method: 'get',
     path: '/transfer-queue',
-    summary: 'Finance/Owner: Uang Muka "Disetujui" + Reimburse "Nota Terverifikasi", by needed date (US-19); PTs where the caller is Finance/Direktur, ?company= narrows',
+    summary: 'Finance/Owner: Pengajuan Baru "Disetujui" + Reimburse "Nota Terverifikasi", by needed date (US-19); PTs where the caller is Finance/Direktur, ?company= narrows',
     security,
     request: { headers: deviceHeader, query: F.CompanyFilterQuery },
     responses: res(200, 'Queue', F.ExpenseRequestList, [400, 401, 403]),
@@ -280,7 +280,7 @@ export function buildOpenApiDocument(version: string) {
   registry.registerPath({
     method: 'get',
     path: '/lpj-queue',
-    summary: 'MC3 Finance/Owner: LPJ verification list (Uang Muka "LPJ Diajukan" / "LPJ Terverifikasi", US-21) of the PTs where the caller is Finance/Direktur, with company refs; ?company= narrows',
+    summary: 'MC3 Finance/Owner: LPJ verification list (Pengajuan Baru "LPJ Diajukan" / "LPJ Terverifikasi", US-21) of the PTs where the caller is Finance/Direktur, with company refs; ?company= narrows',
     security,
     request: { headers: deviceHeader, query: F.CompanyFilterQuery },
     responses: res(200, 'Queue', F.LpjQueue, [400, 401, 403, 426]),
@@ -357,8 +357,16 @@ export function buildOpenApiDocument(version: string) {
   })
 
   // ---- F2b: LPJ & settlement (T5), PDF, approval inbox, notifications, file download ----
-  post('/expense-requests/{id}/receipts-complete', 'Uang Muka: receipts complete → "Nota Lengkap" (LPJ draft created)', F.EmptyBody, ['id'], detailOk())
-  post('/expense-requests/{id}/lpj/submit', 'Uang Muka: submit / resubmit the LPJ (usage description; LPJ number at first submit)', F.LpjSubmitBody, ['id'], detailOk())
+  post('/expense-requests/{id}/receipts-complete', 'Pengajuan Baru: receipts complete → "Nota Lengkap" (LPJ draft created)', F.EmptyBody, ['id'], detailOk())
+  post('/expense-requests/{id}/lpj/submit', 'Pengajuan Baru: submit / resubmit the LPJ (usage description; LPJ number at first submit)', F.LpjSubmitBody, ['id'], detailOk())
+  registry.registerPath({
+    method: 'put',
+    path: '/expense-requests/{id}/lpj/photos',
+    summary: 'Point 13 (DRMS 10/10): requester sets the LPJ photo set (media-receipts ids uploaded via POST /media/receipts, images only, max 10) while the LPJ is Draft / Revisi; frozen after Kirim LPJ',
+    security,
+    request: { headers: idem, params: idParams('id'), body: jsonBody(F.LpjPhotosBody) },
+    responses: detailOk(),
+  })
   post('/expense-requests/{id}/lpj/request-revision', 'Finance: LPJ revision with a required note → "LPJ Revisi"', F.RevisionBody, ['id'], detailOk())
   post('/expense-requests/{id}/lpj/verify', 'Finance: verify the LPJ (all receipts decided; verified total = Σ valid); difference 0 → Selesai', F.EmptyBody, ['id'], detailOk())
   post(

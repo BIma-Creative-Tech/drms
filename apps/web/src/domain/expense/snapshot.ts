@@ -315,6 +315,7 @@ export async function writeSnapshot(req: PayloadRequest, doc: RequestDoc, reason
           unitPrice: l.unitPrice ?? null,
           unitPriceDisplay: displayUnitPrice({ unitPrice: l.unitPrice, qty: l.qty, total: l.total }),
           total: l.total ?? null,
+          receiptAmount: l.receiptAmount ?? null,
           category: relId(l.category) ?? null,
           vehicle: relId(l.vehicle) ?? null,
           notes: l.notes ?? null,
