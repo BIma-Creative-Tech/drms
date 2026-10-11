@@ -12,7 +12,7 @@ import { DEFAULT_SEED_DATA } from '@/seed/data'
 import { seed } from '@/seed/seed'
 
 import { adr0013Fallback, api, asUser, makeFlowUser, sysCreate, uploadMedia, type FlowUser, type Res } from './flow-world'
-import { addMembership, companyId, getTestPayload, installFakeKeycloak, sqlAs, sqlError } from './helpers'
+import { addMembership, companyId, fixturePm, getTestPayload, installFakeKeycloak, sqlAs, sqlError } from './helpers'
 
 /**
  * UAT defect MC4-04 (case AUD-02, staging 2026-10-02): audit rows written BEFORE the QA-MC4-03 writer fix carry
@@ -98,13 +98,13 @@ beforeAll(async () => {
 
   // a submitted request of PT A (doc number for the number_issued fallback)
   X.empA = await sysCreate('employees', { company: A, code: 'AUD-A1', name: 'Staff Audit A' })
-  X.projectA = await sysCreate('projects', { company: A, code: 'AUD-PA', name: 'Proyek Audit A', budget: 10_000_000, status: 'berjalan' })
+  X.projectA = await sysCreate('projects', { company: A, pm: await fixturePm(A), code: 'AUD-PA', name: 'Proyek Audit A', budget: 10_000_000, status: 'berjalan' })
   X.teamA = await sysCreate('team-assignments', { employee: X.empA, project: X.projectA, roleInProject: 'staff' })
   X.accA = await sysCreate('employee-bank-accounts', { employee: X.empA, bank, accountNo: `95${Date.now() % 1e8}`, accountHolder: 'Staff Audit A', isDefault: true })
   X.catA = await inPt(A, 'expense-categories', { code: { equals: 'MAT' } })
   X.seqA = await inPt(A, 'document-sequences', { docType: { equals: 'expense_request' } })
   X.ruleA = await inPt(A, 'approval-rules', { docType: { equals: 'expense_request' } })
-  X.projectB = await sysCreate('projects', { company: B, code: 'AUD-PB', name: 'Proyek Audit B', budget: 10_000_000, status: 'berjalan' })
+  X.projectB = await sysCreate('projects', { company: B, pm: await fixturePm(B), code: 'AUD-PB', name: 'Proyek Audit B', budget: 10_000_000, status: 'berjalan' })
   // Rina: Direktur of A + Finance of B (no office role in EVERY PT → no untagged rows); a B-only Direktur.
   // Rina is also the "Diketahui" Direktur of the request
   rina = await makeFlowUser(['pk-owner'], 'aud-rina', null, { company: A, signature: false, groupAdmin: false })

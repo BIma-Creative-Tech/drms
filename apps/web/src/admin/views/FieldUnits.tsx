@@ -16,6 +16,8 @@ import { companyById } from '@/domain/companies'
 import { withReqTransaction } from '@/lib/system-tx'
 import { DEFAULT_TZ } from '@/lib/time'
 import { xlsxEnabled } from '@/lib/xlsx'
+import { ListToolbar, Pager } from '@/admin/components/list/ListToolbar'
+import { matchesQuery, paginate, parseListQuery } from '@/admin/list-query'
 
 import { EditButton } from './shared'
 import { BtnLink, FIELD_CREATORS, FIELD_OFFICE, FIELD_READERS, FieldFrame, fieldGate, FlagPills, History, idParam, MetaRows, one, OpenAction, PhotoGallery, segmentNum, spOf, Tabs, UnitStatusPill, dateParam } from './field-ui'
@@ -70,13 +72,17 @@ export async function FieldContracts(props: AdminViewServerProps) {
     const units = await unitsOf(req, gate.companies, { activeOnly: true })
     return { projects, today, month, contracts, ts, units, pt: await ptView(req) }
   })
-  const rows = d.projects.map((p) => {
+  // DRMS 10/10 D8: search (kode / nama) + pagination of the contract list
+  const lq = parseListQuery(props.searchParams)
+  const allRows = d.projects.filter((p) => matchesQuery([p.code, p.name], lq.q)).map((p) => {
     const cs = d.contracts.filter((c) => c.projectId === p.id)
     const m = buildTimesheetMatrix({ month: d.month, today: d.today, contracts: cs, timesheets: d.ts.filter((t) => t.projectId === p.id) })
     const activeToday = cs.filter((c) => c.active && c.startDate <= d.today && (c.endDate === null || c.endDate >= d.today))
     const filledToday = new Set(d.ts.filter((t) => t.projectId === p.id && t.reportDate === d.today).map((t) => t.unitId))
     return { p, units: activeToday.length, filledToday: activeToday.filter((c) => filledToday.has(c.unitId)).length, m }
   })
+  const page = paginate(allRows, lq.page, lq.per)
+  const rows = page.items
   const creator = hasRoleAny(req, ...FIELD_CREATORS)
   const office = hasRoleAny(req, ...FIELD_OFFICE)
   const cols: Col<(typeof rows)[number]>[] = [
@@ -146,8 +152,10 @@ export async function FieldContracts(props: AdminViewServerProps) {
         </div>
       </DashHead>
       <Bento label="Unit & kontrak">
-        <Card id="contracts" title="Kontrak unit" sub={`${rows.length} kontrak · klik Buka untuk matriks timesheet, rekap dan unit`}>
-          <DataTable id="contracts" cols={cols} rows={rows} rowKey={(r) => r.p.id} rowAttrs={(r) => ({ 'data-pk-row': r.p.code })} caption="Kontrak unit" empty={<EmptyState text="Belum ada project berjenis kontrak unit dalam cakupan Anda." />} />
+        <Card id="contracts" title="Kontrak unit" sub={`${page.total} kontrak · klik Buka untuk matriks timesheet, rekap dan unit`}>
+          {d.projects.length > 0 ? <ListToolbar id="unit-kontrak" action="/admin/unit-kontrak" query={lq} label="Cari kontrak" search={{ placeholder: 'Kode atau nama project…' }} /> : null}
+          <DataTable id="contracts" cols={cols} rows={rows} rowKey={(r) => r.p.id} rowAttrs={(r) => ({ 'data-pk-row': r.p.code })} caption="Kontrak unit" empty={<EmptyState text={d.projects.length ? 'Tidak ada kontrak yang cocok.' : 'Belum ada project berjenis kontrak unit dalam cakupan Anda.'} />} />
+          {page.total > 0 ? <Pager id="unit-kontrak" path="/admin/unit-kontrak" sp={props.searchParams} page={page} unit="kontrak" /> : null}
         </Card>
         <Card id="units" title="Unit alat berat" sub="Status dari laporan servis terakhir · HM dari timesheet/servis">
           <DataTable id="units" cols={unitCols} rows={heavy} rowKey={(u) => u.id} rowAttrs={(u) => ({ 'data-pk-row': u.label })} caption="Unit alat berat" empty={<EmptyState text="Belum ada unit alat berat (master Unit & Kendaraan)." />} />

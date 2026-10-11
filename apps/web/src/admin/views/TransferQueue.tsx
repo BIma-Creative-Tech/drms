@@ -5,10 +5,13 @@ import { hasRole, relId } from '@/access/roles'
 import { voidableTransfers } from '@/domain/cash/book'
 import { transferQueue } from '@/domain/expense/queues'
 import { approvedByCaller } from '@/domain/expense/transfers'
+import { REQUEST_TYPE_LABELS, REQUEST_TYPES } from '@/domain/expense/types'
 import { withReqTransaction } from '@/lib/system-tx'
 
 import { ReasonAction } from '../components/kas/ReasonAction'
 import { KAS_STYLE } from '../components/kas/style'
+import { ListToolbar, Pager } from '../components/list/ListToolbar'
+import { matchesQuery, paginate, parseListQuery } from '../list-query'
 import { MoneyForm } from '../components/MoneyForm'
 import { ReimburseReceiptReview, loadReimburseReview } from '../components/ReimburseReceiptReview'
 import { accountsOf, itemCompany, PtChip, PtScopeNote, ptView } from './pt'
@@ -23,12 +26,23 @@ export async function TransferQueue(props: AdminViewServerProps) {
   const req = props.initPageResult.req
   if (!allowed(req, ['pk-finance', 'pk-owner'])) return <Forbidden props={props} title="Antrian Transfer" roles={['pk-finance', 'pk-owner']} />
   const pt = await ptView(req)
-  const { items, review, done, mine } = await withReqTransaction(req, async () => {
-    const q = await transferQueue(req)
-    const done = await voidableTransfers(req)
+  // DRMS 10/10 D8: search / PT / jenis + pagination of both tables (URL state; `hal2` = recorded transfers)
+  const lq = parseListQuery(props.searchParams, ['pt', 'jenis'])
+  const ptId = pt.multi && pt.selected.includes(Number(lq.filters.pt)) ? Number(lq.filters.pt) : undefined
+  const { all, page, items, review, done, donePage, mine } = await withReqTransaction(req, async () => {
+    const q = await transferQueue(req, ptId ? { companyIds: [ptId] } : undefined)
+    const page = paginate(
+      q.filter((r) => (!lq.filters.jenis || r.type === lq.filters.jenis) && matchesQuery([r.docNo, r.title, r.scope, r.statusLabel, r.bank?.bankName, r.bank?.accountHolder], lq.q)),
+      lq.page,
+      lq.per,
+    )
+    const doneAll = (await voidableTransfers(req)).filter(
+      (t) => (!ptId || t.companyId === ptId) && (!lq.filters.jenis || t.requestType === lq.filters.jenis) && matchesQuery([t.transferNo, t.requestNo, t.requestTitle], lq.q),
+    )
+    const donePage = paginate(doneAll, parseListQuery(props.searchParams, [], { pageKey: 'hal2' }).page, lq.per)
     // MC2: every queue item carries its PT (`company`, mc2-contract §3) — it also picks the cash
     // accounts offered in each transfer form (never an account of another PT).
-    return { items: q, review: await loadReimburseReview(req), done, mine: await approvedByCaller(req, q.map((x) => x.id)) }
+    return { all: q.length, page, items: page.items, review: await loadReimburseReview(req), done: donePage.items, donePage, mine: await approvedByCaller(req, page.items.map((x) => x.id)) }
   })
   const canTransfer = allowed(req, ['pk-finance'])
   const accounts = canTransfer
@@ -37,12 +51,23 @@ export async function TransferQueue(props: AdminViewServerProps) {
       ).docs.map((a) => ({ id: a.id as number, name: a.name as string, company: relId((a as { company?: unknown }).company) ?? null }))
     : []
   return (
-    <Shell props={props} title={`Antrian Transfer (${items.length})`}>
+    <Shell props={props} title={`Antrian Transfer (${all})`}>
       <PtScopeNote pt={pt} />
       <ReimburseReceiptReview data={review} />
-      <h2>Siap ditransfer ({items.length})</h2>
+      <h2>Siap ditransfer ({page.total})</h2>
+      <ListToolbar
+        id="antrian-transfer"
+        action="/admin/antrian-transfer"
+        query={lq}
+        label="Cari dan saring antrian transfer"
+        search={{ placeholder: 'Nomor, judul, pemilik rekening…' }}
+        filters={[
+          pt.multi ? { key: 'pt', label: 'PT', all: 'Semua PT', options: pt.selected.map((id) => ({ value: String(id), label: pt.ref(id)?.shortCode ?? `#${id}` })) } : null,
+          { key: 'jenis', label: 'Jenis', options: REQUEST_TYPES.map((t) => ({ value: t, label: REQUEST_TYPE_LABELS[t] })) },
+        ]}
+      />
       {items.length === 0 ? (
-        <Empty text="Antrian transfer kosong." />
+        <Empty text={all === 0 ? 'Antrian transfer kosong.' : 'Tidak ada pengajuan yang cocok dengan pencarian / filter.'} />
       ) : (
         // Wide (6 columns + the transfer form): stacked cards ≤ 640px (custom.scss .pk-rtable), one
         // <tbody> per item so the item row and its form stay one card; a plain table on wider screens.
@@ -118,10 +143,11 @@ export async function TransferQueue(props: AdminViewServerProps) {
           ))}
         </table>
       )}
+      {items.length > 0 ? <Pager id="antrian-transfer" path="/admin/antrian-transfer" sp={props.searchParams} page={page} unit="pengajuan" /> : null}
       <style>{KAS_STYLE}</style>
       {/* E2 (US-24, T8): recorded transfers that can still be voided (request "Sudah Ditransfer"). */}
       <h2 id="transfer-tercatat" style={{ marginTop: 32 }}>
-        Transfer tercatat — dapat dibatalkan ({done.length})
+        Transfer tercatat — dapat dibatalkan ({donePage.total})
       </h2>
       <p style={{ fontSize: 13, color: 'var(--pk-muted-fg)', margin: '0 0 8px' }}>
         Void transfer membuat jurnal balik untuk KK-nya (KK asli tetap tampil sebagai Void) dan mengembalikan pengajuan ke antrian: Uang Muka → Disetujui, Reimburse → Nota
@@ -185,6 +211,7 @@ export async function TransferQueue(props: AdminViewServerProps) {
           </table>
         </TableScroll>
       )}
+      {done.length > 0 ? <Pager id="transfer-tercatat" path="/admin/antrian-transfer" sp={props.searchParams} page={donePage} pageKey="hal2" unit="transfer" /> : null}
     </Shell>
   )
 }

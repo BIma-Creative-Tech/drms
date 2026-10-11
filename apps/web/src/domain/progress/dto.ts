@@ -5,6 +5,7 @@ import { hasRoleAny, relId, userId } from '@/access/roles'
 import { mayCreateReports } from './access'
 import { reportRev, type ReportDoc } from './reports'
 import { displayNames } from '@/domain/companies'
+import { searchWhere } from '@/lib/text-search'
 
 /**
  * API shape of progress reports (/api/v1/progress-reports, schemas-progress.ts). Names of project,
@@ -109,7 +110,7 @@ export async function reportDto(req: PayloadRequest, d: ReportDoc): Promise<Repo
   return (await reportDtos(req, [d]))[0]!
 }
 
-export type ReportListFilter = { projectId?: number; stageId?: number; from?: string; to?: string; mine?: boolean; limit: number; after?: number; companyIds?: readonly number[] }
+export type ReportListFilter = { projectId?: number; stageId?: number; from?: string; to?: string; mine?: boolean; limit: number; after?: number; companyIds?: readonly number[]; q?: string }
 
 /** US-31: newest first, filter by project (and stage / date range), caller's read scope, cursor on id. */
 export async function listReports(req: PayloadRequest, f: ReportListFilter): Promise<{ items: ReportDto[]; nextCursor: number | null }> {
@@ -123,6 +124,8 @@ export async function listReports(req: PayloadRequest, f: ReportListFilter): Pro
   if (f.mine) and.push({ reporter: { equals: userId(req) ?? -1 } })
   if (f.after !== undefined) and.push({ id: { less_than: f.after } })
   if (f.companyIds?.length) and.push({ company: { in: [...f.companyIds] } }) // MC3: narrows only
+  const text = searchWhere(['docNo', 'work', 'issues'], f.q) // DRMS 10/10 D8
+  if (text) and.push(text)
   let docs: ReportDoc[] = []
   try {
     const res = await req.payload.find({

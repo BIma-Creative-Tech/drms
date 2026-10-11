@@ -2250,3 +2250,359 @@ $pk-modules: dashboard, persetujuan, proyek, keuangan, absensi, laporan, penggun
     }
   }
 }
+
+// ---- DRMS 10/10 D9: module landing page /admin/modul/<id> (src/admin/views/ModuleLanding.tsx) ----------
+// Same tiles as the launcher (.pk-launcher__grid / .pk-tile), a module header instead of the greeting
+// and one tile group per menu section.
+@layer payload {
+  .pk-modland {
+    padding-top: clamp(16px, 3vw, 32px);
+  }
+
+  .pk-modland__head {
+    display: flex;
+    gap: 16px;
+    align-items: center;
+    margin-bottom: clamp(16px, 3vw, 28px);
+  }
+
+  .pk-modland__chip {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 56px;
+    height: 56px;
+    border-radius: 24%;
+    background: linear-gradient(135deg, var(--pk-tile-from), var(--pk-tile-to));
+    color: #FFFFFF;
+  }
+
+  .pk-modland__title {
+    margin: 0;
+    font-size: clamp(24px, 3vw, 32px);
+    line-height: 1.15;
+  }
+
+  .pk-modland__hint {
+    margin: 4px 0 0;
+    color: var(--pk-muted-fg);
+    font-size: 14px;
+  }
+
+  .pk-modland__section + .pk-modland__section {
+    margin-top: clamp(20px, 3vw, 32px);
+  }
+
+  .pk-modland__label {
+    margin: 0 0 12px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--pk-border);
+    color: var(--pk-muted-fg);
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+}
+
+// ---- DRMS 10/10 #5: Payload edit forms — one primary action, uniform spacing (every collection/global) --
+// Scoped to Payload's document view classes (.doc-header / .doc-controls / .document-fields), so the
+// custom views are untouched. Payload's own rules live in @layer payload-default (lower priority).
+@layer payload {
+  // A lone view tab ("Edit" — the API tab is hidden via admin.hideAPIURL, src/admin/edit-view.ts) is
+  // not a step: hide the tab row. Real extra tabs (Riwayat, Versi) keep it.
+  .doc-tabs:not(:has(.doc-tab ~ .doc-tab)) {
+    display: none;
+  }
+
+  .doc-header {
+    padding-bottom: 4px;
+  }
+
+  // "Simpan" / "Buat" = the page's primary action, sized like the shell buttons (.pk-kbtn: 38 px, 13 px/600).
+  .doc-controls__controls {
+    gap: 8px;
+    align-items: center;
+
+    .btn {
+      min-height: 38px;
+      margin: 0;
+      padding-block: 0;
+      padding-inline: 16px;
+      font-size: 13px;
+    }
+  }
+
+  .doc-controls__wrapper {
+    min-height: 56px;
+  }
+
+  // One field rhythm for main column, rows and sidebar: 20 px between fields (16 px on phones),
+  // descriptions 6 px under their control.
+  .document-fields {
+    --pk-field-gap: 20px;
+
+    .render-fields {
+      --spacing-field: var(--pk-field-gap);
+    }
+
+    // a row is one field of the column: its own bottom margin only (Payload adds a second one on .row__fields)
+    .render-fields > .field-type.row {
+      margin-bottom: var(--pk-field-gap);
+    }
+
+    .field-type.row .row__fields {
+      row-gap: var(--pk-field-gap);
+
+      &:has(> *:nth-child(1)) {
+        margin-bottom: 0;
+      }
+
+      // .row__fields is a .render-fields too: its children got the column margin → uneven gap below rows
+      > .field-type {
+        margin-bottom: 0;
+      }
+    }
+
+    .field-description {
+      margin-top: 6px;
+      line-height: 1.45;
+    }
+
+    .field-type > .field-label,
+    .field-type .field-label {
+      margin-bottom: 6px;
+    }
+  }
+
+  .document-fields__edit {
+    padding-top: 24px;
+  }
+
+  .document-fields__sidebar-fields {
+    gap: var(--pk-field-gap, 20px);
+    padding-top: 24px;
+  }
+
+  @media (max-width: 1024px) {
+    // Payload stacks rows as blocks without any gap between the stacked fields
+    .document-fields .field-type.row .row__fields {
+      display: flex;
+      flex-direction: column;
+      gap: var(--pk-field-gap);
+    }
+  }
+
+  @media (max-width: 768px) {
+    .document-fields {
+      --pk-field-gap: 16px;
+    }
+
+    .document-fields__edit,
+    .document-fields__sidebar-fields {
+      padding-top: 16px;
+    }
+
+    // stacked sidebar: same gap below the last main field as between fields
+    .document-fields__sidebar-wrap {
+      margin-top: var(--pk-field-gap);
+      padding-top: var(--pk-field-gap);
+      border-top: 1px solid var(--pk-border);
+    }
+  }
+
+  // Link panel in a form sidebar (ProjectDetailLink): to the custom page of the same record.
+  .pk-doclink {
+    margin-bottom: var(--pk-field-gap, 20px);
+    padding: 12px 14px;
+    border: 1px solid color-mix(in oklab, var(--pk-primary) 35%, var(--pk-border));
+    border-radius: var(--style-radius-m);
+    background: color-mix(in oklab, var(--pk-primary) 6%, var(--pk-card));
+  }
+
+  .pk-doclink__a {
+    display: inline-flex;
+    gap: 8px;
+    align-items: center;
+    color: var(--pk-primary-hover);
+    font-weight: 600;
+    text-decoration: none;
+
+    &:hover {
+      text-decoration: underline;
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--pk-ring);
+      outline-offset: 2px;
+    }
+  }
+
+  .pk-doclink__hint {
+    margin: 4px 0 0;
+    color: var(--pk-muted-fg);
+    font-size: 12px;
+  }
+}
+
+// ---- DRMS 10/10 D8: shared table toolbar + pager of the custom views (src/admin/components/list) --------
+// Standalone (Shell views have no .pk-f3 / KAS_STYLE): the controls copy the .pk-kbtn / .pk-filter look.
+@layer payload {
+  .pk-ltb {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 12px;
+    align-items: flex-end;
+    margin: 0 0 12px;
+    padding: 12px;
+    border: 1px solid var(--pk-border);
+    border-radius: var(--style-radius-l);
+    background: var(--pk-card);
+  }
+
+  .pk-ltb__field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+    color: var(--pk-muted-fg);
+    font-size: 12px;
+    font-weight: 600;
+
+    input,
+    select {
+      min-width: 140px;
+      min-height: 36px;
+      padding: 4px 8px;
+      border: 1px solid var(--pk-input);
+      border-radius: var(--style-radius-s);
+      background: var(--theme-input-bg, var(--pk-card));
+      color: var(--pk-fg);
+      font: inherit;
+      font-size: 13px;
+      font-weight: 400;
+
+      &:focus-visible {
+        outline: 2px solid var(--pk-ring);
+        outline-offset: 1px;
+      }
+    }
+  }
+
+  .pk-ltb__search {
+    flex: 1 1 240px;
+
+    input {
+      width: 100%;
+    }
+  }
+
+  .pk-ltb__per select {
+    min-width: 84px;
+  }
+
+  .pk-ltb__actions {
+    display: flex;
+    gap: 8px;
+  }
+
+  .pk-ltb__btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 36px;
+    padding: 0 14px;
+    border: 1px solid color-mix(in oklab, var(--pk-muted-fg) 60%, var(--pk-input));
+    border-radius: var(--style-radius-m);
+    background: var(--pk-card);
+    color: var(--pk-fg);
+    font: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    white-space: nowrap;
+    text-decoration: none;
+    cursor: pointer;
+
+    &:hover:not([aria-disabled='true']) {
+      border-color: var(--pk-primary);
+      color: var(--pk-primary);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--pk-ring);
+      outline-offset: 2px;
+    }
+
+    &[aria-disabled='true'] {
+      opacity: 0.5;
+      cursor: default;
+    }
+  }
+
+  .pk-ltb__btn--ghost {
+    border-color: transparent;
+    background: transparent;
+  }
+
+  .pk-pager {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 16px;
+    align-items: center;
+    justify-content: space-between;
+    margin: 12px 0 20px;
+    color: var(--pk-muted-fg);
+    font-size: 13px;
+  }
+
+  .pk-pager__nav {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+  }
+
+  .pk-pager__page {
+    color: var(--pk-fg);
+    font-weight: 600;
+  }
+
+  @media (max-width: 640px) {
+    .pk-ltb__field {
+      flex: 1 1 calc(50% - 6px);
+
+      input,
+      select {
+        width: 100%;
+        min-width: 0;
+      }
+    }
+
+    .pk-ltb__search {
+      flex-basis: 100%;
+    }
+
+    .pk-ltb__actions {
+      flex-basis: 100%;
+    }
+  }
+
+  @media (pointer: coarse) {
+    .pk-ltb__field :is(input, select),
+    .pk-ltb__btn {
+      min-height: 44px;
+    }
+  }
+}
+
+// D8: search box inside the existing .pk-filter forms (Kas, Absensi, field reports) grows first
+@layer payload {
+  .pk-f3 form.pk-filter .pk-filter__search {
+    flex: 1 1 220px;
+
+    input {
+      width: 100%;
+    }
+  }
+}

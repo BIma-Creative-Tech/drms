@@ -3,6 +3,7 @@ import type { PayloadRequest, Where } from 'payload'
 import { relId, userId } from '@/access/roles'
 import { ActivityItems, type ActivityItemIn } from '@/api/v1/schemas-field'
 import { requestMeta } from '@/lib/request-meta'
+import { searchWhere } from '@/lib/text-search'
 
 import { mayReadValue } from './access'
 import {
@@ -287,7 +288,7 @@ export async function activityDto(req: PayloadRequest, d: ActivityDoc): Promise<
   return (await activityDtos(req, [d]))[0]!
 }
 
-export type ActivityListFilter = { projectId?: number; clientId?: number; kind?: ActivityKind; poStatus?: PoStatus; reporterId?: number; from?: string; to?: string; mine?: boolean; limit: number; after?: number; companyIds?: readonly number[] }
+export type ActivityListFilter = { projectId?: number; clientId?: number; kind?: ActivityKind; poStatus?: PoStatus; reporterId?: number; from?: string; to?: string; mine?: boolean; limit: number; after?: number; companyIds?: readonly number[]; q?: string }
 
 export async function listActivities(req: PayloadRequest, f: ActivityListFilter): Promise<{ items: ActivityDto[]; nextCursor: number | null }> {
   const and: Where[] = []
@@ -301,6 +302,8 @@ export async function listActivities(req: PayloadRequest, f: ActivityListFilter)
   if (f.mine) and.push({ reporter: { equals: userId(req) ?? -1 } })
   if (f.after !== undefined) and.push({ id: { less_than: f.after } })
   if (f.companyIds?.length) and.push({ company: { in: [...f.companyIds] } })
+  const text = searchWhere(['docNo', 'receiver', 'notes'], f.q) // DRMS 10/10 D8
+  if (text) and.push(text)
   const docs = await scopedFind<ActivityDoc>(req, 'aftersales-activities', and, f.limit + 1, '-id')
   const page = docs.slice(0, f.limit)
   return { items: await activityDtos(req, page), nextCursor: docs.length > f.limit ? page[page.length - 1]!.id : null }

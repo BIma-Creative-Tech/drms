@@ -118,3 +118,11 @@ export const FR1_ADMIN_VIEWS = {
   fieldDaily: { Component: '@/admin/views/FieldDaily#FieldDailyDetail', path: '/laporan-harian/detail/:id' as const, exact: true, meta: { title: 'Laporan harian' } },
   fieldDailyRap: { Component: '@/admin/views/FieldDaily#FieldDailyRap', path: '/laporan-harian/rap/:id' as const, exact: true, meta: { title: 'RAP project' } },
 }
+
+/**
+ * DRMS 10/10 D9: module landing page (tiles of the module's visible sub-menus, registry
+ * `moduleLandingHref`). Exact: `/modul/<id>` only; the view resolves visibility itself.
+ */
+export const D1010_ADMIN_VIEWS = {
+  moduleLanding: { Component: '@/admin/views/ModuleLanding#ModuleLanding', path: '/modul/:id' as const, exact: true, meta: { title: 'Modul' } },
+}

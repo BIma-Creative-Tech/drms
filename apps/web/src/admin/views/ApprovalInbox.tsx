@@ -4,9 +4,12 @@ import React from 'react'
 import { selfApprovalNote } from '@/domain/expense/decision'
 import { detail } from '@/domain/expense/dto'
 import { approvalInbox } from '@/domain/expense/queues'
+import { REQUEST_TYPE_LABELS, REQUEST_TYPES } from '@/domain/expense/types'
 import { withReqTransaction } from '@/lib/system-tx'
 
 import { ActionButton } from '../components/ActionButton'
+import { ListToolbar, Pager } from '../components/list/ListToolbar'
+import { matchesQuery, paginate, parseListQuery } from '../list-query'
 import { ReviewDetails } from '../components/ReviewDetails'
 import { AddendumInboxSection } from './Addendum'
 import { ShortfallInboxSection } from './ShortfallInbox'
@@ -25,13 +28,21 @@ import { Empty, Shell, TableScroll, badge, docLink, num, rp, table, td, th } fro
 export async function ApprovalInbox(props: AdminViewServerProps) {
   const req = props.initPageResult.req
   const pt = await ptView(req)
-  const { items, budgetWarnPct, details } = await withReqTransaction(req, async () => {
-    const inbox = await approvalInbox(req)
-    // S3e (US-26/US-59, S-05): lines, receipts and per-line flags for each waiting request.
+  // DRMS 10/10 D8: search / PT / jenis / langkah + pagination (URL state); the inbox is a bounded worklist
+  const lq = parseListQuery(props.searchParams, ['pt', 'jenis', 'langkah'])
+  const ptId = pt.multi && pt.selected.includes(Number(lq.filters.pt)) ? Number(lq.filters.pt) : undefined
+  const { all, page, budgetWarnPct, details } = await withReqTransaction(req, async () => {
+    const inbox = await approvalInbox(req, ptId ? { companyIds: [ptId] } : undefined)
+    const matched = inbox.items.filter(
+      (r) => (!lq.filters.jenis || r.type === lq.filters.jenis) && (!lq.filters.langkah || r.step === lq.filters.langkah) && matchesQuery([r.docNo, r.title, r.scope, r.requesters, r.typeLabel, r.stepLabel], lq.q),
+    )
+    const page = paginate(matched, lq.page, lq.per)
+    // S3e (US-26/US-59, S-05): lines, receipts and per-line flags for each waiting request (of this page).
     const map = new Map<number, Awaited<ReturnType<typeof detail>>>()
-    for (const it of inbox.items) map.set(it.id, await detail(req, it.id))
-    return { ...inbox, details: map }
+    for (const it of page.items) map.set(it.id, await detail(req, it.id))
+    return { all: inbox.items.length, page, budgetWarnPct: inbox.budgetWarnPct, details: map }
   })
+  const items = page.items
   const cols = pt.multi ? 10 : 9
   return (
     <Shell props={props} title="Persetujuan">
@@ -39,8 +50,22 @@ export async function ApprovalInbox(props: AdminViewServerProps) {
       <p style={{ marginTop: 0 }}>
         Pengajuan yang menunggu keputusan Anda. Merah = anggaran project sesudah disetujui melebihi {pt.multi ? 'ambang PT pengajuan' : `${budgetWarnPct}%`}.{pt.multi ? ' Keputusan selalu memakai peran Anda di PT dokumen.' : ''}
       </p>
+      {all > 0 || lq.q || ptId ? (
+        <ListToolbar
+          id="persetujuan"
+          action="/admin/persetujuan"
+          query={lq}
+          label="Cari dan saring persetujuan"
+          search={{ placeholder: 'Nomor, judul, pemohon, project…' }}
+          filters={[
+            pt.multi ? { key: 'pt', label: 'PT', all: 'Semua PT', options: pt.selected.map((id) => ({ value: String(id), label: pt.ref(id)?.shortCode ?? `#${id}` })) } : null,
+            { key: 'jenis', label: 'Jenis', options: REQUEST_TYPES.map((t) => ({ value: t, label: REQUEST_TYPE_LABELS[t] })) },
+            { key: 'langkah', label: 'Langkah', options: [{ value: 'acknowledge', label: 'Persetujuan pertama (PM / Diketahui)' }, { value: 'approve', label: 'Persetujuan berikutnya' }] },
+          ]}
+        />
+      ) : null}
       {items.length === 0 ? (
-        <Empty text="Tidak ada pengajuan yang menunggu keputusan Anda." />
+        <Empty text={all === 0 ? 'Tidak ada pengajuan yang menunggu keputusan Anda.' : 'Tidak ada pengajuan yang cocok dengan pencarian / filter.'} />
       ) : (
         <TableScroll label="Daftar persetujuan">
           <table style={table}>
@@ -142,6 +167,7 @@ export async function ApprovalInbox(props: AdminViewServerProps) {
           </table>
         </TableScroll>
       )}
+      {items.length > 0 ? <Pager id="persetujuan" path="/admin/persetujuan" sp={props.searchParams} page={page} unit="pengajuan" /> : null}
       {/* E5: Addendum RAB waiting for the caller (Direktur "Setujui" / Finance approval). */}
       <AddendumInboxSection req={req} />
       {/* QA-06 / ADR 0019: LPJ shortfall above approved + tolerance (Direktur → Finance). */}

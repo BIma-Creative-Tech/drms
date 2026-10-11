@@ -214,8 +214,16 @@ describe('4. PM files for himself → the PM step is skipped, the Direktur decid
 })
 
 describe('5. Project without a PM → 409', () => {
+  // DRMS 10/10 #5: new projects need a PM (validation + NOT NULL, migration 20261012_100000_d1010_project_pm);
+  // a LEGACY row without one (DB where the migration skipped NOT NULL) is simulated as the owner role.
+  afterAll(async () => {
+    await sqlAs('owner', "UPDATE projects SET pm_id = $1 WHERE code = 'APM-NOPM' AND pm_id IS NULL", [w.users.pm.id])
+    await sqlAs('owner', 'ALTER TABLE projects ALTER COLUMN pm_id SET NOT NULL')
+  })
   it('submit is blocked with a clear message; the request stays Draft', async () => {
-    const noPm = await sysCreate('projects', { code: 'APM-NOPM', name: 'APM tanpa PM', budget: 10_000_000, status: 'berjalan' })
+    const noPm = await sysCreate('projects', { code: 'APM-NOPM', name: 'APM tanpa PM', pm: w.users.pm.id, budget: 10_000_000, status: 'berjalan' })
+    await sqlAs('owner', 'ALTER TABLE projects ALTER COLUMN pm_id DROP NOT NULL')
+    await sqlAs('owner', 'UPDATE projects SET pm_id = NULL WHERE id = $1', [noPm])
     await sysCreate('approval-rules', { docType: 'expense_request', requestType: 'any', priority: 10, acknowledge: 'required', acknowledgeBy: 'scope_manager', acknowledgeRole: null, active: true, project: noPm, name: 'APM rule tanpa PM', minAmount: 0, steps: [{ level: 1, approverRole: 'pk-owner' }] })
     await sysCreate('team-assignments', { employee: w.emp.a, project: noPm, roleInProject: 'staff' })
     const r = await submitted(w.users.staffA, { projectId: noPm }, 409)

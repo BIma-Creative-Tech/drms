@@ -1,11 +1,13 @@
-import type { AdminViewServerProps } from 'payload'
+import type { AdminViewServerProps, Where } from 'payload'
 import React from 'react'
 
 import { notificationHref } from '@/domain/notifications'
 import { DEFAULT_TZ } from '@/lib/time'
 
 import { ActionButton } from '../components/ActionButton'
+import { ListToolbar, Pager } from '../components/list/ListToolbar'
 import { NotificationOpen } from '../components/NotificationOpen'
+import { isFiltered, pageOfFind, parseListQuery, searchWhere } from '../list-query'
 import { dateTimeId } from './progress-ui'
 import { Empty, Shell, TableScroll, badge, table, td, th } from './shared'
 
@@ -14,17 +16,23 @@ import { Empty, Shell, TableScroll, badge, table, td, th } from './shared'
  * unread marked; "Buka" marks one read and opens its document; "Tandai semua dibaca" uses
  * POST /api/v1/notifications/read-all. Reads with the collection access (own rows only).
  */
-const LIMIT = 50
-
 type Row = { id: number; title: string; body: string; docType?: string | null; docId?: string | null; docNo?: string | null; readAt?: string | null; createdAt: string }
 
 export async function NotificationsView(props: AdminViewServerProps) {
   const req = props.initPageResult.req
   const user = req.user
   if (!user) return null
-  const res = await req.payload.find({ collection: 'notifications', where: { user: { equals: user.id } }, sort: '-id', limit: LIMIT, depth: 0, user, overrideAccess: false, req })
+  // DRMS 10/10 D8: search (judul / isi / nomor) + read-state filter + pagination in the database
+  const lq = parseListQuery(props.searchParams, ['status'])
+  const own = { user: { equals: user.id } }
+  const and: Where[] = [own]
+  if (lq.filters.status === 'baru') and.push({ readAt: { exists: false } })
+  if (lq.filters.status === 'dibaca') and.push({ readAt: { exists: true } })
+  const text = searchWhere(['title', 'body', 'docNo'], lq.q)
+  if (text) and.push(text)
+  const res = await req.payload.find({ collection: 'notifications', where: { and }, sort: '-id', limit: lq.per, page: lq.page, depth: 0, user, overrideAccess: false, req })
   const rows = res.docs as unknown as Row[]
-  const unread = rows.filter((r) => !r.readAt).length
+  const unread = (await req.payload.count({ collection: 'notifications', where: { and: [own, { readAt: { exists: false } }] }, user, overrideAccess: false, req })).totalDocs
   const tz = process.env.TZ || DEFAULT_TZ
   return (
     <Shell props={props} title="Notifikasi">
@@ -32,8 +40,16 @@ export async function NotificationsView(props: AdminViewServerProps) {
         <span data-pk-unread-count={unread}>{unread > 0 ? `${unread} belum dibaca` : 'Semua sudah dibaca.'}</span>
         {unread > 0 ? <ActionButton url="/api/v1/notifications/read-all" label="Tandai semua dibaca" testId="notifications-read-all" /> : null}
       </div>
+      <ListToolbar
+        id="notifikasi"
+        action="/admin/notifikasi"
+        query={lq}
+        label="Cari notifikasi"
+        search={{ placeholder: 'Judul, isi atau nomor dokumen…' }}
+        filters={[{ key: 'status', label: 'Status', options: [{ value: 'baru', label: 'Belum dibaca' }, { value: 'dibaca', label: 'Sudah dibaca' }] }]}
+      />
       {rows.length === 0 ? (
-        <Empty text="Belum ada notifikasi." />
+        <Empty text={isFiltered(lq) ? 'Tidak ada notifikasi yang cocok.' : 'Belum ada notifikasi.'} />
       ) : (
         <TableScroll label="Notifikasi">
           <table style={table} data-pk-table="notifications">
@@ -63,7 +79,7 @@ export async function NotificationsView(props: AdminViewServerProps) {
           </table>
         </TableScroll>
       )}
-      {res.totalDocs > LIMIT ? <p style={{ fontSize: 12 }}>Menampilkan {LIMIT} terbaru dari {res.totalDocs}. Riwayat lengkap: menu Sistem → Notifikasi.</p> : null}
+      <Pager id="notifikasi" path="/admin/notifikasi" sp={props.searchParams} page={pageOfFind(res)} unit="notifikasi" />
     </Shell>
   )
 }

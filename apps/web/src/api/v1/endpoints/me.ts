@@ -2,6 +2,7 @@ import type { PayloadRequest } from 'payload'
 
 import { companyContextOf, membershipsOf, userRoles, type Membership, type Role } from '@/access/roles'
 import { appSettings, companyById, settings } from '@/domain/companies'
+import { resolveDisplayName } from '@/domain/user-display-name'
 import { privacyStatusOf } from '@/legal/privacy-notice'
 import { DEFAULT_TZ } from '@/lib/time'
 
@@ -139,6 +140,9 @@ export const meEndpoint = v1({
       id: u.id,
       email: u.email,
       name: u.name ?? null,
+      // DRMS 10/10 WA-14: label to greet the caller with (users.name → employee of a selected PT → email
+      // local part → "Pengguna", domain/user-display-name.ts). Additive; `name` keeps the stored account name.
+      displayName: await resolveDisplayName(req.payload, req.user),
       roles,
       capabilities: capabilitiesOf(roles, { fieldReportsEnabled: companies.some((c) => c.selected && c.settings.fieldReportsEnabled) }),
       employee: legacyEmployeeId !== null ? (employees.get(legacyEmployeeId) ?? null) : null,

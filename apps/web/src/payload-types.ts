@@ -710,7 +710,7 @@ export interface Project {
    * Kosong = radius default perusahaan (Setting perusahaan).
    */
   radiusM?: number | null;
-  pm?: (number | null) | User;
+  pm: number | User;
   budget?: number | null;
   startDate?: string | null;
   targetDate?: string | null;

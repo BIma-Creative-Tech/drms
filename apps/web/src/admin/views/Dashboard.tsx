@@ -9,6 +9,7 @@ import { adminDashboard, financeDashboard, ownerDashboard, pmDashboard, staffDas
 import type { ProjectBudget } from '@/domain/reports/kpi'
 import { lastDay, MONTHS_SHORT, periodLabel } from '@/domain/reports/rules'
 import { delta, share, statusTone, type PipelineStage } from '@/domain/reports/viz'
+import { resolveDisplayName } from '@/domain/user-display-name'
 import { withReqTransaction } from '@/lib/system-tx'
 import { listReports } from '@/domain/progress/dto'
 import { projectProgressVsBudget, type ProjectProgress } from '@/domain/reports/progress'
@@ -1166,6 +1167,7 @@ async function Staff({ req }: { req: PayloadRequest }) {
   const d = await withReqTransaction(req, () => staffDashboard(req))
   const v = d.viz
   const user = req.user as { id: number; name?: string | null; email?: string } | null
+  const hello = await resolveDisplayName(req.payload, req.user)
   const hint: Record<string, string> = {
     draft: 'belum diajukan',
     receipt_revision: 'perbaiki nota',
@@ -1195,7 +1197,9 @@ async function Staff({ req }: { req: PayloadRequest }) {
   return (
     <>
       <div className="pk-actions" style={{ margin: '-8px 0 16px' }}>
-        <span style={{ marginRight: 'auto', color: 'var(--pk-muted-fg)' }}>Halo, {user?.name || user?.email}</span>
+        <span style={{ marginRight: 'auto', color: 'var(--pk-muted-fg)' }} data-pk-greeting>
+          Halo, {hello}
+        </span>
         <a className="pk-btn primary" href={`${ER}/create`} data-pk-action="new-request">
           + Buat pengajuan
         </a>
@@ -1275,9 +1279,10 @@ async function Staff({ req }: { req: PayloadRequest }) {
  */
 async function Operator({ req }: { req: PayloadRequest }) {
   const user = req.user as { id: number; name?: string | null; email?: string } | null
+  const hello = await resolveDisplayName(req.payload, req.user)
   return (
     <Bento label="Absensi">
-      <Card id="operator-absen" title="Absen" sub={`Halo, ${user?.name || user?.email || ''}`} span={12}>
+      <Card id="operator-absen" title="Absen" sub={`Halo, ${hello}`} span={12}>
         <div className="pk-actions">
           <Link className="pk-btn primary" href="/admin/absensi/absen">
             Absen sekarang

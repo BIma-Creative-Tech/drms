@@ -11,7 +11,7 @@ import { DEFAULT_SEED_DATA } from '@/seed/data'
 import { seed } from '@/seed/seed'
 
 import { adr0013Fallback, api, asUser, makeFlowUser, png, sysCreate, upload, type FlowUser, type Res } from './flow-world'
-import { addMembership, companyId, getTestPayload, installFakeKeycloak, sqlAs, withContext } from './helpers'
+import { addMembership, companyId, fixturePm, getTestPayload, installFakeKeycloak, sqlAs, withContext } from './helpers'
 
 /**
  * PT scope rule (owner decision 2026-10-02, ADR 0016 "Scope rule"): read + search scope = the PTs a
@@ -65,11 +65,11 @@ async function inPt(company: number, collection: CollectionSlug, code: string): 
 
 /** Project + MAT category of a PT; `employee` assigned to the project with a default bank account. */
 async function ptFixture(company: number, code: string) {
-  const project = await sysCreate('projects', { company, code: `${code}-${tag}`, name: `Proyek ${code}`, budget: 500_000_000, status: 'berjalan' })
+  const project = await sysCreate('projects', { company, pm: await fixturePm(company), code: `${code}-${tag}`, name: `Proyek ${code}`, budget: 500_000_000, status: 'berjalan' })
   return { project, cat: await inPt(company, 'expense-categories', 'MAT') }
 }
 async function staffEmployee(company: number, project: number, code: string) {
-  const emp = await sysCreate('employees', { company, code: `${code}-${tag}`, name: `Karyawan ${code}` })
+  const emp = await sysCreate('employees', { company, pm: await fixturePm(company), code: `${code}-${tag}`, name: `Karyawan ${code}` })
   await sysCreate('team-assignments', { employee: emp, project, roleInProject: 'staff' })
   const bank = (await p.find({ collection: 'banks', where: { code: { equals: 'MANDIRI' } }, limit: 1, overrideAccess: true /* SYSTEM-READ: fixture */ })).docs[0]!.id
   const acc = await sysCreate('employee-bank-accounts', { employee: emp, bank, accountNo: `8${Date.now() % 1e9}${Math.floor(Math.random() * 90 + 10)}`, accountHolder: `Karyawan ${code}`, isDefault: true })
@@ -351,7 +351,7 @@ describe('LOW findings closed under the rule (QA-MC4-08 / 10 / 11 / 12, /me, not
     const items = [{ name: 'Rahasia B', weightPct: 100, sequence: 1 }]
     const tB = await sysCreate('stage-templates', { company: B, name: `Templat B ${tag}`, items, active: true })
     const tA = await sysCreate('stage-templates', { company: A, name: `Templat A ${tag}`, items: [{ name: 'Tahap A', weightPct: 100, sequence: 1 }], active: true })
-    const proj = await sysCreate('projects', { company: A, code: `SKT-${tag}`, name: 'Proyek templat', budget: 1_000_000, status: 'berjalan' })
+    const proj = await sysCreate('projects', { company: A, pm: await fixturePm(A), code: `SKT-${tag}`, name: 'Proyek templat', budget: 1_000_000, status: 'berjalan' })
     const foreign = await call('PUT', `/api/v1/projects/${proj}/stages`, U.ownerA, { templateId: tB }, key())
     const missing = await call('PUT', `/api/v1/projects/${proj}/stages`, U.ownerA, { templateId: 999_999_999 }, key())
     expect(foreign.status).toBe(400)

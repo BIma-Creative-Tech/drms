@@ -91,6 +91,11 @@ export const openapiDocument = {
               "null"
             ]
           },
+          "displayName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "DRMS 10/10 WA-14: label to greet/show the caller (never empty): users.name → employee name of the membership in a selected PT (lowest PT id first, then other memberships) → email local part → \"Pengguna\". `name` stays the stored account name."
+          },
           "roles": {
             "type": "array",
             "items": {
@@ -298,6 +303,7 @@ export const openapiDocument = {
           "id",
           "email",
           "name",
+          "displayName",
           "roles",
           "capabilities",
           "employee",
@@ -29467,6 +29473,17 @@ export const openapiDocument = {
           },
           {
             "schema": {
+              "type": "string",
+              "maxLength": 100,
+              "description": "Text search: number, complaint, action, notes (every word must match)."
+            },
+            "required": false,
+            "description": "Text search: number, complaint, action, notes (every word must match).",
+            "name": "q",
+            "in": "query"
+          },
+          {
+            "schema": {
               "type": "integer",
               "exclusiveMinimum": 0
             },
@@ -30948,6 +30965,17 @@ export const openapiDocument = {
             },
             "required": false,
             "name": "reporter",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 100,
+              "description": "Text search: document number, receiver, notes (every word must match)."
+            },
+            "required": false,
+            "description": "Text search: document number, receiver, notes (every word must match).",
+            "name": "q",
             "in": "query"
           },
           {
@@ -33001,6 +33029,17 @@ export const openapiDocument = {
             },
             "required": false,
             "name": "mine",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 100,
+              "description": "DRMS 10/10 D8 text search: number, issues, notes (every word must match)."
+            },
+            "required": false,
+            "description": "DRMS 10/10 D8 text search: number, issues, notes (every word must match).",
+            "name": "q",
             "in": "query"
           },
           {

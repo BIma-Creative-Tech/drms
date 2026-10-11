@@ -132,6 +132,21 @@ export async function makeUser(roles: Role[], opts: { employee?: number; active?
   return { ...(await withContext(doc as unknown as TestUser)), collection: 'users' }
 }
 
+/**
+ * DRMS 10/10 #5: a project needs its PM (Projects.ts validation + DB NOT NULL) — a PM account that is
+ * a member (pk-pm) of `company` (default DRMS) for fixtures that do not care who the PM is. One per PT.
+ */
+const fixturePms = new Map<number, number>()
+export async function fixturePm(company?: number): Promise<number> {
+  const c = company ?? (await companyId())
+  let id = fixturePms.get(c)
+  if (id === undefined) {
+    id = (await makeUser(['pk-pm'], { company: c, label: 'pm-fixture' })).id
+    fixturePms.set(c, id)
+  }
+  return id
+}
+
 // ---- HTTP through Payload's REST handler (same code path as the Next route) --------------------
 export async function http(
   method: string,
