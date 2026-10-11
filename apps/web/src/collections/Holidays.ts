@@ -4,6 +4,8 @@ import { anyRole, denyAll } from '@/access/roles'
 import { byRoleAny, rolesAllowedAny } from '@/access/policies'
 import { reasonOnAnyUpdate, withAudit } from '@/audit/hooks'
 
+import { BUSINESS_DATE_FIELD } from './fields-f2'
+
 /** Hari libur (rekap absensi). Admin C/R/U, Owner R/U, all R. Date = business date (YYYY-MM-DD). */
 export const Holidays: CollectionConfig = withAudit(
   {
@@ -20,8 +22,10 @@ export const Holidays: CollectionConfig = withAudit(
       {
         name: 'date',
         type: 'text',
-        label: 'Tanggal (YYYY-MM-DD)',
+        label: 'Tanggal',
         required: true,
+        // DRMS 10/10 8c: date picker on the same YYYY-MM-DD text column (like every business date)
+        admin: { components: { Field: BUSINESS_DATE_FIELD } },
         unique: true,
         index: true,
         validate: (v: unknown) => (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(Date.parse(`${v}T00:00:00Z`)) ? true : 'Format tanggal YYYY-MM-DD.'),

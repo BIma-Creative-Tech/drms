@@ -82,7 +82,7 @@ export const ContractUnits: CollectionConfig = withAudit(
       {
         type: 'row',
         fields: [
-          businessDateField('startDate', 'Mulai', { required: true, index: true, admin: { description: 'YYYY-MM-DD' } }),
+          businessDateField('startDate', 'Mulai', { required: true, index: true }),
           businessDateField('endDate', 'Selesai', { index: true, admin: { description: 'Kosong = berjalan.' } }),
         ],
       },

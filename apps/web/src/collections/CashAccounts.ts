@@ -73,7 +73,7 @@ export const CashAccounts: CollectionConfig = withAudit(
       { name: 'accountNo', type: 'text', label: 'Nomor rekening', maxLength: 34 },
       { name: 'accountHolder', type: 'text', label: 'Atas nama', maxLength: 128 },
       rupiahField('openingBalance', 'Saldo awal (Rp)'),
-      businessDateField('openingBalanceDate', 'Tanggal saldo awal (YYYY-MM-DD)', {
+      businessDateField('openingBalanceDate', 'Tanggal saldo awal', {
         admin: {
           description:
             'Tanggal go-live akun ini. Transaksi kas sebelum tanggal ini ditolak; saldo awal terkunci setelah periode sejak tanggal ini ditutup. Kosong = tanpa kunci.',

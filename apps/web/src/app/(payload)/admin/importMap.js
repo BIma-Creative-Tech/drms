@@ -10,17 +10,24 @@ import { ActiveCell as ActiveCell_5b572f69f0b2c658d322ad3e65563a49 } from '@/adm
 import { MemberCountCell as MemberCountCell_0560bc1409d80e4fbd9f8971b0f4bccb } from '@/admin/components/companies/MemberCountCell'
 import { CompanyCell as CompanyCell_a3ad1a52c7c805d12e2b4c793adf9c6d } from '@/admin/components/companies/CompanyCell'
 import { CompanyListFilter as CompanyListFilter_b31d22e0603f5879a90d350d8ff6b31b } from '@/admin/components/companies/CompanyListFilter'
+import { CompanyField as CompanyField_d907892a7d1864bfc60310041555d48d } from '@/admin/components/companies/CompanyField'
+import { BusinessDateField as BusinessDateField_1172137b1c1eab4696f62271d5ebbe2f } from '@/admin/components/BusinessDateField'
 import { WorkflowPanel as WorkflowPanel_6fcc9de32a179d40aa1576187df45f1e } from '@/admin/components/WorkflowPanel'
 import { PdfLinks as PdfLinks_baf3bc4fa5b0188cc15c74a19f03943f } from '@/admin/components/PdfLinks'
-import { ReadOnlyJson as ReadOnlyJson_08329374a86bb7164f48836797d5c216 } from '@/components/ReadOnlyJson'
+import { BankAccountPreview as BankAccountPreview_1615d70b0243139e3dffd45ad2617f07 } from '@/admin/components/BankAccountPreview'
+import { RupiahNumberField as RupiahNumberField_d552ada140febbfef2d7dea921fde6df } from '@/admin/components/RupiahNumberField'
+import { LinesTotalPreview as LinesTotalPreview_981a7b2ac6e59231317266aea0a515ba } from '@/admin/components/LinesTotalPreview'
+import { CollapsedReadOnlyJson as CollapsedReadOnlyJson_08329374a86bb7164f48836797d5c216 } from '@/components/ReadOnlyJson'
 import { ResubmitOfField as ResubmitOfField_c0f3cc59bdb1242c0f258beab78a7cba } from '@/admin/components/ResubmitOfField'
 import { RiwayatView as RiwayatView_5fd51ea07b7ad6c5f81167eb6f8e8f96 } from '@/admin/views/RiwayatView'
+import { ReadOnlyJson as ReadOnlyJson_08329374a86bb7164f48836797d5c216 } from '@/components/ReadOnlyJson'
 import { ModuleNav as ModuleNav_a975bb2dde1c2e03760e9af25ce7c88f } from '@/admin/shell/ModuleNav'
 import { LogoutButton as LogoutButton_db9ac62598c46d0f1db201f6af05442e } from '@/components/LogoutButton'
 import { Icon as Icon_bbc58174e2e54453bd848c29fea2f58a } from '@/theme/graphics'
 import { Logo as Logo_bbc58174e2e54453bd848c29fea2f58a } from '@/theme/graphics'
 import { SsoLoginButton as SsoLoginButton_e910a89f6cf03666cb4ab2594dae916d } from '@/components/SsoLoginButton'
 import { LoadingProvider as LoadingProvider_102ab52fcb0bfaca8f09b2ac251085a9 } from '@/admin/loading/LoadingProvider'
+import { LightboxProvider as LightboxProvider_9e2cf7dbd1ec819b046a1110cd1942a3 } from '@/admin/components/lightbox/LightboxProvider'
 import { ApprovalInbox as ApprovalInbox_38358c8fa3c2f08f616ef2728997b5dc } from '@/admin/views/ApprovalInbox'
 import { TransferQueue as TransferQueue_8a6e0f53c8f086ccf31fb1d3d209ace9 } from '@/admin/views/TransferQueue'
 import { LpjVerification as LpjVerification_0e13d2751aafbaa3ddc692019a4025e1 } from '@/admin/views/LpjVerification'
@@ -80,17 +87,24 @@ export const importMap = {
   "@/admin/components/companies/MemberCountCell#MemberCountCell": MemberCountCell_0560bc1409d80e4fbd9f8971b0f4bccb,
   "@/admin/components/companies/CompanyCell#CompanyCell": CompanyCell_a3ad1a52c7c805d12e2b4c793adf9c6d,
   "@/admin/components/companies/CompanyListFilter#CompanyListFilter": CompanyListFilter_b31d22e0603f5879a90d350d8ff6b31b,
+  "@/admin/components/companies/CompanyField#CompanyField": CompanyField_d907892a7d1864bfc60310041555d48d,
+  "@/admin/components/BusinessDateField#BusinessDateField": BusinessDateField_1172137b1c1eab4696f62271d5ebbe2f,
   "@/admin/components/WorkflowPanel#WorkflowPanel": WorkflowPanel_6fcc9de32a179d40aa1576187df45f1e,
   "@/admin/components/PdfLinks#PdfLinks": PdfLinks_baf3bc4fa5b0188cc15c74a19f03943f,
-  "@/components/ReadOnlyJson#ReadOnlyJson": ReadOnlyJson_08329374a86bb7164f48836797d5c216,
+  "@/admin/components/BankAccountPreview#BankAccountPreview": BankAccountPreview_1615d70b0243139e3dffd45ad2617f07,
+  "@/admin/components/RupiahNumberField#RupiahNumberField": RupiahNumberField_d552ada140febbfef2d7dea921fde6df,
+  "@/admin/components/LinesTotalPreview#LinesTotalPreview": LinesTotalPreview_981a7b2ac6e59231317266aea0a515ba,
+  "@/components/ReadOnlyJson#CollapsedReadOnlyJson": CollapsedReadOnlyJson_08329374a86bb7164f48836797d5c216,
   "@/admin/components/ResubmitOfField#ResubmitOfField": ResubmitOfField_c0f3cc59bdb1242c0f258beab78a7cba,
   "@/admin/views/RiwayatView#RiwayatView": RiwayatView_5fd51ea07b7ad6c5f81167eb6f8e8f96,
+  "@/components/ReadOnlyJson#ReadOnlyJson": ReadOnlyJson_08329374a86bb7164f48836797d5c216,
   "@/admin/shell/ModuleNav#ModuleNav": ModuleNav_a975bb2dde1c2e03760e9af25ce7c88f,
   "@/components/LogoutButton#LogoutButton": LogoutButton_db9ac62598c46d0f1db201f6af05442e,
   "@/theme/graphics#Icon": Icon_bbc58174e2e54453bd848c29fea2f58a,
   "@/theme/graphics#Logo": Logo_bbc58174e2e54453bd848c29fea2f58a,
   "@/components/SsoLoginButton#SsoLoginButton": SsoLoginButton_e910a89f6cf03666cb4ab2594dae916d,
   "@/admin/loading/LoadingProvider#LoadingProvider": LoadingProvider_102ab52fcb0bfaca8f09b2ac251085a9,
+  "@/admin/components/lightbox/LightboxProvider#LightboxProvider": LightboxProvider_9e2cf7dbd1ec819b046a1110cd1942a3,
   "@/admin/views/ApprovalInbox#ApprovalInbox": ApprovalInbox_38358c8fa3c2f08f616ef2728997b5dc,
   "@/admin/views/TransferQueue#TransferQueue": TransferQueue_8a6e0f53c8f086ccf31fb1d3d209ace9,
   "@/admin/views/LpjVerification#LpjVerification": LpjVerification_0e13d2751aafbaa3ddc692019a4025e1,
