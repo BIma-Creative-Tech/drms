@@ -20,6 +20,8 @@ import 'package:proyekkas/app/theme.dart';
 import 'package:proyekkas/core/connectivity/connectivity_controller.dart';
 import 'package:proyekkas/core/network/api_exception.dart';
 import 'package:proyekkas/core/storage/secure_store.dart';
+import 'package:proyekkas/features/approvals/application/inbox_providers.dart';
+import 'package:proyekkas/features/approvals/presentation/inbox_screen.dart';
 import 'package:proyekkas/features/auth/application/auth_controller.dart';
 import 'package:proyekkas/features/auth/domain/user_profile.dart';
 import 'package:proyekkas/features/expense/application/expense_providers.dart';
@@ -37,6 +39,7 @@ import '../test/support/fixtures.dart';
 import '../test/support/harness.dart';
 import '../test/support/seed.dart';
 import '../test/support/widget_harness.dart' show FakeAuth, FakeConnectivity, profile;
+import '../test/widget/e1_e3_screens_test.dart' as e1 show inboxPage;
 import '../test/widget/requester_flow_test.dart' show advanceJson;
 
 const _dir = String.fromEnvironment('PK_SHOTS_DIR', defaultValue: 'build/preview-shots');
@@ -86,6 +89,7 @@ Future<void> _shot(
   required Widget child,
   List<Override> overrides = const [],
   Future<void> Function(WidgetTester tester)? act,
+  Set<Role> roles = const {Role.staff},
 }) async {
   debugDisableShadows = false;
   await initializeDateFormatting('id');
@@ -103,9 +107,7 @@ Future<void> _shot(
         deviceIdentityProvider.overrideWithValue(testDevice()),
         databaseProvider.overrideWithValue(db),
         connectivityProvider.overrideWith(() => FakeConnectivity(true)),
-        authControllerProvider.overrideWith(
-          () => FakeAuth(AuthSignedIn(profile: profile({Role.staff}), sub: 'preview-sub')),
-        ),
+        authControllerProvider.overrideWith(() => FakeAuth(AuthSignedIn(profile: profile(roles), sub: 'preview-sub'))),
         ...overrides,
       ],
       child: RepaintBoundary(
@@ -151,6 +153,9 @@ Future<void> _scrollTo(WidgetTester tester, Key key) async {
   await tester.scrollUntilVisible(find.byKey(key), 300, scrollable: find.byType(Scrollable).first);
   await Scrollable.ensureVisible(tester.element(find.byKey(key)), alignment: 0.3);
 }
+
+/// Detail under the current ADR 0021 snapshot: PM approved, the Direktur decides (Finance only transfers).
+Map<String, dynamic> _pmDetail() => pmDetailJson(status: 'pending_approval', allowed: const ['approve', 'reject']);
 
 void main() {
   setUpAll(_loadFonts);
@@ -201,10 +206,42 @@ void main() {
       () => const [],
       (t) => _scrollTo(t, const Key('line-3')),
     ),
+    // B-2 integration: the current ADR 0021 snapshot (PM project → Direktur), like the web detail
     'b2-detail-lines': (
       const RequestDetailScreen(id: 42),
-      () => [requestDetailProvider(42).overrideWith((ref) async => detailFromJson(detailJson())), ...photoOverrides()],
+      () => [requestDetailProvider(42).overrideWith((ref) async => detailFromJson(_pmDetail())), ...photoOverrides()],
       (t) => _scrollTo(t, const Key('line-2-receipt-mismatch')),
+    ),
+    'b2int-detail-timeline': (
+      const RequestDetailScreen(id: 42),
+      () => [requestDetailProvider(42).overrideWith((ref) async => detailFromJson(_pmDetail())), ...photoOverrides()],
+      (t) async {
+        await t.scrollUntilVisible(find.text('Transfer Finance'), 300, scrollable: find.byType(Scrollable).first);
+        await Scrollable.ensureVisible(t.element(find.text('Transfer Finance')), alignment: 0.6);
+      },
+    ),
+    'b2int-detail-revisi-legacy': (
+      const RequestDetailScreen(id: 42),
+      () => [
+        requestDetailProvider(42).overrideWith(
+          (ref) async => detailFromJson({
+            ..._pmDetail(),
+            'status': 'receipt_revision',
+            'statusLabel': 'Revisi Nota',
+            'allowedActions': const ['receipts_resubmit', 'edit'],
+            'approvals': [
+              ...(_pmDetail()['approvals'] as List),
+              {'id': 4, 'cycle': 1, 'position': 'approval', 'level': 1, 'actorName': 'Dedi', 'decision': 'approved'},
+            ],
+            'lines': [
+              for (final (i, l) in (_pmDetail()['lines'] as List).indexed)
+                {...(l as Map<String, dynamic>), if (i == 1) 'unitPrice': null},
+            ],
+          }),
+        ),
+        ...photoOverrides(),
+      ],
+      (t) => _scrollTo(t, const Key('lines-incomplete-note')),
     ),
     'b2-detail-lpj-photos': (
       const RequestDetailScreen(id: 42),
@@ -244,5 +281,28 @@ void main() {
         await _shot(tester, name: name, brightness: b, child: child, overrides: overrides(), act: act);
       });
     }
+  }
+  // B-2 integration: approval inbox with the "Selisih nota (n)" badge (web Antrian Transfer parity)
+  for (final b in Brightness.values) {
+    testWidgets('b2int-inbox-mismatch ${b.name}', (tester) async {
+      await _shot(
+        tester,
+        name: 'b2int-inbox-mismatch',
+        brightness: b,
+        roles: {Role.owner},
+        child: const InboxScreen(),
+        overrides: [
+          inboxProvider.overrideWith(
+            (ref) async => e1.inboxPage(
+              extra: {
+                'statusLabel': 'Menunggu persetujuan Direktur',
+                'stepLabel': 'Persetujuan Direktur',
+                'flags': {'warning': 1, 'info': 0, 'receiptMismatch': 1},
+              },
+            ),
+          ),
+        ],
+      );
+    });
   }
 }

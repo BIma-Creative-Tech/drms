@@ -361,6 +361,7 @@ InboxItem inboxItemFromJson(Json j) {
     budgetOverWarn: budget?['overWarn'] == true,
     warningFlags: _int(flags?['warning']),
     infoFlags: _int(flags?['info']),
+    receiptMismatchFlags: _int(flags?['receiptMismatch']),
     companyId: companyIdOf(j),
   );
 }

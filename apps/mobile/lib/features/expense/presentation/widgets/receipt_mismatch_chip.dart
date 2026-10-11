@@ -8,9 +8,12 @@ import '../../../../l10n/gen/app_localizations.dart';
 /// (awareness only: approval and transfer use the total). Same wording as the web badge. With both amounts
 /// the tooltip / semantics say which values differ.
 class ReceiptMismatchChip extends StatelessWidget {
-  const ReceiptMismatchChip({super.key, this.receiptAmount, this.total});
+  const ReceiptMismatchChip({super.key, this.receiptAmount, this.total, this.count});
   final int? receiptAmount;
   final int? total;
+
+  /// Queue badge (approval inbox, like the web Antrian Transfer): "Selisih nota (n)" = n lines.
+  final int? count;
 
   @override
   Widget build(BuildContext context) {
@@ -32,14 +35,14 @@ class ReceiptMismatchChip extends StatelessWidget {
           Icon(Icons.warning_amber_rounded, size: 14, color: color),
           const SizedBox(width: 4),
           Text(
-            t.receiptMismatchChip,
+            count == null ? t.receiptMismatchChip : t.receiptMismatchCount(count!),
             style: Theme.of(context).textTheme.labelSmall?.copyWith(color: color, fontWeight: FontWeight.w600),
           ),
         ],
       ),
     );
     return Semantics(
-      label: detail ?? t.receiptMismatchChip,
+      label: detail ?? (count == null ? t.receiptMismatchChip : t.receiptMismatchCount(count!)),
       excludeSemantics: true,
       child: detail == null ? chip : Tooltip(message: detail, child: chip),
     );

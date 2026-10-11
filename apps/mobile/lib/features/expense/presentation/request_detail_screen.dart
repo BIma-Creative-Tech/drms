@@ -275,6 +275,12 @@ class _LineCard extends ConsumerWidget {
                   total: line.total,
                 ),
               ),
+            if (lineNeedsCompletion(detail, line))
+              Text(
+                t.lineNeedsUnitPriceShort,
+                key: Key('line-${line.no}-needs-unit-price'),
+                style: TextStyle(color: context.pk.warnText, fontWeight: FontWeight.w600),
+              ),
             if (line.notes != null) Text(line.notes!, style: Theme.of(context).textTheme.bodySmall),
             if (receipts.isNotEmpty) const SizedBox(height: 8),
             for (final r in receipts)

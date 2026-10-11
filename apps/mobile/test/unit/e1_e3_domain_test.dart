@@ -101,9 +101,10 @@ void main() {
       expect(d.approvalRule!.legacyPmAcknowledge, isTrue);
       expect(d.statusLabel, 'Menunggu persetujuan PM');
       final steps = buildTimeline(d);
-      expect(steps.map((s) => s.title), ['Diajukan Oleh', 'Dibuat Oleh', 'Persetujuan PM', 'Persetujuan Direktur']);
-      expect(steps[2].state, TurnState.current);
-      expect(steps[3].state, TurnState.pending);
+      // same steps as the web ApprovalTimeline (ADR 0021 snapshot)
+      expect(steps.map((s) => s.title), ['Diajukan', 'Persetujuan PM', 'Persetujuan Direktur', 'Transfer Finance']);
+      expect(steps.map((s) => s.state), [TurnState.done, TurnState.current, TurnState.pending, TurnState.pending]);
+      expect(steps[0].actor, 'Budi');
       expect(currentTurn(d), 'PM project — persetujuan PM');
       expect(acknowledgeTitle(d.approvalRule), 'Persetujuan PM');
     });
@@ -114,7 +115,9 @@ void main() {
       expect(rule.roleOfLevel(1), 'pk-owner');
       expect(rule.lastLevel, 1);
       expect(currentTurn(d), 'Persetujuan Direktur');
-      expect(buildTimeline(d).where((s) => s.title.contains('Finance')), isEmpty);
+      // Finance only transfers: no "Approval (Finance)" level, the last step is "Transfer Finance"
+      expect(buildTimeline(d).where((s) => s.title.startsWith('Approval')), isEmpty);
+      expect(buildTimeline(d).last.title, 'Transfer Finance');
     });
 
     test('PM requester: PM step skipped "(tidak berlaku — pemohon)", Direktur decides', () {

@@ -56,6 +56,11 @@ abstract class ExpenseLine with _$ExpenseLine {
   }) = _ExpenseLine;
 }
 
+/// D3: a line saved before D3 (no reproducible unit price) in an editable request (Draft / Revisi Nota) —
+/// "Lengkapi Qty & Harga satuan"; the server refuses (re)submit until it is completed.
+bool lineNeedsCompletion(ExpenseDetail d, ExpenseLine l) =>
+    (d.status == RequestStatus.draft || d.status == RequestStatus.receiptRevision) && l.unitPrice == null;
+
 /// Flag code of D3 "Nominal sesuai nota ≠ total baris" (awareness for Finance, never blocks).
 const receiptAmountMismatchFlag = 'receipt_amount_mismatch';
 
@@ -330,6 +335,9 @@ abstract class InboxItem with _$InboxItem {
     @Default(false) bool budgetOverWarn,
     @Default(0) int warningFlags,
     @Default(0) int infoFlags,
+
+    /// D3: lines whose "Nominal sesuai nota" ≠ total (`flags.receiptMismatch`) — badge "Selisih nota (n)".
+    @Default(0) int receiptMismatchFlags,
 
     /// MC3: PT of the request (`company.id`) — chip + role check of that PT.
     int? companyId,

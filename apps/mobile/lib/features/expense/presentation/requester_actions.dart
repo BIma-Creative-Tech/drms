@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../app/providers.dart';
+import '../../../app/theme.dart';
 import '../../../core/format/dates.dart';
 import '../../../core/format/rupiah.dart';
 import '../../../core/media/photo_compressor.dart';
@@ -37,6 +38,11 @@ class RequesterActionsSection extends ConsumerWidget {
     final a = detail.allowedActions;
     final canAdd = canAddReceipts(detail);
     final lpjAgain = detail.settlement != null && (detail.settlement!.submitCount > 0);
+    // D3: a pre-D3 line needs Qty & Harga satuan before "Kirim ulang nota" (server rule; edited on the web)
+    final incomplete = [
+      for (final l in detail.lines)
+        if (lineNeedsCompletion(detail, l)) l.no,
+    ];
     final buttons = <Widget>[
       if (canAdd) ...[
         OnlineOnlyButton(
@@ -68,13 +74,20 @@ class RequesterActionsSection extends ConsumerWidget {
           icon: Icons.send,
           onPressed: () => _submitLpj(context, ref),
         ),
+      if (a.contains(RequesterAction.receiptsResubmit.code) && incomplete.isNotEmpty)
+        Text(
+          t.linesIncompleteResubmit(incomplete.join(', ')),
+          key: const Key('lines-incomplete-note'),
+          style: TextStyle(color: context.pk.warnText, fontWeight: FontWeight.w600),
+        ),
       if (a.contains(RequesterAction.receiptsResubmit.code))
         OnlineOnlyButton(
           key: const Key('action-receipts-resubmit'),
           label: t.actionReceiptsResubmit,
           icon: Icons.replay,
-          onPressed: () =>
-              _confirmAndRun(context, ref, RequesterAction.receiptsResubmit, t.actionReceiptsResubmitConfirm),
+          onPressed: incomplete.isNotEmpty
+              ? null
+              : () => _confirmAndRun(context, ref, RequesterAction.receiptsResubmit, t.actionReceiptsResubmitConfirm),
         ),
       // Finance also holds `complete`; on the phone it is the requester's "dana diterima".
       if (a.contains(RequesterAction.complete.code) && !a.contains('transfer_void'))

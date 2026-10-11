@@ -544,7 +544,7 @@ abstract class AppLocalizations {
   /// No description provided for @linesTitle.
   ///
   /// In id, this message translates to:
-  /// **'Baris item'**
+  /// **'Rincian item'**
   String get linesTitle;
 
   /// No description provided for @receiptsTitle.
@@ -888,6 +888,18 @@ abstract class AppLocalizations {
   /// In id, this message translates to:
   /// **'Lengkapi Qty & Harga satuan'**
   String get lineNeedsUnitPriceShort;
+
+  /// No description provided for @linesIncompleteResubmit.
+  ///
+  /// In id, this message translates to:
+  /// **'Lengkapi Qty & Harga satuan pada baris {lines} (Ubah di web) sebelum mengirim ulang nota.'**
+  String linesIncompleteResubmit(String lines);
+
+  /// No description provided for @receiptMismatchCount.
+  ///
+  /// In id, this message translates to:
+  /// **'Selisih nota ({count})'**
+  String receiptMismatchCount(int count);
 
   /// No description provided for @fieldLineNo.
   ///

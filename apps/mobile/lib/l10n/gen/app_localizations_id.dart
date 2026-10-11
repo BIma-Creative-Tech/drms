@@ -254,7 +254,7 @@ class AppLocalizationsId extends AppLocalizations {
   String get timelineTitle => 'Riwayat approval';
 
   @override
-  String get linesTitle => 'Baris item';
+  String get linesTitle => 'Rincian item';
 
   @override
   String get receiptsTitle => 'Nota';
@@ -435,6 +435,16 @@ class AppLocalizationsId extends AppLocalizations {
 
   @override
   String get lineNeedsUnitPriceShort => 'Lengkapi Qty & Harga satuan';
+
+  @override
+  String linesIncompleteResubmit(String lines) {
+    return 'Lengkapi Qty & Harga satuan pada baris $lines (Ubah di web) sebelum mengirim ulang nota.';
+  }
+
+  @override
+  String receiptMismatchCount(int count) {
+    return 'Selisih nota ($count)';
+  }
 
   @override
   String get fieldLineNo => 'No';

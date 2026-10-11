@@ -127,7 +127,7 @@
   "detailTitle": "Detail Pengajuan",
   "turnLabel": "Giliran",
   "timelineTitle": "Riwayat approval",
-  "linesTitle": "Baris item",
+  "linesTitle": "Rincian item",
   "receiptsTitle": "Nota",
   "flagsTitle": "Flag validasi",
   "grandTotal": "Grand total",
@@ -219,6 +219,22 @@
     }
   },
   "lineNeedsUnitPriceShort": "Lengkapi Qty & Harga satuan",
+  "linesIncompleteResubmit": "Lengkapi Qty & Harga satuan pada baris {lines} (Ubah di web) sebelum mengirim ulang nota.",
+  "@linesIncompleteResubmit": {
+    "placeholders": {
+      "lines": {
+        "type": "String"
+      }
+    }
+  },
+  "receiptMismatchCount": "Selisih nota ({count})",
+  "@receiptMismatchCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "fieldLineNo": "No",
   "receiptDiff": "Selisih total baris vs nota: {amount}",
   "@receiptDiff": {

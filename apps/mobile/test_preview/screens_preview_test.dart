@@ -133,7 +133,10 @@ Future<void> _shot(
         pmDashboardProvider.overrideWith((ref) async => PmDashboard.fromJson(pmDashboardJson())),
         inboxProvider.overrideWith((ref) async => e1.inboxPage()),
         expenseApiProvider.overrideWithValue(e1.FakeExpenseApi()),
-        requestDetailProvider(42).overrideWith((ref) async => detailFromJson(detailJson())),
+        // B-2 integration: the current ADR 0021 snapshot (legacy wording only for legacy snapshots)
+        requestDetailProvider(42).overrideWith(
+          (ref) async => detailFromJson(pmDetailJson(status: 'pending_approval', allowed: const ['approve', 'reject'])),
+        ),
         attendanceSitesProvider.overrideWith((ref) async => const [_site, _cc]),
         attendanceItemsProvider.overrideWith((ref) => Stream.value(const [])),
         attendanceRecapProvider.overrideWith((ref, key) async => AttendanceRecap.fromJson(recapJson())),
