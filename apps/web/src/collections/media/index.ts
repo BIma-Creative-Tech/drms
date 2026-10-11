@@ -313,7 +313,12 @@ export const MediaSelfies = mediaCollection({
   createGuard: assertSelfieUploadAllowed,
   // E6 S2 (Q-33): set by the selfieRetention job when the file was deleted from the volume. The row
   // stays as a tombstone (attendances.selfie_id is NOT NULL and append-only), without the image.
-  extraFields: [{ name: 'removedAt', type: 'date', label: 'File dihapus (retensi)', index: true, access: { update: () => false }, admin: { readOnly: true } }],
+  // D7 (DRMS 10/10, ADR 0010 addendum 2026-10-12): set once by the worker job `stampSelfie` when the timestamp
+  // band (server time in the PT zone, GPS, location, employee, "RR Teams") was burnt into the stored file.
+  extraFields: [
+    { name: 'removedAt', type: 'date', label: 'File dihapus (retensi)', index: true, access: { update: () => false }, admin: { readOnly: true } },
+    { name: 'stampedAt', type: 'date', label: 'Cap waktu dibubuhkan', access: { update: () => false }, admin: { readOnly: true, date: { pickerAppearance: 'dayAndTime' } } },
+  ],
 })
 
 export const MediaProgressPhotos = mediaCollection({

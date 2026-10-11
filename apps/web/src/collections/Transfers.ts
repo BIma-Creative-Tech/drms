@@ -21,7 +21,7 @@ export const Transfers: CollectionConfig = withAudit(
   {
     slug: 'transfers',
     labels: { singular: 'Transfer', plural: 'Transfer' },
-    admin: { group: 'Keuangan', useAsTitle: 'docNo', defaultColumns: ['docNo', 'request', 'kind', 'amount', 'transferDate', 'status'], components: { views: { edit: RIWAYAT_TAB } } },
+    admin: { group: 'Keuangan', useAsTitle: 'docNo', defaultColumns: ['docNo', 'request', 'kind', 'amount', 'transferAt', 'status'], components: { views: { edit: RIWAYAT_TAB } } },
     access: {
       // Finance/Owner/Admin: all rows of their PTs; requesters own; PM team (via the request scope).
       read: byVisibleRequest('request'),
@@ -51,6 +51,9 @@ export const Transfers: CollectionConfig = withAudit(
       { name: 'bankRef', type: 'text', label: 'Nomor referensi bank', required: true, maxLength: 64, admin: ro },
       { name: 'proof', type: 'upload', relationTo: 'media-transfer-proofs', label: 'Bukti transfer', required: true, admin: ro },
       businessDateField('transferDate', 'Tanggal transfer', { required: true, admin: ro }),
+      // Item 11 (DRMS 10/10): date AND time of the bank transfer document; `transferDate` = its date in the PT
+      // time zone (reports keep using it). Null = recorded by an old client without a time ("jam tidak diketahui").
+      { name: 'transferAt', type: 'date', label: 'Tanggal & jam transfer (sesuai bukti)', index: true, admin: { ...ro, date: { pickerAppearance: 'dayAndTime' } } },
       { name: 'postedBy', type: 'relationship', relationTo: 'users', label: 'Dicatat oleh', admin: ro },
       { name: 'status', type: 'select', required: true, defaultValue: 'posted', index: true, options: [{ label: 'Posted', value: 'posted' }, { label: 'Void', value: 'void' }], admin: ro },
       { name: 'cashEntry', type: 'relationship', relationTo: 'cash-entries', label: 'Kas keluar', admin: ro },

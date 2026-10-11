@@ -222,6 +222,7 @@ export interface Config {
       selfieRetention: TaskSelfieRetention;
       dailyReminders: TaskDailyReminders;
       mediaOrphanCleanup: TaskMediaOrphanCleanup;
+      stampSelfie: TaskStampSelfie;
       inline: {
         input: unknown;
         output: unknown;
@@ -324,7 +325,7 @@ export interface MediaSignature {
 export interface Company {
   id: number;
   /**
-   * Token {COMPANY} di nomor dokumen (mis. 1/PB-CS1/27/IX/2026): huruf besar/angka, 2–16 karakter. Terkunci setelah PT ini punya dokumen bernomor.
+   * Token {COMPANY} di setiap nomor dokumen (mis. PB/CS1/2610/0001, TRF/CS1/2610/0001): huruf besar/angka, 2–16 karakter. Terkunci setelah PT ini punya dokumen bernomor.
    */
   shortCode: string;
   name: string;
@@ -358,6 +359,10 @@ export interface Company {
    */
   shortfallTolerancePct: number;
   receiptMaxAgeDays: number;
+  /**
+   * Pengajuan disetujui yang belum ditransfer lebih lama dari ini tampil merah di Antrian Transfer; dipakai laporan "SLA transfer" dan dashboard.
+   */
+  transferSlaHours: number;
   reimburseAutoCloseDays: number;
   /**
    * Uang muka tanpa LPJ lebih lama dari ini tampil sebagai "LPJ terlambat" di dashboard/laporan.
@@ -573,6 +578,7 @@ export interface MediaSelfy {
   capturedAt?: string | null;
   ownerCompany?: (number | null) | Company;
   removedAt?: string | null;
+  stampedAt?: string | null;
   /**
    * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
    */
@@ -1254,6 +1260,7 @@ export interface ExpenseRequest {
   approvalCycle?: number | null;
   currentLevel?: number | null;
   submittedAt?: string | null;
+  approvedAt?: string | null;
   contentHash?: string | null;
   resubmitOf?: (number | null) | ExpenseRequest;
   cancelReason?: string | null;
@@ -1544,6 +1551,7 @@ export interface Transfer {
   bankRef: string;
   proof: number | MediaTransferProof;
   transferDate: string;
+  transferAt?: string | null;
   postedBy?: (number | null) | User;
   status: 'posted' | 'void';
   cashEntry?: (number | null) | CashEntry;
@@ -2561,7 +2569,8 @@ export interface PayloadJob {
           | 'reimburseAutoClose'
           | 'selfieRetention'
           | 'dailyReminders'
-          | 'mediaOrphanCleanup';
+          | 'mediaOrphanCleanup'
+          | 'stampSelfie';
         taskID: string;
         input?:
           | {
@@ -2603,6 +2612,7 @@ export interface PayloadJob {
         | 'selfieRetention'
         | 'dailyReminders'
         | 'mediaOrphanCleanup'
+        | 'stampSelfie'
       )
     | null;
   queue?: string | null;
@@ -2922,6 +2932,7 @@ export interface CompaniesSelect<T extends boolean = true> {
   receiptRoundingTolerance?: T;
   shortfallTolerancePct?: T;
   receiptMaxAgeDays?: T;
+  transferSlaHours?: T;
   reimburseAutoCloseDays?: T;
   lpjDueDays?: T;
   syncExpenseDraftsEnabled?: T;
@@ -3427,6 +3438,7 @@ export interface ExpenseRequestsSelect<T extends boolean = true> {
   approvalCycle?: T;
   currentLevel?: T;
   submittedAt?: T;
+  approvedAt?: T;
   contentHash?: T;
   resubmitOf?: T;
   cancelReason?: T;
@@ -3565,6 +3577,7 @@ export interface TransfersSelect<T extends boolean = true> {
   bankRef?: T;
   proof?: T;
   transferDate?: T;
+  transferAt?: T;
   postedBy?: T;
   status?: T;
   cashEntry?: T;
@@ -4239,6 +4252,7 @@ export interface MediaSelfiesSelect<T extends boolean = true> {
   capturedAt?: T;
   ownerCompany?: T;
   removedAt?: T;
+  stampedAt?: T;
   changeReason?: T;
   updatedAt?: T;
   createdAt?: T;
@@ -4630,6 +4644,18 @@ export interface TaskMediaOrphanCleanup {
     candidates: number;
     deleted: number;
     dryRun: boolean;
+  };
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "TaskStampSelfie".
+ */
+export interface TaskStampSelfie {
+  input: {
+    attendanceId: number;
+  };
+  output: {
+    status: string;
   };
 }
 /**
