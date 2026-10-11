@@ -13,6 +13,7 @@ import { ListToolbar, Pager } from '../components/list/ListToolbar'
 import { matchesQuery, paginate, parseListQuery } from '../list-query'
 import { ReviewDetails } from '../components/ReviewDetails'
 import { AddendumInboxSection } from './Addendum'
+import { LoanInboxSection } from './Loans'
 import { ShortfallInboxSection } from './ShortfallInbox'
 import { itemCompany, PtChip, PtScopeNote, ptView } from './pt'
 import { Empty, Shell, TableScroll, badge, docLink, num, rp, table, td, th } from './shared'
@@ -151,6 +152,8 @@ export async function ApprovalInbox(props: AdminViewServerProps) {
       <AddendumInboxSection req={req} />
       {/* QA-06 / ADR 0019: LPJ shortfall above approved + tolerance (Direktur → Finance). */}
       <ShortfallInboxSection req={req} />
+      {/* ADR 0022: inter-project loans waiting for the Direktur (G1 pool). */}
+      <LoanInboxSection req={req} />
     </Shell>
   )
 }

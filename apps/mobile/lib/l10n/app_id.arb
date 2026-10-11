@@ -2135,5 +2135,150 @@
         "type": "String"
       }
     }
+  },
+  "loanTitle": "Pinjaman antar project",
+  "loanTab": "Pinjaman",
+  "loanEmpty": "Belum ada pinjaman antar project.",
+  "loanInboxEmpty": "Tidak ada pinjaman antar project yang menunggu keputusan Anda.",
+  "loanInboxTitle": "Pinjaman antar project ({count})",
+  "@loanInboxTitle": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "loanNew": "Ajukan pinjaman",
+  "loanNewTitle": "Ajukan pinjaman antar project",
+  "loanEditTitle": "Ubah draft pinjaman",
+  "loanNotEditable": "Pinjaman ini sudah tidak bisa diubah (bukan Draft lagi atau bukan milik Anda).",
+  "loanNoBorrower": "Pinjaman antar project diajukan oleh PM project peminjam. Anda belum menjadi PM project yang aktif.",
+  "loanBorrower": "Project peminjam",
+  "loanLender": "Project pemberi pinjaman",
+  "loanKind": "Jenis",
+  "loanKindDana": "Dana",
+  "loanKindBarang": "Barang/material",
+  "loanAmount": "Nilai pinjaman",
+  "loanReason": "Alasan",
+  "loanDate": "Tanggal pinjaman",
+  "loanDueDate": "Jatuh tempo",
+  "loanRepaid": "Sudah kembali",
+  "loanOutstanding": "Sisa pinjaman",
+  "loanSaveDraft": "Simpan draft",
+  "loanSaveChanges": "Simpan perubahan",
+  "loanSubmit": "Ajukan ke Direktur",
+  "loanSubmitConfirmTitle": "Ajukan pinjaman?",
+  "loanSubmitConfirmBody": "Nomor PJ diberikan dan Direktur diberi tahu. Isi pinjaman tidak dapat diubah lagi.",
+  "loanSubmitted": "Pinjaman diajukan. Menunggu persetujuan Direktur.",
+  "loanSavedDraft": "Draft pinjaman tersimpan.",
+  "loanEdit": "Ubah draft",
+  "loanCancel": "Batalkan",
+  "loanCancelTitle": "Batalkan pinjaman?",
+  "loanCancelPrompt": "Pinjaman dibatalkan (tidak dihapus). Alasan wajib.",
+  "loanApprove": "Setujui",
+  "loanReject": "Tolak",
+  "loanApproveTitle": "Setujui {docNo}?",
+  "@loanApproveTitle": {
+    "placeholders": {
+      "docNo": {
+        "type": "String"
+      }
+    }
+  },
+  "loanApproveBody": "{borrower} meminjam {amount} dari {lender}. Tidak ada transaksi kas yang dibuat; pinjaman tercatat sebagai piutang antar project.",
+  "@loanApproveBody": {
+    "placeholders": {
+      "borrower": {
+        "type": "String"
+      },
+      "amount": {
+        "type": "String"
+      },
+      "lender": {
+        "type": "String"
+      }
+    }
+  },
+  "loanRejectTitle": "Tolak {docNo}?",
+  "@loanRejectTitle": {
+    "placeholders": {
+      "docNo": {
+        "type": "String"
+      }
+    }
+  },
+  "loanRejectPrompt": "Alasan penolakan dikirim ke PM peminjam.",
+  "loanDone": "Tersimpan.",
+  "loanOverdueDays": "Terlambat · {days} hari",
+  "@loanOverdueDays": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      }
+    }
+  },
+  "loanRoleBorrower": "Meminjam",
+  "loanRoleLender": "Meminjamkan",
+  "loanFlow": "{lender} → {borrower}",
+  "@loanFlow": {
+    "placeholders": {
+      "lender": {
+        "type": "String"
+      },
+      "borrower": {
+        "type": "String"
+      }
+    }
+  },
+  "loanRepayments": "Pengembalian",
+  "loanRepaymentSeq": "Pengembalian ke-{n}",
+  "@loanRepaymentSeq": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "loanRepaymentVoid": "Dibatalkan (void)",
+  "loanRepaymentVoidReason": "Dibatalkan (void): {reason}",
+  "@loanRepaymentVoidReason": {
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+  "loanRepaymentsEmpty": "Belum ada pengembalian.",
+  "loanRepaymentsWebHint": "Pengembalian dicatat di web oleh PM peminjam atau Finance.",
+  "loanRecordedBy": "dicatat {name}",
+  "@loanRecordedBy": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "loanTimeline": "Alur persetujuan",
+  "loanStepSubmitted": "Diajukan PM peminjam",
+  "loanStepDirektur": "Persetujuan Direktur",
+  "loanStepWaiting": "Menunggu",
+  "loanStepNotYet": "Belum",
+  "loanDecApproved": "Disetujui",
+  "loanDecRejected": "Ditolak",
+  "loanOutstandingOf": "Sisa {amount}",
+  "@loanOutstandingOf": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "loanDueOn": "Jatuh tempo {date}",
+  "@loanDueOn": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
   }
 }

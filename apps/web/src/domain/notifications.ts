@@ -410,6 +410,8 @@ export function notificationHref(docType: string | null | undefined, docId: stri
       return `/admin/progress/laporan/${docId}`
     case 'budget_addendum':
       return `/admin/addendum/detail/${docId}`
+    case 'project_loan':
+      return `/admin/pinjaman/detail/${docId}`
     // FR1: field reports → the custom detail views (ADR 0020 web views)
     case 'service_report':
       return `/admin/laporan-servis/detail/${docId}`

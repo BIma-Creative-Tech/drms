@@ -229,6 +229,14 @@ export const COMPANY_SETTING_FIELDS: Field[] = [
         defaultValue: true,
         admin: { description: 'Ambang = "Ambang anggaran kuning" dan "merah" di atas; sekali per ambang per project.' },
       },
+      {
+        // ADR 0022 Q-L6: daily while a loan is overdue (Terlambat), per PT switchable
+        name: 'reminderLoanOverdueEnabled',
+        type: 'checkbox',
+        label: 'Pinjaman antar project terlambat → PM peminjam + Direktur',
+        defaultValue: true,
+        admin: { description: 'Setiap hari selama pinjaman lewat jatuh tempo dan belum lunas.' },
+      },
     ],
   },
   // S3e (US-05, US-41, S-04): status notifications outside the scheduled reminders.

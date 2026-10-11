@@ -5730,6 +5730,360 @@ abstract class AppLocalizations {
   /// In id, this message translates to:
   /// **'Lebih {amount}'**
   String rapOverBy(String amount);
+
+  /// No description provided for @loanTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Pinjaman antar project'**
+  String get loanTitle;
+
+  /// No description provided for @loanTab.
+  ///
+  /// In id, this message translates to:
+  /// **'Pinjaman'**
+  String get loanTab;
+
+  /// No description provided for @loanEmpty.
+  ///
+  /// In id, this message translates to:
+  /// **'Belum ada pinjaman antar project.'**
+  String get loanEmpty;
+
+  /// No description provided for @loanInboxEmpty.
+  ///
+  /// In id, this message translates to:
+  /// **'Tidak ada pinjaman antar project yang menunggu keputusan Anda.'**
+  String get loanInboxEmpty;
+
+  /// No description provided for @loanInboxTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Pinjaman antar project ({count})'**
+  String loanInboxTitle(int count);
+
+  /// No description provided for @loanNew.
+  ///
+  /// In id, this message translates to:
+  /// **'Ajukan pinjaman'**
+  String get loanNew;
+
+  /// No description provided for @loanNewTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Ajukan pinjaman antar project'**
+  String get loanNewTitle;
+
+  /// No description provided for @loanEditTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Ubah draft pinjaman'**
+  String get loanEditTitle;
+
+  /// No description provided for @loanNotEditable.
+  ///
+  /// In id, this message translates to:
+  /// **'Pinjaman ini sudah tidak bisa diubah (bukan Draft lagi atau bukan milik Anda).'**
+  String get loanNotEditable;
+
+  /// No description provided for @loanNoBorrower.
+  ///
+  /// In id, this message translates to:
+  /// **'Pinjaman antar project diajukan oleh PM project peminjam. Anda belum menjadi PM project yang aktif.'**
+  String get loanNoBorrower;
+
+  /// No description provided for @loanBorrower.
+  ///
+  /// In id, this message translates to:
+  /// **'Project peminjam'**
+  String get loanBorrower;
+
+  /// No description provided for @loanLender.
+  ///
+  /// In id, this message translates to:
+  /// **'Project pemberi pinjaman'**
+  String get loanLender;
+
+  /// No description provided for @loanKind.
+  ///
+  /// In id, this message translates to:
+  /// **'Jenis'**
+  String get loanKind;
+
+  /// No description provided for @loanKindDana.
+  ///
+  /// In id, this message translates to:
+  /// **'Dana'**
+  String get loanKindDana;
+
+  /// No description provided for @loanKindBarang.
+  ///
+  /// In id, this message translates to:
+  /// **'Barang/material'**
+  String get loanKindBarang;
+
+  /// No description provided for @loanAmount.
+  ///
+  /// In id, this message translates to:
+  /// **'Nilai pinjaman'**
+  String get loanAmount;
+
+  /// No description provided for @loanReason.
+  ///
+  /// In id, this message translates to:
+  /// **'Alasan'**
+  String get loanReason;
+
+  /// No description provided for @loanDate.
+  ///
+  /// In id, this message translates to:
+  /// **'Tanggal pinjaman'**
+  String get loanDate;
+
+  /// No description provided for @loanDueDate.
+  ///
+  /// In id, this message translates to:
+  /// **'Jatuh tempo'**
+  String get loanDueDate;
+
+  /// No description provided for @loanRepaid.
+  ///
+  /// In id, this message translates to:
+  /// **'Sudah kembali'**
+  String get loanRepaid;
+
+  /// No description provided for @loanOutstanding.
+  ///
+  /// In id, this message translates to:
+  /// **'Sisa pinjaman'**
+  String get loanOutstanding;
+
+  /// No description provided for @loanSaveDraft.
+  ///
+  /// In id, this message translates to:
+  /// **'Simpan draft'**
+  String get loanSaveDraft;
+
+  /// No description provided for @loanSaveChanges.
+  ///
+  /// In id, this message translates to:
+  /// **'Simpan perubahan'**
+  String get loanSaveChanges;
+
+  /// No description provided for @loanSubmit.
+  ///
+  /// In id, this message translates to:
+  /// **'Ajukan ke Direktur'**
+  String get loanSubmit;
+
+  /// No description provided for @loanSubmitConfirmTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Ajukan pinjaman?'**
+  String get loanSubmitConfirmTitle;
+
+  /// No description provided for @loanSubmitConfirmBody.
+  ///
+  /// In id, this message translates to:
+  /// **'Nomor PJ diberikan dan Direktur diberi tahu. Isi pinjaman tidak dapat diubah lagi.'**
+  String get loanSubmitConfirmBody;
+
+  /// No description provided for @loanSubmitted.
+  ///
+  /// In id, this message translates to:
+  /// **'Pinjaman diajukan. Menunggu persetujuan Direktur.'**
+  String get loanSubmitted;
+
+  /// No description provided for @loanSavedDraft.
+  ///
+  /// In id, this message translates to:
+  /// **'Draft pinjaman tersimpan.'**
+  String get loanSavedDraft;
+
+  /// No description provided for @loanEdit.
+  ///
+  /// In id, this message translates to:
+  /// **'Ubah draft'**
+  String get loanEdit;
+
+  /// No description provided for @loanCancel.
+  ///
+  /// In id, this message translates to:
+  /// **'Batalkan'**
+  String get loanCancel;
+
+  /// No description provided for @loanCancelTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Batalkan pinjaman?'**
+  String get loanCancelTitle;
+
+  /// No description provided for @loanCancelPrompt.
+  ///
+  /// In id, this message translates to:
+  /// **'Pinjaman dibatalkan (tidak dihapus). Alasan wajib.'**
+  String get loanCancelPrompt;
+
+  /// No description provided for @loanApprove.
+  ///
+  /// In id, this message translates to:
+  /// **'Setujui'**
+  String get loanApprove;
+
+  /// No description provided for @loanReject.
+  ///
+  /// In id, this message translates to:
+  /// **'Tolak'**
+  String get loanReject;
+
+  /// No description provided for @loanApproveTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Setujui {docNo}?'**
+  String loanApproveTitle(String docNo);
+
+  /// No description provided for @loanApproveBody.
+  ///
+  /// In id, this message translates to:
+  /// **'{borrower} meminjam {amount} dari {lender}. Tidak ada transaksi kas yang dibuat; pinjaman tercatat sebagai piutang antar project.'**
+  String loanApproveBody(String borrower, String amount, String lender);
+
+  /// No description provided for @loanRejectTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Tolak {docNo}?'**
+  String loanRejectTitle(String docNo);
+
+  /// No description provided for @loanRejectPrompt.
+  ///
+  /// In id, this message translates to:
+  /// **'Alasan penolakan dikirim ke PM peminjam.'**
+  String get loanRejectPrompt;
+
+  /// No description provided for @loanDone.
+  ///
+  /// In id, this message translates to:
+  /// **'Tersimpan.'**
+  String get loanDone;
+
+  /// No description provided for @loanOverdueDays.
+  ///
+  /// In id, this message translates to:
+  /// **'Terlambat · {days} hari'**
+  String loanOverdueDays(int days);
+
+  /// No description provided for @loanRoleBorrower.
+  ///
+  /// In id, this message translates to:
+  /// **'Meminjam'**
+  String get loanRoleBorrower;
+
+  /// No description provided for @loanRoleLender.
+  ///
+  /// In id, this message translates to:
+  /// **'Meminjamkan'**
+  String get loanRoleLender;
+
+  /// No description provided for @loanFlow.
+  ///
+  /// In id, this message translates to:
+  /// **'{lender} → {borrower}'**
+  String loanFlow(String lender, String borrower);
+
+  /// No description provided for @loanRepayments.
+  ///
+  /// In id, this message translates to:
+  /// **'Pengembalian'**
+  String get loanRepayments;
+
+  /// No description provided for @loanRepaymentSeq.
+  ///
+  /// In id, this message translates to:
+  /// **'Pengembalian ke-{n}'**
+  String loanRepaymentSeq(int n);
+
+  /// No description provided for @loanRepaymentVoid.
+  ///
+  /// In id, this message translates to:
+  /// **'Dibatalkan (void)'**
+  String get loanRepaymentVoid;
+
+  /// No description provided for @loanRepaymentVoidReason.
+  ///
+  /// In id, this message translates to:
+  /// **'Dibatalkan (void): {reason}'**
+  String loanRepaymentVoidReason(String reason);
+
+  /// No description provided for @loanRepaymentsEmpty.
+  ///
+  /// In id, this message translates to:
+  /// **'Belum ada pengembalian.'**
+  String get loanRepaymentsEmpty;
+
+  /// No description provided for @loanRepaymentsWebHint.
+  ///
+  /// In id, this message translates to:
+  /// **'Pengembalian dicatat di web oleh PM peminjam atau Finance.'**
+  String get loanRepaymentsWebHint;
+
+  /// No description provided for @loanRecordedBy.
+  ///
+  /// In id, this message translates to:
+  /// **'dicatat {name}'**
+  String loanRecordedBy(String name);
+
+  /// No description provided for @loanTimeline.
+  ///
+  /// In id, this message translates to:
+  /// **'Alur persetujuan'**
+  String get loanTimeline;
+
+  /// No description provided for @loanStepSubmitted.
+  ///
+  /// In id, this message translates to:
+  /// **'Diajukan PM peminjam'**
+  String get loanStepSubmitted;
+
+  /// No description provided for @loanStepDirektur.
+  ///
+  /// In id, this message translates to:
+  /// **'Persetujuan Direktur'**
+  String get loanStepDirektur;
+
+  /// No description provided for @loanStepWaiting.
+  ///
+  /// In id, this message translates to:
+  /// **'Menunggu'**
+  String get loanStepWaiting;
+
+  /// No description provided for @loanStepNotYet.
+  ///
+  /// In id, this message translates to:
+  /// **'Belum'**
+  String get loanStepNotYet;
+
+  /// No description provided for @loanDecApproved.
+  ///
+  /// In id, this message translates to:
+  /// **'Disetujui'**
+  String get loanDecApproved;
+
+  /// No description provided for @loanDecRejected.
+  ///
+  /// In id, this message translates to:
+  /// **'Ditolak'**
+  String get loanDecRejected;
+
+  /// No description provided for @loanOutstandingOf.
+  ///
+  /// In id, this message translates to:
+  /// **'Sisa {amount}'**
+  String loanOutstandingOf(String amount);
+
+  /// No description provided for @loanDueOn.
+  ///
+  /// In id, this message translates to:
+  /// **'Jatuh tempo {date}'**
+  String loanDueOn(String date);
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

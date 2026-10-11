@@ -2,6 +2,7 @@ import type { Access, CollectionConfig, Where } from 'payload'
 
 import { denyAll } from '@/access/roles'
 import { visibleAddendumIds } from '@/domain/addendum/access'
+import { visibleLoanIds } from '@/domain/loans/access'
 import { byVisibleRequest, denyDeleteLogged } from '@/domain/expense/access'
 import { inIds } from '@/access/scope'
 import { APPROVAL_DECISIONS, APPROVAL_POSITIONS } from '@/domain/expense/types'
@@ -22,6 +23,8 @@ const ro = { readOnly: true }
  * QA-06 / ADR 0019: rows of an LPJ shortfall re-approval carry docType `expense_shortfall` + `settlement`
  * (no `request` — the request's own approval cycles stay untouched); G1 = requester/creator of the
  * settlement's request. Office roles read them through the `company` predicate of byVisibleRequest.
+ * ADR 0022: rows of an inter-project loan carry docType `project_loan` + `loan` (one Direktur decision; G1 = the
+ * loan's creator, except the recorded `direktur_self` case).
  */
 const readAccess: Access = async (args) => {
   const { req } = args
@@ -29,7 +32,8 @@ const readAccess: Access = async (args) => {
   // office roles: rows of their PTs (inside byVisibleRequest); others: visible requests / addenda
   const byRequest = await byVisibleRequest('request')(args)
   const byAddendum = inIds('addendum', await visibleAddendumIds(req))
-  const or = [byRequest, byAddendum].filter((w): w is Where => typeof w === 'object' && w !== null)
+  const byLoan = inIds('loan', await visibleLoanIds(req)) // ADR 0022: Direktur decisions on inter-project loans
+  const or = [byRequest, byAddendum, byLoan].filter((w): w is Where => typeof w === 'object' && w !== null)
   if (byRequest === true) return true
   return or.length === 0 ? false : or.length === 1 ? or[0]! : { or }
 }
@@ -40,13 +44,14 @@ export const Approvals: CollectionConfig = {
   admin: { group: 'Keuangan', defaultColumns: ['request', 'position', 'level', 'actorName', 'decision', 'decidedAt'] },
   access: { read: readAccess, create: denyAll, update: denyAll, delete: denyDeleteLogged('approval') },
   lockDocuments: false,
-  hooks: { beforeChange: [companyHook('approvals', { derive: [{ field: 'request', collection: 'expense-requests' }, { field: 'addendum', collection: 'budget-addenda' }, { field: 'settlement', collection: 'settlements' }] })] },
+  hooks: { beforeChange: [companyHook('approvals', { derive: [{ field: 'request', collection: 'expense-requests' }, { field: 'addendum', collection: 'budget-addenda' }, { field: 'settlement', collection: 'settlements' }, { field: 'loan', collection: 'project-loans' }] })] },
   fields: [
     companyField({ derived: true }),
-    { name: 'docType', type: 'select', required: true, defaultValue: 'expense_request', options: ['expense_request', 'budget_addendum', 'expense_shortfall'].map((v) => ({ label: v, value: v })), admin: ro },
+    { name: 'docType', type: 'select', required: true, defaultValue: 'expense_request', options: ['expense_request', 'budget_addendum', 'expense_shortfall', 'project_loan'].map((v) => ({ label: v, value: v })), admin: ro },
     { name: 'request', type: 'relationship', relationTo: 'expense-requests', label: 'Pengajuan', index: true, admin: ro },
     { name: 'addendum', type: 'relationship', relationTo: 'budget-addenda', label: 'Addendum RAB', index: true, admin: ro },
     { name: 'settlement', type: 'relationship', relationTo: 'settlements', label: 'LPJ (persetujuan kekurangan)', index: true, admin: ro },
+    { name: 'loan', type: 'relationship', relationTo: 'project-loans', label: 'Pinjaman antar project', index: true, admin: ro },
     { name: 'cycle', type: 'number', label: 'Siklus', required: true, admin: ro },
     { name: 'position', type: 'select', label: 'Posisi', required: true, options: APPROVAL_POSITIONS.map((v) => ({ label: v, value: v })), admin: ro },
     { name: 'level', type: 'number', label: 'Level', required: true, defaultValue: 0, admin: ro },

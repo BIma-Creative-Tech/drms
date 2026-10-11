@@ -435,6 +435,19 @@ const ROUTE_CLASSES: Record<string, RouteClass> = {
   'PATCH /daily-reports/:id': 'document',
   'POST /daily-reports/:id/corrections': 'document',
   'POST /daily-reports': 'named-pt',
+  // ADR 0022 inter-project loans
+  'GET /project-loans': 'selection',
+  'GET /project-loans/inbox': 'selection',
+  'GET /project-loans/options': 'selection',
+  'GET /project-loans/:id': 'document',
+  'PATCH /project-loans/:id': 'document',
+  'POST /project-loans/:id/submit': 'document',
+  'POST /project-loans/:id/cancel': 'document',
+  'POST /project-loans/:id/approve': 'document',
+  'POST /project-loans/:id/reject': 'document',
+  'POST /project-loans/:id/repayments': 'document',
+  'POST /project-loans/:id/repayments/:rid/void': 'document',
+  'POST /project-loans': 'named-pt',
 }
 
 describe('MC3 — route classes sampled across PTs', () => {

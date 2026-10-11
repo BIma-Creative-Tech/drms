@@ -9,6 +9,7 @@ import { CASH_ENDPOINTS } from './endpoints/cash'
 import { DAILY_ENDPOINTS } from './endpoints/daily'
 import { EXPENSE_ENDPOINTS } from './endpoints/expense-requests'
 import { FIELD_ENDPOINTS } from './endpoints/field'
+import { LOAN_ENDPOINTS } from './endpoints/loans'
 import { mastersEndpoint } from './endpoints/masters'
 import { membershipBatchEndpoint } from './endpoints/memberships'
 import { mediaFileEndpoint, mediaSignedUrlEndpoint, uploadMediaEndpoint } from './endpoints/media'
@@ -70,4 +71,6 @@ export const v1Endpoints: Endpoint[] = [
   ...DAILY_ENDPOINTS,
   // DRMS 10/10 Phase C: project list / detail (APK Proyek) + cost-center picker (D2) — after /projects/progress
   ...PROJECT_ENDPOINTS,
+  // ADR 0022: inter-project loans (PM submits, Direktur decides, repayments) — web + APK
+  ...LOAN_ENDPOINTS,
 ]

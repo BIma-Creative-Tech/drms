@@ -14,6 +14,7 @@ import { CompanyField as CompanyField_d907892a7d1864bfc60310041555d48d } from '@
 import { ProjectDetailLink as ProjectDetailLink_50199ae12722a75ff9856fb84c25b621 } from '@/admin/components/ProjectDetailLink'
 import { ProjectRapTab as ProjectRapTab_477bcbaacaa37a019b46a0d40f873f32 } from '@/admin/views/ProjectTabs'
 import { ProjectRequestsTab as ProjectRequestsTab_477bcbaacaa37a019b46a0d40f873f32 } from '@/admin/views/ProjectTabs'
+import { ProjectLoansTab as ProjectLoansTab_e5d452935824a68d96fdc373e55d7f95 } from '@/admin/views/Loans'
 import { BusinessDateField as BusinessDateField_1172137b1c1eab4696f62271d5ebbe2f } from '@/admin/components/BusinessDateField'
 import { WorkflowPanel as WorkflowPanel_6fcc9de32a179d40aa1576187df45f1e } from '@/admin/components/WorkflowPanel'
 import { PdfLinks as PdfLinks_baf3bc4fa5b0188cc15c74a19f03943f } from '@/admin/components/PdfLinks'
@@ -84,6 +85,9 @@ import { FieldDailyNew as FieldDailyNew_ded092a2d290d4acb50f0fbf9f77715a } from 
 import { FieldDailyDetail as FieldDailyDetail_ded092a2d290d4acb50f0fbf9f77715a } from '@/admin/views/FieldDaily'
 import { FieldDailyRap as FieldDailyRap_ded092a2d290d4acb50f0fbf9f77715a } from '@/admin/views/FieldDaily'
 import { ModuleLanding as ModuleLanding_72aa9cb004784b713db133bbda520731 } from '@/admin/views/ModuleLanding'
+import { LoanList as LoanList_e5d452935824a68d96fdc373e55d7f95 } from '@/admin/views/Loans'
+import { LoanNew as LoanNew_e5d452935824a68d96fdc373e55d7f95 } from '@/admin/views/Loans'
+import { LoanDetail as LoanDetail_e5d452935824a68d96fdc373e55d7f95 } from '@/admin/views/Loans'
 import { CollectionCards as CollectionCards_f9c02e79a4aed9a3924487c0cd4cafb1 } from '@payloadcms/next/rsc'
 
 /** @type import('payload').ImportMap */
@@ -104,6 +108,7 @@ export const importMap = {
   "@/admin/components/ProjectDetailLink#ProjectDetailLink": ProjectDetailLink_50199ae12722a75ff9856fb84c25b621,
   "@/admin/views/ProjectTabs#ProjectRapTab": ProjectRapTab_477bcbaacaa37a019b46a0d40f873f32,
   "@/admin/views/ProjectTabs#ProjectRequestsTab": ProjectRequestsTab_477bcbaacaa37a019b46a0d40f873f32,
+  "@/admin/views/Loans#ProjectLoansTab": ProjectLoansTab_e5d452935824a68d96fdc373e55d7f95,
   "@/admin/components/BusinessDateField#BusinessDateField": BusinessDateField_1172137b1c1eab4696f62271d5ebbe2f,
   "@/admin/components/WorkflowPanel#WorkflowPanel": WorkflowPanel_6fcc9de32a179d40aa1576187df45f1e,
   "@/admin/components/PdfLinks#PdfLinks": PdfLinks_baf3bc4fa5b0188cc15c74a19f03943f,
@@ -174,5 +179,8 @@ export const importMap = {
   "@/admin/views/FieldDaily#FieldDailyDetail": FieldDailyDetail_ded092a2d290d4acb50f0fbf9f77715a,
   "@/admin/views/FieldDaily#FieldDailyRap": FieldDailyRap_ded092a2d290d4acb50f0fbf9f77715a,
   "@/admin/views/ModuleLanding#ModuleLanding": ModuleLanding_72aa9cb004784b713db133bbda520731,
+  "@/admin/views/Loans#LoanList": LoanList_e5d452935824a68d96fdc373e55d7f95,
+  "@/admin/views/Loans#LoanNew": LoanNew_e5d452935824a68d96fdc373e55d7f95,
+  "@/admin/views/Loans#LoanDetail": LoanDetail_e5d452935824a68d96fdc373e55d7f95,
   "@payloadcms/next/rsc#CollectionCards": CollectionCards_f9c02e79a4aed9a3924487c0cd4cafb1
 }

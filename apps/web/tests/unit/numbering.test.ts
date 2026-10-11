@@ -60,11 +60,11 @@ describe('numbering (ADR 0007)', () => {
     expect(() => formatDocNo(EXPENSE_REQUEST_SEQUENCE, 0, parseBusinessDate('2026-09-23'), 'DRMS')).toThrow()
   })
 
-  it('ships ADR 0007 defaults: every sequence (PB included, owner 2026-10-11) resets monthly from 1 — PB/TRF/KM/KK/LPJ/LP/ADD/SV/LH', () => {
+  it('ships ADR 0007 defaults: every sequence (PB included, owner 2026-10-11) resets monthly from 1 — PB/TRF/KM/KK/LPJ/LP/ADD/SV/LH/PJ', () => {
     expect(EXPENSE_REQUEST_SEQUENCE).toMatchObject({ resetPolicy: 'monthly', startAt: 1, padding: 4 })
     for (const s of DEFAULT_SEQUENCES) expect(s).toMatchObject({ resetPolicy: 'monthly', startAt: 1 })
     for (const s of DEFAULT_SEQUENCES) expect(patternError(s.pattern, s.resetPolicy)).toBeNull()
-    expect(DEFAULT_SEQUENCES.map((s) => s.docCode).sort()).toEqual(['ADD', 'KK', 'KM', 'LH', 'LP', 'LPJ', 'PB', 'SV', 'TRF'])
+    expect(DEFAULT_SEQUENCES.map((s) => s.docCode).sort()).toEqual(['ADD', 'KK', 'KM', 'LH', 'LP', 'LPJ', 'PB', 'PJ', 'SV', 'TRF'])
     // FR1 (ADR 0020): Laporan servis unit, monthly; D5: with the PT short code
     expect(formatDocNo(DEFAULT_SEQUENCES.find((s) => s.docType === 'service_report')!, 7, parseBusinessDate('2026-10-10'), 'DRMS')).toBe('SV/DRMS/2610/0007')
     expect(formatDocNo(DEFAULT_SEQUENCES.find((s) => s.docType === 'cash_out')!, 1, parseBusinessDate('2026-09-23'), 'DRMS')).toBe('KK/DRMS/2609/0001')
