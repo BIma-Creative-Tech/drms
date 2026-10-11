@@ -437,29 +437,29 @@ export async function down({ db }: MigrateDownArgs): Promise<void> {
   DROP TABLE "period_closings" CASCADE;
   ALTER TABLE "approval_rules" DROP CONSTRAINT "approval_rules_acknowledge_user_id_users_id_fk";
   
-  ALTER TABLE "payload_locked_documents_rels" DROP CONSTRAINT "payload_locked_documents_rels_expense_requests_fk";
+  ALTER TABLE "payload_locked_documents_rels" DROP CONSTRAINT IF EXISTS "payload_locked_documents_rels_expense_requests_fk";
   
-  ALTER TABLE "payload_locked_documents_rels" DROP CONSTRAINT "payload_locked_documents_rels_receipts_fk";
+  ALTER TABLE "payload_locked_documents_rels" DROP CONSTRAINT IF EXISTS "payload_locked_documents_rels_receipts_fk";
   
-  ALTER TABLE "payload_locked_documents_rels" DROP CONSTRAINT "payload_locked_documents_rels_receipt_flags_fk";
+  ALTER TABLE "payload_locked_documents_rels" DROP CONSTRAINT IF EXISTS "payload_locked_documents_rels_receipt_flags_fk";
   
-  ALTER TABLE "payload_locked_documents_rels" DROP CONSTRAINT "payload_locked_documents_rels_transfers_fk";
+  ALTER TABLE "payload_locked_documents_rels" DROP CONSTRAINT IF EXISTS "payload_locked_documents_rels_transfers_fk";
   
-  ALTER TABLE "payload_locked_documents_rels" DROP CONSTRAINT "payload_locked_documents_rels_cash_entries_fk";
+  ALTER TABLE "payload_locked_documents_rels" DROP CONSTRAINT IF EXISTS "payload_locked_documents_rels_cash_entries_fk";
   
-  ALTER TABLE "payload_locked_documents_rels" DROP CONSTRAINT "payload_locked_documents_rels_period_closings_fk";
+  ALTER TABLE "payload_locked_documents_rels" DROP CONSTRAINT IF EXISTS "payload_locked_documents_rels_period_closings_fk";
   
   ALTER TABLE "audit_logs" ALTER COLUMN "action" SET DATA TYPE text;
   DROP TYPE "public"."enum_audit_logs_action";
   CREATE TYPE "public"."enum_audit_logs_action" AS ENUM('create', 'update', 'status_change', 'deactivate', 'reactivate', 'delete_attempt', 'void', 'view_sensitive', 'login', 'logout', 'login_failed', 'session_revoked', 'role_change', 'role_sync', 'device_register', 'device_revoke', 'number_issued', 'export', 'print', 'sign', 'acknowledge', 'flag_raised', 'flag_reviewed', 'sync_odoo', 'sync_offline', 'period_close', 'period_reopen', 'schema_maintenance', 'email_test');
   ALTER TABLE "audit_logs" ALTER COLUMN "action" SET DATA TYPE "public"."enum_audit_logs_action" USING "action"::"public"."enum_audit_logs_action";
   DROP INDEX "approval_rules_acknowledge_user_idx";
-  DROP INDEX "payload_locked_documents_rels_expense_requests_id_idx";
-  DROP INDEX "payload_locked_documents_rels_receipts_id_idx";
-  DROP INDEX "payload_locked_documents_rels_receipt_flags_id_idx";
-  DROP INDEX "payload_locked_documents_rels_transfers_id_idx";
-  DROP INDEX "payload_locked_documents_rels_cash_entries_id_idx";
-  DROP INDEX "payload_locked_documents_rels_period_closings_id_idx";
+  DROP INDEX IF EXISTS "payload_locked_documents_rels_expense_requests_id_idx";
+  DROP INDEX IF EXISTS "payload_locked_documents_rels_receipts_id_idx";
+  DROP INDEX IF EXISTS "payload_locked_documents_rels_receipt_flags_id_idx";
+  DROP INDEX IF EXISTS "payload_locked_documents_rels_transfers_id_idx";
+  DROP INDEX IF EXISTS "payload_locked_documents_rels_cash_entries_id_idx";
+  DROP INDEX IF EXISTS "payload_locked_documents_rels_period_closings_id_idx";
   ALTER TABLE "approval_rules" DROP COLUMN "acknowledge_by";
   ALTER TABLE "approval_rules" DROP COLUMN "acknowledge_user_id";
   ALTER TABLE "approval_rules" DROP COLUMN "sign_diajukan";

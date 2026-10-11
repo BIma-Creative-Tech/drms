@@ -222,6 +222,8 @@ export async function up({ db }: MigrateUpArgs): Promise<void> {
 }
 
 export async function down({ db }: MigrateDownArgs): Promise<void> {
+  // The DROP TABLE … CASCADE statements below already remove the payload_locked_documents_rels FKs → IF EXISTS
+  // keeps a full down of every migration working (generated order, fixed DRMS 10/10 B-2 integration).
   await db.execute(sql`
    ALTER TABLE "rap_items" DISABLE ROW LEVEL SECURITY;
   ALTER TABLE "rap_templates_items" DISABLE ROW LEVEL SECURITY;
@@ -235,25 +237,25 @@ export async function down({ db }: MigrateDownArgs): Promise<void> {
   DROP TABLE "resource_types" CASCADE;
   DROP TABLE "daily_reports" CASCADE;
   DROP TABLE "daily_report_lines" CASCADE;
-  ALTER TABLE "payload_locked_documents_rels" DROP CONSTRAINT "payload_locked_documents_rels_rap_items_fk";
+  ALTER TABLE "payload_locked_documents_rels" DROP CONSTRAINT IF EXISTS "payload_locked_documents_rels_rap_items_fk";
   
-  ALTER TABLE "payload_locked_documents_rels" DROP CONSTRAINT "payload_locked_documents_rels_rap_templates_fk";
+  ALTER TABLE "payload_locked_documents_rels" DROP CONSTRAINT IF EXISTS "payload_locked_documents_rels_rap_templates_fk";
   
-  ALTER TABLE "payload_locked_documents_rels" DROP CONSTRAINT "payload_locked_documents_rels_resource_types_fk";
+  ALTER TABLE "payload_locked_documents_rels" DROP CONSTRAINT IF EXISTS "payload_locked_documents_rels_resource_types_fk";
   
-  ALTER TABLE "payload_locked_documents_rels" DROP CONSTRAINT "payload_locked_documents_rels_daily_reports_fk";
+  ALTER TABLE "payload_locked_documents_rels" DROP CONSTRAINT IF EXISTS "payload_locked_documents_rels_daily_reports_fk";
   
-  ALTER TABLE "payload_locked_documents_rels" DROP CONSTRAINT "payload_locked_documents_rels_daily_report_lines_fk";
+  ALTER TABLE "payload_locked_documents_rels" DROP CONSTRAINT IF EXISTS "payload_locked_documents_rels_daily_report_lines_fk";
   
   ALTER TABLE "document_sequences" ALTER COLUMN "doc_type" SET DATA TYPE text;
   DROP TYPE "public"."enum_document_sequences_doc_type";
   CREATE TYPE "public"."enum_document_sequences_doc_type" AS ENUM('expense_request', 'transfer', 'settlement', 'cash_in', 'cash_out', 'progress_report', 'budget_addendum', 'reversal', 'service_report');
   ALTER TABLE "document_sequences" ALTER COLUMN "doc_type" SET DATA TYPE "public"."enum_document_sequences_doc_type" USING "doc_type"::"public"."enum_document_sequences_doc_type";
-  DROP INDEX "payload_locked_documents_rels_rap_items_id_idx";
-  DROP INDEX "payload_locked_documents_rels_rap_templates_id_idx";
-  DROP INDEX "payload_locked_documents_rels_resource_types_id_idx";
-  DROP INDEX "payload_locked_documents_rels_daily_reports_id_idx";
-  DROP INDEX "payload_locked_documents_rels_daily_report_lines_id_idx";
+  DROP INDEX IF EXISTS "payload_locked_documents_rels_rap_items_id_idx";
+  DROP INDEX IF EXISTS "payload_locked_documents_rels_rap_templates_id_idx";
+  DROP INDEX IF EXISTS "payload_locked_documents_rels_resource_types_id_idx";
+  DROP INDEX IF EXISTS "payload_locked_documents_rels_daily_reports_id_idx";
+  DROP INDEX IF EXISTS "payload_locked_documents_rels_daily_report_lines_id_idx";
   ALTER TABLE "project_stages" DROP COLUMN "progress_mode";
   ALTER TABLE "payload_locked_documents_rels" DROP COLUMN "rap_items_id";
   ALTER TABLE "payload_locked_documents_rels" DROP COLUMN "rap_templates_id";

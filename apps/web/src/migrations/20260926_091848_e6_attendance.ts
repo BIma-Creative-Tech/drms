@@ -168,7 +168,7 @@ export async function down({ db }: MigrateDownArgs): Promise<void> {
   DROP INDEX "attendances_cost_center_idx";
   DROP INDEX "attendances_source_idx";
   DROP INDEX "attendances_recorded_by_idx";
-  DROP INDEX "payload_locked_documents_rels_attendance_corrections_id_idx";
+  DROP INDEX IF EXISTS "payload_locked_documents_rels_attendance_corrections_id_idx";
   DROP INDEX "company_settings_default_work_schedule_idx";
   ALTER TABLE "attendances" ALTER COLUMN "user_id" SET NOT NULL;
   ALTER TABLE "attendances" ALTER COLUMN "project_id" SET NOT NULL;

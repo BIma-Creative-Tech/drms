@@ -131,7 +131,7 @@ export async function down({ db }: MigrateDownArgs): Promise<void> {
   DROP TABLE "contract_units" CASCADE;
   ALTER TABLE "vehicles" DROP CONSTRAINT "vehicles_client_id_clients_id_fk";
   
-  ALTER TABLE "payload_locked_documents_rels" DROP CONSTRAINT "payload_locked_documents_rels_contract_units_fk";
+  ALTER TABLE "payload_locked_documents_rels" DROP CONSTRAINT IF EXISTS "payload_locked_documents_rels_contract_units_fk";
   
   ALTER TABLE "document_sequences" ALTER COLUMN "doc_type" SET DATA TYPE text;
   DROP TYPE "public"."enum_document_sequences_doc_type";
@@ -143,7 +143,7 @@ export async function down({ db }: MigrateDownArgs): Promise<void> {
   DROP INDEX "vehicles_unit_code_idx";
   DROP INDEX "vehicles_client_idx";
   DROP INDEX "vehicles_status_idx";
-  DROP INDEX "payload_locked_documents_rels_contract_units_id_idx";
+  DROP INDEX IF EXISTS "payload_locked_documents_rels_contract_units_id_idx";
   ALTER TABLE "vehicles" ALTER COLUMN "plate_no" SET NOT NULL;
   ALTER TABLE "companies" DROP COLUMN "field_reports_enabled";
   ALTER TABLE "projects" DROP COLUMN "kind";

@@ -78,9 +78,9 @@ export async function down({ db }: MigrateDownArgs): Promise<void> {
     'project_id', 'projects', 'cost_center_id', 'cost_centers', 'bank_account_id', 'employee_bank_accounts',
     'approval_rule_id', 'approval_rules', 'resubmit_of_id', 'expense_requests');
   ALTER TABLE "expense_requests" DROP CONSTRAINT "expense_requests_urgency_level_id_urgency_levels_id_fk";
-  ALTER TABLE "payload_locked_documents_rels" DROP CONSTRAINT "payload_locked_documents_rels_urgency_levels_fk";
+  ALTER TABLE "payload_locked_documents_rels" DROP CONSTRAINT IF EXISTS "payload_locked_documents_rels_urgency_levels_fk";
   DROP INDEX "expense_requests_urgency_level_idx";
-  DROP INDEX "payload_locked_documents_rels_urgency_levels_id_idx";
+  DROP INDEX IF EXISTS "payload_locked_documents_rels_urgency_levels_id_idx";
   ALTER TABLE "expense_requests" DROP COLUMN "urgency_level_id";
   ALTER TABLE "payload_locked_documents_rels" DROP COLUMN "urgency_levels_id";
   DROP TABLE "urgency_levels" CASCADE;`)

@@ -227,15 +227,15 @@ export async function down({ db }: MigrateDownArgs): Promise<void> {
   DROP TABLE "service_reports" CASCADE;
   DROP TABLE "unit_timesheets" CASCADE;
   DROP TABLE "aftersales_activities" CASCADE;
-  ALTER TABLE "payload_locked_documents_rels" DROP CONSTRAINT "payload_locked_documents_rels_service_reports_fk";
+  ALTER TABLE "payload_locked_documents_rels" DROP CONSTRAINT IF EXISTS "payload_locked_documents_rels_service_reports_fk";
   
-  ALTER TABLE "payload_locked_documents_rels" DROP CONSTRAINT "payload_locked_documents_rels_unit_timesheets_fk";
+  ALTER TABLE "payload_locked_documents_rels" DROP CONSTRAINT IF EXISTS "payload_locked_documents_rels_unit_timesheets_fk";
   
-  ALTER TABLE "payload_locked_documents_rels" DROP CONSTRAINT "payload_locked_documents_rels_aftersales_activities_fk";
+  ALTER TABLE "payload_locked_documents_rels" DROP CONSTRAINT IF EXISTS "payload_locked_documents_rels_aftersales_activities_fk";
   
-  DROP INDEX "payload_locked_documents_rels_service_reports_id_idx";
-  DROP INDEX "payload_locked_documents_rels_unit_timesheets_id_idx";
-  DROP INDEX "payload_locked_documents_rels_aftersales_activities_id_idx";
+  DROP INDEX IF EXISTS "payload_locked_documents_rels_service_reports_id_idx";
+  DROP INDEX IF EXISTS "payload_locked_documents_rels_unit_timesheets_id_idx";
+  DROP INDEX IF EXISTS "payload_locked_documents_rels_aftersales_activities_id_idx";
   ALTER TABLE "payload_locked_documents_rels" DROP COLUMN "service_reports_id";
   ALTER TABLE "payload_locked_documents_rels" DROP COLUMN "unit_timesheets_id";
   ALTER TABLE "payload_locked_documents_rels" DROP COLUMN "aftersales_activities_id";
