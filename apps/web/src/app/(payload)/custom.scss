@@ -2250,3 +2250,58 @@ $pk-modules: dashboard, persetujuan, proyek, keuangan, absensi, laporan, penggun
     }
   }
 }
+
+// ---- DRMS 10/10 D9: module landing page /admin/modul/<id> (src/admin/views/ModuleLanding.tsx) ----------
+// Same tiles as the launcher (.pk-launcher__grid / .pk-tile), a module header instead of the greeting
+// and one tile group per menu section.
+@layer payload {
+  .pk-modland {
+    padding-top: clamp(16px, 3vw, 32px);
+  }
+
+  .pk-modland__head {
+    display: flex;
+    gap: 16px;
+    align-items: center;
+    margin-bottom: clamp(16px, 3vw, 28px);
+  }
+
+  .pk-modland__chip {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 56px;
+    height: 56px;
+    border-radius: 24%;
+    background: linear-gradient(135deg, var(--pk-tile-from), var(--pk-tile-to));
+    color: #FFFFFF;
+  }
+
+  .pk-modland__title {
+    margin: 0;
+    font-size: clamp(24px, 3vw, 32px);
+    line-height: 1.15;
+  }
+
+  .pk-modland__hint {
+    margin: 4px 0 0;
+    color: var(--pk-muted-fg);
+    font-size: 14px;
+  }
+
+  .pk-modland__section + .pk-modland__section {
+    margin-top: clamp(20px, 3vw, 32px);
+  }
+
+  .pk-modland__label {
+    margin: 0 0 12px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--pk-border);
+    color: var(--pk-muted-fg);
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+}

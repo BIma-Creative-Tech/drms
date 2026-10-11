@@ -201,10 +201,11 @@ describe('tile visibility per role (real config: admin.hidden + access.read + ro
     for (const r of ['pk-owner', 'pk-finance', 'pk-pm', 'pk-admin', 'pk-staff'] as Role[]) expect(navKeys(await modulesFor([r])).filter((k) => FIELD.includes(k as string)), `${r} flag off`).toEqual([])
     expect(navKeys(await modulesFor(['pk-owner'], 0, true))).toEqual(expect.arrayContaining(FIELD))
     expect(navKeys(await modulesFor(['pk-pm'], 0, true))).toEqual(expect.arrayContaining(FIELD))
-    // Staff (assigned projects): input + lists, no weekly recap; the Proyek tile opens "Unit & kontrak"
+    // Staff (assigned projects): input + lists, no weekly recap; the Proyek tile opens its landing page
+    // (D9) whose first sub-menu is "Unit & kontrak"
     const staff = await modulesFor(['pk-staff'], 0, true)
     expect(navKeys(staff).filter((k) => FIELD.includes(k as string))).toEqual(['unit-kontrak', 'laporan-servis', 'aktivitas-aftersales'])
-    expect(staff.find((x) => x.id === 'proyek')?.href).toBe('/admin/unit-kontrak')
+    expect(staff.find((x) => x.id === 'proyek')).toMatchObject({ href: '/admin/modul/proyek', firstHref: '/admin/unit-kontrak', landing: true })
     expect(moduleForPath('/admin/unit-kontrak/kontrak/5')).toBe('proyek')
     expect(moduleForPath('/admin/aftersales/aktivitas/detail/9')).toBe('proyek')
     expect(moduleForPath('/admin/laporan-servis/baru')).toBe('proyek')
@@ -222,10 +223,11 @@ describe('tile visibility per role (real config: admin.hidden + access.read + ro
     expect((await modulesFor(['pk-pm'], 3)).every((x) => x.badge === 0)).toBe(true)
   })
 
-  it('a module with nothing visible is dropped; tile href = first visible item', () => {
+  it('a module with nothing visible is dropped; firstHref = first visible item, href = landing (D9)', () => {
     const r = resolveModules({ roles: ['pk-pm'], staffOnly: false, canSee: (k, s) => s === 'holidays', labelOf: (_, s) => s })
     const abs = r.find((x) => x.id === 'absensi')!
-    expect(abs.href).toBe('/admin/absensi/absen') // "Absen" (every role, owner decision 2026-10-09) is the first item
+    expect(abs.firstHref).toBe('/admin/absensi/absen') // "Absen" (every role, owner decision 2026-10-09) is the first item
+    expect(abs.href).toBe('/admin/modul/absensi')
     expect(r.find((x) => x.id === 'master')).toBeUndefined()
     expect(r.find((x) => x.id === 'media')).toBeUndefined()
   })
@@ -258,6 +260,10 @@ describe('active module resolution', () => {
     ['/admin/antrian-transfer', 'persetujuan'],
     ['/admin/audit-log', 'sistem'],
     ['/admin/notifikasi', 'sistem'],
+    ['/admin/modul/master', 'master'],
+    ['/admin/modul/keuangan/', 'keuangan'],
+    ['/admin/modul/unknown', null],
+    ['/admin/modul/master/x', null],
   ] as Array<[string, ModuleId | null]>)('%s → %s', (path, id) => {
     expect(moduleForPath(path)).toBe(id)
   })
@@ -320,9 +326,12 @@ describe('ModuleBar (SSR with mocked pathname/theme)', () => {
     expect(html).toContain('>Transfer &amp; LPJ<')
   })
 
-  it('breadcrumb line: none on custom views and the launcher (no empty row), module home on entity pages', async () => {
-    expect(await bar('/admin/kas', ['pk-finance'])).not.toContain('pk-crumbs')
+  it('breadcrumb line: none on the launcher (no empty row), module home on entity pages and (D9) custom views', async () => {
+    const kas = await bar('/admin/kas', ['pk-finance'])
+    expect(kas).toMatch(/data-pk-crumb="home"[^>]*href="\/admin\/modul\/keuangan"/)
+    expect(kas).toMatch(/aria-current="page"[^>]*>.*?Buku kas/)
     expect(await bar('/admin', ['pk-finance'])).not.toContain('pk-crumbs')
+    expect(await bar('/admin/dashboard', ['pk-finance'])).not.toContain('pk-crumbs')
     const html = await bar('/admin/collections/expense-requests/1', ['pk-finance'], [
       { label: { id: 'Pengajuan biaya', en: 'Expense requests' }, url: '/admin/collections/expense-requests' },
       { label: 'PB-2026-0001' },
@@ -391,11 +400,33 @@ describe('breadcrumbs (deriveCrumbs)', () => {
     ])
   })
 
-  it('custom views and the launcher: no crumbs → no row', () => {
-    expect(crumbs('/admin/kas', keu, null)).toEqual([])
-    expect(crumbs('/admin/antrian-transfer', persetujuan, null)).toEqual([])
+  it('launcher / unknown pages: no crumbs → no row', () => {
     expect(crumbs('/admin', null, null)).toEqual([])
     expect(crumbs('/admin/collections/unknown', null, null)).toEqual([])
+  })
+
+  it('D9: custom views of a module with a landing page lead back to it (module › menu item)', () => {
+    expect(keu.href).toBe('/admin/modul/keuangan')
+    expect(crumbs('/admin/kas', keu, null)).toEqual([
+      ['Keuangan', '/admin/modul/keuangan', ''],
+      ['Buku kas', null, 'current'],
+    ])
+    // deeper page of a view: the menu item stays a link
+    expect(crumbs('/admin/kas/baru', keu, null)).toEqual([
+      ['Keuangan', '/admin/modul/keuangan', ''],
+      ['Buku kas', '/admin/kas', ''],
+    ])
+    expect(crumbs('/admin/antrian-transfer', persetujuan, null)).toEqual([
+      ['Persetujuan', '/admin/modul/persetujuan', ''],
+      ['Antrian Transfer', null, 'current'],
+    ])
+  })
+
+  it('D9: the landing page itself shows "Semua modul › module"', () => {
+    expect(crumbs('/admin/modul/keuangan', keu, null)).toEqual([
+      ['Semua modul', '/admin', ''],
+      ['Keuangan', null, 'current'],
+    ])
   })
 
   it('outside every module (account, entity hidden from the menu): home = "Semua modul" → launcher', () => {

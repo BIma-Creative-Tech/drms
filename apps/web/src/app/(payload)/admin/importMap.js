@@ -64,6 +64,7 @@ import { FieldDailyList as FieldDailyList_ded092a2d290d4acb50f0fbf9f77715a } fro
 import { FieldDailyNew as FieldDailyNew_ded092a2d290d4acb50f0fbf9f77715a } from '@/admin/views/FieldDaily'
 import { FieldDailyDetail as FieldDailyDetail_ded092a2d290d4acb50f0fbf9f77715a } from '@/admin/views/FieldDaily'
 import { FieldDailyRap as FieldDailyRap_ded092a2d290d4acb50f0fbf9f77715a } from '@/admin/views/FieldDaily'
+import { ModuleLanding as ModuleLanding_72aa9cb004784b713db133bbda520731 } from '@/admin/views/ModuleLanding'
 import { CollectionCards as CollectionCards_f9c02e79a4aed9a3924487c0cd4cafb1 } from '@payloadcms/next/rsc'
 
 /** @type import('payload').ImportMap */
@@ -134,5 +135,6 @@ export const importMap = {
   "@/admin/views/FieldDaily#FieldDailyNew": FieldDailyNew_ded092a2d290d4acb50f0fbf9f77715a,
   "@/admin/views/FieldDaily#FieldDailyDetail": FieldDailyDetail_ded092a2d290d4acb50f0fbf9f77715a,
   "@/admin/views/FieldDaily#FieldDailyRap": FieldDailyRap_ded092a2d290d4acb50f0fbf9f77715a,
+  "@/admin/views/ModuleLanding#ModuleLanding": ModuleLanding_72aa9cb004784b713db133bbda520731,
   "@payloadcms/next/rsc#CollectionCards": CollectionCards_f9c02e79a4aed9a3924487c0cd4cafb1
 }
