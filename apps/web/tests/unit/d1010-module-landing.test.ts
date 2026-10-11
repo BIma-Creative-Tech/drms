@@ -45,7 +45,7 @@ describe('landing tiles respect permissions / hidden entities / role rules', () 
   it('tiles carry section groups, badges and a "Buat baru" create tile', () => {
     const keu = resolve(['pk-finance'], () => true).find((m) => m.id === 'keuangan')!
     const sections = landingSections(keu)
-    expect(sections.map((s) => s.label)).toEqual(['Pengajuan', 'Kas', 'Transfer & LPJ', 'Tutup buku'])
+    expect(sections.map((s) => s.label)).toEqual(['Pengajuan', 'Kas', 'Transfer & LPJ', 'Pinjaman', 'Tutup buku'])
     const create = sections[0]!.tiles.find((t) => t.href.endsWith('/create'))!
     expect(create).toMatchObject({ label: 'Buat pengajuan', hint: 'Buat baru', icon: 'add' })
     const per = resolveModules({ roles: ['pk-finance'], staffOnly: false, canSee: () => true, labelOf: (_, s) => s, badges: { transfers: 4 } }).find((m) => m.id === 'persetujuan')!

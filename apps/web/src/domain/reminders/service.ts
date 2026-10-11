@@ -7,6 +7,8 @@ import { projectBudgets } from '@/domain/reports/kpi'
 import { fromCompanies } from '@/domain/reports/scope'
 import { daysBetween } from '@/domain/reports/rules'
 import { statusLabel, type RequestStatus, type RequestType } from '@/domain/expense/types'
+import { daysOverdue } from '@/domain/loans/rules'
+import { LOAN_NOTIFICATION_DEFAULTS, loanVars, renderLoanText } from '@/domain/loans/service'
 import { formatRupiah } from '@/lib/money'
 import { withSystemTransaction } from '@/lib/system-tx'
 import { DEFAULT_TZ } from '@/lib/time'
@@ -25,6 +27,8 @@ import { activeCompanyIds, settingsOf } from '@/domain/companies'
  *   (c) revision_pending Revisi Nota / LPJ Revisi unchanged ≥ reminderRevisionDays → requesters + creator
  *   (d) budget_threshold project commitment (K-07/K-08) ≥ budgetWarnPct / budgetOverPct → Direktur +
  *                        Finance + PM, once per threshold per project (not per day)
+ *   (e) loan_overdue     ADR 0022 Q-L6: inter-project loan past its due date with an outstanding balance →
+ *                        PM of the borrower project + Direktur, once per business day while overdue
  * Idempotency: `reminder_deliveries` (rule, subject, period, user) primary key — a recipient gets a
  * rule's reminder for a subject at most once per business day (budget: once per threshold), even when
  * the job is re-run or forced. Recipients are ACTIVE users only; archived projects (and requests of
@@ -267,6 +271,35 @@ async function aftersalesFollowup(run: Run) {
   }
 }
 
+/**
+ * ADR 0022 Q-L6: approved / partially repaid loans of the PT whose due date lies before today (PT clock) and that still
+ * have an outstanding balance ("Terlambat", derived) → the borrower project's PM + the PT's Direktur, once per day.
+ * Archived borrower projects produce nothing (like the other rules).
+ */
+async function loanOverdue(run: Run) {
+  const { req, s, date } = run
+  const owners = await roleHolders(req, 'pk-owner', s.companyId)
+  const rows = await q<{ id: number; doc_no: string | null; amount: string; repaid_total: string; due_date: string; status: string; pm_id: number | null; lcode: string; lname: string; bcode: string; bname: string }>(
+    req,
+    sql`SELECT l.id, l.doc_no, l.amount, l.repaid_total, l.due_date, l.status::text AS status, pb.pm_id, pl.code AS lcode, pl.name AS lname, pb.code AS bcode, pb.name AS bname
+          FROM project_loans l JOIN projects pb ON pb.id = l.borrower_project_id JOIN projects pl ON pl.id = l.lender_project_id
+         WHERE l.company_id = ${s.companyId} AND l.status::text IN ('approved', 'partially_repaid') AND l.due_date < ${date}
+           AND l.amount > l.repaid_total AND pb.status::text <> 'arsip'
+         ORDER BY l.due_date, l.id`,
+  )
+  const t = await notificationTemplate(req, REMINDER_EVENTS.loan_overdue, LOAN_NOTIFICATION_DEFAULTS['project_loan.overdue'])
+  for (const r of rows) {
+    const loan = { id: Number(r.id), docNo: r.doc_no, amount: Number(r.amount), repaidTotal: Number(r.repaid_total), dueDate: r.due_date }
+    const days = daysOverdue({ status: r.status as 'approved', dueDate: r.due_date, outstanding: loan.amount - loan.repaidTotal }, date)
+    const vars = loanVars(loan, { id: 0, code: r.lcode, name: r.lname }, { id: 0, code: r.bcode, name: r.bname }, { days: String(days) })
+    await run.deliver('loan_overdue', `loan:${r.id}`, date, [...(r.pm_id ? [Number(r.pm_id)] : []), ...owners], async (userIds) => {
+      const m: Msg = { title: renderLoanText(t.title, vars), body: renderLoanText(t.body, vars), docType: 'project_loan', docId: String(r.id), docNo: r.doc_no }
+      await inApp(req, REMINDER_EVENTS.loan_overdue, userIds, m, s.companyId)
+      return m
+    })
+  }
+}
+
 async function budgetThreshold(run: Run) {
   const { req, s } = run
   const office = [...(await roleHolders(req, 'pk-owner', s.companyId)), ...(await roleHolders(req, 'pk-finance', s.companyId))]
@@ -327,6 +360,7 @@ async function runCompany(payload: Payload, companyId: number, now: Date, force:
       if (s.revision.enabled) await revisionPending(run)
       if (s.budget.enabled) await budgetThreshold(run)
       if (s.aftersalesFollowup.enabled) await aftersalesFollowup(run)
+      if (s.loanOverdue.enabled) await loanOverdue(run)
       await tx.execute(
         sql`INSERT INTO reminder_runs (company_id, run_date, summary) VALUES (${companyId}, ${date}, ${JSON.stringify({ rules: run.rules, emails: run.emails })}::jsonb)
             ON CONFLICT (company_id, run_date) DO UPDATE SET summary = EXCLUDED.summary, finished_at = clock_timestamp()`,

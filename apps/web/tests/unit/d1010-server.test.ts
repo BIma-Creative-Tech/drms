@@ -59,7 +59,8 @@ describe('D5 numbering: every number carries the PT short code', () => {
   })
 
   it('the data migration moves exactly the old defaults to the new defaults (frozen copy matches the code)', () => {
-    expect(NUMBERING_MOVES.map((m) => m.docType).sort()).toEqual(DEFAULT_SEQUENCES.map((s) => s.docType).sort())
+    // ADR 0022: `project_loan` (PJ) is born in the D5 shape (seeded by 20261013_100100) — no legacy pattern to move
+    expect(NUMBERING_MOVES.map((m) => m.docType).sort()).toEqual(DEFAULT_SEQUENCES.filter((s) => s.docType !== 'project_loan').map((s) => s.docType).sort())
     for (const m of NUMBERING_MOVES) {
       expect({ pattern: m.oldPattern, padding: m.oldPadding }).toEqual(LEGACY_DEFAULT_PATTERNS[m.docType])
       expect({ pattern: m.newPattern, padding: m.newPadding }).toEqual({ pattern: seq(m.docType).pattern, padding: seq(m.docType).padding })

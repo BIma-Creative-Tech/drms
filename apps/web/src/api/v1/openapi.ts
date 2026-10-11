@@ -6,6 +6,7 @@ import { registerAttendancePaths } from './openapi-attendance'
 import { registerCompanyPaths } from './openapi-companies'
 import { registerDailyPaths } from './openapi-daily'
 import { registerFieldPaths } from './openapi-field'
+import { registerLoanPaths } from './openapi-loans'
 import { registerProjectPaths } from './openapi-projects'
 import { registerShortfallPaths } from './openapi-shortfall'
 import { Device, DeviceRegister, DeviceRevoke, Health, Masters, MastersQuery, Me, Problem, Ready, TestEmailQueued } from './schemas'
@@ -617,6 +618,8 @@ export function buildOpenApiDocument(version: string) {
   registerDailyPaths(registry, { security, deviceHeader, idem, res })
   // ---- DRMS 10/10 Phase C: projects (APK Proyek) + cost-center picker (D2) ----------------------
   registerProjectPaths(registry, { security, deviceHeader, res })
+  // ---- ADR 0022: inter-project loans (Pinjaman antar project) ----------------------------------
+  registerLoanPaths(registry, { security, deviceHeader, idem, res })
 
   return new OpenApiGeneratorV31(registry.definitions).generateDocument({
     openapi: '3.1.0',

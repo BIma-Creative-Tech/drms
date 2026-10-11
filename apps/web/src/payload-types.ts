@@ -114,6 +114,8 @@ export interface Config {
     'attendance-corrections': AttendanceCorrection;
     'progress-reports': ProgressReport;
     'budget-addenda': BudgetAddendum;
+    'project-loans': ProjectLoan;
+    'project-loan-repayments': ProjectLoanRepayment;
     notifications: Notification;
     devices: Device;
     'web-sessions': WebSession;
@@ -180,6 +182,8 @@ export interface Config {
     'attendance-corrections': AttendanceCorrectionsSelect<false> | AttendanceCorrectionsSelect<true>;
     'progress-reports': ProgressReportsSelect<false> | ProgressReportsSelect<true>;
     'budget-addenda': BudgetAddendaSelect<false> | BudgetAddendaSelect<true>;
+    'project-loans': ProjectLoansSelect<false> | ProjectLoansSelect<true>;
+    'project-loan-repayments': ProjectLoanRepaymentsSelect<false> | ProjectLoanRepaymentsSelect<true>;
     notifications: NotificationsSelect<false> | NotificationsSelect<true>;
     devices: DevicesSelect<false> | DevicesSelect<true>;
     'web-sessions': WebSessionsSelect<false> | WebSessionsSelect<true>;
@@ -419,6 +423,10 @@ export interface Company {
    * Ambang = "Ambang anggaran kuning" dan "merah" di atas; sekali per ambang per project.
    */
   reminderBudgetEnabled?: boolean | null;
+  /**
+   * Setiap hari selama pinjaman lewat jatuh tempo dan belum lunas.
+   */
+  reminderLoanOverdueEnabled?: boolean | null;
   /**
    * Pemohon lain dan pembuat diberi tahu; pelaku aksi tidak diberi tahu tentang aksinya sendiri.
    */
@@ -1157,7 +1165,8 @@ export interface DocumentSequence {
     | 'budget_addendum'
     | 'reversal'
     | 'service_report'
-    | 'daily_report';
+    | 'daily_report'
+    | 'project_loan';
   /**
    * Token {DOC}, mis. PB, TRF.
    */
@@ -1396,10 +1405,11 @@ export interface Approval {
    * Mengikuti dokumen induk.
    */
   company?: (number | null) | Company;
-  docType: 'expense_request' | 'budget_addendum' | 'expense_shortfall';
+  docType: 'expense_request' | 'budget_addendum' | 'expense_shortfall' | 'project_loan';
   request?: (number | null) | ExpenseRequest;
   addendum?: (number | null) | BudgetAddendum;
   settlement?: (number | null) | Settlement;
+  loan?: (number | null) | ProjectLoan;
   cycle: number;
   position: 'diajukan' | 'dibuat' | 'diketahui' | 'approval';
   level: number;
@@ -1692,6 +1702,47 @@ export interface MediaTransferProof {
       filename?: string | null;
     };
   };
+}
+/**
+ * Diajukan dan diputuskan lewat layar Pinjaman antar project (bukan dari form ini).
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "project-loans".
+ */
+export interface ProjectLoan {
+  id: number;
+  /**
+   * Mengikuti dokumen induk.
+   */
+  company?: (number | null) | Company;
+  docNo?: string | null;
+  lenderProject: number | Project;
+  borrowerProject: number | Project;
+  kind: 'dana' | 'barang';
+  amount: number;
+  reason: string;
+  loanDate: string;
+  dueDate: string;
+  status: 'draft' | 'pending_approval' | 'approved' | 'partially_repaid' | 'repaid' | 'rejected' | 'cancelled';
+  repaidTotal?: number | null;
+  outstanding?: number | null;
+  samePm?: boolean | null;
+  createdBy: number | User;
+  submittedAt?: string | null;
+  decidedAt?: string | null;
+  decidedBy?: (number | null) | User;
+  rejectReason?: string | null;
+  cancelReason?: string | null;
+  approvalCycle?: number | null;
+  g1Exception?: string | null;
+  source?: ('web' | 'apk') | null;
+  uuid?: string | null;
+  /**
+   * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
+   */
+  changeReason?: string | null;
+  updatedAt: string;
+  createdAt: string;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -2334,6 +2385,35 @@ export interface ProgressReport {
   createdAt: string;
 }
 /**
+ * Dicatat dan dibatalkan (void) lewat layar Pinjaman antar project.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "project-loan-repayments".
+ */
+export interface ProjectLoanRepayment {
+  id: number;
+  /**
+   * Mengikuti dokumen induk.
+   */
+  company?: (number | null) | Company;
+  loan: number | ProjectLoan;
+  repayDate: string;
+  amount: number;
+  note?: string | null;
+  status: 'posted' | 'void';
+  voidReason?: string | null;
+  recordedBy: number | User;
+  voidedBy?: (number | null) | User;
+  voidedAt?: string | null;
+  source?: ('web' | 'apk') | null;
+  /**
+   * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
+   */
+  changeReason?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "notifications".
  */
@@ -2829,6 +2909,14 @@ export interface PayloadLockedDocument {
         value: number | BudgetAddendum;
       } | null)
     | ({
+        relationTo: 'project-loans';
+        value: number | ProjectLoan;
+      } | null)
+    | ({
+        relationTo: 'project-loan-repayments';
+        value: number | ProjectLoanRepayment;
+      } | null)
+    | ({
         relationTo: 'devices';
         value: number | Device;
       } | null)
@@ -2961,6 +3049,7 @@ export interface CompaniesSelect<T extends boolean = true> {
   reminderRevisionEnabled?: T;
   reminderRevisionDays?: T;
   reminderBudgetEnabled?: T;
+  reminderLoanOverdueEnabled?: T;
   notifyRequesterStatusEnabled?: T;
   approvalEmailEnabled?: T;
   active?: T;
@@ -3491,6 +3580,7 @@ export interface ApprovalsSelect<T extends boolean = true> {
   request?: T;
   addendum?: T;
   settlement?: T;
+  loan?: T;
   cycle?: T;
   position?: T;
   level?: T;
@@ -4065,6 +4155,58 @@ export interface BudgetAddendaSelect<T extends boolean = true> {
   cancelReason?: T;
   source?: T;
   uuid?: T;
+  changeReason?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "project-loans_select".
+ */
+export interface ProjectLoansSelect<T extends boolean = true> {
+  company?: T;
+  docNo?: T;
+  lenderProject?: T;
+  borrowerProject?: T;
+  kind?: T;
+  amount?: T;
+  reason?: T;
+  loanDate?: T;
+  dueDate?: T;
+  status?: T;
+  repaidTotal?: T;
+  outstanding?: T;
+  samePm?: T;
+  createdBy?: T;
+  submittedAt?: T;
+  decidedAt?: T;
+  decidedBy?: T;
+  rejectReason?: T;
+  cancelReason?: T;
+  approvalCycle?: T;
+  g1Exception?: T;
+  source?: T;
+  uuid?: T;
+  changeReason?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "project-loan-repayments_select".
+ */
+export interface ProjectLoanRepaymentsSelect<T extends boolean = true> {
+  company?: T;
+  loan?: T;
+  repayDate?: T;
+  amount?: T;
+  note?: T;
+  status?: T;
+  voidReason?: T;
+  recordedBy?: T;
+  voidedBy?: T;
+  voidedAt?: T;
+  source?: T;
   changeReason?: T;
   updatedAt?: T;
   createdAt?: T;
