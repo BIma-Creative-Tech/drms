@@ -154,6 +154,9 @@ abstract class UserProfile with _$UserProfile {
     required int id,
     required String email,
     String? name,
+
+    /// d1010 (WA-14): greeting name resolved by the server (`/me` `displayName`); null on older servers.
+    String? serverDisplayName,
     required Set<Role> roles,
     @Default(Capabilities()) Capabilities capabilities,
     Employee? employee,
@@ -242,7 +245,21 @@ abstract class UserProfile with _$UserProfile {
 
   bool has(Role r) => roles.contains(r);
 
-  String get displayName => (name == null || name!.trim().isEmpty) ? email : name!;
+  /// Greeting / profile name (d1010 WA-14). Never the full e-mail address: `/me` `displayName` → `name` →
+  /// employee name (scope first, then any PT) → e-mail local part → "Pengguna".
+  String get displayName {
+    // A "name" that is itself an e-mail address is skipped (WA-14: the full address is never shown).
+    final full = [
+      serverDisplayName,
+      name,
+      employee?.name,
+      for (final c in companies) c.employee?.name,
+    ].map((v) => v?.trim() ?? '').where((s) => s.isNotEmpty && !s.contains('@')).firstOrNull;
+    if (full != null) return full;
+    final at = email.indexOf('@');
+    final local = (at < 0 ? email : email.substring(0, at)).trim();
+    return local.isEmpty ? 'Pengguna' : local;
+  }
 
   /// Direktur first, then Finance (both: approval inbox + KPI home), PM (team monitor), Staff.
   HomeKind get homeKind {

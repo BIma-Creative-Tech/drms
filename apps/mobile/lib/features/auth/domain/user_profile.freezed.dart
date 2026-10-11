@@ -1490,7 +1490,8 @@ $CompanySettingsCopyWith<$Res> get settings {
 /// @nodoc
 mixin _$UserProfile {
 
- int get id; String get email; String? get name; Set<Role> get roles; Capabilities get capabilities; Employee? get employee; String get timezone; String? get minAppVersion; ImageTargets get imageTargets; String? get serverTime;/// MC3: every active membership (ascending id). Empty = server before MC3 (single-PT behaviour).
+ int get id; String get email; String? get name;/// d1010 (WA-14): greeting name resolved by the server (`/me` `displayName`); null on older servers.
+ String? get serverDisplayName; Set<Role> get roles; Capabilities get capabilities; Employee? get employee; String get timezone; String? get minAppVersion; ImageTargets get imageTargets; String? get serverTime;/// MC3: every active membership (ascending id). Empty = server before MC3 (single-PT behaviour).
  List<CompanyMembership> get companies;/// MC3: ids of the PTs the top-level fields were computed for ([scopedTo]); empty = not scoped.
  List<int> get scopeCompanyIds;/// ADR 0018: privacy-notice acknowledgement (`/me` `privacy`); null = server without the feature.
  PrivacyStatus? get privacy;
@@ -1505,20 +1506,20 @@ $UserProfileCopyWith<UserProfile> get copyWith => _$UserProfileCopyWithImpl<User
 @override
 bool operator ==(Object other) {
   final _this = this as UserProfile;
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is UserProfile&&(identical(other.id, _this.id) || other.id == _this.id)&&(identical(other.email, _this.email) || other.email == _this.email)&&(identical(other.name, _this.name) || other.name == _this.name)&&const DeepCollectionEquality().equals(other.roles, _this.roles)&&(identical(other.capabilities, _this.capabilities) || other.capabilities == _this.capabilities)&&(identical(other.employee, _this.employee) || other.employee == _this.employee)&&(identical(other.timezone, _this.timezone) || other.timezone == _this.timezone)&&(identical(other.minAppVersion, _this.minAppVersion) || other.minAppVersion == _this.minAppVersion)&&(identical(other.imageTargets, _this.imageTargets) || other.imageTargets == _this.imageTargets)&&(identical(other.serverTime, _this.serverTime) || other.serverTime == _this.serverTime)&&const DeepCollectionEquality().equals(other.companies, _this.companies)&&const DeepCollectionEquality().equals(other.scopeCompanyIds, _this.scopeCompanyIds)&&(identical(other.privacy, _this.privacy) || other.privacy == _this.privacy));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is UserProfile&&(identical(other.id, _this.id) || other.id == _this.id)&&(identical(other.email, _this.email) || other.email == _this.email)&&(identical(other.name, _this.name) || other.name == _this.name)&&(identical(other.serverDisplayName, _this.serverDisplayName) || other.serverDisplayName == _this.serverDisplayName)&&const DeepCollectionEquality().equals(other.roles, _this.roles)&&(identical(other.capabilities, _this.capabilities) || other.capabilities == _this.capabilities)&&(identical(other.employee, _this.employee) || other.employee == _this.employee)&&(identical(other.timezone, _this.timezone) || other.timezone == _this.timezone)&&(identical(other.minAppVersion, _this.minAppVersion) || other.minAppVersion == _this.minAppVersion)&&(identical(other.imageTargets, _this.imageTargets) || other.imageTargets == _this.imageTargets)&&(identical(other.serverTime, _this.serverTime) || other.serverTime == _this.serverTime)&&const DeepCollectionEquality().equals(other.companies, _this.companies)&&const DeepCollectionEquality().equals(other.scopeCompanyIds, _this.scopeCompanyIds)&&(identical(other.privacy, _this.privacy) || other.privacy == _this.privacy));
 }
 
 
 @override
 int get hashCode {
   final _this = this as UserProfile;
-  return Object.hash(runtimeType,_this.id,_this.email,_this.name,const DeepCollectionEquality().hash(_this.roles),_this.capabilities,_this.employee,_this.timezone,_this.minAppVersion,_this.imageTargets,_this.serverTime,const DeepCollectionEquality().hash(_this.companies),const DeepCollectionEquality().hash(_this.scopeCompanyIds),_this.privacy);
+  return Object.hash(runtimeType,_this.id,_this.email,_this.name,_this.serverDisplayName,const DeepCollectionEquality().hash(_this.roles),_this.capabilities,_this.employee,_this.timezone,_this.minAppVersion,_this.imageTargets,_this.serverTime,const DeepCollectionEquality().hash(_this.companies),const DeepCollectionEquality().hash(_this.scopeCompanyIds),_this.privacy);
 }
 
 @override
 String toString() {
   final _this = this as UserProfile;
-  return 'UserProfile(id: ${_this.id}, email: ${_this.email}, name: ${_this.name}, roles: ${_this.roles}, capabilities: ${_this.capabilities}, employee: ${_this.employee}, timezone: ${_this.timezone}, minAppVersion: ${_this.minAppVersion}, imageTargets: ${_this.imageTargets}, serverTime: ${_this.serverTime}, companies: ${_this.companies}, scopeCompanyIds: ${_this.scopeCompanyIds}, privacy: ${_this.privacy})';
+  return 'UserProfile(id: ${_this.id}, email: ${_this.email}, name: ${_this.name}, serverDisplayName: ${_this.serverDisplayName}, roles: ${_this.roles}, capabilities: ${_this.capabilities}, employee: ${_this.employee}, timezone: ${_this.timezone}, minAppVersion: ${_this.minAppVersion}, imageTargets: ${_this.imageTargets}, serverTime: ${_this.serverTime}, companies: ${_this.companies}, scopeCompanyIds: ${_this.scopeCompanyIds}, privacy: ${_this.privacy})';
 }
 
 
@@ -1529,7 +1530,7 @@ abstract mixin class $UserProfileCopyWith<$Res>  {
   factory $UserProfileCopyWith(UserProfile value, $Res Function(UserProfile) _then) = _$UserProfileCopyWithImpl;
 @useResult
 $Res call({
- int id, String email, String? name, Set<Role> roles, Capabilities capabilities, Employee? employee, String timezone, String? minAppVersion, ImageTargets imageTargets, String? serverTime, List<CompanyMembership> companies, List<int> scopeCompanyIds, PrivacyStatus? privacy
+ int id, String email, String? name, String? serverDisplayName, Set<Role> roles, Capabilities capabilities, Employee? employee, String timezone, String? minAppVersion, ImageTargets imageTargets, String? serverTime, List<CompanyMembership> companies, List<int> scopeCompanyIds, PrivacyStatus? privacy
 });
 
 
@@ -1546,11 +1547,12 @@ class _$UserProfileCopyWithImpl<$Res>
 
 /// Create a copy of UserProfile
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? email = null,Object? name = freezed,Object? roles = null,Object? capabilities = null,Object? employee = freezed,Object? timezone = null,Object? minAppVersion = freezed,Object? imageTargets = null,Object? serverTime = freezed,Object? companies = null,Object? scopeCompanyIds = null,Object? privacy = freezed,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? email = null,Object? name = freezed,Object? serverDisplayName = freezed,Object? roles = null,Object? capabilities = null,Object? employee = freezed,Object? timezone = null,Object? minAppVersion = freezed,Object? imageTargets = null,Object? serverTime = freezed,Object? companies = null,Object? scopeCompanyIds = null,Object? privacy = freezed,}) {
   return _then(UserProfile(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as int,email: null == email ? _self.email : email // ignore: cast_nullable_to_non_nullable
 as String,name: freezed == name ? _self.name : name // ignore: cast_nullable_to_non_nullable
+as String?,serverDisplayName: freezed == serverDisplayName ? _self.serverDisplayName : serverDisplayName // ignore: cast_nullable_to_non_nullable
 as String?,roles: null == roles ? _self.roles : roles // ignore: cast_nullable_to_non_nullable
 as Set<Role>,capabilities: null == capabilities ? _self.capabilities : capabilities // ignore: cast_nullable_to_non_nullable
 as Capabilities,employee: freezed == employee ? _self.employee : employee // ignore: cast_nullable_to_non_nullable
@@ -1676,10 +1678,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( int id,  String email,  String? name,  Set<Role> roles,  Capabilities capabilities,  Employee? employee,  String timezone,  String? minAppVersion,  ImageTargets imageTargets,  String? serverTime,  List<CompanyMembership> companies,  List<int> scopeCompanyIds,  PrivacyStatus? privacy)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( int id,  String email,  String? name,  String? serverDisplayName,  Set<Role> roles,  Capabilities capabilities,  Employee? employee,  String timezone,  String? minAppVersion,  ImageTargets imageTargets,  String? serverTime,  List<CompanyMembership> companies,  List<int> scopeCompanyIds,  PrivacyStatus? privacy)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _UserProfile() when $default != null:
-return $default(_that.id,_that.email,_that.name,_that.roles,_that.capabilities,_that.employee,_that.timezone,_that.minAppVersion,_that.imageTargets,_that.serverTime,_that.companies,_that.scopeCompanyIds,_that.privacy);case _:
+return $default(_that.id,_that.email,_that.name,_that.serverDisplayName,_that.roles,_that.capabilities,_that.employee,_that.timezone,_that.minAppVersion,_that.imageTargets,_that.serverTime,_that.companies,_that.scopeCompanyIds,_that.privacy);case _:
   return orElse();
 
 }
@@ -1697,10 +1699,10 @@ return $default(_that.id,_that.email,_that.name,_that.roles,_that.capabilities,_
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( int id,  String email,  String? name,  Set<Role> roles,  Capabilities capabilities,  Employee? employee,  String timezone,  String? minAppVersion,  ImageTargets imageTargets,  String? serverTime,  List<CompanyMembership> companies,  List<int> scopeCompanyIds,  PrivacyStatus? privacy)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( int id,  String email,  String? name,  String? serverDisplayName,  Set<Role> roles,  Capabilities capabilities,  Employee? employee,  String timezone,  String? minAppVersion,  ImageTargets imageTargets,  String? serverTime,  List<CompanyMembership> companies,  List<int> scopeCompanyIds,  PrivacyStatus? privacy)  $default,) {final _that = this;
 switch (_that) {
 case _UserProfile():
-return $default(_that.id,_that.email,_that.name,_that.roles,_that.capabilities,_that.employee,_that.timezone,_that.minAppVersion,_that.imageTargets,_that.serverTime,_that.companies,_that.scopeCompanyIds,_that.privacy);case _:
+return $default(_that.id,_that.email,_that.name,_that.serverDisplayName,_that.roles,_that.capabilities,_that.employee,_that.timezone,_that.minAppVersion,_that.imageTargets,_that.serverTime,_that.companies,_that.scopeCompanyIds,_that.privacy);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -1717,10 +1719,10 @@ return $default(_that.id,_that.email,_that.name,_that.roles,_that.capabilities,_
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( int id,  String email,  String? name,  Set<Role> roles,  Capabilities capabilities,  Employee? employee,  String timezone,  String? minAppVersion,  ImageTargets imageTargets,  String? serverTime,  List<CompanyMembership> companies,  List<int> scopeCompanyIds,  PrivacyStatus? privacy)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( int id,  String email,  String? name,  String? serverDisplayName,  Set<Role> roles,  Capabilities capabilities,  Employee? employee,  String timezone,  String? minAppVersion,  ImageTargets imageTargets,  String? serverTime,  List<CompanyMembership> companies,  List<int> scopeCompanyIds,  PrivacyStatus? privacy)?  $default,) {final _that = this;
 switch (_that) {
 case _UserProfile() when $default != null:
-return $default(_that.id,_that.email,_that.name,_that.roles,_that.capabilities,_that.employee,_that.timezone,_that.minAppVersion,_that.imageTargets,_that.serverTime,_that.companies,_that.scopeCompanyIds,_that.privacy);case _:
+return $default(_that.id,_that.email,_that.name,_that.serverDisplayName,_that.roles,_that.capabilities,_that.employee,_that.timezone,_that.minAppVersion,_that.imageTargets,_that.serverTime,_that.companies,_that.scopeCompanyIds,_that.privacy);case _:
   return null;
 
 }
@@ -1732,12 +1734,14 @@ return $default(_that.id,_that.email,_that.name,_that.roles,_that.capabilities,_
 
 
 class _UserProfile extends UserProfile {
-  const _UserProfile({required this.id, required this.email, this.name, required  Set<Role> roles, this.capabilities = const Capabilities(), this.employee, this.timezone = 'Asia/Makassar', this.minAppVersion, this.imageTargets = const ImageTargets(), this.serverTime,  List<CompanyMembership> companies = const <CompanyMembership>[],  List<int> scopeCompanyIds = const <int>[], this.privacy}): _roles = roles,_companies = companies,_scopeCompanyIds = scopeCompanyIds,super._();
+  const _UserProfile({required this.id, required this.email, this.name, this.serverDisplayName, required  Set<Role> roles, this.capabilities = const Capabilities(), this.employee, this.timezone = 'Asia/Makassar', this.minAppVersion, this.imageTargets = const ImageTargets(), this.serverTime,  List<CompanyMembership> companies = const <CompanyMembership>[],  List<int> scopeCompanyIds = const <int>[], this.privacy}): _roles = roles,_companies = companies,_scopeCompanyIds = scopeCompanyIds,super._();
   
 
 @override final  int id;
 @override final  String email;
 @override final  String? name;
+/// d1010 (WA-14): greeting name resolved by the server (`/me` `displayName`); null on older servers.
+@override final  String? serverDisplayName;
  final  Set<Role> _roles;
 @override Set<Role> get roles {
   if (_roles is EqualUnmodifiableSetView) return _roles;
@@ -1782,18 +1786,18 @@ _$UserProfileCopyWith<_UserProfile> get copyWith => __$UserProfileCopyWithImpl<_
 
 @override
 bool operator ==(Object other) {
-    return identical(this, other) || (other.runtimeType == runtimeType&&other is _UserProfile&&(identical(other.id, id) || other.id == id)&&(identical(other.email, email) || other.email == email)&&(identical(other.name, name) || other.name == name)&&const DeepCollectionEquality().equals(other.roles, _roles)&&(identical(other.capabilities, capabilities) || other.capabilities == capabilities)&&(identical(other.employee, employee) || other.employee == employee)&&(identical(other.timezone, timezone) || other.timezone == timezone)&&(identical(other.minAppVersion, minAppVersion) || other.minAppVersion == minAppVersion)&&(identical(other.imageTargets, imageTargets) || other.imageTargets == imageTargets)&&(identical(other.serverTime, serverTime) || other.serverTime == serverTime)&&const DeepCollectionEquality().equals(other.companies, _companies)&&const DeepCollectionEquality().equals(other.scopeCompanyIds, _scopeCompanyIds)&&(identical(other.privacy, privacy) || other.privacy == privacy));
+    return identical(this, other) || (other.runtimeType == runtimeType&&other is _UserProfile&&(identical(other.id, id) || other.id == id)&&(identical(other.email, email) || other.email == email)&&(identical(other.name, name) || other.name == name)&&(identical(other.serverDisplayName, serverDisplayName) || other.serverDisplayName == serverDisplayName)&&const DeepCollectionEquality().equals(other.roles, _roles)&&(identical(other.capabilities, capabilities) || other.capabilities == capabilities)&&(identical(other.employee, employee) || other.employee == employee)&&(identical(other.timezone, timezone) || other.timezone == timezone)&&(identical(other.minAppVersion, minAppVersion) || other.minAppVersion == minAppVersion)&&(identical(other.imageTargets, imageTargets) || other.imageTargets == imageTargets)&&(identical(other.serverTime, serverTime) || other.serverTime == serverTime)&&const DeepCollectionEquality().equals(other.companies, _companies)&&const DeepCollectionEquality().equals(other.scopeCompanyIds, _scopeCompanyIds)&&(identical(other.privacy, privacy) || other.privacy == privacy));
 }
 
 
 @override
 int get hashCode {
-    return Object.hash(runtimeType,id,email,name,const DeepCollectionEquality().hash(_roles),capabilities,employee,timezone,minAppVersion,imageTargets,serverTime,const DeepCollectionEquality().hash(_companies),const DeepCollectionEquality().hash(_scopeCompanyIds),privacy);
+    return Object.hash(runtimeType,id,email,name,serverDisplayName,const DeepCollectionEquality().hash(_roles),capabilities,employee,timezone,minAppVersion,imageTargets,serverTime,const DeepCollectionEquality().hash(_companies),const DeepCollectionEquality().hash(_scopeCompanyIds),privacy);
 }
 
 @override
 String toString() {
-    return 'UserProfile(id: $id, email: $email, name: $name, roles: $roles, capabilities: $capabilities, employee: $employee, timezone: $timezone, minAppVersion: $minAppVersion, imageTargets: $imageTargets, serverTime: $serverTime, companies: $companies, scopeCompanyIds: $scopeCompanyIds, privacy: $privacy)';
+    return 'UserProfile(id: $id, email: $email, name: $name, serverDisplayName: $serverDisplayName, roles: $roles, capabilities: $capabilities, employee: $employee, timezone: $timezone, minAppVersion: $minAppVersion, imageTargets: $imageTargets, serverTime: $serverTime, companies: $companies, scopeCompanyIds: $scopeCompanyIds, privacy: $privacy)';
 }
 
 
@@ -1804,7 +1808,7 @@ abstract mixin class _$UserProfileCopyWith<$Res> implements $UserProfileCopyWith
   factory _$UserProfileCopyWith(_UserProfile value, $Res Function(_UserProfile) _then) = __$UserProfileCopyWithImpl;
 @override @useResult
 $Res call({
- int id, String email, String? name, Set<Role> roles, Capabilities capabilities, Employee? employee, String timezone, String? minAppVersion, ImageTargets imageTargets, String? serverTime, List<CompanyMembership> companies, List<int> scopeCompanyIds, PrivacyStatus? privacy
+ int id, String email, String? name, String? serverDisplayName, Set<Role> roles, Capabilities capabilities, Employee? employee, String timezone, String? minAppVersion, ImageTargets imageTargets, String? serverTime, List<CompanyMembership> companies, List<int> scopeCompanyIds, PrivacyStatus? privacy
 });
 
 
@@ -1821,11 +1825,12 @@ class __$UserProfileCopyWithImpl<$Res>
 
 /// Create a copy of UserProfile
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? email = null,Object? name = freezed,Object? roles = null,Object? capabilities = null,Object? employee = freezed,Object? timezone = null,Object? minAppVersion = freezed,Object? imageTargets = null,Object? serverTime = freezed,Object? companies = null,Object? scopeCompanyIds = null,Object? privacy = freezed,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? email = null,Object? name = freezed,Object? serverDisplayName = freezed,Object? roles = null,Object? capabilities = null,Object? employee = freezed,Object? timezone = null,Object? minAppVersion = freezed,Object? imageTargets = null,Object? serverTime = freezed,Object? companies = null,Object? scopeCompanyIds = null,Object? privacy = freezed,}) {
   return _then(_UserProfile(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as int,email: null == email ? _self.email : email // ignore: cast_nullable_to_non_nullable
 as String,name: freezed == name ? _self.name : name // ignore: cast_nullable_to_non_nullable
+as String?,serverDisplayName: freezed == serverDisplayName ? _self.serverDisplayName : serverDisplayName // ignore: cast_nullable_to_non_nullable
 as String?,roles: null == roles ? _self._roles : roles // ignore: cast_nullable_to_non_nullable
 as Set<Role>,capabilities: null == capabilities ? _self.capabilities : capabilities // ignore: cast_nullable_to_non_nullable
 as Capabilities,employee: freezed == employee ? _self.employee : employee // ignore: cast_nullable_to_non_nullable
