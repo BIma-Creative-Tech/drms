@@ -6,6 +6,31 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-10-12
+
+**DRMS 10/10 Phases D–G on top of 0.8.0** (owner decisions 2026-10-11): Staff see their projects without money,
+Pinjaman antar project (ADR 0022), sites / kantor cabang (ADR 0023), configurable approval rules + Direktur's own
+request without approval (ADR 0024), RAP for every project with a RAB (D4 amendment). Production goes 0.6.4 → 0.9.0, so
+**the 0.8.0 notes below apply to this deploy as well** (its 11 migrations and deploy checklist run first). The APK
+features of these phases need the next APK build (drift schema **9**); APK 0.5.0 keeps working against 0.9.0 (all API
+changes are additive).
+
+**Database migrations** (after those of 0.8.0, in this order; details in the sections below):
+`20261013_100000_d1010_project_loans`, `20261013_100100_d1010_project_loans_guard`, `20261013_200000_d1010_sites`,
+`20261013_200100_d1010_sites_guard`, `20261013_300000_d1010_approval_config`, `20261013_300000_d1010_approval_config_guard`,
+`20261013_300000_d1010_approval_config_data` (rule "Pengajuan Direktur" per PT that still has the default rules),
+`20261013_400000_d1010_rap_all`, `20261013_400100_d1010_rap_all_guard` (logs every project with a RAB but no RAP). Each
+has a `down()`; **take the pre-deploy dump**.
+
+**Deploy checklist (in addition to 0.8.0):** check the approval rules of every PT, incl. the new "Peran pemohon" and the
+"Pengajuan Direktur" rule; **every project with a RAB (any kind) needs a RAP** before its requests can be sent — the
+migration log and the dashboard card "Project ber-RAB belum punya RAP" list them; sites are optional (a PT without sites
+behaves as before); the overdue-loan reminder is a per-PT switch.
+
+**CI / release:** integration tests split into three jobs (halves a / b + the F3 KPI data set); images are published to
+`ghcr.io/bima-creative-tech/proyekkas-{web,migrate}` after the repository moved to `BIma-Creative-Tech/drms` (older
+images stay under `ghcr.io/bctech-adm`).
+
 ### Changed (DRMS 10/10 follow-up — Staff see projects without money, owner 2026-10-11)
 
 - Web: Staff get the "Proyek" module — the list of their assigned projects (search / filter) and the project page
