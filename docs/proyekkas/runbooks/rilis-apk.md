@@ -56,13 +56,13 @@ Dari halaman run tag di GitHub (Actions → workflow **mobile** → run untuk `m
 V=0.2.0                                   # = pubspec version = tag mobile-v$V
 D=/root/apk-release/$V
 mkdir -p "$D"
-gh run list -R bctech-adm/drms --workflow mobile --branch "mobile-v$V" --limit 1   # catat RUN_ID
-gh run download "$RUN_ID" -R bctech-adm/drms -n proyekkas-prod-release-apk -D "$D/artefak"
+gh run list -R BIma-Creative-Tech/drms --workflow mobile --branch "mobile-v$V" --limit 1   # catat RUN_ID
+gh run download "$RUN_ID" -R BIma-Creative-Tech/drms -n proyekkas-prod-release-apk -D "$D/artefak"
 # Artefak berisi app/outputs/flutter-apk/app-*-prod-release.apk (+ simbol obfuscation) → ambil arm64 saja:
 mv "$(find "$D/artefak" -name app-arm64-v8a-prod-release.apk)" "$D"/ && rm -rf "$D/artefak"
 ls -l "$D"/app-arm64-v8a-prod-release.apk
 # Deskripsi rilis versi yang sama, dari tag (bukan dari branch lain):
-gh api "repos/bctech-adm/drms/contents/docs/release-notes/apk/$V.md?ref=mobile-v$V" \
+gh api "repos/BIma-Creative-Tech/drms/contents/docs/release-notes/apk/$V.md?ref=mobile-v$V" \
   -H 'Accept: application/vnd.github.raw' > "$D/notes.md"
 cat "$D/notes.md"
 # Direktori/file harus terbaca oleh uid 1001 (container):

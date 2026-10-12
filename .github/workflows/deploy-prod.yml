@@ -2,7 +2,7 @@
 #   1. infra: `infra-deploy` v2 on the VPS (accepts `--set PK_WEB_IMAGE=… --set PK_MIGRATE_IMAGE=…` from a per-stack
 #      allowlist with value regexes, keeps .env.prev, pre-deploy pg_dump, waits for healthy, auto-rollback) — infra
 #      runbook docs/runbooks/proyekkas-drms-prod.md §11. Until then prod is deployed manually by the Lead.
-#   2. GitHub (repo bctech-adm/drms → Settings → Environments): environment `infra-deploy` with required reviewers,
+#   2. GitHub (repo BIma-Creative-Tech/drms → Settings → Environments): environment `infra-deploy` with required reviewers,
 #      "Prevent self-review", deployment branches/tags rule = tags `v*.*.*` only; environment secrets
 #      DEPLOY_SSH_KEY (ed25519 private key; public half in ~deploy/.ssh/authorized_keys with
 #      `restrict,command="sudo /usr/local/sbin/infra-deploy …"`) and DEPLOY_KNOWN_HOSTS (`ssh-keyscan -p 2221` output,
@@ -18,7 +18,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Release version X.Y.Z (git tag vX.Y.Z; images ghcr.io/bctech-adm/proyekkas-{web,migrate}:X.Y.Z)"
+        description: "Release version X.Y.Z (git tag vX.Y.Z; images ghcr.io/bima-creative-tech/proyekkas-{web,migrate}:X.Y.Z)"
         required: true
         type: string
 
@@ -30,8 +30,8 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  WEB_IMAGE: ghcr.io/bctech-adm/proyekkas-web
-  MIGRATE_IMAGE: ghcr.io/bctech-adm/proyekkas-migrate
+  WEB_IMAGE: ghcr.io/bima-creative-tech/proyekkas-web
+  MIGRATE_IMAGE: ghcr.io/bima-creative-tech/proyekkas-migrate
   STACK: web/clients/drms-proyekkas
   HEALTH_URL: https://drms-kas.bimacreative.tech/api/v1/health
 
