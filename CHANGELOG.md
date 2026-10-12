@@ -6,6 +6,45 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-10-12
+
+**DRMS 10/10 Phases D–G on top of 0.8.0** (pinjaman antar project ADR 0022, site / kantor cabang ADR 0023, aturan
+approval yang bisa dikonfigurasi + Pengajuan Direktur tanpa persetujuan ADR 0024, RAP untuk semua project dengan RAB,
+Staff melihat project tanpa nilai uang) **plus the "Lampiran umum" fix** found on production 2026-10-12. 0.8.0 was never
+deployed: this release replaces it (production 0.6.4 → 0.9.0, staging 0.7.0 → 0.9.0). APK **mobile-v0.5.0** (pubspec
+`0.5.0+1`, drift schema **9**, notes `docs/release-notes/apk/0.5.0.md`). **Staging first** — production only after the
+owner approves.
+
+**Database migrations after 0.8.0** (run by `migrate`, in this order): `20261013_100000_d1010_project_loans`,
+`20261013_100100_d1010_project_loans_guard`, `20261013_200000_d1010_sites`, `20261013_200100_d1010_sites_guard`,
+`20261013_300000_d1010_approval_config`, `20261013_300000_d1010_approval_config_guard`,
+`20261013_300000_d1010_approval_config_data`, `20261013_400000_d1010_rap_all`, `20261013_400100_d1010_rap_all_guard`,
+`20261013_500000_attachments_owner_link` (data). From production 0.6.4 the 0.7.0 and 0.8.0 migrations run first (see
+those sections). **Take the pre-deploy dump** (data migrations renumber sequences, link attachments, seed rules).
+
+**Deploy checklist (in addition to 0.8.0's):** read the migrate log of `…_approval_config_data` — a PT listed in
+`customisedKept` did not get the "Pengajuan Direktur" rule (the Admin creates it, ADR 0024 Rollout 2); read
+`…_attachments_owner_link` (`linked`); after `migrate` the Admin reviews the approval rules of every PT (Keuangan → Aturan
+approval) — rules are data: the 0.6.x rule "Direktur lalu Finance" keeps Finance as an approver until it is changed.
+New requests always need a project (D2): requests that used a pusat biaya need a project per kind of spending (e.g. an
+office / payroll project) and, where wanted, a rule scoped to it.
+
+**CI:** integration split into halves a/b plus the F3 KPI data-set job (90 min); the required status check names changed —
+update the branch protection of `main`.
+
+### Fixed (Lampiran umum, production 2026-10-12, PB 230/PB-DRMS)
+
+- "Lampiran umum" of an expense request were stored on the draft but never linked to it, so only the uploader (and office
+  roles of EVERY PT) could open them: the PM / Direktur / Finance deciding saw no image. They are now linked at **submit**
+  (every path — web form, APK, submit again after withdraw; idempotent), and only uploads of the people on the request
+  (creator, requester accounts, the person submitting) are accepted (else 409 "Lampiran bukan unggahan pembuat/pemohon
+  pengajuan ini"). A file copied by "Ajukan ulang" keeps the link to its original request.
+- Migration `20261013_500000_attachments_owner_link` (data, idempotent, audited): links the files of requests already
+  submitted before the fix (referenced by exactly one request, uploaded by its creator or "Diajukan Oleh" signer); drafts
+  are linked at their submit.
+- **PDF Pengajuan Biaya** prints the "Lampiran umum" after the receipt pages ("Lampiran Umum — <nomor> (1–2 dari n)"):
+  images embedded (sharing the 12-image budget of ADR 0008 §2), PDF files listed.
+
 ### Changed (DRMS 10/10 follow-up — Staff see projects without money, owner 2026-10-11)
 
 - Web: Staff get the "Proyek" module — the list of their assigned projects (search / filter) and the project page

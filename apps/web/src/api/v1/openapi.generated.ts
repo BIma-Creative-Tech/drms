@@ -3,7 +3,7 @@ export const openapiDocument = {
   "openapi": "3.1.0",
   "info": {
     "title": "RR Teams API v1",
-    "version": "0.8.0",
+    "version": "0.9.0",
     "description": "Versioned contract for the Android APK and admin custom views (architecture §6). Errors: RFC 9457."
   },
   "servers": [

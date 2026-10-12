@@ -26,10 +26,10 @@ import {
   type Signature,
 } from './common'
 import { fromDocLines, validateContent } from './drafts'
-import { approveWithoutDecision, assertEveryLineHasReceipt, recomputeFlags, syncProjectRapFlags, syncRapFlags } from './receipts'
+import { approveWithoutDecision, assertEveryLineHasReceipt, claimAttachments, recomputeFlags, syncProjectRapFlags, syncRapFlags } from './receipts'
 import { isNoApproval } from './decision'
 import { ACK_DELEGATE_ROLE, budgetImpact, lastLevel, type AckDelegate, type ApprovalSnapshot } from './rules'
-import { auditSelfApproval, auditSkipped, selectAndSnapshot, writeSnapshot } from './snapshot'
+import { auditSelfApproval, auditSkipped, involvedUserIds, selectAndSnapshot, writeSnapshot } from './snapshot'
 import type { ApprovalDecision, ApprovalPosition } from './types'
 
 export { selectAndSnapshot, writeSnapshot }
@@ -173,6 +173,8 @@ export async function submit(req: PayloadRequest, id: number, opts: SubmitOption
   const callerEmp = employeeIn(req, companyId)
   const dibuatSig = await requireSignature(req, creator, snapshot.signDibuat, caller === creator ? opts.signatureMediaId : null)
   const diajukanSig = await requireSignature(req, caller, snapshot.signDiajukan, opts.signatureMediaId)
+  // "Lampiran umum" become readable by everyone who may read the request (owner link, same transaction)
+  await claimAttachments(req, doc, new Set([...(await involvedUserIds(req, doc)), caller]))
 
   // Number: allocated once, at the first submit (kept on withdraw → resubmit; ADR 0007 §4).
   let docNo = doc.docNo ?? null
