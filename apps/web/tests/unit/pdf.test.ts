@@ -55,6 +55,7 @@ describe('PengajuanBiaya template', () => {
           flags: [],
         })),
       ),
+      attachments: [],
       internal: false,
       printedText: 'Dicetak 23/09/2026 10:00 WITA oleh Finance',
     }
@@ -81,5 +82,18 @@ describe('PengajuanBiaya template', () => {
       ]),
     )
     expect(pdfPageCount(pdf)).toBe(3) // form + 3 receipts at 2 per page
+
+    // bug 2026-10-12: "Lampiran umum" are printed after the receipts (image embedded, PDF file listed)
+    const withAttachments = await renderPengajuanBiaya({
+      ...d,
+      attachments: [
+        { heading: 'Lampiran 1', details: 'Gambar 1600×293 px', image: { data: await receiptImage(['DAFTAR GAJI']), format: 'jpg' } },
+        { heading: 'Lampiran 2', details: 'Berkas PDF', image: null },
+      ],
+    })
+    expect(pdfPageCount(withAttachments)).toBe(4)
+    const attText = pdfText(withAttachments)
+    expect(attText).toContain('Lampiran Umum')
+    expect(attText).toContain('Berkas PDF')
   })
 })

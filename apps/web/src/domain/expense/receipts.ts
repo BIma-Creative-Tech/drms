@@ -93,6 +93,25 @@ export async function claimMedia(
   return m
 }
 
+/**
+ * Prod 2026-10-12 (PB 230/PB-DRMS): "Lampiran umum" were stored on the draft but never owner-linked,
+ * so only their uploader (and office roles of EVERY PT) could open them — the deciders saw no image.
+ * Linked at submit (every path: web form, APK, re-submit after withdraw; idempotent). Only uploads of
+ * the people on the request (`involved`: creator, requester accounts, caller) are linked; a file
+ * already linked to ANOTHER expense request (copied by "Ajukan ulang", US-06) keeps that link.
+ */
+export async function claimAttachments(req: PayloadRequest, doc: RequestDoc, involved: ReadonlySet<number>): Promise<void> {
+  for (const mediaId of ids(doc.attachments)) {
+    const m = (await req.payload
+      .findByID({ collection: 'media-attachments', id: mediaId, depth: 0, overrideAccess: true /* SYSTEM-READ: owner link checked below */, req })
+      .catch(() => null)) as { uploadedBy?: unknown; ownerDocType?: string | null; ownerDocId?: string | null } | null
+    if (!m) fail(409, 'Lampiran tidak ditemukan; hapus dari pengajuan lalu unggah ulang.')
+    if (m.ownerDocType === 'expense_request' && m.ownerDocId && m.ownerDocId !== String(doc.id)) continue
+    if (!m.ownerDocId && !involved.has(relId(m.uploadedBy) ?? -1)) fail(409, 'Lampiran bukan unggahan pembuat/pemohon pengajuan ini; unggah ulang.')
+    await claimMedia(req, 'media-attachments', mediaId, doc.id, { anyUploader: true })
+  }
+}
+
 function lineIndex(doc: RequestDoc, lineId: string): number {
   const i = (doc.lines ?? []).findIndex((l) => l.id === lineId)
   if (i < 0) fail(400, 'Baris item tidak ditemukan.', [{ path: 'lineId', message: 'Baris item tidak ditemukan.' }])
