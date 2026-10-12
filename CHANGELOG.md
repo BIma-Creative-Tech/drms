@@ -6,6 +6,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-10-12
+
+**Approval PM → Direktur (ADR 0021), RAP + Laporan harian (P3), DRMS 10/10 Phases A–C** (owner feedback 2026-10-10 /
+2026-10-11; web ↔ APK consistency). APK **mobile-v0.5.0** (pubspec `0.5.0+1`, notes `docs/release-notes/apk/0.5.0.md`;
+includes the never-tagged 0.4.1; drift schema **v8**). **Staging first** — production only after the owner approves
+the UAT.
+
+**Database migrations** (run by `migrate`, in this order; details in the sections below):
+`20261010_130000_approval_pm_direktur`, `20261011_100000_p3_rap`, `20261011_110000_p3_security`,
+`20261012_100000_d1010_project_pm` (conditional NOT NULL), `20261012_200000_d1010_schema`, `20261012_200100_d1010_data`
+(sequences on the default pattern → `<DOC>/{COMPANY}/{YY}{MM}/{seq}`), `20261012_300000_d1010_lines_lpj_photos`,
+`20261012_300100_d1010_lines_guard`, `20261012_300200_d1010_pb_monthly` (PB monthly), `20261012_400000_d1010_rap_cost_center`,
+`20261012_400100_d1010_rap_guard`. Each has a `down()`; still **take the pre-deploy dump** (data migrations renumber
+sequences and normalise editable lines). Older migrations only gained `IF EXISTS` in `down()`.
+
+**Deploy checklist:** the **worker must run** (selfie stamps); after `migrate` the Admin sets the approval rules of every
+PT (see "Approval pengajuan biaya" below); fill PMs via "Project tanpa PM"; **every project with a RAB needs a RAP**
+before its requests can be sent (D4) — create the RAP of active konstruksi projects first; set "Pusat biaya (default
+transfer)" per project (Finance picks the cost center at transfer, D2).
+
+**CI:** integration job timeout 40 → 70 min (the suite outgrew 40 min on the self-hosted runner).
+
 **DRMS 10/10 Phase C — server + web** (owner decisions D2 / D4, points 2–4, 7, 10; web ↔ APK consistency). API contract
 for the APK in `docs/proyekkas/plans/drms-1010.md` ("Phase C API contract").
 
