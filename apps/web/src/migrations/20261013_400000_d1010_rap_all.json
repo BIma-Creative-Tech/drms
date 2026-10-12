@@ -443,6 +443,13 @@
           "notNull": false,
           "default": true
         },
+        "reminder_loan_overdue_enabled": {
+          "name": "reminder_loan_overdue_enabled",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false,
+          "default": true
+        },
         "notify_requester_status_enabled": {
           "name": "notify_requester_status_enabled",
           "type": "boolean",
@@ -992,6 +999,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "home_site_id": {
+          "name": "home_site_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
         "face_ref_photo_id": {
           "name": "face_ref_photo_id",
           "type": "integer",
@@ -1068,6 +1081,21 @@
           "columns": [
             {
               "expression": "work_schedule_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "employees_home_site_idx": {
+          "name": "employees_home_site_idx",
+          "columns": [
+            {
+              "expression": "home_site_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -1174,6 +1202,19 @@
           "tableTo": "work_schedules",
           "columnsFrom": [
             "work_schedule_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "employees_home_site_id_sites_id_fk": {
+          "name": "employees_home_site_id_sites_id_fk",
+          "tableFrom": "employees",
+          "tableTo": "sites",
+          "columnsFrom": [
+            "home_site_id"
           ],
           "columnsTo": [
             "id"
@@ -1964,6 +2005,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "site_id": {
+          "name": "site_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
         "address": {
           "name": "address",
           "type": "varchar",
@@ -2121,6 +2168,21 @@
           "method": "btree",
           "with": {}
         },
+        "projects_site_idx": {
+          "name": "projects_site_idx",
+          "columns": [
+            {
+              "expression": "site_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
         "projects_pm_idx": {
           "name": "projects_pm_idx",
           "columns": [
@@ -2232,6 +2294,19 @@
           "tableTo": "clients",
           "columnsFrom": [
             "client_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "projects_site_id_sites_id_fk": {
+          "name": "projects_site_id_sites_id_fk",
+          "tableFrom": "projects",
+          "tableTo": "sites",
+          "columnsFrom": [
+            "site_id"
           ],
           "columnsTo": [
             "id"
@@ -3493,6 +3568,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "site_id": {
+          "name": "site_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
         "odoo_journal_code": {
           "name": "odoo_journal_code",
           "type": "varchar",
@@ -3563,6 +3644,21 @@
           "columns": [
             {
               "expression": "bank_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "cash_accounts_site_idx": {
+          "name": "cash_accounts_site_idx",
+          "columns": [
+            {
+              "expression": "site_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -3660,6 +3756,19 @@
           ],
           "onDelete": "set null",
           "onUpdate": "no action"
+        },
+        "cash_accounts_site_id_sites_id_fk": {
+          "name": "cash_accounts_site_id_sites_id_fk",
+          "tableFrom": "cash_accounts",
+          "tableTo": "sites",
+          "columnsFrom": [
+            "site_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -3698,6 +3807,12 @@
         },
         "cost_center_id": {
           "name": "cost_center_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "site_id": {
+          "name": "site_id",
           "type": "integer",
           "primaryKey": false,
           "notNull": false
@@ -3798,6 +3913,21 @@
           "method": "btree",
           "with": {}
         },
+        "team_assignments_site_idx": {
+          "name": "team_assignments_site_idx",
+          "columns": [
+            {
+              "expression": "site_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
         "team_assignments_updated_at_idx": {
           "name": "team_assignments_updated_at_idx",
           "columns": [
@@ -3875,6 +4005,19 @@
           "tableTo": "cost_centers",
           "columnsFrom": [
             "cost_center_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "team_assignments_site_id_sites_id_fk": {
+          "name": "team_assignments_site_id_sites_id_fk",
+          "tableFrom": "team_assignments",
+          "tableTo": "sites",
+          "columnsFrom": [
+            "site_id"
           ],
           "columnsTo": [
             "id"
@@ -4184,6 +4327,89 @@
         }
       },
       "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.approval_rules_requester_roles": {
+      "name": "approval_rules_requester_roles",
+      "schema": "",
+      "columns": {
+        "order": {
+          "name": "order",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "parent_id": {
+          "name": "parent_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "value": {
+          "name": "value",
+          "type": "enum_approval_rules_requester_roles",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "approval_rules_requester_roles_order_idx": {
+          "name": "approval_rules_requester_roles_order_idx",
+          "columns": [
+            {
+              "expression": "order",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "approval_rules_requester_roles_parent_idx": {
+          "name": "approval_rules_requester_roles_parent_idx",
+          "columns": [
+            {
+              "expression": "parent_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "approval_rules_requester_roles_parent_fk": {
+          "name": "approval_rules_requester_roles_parent_fk",
+          "tableFrom": "approval_rules_requester_roles",
+          "tableTo": "approval_rules",
+          "columnsFrom": [
+            "parent_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
@@ -5737,6 +5963,267 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.sites": {
+      "name": "sites",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "company_id": {
+          "name": "company_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "code": {
+          "name": "code",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "address": {
+          "name": "address",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "lat": {
+          "name": "lat",
+          "type": "numeric",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "lng": {
+          "name": "lng",
+          "type": "numeric",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "radius_m": {
+          "name": "radius_m",
+          "type": "numeric",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "default_work_schedule_id": {
+          "name": "default_work_schedule_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cost_center_id": {
+          "name": "cost_center_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "active": {
+          "name": "active",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false,
+          "default": true
+        },
+        "uuid": {
+          "name": "uuid",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp(3) with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp(3) with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "sites_company_idx": {
+          "name": "sites_company_idx",
+          "columns": [
+            {
+              "expression": "company_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "sites_code_idx": {
+          "name": "sites_code_idx",
+          "columns": [
+            {
+              "expression": "code",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "sites_default_work_schedule_idx": {
+          "name": "sites_default_work_schedule_idx",
+          "columns": [
+            {
+              "expression": "default_work_schedule_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "sites_cost_center_idx": {
+          "name": "sites_cost_center_idx",
+          "columns": [
+            {
+              "expression": "cost_center_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "sites_active_idx": {
+          "name": "sites_active_idx",
+          "columns": [
+            {
+              "expression": "active",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "sites_uuid_idx": {
+          "name": "sites_uuid_idx",
+          "columns": [
+            {
+              "expression": "uuid",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "sites_updated_at_idx": {
+          "name": "sites_updated_at_idx",
+          "columns": [
+            {
+              "expression": "updated_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "sites_created_at_idx": {
+          "name": "sites_created_at_idx",
+          "columns": [
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "sites_company_id_companies_id_fk": {
+          "name": "sites_company_id_companies_id_fk",
+          "tableFrom": "sites",
+          "tableTo": "companies",
+          "columnsFrom": [
+            "company_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "sites_default_work_schedule_id_work_schedules_id_fk": {
+          "name": "sites_default_work_schedule_id_work_schedules_id_fk",
+          "tableFrom": "sites",
+          "tableTo": "work_schedules",
+          "columnsFrom": [
+            "default_work_schedule_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "sites_cost_center_id_cost_centers_id_fk": {
+          "name": "sites_cost_center_id_cost_centers_id_fk",
+          "tableFrom": "sites",
+          "tableTo": "cost_centers",
+          "columnsFrom": [
+            "cost_center_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.document_sequences": {
       "name": "document_sequences",
       "schema": "",
@@ -7126,6 +7613,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "loan_id": {
+          "name": "loan_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
         "cycle": {
           "name": "cycle",
           "type": "numeric",
@@ -7316,6 +7809,21 @@
           "method": "btree",
           "with": {}
         },
+        "approvals_loan_idx": {
+          "name": "approvals_loan_idx",
+          "columns": [
+            {
+              "expression": "loan_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
         "approvals_actor_idx": {
           "name": "approvals_actor_idx",
           "columns": [
@@ -7438,6 +7946,19 @@
           "tableTo": "settlements",
           "columnsFrom": [
             "settlement_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "approvals_loan_id_project_loans_id_fk": {
+          "name": "approvals_loan_id_project_loans_id_fk",
+          "tableFrom": "approvals",
+          "tableTo": "project_loans",
+          "columnsFrom": [
+            "loan_id"
           ],
           "columnsTo": [
             "id"
@@ -13796,6 +14317,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "site_id": {
+          "name": "site_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
         "source": {
           "name": "source",
           "type": "enum_attendances_source",
@@ -14005,6 +14532,21 @@
           "method": "btree",
           "with": {}
         },
+        "attendances_site_idx": {
+          "name": "attendances_site_idx",
+          "columns": [
+            {
+              "expression": "site_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
         "attendances_source_idx": {
           "name": "attendances_source_idx",
           "columns": [
@@ -14200,6 +14742,19 @@
           "tableTo": "cost_centers",
           "columnsFrom": [
             "cost_center_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "attendances_site_id_sites_id_fk": {
+          "name": "attendances_site_id_sites_id_fk",
+          "tableFrom": "attendances",
+          "tableTo": "sites",
+          "columnsFrom": [
+            "site_id"
           ],
           "columnsTo": [
             "id"
@@ -15301,6 +15856,663 @@
           "tableTo": "approval_rules",
           "columnsFrom": [
             "approval_rule_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.project_loans": {
+      "name": "project_loans",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "company_id": {
+          "name": "company_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "doc_no": {
+          "name": "doc_no",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "lender_project_id": {
+          "name": "lender_project_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "borrower_project_id": {
+          "name": "borrower_project_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "kind": {
+          "name": "kind",
+          "type": "enum_project_loans_kind",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'dana'"
+        },
+        "amount": {
+          "name": "amount",
+          "type": "numeric",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "reason": {
+          "name": "reason",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "loan_date": {
+          "name": "loan_date",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "due_date": {
+          "name": "due_date",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "enum_project_loans_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'draft'"
+        },
+        "repaid_total": {
+          "name": "repaid_total",
+          "type": "numeric",
+          "primaryKey": false,
+          "notNull": false,
+          "default": 0
+        },
+        "outstanding": {
+          "name": "outstanding",
+          "type": "numeric",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "same_pm": {
+          "name": "same_pm",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false,
+          "default": false
+        },
+        "created_by_id": {
+          "name": "created_by_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "submitted_at": {
+          "name": "submitted_at",
+          "type": "timestamp(3) with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "decided_at": {
+          "name": "decided_at",
+          "type": "timestamp(3) with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "decided_by_id": {
+          "name": "decided_by_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "reject_reason": {
+          "name": "reject_reason",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cancel_reason": {
+          "name": "cancel_reason",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "approval_cycle": {
+          "name": "approval_cycle",
+          "type": "numeric",
+          "primaryKey": false,
+          "notNull": false,
+          "default": 0
+        },
+        "g1_exception": {
+          "name": "g1_exception",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "source": {
+          "name": "source",
+          "type": "enum_project_loans_source",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "uuid": {
+          "name": "uuid",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp(3) with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp(3) with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "project_loans_company_idx": {
+          "name": "project_loans_company_idx",
+          "columns": [
+            {
+              "expression": "company_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "project_loans_doc_no_idx": {
+          "name": "project_loans_doc_no_idx",
+          "columns": [
+            {
+              "expression": "doc_no",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "project_loans_lender_project_idx": {
+          "name": "project_loans_lender_project_idx",
+          "columns": [
+            {
+              "expression": "lender_project_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "project_loans_borrower_project_idx": {
+          "name": "project_loans_borrower_project_idx",
+          "columns": [
+            {
+              "expression": "borrower_project_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "project_loans_status_idx": {
+          "name": "project_loans_status_idx",
+          "columns": [
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "project_loans_created_by_idx": {
+          "name": "project_loans_created_by_idx",
+          "columns": [
+            {
+              "expression": "created_by_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "project_loans_decided_by_idx": {
+          "name": "project_loans_decided_by_idx",
+          "columns": [
+            {
+              "expression": "decided_by_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "project_loans_uuid_idx": {
+          "name": "project_loans_uuid_idx",
+          "columns": [
+            {
+              "expression": "uuid",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "project_loans_updated_at_idx": {
+          "name": "project_loans_updated_at_idx",
+          "columns": [
+            {
+              "expression": "updated_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "project_loans_created_at_idx": {
+          "name": "project_loans_created_at_idx",
+          "columns": [
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "project_loans_company_id_companies_id_fk": {
+          "name": "project_loans_company_id_companies_id_fk",
+          "tableFrom": "project_loans",
+          "tableTo": "companies",
+          "columnsFrom": [
+            "company_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "project_loans_lender_project_id_projects_id_fk": {
+          "name": "project_loans_lender_project_id_projects_id_fk",
+          "tableFrom": "project_loans",
+          "tableTo": "projects",
+          "columnsFrom": [
+            "lender_project_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "project_loans_borrower_project_id_projects_id_fk": {
+          "name": "project_loans_borrower_project_id_projects_id_fk",
+          "tableFrom": "project_loans",
+          "tableTo": "projects",
+          "columnsFrom": [
+            "borrower_project_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "project_loans_created_by_id_users_id_fk": {
+          "name": "project_loans_created_by_id_users_id_fk",
+          "tableFrom": "project_loans",
+          "tableTo": "users",
+          "columnsFrom": [
+            "created_by_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "project_loans_decided_by_id_users_id_fk": {
+          "name": "project_loans_decided_by_id_users_id_fk",
+          "tableFrom": "project_loans",
+          "tableTo": "users",
+          "columnsFrom": [
+            "decided_by_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.project_loan_repayments": {
+      "name": "project_loan_repayments",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "company_id": {
+          "name": "company_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "loan_id": {
+          "name": "loan_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "repay_date": {
+          "name": "repay_date",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "amount": {
+          "name": "amount",
+          "type": "numeric",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "note": {
+          "name": "note",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status": {
+          "name": "status",
+          "type": "enum_project_loan_repayments_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'posted'"
+        },
+        "void_reason": {
+          "name": "void_reason",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "recorded_by_id": {
+          "name": "recorded_by_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "voided_by_id": {
+          "name": "voided_by_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "voided_at": {
+          "name": "voided_at",
+          "type": "timestamp(3) with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "source": {
+          "name": "source",
+          "type": "enum_project_loan_repayments_source",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp(3) with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp(3) with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "project_loan_repayments_company_idx": {
+          "name": "project_loan_repayments_company_idx",
+          "columns": [
+            {
+              "expression": "company_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "project_loan_repayments_loan_idx": {
+          "name": "project_loan_repayments_loan_idx",
+          "columns": [
+            {
+              "expression": "loan_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "project_loan_repayments_status_idx": {
+          "name": "project_loan_repayments_status_idx",
+          "columns": [
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "project_loan_repayments_recorded_by_idx": {
+          "name": "project_loan_repayments_recorded_by_idx",
+          "columns": [
+            {
+              "expression": "recorded_by_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "project_loan_repayments_voided_by_idx": {
+          "name": "project_loan_repayments_voided_by_idx",
+          "columns": [
+            {
+              "expression": "voided_by_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "project_loan_repayments_updated_at_idx": {
+          "name": "project_loan_repayments_updated_at_idx",
+          "columns": [
+            {
+              "expression": "updated_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "project_loan_repayments_created_at_idx": {
+          "name": "project_loan_repayments_created_at_idx",
+          "columns": [
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "project_loan_repayments_company_id_companies_id_fk": {
+          "name": "project_loan_repayments_company_id_companies_id_fk",
+          "tableFrom": "project_loan_repayments",
+          "tableTo": "companies",
+          "columnsFrom": [
+            "company_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "project_loan_repayments_loan_id_project_loans_id_fk": {
+          "name": "project_loan_repayments_loan_id_project_loans_id_fk",
+          "tableFrom": "project_loan_repayments",
+          "tableTo": "project_loans",
+          "columnsFrom": [
+            "loan_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "project_loan_repayments_recorded_by_id_users_id_fk": {
+          "name": "project_loan_repayments_recorded_by_id_users_id_fk",
+          "tableFrom": "project_loan_repayments",
+          "tableTo": "users",
+          "columnsFrom": [
+            "recorded_by_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "project_loan_repayments_voided_by_id_users_id_fk": {
+          "name": "project_loan_repayments_voided_by_id_users_id_fk",
+          "tableFrom": "project_loan_repayments",
+          "tableTo": "users",
+          "columnsFrom": [
+            "voided_by_id"
           ],
           "columnsTo": [
             "id"
@@ -19185,6 +20397,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "sites_id": {
+          "name": "sites_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
         "document_sequences_id": {
           "name": "document_sequences_id",
           "type": "integer",
@@ -19307,6 +20525,18 @@
         },
         "budget_addenda_id": {
           "name": "budget_addenda_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "project_loans_id": {
+          "name": "project_loans_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "project_loan_repayments_id": {
+          "name": "project_loan_repayments_id",
           "type": "integer",
           "primaryKey": false,
           "notNull": false
@@ -19766,6 +20996,21 @@
           "method": "btree",
           "with": {}
         },
+        "payload_locked_documents_rels_sites_id_idx": {
+          "name": "payload_locked_documents_rels_sites_id_idx",
+          "columns": [
+            {
+              "expression": "sites_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
         "payload_locked_documents_rels_document_sequences_id_idx": {
           "name": "payload_locked_documents_rels_document_sequences_id_idx",
           "columns": [
@@ -20071,6 +21316,36 @@
           "columns": [
             {
               "expression": "budget_addenda_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "payload_locked_documents_rels_project_loans_id_idx": {
+          "name": "payload_locked_documents_rels_project_loans_id_idx",
+          "columns": [
+            {
+              "expression": "project_loans_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "payload_locked_documents_rels_project_loan_repayments_id_idx": {
+          "name": "payload_locked_documents_rels_project_loan_repayments_id_idx",
+          "columns": [
+            {
+              "expression": "project_loan_repayments_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -20528,6 +21803,19 @@
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
+        "payload_locked_documents_rels_sites_fk": {
+          "name": "payload_locked_documents_rels_sites_fk",
+          "tableFrom": "payload_locked_documents_rels",
+          "tableTo": "sites",
+          "columnsFrom": [
+            "sites_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
         "payload_locked_documents_rels_document_sequences_fk": {
           "name": "payload_locked_documents_rels_document_sequences_fk",
           "tableFrom": "payload_locked_documents_rels",
@@ -20794,6 +22082,32 @@
           "tableTo": "budget_addenda",
           "columnsFrom": [
             "budget_addenda_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "payload_locked_documents_rels_project_loans_fk": {
+          "name": "payload_locked_documents_rels_project_loans_fk",
+          "tableFrom": "payload_locked_documents_rels",
+          "tableTo": "project_loans",
+          "columnsFrom": [
+            "project_loans_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "payload_locked_documents_rels_project_loan_repayments_fk": {
+          "name": "payload_locked_documents_rels_project_loan_repayments_fk",
+          "tableFrom": "payload_locked_documents_rels",
+          "tableTo": "project_loan_repayments",
+          "columnsFrom": [
+            "project_loan_repayments_id"
           ],
           "columnsTo": [
             "id"
@@ -21462,6 +22776,17 @@
         "mandor"
       ]
     },
+    "public.enum_approval_rules_requester_roles": {
+      "name": "enum_approval_rules_requester_roles",
+      "schema": "public",
+      "values": [
+        "pk-owner",
+        "pk-pm",
+        "pk-staff",
+        "pk-finance",
+        "pk-admin"
+      ]
+    },
     "public.enum_approval_rules_steps_approver_role": {
       "name": "enum_approval_rules_steps_approver_role",
       "schema": "public",
@@ -21594,7 +22919,8 @@
         "budget_addendum",
         "reversal",
         "service_report",
-        "daily_report"
+        "daily_report",
+        "project_loan"
       ]
     },
     "public.enum_document_sequences_reset_policy": {
@@ -21659,7 +22985,8 @@
       "values": [
         "expense_request",
         "budget_addendum",
-        "expense_shortfall"
+        "expense_shortfall",
+        "project_loan"
       ]
     },
     "public.enum_approvals_position": {
@@ -22093,6 +23420,51 @@
     },
     "public.enum_budget_addenda_source": {
       "name": "enum_budget_addenda_source",
+      "schema": "public",
+      "values": [
+        "web",
+        "apk"
+      ]
+    },
+    "public.enum_project_loans_kind": {
+      "name": "enum_project_loans_kind",
+      "schema": "public",
+      "values": [
+        "dana",
+        "barang"
+      ]
+    },
+    "public.enum_project_loans_status": {
+      "name": "enum_project_loans_status",
+      "schema": "public",
+      "values": [
+        "draft",
+        "pending_approval",
+        "approved",
+        "partially_repaid",
+        "repaid",
+        "rejected",
+        "cancelled"
+      ]
+    },
+    "public.enum_project_loans_source": {
+      "name": "enum_project_loans_source",
+      "schema": "public",
+      "values": [
+        "web",
+        "apk"
+      ]
+    },
+    "public.enum_project_loan_repayments_status": {
+      "name": "enum_project_loan_repayments_status",
+      "schema": "public",
+      "values": [
+        "posted",
+        "void"
+      ]
+    },
+    "public.enum_project_loan_repayments_source": {
+      "name": "enum_project_loan_repayments_source",
       "schema": "public",
       "values": [
         "web",

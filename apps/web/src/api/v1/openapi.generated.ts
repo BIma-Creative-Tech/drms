@@ -160,6 +160,29 @@ export const openapiDocument = {
               },
               "name": {
                 "type": "string"
+              },
+              "homeSite": {
+                "type": [
+                  "object",
+                  "null"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "integer"
+                  },
+                  "code": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "id",
+                  "code",
+                  "name"
+                ],
+                "description": "ADR 0023: \"Site penempatan\" (kantor cabang) of the employee, null when none."
               }
             },
             "required": [
@@ -470,6 +493,29 @@ export const openapiDocument = {
           },
           "name": {
             "type": "string"
+          },
+          "homeSite": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "type": "integer"
+              },
+              "code": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "code",
+              "name"
+            ],
+            "description": "ADR 0023: \"Site penempatan\" (kantor cabang) of the employee, null when none."
           }
         },
         "required": [
@@ -4202,6 +4248,14 @@ export const openapiDocument = {
                   "type": "integer",
                   "exclusiveMinimum": 0
                 },
+                "siteId": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "exclusiveMinimum": 0,
+                  "description": "ADR 0023 (Q-S7): site flag of the account (petty cash of a branch), null = none."
+                },
                 "name": {
                   "type": "string"
                 },
@@ -4225,6 +4279,7 @@ export const openapiDocument = {
               "required": [
                 "cashAccountId",
                 "companyId",
+                "siteId",
                 "name",
                 "active",
                 "openingBalance",
@@ -6726,12 +6781,17 @@ export const openapiDocument = {
           "project_id": {
             "type": "integer",
             "exclusiveMinimum": 0,
-            "description": "Project (one of project_id / cost_center_id)."
+            "description": "Project (exactly one of project_id / cost_center_id / site_id)."
           },
           "cost_center_id": {
             "type": "integer",
             "exclusiveMinimum": 0,
             "description": "Cost center / operational location (E6, Q-40)."
+          },
+          "site_id": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "description": "ADR 0023: site (kantor cabang) — allowed at the home site or with an active site assignment."
           },
           "lat": {
             "type": "number",
@@ -6798,6 +6858,11 @@ export const openapiDocument = {
           "cost_center_id": {
             "type": "integer",
             "exclusiveMinimum": 0
+          },
+          "site_id": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "description": "ADR 0023: a team site of the PM (pm-role site assignment, or PM of a project of the site)."
           },
           "lat": {
             "type": "number",
@@ -8487,7 +8552,8 @@ export const openapiDocument = {
             "type": "string",
             "enum": [
               "project",
-              "cost_center"
+              "cost_center",
+              "site"
             ]
           },
           "id": {
@@ -8752,12 +8818,17 @@ export const openapiDocument = {
           "project_id": {
             "type": "integer",
             "exclusiveMinimum": 0,
-            "description": "Project (one of project_id / cost_center_id)."
+            "description": "Project (exactly one of project_id / cost_center_id / site_id)."
           },
           "cost_center_id": {
             "type": "integer",
             "exclusiveMinimum": 0,
             "description": "Cost center / operational location (E6, Q-40)."
+          },
+          "site_id": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "description": "ADR 0023: site (kantor cabang) — allowed at the home site or with an active site assignment."
           },
           "lat": {
             "type": "number",
@@ -14187,6 +14258,30 @@ export const openapiDocument = {
             ],
             "description": "D2: default cost center proposed to Finance at the transfer."
           },
+          "site": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "type": "integer",
+                "exclusiveMinimum": 0
+              },
+              "code": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "code",
+              "name"
+            ],
+            "description": "ADR 0023: site (kantor cabang) that handles the project."
+          },
           "rapPlanned": {
             "type": [
               "number",
@@ -14240,6 +14335,7 @@ export const openapiDocument = {
           "contractValue",
           "progressPct",
           "costCenter",
+          "site",
           "rapPlanned",
           "rapRealised",
           "rapPercent",
@@ -14338,6 +14434,30 @@ export const openapiDocument = {
             ],
             "description": "D2: default cost center proposed to Finance at the transfer."
           },
+          "site": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "type": "integer",
+                "exclusiveMinimum": 0
+              },
+              "code": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "code",
+              "name"
+            ],
+            "description": "ADR 0023: site (kantor cabang) that handles the project."
+          },
           "rapPlanned": {
             "type": [
               "number",
@@ -14431,6 +14551,7 @@ export const openapiDocument = {
           "contractValue",
           "progressPct",
           "costCenter",
+          "site",
           "rapPlanned",
           "rapRealised",
           "rapPercent",
@@ -14559,6 +14680,139 @@ export const openapiDocument = {
           "docs",
           "totalDocs"
         ]
+      },
+      "SiteList": {
+        "type": "object",
+        "properties": {
+          "docs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                "code": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "companyId": {
+                  "type": "integer"
+                },
+                "address": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "lat": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "lng": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "radiusM": {
+                  "type": [
+                    "number",
+                    "null"
+                  ],
+                  "description": "Effective geofence radius (own, else the PT default) when the site has a point."
+                },
+                "costCenter": {
+                  "type": [
+                    "object",
+                    "null"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "code",
+                    "name"
+                  ],
+                  "description": "Default (operational) cost center of the site."
+                },
+                "defaultWorkSchedule": {
+                  "type": [
+                    "object",
+                    "null"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0
+                    },
+                    "name": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name"
+                  ]
+                },
+                "active": {
+                  "type": "boolean"
+                },
+                "home": {
+                  "type": "boolean",
+                  "description": "The caller's \"Site penempatan\" (own check-in allowed)."
+                },
+                "assigned": {
+                  "type": "boolean",
+                  "description": "The caller has an active site assignment today (own check-in allowed)."
+                },
+                "team": {
+                  "type": "boolean",
+                  "description": "The caller may record PM on-behalf here (team site)."
+                }
+              },
+              "required": [
+                "id",
+                "code",
+                "name",
+                "companyId",
+                "address",
+                "lat",
+                "lng",
+                "radiusM",
+                "costCenter",
+                "defaultWorkSchedule",
+                "active",
+                "home",
+                "assigned",
+                "team"
+              ]
+            }
+          },
+          "totalDocs": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "docs",
+          "totalDocs"
+        ],
+        "description": "ADR 0023: sites (kantor cabang) of the selected PTs."
       },
       "ProjectLoanList": {
         "type": "object",
@@ -16005,10 +16259,10 @@ export const openapiDocument = {
             "schema": {
               "type": "string",
               "pattern": "^[a-z-]+(,[a-z-]+)*$",
-              "description": "Comma separated subset of: projects, project-stages, cost-centers, expense-categories, uoms, vehicles, employees, banks, bank-accounts, work-schedules, holidays, team-assignments, vendors, cash-in-sources, urgency-levels, clients. Default: all."
+              "description": "Comma separated subset of: projects, project-stages, cost-centers, expense-categories, uoms, vehicles, employees, banks, bank-accounts, work-schedules, holidays, team-assignments, vendors, cash-in-sources, urgency-levels, clients, sites. Default: all."
             },
             "required": false,
-            "description": "Comma separated subset of: projects, project-stages, cost-centers, expense-categories, uoms, vehicles, employees, banks, bank-accounts, work-schedules, holidays, team-assignments, vendors, cash-in-sources, urgency-levels, clients. Default: all.",
+            "description": "Comma separated subset of: projects, project-stages, cost-centers, expense-categories, uoms, vehicles, employees, banks, bank-accounts, work-schedules, holidays, team-assignments, vendors, cash-in-sources, urgency-levels, clients, sites. Default: all.",
             "name": "types",
             "in": "query"
           },
@@ -20922,6 +21176,17 @@ export const openapiDocument = {
           {
             "schema": {
               "type": "string",
+              "pattern": "^\\d{1,9}$",
+              "description": "ADR 0023: only the accounts flagged with this site."
+            },
+            "required": false,
+            "description": "ADR 0023: only the accounts flagged with this site.",
+            "name": "site",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
               "format": "uuid",
               "description": "Registered install id (APK)."
             },
@@ -24670,6 +24935,17 @@ export const openapiDocument = {
           {
             "schema": {
               "type": "string",
+              "pattern": "^\\d{1,9}$",
+              "description": "ADR 0023: site id (kantor cabang) of the selected PTs — narrows every scope-based card."
+            },
+            "required": false,
+            "description": "ADR 0023: site id (kantor cabang) of the selected PTs — narrows every scope-based card.",
+            "name": "site",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
               "format": "uuid",
               "description": "Registered install id (APK)."
             },
@@ -24728,6 +25004,154 @@ export const openapiDocument = {
                         ]
                       },
                       "description": "MC2: PTs covered by this layout = the selected PTs where the caller holds the layout's role."
+                    },
+                    "sites": {
+                      "type": "object",
+                      "properties": {
+                        "options": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "integer"
+                              },
+                              "companyId": {
+                                "type": "integer",
+                                "description": "PT (companies id); label from `companies[]` / GET /me companies[]."
+                              },
+                              "code": {
+                                "type": "string"
+                              },
+                              "name": {
+                                "type": "string"
+                              },
+                              "active": {
+                                "type": "boolean"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "companyId",
+                              "code",
+                              "name",
+                              "active"
+                            ]
+                          }
+                        },
+                        "selected": {
+                          "type": [
+                            "integer",
+                            "null"
+                          ]
+                        },
+                        "cash": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "siteId": {
+                                "type": [
+                                  "integer",
+                                  "null"
+                                ]
+                              },
+                              "companyId": {
+                                "type": [
+                                  "integer",
+                                  "null"
+                                ],
+                                "description": "PT (companies id); label from `companies[]` / GET /me companies[]."
+                              },
+                              "code": {
+                                "type": "string"
+                              },
+                              "name": {
+                                "type": "string"
+                              },
+                              "balance": {
+                                "type": "integer",
+                                "description": "Rupiah (integer)"
+                              },
+                              "accounts": {
+                                "type": "integer"
+                              }
+                            },
+                            "required": [
+                              "siteId",
+                              "companyId",
+                              "code",
+                              "name",
+                              "balance",
+                              "accounts"
+                            ]
+                          }
+                        },
+                        "summary": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "siteId": {
+                                "type": [
+                                  "integer",
+                                  "null"
+                                ]
+                              },
+                              "companyId": {
+                                "type": [
+                                  "integer",
+                                  "null"
+                                ],
+                                "description": "PT (companies id); label from `companies[]` / GET /me companies[]."
+                              },
+                              "code": {
+                                "type": "string"
+                              },
+                              "name": {
+                                "type": "string"
+                              },
+                              "balance": {
+                                "type": "integer",
+                                "description": "Rupiah (integer)"
+                              },
+                              "accounts": {
+                                "type": "integer"
+                              },
+                              "projectsRunning": {
+                                "type": "integer"
+                              },
+                              "attendanceToday": {
+                                "type": "integer",
+                                "description": "Employees with a check-in today at the site or a project of the site."
+                              },
+                              "disbursedMonth": {
+                                "type": "integer",
+                                "description": "K-05 net disbursed this month for the site's projects."
+                              }
+                            },
+                            "required": [
+                              "siteId",
+                              "companyId",
+                              "code",
+                              "name",
+                              "balance",
+                              "accounts",
+                              "projectsRunning",
+                              "attendanceToday",
+                              "disbursedMonth"
+                            ]
+                          },
+                          "description": "Per-site breakdown (only without a site filter)."
+                        }
+                      },
+                      "required": [
+                        "options",
+                        "selected",
+                        "cash",
+                        "summary"
+                      ],
+                      "description": "ADR 0023: empty lists when the PTs have no site."
                     },
                     "cash": {
                       "type": "object",
@@ -25763,6 +26187,7 @@ export const openapiDocument = {
                     "asOf",
                     "month",
                     "companies",
+                    "sites",
                     "cash",
                     "budget",
                     "completeness",
@@ -25773,6 +26198,16 @@ export const openapiDocument = {
                     "transferQueue",
                     "viz"
                   ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
                 }
               }
             }
@@ -25835,6 +26270,17 @@ export const openapiDocument = {
           {
             "schema": {
               "type": "string",
+              "pattern": "^\\d{1,9}$",
+              "description": "ADR 0023: site id (kantor cabang) of the selected PTs — narrows every scope-based card."
+            },
+            "required": false,
+            "description": "ADR 0023: site id (kantor cabang) of the selected PTs — narrows every scope-based card.",
+            "name": "site",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
               "format": "uuid",
               "description": "Registered install id (APK)."
             },
@@ -25893,6 +26339,96 @@ export const openapiDocument = {
                         ]
                       },
                       "description": "MC2: PTs covered by this layout = the selected PTs where the caller holds the layout's role."
+                    },
+                    "sites": {
+                      "type": "object",
+                      "properties": {
+                        "options": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "integer"
+                              },
+                              "companyId": {
+                                "type": "integer",
+                                "description": "PT (companies id); label from `companies[]` / GET /me companies[]."
+                              },
+                              "code": {
+                                "type": "string"
+                              },
+                              "name": {
+                                "type": "string"
+                              },
+                              "active": {
+                                "type": "boolean"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "companyId",
+                              "code",
+                              "name",
+                              "active"
+                            ]
+                          }
+                        },
+                        "selected": {
+                          "type": [
+                            "integer",
+                            "null"
+                          ]
+                        },
+                        "cash": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "siteId": {
+                                "type": [
+                                  "integer",
+                                  "null"
+                                ]
+                              },
+                              "companyId": {
+                                "type": [
+                                  "integer",
+                                  "null"
+                                ],
+                                "description": "PT (companies id); label from `companies[]` / GET /me companies[]."
+                              },
+                              "code": {
+                                "type": "string"
+                              },
+                              "name": {
+                                "type": "string"
+                              },
+                              "balance": {
+                                "type": "integer",
+                                "description": "Rupiah (integer)"
+                              },
+                              "accounts": {
+                                "type": "integer"
+                              }
+                            },
+                            "required": [
+                              "siteId",
+                              "companyId",
+                              "code",
+                              "name",
+                              "balance",
+                              "accounts"
+                            ]
+                          }
+                        }
+                      },
+                      "required": [
+                        "options",
+                        "selected",
+                        "cash"
+                      ],
+                      "description": "ADR 0023: per-site cash balance; empty without sites."
                     },
                     "transferQueue": {
                       "type": "object",
@@ -26589,6 +27125,7 @@ export const openapiDocument = {
                     "asOf",
                     "month",
                     "companies",
+                    "sites",
                     "transferQueue",
                     "reimburseToVerify",
                     "lpjToVerify",
@@ -26605,6 +27142,16 @@ export const openapiDocument = {
                     "nextClosable",
                     "viz"
                   ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
                 }
               }
             }
@@ -26667,6 +27214,17 @@ export const openapiDocument = {
           {
             "schema": {
               "type": "string",
+              "pattern": "^\\d{1,9}$",
+              "description": "ADR 0023: site id (kantor cabang) of the selected PTs — narrows every scope-based card."
+            },
+            "required": false,
+            "description": "ADR 0023: site id (kantor cabang) of the selected PTs — narrows every scope-based card.",
+            "name": "site",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
               "format": "uuid",
               "description": "Registered install id (APK)."
             },
@@ -26725,6 +27283,53 @@ export const openapiDocument = {
                         ]
                       },
                       "description": "MC2: PTs covered by this layout = the selected PTs where the caller holds the layout's role."
+                    },
+                    "sites": {
+                      "type": "object",
+                      "properties": {
+                        "options": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "integer"
+                              },
+                              "companyId": {
+                                "type": "integer",
+                                "description": "PT (companies id); label from `companies[]` / GET /me companies[]."
+                              },
+                              "code": {
+                                "type": "string"
+                              },
+                              "name": {
+                                "type": "string"
+                              },
+                              "active": {
+                                "type": "boolean"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "companyId",
+                              "code",
+                              "name",
+                              "active"
+                            ]
+                          }
+                        },
+                        "selected": {
+                          "type": [
+                            "integer",
+                            "null"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "options",
+                        "selected"
+                      ],
+                      "description": "ADR 0023: site filter options (sites of the PM's PTs)."
                     },
                     "hasScope": {
                       "type": "boolean"
@@ -27521,6 +28126,7 @@ export const openapiDocument = {
                     "asOf",
                     "month",
                     "companies",
+                    "sites",
                     "hasScope",
                     "waitingForMe",
                     "teamWaiting",
@@ -27534,6 +28140,16 @@ export const openapiDocument = {
                     "progressReports",
                     "viz"
                   ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
                 }
               }
             }
@@ -27709,6 +28325,16 @@ export const openapiDocument = {
                     "gaps",
                     "latestAudit"
                   ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
                 }
               }
             }
@@ -28068,6 +28694,16 @@ export const openapiDocument = {
               }
             }
           },
+          "400": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
           "401": {
             "description": "Problem",
             "content": {
@@ -28314,6 +28950,16 @@ export const openapiDocument = {
             "required": false,
             "description": "MC2: PT filter (company ids, repeatable or comma list) — narrows the scope; a PT outside the caller's selection → 403 code COMPANY_NOT_ALLOWED (QA-MC4-14)",
             "name": "pt",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "ADR 0023: site id (kantor cabang) — narrows the scope (requests/projects through the project's site, cash through the account's site, attendance through the row's site); never widens."
+            },
+            "required": false,
+            "description": "ADR 0023: site id (kantor cabang) — narrows the scope (requests/projects through the project's site, cash through the account's site, attendance through the row's site); never widens.",
+            "name": "site",
             "in": "query"
           },
           {
@@ -28892,6 +29538,16 @@ export const openapiDocument = {
           {
             "schema": {
               "type": "string",
+              "description": "ADR 0023: site id (kantor cabang) — narrows the scope (requests/projects through the project's site, cash through the account's site, attendance through the row's site); never widens."
+            },
+            "required": false,
+            "description": "ADR 0023: site id (kantor cabang) — narrows the scope (requests/projects through the project's site, cash through the account's site, attendance through the row's site); never widens.",
+            "name": "site",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
               "format": "uuid",
               "description": "Registered install id (APK)."
             },
@@ -29313,6 +29969,17 @@ export const openapiDocument = {
             },
             "required": false,
             "name": "cost_center_id",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{1,10}$",
+              "description": "ADR 0023: narrows to a site (its home-site employees and site assignments, attendance rows of the site)."
+            },
+            "required": false,
+            "description": "ADR 0023: narrows to a site (its home-site employees and site assignments, attendance rows of the site).",
+            "name": "site_id",
             "in": "query"
           },
           {
@@ -36461,6 +37128,17 @@ export const openapiDocument = {
           {
             "schema": {
               "type": "string",
+              "pattern": "^\\d{1,10}$",
+              "description": "ADR 0023: only projects of this site (narrows the read scope)."
+            },
+            "required": false,
+            "description": "ADR 0023: only projects of this site (narrows the read scope).",
+            "name": "site",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
               "format": "uuid",
               "description": "Registered install id (APK)."
             },
@@ -36705,6 +37383,133 @@ export const openapiDocument = {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/CostCenterList"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sites": {
+      "get": {
+        "summary": "ADR 0023: sites (kantor cabang) of the selected PTs (every member reads them; active only unless active=all) with the caller's flags home (Site penempatan), assigned (site assignment today) and team (PM on-behalf) — attendance location list",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 100,
+              "description": "Search in kode / nama (every word must match)."
+            },
+            "required": false,
+            "description": "Search in kode / nama (every word must match).",
+            "name": "q",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "1",
+                "all"
+              ],
+              "description": "Default active only; `all` includes deactivated ones."
+            },
+            "required": false,
+            "description": "Default active only; `all` includes deactivated ones.",
+            "name": "active",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9]\\d{0,8}(,[1-9]\\d{0,8})*$",
+              "description": "MC3: PT filter (comma separated ids). Only narrows the effective selection (X-Company-Ids / cookie ∩ memberships); a PT outside it → 403 COMPANY_NOT_ALLOWED."
+            },
+            "required": false,
+            "description": "MC3: PT filter (comma separated ids). Only narrows the effective selection (X-Company-Ids / cookie ∩ memberships); a PT outside it → 403 COMPANY_NOT_ALLOWED.",
+            "name": "company",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": true,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "APK version; below company minimum → 426."
+            },
+            "required": false,
+            "description": "APK version; below company minimum → 426.",
+            "name": "X-App-Version",
+            "in": "header"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sites",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SiteList"
                 }
               }
             }
