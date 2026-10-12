@@ -422,6 +422,7 @@ const ROUTE_CLASSES: Record<string, RouteClass> = {
   'GET /projects': 'selection',
   'GET /projects/:id': 'document',
   'GET /cost-centers': 'selection',
+  'GET /sites': 'selection', // ADR 0023
   'GET /projects/:id/rap.xlsx': 'document',
   'POST /projects/:id/rap/items': 'document',
   'PATCH /rap-items/:id': 'document',

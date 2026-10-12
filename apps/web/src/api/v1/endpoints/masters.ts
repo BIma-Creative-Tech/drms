@@ -5,6 +5,8 @@ import type { CollectionSlug, PayloadRequest, Where } from 'payload'
 import { memberCompanies, relId } from '@/access/roles'
 import { withEffectiveRadius } from '@/domain/attendance/calendar'
 import { companyById } from '@/domain/companies'
+import { today } from '@/domain/expense/common'
+import { siteFlagsFor, type SiteFlags } from '@/domain/sites'
 
 import { companyQuery } from '../company-query'
 import { MASTER_TYPES, MastersQuery, SHARED_MASTER_TYPES, type MasterType } from '../schemas'
@@ -14,24 +16,26 @@ const LIMIT = 500
 
 /** type → collection + whitelisted fields (never internal/sensitive columns like odoo refs). */
 const MAP: Record<MasterType, { collection: CollectionSlug; fields: string[] }> = {
-  projects: { collection: 'projects', fields: ['code', 'name', 'kind', 'client', 'address', 'lat', 'lng', 'radiusM', 'pm', 'status', 'startDate', 'targetDate', 'progressPct'] },
+  projects: { collection: 'projects', fields: ['code', 'name', 'kind', 'client', 'site', 'address', 'lat', 'lng', 'radiusM', 'pm', 'status', 'startDate', 'targetDate', 'progressPct'] },
   'project-stages': { collection: 'project-stages', fields: ['project', 'name', 'weightPct', 'sequence', 'progressPct', 'active'] },
   'cost-centers': { collection: 'cost-centers', fields: ['code', 'name', 'type', 'manager', 'lat', 'lng', 'radiusM', 'active'] },
   'expense-categories': { collection: 'expense-categories', fields: ['code', 'name', 'defaultUom', 'allowedUoms', 'requiresVehicle', 'active'] },
   uoms: { collection: 'uoms', fields: ['code', 'name', 'category', 'active'] },
   vehicles: { collection: 'vehicles', fields: ['kind', 'displayName', 'unitCode', 'plateNo', 'plateDisplay', 'type', 'brandModel', 'owner', 'status', 'costCenter', 'project', 'active'] },
-  employees: { collection: 'employees', fields: ['code', 'name', 'nickname', 'position', 'active'] },
+  employees: { collection: 'employees', fields: ['code', 'name', 'nickname', 'position', 'homeSite', 'active'] },
   banks: { collection: 'banks', fields: ['code', 'name', 'active'] },
   'bank-accounts': { collection: 'employee-bank-accounts', fields: ['employee', 'bank', 'accountNo', 'accountHolder', 'isDefault', 'verificationStatus', 'active'] },
   'work-schedules': { collection: 'work-schedules', fields: ['name', 'startTime', 'endTime', 'lateToleranceMin', 'workDays', 'active'] },
   holidays: { collection: 'holidays', fields: ['date', 'name'] },
-  'team-assignments': { collection: 'team-assignments', fields: ['employee', 'project', 'costCenter', 'roleInProject', 'startDate', 'endDate'] },
+  'team-assignments': { collection: 'team-assignments', fields: ['employee', 'project', 'costCenter', 'site', 'roleInProject', 'startDate', 'endDate'] },
   // MC3-1: receipt vendor picker (vendor_id) and Kas "sumber kas masuk" — per PT, read access of the collection
   vendors: { collection: 'vendors', fields: ['name', 'contact', 'active'] },
   'cash-in-sources': { collection: 'cash-in-sources', fields: ['code', 'name', 'active'] },
   'urgency-levels': { collection: 'urgency-levels', fields: ['code', 'name', 'rank', 'active'] },
   // FR1: customers (collection access: office roles + PM; Staff only when assigned to an aftersales project of the PT)
   clients: { collection: 'clients', fields: ['name', 'contact', 'phone', 'active'] },
+  // ADR 0023: kantor cabang (every member of the PT reads them) + per-caller flags home / assigned / team (siteFlagsFor)
+  sites: { collection: 'sites', fields: ['code', 'name', 'address', 'lat', 'lng', 'radiusM', 'costCenter', 'defaultWorkSchedule', 'active'] },
 }
 
 const SHARED: ReadonlySet<MasterType> = new Set(SHARED_MASTER_TYPES)
@@ -66,7 +70,19 @@ async function loadType(req: PayloadRequest, type: MasterType, companies: number
       req,
     })
     let items = res.docs.map((d) => pick(d as unknown as Record<string, unknown>, fields, shared))
-    if (type === 'projects' || type === 'cost-centers') {
+    if (type === 'sites') {
+      // ADR 0023 §6: the caller's own check-in sites (home site / active site assignment) and on-behalf sites (team)
+      const flags = new Map<number, SiteFlags>()
+      for (const i of items) {
+        const c = i.company as number
+        if (!flags.has(c)) flags.set(c, await siteFlagsFor(req, c, await today(req, c)))
+        const f = flags.get(c)!
+        i.home = f.home === i.id
+        i.assigned = f.assigned.has(i.id as number)
+        i.team = f.team.has(i.id as number)
+      }
+    }
+    if (type === 'projects' || type === 'cost-centers' || type === 'sites') {
       // default geofence radius of EACH item's PT (ADR 0016 §1: per-PT setting)
       const out: Item[] = []
       for (const i of items) out.push(typeof i.company === 'number' ? withEffectiveRadius(i, (await companyById(req, i.company)).defaultGeofenceRadiusM) : i)

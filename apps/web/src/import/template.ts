@@ -13,7 +13,7 @@ import { writeXlsx, type WriteCell, type WriteSheet } from './xlsx-io'
 export type SheetRows = Partial<Record<Exclude<SheetKey, 'pengaturan'>, Array<Record<string, string | number | null>>>>
 export type WorkbookContent = { settings: Record<string, string | number>; rows: SheetRows }
 
-export const TEMPLATE_VERSION = 'MC2-5'
+export const TEMPLATE_VERSION = 'MC2-5 + Site (ADR 0023)'
 
 const V = (v: string | number | null | undefined): WriteCell => (v === null || v === undefined || v === '' ? null : v)
 

@@ -49,9 +49,7 @@ UserProfile userProfileFromJson(Json j) {
     serverDisplayName: _strN(j['displayName']),
     roles: roles,
     capabilities: _capabilities(caps, roles),
-    employee: emp == null
-        ? null
-        : Employee(id: _int(emp['id']), code: '${emp['code'] ?? ''}', name: '${emp['name'] ?? ''}'),
+    employee: emp == null ? null : _employee(emp),
     timezone: '${settings['timezone'] ?? 'Asia/Makassar'}',
     minAppVersion: _strN(settings['minAppVersion']),
     imageTargets: targets == null
@@ -94,9 +92,7 @@ CompanyMembership companyMembershipFromJson(Json j) {
     name: '${j['name'] ?? ''}',
     timezone: '${j['timezone'] ?? 'Asia/Makassar'}',
     roles: roles,
-    employee: emp != null
-        ? Employee(id: _int(emp['id']), code: '${emp['code'] ?? ''}', name: '${emp['name'] ?? ''}')
-        : (empId == null ? null : Employee(id: empId, code: '', name: '')),
+    employee: emp != null ? _employee(emp) : (empId == null ? null : Employee(id: empId, code: '', name: '')),
     capabilities: _capabilities(_map(j['capabilities']), roles),
     settings: CompanySettings(
       defaultGeofenceRadiusM: _int(s['defaultGeofenceRadiusM'], 100),
@@ -601,4 +597,18 @@ String offsetString(Duration d) {
   final sign = d.isNegative ? '-' : '+';
   final a = d.abs();
   return '$sign${a.inHours.toString().padLeft(2, '0')}:${(a.inMinutes % 60).toString().padLeft(2, '0')}';
+}
+
+/// `/me` `EmployeeRef` (+ ADR 0023 `homeSite: {id, code, name} | null`; absent on servers before sites).
+Employee _employee(Map<String, dynamic> emp) {
+  final site = _map(emp['homeSite']);
+  final code = '${site?['code'] ?? ''}';
+  final name = '${site?['name'] ?? ''}';
+  return Employee(
+    id: _int(emp['id']),
+    code: '${emp['code'] ?? ''}',
+    name: '${emp['name'] ?? ''}',
+    homeSiteId: site == null ? null : _intN(site['id']),
+    homeSiteLabel: site == null ? null : (code.isEmpty ? name : (name.isEmpty ? code : '$code — $name')),
+  );
 }

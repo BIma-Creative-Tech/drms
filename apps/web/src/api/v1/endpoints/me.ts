@@ -1,6 +1,6 @@
 import type { PayloadRequest } from 'payload'
 
-import { companyContextOf, membershipsOf, userRoles, type Membership, type Role } from '@/access/roles'
+import { companyContextOf, membershipsOf, relId, userRoles, type Membership, type Role } from '@/access/roles'
 import { appSettings, companyById, settings } from '@/domain/companies'
 import { resolveDisplayName } from '@/domain/user-display-name'
 import { privacyStatusOf } from '@/legal/privacy-notice'
@@ -55,7 +55,8 @@ export function legacyCompanyOf(selected: readonly Membership[]): number | null 
   return (sorted.find((m) => m.employee !== null) ?? sorted[0])?.company ?? null
 }
 
-type EmployeeRef = { id: number; code: string; name: string }
+type SiteRef = { id: number; code: string; name: string }
+type EmployeeRef = { id: number; code: string; name: string; homeSite: SiteRef | null }
 
 async function employeeRefs(req: PayloadRequest, ids: number[]): Promise<Map<number, EmployeeRef>> {
   const out = new Map<number, EmployeeRef>()
@@ -65,11 +66,19 @@ async function employeeRefs(req: PayloadRequest, ids: number[]): Promise<Map<num
     where: { id: { in: ids } },
     depth: 0,
     pagination: false,
-    select: { code: true, name: true },
+    select: { code: true, name: true, homeSite: true },
     overrideAccess: true, // SYSTEM-READ: the caller's OWN membership employees (ids from the auth context)
     req,
   })
-  for (const e of res.docs as unknown as EmployeeRef[]) out.set(e.id, { id: e.id, code: e.code, name: e.name })
+  const docs = res.docs as unknown as Array<{ id: number; code: string; name: string; homeSite?: unknown }>
+  // ADR 0023: "Site penempatan" of the own employee (profile + APK attendance picker hint)
+  const siteIds = [...new Set(docs.map((e) => relId(e.homeSite)).filter((x): x is number => x !== undefined))]
+  const sites = new Map<number, SiteRef>()
+  if (siteIds.length) {
+    const r = await req.payload.find({ collection: 'sites', where: { id: { in: siteIds } }, depth: 0, pagination: false, select: { code: true, name: true }, overrideAccess: true /* SYSTEM-READ: home sites of the caller's own employees */, req })
+    for (const x of r.docs as unknown as SiteRef[]) sites.set(x.id, { id: x.id, code: x.code, name: x.name })
+  }
+  for (const e of docs) out.set(e.id, { id: e.id, code: e.code, name: e.name, homeSite: sites.get(relId(e.homeSite) ?? -1) ?? null })
   return out
 }
 

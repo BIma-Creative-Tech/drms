@@ -1,4 +1,4 @@
-import { APIError, type CollectionBeforeChangeHook, type CollectionSlug, type PayloadRequest, type RelationshipField } from 'payload'
+import { APIError, type CollectionBeforeChangeHook, type CollectionSlug, type PayloadRequest, type RelationshipField, type Where } from 'payload'
 
 import { PENDING_CREATE_ROLES } from '@/access/policies'
 import { hasRole, relId, soleCompany, type Role } from '@/access/roles'
@@ -176,4 +176,14 @@ export function requireCompanyWhenAmbiguous(
   if (value !== null && value !== undefined && value !== '') return true
   if (opts.operation !== 'create' || !opts.req?.user) return true
   return soleCompany(opts.req as never) === undefined ? 'PT wajib dipilih: Anda memilih lebih dari satu PT (atau belum punya PT).' : true
+}
+
+/**
+ * ADR 0023: `filterOptions` of a `site` picker — ACTIVE sites of the document's PT (an inactive site is not
+ * selectable; a stored one stays). Use with `pickerSameCompany()` (no save-time re-validation; the company hook +
+ * DB trigger `pk_same_company` keep cross-PT values impossible).
+ */
+export const siteOptions = (args: { data?: unknown }): Where => {
+  const same = sameCompanyOptions(args)
+  return same === true ? { active: { not_equals: false } } : { and: [same, { active: { not_equals: false } }] }
 }

@@ -42,6 +42,7 @@ type AttendanceRaw = {
   kind: 'check_in' | 'check_out'
   project?: unknown
   costCenter?: unknown
+  site?: unknown
   localDate: string
   attendanceTime: string
 }
@@ -73,6 +74,8 @@ export async function correctAttendance(req: PayloadRequest, attendanceId: numbe
 
   const project = relId(att.project)
   const costCenter = relId(att.costCenter)
+  // ADR 0023: a site check-in has neither project nor cost center (a project row also carries its project's site)
+  const site = project === undefined && costCenter === undefined ? relId(att.site) : undefined
   // ADR 0016 §5: every role check IN THE ATTENDANCE's PT (Admin of PT A is nobody in PT B)
   const company = relId((att as { company?: unknown }).company)
   const emps = ownEmployees(req)
@@ -80,7 +83,9 @@ export async function correctAttendance(req: PayloadRequest, attendanceId: numbe
   if (isOwn) await deny(req, attendanceId, 'Tidak dapat mengoreksi absensi Anda sendiri.')
   if (!hasRole(req, 'pk-admin', company)) {
     const scope = hasRole(req, 'pk-pm', company) ? await resolveScope(req, company ?? null) : null
-    const inTeam = !!scope && ((project !== undefined && scope.teamProjects.includes(project)) || (costCenter !== undefined && scope.teamCostCenters.includes(costCenter)))
+    const inTeam =
+      !!scope &&
+      ((project !== undefined && scope.teamProjects.includes(project)) || (costCenter !== undefined && scope.teamCostCenters.includes(costCenter)) || (site !== undefined && scope.teamSites.includes(site)))
     if (!inTeam) {
       // Readable (office roles of that PT) → 403 + audit; not readable at all (other team / PT, staff) → 404, no existence leak.
       if (hasRole(req, ['pk-owner', 'pk-finance'], company)) await deny(req, attendanceId, 'Koreksi absensi hanya oleh PM tim atau Admin.')
@@ -99,7 +104,7 @@ export async function correctAttendance(req: PayloadRequest, attendanceId: numbe
   const oldTime = await effectiveTime(req, att.id, att.attendanceTime)
   if (new Date(oldTime).getTime() === newTime.getTime()) throw new APIError('Jam baru sama dengan jam saat ini.', 400, null, true)
 
-  const loc: Location = project !== undefined ? { type: 'project', id: project } : { type: 'cost_center', id: costCenter! }
+  const loc: Location = project !== undefined ? { type: 'project', id: project } : costCenter !== undefined ? { type: 'cost_center', id: costCenter } : { type: 'site', id: site! }
   const day = await dayRowsAt(req, relId(att.employee)!, loc, att.localDate)
   const other = day.find((r) => r.kind !== att.kind)
   if (other) {

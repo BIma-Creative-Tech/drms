@@ -30,6 +30,8 @@ export type DbKeys = {
   uoms: Set<string>
   categories: PtKeys
   costCenters: PtKeys
+  /** ADR 0023: sites (kantor cabang) per PT. */
+  sites: PtKeys
   projects: PtKeys
   /** user id → PT codes with an ACTIVE membership (PM / cost-center manager must be a member there). */
   membershipsByUser: Map<number, Set<string>>
@@ -58,6 +60,7 @@ export function emptyDbKeys(): DbKeys {
     uoms: new Set(),
     categories: new Map(),
     costCenters: new Map(),
+    sites: new Map(),
     projects: new Map(),
     membershipsByUser: new Map(),
     usersByEmail: new Map(),
@@ -134,6 +137,7 @@ export function resolveReferences(data: ImportData, db: DbKeys, kcMap: ReadonlyM
   withPt('pengguna', data.users.filter((u) => u.roles.length > 0 || u.pt !== null))
   withPt('rekening', data.bankAccounts)
   withPt('pusatBiaya', data.costCenters)
+  withPt('site', data.sites)
   withPt('project', data.projects)
   withPt('tahapan', data.stages)
   withPt('rab', data.budgetLines)
@@ -157,6 +161,7 @@ export function resolveReferences(data: ImportData, db: DbKeys, kcMap: ReadonlyM
   const categories = pool(data.categories, (c: { code: string }) => c.code, db.categories)
   const costCenters = pool(data.costCenters, (c: { code: string }) => c.code, db.costCenters)
   const projects = pool(data.projects, (p: { code: string }) => p.code, db.projects)
+  const sites = pool(data.sites, (x: { code: string }) => x.code, db.sites)
   const set = (wb: Iterable<string>, dbSet: Set<string>) => new Set([...wb, ...dbSet])
   const banks = set(
     data.banks.map((b) => b.code),
@@ -193,6 +198,16 @@ export function resolveReferences(data: ImportData, db: DbKeys, kcMap: ReadonlyM
     need('kategori', c._row, 'satuan_default', c.defaultUom, uoms, 'Satuan', 'Satuan')
     for (const u of c.allowedUoms) need('kategori', c._row, 'satuan_wajar', u, uoms, 'Satuan', 'Satuan')
   }
+  // ADR 0023: site links (same PT; workbook sheet Site or an existing site)
+  for (const x of data.sites) needIn('site', x, x._row, 'kode_pusat_biaya', x.costCenterCode, costCenters, 'Pusat biaya', 'PusatBiaya')
+  for (const e of data.employees) needIn('karyawan', e, e._row, 'kode_site', e.siteCode, sites, 'Site', 'Site')
+  for (const p of data.projects) needIn('project', p, p._row, 'kode_site', p.siteCode, sites, 'Site', 'Site')
+  for (const a of data.cashAccounts) needIn('akunKas', a, a._row, 'kode_site', a.siteCode, sites, 'Site', 'Site')
+  for (const x of data.sites) {
+    // the default cost center of a site is an operational one (DB trigger pk_site_cost_center_operational)
+    const cc = x.costCenterCode ? data.costCenters.find((c) => c.code === x.costCenterCode && P(c) === P(x)) : undefined
+    if (cc && cc.type !== 'operational') issues.push({ level: 'error', sheet: SHEET_BY_KEY.site.name, row: x._row, column: 'kode_pusat_biaya', message: `Pusat biaya "${cc.code}" bukan jenis Operasional — pusat biaya default site harus operasional.` })
+  }
   for (const u of data.users) needIn('pengguna', u, u._row, 'kode_karyawan', u.employeeCode, employees, 'Karyawan', 'Karyawan')
   for (const a of data.access) needIn('aksesPt', a, a._row, 'kode_karyawan', a.employeeCode, employees, 'Karyawan', 'Karyawan')
   for (const a of data.bankAccounts) {
@@ -212,6 +227,7 @@ export function resolveReferences(data: ImportData, db: DbKeys, kcMap: ReadonlyM
     needIn('penugasan', a, a._row, 'kode_karyawan', a.employeeCode, employees, 'Karyawan', 'Karyawan')
     needIn('penugasan', a, a._row, 'kode_project', a.projectCode, projects, 'Project', 'Project')
     needIn('penugasan', a, a._row, 'kode_pusat_biaya', a.costCenterCode, costCenters, 'Pusat biaya', 'PusatBiaya')
+    needIn('penugasan', a, a._row, 'kode_site', a.siteCode, sites, 'Site', 'Site')
   }
   // one account per (user, PT): Pengguna row PT + AksesPT rows; one employee per account per PT
   {

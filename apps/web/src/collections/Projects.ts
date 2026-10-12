@@ -10,7 +10,7 @@ import { reasonOnChange, withAudit } from '@/audit/hooks'
 import { PROJECT_KIND_LABELS, PROJECT_KINDS } from '@/domain/field/rules'
 import { progressWriteGuard } from '@/domain/progress/guards'
 import { codeField, odooRefField, percentField, rupiahField, uuidField } from '@/fields/common'
-import { companyField, companyHook, pickerSameCompany } from '@/fields/company'
+import { companyField, companyHook, pickerSameCompany, siteOptions } from '@/fields/company'
 import { userPicker } from '@/fields/users'
 
 export const PROJECT_STATUSES = [
@@ -70,7 +70,7 @@ export const Projects: CollectionConfig = withAudit(
     slug: 'projects',
     labels: { singular: 'Project', plural: 'Project' },
     // DRMS 10/10 point 7: tabs Proyek (form) / RAP / Pengajuan (admin/config.ts PROJECT_TABS)
-    admin: { useAsTitle: 'name', group: 'Proyek', defaultColumns: ['code', 'name', 'client', 'pm', 'status'], components: { views: { edit: PROJECT_TABS } } },
+    admin: { useAsTitle: 'name', group: 'Proyek', defaultColumns: ['code', 'name', 'client', 'site', 'pm', 'status'], components: { views: { edit: PROJECT_TABS } } },
     access: {
       read: byRole({
         'pk-admin': true,
@@ -90,7 +90,7 @@ export const Projects: CollectionConfig = withAudit(
       delete: denyAll,
     },
     hooks: {
-      beforeChange: [companyHook('projects', { check: [{ field: 'client', collection: 'clients' }, { field: 'pm', collection: 'users', member: true }, { field: 'costCenter', collection: 'cost-centers' }] }), kindChangeGuard],
+      beforeChange: [companyHook('projects', { check: [{ field: 'client', collection: 'clients' }, { field: 'pm', collection: 'users', member: true }, { field: 'costCenter', collection: 'cost-centers' }, { field: 'site', collection: 'sites' }] }), kindChangeGuard],
       beforeOperation: [progressWriteGuard('projects'), readOnlyFieldsGuard('projects', (req, company) => hasRole(req, PROJECT_EDITOR_ROLES, company), 'Direktur, Admin, atau PM')],
     },
     fields: [
@@ -114,6 +114,19 @@ export const Projects: CollectionConfig = withAudit(
         },
       },
       { name: 'client', type: 'relationship', relationTo: 'clients', label: 'Klien', access: { update: projectEditors } },
+      // ADR 0023 (Q-S1): the branch office (site) that handles the project — at most one; same PT (companyHook + DB
+      // trigger). Report / dashboard filter "Site"; the project keeps its own attendance point (no fallback to the site).
+      {
+        name: 'site',
+        type: 'relationship',
+        relationTo: 'sites',
+        label: 'Site',
+        index: true,
+        access: { update: projectEditors },
+        ...pickerSameCompany(),
+        filterOptions: siteOptions,
+        admin: { placeholder: 'Pilih site…', description: 'Kantor cabang yang menangani project ini (opsional).' },
+      },
       { name: 'address', type: 'textarea', label: 'Alamat', maxLength: 500 },
       {
         type: 'row',

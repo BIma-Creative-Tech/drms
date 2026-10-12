@@ -107,6 +107,14 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 title: Text(t.profileEmployee),
                 subtitle: Text('${p.employee!.code} — ${p.employee!.name}'),
               ),
+            // ADR 0023: the branch office the employee is stationed at (default attendance location)
+            if (p.employee?.homeSiteLabel != null)
+              ListTile(
+                key: const Key('profile-home-site'),
+                leading: const Icon(Icons.home_work),
+                title: Text(t.siteHome),
+                subtitle: Text(p.employee!.homeSiteLabel!),
+              ),
           ],
           ListTile(
             leading: const Icon(Icons.info_outline),

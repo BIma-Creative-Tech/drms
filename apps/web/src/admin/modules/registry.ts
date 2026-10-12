@@ -245,7 +245,7 @@ export const MODULES: readonly ModuleDef[] = [
     icon: 'master',
     hint: 'Bank, satuan, vendor',
     manage: true,
-    sections: [{ items: [{ collection: 'banks' }, { collection: 'uoms' }, { collection: 'expense-categories' }, { collection: 'urgency-levels' }, { collection: 'vehicles' }, { collection: 'vendors' }] }],
+    sections: [{ items: [{ collection: 'banks' }, { collection: 'uoms' }, { collection: 'expense-categories' }, { collection: 'urgency-levels' }, { collection: 'vehicles' }, { collection: 'vendors' }, { collection: 'sites' }] }],
   },
   {
     id: 'media',
@@ -555,6 +555,7 @@ export const ITEM_ICONS: Readonly<Record<string, IconName>> = {
   '/collections/urgency-levels': 'tDanger',
   '/collections/vehicles': 'tCar',
   '/collections/vendors': 'tShop',
+  '/collections/sites': 'tBuilding',
   // Media
   '/collections/media-receipts': 'tReceipt2',
   '/collections/media-transfer-proofs': 'tCardReceive',

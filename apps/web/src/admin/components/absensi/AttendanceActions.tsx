@@ -447,7 +447,11 @@ export function GeofenceForm({ costCenterId, name, lat, lng, radiusM, defaultRad
   )
 }
 
-export type SelfCheckLocation = { type: 'project' | 'cost_center'; id: number; label: string; checkIn: string | null; checkOut: string | null }
+/** ADR 0023: `site` = kantor cabang (assigned or the home site, `home` = "Site penempatan"). */
+export type SelfCheckLocation = { type: 'project' | 'cost_center' | 'site'; id: number; label: string; checkIn: string | null; checkOut: string | null; home?: boolean }
+
+const LOC_FIELD: Record<SelfCheckLocation['type'], string> = { project: 'project_id', cost_center: 'cost_center_id', site: 'site_id' }
+const LOC_KIND: Record<SelfCheckLocation['type'], string> = { project: 'Project', cost_center: 'Pusat biaya', site: 'Site (kantor cabang)' }
 
 function getPosition(): Promise<GeolocationPosition> {
   return new Promise((resolve, reject) => {
@@ -488,7 +492,7 @@ export function SelfCheckForm({ locations, privacyBlocked }: { locations: SelfCh
       const pos = await getPosition()
       const selfieId = await uploadSelfie(file)
       const body = {
-        [loc.type === 'project' ? 'project_id' : 'cost_center_id']: loc.id,
+        [LOC_FIELD[loc.type]]: loc.id,
         lat: pos.coords.latitude,
         lng: pos.coords.longitude,
         accuracy_m: pos.coords.accuracy ?? null,
@@ -506,7 +510,7 @@ export function SelfCheckForm({ locations, privacyBlocked }: { locations: SelfCh
     }
   }
 
-  if (locations.length === 0) return <EmptyStateInline text="Anda belum ditugaskan ke project/pusat biaya manapun. Hubungi Admin untuk penugasan (Team Assignment)." />
+  if (locations.length === 0) return <EmptyStateInline text="Anda belum ditugaskan ke project/pusat biaya/site manapun dan belum punya site penempatan. Hubungi Admin untuk penugasan (Team Assignment)." />
   if (privacyBlocked) {
     return (
       <p className="pk-kerr" role="alert">
@@ -529,7 +533,7 @@ export function SelfCheckForm({ locations, privacyBlocked }: { locations: SelfCh
               <input type="radio" name="self-check-loc" value={key} checked={locKey === key} onChange={() => setLocKey(key)} />
               <span className="name">
                 {l.label}
-                <span className="sub">{l.type === 'project' ? 'Project' : 'Pusat biaya'}</span>
+                <span className="sub">{l.home ? 'Site penempatan' : LOC_KIND[l.type]}</span>
               </span>
               <span className="st">{l.checkOut ? `Selesai · pulang ${l.checkOut}` : l.checkIn ? `Masuk ${l.checkIn}` : 'Belum absen'}</span>
             </label>

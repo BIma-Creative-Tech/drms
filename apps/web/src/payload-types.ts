@@ -91,6 +91,7 @@ export interface Config {
     'urgency-levels': UrgencyLevel;
     vehicles: Vehicle;
     'cost-centers': CostCenter;
+    sites: Site;
     'document-sequences': DocumentSequence;
     'expense-requests': ExpenseRequest;
     'expense-line-snapshots': ExpenseLineSnapshot;
@@ -159,6 +160,7 @@ export interface Config {
     'urgency-levels': UrgencyLevelsSelect<false> | UrgencyLevelsSelect<true>;
     vehicles: VehiclesSelect<false> | VehiclesSelect<true>;
     'cost-centers': CostCentersSelect<false> | CostCentersSelect<true>;
+    sites: SitesSelect<false> | SitesSelect<true>;
     'document-sequences': DocumentSequencesSelect<false> | DocumentSequencesSelect<true>;
     'expense-requests': ExpenseRequestsSelect<false> | ExpenseRequestsSelect<true>;
     'expense-line-snapshots': ExpenseLineSnapshotsSelect<false> | ExpenseLineSnapshotsSelect<true>;
@@ -554,12 +556,90 @@ export interface Employee {
    */
   userAccount?: (number | null) | User;
   phone?: string | null;
+  /**
+   * Kosong = jadwal default site penempatan, lalu jadwal default perusahaan.
+   */
   workSchedule?: (number | null) | WorkSchedule;
+  /**
+   * Kantor cabang tempat karyawan ditempatkan (opsional): boleh absen di site ini tanpa penugasan tim.
+   */
+  homeSite?: (number | null) | Site;
   faceRefPhoto?: (number | null) | MediaSelfy;
   /**
    * Referensi Odoo (diisi otomatis saat sinkronisasi ke Odoo).
    */
   odooEmployeeRef?: string | null;
+  active?: boolean | null;
+  uuid?: string | null;
+  /**
+   * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
+   */
+  changeReason?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * Kantor cabang PT (mis. Cabang Balikpapan). Satu site menangani beberapa project; absensi kantor cabang memakai titik + radius site.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "sites".
+ */
+export interface Site {
+  id: number;
+  /**
+   * Wajib bila Anda memilih lebih dari satu PT di pemilih PT; tidak dapat diubah setelah dibuat.
+   */
+  company?: (number | null) | Company;
+  code: string;
+  name: string;
+  address?: string | null;
+  lat?: number | null;
+  lng?: number | null;
+  /**
+   * Kosong = radius default perusahaan (Setting perusahaan). Tanpa titik = absensi di site ini belum bisa.
+   */
+  radiusM?: number | null;
+  /**
+   * Untuk karyawan dengan site penempatan ini yang tidak punya jadwal sendiri. Kosong = jadwal default perusahaan.
+   */
+  defaultWorkSchedule?: (number | null) | WorkSchedule;
+  /**
+   * Pusat biaya operasional kantor cabang; diusulkan ke Finance untuk project site ini yang belum punya pusat biaya.
+   */
+  costCenter?: (number | null) | CostCenter;
+  active?: boolean | null;
+  uuid?: string | null;
+  /**
+   * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
+   */
+  changeReason?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "cost-centers".
+ */
+export interface CostCenter {
+  id: number;
+  /**
+   * Wajib bila Anda memilih lebih dari satu PT di pemilih PT; tidak dapat diubah setelah dibuat.
+   */
+  company?: (number | null) | Company;
+  code: string;
+  name: string;
+  type: 'operational' | 'department';
+  manager?: (number | null) | User;
+  lat?: number | null;
+  lng?: number | null;
+  /**
+   * Kosong = radius default perusahaan (Setting perusahaan).
+   */
+  radiusM?: number | null;
+  /**
+   * Referensi Odoo (diisi otomatis saat sinkronisasi ke Odoo).
+   */
+  odooAnalyticRef?: string | null;
   active?: boolean | null;
   uuid?: string | null;
   /**
@@ -717,6 +797,10 @@ export interface Project {
    */
   kind?: ('umum' | 'konstruksi' | 'kontrak_unit' | 'aftersales' | 'trading') | null;
   client?: (number | null) | Client;
+  /**
+   * Kantor cabang yang menangani project ini (opsional).
+   */
+  site?: (number | null) | Site;
   address?: string | null;
   lat?: number | null;
   lng?: number | null;
@@ -741,39 +825,6 @@ export interface Project {
    * Referensi Odoo (diisi otomatis saat sinkronisasi ke Odoo).
    */
   odooAnalyticRef?: string | null;
-  uuid?: string | null;
-  /**
-   * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
-   */
-  changeReason?: string | null;
-  updatedAt: string;
-  createdAt: string;
-}
-/**
- * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "cost-centers".
- */
-export interface CostCenter {
-  id: number;
-  /**
-   * Wajib bila Anda memilih lebih dari satu PT di pemilih PT; tidak dapat diubah setelah dibuat.
-   */
-  company?: (number | null) | Company;
-  code: string;
-  name: string;
-  type: 'operational' | 'department';
-  manager?: (number | null) | User;
-  lat?: number | null;
-  lng?: number | null;
-  /**
-   * Kosong = radius default perusahaan (Setting perusahaan).
-   */
-  radiusM?: number | null;
-  /**
-   * Referensi Odoo (diisi otomatis saat sinkronisasi ke Odoo).
-   */
-  odooAnalyticRef?: string | null;
-  active?: boolean | null;
   uuid?: string | null;
   /**
    * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
@@ -949,6 +1000,10 @@ export interface CashAccount {
    * Tanggal go-live akun ini. Transaksi kas sebelum tanggal ini ditolak; saldo awal terkunci setelah periode sejak tanggal ini ditutup. Kosong = tanpa kunci.
    */
   openingBalanceDate?: string | null;
+  /**
+   * Opsional: kas kecil / rekening kantor cabang ini (saldo per site di dashboard).
+   */
+  site?: (number | null) | Site;
   odooJournalCode?: string | null;
   active?: boolean | null;
   uuid?: string | null;
@@ -972,6 +1027,7 @@ export interface TeamAssignment {
   employee: number | Employee;
   project?: (number | null) | Project;
   costCenter?: (number | null) | CostCenter;
+  site?: (number | null) | Site;
   roleInProject: 'pm' | 'staff' | 'mandor';
   startDate?: string | null;
   endDate?: string | null;
@@ -2227,6 +2283,7 @@ export interface Attendance {
   kind: 'check_in' | 'check_out';
   project?: (number | null) | Project;
   costCenter?: (number | null) | CostCenter;
+  site?: (number | null) | Site;
   source: 'self' | 'pm';
   recordedBy?: (number | null) | User;
   onBehalfReason?: string | null;
@@ -2825,6 +2882,10 @@ export interface PayloadLockedDocument {
         value: number | CostCenter;
       } | null)
     | ({
+        relationTo: 'sites';
+        value: number | Site;
+      } | null)
+    | ({
         relationTo: 'document-sequences';
         value: number | DocumentSequence;
       } | null)
@@ -3087,6 +3148,7 @@ export interface EmployeesSelect<T extends boolean = true> {
   userAccount?: T;
   phone?: T;
   workSchedule?: T;
+  homeSite?: T;
   faceRefPhoto?: T;
   odooEmployeeRef?: T;
   active?: T;
@@ -3171,6 +3233,7 @@ export interface ProjectsSelect<T extends boolean = true> {
   name?: T;
   kind?: T;
   client?: T;
+  site?: T;
   address?: T;
   lat?: T;
   lng?: T;
@@ -3285,6 +3348,7 @@ export interface CashAccountsSelect<T extends boolean = true> {
   accountHolder?: T;
   openingBalance?: T;
   openingBalanceDate?: T;
+  site?: T;
   odooJournalCode?: T;
   active?: T;
   uuid?: T;
@@ -3301,6 +3365,7 @@ export interface TeamAssignmentsSelect<T extends boolean = true> {
   employee?: T;
   project?: T;
   costCenter?: T;
+  site?: T;
   roleInProject?: T;
   startDate?: T;
   endDate?: T;
@@ -3465,6 +3530,26 @@ export interface CostCentersSelect<T extends boolean = true> {
   lng?: T;
   radiusM?: T;
   odooAnalyticRef?: T;
+  active?: T;
+  uuid?: T;
+  changeReason?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "sites_select".
+ */
+export interface SitesSelect<T extends boolean = true> {
+  company?: T;
+  code?: T;
+  name?: T;
+  address?: T;
+  lat?: T;
+  lng?: T;
+  radiusM?: T;
+  defaultWorkSchedule?: T;
+  costCenter?: T;
   active?: T;
   uuid?: T;
   changeReason?: T;
@@ -4054,6 +4139,7 @@ export interface AttendancesSelect<T extends boolean = true> {
   kind?: T;
   project?: T;
   costCenter?: T;
+  site?: T;
   source?: T;
   recordedBy?: T;
   onBehalfReason?: T;

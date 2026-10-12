@@ -29,7 +29,7 @@ export const SAMPLE: WorkbookContent = {
       { kode_pt: 'DRMS', kode: 'CTH-003', nama: 'Candra Contoh', nama_panggilan: 'Candra', jabatan: 'Project Manager', no_hp: '081200000003', aktif: 'Ya' },
       { kode_pt: 'DRMS', kode: 'CTH-004', nama: 'Dewi Fiktif', nama_panggilan: 'Dewi', jabatan: 'Staff lapangan', no_hp: '081200000004', aktif: 'Ya' },
       { kode_pt: 'DRMS', kode: 'CTH-005', nama: 'Eko Contoh', nama_panggilan: 'Eko', jabatan: 'Mandor', no_hp: null, aktif: 'Ya' },
-      { kode_pt: 'DRMS', kode: 'CTH-006', nama: 'Fitri Fiktif', nama_panggilan: 'Fitri', jabatan: 'Admin', no_hp: null, aktif: 'Ya' },
+      { kode_pt: 'DRMS', kode: 'CTH-006', nama: 'Fitri Fiktif', nama_panggilan: 'Fitri', jabatan: 'Admin', no_hp: null, kode_site: 'CTH-CAB', aktif: 'Ya' },
     ],
     pengguna: [
       { kode_pt: 'DRMS', username: 'andi.contoh', email: 'andi@drms-contoh.test', nama: 'Andi Contoh', kode_karyawan: 'CTH-001', peran: 'Direktur', aktif: 'Ya' },
@@ -48,6 +48,8 @@ export const SAMPLE: WorkbookContent = {
       { kode_pt: 'DRMS', kode: 'CTH-OPS', nama: 'Ops Contoh Palangka (FIKTIF)', jenis: 'Operasional', penanggung_jawab: 'candra.contoh', latitude: -2.2101, longitude: 113.9202, radius_m: 150, aktif: 'Ya' },
       { kode_pt: 'DRMS', kode: 'CTH-KANTOR', nama: 'Kantor Contoh (FIKTIF)', jenis: 'Departemen', penanggung_jawab: 'andi.contoh', latitude: null, longitude: null, radius_m: null, aktif: 'Ya' },
     ],
+    // ADR 0023: a branch office (kantor cabang) with its point and default operational cost center
+    site: [{ kode_pt: 'DRMS', kode: 'CTH-CAB', nama: 'Cabang Contoh (FIKTIF)', alamat: 'Jl. Cabang Contoh No. 3, Kota Fiktif', latitude: -2.2105, longitude: 113.9208, radius_m: 120, kode_pusat_biaya: 'CTH-OPS', aktif: 'Ya' }],
     project: [
       {
         kode_pt: 'DRMS',
@@ -71,6 +73,7 @@ export const SAMPLE: WorkbookContent = {
         klien: 'PT Klien Contoh (FIKTIF)',
         alamat: null,
         pm: 'candra.contoh',
+        kode_site: 'CTH-CAB',
         latitude: -3.4402,
         longitude: 114.8303,
         radius_m: 300,
@@ -102,9 +105,10 @@ export const SAMPLE: WorkbookContent = {
       { kode_pt: 'DRMS', kode_karyawan: 'CTH-004', kode_project: 'CTH-PRJ-01', kode_pusat_biaya: null, peran: 'Staff', tanggal_mulai: '2026-11-01', tanggal_selesai: null },
       { kode_pt: 'DRMS', kode_karyawan: 'CTH-005', kode_project: 'CTH-PRJ-01', kode_pusat_biaya: null, peran: 'Mandor', tanggal_mulai: '2026-11-01', tanggal_selesai: null },
       { kode_pt: 'DRMS', kode_karyawan: 'CTH-004', kode_project: null, kode_pusat_biaya: 'CTH-OPS', peran: 'Staff', tanggal_mulai: null, tanggal_selesai: null },
+      { kode_pt: 'DRMS', kode_karyawan: 'CTH-005', kode_project: null, kode_pusat_biaya: null, kode_site: 'CTH-CAB', peran: 'Mandor', tanggal_mulai: '2026-11-01', tanggal_selesai: null },
     ],
     akunKas: [
-      { kode_pt: 'DRMS', nama: 'Kas Kecil Contoh (FIKTIF)', jenis: 'Kas', kode_bank: null, no_rekening: null, atas_nama: null, saldo_awal: 5000000, kode_jurnal_odoo: null, aktif: 'Ya' },
+      { kode_pt: 'DRMS', nama: 'Kas Kecil Contoh (FIKTIF)', jenis: 'Kas', kode_bank: null, no_rekening: null, atas_nama: null, saldo_awal: 5000000, kode_jurnal_odoo: null, kode_site: 'CTH-CAB', aktif: 'Ya' },
       { kode_pt: 'DRMS', nama: 'Bank Operasional Contoh (FIKTIF)', jenis: 'Bank', kode_bank: 'BCA', no_rekening: '9990001234', atas_nama: 'PT Contoh Fiktif', saldo_awal: 125750000, kode_jurnal_odoo: 'BNK1', aktif: 'Ya' },
     ],
   },

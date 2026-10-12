@@ -50,6 +50,7 @@ export type SheetKey =
   | 'aksesPt'
   | 'rekening'
   | 'pusatBiaya'
+  | 'site'
   | 'project'
   | 'tahapan'
   | 'rab'
@@ -101,6 +102,9 @@ const kodePt = (): ColSpec => ({
   ref: { sheet: 'perusahaan', col: 'kode_pt' },
   width: 10,
 })
+
+/** ADR 0023: optional link to a site (kantor cabang) of the row's PT — sheet Site or an existing site. Empty = unchanged. */
+const kodeSite = (hint: string): ColSpec => ({ key: 'kode_site', type: 'code', hint, ref: { sheet: 'site', col: 'kode' }, width: 12 })
 
 const aktif = (): ColSpec => ({ key: 'aktif', type: 'bool', hint: 'Ya/Tidak. Kosong = Ya.', options: { Ya: 'true', Tidak: 'false' }, width: 9 })
 const coord = (): ColSpec[] => [
@@ -191,6 +195,7 @@ export const SHEETS: SheetSpec[] = [
       { key: 'nama_panggilan', type: 'text', maxLength: 64, hint: 'Opsional.', width: 14 },
       { key: 'jabatan', type: 'text', maxLength: 128, hint: 'Opsional, mis. Mandor, Driver.', width: 18 },
       { key: 'no_hp', type: 'phone', hint: 'Opsional, mis. 0812xxxx (format teks).', width: 16 },
+      kodeSite('Opsional: site penempatan (sheet Site, PT yang sama) — boleh absen di site ini tanpa penugasan. Kosong = tidak diubah.'),
       aktif(),
     ],
   },
@@ -260,6 +265,23 @@ export const SHEETS: SheetSpec[] = [
     ],
   },
   {
+    key: 'site',
+    name: 'Site',
+    title: 'Site (kantor cabang)',
+    description:
+      'Kantor cabang PT (ADR 0023), mis. "Cabang Balikpapan": satu site menangani beberapa project. Koordinat = titik absen kantor cabang; pusat biaya default = pusat biaya operasional cabang. Dihubungkan lewat kolom kode_site di sheet Karyawan, Project, Penugasan dan AkunKas.',
+    naturalKey: ['kode_pt', 'kode'],
+    columns: [
+      kodePt(),
+      { key: 'kode', type: 'code', required: true, hint: 'Kode site unik per PT, mis. CAB-BPN.', width: 12 },
+      { key: 'nama', type: 'text', required: true, maxLength: 128, hint: 'Nama site, mis. Cabang Balikpapan.', width: 26 },
+      { key: 'alamat', type: 'text', maxLength: 500, hint: 'Opsional.', width: 28 },
+      ...coord(),
+      { key: 'kode_pusat_biaya', type: 'code', hint: 'Opsional: pusat biaya default (operasional, sheet PusatBiaya, PT yang sama).', ref: { sheet: 'pusatBiaya', col: 'kode' }, width: 16 },
+      aktif(),
+    ],
+  },
+  {
     key: 'project',
     name: 'Project',
     title: 'Project',
@@ -272,6 +294,7 @@ export const SHEETS: SheetSpec[] = [
       { key: 'klien', type: 'text', maxLength: 160, hint: 'Opsional: nama klien/pemberi kerja (dibuat otomatis bila belum ada).', width: 22 },
       { key: 'alamat', type: 'text', maxLength: 500, hint: 'Opsional.', width: 28 },
       { key: 'pm', type: 'username', hint: 'Username PM (sheet Pengguna).', ref: { sheet: 'pengguna', col: 'username' }, width: 16 },
+      kodeSite('Opsional: site (kantor cabang) yang menangani project ini (sheet Site, PT yang sama). Kosong = tidak diubah.'),
       ...coord(),
       { key: 'rab', type: 'money', min: 0, hint: 'RAB total (Rupiah, bilangan bulat). Kosong = jumlah sheet RAB project ini.', width: 16 },
       { key: 'tanggal_mulai', type: 'date', hint: 'Format YYYY-MM-DD atau DD/MM/YYYY.', width: 13 },
@@ -326,13 +349,14 @@ export const SHEETS: SheetSpec[] = [
     key: 'penugasan',
     name: 'Penugasan',
     title: 'Penugasan tim',
-    description: 'Karyawan yang ditugaskan ke project ATAU pusat biaya (menentukan project yang terlihat di APK dan lokasi absen).',
-    naturalKey: ['kode_pt', 'kode_karyawan', 'kode_project', 'kode_pusat_biaya'],
+    description: 'Karyawan yang ditugaskan ke project, pusat biaya ATAU site (menentukan project yang terlihat di APK dan lokasi absen).',
+    naturalKey: ['kode_pt', 'kode_karyawan', 'kode_project', 'kode_pusat_biaya', 'kode_site'],
     columns: [
       kodePt(),
       { key: 'kode_karyawan', type: 'code', required: true, hint: 'Kode karyawan (sheet Karyawan).', ref: { sheet: 'karyawan', col: 'kode' }, width: 14 },
       { key: 'kode_project', type: 'code', hint: 'Isi salah satu: kode project …', ref: { sheet: 'project', col: 'kode' }, width: 14 },
-      { key: 'kode_pusat_biaya', type: 'code', hint: '… ATAU kode pusat biaya.', ref: { sheet: 'pusatBiaya', col: 'kode' }, width: 16 },
+      { key: 'kode_pusat_biaya', type: 'code', hint: '… ATAU kode pusat biaya …', ref: { sheet: 'pusatBiaya', col: 'kode' }, width: 16 },
+      kodeSite('… ATAU kode site (kantor cabang, sheet Site).'),
       { key: 'peran', type: 'enum', hint: 'Staff, Mandor atau PM. Kosong = Staff.', options: TEAM_ROLES, width: 10 },
       { key: 'tanggal_mulai', type: 'date', hint: 'Opsional, YYYY-MM-DD atau DD/MM/YYYY.', width: 13 },
       { key: 'tanggal_selesai', type: 'date', hint: 'Opsional.', width: 13 },
@@ -353,6 +377,7 @@ export const SHEETS: SheetSpec[] = [
       { key: 'atas_nama', type: 'text', maxLength: 128, hint: 'Opsional.', width: 24 },
       { key: 'saldo_awal', type: 'money', required: true, min: 0, hint: 'Saldo pada tanggal go-live (Rupiah, bilangan bulat ≥ 0).', width: 16 },
       { key: 'kode_jurnal_odoo', type: 'text', maxLength: 16, hint: 'Opsional.', width: 12 },
+      kodeSite('Opsional: kas kecil / rekening site ini (sheet Site, PT yang sama). Kosong = tidak diubah.'),
       aktif(),
     ],
   },

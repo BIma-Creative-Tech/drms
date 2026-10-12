@@ -32,6 +32,8 @@ const WITH_COMPANY = [
   'rap-items', 'rap-templates', 'resource-types', 'daily-reports', 'daily-report-lines',
   // ADR 0022 inter-project loans
   'project-loans', 'project-loan-repayments',
+  // ADR 0023 sites (kantor cabang)
+  'sites',
 ].sort()
 
 describe('PT column + PT filter on list views', () => {

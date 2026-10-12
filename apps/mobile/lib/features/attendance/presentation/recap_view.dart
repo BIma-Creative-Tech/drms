@@ -10,8 +10,8 @@ import '../../dashboard/presentation/charts.dart' show periodLong;
 import '../../auth/application/auth_controller.dart';
 import '../../auth/domain/user_profile.dart';
 import '../application/attendance_providers.dart';
-import '../domain/attendance.dart';
 import '../domain/attendance_recap.dart';
+import 'attendance_widgets.dart' show siteKindIcon;
 
 /// Visual of a day status: colour + icon + short text (never colour alone).
 ({Color color, IconData icon, String label}) dayStatusVisual(
@@ -365,7 +365,7 @@ class DayDetailSheet extends StatelessWidget {
             for (final l in d.locations)
               ListTile(
                 contentPadding: EdgeInsets.zero,
-                leading: Icon(l.location.kind == SiteKind.project ? Icons.apartment : Icons.business),
+                leading: Icon(siteKindIcon(l.location.kind)),
                 title: Text(l.location.label),
                 subtitle: Text(
                   '${t.attendanceCheckIn}: ${localHm(l.checkIn?.time, zone)} · ${t.attendanceCheckOut}: ${localHm(l.checkOut?.time, zone)}',

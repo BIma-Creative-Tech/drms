@@ -39,6 +39,8 @@ const fixtures: Record<string, Fixture> = {
   'cash-in-sources': { create: () => ({ code: 'AUD-CIS', name: 'CIS Audit' }), update: { name: 'CIS Audit 2' }, field: 'name' },
   'cash-accounts': { create: () => ({ name: 'Kas Audit', kind: 'cash' }), update: { accountHolder: 'PT DRMS' }, field: 'accountHolder' },
   'cost-centers': { create: () => ({ code: 'AUD-CC', name: 'CC Audit' }), update: { name: 'CC Audit 2' }, field: 'name' },
+  // ADR 0023
+  sites: { create: () => ({ code: 'AUD-SITE', name: 'Site Audit' }), update: { name: 'Site Audit 2' }, field: 'name' },
   'team-assignments': { create: () => ({ employee: ids.employees, project: ids.projects, roleInProject: 'staff' }), update: { roleInProject: 'mandor' }, field: 'roleInProject' },
   'work-schedules': { create: () => ({ name: 'Shift Audit', startTime: '08:00', endTime: '17:00' }), update: { endTime: '16:30' }, field: 'endTime' },
   holidays: { create: () => ({ date: '2026-12-25', name: 'Natal' }), update: { name: 'Hari Natal' }, field: 'name' },

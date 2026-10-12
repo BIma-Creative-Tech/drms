@@ -382,7 +382,7 @@
   "integrityWarning": "HP ini terdeteksi di-root atau berupa emulator. Aktivitas dari HP ini ditandai untuk ditinjau Admin.",
   "attendanceTitle": "Absensi",
   "attendanceDisabled": "Absensi dari aplikasi belum diaktifkan Admin (Setting perusahaan).",
-  "attendanceNoProjects": "Anda belum ditugaskan di project atau pusat biaya mana pun. Hubungi PM/Admin.",
+  "attendanceNoProjects": "Anda belum ditugaskan di site, project, atau pusat biaya mana pun. Hubungi PM/Admin.",
   "attendanceProject": "Project",
   "attendanceCheckIn": "Absen masuk",
   "attendanceCheckOut": "Absen pulang",
@@ -699,7 +699,7 @@
   "attendanceTabCheck": "Absen",
   "attendanceTabRecap": "Rekap",
   "attendanceTabTeam": "Tim",
-  "attendanceLocation": "Lokasi (project / pusat biaya)",
+  "attendanceLocation": "Lokasi (site / project / pusat biaya)",
   "attendanceRadius": "radius {meters} m",
   "@attendanceRadius": {
     "placeholders": {
@@ -711,6 +711,9 @@
   "attendanceCheckDistance": "Cek jarak ke lokasi",
   "siteProject": "Project",
   "siteCostCenter": "Pusat biaya",
+  "siteSite": "Site",
+  "siteHome": "Site penempatan",
+  "siteHomeBadge": "Penempatan",
   "distanceInside": "Di dalam area absen",
   "distanceOutside": "Di luar area absen",
   "distanceDetail": "Radius {radius} m + toleransi GPS {allowance} m (akurasi GPS ±{accuracy} m, maks. 50 m dihitung).",

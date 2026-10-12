@@ -67,8 +67,9 @@ class AttendanceService {
       elapsedMs: await clock.elapsedMs(),
       bootId: await clock.bootId(),
       offline: !online,
-      // MC3: the PT of the chosen project / cost center (never the switcher selection).
+      // MC3: the PT of the chosen project / cost center / site (never the switcher selection).
       companyId: site.companyId,
+      siteId: site.kind == SiteKind.site ? site.id : null,
     );
   }
 
@@ -108,6 +109,7 @@ class AttendanceService {
       bootId: await clock.bootId(),
       offline: !online,
       companyId: site.companyId,
+      siteId: site.kind == SiteKind.site ? site.id : null,
     );
   }
 }
@@ -151,17 +153,44 @@ final onBehalfCaptureProvider = Provider<LensCapture>(
       ),
 );
 
+/// Cached masters of the switcher scope (MC3: locations of the selected PTs; each carries its PT and the
+/// attendance item is queued in that PT).
+Future<Map<String, List<MasterItem>>> _scopedMasters(Ref ref, String sub) {
+  final profile = ref.watch(currentProfileProvider);
+  final scope = profile == null || profile.companies.isEmpty ? null : profile.scopedCompanies.map((c) => c.id);
+  return ref.watch(mastersRepositoryProvider).cached(sub, companyIds: scope);
+}
+
+/// ADR 0023: every cached site of the scope (active only — `cached` drops deactivated rows) with the caller's
+/// flags `home` / `assigned` / `team` from the server.
+final _masterSitesProvider = FutureProvider<List<ProjectSite>>((ref) async {
+  final sub = ref.watch(currentSubProvider);
+  if (sub == null) return const [];
+  ref.watch(mastersRevisionProvider);
+  final masters = await _scopedMasters(ref, sub);
+  return [
+    for (final m in masters[MasterTypes.sites] ?? const <MasterItem>[]) ProjectSite.fromMaster(m, kind: SiteKind.site),
+  ];
+});
+
 /// Locations of the user (masters are access-filtered server-side: Staff = assigned, PM = team), with
-/// their geofence: projects (archived hidden) and cost centers ("pusat biaya", E6 Q-40).
+/// their geofence: ADR 0023 sites where the user may check in (home site = "Site penempatan" first, then the
+/// sites of a team assignment), projects (archived hidden) and cost centers ("pusat biaya", E6 Q-40). The first
+/// entry is the default of the picker, so a stationed employee starts at the home site.
 final attendanceSitesProvider = FutureProvider<List<ProjectSite>>((ref) async {
   final sub = ref.watch(currentSubProvider);
   if (sub == null) return const [];
   ref.watch(mastersRevisionProvider);
-  // MC3: locations of the selected PTs (each carries its PT; the check-in is queued in that PT).
-  final profile = ref.watch(currentProfileProvider);
-  final scope = profile == null || profile.companies.isEmpty ? null : profile.scopedCompanies.map((c) => c.id);
-  final masters = await ref.watch(mastersRepositoryProvider).cached(sub, companyIds: scope);
+  final masters = await _scopedMasters(ref, sub);
+  final sites = [
+    for (final s in await ref.watch(_masterSitesProvider.future))
+      if (s.home || s.assigned) s,
+  ];
   return [
+    for (final s in sites)
+      if (s.home) s,
+    for (final s in sites)
+      if (!s.home) s,
     for (final m in masters[MasterTypes.projects] ?? const <MasterItem>[])
       if (m.extra['status'] != 'arsip') ProjectSite.fromMaster(m),
     for (final m in masters[MasterTypes.costCenters] ?? const <MasterItem>[])
@@ -179,41 +208,53 @@ class OnBehalfCandidate {
 
 /// Team members of the PM from the cached `team-assignments` masters (works offline; the server
 /// re-checks the assignment on the local date). The PM's own employee is excluded (never own).
+/// ADR 0023 (Q-S5): at a site of the PM's team (`team`), the members are the employees stationed there
+/// (`employees.homeSite`) and those with a team assignment to the site.
 final onBehalfCandidatesProvider = FutureProvider<List<OnBehalfCandidate>>((ref) async {
   final sub = ref.watch(currentSubProvider);
   if (sub == null) return const [];
   final profile = ref.watch(currentProfileProvider);
   // MC3: the PM's own employee of EVERY PT is excluded; only locations of PTs where the user is PM.
   final own = profile?.employeeIds ?? const <int>{};
-  final scope = profile == null || profile.companies.isEmpty ? null : profile.scopedCompanies.map((c) => c.id);
-  final masters = await ref.watch(mastersRepositoryProvider).cached(sub, companyIds: scope);
+  final masters = await _scopedMasters(ref, sub);
+  bool pmIn(ProjectSite s) =>
+      profile == null || profile.companies.isEmpty || profile.forCompany(s.companyId).canAttendOnBehalf;
   final sites = [
     for (final s in await ref.watch(attendanceSitesProvider.future))
-      if (profile == null || profile.companies.isEmpty || profile.forCompany(s.companyId).canAttendOnBehalf) s,
+      if (s.kind != SiteKind.site && pmIn(s)) s,
+    for (final s in await ref.watch(_masterSitesProvider.future))
+      if (s.team && pmIn(s)) s,
   ];
   final names = {for (final e in masters[MasterTypes.employees] ?? const <MasterItem>[]) e.id: e.label};
   final today = toYmd(DateTime.now());
   final byEmployee = <int, List<ProjectSite>>{};
+  void add(int emp, ProjectSite? site) {
+    if (site == null || own.contains(emp)) return;
+    final list = byEmployee.putIfAbsent(emp, () => []);
+    if (!list.any((s) => s.key == site.key)) list.add(site);
+  }
+
+  ProjectSite? find(SiteKind kind, int? id) =>
+      id == null ? null : sites.where((s) => s.kind == kind && s.id == id).firstOrNull;
   for (final a in masters[MasterTypes.teamAssignments] ?? const <MasterItem>[]) {
     final emp = (a.extra['employee'] as num?)?.toInt();
-    if (emp == null || own.contains(emp)) continue;
+    if (emp == null) continue;
     String? day(Object? v) => v is String && v.length >= 10 ? v.substring(0, 10) : null;
     final start = day(a.extra['startDate']);
     final end = day(a.extra['endDate']);
     if (start != null && start.compareTo(today) > 0) continue;
     if (end != null && end.compareTo(today) < 0) continue;
-    final project = (a.extra['project'] as num?)?.toInt();
-    final cc = (a.extra['costCenter'] as num?)?.toInt();
-    final site = sites
-        .where(
-          (s) =>
-              (project != null && s.kind == SiteKind.project && s.id == project) ||
-              (cc != null && s.kind == SiteKind.costCenter && s.id == cc),
-        )
-        .firstOrNull;
-    if (site == null) continue;
-    final list = byEmployee.putIfAbsent(emp, () => []);
-    if (!list.any((s) => s.key == site.key)) list.add(site);
+    int? id(String k) => (a.extra[k] as num?)?.toInt();
+    add(
+      emp,
+      find(SiteKind.project, id('project')) ??
+          find(SiteKind.costCenter, id('costCenter')) ??
+          find(SiteKind.site, id('site')),
+    );
+  }
+  // ADR 0023: stationed at a team site (no assignment rows needed)
+  for (final e in masters[MasterTypes.employees] ?? const <MasterItem>[]) {
+    add(e.id, find(SiteKind.site, (e.extra['homeSite'] as num?)?.toInt()));
   }
   final out = [
     for (final e in byEmployee.entries)

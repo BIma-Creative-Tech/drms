@@ -313,7 +313,8 @@ as bool,
 /// @nodoc
 mixin _$Employee {
 
- int get id; String get code; String get name;
+ int get id; String get code; String get name;/// ADR 0023: "Site penempatan" (`/me` employee.homeSite) — id and `KODE — Nama`; null = none / older server.
+ int? get homeSiteId; String? get homeSiteLabel;
 /// Create a copy of Employee
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -325,20 +326,20 @@ $EmployeeCopyWith<Employee> get copyWith => _$EmployeeCopyWithImpl<Employee>(thi
 @override
 bool operator ==(Object other) {
   final _this = this as Employee;
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is Employee&&(identical(other.id, _this.id) || other.id == _this.id)&&(identical(other.code, _this.code) || other.code == _this.code)&&(identical(other.name, _this.name) || other.name == _this.name));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is Employee&&(identical(other.id, _this.id) || other.id == _this.id)&&(identical(other.code, _this.code) || other.code == _this.code)&&(identical(other.name, _this.name) || other.name == _this.name)&&(identical(other.homeSiteId, _this.homeSiteId) || other.homeSiteId == _this.homeSiteId)&&(identical(other.homeSiteLabel, _this.homeSiteLabel) || other.homeSiteLabel == _this.homeSiteLabel));
 }
 
 
 @override
 int get hashCode {
   final _this = this as Employee;
-  return Object.hash(runtimeType,_this.id,_this.code,_this.name);
+  return Object.hash(runtimeType,_this.id,_this.code,_this.name,_this.homeSiteId,_this.homeSiteLabel);
 }
 
 @override
 String toString() {
   final _this = this as Employee;
-  return 'Employee(id: ${_this.id}, code: ${_this.code}, name: ${_this.name})';
+  return 'Employee(id: ${_this.id}, code: ${_this.code}, name: ${_this.name}, homeSiteId: ${_this.homeSiteId}, homeSiteLabel: ${_this.homeSiteLabel})';
 }
 
 
@@ -349,7 +350,7 @@ abstract mixin class $EmployeeCopyWith<$Res>  {
   factory $EmployeeCopyWith(Employee value, $Res Function(Employee) _then) = _$EmployeeCopyWithImpl;
 @useResult
 $Res call({
- int id, String code, String name
+ int id, String code, String name, int? homeSiteId, String? homeSiteLabel
 });
 
 
@@ -366,12 +367,14 @@ class _$EmployeeCopyWithImpl<$Res>
 
 /// Create a copy of Employee
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? code = null,Object? name = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? code = null,Object? name = null,Object? homeSiteId = freezed,Object? homeSiteLabel = freezed,}) {
   return _then(Employee(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as int,code: null == code ? _self.code : code // ignore: cast_nullable_to_non_nullable
 as String,name: null == name ? _self.name : name // ignore: cast_nullable_to_non_nullable
-as String,
+as String,homeSiteId: freezed == homeSiteId ? _self.homeSiteId : homeSiteId // ignore: cast_nullable_to_non_nullable
+as int?,homeSiteLabel: freezed == homeSiteLabel ? _self.homeSiteLabel : homeSiteLabel // ignore: cast_nullable_to_non_nullable
+as String?,
   ));
 }
 
@@ -456,10 +459,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( int id,  String code,  String name)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( int id,  String code,  String name,  int? homeSiteId,  String? homeSiteLabel)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _Employee() when $default != null:
-return $default(_that.id,_that.code,_that.name);case _:
+return $default(_that.id,_that.code,_that.name,_that.homeSiteId,_that.homeSiteLabel);case _:
   return orElse();
 
 }
@@ -477,10 +480,10 @@ return $default(_that.id,_that.code,_that.name);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( int id,  String code,  String name)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( int id,  String code,  String name,  int? homeSiteId,  String? homeSiteLabel)  $default,) {final _that = this;
 switch (_that) {
 case _Employee():
-return $default(_that.id,_that.code,_that.name);case _:
+return $default(_that.id,_that.code,_that.name,_that.homeSiteId,_that.homeSiteLabel);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -497,10 +500,10 @@ return $default(_that.id,_that.code,_that.name);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( int id,  String code,  String name)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( int id,  String code,  String name,  int? homeSiteId,  String? homeSiteLabel)?  $default,) {final _that = this;
 switch (_that) {
 case _Employee() when $default != null:
-return $default(_that.id,_that.code,_that.name);case _:
+return $default(_that.id,_that.code,_that.name,_that.homeSiteId,_that.homeSiteLabel);case _:
   return null;
 
 }
@@ -512,12 +515,15 @@ return $default(_that.id,_that.code,_that.name);case _:
 
 
 class _Employee implements Employee {
-  const _Employee({required this.id, required this.code, required this.name});
+  const _Employee({required this.id, required this.code, required this.name, this.homeSiteId, this.homeSiteLabel});
   
 
 @override final  int id;
 @override final  String code;
 @override final  String name;
+/// ADR 0023: "Site penempatan" (`/me` employee.homeSite) — id and `KODE — Nama`; null = none / older server.
+@override final  int? homeSiteId;
+@override final  String? homeSiteLabel;
 
 /// Create a copy of Employee
 /// with the given fields replaced by the non-null parameter values.
@@ -529,18 +535,18 @@ _$EmployeeCopyWith<_Employee> get copyWith => __$EmployeeCopyWithImpl<_Employee>
 
 @override
 bool operator ==(Object other) {
-    return identical(this, other) || (other.runtimeType == runtimeType&&other is _Employee&&(identical(other.id, id) || other.id == id)&&(identical(other.code, code) || other.code == code)&&(identical(other.name, name) || other.name == name));
+    return identical(this, other) || (other.runtimeType == runtimeType&&other is _Employee&&(identical(other.id, id) || other.id == id)&&(identical(other.code, code) || other.code == code)&&(identical(other.name, name) || other.name == name)&&(identical(other.homeSiteId, homeSiteId) || other.homeSiteId == homeSiteId)&&(identical(other.homeSiteLabel, homeSiteLabel) || other.homeSiteLabel == homeSiteLabel));
 }
 
 
 @override
 int get hashCode {
-    return Object.hash(runtimeType,id,code,name);
+    return Object.hash(runtimeType,id,code,name,homeSiteId,homeSiteLabel);
 }
 
 @override
 String toString() {
-    return 'Employee(id: $id, code: $code, name: $name)';
+    return 'Employee(id: $id, code: $code, name: $name, homeSiteId: $homeSiteId, homeSiteLabel: $homeSiteLabel)';
 }
 
 
@@ -551,7 +557,7 @@ abstract mixin class _$EmployeeCopyWith<$Res> implements $EmployeeCopyWith<$Res>
   factory _$EmployeeCopyWith(_Employee value, $Res Function(_Employee) _then) = __$EmployeeCopyWithImpl;
 @override @useResult
 $Res call({
- int id, String code, String name
+ int id, String code, String name, int? homeSiteId, String? homeSiteLabel
 });
 
 
@@ -568,12 +574,14 @@ class __$EmployeeCopyWithImpl<$Res>
 
 /// Create a copy of Employee
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? code = null,Object? name = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? code = null,Object? name = null,Object? homeSiteId = freezed,Object? homeSiteLabel = freezed,}) {
   return _then(_Employee(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as int,code: null == code ? _self.code : code // ignore: cast_nullable_to_non_nullable
 as String,name: null == name ? _self.name : name // ignore: cast_nullable_to_non_nullable
-as String,
+as String,homeSiteId: freezed == homeSiteId ? _self.homeSiteId : homeSiteId // ignore: cast_nullable_to_non_nullable
+as int?,homeSiteLabel: freezed == homeSiteLabel ? _self.homeSiteLabel : homeSiteLabel // ignore: cast_nullable_to_non_nullable
+as String?,
   ));
 }
 

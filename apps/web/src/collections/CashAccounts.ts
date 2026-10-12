@@ -6,7 +6,7 @@ import { reasonOnChange, reasonOnDeactivate, withAudit } from '@/audit/hooks'
 import { activeField, rupiahField, uuidField } from '@/fields/common'
 
 import { businessDateField } from './fields-f2'
-import { companyField, companyHook } from '@/fields/company'
+import { companyField, companyHook, pickerSameCompany, siteOptions } from '@/fields/company'
 
 /**
  * S3b / E11 (ADR 0005 "As implemented (S3b)"): the opening balance is final once a period on or after
@@ -47,8 +47,8 @@ export const CashAccounts: CollectionConfig = withAudit(
   {
     slug: 'cash-accounts',
     labels: { singular: 'Akun kas/bank', plural: 'Akun kas/bank' },
-    admin: { useAsTitle: 'name', group: 'Keuangan', defaultColumns: ['name', 'kind', 'accountNo', 'active'] },
-    hooks: { beforeChange: [companyHook('cash-accounts'), openingBalanceLock] },
+    admin: { useAsTitle: 'name', group: 'Keuangan', defaultColumns: ['name', 'kind', 'accountNo', 'site', 'active'] },
+    hooks: { beforeChange: [companyHook('cash-accounts', { check: [{ field: 'site', collection: 'sites' }] }), openingBalanceLock] },
     access: {
       read: byRole({ 'pk-admin': true, 'pk-finance': true, 'pk-owner': true }),
       create: rolesAllowed('pk-admin', 'pk-finance'),
@@ -79,6 +79,18 @@ export const CashAccounts: CollectionConfig = withAudit(
             'Tanggal go-live akun ini. Transaksi kas sebelum tanggal ini ditolak; saldo awal terkunci setelah periode sejak tanggal ini ditutup. Kosong = tanpa kunci.',
         },
       }),
+      // ADR 0023 (Q-S7): petty cash of a branch office — filter of the cash book / K-01 balances and the per-site balance
+      // on the dashboards. Cash rules are unchanged (still a PT account).
+      {
+        name: 'site',
+        type: 'relationship',
+        relationTo: 'sites',
+        label: 'Site',
+        index: true,
+        ...pickerSameCompany(),
+        filterOptions: siteOptions,
+        admin: { placeholder: 'Pilih site…', description: 'Opsional: kas kecil / rekening kantor cabang ini (saldo per site di dashboard).' },
+      },
       { name: 'odooJournalCode', type: 'text', label: 'Kode jurnal Odoo', maxLength: 16 },
       activeField(),
       uuidField(),

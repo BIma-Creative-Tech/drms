@@ -36,9 +36,17 @@ const dashboard = (name: string, roles: Parameters<typeof v1>[0]['roles'], load:
     handler: async ({ req }) => json(await withReqTransaction(req, () => load(req))),
   })
 
-export const ownerDashboardEndpoint = dashboard('owner', ['pk-owner'], (req) => ownerDashboard(req))
-export const financeDashboardEndpoint = dashboard('finance', ['pk-finance'], (req) => financeDashboard(req))
-export const pmDashboardEndpoint = dashboard('pm', ['pk-pm'], (req) => pmDashboard(req))
+/** ADR 0023 §5: `?site=` narrows the owner / finance / PM dashboards (never widens). */
+function siteQuery(req: PayloadRequest): number | undefined {
+  const raw = req.searchParams.get('site')
+  if (raw === null || raw === '') return undefined
+  if (!/^\d{1,9}$/.test(raw)) throw new HttpError(400, 'Bad Request', { errors: [{ path: 'site', message: 'site harus id angka.' }] })
+  return Number(raw)
+}
+
+export const ownerDashboardEndpoint = dashboard('owner', ['pk-owner'], (req) => ownerDashboard(req, { siteId: siteQuery(req) }))
+export const financeDashboardEndpoint = dashboard('finance', ['pk-finance'], (req) => financeDashboard(req, { siteId: siteQuery(req) }))
+export const pmDashboardEndpoint = dashboard('pm', ['pk-pm'], (req) => pmDashboard(req, { siteId: siteQuery(req) }))
 export const adminDashboardEndpoint = dashboard('admin', ['pk-admin'], (req) => adminDashboard(req))
 export const meDashboardEndpoint = dashboard('me', undefined, (req) => staffDashboard(req))
 

@@ -16,7 +16,8 @@ import { companyOf, settings, userOfEmployee as userOfEmployeeLink } from '@/dom
 
 /**
  * E6 — the ONE write path of `attendances` (sync items attendance.check_in / check_out / on_behalf,
- * US-01/02/14, Q-40). Server-side checks, in this order (error codes are part of the APK contract):
+ * US-01/02/14, Q-40). ADR 0023: a location is a project, a cost center or a site (kantor cabang); at a site the
+ * employee needs an active site assignment OR that site as home site, a PM on-behalf a team site. Server-side checks, in this order (error codes are part of the APK contract):
  * MOCK_LOCATION → NOT_FOUND/VALIDATION (location) → NO_GEOFENCE → NOT_ASSIGNED → OUTSIDE_GEOFENCE →
  * MEDIA_MISSING / FORBIDDEN (selfie) → ALREADY_CHECKED_IN / NO_CHECK_IN / ALREADY_CHECKED_OUT.
  * On-behalf (source `pm`) additionally: caller holds pk-pm, the location is in the caller's TEAM
@@ -37,7 +38,21 @@ const reject = (code: string, message: string, field?: string): never => {
   throw new AttendanceReject(code, message, field)
 }
 
-export type Location = { type: 'project'; id: number } | { type: 'cost_center'; id: number }
+/** ADR 0023: `site` = a branch office (kantor cabang) of the PT with its own geofence. */
+export type Location = { type: 'project'; id: number } | { type: 'cost_center'; id: number } | { type: 'site'; id: number }
+
+/** Collection of a location type. */
+export const LOCATION_COLLECTION = { project: 'projects', cost_center: 'cost-centers', site: 'sites' } as const satisfies Record<Location['type'], string>
+
+/** Sync / API field of a location type (`payload.<field>` in errors). */
+export const LOCATION_FIELD = { project: 'project_id', cost_center: 'cost_center_id', site: 'site_id' } as const satisfies Record<Location['type'], string>
+
+/** Exactly one of the three location ids → Location (callers validated "exactly one" in the schema). */
+export function locationOf(p: { project_id?: number | null; cost_center_id?: number | null; site_id?: number | null }): Location {
+  if (typeof p.project_id === 'number') return { type: 'project', id: p.project_id }
+  if (typeof p.cost_center_id === 'number') return { type: 'cost_center', id: p.cost_center_id }
+  return { type: 'site', id: p.site_id as number }
+}
 
 type GeoDoc = { id: number; company?: unknown; code?: string | null; name?: string | null; lat?: number | null; lng?: number | null; radiusM?: number | null; status?: string | null; active?: boolean | null }
 
@@ -71,13 +86,24 @@ export type RecordInput = {
   fieldPrefix?: string
 }
 
-const LABEL: Record<Location['type'], string> = { project: 'project', cost_center: 'pusat biaya' }
+const LABEL: Record<Location['type'], string> = { project: 'project', cost_center: 'pusat biaya', site: 'site' }
 
-/** Is `employee` assigned to the location on `localDate` (team-assignments, start/end inclusive)? */
+const ASSIGNMENT_FIELD: Record<Location['type'], string> = { project: 'project', cost_center: 'costCenter', site: 'site' }
+
+/**
+ * Is `employee` assigned to the location on `localDate` (team-assignments, start/end inclusive)? ADR 0023 Q-S5: at a
+ * site also when it is the employee's home site ("Site penempatan") — no daily assignment rows needed.
+ */
 export async function isAssignedTo(req: PayloadRequest, employee: number, loc: Location, localDate: string): Promise<boolean> {
+  if (loc.type === 'site') {
+    const emp = (await req.payload.findByID({ collection: 'employees', id: employee, depth: 0, select: { homeSite: true } as never, overrideAccess: true /* SYSTEM-READ: home site of the attendance's employee */, req, disableErrors: true })) as {
+      homeSite?: unknown
+    } | null
+    if (relId(emp?.homeSite) === loc.id) return true
+  }
   const res = await req.payload.find({
     collection: 'team-assignments',
-    where: { and: [{ employee: { equals: employee } }, { [loc.type === 'project' ? 'project' : 'costCenter']: { equals: loc.id } }] },
+    where: { and: [{ employee: { equals: employee } }, { [ASSIGNMENT_FIELD[loc.type]]: { equals: loc.id } }] },
     depth: 0,
     pagination: false,
     overrideAccess: true, // SYSTEM-READ: assignment check of the attendance's employee
@@ -90,13 +116,23 @@ export async function isAssignedTo(req: PayloadRequest, employee: number, loc: L
   })
 }
 
-/** Current schedule of an employee: own work schedule, else the company default, else null. */
+/**
+ * Current schedule of an employee: own work schedule, else the default schedule of the employee's home site (ADR 0023
+ * §3: a branch office can have its own office hours), else the company default, else null.
+ */
 export async function scheduleOfEmployee(req: PayloadRequest, employee: number, defaultScheduleId?: number | null): Promise<ScheduleSnapshot | null> {
   const emp = (await req.payload.findByID({ collection: 'employees', id: employee, depth: 1, overrideAccess: true /* SYSTEM-READ: schedule of the employee */, req, disableErrors: true })) as {
     workSchedule?: unknown
+    homeSite?: unknown
   } | null
   const own = emp?.workSchedule && typeof emp.workSchedule === 'object' ? snapshotOf(emp.workSchedule as Record<string, unknown>) : null
   if (own) return own
+  const siteDefault = relId((emp?.homeSite as { defaultWorkSchedule?: unknown } | null | undefined)?.defaultWorkSchedule)
+  if (siteDefault !== undefined) {
+    const doc = await req.payload.findByID({ collection: 'work-schedules', id: siteDefault, depth: 0, overrideAccess: true /* SYSTEM-READ: home-site schedule */, req, disableErrors: true })
+    const snap = snapshotOf(doc as Record<string, unknown> | null)
+    if (snap) return snap
+  }
   let defId = defaultScheduleId
   if (defId === undefined) {
     const s = await settings(req, relId((emp as { company?: unknown } | null)?.company))
@@ -114,7 +150,7 @@ export async function userOfEmployee(req: PayloadRequest, employee: number): Pro
 
 async function loadLocation(req: PayloadRequest, loc: Location, field: string): Promise<GeoDoc> {
   const doc = (await req.payload.findByID({
-    collection: loc.type === 'project' ? 'projects' : 'cost-centers',
+    collection: LOCATION_COLLECTION[loc.type],
     id: loc.id,
     depth: 0,
     overrideAccess: true, // SYSTEM-READ: geofence of the target location
@@ -124,10 +160,11 @@ async function loadLocation(req: PayloadRequest, loc: Location, field: string): 
   // QA-MC4-14 (scope rule): a location of a PT the caller is not mapped to = a missing one
   const mapped = mappedCompanies(req)
   if (!doc || (mapped !== null && !mapped.includes(relId((doc as { company?: unknown }).company) ?? -1))) {
-    return reject('NOT_FOUND', loc.type === 'project' ? 'Project tidak ditemukan.' : 'Pusat biaya tidak ditemukan.', field)
+    return reject('NOT_FOUND', loc.type === 'project' ? 'Project tidak ditemukan.' : loc.type === 'site' ? 'Site tidak ditemukan.' : 'Pusat biaya tidak ditemukan.', field)
   }
   if (loc.type === 'project' && doc.status === 'arsip') reject('VALIDATION', 'Project sudah diarsipkan.', field)
   if (loc.type === 'cost_center' && doc.active === false) reject('VALIDATION', 'Pusat biaya sudah dinonaktifkan.', field)
+  if (loc.type === 'site' && doc.active === false) reject('VALIDATION', 'Site sudah dinonaktifkan.', field)
   if (typeof doc.lat !== 'number' || typeof doc.lng !== 'number') {
     reject('NO_GEOFENCE', `Titik lokasi ${LABEL[loc.type]} belum diisi Admin. Absensi belum bisa dipakai di ${LABEL[loc.type]} ini.`, field)
   }
@@ -144,12 +181,14 @@ type DayRow = { id: number; kind: AttendanceKind; effective_time: string }
 /** Rows of this employee at this location on the local date, with the effective (corrected) time. */
 export async function dayRowsAt(req: PayloadRequest, employee: number, loc: Location, localDate: string): Promise<DayRow[]> {
   const tx = await getRequestTx(req)
-  const col = loc.type === 'project' ? sql`a.project_id` : sql`a.cost_center_id`
+  // ADR 0023: a site check-in = site_id without project / cost center (a project row also carries its project's site)
+  const at =
+    loc.type === 'project' ? sql`a.project_id = ${loc.id}` : loc.type === 'cost_center' ? sql`a.cost_center_id = ${loc.id}` : sql`a.site_id = ${loc.id} AND a.project_id IS NULL AND a.cost_center_id IS NULL`
   const r = (await tx.execute(sql`
     SELECT a.id, a.kind, coalesce(c.new_time, a.attendance_time) AS effective_time
     FROM attendances a
     LEFT JOIN LATERAL (SELECT new_time FROM attendance_corrections c WHERE c.attendance_id = a.id ORDER BY c.id DESC LIMIT 1) c ON TRUE
-    WHERE a.employee_id = ${employee} AND ${col} = ${loc.id} AND a.local_date = ${localDate}
+    WHERE a.employee_id = ${employee} AND ${at} AND a.local_date = ${localDate}
     ORDER BY effective_time`)) as unknown as { rows: DayRow[] }
   return r.rows
 }
@@ -157,7 +196,7 @@ export async function dayRowsAt(req: PayloadRequest, employee: number, loc: Loca
 /** Records one attendance after every server-side check. Returns the new row id. */
 export async function recordAttendance(req: PayloadRequest, input: RecordInput): Promise<{ id: number; localDate: string }> {
   const pre = input.fieldPrefix ?? 'payload.'
-  const locField = `${pre}${input.location.type === 'project' ? 'project_id' : 'cost_center_id'}`
+  const locField = `${pre}${LOCATION_FIELD[input.location.type]}`
   // ADR 0010 decision 8 / US-01 "Mock location ditolak" (Q-43 proposal: fake GPS always blocked).
   if (input.isMocked) reject('MOCK_LOCATION', 'Lokasi palsu (mock location) terdeteksi. Absensi ditolak.', `${pre}is_mocked`)
   const geo = await loadLocation(req, input.location, locField)
@@ -168,7 +207,8 @@ export async function recordAttendance(req: PayloadRequest, input: RecordInput):
     const company = relId((geo as { company?: unknown }).company)
     if (!hasRole(req, 'pk-pm', company)) reject('FORBIDDEN', `Hanya untuk ${LABEL[input.location.type]} tim Anda.`, locField)
     const scope = await resolveScope(req, company ?? null)
-    const team = input.location.type === 'project' ? scope.teamProjects : scope.teamCostCenters
+    // ADR 0023 Q-S5: at a site = a PM assigned (role PM) to the site or the PM of a project of that site
+    const team = input.location.type === 'project' ? scope.teamProjects : input.location.type === 'site' ? scope.teamSites : scope.teamCostCenters
     if (!team.includes(input.location.id)) reject('FORBIDDEN', `Hanya untuk ${LABEL[input.location.type]} tim Anda.`, locField)
   }
   if (!(await isAssignedTo(req, input.employee, input.location, localDate))) {
@@ -195,7 +235,7 @@ export async function recordAttendance(req: PayloadRequest, input: RecordInput):
   await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${`att:${input.employee}:${input.location.type}:${input.location.id}:${localDate}`}, 0))`)
   const today = await dayRowsAt(req, input.employee, input.location, localDate)
   const checkIn = today.find((r) => r.kind === 'check_in')
-  const where = input.location.type === 'project' ? 'project' : 'pusat biaya'
+  const where = LABEL[input.location.type]
   if (input.kind === 'check_in' && checkIn) reject('ALREADY_CHECKED_IN', `Sudah absen masuk di ${where} ini hari ini.`)
   if (input.kind === 'check_out') {
     if (!checkIn) reject('NO_CHECK_IN', `Belum ada absen masuk hari ini di ${where} ini.`)
@@ -211,6 +251,8 @@ export async function recordAttendance(req: PayloadRequest, input: RecordInput):
       kind: input.kind,
       project: input.location.type === 'project' ? input.location.id : null,
       costCenter: input.location.type === 'cost_center' ? input.location.id : null,
+      // ADR 0023: the DB (pk_attendance_site) fills the project's site for a project check-in; NULL for a cost center
+      site: input.location.type === 'site' ? input.location.id : null,
       source: input.source,
       recordedBy: input.recordedBy,
       onBehalfReason: input.onBehalfReason,
@@ -256,8 +298,7 @@ export async function recordWebAttendance(req: PayloadRequest, kind: AttendanceK
   if (uid === undefined) reject('VALIDATION', 'Tidak terautentikasi.')
   // ADR 0016 D1: the caller's employee IN THE LOCATION's PT (one employee per PT); an unmapped/missing
   // location resolves to no company here too (recordAttendance → NOT_FOUND, QA-MC4-14).
-  const locCollection = input.location.type === 'project' ? 'projects' : 'cost-centers'
-  const locRaw = await companyOf(req, locCollection, input.location.id)
+  const locRaw = await companyOf(req, LOCATION_COLLECTION[input.location.type], input.location.id)
   const mapped = mappedCompanies(req)
   const locCompany = locRaw !== undefined && (mapped === null || mapped.includes(locRaw)) ? locRaw : undefined
   const own = locCompany !== undefined ? employeeIn(req, locCompany) : await employeeOfUser(req, uid!)

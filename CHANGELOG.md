@@ -44,6 +44,40 @@ append-only repayments, approvals owner CHECK + G1 branch, reminder rule `loan_o
 - APK: project tab "Pinjaman", loan form (create / edit Draft, submit), detail, Direktur decision from the inbox (online
   only; repayments stay on the web in v1).
 
+**DRMS 10/10 Phase D — multiple sites (kantor cabang) per PT** (ADR 0023, owner decisions 2026-10-11 Q-S1…Q-S7; server
++ web + APK). A site is a branch office of the PT (same legal entity, numbering, approvals and access per PT); one site
+handles several projects, a project belongs to at most one site. A PT without sites behaves exactly as before.
+
+**Database migrations:** `20261013_200000_d1010_sites` (schema: table `sites`; nullable `employees.home_site_id`,
+`projects.site_id`, `cash_accounts.site_id`, `team_assignments.site_id`, `attendances.site_id`) and
+`20261013_200100_d1010_sites_guard` (company NOT NULL + immutable, code unique per PT, no delete, operational default cost
+center, same-PT triggers for every site reference, team assignment = exactly one of project / cost center / site,
+attendance location = project | cost center | site with the site filled by the DB, one check-in/out per site and day).
+No data is moved. **APK drift schema 9** (nullable `site_id` on the outbox).
+
+### Added (ADR 0023)
+
+- **Master "Site (kantor cabang)"** under Master Data (kode, nama, alamat, titik + radius absen, jadwal kerja default,
+  pusat biaya default, aktif); every member of the PT reads it, Admin / Direktur maintain it. **"Buat site dari pusat
+  biaya"** on the cost-center form pre-fills a new site from that cost center.
+- **Optional site links:** "Site penempatan" on employees, "Site" on projects, cash accounts (petty cash of a branch) and
+  team assignments (third option next to project / cost center); Site column + filter in those lists and on attendances.
+- **Attendance at a site** (web Absen, APK, PM "diabsenkan"): allowed at the employee's home site or with an active site
+  assignment; on-behalf for a PM assigned (role PM) to the site or the PM of a project of the site. Geofence of the site
+  (empty radius = PT default). Schedule resolution employee → home site → PT default. Old APKs keep working.
+- **Site filter** (only narrows the scope) on Rekap Kas, Buku Kas, Pengeluaran per kategori, Anggaran project, Rekap
+  pengajuan, Kelengkapan, Laporan absensi, the attendance views (Tim hari ini, Rekap bulanan), the Kas book and the
+  Direktur / Finance / PM dashboards; **saldo kas per site** on the Direktur and Finance dashboards, **ringkasan per site**
+  (project berjalan, hadir hari ini, pencairan bulan ini) on the Direktur dashboard.
+- **Transfer default cost center:** a project without its own default proposes the default cost center of its site.
+- **Import workbook:** sheet **Site** + optional `kode_site` on Karyawan, Project, Penugasan and AkunKas.
+- **API:** `GET /api/v1/sites` (caller flags `home` / `assigned` / `team`), masters type `sites` (+ `site` on projects /
+  team assignments, `homeSite` on employees), `site_id` on attendance check-in/out (web + sync, exactly one location),
+  `site_id` on team-today, `site` on `GET /projects(/{id})` and `?site=` on the list, `homeSite` on `/me` employees,
+  `?site=` on dashboards and `/cash-accounts/balances` (`siteId` per account), report parameter `site`.
+- **APK:** sites in the attendance location picker (home site first) and in "Diabsenkan PM", masters cache per PT, site on
+  the project detail and "Site penempatan" on the profile.
+
 ## [0.8.0] - 2026-10-12
 
 **Approval PM → Direktur (ADR 0021), RAP + Laporan harian (P3), DRMS 10/10 Phases A–C** (owner feedback 2026-10-10 /

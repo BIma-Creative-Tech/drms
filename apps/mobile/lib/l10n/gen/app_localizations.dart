@@ -1414,7 +1414,7 @@ abstract class AppLocalizations {
   /// No description provided for @attendanceNoProjects.
   ///
   /// In id, this message translates to:
-  /// **'Anda belum ditugaskan di project atau pusat biaya mana pun. Hubungi PM/Admin.'**
+  /// **'Anda belum ditugaskan di site, project, atau pusat biaya mana pun. Hubungi PM/Admin.'**
   String get attendanceNoProjects;
 
   /// No description provided for @attendanceProject.
@@ -2254,7 +2254,7 @@ abstract class AppLocalizations {
   /// No description provided for @attendanceLocation.
   ///
   /// In id, this message translates to:
-  /// **'Lokasi (project / pusat biaya)'**
+  /// **'Lokasi (site / project / pusat biaya)'**
   String get attendanceLocation;
 
   /// No description provided for @attendanceRadius.
@@ -2280,6 +2280,24 @@ abstract class AppLocalizations {
   /// In id, this message translates to:
   /// **'Pusat biaya'**
   String get siteCostCenter;
+
+  /// No description provided for @siteSite.
+  ///
+  /// In id, this message translates to:
+  /// **'Site'**
+  String get siteSite;
+
+  /// No description provided for @siteHome.
+  ///
+  /// In id, this message translates to:
+  /// **'Site penempatan'**
+  String get siteHome;
+
+  /// No description provided for @siteHomeBadge.
+  ///
+  /// In id, this message translates to:
+  /// **'Penempatan'**
+  String get siteHomeBadge;
 
   /// No description provided for @distanceInside.
   ///

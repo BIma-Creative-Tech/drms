@@ -82,7 +82,15 @@ abstract class Capabilities with _$Capabilities {
 
 @freezed
 abstract class Employee with _$Employee {
-  const factory Employee({required int id, required String code, required String name}) = _Employee;
+  const factory Employee({
+    required int id,
+    required String code,
+    required String name,
+
+    /// ADR 0023: "Site penempatan" (`/me` employee.homeSite) — id and `KODE — Nama`; null = none / older server.
+    int? homeSiteId,
+    String? homeSiteLabel,
+  }) = _Employee;
 }
 
 @freezed

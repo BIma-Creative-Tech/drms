@@ -233,6 +233,10 @@ class OutboxRepository {
     required String bootId,
     required bool offline,
     int? companyId,
+
+    /// ADR 0023 (schema v9): the site of a check-in / on-behalf at a site (`payload.site_id`); null for a project or
+    /// cost-center item.
+    int? siteId,
   }) async {
     final opUuid = const Uuid().v7();
     await db
@@ -242,6 +246,7 @@ class OutboxRepository {
             opUuid: opUuid,
             userSub: sub,
             companyId: Value(companyId),
+            siteId: Value(siteId),
             type: type,
             targetUuid: opUuid,
             payloadJson: jsonEncode(payload),

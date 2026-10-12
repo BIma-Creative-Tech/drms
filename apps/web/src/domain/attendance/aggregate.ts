@@ -5,7 +5,8 @@ import { datesBetween, evaluateDay, isoWeekday, localHHMM, presenceStatus, type 
  * report M13). Facts carry the EFFECTIVE time (newest T10 correction applied by the loader).
  * No Payload import: unit-tested with fixed tables.
  */
-export type LocationRef = { type: 'project' | 'cost_center'; id: number; code: string; name: string }
+/** ADR 0023: `site` = a branch office (kantor cabang) check-in. */
+export type LocationRef = { type: 'project' | 'cost_center' | 'site'; id: number; code: string; name: string }
 
 export type AttendanceFact = {
   id: number

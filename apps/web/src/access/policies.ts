@@ -131,6 +131,12 @@ export const assignedCostCenters =
   async ({ scope }) =>
     inIds(field, (await scope()).assignedCostCenters)
 
+/** ADR 0023: records whose `field` (a site relationship) is in the user's team sites. */
+export const teamSites =
+  (field = 'site'): Rule =>
+  async ({ scope }) =>
+    inIds(field, (await scope()).teamSites)
+
 /** Combines rules for one role with OR (e.g. PM: team projects OR team cost centers). */
 export function anyOf(...rules: Rule[]): Rule {
   return async (ctx) => {
