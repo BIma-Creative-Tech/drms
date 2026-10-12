@@ -294,6 +294,9 @@ class TransferQueueCard extends ConsumerWidget {
                     ),
                   if (it.receiptMismatch > 0)
                     ReceiptMismatchChip(key: Key('tq-${it.id}-mismatch'), count: it.receiptMismatch),
+                  // ADR 0024: reached the queue without approval (web badge "Tanpa persetujuan (Direktur)")
+                  if (it.noApproval)
+                    _Pill(key: Key('tq-${it.id}-no-approval'), text: t.noApprovalBadge, color: context.pk.warnText),
                 ],
               ),
               if (canTransfer) ...[

@@ -11,7 +11,8 @@ import { actorContext, fail, ids, loadRaw, loadVisible, requireAction, requireAc
 import { mayViewFlag, withFlagVisibility } from './flag-visibility'
 import { computeFlags, normalizeReceiptNo, normalizeVendor, rapOverFlagSpecs, type DuplicateHit, type FlagCategory, type FlagSpec } from './flags'
 import { grandTotal, lineNeedsCompletion } from './lines'
-import { auditSelfApproval, auditSkipped, selectAndSnapshot, writeSnapshot } from './snapshot'
+import { isNoApproval } from './decision'
+import { auditSelfApproval, auditSkipped, legacyExceptionOf, selectAndSnapshot, writeSnapshot } from './snapshot'
 import { isBusinessDate, INACTIVE_FOR_DUPLICATES, type FlagKind } from './types'
 
 export type ReceiptInput = {
@@ -341,7 +342,8 @@ export async function resubmitReceipts(req: PayloadRequest, requestId: number) {
   if (total === raw.approvedAmount) {
     updated = await updateRequest(req, requestId, { status: 'approved' })
   } else {
-    const { rule, snapshot } = await selectAndSnapshot(req, raw)
+    // ADR 0024: a request carrying an ADR 0021 exception keeps that flow; `direktur_no_approval` is re-derived
+    const { rule, snapshot } = await selectAndSnapshot(req, raw, { legacy: legacyExceptionOf(raw.g1Exception) })
     // E1 (ADR 0013 §6): the new amount goes through the WHOLE flow again — "Diketahui" (Direktur
     // approval) first when the new snapshot requires it, not straight to "Menunggu Approval".
     const needsAck = snapshot.acknowledge === 'required'
@@ -351,14 +353,35 @@ export async function resubmitReceipts(req: PayloadRequest, requestId: number) {
       approvalSnapshot: snapshot,
       g1Exception: snapshot.selfApproval ?? null,
       approvalCycle: (raw.approvalCycle ?? 0) + 1,
-      currentLevel: needsAck ? 0 : 1,
+      currentLevel: needsAck ? 0 : isNoApproval(snapshot) ? 0 : 1,
     })
     await auditSkipped(req, updated, snapshot)
     await auditSelfApproval(req, updated, snapshot)
+    // ADR 0024: a Direktur's own request under the zero-step rule needs no decision for the new amount either
+    if (isNoApproval(snapshot)) {
+      await writeSnapshot(req, updated, 'receipts_resubmit')
+      await afterReceiptChange(req, requestId)
+      return approveWithoutDecision(req, updated)
+    }
   }
   await writeSnapshot(req, updated, 'receipts_resubmit')
   await afterReceiptChange(req, requestId)
   return updated
+}
+
+/**
+ * ADR 0024 (owner decision 2026-10-11): "Menunggu persetujuan" → "Disetujui" with NO decision row, for a
+ * request whose snapshot is `direktur_no_approval` (submit / receipt re-approval). Same transaction as the
+ * submit; the DB accepts this transition without a decision only with `g1_exception = direktur_no_approval`
+ * (trigger `expense_requests_approval_guard`). Audit: `approval_policy_exception` (written by the caller)
+ * + the status change; Finance is notified (transfer queue / receipt verification) by the status hook.
+ */
+export async function approveWithoutDecision(req: PayloadRequest, doc: RequestDoc): Promise<RequestDoc> {
+  if (doc.status !== 'pending_approval' || !isNoApproval(doc.approvalSnapshot)) return doc
+  const approved = await updateRequest(req, doc.id, { status: 'approved', approvedAmount: doc.grandTotal ?? 0, approvedAt: new Date().toISOString() })
+  await writeSnapshot(req, approved, 'approve')
+  await syncProjectRapFlags(req, doc.id)
+  return approved
 }
 
 export async function assertEveryLineHasReceipt(req: PayloadRequest, doc: RequestDoc) {

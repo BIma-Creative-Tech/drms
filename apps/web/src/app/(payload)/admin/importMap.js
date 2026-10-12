@@ -17,6 +17,7 @@ import { ProjectRequestsTab as ProjectRequestsTab_477bcbaacaa37a019b46a0d40f873f
 import { ProjectLoansTab as ProjectLoansTab_e5d452935824a68d96fdc373e55d7f95 } from '@/admin/views/Loans'
 import { BusinessDateField as BusinessDateField_1172137b1c1eab4696f62271d5ebbe2f } from '@/admin/components/BusinessDateField'
 import { SiteFromCostCenterLink as SiteFromCostCenterLink_57dfe94c9146c60f785b1649b36e1df1 } from '@/admin/components/SiteFromCostCenterLink'
+import { ApprovalRulePreview as ApprovalRulePreview_d1fda995effefe011ec359f37cc8493e } from '@/admin/components/ApprovalRulePreview'
 import { WorkflowPanel as WorkflowPanel_6fcc9de32a179d40aa1576187df45f1e } from '@/admin/components/WorkflowPanel'
 import { PdfLinks as PdfLinks_baf3bc4fa5b0188cc15c74a19f03943f } from '@/admin/components/PdfLinks'
 import { RequestTypeField as RequestTypeField_a356a4ed347478242de628aded3440b3 } from '@/admin/components/EditableOnlyFields'
@@ -112,6 +113,7 @@ export const importMap = {
   "@/admin/views/Loans#ProjectLoansTab": ProjectLoansTab_e5d452935824a68d96fdc373e55d7f95,
   "@/admin/components/BusinessDateField#BusinessDateField": BusinessDateField_1172137b1c1eab4696f62271d5ebbe2f,
   "@/admin/components/SiteFromCostCenterLink#SiteFromCostCenterLink": SiteFromCostCenterLink_57dfe94c9146c60f785b1649b36e1df1,
+  "@/admin/components/ApprovalRulePreview#ApprovalRulePreview": ApprovalRulePreview_d1fda995effefe011ec359f37cc8493e,
   "@/admin/components/WorkflowPanel#WorkflowPanel": WorkflowPanel_6fcc9de32a179d40aa1576187df45f1e,
   "@/admin/components/PdfLinks#PdfLinks": PdfLinks_baf3bc4fa5b0188cc15c74a19f03943f,
   "@/admin/components/EditableOnlyFields#RequestTypeField": RequestTypeField_a356a4ed347478242de628aded3440b3,

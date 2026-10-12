@@ -252,6 +252,7 @@ export const TransferQueueItem = ExpenseRequestListItem.extend({
   bankVerification: z.enum(['verified', 'unverified']).meta({ description: 'QA-17: unverified → the transfer needs confirmUnverifiedAccount.' }),
   flags: z.object({ warning: z.number().int(), info: z.number().int(), receiptMismatch: z.number().int() }),
   sla: z.object({ approvedAt: z.string().nullable(), slaHours: z.number(), ageHours: z.number().nullable(), over: z.boolean() }).meta({ description: 'Item 11: age since the final approval vs the PT transfer SLA.' }),
+  noApproval: z.boolean().meta({ description: 'ADR 0024: a Direktur\'s own request without any approval (kebijakan PT) — show the badge "Tanpa persetujuan (Direktur)"; Finance\'s transfer checks are the only check.' }),
 }).meta({ id: 'TransferQueueItem' })
 
 export const TransferQueueList = z.object({ items: z.array(TransferQueueItem), nextCursor: z.string().nullable() }).meta({ id: 'TransferQueueList' })
@@ -305,11 +306,11 @@ export const ExpenseRequestDetail = ExpenseRequestListItem.extend({
         .array(z.object({ position: z.enum(['diketahui', 'approval']), level: z.number().int(), role: z.string().nullable(), userId: id.nullable(), reason: z.string() }))
         .meta({ description: 'ADR 0013 G1-2: positions skipped at submit because their only holders are requester/creator — show "(tidak berlaku — pemohon)".' }),
       selfApproval: z
-        .enum(['direktur_via_pm', 'direktur_via_pm_self'])
+        .enum(['direktur_via_pm', 'direktur_via_pm_self', 'direktur_no_approval'])
         .nullable()
         .meta({
           description:
-            'ADR 0021 narrow G1 exception: a Direktur\'s request filed by the PM project (PM approves, then a Direktur). direktur_via_pm = another Direktur decides the Direktur step; direktur_via_pm_self = the requester Direktur may approve (only Direktur of the PT, owner 2026-10-11). Show the note "Pengajuan Direktur — diajukan oleh PM …".',
+            'G1 exception of the snapshot. ADR 0024 (owner 2026-10-11): direktur_no_approval = a Direktur\'s OWN request under a zero-step rule — no approval step at all, straight to the Finance transfer queue; show the step "Persetujuan" (skipped) with the note "Tanpa persetujuan — pengajuan Direktur (kebijakan PT)" and status "Tanpa persetujuan (Antri Transfer)". Legacy ADR 0021 (no longer set for new requests): a Direktur\'s request filed by the PM project (PM approves, then a Direktur). direktur_via_pm = another Direktur decides the Direktur step; direktur_via_pm_self = the requester Direktur may approve (only Direktur of the PT, owner 2026-10-11). Show the note "Pengajuan Direktur — diajukan oleh PM …".',
         }),
       steps: z.array(z.object({ level: z.number().int(), approverRole: z.string().nullable(), approverUserId: id.nullable() })),
       signDiajukan: z.enum(['required', 'optional', 'none']),
@@ -813,7 +814,7 @@ export const ApprovalInbox = z
         decisionFlow: z.boolean().meta({ description: 'ADR 0013/0021 decision flow (acknowledge = an approval, button "Setujui"); false = pre-E1 snapshot.' }),
         decisionBy: z.enum(['pm', 'direktur', 'finance', 'other']).meta({ description: 'ADR 0021: who decides this step (APK decision sheet texts): pm = PM project, direktur, finance, other (named user / legacy).' }),
         finalStep: z.boolean().meta({ description: 'ADR 0021: approving this step makes the request "Disetujui" (Finance then transfers / verifies receipts).' }),
-        selfApproval: z.enum(['direktur_via_pm', 'direktur_via_pm_self']).nullable().meta({ description: 'ADR 0021 narrow G1 exception (a Direktur\'s request filed by the PM project; _self = the requester Direktur is the PT\'s only Direktur).' }),
+        selfApproval: z.enum(['direktur_via_pm', 'direktur_via_pm_self']).nullable().meta({ description: 'ADR 0021 narrow G1 exception (a Direktur\'s request filed by the PM project; _self = the requester Direktur is the PT\'s only Direktur). Legacy since ADR 0024 (a request without approval never reaches the inbox).' }),
         budget: z.object({
           basis: z.enum(['project', 'none']),
           pctBefore: z.number().nullable(),

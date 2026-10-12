@@ -132,7 +132,7 @@ describe('tile visibility per role (real config: admin.hidden + access.read + ro
     const m = await modulesFor(['pk-owner'])
     expect(ids(m)).toEqual(expect.arrayContaining<ModuleId>(['dashboard', 'persetujuan', 'proyek', 'keuangan', 'absensi', 'laporan', 'sistem', 'pengaturan']))
     expect(navKeys(m)).toEqual(expect.arrayContaining(['persetujuan', 'antrian-transfer', 'verifikasi-lpj', 'kas', 'tutup-buku', 'progress', 'addendum', 'laporan', 'absensi', 'audit-log']))
-    expect(navKeys(m)).not.toContain('buat-pengajuan') // Owner does not create requests
+    expect(navKeys(m)).toContain('buat-pengajuan') // ADR 0024: the Direktur files his own requests
   })
 
   it('Finance: same office views + "+ Buat pengajuan"', async () => {

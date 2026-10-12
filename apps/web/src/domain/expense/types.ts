@@ -65,6 +65,15 @@ export const LEGACY_WAITING_LABELS = {
   approval: 'Menunggu Approval',
 } as const
 
+/**
+ * ADR 0024: "Disetujui" of a Direktur's own request without approval (snapshot `direktur_no_approval`) —
+ * nobody approved it, it went straight to Finance. Web + API + APK (request_status.dart) use these texts.
+ */
+export const NO_APPROVAL_STATUS_LABELS: Record<RequestType, string> = {
+  advance: 'Tanpa persetujuan (Antri Transfer)',
+  reimburse: 'Tanpa persetujuan (Verifikasi Nota)',
+}
+
 /** Type-specific display label (Pengajuan Baru "Disetujui (Antri Transfer)", US-19). */
 export function statusLabel(type: RequestType, status: RequestStatus): string {
   if (type === 'advance' && status === 'approved') return 'Disetujui (Antri Transfer)'

@@ -82,6 +82,12 @@ async function loadType(req: PayloadRequest, type: MasterType, companies: number
         i.team = f.team.has(i.id as number)
       }
     }
+    if (type === 'employees' && items.length > 0) {
+      // ADR 0024: `direktur` = the employee's account holds Direktur in the employee's PT — the APK does not
+      // offer such an employee as requester to anyone else (a Direktur files his own request; server: 403 / 409)
+      const dir = await direkturEmployees(req, items.map((i) => i.id as number))
+      items = items.map((i) => ({ ...i, direktur: dir.has(i.id as number) }))
+    }
     if (type === 'projects' || type === 'cost-centers' || type === 'sites') {
       // default geofence radius of EACH item's PT (ADR 0016 §1: per-PT setting)
       const out: Item[] = []
@@ -94,6 +100,25 @@ async function loadType(req: PayloadRequest, type: MasterType, companies: number
     if ((err as { status?: number }).status === 403) return { items: [], hasMore: false }
     throw err
   }
+}
+
+/** Employees whose active account holds Direktur (pk-owner) through an active membership (ADR 0024). */
+async function direkturEmployees(req: PayloadRequest, employeeIds: number[]): Promise<Set<number>> {
+  const res = await req.payload.find({
+    collection: 'company-memberships',
+    where: { and: [{ employee: { in: employeeIds } }, { roles: { in: ['pk-owner'] } }, { active: { equals: true } }] },
+    depth: 0,
+    pagination: false,
+    select: { employee: true, user: true },
+    overrideAccess: true, // SYSTEM-READ: Direktur marker of employees the caller may already read
+    req,
+  })
+  const rows = res.docs as unknown as Array<{ employee?: unknown; user?: unknown }>
+  const users = [...new Set(rows.map((r) => relId(r.user)).filter((x): x is number => x !== undefined))]
+  if (users.length === 0) return new Set()
+  const active = await req.payload.find({ collection: 'users', where: { and: [{ id: { in: users } }, { active: { equals: true } }] }, depth: 0, pagination: false, select: { email: true }, overrideAccess: true /* SYSTEM-READ: active accounts */, req })
+  const ok = new Set(active.docs.map((d) => d.id as number))
+  return new Set(rows.filter((r) => ok.has(relId(r.user) ?? -1)).map((r) => relId(r.employee)).filter((x): x is number => x !== undefined))
 }
 
 const digest = (v: unknown) => createHash('sha256').update(JSON.stringify(v)).digest('hex')

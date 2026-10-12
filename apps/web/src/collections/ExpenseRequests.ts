@@ -282,8 +282,9 @@ export const ExpenseRequests: CollectionConfig = withAudit(
     },
     access: {
       read: requestReadAccess,
-      // Q-09 default: Staff/PM for themselves, Admin and Finance also on behalf of requesters.
-      create: rolesAllowed('pk-staff', 'pk-pm', 'pk-admin', 'pk-finance'),
+      // Q-09 default: Staff/PM for themselves, Admin and Finance also on behalf of requesters. ADR 0024 (owner
+      // 2026-10-11): the Direktur files his OWN requests (only for himself — drafts.ts on-behalf rule).
+      create: rolesAllowed('pk-staff', 'pk-pm', 'pk-admin', 'pk-finance', 'pk-owner'),
       update: requestUpdateAccess,
       delete: denyDeleteLogged('expense_request'),
     },

@@ -78,6 +78,31 @@ No data is moved. **APK drift schema 9** (nullable `site_id` on the outbox).
 - **APK:** sites in the attendance location picker (home site first) and in "Diabsenkan PM", masters cache per PT, site on
   the project detail and "Site penempatan" on the profile.
 
+**DRMS 10/10 Phase E — configurable approval rules + Direktur no-approval** (owner decision 2026-10-11, ADR 0024;
+supersedes parts of ADR 0021). **Database migrations:** `20261013_300000_d1010_approval_config` (schema:
+`approval_rules_requester_roles`), `20261013_300000_d1010_approval_config_guard` (zero-step rule guard, `g1_exception`
+`direktur_no_approval` check, "Disetujui" needs a decision row unless that exception), `20261013_300000_d1010_approval_config_data`
+(rule "Pengajuan Direktur" per PT that still has the default rules).
+
+### Added (Phase E)
+
+- **Aturan approval → "Peran pemohon"** (Direktur / PM / Staff / Finance / Admin; empty = any) used in rule selection with
+  the priority; rules **without approval level** ("Tanpa persetujuan — langsung ke antrian transfer Finance") allowed
+  only for Peran pemohon = Direktur (form + database); explanation and live preview in the rule form.
+- **A Direktur's own request goes straight to the Finance transfer queue** without approval: status "Tanpa persetujuan
+  (Antri Transfer)" / "(Verifikasi Nota)", timeline step "Persetujuan — Tanpa persetujuan — pengajuan Direktur (kebijakan
+  PT)" (web + APK), transfer queue badge, PDF note, Rekap Pengajuan column "Persetujuan", audit
+  `approval_policy_exception`; the LPJ shortfall and the receipt re-approval of such a request need no approval either.
+- API (additive): `approvalRule.selfApproval` `direktur_no_approval`, transfer queue `noApproval`, `/me`
+  `companies[].ownRequestNoApproval`, masters employees `direktur`, shortfall `noApproval`.
+- APK: info "Pengajuan Anda langsung ke antrian transfer Finance" for a Direktur, no Direktur offered as requester to
+  others, timeline / status / queue badge identical to the web.
+
+### Changed (Phase E)
+
+- The PM no longer files a request on a Direktur's behalf (ADR 0021 `direktur_via_pm` withdrawn for new requests: 403 at
+  the draft; Admin/Finance for a Direktur → 409 at submit). Requests already submitted under it keep working.
+
 ## [0.8.0] - 2026-10-12
 
 **Approval PM → Direktur (ADR 0021), RAP + Laporan harian (P3), DRMS 10/10 Phases A–C** (owner feedback 2026-10-10 /

@@ -4,6 +4,7 @@ import { relId, userId, type Role } from '@/access/roles'
 import { formatRupiah } from '@/lib/money'
 import { DEFAULT_TZ, startOfLocalDay } from '@/lib/time'
 
+import { isNoApproval } from './expense/decision'
 import type { ApprovalSnapshot } from './expense/rules'
 import { requestStatusLabel } from './expense/timeline'
 import { REQUEST_TYPE_LABELS, type RequestStatus, type RequestType } from './expense/types'
@@ -71,6 +72,15 @@ const DEFAULTS: Record<NotifyEvent, { title: string; body: string }> = {
  * the request only after it, through `expense.pending_approval`; Finance after the Direktur).
  */
 const PM_ACK_DEFAULT = { title: 'Persetujuan PM: {docNo}', body: '{docNo} menunggu persetujuan Anda sebagai PM project: {type} "{title}" {amount}.' }
+
+/**
+ * ADR 0024: the team PM hears of a Direktur's own request without approval when it reaches Finance (the
+ * request never waits for a decision: Draft → "Menunggu persetujuan" → "Disetujui" in one transaction).
+ */
+const NO_APPROVAL_TEAM_DEFAULT = {
+  title: 'Pengajuan Direktur: {docNo}',
+  body: '{type} "{title}" {amount} di project Anda diajukan oleh Direktur — tanpa persetujuan (kebijakan PT), langsung ke antrian Finance.',
+}
 
 /** The waiting "Diketahui" is the PM project's (ADR 0021 snapshot). */
 function pmAck(doc: Doc): boolean {
@@ -216,6 +226,15 @@ export async function projectPmUsers(req: PayloadRequest, project: number, compa
 
 /** Events + recipients of one transition (pure mapping; recipients resolved lazily). */
 export function eventsFor(prev: { status: RequestStatus; currentLevel?: number | null } | null, doc: Doc): Array<{ event: NotifyEvent; to: Target }> {
+  if (isNoApproval(doc.approvalSnapshot) && prev && prev.status !== doc.status) {
+    // ADR 0024: nobody decides — the transient "Menunggu persetujuan" is silent; on "Disetujui" Finance
+    // (transfer queue / receipt verification), the other requesters and the team PM are informed.
+    if (doc.status === 'pending_approval') return []
+    if (doc.status === 'approved' && prev.status === 'pending_approval') {
+      const base = baseEventsFor(prev, doc)
+      return relId(doc.project) === undefined ? base : [...base, { event: 'expense.team_submitted', to: 'pm' }]
+    }
+  }
   const base = baseEventsFor(prev, doc)
   // QA-18: the team PM of the project hears about submit / reject / transfer / LPJ revision / completion
   if (relId(doc.project) === undefined || !prev || prev.status === doc.status) return base
@@ -367,7 +386,12 @@ async function deliver(req: PayloadRequest, doc: Doc, events: Array<{ event: Not
     else if (e.to === 'finance') to = finance ??= await usersWithRole(req, 'pk-finance', doc)
     else if (e.to === 'pm') to = teamPmsFor(e.event, doc, (pms ??= await teamPms(req, doc)))
     else to = await stepUsers(req, doc, e.to)
-    const t = e.event === 'expense.pending_ack' && pmAck(doc) ? PM_ACK_DEFAULT : await template(req, e.event)
+    const t =
+      e.event === 'expense.pending_ack' && pmAck(doc)
+        ? PM_ACK_DEFAULT
+        : e.event === 'expense.team_submitted' && isNoApproval(doc.approvalSnapshot)
+          ? NO_APPROVAL_TEAM_DEFAULT
+          : await template(req, e.event)
     for (const uid of to) {
       if (uid === actor || done.has(`${e.event}:${uid}`)) continue
       done.add(`${e.event}:${uid}`)

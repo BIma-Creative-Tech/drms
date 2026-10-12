@@ -164,6 +164,15 @@ describe('AC-5: approval-rules refuse PM/Staff deciders, scope_manager and an op
 })
 
 describe('AC-6: G1-2 skip rule', () => {
+  // ADR 0024: these cases are about a PT WITHOUT the rule "Pengajuan Direktur" (a Direktur's own request would
+  // otherwise go straight to Finance, and one filed by Admin/Finance is refused) — switched off here.
+  const toggle = (active: boolean) => sqlAs('app', "UPDATE approval_rules SET active = $1 WHERE name = 'Pengajuan Direktur'", [active])
+  beforeAll(async () => {
+    await toggle(false)
+  })
+  afterAll(async () => {
+    await toggle(true)
+  })
   it('the only Direktur is the requester → "Diketahui" skipped (audit approval_skipped), Finance decides; PDF "(tidak berlaku — pemohon)"', async () => {
     const r = await onlyActive('pk-owner', [dirReq.id], () => submitted(w.users.admin, { requesterIds: [dirEmp], bankAccountId: accDir }))
     expect(r.body).toMatchObject({

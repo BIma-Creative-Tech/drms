@@ -191,7 +191,7 @@ void main() {
       expect(find.byKey(const Key('home-new-advance')), findsOneWidget);
     });
 
-    testWidgets('Direktur home: approval inbox with count, no create buttons', (tester) async {
+    testWidgets('Direktur home: approval inbox with count + own request buttons (ADR 0024)', (tester) async {
       await pumpScreen(
         tester,
         const HomeScreen(),
@@ -205,7 +205,8 @@ void main() {
       );
       expect(find.byKey(const Key('home-inbox')), findsOneWidget);
       expect(find.text('1 menunggu'), findsOneWidget);
-      expect(find.byKey(const Key('home-new-advance')), findsNothing);
+      // ADR 0024 (owner 2026-10-11): the Direktur files his own requests (straight to the Finance transfer queue)
+      expect(find.byKey(const Key('home-new-advance')), findsOneWidget);
     });
 
     testWidgets('network error is shown in Bahasa Indonesia with retry', (tester) async {

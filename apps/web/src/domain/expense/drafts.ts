@@ -9,7 +9,6 @@ import { rapRequirement } from '@/domain/rap/budget'
 
 import { normalizeLines, validateLines } from './lines'
 import { copyReceiptsForResubmit } from './receipts'
-import { requesterUsersAllDirektur, scopeManagerOf } from './snapshot'
 import { isBusinessDate, type RequestType } from './types'
 
 export type LineInputApi = {
@@ -193,20 +192,12 @@ export async function validateContent(
   // request (also at submit, so an older draft that breaks the rule cannot be sent) and for a Staff-only
   // caller who changes the requesters of someone else's draft. Before Q-09 (clearer message for Staff).
   if (uniq.length > 0) await assertStaffSelfOnly(req, uniq, ownPt, opts)
-  // ADR 0021 (owner decision 2026-10-10): a Direktur's own request is filed by the PM project of the
-  // request's project (cost center: its manager) on the Direktur's behalf — requesters = Direktur(s) of
-  // the PT only, creator = that PM. Approval then runs PM → Direktur under the narrow G1 exception.
-  const pmForDirektur =
-    !onBehalf &&
-    ownPt !== undefined &&
-    userId(req) === opts.creatorId &&
-    uniq.length > 0 &&
-    (await scopeManagerOf(req, { projectId: c.projectId ?? null, costCenterId: c.projectId ? null : (c.costCenterId ?? null) })) === opts.creatorId &&
-    (await requesterUsersAllDirektur(req, uniq, ownPt)) !== null
-  if (!onBehalf && !pmForDirektur) {
+  // ADR 0024 (owner decision 2026-10-11): the PM no longer files on a Direktur's behalf (ADR 0021
+  // `direktur_via_pm` withdrawn) — a Direktur files his own request (zero-step rule → Finance transfer queue).
+  if (!onBehalf) {
     const creatorEmp = ownPt !== undefined ? employeeIn(req, ownPt) : relId((req.user as { employee?: unknown } | null)?.employee)
     if (userId(req) === opts.creatorId && (creatorEmp === undefined || (uniq.length > 0 && !uniq.includes(creatorEmp)))) {
-      fail(403, 'Hanya Admin/Finance yang boleh membuat pengajuan atas nama orang lain (PM project: hanya atas nama Direktur, ADR 0021).')
+      fail(403, 'Hanya Admin/Finance yang boleh membuat pengajuan atas nama orang lain.')
     }
   }
 

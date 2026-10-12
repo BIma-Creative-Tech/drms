@@ -94,6 +94,7 @@ CompanyMembership companyMembershipFromJson(Json j) {
     roles: roles,
     employee: emp != null ? _employee(emp) : (empId == null ? null : Employee(id: empId, code: '', name: '')),
     capabilities: _capabilities(_map(j['capabilities']), roles),
+    ownRequestNoApproval: j['ownRequestNoApproval'] == true,
     settings: CompanySettings(
       defaultGeofenceRadiusM: _int(s['defaultGeofenceRadiusM'], 100),
       receiptRoundingTolerance: _int(s['receiptRoundingTolerance']),

@@ -43,3 +43,13 @@ enum RequestStatus {
   bool get isFinal => this == completed || this == rejected || this == cancelled;
   bool get waitsForDecision => this == pendingAck || this == pendingApproval;
 }
+
+/// ADR 0024: "Disetujui" of a Direktur's own request without approval (web `NO_APPROVAL_STATUS_LABELS`).
+const noApprovalStatusLabels = {
+  RequestType.advance: 'Tanpa persetujuan (Antri Transfer)',
+  RequestType.reimburse: 'Tanpa persetujuan (Verifikasi Nota)',
+};
+
+/// Fallback status label when the server's `statusLabel` is missing (the server label wins).
+String statusLabelFallback(RequestType type, RequestStatus status, {bool noApproval = false}) =>
+    noApproval && status == RequestStatus.approved ? noApprovalStatusLabels[type]! : status.label;

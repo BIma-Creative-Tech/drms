@@ -43,7 +43,8 @@ export const requestReadAccess: Access = byRole({
  * editable by their creator/requesters only (G8, US-04).
  */
 export const requestUpdateAccess: Access = async (args) => {
-  const own = await byRole({ 'pk-staff': ownRequest, 'pk-pm': ownRequest, 'pk-admin': ownRequest, 'pk-finance': ownRequest })(args)
+  // ADR 0024: the Direktur edits his own drafts too
+  const own = await byRole({ 'pk-staff': ownRequest, 'pk-pm': ownRequest, 'pk-admin': ownRequest, 'pk-finance': ownRequest, 'pk-owner': ownRequest })(args)
   if (own === false) return false
   const draft: Where = { status: { in: ['draft', 'receipt_revision'] } }
   return own === true ? draft : { and: [draft, own] }

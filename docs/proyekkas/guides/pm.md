@@ -28,9 +28,10 @@ tangan**. Beranda PM juga punya kartu **Menunggu tindakan saya**.
   yang menunggu Anda, notifikasi "Pengajuan tim: …" tidak dikirim lagi (sudah diwakili notifikasi persetujuan).
 - **Pengajuan Anda sendiri** (Anda pemohon) atau pengajuan yang **Anda buat untuk Staff**: langkah PM dilewati
   otomatis dan tercatat "(tidak berlaku — pemohon)"; Direktur yang memutuskan.
-- **Pengajuan untuk Direktur** dibuat oleh Anda (PM project) atas nama Direktur: buat pengajuan dengan Direktur sebagai
-  pemohon. Anda menyetujui sebagai PM project, lalu Direktur menyetujui. Ini pengecualian yang disetujui owner
-  (10 Okt 2026) dan tercatat di panel dan PDF: "Pengajuan Direktur — diajukan oleh PM (kebijakan owner 2026-10-10)".
+- **Pengajuan untuk Direktur:** sejak 11 Okt 2026 (keputusan owner, ADR 0024) Anda **tidak lagi** membuatnya atas nama
+  Direktur (sistem menolak; APK tidak menawarkan Direktur sebagai pemohon). Direktur mengajukan sendiri dan pengajuannya
+  langsung ke antrian transfer Finance tanpa persetujuan; Anda menerima notifikasi "Pengajuan Direktur: …" bila
+  pengajuan itu di project Anda. Pengajuan yang dulu Anda buat untuk Direktur tetap Anda setujui seperti biasa.
 - **Kekurangan LPJ** di atas nominal disetujui + toleransi: persetujuan ulang juga lewat Anda dulu, lalu Direktur —
   di **web → Persetujuan → Kekurangan LPJ di atas nominal disetujui**.
 - PM lain (termasuk PM penugasan tim yang bukan PM di data project) tidak bisa memutuskan: sistem menolak dan

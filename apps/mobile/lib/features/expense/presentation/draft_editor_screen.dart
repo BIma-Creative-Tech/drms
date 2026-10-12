@@ -302,7 +302,23 @@ class _DraftEditorScreenState extends ConsumerState<DraftEditorScreen> {
     final m = widget.masters;
     final selfOnly = _selfOnlyEmployee();
     final allEmployees = m[MasterTypes.employees] ?? const <MasterItem>[];
-    final employees = requesterChoices(allEmployees, (e) => e.id, selfOnlyEmployee: selfOnly);
+    final ownEmployee = ref.read(currentProfileProvider)?.forCompany(_d.companyId).employee?.id;
+    final employees = requesterChoices(
+      allEmployees,
+      (e) => e.id,
+      selfOnlyEmployee: selfOnly,
+      isDirektur: (e) => e.extra['direktur'] == true,
+      ownEmployee: ownEmployee,
+    );
+    // ADR 0024: the Direktur's own request in a PT with the rule "Pengajuan Direktur" → straight to Finance.
+    final account = ref.watch(accountProfileProvider);
+    final membership =
+        account?.company(_d.companyId) ?? ((account?.companies.length ?? 0) == 1 ? account!.companies.first : null);
+    final direkturNoApproval =
+        (membership?.ownRequestNoApproval ?? false) &&
+        ownEmployee != null &&
+        _d.requesterIds.length == 1 &&
+        _d.requesterIds.single == ownEmployee;
     final accounts = (m[MasterTypes.bankAccounts] ?? const [])
         .where((a) => _d.requesterIds.isEmpty || _d.requesterIds.contains((a.extra['employee'] as num?)?.toInt()))
         .toList();
@@ -349,6 +365,17 @@ class _DraftEditorScreenState extends ConsumerState<DraftEditorScreen> {
                       ),
                     ),
                   ],
+                ),
+              ),
+            if (direkturNoApproval)
+              Card(
+                key: const Key('draft-direktur-no-approval'),
+                color: Theme.of(context).colorScheme.secondaryContainer,
+                margin: const EdgeInsets.only(bottom: 12),
+                child: ListTile(
+                  leading: const Icon(Icons.info_outline),
+                  title: Text(t.draftDirekturNoApprovalInfo),
+                  subtitle: Text(t.draftDirekturNoApprovalHint),
                 ),
               ),
             Text(t.fieldType),

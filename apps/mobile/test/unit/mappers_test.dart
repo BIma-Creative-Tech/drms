@@ -53,6 +53,8 @@ void main() {
     expect(p.imageTargets.receiptsMaxPx, 2000);
     expect(userProfileFromJson(meJson(roles: ['pk-owner'])).homeKind, HomeKind.direktur);
     expect(userProfileFromJson(meJson(roles: ['pk-finance'])).canCreateRequests, isFalse);
+    // ADR 0024: the Direktur files his own requests
+    expect(userProfileFromJson(meJson(roles: ['pk-owner'])).canCreateRequests, isTrue);
   });
 
   test('me capabilities (E1) drive inbox / team monitor, not role hardcoding', () {

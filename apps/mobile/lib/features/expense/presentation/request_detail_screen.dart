@@ -149,6 +149,18 @@ class _DetailBody extends ConsumerWidget {
               ],
             ),
           ),
+        // ADR 0024: a Direktur's own request without approval (audited policy exception; web panel note).
+        if (d.approvalRule?.noApproval ?? false)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: Row(
+              children: [
+                const Icon(Icons.info_outline, size: 18),
+                const SizedBox(width: 6),
+                Expanded(child: Text(t.noApprovalNote, key: const Key('no-approval-note'))),
+              ],
+            ),
+          ),
         section(t.sectionRequestDetails, key: const Key('section-details')),
         if (ptText != null) row(t.draftCompany, ptText, key: const Key('detail-company')),
         row(t.grandTotal, formatRupiah(d.grandTotal)),

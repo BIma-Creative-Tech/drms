@@ -274,6 +274,47 @@ Map<String, dynamic> pmDetailJson({
   'approvalRule': rule ?? pmRuleJson(),
 };
 
+/// ADR 0024 rule snapshot: a Direktur's own request under the zero-step rule "Pengajuan Direktur" (no approval).
+Map<String, dynamic> noApprovalRuleJson() => {
+  'id': 9,
+  'name': 'Pengajuan Direktur',
+  'acknowledge': 'none',
+  'acknowledgerUserId': null,
+  'acknowledgeDelegatedTo': null,
+  'acknowledgeDelegationReason': null,
+  'acknowledgeBy': 'role',
+  'acknowledgeRole': null,
+  'decisionRoles': ['pk-owner', 'pk-finance'],
+  'selfApproval': 'direktur_no_approval',
+  'skipped': <Object>[],
+  'steps': <Object>[],
+  'signDiajukan': 'required',
+  'signDibuat': 'required',
+};
+
+/// Detail of a Direktur's own Pengajuan Baru that went straight to the Finance transfer queue (ADR 0024).
+Map<String, dynamic> noApprovalDetailJson({
+  String status = 'approved',
+  List<Map<String, dynamic>> transfers = const [],
+}) => {
+  ...detailJson(
+    status: status,
+    allowed: const [],
+    currentLevel: 0,
+    approvals: [_appr(1, 'diajukan', 0, 'Dedi Direktur', 'signed'), _appr(2, 'dibuat', 0, 'Dedi Direktur', 'signed')],
+  ),
+  'type': 'advance',
+  'typeLabel': 'Pengajuan Baru',
+  'statusLabel': status == 'approved' ? 'Tanpa persetujuan (Antri Transfer)' : 'Ditransfer',
+  'approvedAmount': 1447500,
+  'requesters': [
+    {'id': 15, 'code': 'E15', 'name': 'Dedi Direktur'},
+  ],
+  'createdBy': {'id': 5, 'name': 'Dedi Direktur'},
+  'transfers': transfers,
+  'approvalRule': noApprovalRuleJson(),
+};
+
 Map<String, dynamic> direkturDashboardJson() => {
   'asOf': '2026-09-26',
   'month': '2026-09',

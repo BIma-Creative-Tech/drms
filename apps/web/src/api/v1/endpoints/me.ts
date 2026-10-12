@@ -2,6 +2,8 @@ import type { PayloadRequest } from 'payload'
 
 import { companyContextOf, membershipsOf, relId, userRoles, type Membership, type Role } from '@/access/roles'
 import { appSettings, companyById, settings } from '@/domain/companies'
+import { DIREKTUR_ROLE } from '@/domain/expense/decision'
+import { loadActiveRules } from '@/domain/expense/snapshot'
 import { resolveDisplayName } from '@/domain/user-display-name'
 import { privacyStatusOf } from '@/legal/privacy-notice'
 import { DEFAULT_TZ } from '@/lib/time'
@@ -118,6 +120,8 @@ export const meEndpoint = v1({
         employeeId: m.employee,
         employee: m.employee !== null ? (employees.get(m.employee) ?? null) : null,
         capabilities: capabilitiesOf(roles, { fieldReportsEnabled: c.fieldReportsEnabled === true }),
+        // ADR 0024: the Direktur's own requests in this PT go straight to the Finance transfer queue (APK hint)
+        ownRequestNoApproval: roles.includes(DIREKTUR_ROLE) && (await loadActiveRules(req, 'expense_request', m.company)).some((r) => r.steps.length === 0 && r.requesterRoles?.length === 1 && r.requesterRoles[0] === DIREKTUR_ROLE),
         settings: {
           defaultGeofenceRadiusM: c.defaultGeofenceRadiusM,
           receiptRoundingTolerance: c.receiptRoundingTolerance,

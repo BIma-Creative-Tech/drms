@@ -1072,7 +1072,11 @@ export interface ApprovalRule {
   project?: (number | null) | Project;
   costCenter?: (number | null) | CostCenter;
   /**
-   * Angka kecil dievaluasi lebih dulu.
+   * Aturan berlaku bila SETIAP pemohon memegang salah satu peran ini di PT pengajuan. Kosong = semua pemohon.
+   */
+  requesterRoles?: ('pk-owner' | 'pk-pm' | 'pk-staff' | 'pk-finance' | 'pk-admin')[] | null;
+  /**
+   * Angka kecil dievaluasi lebih dulu (aturan "Pengajuan Direktur" = 10, default = 100).
    */
   priority?: number | null;
   acknowledge: 'required' | 'optional' | 'none';
@@ -1081,6 +1085,9 @@ export interface ApprovalRule {
   acknowledgeUser?: (number | null) | User;
   signDiajukan: 'required' | 'optional' | 'none';
   signDibuat: 'required' | 'optional' | 'none';
+  /**
+   * Kosongkan HANYA untuk aturan Peran pemohon = Direktur: "Tanpa persetujuan — langsung ke antrian transfer Finance".
+   */
   steps?:
     | {
         level: number;
@@ -3424,6 +3431,7 @@ export interface ApprovalRulesSelect<T extends boolean = true> {
   category?: T;
   project?: T;
   costCenter?: T;
+  requesterRoles?: T;
   priority?: T;
   acknowledge?: T;
   acknowledgeBy?: T;
