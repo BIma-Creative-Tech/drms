@@ -60,7 +60,7 @@ jobs:
   integration:
     name: integration (throwaway Postgres, migrations as owner, tests as app role)
     runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '"ubuntu-24.04"') }}
-    timeout-minutes: 40 # self-hosted = 2 vCPU
+    timeout-minutes: 70 # self-hosted = 2 vCPU; the suite outgrew 40 min
     services:
       postgres:
         image: postgres:16.15-bookworm@sha256:efedf3595f1d6f415c08568ba171029bf54052e754cc9f030e3f2412b21f3d67
