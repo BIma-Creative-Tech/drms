@@ -415,7 +415,7 @@ export const ExpenseRequestDetail = ExpenseRequestListItem.extend({
     .meta({ id: 'Settlement', description: 'T5 LPJ (Pengajuan Baru only; null before "Nota Lengkap").' }),
   budget: z
     .object({ basis: z.enum(['project', 'none']), pctBefore: z.number().nullable(), pctAfter: z.number().nullable() })
-    .meta({ description: 'US-26 preview (committed % before → after); cost centers: "none" (Q-24).' }),
+    .meta({ description: 'US-26 preview (committed % before → after); cost centers: "none" (Q-24). Owner 2026-10-11: "none" + nulls for callers without a money role in the PT (Staff) — the % with the total would reveal the RAB.' }),
   openWarningFlags: z.number().int(),
   allowedActions: z.array(ActionEnum).meta({ description: 'UI hint; the server re-checks every action.' }),
   resubmitOfId: id.nullable(),

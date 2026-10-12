@@ -106,8 +106,8 @@ describe('registry guard: every entity maps to exactly one module', () => {
   })
 
   it('every custom view item points at a registered admin view path', async () => {
-    const { E2_ADMIN_VIEWS, E6_ADMIN_VIEWS, F2_ADMIN_VIEWS, F3_ADMIN_VIEWS, FR1_ADMIN_VIEWS, MC2_ADMIN_VIEWS, S2A_ADMIN_VIEWS, S3E_ADMIN_VIEWS } = await import('@/admin/config')
-    const paths = new Set(Object.values({ ...F2_ADMIN_VIEWS, ...F3_ADMIN_VIEWS, ...E2_ADMIN_VIEWS, ...E6_ADMIN_VIEWS, ...S2A_ADMIN_VIEWS, ...S3E_ADMIN_VIEWS, ...MC2_ADMIN_VIEWS, ...FR1_ADMIN_VIEWS }).map((v) => ('path' in v ? v.path : '')))
+    const { E2_ADMIN_VIEWS, E6_ADMIN_VIEWS, F2_ADMIN_VIEWS, F3_ADMIN_VIEWS, FR1_ADMIN_VIEWS, LOAN_ADMIN_VIEWS, MC2_ADMIN_VIEWS, S2A_ADMIN_VIEWS, S3E_ADMIN_VIEWS } = await import('@/admin/config')
+    const paths = new Set(Object.values({ ...F2_ADMIN_VIEWS, ...F3_ADMIN_VIEWS, ...E2_ADMIN_VIEWS, ...E6_ADMIN_VIEWS, ...S2A_ADMIN_VIEWS, ...S3E_ADMIN_VIEWS, ...MC2_ADMIN_VIEWS, ...FR1_ADMIN_VIEWS, ...LOAN_ADMIN_VIEWS }).map((v) => ('path' in v ? v.path : '')))
     for (const m of MODULES)
       for (const s of m.sections)
         for (const i of s.items) if ('view' in i && !i.view.startsWith('/collections/')) expect(paths, `${m.id}: ${i.view}`).toContain(i.view)
@@ -156,10 +156,13 @@ describe('tile visibility per role (real config: admin.hidden + access.read + ro
     expect(hrefs(m)).toContain('/admin/collections/web-sessions') // admin-only entity
   })
 
-  it('staff-only: a small set — own requests/receipts, own attendance recap (profile + notifications live in the top bar)', async () => {
+  it('staff-only: a small set — own requests/receipts, own attendance recap, their projects (profile + notifications live in the top bar)', async () => {
     const m = await modulesFor(['pk-staff'])
     // QA-20(c): "Pengguna & Akses" (= own profile only) and "Sistem" (= own notifications only) are gone
-    expect(ids(m).sort()).toEqual(['absensi', 'dashboard', 'keuangan'])
+    expect(ids(m).sort()).toEqual(['absensi', 'dashboard', 'keuangan', 'proyek'])
+    // owner decision 2026-10-11: the project list (read-only, no money); one item → the tile opens it directly
+    expect(m.find((x) => x.id === 'proyek')).toMatchObject({ href: '/admin/collections/projects', landing: false })
+    expect(m.find((x) => x.id === 'proyek')!.sections.flatMap((s) => s.items.map((i) => i.href))).toEqual(['/admin/collections/projects'])
     const keu = m.find((x) => x.id === 'keuangan')!
     expect(keu.sections.flatMap((s) => s.items.map((i) => i.href))).toEqual(['/admin/collections/expense-requests', '/admin/collections/expense-requests/create', '/admin/collections/receipts', '/admin/collections/settlements'])
     const abs = m.find((x) => x.id === 'absensi')!
@@ -167,7 +170,8 @@ describe('tile visibility per role (real config: admin.hidden + access.read + ro
     expect(abs.sections.flatMap((s) => s.items.map((i) => i.label))).toEqual(['Absen', 'Rekap absensi saya'])
     expect(hrefs(m)).not.toContain('/admin/kas')
     expect(hrefs(m)).not.toContain('/admin/laporan')
-    for (const hidden of ['persetujuan', 'proyek', 'master', 'media', 'pengaturan', 'laporan', 'pengguna', 'sistem']) expect(ids(m)).not.toContain(hidden)
+    for (const hidden of ['persetujuan', 'master', 'media', 'pengaturan', 'laporan', 'pengguna', 'sistem']) expect(ids(m)).not.toContain(hidden)
+    for (const no of ['/admin/pinjaman', '/admin/progress', '/admin/addendum', '/admin/collections/budget-lines', '/admin/collections/rap-items']) expect(hrefs(m)).not.toContain(no)
   })
 
   it('QA-20(c) PM: no Master Data / Pengaturan tiles (read-only reference data), no Sistem (own notifications only)', async () => {
@@ -202,10 +206,10 @@ describe('tile visibility per role (real config: admin.hidden + access.read + ro
     expect(navKeys(await modulesFor(['pk-owner'], 0, true))).toEqual(expect.arrayContaining(FIELD))
     expect(navKeys(await modulesFor(['pk-pm'], 0, true))).toEqual(expect.arrayContaining(FIELD))
     // Staff (assigned projects): input + lists, no weekly recap; the Proyek tile opens its landing page
-    // (D9) whose first sub-menu is "Unit & kontrak"
+    // (D9) whose first sub-menu is the project list (owner decision 2026-10-11)
     const staff = await modulesFor(['pk-staff'], 0, true)
     expect(navKeys(staff).filter((k) => FIELD.includes(k as string))).toEqual(['unit-kontrak', 'laporan-servis', 'aktivitas-aftersales'])
-    expect(staff.find((x) => x.id === 'proyek')).toMatchObject({ href: '/admin/modul/proyek', firstHref: '/admin/unit-kontrak', landing: true })
+    expect(staff.find((x) => x.id === 'proyek')).toMatchObject({ href: '/admin/modul/proyek', firstHref: '/admin/collections/projects', landing: true })
     expect(moduleForPath('/admin/unit-kontrak/kontrak/5')).toBe('proyek')
     expect(moduleForPath('/admin/aftersales/aktivitas/detail/9')).toBe('proyek')
     expect(moduleForPath('/admin/laporan-servis/baru')).toBe('proyek')

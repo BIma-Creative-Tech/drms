@@ -13,6 +13,8 @@ import '../../expense/presentation/widgets/receipt_mismatch_chip.dart';
 import '../../addendum/presentation/addendum_providers.dart';
 import '../../addendum/presentation/addendum_screens.dart';
 import '../../companies/presentation/company_chip.dart';
+import '../../loans/presentation/loan_providers.dart';
+import '../../loans/presentation/loan_widgets.dart';
 import '../application/inbox_providers.dart';
 
 /// Inbox label of the caller's step: the server's `stepLabel` (E1) wins; older servers get the local text.
@@ -24,7 +26,8 @@ String inboxStepLabel(AppLocalizations t, InboxItem it) {
 }
 
 /// PM project / Direktur / Finance inbox (ADR 0013, ADR 0021) with budget impact (red above the warn %, US-26) and open flags (US-59).
-/// E5: budget addenda waiting for the caller are listed above the expense requests ([AddendumInboxSection]).
+/// E5: budget addenda waiting for the caller are listed above the expense requests ([AddendumInboxSection]);
+/// ADR 0022: inter-project loans waiting for the Direktur ([LoanInboxSection]).
 class InboxScreen extends ConsumerWidget {
   const InboxScreen({super.key});
 
@@ -36,6 +39,7 @@ class InboxScreen extends ConsumerWidget {
       body: RefreshIndicator(
         onRefresh: () {
           ref.invalidate(addendumInboxProvider);
+          ref.invalidate(loanInboxProvider);
           ref.invalidate(lpjQueueProvider);
           return ref.refresh(inboxProvider.future);
         },
@@ -47,6 +51,7 @@ class InboxScreen extends ConsumerWidget {
                   padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
                   children: [
                     const AddendumInboxSection(),
+                    const LoanInboxSection(),
                     const LpjQueueSection(),
                     Padding(
                       padding: const EdgeInsets.all(32),
@@ -64,7 +69,7 @@ class InboxScreen extends ConsumerWidget {
                   padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
                   itemCount: page.items.length + 1,
                   itemBuilder: (_, i) => i == 0
-                      ? const Column(children: [AddendumInboxSection(), LpjQueueSection()])
+                      ? const Column(children: [AddendumInboxSection(), LoanInboxSection(), LpjQueueSection()])
                       : InboxCard(item: page.items[i - 1]),
                 ),
         ),

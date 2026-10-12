@@ -6,6 +6,44 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed (DRMS 10/10 follow-up — Staff see projects without money, owner 2026-10-11)
+
+- Web: Staff get the "Proyek" module — the list of their assigned projects (search / filter) and the project page
+  read-only (no Simpan): tab Proyek without RAB, tab RAP with codes, volumes and realised volume only, tab Pengajuan with
+  their own requests only; no tab Pinjaman for Staff (shown to Direktur, Admin, Finance and PM only).
+- Project money is now hidden from Staff at the API level (field read access, `access/money.ts`): `projects.budget`
+  (RAB / contract value), `rap-items.unitPrice` and the RAB % of approval rows (`approvals.budgetPctBefore/After`) are
+  readable only with a money role (Direktur, Admin, Finance, PM) in the row's PT — also through `?select=` and `depth`
+  population; a `where` / `sort` on those fields is refused. `/api/v1/projects` returns `contractValue: null` for
+  Staff; `GET /api/v1/expense-requests/{id}` returns `budget: {basis: "none", pctBefore: null, pctAfter: null}` and
+  null `approvals[].budgetPct*` for callers without a money role (the % with the request total revealed the RAB).
+- APK: "Proyek" menu for Staff (tabs Proyek / RAP / Pengajuan — own requests only, no Pinjaman); no contract value row
+  for Staff; the request detail drops the "Dampak anggaran" row for Staff instead of showing "Tanpa anggaran".
+
+**DRMS 10/10 Phase D — Pinjaman antar project (ADR 0022, owner D6 + Q-L1…Q-L7 2026-10-11).** The PM of the borrower
+project submits a loan from another project of the SAME PT (Dana or Barang/material, value in Rp, no interest, due date
+required); one Direktur decides (G1: another Direktur when the PM is a Direktur; the PT's only Direktur may approve his
+own loan, recorded as `direktur_self`); the lender PM is notified. Repayments are recorded by the borrower PM or Finance
+without approval (append-only, void with reason) → Sebagian kembali → Lunas; "Terlambat" is derived from the due date.
+Notional allocation: **no cash entry is created** for a loan or a repayment; RAB / RAP / realisation unchanged.
+
+**Database migrations:** `20261013_100000_d1010_project_loans` (tables `project_loans`, `project_loan_repayments`,
+`approvals.loan_id`, enum values `project_loan`, `companies.reminder_loan_overdue_enabled`) and
+`20261013_100100_d1010_project_loans_guard` (same-PT triggers, transitions + frozen content, repaid = Σ posted repayments,
+append-only repayments, approvals owner CHECK + G1 branch, reminder rule `loan_overdue`, sequence
+`PJ/{COMPANY}/{YY}{MM}/{seq}` seeded per PT). Additive; `down()` drops the new objects (pre-production).
+
+### Added (DRMS 10/10 Phase D — loans)
+
+- API `/api/v1/project-loans`: list (D8 pages, search, filters project/role/status/overdue), `inbox`, `options`, detail,
+  create / edit Draft / submit / cancel / approve / reject, `repayments` add and `repayments/:rid/void`; OpenAPI updated.
+- Web: Keuangan → Pinjaman (list, form, detail with the fixed decision bar for the Direktur, repayment dialog, void),
+  project tab "Pinjaman" (diterima / diberikan / terlambat), section in Persetujuan, dashboard card (Direktur, Finance,
+  PM), report "Pinjaman antar project" (per-loan + per-project summary, CSV / Excel / PDF).
+- Daily reminder for overdue loans to the borrower PM + Direktur (per-PT switch "Pinjaman antar project terlambat").
+- APK: project tab "Pinjaman", loan form (create / edit Draft, submit), detail, Direktur decision from the inbox (online
+  only; repayments stay on the web in v1).
+
 ## [0.8.0] - 2026-10-12
 
 **Approval PM → Direktur (ADR 0021), RAP + Laporan harian (P3), DRMS 10/10 Phases A–C** (owner feedback 2026-10-10 /

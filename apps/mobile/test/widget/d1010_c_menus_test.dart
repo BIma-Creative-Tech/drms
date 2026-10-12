@@ -160,7 +160,7 @@ void main() {
 
       await tester.tap(find.byKey(const Key('tab-project-requests')));
       await tester.pumpAndSettle();
-      expect(api.requestCalls.last, (projectId: 9, q: '', status: null, page: 1));
+      expect(api.requestCalls.last, (projectId: 9, q: '', status: null, mine: false, page: 1));
       expect(find.byKey(const Key('project-request-42')), findsOneWidget);
       expect(find.byKey(const Key('project-request-44')), findsOneWidget);
       await tester.tap(find.byKey(const Key('project-requests-status')));
@@ -187,8 +187,40 @@ void main() {
       ],
     );
 
-    testWidgets('home: Staff has neither Proyek nor Finance', (tester) async {
+    testWidgets(
+      'project tabs for Staff (owner 2026-10-11): no contract value, no RAP money, no Pinjaman, own requests',
+      (tester) async {
+        final api = FakeProjectsApi(noMoney: true);
+        await pumpRouted(
+          tester,
+          '/projects/9',
+          roles: {Role.staff},
+          overrides: [projectsApiProvider.overrideWithValue(api)],
+        );
+        expect(find.byKey(const Key('tab-project-info')), findsOneWidget);
+        expect(find.byKey(const Key('tab-project-rap')), findsOneWidget);
+        expect(find.byKey(const Key('tab-project-requests')), findsOneWidget);
+        expect(find.byKey(const Key('tab-project-loans')), findsNothing);
+        expect(find.text('PRJ-09'), findsWidgets);
+        expect(tester.widget<Text>(find.byKey(const Key('project-pm'))).data, 'Rudi Hartono');
+        expect(find.byKey(const Key('project-contract')), findsNothing);
+        expect(find.byKey(const Key('project-rap-remaining')), findsNothing);
+        expect(find.textContaining('Rp'), findsNothing);
+
+        await tester.tap(find.byKey(const Key('tab-project-requests')));
+        await tester.pumpAndSettle();
+        expect(api.requestCalls.last, (projectId: 9, q: '', status: null, mine: true, page: 1));
+      },
+    );
+
+    testWidgets('home: Staff has Proyek (owner 2026-10-11), no Finance', (tester) async {
       await home(tester, {Role.staff});
+      expect(find.byKey(const Key('home-projects')), findsOneWidget);
+      expect(find.byKey(const Key('home-finance')), findsNothing);
+    });
+
+    testWidgets('home: Operator/Anggota has neither Proyek nor Finance', (tester) async {
+      await home(tester, {Role.operator});
       expect(find.byKey(const Key('home-projects')), findsNothing);
       expect(find.byKey(const Key('home-finance')), findsNothing);
     });

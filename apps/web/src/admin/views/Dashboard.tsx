@@ -18,6 +18,7 @@ import { officeScope, teamScope } from '@/domain/reports/scope'
 import { docHref } from '../doc-links'
 
 import { TeamTodayWidget } from './Absensi'
+import { LoanCard } from './dashboard-loans'
 import { RapMonitorCard } from './dashboard-rap'
 import { SlaTransferCard } from './dashboard-sla'
 import { ChartHover } from './ChartHover'
@@ -695,6 +696,8 @@ async function Owner({ req, months }: { req: PayloadRequest; months: 6 | 12 }) {
         <SlaTransferCard req={req} span={12} i={8} />
         {/* DRMS 10/10 point 2–4 (D4): RAP realisation per project, items over plan → the project's RAP tab */}
         <RapMonitorCard req={req} span={12} i={8} />
+        {/* ADR 0022 §9: inter-project loans — outstanding / overdue per project, loans waiting for the Direktur */}
+        <LoanCard req={req} span={12} i={8} />
         <TrendCard id="owner-trend" rows={v.requestTrend} title="Tren pengajuan" sub="Jumlah pengajuan per bulan (tanggal pengajuan)" span={6} i={8} />
         <Card id="accounts" title="Saldo per akun" sub="Akun nonaktif bersaldo 0 disembunyikan" span={3} i={9}>
           <HBarList
@@ -970,6 +973,7 @@ async function Finance({ req }: { req: PayloadRequest }) {
         <CategoryCard id="finance-categories" c={v.categories} span={4} i={13} sub="Dicairkan 6 bulan terakhir" />
 
         <SlaTransferCard req={req} span={12} i={14} />
+        <LoanCard req={req} span={12} i={14} />
         <Card id="period-close" title="Tutup buku" span={6} i={14} action={{ href: '/admin/tutup-buku', label: 'Tutup buku' }}>
           <p className="pk-kpi-x" data-pk-kpi="last-closed" style={{ fontSize: 14 }}>
             {d.lastClosedPeriod ? (
@@ -1082,6 +1086,7 @@ async function Pm({ req }: { req: PayloadRequest }) {
         {/* ADR 0021: the PM project approves its requests first ("Persetujuan PM") */}
         <InboxCard id="pm-inbox" items={v.inbox} count={d.waitingForMe} span={12} i={8} />
         <TeamWaitingCard id="pm-waiting" data={d.teamWaiting} span={6} i={8} />
+        <LoanCard req={req} span={6} i={8} />
         <Card id="team-latest" title="Pengajuan tim terbaru" span={6} i={9} action={{ href: ER, label: 'Lihat semua' }}>
           <DataTable<R>
             id="team-latest"

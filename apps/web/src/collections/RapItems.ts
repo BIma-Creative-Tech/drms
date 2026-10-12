@@ -1,7 +1,8 @@
 import type { CollectionConfig } from 'payload'
 
 import { denyAll } from '@/access/roles'
-import { assignedProjects, byRole, fieldRoles, teamProjects } from '@/access/policies'
+import { moneyRead } from '@/access/money'
+import { assignedProjects, byRole, teamProjects } from '@/access/policies'
 import { withAudit } from '@/audit/hooks'
 import { RAP_KIND_LABELS, RAP_KINDS } from '@/domain/rap/rules'
 import { activeField, uuidField } from '@/fields/common'
@@ -9,8 +10,8 @@ import { companyField, companyHook } from '@/fields/company'
 
 import { ro } from './fields-f2'
 
-/** Prices/values never reach Staff (owner decision 2026-10-10) — field read on the price columns. */
-const priceRead = fieldRoles('pk-admin', 'pk-owner', 'pk-finance', 'pk-pm')
+/** Prices/values never reach Staff (owner decision 2026-10-10) — field read on the price columns (money roles of the row's PT). */
+const priceRead = moneyRead('rap-items')
 
 /**
  * P3 RAP item of a construction project (ADR 0020 §C): `pekerjaan` (volume drives the stage progress)

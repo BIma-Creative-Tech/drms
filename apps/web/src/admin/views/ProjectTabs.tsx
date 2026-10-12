@@ -2,7 +2,7 @@ import { Gutter } from '@payloadcms/ui'
 import type { DocumentViewServerProps, PayloadRequest, Where } from 'payload'
 import React from 'react'
 
-import { hasRoleAny } from '@/access/roles'
+import { employeeIn, hasRoleAny, relId, rolesIn, userId } from '@/access/roles'
 import { KAS_STYLE } from '@/admin/components/kas/style'
 import { ListToolbar, Pager } from '@/admin/components/list/ListToolbar'
 import { matchesQuery, pageOfFind, paginate, parseListQuery, searchWhere } from '@/admin/list-query'
@@ -149,7 +149,7 @@ export async function ProjectRapTab(props: DocumentViewServerProps) {
           <Card
             id="project-rap-items"
             title="Rincian RAP per item"
-            sub="Realisasi = total baris pengajuan yang sudah disetujui Direktur, dibebankan ke item RAP"
+            sub={prices ? 'Realisasi = total baris pengajuan yang sudah disetujui Direktur, dibebankan ke item RAP' : 'Volume rencana dan realisasi volume dari laporan harian'}
             action={manage ? { href: `/admin/laporan-harian/rap/${id}`, label: rap.canEdit ? 'Kelola RAP' : 'Halaman RAP' } : undefined}
           >
             <ListToolbar
@@ -231,6 +231,21 @@ const STATUS_GROUPS: Record<string, { label: string; statuses: readonly RequestS
 
 type Row = ReturnType<typeof listItem>
 
+/**
+ * Staff-only in the project's PT → "created by me OR naming my employee" (the `own` rule of domain/expense/access.ts);
+ * any other role there → null (the collection read scope alone). The project must be readable by the caller.
+ */
+async function ownOnlyWhere(req: PayloadRequest, projectId: number): Promise<Where | null> {
+  const p = (await req.payload.findByID({ collection: 'projects', id: projectId, depth: 0, select: { company: true }, user: req.user, overrideAccess: false /* caller's read scope */, req }).catch(() => null)) as { company?: unknown } | null
+  const company = relId(p?.company)
+  const roles = rolesIn(req, company)
+  if (!roles.includes('pk-staff') || roles.some((r) => r !== 'pk-staff')) return null
+  const or: Where[] = [{ createdBy: { equals: userId(req) ?? -1 } }]
+  const emp = employeeIn(req, company)
+  if (emp !== undefined) or.push({ requesters: { in: [emp] } })
+  return { or }
+}
+
 export async function ProjectRequestsTab(props: DocumentViewServerProps) {
   const req = props.initPageResult.req as PayloadRequest
   const id = idOf(props)
@@ -243,6 +258,9 @@ export async function ProjectRequestsTab(props: DocumentViewServerProps) {
   if (lq.filters.jenis === 'advance' || lq.filters.jenis === 'reimburse') and.push({ type: { equals: lq.filters.jenis } })
   const text = searchWhere(['docNo', 'title'], lq.q)
   if (text) and.push(text)
+  // owner 2026-10-11: a Staff (no other role in the project's PT) sees only their OWN requests of the project here
+  const own = Number.isSafeInteger(id) ? await ownOnlyWhere(req, id) : null
+  if (own) and.push(own)
   const res = Number.isSafeInteger(id)
     ? await req.payload
         .find({ collection: 'expense-requests', where: { and }, sort: '-id', page: lq.page, limit: lq.per, depth: 0, user: req.user, overrideAccess: false /* caller's read scope */, req })
@@ -277,7 +295,7 @@ export async function ProjectRequestsTab(props: DocumentViewServerProps) {
   ]
   return (
     <TabRoot name="project-requests">
-      <Card id="project-requests" title={`Pengajuan project ini (${page.total})`} sub="Nomor dapat diklik untuk membuka pengajuan">
+      <Card id="project-requests" title={`${own ? 'Pengajuan saya di project ini' : 'Pengajuan project ini'} (${page.total})`} sub="Nomor dapat diklik untuk membuka pengajuan">
         <ListToolbar
           id="project-requests"
           action={path}

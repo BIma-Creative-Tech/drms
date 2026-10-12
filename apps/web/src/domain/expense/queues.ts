@@ -1,5 +1,6 @@
 import type { PayloadRequest, Where } from 'payload'
 
+import { seesMoney } from '@/access/money'
 import { companiesWithRole, relId, type Role } from '@/access/roles'
 import { companyRefs, type CompanyRef } from '@/domain/companies'
 
@@ -125,7 +126,8 @@ export async function approvalInbox(req: PayloadRequest, f?: QueueFilter) {
     const acts = allowedActions(ctx)
     const step: 'approve' | 'acknowledge' | null = acts.includes('approve') ? 'approve' : acts.includes('acknowledge') ? 'acknowledge' : null
     if (!step) continue
-    const p = d.project && typeof d.project === 'object' ? d.project : null
+    // owner 2026-10-11: RAB % only for the money roles of the request's PT (e.g. not a Staff acknowledger)
+    const p = d.project && typeof d.project === 'object' && seesMoney(req, cid) ? d.project : null
     const b = p ? budgetImpact(p.budget, await projectCommitted(req, p.id, d.id), d.grandTotal ?? 0) : { before: null, after: null }
     const decisionFlow = isDecisionSnapshot(d.approvalSnapshot)
     const snap = (d.approvalSnapshot ?? null) as ApprovalSnapshot | null

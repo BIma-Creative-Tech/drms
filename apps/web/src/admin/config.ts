@@ -3,6 +3,11 @@
  * through the generated import map (payload generate:importmap). No React import here — collection
  * configs are also loaded by the worker and the OpenAPI generator.
  */
+import type { PayloadRequest } from 'payload'
+
+import { MONEY_ROLES } from '@/access/money'
+import { hasRoleAny } from '@/access/roles'
+
 export const RIWAYAT_TAB = {
   riwayat: {
     Component: '@/admin/views/RiwayatView#RiwayatView',
@@ -26,6 +31,13 @@ export const PROJECT_TABS = {
     Component: '@/admin/views/ProjectTabs#ProjectRequestsTab',
     path: '/pengajuan' as const,
     tab: { label: 'Pengajuan', href: '/pengajuan', order: 300 },
+  },
+  // ADR 0022 §8: "Pinjaman antar project" of this project (as lender and as borrower). Owner 2026-10-11: no tab for
+  // Staff (loans are money; the view itself re-checks the roles and shows nothing without them).
+  pinjaman: {
+    Component: '@/admin/views/Loans#ProjectLoansTab',
+    path: '/pinjaman' as const,
+    tab: { label: 'Pinjaman', href: '/pinjaman', order: 400, condition: ({ req }: { req: Pick<PayloadRequest, 'user'> }) => hasRoleAny(req, ...MONEY_ROLES) },
   },
 }
 
@@ -143,4 +155,14 @@ export const FR1_ADMIN_VIEWS = {
  */
 export const D1010_ADMIN_VIEWS = {
   moduleLanding: { Component: '@/admin/views/ModuleLanding#ModuleLanding', path: '/modul/:id' as const, exact: true, meta: { title: 'Modul' } },
+}
+
+/**
+ * ADR 0022: inter-project loans ("Pinjaman antar project") — list (D8), new Draft (PM of the borrower project), detail
+ * with decision bar (Direktur), repayments (borrower PM / Finance) and void (Direktur / Finance). All exact.
+ */
+export const LOAN_ADMIN_VIEWS = {
+  loanList: { Component: '@/admin/views/Loans#LoanList', path: '/pinjaman' as const, exact: true, meta: { title: 'Pinjaman antar project' } },
+  loanNew: { Component: '@/admin/views/Loans#LoanNew', path: '/pinjaman/baru' as const, exact: true, meta: { title: 'Ajukan pinjaman antar project' } },
+  loanDetail: { Component: '@/admin/views/Loans#LoanDetail', path: '/pinjaman/detail/:id' as const, exact: true, meta: { title: 'Pinjaman antar project' } },
 }

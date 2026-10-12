@@ -160,10 +160,12 @@ class _DetailBody extends ConsumerWidget {
         if (d.requestDate != null) row(t.requestDate, formatDateOnly(d.requestDate)),
         row(t.neededDate, formatDateOnly(d.neededDate)),
         if (d.notes != null && d.notes!.trim().isNotEmpty) row(t.fieldNotes, d.notes!.trim()),
-        row(
-          t.budgetImpact,
-          d.budget.hasBudget ? t.budgetChange(pct(d.budget.pctBefore), pct(d.budget.pctAfter)) : t.budgetNone,
-        ),
+        // owner 2026-10-11: the RAB % is money (the server sends basis "none" to Staff) — no row instead of "Tanpa anggaran"
+        if (d.budget.hasBudget || (pt?.seesProjectMoney ?? profile?.seesProjectMoney ?? false))
+          row(
+            t.budgetImpact,
+            d.budget.hasBudget ? t.budgetChange(pct(d.budget.pctBefore), pct(d.budget.pctAfter)) : t.budgetNone,
+          ),
         if (over)
           Row(
             children: [

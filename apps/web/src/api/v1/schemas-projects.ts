@@ -35,7 +35,7 @@ export const ProjectListItem = z
     pm: z.object({ id, name: z.string() }).nullable(),
     status: z.string().nullable(),
     statusLabel: z.string().nullable(),
-    contractValue: z.number().nullable().meta({ description: 'RAB of the project (null when not readable, e.g. Operator).' }),
+    contractValue: z.number().nullable().meta({ description: 'RAB of the project; null without a money role in its PT (Direktur, Admin, Finance, PM) — Staff and Operator never get it (owner 2026-10-11).' }),
     progressPct: z.number().nullable(),
     costCenter: Ref.nullable().meta({ description: 'D2: default cost center proposed to Finance at the transfer.' }),
     rapPlanned: z.number().nullable().meta({ description: 'D4: Σ planned RAP amount (price roles only).' }),
