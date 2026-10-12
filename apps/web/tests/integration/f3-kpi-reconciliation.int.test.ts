@@ -290,7 +290,7 @@ beforeAll(async () => {
   const open = await sqlAs('app', "SELECT id FROM cash_entries WHERE source_type = 'manual' AND status = 'posted' AND entry_date > $1 ORDER BY id DESC LIMIT 3", [lastDay(closedMonth)])
   for (const r of open.rows) await must(call('POST', `/api/v1/cash-entries/${r.id}/void`, w.users.finance, { reason: 'salah input F3' }))
   console.log(`[f3] generated ${N} requests in ${Math.round((Date.now() - t0) / 1000)} s`, JSON.stringify(stats))
-}, 1_800_000)
+}, 3_600_000) // ~500 s on a quiet host, 30+ min on the shared CI host under load (own CI job, 90 min)
 
 let closedK02a: Awaited<ReturnType<typeof cashFlowMonthly>>
 let voidedClosed: number

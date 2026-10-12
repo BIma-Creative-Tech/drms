@@ -58,9 +58,15 @@ jobs:
         run: npm audit --omit=dev --audit-level=high
 
   integration:
-    name: integration (throwaway Postgres, migrations as owner, tests as app role)
+    name: integration ${{ matrix.part }} (throwaway Postgres, migrations as owner, tests as app role)
     runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '"ubuntu-24.04"') }}
-    timeout-minutes: 70 # self-hosted = 2 vCPU; the suite outgrew 40 min
+    # The full suite outgrew one job on the shared 4-core self-hosted host (~100 min under load): two halves of the files
+    # (alternating, sorted) plus the F3 KPI data-set file (520 generated requests) on its own.
+    timeout-minutes: ${{ matrix.part == 'f3' && 90 || 70 }}
+    strategy:
+      fail-fast: false
+      matrix:
+        part: [a, b, f3]
     services:
       postgres:
         image: postgres:16.15-bookworm@sha256:efedf3595f1d6f415c08568ba171029bf54052e754cc9f030e3f2412b21f3d67
@@ -112,11 +118,22 @@ jobs:
             echo "NODE_EXTRA_CA_CERTS=$d/ca.crt"
           } >> "$GITHUB_ENV"
       - name: Integration tests
+        env:
+          PART: ${{ matrix.part }}
         run: |
           export PK_TEST_DATABASE_URL="postgres://pk_test_app:${PK_F1_APP_PASSWORD}@127.0.0.1:5432/pk_test"
           export PK_TEST_DATABASE_URL_OWNER="postgres://pk_test_owner:${PK_F1_OWNER_PASSWORD}@127.0.0.1:5432/pk_test"
           export PK_TEST_DATABASE_URL_RO="postgres://pk_test_ro:${PK_F1_RO_PASSWORD}@127.0.0.1:5432/pk_test"
-          TZ=Asia/Makassar npm run test:int
+          cd apps/web
+          if [ "$PART" = f3 ]; then
+            files="tests/integration/f3-kpi-reconciliation.int.test.ts"
+          else
+            k=$([ "$PART" = a ] && echo 1 || echo 0)
+            files=$(ls tests/integration/*.int.test.ts | grep -v '/f3-kpi-reconciliation\.' | awk -v k="$k" 'NR % 2 == k')
+          fi
+          echo "$files"
+          # shellcheck disable=SC2086 # one argument per file
+          TZ=Asia/Makassar npx vitest run -c vitest.integration.config.ts $files
 
   security:
     name: gitleaks · semgrep · trivy fs · hadolint
