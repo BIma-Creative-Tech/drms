@@ -6,6 +6,34 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.9.1] - 2026-10-12
+
+**0.9.0 plus the "Lampiran umum" fix** found on production 2026-10-12 (PB 230/PB-DRMS). Production goes 0.6.4 → 0.9.1:
+the notes of **0.9.0 and 0.8.0 below apply to this deploy as well** (their migrations and deploy checklists run first).
+0.9.0 was tagged without this fix and is not meant to be deployed.
+
+**Database migrations** (after those of 0.9.0): `20261013_500000_attachments_owner_link` (data, idempotent, audited).
+**Take the pre-deploy dump.**
+
+**Deploy checklist (in addition to 0.9.0's):** read the migrate log of `…_attachments_owner_link` (`linked`) and of
+`…_approval_config_data` (a PT listed in `customisedKept` did not get the "Pengajuan Direktur" rule — the Admin creates
+it, ADR 0024 Rollout 2); rules are data: the 0.6.x rule "Direktur lalu Finance" keeps Finance as an approver until it is
+changed. New requests always need a project (D2): spending that used a pusat biaya needs a project per kind of spending
+(e.g. an office / payroll project) and, where wanted, a rule scoped to it.
+
+### Fixed (Lampiran umum, production 2026-10-12, PB 230/PB-DRMS)
+
+- "Lampiran umum" of an expense request were stored on the draft but never linked to it, so only the uploader (and office
+  roles of EVERY PT) could open them: the PM / Direktur / Finance deciding saw no image. They are now linked at **submit**
+  (every path — web form, APK, submit again after withdraw; idempotent), and only uploads of the people on the request
+  (creator, requester accounts, the person submitting) are accepted (else 409 "Lampiran bukan unggahan pembuat/pemohon
+  pengajuan ini"). A file copied by "Ajukan ulang" keeps the link to its original request.
+- Migration `20261013_500000_attachments_owner_link` (data, idempotent, audited): links the files of requests already
+  submitted before the fix (referenced by exactly one request, uploaded by its creator or "Diajukan Oleh" signer); drafts
+  are linked at their submit.
+- **PDF Pengajuan Biaya** prints the "Lampiran umum" after the receipt pages ("Lampiran Umum — <nomor> (1–2 dari n)"):
+  images embedded (sharing the 12-image budget of ADR 0008 §2), PDF files listed.
+
 ## [0.9.0] - 2026-10-12
 
 **DRMS 10/10 Phases D–G on top of 0.8.0** (owner decisions 2026-10-11): Staff see their projects without money,

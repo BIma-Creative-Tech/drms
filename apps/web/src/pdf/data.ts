@@ -13,7 +13,7 @@ import { DEFAULT_TZ } from '@/lib/time'
 
 import { formatAmount, formatDateLong, formatDateShort, formatQty, formatRupiah, formatServerTime, pdfSafe, subtitleOf } from './format'
 import { loadImage, MAX_RECEIPT_IMAGES } from './images'
-import type { PdfData, PdfImage, PdfReceipt, PdfSignature } from './PengajuanBiaya'
+import type { PdfAttachment, PdfData, PdfImage, PdfReceipt, PdfSignature } from './PengajuanBiaya'
 
 export { MAX_RECEIPT_IMAGES }
 
@@ -130,6 +130,29 @@ export async function buildPdfData(req: PayloadRequest, requestId: number, opts:
     })
   }
 
+  // "Lampiran umum": images share the receipts' image budget (ADR 0008 §2); PDFs are listed by name
+  let imageBudget = Math.max(0, MAX_RECEIPT_IMAGES - Math.min(receiptRows.length, MAX_RECEIPT_IMAGES))
+  const attachments: PdfAttachment[] = []
+  for (const [i, a] of (doc.attachments ?? []).entries()) {
+    const id = relId(a)
+    const m = id
+      ? ((await req.payload.findByID({ collection: 'media-attachments', id, depth: 0, overrideAccess: true /* SYSTEM-READ: caller access checked */, req }).catch(() => null)) as {
+          mimeType?: string | null
+          width?: number | null
+          height?: number | null
+        } | null)
+      : null
+    if (!m) continue
+    const isImage = m.mimeType === 'image/jpeg' || m.mimeType === 'image/png'
+    const image = isImage && imageBudget > 0 ? await loadImage(req, 'media-attachments', id) : null
+    if (image) imageBudget--
+    attachments.push({
+      heading: pdfSafe(`Lampiran ${i + 1}`),
+      details: pdfSafe(isImage ? `Gambar ${m.width ?? '?'}×${m.height ?? '?'} px` : 'Berkas PDF'),
+      image,
+    })
+  }
+
   const kop = [s.pdfHeader, s.address, s.phone ? `Telp. ${s.phone}` : null]
     .flatMap((x) => (x ? String(x).split(/\r?\n/) : []))
     .map((x) => pdfSafe(x.trim()))
@@ -168,6 +191,7 @@ export async function buildPdfData(req: PayloadRequest, requestId: number, opts:
         }
       : null,
     receipts,
+    attachments,
     internal: opts.internal,
     printedText: pdfSafe(`Dicetak ${formatServerTime(new Date().toISOString(), tz)} oleh ${opts.printedBy}`),
   }

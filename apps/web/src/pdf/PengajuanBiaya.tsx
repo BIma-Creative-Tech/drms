@@ -31,6 +31,13 @@ export type PdfReceipt = {
   flags: string[]
 }
 
+/** "Lampiran umum" (bug 2026-10-12: was missing from the PDF); a PDF file is listed without an image. */
+export type PdfAttachment = {
+  heading: string
+  details: string
+  image: PdfImage | null
+}
+
 export type PdfData = {
   companyName: string
   companyCode: string
@@ -48,6 +55,7 @@ export type PdfData = {
   policyNote?: string
   transfer: { bankName: string; accountHolder: string; accountNo: string } | null
   receipts: PdfReceipt[]
+  attachments: PdfAttachment[]
   internal: boolean
   printedText: string
 }
@@ -153,6 +161,8 @@ export function PengajuanBiaya({ d }: { d: PdfData }) {
   const spacer = Math.max(0, MIN_ROWS - d.lines.length)
   const pairs: PdfReceipt[][] = []
   for (let i = 0; i < d.receipts.length; i += 2) pairs.push(d.receipts.slice(i, i + 2))
+  const attachmentPairs: PdfAttachment[][] = []
+  for (let i = 0; i < d.attachments.length; i += 2) attachmentPairs.push(d.attachments.slice(i, i + 2))
   return (
     <Document title={`Pengajuan Biaya ${d.docNo}`} author={d.companyName} creator="RR Teams" producer="RR Teams" language="id-ID">
       <Page size="A4" style={s.page}>
@@ -291,6 +301,30 @@ export function PengajuanBiaya({ d }: { d: PdfData }) {
                     </Text>
                   ))
                 : null}
+            </View>
+          ))}
+          <Footer d={d} />
+        </Page>
+      ))}
+
+      {attachmentPairs.map((pair, pi) => (
+        <Page key={`a${pi}`} size="A4" style={s.page}>
+          <Text style={s.rHead}>
+            Lampiran Umum — {d.docNo} ({pi * 2 + 1}
+            {pair.length > 1 ? `–${pi * 2 + 2}` : ''} dari {d.attachments.length})
+          </Text>
+          {pair.map((a, ai) => (
+            <View key={ai} style={s.receipt} wrap={false}>
+              <View style={s.receiptImgBox}>
+                {a.image ? (
+                  // eslint-disable-next-line jsx-a11y/alt-text -- react-pdf Image has no alt
+                  <Image style={s.receiptImg} src={a.image} />
+                ) : (
+                  <Text>(berkas tidak dapat ditampilkan di PDF — buka dari aplikasi)</Text>
+                )}
+              </View>
+              <Text style={s.receiptHeading}>{a.heading}</Text>
+              <Text>{a.details}</Text>
             </View>
           ))}
           <Footer d={d} />
