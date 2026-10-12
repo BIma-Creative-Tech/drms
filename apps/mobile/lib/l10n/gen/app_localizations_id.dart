@@ -2885,7 +2885,18 @@ class AppLocalizationsId extends AppLocalizations {
   String get rapOfflineNoBudget => 'Offline: sisa anggaran RAP tampil lagi saat online.';
 
   @override
-  String get rapNoItems => 'Project ini belum punya item RAP. Hubungi PM atau Direktur.';
+  String get rapNoItems => 'Project ini belum punya RAP (project tanpa RAB: item RAP tidak wajib).';
+
+  @override
+  String get rapMissingBlock => 'Project belum punya RAP — hubungi PM';
+
+  @override
+  String get rapMissingBlockDetail =>
+      'Pengajuan ini bisa disimpan sebagai draft, tetapi baru bisa dikirim setelah PM mengisi RAP project.';
+
+  @override
+  String get rapMissingProjectDetail =>
+      'Project ini punya RAB, jadi wajib punya RAP: pengajuan project ini baru bisa dikirim setelah PM / Direktur mengisi RAP.';
 
   @override
   String get noSearchResults => 'Tidak ada yang cocok.';

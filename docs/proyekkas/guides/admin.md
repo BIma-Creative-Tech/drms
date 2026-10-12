@@ -299,6 +299,10 @@ PT: sheet **Perusahaan** (satu baris per PT: `kode_pt`, nama, nama legal, alamat
 RAB, Kendaraan, Penugasan, AkunKas), dan sheet **AksesPT** untuk akses satu pengguna di PT lain. Langkah lengkap:
 [runbook impor data go-live](../runbooks/import-data-golive.md) §4.1.
 
+File impor tidak memuat RAP. Setiap project ber-RAB wajib punya RAP sebelum pengajuannya bisa dikirim (keputusan
+pemilik 11 Okt 2026): laporan impor memberi **PERINGATAN** per project ber-RAB yang belum punya RAP. Setelah impor,
+PM / Direktur mengisi RAP di tab **RAP** project (template atau impor Excel RAP).
+
 ## 11. Audit Log
 
 **Audit Log** (atau **Sistem → Audit Log**): filter tanggal, user, jenis dokumen, aksi → unduh (maks. 31 hari).

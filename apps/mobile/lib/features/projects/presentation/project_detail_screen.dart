@@ -250,7 +250,26 @@ class _RapTabState extends ConsumerState<_RapTab> {
                   ),
                 ),
               const SizedBox(height: 8),
-              if (load.items.isEmpty)
+              if (load.items.isEmpty && load.missing)
+                Card(
+                  key: const Key('project-rap-missing'),
+                  color: Theme.of(context).colorScheme.errorContainer,
+                  child: ListTile(
+                    leading: Icon(Icons.block, color: Theme.of(context).colorScheme.onErrorContainer),
+                    title: Text(
+                      t.rapMissingBlock,
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        color: Theme.of(context).colorScheme.onErrorContainer,
+                      ),
+                    ),
+                    subtitle: Text(
+                      t.rapMissingProjectDetail,
+                      style: TextStyle(color: Theme.of(context).colorScheme.onErrorContainer),
+                    ),
+                  ),
+                )
+              else if (load.items.isEmpty)
                 Padding(
                   padding: const EdgeInsets.all(24),
                   child: Center(child: Text(t.rapNoItemsProject)),

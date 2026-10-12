@@ -120,8 +120,8 @@ class DraftService {
 
   /// "Ajukan" — online only. Creates the server draft through `/api/v1` (idempotent by clientUuid)
   /// when the offline queue has not delivered it yet, uploads the receipts, then submits.
-  Future<ExpenseDetail> submit(String sub, DraftRequest draft) async {
-    final issues = validateForSubmit(draft);
+  Future<ExpenseDetail> submit(String sub, DraftRequest draft, {RapCheck rap = RapCheck.strict}) async {
+    final issues = validateForSubmit(draft, rap: rap);
     if (issues.isNotEmpty) throw DraftValidationException(issues);
     return lock.run(() async {
       final pending = await outbox.pendingForTarget(sub, draft.clientUuid);

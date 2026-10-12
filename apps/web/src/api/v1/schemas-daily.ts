@@ -32,7 +32,7 @@ export const LineOriginEnum = z.enum(['report', 'edit', 'correction']).meta({ id
 const rapItemFields = {
   code: z.string().trim().min(1).max(32).meta({ description: 'Unique per project (409 DUPLICATE_CODE).' }),
   description: z.string().trim().min(1).max(300),
-  stageId: id.meta({ description: 'Stage of the same project.' }),
+  stageId: id.nullable().optional().meta({ description: 'Stage of the same project. Required for konstruksi (400 stageId); other kinds may omit it (DRMS 10/10 D4) and clear it with null.' }),
   kind: RapKindEnum,
   uomId: id,
   volume: dec2(0.01, 100_000_000),
@@ -47,7 +47,7 @@ export const RapItemUpdate = z
   .object({
     code: rapItemFields.code.optional(),
     description: rapItemFields.description.optional(),
-    stageId: rapItemFields.stageId.optional(),
+    stageId: rapItemFields.stageId,
     kind: RapKindEnum.optional().meta({ description: 'Cannot change (400).' }),
     uomId: id.optional(),
     volume: rapItemFields.volume.optional(),
@@ -81,7 +81,7 @@ export const RapItem = z
     description: z.string(),
     name: z.string().meta({ description: 'DRMS 10/10: alias of description.' }),
     kind: RapKindEnum,
-    stage: z.object({ id, name: z.string() }),
+    stage: z.object({ id, name: z.string() }).nullable().meta({ description: 'null: item without stage (allowed outside konstruksi, DRMS 10/10 D4).' }),
     uom: z.object({ id, code: z.string() }),
     volume: z.number(),
     qty: z.number().meta({ description: 'DRMS 10/10: alias of volume.' }),
@@ -110,6 +110,8 @@ export const Rap = z
   .object({
     projectId: id,
     kind: z.string(),
+    rapRequired: z.boolean().meta({ description: 'DRMS 10/10 D4 (owner 2026-10-11): the project has a RAB (or is konstruksi) → it needs ≥ 1 active item before a request can be submitted ("Project belum punya RAP — hubungi PM").' }),
+    drivesProgress: z.boolean().meta({ description: 'konstruksi only: work items drive the stage % (daily reports). Other kinds: cost plan only, stage optional, progress manual.' }),
     locked: z.boolean(),
     canEdit: z.boolean(),
     needsReason: z.boolean(),

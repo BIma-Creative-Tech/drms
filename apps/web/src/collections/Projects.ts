@@ -45,7 +45,7 @@ export function projectPmValidate(value: unknown, { operation }: { operation?: s
 }
 
 /**
- * FR1: a kind change is refused once the project has field reports or contract units (409).
+ * FR1: a kind change is refused once the project has field reports, contract units or RAP items (409).
  */
 const kindChangeGuard: CollectionBeforeChangeHook = async ({ data, originalDoc, operation, req }) => {
   if (operation !== 'update' || !originalDoc || data.kind === undefined || data.kind === originalDoc.kind) return data
@@ -53,6 +53,9 @@ const kindChangeGuard: CollectionBeforeChangeHook = async ({ data, originalDoc, 
     const r = await req.payload.find({ collection, where: { project: { equals: originalDoc.id } }, limit: 1, depth: 0, pagination: false, select: { project: true } as never, overrideAccess: true /* SYSTEM-READ: does the project have field data? */, req })
     if (r.docs.length > 0) throw new APIError('Jenis project tidak dapat diubah: project ini sudah punya laporan lapangan atau unit kontrak.', 409, { errors: [{ path: 'kind', message: 'Sudah ada data lapangan.' }] }, true)
   }
+  // P3 / DRMS 10/10 D4: RAP items (any kind now) also freeze the kind (DB trigger pk_project_kind_guard) — clear message
+  const rap = await req.payload.find({ collection: 'rap-items', where: { project: { equals: originalDoc.id } }, limit: 1, depth: 0, pagination: false, select: { project: true } as never, overrideAccess: true /* SYSTEM-READ: does the project have a RAP? */, req })
+  if (rap.docs.length > 0) throw new APIError('Jenis project tidak dapat diubah: project ini sudah punya RAP.', 409, { errors: [{ path: 'kind', message: 'Sudah ada RAP.' }] }, true)
   return data
 }
 

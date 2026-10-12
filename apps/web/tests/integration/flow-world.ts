@@ -8,7 +8,10 @@ import { withSystemTransaction } from '@/lib/system-tx'
 import config from '@/payload.config'
 import { seed } from '@/seed/seed'
 
+import { fixtureRap, fixtureRapItem, withFixtureRap } from './fixture-rap'
 import { addMembership, companyId, getTestPayload, installFakeKeycloak, sqlAs, webSessionCookie, withContext, type TestUser } from './helpers'
+
+export { fixtureRapItem, withFixtureRap }
 
 /**
  * Isolated F2a test world per test file (all files share one DB): own employees, users (each with
@@ -21,10 +24,32 @@ export const ORIGIN = 'http://localhost:3000'
 
 export type FlowUser = TestUser & { employee: number | null; cookie: string; _strategy: 'oidcSession' }
 
+/**
+ * `extra.rap: false` = no fixture RAP item for a project with a RAB (tests of the D4 "no RAP yet" rule); the other
+ * `extra` keys go to `payload.create`.
+ */
 export async function sysCreate(collection: CollectionSlug, data: Record<string, unknown>, extra: Record<string, unknown> = {}): Promise<number> {
   const p = await getTestPayload()
-  const doc = await p.create({ collection, data: data as never, depth: 0, overrideAccess: true /* SYSTEM-WRITE: test fixture */, ...extra })
-  return doc.id as number
+  const { rap, ...rest } = extra
+  const doc = await p.create({ collection, data: data as never, depth: 0, overrideAccess: true /* SYSTEM-WRITE: test fixture */, ...rest })
+  const id = doc.id as number
+  // D4 (owner 2026-10-11): a project with a RAB needs a RAP to send requests → a fixture item (konstruksi tests build theirs)
+  if (collection === 'projects' && rap !== false && typeof data.budget === 'number' && data.budget > 0 && data.kind !== 'konstruksi') {
+    fixtureRap.set(id, await sysRapItem(id))
+  }
+  return id
+}
+
+
+/**
+ * DRMS 10/10 D4 (owner 2026-10-11 "RAP wajib untuk semua proyek yang punya RAB"): a project with a RAB needs ≥ 1 RAP
+ * item before a request can be submitted, and every line then names one. Fixture RAP item: no stage (allowed
+ * outside konstruksi), unpriced by default (never "Melebihi RAP"), uom LS.
+ */
+export async function sysRapItem(project: number, opts: { code?: string; unitPrice?: number | null; volume?: number; stage?: number | null } = {}): Promise<number> {
+  const p = await getTestPayload()
+  const ls = (await p.find({ collection: 'uoms', where: { code: { equals: 'LS' } }, limit: 1, depth: 0, overrideAccess: true /* SYSTEM-READ: fixture */ })).docs[0]!.id as number
+  return sysCreate('rap-items', { project, stage: opts.stage ?? null, code: opts.code ?? 'UMUM', description: 'Biaya umum project', kind: 'pekerjaan', uom: ls, volume: opts.volume ?? 1, unitPrice: opts.unitPrice ?? null, active: true })
 }
 
 let pngSeq = 0
@@ -148,6 +173,8 @@ export async function makeWorld(tag: string, opts: { rule?: 'direktur_finance' |
   const projectCostCenter = await sysCreate('cost-centers', { code: code('PCC'), name: `${tag} Proyek` })
   const project = await sysCreate('projects', { code: code('P1'), name: `${tag} Project`, pm: users.pm.id, budget: 100_000_000, status: 'berjalan', costCenter: projectCostCenter })
   const otherProject = await sysCreate('projects', { code: code('P2'), name: `${tag} Other`, pm: users.otherPm.id, budget: 50_000_000, status: 'berjalan', costCenter: projectCostCenter })
+  // D4: both projects have a RAB → each got a fixture RAP item (request bodies charge their lines to it)
+  const rap = { project: fixtureRapItem(project)!, otherProject: fixtureRapItem(otherProject)! }
   const costCenter = await sysCreate('cost-centers', { code: code('CC'), name: `${tag} Ops`, manager: users.pm.id })
   for (const e of [emp.a, emp.b]) {
     await sysCreate('team-assignments', { employee: e, project, roleInProject: 'staff' })
@@ -185,7 +212,7 @@ export async function makeWorld(tag: string, opts: { rule?: 'direktur_finance' |
         steps: [{ level: 1, approverRole: 'pk-owner' }],
       })
     }
-    return { emp, users, project, otherProject, costCenter, projectCostCenter, accA, accB, cashAccount, cat, uom, vehicle, cashInSource }
+    return { emp, users, project, otherProject, rap, costCenter, projectCostCenter, accA, accB, cashAccount, cat, uom, vehicle, cashInSource }
   }
   // World rules (priority 10, scoped), ADR 0013: "Diketahui" = Direktur (pk-owner, `owner`/`owner2`)
   // approval, then Finance level 1; > 10 juta: two Finance levels (`finance` + `finance2`, Q-31 example).
@@ -203,7 +230,7 @@ export async function makeWorld(tag: string, opts: { rule?: 'direktur_finance' |
       ],
     })
   }
-  return { emp, users, project, otherProject, costCenter, projectCostCenter, accA, accB, cashAccount, cat, uom, vehicle, cashInSource }
+  return { emp, users, project, otherProject, rap, costCenter, projectCostCenter, accA, accB, cashAccount, cat, uom, vehicle, cashInSource }
 }
 
 // ---------------------------------------------------------------- HTTP helpers
@@ -216,7 +243,7 @@ export async function api(method: string, path: string, user: FlowUser | null, j
   let body: string | undefined
   if (json !== undefined) {
     h.set('Content-Type', 'application/json')
-    body = JSON.stringify(json)
+    body = JSON.stringify(withFixtureRap(json))
   }
   const res = await handleEndpoints({ config, request: new Request(`${ORIGIN}${path}`, { method, headers: h, body }) })
   const text = await res.text()
@@ -251,6 +278,8 @@ export async function asUser<T>(user: FlowUser | null, fn: (req: PayloadRequest)
  * the app refuses to create one, so only the DB owner can (trigger expense_requests_project_rules paused for it).
  */
 export async function legacyCostCenter(id: number, costCenter: number): Promise<void> {
+  // legacy rows predate D4 too: their lines name no RAP item (draftBody charged them to the world project's item)
+  await sqlAs('owner', 'UPDATE expense_requests_lines SET rap_item_id = NULL WHERE _parent_id = $1', [id])
   // three statements = three transactions (the UPDATE queues deferred checks; ALTER TABLE refuses pending events)
   await sqlAs('owner', 'ALTER TABLE expense_requests DISABLE TRIGGER expense_requests_project_rules')
   try {
@@ -260,7 +289,12 @@ export async function legacyCostCenter(id: number, costCenter: number): Promise<
   }
 }
 
+/** D4: lines charged to the fixture RAP item of the body's project (see withFixtureRap). */
 export function draftBody(w: World, over: Record<string, unknown> = {}) {
+  return withFixtureRap(draftBodyRaw(w, over))
+}
+
+function draftBodyRaw(w: World, over: Record<string, unknown> = {}): Record<string, unknown> {
   return {
     type: 'advance',
     title: 'Pembelian material',

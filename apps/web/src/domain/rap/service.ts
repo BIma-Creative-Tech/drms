@@ -6,20 +6,22 @@ import type { PayloadRequest } from 'payload'
 import { hasRole, relId } from '@/access/roles'
 import { resolveScope } from '@/access/scope'
 import { fail, validation } from '@/domain/field/common'
-import { kindOf } from '@/domain/field/rules'
+import { kindOf, PROJECT_KIND_LABELS } from '@/domain/field/rules'
 import { lockProject, projectStages, recalcProjectProgress, setStageProgress, type StageRow } from '@/domain/progress/recalc'
 import { requireVisibleProject, saveStageSet } from '@/domain/progress/stages'
 import { getRequestTx } from '@/lib/tx'
 
 import { rapItemMoney, sumRapMoney, type RapMoney } from './budget'
-import { isQty, itemPct, normUom, round2, stagePct, stockOf, type RapKind } from './rules'
+import { isQty, itemPct, normUom, rapDrivesProgress, rapRequiredFor, round2, stagePct, stockOf, type RapKind } from './rules'
 import { parseRapWorkbook, type RapIssue, type RapRow } from './workbook'
 
 /**
- * P3 RAP of a construction project (owner decisions 2026-10-10). Who: Direktur/Admin of the PT (any
- * project) and the PM of the project's team; Staff read quantities only (no prices). Lock: once the
- * project has a daily-report ledger line the RAP is locked — then only Direktur/Admin, with a reason.
- * Items are never deleted (deactivated). Every change recomputes the RAP-driven stages and the project %.
+ * P3 RAP of a project (owner decisions 2026-10-10; every project kind since DRMS 10/10 D4, owner 2026-10-11 "RAP wajib
+ * untuk semua proyek yang punya RAB"). Who: Direktur/Admin of the PT (any project) and the PM of the project's team;
+ * Staff read quantities only (no prices). Lock: once the project has a daily-report ledger line the RAP is locked —
+ * then only Direktur/Admin, with a reason. Items are never deleted (deactivated). Konstruksi: every item has a stage
+ * and every change recomputes the RAP-driven stages and the project %; other kinds (`rapDrivesProgress` false): the
+ * stage is optional (an existing stage only, never created by an import) and the progress stays manual (E4).
  */
 
 type Project = { id: number; company: number; kind: string; status: string | null; budget: number | null }
@@ -46,7 +48,6 @@ export async function isRapLocked(req: PayloadRequest, p: Pick<Project, 'id' | '
 }
 
 async function requireEditor(req: PayloadRequest, p: Project, reason: string | null | undefined): Promise<{ locked: boolean; roles: RapRoles; reason: string }> {
-  if (kindOf(p.kind) !== 'konstruksi') fail(409, 'WRONG_PROJECT_KIND', 'RAP hanya untuk project jenis konstruksi.')
   if (p.status === 'arsip') fail(409, 'STATE_CONFLICT', 'Project sudah diarsipkan.')
   const roles = await rapRoles(req, p)
   if (!roles.director && !roles.pm) fail(403, 'FORBIDDEN', 'RAP hanya dapat diubah oleh Direktur/Admin atau PM project ini.')
@@ -62,8 +63,9 @@ type ItemRow = {
   code: string
   description: string
   kind: RapKind
-  stage_id: number
-  stage_name: string
+  /** null = no stage (allowed outside konstruksi only, DB trigger). */
+  stage_id: number | null
+  stage_name: string | null
   uom_id: number
   uom_code: string
   volume: string
@@ -82,7 +84,7 @@ async function itemRows(req: PayloadRequest, p: Pick<Project, 'id' | 'company'>)
     SELECT i.id, i.code, i.description, i.kind::text AS kind, i.stage_id, s.name AS stage_name, i.uom_id, u.code AS uom_code,
            i.volume::text AS volume, i.unit_price::text AS unit_price, i.weight_pct::text AS weight_pct, i.sort_order::text AS sort_order,
            i.realised_qty::text AS realised_qty, i.received_qty::text AS received_qty, i.used_qty::text AS used_qty, i.active
-      FROM rap_items i JOIN project_stages s ON s.id = i.stage_id JOIN uoms u ON u.id = i.uom_id
+      FROM rap_items i LEFT JOIN project_stages s ON s.id = i.stage_id JOIN uoms u ON u.id = i.uom_id
      WHERE i.project_id = ${p.id} AND i.company_id = ${p.company}
      ORDER BY i.sort_order, i.id`)) as unknown as { rows: ItemRow[] }
   return r.rows
@@ -98,7 +100,8 @@ export type RapItemDto = {
   /** DRMS 10/10 contract alias of `description`. */
   name: string
   kind: RapKind
-  stage: { id: number; name: string }
+  /** null outside konstruksi when the item has no stage (DRMS 10/10 D4, 2026-10-11). */
+  stage: { id: number; name: string } | null
   uom: { id: number; code: string }
   volume: number
   /** DRMS 10/10 contract alias of `volume`. */
@@ -138,7 +141,7 @@ export function itemDto(r: ItemRow, prices: boolean, money?: RapMoney): RapItemD
     description: r.description,
     name: r.description,
     kind: r.kind,
-    stage: { id: r.stage_id, name: r.stage_name },
+    stage: r.stage_id === null ? null : { id: r.stage_id, name: r.stage_name ?? '' },
     uom: { id: r.uom_id, code: r.uom_code },
     volume,
     qty: volume,
@@ -174,11 +177,16 @@ export async function loadRap(req: PayloadRequest, projectId: number) {
     return { id: s.id, name: s.name, weightPct: s.weightPct, progressPct: s.progressPct, active: s.active, progressMode: modes.get(s.id) ?? 'manual', basis: res.basis, workItems: work.filter((r) => r.active !== false).length }
   })
   const rapValue = roles.prices ? rows.filter((r) => r.active !== false && r.unit_price !== null).reduce((s, r) => s + Math.round(num(r.volume) * num(r.unit_price)), 0) : null
+  const kind = kindOf(p.kind)
   return {
     projectId,
-    kind: kindOf(p.kind),
+    kind,
+    // DRMS 10/10 D4: the project needs ≥ 1 active item before requests can be sent (RAB > 0 or konstruksi)
+    rapRequired: rapRequiredFor({ kind, budget: p.budget }),
+    // konstruksi only: work items drive the stage progress (else stage optional, progress manual)
+    drivesProgress: rapDrivesProgress(kind),
     locked,
-    canEdit: kindOf(p.kind) === 'konstruksi' && p.status !== 'arsip' && (roles.director || (roles.pm && !locked)),
+    canEdit: p.status !== 'arsip' && (roles.director || (roles.pm && !locked)),
     needsReason: locked,
     items,
     stages: stageDtos,
@@ -217,7 +225,10 @@ async function stageModes(req: PayloadRequest, p: Pick<Project, 'id' | 'company'
  * transaction (lockProject first).
  */
 export async function refreshRapProgress(req: PayloadRequest, projectId: number): Promise<void> {
-  const p = { id: projectId, company: (await req.payload.findByID({ collection: 'projects', id: projectId, depth: 0, overrideAccess: true /* SYSTEM-READ: PT */, req }).then((d) => relId((d as { company?: unknown }).company) ?? -1)) }
+  const doc = (await req.payload.findByID({ collection: 'projects', id: projectId, depth: 0, overrideAccess: true /* SYSTEM-READ: PT + kind */, req })) as { company?: unknown; kind?: unknown }
+  // DRMS 10/10 D4: outside konstruksi the RAP is a cost plan only — the stages keep their manual progress (E4)
+  if (!rapDrivesProgress(kindOf(doc.kind))) return
+  const p = { id: projectId, company: relId(doc.company) ?? -1 }
   await lockProject(req, projectId)
   const [rows, stages, modes] = [await itemRows(req, p), await projectStages(req, projectId), await stageModes(req, p)]
   for (const s of stages) {
@@ -240,7 +251,8 @@ export async function refreshRapProgress(req: PayloadRequest, projectId: number)
 export type RapItemInput = {
   code?: string
   description?: string
-  stageId?: number
+  /** Required for konstruksi; other kinds may leave it empty / clear it with null. */
+  stageId?: number | null
   kind?: RapKind
   uomId?: number
   volume?: number
@@ -250,12 +262,12 @@ export type RapItemInput = {
   active?: boolean
 }
 
-function itemIssues(i: RapItemInput, create: boolean): Array<{ path: string; message: string }> {
+function itemIssues(i: RapItemInput, create: boolean, stageRequired: boolean): Array<{ path: string; message: string }> {
   const out: Array<{ path: string; message: string }> = []
   const need = <K extends keyof RapItemInput>(k: K) => create && (i[k] === undefined || i[k] === null)
   if (need('code') || (i.code !== undefined && (!i.code.trim() || i.code.trim().length > 32))) out.push({ path: 'code', message: 'Kode wajib, maks. 32 karakter.' })
   if (need('description') || (i.description !== undefined && (!i.description.trim() || i.description.trim().length > 300))) out.push({ path: 'description', message: 'Uraian wajib, maks. 300 karakter.' })
-  if (need('stageId')) out.push({ path: 'stageId', message: 'Tahapan wajib.' })
+  if (stageRequired && (need('stageId') || i.stageId === null)) out.push({ path: 'stageId', message: 'Tahapan wajib untuk project konstruksi.' })
   if (need('kind')) out.push({ path: 'kind', message: 'Jenis wajib.' })
   if (need('uomId')) out.push({ path: 'uomId', message: 'Satuan wajib.' })
   if (need('volume') || (i.volume !== undefined && !isQty(i.volume))) out.push({ path: 'volume', message: 'Volume harus > 0, maks. 2 desimal.' })
@@ -266,7 +278,7 @@ function itemIssues(i: RapItemInput, create: boolean): Array<{ path: string; mes
 
 async function checkRefs(req: PayloadRequest, p: Project, i: RapItemInput, stages: StageRow[]): Promise<void> {
   const issues: Array<{ path: string; message: string }> = []
-  if (i.stageId !== undefined && !stages.some((s) => s.id === i.stageId && s.active)) issues.push({ path: 'stageId', message: 'Tahapan bukan tahapan aktif project ini.' })
+  if (i.stageId !== undefined && i.stageId !== null && !stages.some((s) => s.id === i.stageId && s.active)) issues.push({ path: 'stageId', message: 'Tahapan bukan tahapan aktif project ini.' })
   if (i.uomId !== undefined) {
     const u = await req.payload.findByID({ collection: 'uoms', id: i.uomId, depth: 0, overrideAccess: true /* SYSTEM-READ: shared master */, req, disableErrors: true })
     if (!u || (u as { active?: boolean | null }).active === false) issues.push({ path: 'uomId', message: 'Satuan tidak ditemukan atau nonaktif.' })
@@ -287,7 +299,7 @@ const withReason = async <T>(req: PayloadRequest, reason: string, fn: () => Prom
 export async function createRapItem(req: PayloadRequest, projectId: number, input: RapItemInput, reason?: string | null): Promise<RapItemDto> {
   const p = await loadProjectFor(req, projectId)
   const ed = await requireEditor(req, p, reason)
-  validation(itemIssues(input, true))
+  validation(itemIssues(input, true, rapDrivesProgress(kindOf(p.kind))))
   await lockProject(req, projectId)
   const stages = await projectStages(req, projectId)
   await checkRefs(req, p, input, stages)
@@ -299,7 +311,7 @@ export async function createRapItem(req: PayloadRequest, projectId: number, inpu
       collection: 'rap-items',
       data: {
         project: projectId,
-        stage: input.stageId!,
+        stage: input.stageId ?? null,
         code,
         description: input.description!.trim(),
         kind: input.kind!,
@@ -327,7 +339,7 @@ export async function updateRapItem(req: PayloadRequest, itemId: number, input: 
   const p = await loadProjectFor(req, projectId)
   const ed = await requireEditor(req, p, reason)
   if (input.kind !== undefined && input.kind !== cur!.kind) fail(400, 'VALIDATION', 'Jenis item tidak dapat diubah (buat item baru).', 'kind')
-  validation(itemIssues(input, false))
+  validation(itemIssues(input, false, rapDrivesProgress(kindOf(p.kind))))
   await lockProject(req, projectId)
   const stages = await projectStages(req, projectId)
   await checkRefs(req, p, input, stages)
@@ -382,17 +394,23 @@ async function diffRows(req: PayloadRequest, p: Project, rows: RapRow[], removeM
   const issues: RapIssue[] = []
   const byCode = new Map(existing.map((e) => [key(e.code), e]))
   const stageNames = new Map(stages.filter((s) => s.active).map((s) => [stageKey(s.name), s]))
-  const newStages = [...new Set(rows.map((r) => r.stageName.trim()).filter((n) => !stageNames.has(stageKey(n))))]
+  // konstruksi: stage required, unknown stages are created (Direktur); other kinds: optional, existing stages only
+  const staged = rapDrivesProgress(kindOf(p.kind))
+  const newStages = staged ? [...new Set(rows.map((r) => r.stageName.trim()).filter((n) => n && !stageNames.has(stageKey(n))))] : []
   const out: RapPreviewRow[] = []
   rows.forEach((r, i) => {
     const uomId = uoms.get(key(normUom(r.uomCode)))
     if (!uomId) issues.push({ row: r.row, column: 'satuan', message: `Satuan "${r.uomCode}" tidak dikenal.` })
+    if (staged && !r.stageName.trim()) issues.push({ row: r.row, column: 'tahapan', message: 'Tahapan wajib untuk project konstruksi.' })
+    if (!staged && r.stageName.trim() && !stageNames.has(stageKey(r.stageName))) {
+      issues.push({ row: r.row, column: 'tahapan', message: `Tahapan "${r.stageName.trim()}" tidak ada di project ini — kosongkan kolom tahapan atau pakai tahapan yang sudah ada.` })
+    }
     const e = byCode.get(key(r.code))
     if (!e) return void out.push({ row: r.row, code: r.code, status: 'new', changes: [] })
     if (e.kind !== r.kind) issues.push({ row: r.row, column: 'jenis', message: `Kode ${r.code}: jenis tidak dapat diubah (${e.kind} → ${r.kind}).` })
     const changes: string[] = []
     if (e.description !== r.description) changes.push('uraian')
-    if (stageKey(e.stage_name) !== stageKey(r.stageName)) changes.push('tahapan')
+    if (stageKey(e.stage_name ?? '') !== stageKey(r.stageName)) changes.push('tahapan')
     if (uomId !== undefined && e.uom_id !== uomId) changes.push('satuan')
     if (round2(num(e.volume)) !== round2(r.volume)) changes.push('volume')
     if (numN(e.unit_price) !== r.unitPrice) changes.push('harga_satuan')
@@ -411,7 +429,6 @@ async function diffRows(req: PayloadRequest, p: Project, rows: RapRow[], removeM
 /** POST /projects/{id}/rap/import/preview — nothing is written. */
 export async function previewRapImport(req: PayloadRequest, projectId: number, bytes: Uint8Array): Promise<RapPreview> {
   const p = await loadProjectFor(req, projectId)
-  if (kindOf(p.kind) !== 'konstruksi') fail(409, 'WRONG_PROJECT_KIND', 'RAP hanya untuk project jenis konstruksi.')
   const roles = await rapRoles(req, p)
   if (!roles.director && !roles.pm) fail(403, 'FORBIDDEN', 'RAP hanya dapat diubah oleh Direktur/Admin atau PM project ini.')
   const locked = await isRapLocked(req, p)
@@ -458,7 +475,7 @@ async function applyRows(req: PayloadRequest, p: Project, rows: RapRow[], opts: 
       const data = {
         code: r.code.trim(),
         description: r.description,
-        stage: stages.get(stageKey(r.stageName))!,
+        stage: r.stageName.trim() ? (stages.get(stageKey(r.stageName)) ?? null) : null,
         uom: d.uoms.get(key(normUom(r.uomCode)))!,
         volume: round2(r.volume),
         unitPrice: r.unitPrice,
@@ -502,17 +519,26 @@ export async function applyRapTemplate(req: PayloadRequest, projectId: number, t
   if ((await itemRows(req, p)).length > 0) fail(409, 'STATE_CONFLICT', 'Template hanya dapat dipakai pada project yang belum punya RAP.', 'templateId')
   const t = (await req.payload.findByID({ collection: 'rap-templates', id: templateId, depth: 0, overrideAccess: true /* SYSTEM-READ: PT checked below */, req, disableErrors: true })) as Record<string, unknown> | null
   if (!t || t.active === false || relId(t.company) !== p.company) fail(400, 'VALIDATION', 'Template RAP tidak ditemukan atau nonaktif.', 'templateId')
+  // DRMS 10/10 D4: a template of another project kind does not fit (stages / items of that business)
+  if (typeof t!.projectKind === 'string' && t!.projectKind !== kindOf(p.kind)) {
+    fail(400, 'VALIDATION', `Template RAP ini untuk project jenis ${PROJECT_KIND_LABELS[kindOf(t!.projectKind)]}.`, 'templateId')
+  }
   const rows: RapRow[] = ((t!.items as Array<Record<string, unknown>> | null) ?? []).map((x, i) => ({
     row: i + 1,
     code: String(x.code),
     description: String(x.description),
-    stageName: String(x.stageName),
+    stageName: typeof x.stageName === 'string' ? x.stageName : '',
     kind: x.kind as RapKind,
     uomCode: String(x.uomCode),
     volume: Number(x.volume),
     unitPrice: typeof x.unitPrice === 'number' ? x.unitPrice : null,
     weightPct: typeof x.weightPct === 'number' ? x.weightPct : null,
   }))
+  if (!rapDrivesProgress(kindOf(p.kind))) {
+    // outside konstruksi the stage is only a grouping: a template stage this project does not have is dropped
+    const own = new Set((await projectStages(req, p.id)).filter((s) => s.active).map((s) => stageKey(s.name)))
+    for (const r of rows) if (!own.has(stageKey(r.stageName))) r.stageName = ''
+  }
   await applyRows(req, p, rows, { removeMissing: false, reason: '', roles: ed.roles })
   return loadRap(req, projectId)
 }
@@ -531,6 +557,7 @@ export async function saveRapAsTemplate(req: PayloadRequest, projectId: number, 
     data: {
       company: p.company,
       name: title,
+      projectKind: kindOf(p.kind),
       active: true,
       items: items.map((r) => ({ code: r.code, description: r.description, stageName: r.stage_name, kind: r.kind, uomCode: r.uom_code, volume: num(r.volume), unitPrice: numN(r.unit_price), weightPct: numN(r.weight_pct) })),
     } as never,
@@ -545,4 +572,21 @@ export async function saveRapAsTemplate(req: PayloadRequest, projectId: number, 
 export async function activeUomCodes(req: PayloadRequest): Promise<string[]> {
   const res = await req.payload.find({ collection: 'uoms', where: { active: { not_equals: false } }, depth: 0, pagination: false, sort: 'code', overrideAccess: true /* SYSTEM-READ: shared master */, req })
   return res.docs.map((d) => String((d as { code?: unknown }).code ?? '')).filter(Boolean)
+}
+
+export type RapTemplateOption = { id: number; name: string; items: number; projectKind: string | null }
+
+/** Active RAP templates of the project's PT that fit its kind (same kind or "any kind") — web "Pakai template". */
+export async function rapTemplatesFor(req: PayloadRequest, projectId: number): Promise<RapTemplateOption[]> {
+  const p = await loadProjectFor(req, projectId)
+  const res = await req.payload.find({
+    collection: 'rap-templates',
+    where: { and: [{ company: { equals: p.company } }, { active: { not_equals: false } }, { or: [{ projectKind: { equals: kindOf(p.kind) } }, { projectKind: { exists: false } }] }] },
+    sort: 'name',
+    depth: 0,
+    pagination: false,
+    overrideAccess: true, // SYSTEM-READ: templates of the visible project's PT (applying re-checks the editor role)
+    req,
+  })
+  return (res.docs as Array<{ id: number; name?: string; items?: unknown[] | null; projectKind?: string | null }>).map((d) => ({ id: d.id, name: d.name ?? '', items: d.items?.length ?? 0, projectKind: d.projectKind ?? null }))
 }

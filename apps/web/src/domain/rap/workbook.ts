@@ -5,11 +5,12 @@ import { isQty, normUom, RAP_KINDS, round2, type RapKind } from './rules'
 
 /**
  * P3 RAP Excel (owner decision 2026-10-10): one sheet "RAP" with the columns below + a "Petunjuk"
- * sheet; `jenis` and `satuan` are dropdowns. Pure: bytes in/out, no Payload.
+ * sheet; `jenis` and `satuan` are dropdowns. Pure: bytes in/out, no Payload. DRMS 10/10 D4 (2026-10-11): RAP for
+ * every project kind with a RAB → `tahapan` may be empty here; the service requires it for konstruksi only.
  */
 export const RAP_SHEET = 'RAP'
 export const RAP_COLUMNS = ['kode', 'uraian', 'tahapan', 'jenis', 'satuan', 'volume', 'harga_satuan', 'bobot'] as const
-const REQUIRED = new Set(['kode', 'uraian', 'tahapan', 'jenis', 'satuan', 'volume'])
+const REQUIRED = new Set(['kode', 'uraian', 'jenis', 'satuan', 'volume'])
 
 export type RapRow = {
   row: number
@@ -33,9 +34,9 @@ export function buildRapWorkbook(uomCodes: readonly string[], rows: ReadonlyArra
     name: RAP_SHEET,
     freezeHeader: true,
     cols: [{ width: 12, text: true }, { width: 44 }, { width: 24 }, { width: 12 }, { width: 10, text: true }, { width: 12 }, { width: 16 }, { width: 9 }],
-    rows: [header, ...rows.map((r) => [r.code, r.description, r.stageName, r.kind, r.uomCode, r.volume, r.unitPrice ?? null, r.weightPct ?? null])],
+    rows: [header, ...rows.map((r) => [r.code, r.description, r.stageName || null, r.kind, r.uomCode, r.volume, r.unitPrice ?? null, r.weightPct ?? null])],
     validations: [
-      { col: 3, rule: { kind: 'list', source: RAP_KINDS.join(','), prompt: 'pekerjaan = dihitung ke progress; material = masuk/terpakai/stok saja' } },
+      { col: 3, rule: { kind: 'list', source: RAP_KINDS.join(','), prompt: 'pekerjaan = jasa/pekerjaan (konstruksi: dihitung ke progress); material = barang/bahan' } },
       { col: 4, rule: { kind: 'list', source: uomCodes.join(','), allowOther: true, prompt: 'Kode satuan (m³ → M3, m² → M2 juga diterima)' } },
       { col: 5, rule: { kind: 'decimal', min: 0.01, prompt: 'Volume RAP, maks. 2 desimal' } },
       { col: 6, rule: { kind: 'whole', min: 0, prompt: 'Rupiah bulat, boleh kosong (tidak terlihat oleh Staff)' } },
@@ -50,8 +51,10 @@ export function buildRapWorkbook(uomCodes: readonly string[], rows: ReadonlyArra
       [{ v: 'Template RAP — RR Teams', s: 'title' }],
       ['Satu baris = satu item RAP. Kolom bertanda * wajib.'],
       ['kode: unik per project (mis. A.1, B.2.3). Impor ulang dengan kode yang sama MENGUBAH item itu; item yang tidak ada di file dinonaktifkan.'],
-      ['tahapan: nama tahapan project. Tahapan yang belum ada dibuat; bobotnya diusulkan dari porsi nilai (volume × harga).'],
-      ['jenis: pekerjaan (dihitung ke progress tahapan) atau material (masuk / terpakai / stok, TIDAK dihitung ke progress).'],
+      ['tahapan: project konstruksi WAJIB — nama tahapan project; tahapan yang belum ada dibuat, bobotnya diusulkan dari porsi nilai (volume × harga).'],
+      ['tahapan: project jenis lain (umum, trading, kontrak unit, aftersales) boleh kosong; bila diisi harus tahapan yang sudah ada di project.'],
+      ['jenis: pekerjaan (jasa/pekerjaan; konstruksi: dihitung ke progress tahapan) atau material (barang/bahan; masuk / terpakai / stok, TIDAK dihitung ke progress).'],
+      ['Project yang punya RAB wajib punya RAP: pengajuan baru bisa dikirim setelah RAP terisi, dan setiap baris pengajuan memilih item RAP.'],
       ['satuan: kode satuan (M, M1, M2, M3, KG, SAK, ZAK, BTG, LBR, BH, …). m³ / m² juga dikenali.'],
       ['harga_satuan: Rupiah bulat (boleh kosong). Progress tahapan dibobot nilai bila semua pekerjaan berharga, selain itu rata.'],
       ['Setelah ada laporan harian (realisasi), RAP terkunci: perubahan hanya oleh Direktur dengan alasan.'],
@@ -99,7 +102,7 @@ export function parseRapWorkbook(bytes: Uint8Array): { rows: RapRow[]; issues: R
     else if (seen.has(code.toUpperCase())) err('kode', `Kode ${code} ganda (baris ${seen.get(code.toUpperCase())}).`)
     else seen.set(code.toUpperCase(), row)
     if (!description || description.length > 300) err('uraian', 'Uraian wajib, maks. 300 karakter.')
-    if (!stageName || stageName.length > 128) err('tahapan', 'Tahapan wajib, maks. 128 karakter.')
+    if (stageName.length > 128) err('tahapan', 'Tahapan maks. 128 karakter.')
     if (!kind) err('jenis', 'Jenis harus "pekerjaan" atau "material".')
     if (!uomCode) err('satuan', 'Satuan wajib.')
     const volume = volRaw === null ? null : round2(volRaw)
@@ -107,7 +110,7 @@ export function parseRapWorkbook(bytes: Uint8Array): { rows: RapRow[]; issues: R
     if (unitPrice === null && cellStr(priceCell) !== '') err('harga_satuan', 'Harga satuan harus Rupiah bulat.')
     if (unitPrice !== null && unitPrice < 0) err('harga_satuan', 'Harga satuan tidak boleh negatif.')
     if (weightPct !== null && (weightPct < 0 || weightPct > 100)) err('bobot', 'Bobot 0–100.')
-    if (code && description && stageName && kind && uomCode && volume !== null && isQty(volume)) {
+    if (code && description && stageName.length <= 128 && kind && uomCode && volume !== null && isQty(volume)) {
       rows.push({ row, code, description, stageName, kind, uomCode, volume, unitPrice, weightPct })
     }
   })

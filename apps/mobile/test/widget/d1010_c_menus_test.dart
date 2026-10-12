@@ -130,6 +130,23 @@ void main() {
       expect(find.byType(ProjectDetailScreen), findsOneWidget);
     });
 
+    testWidgets(
+      'D4 (2026-10-11): RAP tab of a project with a RAB but no RAP says "Project belum punya RAP — hubungi PM"',
+      (tester) async {
+        final api = FakeProjectsApi()..rapItems = const [];
+        await pumpRouted(
+          tester,
+          '/projects/9',
+          roles: {Role.staff},
+          overrides: [projectsApiProvider.overrideWithValue(api)],
+        );
+        await tester.tap(find.byKey(const Key('tab-project-rap')));
+        await tester.pumpAndSettle();
+        expect(find.byKey(const Key('project-rap-missing')), findsOneWidget);
+        expect(find.text('Project belum punya RAP — hubungi PM'), findsOneWidget);
+      },
+    );
+
     testWidgets('project tabs: Proyek info, RAP plan/realisation/sisa with over budget, Pengajuan filter + open', (
       tester,
     ) async {

@@ -90,3 +90,35 @@ the after-sales staff (quotations, incoming POs, deliveries). Construction (dail
 | Exclusion constraint (`btree_gist`) for contract overlap | Needs an extension on the shared platform Postgres; trigger + advisory lock gives the same guarantee. |
 | Staff may also create manual progress reports | Owner kept v1.1 §4 for progress % (E4 tests); field reports are separate documents. |
 | Spare-part stock | Out of scope (owner): no inventory module; text lines only. |
+
+## Amendment 2026-10-11 — RAP for every project with a RAB (DRMS 10/10 D4)
+
+- **Status:** accepted (owner decision 2026-10-11: "RAP wajib untuk semua proyek yang punya RAB"; "Melebihi RAP" stays
+  a warning, never blocking). Branch `feat/d1010-f-rap-all`. Supersedes the "RAP exists for konstruksi only" part of
+  P3 and Phase C D4 ("other kinds without RAP stay unconstrained", plan `drms-1010.md` open question 1).
+
+**Decision.**
+
+1. **The RAP is a cost plan of any project, not a konstruksi feature.** RAP items, the Excel import / export and the
+   templates work for every project kind (`umum`, `trading`, `kontrak_unit`, `aftersales`, `konstruksi`). Editors stay
+   the same: the Direktur/Admin of the PT and the PM of the project's team; locking (daily-report realisation) unchanged.
+2. **Rule (`rapRequiredFor`).** A project **with a RAB** (`projects.budget > 0`) of ANY kind, and every konstruksi
+   project (P3, unchanged), needs ≥ 1 active RAP item before an expense request can be **submitted**; otherwise 400
+   `projectId` "Project belum punya RAP — hubungi PM" (one text for server, web and APK). Every line of a project with a
+   RAP names a RAP item (Phase C, unchanged). Drafts can be saved; requests submitted before stay valid. A project
+   without RAB (not konstruksi) may have a RAP but is not forced to.
+3. **Field reports stay per kind (this ADR §1).** Only konstruksi RAPs drive the stage progress from the daily
+   reports (`rapDrivesProgress`) and require a stage per item. Other kinds: the stage is optional (an existing stage as
+   grouping; an import never creates stages there), the progress stays manual (E4 progress reports), no daily-report
+   quantities. DB: `rap_items.stage_id` nullable, `pk_rap_item_guard` refuses a stage-less item of a konstruksi
+   project (migration `20261013_400100_d1010_rap_all_guard`). The project kind stays frozen once RAP items exist
+   (P3 trigger; hook now answers 409 "sudah punya RAP").
+4. **Templates per project kind.** `rap_templates.project_kind` (NULL = any kind); a template saved from a project
+   carries its kind and is offered only to projects of that kind; existing templates became `konstruksi`.
+5. **Existing data.** No RAP is created automatically. The migration logs every non-archived / unfinished project with a
+   RAB (or konstruksi) without RAP; the Direktur dashboard lists them ("Project ber-RAB belum punya RAP") and the PM
+   dashboard nudges the team's ones; the go-live import warns per imported project with a RAB.
+
+**Consequences.** Projects with a RAB but no RAP (e.g. imported go-live projects, the UAT seed project) cannot send
+requests until a PM fills the RAP — intended. The APK learns the rule from `GET /projects/{id}/rap` `rapRequired` and
+`GET /projects` `rapMissing`; older APKs still get the server's 400 with the same message under the project field.

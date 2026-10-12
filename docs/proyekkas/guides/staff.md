@@ -79,7 +79,11 @@ tanpa persetujuan.
 Pantau di **Pengajuan Saya** atau lonceng. Pemohon lain yang Anda cantumkan diberi tahu saat pengajuan dibuat atas
 namanya, diajukan, dan ditarik kembali; di web lonceng **Notifikasi** ada di bar atas, kanan.
 
-**Pesan yang sering muncul:** "Reimburse wajib melampirkan minimal 1 nota." · "Pilih salah satu: project atau pusat
+**RAP (sejak 11 Okt 2026):** project yang punya RAB wajib punya **RAP** — setiap baris memilih **Item RAP**. Bila
+project belum punya RAP, editor menampilkan **"Project belum punya RAP — hubungi PM"**: draft tetap bisa disimpan,
+tetapi baru bisa diajukan setelah PM mengisi RAP project. Hubungi PM project Anda.
+
+**Pesan yang sering muncul:** "Project belum punya RAP — hubungi PM" · "Reimburse wajib melampirkan minimal 1 nota." · "Pilih salah satu: project atau pusat
 biaya." · "Rekening tujuan wajib dipilih." · "Data master belum tersedia…" (buka aplikasi saat online sekali) ·
 "Tanggal nota tidak boleh di masa depan" · "Staff hanya dapat mengajukan untuk dirinya sendiri…".
 

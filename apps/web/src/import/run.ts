@@ -193,6 +193,12 @@ const PER_PT_IMPORT = new Set<CollectionSlug>([
 /** Of those, the ones whose company is chosen on create (the others derive it from their parent). */
 const COMPANY_ON_CREATE = new Set<CollectionSlug>(['employees', 'expense-categories', 'cost-centers', 'sites', 'projects', 'vehicles', 'cash-accounts', 'clients', 'document-sequences', 'period-closings', 'cash-in-sources', 'approval-rules'])
 
+/** RAB of an imported project: the `rab` column, else Σ of its RAB sheet lines (undefined = none). */
+function budgetOf(p: ImportData['projects'][number], x: Exec): number | undefined {
+  const lines = x.data.budgetLines.filter((b) => b.projectCode === p.code && ptOf(b, x.defaultPt) === ptOf(p, x.defaultPt))
+  return p.budget ?? (lines.length > 0 ? lines.reduce((s, b) => s + b.amount, 0) : undefined)
+}
+
 class Exec {
   readonly cache = new Map<string, number>()
   readonly kcFollowUp: KeycloakFollowUpRow[] = []
@@ -531,7 +537,7 @@ const MASTERS: Array<{ key: SheetKey; rows: (d: ImportData) => number; run: Mast
   {
     key: 'project',
     rows: (d) => d.projects.length,
-    run: async (x, rep) => {
+    run: async (x, rep, issues) => {
       for (const p of x.data.projects) {
         const r = await atRow(rep.sheet, p._row, async () => {
           await x.use(p)
@@ -540,8 +546,7 @@ const MASTERS: Array<{ key: SheetKey; rows: (d: ImportData) => number; run: Mast
             const found = await x.findOne('clients', { name: { equals: p.client } })
             client = found ? (found.id as number) : ((await x.req.payload.create({ collection: 'clients', data: { name: p.client, active: true, company: x.companyId }, depth: 0, overrideAccess: true /* SYSTEM-WRITE: go-live import */, req: x.req })).id as number)
           }
-          const lines = x.data.budgetLines.filter((b) => b.projectCode === p.code && ptOf(b, x.defaultPt) === ptOf(p, x.defaultPt))
-          const budget = p.budget ?? (lines.length > 0 ? lines.reduce((s, b) => s + b.amount, 0) : undefined)
+          const budget = budgetOf(p, x)
           return x.upsert(
             'projects',
             { code: { equals: p.code } },
@@ -564,6 +569,12 @@ const MASTERS: Array<{ key: SheetKey; rows: (d: ImportData) => number; run: Mast
           )
         })
         tally(rep, r.action)
+        // DRMS 10/10 D4 (owner 2026-10-11): a project with a RAB needs a RAP before requests can be sent; the go-live
+        // file has no RAP sheet → name every such project so the PMs fill the RAP (Excel / template on the RAP tab)
+        if (r.id && (budgetOf(p, x) ?? 0) > 0) {
+          const rap = await x.req.payload.find({ collection: 'rap-items', where: { and: [{ project: { equals: r.id } }, { active: { not_equals: false } }] }, limit: 1, depth: 0, pagination: false, overrideAccess: true /* SYSTEM-READ: go-live import */, req: x.req })
+          if (rap.docs.length === 0) issues.push({ level: 'warning', sheet: rep.sheet, row: p._row, message: `Project ${p.code} punya RAB tetapi belum punya RAP: pengajuan project ini baru bisa dikirim setelah PM / Direktur mengisi RAP (tab RAP project: template atau impor Excel).` })
+        }
       }
     },
   },

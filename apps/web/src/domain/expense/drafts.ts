@@ -6,6 +6,7 @@ import { resolveScope } from '@/access/scope'
 
 import { actorContext, fail, ids, loadRaw, loadVisible, requireAction, type RequestDoc } from './common'
 import { rapRequirement } from '@/domain/rap/budget'
+import { RAP_MISSING_MESSAGE } from '@/domain/rap/rules'
 
 import { normalizeLines, validateLines } from './lines'
 import { copyReceiptsForResubmit } from './receipts'
@@ -249,7 +250,8 @@ export async function validateContent(
 /**
  * D4 (owner 2026-10-11): every line names a RAP item OF THE REQUEST's PROJECT. Draft: a chosen item must belong to the
  * project; submit: required on every line when the project has a RAP, an inactive item must be replaced, and a
- * konstruksi project without RAP cannot send requests yet (the PM / Direktur fills the RAP first).
+ * project that needs a RAP (any kind with a RAB, or konstruksi — "RAP wajib untuk semua proyek yang punya RAB") but has
+ * none cannot send requests yet (the PM / Direktur fills the RAP first). Requests sent before stay valid.
  */
 async function rapLineErrors(req: PayloadRequest, projectId: number | null, lines: LineInputApi[], forSubmit: boolean): Promise<Array<{ path: string; message: string }>> {
   const errors: Array<{ path: string; message: string }> = []
@@ -262,8 +264,8 @@ async function rapLineErrors(req: PayloadRequest, projectId: number | null, line
   }
   if (!chosen && !forSubmit) return errors
   const rap = await rapRequirement(req, projectId)
-  if (forSubmit && !rap.hasRap && rap.konstruksi) {
-    errors.push({ path: 'projectId', message: 'Project konstruksi ini belum punya RAP. Minta PM / Direktur mengisi RAP project dulu.' })
+  if (forSubmit && !rap.hasRap && rap.required) {
+    errors.push({ path: 'projectId', message: RAP_MISSING_MESSAGE })
   }
   lines.forEach((l, i) => {
     const item = l.rapItemId ? rap.items.get(l.rapItemId) : undefined

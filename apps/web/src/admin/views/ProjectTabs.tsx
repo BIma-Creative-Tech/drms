@@ -3,6 +3,8 @@ import type { DocumentViewServerProps, PayloadRequest, Where } from 'payload'
 import React from 'react'
 
 import { employeeIn, hasRoleAny, relId, rolesIn, userId } from '@/access/roles'
+import { RapImport } from '@/admin/components/field/RapImport'
+import { RapTemplateActions } from '@/admin/components/field/RapTemplateActions'
 import { KAS_STYLE } from '@/admin/components/kas/style'
 import { ListToolbar, Pager } from '@/admin/components/list/ListToolbar'
 import { matchesQuery, pageOfFind, paginate, parseListQuery, searchWhere } from '@/admin/list-query'
@@ -10,11 +12,13 @@ import { listItem } from '@/domain/expense/dto'
 import type { RequestDoc } from '@/domain/expense/common'
 import { BUDGET_COMMITTED, REQUEST_TYPE_LABELS, REQUEST_TYPES, type RequestStatus } from '@/domain/expense/types'
 import { kindOf } from '@/domain/field/rules'
-import { loadRap } from '@/domain/rap/service'
+import { RAP_MISSING_MESSAGE } from '@/domain/rap/rules'
+import { loadRap, rapTemplatesFor } from '@/domain/rap/service'
 import { formatDateLong } from '@/pdf/format'
 import { withReqTransaction } from '@/lib/system-tx'
 
 import { F3Root } from './f3-ui'
+import { Alert } from './progress-ui'
 import { Card, DataTable, EmptyState, KpiRow, KpiTile, Meter, StatusPill, VIZ_STYLE, rp, type Col } from './viz'
 
 /**
@@ -22,7 +26,9 @@ import { Card, DataTable, EmptyState, KpiRow, KpiTile, Meter, StatusPill, VIZ_ST
  * view), "RAP" (plan vs realisation per RAP item, D4) and "Pengajuan" (the project's expense requests). Document views
  * of the Projects collection (Payload edit tabs); the project must be readable by the caller (collection access),
  * else nothing is shown. RAP money only for the price roles (DTO of loadRap). Tables: search + filter + pages (D8);
- * at ≤ 640 px RAP items are cards (APK layout, as the request lines).
+ * at ≤ 640 px RAP items are cards (APK layout, as the request lines). D4 owner 2026-10-11: RAP for EVERY project kind
+ * with a RAB — the tab also manages the RAP (Excel import / export, templates of the project kind) for the PM and the
+ * Direktur/Admin; konstruksi keeps its daily-report RAP page (stage progress, weekly recap) under Laporan harian.
  */
 const idOf = (props: DocumentViewServerProps) => Number(props.initPageResult.docID ?? (props.doc as { id?: unknown } | undefined)?.id)
 
@@ -52,7 +58,9 @@ export async function ProjectRapTab(props: DocumentViewServerProps) {
   const data = Number.isSafeInteger(id)
     ? await withReqTransaction(req, async () => {
         const p = (await req.payload.findByID({ collection: 'projects', id, depth: 0, user: req.user, overrideAccess: false /* caller's read scope */, req }).catch(() => null)) as { kind?: string | null } | null
-        return p ? { kind: kindOf(p.kind), rap: await loadRap(req, id) } : null
+        if (!p) return null
+        const rap = await loadRap(req, id)
+        return { kind: kindOf(p.kind), rap, templates: rap.canEdit && rap.items.length === 0 ? await rapTemplatesFor(req, id) : [] }
       }).catch(() => null)
     : null
   if (!data) {
@@ -62,16 +70,17 @@ export async function ProjectRapTab(props: DocumentViewServerProps) {
       </TabRoot>
     )
   }
-  const { rap, kind } = data
+  const { rap, kind, templates } = data
   const prices = rap.budget !== null
+  const stageOf = (i: Item) => (i.stage ? `${i.stage.name} · ` : '')
   const sp = props.searchParams as Record<string, string | string[] | undefined> | undefined
   const lq = parseListQuery(sp, ['tahap', 'status'])
   const filtered = rap.items.filter(
     (i) =>
       (i.active || (i.realisedAmount ?? 0) > 0 || !!lq.filters.status) &&
-      (!lq.filters.tahap || String(i.stage.id) === lq.filters.tahap) &&
+      (!lq.filters.tahap || String(i.stage?.id ?? '') === lq.filters.tahap) &&
       (lq.filters.status === 'melebihi' ? i.overBudget === true : lq.filters.status === 'nonaktif' ? !i.active : lq.filters.status === 'aktif' ? i.active : true) &&
-      matchesQuery([i.code, i.description, i.stage.name], lq.q),
+      matchesQuery([i.code, i.description, i.stage?.name ?? ''], lq.q),
   )
   const page = paginate(filtered, lq.page, lq.per)
   const b = rap.budget
@@ -109,18 +118,40 @@ export async function ProjectRapTab(props: DocumentViewServerProps) {
         <>
           {i.description} {i.active ? null : <small>(nonaktif)</small>}
           <span className="sub">
-            {i.stage.name} · {qty(i.volume)} {i.uom.code}
+            {stageOf(i)}
+            {qty(i.volume)} {i.uom.code}
             {prices && i.unitPrice !== null && i.unitPrice !== undefined ? ` × ${rp(i.unitPrice)}` : ''}
           </span>
         </>
       ),
     },
-    ...(prices ? moneyCols : [{ key: 'v', label: 'Volume RAP', num: true, cell: (i: Item) => `${qty(i.volume)} ${i.uom.code}` }, { key: 'r', label: 'Realisasi volume', num: true, cell: (i: Item) => `${qty(i.realised)} ${i.uom.code}` }]),
+    ...(prices
+      ? moneyCols
+      : [
+          { key: 'v', label: 'Volume RAP', num: true, cell: (i: Item) => `${qty(i.volume)} ${i.uom.code}` },
+          // daily-report quantities exist for konstruksi only
+          ...(rap.drivesProgress ? [{ key: 'r', label: 'Realisasi volume', num: true, cell: (i: Item) => `${qty(i.realised)} ${i.uom.code}` }] : []),
+        ]),
   ]
   return (
     <TabRoot name="project-rap">
-      {kind !== 'konstruksi' && rap.items.length === 0 ? (
-        <EmptyState text="RAP dipakai untuk project jenis konstruksi. Project ini belum punya RAP." />
+      {rap.items.length === 0 ? (
+        rap.rapRequired ? (
+          <Alert tone="bad" attr="rap-missing">
+            <p>
+              <b>{RAP_MISSING_MESSAGE}</b>
+            </p>
+            <p>
+              {rap.canEdit
+                ? 'Project ini punya RAB, jadi wajib punya RAP: pengajuan project ini baru bisa dikirim setelah RAP terisi. Isi RAP lewat template atau impor Excel di bawah.'
+                : 'Project ini punya RAB, jadi wajib punya RAP: pengajuan project ini baru bisa dikirim setelah PM / Direktur mengisi RAP.'}
+            </p>
+          </Alert>
+        ) : (
+          <Alert tone="info" attr="rap-optional">
+            <p>Project ini belum punya RAP. RAP wajib untuk project yang punya RAB; project ini belum ber-RAB, jadi RAP opsional.</p>
+          </Alert>
+        )
       ) : (
         <>
           {b ? (
@@ -143,14 +174,14 @@ export async function ProjectRapTab(props: DocumentViewServerProps) {
             </KpiRow>
           ) : (
             <p className="pk-note" style={{ marginTop: 0 }}>
-              Nilai RAP hanya untuk Direktur, Admin, Finance dan PM project. Anda melihat volume rencana dan realisasi laporan harian.
+              Nilai RAP hanya untuk Direktur, Admin, Finance dan PM project. {rap.drivesProgress ? 'Anda melihat volume rencana dan realisasi laporan harian.' : 'Anda melihat item dan volume rencana.'}
             </p>
           )}
           <Card
             id="project-rap-items"
             title="Rincian RAP per item"
-            sub={prices ? 'Realisasi = total baris pengajuan yang sudah disetujui Direktur, dibebankan ke item RAP' : 'Volume rencana dan realisasi volume dari laporan harian'}
-            action={manage ? { href: `/admin/laporan-harian/rap/${id}`, label: rap.canEdit ? 'Kelola RAP' : 'Halaman RAP' } : undefined}
+            sub={prices ? 'Realisasi = total baris pengajuan yang sudah disetujui Direktur, dibebankan ke item RAP' : rap.drivesProgress ? 'Volume rencana dan realisasi volume dari laporan harian' : 'Item dan volume rencana'}
+            action={manage ? { href: `/admin/laporan-harian/rap/${id}`, label: 'RAP & laporan harian' } : undefined}
           >
             <ListToolbar
               id="project-rap"
@@ -185,7 +216,8 @@ export async function ProjectRapTab(props: DocumentViewServerProps) {
                     {prices ? <span className="pk-lcard__total">{pct(i.percent)}</span> : null}
                   </div>
                   <div className="pk-lcard__meta">
-                    {i.stage.name} · {qty(i.volume)} {i.uom.code}
+                    {stageOf(i)}
+                    {qty(i.volume)} {i.uom.code}
                     {prices && i.unitPrice !== null && i.unitPrice !== undefined ? ` × ${rp(i.unitPrice)}` : ''}
                   </div>
                   {prices ? (
@@ -203,11 +235,11 @@ export async function ProjectRapTab(props: DocumentViewServerProps) {
                         </div>
                       ) : null}
                     </>
-                  ) : (
+                  ) : rap.drivesProgress ? (
                     <div className="pk-lcard__meta">
                       Realisasi volume {qty(i.realised)} {i.uom.code}
                     </div>
-                  )}
+                  ) : null}
                 </article>
               ))}
             </div>
@@ -215,6 +247,23 @@ export async function ProjectRapTab(props: DocumentViewServerProps) {
           </Card>
         </>
       )}
+      {rap.canEdit ? (
+        <Card id="project-rap-manage" title="Kelola RAP" sub={rap.drivesProgress ? 'Konstruksi: tahapan wajib; pekerjaan menggerakkan progress tahapan' : 'Rencana biaya project: tahapan opsional, progress tetap manual'}>
+          <div className="pk-kact" style={{ marginBottom: 12 }}>
+            {rap.items.length ? (
+              <a className="pk-kbtn" href={`/api/v1/projects/${id}/rap.xlsx`} data-pk-link="rap-download">
+                Unduh RAP (.xlsx)
+              </a>
+            ) : null}
+            <a className="pk-kbtn" href="/api/v1/rap/template.xlsx" data-pk-link="rap-template">
+              Template Excel kosong
+            </a>
+          </div>
+          <RapTemplateActions projectId={id} templates={templates} empty={rap.items.length === 0} />
+          <h3 style={{ fontSize: 14, margin: '16px 0 8px' }}>Impor RAP dari Excel</h3>
+          <RapImport projectId={id} needsReason={rap.needsReason} stageRequired={rap.drivesProgress} />
+        </Card>
+      ) : null}
     </TabRoot>
   )
 }

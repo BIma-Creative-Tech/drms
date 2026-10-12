@@ -105,7 +105,7 @@ export const rapExportEndpoint = v1({
     const rap = await loadRap(req, id)
     const rows = rap.items
       .filter((i) => i.active)
-      .map((i) => ({ code: i.code, description: i.description, stageName: i.stage.name, kind: i.kind, uomCode: i.uom.code, volume: i.volume, unitPrice: i.unitPrice ?? null, weightPct: i.weightPct }))
+      .map((i) => ({ code: i.code, description: i.description, stageName: i.stage?.name ?? '', kind: i.kind, uomCode: i.uom.code, volume: i.volume, unitPrice: i.unitPrice ?? null, weightPct: i.weightPct }))
     return xlsxResponse(buildRapWorkbook(await activeUomCodes(req), rows), `rap-project-${id}.xlsx`)
   },
 })

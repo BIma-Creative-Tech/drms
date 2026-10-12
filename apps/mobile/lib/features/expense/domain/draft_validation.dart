@@ -43,12 +43,29 @@ List<T> requesterChoices<T>(
   return employees.where((e) => !isDirektur(e) || idOf(e) == ownEmployee).toList();
 }
 
+/// D4 (owner 2026-10-11): message when the project has a RAB but no RAP yet (same text as the server and the web).
+const rapMissingMessage = 'Project belum punya RAP — hubungi PM';
+
+/// D4: what the project's RAP asks of the lines (from `GET /projects/{id}/rap`; [strict] when unknown, e.g. offline).
+enum RapCheck {
+  /// Every line names a RAP item (the project has a RAP, or nothing is known — the server decides).
+  strict,
+
+  /// The project needs a RAP (RAB) but has none → submit refused with [rapMissingMessage].
+  missing,
+
+  /// No RAP and none required (project without RAB) → lines without an item are fine.
+  optional,
+}
+
 /// Everything required before "Ajukan" (online submit).
-List<DraftIssue> validateForSubmit(DraftRequest d, {int? selfOnlyEmployee}) {
+List<DraftIssue> validateForSubmit(DraftRequest d, {int? selfOnlyEmployee, RapCheck rap = RapCheck.strict}) {
   final issues = <DraftIssue>[...validateForSave(d), ...requesterIssues(d, selfOnlyEmployee: selfOnlyEmployee)];
   // D2: project required (no non-project requests; Finance sets the cost center at transfer).
   if (d.projectId == null) {
     issues.add(const DraftIssue('projectId', 'Project wajib dipilih.'));
+  } else if (rap == RapCheck.missing) {
+    issues.add(const DraftIssue('projectId', rapMissingMessage));
   }
   if (d.bankAccountId == null) {
     issues.add(const DraftIssue('bankAccountId', 'Rekening tujuan wajib dipilih.'));
@@ -64,7 +81,7 @@ List<DraftIssue> validateForSubmit(DraftRequest d, {int? selfOnlyEmployee}) {
       issues.add(DraftIssue('categoryId', 'Kategori wajib dipilih.', lineNo: l.no));
     }
     // D4: every line is charged to a RAP item of the project.
-    if (l.rapItemId == null) {
+    if (l.rapItemId == null && rap == RapCheck.strict) {
       issues.add(DraftIssue('rapItemId', 'Item RAP wajib dipilih.', lineNo: l.no));
     }
     // D3: total = qty × harga satuan — both required (a pre-D3 line asks for its unit price here).

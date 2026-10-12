@@ -113,7 +113,8 @@ class RapItemPickerField extends ConsumerWidget {
     } else if (selected != null) {
       helper = remaining ?? (data!.offline ? t.rapOfflineNoBudget : null);
     } else if (data != null && data.pickable.isEmpty) {
-      helper = t.rapNoItems;
+      // D4 (owner 2026-10-11): a project with a RAB must have a RAP — same text as the web
+      helper = data.missing ? t.rapMissingBlock : t.rapNoItems;
     }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,

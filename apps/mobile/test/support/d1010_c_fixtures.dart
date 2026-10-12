@@ -178,8 +178,13 @@ class FakeProjectsApi extends Fake implements ProjectsApi {
         : projectDetailJson(),
   );
 
+  /// D4 `rapRequired` of `GET /projects/{id}/rap` (false = project without RAB) and its items.
+  bool rapRequired = true;
+  List<RapBudgetItem> rapItems = rapItemsFixture;
+
   @override
-  Future<List<RapBudgetItem>> rap(int projectId) async => rapItemsFixture;
+  Future<({List<RapBudgetItem> items, bool required})> rap(int projectId) async =>
+      (items: rapItems, required: rapRequired);
 
   @override
   Future<PageResult<ExpenseSummary>> requests(

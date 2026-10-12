@@ -498,7 +498,7 @@ export async function FieldDailyRap(props: AdminViewServerProps) {
       cell: (i) => (
         <>
           {i.description} {i.active ? null : <small>(nonaktif)</small>}
-          <span className="sub">{i.stage.name}</span>
+          <span className="sub">{i.stage?.name ?? '—'}</span>
         </>
       ),
     },

@@ -60,6 +60,8 @@ import * as migration_20261013_200100_d1010_sites_guard from './20261013_200100_
 import * as migration_20261013_300000_d1010_approval_config from './20261013_300000_d1010_approval_config';
 import * as migration_20261013_300000_d1010_approval_config_guard from './20261013_300000_d1010_approval_config_guard';
 import * as migration_20261013_300000_d1010_approval_config_data from './20261013_300000_d1010_approval_config_data';
+import * as migration_20261013_400000_d1010_rap_all from './20261013_400000_d1010_rap_all';
+import * as migration_20261013_400100_d1010_rap_all_guard from './20261013_400100_d1010_rap_all_guard';
 
 export const migrations = [
   {
@@ -371,5 +373,15 @@ export const migrations = [
     up: migration_20261013_300000_d1010_approval_config_data.up,
     down: migration_20261013_300000_d1010_approval_config_data.down,
     name: '20261013_300000_d1010_approval_config_data',
+  },
+  {
+    up: migration_20261013_400000_d1010_rap_all.up,
+    down: migration_20261013_400000_d1010_rap_all.down,
+    name: '20261013_400000_d1010_rap_all',
+  },
+  {
+    up: migration_20261013_400100_d1010_rap_all_guard.up,
+    down: migration_20261013_400100_d1010_rap_all_guard.down,
+    name: '20261013_400100_d1010_rap_all_guard',
   },
 ];
