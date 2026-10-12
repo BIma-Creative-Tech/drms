@@ -16,8 +16,8 @@
 # ignores uid/gid/mode of file secrets, so host ownership must fit (verified on staging, Compose v5.5.1).
 #
 # Images: ONLY from GHCR, pinned by digest (built on GitHub runners by .github/workflows/ci.yml job `image`):
-#   PK_WEB_IMAGE=ghcr.io/bctech-adm/proyekkas-web:<X.Y.Z>@sha256:<digest>
-#   PK_MIGRATE_IMAGE=ghcr.io/bctech-adm/proyekkas-migrate:<X.Y.Z>@sha256:<digest>
+#   PK_WEB_IMAGE=ghcr.io/bima-creative-tech/proyekkas-web:<X.Y.Z>@sha256:<digest>
+#   PK_MIGRATE_IMAGE=ghcr.io/bima-creative-tech/proyekkas-migrate:<X.Y.Z>@sha256:<digest>
 # The digests are printed in the job summary of the release-tag run. Pull needs root `docker login ghcr.io`
 # (PAT classic, read:packages only). Template .env: infra web/clients/drms-proyekkas/.env.example.
 #

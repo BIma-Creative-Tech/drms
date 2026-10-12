@@ -1,9 +1,9 @@
-# ProyekKas CI (CLAUDE.md §3.6/§3.7, ADR 0002 §5). Runs on GitHub (bctech-adm/drms);
+# ProyekKas CI (CLAUDE.md §3.6/§3.7, ADR 0002 §5). Runs on GitHub (BIma-Creative-Tech/drms);
 # syntax checked with actionlint. Actions pinned by commit SHA (resolved with `git ls-remote`),
 # tool images pinned by digest (the same images used locally for the F1 evidence).
 # Images (E10): job `image` builds web (runner) + migrate on the GitHub runner (never on the VPS), gates them
 # with Trivy and — on develop, release tags and ci/ghcr-* only — pushes them to GHCR (private):
-#   ghcr.io/bctech-adm/proyekkas-web · ghcr.io/bctech-adm/proyekkas-migrate
+#   ghcr.io/bima-creative-tech/proyekkas-web · ghcr.io/bima-creative-tech/proyekkas-migrate
 #   develop  → sha-<sha7> + <pkg version>-stg-<sha7>   (staging)
 #   vX.Y.Z   → X.Y.Z  (prod; tag must be on main, = package.json version, never overwritten)
 #   ci/ghcr-* → test-<sha7>
@@ -176,8 +176,8 @@ jobs:
       packages: write # GHCR push with GITHUB_TOKEN (read-only on fork PRs; push steps are skipped there)
     env:
       REGISTRY: ghcr.io
-      WEB_IMAGE: ghcr.io/bctech-adm/proyekkas-web
-      MIGRATE_IMAGE: ghcr.io/bctech-adm/proyekkas-migrate
+      WEB_IMAGE: ghcr.io/bima-creative-tech/proyekkas-web
+      MIGRATE_IMAGE: ghcr.io/bima-creative-tech/proyekkas-migrate
       TRIVY_IMAGE: aquasec/trivy:0.74.0@sha256:62b1e65e8869bc4b4c6aa4fa2b21595256c7c2f6018a9d9ad61caf87187c1969
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -245,7 +245,7 @@ jobs:
               echo "org.opencontainers.image.revision=$GITHUB_SHA"
               echo "org.opencontainers.image.version=$version"
               echo "org.opencontainers.image.created=$created"
-              echo "org.opencontainers.image.vendor=bctech-adm"
+              echo "org.opencontainers.image.vendor=BIma-Creative-Tech"
               echo "org.opencontainers.image.licenses=NOASSERTION"
               if [[ $name == web ]]; then
                 echo "org.opencontainers.image.description=ProyekKas DRMS web + worker (worker: node apps/web/dist/worker.mjs)"

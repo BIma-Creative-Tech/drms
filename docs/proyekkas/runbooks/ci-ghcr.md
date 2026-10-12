@@ -10,12 +10,12 @@ image yang sudah lolos Trivy, dirujuk dengan **digest**.
 
 | Image | Isi | Dipakai oleh |
 |---|---|---|
-| `ghcr.io/bctech-adm/proyekkas-web` | target `runner` `apps/web/Dockerfile` (Next standalone + `dist/worker.mjs`) | `drms-pk-web`, `drms-pk-worker` |
-| `ghcr.io/bctech-adm/proyekkas-migrate` | target `migrate` (payload migrate + seed) | `drms-pk-migrate`, `drms-pk-seed` |
+| `ghcr.io/bima-creative-tech/proyekkas-web` | target `runner` `apps/web/Dockerfile` (Next standalone + `dist/worker.mjs`) | `drms-pk-web`, `drms-pk-worker` |
+| `ghcr.io/bima-creative-tech/proyekkas-migrate` | target `migrate` (payload migrate + seed) | `drms-pk-migrate`, `drms-pk-seed` |
 
 Nama `proyekkas-*` (bukan `drms-web`/`drms-migrate`) dipilih karena **sudah mengikat** di sisi infra: `.env.example`
 prod, runbook infra §6/§11, dan regex allowlist `infra-deploy` v2
-(`^ghcr\.io/bctech-adm/proyekkas-web:[0-9]+\.[0-9]+\.[0-9]+@sha256:[0-9a-f]{64}$`). Nama ini juga sama dengan image
+(`^ghcr\.io/bima-creative-tech/proyekkas-web:[0-9]+\.[0-9]+\.[0-9]+@sha256:[0-9a-f]{64}$`). Nama ini juga sama dengan image
 lokal staging (`proyekkas-web:0.1.0-stg-<sha>`).
 
 ## 2. Cara image dibuat — `.github/workflows/ci.yml` job `image`
@@ -35,15 +35,15 @@ Urutan (job `image` hanya jalan setelah `verify`, `integration`, `security` hija
      digest **tetap tanpa tag** (tidak bisa dipakai lewat tag; jangan deploy digest tanpa tag).
 4. **Tag**: hanya digest yang lolos diberi tag (`docker buildx imagetools create`, tanpa build ulang) — §3.
 5. **Summary**: tag dicek menunjuk digest yang dipindai, lalu baris siap tempel untuk `.env` prod:
-   `PK_WEB_IMAGE=ghcr.io/bctech-adm/proyekkas-web:<tag>@sha256:…` dan `PK_MIGRATE_IMAGE=…`.
+   `PK_WEB_IMAGE=ghcr.io/bima-creative-tech/proyekkas-web:<tag>@sha256:…` dan `PK_MIGRATE_IMAGE=…`.
 
 Label OCI di setiap image: `org.opencontainers.image.{title,description,source,revision,version,created,vendor,licenses}`.
-`source` = `https://github.com/bctech-adm/drms` → paket GHCR otomatis tertaut ke repo (hak akses mengikuti repo).
+`source` = `https://github.com/BIma-Creative-Tech/drms` → paket GHCR otomatis tertaut ke repo (hak akses mengikuti repo).
 
 Cek SBOM / provenance (butuh login GHCR):
 ```bash
-docker buildx imagetools inspect ghcr.io/bctech-adm/proyekkas-web:X.Y.Z --format '{{json .SBOM}}' | head
-docker buildx imagetools inspect ghcr.io/bctech-adm/proyekkas-web:X.Y.Z --format '{{json .Provenance}}' | head
+docker buildx imagetools inspect ghcr.io/bima-creative-tech/proyekkas-web:X.Y.Z --format '{{json .SBOM}}' | head
+docker buildx imagetools inspect ghcr.io/bima-creative-tech/proyekkas-web:X.Y.Z --format '{{json .Provenance}}' | head
 ```
 
 ## 3. Tag
@@ -66,17 +66,17 @@ Tag yang sama memicu workflow `release-notes` → GitHub Release `vX.Y.Z` berisi
 
 ## 4. Visibilitas image (harus privat) — **aksi user**
 
-Repo `bctech-adm/drms` **publik**. Paket yang dibuat workflow dengan `GITHUB_TOKEN` tertaut ke repo dan **mewarisi
+Repo `BIma-Creative-Tech/drms` **publik**. Paket yang dibuat workflow dengan `GITHUB_TOKEN` tertaut ke repo dan **mewarisi
 visibilitas publik** — terbukti pada push uji pertama 2026-09-26 (`test-ba70515`: manifest bisa diambil tanpa login,
 HTTP 200). Isi image tidak memuat secret (hanya placeholder build), tetapi target tetap privat:
-GitHub → organisasi `bctech-adm` → Packages → `proyekkas-web` dan `proyekkas-migrate` → *Package settings* →
+GitHub → organisasi `BIma-Creative-Tech` → Packages → `proyekkas-web` dan `proyekkas-migrate` → *Package settings* →
 *Change visibility* → **Private** (sekali per paket; bila dikunci kebijakan org, admin org mengizinkan dulu di
-Settings → Packages). *Manage Actions access*: repo `bctech-adm/drms` peran **Write** (agar CI tetap bisa push).
+Settings → Packages). *Manage Actions access*: repo `BIma-Creative-Tech/drms` peran **Write** (agar CI tetap bisa push).
 Setelah privat, VPS wajib `docker login ghcr.io` (§6a). Cek (tanpa login harus 401/403):
 ```bash
-T=$(curl -s "https://ghcr.io/token?scope=repository:bctech-adm/proyekkas-web:pull" | sed -E 's/.*"token":"([^"]*)".*/\1/')
+T=$(curl -s "https://ghcr.io/token?scope=repository:bima-creative-tech/proyekkas-web:pull" | sed -E 's/.*"token":"([^"]*)".*/\1/')
 curl -s -o /dev/null -w '%{http_code}\n' -H "Authorization: Bearer $T" \
-  -H 'Accept: application/vnd.oci.image.index.v1+json' https://ghcr.io/v2/bctech-adm/proyekkas-web/manifests/<tag>
+  -H 'Accept: application/vnd.oci.image.index.v1+json' https://ghcr.io/v2/bima-creative-tech/proyekkas-web/manifests/<tag>
 ```
 Agent tidak mengubah setelan GitHub.
 
@@ -144,7 +144,7 @@ tidak ada gerbang approval manusia; deploy prod tetap keputusan eksplisit per ri
 - **Image saja** (migrasi versi baru kompatibel mundur): kembalikan `.env` (`cp -p .env.prev .env`, atau isi
   `PK_*_IMAGE` = ref@digest rilis sebelumnya dari job summary tag lama) → `docker compose up -d`. Migrate versi lama =
   no-op. Daftar digest lama: halaman paket GHCR atau
-  `docker buildx imagetools inspect ghcr.io/bctech-adm/proyekkas-web:X.Y.Z`.
+  `docker buildx imagetools inspect ghcr.io/bima-creative-tech/proyekkas-web:X.Y.Z`.
 - **Skema tidak kompatibel**: restore dump pra-deploy (`restore.sh pk_drms pk_drms_rb --owner pk_drms_owner`) lalu
   tukar — destruktif, **konfirmasi user**; atau migrasi *down* dari tim app.
 - **Matikan**: `docker compose down` (tanpa `-v`).
@@ -153,7 +153,7 @@ tidak ada gerbang approval manusia; deploy prod tetap keputusan eksplisit per ri
 ## 8. Staging
 
 Setelah merge ke `develop`, staging dapat memakai image GHCR (tidak perlu build di VPS): `.env` staging
-`PK_WEB_IMAGE=ghcr.io/bctech-adm/proyekkas-web:<ver>-stg-<sha7>@sha256:…` (sama untuk migrate) → `infra-deploy
+`PK_WEB_IMAGE=ghcr.io/bima-creative-tech/proyekkas-web:<ver>-stg-<sha7>@sha256:…` (sama untuk migrate) → `infra-deploy
 staging/drms-proyekkas`. Butuh login GHCR yang sama (§6a).
 
 ## 9. Kebersihan paket
