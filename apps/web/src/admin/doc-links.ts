@@ -15,6 +15,7 @@ const DETAIL: Record<string, (id: string) => string> = {
   service_report: (id) => `/admin/collections/service-reports/${id}`,
   unit_timesheet: (id) => `/admin/collections/unit-timesheets/${id}`,
   aftersales_activity: (id) => `/admin/collections/aftersales-activities/${id}`,
+  project_loan: (id) => `/admin/pinjaman/detail/${id}`,
 }
 
 /** Detail URL of a numbered document, or null (unknown type / missing or malformed id). */

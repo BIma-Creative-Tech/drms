@@ -279,7 +279,7 @@ export const MediaReceipts = mediaCollection({
   formatOptions: { format: 'jpeg', options: { quality: 82, mozjpeg: true } },
   imageSizes: [thumb],
   ownerCompany: true,
-  access: { read: focused('media-receipts', ownerLinked, true), create: rolesAllowedAny('pk-staff', 'pk-pm', 'pk-finance', 'pk-admin') },
+  access: { read: focused('media-receipts', ownerLinked, true), create: rolesAllowedAny('pk-staff', 'pk-pm', 'pk-finance', 'pk-admin', 'pk-owner') /* ADR 0024: Direktur's own requests */ },
 })
 
 export const MediaTransferProofs = mediaCollection({
@@ -366,7 +366,7 @@ export const MediaAttachments = mediaCollection({
   maxBytesByMime: { 'application/pdf': 5 * 1024 * 1024 },
   disposition: 'attachment',
   ownerCompany: true,
-  access: { read: focused('media-attachments', ownerLinked, true), create: rolesAllowedAny('pk-staff', 'pk-pm', 'pk-finance', 'pk-admin') },
+  access: { read: focused('media-attachments', ownerLinked, true), create: rolesAllowedAny('pk-staff', 'pk-pm', 'pk-finance', 'pk-admin', 'pk-owner') /* ADR 0024: Direktur's own requests */ },
 })
 
 export const MEDIA_COLLECTIONS = [

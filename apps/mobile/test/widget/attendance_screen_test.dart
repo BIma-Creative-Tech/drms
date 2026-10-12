@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 
+import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:proyekkas/core/db/app_database.dart';
@@ -143,7 +144,10 @@ void main() {
 
   testWidgets('no assigned project', (tester) async {
     await pump(tester, sites: const []);
-    expect(find.text('Anda belum ditugaskan di project atau pusat biaya mana pun. Hubungi PM/Admin.'), findsOneWidget);
+    expect(
+      find.text('Anda belum ditugaskan di site, project, atau pusat biaya mana pun. Hubungi PM/Admin.'),
+      findsOneWidget,
+    );
   });
 
   testWidgets('history: queued offline item and a rejection with the server text', (tester) async {
@@ -157,5 +161,30 @@ void main() {
     expect(find.textContaining('Absen masuk · P-01 — Gudang Contoh · offline'), findsOneWidget);
     expect(find.textContaining('Menunggu'), findsOneWidget);
     expect(find.textContaining('Di luar radius project (140 m dari titik, radius 100 m).'), findsOneWidget);
+  });
+
+  testWidgets('ADR 0023: home site first with the "Penempatan" badge; check-in at the site; history by site', (
+    tester,
+  ) async {
+    const home = ProjectSite(
+      id: 2,
+      label: 'BPN — Cabang Balikpapan',
+      lat: -2.21,
+      lng: 113.91,
+      radiusM: 100,
+      kind: SiteKind.site,
+      home: true,
+    );
+    await pump(
+      tester,
+      sites: const [home, _site],
+      history: [_row('pending').copyWith(payloadJson: '{"site_id":2}', siteId: const Value(2))],
+    );
+    expect(find.byKey(const Key('home-site-badge')), findsOneWidget);
+    expect(find.text('Site penempatan · radius 100 m'), findsOneWidget);
+    expect(find.textContaining('Absen masuk · BPN — Cabang Balikpapan'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('attendance-checkIn')));
+    await tester.pumpAndSettle();
+    expect(service.calls.single.$2, 2, reason: 'the default location is the home site');
   });
 }

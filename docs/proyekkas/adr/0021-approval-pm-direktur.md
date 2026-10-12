@@ -1,5 +1,11 @@
 # ADR 0021 — Approval flow: PM project, then Direktur; Finance transfers only
 
+> **Superseded in part by [ADR 0024](0024-configurable-approval-rules-direktur-no-approval.md) (owner, 2026-10-11).**
+> A Direktur files his own request himself; under the rule "Pengajuan Direktur" (requester role = Direktur, no approval
+> level) it goes straight to the Finance transfer queue (`direktur_no_approval`, audited). Decision 4's 409 text and
+> decision 5 (`direktur_via_pm` / `direktur_via_pm_self`, the PM files for the Direktur) no longer apply to new
+> submissions; requests already submitted under them keep working with their wording. The rest of this ADR stands.
+
 - **Status:** accepted (owner decisions 2026-10-10, plan "Approval pengajuan biaya: Staff → PM project → Direktur →
   Finance transfer"). Staging first; no production deploy without separate owner approval.
 - **Date:** 2026-10-10

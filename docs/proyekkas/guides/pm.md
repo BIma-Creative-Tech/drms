@@ -28,9 +28,10 @@ tangan**. Beranda PM juga punya kartu **Menunggu tindakan saya**.
   yang menunggu Anda, notifikasi "Pengajuan tim: …" tidak dikirim lagi (sudah diwakili notifikasi persetujuan).
 - **Pengajuan Anda sendiri** (Anda pemohon) atau pengajuan yang **Anda buat untuk Staff**: langkah PM dilewati
   otomatis dan tercatat "(tidak berlaku — pemohon)"; Direktur yang memutuskan.
-- **Pengajuan untuk Direktur** dibuat oleh Anda (PM project) atas nama Direktur: buat pengajuan dengan Direktur sebagai
-  pemohon. Anda menyetujui sebagai PM project, lalu Direktur menyetujui. Ini pengecualian yang disetujui owner
-  (10 Okt 2026) dan tercatat di panel dan PDF: "Pengajuan Direktur — diajukan oleh PM (kebijakan owner 2026-10-10)".
+- **Pengajuan untuk Direktur:** sejak 11 Okt 2026 (keputusan owner, ADR 0024) Anda **tidak lagi** membuatnya atas nama
+  Direktur (sistem menolak; APK tidak menawarkan Direktur sebagai pemohon). Direktur mengajukan sendiri dan pengajuannya
+  langsung ke antrian transfer Finance tanpa persetujuan; Anda menerima notifikasi "Pengajuan Direktur: …" bila
+  pengajuan itu di project Anda. Pengajuan yang dulu Anda buat untuk Direktur tetap Anda setujui seperti biasa.
 - **Kekurangan LPJ** di atas nominal disetujui + toleransi: persetujuan ulang juga lewat Anda dulu, lalu Direktur —
   di **web → Persetujuan → Kekurangan LPJ di atas nominal disetujui**.
 - PM lain (termasuk PM penugasan tim yang bukan PM di data project) tidak bisa memutuskan: sistem menolak dan
@@ -99,6 +100,21 @@ kuning = perlu perhatian; merah = anggaran terpakai mendahului progress lebih da
   (total harus 100%, alasan wajib saat bobot berubah). Menambah/menonaktifkan tahapan dan membuat project: Direktur.
 - **Penugasan tim:** **Proyek → Penugasan tim** → tambah karyawan ke project/pusat biaya Anda (tanggal mulai).
   Karyawan pindah project: isi **Selesai** (tanggal + alasan) di penugasan lama, lalu buat penugasan baru.
+
+## 4a. RAP project (web, semua jenis project ber-RAB)
+
+Sejak 11 Okt 2026 (keputusan pemilik): **setiap project yang punya RAB wajib punya RAP** — tidak hanya konstruksi.
+Selama RAP kosong, pengajuan project itu **tidak bisa dikirim** (pemohon melihat "Project belum punya RAP — hubungi
+PM"). Dashboard PM menampilkan kartu **"Project Anda belum punya RAP"** berisi project tim yang perlu diisi.
+
+1. Buka project → tab **RAP** → kartu **Kelola RAP**.
+2. Isi RAP dengan salah satu cara: **Pakai template** (template RAP PT ini untuk jenis project yang sama), atau
+   **Template Excel kosong** → isi kode, uraian, jenis (pekerjaan/material), satuan, volume, harga satuan → **Pratinjau**
+   → **Simpan RAP**.
+3. Kolom **tahapan**: wajib untuk project konstruksi; jenis lain (umum, trading, kontrak unit, aftersales) boleh
+   kosong — bila diisi harus tahapan yang sudah ada. RAP project non-konstruksi tidak mengubah progress tahapan.
+4. RAP yang sudah rapi bisa disimpan sebagai template (**Simpan template**) untuk project berikutnya yang sejenis.
+5. Realisasi melebihi rencana item tetap boleh diajukan — hanya muncul tanda **"Melebihi RAP"** (peringatan).
 
 ## 5. Addendum RAB
 

@@ -21,6 +21,8 @@ export const DOC_TYPES = [
   'service_report',
   // P3 (konstruksi): Laporan harian LH/YYMM/####
   'daily_report',
+  // ADR 0022: Pinjaman antar project PJ/{COMPANY}/YYMM/#### (issued at submit)
+  'project_loan',
 ] as const
 export type DocType = (typeof DOC_TYPES)[number]
 
@@ -117,6 +119,8 @@ export const DEFAULT_SEQUENCES: ReadonlyArray<Omit<SequenceConfig, 'timezone' | 
   { docType: 'service_report', docCode: 'SV', pattern: 'SV/{COMPANY}/{YY}{MM}/{seq}', resetPolicy: 'monthly', padding: 4, startAt: 1 },
   // P3 konstruksi
   { docType: 'daily_report', docCode: 'LH', pattern: 'LH/{COMPANY}/{YY}{MM}/{seq}', resetPolicy: 'monthly', padding: 4, startAt: 1 },
+  // ADR 0022 §6: inter-project loan, number at submit (date token = loan date)
+  { docType: 'project_loan', docCode: 'PJ', pattern: 'PJ/{COMPANY}/{YY}{MM}/{seq}', resetPolicy: 'monthly', padding: 4, startAt: 1 },
 ]
 
 /**

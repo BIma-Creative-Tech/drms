@@ -1,12 +1,19 @@
 import type { CollectionConfig } from 'payload'
 
 import { denyAll } from '@/access/roles'
-import { anyOf, byRole, ownEmployee, ownUser, teamCostCenters, teamProjects } from '@/access/policies'
+import { anyOf, byRole, ownEmployee, ownUser, teamCostCenters, teamProjects, type Rule } from '@/access/policies'
+import { inIds } from '@/access/scope'
 import { withAudit } from '@/audit/hooks'
 
 import { ro } from './fields-f2'
 import { companyField, companyHook } from '@/fields/company'
 import { USER_NAME_VIEW } from '@/fields/users'
+
+/**
+ * ADR 0023: a PM reads the attendance AT his team sites (site check-ins: no project / cost center) — not every
+ * project attendance that carries the same derived `site` (that stays the project's team rule).
+ */
+const teamSiteCheckIns: Rule = async ({ scope }) => ({ and: [inIds('site', (await scope()).teamSites), { project: { exists: false } }, { costCenter: { exists: false } }] })
 
 /** Read-only JSON without Monaco (CSP, config-guards.test.ts). */
 const jsonView = { readOnly: true, components: { Field: '@/components/ReadOnlyJson#ReadOnlyJson' } }
@@ -15,7 +22,7 @@ const jsonView = { readOnly: true, components: { Field: '@/components/ReadOnlyJs
  * Attendance check-in / check-out from the APK (US-01/US-02/US-14; ADR 0010 decisions 7/8).
  * Written ONLY by the sync service (`POST /api/v1/sync/batch`, items `attendance.check_in` /
  * `attendance.check_out` / `attendance.on_behalf`) after the server-side checks
- * (domain/attendance/record.ts): assigned project OR cost center (E6, Q-40) with a geofence,
+ * (domain/attendance/record.ts): assigned project OR cost center (E6, Q-40) OR site (ADR 0023) with a geofence,
  * distance ≤ radius + GPS accuracy (capped), no mocked location, selfie uploaded by the caller, one
  * check-in and one check-out per employee/location/local date. `source = pm` = "diabsenkan oleh PM"
  * (US-14): `recordedBy` = the PM, selfie + GPS from the PM's phone, reason mandatory. Nothing is
@@ -35,14 +42,14 @@ export const Attendances: CollectionConfig = withAudit(
     admin: {
       group: 'Proyek',
       useAsTitle: 'localDate',
-      defaultColumns: ['employee', 'kind', 'project', 'costCenter', 'localDate', 'attendanceTime', 'source', 'offline', 'distanceM'],
+      defaultColumns: ['employee', 'kind', 'project', 'costCenter', 'site', 'localDate', 'attendanceTime', 'source', 'offline', 'distanceM'],
     },
     access: {
       read: byRole({
         'pk-admin': true,
         'pk-owner': true,
         'pk-finance': true,
-        'pk-pm': anyOf(teamProjects('project'), teamCostCenters('costCenter'), ownUser('user'), ownEmployee('employee')),
+        'pk-pm': anyOf(teamProjects('project'), teamCostCenters('costCenter'), teamSiteCheckIns, ownUser('user'), ownEmployee('employee')),
         'pk-staff': anyOf(ownUser('user'), ownEmployee('employee')),
         // Operator/Anggota (owner decision 2026-10-09): own attendance only, same as Staff.
         'pk-operator': anyOf(ownUser('user'), ownEmployee('employee')),
@@ -51,7 +58,7 @@ export const Attendances: CollectionConfig = withAudit(
       update: denyAll,
       delete: denyAll,
     },
-    hooks: { beforeChange: [companyHook('attendances', { derive: [{ field: 'employee', collection: 'employees' }], check: [{ field: 'project', collection: 'projects' }, { field: 'costCenter', collection: 'cost-centers' }] })] },
+    hooks: { beforeChange: [companyHook('attendances', { derive: [{ field: 'employee', collection: 'employees' }], check: [{ field: 'project', collection: 'projects' }, { field: 'costCenter', collection: 'cost-centers' }, { field: 'site', collection: 'sites' }] })] },
     fields: [
       companyField({ derived: true }),
       { name: 'employee', type: 'relationship', relationTo: 'employees', label: 'Karyawan', required: true, index: true, admin: ro },
@@ -68,9 +75,13 @@ export const Attendances: CollectionConfig = withAudit(
         ],
         admin: ro,
       },
-      // Exactly one of project / costCenter (DB CHECK, migration e6_attendance).
+      // Location: project OR costCenter OR (both empty) site — DB CHECK attendances_one_location (d1010_sites_guard).
       { name: 'project', type: 'relationship', relationTo: 'projects', label: 'Project', index: true, admin: ro },
       { name: 'costCenter', type: 'relationship', relationTo: 'cost-centers', label: 'Pusat biaya', index: true, admin: ro },
+      // ADR 0023: the site of the location, filled by the server (DB trigger pk_attendance_site): the site itself for
+      // a site check-in (then project and cost center are empty), the project's site for a project check-in, empty
+      // for a cost-center check-in. Report / list filter "Site".
+      { name: 'site', type: 'relationship', relationTo: 'sites', label: 'Site', index: true, admin: ro },
       {
         name: 'source',
         type: 'select',

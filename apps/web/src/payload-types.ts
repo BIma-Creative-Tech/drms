@@ -91,6 +91,7 @@ export interface Config {
     'urgency-levels': UrgencyLevel;
     vehicles: Vehicle;
     'cost-centers': CostCenter;
+    sites: Site;
     'document-sequences': DocumentSequence;
     'expense-requests': ExpenseRequest;
     'expense-line-snapshots': ExpenseLineSnapshot;
@@ -114,6 +115,8 @@ export interface Config {
     'attendance-corrections': AttendanceCorrection;
     'progress-reports': ProgressReport;
     'budget-addenda': BudgetAddendum;
+    'project-loans': ProjectLoan;
+    'project-loan-repayments': ProjectLoanRepayment;
     notifications: Notification;
     devices: Device;
     'web-sessions': WebSession;
@@ -157,6 +160,7 @@ export interface Config {
     'urgency-levels': UrgencyLevelsSelect<false> | UrgencyLevelsSelect<true>;
     vehicles: VehiclesSelect<false> | VehiclesSelect<true>;
     'cost-centers': CostCentersSelect<false> | CostCentersSelect<true>;
+    sites: SitesSelect<false> | SitesSelect<true>;
     'document-sequences': DocumentSequencesSelect<false> | DocumentSequencesSelect<true>;
     'expense-requests': ExpenseRequestsSelect<false> | ExpenseRequestsSelect<true>;
     'expense-line-snapshots': ExpenseLineSnapshotsSelect<false> | ExpenseLineSnapshotsSelect<true>;
@@ -180,6 +184,8 @@ export interface Config {
     'attendance-corrections': AttendanceCorrectionsSelect<false> | AttendanceCorrectionsSelect<true>;
     'progress-reports': ProgressReportsSelect<false> | ProgressReportsSelect<true>;
     'budget-addenda': BudgetAddendaSelect<false> | BudgetAddendaSelect<true>;
+    'project-loans': ProjectLoansSelect<false> | ProjectLoansSelect<true>;
+    'project-loan-repayments': ProjectLoanRepaymentsSelect<false> | ProjectLoanRepaymentsSelect<true>;
     notifications: NotificationsSelect<false> | NotificationsSelect<true>;
     devices: DevicesSelect<false> | DevicesSelect<true>;
     'web-sessions': WebSessionsSelect<false> | WebSessionsSelect<true>;
@@ -420,6 +426,10 @@ export interface Company {
    */
   reminderBudgetEnabled?: boolean | null;
   /**
+   * Setiap hari selama pinjaman lewat jatuh tempo dan belum lunas.
+   */
+  reminderLoanOverdueEnabled?: boolean | null;
+  /**
    * Pemohon lain dan pembuat diberi tahu; pelaku aksi tidak diberi tahu tentang aksinya sendiri.
    */
   notifyRequesterStatusEnabled?: boolean | null;
@@ -546,12 +556,90 @@ export interface Employee {
    */
   userAccount?: (number | null) | User;
   phone?: string | null;
+  /**
+   * Kosong = jadwal default site penempatan, lalu jadwal default perusahaan.
+   */
   workSchedule?: (number | null) | WorkSchedule;
+  /**
+   * Kantor cabang tempat karyawan ditempatkan (opsional): boleh absen di site ini tanpa penugasan tim.
+   */
+  homeSite?: (number | null) | Site;
   faceRefPhoto?: (number | null) | MediaSelfy;
   /**
    * Referensi Odoo (diisi otomatis saat sinkronisasi ke Odoo).
    */
   odooEmployeeRef?: string | null;
+  active?: boolean | null;
+  uuid?: string | null;
+  /**
+   * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
+   */
+  changeReason?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * Kantor cabang PT (mis. Cabang Balikpapan). Satu site menangani beberapa project; absensi kantor cabang memakai titik + radius site.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "sites".
+ */
+export interface Site {
+  id: number;
+  /**
+   * Wajib bila Anda memilih lebih dari satu PT di pemilih PT; tidak dapat diubah setelah dibuat.
+   */
+  company?: (number | null) | Company;
+  code: string;
+  name: string;
+  address?: string | null;
+  lat?: number | null;
+  lng?: number | null;
+  /**
+   * Kosong = radius default perusahaan (Setting perusahaan). Tanpa titik = absensi di site ini belum bisa.
+   */
+  radiusM?: number | null;
+  /**
+   * Untuk karyawan dengan site penempatan ini yang tidak punya jadwal sendiri. Kosong = jadwal default perusahaan.
+   */
+  defaultWorkSchedule?: (number | null) | WorkSchedule;
+  /**
+   * Pusat biaya operasional kantor cabang; diusulkan ke Finance untuk project site ini yang belum punya pusat biaya.
+   */
+  costCenter?: (number | null) | CostCenter;
+  active?: boolean | null;
+  uuid?: string | null;
+  /**
+   * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
+   */
+  changeReason?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "cost-centers".
+ */
+export interface CostCenter {
+  id: number;
+  /**
+   * Wajib bila Anda memilih lebih dari satu PT di pemilih PT; tidak dapat diubah setelah dibuat.
+   */
+  company?: (number | null) | Company;
+  code: string;
+  name: string;
+  type: 'operational' | 'department';
+  manager?: (number | null) | User;
+  lat?: number | null;
+  lng?: number | null;
+  /**
+   * Kosong = radius default perusahaan (Setting perusahaan).
+   */
+  radiusM?: number | null;
+  /**
+   * Referensi Odoo (diisi otomatis saat sinkronisasi ke Odoo).
+   */
+  odooAnalyticRef?: string | null;
   active?: boolean | null;
   uuid?: string | null;
   /**
@@ -709,6 +797,10 @@ export interface Project {
    */
   kind?: ('umum' | 'konstruksi' | 'kontrak_unit' | 'aftersales' | 'trading') | null;
   client?: (number | null) | Client;
+  /**
+   * Kantor cabang yang menangani project ini (opsional).
+   */
+  site?: (number | null) | Site;
   address?: string | null;
   lat?: number | null;
   lng?: number | null;
@@ -733,39 +825,6 @@ export interface Project {
    * Referensi Odoo (diisi otomatis saat sinkronisasi ke Odoo).
    */
   odooAnalyticRef?: string | null;
-  uuid?: string | null;
-  /**
-   * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
-   */
-  changeReason?: string | null;
-  updatedAt: string;
-  createdAt: string;
-}
-/**
- * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "cost-centers".
- */
-export interface CostCenter {
-  id: number;
-  /**
-   * Wajib bila Anda memilih lebih dari satu PT di pemilih PT; tidak dapat diubah setelah dibuat.
-   */
-  company?: (number | null) | Company;
-  code: string;
-  name: string;
-  type: 'operational' | 'department';
-  manager?: (number | null) | User;
-  lat?: number | null;
-  lng?: number | null;
-  /**
-   * Kosong = radius default perusahaan (Setting perusahaan).
-   */
-  radiusM?: number | null;
-  /**
-   * Referensi Odoo (diisi otomatis saat sinkronisasi ke Odoo).
-   */
-  odooAnalyticRef?: string | null;
-  active?: boolean | null;
   uuid?: string | null;
   /**
    * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
@@ -941,6 +1000,10 @@ export interface CashAccount {
    * Tanggal go-live akun ini. Transaksi kas sebelum tanggal ini ditolak; saldo awal terkunci setelah periode sejak tanggal ini ditutup. Kosong = tanpa kunci.
    */
   openingBalanceDate?: string | null;
+  /**
+   * Opsional: kas kecil / rekening kantor cabang ini (saldo per site di dashboard).
+   */
+  site?: (number | null) | Site;
   odooJournalCode?: string | null;
   active?: boolean | null;
   uuid?: string | null;
@@ -964,6 +1027,7 @@ export interface TeamAssignment {
   employee: number | Employee;
   project?: (number | null) | Project;
   costCenter?: (number | null) | CostCenter;
+  site?: (number | null) | Site;
   roleInProject: 'pm' | 'staff' | 'mandor';
   startDate?: string | null;
   endDate?: string | null;
@@ -1008,7 +1072,11 @@ export interface ApprovalRule {
   project?: (number | null) | Project;
   costCenter?: (number | null) | CostCenter;
   /**
-   * Angka kecil dievaluasi lebih dulu.
+   * Aturan berlaku bila SETIAP pemohon memegang salah satu peran ini di PT pengajuan. Kosong = semua pemohon.
+   */
+  requesterRoles?: ('pk-owner' | 'pk-pm' | 'pk-staff' | 'pk-finance' | 'pk-admin')[] | null;
+  /**
+   * Angka kecil dievaluasi lebih dulu (aturan "Pengajuan Direktur" = 10, default = 100).
    */
   priority?: number | null;
   acknowledge: 'required' | 'optional' | 'none';
@@ -1017,6 +1085,9 @@ export interface ApprovalRule {
   acknowledgeUser?: (number | null) | User;
   signDiajukan: 'required' | 'optional' | 'none';
   signDibuat: 'required' | 'optional' | 'none';
+  /**
+   * Kosongkan HANYA untuk aturan Peran pemohon = Direktur: "Tanpa persetujuan — langsung ke antrian transfer Finance".
+   */
   steps?:
     | {
         level: number;
@@ -1157,7 +1228,8 @@ export interface DocumentSequence {
     | 'budget_addendum'
     | 'reversal'
     | 'service_report'
-    | 'daily_report';
+    | 'daily_report'
+    | 'project_loan';
   /**
    * Token {DOC}, mis. PB, TRF.
    */
@@ -1334,7 +1406,7 @@ export interface RapItem {
    */
   company?: (number | null) | Company;
   project: number | Project;
-  stage: number | ProjectStage;
+  stage?: (number | null) | ProjectStage;
   code: string;
   description: string;
   kind: 'pekerjaan' | 'material';
@@ -1396,10 +1468,11 @@ export interface Approval {
    * Mengikuti dokumen induk.
    */
   company?: (number | null) | Company;
-  docType: 'expense_request' | 'budget_addendum' | 'expense_shortfall';
+  docType: 'expense_request' | 'budget_addendum' | 'expense_shortfall' | 'project_loan';
   request?: (number | null) | ExpenseRequest;
   addendum?: (number | null) | BudgetAddendum;
   settlement?: (number | null) | Settlement;
+  loan?: (number | null) | ProjectLoan;
   cycle: number;
   position: 'diajukan' | 'dibuat' | 'diketahui' | 'approval';
   level: number;
@@ -1692,6 +1765,47 @@ export interface MediaTransferProof {
       filename?: string | null;
     };
   };
+}
+/**
+ * Diajukan dan diputuskan lewat layar Pinjaman antar project (bukan dari form ini).
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "project-loans".
+ */
+export interface ProjectLoan {
+  id: number;
+  /**
+   * Mengikuti dokumen induk.
+   */
+  company?: (number | null) | Company;
+  docNo?: string | null;
+  lenderProject: number | Project;
+  borrowerProject: number | Project;
+  kind: 'dana' | 'barang';
+  amount: number;
+  reason: string;
+  loanDate: string;
+  dueDate: string;
+  status: 'draft' | 'pending_approval' | 'approved' | 'partially_repaid' | 'repaid' | 'rejected' | 'cancelled';
+  repaidTotal?: number | null;
+  outstanding?: number | null;
+  samePm?: boolean | null;
+  createdBy: number | User;
+  submittedAt?: string | null;
+  decidedAt?: string | null;
+  decidedBy?: (number | null) | User;
+  rejectReason?: string | null;
+  cancelReason?: string | null;
+  approvalCycle?: number | null;
+  g1Exception?: string | null;
+  source?: ('web' | 'apk') | null;
+  uuid?: string | null;
+  /**
+   * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
+   */
+  changeReason?: string | null;
+  updatedAt: string;
+  createdAt: string;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -2024,12 +2138,19 @@ export interface RapTemplate {
    */
   company?: (number | null) | Company;
   name: string;
+  /**
+   * Template hanya ditawarkan untuk project jenis ini. Kosong = semua jenis.
+   */
+  projectKind?: ('umum' | 'konstruksi' | 'kontrak_unit' | 'aftersales' | 'trading') | null;
   notes?: string | null;
   items?:
     | {
         code: string;
         description: string;
-        stageName: string;
+        /**
+         * Wajib untuk template konstruksi; jenis lain boleh kosong.
+         */
+        stageName?: string | null;
         kind: 'pekerjaan' | 'material';
         uomCode: string;
         volume: number;
@@ -2176,6 +2297,7 @@ export interface Attendance {
   kind: 'check_in' | 'check_out';
   project?: (number | null) | Project;
   costCenter?: (number | null) | CostCenter;
+  site?: (number | null) | Site;
   source: 'self' | 'pm';
   recordedBy?: (number | null) | User;
   onBehalfReason?: string | null;
@@ -2326,6 +2448,35 @@ export interface ProgressReport {
   syncRev?: number | null;
   clientUuid?: string | null;
   uuid?: string | null;
+  /**
+   * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
+   */
+  changeReason?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * Dicatat dan dibatalkan (void) lewat layar Pinjaman antar project.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "project-loan-repayments".
+ */
+export interface ProjectLoanRepayment {
+  id: number;
+  /**
+   * Mengikuti dokumen induk.
+   */
+  company?: (number | null) | Company;
+  loan: number | ProjectLoan;
+  repayDate: string;
+  amount: number;
+  note?: string | null;
+  status: 'posted' | 'void';
+  voidReason?: string | null;
+  recordedBy: number | User;
+  voidedBy?: (number | null) | User;
+  voidedAt?: string | null;
+  source?: ('web' | 'apk') | null;
   /**
    * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
    */
@@ -2745,6 +2896,10 @@ export interface PayloadLockedDocument {
         value: number | CostCenter;
       } | null)
     | ({
+        relationTo: 'sites';
+        value: number | Site;
+      } | null)
+    | ({
         relationTo: 'document-sequences';
         value: number | DocumentSequence;
       } | null)
@@ -2827,6 +2982,14 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'budget-addenda';
         value: number | BudgetAddendum;
+      } | null)
+    | ({
+        relationTo: 'project-loans';
+        value: number | ProjectLoan;
+      } | null)
+    | ({
+        relationTo: 'project-loan-repayments';
+        value: number | ProjectLoanRepayment;
       } | null)
     | ({
         relationTo: 'devices';
@@ -2961,6 +3124,7 @@ export interface CompaniesSelect<T extends boolean = true> {
   reminderRevisionEnabled?: T;
   reminderRevisionDays?: T;
   reminderBudgetEnabled?: T;
+  reminderLoanOverdueEnabled?: T;
   notifyRequesterStatusEnabled?: T;
   approvalEmailEnabled?: T;
   active?: T;
@@ -2998,6 +3162,7 @@ export interface EmployeesSelect<T extends boolean = true> {
   userAccount?: T;
   phone?: T;
   workSchedule?: T;
+  homeSite?: T;
   faceRefPhoto?: T;
   odooEmployeeRef?: T;
   active?: T;
@@ -3082,6 +3247,7 @@ export interface ProjectsSelect<T extends boolean = true> {
   name?: T;
   kind?: T;
   client?: T;
+  site?: T;
   address?: T;
   lat?: T;
   lng?: T;
@@ -3196,6 +3362,7 @@ export interface CashAccountsSelect<T extends boolean = true> {
   accountHolder?: T;
   openingBalance?: T;
   openingBalanceDate?: T;
+  site?: T;
   odooJournalCode?: T;
   active?: T;
   uuid?: T;
@@ -3212,6 +3379,7 @@ export interface TeamAssignmentsSelect<T extends boolean = true> {
   employee?: T;
   project?: T;
   costCenter?: T;
+  site?: T;
   roleInProject?: T;
   startDate?: T;
   endDate?: T;
@@ -3270,6 +3438,7 @@ export interface ApprovalRulesSelect<T extends boolean = true> {
   category?: T;
   project?: T;
   costCenter?: T;
+  requesterRoles?: T;
   priority?: T;
   acknowledge?: T;
   acknowledgeBy?: T;
@@ -3376,6 +3545,26 @@ export interface CostCentersSelect<T extends boolean = true> {
   lng?: T;
   radiusM?: T;
   odooAnalyticRef?: T;
+  active?: T;
+  uuid?: T;
+  changeReason?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "sites_select".
+ */
+export interface SitesSelect<T extends boolean = true> {
+  company?: T;
+  code?: T;
+  name?: T;
+  address?: T;
+  lat?: T;
+  lng?: T;
+  radiusM?: T;
+  defaultWorkSchedule?: T;
+  costCenter?: T;
   active?: T;
   uuid?: T;
   changeReason?: T;
@@ -3491,6 +3680,7 @@ export interface ApprovalsSelect<T extends boolean = true> {
   request?: T;
   addendum?: T;
   settlement?: T;
+  loan?: T;
   cycle?: T;
   position?: T;
   level?: T;
@@ -3863,6 +4053,7 @@ export interface RapItemsSelect<T extends boolean = true> {
 export interface RapTemplatesSelect<T extends boolean = true> {
   company?: T;
   name?: T;
+  projectKind?: T;
   notes?: T;
   items?:
     | T
@@ -3964,6 +4155,7 @@ export interface AttendancesSelect<T extends boolean = true> {
   kind?: T;
   project?: T;
   costCenter?: T;
+  site?: T;
   source?: T;
   recordedBy?: T;
   onBehalfReason?: T;
@@ -4065,6 +4257,58 @@ export interface BudgetAddendaSelect<T extends boolean = true> {
   cancelReason?: T;
   source?: T;
   uuid?: T;
+  changeReason?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "project-loans_select".
+ */
+export interface ProjectLoansSelect<T extends boolean = true> {
+  company?: T;
+  docNo?: T;
+  lenderProject?: T;
+  borrowerProject?: T;
+  kind?: T;
+  amount?: T;
+  reason?: T;
+  loanDate?: T;
+  dueDate?: T;
+  status?: T;
+  repaidTotal?: T;
+  outstanding?: T;
+  samePm?: T;
+  createdBy?: T;
+  submittedAt?: T;
+  decidedAt?: T;
+  decidedBy?: T;
+  rejectReason?: T;
+  cancelReason?: T;
+  approvalCycle?: T;
+  g1Exception?: T;
+  source?: T;
+  uuid?: T;
+  changeReason?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "project-loan-repayments_select".
+ */
+export interface ProjectLoanRepaymentsSelect<T extends boolean = true> {
+  company?: T;
+  loan?: T;
+  repayDate?: T;
+  amount?: T;
+  note?: T;
+  status?: T;
+  voidReason?: T;
+  recordedBy?: T;
+  voidedBy?: T;
+  voidedAt?: T;
+  source?: T;
   changeReason?: T;
   updatedAt?: T;
   createdAt?: T;

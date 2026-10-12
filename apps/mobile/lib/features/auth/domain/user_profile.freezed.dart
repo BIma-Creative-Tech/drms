@@ -313,7 +313,8 @@ as bool,
 /// @nodoc
 mixin _$Employee {
 
- int get id; String get code; String get name;
+ int get id; String get code; String get name;/// ADR 0023: "Site penempatan" (`/me` employee.homeSite) — id and `KODE — Nama`; null = none / older server.
+ int? get homeSiteId; String? get homeSiteLabel;
 /// Create a copy of Employee
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -325,20 +326,20 @@ $EmployeeCopyWith<Employee> get copyWith => _$EmployeeCopyWithImpl<Employee>(thi
 @override
 bool operator ==(Object other) {
   final _this = this as Employee;
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is Employee&&(identical(other.id, _this.id) || other.id == _this.id)&&(identical(other.code, _this.code) || other.code == _this.code)&&(identical(other.name, _this.name) || other.name == _this.name));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is Employee&&(identical(other.id, _this.id) || other.id == _this.id)&&(identical(other.code, _this.code) || other.code == _this.code)&&(identical(other.name, _this.name) || other.name == _this.name)&&(identical(other.homeSiteId, _this.homeSiteId) || other.homeSiteId == _this.homeSiteId)&&(identical(other.homeSiteLabel, _this.homeSiteLabel) || other.homeSiteLabel == _this.homeSiteLabel));
 }
 
 
 @override
 int get hashCode {
   final _this = this as Employee;
-  return Object.hash(runtimeType,_this.id,_this.code,_this.name);
+  return Object.hash(runtimeType,_this.id,_this.code,_this.name,_this.homeSiteId,_this.homeSiteLabel);
 }
 
 @override
 String toString() {
   final _this = this as Employee;
-  return 'Employee(id: ${_this.id}, code: ${_this.code}, name: ${_this.name})';
+  return 'Employee(id: ${_this.id}, code: ${_this.code}, name: ${_this.name}, homeSiteId: ${_this.homeSiteId}, homeSiteLabel: ${_this.homeSiteLabel})';
 }
 
 
@@ -349,7 +350,7 @@ abstract mixin class $EmployeeCopyWith<$Res>  {
   factory $EmployeeCopyWith(Employee value, $Res Function(Employee) _then) = _$EmployeeCopyWithImpl;
 @useResult
 $Res call({
- int id, String code, String name
+ int id, String code, String name, int? homeSiteId, String? homeSiteLabel
 });
 
 
@@ -366,12 +367,14 @@ class _$EmployeeCopyWithImpl<$Res>
 
 /// Create a copy of Employee
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? code = null,Object? name = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? code = null,Object? name = null,Object? homeSiteId = freezed,Object? homeSiteLabel = freezed,}) {
   return _then(Employee(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as int,code: null == code ? _self.code : code // ignore: cast_nullable_to_non_nullable
 as String,name: null == name ? _self.name : name // ignore: cast_nullable_to_non_nullable
-as String,
+as String,homeSiteId: freezed == homeSiteId ? _self.homeSiteId : homeSiteId // ignore: cast_nullable_to_non_nullable
+as int?,homeSiteLabel: freezed == homeSiteLabel ? _self.homeSiteLabel : homeSiteLabel // ignore: cast_nullable_to_non_nullable
+as String?,
   ));
 }
 
@@ -456,10 +459,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( int id,  String code,  String name)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( int id,  String code,  String name,  int? homeSiteId,  String? homeSiteLabel)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _Employee() when $default != null:
-return $default(_that.id,_that.code,_that.name);case _:
+return $default(_that.id,_that.code,_that.name,_that.homeSiteId,_that.homeSiteLabel);case _:
   return orElse();
 
 }
@@ -477,10 +480,10 @@ return $default(_that.id,_that.code,_that.name);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( int id,  String code,  String name)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( int id,  String code,  String name,  int? homeSiteId,  String? homeSiteLabel)  $default,) {final _that = this;
 switch (_that) {
 case _Employee():
-return $default(_that.id,_that.code,_that.name);case _:
+return $default(_that.id,_that.code,_that.name,_that.homeSiteId,_that.homeSiteLabel);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -497,10 +500,10 @@ return $default(_that.id,_that.code,_that.name);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( int id,  String code,  String name)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( int id,  String code,  String name,  int? homeSiteId,  String? homeSiteLabel)?  $default,) {final _that = this;
 switch (_that) {
 case _Employee() when $default != null:
-return $default(_that.id,_that.code,_that.name);case _:
+return $default(_that.id,_that.code,_that.name,_that.homeSiteId,_that.homeSiteLabel);case _:
   return null;
 
 }
@@ -512,12 +515,15 @@ return $default(_that.id,_that.code,_that.name);case _:
 
 
 class _Employee implements Employee {
-  const _Employee({required this.id, required this.code, required this.name});
+  const _Employee({required this.id, required this.code, required this.name, this.homeSiteId, this.homeSiteLabel});
   
 
 @override final  int id;
 @override final  String code;
 @override final  String name;
+/// ADR 0023: "Site penempatan" (`/me` employee.homeSite) — id and `KODE — Nama`; null = none / older server.
+@override final  int? homeSiteId;
+@override final  String? homeSiteLabel;
 
 /// Create a copy of Employee
 /// with the given fields replaced by the non-null parameter values.
@@ -529,18 +535,18 @@ _$EmployeeCopyWith<_Employee> get copyWith => __$EmployeeCopyWithImpl<_Employee>
 
 @override
 bool operator ==(Object other) {
-    return identical(this, other) || (other.runtimeType == runtimeType&&other is _Employee&&(identical(other.id, id) || other.id == id)&&(identical(other.code, code) || other.code == code)&&(identical(other.name, name) || other.name == name));
+    return identical(this, other) || (other.runtimeType == runtimeType&&other is _Employee&&(identical(other.id, id) || other.id == id)&&(identical(other.code, code) || other.code == code)&&(identical(other.name, name) || other.name == name)&&(identical(other.homeSiteId, homeSiteId) || other.homeSiteId == homeSiteId)&&(identical(other.homeSiteLabel, homeSiteLabel) || other.homeSiteLabel == homeSiteLabel));
 }
 
 
 @override
 int get hashCode {
-    return Object.hash(runtimeType,id,code,name);
+    return Object.hash(runtimeType,id,code,name,homeSiteId,homeSiteLabel);
 }
 
 @override
 String toString() {
-    return 'Employee(id: $id, code: $code, name: $name)';
+    return 'Employee(id: $id, code: $code, name: $name, homeSiteId: $homeSiteId, homeSiteLabel: $homeSiteLabel)';
 }
 
 
@@ -551,7 +557,7 @@ abstract mixin class _$EmployeeCopyWith<$Res> implements $EmployeeCopyWith<$Res>
   factory _$EmployeeCopyWith(_Employee value, $Res Function(_Employee) _then) = __$EmployeeCopyWithImpl;
 @override @useResult
 $Res call({
- int id, String code, String name
+ int id, String code, String name, int? homeSiteId, String? homeSiteLabel
 });
 
 
@@ -568,12 +574,14 @@ class __$EmployeeCopyWithImpl<$Res>
 
 /// Create a copy of Employee
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? code = null,Object? name = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? code = null,Object? name = null,Object? homeSiteId = freezed,Object? homeSiteLabel = freezed,}) {
   return _then(_Employee(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as int,code: null == code ? _self.code : code // ignore: cast_nullable_to_non_nullable
 as String,name: null == name ? _self.name : name // ignore: cast_nullable_to_non_nullable
-as String,
+as String,homeSiteId: freezed == homeSiteId ? _self.homeSiteId : homeSiteId // ignore: cast_nullable_to_non_nullable
+as int?,homeSiteLabel: freezed == homeSiteLabel ? _self.homeSiteLabel : homeSiteLabel // ignore: cast_nullable_to_non_nullable
+as String?,
   ));
 }
 
@@ -1138,7 +1146,9 @@ as bool,
 mixin _$CompanyMembership {
 
  int get id;/// PT short code (e.g. `DRMS`), shown on chips.
- String get code; String get name; String get timezone; Set<Role> get roles; Employee? get employee; Capabilities get capabilities; CompanySettings get settings;
+ String get code; String get name; String get timezone; Set<Role> get roles; Employee? get employee; Capabilities get capabilities; CompanySettings get settings;/// ADR 0024: Direktur in this PT and the PT has the zero-step rule "Pengajuan Direktur" — the Direktur's own
+/// requests go straight to the Finance transfer queue (hint for the request form; the server decides at submit).
+ bool get ownRequestNoApproval;
 /// Create a copy of CompanyMembership
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -1150,20 +1160,20 @@ $CompanyMembershipCopyWith<CompanyMembership> get copyWith => _$CompanyMembershi
 @override
 bool operator ==(Object other) {
   final _this = this as CompanyMembership;
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is CompanyMembership&&(identical(other.id, _this.id) || other.id == _this.id)&&(identical(other.code, _this.code) || other.code == _this.code)&&(identical(other.name, _this.name) || other.name == _this.name)&&(identical(other.timezone, _this.timezone) || other.timezone == _this.timezone)&&const DeepCollectionEquality().equals(other.roles, _this.roles)&&(identical(other.employee, _this.employee) || other.employee == _this.employee)&&(identical(other.capabilities, _this.capabilities) || other.capabilities == _this.capabilities)&&(identical(other.settings, _this.settings) || other.settings == _this.settings));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is CompanyMembership&&(identical(other.id, _this.id) || other.id == _this.id)&&(identical(other.code, _this.code) || other.code == _this.code)&&(identical(other.name, _this.name) || other.name == _this.name)&&(identical(other.timezone, _this.timezone) || other.timezone == _this.timezone)&&const DeepCollectionEquality().equals(other.roles, _this.roles)&&(identical(other.employee, _this.employee) || other.employee == _this.employee)&&(identical(other.capabilities, _this.capabilities) || other.capabilities == _this.capabilities)&&(identical(other.settings, _this.settings) || other.settings == _this.settings)&&(identical(other.ownRequestNoApproval, _this.ownRequestNoApproval) || other.ownRequestNoApproval == _this.ownRequestNoApproval));
 }
 
 
 @override
 int get hashCode {
   final _this = this as CompanyMembership;
-  return Object.hash(runtimeType,_this.id,_this.code,_this.name,_this.timezone,const DeepCollectionEquality().hash(_this.roles),_this.employee,_this.capabilities,_this.settings);
+  return Object.hash(runtimeType,_this.id,_this.code,_this.name,_this.timezone,const DeepCollectionEquality().hash(_this.roles),_this.employee,_this.capabilities,_this.settings,_this.ownRequestNoApproval);
 }
 
 @override
 String toString() {
   final _this = this as CompanyMembership;
-  return 'CompanyMembership(id: ${_this.id}, code: ${_this.code}, name: ${_this.name}, timezone: ${_this.timezone}, roles: ${_this.roles}, employee: ${_this.employee}, capabilities: ${_this.capabilities}, settings: ${_this.settings})';
+  return 'CompanyMembership(id: ${_this.id}, code: ${_this.code}, name: ${_this.name}, timezone: ${_this.timezone}, roles: ${_this.roles}, employee: ${_this.employee}, capabilities: ${_this.capabilities}, settings: ${_this.settings}, ownRequestNoApproval: ${_this.ownRequestNoApproval})';
 }
 
 
@@ -1174,7 +1184,7 @@ abstract mixin class $CompanyMembershipCopyWith<$Res>  {
   factory $CompanyMembershipCopyWith(CompanyMembership value, $Res Function(CompanyMembership) _then) = _$CompanyMembershipCopyWithImpl;
 @useResult
 $Res call({
- int id, String code, String name, String timezone, Set<Role> roles, Employee? employee, Capabilities capabilities, CompanySettings settings
+ int id, String code, String name, String timezone, Set<Role> roles, Employee? employee, Capabilities capabilities, CompanySettings settings, bool ownRequestNoApproval
 });
 
 
@@ -1191,7 +1201,7 @@ class _$CompanyMembershipCopyWithImpl<$Res>
 
 /// Create a copy of CompanyMembership
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? code = null,Object? name = null,Object? timezone = null,Object? roles = null,Object? employee = freezed,Object? capabilities = null,Object? settings = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? code = null,Object? name = null,Object? timezone = null,Object? roles = null,Object? employee = freezed,Object? capabilities = null,Object? settings = null,Object? ownRequestNoApproval = null,}) {
   return _then(CompanyMembership(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as int,code: null == code ? _self.code : code // ignore: cast_nullable_to_non_nullable
@@ -1201,7 +1211,8 @@ as String,roles: null == roles ? _self.roles : roles // ignore: cast_nullable_to
 as Set<Role>,employee: freezed == employee ? _self.employee : employee // ignore: cast_nullable_to_non_nullable
 as Employee?,capabilities: null == capabilities ? _self.capabilities : capabilities // ignore: cast_nullable_to_non_nullable
 as Capabilities,settings: null == settings ? _self.settings : settings // ignore: cast_nullable_to_non_nullable
-as CompanySettings,
+as CompanySettings,ownRequestNoApproval: null == ownRequestNoApproval ? _self.ownRequestNoApproval : ownRequestNoApproval // ignore: cast_nullable_to_non_nullable
+as bool,
   ));
 }
 /// Create a copy of CompanyMembership
@@ -1316,10 +1327,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( int id,  String code,  String name,  String timezone,  Set<Role> roles,  Employee? employee,  Capabilities capabilities,  CompanySettings settings)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( int id,  String code,  String name,  String timezone,  Set<Role> roles,  Employee? employee,  Capabilities capabilities,  CompanySettings settings,  bool ownRequestNoApproval)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _CompanyMembership() when $default != null:
-return $default(_that.id,_that.code,_that.name,_that.timezone,_that.roles,_that.employee,_that.capabilities,_that.settings);case _:
+return $default(_that.id,_that.code,_that.name,_that.timezone,_that.roles,_that.employee,_that.capabilities,_that.settings,_that.ownRequestNoApproval);case _:
   return orElse();
 
 }
@@ -1337,10 +1348,10 @@ return $default(_that.id,_that.code,_that.name,_that.timezone,_that.roles,_that.
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( int id,  String code,  String name,  String timezone,  Set<Role> roles,  Employee? employee,  Capabilities capabilities,  CompanySettings settings)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( int id,  String code,  String name,  String timezone,  Set<Role> roles,  Employee? employee,  Capabilities capabilities,  CompanySettings settings,  bool ownRequestNoApproval)  $default,) {final _that = this;
 switch (_that) {
 case _CompanyMembership():
-return $default(_that.id,_that.code,_that.name,_that.timezone,_that.roles,_that.employee,_that.capabilities,_that.settings);case _:
+return $default(_that.id,_that.code,_that.name,_that.timezone,_that.roles,_that.employee,_that.capabilities,_that.settings,_that.ownRequestNoApproval);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -1357,10 +1368,10 @@ return $default(_that.id,_that.code,_that.name,_that.timezone,_that.roles,_that.
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( int id,  String code,  String name,  String timezone,  Set<Role> roles,  Employee? employee,  Capabilities capabilities,  CompanySettings settings)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( int id,  String code,  String name,  String timezone,  Set<Role> roles,  Employee? employee,  Capabilities capabilities,  CompanySettings settings,  bool ownRequestNoApproval)?  $default,) {final _that = this;
 switch (_that) {
 case _CompanyMembership() when $default != null:
-return $default(_that.id,_that.code,_that.name,_that.timezone,_that.roles,_that.employee,_that.capabilities,_that.settings);case _:
+return $default(_that.id,_that.code,_that.name,_that.timezone,_that.roles,_that.employee,_that.capabilities,_that.settings,_that.ownRequestNoApproval);case _:
   return null;
 
 }
@@ -1372,7 +1383,7 @@ return $default(_that.id,_that.code,_that.name,_that.timezone,_that.roles,_that.
 
 
 class _CompanyMembership extends CompanyMembership {
-  const _CompanyMembership({required this.id, required this.code, required this.name, this.timezone = 'Asia/Makassar',  Set<Role> roles = const <Role>{}, this.employee, this.capabilities = const Capabilities(), this.settings = const CompanySettings()}): _roles = roles,super._();
+  const _CompanyMembership({required this.id, required this.code, required this.name, this.timezone = 'Asia/Makassar',  Set<Role> roles = const <Role>{}, this.employee, this.capabilities = const Capabilities(), this.settings = const CompanySettings(), this.ownRequestNoApproval = false}): _roles = roles,super._();
   
 
 @override final  int id;
@@ -1390,6 +1401,9 @@ class _CompanyMembership extends CompanyMembership {
 @override final  Employee? employee;
 @override@JsonKey() final  Capabilities capabilities;
 @override@JsonKey() final  CompanySettings settings;
+/// ADR 0024: Direktur in this PT and the PT has the zero-step rule "Pengajuan Direktur" — the Direktur's own
+/// requests go straight to the Finance transfer queue (hint for the request form; the server decides at submit).
+@override@JsonKey() final  bool ownRequestNoApproval;
 
 /// Create a copy of CompanyMembership
 /// with the given fields replaced by the non-null parameter values.
@@ -1401,18 +1415,18 @@ _$CompanyMembershipCopyWith<_CompanyMembership> get copyWith => __$CompanyMember
 
 @override
 bool operator ==(Object other) {
-    return identical(this, other) || (other.runtimeType == runtimeType&&other is _CompanyMembership&&(identical(other.id, id) || other.id == id)&&(identical(other.code, code) || other.code == code)&&(identical(other.name, name) || other.name == name)&&(identical(other.timezone, timezone) || other.timezone == timezone)&&const DeepCollectionEquality().equals(other.roles, _roles)&&(identical(other.employee, employee) || other.employee == employee)&&(identical(other.capabilities, capabilities) || other.capabilities == capabilities)&&(identical(other.settings, settings) || other.settings == settings));
+    return identical(this, other) || (other.runtimeType == runtimeType&&other is _CompanyMembership&&(identical(other.id, id) || other.id == id)&&(identical(other.code, code) || other.code == code)&&(identical(other.name, name) || other.name == name)&&(identical(other.timezone, timezone) || other.timezone == timezone)&&const DeepCollectionEquality().equals(other.roles, _roles)&&(identical(other.employee, employee) || other.employee == employee)&&(identical(other.capabilities, capabilities) || other.capabilities == capabilities)&&(identical(other.settings, settings) || other.settings == settings)&&(identical(other.ownRequestNoApproval, ownRequestNoApproval) || other.ownRequestNoApproval == ownRequestNoApproval));
 }
 
 
 @override
 int get hashCode {
-    return Object.hash(runtimeType,id,code,name,timezone,const DeepCollectionEquality().hash(_roles),employee,capabilities,settings);
+    return Object.hash(runtimeType,id,code,name,timezone,const DeepCollectionEquality().hash(_roles),employee,capabilities,settings,ownRequestNoApproval);
 }
 
 @override
 String toString() {
-    return 'CompanyMembership(id: $id, code: $code, name: $name, timezone: $timezone, roles: $roles, employee: $employee, capabilities: $capabilities, settings: $settings)';
+    return 'CompanyMembership(id: $id, code: $code, name: $name, timezone: $timezone, roles: $roles, employee: $employee, capabilities: $capabilities, settings: $settings, ownRequestNoApproval: $ownRequestNoApproval)';
 }
 
 
@@ -1423,7 +1437,7 @@ abstract mixin class _$CompanyMembershipCopyWith<$Res> implements $CompanyMember
   factory _$CompanyMembershipCopyWith(_CompanyMembership value, $Res Function(_CompanyMembership) _then) = __$CompanyMembershipCopyWithImpl;
 @override @useResult
 $Res call({
- int id, String code, String name, String timezone, Set<Role> roles, Employee? employee, Capabilities capabilities, CompanySettings settings
+ int id, String code, String name, String timezone, Set<Role> roles, Employee? employee, Capabilities capabilities, CompanySettings settings, bool ownRequestNoApproval
 });
 
 
@@ -1440,7 +1454,7 @@ class __$CompanyMembershipCopyWithImpl<$Res>
 
 /// Create a copy of CompanyMembership
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? code = null,Object? name = null,Object? timezone = null,Object? roles = null,Object? employee = freezed,Object? capabilities = null,Object? settings = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? code = null,Object? name = null,Object? timezone = null,Object? roles = null,Object? employee = freezed,Object? capabilities = null,Object? settings = null,Object? ownRequestNoApproval = null,}) {
   return _then(_CompanyMembership(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as int,code: null == code ? _self.code : code // ignore: cast_nullable_to_non_nullable
@@ -1450,7 +1464,8 @@ as String,roles: null == roles ? _self._roles : roles // ignore: cast_nullable_t
 as Set<Role>,employee: freezed == employee ? _self.employee : employee // ignore: cast_nullable_to_non_nullable
 as Employee?,capabilities: null == capabilities ? _self.capabilities : capabilities // ignore: cast_nullable_to_non_nullable
 as Capabilities,settings: null == settings ? _self.settings : settings // ignore: cast_nullable_to_non_nullable
-as CompanySettings,
+as CompanySettings,ownRequestNoApproval: null == ownRequestNoApproval ? _self.ownRequestNoApproval : ownRequestNoApproval // ignore: cast_nullable_to_non_nullable
+as bool,
   ));
 }
 

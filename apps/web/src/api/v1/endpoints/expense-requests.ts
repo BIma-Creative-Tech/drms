@@ -249,7 +249,7 @@ export const transferQueueEndpoint = v1({
     return json({
       items: items.map((i) => {
         const x = extra.get(i.id)
-        return { ...i, project: x?.project ?? null, costCenter: x?.costCenter ?? null, bank: x?.bank ?? null, bankVerification: x?.bankVerification ?? 'unverified', flags: x?.flags ?? { warning: 0, info: 0, receiptMismatch: 0 }, sla: x?.sla ?? { approvedAt: null, slaHours: 24, ageHours: null, over: false } }
+        return { ...i, project: x?.project ?? null, costCenter: x?.costCenter ?? null, bank: x?.bank ?? null, bankVerification: x?.bankVerification ?? 'unverified', flags: x?.flags ?? { warning: 0, info: 0, receiptMismatch: 0 }, sla: x?.sla ?? { approvedAt: null, slaHours: 24, ageHours: null, over: false }, noApproval: x?.noApproval ?? false }
       }),
       nextCursor: null,
     })
@@ -295,7 +295,7 @@ export const createRequestEndpoint = v1({
     return withNamedCompany(
       req,
       company,
-      { roles: ['pk-staff', 'pk-pm', 'pk-admin', 'pk-finance'], refs: [{ collection: 'projects', id: input.projectId, path: 'projectId' }, { collection: 'cost-centers', id: input.costCenterId, path: 'costCenterId' }] },
+      { roles: ['pk-staff', 'pk-pm', 'pk-admin', 'pk-finance', 'pk-owner'], refs: [{ collection: 'projects', id: input.projectId, path: 'projectId' }, { collection: 'cost-centers', id: input.costCenterId, path: 'costCenterId' }] },
       async () => {
         const { doc, created } = await createDraft(req, input)
         return ok(req, doc.id, created ? 201 : 200)

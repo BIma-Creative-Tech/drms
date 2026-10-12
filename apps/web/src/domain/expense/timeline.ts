@@ -6,9 +6,9 @@
  */
 import { ROLE_LABELS, type Role } from '@/access/roles'
 
-import { DIREKTUR_ROLE, isDecisionSnapshot } from './decision'
+import { DIREKTUR_ROLE, isDecisionSnapshot, isNoApproval } from './decision'
 import { ACK_DELEGATE_ROLE, type ApprovalSnapshot } from './rules'
-import { LEGACY_WAITING_LABELS, statusLabel, type RequestStatus, type RequestType } from './types'
+import { LEGACY_WAITING_LABELS, NO_APPROVAL_STATUS_LABELS, statusLabel, type RequestStatus, type RequestType } from './types'
 
 /** Happy-path order per type (branches — rejected/cancelled/revisions — are shown as the current step). */
 export const STATUS_PATH: Record<RequestType, RequestStatus[]> = {
@@ -25,7 +25,9 @@ const SIDE_ANCHOR: Partial<Record<RequestStatus, RequestStatus>> = {
 export type TimelineStep = { status: RequestStatus; label: string; state: 'done' | 'current' | 'todo' }
 
 export function timeline(type: RequestType, status: RequestStatus, opts: { skipAck?: boolean; snapshot?: LabelSnapshot | null; currentLevel?: number | null } = {}): TimelineStep[] {
-  const path = STATUS_PATH[type].filter((s) => !(opts.skipAck && s === 'pending_ack'))
+  // ADR 0024: a Direktur's own request without approval never waits for a decision
+  const noApproval = isNoApproval(opts.snapshot)
+  const path = STATUS_PATH[type].filter((s) => !((opts.skipAck || noApproval) && s === 'pending_ack') && !(noApproval && s === 'pending_approval'))
   const anchor = SIDE_ANCHOR[status] ?? status
   const idx = path.indexOf(anchor)
   const steps: TimelineStep[] = path.map((s, i) => ({
@@ -46,7 +48,7 @@ export function timeline(type: RequestType, status: RequestStatus, opts: { skipA
 
 export type NextActor = { who: string; what: string }
 
-type LabelSnapshot = Pick<ApprovalSnapshot, 'acknowledgeBy' | 'acknowledgeRole' | 'steps' | 'decisionRoles'>
+type LabelSnapshot = Pick<ApprovalSnapshot, 'acknowledgeBy' | 'acknowledgeRole' | 'steps' | 'decisionRoles' | 'selfApproval'>
 
 /** ADR 0021: PM project → Direktur snapshot ("Diketahui" = Persetujuan PM). */
 export function isPmFlow(snap: Pick<ApprovalSnapshot, 'acknowledgeBy' | 'decisionRoles'> | null | undefined): boolean {
@@ -82,9 +84,12 @@ export function decisionByOf(snap: LabelSnapshot | null | undefined, step: 'ackn
  * Status label of a request for its snapshot. ADR 0021 (PM project → Direktur) = STATUS_LABELS
  * ("Menunggu persetujuan PM" / "Menunggu persetujuan Direktur"); older snapshots keep their wording
  * (LEGACY_WAITING_LABELS: "Menunggu Diketahui (Direktur)", "Menunggu Diketahui", "Menunggu Approval").
+ * ADR 0024: "Disetujui" of a `direktur_no_approval` snapshot → NO_APPROVAL_STATUS_LABELS.
  * No snapshot (list rows without it, reminders) = `statusLabel`. One source: domain/expense/types.ts.
  */
 export function requestStatusLabel(type: RequestType, status: RequestStatus, snap: LabelSnapshot | null | undefined, currentLevel: number | null | undefined): string {
+  // ADR 0024: a Direktur's own request without approval is never "Disetujui"
+  if (status === 'approved' && isNoApproval(snap)) return NO_APPROVAL_STATUS_LABELS[type]
   if (status === 'pending_ack' && snap && !isPmFlow(snap)) {
     return isDecisionSnapshot(snap) && snap.acknowledgeBy === 'role' && snap.acknowledgeRole === DIREKTUR_ROLE ? LEGACY_WAITING_LABELS.ackDirektur : LEGACY_WAITING_LABELS.ack
   }

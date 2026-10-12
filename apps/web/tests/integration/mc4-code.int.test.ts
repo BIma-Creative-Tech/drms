@@ -244,9 +244,10 @@ describe('MC4-2 — optional body `company` on /api/v1 creates', () => {
     // ownerBC has no membership in A
     const r = await call('POST', E, ownerBC, { type: 'advance', title: 'MC4 asing', company: A }, key())
     expect([r.status, r.body.code]).toEqual([403, 'COMPANY_NOT_ALLOWED'])
-    // ownerBC is Direktur in B: expense create needs Staff/PM/Admin/Finance
+    // ownerBC is Direktur in B: ADR 0024 lets a Direktur create (his OWN requests) — the role check passes, but
+    // without an employee in B he cannot be the requester → refused by the on-behalf rule (not a PT denial)
     expect((await call('POST', E, ownerBC, { type: 'advance', title: 'MC4 peran', company: B }, key())).status).toBe(403)
-    expect(await deniedCount(ownerBC.id)).toBe(n0 + 2)
+    expect(await deniedCount(ownerBC.id)).toBe(n0 + 1)
     // progress report: tri is only Staff in A (needs PM / Direktur there)
     const pr = await call('POST', '/api/v1/progress-reports', tri, { company: A, projectId: w.project, stageId: X.stageB, pctAfter: 10, work: 'Uji MC4' }, key())
     expect([pr.status, pr.body.code]).toEqual([403, 'COMPANY_NOT_ALLOWED'])

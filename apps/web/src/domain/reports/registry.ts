@@ -3,12 +3,14 @@ import type { PayloadRequest } from 'payload'
 
 import type { Role } from '@/access/roles'
 import { docLink } from '@/admin/doc-links'
-import { REQUEST_STATUSES, REQUEST_TYPE_LABELS, REQUEST_TYPES, statusLabel, type RequestStatus, type RequestType } from '@/domain/expense/types'
+import { NO_APPROVAL_NOTE } from '@/domain/expense/decision'
+import { NO_APPROVAL_STATUS_LABELS, REQUEST_STATUSES, REQUEST_TYPE_LABELS, REQUEST_TYPES, statusLabel, type RequestStatus, type RequestType } from '@/domain/expense/types'
 
 import { absensiReport } from './attendance-report'
 import { rekapAftersales, rekapTimesheetKontrak } from './field-reports'
 import { projectProgressVsBudget } from './progress'
 import { slaTransferReport } from './sla-report'
+import { pinjamanReport } from '@/domain/loans/report'
 import { auditLogCount, auditLogPage, AUDIT_PAGE, AUDIT_SOURCES, parseAuditFilter, type AuditFilter } from './audit-log'
 import {
   cashBalances,
@@ -40,7 +42,9 @@ import {
   ledgerScopeSql,
   masterScopeSql,
   narrowToCompanies,
+  narrowToSite,
   projectScopeSql,
+  siteScopeSql,
   requestScopeSql,
   scopeCompanies,
   fromCompanies,
@@ -96,6 +100,8 @@ export type ReportDef = {
   fileStem(ctx: Ctx, sp: URLSearchParams): string
   /** Data scope of the caller; default officeScope (Finance/Owner all, PM team). */
   scope?(req: PayloadRequest): Promise<ReportScope>
+  /** ADR 0023 §5: offer the "Site" filter (parameter `site`) — reports whose rows derive a site. */
+  siteFilter?: boolean
 }
 
 // ---------------------------------------------------------------- shared parsing
@@ -126,13 +132,16 @@ export function narrowScope(scope: ReportScope, projectId?: number, costCenterId
   const out: CompanyScope[] = scope.companies.map((c) => {
     if (c.kind === 'own') return c
     // both given: a request has a project OR a cost center → both filters together match nothing
-    if (projectId && costCenterId) return { company: c.company, kind: 'team', projects: [], costCenters: [] }
+    // ADR 0023: a site filter (`onlySites`) stays on the narrowed part (both filters apply)
+    const site = c.onlySites ? { onlySites: c.onlySites } : {}
+    if (projectId && costCenterId) return { company: c.company, kind: 'team', projects: [], costCenters: [], ...site }
     const ok = (ids: number[], id?: number) => id !== undefined && (c.kind === 'all' || ids.includes(id))
     return {
       company: c.company,
       kind: 'team',
       projects: ok(c.kind === 'team' ? c.projects : [], projectId) ? [projectId!] : [],
       costCenters: ok(c.kind === 'team' ? c.costCenters : [], costCenterId) ? [costCenterId!] : [],
+      ...site,
     }
   })
   return fromCompanies(out)
@@ -148,7 +157,13 @@ export function ptParam(sp: URLSearchParams): number[] | null {
     .map((v) => Number(v.trim()))
   return ids.length ? [...new Set(ids)] : null
 }
-export const effectiveScope = (scope: ReportScope, sp: URLSearchParams): ReportScope => narrowToCompanies(scope, ptParam(sp))
+/** ADR 0023 §5: report parameter `site` (one site id of the selected PTs): narrows the scope, never widens. */
+export const SITE_PARAM = 'site'
+export function siteParam(sp: URLSearchParams): number | null {
+  const v = (sp.get(SITE_PARAM) ?? '').trim()
+  return /^\d{1,9}$/.test(v) && Number(v) > 0 ? Number(v) : null
+}
+export const effectiveScope = (scope: ReportScope, sp: URLSearchParams): ReportScope => narrowToSite(narrowToCompanies(scope, ptParam(sp)), siteParam(sp))
 
 /** Prefix of master labels when the scope spans more than one PT (`[CS1] `). */
 async function ptPrefix(req: PayloadRequest, scope: ReportScope): Promise<(companyId: unknown) => string> {
@@ -236,6 +251,7 @@ export function describeFilters(fields: FilterField[]): string[] {
 
 const rekapKas: ReportDef = {
   code: 'rekap-kas',
+  siteFilter: true,
   title: 'Rekap Kas',
   kpi: 'K-01, K-02a',
   description: 'Saldo per akun dan arus kas per bulan (masuk/keluar, koreksi void). Angka resmi buku kas.',
@@ -267,7 +283,7 @@ const rekapKas: ReportDef = {
       columns,
       rows: flows.map((x) => ({
         cells: { bulan: periodLabel(x.period), awal: x.openingBalance, ...(golive ? { golive: x.saldoAwalAkun } : {}), masuk: x.masuk, keluar: x.keluar, selisih: x.net, koreksi: x.koreksi, akhir: x.closingBalance },
-        href: `/admin/laporan/buku-kas?${qs({ dari: `${x.period}-01`, sampai: lastDay(x.period), akun: f.accountId, project: f.projectId, pusat: f.costCenterId })}`,
+        href: `/admin/laporan/buku-kas?${qs({ dari: `${x.period}-01`, sampai: lastDay(x.period), akun: f.accountId, project: f.projectId, pusat: f.costCenterId, site: siteParam(sp) ?? undefined })}`,
       })),
       totals: {
         bulan: 'TOTAL',
@@ -369,6 +385,7 @@ function ledgerWhere(scope: ReportScope, sp: URLSearchParams, ctx: Ctx): SQL {
 
 const bukuKas: ReportDef = {
   code: 'buku-kas',
+  siteFilter: true,
   title: 'Buku Kas',
   kpi: 'baris buku kas',
   description: 'Daftar transaksi kas per baris (KM/KK, void dan jurnal balik), terbaru di atas.',
@@ -483,6 +500,7 @@ const bukuKas: ReportDef = {
 
 const pengeluaranKategori: ReportDef = {
   code: 'pengeluaran-kategori',
+  siteFilter: true,
   title: 'Pengeluaran per Kategori',
   kpi: 'K-17, K-06',
   description: 'Dana dicairkan atau realisasi terverifikasi per kategori (dari baris item) atau per project/pusat biaya, plus kas keluar manual.',
@@ -563,6 +581,7 @@ const pengeluaranKategori: ReportDef = {
 
 const anggaranProject: ReportDef = {
   code: 'anggaran-project',
+  siteFilter: true,
   title: 'Anggaran Project',
   kpi: 'K-07, K-08, K-05, K-06, K-09',
   description: 'RAB vs Komitmen vs Dicairkan vs Realisasi per project; per kategori bila project punya RAB kategori.',
@@ -673,6 +692,7 @@ function requestFilter(sp: URLSearchParams, ctx: Ctx): RequestFilter {
 
 const rekapPengajuan: ReportDef = {
   code: 'rekap-pengajuan',
+  siteFilter: true,
   title: 'Rekap Pengajuan',
   kpi: 'K-13',
   description: 'Pengajuan (non-draft) per status, jenis, kategori dan periode tanggal pengajuan.',
@@ -701,6 +721,8 @@ const rekapPengajuan: ReportDef = {
           { key: 'lingkup', label: 'Project / pusat biaya', type: 'text' },
           { key: 'pemohon', label: 'Pemohon', type: 'text' },
           { key: 'status', label: 'Status', type: 'text', primary: true },
+          // ADR 0024: the audited exception is visible in the report (a Direktur's own request without approval)
+          { key: 'persetujuan', label: 'Persetujuan', type: 'text' },
           { key: 'grandTotal', label: 'Grand total (Rp)', type: 'money', primary: true },
           { key: 'disetujui', label: 'Disetujui (Rp)', type: 'money' },
           { key: 'dicairkan', label: 'Dicairkan (Rp)', type: 'money' },
@@ -715,7 +737,8 @@ const rekapPengajuan: ReportDef = {
             judul: x.title,
             lingkup: x.scopeName,
             pemohon: x.requesters,
-            status: statusLabel(x.type, x.status),
+            status: x.noApproval && x.status === 'approved' ? NO_APPROVAL_STATUS_LABELS[x.type] : statusLabel(x.type, x.status),
+            persetujuan: x.noApproval ? NO_APPROVAL_NOTE : '',
             grandTotal: x.grandTotal,
             disetujui: x.approvedAmount,
             dicairkan: x.disbursed,
@@ -787,6 +810,7 @@ const rekapPengajuan: ReportDef = {
 
 const kelengkapan: ReportDef = {
   code: 'kelengkapan',
+  siteFilter: true,
   title: 'Kelengkapan Nota/LPJ',
   kpi: 'K-12',
   description: 'Pengajuan baru belum LPJ (dan yang terlambat), LPJ menunggu, nota reimburse menunggu, flag peringatan terbuka.',
@@ -1104,6 +1128,17 @@ async function ptField(req: PayloadRequest, scope: ReportScope, sp: URLSearchPar
   return [{ name: PT_PARAM, label: 'PT', kind: 'multiselect', options: refs.map((r) => ({ value: String(r.id), label: `${r.shortCode} — ${r.name}` })), value: chosen }]
 }
 
+/**
+ * ADR 0023 §5: "Site" filter field (single select) — the sites of the PTs in the (PT-narrowed) scope, inactive ones
+ * marked; hidden while those PTs have no site. Value = the `site` parameter (an unknown id narrows to nothing).
+ */
+async function siteField(req: PayloadRequest, scope: ReportScope, sp: URLSearchParams): Promise<FilterField[]> {
+  const pre = await ptPrefix(req, scope)
+  const r = await rows(req, sql`SELECT s.id, s.company_id, s.code, s.name, coalesce(s.active, true) AS active FROM sites s WHERE ${siteScopeSql(scope)} ORDER BY s.code, s.company_id`)
+  if (r.length === 0) return []
+  return [sel(SITE_PARAM, 'Site', sp, r.map((x) => ({ value: String(x.id), label: `${pre(x.company_id)}${x.code} ${x.name}${x.active ? '' : ' (nonaktif)'}` })))]
+}
+
 function withCompanies(def: ReportDef): ReportDef {
   return {
     ...def,
@@ -1113,12 +1148,13 @@ function withCompanies(def: ReportDef): ReportDef {
     },
     async filters(req, scope, sp) {
       const base = scope.companies || !def.scope ? scope : await def.scope(req)
-      return [...(await ptField(req, base, sp)), ...(await def.filters(req, effectiveScope(base, sp), sp))]
+      const byPt = narrowToCompanies(base, ptParam(sp))
+      return [...(await ptField(req, base, sp)), ...(def.siteFilter ? await siteField(req, byPt, sp) : []), ...(await def.filters(req, effectiveScope(base, sp), sp))]
     },
   }
 }
 
-export const REPORTS: ReportDef[] = [rekapKas, bukuKas, pengeluaranKategori, anggaranProject, rekapPengajuan, kelengkapan, slaTransferReport, biayaKendaraan, absensiReport, rekapTimesheetKontrak, rekapAftersales].map(withCompanies)
+export const REPORTS: ReportDef[] = [rekapKas, bukuKas, pengeluaranKategori, anggaranProject, rekapPengajuan, kelengkapan, slaTransferReport, biayaKendaraan, absensiReport, rekapTimesheetKontrak, rekapAftersales, pinjamanReport].map(withCompanies)
 export const AUDIT_REPORT = withCompanies(auditLog)
 export const ALL_REPORTS: ReportDef[] = [...REPORTS, AUDIT_REPORT]
 export const REPORT_CODES = ALL_REPORTS.map((r) => r.code)

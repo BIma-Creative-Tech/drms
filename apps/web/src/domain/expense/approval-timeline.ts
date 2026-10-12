@@ -9,7 +9,7 @@
  */
 import { ROLE_LABELS, type Role } from '@/access/roles'
 
-import { DIREKTUR_ROLE, isDecisionSnapshot, selfApprovalNote, SKIPPED_LABEL, type SkippedPosition } from './decision'
+import { DIREKTUR_ROLE, isDecisionSnapshot, isNoApproval, NO_APPROVAL_NOTE, selfApprovalNote, SKIPPED_LABEL, type SkippedPosition } from './decision'
 import type { AckBy, AckDelegate, AckMode } from './rules'
 import type { RequestStatus, RequestType } from './types'
 
@@ -96,10 +96,14 @@ export function approvalPosition(s: TimelineSnapshot | null, level: number, mult
   return { title: multi ? `Approval level ${level}` : 'Approval', role: role ? ROLE_LABELS[role] : 'Approver' }
 }
 
-/** Readable text of the ADR 0021 G1 exception (never the code `direktur_via_pm`). */
+/** Readable text of the ADR 0021 / 0024 G1 exception (never the code `direktur_via_pm` / `direktur_no_approval`). */
 export function g1ExceptionText(v: unknown): string | null {
   return selfApprovalNote(v)
 }
+
+/** ADR 0024 step of a request without approval (web = APK). */
+export const NO_APPROVAL_STEP_TITLE = 'Persetujuan'
+export const NO_APPROVAL_STEP_ROLE = 'Direktur (pemohon)'
 
 export function buildApprovalTimeline(d: TimelineInput): ApprovalTimelineStep[] {
   const snap = d.snapshot
@@ -128,6 +132,12 @@ export function buildApprovalTimeline(d: TimelineInput): ApprovalTimelineStep[] 
     at: diajukan?.decidedAt ?? dibuat?.decidedAt ?? d.submittedAt,
     note: submitted ? creatorNote : ['belum diajukan', creatorNote].filter(Boolean).join(' · '),
   })
+
+  // ADR 0024: a Direktur's own request without approval → one "Persetujuan" step, skipped by policy
+  // (APK turn_timeline.dart builds the same step).
+  if (isNoApproval(snap)) {
+    steps.push({ key: 'no-approval', title: NO_APPROVAL_STEP_TITLE, role: NO_APPROVAL_STEP_ROLE, planned: null, state: 'skipped', actor: null, at: null, note: NO_APPROVAL_NOTE })
+  }
 
   // 2. Persetujuan PM / Diketahui
   const ack = ackPosition(snap)

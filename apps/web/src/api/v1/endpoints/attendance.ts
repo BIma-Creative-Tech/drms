@@ -7,7 +7,7 @@ import type { z } from 'zod'
 import { ownEmployees, relId, userId } from '@/access/roles'
 import { writeAudit } from '@/audit/writer'
 import { correctAttendance } from '@/domain/attendance/corrections'
-import { AttendanceReject, recordWebAttendance, type Location } from '@/domain/attendance/record'
+import { AttendanceReject, locationOf, recordWebAttendance, type Location } from '@/domain/attendance/record'
 import { employeeRecap, myRecap, teamTodayFor } from '@/domain/attendance/service'
 import { fileSize, mediaPath } from '@/lib/media-files'
 import { withReqTransaction } from '@/lib/system-tx'
@@ -22,7 +22,7 @@ import { AttendanceCheckBody, AttendanceCorrectBody, AttendanceMonthQuery, Atten
  * 2026-10-09, every role).
  * - GET  /attendance/me?month=YYYY-MM                 US-09 own monthly recap (any role with an employee)
  * - GET  /attendance/recap?employee_id=&month=        recap of an employee: PM team / Admin, Owner, Finance
- * - GET  /attendance/team-today?date=&project_id=&cost_center_id=   US-13 (PM team; office roles all)
+ * - GET  /attendance/team-today?date=&project_id=&cost_center_id=&site_id=   US-13 (PM team; office roles all)
  * - POST /attendance/check-in, /attendance/check-out  self-service web absen (every role)
  * - POST /attendance/{id}/correct {new_time, reason}  US-15 T10 (PM team / Admin; never own; idempotent)
  * - GET  /attendance/{id}/selfie                      selfie of a visible attendance; audited view_sensitive
@@ -72,6 +72,7 @@ export const teamTodayEndpoint = v1({
         date: q.data.date,
         projectId: q.data.project_id ? Number(q.data.project_id) : undefined,
         costCenterId: q.data.cost_center_id ? Number(q.data.cost_center_id) : undefined,
+        siteId: q.data.site_id ? Number(q.data.site_id) : undefined,
         companyIds,
       }),
     )
@@ -99,7 +100,7 @@ const ATTENDANCE_REJECT_STATUS: Record<string, number> = {
 /** Shared handler of /attendance/check-in and /attendance/check-out (owner decision 2026-10-09). */
 function webCheckHandler(kind: 'check_in' | 'check_out') {
   return async ({ req, body }: { req: PayloadRequest; body: z.infer<typeof AttendanceCheckBody> }) => {
-    const location: Location = body.project_id !== undefined ? { type: 'project', id: body.project_id } : { type: 'cost_center', id: body.cost_center_id! }
+    const location: Location = locationOf(body)
     try {
       const r = await recordWebAttendance(req, kind, { location, lat: body.lat, lng: body.lng, accuracyM: body.accuracy_m ?? null, selfieId: body.selfie_media_id })
       return json(r, 201)

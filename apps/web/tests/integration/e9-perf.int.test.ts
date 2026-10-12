@@ -114,6 +114,8 @@ describe('P-1 image queue: concurrent uploads', () => {
     setImageQueueForTests({ max: 1, maxQueue: 5, timeoutMs: 30_000 })
     const held = await imageQueue().acquire()
     const pending = Promise.all([1, 2, 3].map(async (i) => send('/api/v1/media/receipts', w.users.staffA, await photo(1000, 800, 50 + i), 'image/jpeg')))
+    // the three photos are generated before they are sent: on a loaded host that takes longer than a fixed delay
+    for (const deadline = Date.now() + 15_000; imageQueue().queued < 3 && Date.now() < deadline; ) await new Promise((r) => setTimeout(r, 20))
     await new Promise((r) => setTimeout(r, 200))
     expect(imageQueue().queued).toBe(3)
     held.release()

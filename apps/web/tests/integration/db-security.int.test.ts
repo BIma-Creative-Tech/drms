@@ -56,6 +56,7 @@ describe('grants (least privilege)', () => {
       "SELECT table_name FROM information_schema.role_table_grants WHERE grantee = current_user AND privilege_type = 'DELETE' ORDER BY 1",
     )
     expect(r.rows.map((x) => x.table_name)).toEqual([
+      'approval_rules_requester_roles', // ADR 0024: "Peran pemohon" (hasMany rewritten on update)
       'approval_rules_steps',
       'company_memberships_roles', // MC1: per-PT roles (hasMany rewritten on update)
       'expense_categories_rels',

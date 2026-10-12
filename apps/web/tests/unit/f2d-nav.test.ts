@@ -20,9 +20,9 @@ describe('profile link for every signing role', () => {
     expect(profileHref(u)).toBe('/admin/collections/users/42')
   })
 
-  it('Owner: own profile, no "Buat pengajuan", sees Antrian Transfer', () => {
+  it('Owner: own profile, "Buat pengajuan" (ADR 0024: own requests), sees Antrian Transfer', () => {
     expect(profileHref(navUser({ id: 7, roles: ['pk-owner'] } as unknown as TypedUser))).toBe('/admin/collections/users/7')
-    expect(keys(['pk-owner'])).not.toContain('buat-pengajuan')
+    expect(keys(['pk-owner'])).toContain('buat-pengajuan')
     expect(keys(['pk-owner'])).toContain('antrian-transfer')
   })
 

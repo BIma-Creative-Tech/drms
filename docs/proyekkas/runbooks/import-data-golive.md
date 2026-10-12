@@ -149,6 +149,9 @@ Langkah:
 - [ ] Commit kedua dengan file yang sama (opsional, sebagai bukti) → semua `baru 0, ubah 0` (AC E11).
 - [ ] Login uji satu pengguna per peran (web + APK).
 - [ ] Bila laporan memuat blok **`PERINGATAN KEYCLOAK`**: jalankan §3.5 (wajib sebelum serah terima).
+- [ ] **RAP (D4, keputusan pemilik 2026-10-11):** peringatan "Project … punya RAB tetapi belum punya RAP" = pengajuan
+      project itu belum bisa dikirim. Serahkan daftarnya ke PM / Direktur untuk mengisi RAP (tab RAP project: template
+      atau impor Excel RAP) sebelum pengguna mulai mengajukan; daftar yang sama tampil di Beranda Direktur.
 
 ### 3.5 Langkah Keycloak setelah impor menonaktifkan / mengaktifkan pengguna (E9 B-2, ASVS G-22)
 

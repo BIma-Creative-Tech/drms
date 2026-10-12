@@ -4,6 +4,10 @@
  * ADR 0021 (owner 2026-10-10) supersedes the decision part for expense requests: "Diketahui" may be
  * given by the PM project (`acknowledgeBy: scope_manager` = `projects.pm`, else `cost-centers.manager`)
  * followed by the Direktur; Finance only transfers. Budget addenda stay Direktur → Finance.
+ * ADR 0024 (owner 2026-10-11): a rule may carry a requester-role condition ("Peran pemohon") and an
+ * expense-request rule whose requester role is EXACTLY Direktur may have zero steps ("Tanpa persetujuan —
+ * langsung ke antrian transfer Finance"): a Direktur's own request then goes to Finance with no decision
+ * (`direktur_no_approval`, audited); the PM no longer files for a Direktur (`direktur_via_pm*` = legacy).
  * Pure module (unit-tested): rule validation shared by the `approval-rules` hook and the submit
  * check, and the submit-time position plan (who may decide each position, which positions are
  * skipped because their only holders are requester/creator).
@@ -34,7 +38,7 @@ export type SkippedPosition = {
 /** Printed in the PDF box / shown in the panel for a skipped position. */
 export const SKIPPED_LABEL = '(tidak berlaku — pemohon)'
 
-type RuleShape = Pick<RuleInput, 'acknowledge' | 'acknowledgeBy' | 'acknowledgeRole' | 'acknowledgeUser' | 'steps'>
+type RuleShape = Pick<RuleInput, 'acknowledge' | 'acknowledgeBy' | 'acknowledgeRole' | 'acknowledgeUser' | 'steps' | 'requesterRoles'>
 
 /** ADR 0021: G1 exception of a Direktur's request filed by the PM project (snapshot / DB column value). */
 export const DIREKTUR_VIA_PM = 'direktur_via_pm' as const
@@ -45,6 +49,10 @@ export const DIREKTUR_VIA_PM = 'direktur_via_pm' as const
  * other Direktur(s) decide the Direktur step.
  */
 export const DIREKTUR_VIA_PM_SELF = 'direktur_via_pm_self' as const
+/**
+ * The ADR 0021 exceptions (a Direktur's request filed by the PM project). ADR 0024: no longer set for new
+ * submissions — only requests that already carry one (re-approval / LPJ shortfall keep their flow).
+ */
 export type SelfApproval = typeof DIREKTUR_VIA_PM | typeof DIREKTUR_VIA_PM_SELF
 export const SELF_APPROVALS: readonly SelfApproval[] = [DIREKTUR_VIA_PM, DIREKTUR_VIA_PM_SELF]
 
@@ -52,13 +60,54 @@ export function isSelfApproval(v: unknown): v is SelfApproval {
   return (SELF_APPROVALS as readonly unknown[]).includes(v)
 }
 
+/**
+ * ADR 0024 (owner decision 2026-10-11): a Direktur's OWN request under a zero-step rule (requester role =
+ * Direktur) goes straight to the Finance transfer queue — no decision position at all. An explicit, audited
+ * policy exception to G1-2 ("at least one independent decision"); Finance's transfer checks stay the only
+ * check before money leaves. Snapshot `selfApproval` + column `expense_requests.g1_exception` (DB-checked).
+ */
+export const DIREKTUR_NO_APPROVAL = 'direktur_no_approval' as const
+export type G1Exception = SelfApproval | typeof DIREKTUR_NO_APPROVAL
+export const G1_EXCEPTIONS: readonly G1Exception[] = [DIREKTUR_VIA_PM, DIREKTUR_VIA_PM_SELF, DIREKTUR_NO_APPROVAL]
+
+/** Snapshot of a Direktur's own request without approval (ADR 0024). */
+export function isNoApproval(s: { selfApproval?: unknown } | null | undefined): boolean {
+  return s?.selfApproval === DIREKTUR_NO_APPROVAL
+}
+
+/** Panel / timeline / PDF / report text of the ADR 0024 exception. */
+export const NO_APPROVAL_NOTE = 'Tanpa persetujuan — pengajuan Direktur (kebijakan PT)'
+/** Rule form / list label of a zero-step rule. */
+export const NO_APPROVAL_RULE_LABEL = 'Tanpa persetujuan — langsung ke antrian transfer Finance'
+/** PDF box text of the decision positions of such a request. */
+export const NO_APPROVAL_PDF_LABEL = '(tidak berlaku — tanpa persetujuan)'
+
+/** Requester roles offered in "Peran pemohon" (ADR 0024; Operator never files expense requests). */
+export const REQUESTER_ROLE_OPTIONS = ['pk-owner', 'pk-pm', 'pk-staff', 'pk-finance', 'pk-admin'] as const satisfies readonly Role[]
+
+/**
+ * ADR 0024 guardrail: why a ZERO-STEP rule may not be saved / used (null = fine or not zero-step). Only an
+ * expense-request rule whose requester role is EXACTLY Direktur and without "Diketahui" — so an Admin can
+ * never open a no-approval path for Staff / PM / Finance. Mirrored by the DB trigger `approval_rules_zero_step`.
+ */
+export function zeroStepRuleError(rule: Pick<RuleInput, 'steps' | 'requesterRoles' | 'acknowledge'>, docType: string = 'expense_request'): string | null {
+  if (rule.steps.length > 0) return null
+  if (docType !== 'expense_request') return 'Aturan Addendum RAB harus punya minimal 1 level approval.'
+  const roles = [...new Set(rule.requesterRoles ?? [])]
+  if (roles.length !== 1 || roles[0] !== DIREKTUR_ROLE) {
+    return `Aturan tanpa level approval ("${NO_APPROVAL_RULE_LABEL}") hanya boleh untuk Peran pemohon = ${ROLE_LABELS[DIREKTUR_ROLE]} saja (ADR 0024). Tambahkan level approval atau ubah Peran pemohon.`
+  }
+  if (rule.acknowledge !== 'none') return `Aturan "${NO_APPROVAL_RULE_LABEL}" tidak memakai "Diketahui Oleh": pilih "Tidak dipakai" (ADR 0024).`
+  return null
+}
+
 /** Printed in the PDF / shown in the panel when the snapshot carries the ADR 0021 G1 exception. */
 export const DIREKTUR_VIA_PM_NOTE = 'Pengajuan Direktur — diajukan oleh PM (kebijakan owner 2026-10-10)'
 export const DIREKTUR_VIA_PM_SELF_NOTE = 'Pengajuan Direktur — diajukan oleh PM; disetujui Direktur pemohon karena satu-satunya Direktur PT (kebijakan owner 2026-10-10)'
 
-/** Panel / PDF / audit text of the exception (null = none). */
+/** Panel / PDF / audit text of the exception (null = none); ADR 0021 wording kept for those requests. */
 export function selfApprovalNote(v: unknown): string | null {
-  return v === DIREKTUR_VIA_PM ? DIREKTUR_VIA_PM_NOTE : v === DIREKTUR_VIA_PM_SELF ? DIREKTUR_VIA_PM_SELF_NOTE : null
+  return v === DIREKTUR_VIA_PM ? DIREKTUR_VIA_PM_NOTE : v === DIREKTUR_VIA_PM_SELF ? DIREKTUR_VIA_PM_SELF_NOTE : v === DIREKTUR_NO_APPROVAL ? NO_APPROVAL_NOTE : null
 }
 
 /** Label of the ADR 0021 "Diketahui" filler (rule form, panel). */
@@ -70,6 +119,9 @@ export const SCOPE_MANAGER_LABEL = 'PM project (manajer pusat biaya bila tanpa p
  * project (`scope_manager`) may fill a REQUIRED "Diketahui" of an expense-request rule only.
  */
 export function ruleDecisionError(rule: RuleShape, rolesOfUser: (id: number) => readonly Role[] | undefined, docType: string = 'expense_request'): string | null {
+  const zero = zeroStepRuleError(rule, docType)
+  if (zero) return zero
+  if (docType !== 'expense_request' && (rule.requesterRoles ?? []).length > 0) return 'Peran pemohon hanya untuk aturan Pengajuan biaya (ADR 0024).'
   const label = (r: Role) => ROLE_LABELS[r]
   const allowed = `${label('pk-owner')} atau ${label('pk-finance')}`
   if (rule.acknowledge !== 'none') {

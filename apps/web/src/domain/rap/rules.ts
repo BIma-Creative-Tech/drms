@@ -40,6 +40,26 @@ export const DEFAULT_RESOURCE_TYPES: ReadonlyArray<{ kind: ResourceKind; code: s
 
 export { round2 }
 
+/**
+ * DRMS 10/10 D4, owner 2026-10-11 ("RAP wajib untuk semua proyek yang punya RAB"): every project WITH A RAB (budget
+ * > 0) needs ≥ 1 active RAP item before an expense request can be submitted — whatever its kind. Konstruksi keeps
+ * its P3 rule (always required). A project without RAB (and not konstruksi) may still have a RAP; then its lines pick
+ * an item too (the "has a RAP" rule), it is just not forced to have one.
+ */
+export function rapRequiredFor(p: { kind: string | null | undefined; budget: number | null | undefined }): boolean {
+  return p.kind === 'konstruksi' || (typeof p.budget === 'number' && p.budget > 0)
+}
+
+/** Message for the requester (server, web and APK use this exact text). */
+export const RAP_MISSING_MESSAGE = 'Project belum punya RAP — hubungi PM'
+
+/**
+ * Only konstruksi RAPs drive the stage progress (work volume of the daily reports, P3) and need a stage per item.
+ * Other kinds (ADR 0020 amendment 2026-10-11): the RAP is a cost plan only — stage optional (an existing stage as a
+ * grouping), the progress stays manual (E4 progress reports), no daily-report quantities.
+ */
+export const rapDrivesProgress = (kind: string | null | undefined): boolean => kind === 'konstruksi'
+
 export const MAX_QTY = 100_000_000
 
 /** A positive quantity with ≤ 2 decimals. */

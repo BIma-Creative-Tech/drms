@@ -36,6 +36,7 @@ import '../features/notifications/presentation/notifications_screen.dart';
 import '../features/privacy/application/privacy_providers.dart';
 import '../features/privacy/presentation/privacy_notice_screen.dart';
 import '../features/progress/presentation/progress_conflict_screen.dart';
+import '../features/loans/presentation/loan_screens.dart';
 import '../features/projects/presentation/project_detail_screen.dart';
 import '../features/projects/presentation/projects_screen.dart';
 import '../features/progress/presentation/progress_detail_screen.dart';
@@ -155,6 +156,7 @@ final routerProvider = Provider<GoRouter>((ref) {
               initialTab: switch (s.uri.queryParameters['tab']) {
                 'rap' => 1,
                 'requests' => 2,
+                'loans' => 3,
                 _ => 0,
               },
             ),
@@ -195,6 +197,21 @@ final routerProvider = Provider<GoRouter>((ref) {
                 builder: (_, s) => AddendumEditRoute(id: int.tryParse(s.pathParameters['id'] ?? '') ?? 0),
               ),
             ],
+          ),
+        ],
+      ),
+      // ADR 0022: inter-project loans (online only; repayments on the web in v1)
+      GoRoute(
+        path: '/loans/new',
+        builder: (_, s) => LoanFormScreen(projectId: int.tryParse(s.uri.queryParameters['project'] ?? '')),
+      ),
+      GoRoute(
+        path: '/loans/:id',
+        builder: (_, s) => LoanDetailScreen(id: int.tryParse(s.pathParameters['id'] ?? '') ?? 0),
+        routes: [
+          GoRoute(
+            path: 'edit',
+            builder: (_, s) => LoanEditRoute(id: int.tryParse(s.pathParameters['id'] ?? '') ?? 0),
           ),
         ],
       ),

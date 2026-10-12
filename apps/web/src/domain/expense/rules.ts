@@ -5,7 +5,7 @@
  */
 import type { Role } from '@/access/roles'
 
-import type { SelfApproval, SkippedPosition } from './decision'
+import type { G1Exception, SkippedPosition } from './decision'
 import type { RequestType } from './types'
 
 export type AckMode = 'required' | 'optional' | 'none'
@@ -31,6 +31,11 @@ export type RuleInput = {
   signDiajukan?: SignMode | null
   signDibuat?: SignMode | null
   steps: Array<{ level: number; approverRole?: Role | null; approverUser?: number | null }>
+  /**
+   * ADR 0024 "Peran pemohon": the rule applies only when EVERY requester holds one of these roles in the
+   * request's PT (empty / absent = any requester). A zero-step rule requires exactly ['pk-owner'].
+   */
+  requesterRoles?: readonly Role[] | null
 }
 
 export type RequestFacts = {
@@ -42,6 +47,11 @@ export type RequestFacts = {
   categoryIds: number[]
   projectId?: number | null
   costCenterId?: number | null
+  /**
+   * ADR 0024: roles in the request's PT per requester (one entry per requester employee; an employee
+   * without an active account has []). Absent → rules with a requester-role condition never match.
+   */
+  requesterRoles?: ReadonlyArray<readonly Role[]>
 }
 
 export type ApprovalSnapshot = {
@@ -82,9 +92,11 @@ export type ApprovalSnapshot = {
   /**
    * ADR 0021 narrow G1 exception (owner decision 2026-10-10): a Direktur's own request filed by the PM
    * project — the creator PM gives "Diketahui" (Persetujuan PM) and the requester Direktur may approve.
-   * Mirrored in `expense_requests.g1_exception` (the DB trigger allows exactly those two rows).
+   * ADR 0024 (owner 2026-10-11): `direktur_no_approval` — a Direktur's own request under a zero-step rule
+   * (no decision at all, straight to Finance); the two ADR 0021 values are no longer set for new requests.
+   * Mirrored in `expense_requests.g1_exception` (DB-checked).
    */
-  selfApproval?: SelfApproval | null
+  selfApproval?: G1Exception | null
 }
 
 export type AckDelegate = 'owner' | 'admin'
@@ -95,7 +107,14 @@ export const ACK_DELEGATION_REASON = 'PM/penanggung jawab adalah pemohon/pembuat
 export const ACK_DELEGATION_REASON_MISSING = 'PM/penanggung jawab belum diatur (Q-07)'
 
 function specificity(r: RuleInput): number {
-  return (r.category ? 1 : 0) + (r.project ? 1 : 0) + (r.costCenter ? 1 : 0) + (r.requestType !== 'any' ? 1 : 0)
+  return (r.category ? 1 : 0) + (r.project ? 1 : 0) + (r.costCenter ? 1 : 0) + (r.requestType !== 'any' ? 1 : 0) + ((r.requesterRoles?.length ?? 0) > 0 ? 1 : 0)
+}
+
+/** ADR 0024: every requester holds at least one of the rule's requester roles (no condition = true). */
+export function requesterRolesMatch(ruleRoles: readonly Role[] | null | undefined, requesters: ReadonlyArray<readonly Role[]> | undefined): boolean {
+  if (!ruleRoles || ruleRoles.length === 0) return true
+  if (!requesters || requesters.length === 0) return false
+  return requesters.every((roles) => roles.some((r) => ruleRoles.includes(r)))
 }
 
 export function ruleMatches(r: RuleInput, f: RequestFacts): boolean {
@@ -107,12 +126,13 @@ export function ruleMatches(r: RuleInput, f: RequestFacts): boolean {
   if (r.category && !f.categoryIds.includes(r.category)) return false
   if (r.project && r.project !== f.projectId) return false
   if (r.costCenter && r.costCenter !== f.costCenterId) return false
+  if (!requesterRolesMatch(r.requesterRoles, f.requesterRoles)) return false
   return true
 }
 
 /**
  * Best matching rule: lowest `priority` first, then the most specific (category/project/cost
- * center/request type), then the highest `minAmount` (the narrower amount band), then lowest id.
+ * center/request type/requester role), then the highest `minAmount` (the narrower amount band), then lowest id.
  */
 export function selectRule(rules: readonly RuleInput[], f: RequestFacts): RuleInput | null {
   const candidates = rules.filter((r) => ruleMatches(r, f))
@@ -126,9 +146,12 @@ export function selectRule(rules: readonly RuleInput[], f: RequestFacts): RuleIn
   return candidates[0] ?? null
 }
 
-/** Steps must be levels 1..n without gaps/duplicates, each with a role or a user. */
-export function stepsError(steps: RuleInput['steps']): string | null {
-  if (steps.length === 0) return 'Aturan approval harus punya minimal 1 level.'
+/**
+ * Steps must be levels 1..n without gaps/duplicates, each with a role or a user. ADR 0024: zero steps
+ * only with `allowEmpty` (the caller checked `zeroStepRuleError`: requester role exactly Direktur).
+ */
+export function stepsError(steps: RuleInput['steps'], opts: { allowEmpty?: boolean } = {}): string | null {
+  if (steps.length === 0) return opts.allowEmpty ? null : 'Aturan approval harus punya minimal 1 level.'
   const levels = [...steps].map((s) => s.level).sort((a, b) => a - b)
   for (let i = 0; i < levels.length; i++) if (levels[i] !== i + 1) return 'Level approval harus berurutan 1..n tanpa duplikat.'
   if (steps.some((s) => !s.approverRole && !s.approverUser)) return 'Setiap level approval butuh peran atau user approver.'
@@ -138,7 +161,9 @@ export function stepsError(steps: RuleInput['steps']): string | null {
 export type AckDelegation = { to: AckDelegate; userIds: number[]; reason: string; originalUserId: number | null }
 
 export function buildSnapshot(r: RuleInput, acknowledgerUserId: number | null, delegation?: AckDelegation | null): ApprovalSnapshot {
-  const err = stepsError(r.steps)
+  // ADR 0024: a zero-step rule is valid only as the Direktur no-approval rule (requester role = Direktur only)
+  const zero = r.steps.length === 0 && r.acknowledge === 'none' && (r.requesterRoles ?? []).length === 1 && r.requesterRoles![0] === 'pk-owner'
+  const err = stepsError(r.steps, { allowEmpty: zero })
   if (err) throw new Error(err)
   const delegated = delegation
     ? {

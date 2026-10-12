@@ -24,10 +24,18 @@ export type SQL = ReturnType<typeof sql>
  * its kind (before MC4 `team`/`own` literals kept their id predicates). Build scopes with the
  * functions below (`fromCompanies` / the role builders) — tests/unit/mc4-code.test.ts pins this.
  */
-export type CompanyScope =
+export type CompanyScope = (
   | { company: number; kind: 'all' }
-  | { company: number; kind: 'team'; projects: number[]; costCenters: number[] }
+  | { company: number; kind: 'team'; projects: number[]; costCenters: number[]; sites?: number[] }
   | { company: number; kind: 'own'; userId: number; employeeId: number | null }
+) & {
+  /**
+   * ADR 0023 §5 report / dashboard filter "Site": an EXTRA predicate on every row of the part (only narrows): a
+   * request / project / cash row through its project's site (`projects.site_id`), a cash-ledger row and an account
+   * through the account's site (`cash_accounts.site_id`), a cost center when it is the site's default cost center.
+   */
+  onlySites?: number[]
+}
 
 export type ScopeKind = 'all' | 'team' | 'own' | 'none'
 
@@ -78,6 +86,20 @@ export function splitScope(s: ReportScope): Array<{ company: number; scope: Repo
   return (s.companies ?? []).map((c) => ({ company: c.company, scope: fromCompanies([c]) }))
 }
 
+/**
+ * ADR 0023 §5: narrows every part to the site `siteId` (report parameter `site`, dashboard filter): adds `onlySites`
+ * — the SQL helpers below AND it to the scope predicate, so it never widens. A site of another PT matches nothing.
+ */
+export function narrowToSite(s: ReportScope, siteId: number | null | undefined): ReportScope {
+  if (!siteId || !s.companies) return s
+  return fromCompanies(s.companies.map((c) => ({ ...c, onlySites: [siteId] })))
+}
+
+/** Site filter of the scope (the first part's — `narrowToSite` sets the same list on every part), else null. */
+export function scopeSites(s: ReportScope): number[] | null {
+  return s.companies?.find((c) => c.onlySites)?.onlySites ?? null
+}
+
 /** Narrows the scope to `companyIds` (report parameter `pt`): never widens. Empty/null = unchanged. */
 export function narrowToCompanies(s: ReportScope, companyIds: readonly number[] | null | undefined): ReportScope {
   if (!companyIds || companyIds.length === 0 || !s.companies) return s
@@ -92,7 +114,7 @@ const holds = (m: MRef, roles: readonly Role[]) => m.roles.some((r) => roles.inc
 
 async function teamOf(req: PayloadRequest, company: number): Promise<CompanyScope> {
   const s = await resolveScope(req, company)
-  return { company, kind: 'team', projects: s.teamProjects, costCenters: s.teamCostCenters }
+  return { company, kind: 'team', projects: s.teamProjects, costCenters: s.teamCostCenters, ...(s.teamSites.length ? { sites: s.teamSites } : {}) }
 }
 
 /**
@@ -167,26 +189,45 @@ export function companyScopeSql(col: SQL, companyIds: readonly number[]): SQL {
   return inList(col, companyIds)
 }
 
-/** OR over the parts of `(companyCol = c AND pred(part))`; FALSE when there is none. */
-function orCompanies(s: ReportScope, companyCol: SQL, pred: (p: Part) => SQL | null): SQL {
+/**
+ * OR over the parts of `(companyCol = c AND pred(part) [AND site(onlySites)])`; FALSE when there is none. `site` =
+ * the ADR 0023 site predicate of the row (required when a part carries `onlySites`; missing → FALSE, fail closed).
+ */
+function orCompanies(s: ReportScope, companyCol: SQL, pred: (p: Part) => SQL | null, site?: (sites: number[]) => SQL): SQL {
   const out: SQL[] = []
   for (const p of parts(s)) {
     const x = pred(p)
     if (!x) continue
-    out.push(sql`(${companyCol} = ${p.company} AND ${x})`)
+    const narrowed = p.onlySites ? sql` AND ${site ? site(p.onlySites) : sql`FALSE`}` : sql``
+    out.push(sql`(${companyCol} = ${p.company} AND ${x}${narrowed})`)
   }
   return out.length ? sql`(${sql.join(out, sql` OR `)})` : sql`FALSE`
 }
 
+/** ADR 0023: `col` (a project id) is a project of one of `sites`. */
+export function projectOfSitesSql(col: SQL, sites: readonly number[]): SQL {
+  return sites.length ? sql`${col} IN (SELECT sp.id FROM projects sp WHERE ${inList(sql`sp.site_id`, sites)})` : sql`FALSE`
+}
+
+/** ADR 0023: `col` (a cash account id) is an account flagged with one of `sites`. */
+export function accountOfSitesSql(col: SQL, sites: readonly number[]): SQL {
+  return sites.length ? sql`${col} IN (SELECT sa.id FROM cash_accounts sa WHERE ${inList(sql`sa.site_id`, sites)})` : sql`FALSE`
+}
+
 /** Row filter on `expense_requests er` for the scope. */
 export function requestScopeSql(s: ReportScope): SQL {
-  return orCompanies(s, sql`er.company_id`, (p) => {
-    if (p.kind === 'all') return sql`TRUE`
-    if (p.kind === 'team') return sql`(${inList(sql`er.project_id`, p.projects)} OR ${inList(sql`er.cost_center_id`, p.costCenters)})`
-    return p.employeeId === null
-      ? sql`er.created_by_id = ${p.userId}`
-      : sql`(er.created_by_id = ${p.userId} OR EXISTS (SELECT 1 FROM expense_requests_rels rr WHERE rr.parent_id = er.id AND rr.path = 'requesters' AND rr.employees_id = ${p.employeeId}))`
-  })
+  return orCompanies(
+    s,
+    sql`er.company_id`,
+    (p) => {
+      if (p.kind === 'all') return sql`TRUE`
+      if (p.kind === 'team') return sql`(${inList(sql`er.project_id`, p.projects)} OR ${inList(sql`er.cost_center_id`, p.costCenters)})`
+      return p.employeeId === null
+        ? sql`er.created_by_id = ${p.userId}`
+        : sql`(er.created_by_id = ${p.userId} OR EXISTS (SELECT 1 FROM expense_requests_rels rr WHERE rr.parent_id = er.id AND rr.path = 'requesters' AND rr.employees_id = ${p.employeeId}))`
+    },
+    (sites) => projectOfSitesSql(sql`er.project_id`, sites),
+  )
 }
 
 const ALIAS = /^[a-z][a-z0-9_]{0,15}$/
@@ -195,28 +236,58 @@ const aliasCol = (alias: string, column: string): SQL => {
   return sql.raw(`${alias}.${column}`)
 }
 
-/** Row filter on `cash_entries ce` (project / cost center of the entry) for the scope. */
+/** Row filter on `cash_entries ce` (project / cost center of the entry) for the scope. Site: the entry's project or account. */
 export function cashScopeSql(s: ReportScope, alias = 'ce'): SQL {
-  return orCompanies(s, aliasCol(alias, 'company_id'), (p) => {
-    if (p.kind === 'all') return sql`TRUE`
-    if (p.kind === 'team') return sql`(${inList(aliasCol(alias, 'project_id'), p.projects)} OR ${inList(aliasCol(alias, 'cost_center_id'), p.costCenters)})`
-    return null
-  })
+  return orCompanies(
+    s,
+    aliasCol(alias, 'company_id'),
+    (p) => {
+      if (p.kind === 'all') return sql`TRUE`
+      if (p.kind === 'team') return sql`(${inList(aliasCol(alias, 'project_id'), p.projects)} OR ${inList(aliasCol(alias, 'cost_center_id'), p.costCenters)})`
+      return null
+    },
+    (sites) => sql`(${projectOfSitesSql(aliasCol(alias, 'project_id'), sites)} OR ${accountOfSitesSql(aliasCol(alias, 'cash_account_id'), sites)})`,
+  )
 }
 
-/** Ledger / manual-cash rows: only PTs with an office (`all`) scope — PM: "tanpa kas manual". */
-export function ledgerScopeSql(s: ReportScope, alias = 'ce'): SQL {
-  return companyScopeSql(aliasCol(alias, 'company_id'), ledgerCompanies(s))
+/**
+ * Ledger / manual-cash rows: only PTs with an office (`all`) scope — PM: "tanpa kas manual". ADR 0023 (Q-S7): with a
+ * site filter the rows of the accounts flagged with that site (`table` = what `alias` is: a ledger row or an account).
+ */
+export function ledgerScopeSql(s: ReportScope, alias = 'ce', table: 'entry' | 'account' = alias === 'a' ? 'account' : 'entry'): SQL {
+  const ledger = (s.companies ?? []).filter((c) => c.kind === 'all')
+  if (!ledger.some((c) => c.onlySites)) return companyScopeSql(aliasCol(alias, 'company_id'), ledgerCompanies(s))
+  return orCompanies(
+    fromCompanies(ledger),
+    aliasCol(alias, 'company_id'),
+    () => sql`TRUE`,
+    (sites) => (table === 'account' ? inList(aliasCol(alias, 'site_id'), sites) : accountOfSitesSql(aliasCol(alias, 'cash_account_id'), sites)),
+  )
 }
 
 /** Projects visible in the scope (`projects p`). */
 export function projectScopeSql(s: ReportScope, alias = 'p'): SQL {
-  return orCompanies(s, aliasCol(alias, 'company_id'), (p) => (p.kind === 'all' ? sql`TRUE` : p.kind === 'team' ? inList(aliasCol(alias, 'id'), p.projects) : null))
+  return orCompanies(
+    s,
+    aliasCol(alias, 'company_id'),
+    (p) => (p.kind === 'all' ? sql`TRUE` : p.kind === 'team' ? inList(aliasCol(alias, 'id'), p.projects) : null),
+    (sites) => inList(aliasCol(alias, 'site_id'), sites),
+  )
 }
 
-/** Cost centers visible in the scope (`cost_centers cc`). */
+/** Cost centers visible in the scope (`cost_centers cc`). Site: the site's default cost center (ADR 0023 §1). */
 export function costCenterScopeSql(s: ReportScope, alias = 'cc'): SQL {
-  return orCompanies(s, aliasCol(alias, 'company_id'), (p) => (p.kind === 'all' ? sql`TRUE` : p.kind === 'team' ? inList(aliasCol(alias, 'id'), p.costCenters) : null))
+  return orCompanies(
+    s,
+    aliasCol(alias, 'company_id'),
+    (p) => (p.kind === 'all' ? sql`TRUE` : p.kind === 'team' ? inList(aliasCol(alias, 'id'), p.costCenters) : null),
+    (sites) => sql`${aliasCol(alias, 'id')} IN (SELECT sc.cost_center_id FROM sites sc WHERE ${inList(sql`sc.id`, sites)})`,
+  )
+}
+
+/** Sites of the scope's PTs (`sites s`, filter option lists): every site of a PT in the scope. */
+export function siteScopeSql(s: ReportScope, alias = 's'): SQL {
+  return companyScopeSql(aliasCol(alias, 'company_id'), scopeCompanies(s))
 }
 
 /** Per-PT masters of the scope's PTs (categories, accounts, vehicles, sources): `alias.company_id IN …`. */

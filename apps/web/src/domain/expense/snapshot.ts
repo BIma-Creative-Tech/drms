@@ -8,7 +8,18 @@ import { getRequestTx } from '@/lib/tx'
 
 import { fail, ids, type RequestDoc } from './common'
 import { displayUnitPrice } from './lines'
-import { DECISION_ROLES, DIREKTUR_ROLE, DIREKTUR_VIA_PM, DIREKTUR_VIA_PM_SELF, planPositions, ruleDecisionError, selfApprovalNote, type SelfApproval } from './decision'
+import {
+  DECISION_ROLES,
+  DIREKTUR_NO_APPROVAL,
+  DIREKTUR_ROLE,
+  DIREKTUR_VIA_PM,
+  DIREKTUR_VIA_PM_SELF,
+  isSelfApproval,
+  planPositions,
+  ruleDecisionError,
+  selfApprovalNote,
+  type SelfApproval,
+} from './decision'
 import { buildSnapshot, selectRule, type ApprovalSnapshot, type RuleInput } from './rules'
 
 /**
@@ -18,25 +29,28 @@ import { buildSnapshot, selectRule, type ApprovalSnapshot, type RuleInput } from
  * an active member of the PT; missing → 409), followed by the Direktur; Finance only transfers. The rule
  * must pass `ruleDecisionError` (legacy rules → 409); the positions are planned by `planPositions`
  * (G1-2 skip rule: a position whose only holders are requester/creator is skipped and recorded; no
- * independent decision → 409). The snapshot carries `decisionRoles` (service guard), `skipped` and,
- * for the narrow ADR 0021 G1 exception, `selfApproval`. Snapshots taken earlier keep working unchanged
- * at decision time.
+ * independent decision → 409). The snapshot carries `decisionRoles` (service guard), `skipped` and the
+ * G1 exception `selfApproval`. ADR 0024 (owner 2026-10-11): rules may be limited to requester roles
+ * ("Peran pemohon", matched per requester in the PT) and a Direktur's own request under a zero-step rule
+ * is `direktur_no_approval` (no decision position). Snapshots taken earlier keep working unchanged at
+ * decision time; a request that already carries an ADR 0021 exception (`legacy`) keeps that flow on
+ * re-approval / LPJ shortfall (zero-step rules are not considered for it).
  */
-export async function selectAndSnapshot(
-  req: PayloadRequest,
-  doc: RequestDoc,
-  opts: { allowSelfApproval?: boolean | 'pm_only' } = {},
-): Promise<{ rule: RuleInput; snapshot: ApprovalSnapshot }> {
+export async function selectAndSnapshot(req: PayloadRequest, doc: RequestDoc, opts: { legacy?: SelfApproval | null } = {}): Promise<{ rule: RuleInput; snapshot: ApprovalSnapshot }> {
   const companyId = relId((doc as { company?: unknown }).company) ?? (await contextCompanyId(req))
-  const rules = await loadActiveRules(req, 'expense_request', companyId)
+  const legacy = opts.legacy ?? null
+  const all = await loadActiveRules(req, 'expense_request', companyId)
+  const rules = legacy ? all.filter((r) => r.steps.length > 0) : all
   const projectId = relId(doc.project) ?? null
   const costCenterId = relId(doc.costCenter) ?? null
+  const requesterEmployeeIds = ids(doc.requesters)
   const rule = selectRule(rules, {
     type: doc.type,
     grandTotal: doc.grandTotal ?? 0,
     categoryIds: (doc.lines ?? []).map((l) => relId(l.category)).filter((x): x is number => x !== undefined),
     projectId,
     costCenterId,
+    requesterRoles: await requesterRolesIn(req, requesterEmployeeIds, companyId),
   })
   if (!rule) fail(409, 'Tidak ada aturan approval yang berlaku untuk pengajuan ini. Hubungi Admin.')
 
@@ -44,31 +58,59 @@ export async function selectAndSnapshot(
     projectId,
     costCenterId,
     creatorId: relId(doc.createdBy) ?? null,
-    requesterEmployeeIds: ids(doc.requesters),
-    allowSelfApproval: opts.allowSelfApproval ?? true,
+    requesterEmployeeIds,
+    legacy,
   })
   return { rule, snapshot }
 }
 
-/** ADR 0021: the expense request's scope (PM project resolution + the narrow G1 exception). */
+/** The ADR 0021 exception a request carries (re-approval / LPJ shortfall keep it), else null. */
+export function legacyExceptionOf(g1Exception: unknown): SelfApproval | null {
+  return isSelfApproval(g1Exception) ? g1Exception : null
+}
+
+/**
+ * ADR 0024 "Peran pemohon": the roles IN THE PT of each requester employee (union over its active
+ * accounts with an active membership there; an employee without such an account → []).
+ */
+export async function requesterRolesIn(req: PayloadRequest, employeeIds: readonly number[], companyId: number): Promise<Role[][]> {
+  const out: Role[][] = []
+  for (const e of employeeIds) {
+    const users = await usersOfEmployees(req, [e])
+    const roles = await rolesOfUsersIn(req, users, companyId)
+    out.push([...new Set([...roles.values()].filter((r) => r.active).flatMap((r) => r.roles))])
+  }
+  return out
+}
+
+/** ADR 0021: the expense request's scope (PM project resolution + the G1 exceptions). */
 export type SnapshotScope = {
   projectId: number | null
   costCenterId: number | null
   creatorId: number | null
   requesterEmployeeIds: readonly number[]
   /**
-   * Which ADR 0021 exception may be applied: true at submit / re-approval (either); for an LPJ shortfall
-   * only what the request itself carries (the DB trigger checks `expense_requests.g1_exception`):
-   * 'pm_only' = `direktur_via_pm` (creator PM's "Diketahui" only), false = none.
+   * ADR 0021 exception the REQUEST already carries (`expense_requests.g1_exception`; the DB trigger checks
+   * the column): re-approval / LPJ shortfall of such a request keep its flow — `direktur_via_pm_self` →
+   * either variant may be re-derived, `direktur_via_pm` → only that one. null = none (every new submit,
+   * ADR 0024: the PM no longer files for a Direktur).
    */
-  allowSelfApproval: boolean | 'pm_only'
+  legacy: SelfApproval | null
 }
 
 export const MSG_PROJECT_WITHOUT_PM = 'Project ini belum punya PM. Hubungi Admin untuk mengisi PM project.'
 export const MSG_COST_CENTER_WITHOUT_MANAGER = 'Pusat biaya ini belum punya manajer (penanggung jawab). Hubungi Admin untuk mengisi manajer pusat biaya.'
 export const MSG_PM_NOT_MEMBER = 'PM project bukan pengguna aktif di PT ini. Hubungi Admin untuk memperbarui PM project.'
-export const MSG_DIREKTUR_VIA_PM =
-  'Pengajuan untuk Direktur dibuat oleh PM project (kebijakan owner 2026-10-10): persetujuan Direktur tidak boleh terlewati. Minta PM project membuat pengajuan ini atas nama Direktur.'
+/**
+ * ADR 0024: under the PM project → Direktur model the Direktur's approval is never skipped silently. A
+ * Direktur files his own request himself (rule "Pengajuan Direktur": straight to the Finance transfer queue).
+ * Replaces the ADR 0021 text "Pengajuan untuk Direktur dibuat oleh PM project …" for new submissions.
+ */
+export const MSG_DIREKTUR_STEP_SKIPPED =
+  'Persetujuan Direktur tidak boleh terlewati: pemohon/pembuat adalah satu-satunya Direktur PT. Pengajuan Direktur dibuat dan dikirim sendiri oleh Direktur (aturan "Pengajuan Direktur": langsung ke antrian transfer Finance, kebijakan PT 2026-10-11). Hubungi Admin bila aturan itu belum ada.'
+/** ADR 0024: the no-approval path only for a Direktur's OWN request (creator = the Direktur requester). */
+export const MSG_DIREKTUR_OWN_REQUEST =
+  'Pengajuan Direktur tanpa persetujuan (langsung ke antrian transfer Finance) harus dibuat dan dikirim sendiri oleh Direktur pemohon (kebijakan PT 2026-10-11). PM / Admin / Finance tidak mengajukan atas nama Direktur.'
 
 /** PM project of the request (`projects.pm`), else the manager of its cost center (ADR 0021). */
 export async function scopeManagerOf(req: PayloadRequest, scope: Pick<SnapshotScope, 'projectId' | 'costCenterId'>): Promise<number | null> {
@@ -126,21 +168,30 @@ export async function snapshotForRule(req: PayloadRequest, rule: RuleInput, excl
   const stepHolders: number[][] = []
   for (const s of [...rule.steps].sort((a, b) => a.level - b.level)) stepHolders.push(await holders(s.approverUser ? null : s.approverRole, s.approverUser))
 
-  // ADR 0021 narrow G1 exception: a Direktur's own request filed by the PM project (creator = the PM,
-  // every requester holds Direktur in the PT) → the creator PM is not excluded from "Diketahui". Owner
-  // answer 2026-10-11 ("Utamakan Direktur lain"): when another active Direktur (not a requester) can take
-  // the Direktur step, only that Direktur decides (`direktur_via_pm`); the requester Direktur(s) are kept
-  // in the Direktur step only when no other Direktur exists (`direktur_via_pm_self`). Recorded in the
-  // snapshot, the request column `g1_exception` (DB trigger) and an `approval_policy_exception` audit row.
+  // ADR 0024: zero-step rule (requester role = Direktur only, validated by ruleDecisionError above) → a
+  // Direktur's OWN request without any decision position: every requester holds Direktur in the PT and the
+  // creator is one of them. Anyone filing for a Direktur → 409 (the PM no longer files on his behalf).
+  if (rule.steps.length === 0) {
+    const requesters = scope ? await requesterUsersAllDirektur(req, scope.requesterEmployeeIds, companyId) : null
+    if (!scope || !requesters || scope.creatorId === null || !requesters.has(scope.creatorId)) fail(409, MSG_DIREKTUR_OWN_REQUEST)
+    return { ...buildSnapshot(rule, null), acknowledge: 'none', steps: [], decisionRoles: [...DECISION_ROLES], skipped: [], selfApproval: DIREKTUR_NO_APPROVAL }
+  }
+
+  // ADR 0021 narrow G1 exception — LEGACY ONLY since ADR 0024 (a request that already carries it: re-approval
+  // / LPJ shortfall). A Direktur's request filed by the PM project (creator = the PM, every requester holds
+  // Direktur in the PT) → the creator PM is not excluded from "Diketahui". Owner answer 2026-10-11 ("Utamakan
+  // Direktur lain"): when another active Direktur (not a requester) can take the Direktur step, only that
+  // Direktur decides (`direktur_via_pm`); the requester Direktur(s) are kept in the Direktur step only when no
+  // other Direktur exists (`direktur_via_pm_self`).
   let selfApproval: SelfApproval | null = null
   let planned = planPositions({ rule, excluded, ackHolders, stepHolders })
-  if (scopeManager && scope && scope.allowSelfApproval && pm !== null && scope.creatorId === pm) {
+  if (scopeManager && scope?.legacy && pm !== null && scope.creatorId === pm) {
     const requesters = await requesterUsersAllDirektur(req, scope.requesterEmployeeIds, companyId)
     if (requesters && !requesters.has(pm)) {
       const ackExcluded = new Set([...excluded].filter((u) => u !== pm))
       const viaPm = planPositions({ rule, excluded, ackExcluded, ackHolders, stepHolders })
       const otherDirektur = viaPm.ok && !viaPm.plan.skipped.some((x) => x.position === 'approval' && x.role === DIREKTUR_ROLE)
-      if (otherDirektur || scope.allowSelfApproval === 'pm_only') {
+      if (otherDirektur || scope.legacy === DIREKTUR_VIA_PM) {
         selfApproval = DIREKTUR_VIA_PM
         planned = viaPm
       } else {
@@ -155,9 +206,8 @@ export async function snapshotForRule(req: PayloadRequest, rule: RuleInput, excl
   // independent decision must remain and every remaining position needs a different person — else 409.
   if (!planned.ok) fail(409, planned.error)
   const { plan } = planned
-  // ADR 0021: under the PM project → Direktur model the Direktur's approval is never skipped silently
-  // (a Direktur's own request is filed by the PM project, see the exception above).
-  if (scopeManager && plan.skipped.some((x) => x.position === 'approval' && x.role === DIREKTUR_ROLE)) fail(409, MSG_DIREKTUR_VIA_PM)
+  // ADR 0021 / 0024: under the PM project → Direktur model the Direktur's approval is never skipped silently.
+  if (scopeManager && plan.skipped.some((x) => x.position === 'approval' && x.role === DIREKTUR_ROLE)) fail(409, MSG_DIREKTUR_STEP_SKIPPED)
   const optionalAckUser =
     rule.acknowledge === 'optional' && rule.acknowledgeBy === 'user' && rule.acknowledgeUser && !excluded.has(rule.acknowledgeUser) ? rule.acknowledgeUser : null
   const base = buildSnapshot(rule, plan.ackRequired ? plan.ackUserId : optionalAckUser)
@@ -214,6 +264,7 @@ export async function loadActiveRules(req: PayloadRequest, docType: 'expense_req
     project: relId(r.project) ?? null,
     costCenter: relId(r.costCenter) ?? null,
     priority: (r.priority as number | null) ?? 100,
+    requesterRoles: ((r.requesterRoles as Role[] | null | undefined) ?? []).filter((x) => typeof x === 'string'),
     acknowledge: (r.acknowledge as RuleInput['acknowledge']) ?? 'none',
     acknowledgeBy: (r.acknowledgeBy as RuleInput['acknowledgeBy']) ?? 'scope_manager',
     acknowledgeRole: (r.acknowledgeRole as RuleInput['acknowledgeRole']) ?? null,
@@ -259,23 +310,18 @@ export async function auditSkipped(req: PayloadRequest, doc: RequestDoc, snapsho
 }
 
 /**
- * ADR 0021: one `approval_policy_exception` audit row when the snapshot carries the narrow G1 exception
- * (a Direktur's request filed by the PM project) — submit / re-approval.
+ * One `approval_policy_exception` audit row when the snapshot carries a G1 exception — submit /
+ * re-approval: ADR 0021 (a Direktur's request filed by the PM project, legacy) or ADR 0024
+ * (`direktur_no_approval`: a Direktur's own request straight to the Finance transfer queue).
  */
 export async function auditSelfApproval(req: PayloadRequest, doc: RequestDoc, snapshot: ApprovalSnapshot): Promise<void> {
   const note = selfApprovalNote(snapshot.selfApproval)
   if (!note) return
-  await writeAudit(req, [
-    {
-      action: 'approval_policy_exception',
-      docType: 'expense_request',
-      docId: String(doc.id),
-      docNo: doc.docNo ?? undefined,
-      field: 'g1Exception',
-      newValue: { exception: snapshot.selfApproval, pm: snapshot.acknowledgerUserId, cycle: doc.approvalCycle ?? 0 },
-      reason: note,
-    },
-  ])
+  const newValue =
+    snapshot.selfApproval === DIREKTUR_NO_APPROVAL
+      ? { exception: snapshot.selfApproval, rule: snapshot.ruleId, ruleName: snapshot.ruleName, cycle: doc.approvalCycle ?? 0 }
+      : { exception: snapshot.selfApproval, pm: snapshot.acknowledgerUserId, cycle: doc.approvalCycle ?? 0 }
+  await writeAudit(req, [{ action: 'approval_policy_exception', docType: 'expense_request', docId: String(doc.id), docNo: doc.docNo ?? undefined, field: 'g1Exception', newValue, reason: note }])
 }
 
 /** Class A snapshot of the request content (ADR 0006 §2 `expense_line_snapshots`). */

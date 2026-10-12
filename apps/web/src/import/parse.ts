@@ -29,10 +29,13 @@ export type ImportData = {
   banks: Rowed<{ code: string; name: string }>[]
   uoms: Rowed<{ code: string; name: string; category: string | null }>[]
   categories: Rowed<Pt & { code: string; name: string; coaCode: string | null; defaultUom: string | null; allowedUoms: string[]; requiresVehicle: boolean; active: boolean }>[]
-  employees: Rowed<Pt & { code: string; name: string; nickname: string | null; position: string | null; phone: string | null; active: boolean }>[]
+  /** `siteCode` (ADR 0023): "Site penempatan"; null = not given (left unchanged). */
+  employees: Rowed<Pt & { code: string; name: string; nickname: string | null; position: string | null; phone: string | null; siteCode: string | null; active: boolean }>[]
   users: Rowed<Pt & { username: string; email: string | null; name: string; employeeCode: string | null; roles: string[]; phone: string | null; active: boolean }>[]
   bankAccounts: Rowed<Pt & { employeeCode: string; bankCode: string; accountNo: string; accountHolder: string; isDefault: boolean; active: boolean }>[]
   costCenters: Rowed<Pt & { code: string; name: string; type: string; manager: string | null; lat: number | null; lng: number | null; radiusM: number | null; active: boolean }>[]
+  /** ADR 0023: sites (kantor cabang) per PT. */
+  sites: Rowed<Pt & { code: string; name: string; address: string | null; lat: number | null; lng: number | null; radiusM: number | null; costCenterCode: string | null; active: boolean }>[]
   projects: Rowed<
     Pt & {
     code: string
@@ -40,6 +43,7 @@ export type ImportData = {
     client: string | null
     address: string | null
     pm: string | null
+    siteCode: string | null
     lat: number | null
     lng: number | null
     radiusM: number | null
@@ -52,8 +56,8 @@ export type ImportData = {
   stages: Rowed<Pt & { projectCode: string; sequence: number; name: string; weightPct: number }>[]
   budgetLines: Rowed<Pt & { projectCode: string; categoryCode: string; amount: number }>[]
   vehicles: Rowed<Pt & { plateNo: string; type: string; brandModel: string | null; costCenterCode: string | null; projectCode: string | null; active: boolean }>[]
-  assignments: Rowed<Pt & { employeeCode: string; projectCode: string | null; costCenterCode: string | null; role: string; startDate: string | null; endDate: string | null }>[]
-  cashAccounts: Rowed<Pt & { name: string; kind: 'cash' | 'bank'; bankCode: string | null; accountNo: string | null; accountHolder: string | null; openingBalance: number; odooJournalCode: string | null; active: boolean }>[]
+  assignments: Rowed<Pt & { employeeCode: string; projectCode: string | null; costCenterCode: string | null; siteCode: string | null; role: string; startDate: string | null; endDate: string | null }>[]
+  cashAccounts: Rowed<Pt & { name: string; kind: 'cash' | 'bank'; bankCode: string | null; accountNo: string | null; accountHolder: string | null; openingBalance: number; odooJournalCode: string | null; siteCode: string | null; active: boolean }>[]
   /** Sheets present in the file (absent sheet = master not touched). */
   present: SheetKey[]
 }
@@ -336,6 +340,7 @@ export function emptyData(): ImportData {
     users: [],
     bankAccounts: [],
     costCenters: [],
+    sites: [],
     projects: [],
     stages: [],
     budgetLines: [],
@@ -424,6 +429,7 @@ export function parseWorkbook(wb: ReadWorkbook): ParseResult {
           nickname: S(r.values.nama_panggilan),
           position: S(r.values.jabatan),
           phone: S(r.values.no_hp),
+          siteCode: S(r.values.kode_site),
           active: B(r.values.aktif),
         }))
         dupCheck(sheet, data.employees, (r) => inPt(r.pt, r.code), 'Kode karyawan (PT / kode)', issues)
@@ -498,6 +504,26 @@ export function parseWorkbook(wb: ReadWorkbook): ParseResult {
           if (g) issues.push({ level: 'error', sheet, row: c._row, column: 'latitude', message: g })
         }
         break
+      case 'site':
+        data.sites = rows.map((r) => ({
+          _row: r.row,
+          pt: S(r.values.kode_pt),
+          code: S(r.values.kode)!,
+          name: S(r.values.nama)!,
+          address: S(r.values.alamat),
+          lat: N(r.values.latitude),
+          lng: N(r.values.longitude),
+          radiusM: N(r.values.radius_m),
+          costCenterCode: S(r.values.kode_pusat_biaya),
+          active: B(r.values.aktif),
+        }))
+        dupCheck(sheet, data.sites, (r) => inPt(r.pt, r.code), 'Kode site (PT / kode)', issues)
+        for (const x of data.sites) {
+          const g = geofenceError(x)
+          if (g) issues.push({ level: 'error', sheet, row: x._row, column: 'latitude', message: g })
+          if (x.lat === null) issues.push({ level: 'warning', sheet, row: x._row, column: 'latitude', message: 'Tanpa koordinat: absensi di site ini ditolak (NO_GEOFENCE).' })
+        }
+        break
       case 'project':
         data.projects = rows.map((r) => ({
           _row: r.row,
@@ -507,6 +533,7 @@ export function parseWorkbook(wb: ReadWorkbook): ParseResult {
           client: S(r.values.klien),
           address: S(r.values.alamat),
           pm: S(r.values.pm),
+          siteCode: S(r.values.kode_site),
           lat: N(r.values.latitude),
           lng: N(r.values.longitude),
           radiusM: N(r.values.radius_m),
@@ -565,15 +592,22 @@ export function parseWorkbook(wb: ReadWorkbook): ParseResult {
           employeeCode: S(r.values.kode_karyawan)!,
           projectCode: S(r.values.kode_project),
           costCenterCode: S(r.values.kode_pusat_biaya),
+          siteCode: S(r.values.kode_site),
           role: S(r.values.peran) ?? 'staff',
           startDate: S(r.values.tanggal_mulai),
           endDate: S(r.values.tanggal_selesai),
         }))
         for (const a of data.assignments) {
-          if ((a.projectCode === null) === (a.costCenterCode === null)) issues.push({ level: 'error', sheet, row: a._row, column: 'kode_project', message: 'Isi salah satu: kode_project ATAU kode_pusat_biaya.' })
+          if ([a.projectCode, a.costCenterCode, a.siteCode].filter((x) => x !== null).length !== 1) issues.push({ level: 'error', sheet, row: a._row, column: 'kode_project', message: 'Isi salah satu: kode_project, kode_pusat_biaya, ATAU kode_site.' })
           if (a.startDate && a.endDate && a.endDate < a.startDate) issues.push({ level: 'error', sheet, row: a._row, column: 'tanggal_selesai', message: 'Tanggal selesai sebelum tanggal mulai.' })
         }
-        dupCheck(sheet, data.assignments, (r) => inPt(r.pt, `${r.employeeCode} → ${r.projectCode ?? r.costCenterCode}`), 'Penugasan (PT / karyawan + project/pusat biaya)', issues)
+        dupCheck(
+          sheet,
+          data.assignments,
+          (r) => inPt(r.pt, `${r.employeeCode} → ${r.projectCode ?? r.costCenterCode ?? `site ${r.siteCode}`}`),
+          'Penugasan (PT / karyawan + project/pusat biaya/site)',
+          issues,
+        )
         break
       case 'akunKas':
         data.cashAccounts = rows.map((r) => ({
@@ -586,6 +620,7 @@ export function parseWorkbook(wb: ReadWorkbook): ParseResult {
           accountHolder: S(r.values.atas_nama),
           openingBalance: N(r.values.saldo_awal)!,
           odooJournalCode: S(r.values.kode_jurnal_odoo),
+          siteCode: S(r.values.kode_site),
           active: B(r.values.aktif),
         }))
         dupCheck(sheet, data.cashAccounts, (r) => inPt(r.pt, r.name.toLowerCase()), 'Nama akun (PT / nama)', issues)

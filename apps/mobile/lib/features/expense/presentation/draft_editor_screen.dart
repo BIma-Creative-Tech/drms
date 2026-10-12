@@ -237,10 +237,19 @@ class _DraftEditorScreenState extends ConsumerState<DraftEditorScreen> {
     return p.employee?.id ?? -1;
   }
 
+  /// D4: the RAP rule of the chosen project as far as the phone knows it (offline / not loaded → strict).
+  RapCheck _rapCheck() {
+    final pid = _d.projectId;
+    final rap = pid == null ? null : ref.read(projectRapProvider(pid)).value;
+    if (rap == null || rap.offline) return RapCheck.strict;
+    if (rap.missing) return RapCheck.missing;
+    return rap.pickable.isEmpty ? RapCheck.optional : RapCheck.strict;
+  }
+
   Future<void> _submit() async {
     final t = AppLocalizations.of(context);
     final draft = _collect();
-    final issues = validateForSubmit(draft, selfOnlyEmployee: _selfOnlyEmployee());
+    final issues = validateForSubmit(draft, selfOnlyEmployee: _selfOnlyEmployee(), rap: _rapCheck());
     setState(() => _issues = issues);
     if (issues.isNotEmpty) return;
     final ok = await showDialog<bool>(
@@ -263,7 +272,7 @@ class _DraftEditorScreenState extends ConsumerState<DraftEditorScreen> {
     if (sub == null) return;
     setState(() => _busy = true);
     try {
-      final detail = await ref.read(draftServiceProvider).submit(sub, _d);
+      final detail = await ref.read(draftServiceProvider).submit(sub, _d, rap: _rapCheck());
       if (!mounted) return;
       showSnack(context, t.submitted);
       ref.invalidate(requestListProvider('mine'));
@@ -302,7 +311,23 @@ class _DraftEditorScreenState extends ConsumerState<DraftEditorScreen> {
     final m = widget.masters;
     final selfOnly = _selfOnlyEmployee();
     final allEmployees = m[MasterTypes.employees] ?? const <MasterItem>[];
-    final employees = requesterChoices(allEmployees, (e) => e.id, selfOnlyEmployee: selfOnly);
+    final ownEmployee = ref.read(currentProfileProvider)?.forCompany(_d.companyId).employee?.id;
+    final employees = requesterChoices(
+      allEmployees,
+      (e) => e.id,
+      selfOnlyEmployee: selfOnly,
+      isDirektur: (e) => e.extra['direktur'] == true,
+      ownEmployee: ownEmployee,
+    );
+    // ADR 0024: the Direktur's own request in a PT with the rule "Pengajuan Direktur" → straight to Finance.
+    final account = ref.watch(accountProfileProvider);
+    final membership =
+        account?.company(_d.companyId) ?? ((account?.companies.length ?? 0) == 1 ? account!.companies.first : null);
+    final direkturNoApproval =
+        (membership?.ownRequestNoApproval ?? false) &&
+        ownEmployee != null &&
+        _d.requesterIds.length == 1 &&
+        _d.requesterIds.single == ownEmployee;
     final accounts = (m[MasterTypes.bankAccounts] ?? const [])
         .where((a) => _d.requesterIds.isEmpty || _d.requesterIds.contains((a.extra['employee'] as num?)?.toInt()))
         .toList();
@@ -310,7 +335,9 @@ class _DraftEditorScreenState extends ConsumerState<DraftEditorScreen> {
     final editableType = _d.serverId == null;
     // D4: RAP items of the chosen project (labels + live remaining budget on the line cards).
     final rap = _d.projectId == null ? null : ref.watch(projectRapProvider(_d.projectId!)).value;
-    final linesWithoutRap = _d.lines.where((l) => l.needsRapItem).length;
+    // a project without any RAP item (and not required to have one) has nothing to pick
+    final rapPickable = rap == null || rap.pickable.isNotEmpty;
+    final linesWithoutRap = rapPickable ? _d.lines.where((l) => l.needsRapItem).length : 0;
 
     return Scaffold(
       appBar: AppBar(
@@ -351,6 +378,17 @@ class _DraftEditorScreenState extends ConsumerState<DraftEditorScreen> {
                   ],
                 ),
               ),
+            if (direkturNoApproval)
+              Card(
+                key: const Key('draft-direktur-no-approval'),
+                color: Theme.of(context).colorScheme.secondaryContainer,
+                margin: const EdgeInsets.only(bottom: 12),
+                child: ListTile(
+                  leading: const Icon(Icons.info_outline),
+                  title: Text(t.draftDirekturNoApprovalInfo),
+                  subtitle: Text(t.draftDirekturNoApprovalHint),
+                ),
+              ),
             Text(t.fieldType),
             const SizedBox(height: 4),
             SegmentedButton<RequestType>(
@@ -375,6 +413,27 @@ class _DraftEditorScreenState extends ConsumerState<DraftEditorScreen> {
               errorText: issueFor('projectId'),
               onChanged: _setProject,
             ),
+            // D4 (owner 2026-10-11): project with a RAB but no RAP → submit refused; same text as the web form
+            if (rap != null && rap.missing)
+              Card(
+                key: const Key('draft-rap-missing'),
+                margin: const EdgeInsets.only(top: 4),
+                color: Theme.of(context).colorScheme.errorContainer,
+                child: ListTile(
+                  leading: Icon(Icons.block, color: Theme.of(context).colorScheme.onErrorContainer),
+                  title: Text(
+                    t.rapMissingBlock,
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      color: Theme.of(context).colorScheme.onErrorContainer,
+                    ),
+                  ),
+                  subtitle: Text(
+                    t.rapMissingBlockDetail,
+                    style: TextStyle(color: Theme.of(context).colorScheme.onErrorContainer),
+                  ),
+                ),
+              ),
             if (_d.projectId == null && widget.initial.costCenterId != null)
               Padding(
                 key: const Key('draft-cost-center-legacy'),
@@ -523,7 +582,7 @@ class _DraftEditorScreenState extends ConsumerState<DraftEditorScreen> {
                           '${t.fieldRapItem}: ${rap?.byId(l.rapItemId)?.label ?? '#${l.rapItemId}'}',
                           key: Key('line-${l.no}-rap'),
                         )
-                      else
+                      else if (rapPickable)
                         Text(
                           t.lineNeedsRapItemShort,
                           key: Key('line-${l.no}-needs-rap'),

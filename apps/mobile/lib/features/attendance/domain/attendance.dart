@@ -17,23 +17,32 @@ enum AttendanceKind {
   static AttendanceKind? fromItemType(String t) => AttendanceKind.values.where((k) => k.itemType == t).firstOrNull;
 }
 
-/// Attendance location type (E6, Q-40): a project or a cost center ("pusat biaya", e.g. an office).
+/// Attendance location type (E6, Q-40): a project, a cost center ("pusat biaya", e.g. an office) or — ADR 0023 — a
+/// site (kantor cabang of the PT, `masters.sites`).
 enum SiteKind {
-  project('project_id', 'project'),
-  costCenter('cost_center_id', 'cost_center');
+  project('project_id', 'project', 'p'),
+  costCenter('cost_center_id', 'cost_center', 'c'),
+  site('site_id', 'site', 's');
 
-  const SiteKind(this.payloadKey, this.code);
+  const SiteKind(this.payloadKey, this.code, this.prefix);
 
-  /// Key in `SyncAttendancePayload` / `SyncOnBehalfPayload` (exactly one of the two is sent).
+  /// Key in `SyncAttendancePayload` / `SyncOnBehalfPayload` (exactly one of the three is sent).
   final String payloadKey;
 
   /// `AttendanceLocationRef.type`.
   final String code;
 
-  static SiteKind fromCode(String? c) => c == 'cost_center' ? costCenter : project;
+  /// Prefix of [ProjectSite.key] (`p7`, `c3`, `s2`).
+  final String prefix;
+
+  static SiteKind fromCode(String? c) => switch (c) {
+    'cost_center' => costCenter,
+    'site' => site,
+    _ => project,
+  };
 }
 
-/// Geofence of an assigned location from the cached masters (`projects` / `cost-centers`: lat, lng,
+/// Geofence of an assigned location from the cached masters (`projects` / `cost-centers` / `sites`: lat, lng,
 /// radiusM).
 class ProjectSite {
   const ProjectSite({
@@ -44,6 +53,9 @@ class ProjectSite {
     this.radiusM,
     this.kind = SiteKind.project,
     this.companyId,
+    this.home = false,
+    this.assigned = false,
+    this.team = false,
   });
   final int id;
 
@@ -55,10 +67,19 @@ class ProjectSite {
   final double? radiusM;
   final SiteKind kind;
 
+  /// ADR 0023 (sites only, from `masters.sites`): the user's own employee is stationed here ("Site penempatan").
+  final bool home;
+
+  /// ADR 0023 (sites only): the user's own employee has an active team assignment to this site today.
+  final bool assigned;
+
+  /// ADR 0023 (sites only): the user may record "diabsenkan PM" here (PM assigned to the site / PM of a project of it).
+  final bool team;
+
   bool get hasGeofence => lat != null && lng != null && radiusM != null;
 
-  /// Unique across both kinds (`p7`, `c3`) — dropdown value.
-  String get key => '${kind == SiteKind.project ? 'p' : 'c'}$id';
+  /// Unique across the kinds (`p7`, `c3`, `s2`) — dropdown value.
+  String get key => '${kind.prefix}$id';
 
   static ProjectSite fromMaster(MasterItem m, {SiteKind kind = SiteKind.project}) {
     double? d(String k) => (m.extra[k] as num?)?.toDouble();
@@ -70,6 +91,9 @@ class ProjectSite {
       radiusM: d('radiusM'),
       kind: kind,
       companyId: m.companyId,
+      home: m.extra['home'] == true,
+      assigned: m.extra['assigned'] == true,
+      team: m.extra['team'] == true,
     );
   }
 }
@@ -99,7 +123,7 @@ enum SiteCheck { ok, outside, noGeofence, mocked }
 
 /// `SyncAttendancePayload` (openapi) with the local selfie id in [selfiePlaceholderKey]; the sync engine
 /// uploads the selfie (`POST /media/selfies`) and replaces it with `selfie_media_id` just before sending.
-/// Exactly one of `project_id` / `cost_center_id` (E6).
+/// Exactly one of `project_id` / `cost_center_id` / `site_id` (E6, ADR 0023).
 Map<String, dynamic> attendancePayload({
   required ProjectSite site,
   required LocationFix fix,

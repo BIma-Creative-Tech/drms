@@ -1,10 +1,11 @@
 import type { PayloadRequest, Where } from 'payload'
 
+import { seesMoney } from '@/access/money'
 import { companiesWithRole, relId, type Role } from '@/access/roles'
 import { companyRefs, type CompanyRef } from '@/domain/companies'
 
 import { actorContext, ids, projectCommitted, settings, type RequestDoc } from './common'
-import { isDecisionSnapshot } from './decision'
+import { isDecisionSnapshot, isNoApproval } from './decision'
 import { DEFAULT_TRANSFER_SLA_HOURS, queueAge } from './sla'
 import { suggestedCostCenter } from './transfers'
 import { withFlagVisibility } from './flag-visibility'
@@ -125,7 +126,8 @@ export async function approvalInbox(req: PayloadRequest, f?: QueueFilter) {
     const acts = allowedActions(ctx)
     const step: 'approve' | 'acknowledge' | null = acts.includes('approve') ? 'approve' : acts.includes('acknowledge') ? 'acknowledge' : null
     if (!step) continue
-    const p = d.project && typeof d.project === 'object' ? d.project : null
+    // owner 2026-10-11: RAB % only for the money roles of the request's PT (e.g. not a Staff acknowledger)
+    const p = d.project && typeof d.project === 'object' && seesMoney(req, cid) ? d.project : null
     const b = p ? budgetImpact(p.budget, await projectCommitted(req, p.id, d.id), d.grandTotal ?? 0) : { before: null, after: null }
     const decisionFlow = isDecisionSnapshot(d.approvalSnapshot)
     const snap = (d.approvalSnapshot ?? null) as ApprovalSnapshot | null
@@ -173,6 +175,8 @@ export async function transferQueue(req: PayloadRequest, f?: QueueFilter) {
       bankVerification: verification((d as { bankAccount?: unknown }).bankAccount),
       flags: await flagCounts(req, d.id),
       sla: { approvedAt, slaHours, ageHours: age?.hours ?? null, over: age?.over ?? false },
+      // ADR 0024: a Direktur's own request that reached the queue without any approval (badge)
+      noApproval: isNoApproval(d.approvalSnapshot),
     })
   }
   // needed date ascending, requests without a date last

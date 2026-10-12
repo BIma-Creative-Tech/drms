@@ -10,11 +10,13 @@ import { isOperatorOnly, isStaffOnly } from './roles'
  * default `overrideEntityVisibility = true`). It does NOT affect the REST/Local API — data access
  * stays with the access functions (defence in depth, not a guard).
  *
- * Staff-only users see just these collections (own requests, their receipts, the LPJ of their requests,
- * their notifications, their own profile). Everything else — masters, finance, system, media libraries — is hidden.
+ * Staff-only users see just these collections (their projects, own requests, their receipts, the LPJ of their
+ * requests, their notifications, their own profile). Everything else — masters, finance, system, media libraries — is hidden.
  */
 // Owner request 2026-10-09 ("LPJ belum ada di staff"): `settlements` (the LPJ records of the own requests) added.
-export const STAFF_VISIBLE_COLLECTIONS: readonly string[] = ['expense-requests', 'receipts', 'settlements', 'notifications', 'users']
+// Owner decision 2026-10-11: `projects` — the Staff's assigned projects, read-only and without money (RAB hidden by
+// field access, access/money.ts; tabs Proyek / RAP / Pengajuan, no Pinjaman).
+export const STAFF_VISIBLE_COLLECTIONS: readonly string[] = ['projects', 'expense-requests', 'receipts', 'settlements', 'notifications', 'users']
 
 /**
  * Operator/Anggota-only users (owner decision 2026-10-09: "hanya untuk melakukan absensi") see

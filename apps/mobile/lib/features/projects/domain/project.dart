@@ -46,11 +46,14 @@ class ProjectSummary {
     this.contractValue,
     this.progressPct,
     this.costCenter,
+    this.site,
     this.rapPlanned,
     this.rapRealised,
     this.rapPercentServer,
     this.rapOverBudgetItems,
     this.rapItems = 0,
+    this.rapRequired = false,
+    this.rapMissing = false,
   });
 
   final int id;
@@ -73,12 +76,21 @@ class ProjectSummary {
   /// D2: default cost center of the project (proposed to Finance at the transfer).
   final RefItem? costCenter;
 
+  /// ADR 0023: the site (kantor cabang) that handles the project; null = none (or a server before sites).
+  final RefItem? site;
+
   /// D4: Σ planned / realised RAP money and % (price roles only; null otherwise).
   final int? rapPlanned;
   final int? rapRealised;
   final double? rapPercentServer;
   final int? rapOverBudgetItems;
   final int rapItems;
+
+  /// D4 (owner 2026-10-11): the project has a RAB (or is konstruksi) → a RAP is required before requests can be sent.
+  final bool rapRequired;
+
+  /// [rapRequired] and no active RAP item yet → requests cannot be submitted ("Project belum punya RAP — hubungi PM").
+  final bool rapMissing;
 
   String get label => code.isEmpty ? name : '$code — $name';
   String get statusText => statusLabel ?? ProjectStatus.labelOf(status);
@@ -128,6 +140,7 @@ class ProjectDetail {
   final RapSummary rap;
 
   RefItem? get costCenter => project.costCenter;
+  RefItem? get site => project.site;
 }
 
 /// One RAP item with its cost realisation (D4): `GET /projects/{id}/rap` `items[]`. Money fields are null when

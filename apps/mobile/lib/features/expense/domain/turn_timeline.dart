@@ -30,8 +30,11 @@ List<TimelineStep> buildTimeline(ExpenseDetail d) {
   final steps = <TimelineStep>[];
   final submitted = d.status != RequestStatus.draft;
   final pmFlow = d.approvalRule?.pmApproval ?? false;
+  // ADR 0024: a Direktur's own request without approval reads like the web: Diajukan → Persetujuan (dilewati,
+  // "Tanpa persetujuan — pengajuan Direktur (kebijakan PT)") → Transfer Finance.
+  final noApproval = d.approvalRule?.noApproval ?? false;
 
-  if (pmFlow) {
+  if (pmFlow || noApproval) {
     // web: one "Diajukan" step; the creator is named in the note when it is someone else
     final diajukan = find(SignPosition.diajukan);
     final dibuat = find(SignPosition.dibuat);
@@ -57,6 +60,12 @@ List<TimelineStep> buildTimeline(ExpenseDetail d) {
             : TimelineStep(title: title, state: submitted ? TurnState.skipped : TurnState.current),
       );
     }
+  }
+
+  if (noApproval) {
+    steps.add(const TimelineStep(title: noApprovalStepTitle, state: TurnState.skipped, note: noApprovalNote));
+    steps.add(_transferStep(d, submitted: submitted, rejected: false));
+    return steps;
   }
 
   final rule = d.approvalRule;
@@ -162,6 +171,10 @@ TimelineStep _transferStep(ExpenseDetail d, {required bool submitted, required b
 
 /// ADR 0013 G1-2 wording (web PDF/Riwayat use the same text).
 const skippedNote = '(tidak berlaku — pemohon)';
+
+/// ADR 0024 step of a request without approval (web `NO_APPROVAL_STEP_TITLE` / `NO_APPROVAL_NOTE`).
+const noApprovalStepTitle = 'Persetujuan';
+const noApprovalNote = 'Tanpa persetujuan — pengajuan Direktur (kebijakan PT)';
 
 /// "Diketahui" position title: PM project approval since ADR 0021 (checked FIRST — those snapshots
 /// also carry decision roles), Direktur approval under ADR 0013, PM on pre-E1 snapshots.

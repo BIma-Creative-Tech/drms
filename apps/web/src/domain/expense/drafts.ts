@@ -6,10 +6,10 @@ import { resolveScope } from '@/access/scope'
 
 import { actorContext, fail, ids, loadRaw, loadVisible, requireAction, type RequestDoc } from './common'
 import { rapRequirement } from '@/domain/rap/budget'
+import { RAP_MISSING_MESSAGE } from '@/domain/rap/rules'
 
 import { normalizeLines, validateLines } from './lines'
 import { copyReceiptsForResubmit } from './receipts'
-import { requesterUsersAllDirektur, scopeManagerOf } from './snapshot'
 import { isBusinessDate, type RequestType } from './types'
 
 export type LineInputApi = {
@@ -193,20 +193,12 @@ export async function validateContent(
   // request (also at submit, so an older draft that breaks the rule cannot be sent) and for a Staff-only
   // caller who changes the requesters of someone else's draft. Before Q-09 (clearer message for Staff).
   if (uniq.length > 0) await assertStaffSelfOnly(req, uniq, ownPt, opts)
-  // ADR 0021 (owner decision 2026-10-10): a Direktur's own request is filed by the PM project of the
-  // request's project (cost center: its manager) on the Direktur's behalf — requesters = Direktur(s) of
-  // the PT only, creator = that PM. Approval then runs PM → Direktur under the narrow G1 exception.
-  const pmForDirektur =
-    !onBehalf &&
-    ownPt !== undefined &&
-    userId(req) === opts.creatorId &&
-    uniq.length > 0 &&
-    (await scopeManagerOf(req, { projectId: c.projectId ?? null, costCenterId: c.projectId ? null : (c.costCenterId ?? null) })) === opts.creatorId &&
-    (await requesterUsersAllDirektur(req, uniq, ownPt)) !== null
-  if (!onBehalf && !pmForDirektur) {
+  // ADR 0024 (owner decision 2026-10-11): the PM no longer files on a Direktur's behalf (ADR 0021
+  // `direktur_via_pm` withdrawn) — a Direktur files his own request (zero-step rule → Finance transfer queue).
+  if (!onBehalf) {
     const creatorEmp = ownPt !== undefined ? employeeIn(req, ownPt) : relId((req.user as { employee?: unknown } | null)?.employee)
     if (userId(req) === opts.creatorId && (creatorEmp === undefined || (uniq.length > 0 && !uniq.includes(creatorEmp)))) {
-      fail(403, 'Hanya Admin/Finance yang boleh membuat pengajuan atas nama orang lain (PM project: hanya atas nama Direktur, ADR 0021).')
+      fail(403, 'Hanya Admin/Finance yang boleh membuat pengajuan atas nama orang lain.')
     }
   }
 
@@ -258,7 +250,8 @@ export async function validateContent(
 /**
  * D4 (owner 2026-10-11): every line names a RAP item OF THE REQUEST's PROJECT. Draft: a chosen item must belong to the
  * project; submit: required on every line when the project has a RAP, an inactive item must be replaced, and a
- * konstruksi project without RAP cannot send requests yet (the PM / Direktur fills the RAP first).
+ * project that needs a RAP (any kind with a RAB, or konstruksi — "RAP wajib untuk semua proyek yang punya RAB") but has
+ * none cannot send requests yet (the PM / Direktur fills the RAP first). Requests sent before stay valid.
  */
 async function rapLineErrors(req: PayloadRequest, projectId: number | null, lines: LineInputApi[], forSubmit: boolean): Promise<Array<{ path: string; message: string }>> {
   const errors: Array<{ path: string; message: string }> = []
@@ -271,8 +264,8 @@ async function rapLineErrors(req: PayloadRequest, projectId: number | null, line
   }
   if (!chosen && !forSubmit) return errors
   const rap = await rapRequirement(req, projectId)
-  if (forSubmit && !rap.hasRap && rap.konstruksi) {
-    errors.push({ path: 'projectId', message: 'Project konstruksi ini belum punya RAP. Minta PM / Direktur mengisi RAP project dulu.' })
+  if (forSubmit && !rap.hasRap && rap.required) {
+    errors.push({ path: 'projectId', message: RAP_MISSING_MESSAGE })
   }
   lines.forEach((l, i) => {
     const item = l.rapItemId ? rap.items.get(l.rapItemId) : undefined

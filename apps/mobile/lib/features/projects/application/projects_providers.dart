@@ -67,8 +67,9 @@ final projectDetailProvider = FutureProvider.autoDispose.family<ProjectDetail, i
   (ref, id) => ref.watch(projectsApiProvider).detail(id),
 );
 
-/// Tab "Pengajuan" of a project: `GET /expense-requests?project=` with search + status filter.
-typedef ProjectRequestsArgs = ({int projectId, String q, String? status});
+/// Tab "Pengajuan" of a project: `GET /expense-requests?project=` with search + status filter; [mine] = only the
+/// caller's own requests (Staff, owner decision 2026-10-11).
+typedef ProjectRequestsArgs = ({int projectId, String q, String? status, bool mine});
 
 final projectRequestsProvider = AsyncNotifierProvider.autoDispose
     .family<ProjectRequests, PagedState<ExpenseSummary>, ProjectRequestsArgs>(ProjectRequests.new);
@@ -79,7 +80,9 @@ class ProjectRequests extends AsyncNotifier<PagedState<ExpenseSummary>> {
 
   @override
   Future<PagedState<ExpenseSummary>> build() async {
-    final first = await ref.watch(projectsApiProvider).requests(args.projectId, q: args.q, status: args.status);
+    final first = await ref
+        .watch(projectsApiProvider)
+        .requests(args.projectId, q: args.q, status: args.status, mine: args.mine);
     return const PagedState<ExpenseSummary>().append(first);
   }
 
@@ -92,7 +95,14 @@ class ProjectRequests extends AsyncNotifier<PagedState<ExpenseSummary>> {
     try {
       final next = await ref
           .read(projectsApiProvider)
-          .requests(args.projectId, q: args.q, status: args.status, page: cur.page + 1, cursor: cur.nextCursor);
+          .requests(
+            args.projectId,
+            q: args.q,
+            status: args.status,
+            mine: args.mine,
+            page: cur.page + 1,
+            cursor: cur.nextCursor,
+          );
       state = AsyncData(cur.append(next));
     } on Object {
       state = AsyncData(cur);
@@ -103,8 +113,15 @@ class ProjectRequests extends AsyncNotifier<PagedState<ExpenseSummary>> {
 
 /// RAP items of a project for the line editor (D4) and the "RAP" tab.
 class RapLoad {
-  const RapLoad(this.items, {this.offline = false});
+  const RapLoad(this.items, {this.offline = false, this.required = false});
   final List<RapBudgetItem> items;
+
+  /// D4 (owner 2026-10-11): the project has a RAB (or is konstruksi) → it needs a RAP before a request can be sent
+  /// (server `rapRequired`; false offline / on an older server — the server still refuses the submit).
+  final bool required;
+
+  /// Required but no active item → "Project belum punya RAP — hubungi PM" (submit refused by the server).
+  bool get missing => required && pickable.isEmpty;
 
   /// From the offline cache: codes and names only, no money (remaining budget unknown).
   final bool offline;
@@ -124,7 +141,8 @@ final projectRapProvider = FutureProvider.autoDispose.family<RapLoad, int>((ref,
   final sub = ref.watch(currentSubProvider);
   final db = ref.watch(databaseProvider);
   try {
-    final items = await ref.watch(projectsApiProvider).rap(projectId);
+    final rap = await ref.watch(projectsApiProvider).rap(projectId);
+    final items = rap.items;
     if (sub != null) {
       await db.kvPut(
         rapCacheKey(sub, projectId),
@@ -134,7 +152,7 @@ final projectRapProvider = FutureProvider.autoDispose.family<RapLoad, int>((ref,
         ]),
       );
     }
-    return RapLoad(items);
+    return RapLoad(items, required: rap.required);
   } on NetworkException {
     final cached = sub == null ? null : await db.kvGet(rapCacheKey(sub, projectId));
     if (cached == null) rethrow;

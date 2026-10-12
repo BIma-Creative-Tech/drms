@@ -37,7 +37,8 @@ import {
   type ProjectBudget,
 } from './kpi'
 import { addMonths, firstDay, lastDay } from './rules'
-import { ownScope, roleScope, scopeCompanies, teamScope, type ReportScope } from './scope'
+import { narrowToSite, ownScope, roleScope, scopeCompanies, teamScope, type ReportScope } from './scope'
+import { cashBySite, scopeSiteOptions, siteSummaries } from './sites'
 import { pipelineFromStatus, topWithOther } from './viz'
 
 /**
@@ -151,9 +152,16 @@ async function completenessByCompany(req: PayloadRequest, scope: ReportScope, fr
   }))
 }
 
-export async function ownerDashboard(req: PayloadRequest, opts: { months?: number; accountId?: number } = {}) {
+/**
+ * ADR 0023 §5: `siteId` = the dashboard "Site" filter (next to the PT switcher) — narrows every scope-based card to
+ * that site (requests / projects through the project's site, cash through the account's site flag); the per-PT
+ * queues and closings keep their meaning. `sites` (filter options) and the per-site cash rows come from the
+ * UN-narrowed scope.
+ */
+export async function ownerDashboard(req: PayloadRequest, opts: { months?: number; accountId?: number; siteId?: number } = {}) {
   const ctx = await reportContext(req)
-  const ALL = await roleScope(req, ['pk-owner'])
+  const BASE = await roleScope(req, ['pk-owner'])
+  const ALL = narrowToSite(BASE, opts.siteId)
   const pts = scopeCompanies(ALL)
   const months = opts.months === 6 ? 6 : 12
   const flowRange = { from: addMonths(ctx.month, -(months - 1)), to: ctx.month, accountId: opts.accountId }
@@ -177,10 +185,13 @@ export async function ownerDashboard(req: PayloadRequest, opts: { months?: numbe
   )
   const completeness = await completenessByCompany(req, ALL, firstDay(ctx.month), lastDay(ctx.month), lpj)
   const monthPt = flowsByCompany(balances.accounts, monthOps, pts)
+  const siteOpts = await scopeSiteOptions(req, BASE)
+  const siteCash = siteOpts.length ? cashBySite(siteOpts, visibleAccounts((await cashBalances(req, BASE, ctx.today)).accounts)) : []
   return {
     asOf: ctx.today,
     month: ctx.month,
     companies,
+    sites: { options: siteOpts, selected: opts.siteId && siteOpts.some((x) => x.id === opts.siteId) ? opts.siteId : null, cash: siteCash, summary: siteOpts.length && !opts.siteId ? await siteSummaries(req, BASE, siteOpts, siteCash, ctx) : [] },
     cash: {
       total: balances.total,
       accounts: visibleAccounts(balances.accounts).map((a) => ({ id: a.id, companyId: a.companyId, name: a.name, active: a.active, balance: a.balance })),
@@ -227,9 +238,10 @@ export async function ownerDashboard(req: PayloadRequest, opts: { months?: numbe
   }
 }
 
-export async function financeDashboard(req: PayloadRequest) {
+export async function financeDashboard(req: PayloadRequest, opts: { siteId?: number } = {}) {
   const ctx = await reportContext(req)
-  const ALL = await roleScope(req, ['pk-finance'])
+  const BASE = await roleScope(req, ['pk-finance'])
+  const ALL = narrowToSite(BASE, opts.siteId)
   const pts = scopeCompanies(ALL)
   const from = addMonths(ctx.month, -5)
   const [queue, lpj, balances, monthBook, flows, lastClosed, disbursed, statuses, categories, recent, queueTop, companies] = await inSequence(
@@ -247,10 +259,17 @@ export async function financeDashboard(req: PayloadRequest) {
     () => companyRefs(req, pts),
   )
   const completeness = await completenessByCompany(req, ALL, firstDay(ctx.month), lastDay(ctx.month), lpj)
+  const siteOpts = await scopeSiteOptions(req, BASE)
   return {
     asOf: ctx.today,
     month: ctx.month,
     companies,
+    // ADR 0023 Q-S7: per-site cash balance (accounts flagged with a site) + the site filter
+    sites: {
+      options: siteOpts,
+      selected: opts.siteId && siteOpts.some((x) => x.id === opts.siteId) ? opts.siteId : null,
+      cash: siteOpts.length ? cashBySite(siteOpts, visibleAccounts((await cashBalances(req, BASE, ctx.today)).accounts)) : [],
+    },
     transferQueue: queue,
     reimburseToVerify: { count: queue.reimburseToVerify, warnings: queue.reimburseToVerifyWarnings },
     lpjToVerify: lpj.lpjToVerify,
@@ -276,9 +295,11 @@ export async function financeDashboard(req: PayloadRequest) {
   }
 }
 
-export async function pmDashboard(req: PayloadRequest) {
+export async function pmDashboard(req: PayloadRequest, opts: { siteId?: number } = {}) {
   const ctx = await reportContext(req)
-  const scope = await teamScope(req)
+  const BASE = await teamScope(req)
+  // ADR 0023 §5: the site filter narrows the team scope (a PM still sees only team projects)
+  const scope = narrowToSite(BASE, opts.siteId)
   const pts = scopeCompanies(scope)
   const from = addMonths(ctx.month, -5)
   const [mine, month, lpjRows, projects, costCenters, latest, trend, statuses, categories, waiting, companies] = await inSequence(
@@ -295,10 +316,12 @@ export async function pmDashboard(req: PayloadRequest) {
     () => companyRefs(req, pts),
   )
   const monthPt = pts.length <= 1 ? pts.map((c) => ({ companyId: c, value: month })) : await perCompany(scope, (s) => teamMonth(req, s, ctx.month))
+  const siteOpts = await scopeSiteOptions(req, BASE)
   return {
     asOf: ctx.today,
     month: ctx.month,
     companies,
+    sites: { options: siteOpts, selected: opts.siteId && siteOpts.some((x) => x.id === opts.siteId) ? opts.siteId : null },
     hasScope: scope.kind === 'team' && (scope.projects.length > 0 || scope.costCenters.length > 0),
     /** ADR 0021: the PM's own "Persetujuan PM" steps (0 on Direktur → Finance requests, ADR 0013). */
     waitingForMe: mine.count,

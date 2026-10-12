@@ -30,7 +30,7 @@ import { withReqTransaction } from '@/lib/system-tx'
 import { DEFAULT_TZ } from '@/lib/time'
 import { getRequestTx } from '@/lib/tx'
 
-import { AttendanceReject, recordAttendance, userOfEmployee } from '@/domain/attendance/record'
+import { AttendanceReject, LOCATION_COLLECTION, locationOf, recordAttendance, userOfEmployee } from '@/domain/attendance/record'
 
 import { attendanceTimeOf, employeeOfUser } from './attendance'
 import { judgeTime, type TimeVerdict } from './clock'
@@ -128,6 +128,8 @@ export async function itemCompany(req: PayloadRequest, item: SyncItemIn): Promis
   if (pid !== undefined) return (await companyOf(req, 'projects', pid)) ?? null
   const cc = posId(p.cost_center_id)
   if (cc !== undefined) return (await companyOf(req, 'cost-centers', cc)) ?? null
+  const site = posId(p.site_id) // ADR 0023: attendance at a site
+  if (site !== undefined) return (await companyOf(req, 'sites', site)) ?? null
   const byUuid = async (collection: CollectionSlug, uuid: unknown): Promise<number | null> => {
     if (typeof uuid !== 'string' || !/^[0-9a-f-]{36}$/i.test(uuid)) return null
     const r = await req.payload.find({ collection, where: { clientUuid: { equals: uuid } }, depth: 0, limit: 1, pagination: false, overrideAccess: true /* SYSTEM-READ: PT of an offline id */, req })
@@ -493,7 +495,8 @@ async function applyAttendance(c: ItemCtx, verdict: TimeVerdict, receivedAt: Dat
   const p = onBehalf ? parsePayload(SyncOnBehalfPayload, item.payload) : parsePayload(SyncAttendancePayload, item.payload)
   // ADR 0016 D1: the caller's employee IN THE LOCATION's PT (one employee per PT)
   // QA-MC4-14: a location of an unmapped PT is treated like a missing one (recordAttendance → NOT_FOUND)
-  const locRaw = await companyOf(req, p.project_id !== undefined ? 'projects' : 'cost-centers', p.project_id ?? p.cost_center_id!)
+  const location = locationOf(p)
+  const locRaw = await companyOf(req, LOCATION_COLLECTION[location.type], location.id)
   const locCompany = isMapped(req, locRaw) ? locRaw : undefined
   const own = locCompany !== undefined ? employeeIn(req, locCompany) : await employeeOfUser(req, uid)
   let employee: number
@@ -522,7 +525,7 @@ async function applyAttendance(c: ItemCtx, verdict: TimeVerdict, receivedAt: Dat
       kind: onBehalf ? (p as SyncOnBehalf).kind : item.type === 'attendance.check_out' ? 'check_out' : 'check_in',
       employee,
       user,
-      location: p.project_id !== undefined ? { type: 'project', id: p.project_id } : { type: 'cost_center', id: p.cost_center_id! },
+      location,
       lat: p.lat,
       lng: p.lng,
       accuracyM: p.accuracy_m ?? null,

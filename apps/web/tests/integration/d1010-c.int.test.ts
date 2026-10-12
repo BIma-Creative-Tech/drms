@@ -71,6 +71,8 @@ describe('D2: no non-project requests', () => {
     const u = await api('PATCH', `${E}/${id}`, w.users.staffA, { projectId: w.project })
     expect(u.status, JSON.stringify(u.body)).toBe(200)
     expect(u.body).toMatchObject({ projectId: w.project, costCenterId: null })
+    // D4 (2026-10-11): the project has a RAB → its lines need a RAP item before the submit (legacy lines had none)
+    await sqlAs('app', 'UPDATE expense_requests_lines SET rap_item_id = $1 WHERE _parent_id = $2', [w.rap.project, id])
     expect((await api('POST', `${E}/${id}/submit`, w.users.staffA, {})).status).toBe(200)
   })
 })
@@ -164,8 +166,9 @@ describe('D4: RAP item per line, plan vs realisation, "Melebihi RAP"', () => {
 
   it('no default cost center and none chosen → 400 costCenterId; a cost center of another PT → 400', async () => {
     const c = await api('POST', E, w.users.staffA, draftBody(w, { projectId: bare, lines: [rapLine(null, 50_000)] }))
-    // `bare` has no RAP → a legacy-free path: make it a plain (umum) project for this check
-    await sqlAs('owner', 'UPDATE projects SET kind = $1 WHERE id = $2', ['umum', bare])
+    // `bare` has no RAP → a legacy-free path: make it a plain (umum) project WITHOUT RAB for this check (D4 2026-10-11:
+    // a project with a RAB needs a RAP whatever its kind)
+    await sqlAs('owner', 'UPDATE projects SET kind = $1, budget = NULL WHERE id = $2', ['umum', bare])
     expect((await api('POST', `${E}/${c.body.id}/submit`, w.users.staffA, {})).status).toBe(200)
     expect((await api('POST', `${E}/${c.body.id}/acknowledge`, w.users.owner, {})).status).toBe(200)
     expect((await api('POST', `${E}/${c.body.id}/approve`, w.users.finance, {})).status).toBe(200)

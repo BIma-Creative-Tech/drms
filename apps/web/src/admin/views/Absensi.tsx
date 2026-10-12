@@ -12,7 +12,7 @@ import { matchesQuery, spValue } from '@/admin/list-query'
 import { Icon as Glyph } from '@/admin/modules/Icon'
 import type { DayRecap, LocationDay, LocationRef, RecapSummary, TeamTodayRow } from '@/domain/attendance/aggregate'
 import { classCounts, classifyDay, DAY_CLASSES, LEGEND, minutesText, monthWeeks, offsetText, shiftMonth, type DayClass } from '@/domain/attendance/calendar'
-import { attendanceContext, attendanceScope, employeeRef, myAssignedLocations, narrowAttScope, narrowAttToCompanies, type AttScope } from '@/domain/attendance/queries'
+import { attendanceContext, attendanceScope, employeeRef, myAssignedLocations, narrowAttScope, narrowAttToCompanies, narrowAttToSite, type AttScope } from '@/domain/attendance/queries'
 import { dayRowsAt } from '@/domain/attendance/record'
 import type { ScheduleSnapshot } from '@/domain/attendance/schedule'
 import { employeeRecap, myRecap, teamTodayFor, type MonthlyRecap, type TeamTodayResult } from '@/domain/attendance/service'
@@ -118,6 +118,7 @@ export const ABSENSI_STYLE = `
 .pk-f3 .pk-chip, .pk-chip { display: inline-flex; align-items: center; gap: 4px; padding: 1px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; border: 1px solid var(--pk-border); color: var(--pk-muted-fg); background: var(--pk-card); white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
 .pk-f3 .pk-chip.proj::before { content: 'P'; font-size: 9px; font-weight: 800; color: var(--pk-primary); }
 .pk-f3 .pk-chip.cc::before { content: 'PB'; font-size: 9px; font-weight: 800; color: var(--pk-tone-warn-text); }
+.pk-f3 .pk-chip.site::before { content: 'S'; font-size: 9px; font-weight: 800; color: var(--pk-tone-ok-text); }
 .pk-f3 .pk-split3 { display: flex; height: 10px; gap: 2px; margin: 10px 0 4px; }
 .pk-f3 .pk-split3 > span { min-width: 2px; } .pk-f3 .pk-split3 > span:first-child { border-radius: 999px 2px 2px 999px; } .pk-f3 .pk-split3 > span:last-child { border-radius: 2px 999px 999px 2px; }
 .pk-f3 .pk-split3 .b { background: var(--viz-mute); } .pk-f3 .pk-split3 .h { background: var(--viz-soft); } .pk-f3 .pk-split3 .s { background: var(--viz-strong); }
@@ -310,7 +311,7 @@ function MemberCard({ m, tz, month, pt }: { m: TeamTodayRow; tz: string; month: 
       ) : null}
       <div className="tags">
         {where.map((l) => (
-          <span key={`${l.type}:${l.id}`} className={`pk-chip ${l.type === 'project' ? 'proj' : 'cc'}`} title={`${l.type === 'project' ? 'Project' : 'Pusat biaya'} ${locLabel(l)}`}>
+          <span key={`${l.type}:${l.id}`} className={`pk-chip ${LOC_CHIP[l.type]}`} title={`${LOC_TITLE[l.type]} ${locLabel(l)}`}>
             {locLabel(l)}
           </span>
         ))}
@@ -322,21 +323,43 @@ function MemberCard({ m, tz, month, pt }: { m: TeamTodayRow; tz: string; month: 
   )
 }
 
+/** ADR 0023: location chip / label per location type (project, pusat biaya, site = kantor cabang). */
+const LOC_CHIP: Record<'project' | 'cost_center' | 'site', string> = { project: 'proj', cost_center: 'cc', site: 'site' }
+const LOC_TITLE: Record<'project' | 'cost_center' | 'site', string> = { project: 'Project', cost_center: 'Pusat biaya', site: 'Site' }
+
+/** ADR 0023 §5: "Site" filter of the attendance views (hidden while the PTs have no site). */
+function SiteSelect({ options, value, all = 'Semua site' }: { options: Array<{ id: number; label: string }>; value: number | undefined; all?: string }) {
+  if (options.length === 0) return null
+  return (
+    <label>
+      Site
+      <select name="site" defaultValue={String(value ?? '')} data-pk-filter-site>
+        <option value="">{all}</option>
+        {options.map((o) => (
+          <option key={o.id} value={o.id}>
+            {o.label}
+          </option>
+        ))}
+      </select>
+    </label>
+  )
+}
+
 export async function AbsensiToday(props: AdminViewServerProps) {
   const req = props.initPageResult.req
   const sp = (props.searchParams ?? {}) as SP
   if (foreignPtParam(req, props.searchParams)) return <PtNotAllowed props={props} title="Absensi hari ini" />
   const pt = await ptView(req)
-  let data: { scope: AttScope | null; r: TeamTodayResult | null; loc: { projects: Opt[]; costCenters: Opt[] }; today: string; lateCount: number; pts: number[]; chosen: number | undefined } | null = null
+  let data: { scope: AttScope | null; r: TeamTodayResult | null; loc: { projects: Opt[]; costCenters: Opt[]; sites: Opt[] }; today: string; lateCount: number; pts: number[]; chosen: number | undefined } | null = null
   try {
     data = await withReqTransaction(req, async () => {
       const scope = await attendanceScope(req)
       const ctx = await attendanceContext(req)
       const pts = scopePts(scope, pt)
       const chosen = ptParam(sp, pts)
-      if (!scope) return { scope, r: null, loc: { projects: [], costCenters: [] }, today: ctx.today, lateCount: 0, pts, chosen }
+      if (!scope) return { scope, r: null, loc: { projects: [], costCenters: [], sites: [] }, today: ctx.today, lateCount: 0, pts, chosen }
       const date = /^\d{4}-\d{2}-\d{2}$/.test(one(sp, 'tanggal')) && one(sp, 'tanggal') <= ctx.today ? one(sp, 'tanggal') : ctx.today
-      const r = await teamTodayFor(req, { date, projectId: idParam(sp, 'project'), costCenterId: idParam(sp, 'pusat'), companyIds: chosen ? [chosen] : undefined })
+      const r = await teamTodayFor(req, { date, projectId: idParam(sp, 'project'), costCenterId: idParam(sp, 'pusat'), siteId: idParam(sp, 'site'), companyIds: chosen ? [chosen] : undefined })
       return { scope, r, loc: await scopeLocations(req, scope), today: ctx.today, lateCount: r.members.filter((m) => m.lateMinutes > 0).length, pts, chosen }
     })
   } catch (err) {
@@ -359,7 +382,7 @@ export async function AbsensiToday(props: AdminViewServerProps) {
   const month = r.date.slice(0, 7)
   // DRMS 10/10 D8: name/code search over the board (the KPI tiles keep counting the whole team)
   const search = spValue(props.searchParams, 'q').slice(0, 100)
-  const filtered = Boolean(idParam(sp, 'project') || idParam(sp, 'pusat') || chosen || search)
+  const filtered = Boolean(idParam(sp, 'project') || idParam(sp, 'pusat') || idParam(sp, 'site') || chosen || search)
   const col = (key: 'belum_absen' | 'hadir' | 'selesai', title: string, note: string) => {
     const list = r.members.filter((m) => m.status === key && matchesQuery([m.employee.name, m.employee.code], search))
     return (
@@ -419,6 +442,7 @@ export async function AbsensiToday(props: AdminViewServerProps) {
             ))}
           </select>
         </label>
+        <SiteSelect options={ptOptions(loc.sites, pt, chosen)} value={idParam(sp, 'site')} />
         <button type="submit" className="pk-kbtn primary">
           Terapkan
         </button>
@@ -480,7 +504,7 @@ export async function AbsensiToday(props: AdminViewServerProps) {
         </div>
       )}
       <p className="pk-note">
-        Waktu = zona perusahaan ({r.timezone}), memakai koreksi terakhir (T10). Lokasi: <span className="pk-chip proj">project</span> <span className="pk-chip cc">pusat biaya</span> tempat absen (atau yang
+        Waktu = zona perusahaan ({r.timezone}), memakai koreksi terakhir (T10). Lokasi: <span className="pk-chip proj">project</span> <span className="pk-chip cc">pusat biaya</span> <span className="pk-chip site">site</span> tempat absen (atau yang
         ditugaskan bila belum absen).
       </p>
     </Frame>
@@ -624,7 +648,7 @@ export async function AbsensiAbsen(props: AdminViewServerProps) {
             const r = rows.find((x) => x.kind === k)
             return r ? formatServerTime(String(r.effective_time), ctx.timeZone) : null
           }
-          return { type: l.type, id: l.id, label: `${l.code} ${l.name}`, checkIn: at('check_in'), checkOut: at('check_out') }
+          return { type: l.type, id: l.id, label: `${l.code} ${l.name}`, checkIn: at('check_in'), checkOut: at('check_out'), ...(l.home ? { home: true } : {}) }
         }),
       )
       const privacyBlocked = uid === undefined ? false : (await privacyAckCheck(req, uid)).required
@@ -660,7 +684,7 @@ type RekapData = {
   canCorrect: boolean
   own: boolean
   grid: Awaited<ReturnType<typeof teamMonth>> | null
-  loc: { projects: Opt[]; costCenters: Opt[] }
+  loc: { projects: Opt[]; costCenters: Opt[]; sites: Opt[] }
 }
 
 export async function AbsensiRekap(props: AdminViewServerProps) {
@@ -682,7 +706,7 @@ export async function AbsensiRekap(props: AdminViewServerProps) {
       const to = lastDay(month)
       const empId = idParam(sp, 'karyawan')
       const ownEmp = relId((req.user as { employee?: unknown } | null)?.employee)
-      const base = { pt, pts, chosen, scope, today: ctx.today, tz: ctx.timeZone, month, history: [], selfies: new Map<number, boolean>(), canCorrect: false, own: false, grid: null, loc: { projects: [], costCenters: [] } }
+      const base = { pt, pts, chosen, scope, today: ctx.today, tz: ctx.timeZone, month, history: [], selfies: new Map<number, boolean>(), canCorrect: false, own: false, grid: null, loc: { projects: [], costCenters: [], sites: [] } }
       if (!scope) {
         // Staff: own recap only (US-09).
         const recap = ownEmp !== undefined ? await myRecap(req, month) : null
@@ -692,7 +716,8 @@ export async function AbsensiRekap(props: AdminViewServerProps) {
       const employees = await recapEmployees(req, scope, from, to)
       if (empId === undefined) {
         // mc2-contract §0.1: narrowAttScope keeps each PT's own ids — a project id of another PT matches nothing
-        const narrowed = narrowAttScope(scope, idParam(sp, 'project'), idParam(sp, 'pusat'))
+        // ADR 0023 §5: the site filter only narrows (extra predicate per PT)
+        const narrowed = narrowAttToSite(narrowAttScope(scope, idParam(sp, 'project'), idParam(sp, 'pusat')), idParam(sp, 'site'))
         return { ...base, employees, recap: null, grid: await teamMonth(req, narrowed, month), loc: await scopeLocations(req, scope) }
       }
       const recap = await employeeRecap(req, empId, month)
@@ -768,6 +793,7 @@ export async function AbsensiRekap(props: AdminViewServerProps) {
                   ))}
                 </select>
               </label>
+              <SiteSelect options={ptOptions(d.loc.sites, d.pt, d.chosen)} value={idParam(sp, 'site')} all="Semua" />
             </>
           ) : null}
           <button type="submit" className="pk-kbtn primary">
@@ -782,7 +808,7 @@ export async function AbsensiRekap(props: AdminViewServerProps) {
 
 function monthHref(sp: SP, month: string): string {
   const q = new URLSearchParams()
-  for (const k of ['karyawan', 'project', 'pusat', 'pt']) if (one(sp, k)) q.set(k, one(sp, k))
+  for (const k of ['karyawan', 'project', 'pusat', 'site', 'pt']) if (one(sp, k)) q.set(k, one(sp, k))
   q.set('bulan', month)
   return `/admin/absensi/rekap?${q.toString()}`
 }
@@ -877,7 +903,7 @@ function EmployeeRecap({ d, recap }: { d: RekapData; recap: MonthlyRecap }) {
                     <div className="locs">
                       {x.locations.map((l) => (
                         <div key={`${l.location.type}:${l.location.id}`} className="loc">
-                          <span className={`pk-chip ${l.location.type === 'project' ? 'proj' : 'cc'}`}>{locLabel(l.location)}</span>
+                          <span className={`pk-chip ${LOC_CHIP[l.location.type]}`}>{locLabel(l.location)}</span>
                           <span className="nw">
                             <Stamp loc={l} kind="checkIn" d={x} tz={d.tz} /> → <Stamp loc={l} kind="checkOut" d={x} tz={d.tz} />
                           </span>

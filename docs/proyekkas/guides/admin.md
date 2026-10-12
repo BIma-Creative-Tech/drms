@@ -168,9 +168,23 @@ sampai selesai).
 - "PM project" hanya untuk **pengajuan biaya** dengan Diketahui **Wajib**. Aturan **Addendum RAB** tetap **Direktur
   (Diketahui) → Finance (Level 1)** dan tidak diubah; sistem menolak "PM project" pada aturan Addendum RAB. Level
   approval hanya boleh Direktur/Finance (peran atau user bernama di PT itu).
-- G1 tetap berlaku: PM yang menjadi pemohon/pembuat dilewati (Direktur yang memutuskan). Pengajuan untuk Direktur
-  dibuat oleh PM project (pengecualian owner, tercatat di Audit Log `approval_policy_exception`). Bila satu-satunya
-  Direktur membuat pengajuannya sendiri, pengiriman ditolak — PM project yang membuatkannya.
+- G1 tetap berlaku: PM yang menjadi pemohon/pembuat dilewati (Direktur yang memutuskan).
+
+**Sejak 11 Okt 2026 (keputusan owner, ADR 0024) aturan dapat dikonfigurasi per peran pemohon:**
+
+- Isian **Peran pemohon** (Direktur, Project Manager, Staff lapangan, Finance, Admin; kosong = semua): aturan hanya
+  berlaku bila **setiap** pemohon memegang salah satu peran itu di PT pengajuan. Aturan dipilih dari aturan aktif yang
+  cocok dengan **Prioritas** terkecil (angka kecil dulu); bila sama, yang paling spesifik.
+- **Tanpa level approval** ("Tanpa persetujuan — langsung ke antrian transfer Finance") hanya boleh bila Peran pemohon =
+  **Direktur saja** dan Diketahui Oleh = **Tidak dipakai**; selain itu sistem (dan database) menolak menyimpan.
+  Kotak **Penjelasan aturan** di formulir menunjukkan contoh alurnya, mis. "Contoh: pengajuan oleh Direktur → langsung
+  ke Finance".
+- Aturan **"Pengajuan Direktur"** (Peran pemohon = Direktur, tanpa level, Prioritas 10) dibuat otomatis oleh migrasi di
+  setiap PT yang masih memakai aturan default (PT yang aturannya sudah diubah dicatat di log migrasi — buat aturannya
+  sendiri bila owner menghendaki). Akibatnya: pengajuan Direktur sendiri langsung ke antrian transfer Finance (tercatat
+  `approval_policy_exception`, panel, PDF, laporan). Pengajuan Direktur hanya boleh dibuat dan dikirim oleh Direktur
+  itu sendiri; PM/Admin/Finance atas namanya ditolak.
+- Setiap perubahan aturan wajib alasan dan tercatat di Audit Log; hanya berlaku untuk pengajuan baru.
 
 ### 4a. Mengubah aturan setelah deploy (sekali, setiap PT: DRMS, LAS, TBK, CS1)
 
@@ -284,6 +298,10 @@ PT: sheet **Perusahaan** (satu baris per PT: `kode_pt`, nama, nama legal, alamat
 **`kode_pt`** di kolom pertama sheet data per PT (Kategori, Karyawan, Pengguna, Rekening, PusatBiaya, Project, Tahapan,
 RAB, Kendaraan, Penugasan, AkunKas), dan sheet **AksesPT** untuk akses satu pengguna di PT lain. Langkah lengkap:
 [runbook impor data go-live](../runbooks/import-data-golive.md) §4.1.
+
+File impor tidak memuat RAP. Setiap project ber-RAB wajib punya RAP sebelum pengajuannya bisa dikirim (keputusan
+pemilik 11 Okt 2026): laporan impor memberi **PERINGATAN** per project ber-RAB yang belum punya RAP. Setelah impor,
+PM / Direktur mengisi RAP di tab **RAP** project (template atau impor Excel RAP).
 
 ## 11. Audit Log
 

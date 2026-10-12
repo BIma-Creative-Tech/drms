@@ -73,11 +73,17 @@ Setelah diajukan, nomor dokumen terbit (mis. `PB/DRMS/2611/0001`; `DRMS` = kode 
 punya nomor urut sendiri yang mulai dari 0001 lagi setiap bulan; semua nomor dokumen lain juga memuat kode PT, mis. `TRF/DRMS/2610/0001`) dan status **Menunggu persetujuan PM**. Yang memutuskan adalah **PM project** (PM di data project;
 untuk pusat biaya: manajernya) lalu **Direktur** **di PT pengajuan itu**; setelah itu Finance mentransfer (sejak 10 Okt
 2026). Pengajuan yang diajukan sebelumnya tetap diputuskan Direktur lalu Finance. Bila muncul "Project ini belum punya
-PM. Hubungi Admin untuk mengisi PM project.", minta Admin mengisi PM project itu.
+PM. Hubungi Admin untuk mengisi PM project.", minta Admin mengisi PM project itu. Alur Anda tidak berubah oleh
+keputusan owner 11 Okt 2026 (ADR 0024): hanya pengajuan **Direktur untuk dirinya sendiri** yang langsung ke Finance
+tanpa persetujuan.
 Pantau di **Pengajuan Saya** atau lonceng. Pemohon lain yang Anda cantumkan diberi tahu saat pengajuan dibuat atas
 namanya, diajukan, dan ditarik kembali; di web lonceng **Notifikasi** ada di bar atas, kanan.
 
-**Pesan yang sering muncul:** "Reimburse wajib melampirkan minimal 1 nota." · "Pilih salah satu: project atau pusat
+**RAP (sejak 11 Okt 2026):** project yang punya RAB wajib punya **RAP** — setiap baris memilih **Item RAP**. Bila
+project belum punya RAP, editor menampilkan **"Project belum punya RAP — hubungi PM"**: draft tetap bisa disimpan,
+tetapi baru bisa diajukan setelah PM mengisi RAP project. Hubungi PM project Anda.
+
+**Pesan yang sering muncul:** "Project belum punya RAP — hubungi PM" · "Reimburse wajib melampirkan minimal 1 nota." · "Pilih salah satu: project atau pusat
 biaya." · "Rekening tujuan wajib dipilih." · "Data master belum tersedia…" (buka aplikasi saat online sekali) ·
 "Tanggal nota tidak boleh di masa depan" · "Staff hanya dapat mengajukan untuk dirinya sendiri…".
 

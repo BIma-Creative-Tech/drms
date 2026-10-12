@@ -153,7 +153,11 @@ class _LineEditorScreenState extends ConsumerState<LineEditorScreen> {
             children: [
               // D3: a line saved before the computed total — ask for qty / satuan / harga satuan.
               // D4: a line saved before the RAP link (or whose project changed) — pick its RAP item.
-              if (widget.line.needsRapItem && widget.line.description.isNotEmpty)
+              // (not when the loaded project has no RAP item at all — the RAP field then says why)
+              if (widget.line.needsRapItem &&
+                  widget.line.description.isNotEmpty &&
+                  !(widget.projectId != null &&
+                      (ref.watch(projectRapProvider(widget.projectId!)).value?.pickable.isEmpty ?? false)))
                 Card(
                   key: const Key('line-needs-rap-item'),
                   color: theme.colorScheme.tertiaryContainer,

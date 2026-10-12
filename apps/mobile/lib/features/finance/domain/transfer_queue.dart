@@ -55,6 +55,7 @@ class TransferQueueItem {
     this.infoFlags = 0,
     this.receiptMismatch = 0,
     this.sla = const TransferSla(),
+    this.noApproval = false,
   });
 
   final int id;
@@ -84,6 +85,9 @@ class TransferQueueItem {
   /// D3 lines whose "Nominal sesuai nota" ≠ total → "Selisih nota (n)".
   final int receiptMismatch;
   final TransferSla sla;
+
+  /// ADR 0024: a Direktur's own request without any approval (kebijakan PT) — Finance is the only check.
+  final bool noApproval;
 
   /// What Finance transfers: the approved amount (server-set, G3).
   int get amount => approvedAmount ?? grandTotal;
@@ -135,6 +139,7 @@ TransferQueueItem transferQueueItemFromJson(Map<String, dynamic> j) {
       ageHours: _dblN(sla?['ageHours']),
       over: sla?['over'] == true,
     ),
+    noApproval: j['noApproval'] == true,
   );
 }
 

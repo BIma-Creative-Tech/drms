@@ -82,7 +82,15 @@ abstract class Capabilities with _$Capabilities {
 
 @freezed
 abstract class Employee with _$Employee {
-  const factory Employee({required int id, required String code, required String name}) = _Employee;
+  const factory Employee({
+    required int id,
+    required String code,
+    required String name,
+
+    /// ADR 0023: "Site penempatan" (`/me` employee.homeSite) — id and `KODE — Nama`; null = none / older server.
+    int? homeSiteId,
+    String? homeSiteLabel,
+  }) = _Employee;
 }
 
 @freezed
@@ -123,6 +131,10 @@ abstract class CompanyMembership with _$CompanyMembership {
     Employee? employee,
     @Default(Capabilities()) Capabilities capabilities,
     @Default(CompanySettings()) CompanySettings settings,
+
+    /// ADR 0024: Direktur in this PT and the PT has the zero-step rule "Pengajuan Direktur" — the Direktur's own
+    /// requests go straight to the Finance transfer queue (hint for the request form; the server decides at submit).
+    @Default(false) bool ownRequestNoApproval,
   }) = _CompanyMembership;
 
   bool has(Role r) => roles.contains(r);
@@ -131,7 +143,14 @@ abstract class CompanyMembership with _$CompanyMembership {
   bool get hasFieldReports => settings.fieldReportsEnabled && capabilities.anyField;
 
   /// Same rule as [UserProfile.canCreateRequests], applied to the roles IN this PT.
-  bool get canCreateRequests => has(Role.staff) || has(Role.pm) || has(Role.admin);
+  /// ADR 0024 (owner 2026-10-11): the Direktur files his own requests (straight to the Finance transfer queue).
+  bool get canCreateRequests => has(Role.staff) || has(Role.pm) || has(Role.admin) || has(Role.owner);
+
+  /// Same rule as [UserProfile.seesProjectMoney], applied to the roles IN this PT.
+  bool get seesProjectMoney => has(Role.pm) || has(Role.owner) || has(Role.finance) || has(Role.admin);
+
+  /// Only role Staff IN this PT (same rule as [UserProfile.requestsForSelfOnly]).
+  bool get staffOnly => roles.isNotEmpty && roles.every((r) => r == Role.staff);
 
   /// "DRMS — Direktur, Finance" (switcher rows).
   String get roleLabels => [
@@ -282,7 +301,8 @@ abstract class UserProfile with _$UserProfile {
   ].join(', ');
 
   /// Who may create requests on the APK (requirements §4: Staff and PM create own requests).
-  bool get canCreateRequests => has(Role.staff) || has(Role.pm) || has(Role.admin);
+  /// ADR 0024 (owner 2026-10-11): the Direktur files his own requests (straight to the Finance transfer queue).
+  bool get canCreateRequests => has(Role.staff) || has(Role.pm) || has(Role.admin) || has(Role.owner);
 
   /// QA-15 (owner decision 2026-10-08): only role Staff (use on [forCompany] of the draft's PT) → requests
   /// for themselves only ("Diajukan Oleh" = own employee). PM / Admin / Finance may add others (Q-09).
@@ -291,9 +311,14 @@ abstract class UserProfile with _$UserProfile {
   /// E4: progress reports are readable by PM (team), Direktur and Finance (all); Staff/Admin none.
   bool get canReadProgress => has(Role.pm) || has(Role.owner) || has(Role.finance);
 
-  /// DRMS 10/10 point 6: "Proyek" menu — PM (team projects), Direktur, Finance, Admin (all projects of their PTs);
-  /// the same roles as the web Proyek module. The server scopes the list.
-  bool get canSeeProjects => has(Role.pm) || has(Role.owner) || has(Role.finance) || has(Role.admin);
+  /// DRMS 10/10 point 6: "Proyek" menu — PM (team projects), Direktur, Finance, Admin (all projects of their PTs)
+  /// and, owner decision 2026-10-11, Staff (their assigned projects, read-only, without money); the same roles as the
+  /// web Proyek module. The server scopes the list and withholds the money.
+  bool get canSeeProjects => has(Role.staff) || seesProjectMoney;
+
+  /// Owner decision 2026-10-11: project money (contract value / RAB, RAP prices and amounts, RAB %, loans) — Direktur,
+  /// Admin, Finance, PM only. UI hint (use [CompanyMembership.seesProjectMoney] for one PT); the server withholds it.
+  bool get seesProjectMoney => has(Role.pm) || has(Role.owner) || has(Role.finance) || has(Role.admin);
 
   /// DRMS 10/10 point 10: "Finance" menu (transfer queue, Catat transfer, LPJ list) — role Finance.
   bool get hasFinanceMenu => has(Role.finance);

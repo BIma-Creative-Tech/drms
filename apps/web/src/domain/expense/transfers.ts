@@ -104,8 +104,8 @@ export async function transferMoment(req: PayloadRequest, companyId: number | un
 }
 
 /**
- * D2: the transfer's cost center — Finance's choice, else the default of the request's project, else (legacy) the
- * request's own cost center. Must be an ACTIVE cost center of the request's PT.
+ * D2: the transfer's cost center — Finance's choice, else the default of the request's project (or of its site, ADR
+ * 0023), else (legacy) the request's own cost center. Must be an ACTIVE cost center of the request's PT.
  */
 export async function transferCostCenter(req: PayloadRequest, doc: { project?: unknown; costCenter?: unknown }, companyId: number | undefined, chosen: number | null): Promise<number> {
   let id = chosen
@@ -118,13 +118,24 @@ export async function transferCostCenter(req: PayloadRequest, doc: { project?: u
   return id!
 }
 
-/** D2: cost center proposed to Finance — the project's default (projects.costCenter), else a legacy request's own. */
+/**
+ * D2: cost center proposed to Finance — the project's default (projects.costCenter), else (ADR 0023 §1) the default
+ * cost center of the project's site, else a legacy request's own.
+ */
 export async function suggestedCostCenter(req: PayloadRequest, doc: { project?: unknown; costCenter?: unknown }): Promise<{ id: number; code: string; name: string } | null> {
   const projectId = relId(doc.project)
   let id: number | undefined
   if (projectId !== undefined) {
-    const p = (await req.payload.findByID({ collection: 'projects', id: projectId, depth: 0, select: { costCenter: true }, overrideAccess: true /* SYSTEM-READ: default cost center of the request's project */, req, disableErrors: true })) as { costCenter?: unknown } | null
+    const p = (await req.payload.findByID({ collection: 'projects', id: projectId, depth: 0, select: { costCenter: true, site: true }, overrideAccess: true /* SYSTEM-READ: default cost center of the request's project */, req, disableErrors: true })) as {
+      costCenter?: unknown
+      site?: unknown
+    } | null
     id = relId(p?.costCenter)
+    const site = relId(p?.site)
+    if (id === undefined && site !== undefined) {
+      const st = (await req.payload.findByID({ collection: 'sites', id: site, depth: 0, select: { costCenter: true }, overrideAccess: true /* SYSTEM-READ: default cost center of the project's site */, req, disableErrors: true })) as { costCenter?: unknown } | null
+      id = relId(st?.costCenter)
+    }
   }
   id ??= relId(doc.costCenter)
   if (id === undefined) return null

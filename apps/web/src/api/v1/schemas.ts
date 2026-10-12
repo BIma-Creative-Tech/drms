@@ -51,7 +51,18 @@ export const Capabilities = z
   })
   .meta({ id: 'Capabilities', description: 'UI hints for the APK (E1); the server guards stay authoritative.' })
 
-const EmployeeRef = z.object({ id: z.number().int(), code: z.string(), name: z.string() }).meta({ id: 'EmployeeRef' })
+const EmployeeRef = z
+  .object({
+    id: z.number().int(),
+    code: z.string(),
+    name: z.string(),
+    homeSite: z
+      .object({ id: z.number().int(), code: z.string(), name: z.string() })
+      .nullable()
+      .optional()
+      .meta({ description: 'ADR 0023: "Site penempatan" (kantor cabang) of the employee, null when none.' }),
+  })
+  .meta({ id: 'EmployeeRef' })
 
 export const MeCompany = z
   .object({
@@ -64,6 +75,10 @@ export const MeCompany = z
     employeeId: z.number().int().nullable().meta({ description: 'Employee record of the caller in this PT (ADR 0016 D1: one per PT).' }),
     employee: EmployeeRef.nullable(),
     capabilities: Capabilities,
+    ownRequestNoApproval: z.boolean().meta({
+      description:
+        'ADR 0024: the caller is Direktur in this PT and the PT has an active rule "Pengajuan Direktur" (Peran pemohon = Direktur, no approval level) — the APK shows "Pengajuan Anda langsung ke antrian transfer Finance" on the request form. Hint only; the rule is chosen at submit.',
+    }),
     settings: z
       .object({
         defaultGeofenceRadiusM: z.number().int(),
@@ -139,6 +154,8 @@ export const MASTER_TYPES = [
   'urgency-levels',
   // FR1 (ADR 0020 §2): customer picker of the aftersales activity log (Staff only on aftersales projects)
   'clients',
+  // ADR 0023: sites (kantor cabang) — attendance locations + per-caller `home` / `assigned` / `team`
+  'sites',
 ] as const
 export type MasterType = (typeof MASTER_TYPES)[number]
 
@@ -182,7 +199,7 @@ export const MastersQuery = z
 
 const MasterItem = z
   .record(z.string(), z.unknown())
-  .meta({ id: 'MasterItem', description: 'Whitelisted fields per type (id, updatedAt, active, …) plus MC3 `company` (PT id; null for shared masters) and `shared` (true for banks, uoms, holidays).' })
+  .meta({ id: 'MasterItem', description: 'Whitelisted fields per type (id, updatedAt, active, …) plus MC3 `company` (PT id; null for shared masters) and `shared` (true for banks, uoms, holidays). ADR 0024: `employees` items carry `direktur` (bool: the account holds Direktur in that PT — not offered as requester to others).' })
 
 export const Masters = z
   .object({

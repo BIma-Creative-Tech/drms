@@ -182,7 +182,7 @@ async function sourceOf(req: PayloadRequest, target: number, from: number | null
   return (res.docs[0] as unknown as Row | undefined) ?? null
 }
 
-const RULE_FIELDS = ['name', 'docType', 'requestType', 'minAmount', 'maxAmount', 'priority', 'acknowledge', 'acknowledgeBy', 'acknowledgeRole', 'signDiajukan', 'signDibuat', 'active'] as const
+const RULE_FIELDS = ['name', 'docType', 'requestType', 'minAmount', 'maxAmount', 'priority', 'requesterRoles', 'acknowledge', 'acknowledgeBy', 'acknowledgeRole', 'signDiajukan', 'signDibuat', 'active'] as const
 
 /**
  * A source rule that cannot be copied: it names rows of its own PT (category / project / cost center
@@ -199,11 +199,13 @@ function notCopyable(r: Row): boolean {
     acknowledgeRole: (r.acknowledgeRole ?? null) as never,
     acknowledgeUser: null,
     steps: steps.map((s) => ({ level: Number(s.level), approverRole: (s.approverRole ?? null) as never, approverUser: null })),
+    // ADR 0024: "Peran pemohon" (a zero-step rule is copyable only as the Direktur rule)
+    requesterRoles: (Array.isArray(r.requesterRoles) ? r.requesterRoles : []) as never,
   }
   const max = typeof r.maxAmount === 'number' ? r.maxAmount : null
   if (max !== null && max < Number(r.minAmount ?? 0)) return true
   if (r.docType === 'budget_addendum' && (r.requestType ?? 'any') !== 'any') return true
-  return stepsError(rule.steps) !== null || ruleDecisionError(rule, () => undefined, (r.docType as string | undefined) ?? 'expense_request') !== null
+  return stepsError(rule.steps, { allowEmpty: true }) !== null || ruleDecisionError(rule, () => undefined, (r.docType as string | undefined) ?? 'expense_request') !== null
 }
 
 export async function copyCompanyDefaults(req: PayloadRequest, target: number, opts: { from?: number | null; settings?: boolean } = {}): Promise<CopyDefaultsReport> {

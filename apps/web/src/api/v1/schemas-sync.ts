@@ -120,9 +120,9 @@ export const SyncDraftDeletePayload = z
   .meta({ id: 'SyncDraftDeletePayload', description: 'Soft delete = the draft is cancelled (no hard delete).' })
 export type SyncDraftDelete = z.infer<typeof SyncDraftDeletePayload>
 
-/** Exactly one of project_id / cost_center_id (E6, Q-40: cost-center geofence). */
-const oneLocation = (v: { project_id?: number | null; cost_center_id?: number | null }) => (v.project_id === undefined) !== (v.cost_center_id === undefined)
-const oneLocationError = { message: 'Isi salah satu: project_id ATAU cost_center_id.', path: ['project_id'] }
+/** Exactly one of project_id / cost_center_id / site_id (E6, Q-40: cost-center geofence; ADR 0023: site). */
+const oneLocation = (v: { project_id?: number | null; cost_center_id?: number | null; site_id?: number | null }) => [v.project_id, v.cost_center_id, v.site_id].filter((x) => x !== undefined).length === 1
+const oneLocationError = { message: 'Isi salah satu: project_id, cost_center_id, ATAU site_id.', path: ['project_id'] }
 
 /**
  * `attendance.check_in` / `attendance.check_out` (US-01/US-02, ADR 0010 decisions 7/8): own
@@ -132,8 +132,9 @@ const oneLocationError = { message: 'Isi salah satu: project_id ATAU cost_center
  */
 export const SyncAttendancePayload = z
   .object({
-    project_id: id.optional().meta({ description: 'Project (one of project_id / cost_center_id).' }),
+    project_id: id.optional().meta({ description: 'Project (exactly one of project_id / cost_center_id / site_id).' }),
     cost_center_id: id.optional().meta({ description: 'Cost center / operational location (E6, Q-40).' }),
+    site_id: id.optional().meta({ description: 'ADR 0023: site (kantor cabang) — allowed at the home site or with an active site assignment.' }),
     lat: z.number().min(-90).max(90),
     lng: z.number().min(-180).max(180),
     accuracy_m: z.number().min(0).max(10_000).nullable().optional().meta({ description: 'GPS accuracy radius (m); up to 50 m is added to the geofence radius.' }),
@@ -159,6 +160,7 @@ export const SyncOnBehalfPayload = z
     kind: z.enum(['check_in', 'check_out']),
     project_id: id.optional(),
     cost_center_id: id.optional(),
+    site_id: id.optional().meta({ description: 'ADR 0023: a team site of the PM (pm-role site assignment, or PM of a project of the site).' }),
     lat: z.number().min(-90).max(90),
     lng: z.number().min(-180).max(180),
     accuracy_m: z.number().min(0).max(10_000).nullable().optional(),

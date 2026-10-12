@@ -6,7 +6,7 @@ import { byRole, rolesAllowed, anyMember } from '@/access/policies'
 import { reasonOnDeactivate, withAudit } from '@/audit/hooks'
 import { activeField, codeField, odooRefField, uuidField } from '@/fields/common'
 
-import { companyField, companyHook, pickerSameCompany, requireCompanyWhenAmbiguous } from '@/fields/company'
+import { companyField, companyHook, pickerSameCompany, requireCompanyWhenAmbiguous, siteOptions } from '@/fields/company'
 import { validationError } from '@/lib/validation'
 import { adminCreatePrefill, applyUserAccount, readUserAccount, USER_ACCOUNT, userAccountOptions, userAccountReadAccess, validateUserAccount } from '@/domain/employee-user-link'
 
@@ -45,7 +45,7 @@ export const Employees: CollectionConfig = withAudit(
   {
     slug: 'employees',
     labels: { singular: 'Karyawan', plural: 'Karyawan' },
-    admin: { useAsTitle: 'name', group: 'Pengguna & Akses', defaultColumns: ['code', 'name', 'position', 'active'], listSearchableFields: ['code', 'name', 'nickname'] },
+    admin: { useAsTitle: 'name', group: 'Pengguna & Akses', defaultColumns: ['code', 'name', 'position', 'homeSite', 'active'], listSearchableFields: ['code', 'name', 'nickname'] },
     access: {
       read: anyMember,
       create: rolesAllowed('pk-admin'),
@@ -63,7 +63,7 @@ export const Employees: CollectionConfig = withAudit(
         },
       ],
       // validateUserAccount after the company hook (needs the resolved PT); errors land on the field
-      beforeChange: [companyHook('employees', { check: [{ field: 'workSchedule', collection: 'work-schedules' }] }), faceRefSamePt, validateUserAccount],
+      beforeChange: [companyHook('employees', { check: [{ field: 'workSchedule', collection: 'work-schedules' }, { field: 'homeSite', collection: 'sites' }] }), faceRefSamePt, validateUserAccount],
       // same req = same transaction as the employee write (create: the id exists now)
       afterChange: [applyUserAccount],
     },
@@ -123,7 +123,19 @@ export const Employees: CollectionConfig = withAudit(
         },
       },
       // E6: jadwal kerja karyawan (kosong = jadwal default di Setting perusahaan).
-      { name: 'workSchedule', type: 'relationship', relationTo: 'work-schedules', label: 'Jadwal kerja', ...pickerSameCompany() },
+      { name: 'workSchedule', type: 'relationship', relationTo: 'work-schedules', label: 'Jadwal kerja', ...pickerSameCompany(), admin: { description: 'Kosong = jadwal default site penempatan, lalu jadwal default perusahaan.' } },
+      // ADR 0023 (Q-S5): "Site penempatan" — the branch office where the employee is stationed: may check in there
+      // without a team assignment; its default work schedule applies when the employee has none; report filter.
+      {
+        name: 'homeSite',
+        type: 'relationship',
+        relationTo: 'sites',
+        label: 'Site penempatan',
+        index: true,
+        ...pickerSameCompany(),
+        filterOptions: siteOptions,
+        admin: { placeholder: 'Pilih site…', description: 'Kantor cabang tempat karyawan ditempatkan (opsional): boleh absen di site ini tanpa penugasan tim.' },
+      },
       { name: 'faceRefPhoto', type: 'upload', relationTo: 'media-selfies', label: 'Foto wajah referensi' },
       odooRefField('odooEmployeeRef', 'Ref. karyawan Odoo'),
       activeField(),

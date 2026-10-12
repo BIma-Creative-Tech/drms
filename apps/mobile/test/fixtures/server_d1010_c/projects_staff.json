@@ -12,7 +12,7 @@
    },
    "status": "berjalan",
    "statusLabel": "Berjalan",
-   "contractValue": 250000000,
+   "contractValue": null,
    "progressPct": 0,
    "costCenter": {
     "id": 1,

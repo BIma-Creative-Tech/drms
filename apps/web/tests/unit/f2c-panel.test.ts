@@ -31,7 +31,7 @@ describe('staff panel visibility', () => {
     expect(isStaffOnly(null)).toBe(false)
   })
 
-  it('staff-only sees exactly: expense requests, receipts, notifications, own profile (no globals)', () => {
+  it('staff-only sees exactly: their projects (owner 2026-10-11), expense requests, receipts, LPJ, notifications, own profile (no globals)', () => {
     const v = visibleFor({ id: 1, roles: ['pk-staff'] })
     expect(v.collections.sort()).toEqual([...STAFF_VISIBLE_COLLECTIONS].sort())
     expect(v.globals).toEqual([])

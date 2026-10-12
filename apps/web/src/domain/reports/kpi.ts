@@ -145,7 +145,8 @@ const REFUND = sql`coalesce((SELECT sum(c.amount) FROM cash_entries c WHERE c.ex
 
 // ================================================================ K-01 cash balance per account
 
-export type AccountBalance = { id: number; companyId: number; name: string; kind: string; active: boolean; opening: number; totalIn: number; totalOut: number; balance: number }
+/** `siteId` (ADR 0023 Q-S7): the account's site flag (petty cash of a branch), null = no site. */
+export type AccountBalance = { id: number; companyId: number; siteId: number | null; name: string; kind: string; active: boolean; opening: number; totalIn: number; totalOut: number; balance: number }
 
 /** Σ of `value(row)` per company id (per-PT breakdown of row lists), ordered by company id. */
 export function byCompany<T extends { companyId: number }>(list: readonly T[], value: (x: T) => number, companyIds?: readonly number[]): Array<{ companyId: number; total: number }> {
@@ -163,7 +164,7 @@ export function byCompany<T extends { companyId: number }>(list: readonly T[], v
 export async function cashBalances(req: PayloadRequest, scope: ReportScope, asOf: string, accountId?: number): Promise<{ accounts: AccountBalance[]; total: number; byCompany: Array<{ companyId: number; total: number }> }> {
   const r = await rows(
     req,
-    sql`SELECT a.id, a.company_id, a.name, a.kind::text AS kind, coalesce(a.active, true) AS active,
+    sql`SELECT a.id, a.company_id, a.site_id, a.name, a.kind::text AS kind, coalesce(a.active, true) AS active,
           (CASE WHEN a.opening_balance_date IS NULL OR a.opening_balance_date <= ${asOf} THEN coalesce(a.opening_balance, 0) ELSE 0 END)::text AS opening,
           coalesce(sum(e.amount) FILTER (WHERE e.direction = 'in'), 0)::text AS tin,
           coalesce(sum(e.amount) FILTER (WHERE e.direction = 'out'), 0)::text AS tout
@@ -176,7 +177,7 @@ export async function cashBalances(req: PayloadRequest, scope: ReportScope, asOf
     const opening = num(x.opening)
     const totalIn = num(x.tin)
     const totalOut = num(x.tout)
-    return { id: num(x.id), companyId: num(x.company_id), name: String(x.name), kind: String(x.kind), active: x.active !== false, opening, totalIn, totalOut, balance: opening + totalIn - totalOut }
+    return { id: num(x.id), companyId: num(x.company_id), siteId: x.site_id === null || x.site_id === undefined ? null : num(x.site_id), name: String(x.name), kind: String(x.kind), active: x.active !== false, opening, totalIn, totalOut, balance: opening + totalIn - totalOut }
   })
   return { accounts, total: accounts.reduce((s, a) => s + a.balance, 0), byCompany: byCompany(accounts, (a) => a.balance, ledgerCompanies(scope)) }
 }
@@ -533,7 +534,8 @@ export async function advancesWithoutLpj(req: PayloadRequest, scope: ReportScope
           (SELECT min(t.transfer_date) FROM transfers t WHERE t.request_id = er.id AND t.status = 'posted' AND t.kind = 'advance') AS first_transfer,
           coalesce((SELECT string_agg(e.name, ', ' ORDER BY rr."order") FROM expense_requests_rels rr JOIN employees e ON e.id = rr.employees_id
                     WHERE rr.parent_id = er.id AND rr.path = 'requesters'), '') AS requesters,
-          coalesce(p.code || ' ' || p.name, cc.code || ' ' || cc.name, '') AS scope_name
+          coalesce(p.code || ' ' || p.name, cc.code || ' ' || cc.name, '') AS scope_name,
+          coalesce(er.g1_exception = 'direktur_no_approval', false) AS no_approval
         FROM expense_requests er
         LEFT JOIN projects p ON p.id = er.project_id LEFT JOIN cost_centers cc ON cc.id = er.cost_center_id
         WHERE er.type = 'advance' AND er.status::text IN (${textList(ADVANCE_WITHOUT_LPJ)}) AND ${requestScopeSql(scope)}
@@ -643,6 +645,8 @@ export type RequestRow = {
   refund: number
   realized: number
   openFlags: number
+  /** ADR 0024: a Direktur's own request without approval (`g1_exception = direktur_no_approval`). */
+  noApproval: boolean
 }
 
 /** K-13 rows (keyset by id descending; `after` = last id of the previous page). */
@@ -655,7 +659,8 @@ export async function requestRows(req: PayloadRequest, scope: ReportScope, f: Re
           (SELECT count(*) FROM receipt_flags f WHERE f.request_id = er.id AND f.status = 'open' AND ${flagVisibleSql(req, sql`f.related_company_id`)})::int AS flags,
           coalesce((SELECT string_agg(e.name, ', ' ORDER BY rr."order") FROM expense_requests_rels rr JOIN employees e ON e.id = rr.employees_id
                     WHERE rr.parent_id = er.id AND rr.path = 'requesters'), '') AS requesters,
-          coalesce(p.code || ' ' || p.name, cc.code || ' ' || cc.name, '') AS scope_name
+          coalesce(p.code || ' ' || p.name, cc.code || ' ' || cc.name, '') AS scope_name,
+          coalesce(er.g1_exception = 'direktur_no_approval', false) AS no_approval
         FROM expense_requests er
         LEFT JOIN projects p ON p.id = er.project_id LEFT JOIN cost_centers cc ON cc.id = er.cost_center_id
         WHERE ${requestScopeSql(scope)} AND ${requestFilterSql(f)} ${page.after ? sql`AND er.id < ${page.after}` : sql``}
@@ -677,6 +682,7 @@ export async function requestRows(req: PayloadRequest, scope: ReportScope, f: Re
     refund: num(x.rf),
     realized: num(x.rl),
     openFlags: num(x.flags),
+    noApproval: x.no_approval === true,
   }))
 }
 
@@ -1081,7 +1087,8 @@ export async function transferQueueTop(req: PayloadRequest, scope: ReportScope, 
     req,
     sql`SELECT er.id, er.company_id, er.doc_no, er.title, er.type::text AS type, er.status::text AS status, er.needed_date,
           coalesce(er.approved_amount, er.grand_total, 0)::text AS amount,
-          coalesce(p.code || ' ' || p.name, cc.code || ' ' || cc.name, '') AS scope_name
+          coalesce(p.code || ' ' || p.name, cc.code || ' ' || cc.name, '') AS scope_name,
+          coalesce(er.g1_exception = 'direktur_no_approval', false) AS no_approval
         FROM expense_requests er
         LEFT JOIN projects p ON p.id = er.project_id LEFT JOIN cost_centers cc ON cc.id = er.cost_center_id
         WHERE ((er.type = 'advance' AND er.status = 'approved') OR (er.type = 'reimburse' AND er.status = 'receipts_verified')) AND ${companyScopeSql(sql`er.company_id`, pts)}

@@ -40,6 +40,7 @@ const sampleCount = async () => ({
   users: await count("SELECT count(*) AS n FROM users WHERE email LIKE '%@drms-contoh.test' OR email LIKE '%.fiktif@pengguna.drms.invalid'"),
   bankAccounts: await count("SELECT count(*) AS n FROM employee_bank_accounts a JOIN employees e ON e.id = a.employee_id WHERE e.code LIKE 'CTH-%'"),
   costCenters: await count("SELECT count(*) AS n FROM cost_centers WHERE code LIKE 'CTH-%'"),
+  sites: await count("SELECT count(*) AS n FROM sites WHERE code LIKE 'CTH-%'"),
   projects: await count("SELECT count(*) AS n FROM projects WHERE code LIKE 'CTH-%'"),
   stages: await count("SELECT count(*) AS n FROM project_stages s JOIN projects p ON p.id = s.project_id WHERE p.code LIKE 'CTH-%'"),
   budgetLines: await count("SELECT count(*) AS n FROM budget_lines b JOIN projects p ON p.id = b.project_id WHERE p.code LIKE 'CTH-%'"),
@@ -116,6 +117,7 @@ describe('E11 go-live import (dry-run → commit → idempotent re-run)', () => 
       users: rows.pengguna!.length - 1, // dewi.fiktif waits for her Keycloak account
       bankAccounts: rows.rekening!.length,
       costCenters: rows.pusatBiaya!.length,
+      sites: rows.site!.length,
       projects: rows.project!.length,
       stages: rows.tahapan!.length,
       budgetLines: rows.rab!.length,
@@ -135,6 +137,13 @@ describe('E11 go-live import (dry-run → commit → idempotent re-run)', () => 
     expect(new Date(prj.start_date).toISOString().slice(0, 10)).toBe('2026-08-01')
     expect(Number((await sqlAs('app', "SELECT sum(s.weight_pct) AS s FROM project_stages s JOIN projects p ON p.id = s.project_id WHERE p.code = 'CTH-PRJ-02' AND s.active")).rows[0].s)).toBe(100)
     expect((await sqlAs('app', "SELECT manager_id FROM cost_centers WHERE code = 'CTH-OPS'")).rows[0].manager_id).toBe(candra.id)
+    // ADR 0023: Site sheet + kode_site links (Karyawan is linked after the sites exist)
+    const cab = (await sqlAs('app', "SELECT s.id, cc.code AS cc FROM sites s JOIN cost_centers cc ON cc.id = s.cost_center_id WHERE s.code = 'CTH-CAB'")).rows[0]
+    expect(cab.cc).toBe('CTH-OPS')
+    expect((await sqlAs('app', "SELECT code FROM employees WHERE home_site_id = $1 ORDER BY code", [cab.id])).rows.map((x) => x.code)).toEqual(['CTH-006'])
+    expect((await sqlAs('app', "SELECT code FROM projects WHERE site_id = $1", [cab.id])).rows.map((x) => x.code)).toEqual(['CTH-PRJ-02'])
+    expect((await sqlAs('app', "SELECT name FROM cash_accounts WHERE site_id = $1", [cab.id])).rows.map((x) => x.name)).toEqual(['Kas Kecil Contoh (FIKTIF)'])
+    expect((await sqlAs('app', "SELECT e.code, t.role_in_project FROM team_assignments t JOIN employees e ON e.id = t.employee_id WHERE t.site_id = $1", [cab.id])).rows).toEqual([{ code: 'CTH-005', role_in_project: 'mandor' }])
     expect((await sqlAs('app', "SELECT account_no, verification_status FROM employee_bank_accounts WHERE account_no = '0990000000401'")).rows[0]).toEqual({ account_no: '0990000000401', verification_status: 'unverified' })
     const acc = (await sqlAs('app', "SELECT name, opening_balance::bigint AS ob, opening_balance_date FROM cash_accounts WHERE name LIKE '%Contoh (FIKTIF)' ORDER BY name")).rows
     expect(acc).toEqual([

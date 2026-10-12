@@ -26,7 +26,8 @@ import {
   type Signature,
 } from './common'
 import { fromDocLines, validateContent } from './drafts'
-import { assertEveryLineHasReceipt, recomputeFlags, syncProjectRapFlags, syncRapFlags } from './receipts'
+import { approveWithoutDecision, assertEveryLineHasReceipt, recomputeFlags, syncProjectRapFlags, syncRapFlags } from './receipts'
+import { isNoApproval } from './decision'
 import { ACK_DELEGATE_ROLE, budgetImpact, lastLevel, type AckDelegate, type ApprovalSnapshot } from './rules'
 import { auditSelfApproval, auditSkipped, selectAndSnapshot, writeSnapshot } from './snapshot'
 import type { ApprovalDecision, ApprovalPosition } from './types'
@@ -200,10 +201,11 @@ export async function submit(req: PayloadRequest, id: number, opts: SubmitOption
     bankSnapshot: { bankName: bankName ?? null, accountNo: acc.accountNo, accountHolder: acc.accountHolder },
     approvalRule: rule.id,
     approvalSnapshot: snapshot,
-    // ADR 0021: the narrow G1 exception is fixed at submit (DB guard: changes only at the freeze point).
+    // ADR 0021 / 0024: the G1 exception is fixed at submit (DB guard: changes only at the freeze point;
+    // `direktur_no_approval` only for a Direktur's own request under a zero-step rule).
     g1Exception: snapshot.selfApproval ?? null,
     approvalCycle: cycle,
-    currentLevel: needsAck ? 0 : 1,
+    currentLevel: needsAck ? 0 : isNoApproval(snapshot) ? 0 : 1,
   })
 
   if (snapshot.signDibuat !== 'none') {
@@ -239,8 +241,11 @@ export async function submit(req: PayloadRequest, id: number, opts: SubmitOption
   }
   await writeSnapshot(req, updated, 'submit')
   await recomputeFlags(req, id)
+  // ADR 0024: a Direktur's own request under the zero-step rule goes straight to Finance (no decision).
+  if (isNoApproval(snapshot)) return approveWithoutDecision(req, updated)
   return updated
 }
+
 
 /** POST …/withdraw — back to Draft while no decision exists in the current cycle (US-04). */
 export async function withdraw(req: PayloadRequest, id: number, reason: string): Promise<RequestDoc> {

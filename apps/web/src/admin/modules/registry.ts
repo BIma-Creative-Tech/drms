@@ -82,8 +82,8 @@ const OFFICE_PM_ADMIN: readonly Role[] = [...OFFICE_PM, 'pk-admin']
 const OFFICE_ADMIN: readonly Role[] = [...OFFICE, 'pk-admin']
 /** FR1 (ADR 0020 §2): field reports are read by every role (rows narrowed by access); recaps office + PM. */
 const FIELD_ALL: readonly Role[] = [...OFFICE_PM_ADMIN, 'pk-staff']
-/** Creating requests: Staff/PM/Admin/Finance (collection create access, Q-09). */
-export const CREATOR_ROLES: readonly Role[] = ['pk-staff', 'pk-pm', 'pk-admin', 'pk-finance']
+/** Creating requests: Staff/PM/Admin/Finance (collection create access, Q-09); ADR 0024: the Direktur (own requests). */
+export const CREATOR_ROLES: readonly Role[] = ['pk-staff', 'pk-pm', 'pk-admin', 'pk-finance', 'pk-owner']
 
 export const MODULES: readonly ModuleDef[] = [
   {
@@ -179,6 +179,15 @@ export const MODULES: readonly ModuleDef[] = [
         ],
       },
       { label: 'Transfer & LPJ', items: [{ collection: 'transfers' }, { collection: 'settlements' }] },
+      // ADR 0022: inter-project loans (PM submits, Direktur approves; Direktur / Admin / Finance / PM only)
+      {
+        label: 'Pinjaman',
+        items: [
+          { view: '/pinjaman', label: 'Pinjaman antar project', roles: OFFICE_PM_ADMIN, navKey: 'pinjaman' },
+          { collection: 'project-loans', label: 'Data pinjaman' },
+          { collection: 'project-loan-repayments', label: 'Data pengembalian pinjaman' },
+        ],
+      },
       { label: 'Tutup buku', items: [{ view: '/tutup-buku', label: 'Tutup buku', roles: OFFICE, navKey: 'tutup-buku' }, { collection: 'period-closings', label: 'Riwayat tutup buku' }] },
     ],
   },
@@ -236,7 +245,7 @@ export const MODULES: readonly ModuleDef[] = [
     icon: 'master',
     hint: 'Bank, satuan, vendor',
     manage: true,
-    sections: [{ items: [{ collection: 'banks' }, { collection: 'uoms' }, { collection: 'expense-categories' }, { collection: 'urgency-levels' }, { collection: 'vehicles' }, { collection: 'vendors' }] }],
+    sections: [{ items: [{ collection: 'banks' }, { collection: 'uoms' }, { collection: 'expense-categories' }, { collection: 'urgency-levels' }, { collection: 'vehicles' }, { collection: 'vendors' }, { collection: 'sites' }] }],
   },
   {
     id: 'media',
@@ -517,6 +526,9 @@ export const ITEM_ICONS: Readonly<Record<string, IconName>> = {
   '/collections/settlements': 'tClipboardText',
   '/tutup-buku': 'tLock',
   '/collections/period-closings': 'tArchiveTick',
+  '/pinjaman': 'tMoneyChange',
+  '/collections/project-loans': 'tArchiveBook',
+  '/collections/project-loan-repayments': 'tMoneyRecive',
   // Absensi
   '/absensi/absen': 'tCamera',
   '/absensi': 'tPeople',
@@ -543,6 +555,7 @@ export const ITEM_ICONS: Readonly<Record<string, IconName>> = {
   '/collections/urgency-levels': 'tDanger',
   '/collections/vehicles': 'tCar',
   '/collections/vendors': 'tShop',
+  '/collections/sites': 'tBuilding',
   // Media
   '/collections/media-receipts': 'tReceipt2',
   '/collections/media-transfer-proofs': 'tCardReceive',

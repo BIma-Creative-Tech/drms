@@ -4,7 +4,7 @@ import { employeeIn, membershipsOf, relId } from '@/access/roles'
 import { firstDay, lastDay, PERIOD_RE } from '@/domain/reports/rules'
 
 import { recapRange, teamToday, type DayRecap, type RecapSummary, type TeamTodayRow } from './aggregate'
-import { attendanceContext, attendanceScope, currentSchedules, employeeRef, fullCompanies, loadFacts, loadHolidays, narrowAttScope, narrowAttToCompanies, teamMembers, type AttScope } from './queries'
+import { attendanceContext, attendanceScope, currentSchedules, employeeRef, fullCompanies, loadFacts, loadHolidays, narrowAttScope, narrowAttToCompanies, narrowAttToSite, teamMembers, type AttScope } from './queries'
 import type { ScheduleSnapshot } from './schedule'
 
 /**
@@ -88,7 +88,7 @@ export type TeamTodayResult = {
 }
 
 /** US-13: team presence for a date (default today; ≤ today). PM team, office roles all. */
-export async function teamTodayFor(req: PayloadRequest, q: { date?: string; projectId?: number; costCenterId?: number; companyIds?: readonly number[] }): Promise<TeamTodayResult> {
+export async function teamTodayFor(req: PayloadRequest, q: { date?: string; projectId?: number; costCenterId?: number; siteId?: number; companyIds?: readonly number[] }): Promise<TeamTodayResult> {
   let scope = await attendanceScope(req)
   if (!scope) throw new APIError('Forbidden', 403, null, true)
   // MC2 UI PT filter: narrows to those PTs of the scope (never widens).
@@ -99,6 +99,8 @@ export async function teamTodayFor(req: PayloadRequest, q: { date?: string; proj
   if (date > ctx.today) throw new APIError('Tanggal tidak boleh di masa depan.', 400, null, true)
   // Filters narrow the scope PER PT; an id outside a PM's team / of another PT → empty (never other data).
   if (q.projectId !== undefined || q.costCenterId !== undefined) scope = narrowAttScope(scope, q.projectId, q.costCenterId)
+  // ADR 0023 §5: the site filter only narrows (an extra predicate per PT)
+  scope = narrowAttToSite(scope, q.siteId)
   const members = await teamMembers(req, scope, date)
   const ids = members.map((m) => m.employeeId)
   const facts = await loadFacts(req, { from: date, to: date, employeeIds: ids, scope })

@@ -719,7 +719,8 @@ class AppLocalizationsId extends AppLocalizations {
   String get attendanceDisabled => 'Absensi dari aplikasi belum diaktifkan Admin (Setting perusahaan).';
 
   @override
-  String get attendanceNoProjects => 'Anda belum ditugaskan di project atau pusat biaya mana pun. Hubungi PM/Admin.';
+  String get attendanceNoProjects =>
+      'Anda belum ditugaskan di site, project, atau pusat biaya mana pun. Hubungi PM/Admin.';
 
   @override
   String get attendanceProject => 'Project';
@@ -913,6 +914,19 @@ class AppLocalizationsId extends AppLocalizations {
 
   @override
   String get direkturViaPmNote => 'Pengajuan Direktur — diajukan oleh PM (kebijakan owner 2026-10-10)';
+
+  @override
+  String get noApprovalNote => 'Tanpa persetujuan — pengajuan Direktur (kebijakan PT)';
+
+  @override
+  String get noApprovalBadge => 'Tanpa persetujuan (Direktur)';
+
+  @override
+  String get draftDirekturNoApprovalInfo => 'Pengajuan Anda langsung ke antrian transfer Finance';
+
+  @override
+  String get draftDirekturNoApprovalHint =>
+      'Tanpa persetujuan — kebijakan PT; Finance tetap memeriksa sebelum transfer.';
 
   @override
   String get direkturViaPmSelfNote =>
@@ -1189,7 +1203,7 @@ class AppLocalizationsId extends AppLocalizations {
   String get attendanceTabTeam => 'Tim';
 
   @override
-  String get attendanceLocation => 'Lokasi (project / pusat biaya)';
+  String get attendanceLocation => 'Lokasi (site / project / pusat biaya)';
 
   @override
   String attendanceRadius(int meters) {
@@ -1204,6 +1218,15 @@ class AppLocalizationsId extends AppLocalizations {
 
   @override
   String get siteCostCenter => 'Pusat biaya';
+
+  @override
+  String get siteSite => 'Site';
+
+  @override
+  String get siteHome => 'Site penempatan';
+
+  @override
+  String get siteHomeBadge => 'Penempatan';
 
   @override
   String get distanceInside => 'Di dalam area absen';
@@ -2862,7 +2885,18 @@ class AppLocalizationsId extends AppLocalizations {
   String get rapOfflineNoBudget => 'Offline: sisa anggaran RAP tampil lagi saat online.';
 
   @override
-  String get rapNoItems => 'Project ini belum punya item RAP. Hubungi PM atau Direktur.';
+  String get rapNoItems => 'Project ini belum punya RAP (project tanpa RAB: item RAP tidak wajib).';
+
+  @override
+  String get rapMissingBlock => 'Project belum punya RAP — hubungi PM';
+
+  @override
+  String get rapMissingBlockDetail =>
+      'Pengajuan ini bisa disimpan sebagai draft, tetapi baru bisa dikirim setelah PM mengisi RAP project.';
+
+  @override
+  String get rapMissingProjectDetail =>
+      'Project ini punya RAB, jadi wajib punya RAP: pengajuan project ini baru bisa dikirim setelah PM / Direktur mengisi RAP.';
 
   @override
   String get noSearchResults => 'Tidak ada yang cocok.';
@@ -3176,5 +3210,206 @@ class AppLocalizationsId extends AppLocalizations {
   @override
   String rapOverBy(String amount) {
     return 'Lebih $amount';
+  }
+
+  @override
+  String get loanTitle => 'Pinjaman antar project';
+
+  @override
+  String get loanTab => 'Pinjaman';
+
+  @override
+  String get loanEmpty => 'Belum ada pinjaman antar project.';
+
+  @override
+  String get loanInboxEmpty => 'Tidak ada pinjaman antar project yang menunggu keputusan Anda.';
+
+  @override
+  String loanInboxTitle(int count) {
+    return 'Pinjaman antar project ($count)';
+  }
+
+  @override
+  String get loanNew => 'Ajukan pinjaman';
+
+  @override
+  String get loanNewTitle => 'Ajukan pinjaman antar project';
+
+  @override
+  String get loanEditTitle => 'Ubah draft pinjaman';
+
+  @override
+  String get loanNotEditable => 'Pinjaman ini sudah tidak bisa diubah (bukan Draft lagi atau bukan milik Anda).';
+
+  @override
+  String get loanNoBorrower =>
+      'Pinjaman antar project diajukan oleh PM project peminjam. Anda belum menjadi PM project yang aktif.';
+
+  @override
+  String get loanBorrower => 'Project peminjam';
+
+  @override
+  String get loanLender => 'Project pemberi pinjaman';
+
+  @override
+  String get loanKind => 'Jenis';
+
+  @override
+  String get loanKindDana => 'Dana';
+
+  @override
+  String get loanKindBarang => 'Barang/material';
+
+  @override
+  String get loanAmount => 'Nilai pinjaman';
+
+  @override
+  String get loanReason => 'Alasan';
+
+  @override
+  String get loanDate => 'Tanggal pinjaman';
+
+  @override
+  String get loanDueDate => 'Jatuh tempo';
+
+  @override
+  String get loanRepaid => 'Sudah kembali';
+
+  @override
+  String get loanOutstanding => 'Sisa pinjaman';
+
+  @override
+  String get loanSaveDraft => 'Simpan draft';
+
+  @override
+  String get loanSaveChanges => 'Simpan perubahan';
+
+  @override
+  String get loanSubmit => 'Ajukan ke Direktur';
+
+  @override
+  String get loanSubmitConfirmTitle => 'Ajukan pinjaman?';
+
+  @override
+  String get loanSubmitConfirmBody =>
+      'Nomor PJ diberikan dan Direktur diberi tahu. Isi pinjaman tidak dapat diubah lagi.';
+
+  @override
+  String get loanSubmitted => 'Pinjaman diajukan. Menunggu persetujuan Direktur.';
+
+  @override
+  String get loanSavedDraft => 'Draft pinjaman tersimpan.';
+
+  @override
+  String get loanEdit => 'Ubah draft';
+
+  @override
+  String get loanCancel => 'Batalkan';
+
+  @override
+  String get loanCancelTitle => 'Batalkan pinjaman?';
+
+  @override
+  String get loanCancelPrompt => 'Pinjaman dibatalkan (tidak dihapus). Alasan wajib.';
+
+  @override
+  String get loanApprove => 'Setujui';
+
+  @override
+  String get loanReject => 'Tolak';
+
+  @override
+  String loanApproveTitle(String docNo) {
+    return 'Setujui $docNo?';
+  }
+
+  @override
+  String loanApproveBody(String borrower, String amount, String lender) {
+    return '$borrower meminjam $amount dari $lender. Tidak ada transaksi kas yang dibuat; pinjaman tercatat sebagai piutang antar project.';
+  }
+
+  @override
+  String loanRejectTitle(String docNo) {
+    return 'Tolak $docNo?';
+  }
+
+  @override
+  String get loanRejectPrompt => 'Alasan penolakan dikirim ke PM peminjam.';
+
+  @override
+  String get loanDone => 'Tersimpan.';
+
+  @override
+  String loanOverdueDays(int days) {
+    return 'Terlambat · $days hari';
+  }
+
+  @override
+  String get loanRoleBorrower => 'Meminjam';
+
+  @override
+  String get loanRoleLender => 'Meminjamkan';
+
+  @override
+  String loanFlow(String lender, String borrower) {
+    return '$lender → $borrower';
+  }
+
+  @override
+  String get loanRepayments => 'Pengembalian';
+
+  @override
+  String loanRepaymentSeq(int n) {
+    return 'Pengembalian ke-$n';
+  }
+
+  @override
+  String get loanRepaymentVoid => 'Dibatalkan (void)';
+
+  @override
+  String loanRepaymentVoidReason(String reason) {
+    return 'Dibatalkan (void): $reason';
+  }
+
+  @override
+  String get loanRepaymentsEmpty => 'Belum ada pengembalian.';
+
+  @override
+  String get loanRepaymentsWebHint => 'Pengembalian dicatat di web oleh PM peminjam atau Finance.';
+
+  @override
+  String loanRecordedBy(String name) {
+    return 'dicatat $name';
+  }
+
+  @override
+  String get loanTimeline => 'Alur persetujuan';
+
+  @override
+  String get loanStepSubmitted => 'Diajukan PM peminjam';
+
+  @override
+  String get loanStepDirektur => 'Persetujuan Direktur';
+
+  @override
+  String get loanStepWaiting => 'Menunggu';
+
+  @override
+  String get loanStepNotYet => 'Belum';
+
+  @override
+  String get loanDecApproved => 'Disetujui';
+
+  @override
+  String get loanDecRejected => 'Ditolak';
+
+  @override
+  String loanOutstandingOf(String amount) {
+    return 'Sisa $amount';
+  }
+
+  @override
+  String loanDueOn(String date) {
+    return 'Jatuh tempo $date';
   }
 }

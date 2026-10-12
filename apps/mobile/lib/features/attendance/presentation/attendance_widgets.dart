@@ -29,9 +29,41 @@ class InfoCard extends StatelessWidget {
   }
 }
 
-/// `Project · P-01 — Gudang` / `Pusat biaya · Ops Palangka`.
-String siteLabel(AppLocalizations t, ProjectSite s) =>
-    '${s.kind == SiteKind.project ? t.siteProject : t.siteCostCenter} · ${s.label}';
+/// `Project` / `Pusat biaya` / `Site` (ADR 0023).
+String siteKindLabel(AppLocalizations t, SiteKind kind) => switch (kind) {
+  SiteKind.project => t.siteProject,
+  SiteKind.costCenter => t.siteCostCenter,
+  SiteKind.site => t.siteSite,
+};
+
+/// Glyph of a location kind: project = building site, cost center = office, site = branch office (kantor cabang).
+IconData siteKindIcon(SiteKind kind) => switch (kind) {
+  SiteKind.project => Icons.apartment,
+  SiteKind.costCenter => Icons.business,
+  SiteKind.site => Icons.home_work,
+};
+
+/// `Project · P-01 — Gudang` / `Pusat biaya · Ops Palangka` / `Site · BPN — Cabang Balikpapan`.
+String siteLabel(AppLocalizations t, ProjectSite s) => '${siteKindLabel(t, s.kind)} · ${s.label}';
+
+/// "Penempatan" badge of the user's home site (ADR 0023, "Site penempatan").
+class HomeSiteBadge extends StatelessWidget {
+  const HomeSiteBadge({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      key: const Key('home-site-badge'),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(color: scheme.primaryContainer, borderRadius: BorderRadius.circular(6)),
+      child: Text(
+        AppLocalizations.of(context).siteHomeBadge,
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(color: scheme.onPrimaryContainer),
+      ),
+    );
+  }
+}
 
 /// Indonesian problem text of a client-side geofence check (null = inside).
 String? siteProblem(AppLocalizations t, ProjectSite site, ({SiteCheck check, int? distanceM}) res) =>

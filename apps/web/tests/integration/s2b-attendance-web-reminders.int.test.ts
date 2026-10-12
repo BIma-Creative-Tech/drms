@@ -259,7 +259,7 @@ describe('E7 daily reminders (fake clock)', () => {
     expect(committed).toBeGreaterThan(0)
     const budgetFor = (pct: number) => Math.floor((committed * 100) / pct)
     await p.update({ collection: 'projects', id: w.project, data: { budget: budgetFor(90) }, overrideAccess: true /* SYSTEM-WRITE: fixture RAB */, context: { auditReason: 'uji ambang anggaran' } })
-    await setSettings({ reminderEmailEnabled: true, reminderLateProgressEnabled: false, reminderLpjOverdueEnabled: false, reminderRevisionEnabled: false })
+    await setSettings({ reminderEmailEnabled: true, reminderLateProgressEnabled: false, reminderLpjOverdueEnabled: false, reminderRevisionEnabled: false, reminderLoanOverdueEnabled: false })
     const jobsBefore = Number((await sqlAs('app', "SELECT count(*)::int AS n FROM payload_jobs WHERE task_slug = 'sendEmail'")).rows[0].n)
     await runDailyReminders(p, { now: atWita(addDays(today, 5), '08:00') })
     const b1 = await notifs('reminder.budget_threshold', w.project)
@@ -279,7 +279,7 @@ describe('E7 daily reminders (fake clock)', () => {
     const b2 = await notifs('reminder.budget_threshold', w.project)
     expect(b2).toHaveLength(expected.length * 2)
     expect(b2.at(-1)!.title).toMatch(/≥ 100%/)
-    await setSettings({ reminderEmailEnabled: false, reminderLateProgressEnabled: true, reminderLpjOverdueEnabled: true, reminderRevisionEnabled: true })
+    await setSettings({ reminderEmailEnabled: false, reminderLateProgressEnabled: true, reminderLpjOverdueEnabled: true, reminderRevisionEnabled: true, reminderLoanOverdueEnabled: true })
   })
 
   it('reminder tables are append-only for the app role; settings are range-checked', async () => {

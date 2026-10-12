@@ -100,10 +100,14 @@ export const EMPLOYEE_BANK_ACCOUNTS = [
  * inactive example with a threshold of the same shape; Finance only transfers. Fresh installs only:
  * existing databases keep their rules — the Admin changes them in the UI (ADR 0021 rollout; the ADR 0013
  * names "Default — Direktur lalu Finance (semua nominal)" / "Contoh — di atas Rp 10 juta: Direktur lalu
- * Finance" came from the data migration `20260926_*_e1_approval_direktur_finance`).
+ * Finance" came from the data migration `20260926_*_e1_approval_direktur_finance`). ADR 0024 (owner 2026-10-11):
+ * + "Pengajuan Direktur" (Peran pemohon = Direktur, no approval level → straight to Finance, priority 10).
  */
 /** Name of the seeded default addendum rule (shared with the E5 migration). */
 export const ADDENDUM_DEFAULT_RULE_NAME = 'Default Addendum RAB — Direktur lalu Finance'
+
+/** ADR 0024: name of the seeded no-approval rule for a Direktur's own requests (also migration 20261013_300000_d1010_approval_config_data). */
+export const DIREKTUR_RULE_NAME = 'Pengajuan Direktur'
 
 export const DEFAULT_APPROVAL_RULES = [
   {
@@ -121,6 +125,24 @@ export const DEFAULT_APPROVAL_RULES = [
     signDiajukan: 'required',
     signDibuat: 'required',
     steps: [{ level: 1, approverRole: 'pk-owner' }],
+    active: true,
+  },
+  {
+    // ADR 0024 (owner decision 2026-10-11): a Direktur's OWN request → no approval step, straight to the
+    // Finance transfer queue (audited exception `direktur_no_approval`). Evaluated before the default (10 < 100).
+    name: DIREKTUR_RULE_NAME,
+    docType: 'expense_request',
+    requestType: 'any',
+    minAmount: 0,
+    maxAmount: null,
+    priority: 10,
+    requesterRoles: ['pk-owner'],
+    acknowledge: 'none',
+    acknowledgeBy: 'role',
+    acknowledgeRole: null,
+    signDiajukan: 'required',
+    signDibuat: 'required',
+    steps: [],
     active: true,
   },
   {

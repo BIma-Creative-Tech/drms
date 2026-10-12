@@ -24,7 +24,7 @@ export function registerDailyPaths(registry: OpenAPIRegistry, h: Helpers): void 
   registry.registerPath({
     method: 'get',
     path: '/projects/{id}/rap',
-    summary: 'P3 RAP of a konstruksi project: items (realised / received / used / stock / %), stage summary (progressMode rap|manual, basis value|equal), lock state; prices and totals only for Direktur/Admin/Finance and the project PM',
+    summary: 'P3 RAP of a project (every kind since DRMS 10/10 D4; konstruksi: stage-driven progress): items (realised / received / used / stock / %), stage summary (progressMode rap|manual, basis value|equal), lock state, rapRequired; prices and totals only for Direktur/Admin/Finance and the project PM',
     security: h.security,
     request: { headers: h.deviceHeader, params: idParam },
     responses: h.res(200, 'RAP', D.Rap, [401, 404, 426]),
@@ -47,7 +47,7 @@ export function registerDailyPaths(registry: OpenAPIRegistry, h: Helpers): void 
   registry.registerPath({
     method: 'post',
     path: '/projects/{id}/rap/items',
-    summary: 'P3 add a RAP item: Direktur/Admin or the project PM; locked RAP (realisation exists) → Direktur/Admin with reason (409 RAP_LOCKED); 409 DUPLICATE_CODE / WRONG_PROJECT_KIND',
+    summary: 'P3 add a RAP item (any project kind; stageId required for konstruksi): Direktur/Admin or the project PM; locked RAP (realisation exists) → Direktur/Admin with reason (409 RAP_LOCKED); 409 DUPLICATE_CODE',
     security: h.security,
     request: { headers: h.idem, params: idParam, body: json(D.RapItemCreate) },
     responses: h.res(201, 'RAP item', D.RapItem, write),
@@ -71,7 +71,7 @@ export function registerDailyPaths(registry: OpenAPIRegistry, h: Helpers): void 
   registry.registerPath({
     method: 'post',
     path: '/projects/{id}/rap/import/commit',
-    summary: 'P3 RAP Excel import — commit the previewed file (409 FILE_CHANGED); idempotent by kode; items missing from the file are deactivated; new stages only for Direktur/Admin',
+    summary: 'P3 RAP Excel import — commit the previewed file (409 FILE_CHANGED); idempotent by kode; items missing from the file are deactivated; konstruksi: new stages only for Direktur/Admin; other kinds: tahapan optional, existing stages only',
     security: h.security,
     request: { params: idParam, body: multipart(D.RapImportCommit) },
     responses: h.res(200, 'RAP', D.Rap, [400, 401, 403, 404, 409, 413, 429]),
@@ -79,7 +79,7 @@ export function registerDailyPaths(registry: OpenAPIRegistry, h: Helpers): void 
   registry.registerPath({
     method: 'post',
     path: '/projects/{id}/rap/apply-template',
-    summary: 'P3 fill an EMPTY RAP from a RAP template of the same PT (409 STATE_CONFLICT when items exist)',
+    summary: 'P3 fill an EMPTY RAP from a RAP template of the same PT and project kind (template without kind = any kind; 400 templateId otherwise; 409 STATE_CONFLICT when items exist)',
     security: h.security,
     request: { headers: h.idem, params: idParam, body: json(D.RapApplyTemplate) },
     responses: h.res(200, 'RAP', D.Rap, write),

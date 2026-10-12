@@ -6,6 +6,135 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed (DRMS 10/10 follow-up — Staff see projects without money, owner 2026-10-11)
+
+- Web: Staff get the "Proyek" module — the list of their assigned projects (search / filter) and the project page
+  read-only (no Simpan): tab Proyek without RAB, tab RAP with codes, volumes and realised volume only, tab Pengajuan with
+  their own requests only; no tab Pinjaman for Staff (shown to Direktur, Admin, Finance and PM only).
+- Project money is now hidden from Staff at the API level (field read access, `access/money.ts`): `projects.budget`
+  (RAB / contract value), `rap-items.unitPrice` and the RAB % of approval rows (`approvals.budgetPctBefore/After`) are
+  readable only with a money role (Direktur, Admin, Finance, PM) in the row's PT — also through `?select=` and `depth`
+  population; a `where` / `sort` on those fields is refused. `/api/v1/projects` returns `contractValue: null` for
+  Staff; `GET /api/v1/expense-requests/{id}` returns `budget: {basis: "none", pctBefore: null, pctAfter: null}` and
+  null `approvals[].budgetPct*` for callers without a money role (the % with the request total revealed the RAB).
+- APK: "Proyek" menu for Staff (tabs Proyek / RAP / Pengajuan — own requests only, no Pinjaman); no contract value row
+  for Staff; the request detail drops the "Dampak anggaran" row for Staff instead of showing "Tanpa anggaran".
+
+**DRMS 10/10 Phase D — Pinjaman antar project (ADR 0022, owner D6 + Q-L1…Q-L7 2026-10-11).** The PM of the borrower
+project submits a loan from another project of the SAME PT (Dana or Barang/material, value in Rp, no interest, due date
+required); one Direktur decides (G1: another Direktur when the PM is a Direktur; the PT's only Direktur may approve his
+own loan, recorded as `direktur_self`); the lender PM is notified. Repayments are recorded by the borrower PM or Finance
+without approval (append-only, void with reason) → Sebagian kembali → Lunas; "Terlambat" is derived from the due date.
+Notional allocation: **no cash entry is created** for a loan or a repayment; RAB / RAP / realisation unchanged.
+
+**Database migrations:** `20261013_100000_d1010_project_loans` (tables `project_loans`, `project_loan_repayments`,
+`approvals.loan_id`, enum values `project_loan`, `companies.reminder_loan_overdue_enabled`) and
+`20261013_100100_d1010_project_loans_guard` (same-PT triggers, transitions + frozen content, repaid = Σ posted repayments,
+append-only repayments, approvals owner CHECK + G1 branch, reminder rule `loan_overdue`, sequence
+`PJ/{COMPANY}/{YY}{MM}/{seq}` seeded per PT). Additive; `down()` drops the new objects (pre-production).
+
+### Added (DRMS 10/10 Phase D — loans)
+
+- API `/api/v1/project-loans`: list (D8 pages, search, filters project/role/status/overdue), `inbox`, `options`, detail,
+  create / edit Draft / submit / cancel / approve / reject, `repayments` add and `repayments/:rid/void`; OpenAPI updated.
+- Web: Keuangan → Pinjaman (list, form, detail with the fixed decision bar for the Direktur, repayment dialog, void),
+  project tab "Pinjaman" (diterima / diberikan / terlambat), section in Persetujuan, dashboard card (Direktur, Finance,
+  PM), report "Pinjaman antar project" (per-loan + per-project summary, CSV / Excel / PDF).
+- Daily reminder for overdue loans to the borrower PM + Direktur (per-PT switch "Pinjaman antar project terlambat").
+- APK: project tab "Pinjaman", loan form (create / edit Draft, submit), detail, Direktur decision from the inbox (online
+  only; repayments stay on the web in v1).
+
+**DRMS 10/10 Phase D — multiple sites (kantor cabang) per PT** (ADR 0023, owner decisions 2026-10-11 Q-S1…Q-S7; server
++ web + APK). A site is a branch office of the PT (same legal entity, numbering, approvals and access per PT); one site
+handles several projects, a project belongs to at most one site. A PT without sites behaves exactly as before.
+
+**Database migrations:** `20261013_200000_d1010_sites` (schema: table `sites`; nullable `employees.home_site_id`,
+`projects.site_id`, `cash_accounts.site_id`, `team_assignments.site_id`, `attendances.site_id`) and
+`20261013_200100_d1010_sites_guard` (company NOT NULL + immutable, code unique per PT, no delete, operational default cost
+center, same-PT triggers for every site reference, team assignment = exactly one of project / cost center / site,
+attendance location = project | cost center | site with the site filled by the DB, one check-in/out per site and day).
+No data is moved. **APK drift schema 9** (nullable `site_id` on the outbox).
+
+### Added (ADR 0023)
+
+- **Master "Site (kantor cabang)"** under Master Data (kode, nama, alamat, titik + radius absen, jadwal kerja default,
+  pusat biaya default, aktif); every member of the PT reads it, Admin / Direktur maintain it. **"Buat site dari pusat
+  biaya"** on the cost-center form pre-fills a new site from that cost center.
+- **Optional site links:** "Site penempatan" on employees, "Site" on projects, cash accounts (petty cash of a branch) and
+  team assignments (third option next to project / cost center); Site column + filter in those lists and on attendances.
+- **Attendance at a site** (web Absen, APK, PM "diabsenkan"): allowed at the employee's home site or with an active site
+  assignment; on-behalf for a PM assigned (role PM) to the site or the PM of a project of the site. Geofence of the site
+  (empty radius = PT default). Schedule resolution employee → home site → PT default. Old APKs keep working.
+- **Site filter** (only narrows the scope) on Rekap Kas, Buku Kas, Pengeluaran per kategori, Anggaran project, Rekap
+  pengajuan, Kelengkapan, Laporan absensi, the attendance views (Tim hari ini, Rekap bulanan), the Kas book and the
+  Direktur / Finance / PM dashboards; **saldo kas per site** on the Direktur and Finance dashboards, **ringkasan per site**
+  (project berjalan, hadir hari ini, pencairan bulan ini) on the Direktur dashboard.
+- **Transfer default cost center:** a project without its own default proposes the default cost center of its site.
+- **Import workbook:** sheet **Site** + optional `kode_site` on Karyawan, Project, Penugasan and AkunKas.
+- **API:** `GET /api/v1/sites` (caller flags `home` / `assigned` / `team`), masters type `sites` (+ `site` on projects /
+  team assignments, `homeSite` on employees), `site_id` on attendance check-in/out (web + sync, exactly one location),
+  `site_id` on team-today, `site` on `GET /projects(/{id})` and `?site=` on the list, `homeSite` on `/me` employees,
+  `?site=` on dashboards and `/cash-accounts/balances` (`siteId` per account), report parameter `site`.
+- **APK:** sites in the attendance location picker (home site first) and in "Diabsenkan PM", masters cache per PT, site on
+  the project detail and "Site penempatan" on the profile.
+
+**DRMS 10/10 Phase E — configurable approval rules + Direktur no-approval** (owner decision 2026-10-11, ADR 0024;
+supersedes parts of ADR 0021). **Database migrations:** `20261013_300000_d1010_approval_config` (schema:
+`approval_rules_requester_roles`), `20261013_300000_d1010_approval_config_guard` (zero-step rule guard, `g1_exception`
+`direktur_no_approval` check, "Disetujui" needs a decision row unless that exception), `20261013_300000_d1010_approval_config_data`
+(rule "Pengajuan Direktur" per PT that still has the default rules).
+
+### Added (Phase E)
+
+- **Aturan approval → "Peran pemohon"** (Direktur / PM / Staff / Finance / Admin; empty = any) used in rule selection with
+  the priority; rules **without approval level** ("Tanpa persetujuan — langsung ke antrian transfer Finance") allowed
+  only for Peran pemohon = Direktur (form + database); explanation and live preview in the rule form.
+- **A Direktur's own request goes straight to the Finance transfer queue** without approval: status "Tanpa persetujuan
+  (Antri Transfer)" / "(Verifikasi Nota)", timeline step "Persetujuan — Tanpa persetujuan — pengajuan Direktur (kebijakan
+  PT)" (web + APK), transfer queue badge, PDF note, Rekap Pengajuan column "Persetujuan", audit
+  `approval_policy_exception`; the LPJ shortfall and the receipt re-approval of such a request need no approval either.
+- API (additive): `approvalRule.selfApproval` `direktur_no_approval`, transfer queue `noApproval`, `/me`
+  `companies[].ownRequestNoApproval`, masters employees `direktur`, shortfall `noApproval`.
+- APK: info "Pengajuan Anda langsung ke antrian transfer Finance" for a Direktur, no Direktur offered as requester to
+  others, timeline / status / queue badge identical to the web.
+
+### Changed (Phase E)
+
+- The PM no longer files a request on a Direktur's behalf (ADR 0021 `direktur_via_pm` withdrawn for new requests: 403 at
+  the draft; Admin/Finance for a Direktur → 409 at submit). Requests already submitted under it keep working.
+
+**DRMS 10/10 D4 amendment — RAP for every project with a RAB** (owner decision 2026-10-11: "RAP wajib untuk semua
+proyek yang punya RAB"; "Melebihi RAP" stays a warning). ADR 0020 amendment, plan `drms-1010.md` ("D4 amendment").
+
+**Database migrations:** `20261013_400000_d1010_rap_all` (schema: `rap_items.stage_id` nullable,
+`rap_templates.project_kind`, template item `stage_name` optional) and `20261013_400100_d1010_rap_all_guard` (a RAP
+item without stage only outside konstruksi; existing templates → kind konstruksi; logs every project with a RAB but no
+RAP — no RAP is created automatically, submitted requests stay valid).
+
+### Changed (D4 amendment)
+
+- **Submit rule:** a project of ANY kind with a RAB (and every konstruksi project, as before) needs ≥ 1 active RAP item
+  before an expense request can be submitted → 400 `projectId` **"Project belum punya RAP — hubungi PM"** (same text on
+  the web form, the APK draft editor / line editor / project RAP tab). Drafts can still be saved; every line of a project
+  with a RAP picks a RAP item. A project without RAB and without RAP stays unconstrained (the APK no longer asks for a RAP
+  item there).
+- **RAP for every project kind:** the project's **RAP tab** now also manages the RAP (Excel import / export, "Pakai
+  template", "Simpan sebagai template") for the PM and the Direktur/Admin — no longer only under Laporan harian
+  (konstruksi). Outside konstruksi the stage ("tahapan") is optional (an existing stage only, never created by an import)
+  and the RAP never drives the stage progress (manual progress reports unchanged); daily reports stay konstruksi-only.
+- **RAP templates per project kind** (`Jenis project` on the template; saved from a project = its kind; a template of
+  another kind → 400 `templateId`; outside konstruksi an unknown template stage is dropped).
+- The project kind is frozen once the project has RAP items (409 "sudah punya RAP" instead of a DB error).
+
+### Added (D4 amendment)
+
+- **Dashboard nudge:** "Project Anda belum punya RAP" (PM, team projects) and "Project ber-RAB belum punya RAP"
+  (Direktur, every project of the selected PTs) with a link to the project's RAP tab.
+- **API (APK):** `GET /projects` / `GET /projects/{id}` `rapRequired`, `rapMissing`; `GET /projects/{id}/rap`
+  `rapRequired`, `drivesProgress`, item `stage` nullable; `POST /projects/{id}/rap/items` `stageId` optional outside
+  konstruksi.
+- **Go-live import:** a warning per imported project with a RAB but no RAP; `rab` column hint mentions the RAP rule.
+
 ## [0.8.0] - 2026-10-12
 
 **Approval PM → Direktur (ADR 0021), RAP + Laporan harian (P3), DRMS 10/10 Phases A–C** (owner feedback 2026-10-10 /

@@ -149,6 +149,18 @@ class _DetailBody extends ConsumerWidget {
               ],
             ),
           ),
+        // ADR 0024: a Direktur's own request without approval (audited policy exception; web panel note).
+        if (d.approvalRule?.noApproval ?? false)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: Row(
+              children: [
+                const Icon(Icons.info_outline, size: 18),
+                const SizedBox(width: 6),
+                Expanded(child: Text(t.noApprovalNote, key: const Key('no-approval-note'))),
+              ],
+            ),
+          ),
         section(t.sectionRequestDetails, key: const Key('section-details')),
         if (ptText != null) row(t.draftCompany, ptText, key: const Key('detail-company')),
         row(t.grandTotal, formatRupiah(d.grandTotal)),
@@ -160,10 +172,12 @@ class _DetailBody extends ConsumerWidget {
         if (d.requestDate != null) row(t.requestDate, formatDateOnly(d.requestDate)),
         row(t.neededDate, formatDateOnly(d.neededDate)),
         if (d.notes != null && d.notes!.trim().isNotEmpty) row(t.fieldNotes, d.notes!.trim()),
-        row(
-          t.budgetImpact,
-          d.budget.hasBudget ? t.budgetChange(pct(d.budget.pctBefore), pct(d.budget.pctAfter)) : t.budgetNone,
-        ),
+        // owner 2026-10-11: the RAB % is money (the server sends basis "none" to Staff) — no row instead of "Tanpa anggaran"
+        if (d.budget.hasBudget || (pt?.seesProjectMoney ?? profile?.seesProjectMoney ?? false))
+          row(
+            t.budgetImpact,
+            d.budget.hasBudget ? t.budgetChange(pct(d.budget.pctBefore), pct(d.budget.pctAfter)) : t.budgetNone,
+          ),
         if (over)
           Row(
             children: [

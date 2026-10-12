@@ -252,6 +252,10 @@ abstract class ApprovalRuleInfo with _$ApprovalRuleInfo {
   /// ADR 0021 (owner 2026-10-11): the requester Direktur approves himself (only Direktur of the PT).
   bool get direkturViaPmSelf => selfApproval == 'direktur_via_pm_self';
 
+  /// ADR 0024 (owner 2026-10-11): a Direktur's own request without any approval step — straight to the Finance
+  /// transfer queue (audited policy exception, web `direktur_no_approval`).
+  bool get noApproval => selfApproval == 'direktur_no_approval';
+
   /// Approver role of an approval level (null = named user / unknown).
   String? roleOfLevel(int level) => steps.where((s) => s.level == level).firstOrNull?.approverRole;
 
