@@ -158,7 +158,7 @@ describe('labels (snapshot-aware)', () => {
     expect(decisionByOf(oldSnap, 'acknowledge', 0)).toBe('direktur')
     expect(decisionByOf(oldSnap, 'approve', 1)).toBe('finance')
   })
-  it('timeline + "Giliran": PM project first, then the Direktur', () => {
+  it('timeline + "Tahapan saat ini": PM project first, then the Direktur', () => {
     const steps = timeline('advance', 'pending_ack', { snapshot: pmSnap, currentLevel: 0 })
     expect(steps.find((s) => s.status === 'pending_ack')).toMatchObject({ label: 'Menunggu persetujuan PM', state: 'current' })
     expect(steps.find((s) => s.status === 'pending_approval')?.label).toBe('Menunggu persetujuan Direktur')

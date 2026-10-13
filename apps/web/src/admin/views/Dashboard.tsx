@@ -10,6 +10,7 @@ import type { ProjectBudget } from '@/domain/reports/kpi'
 import { lastDay, MONTHS_SHORT, periodLabel } from '@/domain/reports/rules'
 import { delta, share, statusTone, type PipelineStage } from '@/domain/reports/viz'
 import { resolveDisplayName } from '@/domain/user-display-name'
+import { formatNumber } from '@/lib/money'
 import { withReqTransaction } from '@/lib/system-tx'
 import { listReports } from '@/domain/progress/dto'
 import { projectProgressVsBudget, type ProjectProgress } from '@/domain/reports/progress'
@@ -225,10 +226,10 @@ function SiteSummaryCard({ rows, span, i }: { rows: SiteSummary[]; span: 8 | 12;
         empty={<EmptyState text="Belum ada site." />}
         cols={[
           { key: 's', label: 'Site', cell: (r) => <a href={`/admin/dashboard?peran=owner&site=${r.siteId}`}>{`${r.code} ${r.name}`}</a> },
-          { key: 'p', label: 'Project berjalan', num: true, cell: (r) => String(r.projectsRunning) },
-          { key: 'a', label: 'Hadir hari ini', num: true, cell: (r) => <a href={`/admin/absensi?${where({ site: String(r.siteId) })}`}>{r.attendanceToday}</a> },
-          { key: 'd', label: 'Pencairan bulan ini', num: true, cell: (r) => rpShort(r.disbursedMonth) },
-          { key: 'c', label: 'Saldo kas site', num: true, cell: (r) => rpShort(r.balance) },
+          { key: 'p', label: 'Project berjalan', num: true, cell: (r) => formatNumber(r.projectsRunning) },
+          { key: 'a', label: 'Hadir hari ini', num: true, cell: (r) => <a href={`/admin/absensi?${where({ site: String(r.siteId) })}`}>{formatNumber(r.attendanceToday)}</a> },
+          { key: 'd', label: 'Pencairan bulan ini', num: true, cell: (r) => rp(r.disbursedMonth) },
+          { key: 'c', label: 'Saldo kas site', num: true, cell: (r) => rp(r.balance) },
         ]}
       />
     </Card>
@@ -263,7 +264,7 @@ function PipelineCard({ id, pipeline, title, sub, span, i }: { id: string; pipel
             {[...pipeline.stages, pipeline.exit].map((s) => (
               <tr key={s.key}>
                 <td>{s.label}</td>
-                <td className="n">{s.count}</td>
+                <td className="n">{formatNumber(s.count)}</td>
                 <td className="n">{rp(s.sum)}</td>
               </tr>
             ))}
@@ -335,9 +336,9 @@ function TrendCard({ id, rows, title, sub, span, i }: { id: string; rows: Array<
       <LineChart
         id={id}
         rows={rows.map((r) => ({ period: r.period, value: r.count, extra: rp(r.sum) }))}
-        fmt={(v) => String(v)}
+        fmt={(v) => formatNumber(v)}
         label="pengajuan"
-        aria={`${title}: ${rows.map((r) => `${short(r.period)} ${r.count}`).join(', ')}`}
+        aria={`${title}: ${rows.map((r) => `${short(r.period)} ${formatNumber(r.count)}`).join(', ')}`}
         empty="Belum ada pengajuan di rentang ini."
       />
       <TableView>
@@ -357,7 +358,7 @@ function TrendCard({ id, rows, title, sub, span, i }: { id: string; rows: Array<
             {rows.map((r) => (
               <tr key={r.period}>
                 <td>{short(r.period)}</td>
-                <td className="n">{r.count}</td>
+                <td className="n">{formatNumber(r.count)}</td>
                 <td className="n">{rp(r.sum)}</td>
               </tr>
             ))}
@@ -508,7 +509,7 @@ function BudgetCard({ id, projects, warnPct, span, i, pm, progress }: { id: stri
       span={span}
       i={i}
       action={{ href: '/admin/laporan/anggaran-project', label: 'Laporan anggaran' }}
-      foot={projects.length > limit ? `Menampilkan ${limit} dari ${projects.length} project — semua ada di tabel angka.` : 'Warna status dari Komitmen (K-08); progress fisik (K-09) di tabel angka dan kartu progress.'}
+      foot={projects.length > limit ? `Menampilkan ${limit} dari ${formatNumber(projects.length)} project — semua ada di tabel angka.` : 'Warna status dari Komitmen (K-08); progress fisik (K-09) di tabel angka dan kartu progress.'}
     >
       <div id="anggaran" />
       {projects.length > 0 ? <BulletLegend warnPct={warnPct} /> : null}
@@ -541,7 +542,7 @@ function InboxCard({ id, items, count, span, i }: { id: string; items: InboxItem
     { key: 'amt', label: 'Grand total', num: true, cell: (r) => rp(r.grandTotal) },
   ]
   return (
-    <Card id={id} title="Menunggu tindakan saya" sub={count > items.length ? `${items.length} dari ${count}, terlama dulu` : 'Terlama dulu'} span={span} i={i} action={{ href: '/admin/persetujuan', label: 'Buka Persetujuan' }}>
+    <Card id={id} title="Menunggu tindakan saya" sub={count > items.length ? `${formatNumber(items.length)} dari ${formatNumber(count)}, terlama dulu` : 'Terlama dulu'} span={span} i={i} action={{ href: '/admin/persetujuan', label: 'Buka Persetujuan' }}>
       <DataTable id={id} cols={cols} rows={items} rowKey={(r) => r.id} caption="Pengajuan yang menunggu Diketahui/Approval saya" empty={<EmptyState text="Tidak ada pengajuan yang menunggu Anda. ✓" />} />
     </Card>
   )
@@ -575,7 +576,7 @@ function TeamWaitingCard({ id, data, span, i }: { id: string; data: TeamWaiting;
     <Card
       id={id}
       title="Pengajuan tim menunggu keputusan"
-      sub={data.count > data.items.length ? `${data.items.length} dari ${data.count}, terlama dulu · PM project lalu Direktur memutuskan` : 'Terlama dulu · PM project lalu Direktur memutuskan'}
+      sub={data.count > data.items.length ? `${formatNumber(data.items.length)} dari ${formatNumber(data.count)}, terlama dulu · PM project lalu Direktur memutuskan` : 'Terlama dulu · PM project lalu Direktur memutuskan'}
       span={span}
       i={i}
       action={{ href: statusList(WAITING), label: 'Lihat semua' }}
@@ -708,16 +709,16 @@ async function Owner({ req, months, siteId }: { req: PayloadRequest; months: 6 |
       <SiteFilter layout="owner" sites={d.sites.options} selected={d.sites.selected} months={months} />
       <Bento label="Ringkasan Direktur">
         <KpiRow>
-          <KpiTile id="cash" hero icon="wallet" label="Saldo kas total" value={rpShort(d.cash.total)} title={rp(d.cash.total)} kpi="k01-total" href={rekapKasMonth(d.month)} more="Rekap Kas" i={0}>
-            <p className="pk-kpi-x">{rp(d.cash.total)}</p>
+          {/* DRMS 13/10 #10: KPI tiles show the full Rupiah value (compact form only on chart axes/labels) */}
+          <KpiTile id="cash" hero icon="wallet" label="Saldo kas total" value={rp(d.cash.total)} title={rp(d.cash.total)} kpi="k01-total" href={rekapKasMonth(d.month)} more="Rekap Kas" i={0}>
             {balPrev ? <Delta d={delta(d.cash.total, balPrev.balance)} good="up" vs={`vs akhir ${short(balPrev.period)}`} /> : null}
             <Sparkline label="Saldo akhir bulan" values={bal.map((b) => ({ label: short(b.period), value: b.balance }))} />
             <p className="pk-kpi-x" data-pk-kpi="k02b-month">
-              Bulan ini <b>+{rpShort(d.cash.monthIn)}</b> / <b>−{rpShort(d.cash.monthOut)}</b>
+              Bulan ini <b>+{rp(d.cash.monthIn)}</b> / <b>−{rp(d.cash.monthOut)}</b>
             </p>
-            <PerPt pt={pt} rows={d.cash.byCompany} value={(r) => r.total} fmt={rpShort} label="Saldo kas" />
+            <PerPt pt={pt} rows={d.cash.byCompany} value={(r) => r.total} fmt={rp} label="Saldo kas" />
           </KpiTile>
-          <KpiTile id="approvals" icon="clock" label="Pengajuan menunggu" value={`${a.count}`} title={`${a.count} pengajuan`} kpi="k10-count" href={statusList(WAITING)} more="Lihat pengajuan" i={1}>
+          <KpiTile id="approvals" icon="clock" label="Pengajuan menunggu" value={formatNumber(a.count)} title={`${formatNumber(a.count)} pengajuan`} kpi="k10-count" href={statusList(WAITING)} more="Lihat pengajuan" i={1}>
             <p className="pk-kpi-x" data-pk-kpi="k10-sum">
               {a.count === 0 ? 'Tidak ada yang menunggu ✓' : <b>{rp(a.sum)}</b>}
             </p>
@@ -729,28 +730,28 @@ async function Owner({ req, months, siteId }: { req: PayloadRequest; months: 6 |
                 </div>
                 <p className="pk-kpi-x">
                   <Swatch cls="o1" />
-                  Diketahui <b>{a.pendingAck.count}</b> · <Swatch cls="o3" />
-                  Approval <b>{a.pendingApproval.count}</b>
+                  Diketahui <b>{formatNumber(a.pendingAck.count)}</b> · <Swatch cls="o3" />
+                  Approval <b>{formatNumber(a.pendingApproval.count)}</b>
                 </p>
               </>
             ) : null}
             <p className="pk-kpi-x" data-pk-kpi="k10-mine">
-              <b>{a.waitingForMe}</b> menunggu saya{a.oldestDays !== null ? ` · tertua ${a.oldestDays} hari` : ''}
+              <b>{formatNumber(a.waitingForMe)}</b> menunggu saya{a.oldestDays !== null ? ` · tertua ${a.oldestDays} hari` : ''}
             </p>
             <PerPt pt={pt} rows={a.byCompany} value={(r) => r.count} label="Pengajuan menunggu" />
           </KpiTile>
-          <KpiTile id="disbursed" icon="send" label="Pencairan bulan ini" value={rpShort(disb.net)} title={rp(disb.net)} kpi="k05-month" href="/admin/laporan/pengeluaran-kategori" more="Pengeluaran per kategori" i={2}>
-            <p className="pk-kpi-x">{rp(disb.net)} dicairkan bersih</p>
+          <KpiTile id="disbursed" icon="send" label="Pencairan bulan ini" value={rp(disb.net)} title={rp(disb.net)} kpi="k05-month" href="/admin/laporan/pengeluaran-kategori" more="Pengeluaran per kategori" i={2}>
+            <p className="pk-kpi-x">Dicairkan bersih</p>
             {disbPrev ? <Delta d={delta(disb.net, disbPrev.net)} vs={`vs ${short(disbPrev.period)}`} /> : null}
             <Sparkline label="Pencairan bersih per bulan" values={v.disbursed.map((x) => ({ label: short(x.period), value: x.net }))} />
           </KpiTile>
           <KpiTile id="budget" icon="target" label="Realisasi vs anggaran" value={pctText(realPct)} title={`${pctText(realPct)} dari RAB`} kpi="k06-pct" href="#anggaran" more="Anggaran project" i={3}>
             <p className="pk-kpi-x">
-              <b>{rpShort(bt.realized)}</b> dari RAB {rpShort(bt.budget)}
+              <b>{rp(bt.realized)}</b> dari RAB {rp(bt.budget)}
             </p>
             <Meter value={bt.realized} max={bt.budget} />
             <p className="pk-kpi-x">
-              Komitmen {pctText(comPct)} · {bt.projects} project ber-RAB
+              Komitmen {pctText(comPct)} · {formatNumber(bt.projects)} project ber-RAB
             </p>
             <p className="pk-kpi-x" data-pk-kpi="k08-running">
               {d.budget.running} berjalan: <BudgetBadge tone="over" /> {d.budget.over} <BudgetBadge tone="warn" /> {d.budget.warn} <BudgetBadge tone="ok" /> {d.budget.ok}
@@ -762,7 +763,7 @@ async function Owner({ req, months, siteId }: { req: PayloadRequest; months: 6 |
               ) : null}
             </p>
             {/* per PT: colour counts with THAT PT's thresholds — no combined percentage (wireframe §5 rule 2) */}
-            <PerPt pt={pt} rows={d.budget.byCompany} value={(r) => r.running} label="Project berjalan" render={(r) => `${r.running} berjalan · ${r.over} merah · ${r.warn} kuning`} />
+            <PerPt pt={pt} rows={d.budget.byCompany} value={(r) => r.running} label="Project berjalan" render={(r) => `${formatNumber(r.running)} berjalan · ${formatNumber(r.over)} merah · ${formatNumber(r.warn)} kuning`} />
           </KpiTile>
         </KpiRow>
 
@@ -793,7 +794,7 @@ async function Owner({ req, months, siteId }: { req: PayloadRequest; months: 6 |
         </Card>
         <Card id="completeness" title="Kelengkapan nota/LPJ" span={3} i={10} action={{ href: '/admin/laporan/kelengkapan', label: 'Laporan' }}>
           <p className="pk-kpi-v" style={{ fontSize: 22, margin: 0 }} data-pk-kpi="k12g">
-            {d.completeness.ratioDone} / {d.completeness.ratioTotal}
+            {formatNumber(d.completeness.ratioDone)} / {formatNumber(d.completeness.ratioTotal)}
           </p>
           <p className="pk-kpi-x">pengajuan baru bulan ini sudah LPJ</p>
           <Meter value={d.completeness.ratioDone} max={Math.max(1, d.completeness.ratioTotal)} />
@@ -801,15 +802,15 @@ async function Owner({ req, months, siteId }: { req: PayloadRequest; months: 6 |
             {d.completeness.overdue > 0 ? <StatusPill tone="bad" label={`${d.completeness.overdue} LPJ terlambat`} /> : <StatusPill tone="ok" label="Tidak ada LPJ terlambat" />}
           </p>
           <p className="pk-kpi-x" data-pk-kpi="k12a">
-            <b>{d.completeness.withoutLpj}</b> pengajuan baru belum LPJ
+            <b>{formatNumber(d.completeness.withoutLpj)}</b> pengajuan baru belum LPJ
           </p>
           <p className="pk-kpi-x" data-pk-kpi="k12e">
-            <b>{d.completeness.reimburseToVerify}</b> nota reimburse menunggu verifikasi
+            <b>{formatNumber(d.completeness.reimburseToVerify)}</b> nota reimburse menunggu verifikasi
           </p>
           <p className="pk-kpi-x" data-pk-kpi="k12f">
-            <b>{d.completeness.openWarnings}</b> flag peringatan terbuka
+            <b>{formatNumber(d.completeness.openWarnings)}</b> flag peringatan terbuka
           </p>
-          <PerPt pt={pt} rows={d.completeness.byCompany} label="Kelengkapan LPJ" render={(r) => `${r.ratioDone}/${r.ratioTotal} · ${r.overdue} terlambat`} />
+          <PerPt pt={pt} rows={d.completeness.byCompany} label="Kelengkapan LPJ" render={(r) => `${formatNumber(r.ratioDone)}/${formatNumber(r.ratioTotal)} · ${formatNumber(r.overdue)} terlambat`} />
         </Card>
 
         <SiteCashCard id="owner-site-cash" rows={d.sites.cash} span={4} i={10} />
@@ -835,8 +836,8 @@ async function Owner({ req, months, siteId }: { req: PayloadRequest; months: 6 |
                   </a>
                 ),
               },
-              { key: 'rab', label: 'RAB', num: true, sec: true, cell: (p) => rpShort(p.budget ?? 0) },
-              { key: 'real', label: 'Realisasi', num: true, cell: (p) => rpShort(p.realized) },
+              { key: 'rab', label: 'RAB', num: true, sec: true, cell: (p) => rp(p.budget ?? 0) },
+              { key: 'real', label: 'Realisasi', num: true, cell: (p) => rp(p.realized) },
               { key: 'pct', label: '% RAB', num: true, sort: 'descending', cell: (p) => pctText(p.pctRealized) },
               { key: 'st', label: 'Status', cell: (p) => <BudgetBadge tone={p.tone} /> },
             ]}
@@ -855,13 +856,12 @@ async function Owner({ req, months, siteId }: { req: PayloadRequest; months: 6 |
         </Card>
         <Card id="transfer-queue" title="Antrian transfer" sub="Lihat saja (Finance yang memproses)" span={3} i={15} action={{ href: '/admin/antrian-transfer', label: 'Antrian' }}>
           <p className="pk-kpi-v" style={{ fontSize: 22, margin: 0 }} data-pk-kpi="k11-count">
-            {d.transferQueue.count} · {rpShort(d.transferQueue.sum)}
+            {formatNumber(d.transferQueue.count)} · {rp(d.transferQueue.sum)}
           </p>
-          <p className="pk-kpi-x">{rp(d.transferQueue.sum)}</p>
           <p className="pk-kpi-x" style={{ marginTop: 8 }}>
             {d.transferQueue.overdue > 0 ? <StatusPill tone="warn" label={`${d.transferQueue.overdue} lewat tanggal dibutuhkan`} /> : <StatusPill tone="ok" label="Tidak ada yang lewat tanggal" />}
           </p>
-          <PerPt pt={pt} rows={d.transferQueue.byCompany} value={(r) => r.count} label="Antrian transfer" render={(r) => `${r.count} · ${rpShort(r.sum)}`} />
+          <PerPt pt={pt} rows={d.transferQueue.byCompany} value={(r) => r.count} label="Antrian transfer" render={(r) => `${formatNumber(r.count)} · ${rp(r.sum)}`} />
         </Card>
       </Bento>
     </>
@@ -890,43 +890,41 @@ async function Finance({ req, siteId }: { req: PayloadRequest; siteId?: number }
       <SiteFilter layout="finance" sites={d.sites.options} selected={d.sites.selected} />
       <Bento label="Ringkasan Finance">
         <KpiRow cols={6}>
-          <KpiTile id="cash" icon="wallet" label="Saldo kas total" value={rpShort(d.cashTotal)} title={rp(d.cashTotal)} kpi="k01-total" href="#pk-card-accounts" more="Saldo per akun" i={0}>
-            <p className="pk-kpi-x">{rp(d.cashTotal)}</p>
+          <KpiTile id="cash" icon="wallet" label="Saldo kas total" value={rp(d.cashTotal)} title={rp(d.cashTotal)} kpi="k01-total" href="#pk-card-accounts" more="Saldo per akun" i={0}>
             {balPrev ? <Delta d={delta(d.cashTotal, balPrev.balance)} good="up" vs={`vs akhir ${short(balPrev.period)}`} /> : null}
             <Sparkline label="Saldo akhir bulan" values={v.balanceTrend.map((b) => ({ label: short(b.period), value: b.balance }))} />
-            <PerPt pt={pt} rows={d.cashByCompany} value={(r) => r.total} fmt={rpShort} label="Saldo kas" />
+            <PerPt pt={pt} rows={d.cashByCompany} value={(r) => r.total} fmt={rp} label="Saldo kas" />
           </KpiTile>
-          <KpiTile id="transfer-queue" icon="send" label="Antrian transfer" value={`${d.transferQueue.count}`} title={`${d.transferQueue.count} pengajuan`} kpi="k11-count" href="/admin/antrian-transfer" more="Antrian Transfer" i={1}>
+          <KpiTile id="transfer-queue" icon="send" label="Antrian transfer" value={formatNumber(d.transferQueue.count)} title={`${formatNumber(d.transferQueue.count)} pengajuan`} kpi="k11-count" href="/admin/antrian-transfer" more="Antrian Transfer" i={1}>
             <p className="pk-kpi-x">
               <b>{rp(d.transferQueue.sum)}</b>
             </p>
             <p className="pk-kpi-x" data-pk-kpi="k11-overdue">
               {d.transferQueue.overdue > 0 ? <StatusPill tone="warn" label={`${d.transferQueue.overdue} lewat tanggal dibutuhkan`} /> : <StatusPill tone="ok" label="Tepat waktu" />}
             </p>
-            <PerPt pt={pt} rows={d.transferQueue.byCompany} value={(r) => r.count} label="Antrian transfer" render={(r) => `${r.count} · ${rpShort(r.sum)}`} />
+            <PerPt pt={pt} rows={d.transferQueue.byCompany} value={(r) => r.count} label="Antrian transfer" render={(r) => `${formatNumber(r.count)} · ${rp(r.sum)}`} />
           </KpiTile>
-          <KpiTile id="lpj-verify" icon="check" label="Menunggu verifikasi" value={`${d.lpjToVerify + d.reimburseToVerify.count}`} title={`${d.lpjToVerify} LPJ, ${d.reimburseToVerify.count} nota reimburse`} href="/admin/verifikasi-lpj" more="Verifikasi LPJ" i={2}>
+          <KpiTile id="lpj-verify" icon="check" label="Menunggu verifikasi" value={formatNumber(d.lpjToVerify + d.reimburseToVerify.count)} title={`${d.lpjToVerify} LPJ, ${d.reimburseToVerify.count} nota reimburse`} href="/admin/verifikasi-lpj" more="Verifikasi LPJ" i={2}>
             <p className="pk-kpi-x" data-pk-kpi="k12c">
-              <b>{d.lpjToVerify}</b> LPJ
+              <b>{formatNumber(d.lpjToVerify)}</b> LPJ
             </p>
             <p className="pk-kpi-x" data-pk-kpi="k12e">
-              <b>{d.reimburseToVerify.count}</b> nota reimburse · {d.reimburseToVerify.warnings} flag
+              <b>{formatNumber(d.reimburseToVerify.count)}</b> nota reimburse · {formatNumber(d.reimburseToVerify.warnings)} flag
             </p>
-            <PerPt pt={pt} rows={d.completenessByCompany} label="Menunggu verifikasi" render={(r) => `${r.lpjToVerify} LPJ · ${r.reimburseToVerify} nota`} />
+            <PerPt pt={pt} rows={d.completenessByCompany} label="Menunggu verifikasi" render={(r) => `${formatNumber(r.lpjToVerify)} LPJ · ${formatNumber(r.reimburseToVerify)} nota`} />
           </KpiTile>
-          <KpiTile id="month-in" icon="down" label={`Kas masuk ${short(cur.period)}`} value={rpShort(cur.masuk)} title={rp(cur.masuk)} kpi="k02a-in" href={rekapKasMonth(cur.period)} more="Rekap Kas" i={3}>
-            <p className="pk-kpi-x">{rp(cur.masuk)}</p>
+          <KpiTile id="month-in" icon="down" label={`Kas masuk ${short(cur.period)}`} value={rp(cur.masuk)} title={rp(cur.masuk)} kpi="k02a-in" href={rekapKasMonth(cur.period)} more="Rekap Kas" i={3}>
             {prev ? <Delta d={delta(cur.masuk, prev.masuk)} vs={`vs ${short(prev.period)}`} /> : null}
             <Sparkline label="Kas masuk per bulan" values={flows.map((f) => ({ label: short(f.period), value: f.masuk }))} />
           </KpiTile>
-          <KpiTile id="month-out" icon="up" label={`Kas keluar ${short(cur.period)}`} value={rpShort(cur.keluar)} title={rp(cur.keluar)} kpi="k02a-out" href={rekapKasMonth(cur.period)} more="Rekap Kas" i={4}>
+          <KpiTile id="month-out" icon="up" label={`Kas keluar ${short(cur.period)}`} value={rp(cur.keluar)} title={rp(cur.keluar)} kpi="k02a-out" href={rekapKasMonth(cur.period)} more="Rekap Kas" i={4}>
             <p className="pk-kpi-x">
-              {rp(cur.keluar)} · selisih <b>{rpShort(cur.masuk - cur.keluar)}</b>
+              Selisih <b>{rp(cur.masuk - cur.keluar)}</b>
             </p>
             {prev ? <Delta d={delta(cur.keluar, prev.keluar)} vs={`vs ${short(prev.period)}`} /> : null}
             <Sparkline label="Kas keluar per bulan" values={flows.map((f) => ({ label: short(f.period), value: f.keluar }))} />
           </KpiTile>
-          <KpiTile id="lpj-settle" icon="scale" label="Selisih LPJ" value={`${d.lpjToSettle.count}`} title={`${d.lpjToSettle.count} LPJ`} kpi="k12d" href="/admin/verifikasi-lpj" more="Selesaikan" i={5}>
+          <KpiTile id="lpj-settle" icon="scale" label="Selisih LPJ" value={formatNumber(d.lpjToSettle.count)} title={`${formatNumber(d.lpjToSettle.count)} LPJ`} kpi="k12d" href="/admin/verifikasi-lpj" more="Selesaikan" i={5}>
             <p className="pk-kpi-x">
               pengembalian <b>{rp(d.lpjToSettle.refund)}</b>
             </p>
@@ -1116,15 +1114,15 @@ async function Pm({ req, siteId }: { req: PayloadRequest; siteId?: number }) {
             id="team-waiting"
             icon="inbox"
             label="Pengajuan tim menunggu keputusan"
-            value={`${d.teamWaiting.count}`}
-            title={`${d.teamWaiting.count} pengajuan tim menunggu PM/Direktur/Finance`}
+            value={formatNumber(d.teamWaiting.count)}
+            title={`${formatNumber(d.teamWaiting.count)} pengajuan tim menunggu PM/Direktur/Finance`}
             kpi="k10-team"
             href={statusList(WAITING)}
             more="Lihat pengajuan"
             i={0}
           >
             <p className="pk-kpi-x">
-              PM <b>{d.teamWaiting.pm}</b> · Direktur <b>{d.teamWaiting.direktur}</b> · Finance <b>{d.teamWaiting.finance}</b>
+              PM <b>{formatNumber(d.teamWaiting.pm)}</b> · Direktur <b>{formatNumber(d.teamWaiting.direktur)}</b> · Finance <b>{formatNumber(d.teamWaiting.finance)}</b>
             </p>
             <p className="pk-kpi-x">{d.teamWaiting.oldestDays !== null ? `tertua ${d.teamWaiting.oldestDays} hari` : 'Tidak ada yang menunggu ✓'}</p>
           </KpiTile>
@@ -1132,20 +1130,20 @@ async function Pm({ req, siteId }: { req: PayloadRequest; siteId?: number }) {
             id="team-month"
             icon="users"
             label="Pengajuan tim bulan ini"
-            value={`${d.teamMonth.count}`}
-            title={`${d.teamMonth.count} pengajuan, ${rp(d.teamMonth.sum)}`}
+            value={formatNumber(d.teamMonth.count)}
+            title={`${formatNumber(d.teamMonth.count)} pengajuan, ${rp(d.teamMonth.sum)}`}
             kpi="k13-month"
             href={`${ER}?${where({ 'where[requestDate][greater_than_equal]': monthStart, 'where[requestDate][less_than_equal]': lastDay(d.month) })}`}
             more="Lihat pengajuan"
             i={1}
           >
             <p className="pk-kpi-x">
-              <b>{rp(d.teamMonth.sum)}</b> · {d.teamMonth.waiting} menunggu persetujuan
+              <b>{rp(d.teamMonth.sum)}</b> · {formatNumber(d.teamMonth.waiting)} menunggu persetujuan
             </p>
             {trendPrev ? <Delta d={delta(d.teamMonth.count, trendPrev.count)} money={false} vs={`pengajuan vs ${short(trendPrev.period)}`} /> : null}
-            <Sparkline label="Pengajuan tim per bulan" values={v.requestTrend.map((x) => ({ label: short(x.period), value: x.count }))} />
+            <Sparkline label="Pengajuan tim per bulan" fmt={formatNumber} values={v.requestTrend.map((x) => ({ label: short(x.period), value: x.count }))} />
           </KpiTile>
-          <KpiTile id="team-lpj" icon="doc" label="LPJ tim" value={`${d.lpj.withoutLpj}`} title={`${d.lpj.withoutLpj} pengajuan baru belum LPJ`} kpi="k12a" href="/admin/laporan/kelengkapan" more="Laporan Kelengkapan" i={2}>
+          <KpiTile id="team-lpj" icon="doc" label="LPJ tim" value={formatNumber(d.lpj.withoutLpj)} title={`${formatNumber(d.lpj.withoutLpj)} pengajuan baru belum LPJ`} kpi="k12a" href="/admin/laporan/kelengkapan" more="Laporan Kelengkapan" i={2}>
             <p className="pk-kpi-x">pengajuan baru belum LPJ</p>
             <p className="pk-kpi-x" data-pk-kpi="k12b">
               {d.lpj.overdue > 0 ? <StatusPill tone="bad" label={`${d.lpj.overdue} terlambat`} /> : <StatusPill tone="ok" label="Tidak ada yang terlambat" />}
@@ -1153,11 +1151,11 @@ async function Pm({ req, siteId }: { req: PayloadRequest; siteId?: number }) {
           </KpiTile>
           <KpiTile id="team-budget" icon="target" label="Realisasi anggaran project saya" value={pctText(realPct)} title={`${pctText(realPct)} dari RAB`} href="#anggaran" more="Per project" i={3}>
             <p className="pk-kpi-x">
-              <b>{rpShort(bt.realized)}</b> dari RAB {rpShort(bt.budget)}
+              <b>{rp(bt.realized)}</b> dari RAB {rp(bt.budget)}
             </p>
             <Meter value={bt.realized} max={bt.budget} />
             <p className="pk-kpi-x">
-              Komitmen {pctText(share(bt.committed, bt.budget))} · {bt.projects} project ber-RAB
+              Komitmen {pctText(share(bt.committed, bt.budget))} · {formatNumber(bt.projects)} project ber-RAB
             </p>
           </KpiTile>
         </KpiRow>
@@ -1232,17 +1230,17 @@ async function Admin({ req }: { req: PayloadRequest }) {
   return (
     <Bento label="Ringkasan Admin">
       <KpiRow cols={3}>
-        <KpiTile id="master-gaps" icon="users" label="User tanpa karyawan/peran" value={`${g.usersIncomplete}`} kpi="users-incomplete" href={`/admin/collections/users?${where({ 'where[employee][exists]': 'false' })}`} more="Lengkapi" i={0}>
+        <KpiTile id="master-gaps" icon="users" label="User tanpa karyawan/peran" value={formatNumber(g.usersIncomplete)} kpi="users-incomplete" href={`/admin/collections/users?${where({ 'where[employee][exists]': 'false' })}`} more="Lengkapi" i={0}>
           <p className="pk-kpi-x">{g.usersIncomplete === 0 ? <StatusPill tone="ok" label="Lengkap" /> : <StatusPill tone="warn" label="Perlu dilengkapi" />}</p>
         </KpiTile>
-        <KpiTile id="projects-without-pm" icon="target" label="Project tanpa PM" value={`${g.projectsWithoutPm}`} kpi="projects-without-pm" href={`/admin/collections/projects?${where({ 'where[pm][exists]': 'false' })}`} more="Tetapkan PM" i={1}>
+        <KpiTile id="projects-without-pm" icon="target" label="Project tanpa PM" value={formatNumber(g.projectsWithoutPm)} kpi="projects-without-pm" href={`/admin/collections/projects?${where({ 'where[pm][exists]': 'false' })}`} more="Tetapkan PM" i={1}>
           <p className="pk-kpi-x">{g.projectsWithoutPm === 0 ? <StatusPill tone="ok" label="Lengkap" /> : <StatusPill tone="warn" label="Perlu PM" />}</p>
         </KpiTile>
         <KpiTile
           id="cost-centers-without-manager"
           icon="scale"
           label="Pusat biaya tanpa penanggung jawab"
-          value={`${g.costCentersWithoutManager}`}
+          value={formatNumber(g.costCentersWithoutManager)}
           kpi="cost-centers-without-manager"
           href={`/admin/collections/cost-centers?${where({ 'where[manager][exists]': 'false' })}`}
           more="Tetapkan"
@@ -1334,22 +1332,22 @@ async function Staff({ req }: { req: PayloadRequest }) {
       </div>
       <Bento label="Ringkasan pengajuan saya">
         <KpiRow>
-          <KpiTile id="my-actions" icon="inbox" label="Perlu tindakan saya" value={`${d.actions.length}`} href="#pk-card-my-actions" more="Lihat daftar" i={0}>
+          <KpiTile id="my-actions" icon="inbox" label="Perlu tindakan saya" value={formatNumber(d.actions.length)} href="#pk-card-my-actions" more="Lihat daftar" i={0}>
             <p className="pk-kpi-x">{d.actions.length === 0 ? 'Tidak ada yang perlu Anda kerjakan ✓' : 'draft, revisi, nota atau LPJ'}</p>
           </KpiTile>
-          <KpiTile id="my-process" icon="clock" label="Sedang diproses" value={`${inProcess}`} href={ER} more="Pengajuan saya" i={1}>
+          <KpiTile id="my-process" icon="clock" label="Sedang diproses" value={formatNumber(inProcess)} href={ER} more="Pengajuan saya" i={1}>
             <p className="pk-kpi-x">
-              menunggu persetujuan <b>{st('ack') + st('approval')}</b>
+              menunggu persetujuan <b>{formatNumber(st('ack') + st('approval'))}</b>
             </p>
           </KpiTile>
-          <KpiTile id="my-month" icon="doc" label={`Pengajuan ${short(cur.period)}`} value={`${cur.count}`} title={`${cur.count} pengajuan, ${rp(cur.sum)}`} i={2}>
+          <KpiTile id="my-month" icon="doc" label={`Pengajuan ${short(cur.period)}`} value={formatNumber(cur.count)} title={`${formatNumber(cur.count)} pengajuan, ${rp(cur.sum)}`} i={2}>
             <p className="pk-kpi-x">
               <b>{rp(cur.sum)}</b>
             </p>
             {prev ? <Delta d={delta(cur.count, prev.count)} money={false} vs={`vs ${short(prev.period)}`} /> : null}
           </KpiTile>
-          <KpiTile id="my-done" icon="check" label="Selesai" value={`${st('done')}`} i={3}>
-            <p className="pk-kpi-x">{v.pipeline.exit.count} ditolak/dibatalkan</p>
+          <KpiTile id="my-done" icon="check" label="Selesai" value={formatNumber(st('done'))} i={3}>
+            <p className="pk-kpi-x">{formatNumber(v.pipeline.exit.count)} ditolak/dibatalkan</p>
           </KpiTile>
         </KpiRow>
 
@@ -1375,7 +1373,7 @@ async function Staff({ req }: { req: PayloadRequest }) {
             id="my-trend"
             rows={v.requestTrend.map((x) => ({ period: x.period, values: [x.sum] }))}
             series={[{ key: 'sum', label: 'Grand total', cls: 's1' }]}
-            aria={`Nilai pengajuan saya per bulan: ${v.requestTrend.map((x) => `${short(x.period)} ${rp(x.sum)} (${x.count})`).join(', ')}`}
+            aria={`Nilai pengajuan saya per bulan: ${v.requestTrend.map((x) => `${short(x.period)} ${rp(x.sum)} (${formatNumber(x.count)})`).join(', ')}`}
             empty="Belum ada pengajuan dalam 6 bulan terakhir."
           />
           <TableView>
@@ -1384,7 +1382,7 @@ async function Staff({ req }: { req: PayloadRequest }) {
                 {v.requestTrend.map((x) => (
                   <tr key={x.period}>
                     <td>{short(x.period)}</td>
-                    <td className="n">{x.count}</td>
+                    <td className="n">{formatNumber(x.count)}</td>
                     <td className="n">{rp(x.sum)}</td>
                   </tr>
                 ))}

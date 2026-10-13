@@ -127,7 +127,7 @@ export const LinesTableField: ArrayFieldClientComponent = (props) => {
     const o = id === null ? undefined : list.find((x) => x.id === id)
     return id === null ? '—' : ((short ? o?.short : undefined) ?? o?.label ?? `#${id}`)
   }
-  // grand total of the dialog preview (the table total is LinesTotalPreview below, as in the APK editor)
+  // grand total: footer row of the table / last card (DRMS 13/10 Persetujuan #10) and the dialog preview
   const grand = values.reduce((s, v) => s + (v.total ?? 0), 0)
 
   const [editing, setEditing] = useState<number | 'new' | null>(null)
@@ -279,6 +279,16 @@ export const LinesTableField: ArrayFieldClientComponent = (props) => {
               </tbody>
             )
           })}
+          {/* DRMS 13/10 Persetujuan #10: the grand total under the "Total" column (was "Total (pratinjau)" below the table) */}
+          <tfoot>
+            <tr data-pk-grand-total={grand}>
+              <th style={{ ...cell, borderBottom: 0, fontWeight: 700 }} colSpan={6} scope="row">
+                Grand total <span style={{ fontSize: 12, fontWeight: 400, color: 'var(--pk-muted-fg)' }}>({rows.length} baris · dihitung ulang server saat disimpan)</span>
+              </th>
+              <td style={{ ...numCell, borderBottom: 0, fontWeight: 700, fontSize: 15 }}>{rp(grand)}</td>
+              <td style={{ ...cell, borderBottom: 0 }} colSpan={2} />
+            </tr>
+          </tfoot>
         </table>
         </div>
         <div className="pk-lcards" data-pk-lines-cards>
@@ -319,6 +329,10 @@ export const LinesTableField: ArrayFieldClientComponent = (props) => {
               }
             />
           ))}
+          <div data-pk-grand-total={grand} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, padding: '8px 2px', fontWeight: 700 }}>
+            <span>Grand total</span>
+            <span style={{ fontVariantNumeric: 'tabular-nums' }}>{rp(grand)}</span>
+          </div>
         </div>
         </>
       )}

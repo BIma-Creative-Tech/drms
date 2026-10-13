@@ -12,7 +12,7 @@ export type DecisionBarProps = {
   label: string
   confirm: string
   canReject: boolean
-  /** Turn text ("Persetujuan PM — giliran Anda"). */
+  /** Step waiting for the caller ("Persetujuan PM"). */
   stepLabel: string
   /** ADR 0022: API collection of the decision (default the expense requests); `/:id/{step|reject}` is appended. */
   base?: string
@@ -60,7 +60,8 @@ export function DecisionBar({ id, step, label, confirm, canReject, stepLabel, ba
       <style>{STYLE}</style>
       <div ref={ref} className="pk-decide" role="region" aria-label={regionLabel} data-pk-decision-bar>
         <div className="pk-decide__text">
-          <strong>Giliran Anda:</strong> {stepLabel}
+          {/* DRMS 13/10 Persetujuan #9: "Menunggu keputusan Anda" instead of "Giliran Anda" */}
+          <strong>Menunggu keputusan Anda:</strong> {stepLabel}
         </div>
         {canReject ? <ActionButton url={`${base}/${id}/reject`} label="Tolak" prompt={rejectPrompt} testId="reject" /> : null}
         {step ? <ActionButton url={`${base}/${id}/${step}`} label={label} variant="primary" confirm={confirm} testId={step} /> : null}

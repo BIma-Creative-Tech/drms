@@ -6,7 +6,7 @@ import React from 'react'
 
 import { hasRoleAny, type Role } from '@/access/roles'
 import { Icon } from '@/admin/modules/Icon'
-import { formatRupiah } from '@/lib/money'
+import { rupiahOrDash } from '@/lib/money'
 
 import { NoAccess } from './NoAccess'
 
@@ -72,7 +72,7 @@ export const badge = (tone: 'ok' | 'warn' | 'bad' | 'muted'): React.CSSPropertie
   background: tone === 'ok' ? 'var(--pk-tone-ok)' : tone === 'warn' ? 'var(--pk-tone-warn)' : tone === 'bad' ? 'var(--pk-tone-bad)' : 'var(--theme-elevation-150)',
 })
 
-export const rp = (v: number | null | undefined) => (v === null || v === undefined ? '—' : formatRupiah(v))
+export const rp = rupiahOrDash
 
 /**
  * Row action "Ubah" in the custom views' tables — the same look as the "Aksi" column of the Payload

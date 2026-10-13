@@ -1,7 +1,8 @@
 import { APIError, type CollectionBeforeChangeHook, type CollectionSlug, type PayloadRequest, type RelationshipField, type Where } from 'payload'
+import { relationship as relationshipValidation } from 'payload/shared'
 
 import { PENDING_CREATE_ROLES } from '@/access/policies'
-import { hasRole, relId, soleCompany, type Role } from '@/access/roles'
+import { companiesWithRole, hasRole, relId, soleCompany, type Role } from '@/access/roles'
 import { defaultCompanyForWrite } from '@/domain/companies'
 import { validationError } from '@/lib/validation'
 
@@ -15,8 +16,8 @@ import { validationError } from '@/lib/validation'
  */
 const COMPANY_FIELD = '@/admin/components/companies/CompanyField#CompanyField'
 
-export function companyField(opts: { derived?: boolean } = {}): RelationshipField {
-  return {
+export function companyField(opts: { derived?: boolean; createRoles?: readonly Role[] } = {}): RelationshipField {
+  const field: RelationshipField = {
     name: 'company',
     type: 'relationship',
     relationTo: 'companies',
@@ -32,6 +33,48 @@ export function companyField(opts: { derived?: boolean } = {}): RelationshipFiel
       ? { position: 'sidebar', readOnly: true, description: 'Mengikuti dokumen induk.', components: { Field: COMPANY_FIELD } }
       : { description: 'Wajib bila Anda memilih lebih dari satu PT di pemilih PT; tidak dapat diubah setelah dibuat.', placeholder: 'Pilih PT…', components: { Field: COMPANY_FIELD } },
   }
+  if (!opts.derived && opts.createRoles) {
+    // DRMS 13/10 Pengajuan #1/#2: the picker offers only the PTs selected in the PT switcher where the caller may
+    // create (creatableCompanies); exactly one → CompanyField prefills it read-only. Picker-only: the save-time
+    // re-validation of filterOptions is skipped (the selection is a read filter, ADR 0016 §5) — the company hook
+    // still rejects a PT without the create role (rolesAllowed → PENDING_CREATE_ROLES) and the DB the rest.
+    const roles = opts.createRoles
+    field.filterOptions = ({ data, user }) => {
+      if (isListFilter(data)) return true
+      const ids = creatableCompanies(user, roles)
+      return ids.length === 0 ? false : { id: { in: ids } }
+    }
+    field.validate = (value, options) => relationshipValidation(value, { ...options, filterOptions: undefined })
+    field.custom = { ...field.custom, pkCreateRoles: roles }
+  }
+  return field
+}
+
+/**
+ * DRMS 13/10 Pengajuan #1/#2: PTs a create form may use = the PTs selected in the PT switcher (cookie
+ * `pk-company-ids` ∩ memberships, access/company-context.ts) where the caller holds one of `roles`.
+ */
+export function creatableCompanies(user: unknown, roles: readonly Role[]): number[] {
+  return companiesWithRole({ user } as never, roles)
+}
+
+/**
+ * The form's PT for a picker filter: the chosen `company`, else (create form) the only creatable PT — the one
+ * CompanyField prefills, so the first render of the dependent pickers is already filtered.
+ */
+export function formCompany(data: unknown, user: unknown, roles?: readonly Role[]): number | undefined {
+  const c = relId((data as { company?: unknown } | undefined)?.company)
+  if (c !== undefined || !roles) return c
+  const only = creatableCompanies(user, roles)
+  return only.length === 1 ? only[0] : undefined
+}
+
+/**
+ * Payload resolves `filterOptions` of the LIST view's relationship filters with `data: {}` — a document form
+ * always carries values (defaults such as `status` on create). Lets a form-only rule leave the list filter as before.
+ */
+export function isListFilter(data: unknown): boolean {
+  return !!data && typeof data === 'object' && Object.keys(data).length === 0
 }
 
 /** A per-PT reference: `field` (or `field[].sub` for arrays) pointing at a per-PT collection. */
@@ -151,15 +194,31 @@ export const sameCompanyOptions = ({ data }: { data?: unknown }) => {
 }
 
 /**
+ * DRMS 13/10 Pengajuan #3/#5: `filterOptions` of a picker that is LOCKED until the PT is known — rows of the form's
+ * PT (`formCompany`: chosen, else the only creatable PT); no PT yet → no options (`false`) instead of every PT's rows
+ * (urgency levels of three PTs listed three times). The list view's filters (data `{}`) keep every readable row.
+ */
+export function companyScopedOptions(roles: readonly Role[]) {
+  return ({ data, user }: { data?: unknown; user?: unknown }): boolean | Where => {
+    if (isListFilter(data)) return true
+    const c = formCompany(data, user, roles)
+    return c === undefined ? false : { company: { equals: c } }
+  }
+}
+
+/**
  * Picker-only PT filter (MC2-4, "employee picker filtered by PT"): `filterOptions` narrows the admin
  * dropdown to the document's PT, while the save-time re-validation of filterOptions (which re-reads
  * the referenced rows with the CALLER's access) is switched off — same pattern as
  * `expense-requests.bankAccount`. Cross-PT values stay impossible: `companyHook` + DB trigger
  * `pk_same_company` (`cross-company reference`).
+ * `createRoles` (DRMS 13/10, opt-in): no options until the PT is chosen (companyScopedOptions) — for a form whose
+ * PT is a chosen master PT (expense requests). Without it, a derived-PT form (e.g. team assignments: PT from the
+ * employee) keeps every readable row before the PT is known.
  */
-export function pickerSameCompany(opts: { required?: boolean } = {}) {
+export function pickerSameCompany(opts: { required?: boolean; createRoles?: readonly Role[] } = {}) {
   return {
-    filterOptions: sameCompanyOptions,
+    filterOptions: opts.createRoles ? companyScopedOptions(opts.createRoles) : sameCompanyOptions,
     validate: (v: unknown) => (opts.required && (v === null || v === undefined || v === '' || (Array.isArray(v) && v.length === 0)) ? 'Wajib diisi.' : true),
   } as const
 }

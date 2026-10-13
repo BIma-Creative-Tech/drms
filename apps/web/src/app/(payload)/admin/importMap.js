@@ -6,6 +6,7 @@ import { ServerTimeField as ServerTimeField_336b69cbb2796933b16a29bcc920508e } f
 import { PrivacyAckCell as PrivacyAckCell_87f32a89e993851f00f0d5bd9ac879da } from '@/admin/components/users/PrivacyAckCell'
 import { RowActionsCell as RowActionsCell_8e692449fbbc6a5e16b8bb6c27a5f01a } from '@/admin/components/RowActionsCell'
 import { RupiahCell as RupiahCell_95c4d3c7fc13f9e44e3e1f6d04b4f6ca } from '@/admin/components/RupiahCell'
+import { NumberCell as NumberCell_95c4d3c7fc13f9e44e3e1f6d04b4f6ca } from '@/admin/components/RupiahCell'
 import { ActiveCell as ActiveCell_5b572f69f0b2c658d322ad3e65563a49 } from '@/admin/components/companies/ActiveCell'
 import { MemberCountCell as MemberCountCell_0560bc1409d80e4fbd9f8971b0f4bccb } from '@/admin/components/companies/MemberCountCell'
 import { CompanyCell as CompanyCell_a3ad1a52c7c805d12e2b4c793adf9c6d } from '@/admin/components/companies/CompanyCell'
@@ -24,10 +25,10 @@ import { RequestTypeField as RequestTypeField_a356a4ed347478242de628aded3440b3 }
 import { RequestStatusCell as RequestStatusCell_08836769fece85e42fb05beb6c632414 } from '@/admin/components/RequestStatusCell'
 import { RequestStatusField as RequestStatusField_3f8d5a55b1fcbc79eb9e47f3583cb1ed } from '@/admin/components/RequestStatusField'
 import { RequestTitleField as RequestTitleField_a356a4ed347478242de628aded3440b3 } from '@/admin/components/EditableOnlyFields'
+import { CompanyScopedField as CompanyScopedField_17980260c895f93f0d171a2dbc0f4023 } from '@/admin/components/companies/CompanyScopedField'
 import { BankAccountPreview as BankAccountPreview_1615d70b0243139e3dffd45ad2617f07 } from '@/admin/components/BankAccountPreview'
 import { RupiahNumberField as RupiahNumberField_d552ada140febbfef2d7dea921fde6df } from '@/admin/components/RupiahNumberField'
 import { LinesTableField as LinesTableField_652f9839b87cfebdbb6f1faba6b58e18 } from '@/admin/components/lines/LinesTableField'
-import { LinesTotalPreview as LinesTotalPreview_981a7b2ac6e59231317266aea0a515ba } from '@/admin/components/LinesTotalPreview'
 import { UserNameCell as UserNameCell_5104a3a36f4740029b1c68f279f156e4 } from '@/admin/components/users/UserNameCell'
 import { UserNameField as UserNameField_578d1739bee7e5d282b9062a1999065a } from '@/admin/components/users/UserNameField'
 import { CollapsedReadOnlyJson as CollapsedReadOnlyJson_08329374a86bb7164f48836797d5c216 } from '@/components/ReadOnlyJson'
@@ -102,6 +103,7 @@ export const importMap = {
   "@/admin/components/users/PrivacyAckCell#PrivacyAckCell": PrivacyAckCell_87f32a89e993851f00f0d5bd9ac879da,
   "@/admin/components/RowActionsCell#RowActionsCell": RowActionsCell_8e692449fbbc6a5e16b8bb6c27a5f01a,
   "@/admin/components/RupiahCell#RupiahCell": RupiahCell_95c4d3c7fc13f9e44e3e1f6d04b4f6ca,
+  "@/admin/components/RupiahCell#NumberCell": NumberCell_95c4d3c7fc13f9e44e3e1f6d04b4f6ca,
   "@/admin/components/companies/ActiveCell#ActiveCell": ActiveCell_5b572f69f0b2c658d322ad3e65563a49,
   "@/admin/components/companies/MemberCountCell#MemberCountCell": MemberCountCell_0560bc1409d80e4fbd9f8971b0f4bccb,
   "@/admin/components/companies/CompanyCell#CompanyCell": CompanyCell_a3ad1a52c7c805d12e2b4c793adf9c6d,
@@ -120,10 +122,10 @@ export const importMap = {
   "@/admin/components/RequestStatusCell#RequestStatusCell": RequestStatusCell_08836769fece85e42fb05beb6c632414,
   "@/admin/components/RequestStatusField#RequestStatusField": RequestStatusField_3f8d5a55b1fcbc79eb9e47f3583cb1ed,
   "@/admin/components/EditableOnlyFields#RequestTitleField": RequestTitleField_a356a4ed347478242de628aded3440b3,
+  "@/admin/components/companies/CompanyScopedField#CompanyScopedField": CompanyScopedField_17980260c895f93f0d171a2dbc0f4023,
   "@/admin/components/BankAccountPreview#BankAccountPreview": BankAccountPreview_1615d70b0243139e3dffd45ad2617f07,
   "@/admin/components/RupiahNumberField#RupiahNumberField": RupiahNumberField_d552ada140febbfef2d7dea921fde6df,
   "@/admin/components/lines/LinesTableField#LinesTableField": LinesTableField_652f9839b87cfebdbb6f1faba6b58e18,
-  "@/admin/components/LinesTotalPreview#LinesTotalPreview": LinesTotalPreview_981a7b2ac6e59231317266aea0a515ba,
   "@/admin/components/users/UserNameCell#UserNameCell": UserNameCell_5104a3a36f4740029b1c68f279f156e4,
   "@/admin/components/users/UserNameField#UserNameField": UserNameField_578d1739bee7e5d282b9062a1999065a,
   "@/components/ReadOnlyJson#CollapsedReadOnlyJson": CollapsedReadOnlyJson_08329374a86bb7164f48836797d5c216,

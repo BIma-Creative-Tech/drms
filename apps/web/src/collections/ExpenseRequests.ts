@@ -2,7 +2,7 @@ import { APIError, type CollectionAfterChangeHook, type Condition, type Collecti
 
 import { RIWAYAT_TAB } from '@/admin/config'
 
-import { employeeIn, ownEmployees, relId, rolesIn, rolesOf, userId } from '@/access/roles'
+import { employeeIn, ownEmployees, relId, rolesIn, rolesOf, userId, type Role } from '@/access/roles'
 import { fieldNever, rolesAllowed } from '@/access/policies'
 import { normalizeValue, reasonOnChange, withAudit } from '@/audit/hooks'
 import { writeAudit, type AuditRow } from '@/audit/writer'
@@ -17,7 +17,7 @@ import { changeReasonField, rupiahField, uuidField } from '@/fields/common'
 import { requestMeta } from '@/lib/request-meta'
 import { forceDeferredChecks } from '@/lib/system-tx'
 import { notifyCreated, notifyTransition } from '@/domain/notifications'
-import { companyField, companyHook, pickerSameCompany, sameCompanyOptions } from '@/fields/company'
+import { companyField, companyHook, formCompany, isListFilter, pickerSameCompany } from '@/fields/company'
 import { validationError } from '@/lib/validation'
 
 import { draftOnly, editableInput, isDraftForm, linesCondition, linesEditable, PLACEHOLDERS, revisionOnly, shownInHeader, submittedOnly, whenSet } from './expense-request-form'
@@ -53,13 +53,26 @@ const revisionAndSet = (name: string): Condition => (d, s, c) => revisionOnly(d,
 const canSeeApprovalRules: Condition = (_data, _sibling, { user }) => rolesOf(user).some((r) => r === 'pk-admin' || r === 'pk-finance')
 const ro = { readOnly: true }
 const RUPIAH_FIELD = '@/admin/components/RupiahNumberField#RupiahNumberField'
+/** DRMS 13/10 Pengajuan #3/#5: a picker that stays disabled ("Pilih PT terlebih dahulu") until the form has a PT. */
+const COMPANY_SCOPED_FIELD = '@/admin/components/companies/CompanyScopedField#CompanyScopedField'
 /** Read-only money as "Rp 1.250.000" (RupiahNumberField read-only mode). */
 const rupiahView = { components: { Field: RUPIAH_FIELD } }
 
-/** Picker filter of `bankAccount` (S3e, US-44): active accounts of the requesters / the creator's employee. */
+/**
+ * Q-09 / ADR 0024: roles that may create a request (collection create access). DRMS 13/10 Pengajuan #1–#3/#5: also the
+ * PT picker scope (PT switcher selection ∩ these roles; one PT → prefilled read-only) and the PT the dependent pickers
+ * (project, urgency, Pemohon, rekening) wait for.
+ */
+export const REQUEST_CREATE_ROLES: readonly Role[] = ['pk-staff', 'pk-pm', 'pk-admin', 'pk-finance', 'pk-owner']
+
+/**
+ * Picker filter of `bankAccount` (S3e, US-44): active accounts of the requesters / the creator's employee.
+ * DRMS 13/10 #3: nothing until the form's PT is known (the list filter, data `{}`, keeps the old rule).
+ */
 export const bankAccountOptions = ({ data, user }: Pick<FilterOptionsProps, 'data' | 'user'>): false | Where => {
   const reqs = ids(((data ?? {}) as { requesters?: unknown[] | null }).requesters ?? null)
-  const company = relId((data as { company?: unknown } | undefined)?.company)
+  const company = formCompany(data, user, REQUEST_CREATE_ROLES)
+  if (company === undefined && !isListFilter(data)) return false
   const emp = company !== undefined ? employeeIn({ user } as never, company) : relId((user as { employee?: unknown } | null)?.employee)
   const owners = reqs.length > 0 ? reqs : emp !== undefined ? [emp] : []
   if (owners.length === 0) return false
@@ -68,12 +81,15 @@ export const bankAccountOptions = ({ data, user }: Pick<FilterOptionsProps, 'dat
 
 /**
  * QA-15 (owner decision 2026-10-08): "Pemohon" (Diajukan Oleh) picker — a user whose only role in the document's
- * PT (unknown yet: in every selected PT) is Staff sees only their OWN employee; everyone else the
+ * PT (list filter: in every selected PT) is Staff sees only their OWN employee; everyone else the
  * employees of the document's PT (pickerSameCompany). Server rule: drafts.ts validateContent.
  */
 export const requesterOptions = ({ data, user }: Pick<FilterOptionsProps, 'data' | 'user'>): boolean | Where => {
-  const company = relId((data as { company?: unknown } | undefined)?.company)
-  const base = sameCompanyOptions({ data })
+  const list = isListFilter(data)
+  const company = list ? undefined : formCompany(data, user, REQUEST_CREATE_ROLES)
+  // DRMS 13/10 Pengajuan #5: locked until the PT is chosen (prefilled for a single PT), then that PT's employees
+  if (!list && company === undefined) return false
+  const base: true | Where = company === undefined ? true : { company: { equals: company } }
   const roles = company !== undefined ? rolesIn({ user } as never, company) : rolesOf(user)
   if (!(roles.includes('pk-staff') && roles.every((r) => r === 'pk-staff'))) return base
   const own = company !== undefined ? [employeeIn({ user } as never, company)].filter((e): e is number => e !== undefined) : ownEmployees({ user } as never)
@@ -284,7 +300,7 @@ export const ExpenseRequests: CollectionConfig = withAudit(
       read: requestReadAccess,
       // Q-09 default: Staff/PM for themselves, Admin and Finance also on behalf of requesters. ADR 0024 (owner
       // 2026-10-11): the Direktur files his OWN requests (only for himself — drafts.ts on-behalf rule).
-      create: rolesAllowed('pk-staff', 'pk-pm', 'pk-admin', 'pk-finance', 'pk-owner'),
+      create: rolesAllowed(...REQUEST_CREATE_ROLES),
       update: requestUpdateAccess,
       delete: denyDeleteLogged('expense_request'),
     },
@@ -293,7 +309,8 @@ export const ExpenseRequests: CollectionConfig = withAudit(
     // (Jenis, Judul, Project, Pusat biaya, Tanggal dibutuhkan, Urgensi, Pemohon, Rekening, Keterangan,
     // Lampiran, baris + total pratinjau); system / workflow fields appear after submit (expense-request-form.ts).
     fields: [
-      companyField(),
+      // DRMS 13/10 Pengajuan #1/#2: PT picker = PT switcher selection ∩ create roles; one PT → prefilled, read-only
+      companyField({ createRoles: REQUEST_CREATE_ROLES }),
       // Phase C polish: shown in the workflow panel header (shownInHeader), not repeated in the sidebar
       { name: 'docNo', type: 'text', label: 'Nomor', index: true, access: system, admin: { ...ro, position: 'sidebar', condition: shownInHeader } },
       // F2c: status timeline + next actor for everyone, requester actions for creator/requesters.
@@ -327,7 +344,7 @@ export const ExpenseRequests: CollectionConfig = withAudit(
       },
       { name: 'title', type: 'text', label: 'Judul', required: true, maxLength: 200, admin: { components: { Field: '@/admin/components/EditableOnlyFields#RequestTitleField' } } },
       // D2: the project is mandatory to send the request (validateContent forSubmit); its RAP items feed the line picker (D4)
-      { name: 'project', type: 'relationship', relationTo: 'projects', label: 'Project', index: true, ...pickerSameCompany(), admin: { placeholder: PLACEHOLDERS.project, description: 'Wajib diisi sebelum dikirim. Item RAP baris diambil dari project ini.', condition: editableInput('project') } },
+      { name: 'project', type: 'relationship', relationTo: 'projects', label: 'Project', index: true, ...pickerSameCompany({ createRoles: REQUEST_CREATE_ROLES }), admin: { placeholder: PLACEHOLDERS.project, description: 'Wajib diisi sebelum dikirim. Item RAP baris diambil dari project ini.', condition: editableInput('project'), components: { Field: COMPANY_SCOPED_FIELD } } },
       // D2 (DRMS 10/10, owner 2026-10-11): no non-project requests — the requester never sets a cost center (create /
       // update access false → a value sent by an old client is ignored); Finance sets it on the transfer
       // (transfers.costCenter). Legacy requests keep theirs (shown read-only, never on a new form).
@@ -343,10 +360,11 @@ export const ExpenseRequests: CollectionConfig = withAudit(
       },
       businessDateField('neededDate', 'Tanggal dibutuhkan', { admin: { condition: editableInput() } }),
       // Owner decision 2026-10-09: replaces "Periode kegiatan" (periodFrom/periodTo, Q-04).
-      { name: 'urgencyLevel', type: 'relationship', relationTo: 'urgency-levels', label: 'Tingkat urgensi', index: true, ...pickerSameCompany(), admin: { placeholder: PLACEHOLDERS.urgencyLevel, condition: editableInput('urgencyLevel') } },
+      // DRMS 13/10 Pengajuan #3: every PT has its own Low/Medium/High — locked until the PT is known, then that PT's levels.
+      { name: 'urgencyLevel', type: 'relationship', relationTo: 'urgency-levels', label: 'Tingkat urgensi', index: true, ...pickerSameCompany({ createRoles: REQUEST_CREATE_ROLES }), admin: { placeholder: PLACEHOLDERS.urgencyLevel, condition: editableInput('urgencyLevel'), components: { Field: COMPANY_SCOPED_FIELD } } },
       // QA-15: Staff-only users pick only themselves (requesterOptions); the server re-checks (validateContent).
       // WA-09: "Pemohon" as in the APK (the PDF signature box keeps "Diajukan Oleh").
-      { name: 'requesters', type: 'relationship', relationTo: 'employees', hasMany: true, label: 'Pemohon', admin: { isSortable: true, placeholder: PLACEHOLDERS.requesters, condition: editableInput() }, ...pickerSameCompany(), filterOptions: requesterOptions },
+      { name: 'requesters', type: 'relationship', relationTo: 'employees', hasMany: true, label: 'Pemohon', admin: { isSortable: true, placeholder: PLACEHOLDERS.requesters, condition: editableInput(), components: { Field: COMPANY_SCOPED_FIELD } }, ...pickerSameCompany(), filterOptions: requesterOptions },
       {
         name: 'bankAccount',
         type: 'relationship',
@@ -360,7 +378,7 @@ export const ExpenseRequests: CollectionConfig = withAudit(
         filterOptions: bankAccountOptions,
         validate: () => true as const,
         // DRMS 10/10 8e: the picker only while Draft; afterwards the preview below shows the submit snapshot.
-        admin: { description: 'Hanya rekening milik pemohon. Kosongkan untuk memakai rekening default pemohon pertama.', placeholder: PLACEHOLDERS.bankAccount, condition: draftOnly },
+        admin: { description: 'Hanya rekening milik pemohon. Kosongkan untuk memakai rekening default pemohon pertama.', placeholder: PLACEHOLDERS.bankAccount, condition: draftOnly, components: { Field: COMPANY_SCOPED_FIELD } },
       },
       // DRMS 10/10 8e (WA-04): chosen account (draft) / snapshot (after submit) — bank · holder · masked no. + eye toggle.
       { name: 'bankAccountPreview', type: 'ui', label: 'Rekening tujuan', admin: { condition: editableInput(), components: { Field: '@/admin/components/BankAccountPreview#BankAccountPreview' } } },
@@ -415,7 +433,7 @@ export const ExpenseRequests: CollectionConfig = withAudit(
           { name: 'notes', type: 'text', label: 'Keterangan', maxLength: 500 },
         ],
       },
-      { name: 'linesTotalPreview', type: 'ui', label: 'Total (pratinjau)', admin: { condition: linesCondition, components: { Field: '@/admin/components/LinesTotalPreview#LinesTotalPreview' } } },
+      // DRMS 13/10 Persetujuan #10: no separate "Total (pratinjau)" box — the grand total is the footer row of the lines table
       // Phase C polish: Grand total is in the panel header; Tanggal / Dibuat oleh in the locked "Rincian pengajuan" — so
       // the sidebar keeps those two only in "Revisi Nota" (editable: no summary there) and never on a Draft
       businessDateField('requestDate', 'Tanggal pengajuan (server)', { access: system, admin: { ...ro, position: 'sidebar', condition: revisionAndSet('requestDate') } }),

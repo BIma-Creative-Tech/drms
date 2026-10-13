@@ -1,11 +1,12 @@
 import type { PayloadRequest } from 'payload'
 
 import type { TimelineEntry } from '@/domain/field/views'
+import { formatNumber } from '@/lib/money'
 
 import { DAILY_FLAGS, WEATHER_LABELS, type Weather } from './rules'
 import { listDailyReports } from './service'
 
-const fmt = (v: number) => v.toLocaleString('id-ID', { maximumFractionDigits: 2 })
+const fmt = (v: number) => formatNumber(v, 2)
 
 /** P3: daily construction reports of one project as timeline entries (type 'harian'), caller's read scope. */
 export async function dailyTimelineEntries(req: PayloadRequest, project: { id: number; kind?: string | null }, w: { from: string; to: string }): Promise<TimelineEntry[]> {

@@ -2,6 +2,8 @@
 import { useRouter } from 'next/navigation'
 import React, { useId, useRef, useState } from 'react'
 
+import { formatRupiah } from '@/lib/money'
+
 import { RupiahInput, useRupiah } from '../RupiahInput'
 import { fieldErrors, newIdemKey, sendJson } from '../kas/client'
 
@@ -14,7 +16,6 @@ import { fieldErrors, newIdemKey, sendJson } from '../kas/client'
  */
 export type ProjectOpt = { id: number; code: string; name: string; budget: number | null }
 
-const rupiah = (v: number) => `Rp ${new Intl.NumberFormat('id-ID').format(v)}`
 
 export function AddendumForm({ projects, initialProject, edit }: { projects: ProjectOpt[]; initialProject?: number; edit?: { id: number; projectId: number; addition: number; reason: string } }) {
   const router = useRouter()
@@ -152,7 +153,7 @@ export function AddendumForm({ projects, initialProject, edit }: { projects: Pro
           <p style={{ margin: 0, fontSize: 14, lineHeight: 1.6 }} data-pk-preview>
             {p ? (
               <>
-                {p.budget ? rupiah(p.budget) : 'Tanpa RAB'} + {rupiah(addition)} = <b>{rupiah((p.budget ?? 0) + addition)}</b>
+                {p.budget ? formatRupiah(p.budget) : 'Tanpa RAB'} + {formatRupiah(addition)} = <b>{formatRupiah((p.budget ?? 0) + addition)}</b>
               </>
             ) : (
               '—'

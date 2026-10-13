@@ -3,6 +3,7 @@
  * bundled into the OpenAPI generator).
  */
 import { isBusinessDate } from '@/domain/expense/types'
+import { formatNumber } from '@/lib/money'
 
 // ---------------------------------------------------------------- K-08 budget colour
 
@@ -129,19 +130,17 @@ export function formatPct(v: number | null | undefined): string {
   return `${i},${d}`
 }
 
-/** Short Rupiah for chart axes: 12.000.000 → '12 jt', 950.000 → '950 rb'. */
+/**
+ * Short Rupiah for chart axes / bar labels only (DRMS 13/10 #10): 12.000.000 → '12 jt', 950.000 → '950 rb',
+ * 12.345.000.000.000 → '12.345 M' (id-ID separators via formatNumber).
+ */
 export function shortRupiah(v: number): string {
   const a = Math.abs(v)
   const sign = v < 0 ? '−' : ''
-  if (a >= 1_000_000_000) return `${sign}${trim1(a / 1_000_000_000)} M`
-  if (a >= 1_000_000) return `${sign}${trim1(a / 1_000_000)} jt`
-  if (a >= 1_000) return `${sign}${trim1(a / 1_000)} rb`
-  return `${sign}${a}`
-}
-
-function trim1(v: number): string {
-  const s = (Math.round(v * 10) / 10).toFixed(1)
-  return (s.endsWith('.0') ? s.slice(0, -2) : s).replace('.', ',')
+  if (a >= 1_000_000_000) return `${sign}${formatNumber(a / 1_000_000_000, 1)} M`
+  if (a >= 1_000_000) return `${sign}${formatNumber(a / 1_000_000, 1)} jt`
+  if (a >= 1_000) return `${sign}${formatNumber(a / 1_000, 1)} rb`
+  return `${sign}${formatNumber(a)}`
 }
 
 /** "Nice" axis maximum ≥ v (1/2/2.5/5 × 10^n). */

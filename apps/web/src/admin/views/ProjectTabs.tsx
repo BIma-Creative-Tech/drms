@@ -15,6 +15,7 @@ import { kindOf } from '@/domain/field/rules'
 import { RAP_MISSING_MESSAGE } from '@/domain/rap/rules'
 import { loadRap, rapTemplatesFor } from '@/domain/rap/service'
 import { formatDateLong } from '@/pdf/format'
+import { formatNumber } from '@/lib/money'
 import { withReqTransaction } from '@/lib/system-tx'
 
 import { F3Root } from './f3-ui'
@@ -44,8 +45,8 @@ function TabRoot({ name, children }: { name: string; children: React.ReactNode }
   )
 }
 
-const pct = (v: number | null | undefined) => (v === null || v === undefined ? '—' : `${v.toLocaleString('id-ID', { maximumFractionDigits: 1 })}%`)
-const qty = (v: number) => v.toLocaleString('id-ID', { maximumFractionDigits: 2 })
+const pct = (v: number | null | undefined) => (v === null || v === undefined ? '—' : `${formatNumber(v, 1)}%`)
+const qty = (v: number) => formatNumber(v, 2)
 
 // ---------------------------------------------------------------- RAP tab
 

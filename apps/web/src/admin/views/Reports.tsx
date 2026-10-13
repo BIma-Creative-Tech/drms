@@ -9,6 +9,7 @@ import { exportLetterhead, PDF_MAX_ROWS } from '@/domain/reports/export'
 import { reportContext } from '@/domain/reports/kpi'
 import { AUDIT_REPORT, REPORTS, reportByCode, type ReportDef } from '@/domain/reports/registry'
 import { auditScope, officeScope, type ReportScope } from '@/domain/reports/scope'
+import { formatNumber } from '@/lib/money'
 import { withReqTransaction } from '@/lib/system-tx'
 import { XLSX_MAX_ROWS, xlsxEnabled } from '@/lib/xlsx'
 import { formatServerTime } from '@/pdf/format'
@@ -209,7 +210,7 @@ function ReportBody({
             )
           })}
           <span className="pk-note" data-pk-row-count={rowCount}>
-            Dibuat {formatServerTime(new Date().toISOString(), ctx.tz)} · {rowCount.toLocaleString('id-ID')} baris
+            Dibuat {formatServerTime(new Date().toISOString(), ctx.tz)} · {formatNumber(rowCount)} baris
             {scope.kind === 'team' ? ' · cakupan tim saya' : ''}
           </span>
         </div>

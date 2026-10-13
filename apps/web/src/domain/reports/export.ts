@@ -6,7 +6,7 @@ import { displayName } from '@/domain/expense/common'
 import { csvLine, CSV_BOM, type CsvCell } from '@/lib/csv'
 import { withReqTransaction } from '@/lib/system-tx'
 import { XLSX_MAX_ROWS, type XlsxSheet } from '@/lib/xlsx'
-import { formatRupiah } from '@/lib/money'
+import { formatNumber, formatRupiah } from '@/lib/money'
 import { formatServerTime } from '@/pdf/format'
 
 import { auditRangeDays, AUDIT_EXPORT_MAX_DAYS, parseAuditFilter } from './audit-log'
@@ -114,9 +114,9 @@ export async function prepareExport(req: PayloadRequest, def: ReportDef, scope: 
     const first = await def.run(req, scope, sp, { limit })
     const count = def.paged ? first.count : first.main.rows.length
     const biggest = Math.max(count, ...first.extra.map((t) => t.rows.length))
-    if (format === 'xlsx' && biggest > XLSX_MAX_ROWS) throw new ExportRefused(413, `Lebih dari ${XLSX_MAX_ROWS.toLocaleString('id-ID')} baris. Persempit filter atau pakai CSV.`)
+    if (format === 'xlsx' && biggest > XLSX_MAX_ROWS) throw new ExportRefused(413, `Lebih dari ${formatNumber(XLSX_MAX_ROWS)} baris. Persempit filter atau pakai CSV.`)
     if (format === 'pdf' && biggest > PDF_MAX_ROWS) throw new ExportRefused(413, `PDF maksimal ${PDF_MAX_ROWS} baris. Persempit filter atau pakai Excel/CSV.`)
-    if (format === 'csv' && count > CSV_MAX_ROWS) throw new ExportRefused(413, `Lebih dari ${CSV_MAX_ROWS.toLocaleString('id-ID')} baris. Persempit filter.`)
+    if (format === 'csv' && count > CSV_MAX_ROWS) throw new ExportRefused(413, `Lebih dari ${formatNumber(CSV_MAX_ROWS)} baris. Persempit filter.`)
     const letterhead = await exportLetterhead(req, def, scope, sp)
     const title = await titleRows(req, def, scope, sp, letterhead)
     await writeAudit(req, [

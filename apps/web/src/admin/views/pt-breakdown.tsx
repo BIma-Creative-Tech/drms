@@ -1,5 +1,7 @@
 import React from 'react'
 
+import { formatNumber } from '@/lib/money'
+
 import { PtChip, type PtView } from './pt'
 
 /**
@@ -20,7 +22,7 @@ export function PerPt<R extends PtRow>({
   pt,
   rows,
   value = () => 0,
-  fmt = String,
+  fmt = (n: number) => formatNumber(n),
   render,
   label,
 }: {

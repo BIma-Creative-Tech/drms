@@ -3,7 +3,6 @@ import React from 'react'
 
 import { selfApprovalNote } from '@/domain/expense/decision'
 import { decisionText, REJECT_PROMPT } from '@/domain/expense/decision-texts'
-import { detail } from '@/domain/expense/dto'
 import { approvalInbox } from '@/domain/expense/queues'
 import { REQUEST_TYPE_LABELS, REQUEST_TYPES } from '@/domain/expense/types'
 import { withReqTransaction } from '@/lib/system-tx'
@@ -11,7 +10,7 @@ import { withReqTransaction } from '@/lib/system-tx'
 import { ActionButton } from '../components/ActionButton'
 import { ListToolbar, Pager } from '../components/list/ListToolbar'
 import { matchesQuery, paginate, parseListQuery } from '../list-query'
-import { ReviewDetails } from '../components/ReviewDetails'
+import { ClickableRow } from '../components/list/ClickableRow'
 import { AddendumInboxSection } from './Addendum'
 import { LoanInboxSection } from './Loans'
 import { ShortfallInboxSection } from './ShortfallInbox'
@@ -24,8 +23,9 @@ import { Empty, Shell, TableScroll, badge, docLink, num, rp, table, td, th } fro
  * "Persetujuan Direktur (Diketahui)") or an approval level (ADR 0021: "Persetujuan Direktur") — only those the rule snapshot assigns to them (G2) and never their own (G1). Budget
  * impact % before → after (red above company-settings.budgetWarnPct, default 85 %; cost centers
  * "tanpa anggaran", Q-24) and open validation flags. Actions call /api/v1 (profile signature, US-43).
- * S3e (S-05): each row expands to the lines, receipt photos and per-line flags (ReviewDetails); the
- * "Flag" column counts OPEN flags of both levels — the same number stored with the decision.
+ * The "Flag" column counts OPEN flags of both levels — the same number stored with the decision (S3e, S-05).
+ * DRMS 13/10 Persetujuan #1: no expandable "Rincian baris, nota & flag" row any more — the whole row opens the
+ * request detail (lines, receipts and per-line flags in ReviewDetails there); the buttons in the row still decide.
  */
 export async function ApprovalInbox(props: AdminViewServerProps) {
   const req = props.initPageResult.req
@@ -33,19 +33,15 @@ export async function ApprovalInbox(props: AdminViewServerProps) {
   // DRMS 10/10 D8: search / PT / jenis / langkah + pagination (URL state); the inbox is a bounded worklist
   const lq = parseListQuery(props.searchParams, ['pt', 'jenis', 'langkah'])
   const ptId = pt.multi && pt.selected.includes(Number(lq.filters.pt)) ? Number(lq.filters.pt) : undefined
-  const { all, page, budgetWarnPct, details } = await withReqTransaction(req, async () => {
+  const { all, page, budgetWarnPct } = await withReqTransaction(req, async () => {
     const inbox = await approvalInbox(req, ptId ? { companyIds: [ptId] } : undefined)
     const matched = inbox.items.filter(
       (r) => (!lq.filters.jenis || r.type === lq.filters.jenis) && (!lq.filters.langkah || r.step === lq.filters.langkah) && matchesQuery([r.docNo, r.title, r.scope, r.requesters, r.typeLabel, r.stepLabel], lq.q),
     )
     const page = paginate(matched, lq.page, lq.per)
-    // S3e (US-26/US-59, S-05): lines, receipts and per-line flags for each waiting request (of this page).
-    const map = new Map<number, Awaited<ReturnType<typeof detail>>>()
-    for (const it of page.items) map.set(it.id, await detail(req, it.id))
-    return { all: inbox.items.length, page, budgetWarnPct: inbox.budgetWarnPct, details: map }
+    return { all: inbox.items.length, page, budgetWarnPct: inbox.budgetWarnPct }
   })
   const items = page.items
-  const cols = pt.multi ? 10 : 9
   return (
     <Shell props={props} title="Persetujuan">
       <PtScopeNote pt={pt} />
@@ -87,8 +83,7 @@ export async function ApprovalInbox(props: AdminViewServerProps) {
             </thead>
             <tbody>
               {items.map((r) => (
-                <React.Fragment key={r.id}>
-                <tr data-pk-inbox-item={r.id}>
+                <ClickableRow key={r.id} href={`/admin/collections/expense-requests/${r.id}`} data-pk-inbox-item={r.id}>
                   {pt.multi ? (
                     <td style={td}>
                       <PtChip pt={pt.ref(itemCompany(r))} />
@@ -128,20 +123,7 @@ export async function ApprovalInbox(props: AdminViewServerProps) {
                     })()}
                     <ActionButton url={`/api/v1/expense-requests/${r.id}/reject`} label="Tolak" prompt={REJECT_PROMPT} />
                   </td>
-                </tr>
-                {details.get(r.id) ? (
-                  <tr>
-                    <td style={{ ...td, paddingTop: 0 }} colSpan={cols}>
-                      <details data-pk-inbox-details={r.id}>
-                        <summary style={{ cursor: 'pointer', fontSize: 12 }}>
-                          Rincian baris, nota &amp; flag ({details.get(r.id)!.lines.length} baris, {details.get(r.id)!.receipts.filter((x) => x.status !== 'removed').length} nota)
-                        </summary>
-                        <ReviewDetails d={details.get(r.id)!} title={`Rincian ${r.docNo ?? `#${r.id}`}`} />
-                      </details>
-                    </td>
-                  </tr>
-                ) : null}
-                </React.Fragment>
+                </ClickableRow>
               ))}
             </tbody>
           </table>
