@@ -82,8 +82,7 @@ jobs:
       - name: dart format (hand-written files)
         run: |
           git ls-files 'lib/*.dart' 'test/*.dart' | grep -v -e '\.g\.dart$' -e '\.freezed\.dart$' -e '^lib/l10n/gen/' \
-            | xargs dart format
-          git diff --exit-code -- lib test
+            | xargs dart format --set-exit-if-changed --output=none
       - run: flutter analyze --no-fatal-infos
       - run: flutter test --coverage
       - name: Coverage summary (job summary; the lcov artifact is uploaded on GitHub-hosted only)
