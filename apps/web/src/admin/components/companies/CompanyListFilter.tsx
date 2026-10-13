@@ -2,6 +2,7 @@ import type { CollectionConfig, Payload } from 'payload'
 import React from 'react'
 
 import { companyContextOf } from '@/access/roles'
+import { formatNumber } from '@/lib/money'
 
 import { companyLabels } from './labels'
 import { activeCompanyFilter, companyFilterHref, hasOtherFilter, type SearchParams } from './list-filter'
@@ -50,7 +51,7 @@ export async function CompanyListFilter({ collectionConfig, payload, user, searc
       </ul>
       <span className="pk-pt-filter__meta" role="status">
         Menampilkan {shown.map((o) => o.code).join(', ')}
-        {total !== null ? ` · ${total.toLocaleString('id-ID')} data` : ''}
+        {total !== null ? ` · ${formatNumber(total)} data` : ''}
         {other ? ' · filter lain aktif' : ''}
       </span>
     </nav>

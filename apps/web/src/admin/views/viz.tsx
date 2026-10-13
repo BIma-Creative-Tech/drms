@@ -5,7 +5,7 @@ import type { IconName } from '@/admin/modules/icons'
 
 import { niceMax, periodLabel, shortRupiah } from '@/domain/reports/rules'
 import type { PillTone } from '@/domain/reports/viz'
-import { formatRupiah } from '@/lib/money'
+import { formatNumber, formatRupiah, rupiahOrDash } from '@/lib/money'
 
 /**
  * Beranda dashboard kit (redesign 2026-09-25, user feedback "terlalu text based"). Server
@@ -69,8 +69,10 @@ html[data-theme='dark'] .pk-f3 {
 .pk-f3 .pk-kpi-l { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: var(--pk-muted-fg); margin: 0; }
 .pk-f3 .pk-kpi-l .ic { width: 28px; height: 28px; border-radius: 8px; display: inline-grid; place-items: center; background: color-mix(in oklab, var(--pk-primary) 12%, transparent); color: var(--pk-primary); flex: none; }
 .pk-f3 .pk-kpi-l .ic svg { width: 16px; height: 16px; }
-.pk-f3 .pk-kpi-v { font-family: var(--pk-font-heading); font-size: clamp(22px, 1.9vw, 26px); font-weight: 700; letter-spacing: -0.02em; line-height: 1.15; margin: 6px 0 0; color: var(--pk-fg); overflow-wrap: anywhere; }
-.pk-f3 .pk-kpi.hero .pk-kpi-v { font-size: clamp(36px, 3.6vw, 48px); }
+/* DRMS 13/10 #10: tiles show the full Rupiah value — the size follows the tile width (container query units) so "Rp 1.234.567.890" stays on one line */
+.pk-f3 .pk-kpi { container-type: inline-size; }
+.pk-f3 .pk-kpi-v { font-family: var(--pk-font-heading); font-size: clamp(16px, 10cqi, 26px); font-weight: 700; letter-spacing: -0.02em; line-height: 1.15; margin: 6px 0 0; color: var(--pk-fg); overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.pk-f3 .pk-kpi.hero .pk-kpi-v { font-size: clamp(20px, 10cqi, 48px); }
 .pk-f3 .pk-kpi-x { font-size: 12px; color: var(--pk-muted-fg); margin: 0; font-variant-numeric: tabular-nums; }
 .pk-f3 .pk-kpi-x b { color: var(--pk-fg); font-weight: 600; }
 .pk-f3 .pk-kpi a.pk-kpi-link { position: absolute; inset: 0; border-radius: inherit; }
@@ -194,8 +196,11 @@ html[data-theme='dark'] .pk-f3 {
 @media (forced-colors: active) { .pk-f3 .pk-hbar .t > span, .pk-f3 .pk-bullet .t .c, .pk-f3 .pk-bullet .t .r, .pk-f3 .pk-meter > span { background: CanvasText; } }
 `
 
-export const rp = (v: number | null | undefined) => (v === null || v === undefined ? '—' : formatRupiah(v))
-/** Compact Rupiah for tiles/labels (auto-compact rule): Rp 12,5 jt · Rp 1,2 M. The exact value is always nearby. */
+export const rp = rupiahOrDash
+/**
+ * Compact Rupiah (Rp 12,5 jt · Rp 1,2 M) — DRMS 13/10 #10: ONLY for chart axes and bar/row labels
+ * where space is tiny (the exact value is in the tooltip/number table). KPI tiles, text and tables use rp.
+ */
 export const rpShort = (v: number) => (v < 0 ? `−Rp ${shortRupiah(-v)}` : `Rp ${shortRupiah(v)}`)
 const pctText = (v: number | null | undefined, digits = 1) => (v === null || v === undefined ? '—' : `${v.toFixed(digits).replace('.', ',')}%`)
 const tip = (t: string, r: Array<[string, string, string?]>) => JSON.stringify({ t, r })
@@ -334,7 +339,7 @@ export type DeltaSpec = { diff: number; pct: number | null; dir: 'up' | 'down' |
 export function Delta({ d, good = 'neutral', vs, money = true }: { d: DeltaSpec; good?: 'up' | 'down' | 'neutral'; vs: string; money?: boolean }) {
   const cls = good === 'neutral' || d.dir === 'flat' ? '' : (d.dir === good ? 'good' : 'bad')
   const arrow = d.dir === 'up' ? '▲' : d.dir === 'down' ? '▼' : '■'
-  const abs = money ? rpShort(Math.abs(d.diff)) : String(Math.abs(d.diff))
+  const abs = money ? rp(Math.abs(d.diff)) : formatNumber(Math.abs(d.diff))
   const sign = d.dir === 'up' ? '+' : d.dir === 'down' ? '−' : '±'
   return (
     <p className={`pk-delta ${cls}`}>
@@ -349,7 +354,7 @@ export function Delta({ d, good = 'neutral', vs, money = true }: { d: DeltaSpec;
 }
 
 /** 12-point mini columns: history in the de-emphasis hue, the current period in the accent. */
-export function Sparkline({ values, label }: { values: Array<{ label: string; value: number }>; label: string }) {
+export function Sparkline({ values, label, fmt = rp }: { values: Array<{ label: string; value: number }>; label: string; fmt?: (v: number) => string }) {
   if (values.length < 2) return null
   const W = 120
   const H = 34
@@ -360,7 +365,7 @@ export function Sparkline({ values, label }: { values: Array<{ label: string; va
   const band = W / values.length
   const bw = Math.max(2, Math.min(8, band - 2))
   return (
-    <svg className="pk-spark" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" role="img" aria-label={`${label}: ${values.map((v) => `${v.label} ${rpShort(v.value)}`).join(', ')}`}>
+    <svg className="pk-spark" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" role="img" aria-label={`${label}: ${values.map((v) => `${v.label} ${fmt(v.value)}`).join(', ')}`}>
       {values.map((v, i) => {
         const h = (Math.abs(v.value) / span) * H
         const y = v.value >= 0 ? y0 - h : y0
@@ -563,7 +568,7 @@ function lineSvg(rows: Array<{ period: string; value: number; extra?: string }>,
         <g key={t}>
           <line className={t === 0 ? 'base' : 'grid'} x1={left} x2={W - right} y1={y(t)} y2={y(t)} />
           <text x={left - 8} y={y(t) + 4} textAnchor="end">
-            {Number.isInteger(t) ? t : t.toFixed(1)}
+            {formatNumber(t, 1)}
           </text>
         </g>
       ))}
@@ -669,12 +674,12 @@ export function PipelineBars({ id, stages, exit, empty }: { id: string; stages: 
           <span className={cls} style={{ width: `${(s.count / max) * 100}%` }} />
         </span>
         <span className="v">
-          <b>{s.count}</b> · {rpShort(s.sum)}
+          <b>{formatNumber(s.count)}</b> · {rpShort(s.sum)}
         </span>
       </>
     )
     const t = tip(s.label, [
-      ['pengajuan', String(s.count), cls],
+      ['pengajuan', formatNumber(s.count), cls],
       ['grand total', formatRupiah(s.sum)],
     ])
     return (

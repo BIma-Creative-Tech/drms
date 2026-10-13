@@ -4,9 +4,10 @@ import React from 'react'
 
 import { loanDashboard } from '@/domain/loans/report'
 import { loanInbox } from '@/domain/loans/service'
+import { formatNumber } from '@/lib/money'
 import { withSystemTransaction } from '@/lib/system-tx'
 
-import { Card, DataTable, EmptyState, rp, rpShort, StatusPill } from './viz'
+import { Card, DataTable, EmptyState, rp, StatusPill } from './viz'
 
 /**
  * ADR 0022 §9: "Pinjaman antar project" card on the Direktur, Finance and PM dashboards — totals outstanding /
@@ -21,7 +22,7 @@ export async function LoanCard({ req, i, span = 12 }: { req: PayloadRequest; i: 
     <Card
       id="loan-monitor"
       title="Pinjaman antar project"
-      sub={`Sisa ${rpShort(t.outstanding)} · ${t.overdueCount} terlambat${t.overdueCount ? ` (${rpShort(t.overdue)})` : ''} · ${t.pending} menunggu persetujuan`}
+      sub={`Sisa ${rp(t.outstanding)} · ${formatNumber(t.overdueCount)} terlambat${t.overdueCount ? ` (${rp(t.overdue)})` : ''} · ${formatNumber(t.pending)} menunggu persetujuan`}
       span={span}
       i={i}
       action={{ href: '/admin/laporan/pinjaman-antar-project', label: 'Laporan pinjaman' }}
@@ -50,9 +51,9 @@ export async function LoanCard({ req, i, span = 12 }: { req: PayloadRequest; i: 
               </a>
             ),
           },
-          { key: 'b', label: 'Diterima (sisa)', num: true, sort: 'descending', cell: (r) => <span title={rp(r.borrowed)}>{rpShort(r.outstandingBorrowed)}</span> },
-          { key: 'l', label: 'Diberikan (sisa)', num: true, cell: (r) => <span title={rp(r.lent)}>{rpShort(r.outstandingLent)}</span> },
-          { key: 'o', label: 'Terlambat', cell: (r) => (r.overdueCount > 0 ? <StatusPill tone="bad" label={`${r.overdueCount} · ${rpShort(r.overdueBorrowed)}`} /> : <StatusPill tone="ok" label="Tepat waktu" />) },
+          { key: 'b', label: 'Diterima (sisa)', num: true, sort: 'descending', cell: (r) => <span title={rp(r.borrowed)}>{rp(r.outstandingBorrowed)}</span> },
+          { key: 'l', label: 'Diberikan (sisa)', num: true, cell: (r) => <span title={rp(r.lent)}>{rp(r.outstandingLent)}</span> },
+          { key: 'o', label: 'Terlambat', cell: (r) => (r.overdueCount > 0 ? <StatusPill tone="bad" label={`${formatNumber(r.overdueCount)} · ${rp(r.overdueBorrowed)}`} /> : <StatusPill tone="ok" label="Tepat waktu" />) },
         ]}
       />
     </Card>

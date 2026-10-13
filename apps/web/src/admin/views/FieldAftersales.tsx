@@ -21,7 +21,7 @@ import { DEFAULT_PAGE_SIZE, PAGE_SIZES, parseListQuery } from '@/admin/list-quer
 import { BtnLink, dateParam, FIELD_CREATORS, FIELD_OFFICE, FIELD_READERS, FieldFrame, fieldGate, FlagPills, History, idParam, MetaRows, one, OpenAction, PhotoGallery, segmentNum, spOf } from './field-ui'
 import { ptView, PtChip } from './pt'
 import { Alert, dateId } from './progress-ui'
-import { Bento, Card, DashHead, DataTable, EmptyState, KpiRow, KpiTile, rp, rpShort, StatusPill, type Col } from './viz'
+import { Bento, Card, DashHead, DataTable, EmptyState, KpiRow, KpiTile, rp, StatusPill, type Col } from './viz'
 import { DateInput } from '../components/DateInput'
 
 /**
@@ -88,7 +88,7 @@ export async function FieldAftersalesRecap(props: AdminViewServerProps) {
     { key: 't', label: 'Terkirim', num: true, cell: (c) => c.terkirim },
     { key: 'b', label: 'Belum', num: true, cell: (c) => (c.belum ? <b style={{ color: 'var(--pk-tone-warn-text)' }}>{c.belum}</b> : '0') },
     { key: 'k', label: 'Kirim / tagih', num: true, sec: true, cell: (c) => `${c.pengiriman} / ${c.penagihan}` },
-    ...(rates ? [{ key: 'v', label: 'Nilai PO', num: true, cell: (c: CRow) => (c.value === null ? '—' : rpShort(c.value)) }] : []),
+    ...(rates ? [{ key: 'v', label: 'Nilai PO', num: true, cell: (c: CRow) => (c.value === null ? '—' : rp(c.value)) }] : []),
     { key: 'a', label: 'Aksi', cell: (c) => <OpenAction href={`${listHref}?pelanggan=${c.clientId}&dari=${d.week.from}&sampai=${d.week.to}`} name={`aktivitas ${c.name}`} label="Aktivitas" /> },
   ]
   return (
@@ -158,7 +158,7 @@ export async function FieldAftersalesRecap(props: AdminViewServerProps) {
             <p className="pk-kpi-x">{d.open.length ? `tertua ${Math.max(...d.open.map((p) => p.ageDays))} hari` : 'semua PO terkirim'}</p>
           </KpiTile>
           {rates ? (
-            <KpiTile id="as-value" icon="wallet" label="Nilai PO minggu ini" value={w.kpi.value === null ? '—' : rpShort(w.kpi.value)} title={w.kpi.value === null ? undefined : rp(w.kpi.value)} kpi="as-value" i={3}>
+            <KpiTile id="as-value" icon="wallet" label="Nilai PO minggu ini" value={w.kpi.value === null ? '—' : rp(w.kpi.value)} title={w.kpi.value === null ? undefined : rp(w.kpi.value)} kpi="as-value" i={3}>
               <p className="pk-kpi-x">Direktur/Finance/Admin</p>
             </KpiTile>
           ) : (

@@ -21,7 +21,7 @@ import { F3Root } from './f3-ui'
 import { Frame } from './frame'
 import { Alert, dateTimeId } from './progress-ui'
 import { PtChip, ptView } from './pt'
-import { Bento, Card, DashHead, DataTable, EmptyState, KpiRow, KpiTile, pctText, rp, rpShort, StatusPill, VIZ_STYLE, type Col } from './viz'
+import { Bento, Card, DashHead, DataTable, EmptyState, KpiRow, KpiTile, pctText, rp, StatusPill, VIZ_STYLE, type Col } from './viz'
 import { NoAccess } from './NoAccess'
 
 /**
@@ -125,7 +125,7 @@ export async function AddendumList(props: AdminViewServerProps) {
         <KpiRow cols={3}>
           <KpiTile id="add-pending" icon="clock" label="Menunggu persetujuan" value={String(pending.length)} kpi="addendum-pending" href={keep({ status: 'pending_ack' })} more="Menunggu Direktur" i={0}>
             <p className="pk-kpi-x">
-              <b>+{rpShort(pending.reduce((s, a) => s + a.addition, 0))}</b> diajukan
+              <b>+{rp(pending.reduce((s, a) => s + a.addition, 0))}</b> diajukan
             </p>
           </KpiTile>
           <KpiTile id="add-mine" icon="inbox" label="Menunggu keputusan saya" value={String(d.inbox)} kpi="addendum-inbox" href="/admin/persetujuan#addendum" more="Buka Persetujuan" i={1}>
@@ -133,7 +133,7 @@ export async function AddendumList(props: AdminViewServerProps) {
           </KpiTile>
           <KpiTile id="add-approved" icon="check" label="Disetujui" value={String(approved.length)} kpi="addendum-approved" href={keep({ status: 'approved' })} more="Lihat" i={2}>
             <p className="pk-kpi-x">
-              RAB bertambah <b>{rpShort(approved.reduce((s, a) => s + a.addition, 0))}</b>
+              RAB bertambah <b>{rp(approved.reduce((s, a) => s + a.addition, 0))}</b>
             </p>
           </KpiTile>
         </KpiRow>
@@ -381,13 +381,12 @@ export async function AddendumDetail(props: AdminViewServerProps) {
 
       <Bento label="Addendum RAB">
         <KpiRow cols={3}>
-          <KpiTile id="a-add" icon="up" label="Tambahan" value={`+${rpShort(a.addition)}`} title={rp(a.addition)} kpi="addendum-addition" i={0}>
-            <p className="pk-kpi-x">{rp(a.addition)}</p>
+          <KpiTile id="a-add" icon="up" label="Tambahan" value={`+${rp(a.addition)}`} title={rp(a.addition)} kpi="addendum-addition" i={0}>
             <p className="pk-kpi-x">
               <StatusPill tone={ADDENDUM_TONE[a.status]} label={a.stepLabel ?? a.statusLabel} />
             </p>
           </KpiTile>
-          <KpiTile id="a-rab" icon="wallet" label={approved ? 'RAB lama → baru' : 'RAB sekarang → setelah disetujui'} value={approved ? rpShort(a.newBudget ?? 0) : rpShort(b.afterAddition)} title={approved ? rp(a.newBudget) : rp(b.afterAddition)} kpi="addendum-rab" i={1}>
+          <KpiTile id="a-rab" icon="wallet" label={approved ? 'RAB lama → baru' : 'RAB sekarang → setelah disetujui'} value={approved ? rp(a.newBudget ?? 0) : rp(b.afterAddition)} title={approved ? rp(a.newBudget) : rp(b.afterAddition)} kpi="addendum-rab" i={1}>
             <p className="pk-kpi-x">
               {approved ? (
                 <>
@@ -501,7 +500,7 @@ export async function AddendumInboxSection({ req }: { req: PayloadRequest }) {
               sec: true,
               cell: (r) => (
                 <span className="nw">
-                  {rpShort(r.budget.current)} → {rpShort(r.budget.afterAddition)}
+                  {rp(r.budget.current)} → {rp(r.budget.afterAddition)}
                 </span>
               ),
             },

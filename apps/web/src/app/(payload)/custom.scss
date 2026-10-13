@@ -479,29 +479,15 @@ $pk-modules: dashboard, persetujuan, proyek, keuangan, absensi, laporan, penggun
     align-items: center;
   }
 
-  // The module name may shrink (ellipsis) so the bell/avatar/☰ never leave the viewport.
+  // The module name may shrink (ellipsis) so the bell/avatar never leave the viewport.
   .pk-bar__start {
     flex-shrink: 1;
     min-width: 0;
   }
 
-  .pk-bar__mid {
-    flex: 1;
-    min-width: 0;
-    height: 100%;
-    overflow-x: clip; // clips the menu horizontally without clipping the dropdowns
-  }
-
-  .pk-bar__nav {
-    display: flex;
-    gap: 2px;
-    align-items: center;
-    width: max-content;
-    height: 100%;
-  }
-
-  .pk-bar[data-compact] .pk-bar__nav {
-    visibility: hidden;
+  // DRMS 13/10 #9: no module menu in the middle any more — the right group sits at the end.
+  .pk-bar__end {
+    margin-inline-start: auto;
   }
 
   .pk-bar__icon-btn,
@@ -613,52 +599,6 @@ $pk-modules: dashboard, persetujuan, proyek, keuangan, absensi, laporan, penggun
     background: linear-gradient(135deg, var(--pk-tile-from), var(--pk-tile-to));
     box-shadow: 0 4px 12px -4px color-mix(in oklab, var(--pk-tile-from) 70%, transparent);
     color: #FFFFFF;
-  }
-
-  .pk-bar__chip--sm {
-    width: 24px;
-    height: 24px;
-    border-radius: 7px;
-  }
-
-  // top-level entries
-  .pk-bar__link {
-    position: relative;
-    display: inline-flex;
-    gap: 6px;
-    align-items: center;
-    height: 38px;
-    padding: 0 12px;
-    border: 0;
-    border-radius: 10px;
-    background: transparent;
-    color: var(--pk-muted-fg);
-    font: inherit;
-    font-weight: 600;
-    text-decoration: none;
-    white-space: nowrap;
-    cursor: pointer;
-
-    &:hover {
-      background: var(--pk-muted-bg);
-      color: var(--pk-fg);
-    }
-
-    &[data-active] {
-      color: var(--pk-primary);
-    }
-
-    > :not(.pk-bar__pill) {
-      position: relative; // above the pill
-    }
-  }
-
-  .pk-bar__pill {
-    position: absolute;
-    inset: 0;
-    border-radius: 10px;
-    background: color-mix(in oklab, var(--pk-primary) 12%, var(--pk-card));
-    box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--pk-primary) 28%, transparent);
   }
 
   .pk-bar__chev {
@@ -777,82 +717,6 @@ $pk-modules: dashboard, persetujuan, proyek, keuangan, absensi, laporan, penggun
       width: 100%;
       margin: 0;
     }
-  }
-
-  // ---- mobile sheet ------------------------------------------------------------------------------
-  .pk-sheet {
-    position: fixed;
-    inset: 0;
-    z-index: 35;
-  }
-
-  .pk-sheet__scrim {
-    position: absolute;
-    inset: 0;
-    background: rgb(2 6 23 / 0.45);
-    backdrop-filter: blur(2px);
-  }
-
-  .pk-sheet__panel {
-    position: absolute;
-    top: 0;
-    right: 0;
-    bottom: 0;
-    display: flex;
-    flex-direction: column;
-    width: min(88vw, 360px);
-    border-left: 1px solid var(--pk-border);
-    background: var(--pk-card);
-    box-shadow: -16px 0 40px -12px rgb(15 23 42 / 0.35);
-  }
-
-  .pk-sheet__head {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    height: var(--pk-bar-h);
-    padding: 0 8px 0 16px;
-    border-bottom: 1px solid var(--pk-border);
-  }
-
-  .pk-sheet__body {
-    flex: 1;
-    overflow-y: auto;
-    padding: 10px;
-    overscroll-behavior: contain;
-  }
-
-  .pk-sheet__all {
-    display: flex;
-    gap: 10px;
-    align-items: center;
-    min-height: 44px;
-    margin-bottom: 6px;
-    padding: 8px 10px;
-    border-radius: 10px;
-    background: var(--pk-muted-bg);
-    color: var(--pk-fg);
-    font-weight: 600;
-    text-decoration: none;
-  }
-
-  .pk-sheet__section + .pk-sheet__section {
-    margin-top: 8px;
-    padding-top: 8px;
-    border-top: 1px solid var(--pk-border);
-  }
-
-  .pk-sheet__label {
-    padding: 6px 10px 4px;
-    color: var(--pk-muted-fg);
-    font-size: 12px;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-  }
-
-  .pk-sheet .pk-bar__menu-link {
-    min-height: 44px;
   }
 
   // ---- launcher ----------------------------------------------------------------------------------

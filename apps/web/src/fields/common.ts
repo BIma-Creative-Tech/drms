@@ -102,6 +102,12 @@ async function codeTakenInCompany(code: string, args: { req?: PayloadRequest; da
   return res.docs.length > 0
 }
 
+/**
+ * DRMS 13/10 #10: marker of a Rupiah number field in the field's server-only `custom` (no DB / schema
+ * effect) — the lists show it as "Rp 1.250.000" whatever its label says (src/admin/display-cells.ts).
+ */
+export const RUPIAH_MARK = { pkRupiah: true } as const
+
 /** Integer Rupiah (architecture §4.1): Postgres numeric ↔ JS number, must be a safe integer ≥ 0. */
 export function rupiahField(name: string, label: string, opts: { required?: boolean } = {}): NumberField {
   return {
@@ -109,6 +115,7 @@ export function rupiahField(name: string, label: string, opts: { required?: bool
     type: 'number',
     label,
     required: opts.required,
+    custom: { ...RUPIAH_MARK },
     min: 0,
     validate: (v: unknown) =>
       v === null || v === undefined || (typeof v === 'number' && Number.isSafeInteger(v) && v >= 0)

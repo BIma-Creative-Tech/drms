@@ -4,11 +4,12 @@ import type { IconName } from './icons'
 
 /**
  * Odoo-style module registry — the single source of truth of the admin navigation (launcher tiles
- * at /admin + the top menu bar of each module). Payload's `admin.group` values stay untouched; this
- * file only decides where an entity appears in the new navigation. Pure data + pure functions (no
- * React, no Payload runtime): used by the server components (ModuleNav, Launcher), the client bar
- * (active-module resolution) and the unit tests (tests/unit/admin-modules.test.ts guards that every
- * collection/global of payload.config.ts maps to exactly one module).
+ * at /admin + the landing-page tiles of each module; DRMS 13/10 #9: no module menu in the top bar).
+ * Payload's `admin.group` values stay untouched; this file only decides where an entity appears in
+ * the new navigation. Pure data + pure functions (no React, no Payload runtime): used by the server
+ * components (ModuleNav, Launcher, ModuleLanding), the client bar (active-module resolution) and the
+ * unit tests (tests/unit/admin-modules.test.ts guards that every collection/global of
+ * payload.config.ts maps to exactly one module).
  *
  * Visibility (resolveModules) = three existing layers, unchanged:
  * 1. Payload read permission of the entity (same check as Payload's groupNavItems),

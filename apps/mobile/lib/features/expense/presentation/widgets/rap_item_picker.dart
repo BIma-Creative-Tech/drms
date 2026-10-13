@@ -72,7 +72,7 @@ class RapProgressBar extends StatelessWidget {
 String? rapRemainingText(AppLocalizations t, RapBudgetItem i) {
   if (i.remaining == null) return null;
   final of = i.planned == null ? '' : ' ${t.rapOf(formatRupiah(i.planned!))}';
-  final pct = i.progress == null ? '' : ' · ${((i.percent ?? (i.progress! * 100))).toStringAsFixed(0)}%';
+  final pct = i.progress == null ? '' : ' · ${formatPercent(i.percent ?? (i.progress! * 100), digits: 0)}';
   final rest = i.remaining! < 0 ? t.rapOverBy(formatRupiah(-i.remaining!)) : t.rapRemaining(formatRupiah(i.remaining!));
   return '$rest$of$pct';
 }

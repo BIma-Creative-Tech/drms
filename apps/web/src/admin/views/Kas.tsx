@@ -42,7 +42,7 @@ import { F3Root } from './f3-ui'
 import { foreignPtParam, PtChip, ptView, type PtView } from './pt'
 import { PtNotAllowed } from './shared'
 import { PerPt } from './pt-breakdown'
-import { Bento, Card, DashHead, DataTable, EmptyState, KpiRow, KpiTile, rp, rpShort, StatusPill, VIZ_STYLE, type Col } from './viz'
+import { Bento, Card, DashHead, DataTable, EmptyState, KpiRow, KpiTile, rp, StatusPill, VIZ_STYLE, type Col } from './viz'
 import { NoAccess } from './NoAccess'
 
 /**
@@ -290,18 +290,17 @@ export async function KasBook(props: AdminViewServerProps) {
         <div className="pk-kas-tiles">
         <Bento label="Saldo per akun">
           <KpiRow cols={4}>
-            <KpiTile id="kas-total" icon="wallet" label="Saldo kas total" value={rpShort(total)} title={rp(total)} kpi="kas-total" i={0}>
-              <p className="pk-kpi-x">{rp(total)}</p>
+            <KpiTile id="kas-total" icon="wallet" label="Saldo kas total" value={rp(total)} title={rp(total)} kpi="kas-total" i={0}>
               <p className="pk-kpi-x">{tiles.length} akun · saldo awal + masuk − keluar</p>
-              <PerPt pt={pt} rows={byPt} value={(r) => r.total} fmt={rpShort} label="Saldo kas" />
+              <PerPt pt={pt} rows={byPt} value={(r) => r.total} fmt={rp} label="Saldo kas" />
             </KpiTile>
             {tiles.map((a, i) => {
               const f = flows.get(a.cashAccountId) ?? { n: 0, tin: 0, tout: 0 }
               return (
-                <KpiTile key={a.cashAccountId} id={`kas-acc-${a.cashAccountId}`} icon="wallet" label={multi && q.pt === undefined ? `${ptCode(pt, a.companyId)} · ${a.name}` : a.name} value={rpShort(a.balance)} title={rp(a.balance)} kpi={`acc-${a.cashAccountId}`} href={`/admin/kas?akun=${a.cashAccountId}`} more="Buku akun ini" i={i + 1}>
+                <KpiTile key={a.cashAccountId} id={`kas-acc-${a.cashAccountId}`} icon="wallet" label={multi && q.pt === undefined ? `${ptCode(pt, a.companyId)} · ${a.name}` : a.name} value={rp(a.balance)} title={rp(a.balance)} kpi={`acc-${a.cashAccountId}`} href={`/admin/kas?akun=${a.cashAccountId}`} more="Buku akun ini" i={i + 1}>
                   <p className="pk-kpi-x">{rp(a.balance)}</p>
                   <p className="pk-kpi-x">
-                    {periodLabel(flowPeriod)}: masuk <b>{rpShort(f.tin)}</b> · keluar <b>{rpShort(f.tout)}</b>
+                    {periodLabel(flowPeriod)}: masuk <b>{rp(f.tin)}</b> · keluar <b>{rp(f.tout)}</b>
                   </p>
                 </KpiTile>
               )

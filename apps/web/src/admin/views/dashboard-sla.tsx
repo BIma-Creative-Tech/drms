@@ -3,6 +3,7 @@ import React from 'react'
 
 import { formatHours } from '@/domain/expense/sla'
 import { slaThisMonth } from '@/domain/reports/sla-report'
+import { formatNumber } from '@/lib/money'
 import { withReqTransaction } from '@/lib/system-tx'
 
 import { Card, Meter } from './viz'
@@ -20,10 +21,10 @@ export async function SlaTransferCard({ req, i, span = 4 }: { req: PayloadReques
       <p className="pk-kpi-v" style={{ fontSize: 22, margin: 0 }} data-pk-kpi="sla-pct">
         {d.text}
       </p>
-      <p className="pk-kpi-x">{d.count === 0 ? 'Belum ada transfer bulan ini.' : `dari ${d.count} transfer dalam SLA`}</p>
+      <p className="pk-kpi-x">{d.count === 0 ? 'Belum ada transfer bulan ini.' : `dari ${formatNumber(d.count)} transfer dalam SLA`}</p>
       <Meter value={d.pctWithin ?? 0} max={100} tone={tone} />
       <p className="pk-kpi-x" data-pk-kpi="sla-late">
-        Rata-rata <b>{formatHours(d.avgHours)}</b> · terlambat <b>{d.late}</b>
+        Rata-rata <b>{formatHours(d.avgHours)}</b> · terlambat <b>{formatNumber(d.late)}</b>
       </p>
     </Card>
   )

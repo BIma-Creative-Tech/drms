@@ -13,7 +13,8 @@ import { loadModules, loadNavUser, loadSwitcher } from './modules-server'
  * DefaultTemplate — built-in list/edit/account views and our custom views wrapped in Frame/Shell —
  * with serverProps {payload, permissions, user, i18n, …} + clientProps {visibleEntities}). Replaces
  * the left sidebar by the Odoo-style top bar: the server computes the visible modules, badges and
- * the bell, the client ModuleBar resolves the active module from the pathname and renders the menu.
+ * the bell, the client ModuleBar resolves the active module from the pathname (no module menu since
+ * DRMS 13/10 #9 — the module landing page has the tiles).
  * Replacing Nav drops before/afterNavLinks and the default logout slot → bell + logout live here.
  * Also hosts the privacy-notice gate (ADR 0018): this is the one server component on every admin page.
  */

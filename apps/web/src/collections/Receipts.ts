@@ -5,7 +5,7 @@ import { RIWAYAT_TAB } from '@/admin/config'
 import { denyAll, isStaffOnly } from '@/access/roles'
 import { reasonOnChange, withAudit } from '@/audit/hooks'
 import { byVisibleRequest, denyDeleteLogged } from '@/domain/expense/access'
-import { uuidField } from '@/fields/common'
+import { RUPIAH_MARK, uuidField } from '@/fields/common'
 
 import { businessDateField, ro } from './fields-f2'
 import { companyField, companyHook } from '@/fields/company'
@@ -39,7 +39,7 @@ export const Receipts: CollectionConfig = withAudit(
       businessDateField('receiptDate', 'Tanggal nota', { required: true }),
       { name: 'receiptTime', type: 'text', label: 'Jam nota', maxLength: 8, validate: (v: unknown) => (v === null || v === undefined || v === '' || (typeof v === 'string' && /^([01]\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/.test(v)) ? true : 'Format HH:MM') },
       { name: 'amount', type: 'number', label: 'Total tercetak (Rp)', required: true, min: 1 },
-      { name: 'taxAmount', type: 'number', label: 'Pajak (informatif, Q-26)', min: 0 },
+      { name: 'taxAmount', type: 'number', label: 'Pajak (informatif, Q-26)', min: 0, custom: { ...RUPIAH_MARK } }, // DRMS 13/10 #10: Rupiah cell in the list
       { name: 'image', type: 'upload', relationTo: 'media-receipts', label: 'Foto nota', required: true },
       { name: 'imageSha256', type: 'text', index: true, admin: { ...ro, hidden: true } },
       {

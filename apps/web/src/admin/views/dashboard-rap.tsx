@@ -3,11 +3,12 @@ import React from 'react'
 
 import { PROJECT_KIND_LABELS, kindOf } from '@/domain/field/rules'
 import { rapMissingProjects, rapMonitoring } from '@/domain/rap/budget'
+import { formatNumber } from '@/lib/money'
 import { withSystemTransaction } from '@/lib/system-tx'
 
-import { Card, DataTable, EmptyState, Meter, StatusPill, rp, rpShort } from './viz'
+import { Card, DataTable, EmptyState, Meter, StatusPill, rp } from './viz'
 
-const pct = (v: number | null) => (v === null ? '—' : `${v.toLocaleString('id-ID', { maximumFractionDigits: 1 })}%`)
+const pct = (v: number | null) => (v === null ? '—' : `${formatNumber(v, 1)}%`)
 
 /**
  * DRMS 10/10 point 2–4 (D4): "Monitoring RAP" on the Direktur dashboard — projects with a RAP, realisation (Σ approved
@@ -21,7 +22,7 @@ export async function RapMonitorCard({ req, i, span = 12 }: { req: PayloadReques
     <Card
       id="rap-monitor"
       title="Monitoring RAP"
-      sub={d.projects === 0 ? 'Realisasi pengajuan per item RAP' : `${d.projects} project ber-RAP · ${d.overProjects} dengan item melebihi RAP`}
+      sub={d.projects === 0 ? 'Realisasi pengajuan per item RAP' : `${formatNumber(d.projects)} project ber-RAP · ${formatNumber(d.overProjects)} dengan item melebihi RAP`}
       span={span}
       i={i}
       action={{ href: '/admin/collections/projects', label: 'Semua project' }}
@@ -43,8 +44,8 @@ export async function RapMonitorCard({ req, i, span = 12 }: { req: PayloadReques
               </a>
             ),
           },
-          { key: 'pl', label: 'Rencana', num: true, sec: true, cell: (r) => (r.planned === null ? '—' : rpShort(r.planned)) },
-          { key: 're', label: 'Realisasi', num: true, cell: (r) => <span title={rp(r.realised)}>{rpShort(r.realised)}</span> },
+          { key: 'pl', label: 'Rencana', num: true, sec: true, cell: (r) => (r.planned === null ? '—' : rp(r.planned)) },
+          { key: 're', label: 'Realisasi', num: true, cell: (r) => rp(r.realised) },
           {
             key: 'pc',
             label: '% RAP',
@@ -77,7 +78,7 @@ export async function RapMissingCard({ req, i, span = 12, team = false }: { req:
     <Card
       id="rap-missing"
       title={team ? 'Project Anda belum punya RAP' : 'Project ber-RAB belum punya RAP'}
-      sub={`${d.total} project · pengajuan project ini belum bisa dikirim sampai RAP diisi${team ? '' : ' (minta PM mengisi)'}`}
+      sub={`${formatNumber(d.total)} project · pengajuan project ini belum bisa dikirim sampai RAP diisi${team ? '' : ' (minta PM mengisi)'}`}
       span={span}
       i={i}
     >
@@ -99,7 +100,7 @@ export async function RapMissingCard({ req, i, span = 12, team = false }: { req:
             ),
           },
           { key: 'k', label: 'Jenis', sec: true, cell: (r) => PROJECT_KIND_LABELS[kindOf(r.kind)] },
-          { key: 'b', label: 'RAB', num: true, sec: true, cell: (r) => (r.budget === null ? '—' : <span title={rp(r.budget)}>{rpShort(r.budget)}</span>) },
+          { key: 'b', label: 'RAB', num: true, sec: true, cell: (r) => (r.budget === null ? '—' : <span title={rp(r.budget)}>{rp(r.budget)}</span>) },
           { key: 's', label: 'Status', cell: () => <StatusPill tone="warn" label="Isi RAP" /> },
         ]}
       />
