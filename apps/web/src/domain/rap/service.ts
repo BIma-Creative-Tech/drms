@@ -11,8 +11,8 @@ import { lockProject, projectStages, recalcProjectProgress, setStageProgress, ty
 import { requireVisibleProject, saveStageSet } from '@/domain/progress/stages'
 import { getRequestTx } from '@/lib/tx'
 
-import { rapItemMoney, sumRapMoney, type RapMoney } from './budget'
-import { isQty, itemPct, normUom, rapDrivesProgress, rapRequiredFor, round2, stagePct, stockOf, type RapKind } from './rules'
+import { rapItemMoney, rapUsage, sumRapMoney, type RapMoney } from './budget'
+import { isQty, itemPct, normUom, RAP_REASON_MIN, RAP_USED_REASON_MESSAGE, rapDrivesProgress, rapItemUsed, rapRequiredFor, round2, stagePct, stockOf, type RapKind } from './rules'
 import { parseRapWorkbook, type RapIssue, type RapRow } from './workbook'
 
 /**
@@ -22,6 +22,9 @@ import { parseRapWorkbook, type RapIssue, type RapRow } from './workbook'
  * then only Direktur/Admin, with a reason. Items are never deleted (deactivated). Konstruksi: every item has a stage
  * and every change recomputes the RAP-driven stages and the project %; other kinds (`rapDrivesProgress` false): the
  * stage is optional (an existing stage only, never created by an import) and the progress stays manual (E4).
+ * Used items (owner 2026-10-13, `rapItemUsed`: expense lines from the final approval onward or daily-report
+ * quantities) stay editable by the same roles, but every change — single edit or Excel import — needs a reason
+ * (400 field `reason`), written to the audit log like the locked-RAP reason.
  */
 
 type Project = { id: number; company: number; kind: string; status: string | null; budget: number | null }
@@ -54,7 +57,7 @@ async function requireEditor(req: PayloadRequest, p: Project, reason: string | n
   const locked = await isRapLocked(req, p)
   const why = (reason ?? '').trim()
   if (locked && !roles.director) fail(409, 'RAP_LOCKED', 'RAP terkunci karena sudah ada realisasi: perubahan hanya oleh Direktur/Admin dengan alasan.')
-  if (locked && why.length < 3) fail(400, 'VALIDATION', 'Alasan wajib diisi (RAP terkunci karena sudah ada realisasi).', 'reason')
+  if (locked && why.length < RAP_REASON_MIN) fail(400, 'VALIDATION', 'Alasan wajib diisi (RAP terkunci karena sudah ada realisasi).', 'reason')
   return { locked, roles, reason: why }
 }
 
@@ -92,6 +95,14 @@ async function itemRows(req: PayloadRequest, p: Pick<Project, 'id' | 'company'>)
 
 const num = (v: string | null | undefined): number => (v === null || v === undefined ? 0 : Number(v))
 const numN = (v: string | null | undefined): number | null => (v === null || v === undefined ? null : Number(v))
+
+/** Ids of the items that are already used ("Sudah terpakai" chip, `rapItemUsed`) — whatever the caller's price role. */
+async function usedItemIds(req: PayloadRequest, p: Pick<Project, 'id'>, rows: readonly ItemRow[]): Promise<Set<number>> {
+  const usage = await rapUsage(req, [p.id])
+  return new Set(rows.filter((r) => rapItemUsed({ realisedAmount: usage.get(r.id)?.realised ?? 0, realised: num(r.realised_qty), received: num(r.received_qty), used: num(r.used_qty) })).map((r) => r.id))
+}
+
+const usedReasonIssue = (used: boolean, reason: string): Array<{ path: string; message: string }> => (used && reason.length < RAP_REASON_MIN ? [{ path: 'reason', message: RAP_USED_REASON_MESSAGE }] : [])
 
 export type RapItemDto = {
   id: number
@@ -339,7 +350,10 @@ export async function updateRapItem(req: PayloadRequest, itemId: number, input: 
   const p = await loadProjectFor(req, projectId)
   const ed = await requireEditor(req, p, reason)
   if (input.kind !== undefined && input.kind !== cur!.kind) fail(400, 'VALIDATION', 'Jenis item tidak dapat diubah (buat item baru).', 'kind')
-  validation(itemIssues(input, false, rapDrivesProgress(kindOf(p.kind))))
+  // owner 2026-10-13: any change of a used item needs a reason, for every editor role (on top of the RAP lock)
+  const changes = (Object.keys(input) as Array<keyof RapItemInput>).some((k) => k !== 'kind' && input[k] !== undefined)
+  const used = changes && (await usedItemIds(req, p, await itemRows(req, p))).has(itemId)
+  validation([...itemIssues(input, false, rapDrivesProgress(kindOf(p.kind))), ...usedReasonIssue(used, ed.reason)])
   await lockProject(req, projectId)
   const stages = await projectStages(req, projectId)
   await checkRefs(req, p, input, stages)
@@ -372,6 +386,8 @@ export type RapPreview = {
   locked: boolean
   rows: RapPreviewRow[]
   deactivated: Array<{ code: string; description: string; hasRealisation: boolean }>
+  /** Codes of used items ("Sudah terpakai") the file changes or deactivates → the commit needs a reason. */
+  usedChanged: string[]
   newStages: string[]
   issues: RapIssue[]
   counts: { new: number; changed: number; unchanged: number; deactivated: number }
@@ -423,7 +439,11 @@ async function diffRows(req: PayloadRequest, p: Project, rows: RapRow[], removeM
   const deactivated = removeMissing
     ? existing.filter((e) => e.active !== false && !inFile.has(key(e.code))).map((e) => ({ code: e.code, description: e.description, hasRealisation: num(e.realised_qty) + num(e.received_qty) + num(e.used_qty) !== 0 }))
     : []
-  return { out, issues, newStages, deactivated, existing, stages, uoms, stageNames }
+  // owner 2026-10-13: used items the file changes or deactivates (the commit then needs a reason)
+  const touched = new Set([...out.filter((r) => r.status === 'changed').map((r) => key(r.code)), ...deactivated.map((x) => key(x.code))])
+  const usedIds = touched.size > 0 ? await usedItemIds(req, p, existing) : new Set<number>()
+  const usedChanged = existing.filter((e) => usedIds.has(e.id) && touched.has(key(e.code))).map((e) => e.code)
+  return { out, issues, newStages, deactivated, usedChanged, existing, stages, uoms, stageNames }
 }
 
 /** POST /projects/{id}/rap/import/preview — nothing is written. */
@@ -439,7 +459,7 @@ export async function previewRapImport(req: PayloadRequest, projectId: number, b
   if (locked && !roles.director) issues.push({ message: 'RAP terkunci karena sudah ada realisasi: impor hanya oleh Direktur/Admin dengan alasan.' })
   const counts = { new: 0, changed: 0, unchanged: 0, deactivated: d.deactivated.length }
   for (const r of d.out) counts[r.status]++
-  return { fileHash: createHash('sha256').update(bytes).digest('hex'), locked, rows: d.out, deactivated: d.deactivated, newStages: d.newStages, issues, counts }
+  return { fileHash: createHash('sha256').update(bytes).digest('hex'), locked, rows: d.out, deactivated: d.deactivated, usedChanged: d.usedChanged, newStages: d.newStages, issues, counts }
 }
 
 /** Proposed weights of the full stage set: value share (volume × price of work items) when every stage has value, else equal. */
@@ -457,6 +477,7 @@ async function applyRows(req: PayloadRequest, p: Project, rows: RapRow[], opts: 
   const problems = [...d.issues]
   if (d.newStages.length > 0 && !opts.roles.director) problems.push({ message: `Tahapan baru (${d.newStages.join(', ')}) hanya dapat dibuat oleh Direktur/Admin.` })
   if (problems.length) validation(problems.map((i) => ({ path: i.row ? `rows.${i.row}${i.column ? `.${i.column}` : ''}` : 'file', message: i.row ? `Baris ${i.row}: ${i.message}` : i.message })))
+  validation(usedReasonIssue(d.usedChanged.length > 0, opts.reason))
 
   if (d.newStages.length > 0) {
     const active = d.stages.filter((s) => s.active)

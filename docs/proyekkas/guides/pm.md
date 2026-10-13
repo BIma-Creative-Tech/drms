@@ -131,6 +131,13 @@ PM"). Dashboard PM menampilkan kartu **"Project Anda belum punya RAP"** berisi p
      uraian, jenis, satuan, volume, harga satuan → kartu **Upload Excel & template** → **Pratinjau** → **Simpan RAP**.
    Setelah ada realisasi laporan harian, RAP terkunci: tombol tampil abu-abu untuk PM; perubahan hanya oleh
    Direktur/Admin dengan alasan.
+   **Item "Sudah terpakai"** (sejak 13 Okt 2026, keputusan pemilik): item yang sudah punya realisasi — dipakai baris
+   pengajuan yang sudah disetujui final, atau volume laporan harian — tetap bisa Anda **Ubah** selama RAP belum
+   terkunci, tetapi **setiap perubahan wajib diisi "Alasan perubahan" (minimal 3 karakter)**, termasuk menonaktifkan
+   item. Tanpa alasan, simpan ditolak ("Item RAP sudah terpakai: isi alasan perubahan …"). Alasan tercatat di audit
+   log bersama perubahan. Item yang belum terpakai tetap bisa diubah tanpa alasan. Hal yang sama berlaku untuk
+   **Upload Excel**: bila file mengubah atau menonaktifkan item yang sudah terpakai, pratinjau menyebut item itu dan
+   kolom alasan wajib diisi sebelum **Simpan RAP**.
 3. Kolom **tahapan**: wajib untuk project konstruksi; jenis lain (umum, trading, kontrak unit, aftersales) boleh
    kosong — bila diisi harus tahapan yang sudah ada. RAP project non-konstruksi tidak mengubah progress tahapan.
 4. RAP yang sudah rapi bisa disimpan sebagai template (**Simpan template**) untuk project berikutnya yang sejenis.

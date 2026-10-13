@@ -7,6 +7,7 @@ import '../../../app/theme.dart';
 import '../../../core/format/dates.dart';
 import '../../../core/format/rupiah.dart';
 import '../../../l10n/gen/app_localizations.dart';
+import '../../expense/domain/request_status.dart';
 import '../domain/dashboard.dart';
 import 'charts.dart';
 
@@ -99,7 +100,7 @@ class _Row extends StatelessWidget {
 
 String _project(String code, String name) => '$code $name'.trim();
 
-/// "Status pengajuan" (K-13 stages). [money] = Σ grand total next to the count (never for Staff).
+/// "Status pengajuan" (K-13 stages). [money] = Σ grand total next to the count (Staff: own requests only).
 class PipelineCard extends StatelessWidget {
   const PipelineCard({
     super.key,
@@ -347,7 +348,7 @@ class RapMissingCard extends StatelessWidget {
   }
 }
 
-/// "Tren pengajuan": requests per month as columns; [money] adds Σ grand total to the readout (never for Staff).
+/// "Tren pengajuan": requests per month as columns; [money] adds Σ grand total to the readout (Staff: own requests).
 class TrendCard extends StatelessWidget {
   const TrendCard({super.key, required this.rows, required this.title, required this.subtitle, this.money = true});
   final List<RequestTrendPoint> rows;
@@ -369,6 +370,49 @@ class TrendCard extends StatelessWidget {
             ? t.kpiTrendReadoutSum(periodLong(r.period), r.count, formatRupiah(r.sum))
             : t.kpiTrendReadout(periodLong(r.period), r.count),
       ),
+    );
+  }
+}
+
+/// "Pengajuan saya" (web Staff home, 10 latest): the caller's own requests — number (or `Draft "judul"`), status and
+/// Nominal (grand total, full Rupiah); a row opens the request.
+class MyRequestsCard extends StatelessWidget {
+  const MyRequestsCard({super.key, required this.rows});
+  final List<OwnRequest> rows;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    return DashSection(
+      key: const Key('dash-my-requests'),
+      title: t.kpiMyLatestTitle,
+      subtitle: t.kpiMyLatestSubtitle,
+      child: rows.isEmpty
+          ? _empty(context, t.kpiMyLatestEmpty)
+          : Column(
+              children: [
+                for (final r in rows)
+                  _Row(
+                    key: Key('dash-my-request-${r.id}'),
+                    title: r.docNo ?? t.kpiMyDraftTitle(r.title),
+                    lines: [
+                      _line(
+                        context,
+                        [
+                          if (r.docNo != null) r.title,
+                          statusLabelFallback(RequestType.fromCode(r.type), RequestStatus.fromCode(r.status)),
+                        ].where((x) => x.isNotEmpty).join(' · '),
+                      ),
+                    ],
+                    trailing: Text(
+                      formatRupiah(r.grandTotal),
+                      style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                    ),
+                    onTap: () => context.push('/requests/${r.id}'),
+                  ),
+              ],
+            ),
     );
   }
 }
