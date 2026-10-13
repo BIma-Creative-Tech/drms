@@ -8,7 +8,7 @@ import { withFlagVisibility } from '@/domain/expense/flag-visibility'
 import { displayUnitPrice } from '@/domain/expense/lines'
 import { receiptsOf } from '@/domain/expense/receipts'
 import { requestStatusLabel } from '@/domain/expense/timeline'
-import { FLAG_LABELS, REQUEST_TYPE_LABELS, type FlagKind } from '@/domain/expense/types'
+import { FLAG_LABELS, payeeOf, requestKindLabel, type FlagKind } from '@/domain/expense/types'
 import { DEFAULT_TZ } from '@/lib/time'
 
 import { formatAmount, formatDateLong, formatDateShort, formatQty, formatRupiah, formatServerTime, pdfSafe, subtitleOf } from './format'
@@ -133,7 +133,11 @@ export async function buildPdfData(req: PayloadRequest, requestId: number, opts:
   // "Lampiran umum": images share the receipts' image budget (ADR 0008 §2); PDFs are listed by name
   let imageBudget = Math.max(0, MAX_RECEIPT_IMAGES - Math.min(receiptRows.length, MAX_RECEIPT_IMAGES))
   const attachments: PdfAttachment[] = []
-  for (const [i, a] of (doc.attachments ?? []).entries()) {
+  // ADR 0025: the vendor invoice (the proof of a vendor payment) is the first attachment page
+  const vendorPay = payeeOf(doc.payeeType) === 'vendor'
+  const invoiceId = vendorPay ? relId(doc.invoiceFile) : undefined
+  const attachmentIds = [...(invoiceId !== undefined ? [invoiceId] : []), ...(doc.attachments ?? []).map((a) => relId(a)).filter((x): x is number => x !== undefined && x !== invoiceId)]
+  for (const [i, a] of attachmentIds.entries()) {
     const id = relId(a)
     const m = id
       ? ((await req.payload.findByID({ collection: 'media-attachments', id, depth: 0, overrideAccess: true /* SYSTEM-READ: caller access checked */, req }).catch(() => null)) as {
@@ -147,7 +151,7 @@ export async function buildPdfData(req: PayloadRequest, requestId: number, opts:
     const image = isImage && imageBudget > 0 ? await loadImage(req, 'media-attachments', id) : null
     if (image) imageBudget--
     attachments.push({
-      heading: pdfSafe(`Lampiran ${i + 1}`),
+      heading: pdfSafe(invoiceId !== undefined && i === 0 ? `Invoice vendor ${doc.invoiceNo ?? ''}`.trim() : `Lampiran ${invoiceId !== undefined ? i : i + 1}`),
       details: pdfSafe(isImage ? `Gambar ${m.width ?? '?'}×${m.height ?? '?'} px` : 'Berkas PDF'),
       image,
     })
@@ -167,7 +171,7 @@ export async function buildPdfData(req: PayloadRequest, requestId: number, opts:
     subtitle: pdfSafe(subtitleOf(doc.docNo, companyCode, doc.title)),
     dateText: formatDateLong(doc.requestDate),
     docNo: pdfSafe(doc.docNo ?? '(belum bernomor)'),
-    typeLabel: REQUEST_TYPE_LABELS[doc.type],
+    typeLabel: requestKindLabel(doc.type, doc.payeeType),
     statusLabel: pdfSafe(requestStatusLabel(doc.type, doc.status, doc.approvalSnapshot ?? null, doc.currentLevel ?? null)),
     lines: (doc.lines ?? []).map((l, i) => ({
       no: i + 1,
@@ -188,6 +192,15 @@ export async function buildPdfData(req: PayloadRequest, requestId: number, opts:
           bankName: pdfSafe(doc.bankSnapshot.bankName ?? ''),
           accountHolder: pdfSafe(doc.bankSnapshot.accountHolder ?? ''),
           accountNo: pdfSafe(doc.bankSnapshot.accountNo),
+        }
+      : null,
+    // ADR 0025: vendor + invoice of a vendor payment (printed with the transfer info)
+    vendorInvoice: vendorPay
+      ? {
+          vendor: pdfSafe(doc.vendor && typeof doc.vendor === 'object' ? String((doc.vendor as { name?: string }).name ?? '') : ''),
+          invoiceNo: pdfSafe(doc.invoiceNo ?? '-'),
+          invoiceDate: doc.invoiceDate ? formatDateLong(doc.invoiceDate) : '-',
+          dueDate: doc.invoiceDueDate ? formatDateLong(doc.invoiceDueDate) : '-',
         }
       : null,
     receipts,

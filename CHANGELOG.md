@@ -6,6 +6,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added (DRMS 13/10 Wave 4 — pembayaran vendor)
+
+- **Pembayaran vendor** (client: "kelola vendor dan rekening vendor; finance memilih vendor dan upload invoice"),
+  [ADR 0025](docs/proyekkas/adr/0025-vendor-payments.md). New per-PT master **Rekening vendor**
+  (`vendor-bank-accounts`: vendor, bank, number, holder, default, verification by Admin / Finance, reason on change,
+  audited, no delete) and a **Rekening** tab on the vendor form. Expense requests get **Jenis penerima**
+  (`payeeType`: `karyawan` default — unchanged — / `vendor`): vendor, vendor account (of that vendor, same PT), invoice
+  number / date / due date / file (required to submit). Vendor payments are filed by **Finance or PM only** (Staff 403),
+  always type Pengajuan Baru, Pemohon = the filer.
+- **Approval through the generic rule engine**: new rule condition "Jenis penerima"; seeded per PT "Pembayaran vendor
+  oleh Finance — Direktur" (Finance → Direktur only); a PM's vendor payment takes the default rule with the PM step
+  skipped. **Duplicate invoice** (same vendor + normalized number on a request not cancelled / rejected) → 409 field
+  error, DB unique index.
+- **Transfer = snapshot of the vendor account**, unverified account → same confirmation as employee accounts; the
+  transfer **completes** the vendor payment (no receipts / LPJ / selisih; void → back to the queue). DB guards: payee
+  consistency CHECK, no receipt / LPJ status, no settlement for a vendor payment.
+- Web: form fields (label-left grid), read-only summary, stepper without LPJ steps, PDF box "Pembayaran Vendor" + invoice
+  as first Lampiran, transfer-queue badge, list filter "Jenis penerima". API / OpenAPI: `payeeType`, `vendorId`,
+  `vendorBankAccountId`, `invoice*` on drafts, list filter `payeeType`, detail `vendor` / `invoice`, transfer queue
+  `vendorName`, masters type `vendor-bank-accounts`, bank preview `vendorAccount`. Migrations
+  `20261014_100000_d1310_vendor_payments` (+ `_guard`, `_data`). Guides: finance, pm, admin.
+
 ### Changed (DRMS 13/10 Wave 3 — dashboard parity APK)
 
 - **One source for the web dashboard and the APK home.** `GET /api/v1/dashboard/{owner,finance,pm}` now carries the

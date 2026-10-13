@@ -12,7 +12,7 @@ import { getRequestTx } from '@/lib/tx'
 
 import { actorContext, fail, loadRaw, loadVisible, requireAction, settings, today, updateRequest } from './common'
 import { claimMedia, recomputeFlags } from './receipts'
-import { isBusinessDate } from './types'
+import { isBusinessDate, payeeOf } from './types'
 
 export type TransferInput = {
   cashAccountId: number
@@ -38,8 +38,8 @@ export type TransferInput = {
   confirmUnverifiedAccount?: boolean
 }
 
-/** Verification state of the destination employee bank account of a request (QA-17). */
-export type DestinationCheck = { bankAccountId: number | null; verificationStatus: 'verified' | 'unverified' }
+/** Verification state of the destination bank account of a request (QA-17; ADR 0025: a vendor account for a vendor payment). */
+export type DestinationCheck = { bankAccountId: number | null; verificationStatus: 'verified' | 'unverified'; accountKind?: 'employee' | 'vendor' }
 
 /**
  * QA-17 (owner decision 2026-10-08: warning + confirmation, audited): money to an employee bank account
@@ -48,10 +48,16 @@ export type DestinationCheck = { bankAccountId: number | null; verificationStatu
  * request without a linked account counts as unverified. Shared by the transfer (T3) and the LPJ
  * shortfall transfer (settle). Returns the state so the caller audits a confirmed transfer.
  */
-export async function checkDestination(req: PayloadRequest, doc: { bankAccount?: unknown; bankSnapshot?: { bankName?: string | null; accountNo?: string | null; accountHolder?: string | null } | null }, confirmed: boolean): Promise<DestinationCheck> {
-  const bankAccountId = relId(doc.bankAccount) ?? null
+export async function checkDestination(
+  req: PayloadRequest,
+  doc: { bankAccount?: unknown; payeeType?: unknown; vendorBankAccount?: unknown; bankSnapshot?: { bankName?: string | null; accountNo?: string | null; accountHolder?: string | null } | null },
+  confirmed: boolean,
+): Promise<DestinationCheck> {
+  // ADR 0025: a vendor payment's destination is the vendor account (same confirmation rule as an employee account)
+  const vendor = payeeOf(doc.payeeType) === 'vendor'
+  const bankAccountId = relId(vendor ? doc.vendorBankAccount : doc.bankAccount) ?? null
   const acct = bankAccountId
-    ? ((await req.payload.findByID({ collection: 'employee-bank-accounts', id: bankAccountId, depth: 0, overrideAccess: true /* SYSTEM-READ: verification state of the request's destination */, req, disableErrors: true })) as {
+    ? ((await req.payload.findByID({ collection: vendor ? 'vendor-bank-accounts' : 'employee-bank-accounts', id: bankAccountId, depth: 0, overrideAccess: true /* SYSTEM-READ: verification state of the request's destination */, req, disableErrors: true })) as {
         verificationStatus?: string | null
       } | null)
     : null
@@ -62,10 +68,10 @@ export async function checkDestination(req: PayloadRequest, doc: { bankAccount?:
       409,
       BANK_ACCOUNT_UNVERIFIED_CONFIRM_REQUIRED,
       'Rekening tujuan belum diverifikasi Finance. Periksa nomor rekening dan nama pemilik, lalu konfirmasi untuk tetap mentransfer.',
-      { bankAccountId, verificationStatus, bankName: snap.bankName ?? null, accountNo: snap.accountNo ?? null, accountHolder: snap.accountHolder ?? null },
+      { bankAccountId, verificationStatus, accountKind: vendor ? 'vendor' : 'employee', bankName: snap.bankName ?? null, accountNo: snap.accountNo ?? null, accountHolder: snap.accountHolder ?? null },
     )
   }
-  return { bankAccountId, verificationStatus }
+  return { bankAccountId, verificationStatus, accountKind: vendor ? 'vendor' : 'employee' }
 }
 
 /** Audit row of a transfer confirmed to an unverified account (QA-17). */
@@ -77,7 +83,7 @@ export async function auditUnverifiedTransfer(req: PayloadRequest, t: { id: numb
       docId: String(t.id),
       docNo: t.docNo,
       field: 'destination',
-      newValue: { bankAccountId: d.bankAccountId, verificationStatus: d.verificationStatus, requestId: info.requestId, requestNo: info.requestNo ?? null, amount: info.amount, kind: info.kind },
+      newValue: { bankAccountId: d.bankAccountId, accountKind: d.accountKind ?? 'employee', verificationStatus: d.verificationStatus, requestId: info.requestId, requestNo: info.requestNo ?? null, amount: info.amount, kind: info.kind },
       reason: 'Transfer ke rekening belum diverifikasi dikonfirmasi pengguna (QA-17)',
       ...(info.companyId !== undefined ? { companyId: info.companyId } : {}),
     },
@@ -162,7 +168,8 @@ type TransferDoc = { id: number; docNo: string; request: unknown; amount: number
 
 /**
  * POST /expense-requests/{id}/transfer (US-20, T3): Pengajuan Baru "Disetujui (Antri Transfer)" or
- * Reimburse "Nota Terverifikasi (Antri Transfer)". Amount copied from `approvedAmount` (G3, also
+ * Reimburse "Nota Terverifikasi (Antri Transfer)". ADR 0025: a vendor payment → "Selesai" at once (no LPJ); the
+ * destination snapshot is the vendor account taken at submit. Amount copied from `approvedAmount` (G3, also
  * DB-checked on insert), destination = the request's bank snapshot (read-only), source account +
  * bank reference + proof required. Auto-posts ONE KK cash-out linked to request and transfer
  * (category = the lines' single category, else empty: category breakdown comes from the lines,
@@ -240,8 +247,15 @@ export async function recordTransfer(req: PayloadRequest, id: number, input: Tra
     overrideAccess: true, // SYSTEM-WRITE: link the KK entry (DB: cash_entry_id set once)
     req,
   })
-  const updated = await updateRequest(req, id, { status: 'transferred', transferredTotal: (doc.transferredTotal ?? 0) + approved })
-  if (doc.type === 'advance') await recomputeFlags(req, id) // receipt date rules use the transfer date
+  // ADR 0025: a vendor payment is done with the transfer (the invoice is the proof — no receipts, LPJ or settlement)
+  const vendor = payeeOf(doc.payeeType) === 'vendor'
+  const updated = await updateRequest(
+    req,
+    id,
+    { status: vendor ? 'completed' : 'transferred', transferredTotal: (doc.transferredTotal ?? 0) + approved },
+    vendor ? 'pembayaran vendor selesai dengan transfer (invoice = bukti, tanpa LPJ)' : undefined,
+  )
+  if (doc.type === 'advance' && !vendor) await recomputeFlags(req, id) // receipt date rules use the transfer date
   return { transfer: linked, cashEntry: entry, request: updated }
 }
 

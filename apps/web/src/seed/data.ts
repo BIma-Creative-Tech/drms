@@ -109,6 +109,13 @@ export const ADDENDUM_DEFAULT_RULE_NAME = 'Default Addendum RAB — Direktur lal
 /** ADR 0024: name of the seeded no-approval rule for a Direktur's own requests (also migration 20261013_300000_d1010_approval_config_data). */
 export const DIREKTUR_RULE_NAME = 'Pengajuan Direktur'
 
+/**
+ * ADR 0025 (DRMS 13/10 Wave 4, D3): a vendor payment filed by Finance → Direktur only (no PM project step). A PM's vendor
+ * payment needs no rule of its own: the default rule applies and the PM step is skipped because he is its PM (G1-2).
+ * Also inserted per PT by migration 20261014_100200_d1310_vendor_payments_data.
+ */
+export const VENDOR_FINANCE_RULE_NAME = 'Pembayaran vendor oleh Finance — Direktur'
+
 export const DEFAULT_APPROVAL_RULES = [
   {
     // ADR 0021 (owner decision 2026-10-10): Staff → PM project ("Diketahui" = Persetujuan PM) → Direktur;
@@ -143,6 +150,24 @@ export const DEFAULT_APPROVAL_RULES = [
     signDiajukan: 'required',
     signDibuat: 'required',
     steps: [],
+    active: true,
+  },
+  {
+    // ADR 0025: vendor payment filed by Finance (Peran pemohon = Finance, Jenis penerima = Vendor) → Direktur only.
+    name: VENDOR_FINANCE_RULE_NAME,
+    docType: 'expense_request',
+    requestType: 'any',
+    payeeType: 'vendor',
+    minAmount: 0,
+    maxAmount: null,
+    priority: 20,
+    requesterRoles: ['pk-finance'],
+    acknowledge: 'none',
+    acknowledgeBy: 'role',
+    acknowledgeRole: null,
+    signDiajukan: 'required',
+    signDibuat: 'required',
+    steps: [{ level: 1, approverRole: 'pk-owner' }],
     active: true,
   },
   {

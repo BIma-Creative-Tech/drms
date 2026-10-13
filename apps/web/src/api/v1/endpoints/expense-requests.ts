@@ -76,7 +76,7 @@ export const listRequestsEndpoint = v1({
   handler: async ({ req }) => {
     const q = ListQuery.safeParse(Object.fromEntries(req.searchParams.entries()))
     if (!q.success) throw new HttpError(400, 'Bad Request', { errors: q.error.issues.map((i) => ({ path: i.path.join('.'), message: i.message })) })
-    const { scope, status, type, limit, cursor, project, q: text, page: pageNo } = q.data
+    const { scope, status, type, payeeType, limit, cursor, project, q: text, page: pageNo } = q.data
     const and: Where[] = []
     const uid = userId(req)!
     if (scope === 'mine') {
@@ -110,6 +110,8 @@ export const listRequestsEndpoint = v1({
     if (scope === 'inbox') and.push({ status: { in: ['pending_ack', 'pending_approval'] } })
     if (status) and.push({ status: { in: status.split(',') } })
     if (type) and.push({ type: { equals: type } })
+    // ADR 0025: vendor payments only (or only requests paid to employees)
+    if (payeeType) and.push({ payeeType: { equals: payeeType } })
     // DRMS 10/10 (project "Pengajuan" tab, APK project screen): one project + search in nomor / judul
     if (project) and.push({ project: { equals: project } })
     const search = searchWhere(['docNo', 'title'], text)
@@ -250,7 +252,7 @@ export const transferQueueEndpoint = v1({
     return json({
       items: items.map((i) => {
         const x = extra.get(i.id)
-        return { ...i, project: x?.project ?? null, costCenter: x?.costCenter ?? null, bank: x?.bank ?? null, bankVerification: x?.bankVerification ?? 'unverified', flags: x?.flags ?? { warning: 0, info: 0, receiptMismatch: 0 }, sla: x?.sla ?? { approvedAt: null, slaHours: 24, ageHours: null, over: false }, noApproval: x?.noApproval ?? false }
+        return { ...i, project: x?.project ?? null, costCenter: x?.costCenter ?? null, bank: x?.bank ?? null, bankVerification: x?.bankVerification ?? 'unverified', flags: x?.flags ?? { warning: 0, info: 0, receiptMismatch: 0 }, sla: x?.sla ?? { approvedAt: null, slaHours: 24, ageHours: null, over: false }, noApproval: x?.noApproval ?? false, vendorName: x?.vendorName ?? null }
       }),
       nextCursor: null,
     })
@@ -620,7 +622,7 @@ export const bankPreviewEndpoint = v1({
   handler: async ({ req }) => {
     const q = BankPreviewQuery.safeParse(Object.fromEntries(req.searchParams.entries()))
     if (!q.success) throw new HttpError(400, 'Bad Request', { errors: q.error.issues.map((i) => ({ path: i.path.join('.'), message: i.message })) })
-    return json(await bankPreview(req, { requestId: q.data.request, accountId: q.data.account, reveal: q.data.reveal === '1' }))
+    return json(await bankPreview(req, { requestId: q.data.request, accountId: q.data.account, vendorAccountId: q.data.vendorAccount, reveal: q.data.reveal === '1' }))
   },
 })
 

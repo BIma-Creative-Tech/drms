@@ -85,6 +85,7 @@ async function load(payload: Payload, user: NonNullable<PayloadRequest['user']>,
     const requesters = d.requesters.map((x) => (x && 'name' in x ? String(x.name ?? '') : '')).filter(Boolean).join(', ')
     const stepper = buildRequestStepper({
       type: d.type,
+      payeeType: d.payeeType, // ADR 0025: no LPJ steps for a vendor payment
       status: d.status,
       approvalCycle: d.approvalCycle,
       currentLevel: d.currentLevel,
@@ -112,7 +113,8 @@ async function load(payload: Payload, user: NonNullable<PayloadRequest['user']>,
       canDuplicate: hasRole(r, CREATE_ROLES, company) && (own || hasRole(r, ['pk-admin', 'pk-finance'], company)),
       ptName: pt ? [pt.shortCode, pt.name].filter(Boolean).join(' · ') : null,
       pt: pt ? { shortCode: String(pt.shortCode ?? `#${company}`), name: pt.name ?? null } : null,
-      draftBank: d.status === 'draft' && d.bankAccountId ? await bankPreview(r, { requestId: docId, reveal: false }).catch(() => null) : null,
+      // ADR 0025: a vendor-payment Draft shows its chosen vendor account
+      draftBank: d.status === 'draft' && (d.bankAccountId || d.vendorBankAccountId) ? await bankPreview(r, { requestId: docId, reveal: false }).catch(() => null) : null,
       attachments,
       stepper,
       stepperNote: g1ExceptionText(snap?.selfApproval),

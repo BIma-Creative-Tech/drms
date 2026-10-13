@@ -97,6 +97,29 @@ tanggalnya menentukan periode (tutup buku) — **No. referensi bank**, **Bukti**
   menekannya di detail pengajuan (di bawah "Tahapan saat ini: Pemohon … atau Finance"). Tanpa itu pengajuan ditutup otomatis
   setelah batas hari di Setting perusahaan.
 
+## 3a. Pembayaran vendor (DRMS 13/10, ADR 0025)
+
+Membayar **invoice vendor** langsung ke **rekening vendor** — tanpa nota per baris, tanpa LPJ dan tanpa selisih;
+invoice adalah buktinya.
+
+1. **Rekening vendor dulu:** Master Data → **Vendor** → buka vendor → tab **Rekening** → tambah rekening (bank, nomor,
+   atas nama, *Rekening default*). Atau Master Data → **Rekening vendor**. Periksa nomor dan nama pemilik lalu ubah
+   **Status verifikasi** menjadi *Terverifikasi* (hanya Finance / Admin). Mengubah nomor / nama / bank wajib dengan
+   alasan (tercatat di audit).
+2. **Buat pengajuan:** Keuangan → Pengajuan biaya → Buat baru → **Jenis penerima: Vendor**. Pilih project, **Vendor**,
+   **Rekening vendor** (hanya rekening aktif vendor itu), isi **Nomor invoice**, **Tanggal invoice**, *Jatuh tempo*
+   (opsional) dan unggah **File invoice** (foto / PDF). Isi baris item seperti biasa (item RAP per baris). Pemohon =
+   Anda sendiri; jenis otomatis *Pengajuan Baru*. **Kirim pengajuan**.
+3. **Persetujuan:** pembayaran vendor yang Anda ajukan langsung ke **Direktur** (aturan "Pembayaran vendor oleh
+   Finance — Direktur"). Yang diajukan PM: langkah PM dilewati (ia PM project-nya) → Direktur.
+4. **Transfer:** muncul di **Antrian Transfer** dengan label *Pembayaran vendor: <nama vendor>*; rekening tujuan =
+   rekening vendor yang tercatat saat diajukan. Rekening yang belum diverifikasi meminta konfirmasi seperti rekening
+   karyawan. Setelah transfer dicatat, pengajuan langsung **Selesai** (tidak ada LPJ). Salah transfer → **Void
+   transfer** di detail pengajuan; pengajuan kembali ke antrian.
+5. **Invoice ganda ditolak:** nomor invoice yang sama dari vendor yang sama (huruf besar/kecil, spasi, tanda `/ - .`
+   diabaikan) pada pengajuan lain yang belum *Dibatalkan* / *Ditolak* → pesan "Invoice … sudah dipakai di pengajuan …".
+   Batalkan pengajuan lama bila memang salah input. *Duplikat* menyalin vendor + rekening, tetapi tidak invoice-nya.
+
 ## 4. LPJ Pengajuan Baru
 
 **Verifikasi LPJ** → **LPJ diajukan**:

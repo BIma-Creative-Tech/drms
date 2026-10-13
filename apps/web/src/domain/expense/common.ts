@@ -11,7 +11,7 @@ import { allowedActions, FINANCE_SELF_GUARDED, mayPerform, targets, type Action,
 import { DIREKTUR_VIA_PM_SELF, isDecisionSnapshot, isSelfApproval, lacksDecisionRole } from './decision'
 import { SHARED_FLAG_WHERE } from './flag-visibility'
 import { matchesAcknowledger, matchesStep, type ApprovalSnapshot } from './rules'
-import { BUDGET_COMMITTED, type RequestStatus, type RequestType } from './types'
+import { BUDGET_COMMITTED, payeeOf, type PayeeType, type RequestStatus, type RequestType } from './types'
 
 /** Public domain error (mapped to problem+json by the /api/v1 wrapper, Payload REST too). */
 export function fail(status: number, message: string, errors?: Array<{ path: string; message: string }>): never {
@@ -37,6 +37,15 @@ export type RequestDoc = {
   id: number
   docNo?: string | null
   type: RequestType
+  /** ADR 0025 "Jenis penerima" (absent on rows read before the column existed = karyawan). */
+  payeeType?: PayeeType | null
+  /** ADR 0025 vendor payment: vendor + its bank account (destination) + invoice (the proof). */
+  vendor?: unknown
+  vendorBankAccount?: unknown
+  invoiceNo?: string | null
+  invoiceDate?: string | null
+  invoiceDueDate?: string | null
+  invoiceFile?: unknown
   status: RequestStatus
   title: string
   project?: unknown
@@ -170,6 +179,7 @@ export async function actorContext(req: PayloadRequest, doc: RequestDoc): Promis
   const matchesCurrentStep = doc.status === 'pending_approval' && matchesStep(step, caller)
   return {
     type: doc.type,
+    payeeType: payeeOf(doc.payeeType),
     status: doc.status,
     roles,
     isCreator,
@@ -212,7 +222,7 @@ export function selfApprovalAllowed(
 export function requireAction(ctx: ActorContext, action: Action): void {
   if (!mayPerform(ctx, action)) fail(403, 'Anda tidak berhak melakukan aksi ini pada pengajuan ini.')
   const nonTransition = ['edit', 'add_receipt', 'receipt_verify', 'review_flag', 'resubmit'].includes(action)
-  if (!nonTransition && targets(ctx.type, ctx.status, action).length === 0) {
+  if (!nonTransition && targets(ctx.type, ctx.status, action, ctx.payeeType).length === 0) {
     fail(409, `Aksi tidak dapat dilakukan pada status pengajuan saat ini (${ctx.status}).`)
   }
   if (!allowedActions(ctx).includes(action)) {

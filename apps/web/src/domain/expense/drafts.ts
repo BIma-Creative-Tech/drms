@@ -1,16 +1,19 @@
+import { sql } from '@payloadcms/db-postgres'
 import type { CollectionSlug, PayloadRequest } from 'payload'
+
+import { getRequestTx } from '@/lib/tx'
 
 import { employeeIn, hasRole, hasRoleAny, isRole, isStaffOnly, mappedCompanies, relId, rolesIn, soleCompany, userId, type Role } from '@/access/roles'
 import { companyOf } from '@/domain/companies'
 import { resolveScope } from '@/access/scope'
 
-import { actorContext, fail, ids, loadRaw, loadVisible, requireAction, type RequestDoc } from './common'
+import { actorContext, fail, ids, loadRaw, loadVisible, requireAction, today, type RequestDoc } from './common'
 import { rapRequirement } from '@/domain/rap/budget'
 import { RAP_MISSING_MESSAGE } from '@/domain/rap/rules'
 
 import { normalizeLines, validateLines } from './lines'
 import { copyReceiptsForResubmit } from './receipts'
-import { isBusinessDate, type RequestType } from './types'
+import { INACTIVE_FOR_DUPLICATES, isBusinessDate, normalizeInvoiceNo, payeeOf, STATUS_LABELS, type PayeeType, type RequestStatus, type RequestType } from './types'
 
 export type LineInputApi = {
   id?: string
@@ -43,6 +46,31 @@ export type DraftInput = {
   lines?: LineInputApi[]
   attachmentIds?: number[]
   clientUuid?: string
+  /** ADR 0025 "Jenis penerima" (default karyawan). `vendor` = Pembayaran vendor (Finance / PM only; type is set to advance). */
+  payeeType?: PayeeType
+  vendorId?: number | null
+  vendorBankAccountId?: number | null
+  invoiceNo?: string | null
+  invoiceDate?: string | null
+  invoiceDueDate?: string | null
+  /** media-attachments id of the invoice (photo / PDF), uploaded by the caller (POST /media/attachments). */
+  invoiceFileId?: number | null
+}
+
+/** ADR 0025 (D3): roles that may file a vendor payment, IN the request's PT. */
+export const VENDOR_PAYMENT_ROLES: readonly Role[] = ['pk-finance', 'pk-pm']
+
+export const VENDOR_PAYMENT_ROLE_MESSAGE = 'Pembayaran vendor hanya dapat diajukan oleh Finance atau PM di PT ini.'
+
+/** Vendor fields of a draft (ADR 0025) — the part of `validateContent`'s input that only a vendor payment uses. */
+export type VendorContent = {
+  payeeType?: PayeeType | null
+  vendorId?: number | null
+  vendorBankAccountId?: number | null
+  invoiceNo?: string | null
+  invoiceDate?: string | null
+  invoiceDueDate?: string | null
+  invoiceFileId?: number | null
 }
 
 const OFFICE = ['pk-admin', 'pk-finance', 'pk-owner'] as const
@@ -132,13 +160,15 @@ export async function validateContent(
     lines: LineInputApi[]
     neededDate?: string | null
     urgencyLevelId?: number | null
-  },
+  } & VendorContent,
   opts: {
     forSubmit: boolean
     creatorId: number
     callerSetsRequesters?: boolean
     /** D2: a legacy cost-center request submitted before (withdrawn / back to Draft) may be sent again without a project. */
     legacyCostCenter?: boolean
+    /** ADR 0025: the request itself (excluded from the duplicate-invoice check); absent on create. */
+    requestId?: number
   },
 ): Promise<void> {
   const errors: Array<{ path: string; message: string }> = []
@@ -202,9 +232,15 @@ export async function validateContent(
     }
   }
 
+  const vendor = payeeOf(c.payeeType) === 'vendor'
+  // ADR 0025: a vendor payment pays the vendor's account — the requester's account plays no part
+  if (vendor) {
+    if (c.bankAccountId) errors.push({ path: 'bankAccountId', message: 'Pembayaran vendor memakai rekening vendor, bukan rekening karyawan.' })
+    errors.push(...(await vendorErrors(req, c, { ...opts, company: ownPt, requesters: uniq })))
+  }
   // G9 / US-44 / Q-11: account of one of the requesters, active.
-  if (opts.forSubmit && !c.bankAccountId) errors.push({ path: 'bankAccountId', message: 'Rekening tujuan wajib diisi.' })
-  if (c.bankAccountId) {
+  if (!vendor && opts.forSubmit && !c.bankAccountId) errors.push({ path: 'bankAccountId', message: 'Rekening tujuan wajib diisi.' })
+  if (!vendor && c.bankAccountId) {
     const acc = await req.payload
       .findByID({ collection: 'employee-bank-accounts', id: c.bankAccountId, depth: 0, overrideAccess: true /* SYSTEM-READ: G9 */, req })
       .catch(() => null)
@@ -245,6 +281,96 @@ export async function validateContent(
   })
   errors.push(...(await rapLineErrors(req, c.projectId ?? null, c.lines, opts.forSubmit)))
   if (errors.length > 0) fail(400, 'Data pengajuan tidak valid.', errors)
+  // ADR 0025: the same invoice of the same vendor on another live request → 409 (DB: expense_requests_vendor_invoice_uq)
+  if (vendor && c.vendorId && normalizeInvoiceNo(c.invoiceNo)) await assertInvoiceUnused(req, c.vendorId, c.invoiceNo!, opts.requestId)
+}
+
+/**
+ * ADR 0025 (D3): vendor-payment rules of a draft / submit — filer = Finance or PM of the request's PT, the requester is
+ * the filer himself, an active vendor of the PT and an active account OF THAT vendor, invoice number / date / file
+ * (required to send), due date not before the invoice date.
+ */
+async function vendorErrors(
+  req: PayloadRequest,
+  c: VendorContent & { type: RequestType },
+  opts: { forSubmit: boolean; creatorId: number; company: number | undefined; requesters: number[] },
+): Promise<Array<{ path: string; message: string }>> {
+  const errors: Array<{ path: string; message: string }> = []
+  // D3: Finance and PM only — checked for the CREATOR in the request's PT (no PT yet: the caller's roles in any selected PT)
+  if (opts.company !== undefined) {
+    const { roles, employee } = await rolesOfUserIn(req, opts.creatorId, opts.company)
+    if (!roles.some((r) => VENDOR_PAYMENT_ROLES.includes(r))) fail(403, VENDOR_PAYMENT_ROLE_MESSAGE)
+    // the filer is the applicant: "Pemohon" = exactly his own employee in the PT (routing by his role, ADR 0025)
+    if (opts.requesters.length > 0 && (employee === undefined || opts.requesters.length !== 1 || opts.requesters[0] !== employee)) {
+      errors.push({ path: 'requesterIds', message: 'Pembayaran vendor: pemohon adalah pembuat pengajuan sendiri (Finance / PM).' })
+    }
+  } else if (!hasRoleAny(req, ...VENDOR_PAYMENT_ROLES)) fail(403, VENDOR_PAYMENT_ROLE_MESSAGE)
+  if (c.type !== 'advance') errors.push({ path: 'type', message: 'Pembayaran vendor memakai jenis Pengajuan Baru.' })
+
+  if (opts.forSubmit && !c.vendorId) errors.push({ path: 'vendorId', message: 'Vendor wajib dipilih.' })
+  let vendorPt: number | undefined
+  if (c.vendorId) {
+    const v = (await req.payload.findByID({ collection: 'vendors', id: c.vendorId, depth: 0, overrideAccess: true /* SYSTEM-READ: vendor check (PT below) */, req, disableErrors: true })) as { company?: unknown; active?: boolean | null } | null
+    vendorPt = relId(v?.company)
+    if (!v || v.active === false || isForeign(req, vendorPt ?? -1) || (opts.company !== undefined && vendorPt !== opts.company)) errors.push({ path: 'vendorId', message: 'Vendor tidak ditemukan, nonaktif, atau bukan vendor PT pengajuan ini.' })
+  }
+  if (opts.forSubmit && !c.vendorBankAccountId) errors.push({ path: 'vendorBankAccountId', message: 'Rekening vendor wajib dipilih.' })
+  if (c.vendorBankAccountId) {
+    const a = (await req.payload.findByID({ collection: 'vendor-bank-accounts', id: c.vendorBankAccountId, depth: 0, overrideAccess: true /* SYSTEM-READ: vendor account check (vendor + PT below) */, req, disableErrors: true })) as {
+      company?: unknown
+      vendor?: unknown
+      active?: boolean | null
+    } | null
+    if (!a || a.active === false || isForeign(req, relId(a.company) ?? -1)) errors.push({ path: 'vendorBankAccountId', message: 'Rekening vendor tidak ditemukan atau nonaktif.' })
+    else if (!c.vendorId || relId(a.vendor) !== c.vendorId) errors.push({ path: 'vendorBankAccountId', message: 'Rekening harus milik vendor yang dipilih.' })
+  }
+
+  const invoiceNo = (c.invoiceNo ?? '').trim()
+  if (opts.forSubmit && !invoiceNo) errors.push({ path: 'invoiceNo', message: 'Nomor invoice wajib diisi.' })
+  else if (invoiceNo && !normalizeInvoiceNo(invoiceNo)) errors.push({ path: 'invoiceNo', message: 'Nomor invoice harus memuat huruf atau angka.' })
+  if (invoiceNo.length > 64) errors.push({ path: 'invoiceNo', message: 'Nomor invoice maksimal 64 karakter.' })
+  if (opts.forSubmit && !c.invoiceDate) errors.push({ path: 'invoiceDate', message: 'Tanggal invoice wajib diisi.' })
+  if (c.invoiceDate && !isBusinessDate(c.invoiceDate)) errors.push({ path: 'invoiceDate', message: 'Tanggal harus YYYY-MM-DD.' })
+  else if (c.invoiceDate) {
+    const todayDate = await today(req, opts.company ?? vendorPt)
+    if (c.invoiceDate > todayDate) errors.push({ path: 'invoiceDate', message: `Tanggal invoice tidak boleh di masa depan (hari ini ${todayDate}).` })
+  }
+  if (c.invoiceDueDate && !isBusinessDate(c.invoiceDueDate)) errors.push({ path: 'invoiceDueDate', message: 'Tanggal harus YYYY-MM-DD.' })
+  else if (c.invoiceDueDate && c.invoiceDate && isBusinessDate(c.invoiceDate) && c.invoiceDueDate < c.invoiceDate) errors.push({ path: 'invoiceDueDate', message: 'Jatuh tempo tidak boleh sebelum tanggal invoice.' })
+  if (opts.forSubmit && !c.invoiceFileId) errors.push({ path: 'invoiceFileId', message: 'File invoice (foto / PDF) wajib diunggah.' })
+  if (c.invoiceFileId) {
+    const m = (await req.payload.findByID({ collection: 'media-attachments', id: c.invoiceFileId, depth: 0, overrideAccess: true /* SYSTEM-READ: invoice file exists (owner link at submit) */, req, disableErrors: true })) as { id?: number } | null
+    if (!m) errors.push({ path: 'invoiceFileId', message: 'File invoice tidak ditemukan; unggah ulang.' })
+  }
+  return errors
+}
+
+/** Message of a duplicate invoice (ADR 0025): the other request by number (or id) and its status. */
+export function duplicateInvoiceMessage(invoiceNo: string, other: { id: number; docNo: string | null; status: RequestStatus }): string {
+  return `Invoice ${invoiceNo.trim()} dari vendor ini sudah dipakai di pengajuan ${other.docNo ?? `#${other.id} (draft)`} — status ${STATUS_LABELS[other.status]}. Satu invoice hanya boleh dibayar sekali; batalkan pengajuan lama atau periksa nomor invoice.`
+}
+
+/**
+ * ADR 0025 duplicate-invoice rule: same vendor + same normalized invoice number on a request that is not cancelled /
+ * rejected (Draft included) → 409 with a field error on `invoiceNo`. The DB unique index
+ * `expense_requests_vendor_invoice_uq` (same key, `pk_invoice_key`) is the final guard against a race.
+ */
+export async function assertInvoiceUnused(req: PayloadRequest, vendorId: number, invoiceNo: string, requestId?: number): Promise<void> {
+  const key = normalizeInvoiceNo(invoiceNo)
+  const tx = await getRequestTx(req)
+  const r = (await tx.execute(sql`
+    SELECT id, doc_no, status::text AS status FROM expense_requests
+     WHERE payee_type = 'vendor' AND vendor_id = ${vendorId} AND id <> ${requestId ?? -1}
+       AND status::text NOT IN (${sql.join(
+         INACTIVE_FOR_DUPLICATES.map((s) => sql`${s}`),
+         sql`, `,
+       )})
+       AND pk_invoice_key(invoice_no) = ${key}
+     ORDER BY id LIMIT 1`)) as unknown as { rows: Array<{ id: number; doc_no: string | null; status: RequestStatus }> }
+  const other = r.rows[0]
+  if (!other) return
+  const message = duplicateInvoiceMessage(invoiceNo, { id: Number(other.id), docNo: other.doc_no, status: other.status })
+  fail(409, message, [{ path: 'invoiceNo', message }])
 }
 
 /**
@@ -313,6 +439,46 @@ async function assertStaffSelfOnly(req: PayloadRequest, requesters: number[], co
   if (caller !== undefined && caller !== opts.creatorId && opts.callerSetsRequesters) await check(caller)
 }
 
+/** ADR 0025: the vendor fields of a stored request in API shape. */
+export function vendorOfDoc(doc: RequestDoc): Required<VendorContent> {
+  return {
+    payeeType: payeeOf(doc.payeeType),
+    vendorId: relId(doc.vendor) ?? null,
+    vendorBankAccountId: relId(doc.vendorBankAccount) ?? null,
+    invoiceNo: doc.invoiceNo ?? null,
+    invoiceDate: doc.invoiceDate ?? null,
+    invoiceDueDate: doc.invoiceDueDate ?? null,
+    invoiceFileId: relId(doc.invoiceFile) ?? null,
+  }
+}
+
+/** ADR 0025: validateContent's vendor part of an API input (karyawan: nothing but the payee type). */
+function vendorInput(input: VendorContent, vendor: boolean): VendorContent {
+  if (!vendor) return { payeeType: 'karyawan' }
+  return {
+    payeeType: 'vendor',
+    vendorId: input.vendorId ?? null,
+    vendorBankAccountId: input.vendorBankAccountId ?? null,
+    invoiceNo: input.invoiceNo ?? null,
+    invoiceDate: input.invoiceDate ?? null,
+    invoiceDueDate: input.invoiceDueDate ?? null,
+    invoiceFileId: input.invoiceFileId ?? null,
+  }
+}
+
+/** ADR 0025: the vendor columns written for a draft (karyawan → all empty, so a payee switch never leaves stale data). */
+export function vendorData(input: VendorContent, vendor: boolean): Record<string, unknown> {
+  return {
+    payeeType: vendor ? 'vendor' : 'karyawan',
+    vendor: vendor ? (input.vendorId ?? null) : null,
+    vendorBankAccount: vendor ? (input.vendorBankAccountId ?? null) : null,
+    invoiceNo: vendor ? (input.invoiceNo?.trim() || null) : null,
+    invoiceDate: vendor ? (input.invoiceDate ?? null) : null,
+    invoiceDueDate: vendor ? (input.invoiceDueDate ?? null) : null,
+    invoiceFile: vendor ? (input.invoiceFileId ?? null) : null,
+  }
+}
+
 export function toDocLines(lines: LineInputApi[]) {
   return lines.map((l) => ({
     ...(l.id ? { id: l.id } : {}),
@@ -378,18 +544,22 @@ export async function createDraft(req: PayloadRequest, input: DraftInput & { typ
   const emp = company !== undefined ? employeeIn(req, company) : relId((req.user as { employee?: unknown } | null)?.employee)
   const requesterIds = input.requesterIds && input.requesterIds.length > 0 ? input.requesterIds : emp !== undefined ? [emp] : []
   const lines = input.lines ?? []
-  await validateContent(req, { ...input, costCenterId: null, requesterIds, lines }, { forSubmit: false, creatorId: uid })
+  const vendor = payeeOf(input.payeeType) === 'vendor'
+  // ADR 0025: a vendor payment is always a Pengajuan Baru (type advance), without an employee account
+  const type: RequestType = vendor ? 'advance' : input.type
+  await validateContent(req, { ...input, type, costCenterId: null, requesterIds, lines, ...vendorInput(input, vendor) }, { forSubmit: false, creatorId: uid })
   const doc = await validated(req, () => req.payload.create({
     collection: 'expense-requests',
     data: {
-      type: input.type,
+      type,
+      ...vendorData(input, vendor),
       title: input.title.trim(),
       project: input.projectId ?? null,
       neededDate: input.neededDate ?? null,
       urgencyLevel: input.urgencyLevelId ?? null,
       notes: input.notes ?? null,
       requesters: requesterIds,
-      bankAccount: input.bankAccountId ?? null,
+      bankAccount: vendor ? null : (input.bankAccountId ?? null),
       lines: toDocLines(lines),
       attachments: input.attachmentIds ?? [],
       clientUuid: input.clientUuid ?? null,
@@ -418,27 +588,49 @@ export async function updateDraft(req: PayloadRequest, id: number, input: DraftI
   const projectId = input.projectId !== undefined ? input.projectId : (relId(doc.project) ?? null)
   // D4: lines without `rapItemId` (old clients) keep the stored RAP item of the same line id
   const lines = input.lines !== undefined ? keepRapItems(input.lines, fromDocLines(doc)) : undefined
+  // ADR 0025: the payee type of a Draft may change (vendor ⇄ karyawan); vendor → type advance, no employee account
+  const payee = payeeOf(input.payeeType ?? doc.payeeType)
+  const vendor = payee === 'vendor'
+  if (doc.status === 'receipt_revision' && input.payeeType !== undefined && payeeOf(input.payeeType) !== payeeOf(doc.payeeType)) fail(409, 'Saat Revisi Nota jenis penerima tidak dapat diubah.')
+  const stored = vendorOfDoc(doc)
+  const vendorNow = vendor
+    ? {
+        payeeType: payee,
+        vendorId: input.vendorId !== undefined ? input.vendorId : stored.vendorId,
+        vendorBankAccountId: input.vendorBankAccountId !== undefined ? input.vendorBankAccountId : stored.vendorBankAccountId,
+        invoiceNo: input.invoiceNo !== undefined ? input.invoiceNo : stored.invoiceNo,
+        invoiceDate: input.invoiceDate !== undefined ? input.invoiceDate : stored.invoiceDate,
+        invoiceDueDate: input.invoiceDueDate !== undefined ? input.invoiceDueDate : stored.invoiceDueDate,
+        invoiceFileId: input.invoiceFileId !== undefined ? input.invoiceFileId : stored.invoiceFileId,
+      }
+    : { payeeType: payee }
   const current = {
-    type: (input.type ?? doc.type) as RequestType,
+    ...vendorNow,
+    type: vendor ? ('advance' as const) : ((input.type ?? doc.type) as RequestType),
     title: input.title ?? doc.title,
     projectId,
     costCenterId: projectId ? null : (relId(doc.costCenter) ?? null),
     requesterIds: input.requesterIds ?? ids(doc.requesters),
-    bankAccountId: input.bankAccountId !== undefined ? input.bankAccountId : (relId(doc.bankAccount) ?? null),
+    bankAccountId: vendor ? null : input.bankAccountId !== undefined ? input.bankAccountId : (relId(doc.bankAccount) ?? null),
     lines: lines ?? fromDocLines(doc),
     neededDate: input.neededDate !== undefined ? input.neededDate : doc.neededDate,
     urgencyLevelId: input.urgencyLevelId !== undefined ? input.urgencyLevelId : (relId(doc.urgencyLevel) ?? null),
   }
-  await validateContent(req, current, { forSubmit: false, creatorId: relId(doc.createdBy) ?? -1, callerSetsRequesters: input.requesterIds !== undefined && input.requesterIds.join(',') !== ids(doc.requesters).join(',') })
+  await validateContent(req, current, { forSubmit: false, creatorId: relId(doc.createdBy) ?? -1, requestId: id, callerSetsRequesters: input.requesterIds !== undefined && input.requesterIds.join(',') !== ids(doc.requesters).join(',') })
   const data: Record<string, unknown> = {}
   if (input.type !== undefined) data.type = input.type
+  if (doc.status === 'draft' && (input.payeeType !== undefined || vendor)) {
+    // ADR 0025: payee type + vendor fields (karyawan clears them; vendor clears the employee account)
+    Object.assign(data, vendorData(vendor ? { ...input, ...vendorNow } : {}, vendor), { type: current.type })
+    if (vendor) data.bankAccount = null
+  }
   if (input.title !== undefined) data.title = input.title.trim()
   if (input.projectId !== undefined) data.project = input.projectId
   if (input.neededDate !== undefined) data.neededDate = input.neededDate
   if (input.urgencyLevelId !== undefined) data.urgencyLevel = input.urgencyLevelId
   if (input.notes !== undefined) data.notes = input.notes
   if (input.requesterIds !== undefined) data.requesters = input.requesterIds
-  if (input.bankAccountId !== undefined) data.bankAccount = input.bankAccountId
+  if (input.bankAccountId !== undefined && !vendor) data.bankAccount = input.bankAccountId
   if (lines !== undefined) data.lines = toDocLines(lines)
   if (input.attachmentIds !== undefined) data.attachments = input.attachmentIds
   const updated = await validated(req, () => req.payload.update({
@@ -476,6 +668,8 @@ export async function resubmitAsDraft(req: PayloadRequest, id: number): Promise<
       notes: src.notes ?? null,
       requesters: ids(src.requesters),
       bankAccount: relId(src.bankAccount) ?? null,
+      // ADR 0025: a rejected vendor payment comes back with its vendor + invoice (the rejected one no longer counts as a duplicate)
+      ...vendorData(vendorOfDoc(src), payeeOf(src.payeeType) === 'vendor'),
       lines: toDocLines(fromDocLines(src).map(({ id: _id, ...l }) => l)),
       attachments: ids(src.attachments),
     } as never,

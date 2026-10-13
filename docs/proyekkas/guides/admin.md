@@ -179,7 +179,7 @@ memegang akses konsol Keycloak di prod: **belum diverifikasi** — hubungi tim t
 
 | Modul | Isi |
 |---|---|
-| **Master Data** | Bank, Satuan (dipakai bersama semua PT); Kategori pengeluaran (satuan wajar, perlu kendaraan), Kendaraan (nomor polisi unik di seluruh grup, contoh `DA 1234 XY`), Vendor — per PT |
+| **Master Data** | Bank, Satuan (dipakai bersama semua PT); Kategori pengeluaran (satuan wajar, perlu kendaraan), Kendaraan (nomor polisi unik di seluruh grup, contoh `DA 1234 XY`), Vendor (tab **Rekening**), **Rekening vendor** (tujuan pembayaran vendor; verifikasi oleh Admin / Finance) — per PT |
 | **Absensi → Konfigurasi** | Jadwal kerja (per PT), Hari libur (bersama) |
 | **Proyek** | Project (dibuat Direktur), Pusat biaya, Klien, Template tahapan, Penugasan tim — per PT |
 | **Keuangan → Kas** | Akun kas/bank (saldo awal), Sumber kas masuk — per PT |
@@ -249,6 +249,16 @@ sampai selesai).
 
 Pengajuan yang sudah diajukan sebelum langkah ini tetap diputuskan Direktur lalu Finance (snapshot lama). Direktur cuti:
 buat/ubah aturan sementara dengan level 1 = Direktur pengganti (user bernama), lalu kembalikan.
+
+### 4b. Pembayaran vendor (DRMS 13/10, ADR 0025)
+
+- Aturan approval punya syarat baru **Jenis penerima** (*Semua* / *Karyawan* / *Vendor*). Semua aturan lama =
+  *Semua* (tidak berubah).
+- Setiap PT mendapat aturan **"Pembayaran vendor oleh Finance — Direktur"** (Jenis penerima *Vendor*, Peran pemohon
+  *Finance*, Diketahui *Tidak dipakai*, level 1 *Direktur*, prioritas 20). Pembayaran vendor oleh PM memakai aturan
+  default PT (PM project → Direktur; langkah PM dilewati karena ia PM project-nya).
+- Pembayaran vendor hanya bisa diajukan Finance atau PM. Admin / Direktur / Staff tidak.
+- Menonaktifkan aturan vendor (dengan alasan) → pembayaran vendor oleh Finance mengikuti aturan default.
 
 ## 5. Penomoran dokumen
 

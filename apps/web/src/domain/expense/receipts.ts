@@ -101,7 +101,9 @@ export async function claimMedia(
  * already linked to ANOTHER expense request (copied by "Ajukan ulang", US-06) keeps that link.
  */
 export async function claimAttachments(req: PayloadRequest, doc: RequestDoc, involved: ReadonlySet<number>): Promise<void> {
-  for (const mediaId of ids(doc.attachments)) {
+  // ADR 0025: the invoice file of a vendor payment is linked the same way (readable by everyone who reads the request)
+  const invoice = relId(doc.invoiceFile)
+  for (const mediaId of [...new Set([...ids(doc.attachments), ...(invoice !== undefined ? [invoice] : [])])]) {
     const m = (await req.payload
       .findByID({ collection: 'media-attachments', id: mediaId, depth: 0, overrideAccess: true /* SYSTEM-READ: owner link checked below */, req })
       .catch(() => null)) as { uploadedBy?: unknown; ownerDocType?: string | null; ownerDocId?: string | null } | null

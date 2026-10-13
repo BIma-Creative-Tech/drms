@@ -35,6 +35,9 @@ export function RequestSummary({ d, ptName, attachments, canRevealBank, draftBan
     if (value !== null && value !== undefined && value !== '') rows.push([label, value, key])
   }
   add('Jenis', d.typeLabel, 'type')
+  // ADR 0025: vendor payment — the payee is the vendor (Pemohon = the Finance / PM filer)
+  const vendorPay = d.payeeType === 'vendor'
+  if (vendorPay) add('Jenis penerima', 'Vendor', 'payeeType')
   add('Judul', d.title, 'title')
   add('PT', ptName, 'company')
   add(d.project ? 'Project' : 'Pusat biaya', scope, 'scope')
@@ -52,8 +55,9 @@ export function RequestSummary({ d, ptName, attachments, canRevealBank, draftBan
     : draftBank
       ? { bankName: draftBank.bankName, accountHolder: draftBank.accountHolder, masked: draftBank.accountNoMasked, canReveal: draftBank.canReveal }
       : null
+  if (vendorPay) add('Vendor', d.vendor && 'name' in d.vendor ? String(d.vendor.name ?? '') : '', 'vendor')
   add(
-    'Rekening tujuan',
+    vendorPay ? 'Rekening vendor' : 'Rekening tujuan',
     bank ? (
       <span style={{ display: 'inline-flex', flexWrap: 'wrap', alignItems: 'center', gap: 6 }}>
         <span>
@@ -65,6 +69,20 @@ export function RequestSummary({ d, ptName, attachments, canRevealBank, draftBan
     ) : null,
     'bank',
   )
+  if (vendorPay && d.invoice) {
+    add('Nomor invoice', d.invoice.no ?? '', 'invoiceNo')
+    add('Tanggal invoice', d.invoice.date ? formatDateLong(d.invoice.date) : '', 'invoiceDate')
+    add('Jatuh tempo', d.invoice.dueDate ? formatDateLong(d.invoice.dueDate) : '', 'invoiceDueDate')
+    add(
+      'File invoice',
+      d.invoice.fileId ? (
+        <a href={`/api/v1/media/attachments/${d.invoice.fileId}/file`} target="_blank" rel="noopener noreferrer" data-pk-invoice-file>
+          {d.invoice.fileName ?? 'Lihat invoice'}
+        </a>
+      ) : null,
+      'invoiceFile',
+    )
+  }
   if (d.approvedAmount !== null) add('Nominal disetujui', formatRupiah(d.approvedAmount), 'approvedAmount')
   if (d.status !== 'draft') add('Total ditransfer', formatRupiah(d.transferredTotal ?? 0), 'transferredTotal')
   if (d.verifiedReceiptsTotal !== null) add('Total nota terverifikasi LPJ', formatRupiah(d.verifiedReceiptsTotal), 'verifiedReceiptsTotal')

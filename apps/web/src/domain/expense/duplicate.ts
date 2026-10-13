@@ -6,7 +6,7 @@ import { DUPLICATED_FROM_FIELD } from '@/domain/history-format'
 
 import { ids, loadRaw, loadVisible, type RequestDoc } from './common'
 import { createDraft, fromDocLines, type DraftInput, type LineInputApi } from './drafts'
-import type { RequestType } from './types'
+import { payeeOf, type RequestType } from './types'
 
 /**
  * DRMS 13/10 Persetujuan #12: "Duplikat" on the request page = a clean NEW Draft with the same PT, project, title,
@@ -19,6 +19,8 @@ import type { RequestType } from './types'
  * (evidence of the source request), "Nominal sesuai nota" per line (belongs to a receipt), the needed date (the
  * new need gets its own) and a legacy cost center (D2: the requester picks a project). The copy is validated like
  * any new draft (createDraft → validateContent) and audited on the new draft (`create`, field `duplicated_from`).
+ * ADR 0025: a vendor payment keeps its vendor and vendor account; the invoice (number, dates, file) is NOT copied — one
+ * invoice is paid once (the duplicate-invoice rule would refuse it anyway); the new draft needs its own invoice.
  */
 export function duplicateDraftInput(src: RequestDoc): DraftInput & { type: RequestType; title: string } {
   return {
@@ -30,6 +32,7 @@ export function duplicateDraftInput(src: RequestDoc): DraftInput & { type: Reque
     requesterIds: ids(src.requesters),
     bankAccountId: relId(src.bankAccount) ?? null,
     lines: fromDocLines(src).map(({ id: _id, receiptAmount: _receipt, ...l }): LineInputApi => ({ ...l, receiptAmount: null })),
+    ...(payeeOf(src.payeeType) === 'vendor' ? { payeeType: 'vendor' as const, vendorId: relId(src.vendor) ?? null, vendorBankAccountId: relId(src.vendorBankAccount) ?? null } : {}),
   }
 }
 
@@ -43,6 +46,15 @@ export async function duplicateAsDraft(req: PayloadRequest, id: number): Promise
   await loadVisible(req, id)
   const src = await loadRaw(req, id)
   const input = duplicateDraftInput(src)
+  if (input.vendorBankAccountId) {
+    // ADR 0025: an account that is no longer usable (inactive) is dropped — the filer picks one before submit
+    const acc = await req.payload.findByID({ collection: 'vendor-bank-accounts', id: input.vendorBankAccountId, depth: 0, overrideAccess: true /* SYSTEM-READ: is the copied vendor account still usable */, req }).catch(() => null)
+    if (!acc || acc.active === false || relId(acc.vendor) !== input.vendorId) input.vendorBankAccountId = null
+  }
+  if (input.vendorId) {
+    const v = await req.payload.findByID({ collection: 'vendors', id: input.vendorId, depth: 0, overrideAccess: true /* SYSTEM-READ: is the copied vendor still active */, req }).catch(() => null)
+    if (!v || v.active === false) input.vendorId = input.vendorBankAccountId = null
+  }
   if (input.bankAccountId) {
     const acc = await req.payload
       .findByID({ collection: 'employee-bank-accounts', id: input.bankAccountId, depth: 0, overrideAccess: true /* SYSTEM-READ: is the copied account still usable (G9) */, req })

@@ -4,6 +4,7 @@ import { employeeIn, hasRole, relId, userId } from '@/access/roles'
 
 import { fail, ids, loadVisible } from './common'
 import { maskAccountNo } from './dto'
+import { payeeOf } from './types'
 
 /**
  * DRMS 10/10 8e (WA-04): the destination account shown under the "Rekening tujuan" picker (draft) and
@@ -30,7 +31,7 @@ export type BankPreview = {
   accountNo?: string
 }
 
-type AccountDoc = { id: number; company?: unknown; employee?: unknown; accountNo?: string | null; accountHolder?: string | null; bank?: unknown }
+type AccountDoc = { id: number; company?: unknown; employee?: unknown; vendor?: unknown; accountNo?: string | null; accountHolder?: string | null; bank?: unknown }
 
 async function bankName(req: PayloadRequest, bank: unknown): Promise<string | null> {
   if (bank && typeof bank === 'object') return String((bank as { name?: string }).name ?? '') || null
@@ -40,9 +41,9 @@ async function bankName(req: PayloadRequest, bank: unknown): Promise<string | nu
   return (b as { name?: string } | null)?.name ?? null
 }
 
-async function readableAccount(req: PayloadRequest, id: number): Promise<AccountDoc | null> {
+async function readableAccount(req: PayloadRequest, id: number, vendor = false): Promise<AccountDoc | null> {
   try {
-    return (await req.payload.findByID({ collection: 'employee-bank-accounts', id, depth: 0, user: req.user, overrideAccess: false, req })) as unknown as AccountDoc
+    return (await req.payload.findByID({ collection: vendor ? 'vendor-bank-accounts' : 'employee-bank-accounts', id, depth: 0, user: req.user, overrideAccess: false, req })) as unknown as AccountDoc
   } catch {
     return null
   }
@@ -60,8 +61,10 @@ function out(source: BankPreview['source'], acc: { bankName: string | null; acco
   }
 }
 
-export async function bankPreview(req: PayloadRequest, input: { requestId?: number; accountId?: number; reveal: boolean }): Promise<BankPreview> {
+export async function bankPreview(req: PayloadRequest, input: { requestId?: number; accountId?: number; vendorAccountId?: number; reveal: boolean }): Promise<BankPreview> {
   const { requestId, accountId, reveal } = input
+  // ADR 0025: a vendor account (vendor payment) — readable through the collection access (Admin / Finance / Direktur / PM of its PT)
+  if (input.vendorAccountId !== undefined) return vendorPreview(req, { requestId, accountId: input.vendorAccountId, reveal })
   if (requestId === undefined) {
     if (accountId === undefined) fail(400, 'Pilih rekening.')
     const acc = await readableAccount(req, accountId)
@@ -78,12 +81,48 @@ export async function bankPreview(req: PayloadRequest, input: { requestId?: numb
     if (!s?.accountNo) fail(404, 'Rekening tujuan belum tercatat.')
     return out('snapshot', { bankName: s.bankName ?? null, accountNo: s.accountNo, accountHolder: s.accountHolder }, full, reveal)
   }
+  // ADR 0025: a vendor-payment Draft shows its saved vendor account
+  if (payeeOf(doc.payeeType) === 'vendor') {
+    const saved = relId(doc.vendorBankAccount)
+    if (saved === undefined) fail(404, 'Belum ada rekening vendor.')
+    return vendorPreview(req, { requestId, accountId: saved, reveal })
+  }
   const saved = relId(doc.bankAccount)
   const id = accountId ?? saved
   if (id === undefined) fail(404, 'Belum ada rekening tujuan.')
   const acc = (await req.payload.findByID({ collection: 'employee-bank-accounts', id, depth: 0, overrideAccess: true /* SYSTEM-READ: checked below (same PT + saved / requester's / readable) */, req }).catch(() => null)) as AccountDoc | null
   if (!acc || relId(acc.company) !== company) fail(404, 'Rekening tidak ditemukan.')
   const allowed = id === saved || ids(doc.requesters).includes(relId(acc.employee) ?? -1) || (await readableAccount(req, id)) !== null
+  if (!allowed) fail(404, 'Rekening tidak ditemukan.')
+  return out('account', { bankName: await bankName(req, acc.bank), accountNo: acc.accountNo, accountHolder: acc.accountHolder }, full, reveal)
+}
+
+/**
+ * ADR 0025: preview of a vendor account. With a request (visible to the caller): a Draft's account must be of the
+ * request's PT and of its chosen vendor — or the saved one; after submit the snapshot. Without a request (new form):
+ * an account the caller may read (collection access). The full number for the request's own people / office roles,
+ * and for readers of the account (vendor accounts are business data, readable in full by their collection readers).
+ */
+async function vendorPreview(req: PayloadRequest, input: { requestId?: number; accountId: number; reveal: boolean }): Promise<BankPreview> {
+  const { requestId, accountId, reveal } = input
+  const readable = await readableAccount(req, accountId, true)
+  if (requestId === undefined) {
+    if (!readable) fail(404, 'Rekening tidak ditemukan.')
+    return out('account', { bankName: await bankName(req, readable.bank), accountNo: readable.accountNo, accountHolder: readable.accountHolder }, true, reveal)
+  }
+  const doc = await loadVisible(req, requestId)
+  const company = relId((doc as { company?: unknown }).company)
+  const emp = employeeIn(req, company)
+  const own = relId(doc.createdBy) === userId(req) || (emp !== undefined && ids(doc.requesters).includes(emp))
+  const full = own || hasRole(req, ['pk-finance', 'pk-owner', 'pk-admin'], company) || readable !== null
+  if (doc.status !== 'draft') {
+    const s = doc.bankSnapshot
+    if (!s?.accountNo) fail(404, 'Rekening tujuan belum tercatat.')
+    return out('snapshot', { bankName: s.bankName ?? null, accountNo: s.accountNo, accountHolder: s.accountHolder }, full, reveal)
+  }
+  const acc = (await req.payload.findByID({ collection: 'vendor-bank-accounts', id: accountId, depth: 0, overrideAccess: true /* SYSTEM-READ: checked below (same PT + saved / of the chosen vendor / readable) */, req }).catch(() => null)) as AccountDoc | null
+  if (!acc || relId(acc.company) !== company) fail(404, 'Rekening tidak ditemukan.')
+  const allowed = accountId === relId(doc.vendorBankAccount) || (relId(doc.vendor) !== undefined && relId(acc.vendor) === relId(doc.vendor)) || readable !== null
   if (!allowed) fail(404, 'Rekening tidak ditemukan.')
   return out('account', { bankName: await bankName(req, acc.bank), accountNo: acc.accountNo, accountHolder: acc.accountHolder }, full, reveal)
 }

@@ -25,7 +25,8 @@ import {
   type RequestDoc,
   type Signature,
 } from './common'
-import { fromDocLines, validateContent } from './drafts'
+import { fromDocLines, validateContent, vendorOfDoc } from './drafts'
+import { payeeOf } from './types'
 import { approveWithoutDecision, assertEveryLineHasReceipt, claimAttachments, recomputeFlags, syncProjectRapFlags, syncRapFlags } from './receipts'
 import { isNoApproval } from './decision'
 import { ACK_DELEGATE_ROLE, budgetImpact, lastLevel, type AckDelegate, type ApprovalSnapshot } from './rules'
@@ -156,9 +157,10 @@ export async function submit(req: PayloadRequest, id: number, opts: SubmitOption
       lines: fromDocLines(doc),
       neededDate: doc.neededDate,
       urgencyLevelId: relId(doc.urgencyLevel) ?? null,
+      ...vendorOfDoc(doc), // ADR 0025: vendor, rekening vendor, invoice (required to send a vendor payment)
     },
     // D2: a legacy cost-center request submitted before may be sent again as it was (no project)
-    { forSubmit: true, creatorId: creator, legacyCostCenter: !relId(doc.project) && relId(doc.costCenter) !== undefined && (doc.approvalCycle ?? 0) > 0 },
+    { forSubmit: true, creatorId: creator, requestId: id, legacyCostCenter: !relId(doc.project) && relId(doc.costCenter) !== undefined && (doc.approvalCycle ?? 0) > 0 },
   )
   if (doc.type === 'reimburse') await assertEveryLineHasReceipt(req, doc)
 
@@ -191,7 +193,11 @@ export async function submit(req: PayloadRequest, id: number, opts: SubmitOption
     }
   }
 
-  const acc = await req.payload.findByID({ collection: 'employee-bank-accounts', id: relId(doc.bankAccount)!, depth: 1, overrideAccess: true /* SYSTEM-READ: bank snapshot (US-44) */, req })
+  // US-44 bank snapshot = the destination of the transfer: the requester's account, or (ADR 0025) the vendor's account
+  const vendor = payeeOf(doc.payeeType) === 'vendor'
+  const acc = vendor
+    ? await req.payload.findByID({ collection: 'vendor-bank-accounts', id: relId(doc.vendorBankAccount)!, depth: 1, overrideAccess: true /* SYSTEM-READ: vendor account snapshot (ADR 0025) */, req })
+    : await req.payload.findByID({ collection: 'employee-bank-accounts', id: relId(doc.bankAccount)!, depth: 1, overrideAccess: true /* SYSTEM-READ: bank snapshot (US-44) */, req })
   const bankName = acc.bank && typeof acc.bank === 'object' ? (acc.bank as { name?: string }).name : null
   const cycle = (doc.approvalCycle ?? 0) + 1
   const needsAck = snapshot.acknowledge === 'required'

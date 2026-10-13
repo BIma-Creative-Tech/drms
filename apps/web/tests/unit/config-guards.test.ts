@@ -74,7 +74,7 @@ describe('Payload config guards', () => {
       expect(await c.access.delete(admin as never), c.slug).toBe(false)
     }
     const masters = [
-      'employees', 'employee-bank-accounts', 'banks', 'clients', 'vendors', 'projects', 'project-stages', 'stage-templates',
+      'employees', 'employee-bank-accounts', 'banks', 'clients', 'vendors', 'vendor-bank-accounts', 'projects', 'project-stages', 'stage-templates',
       'budget-lines', 'expense-categories', 'cash-in-sources', 'cash-accounts', 'team-assignments', 'work-schedules',
       'holidays', 'approval-rules', 'notification-templates', 'uoms', 'vehicles', 'cost-centers', 'document-sequences', 'users', 'devices',
     ]

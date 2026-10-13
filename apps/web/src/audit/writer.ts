@@ -124,6 +124,7 @@ export const PER_PT_DOC_TYPES: Readonly<Record<string, readonly [table: string, 
   budget_line: ['budget_lines', 'company_id'],
   client: ['clients', 'company_id'],
   vendor: ['vendors', 'company_id'],
+  vendor_bank_account: ['vendor_bank_accounts', 'company_id'], // ADR 0025
   stage_template: ['stage_templates', 'company_id'],
   expense_category: ['expense_categories', 'company_id'],
   cash_in_source: ['cash_in_sources', 'company_id'],

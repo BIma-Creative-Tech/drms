@@ -182,7 +182,7 @@ async function sourceOf(req: PayloadRequest, target: number, from: number | null
   return (res.docs[0] as unknown as Row | undefined) ?? null
 }
 
-const RULE_FIELDS = ['name', 'docType', 'requestType', 'minAmount', 'maxAmount', 'priority', 'requesterRoles', 'acknowledge', 'acknowledgeBy', 'acknowledgeRole', 'signDiajukan', 'signDibuat', 'active'] as const
+const RULE_FIELDS = ['name', 'docType', 'requestType', 'minAmount', 'maxAmount', 'priority', 'requesterRoles', 'payeeType', 'acknowledge', 'acknowledgeBy', 'acknowledgeRole', 'signDiajukan', 'signDibuat', 'active'] as const
 
 /**
  * A source rule that cannot be copied: it names rows of its own PT (category / project / cost center
