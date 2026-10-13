@@ -136,7 +136,7 @@ describe('cost-center geofence (Q-40) with syncAttendanceEnabled = true', () => 
     expect(dup[0]!.errors[0]!.code).toBe('ALREADY_CHECKED_IN')
   })
 
-  // DRMS 13/10 A2: no assignment is needed any more (OnSite: any registered location of the PT) — d1310-onsite
+  // DRMS 13/10 A2: no assignment is needed any more (OnSite: any registered location of the PT) — onsite-attendance
   it('rejections carry the distance; no geofence / both locations', async () => {
     const s = await selfie(staffA)
     const res = await sync(staffA, [
@@ -191,7 +191,7 @@ describe('diabsenkan oleh PM (US-14)', () => {
     expect(staffRes[0]!.errors[0]).toMatchObject({ code: 'FORBIDDEN' })
     const otherRes = await sync(otherPm, [item('attendance.on_behalf', ob({ employee_id: w.emp.b, selfie_media_id: sOther }))])
     expect(otherRes[0]!.errors[0]).toMatchObject({ code: 'FORBIDDEN', message: 'Hanya untuk project tim Anda.' })
-    // DRMS 13/10 A2: an unassigned employee of the PT is no longer refused (no assignment needed) — d1310-onsite
+    // DRMS 13/10 A2: an unassigned employee of the PT is no longer refused (no assignment needed) — onsite-attendance
     const res = await sync(pm, [
       item('attendance.on_behalf', ob({ employee_id: w.emp.pm, selfie_media_id: sPm })),
       item('attendance.on_behalf', ob({ employee_id: w.emp.b, selfie_media_id: await selfie(staffA) })),
