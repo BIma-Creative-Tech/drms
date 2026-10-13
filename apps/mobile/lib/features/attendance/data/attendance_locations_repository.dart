@@ -13,12 +13,14 @@ class EligibleLocations {
   /// Attendance type of the user's employee per PT id.
   final Map<int, AttendanceType> types;
 
-  /// Eligible locations (home site first, head office, sites, projects, cost centers — server order).
+  /// Registered locations (home site first, head office, sites, projects, cost centers — server order), then the
+  /// "Di luar area" entry of each Non-OnSite employee (reference = home site, else head office).
   final List<ProjectSite> sites;
 
   factory EligibleLocations.fromJson(Map<String, dynamic> j) {
+    final employees = (j['employees'] as List<dynamic>? ?? const []).whereType<Map<String, dynamic>>().toList();
     final types = {
-      for (final e in (j['employees'] as List<dynamic>? ?? const []).whereType<Map<String, dynamic>>())
+      for (final e in employees)
         if (e['company'] is num) (e['company'] as num).toInt(): AttendanceType.fromCode(e['attendanceType'] as String?),
     };
     return EligibleLocations(
@@ -26,7 +28,28 @@ class EligibleLocations {
       sites: [
         for (final i in (j['items'] as List<dynamic>? ?? const []).whereType<Map<String, dynamic>>())
           ProjectSite.fromEligible(i, type: types[(i['company'] as num?)?.toInt()]),
+        for (final e in employees) ?_outsideOf(e),
       ],
+    );
+  }
+
+  /// The "Di luar area" entry of a Non-OnSite employee: the reference site without a geofence (any position; the
+  /// server decides where it belongs). Null for OnSite or without a reference site.
+  static ProjectSite? _outsideOf(Map<String, dynamic> e) {
+    final ref = e['referenceSite'];
+    if (AttendanceType.fromCode(e['attendanceType'] as String?) != AttendanceType.nonOnsite) return null;
+    if (ref is! Map<String, dynamic>) return null;
+    final companyId = (e['company'] as num?)?.toInt();
+    final id = (ref['id'] as num?)?.toInt() ?? 0;
+    final code = ref['code'] == null ? '' : '${ref['code']}';
+    final name = ref['name'] == null ? '' : '${ref['name']}';
+    return ProjectSite(
+      id: id,
+      label: code.isNotEmpty ? '$code — $name' : name,
+      kind: SiteKind.site,
+      companyId: companyId,
+      attendanceType: AttendanceType.nonOnsite,
+      outsideArea: true,
     );
   }
 

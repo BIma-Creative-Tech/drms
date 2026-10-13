@@ -14,6 +14,7 @@ import '../../../l10n/gen/app_localizations.dart';
 import '../../../shared/widgets/async_body.dart';
 import '../../auth/application/auth_controller.dart';
 import '../../expense/data/draft_repository.dart';
+import '../../expense/data/expense_mappers.dart' show outsideAreaHintKey;
 import '../../sync/application/sync_coordinator.dart';
 import '../../sync/domain/sync_models.dart';
 import '../../companies/presentation/company_chip.dart';
@@ -121,6 +122,7 @@ class _CheckTabState extends ConsumerState<_CheckTab> {
       final d = detectArea(list, fix);
       final pick = d.inside.firstOrNull;
       final nearest = d.nearest;
+      final outside = list.where((s) => s.outsideArea).firstOrNull;
       setState(() {
         _area = d;
         if (pick != null) {
@@ -129,6 +131,12 @@ class _CheckTabState extends ConsumerState<_CheckTab> {
           _notice = d.overlap
               ? t.attendanceDetectedOverlap(d.inside.length)
               : t.attendanceDetected(pick.site.label, pick.distanceM);
+          _noticeIsError = false;
+        } else if (outside != null) {
+          // DRMS 13/10 A2: Non-OnSite has no location restriction → "Di luar area" (reference site)
+          _siteKey = outside.key;
+          _distance = null;
+          _notice = t.attendanceDetectOutsideArea(outside.label);
           _noticeIsError = false;
         } else if (nearest != null) {
           _distance = (site: nearest.site, distanceM: nearest.distanceM, accuracyM: fix.accuracyM);
@@ -181,6 +189,59 @@ class _CheckTabState extends ConsumerState<_CheckTab> {
     }
   }
 
+  /// DRMS 13/10 A2 (Non-OnSite, no location restriction): the selected location when the fix is inside it, else the
+  /// registered location of the same PT containing the fix (nearest), else its "Di luar area" entry. A mocked fix is
+  /// still refused; the server re-checks and decides where the record belongs.
+  Future<({LocationFix fix, ProjectSite site})?> _locateUnrestricted(ProjectSite site, List<ProjectSite> list) async {
+    final t = AppLocalizations.of(context);
+    setState(() {
+      _notice = t.attendanceLocating;
+      _noticeIsError = false;
+    });
+    try {
+      final fix = await ref.read(locationServiceProvider).current();
+      if (!mounted) return null;
+      if (fix.isMocked) {
+        setState(() {
+          _notice = t.attendanceMocked;
+          _noticeIsError = true;
+        });
+        return null;
+      }
+      final same = [
+        for (final s in list)
+          if (s.companyId == site.companyId) s,
+      ];
+      final d = detectArea(same, fix);
+      final hit = d.inside.where((m) => m.site.key == site.key).firstOrNull ?? d.inside.firstOrNull;
+      final outside = same.where((s) => s.outsideArea).firstOrNull;
+      setState(() {
+        if (hit != null) {
+          _siteKey = hit.site.key;
+          _distance = (site: hit.site, distanceM: hit.distanceM, accuracyM: fix.accuracyM);
+          _notice = t.attendanceInside(hit.distanceM, hit.site.radiusM?.round() ?? 0);
+          _noticeIsError = false;
+        } else if (outside != null) {
+          _siteKey = outside.key;
+          _distance = null;
+          _notice = t.attendanceDetectOutsideArea(outside.label);
+          _noticeIsError = false;
+        } else {
+          _notice = t.attendanceNoReference;
+          _noticeIsError = true;
+        }
+      });
+      final target = hit?.site ?? outside;
+      return target == null ? null : (fix: fix, site: target);
+    } on LocationException catch (e) {
+      setState(() {
+        _notice = e.message;
+        _noticeIsError = true;
+      });
+      return null;
+    }
+  }
+
   Future<void> _checkDistance(ProjectSite site) async {
     setState(() => _busy = true);
     try {
@@ -190,7 +251,7 @@ class _CheckTabState extends ConsumerState<_CheckTab> {
     }
   }
 
-  Future<void> _record(AttendanceKind kind, ProjectSite site) async {
+  Future<void> _record(AttendanceKind kind, ProjectSite site, List<ProjectSite> list) async {
     final t = AppLocalizations.of(context);
     final sub = ref.read(currentSubProvider);
     if (sub == null) return;
@@ -201,14 +262,20 @@ class _CheckTabState extends ConsumerState<_CheckTab> {
     }
     setState(() => _busy = true);
     try {
-      final fix = await _locate(site);
-      if (fix == null || !mounted) return;
+      final ({LocationFix fix, ProjectSite site})? at;
+      if (site.unrestricted) {
+        at = await _locateUnrestricted(site, list);
+      } else {
+        final fix = await _locate(site);
+        at = fix == null ? null : (fix: fix, site: site);
+      }
+      if (at == null || !mounted) return;
       final raw = await ref.read(selfieCaptureProvider)(context, t.attendanceSelfieTitle);
       if (raw == null || !mounted) return;
       final online = ref.read(connectivityProvider);
       await ref
           .read(attendanceServiceProvider)
-          .record(sub: sub, kind: kind, site: site, fix: fix, rawSelfie: raw, online: online);
+          .record(sub: sub, kind: kind, site: at.site, fix: at.fix, rawSelfie: raw, online: online);
       ref.read(syncCoordinatorProvider.notifier).requestSync(delay: Duration.zero);
       if (mounted) showSnack(context, online ? t.attendanceSavedOnline : t.attendanceSavedOffline);
     } on PrivacyNoticeRequiredException {
@@ -239,14 +306,16 @@ class _CheckTabState extends ConsumerState<_CheckTab> {
         // DRMS 13/10 A2: attendance type of the PT of the selected location (eligible list only)
         final type = site?.attendanceType;
         // DRMS 13/10 A2: recognise the area once on open (not while blocked: no GPS before the privacy ack)
-        if (!_autoDetected && enabled && !privacyBlocked && list.any((s) => s.hasGeofence)) {
+        final detectable = list.any((s) => s.hasGeofence || s.outsideArea);
+        if (!_autoDetected && enabled && !privacyBlocked && detectable) {
           _autoDetected = true;
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (mounted) _detect(list, auto: true);
           });
         }
         final area = _area;
-        final ready = enabled && !privacyBlocked && !_busy && site != null && site.hasGeofence;
+        // DRMS 13/10 A2: Non-OnSite records anywhere (no geofence needed)
+        final ready = enabled && !privacyBlocked && !_busy && site != null && (site.hasGeofence || site.unrestricted);
         final d = _distance;
         final dist = d != null && site != null && d.site.key == site.key ? d : null;
         return ListView(
@@ -294,13 +363,13 @@ class _CheckTabState extends ConsumerState<_CheckTab> {
                       value: s.key,
                       child: Row(
                         children: [
-                          Icon(siteKindIcon(s.kind), size: 18),
+                          Icon(s.outsideArea ? Icons.explore : siteKindIcon(s.kind), size: 18),
                           const SizedBox(width: 8),
                           if ((profile?.showCompanyChips ?? false) && s.companyId != null) ...[
                             CompanyChip(companyId: s.companyId),
                             const SizedBox(width: 6),
                           ],
-                          Expanded(child: Text(s.label, overflow: TextOverflow.ellipsis)),
+                          Expanded(child: Text(siteDisplayLabel(t, s), overflow: TextOverflow.ellipsis)),
                           if (s.home) ...[const SizedBox(width: 6), const HomeSiteBadge()],
                           if (!s.home && s.isHeadOffice) ...[const SizedBox(width: 6), const HeadOfficeBadge()],
                         ],
@@ -317,11 +386,7 @@ class _CheckTabState extends ConsumerState<_CheckTab> {
               if (site != null)
                 Padding(
                   padding: const EdgeInsets.only(top: 4, left: 12),
-                  child: Text(
-                    '${site.home ? t.siteHome : (site.isHeadOffice ? t.siteHeadOffice : siteKindLabel(t, site.kind))}'
-                    '${site.radiusM == null ? '' : ' · ${t.attendanceRadius(site.radiusM!.round())}'}',
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
+                  child: Text(siteSubLabel(t, site), style: Theme.of(context).textTheme.bodySmall),
                 ),
               if (type != null)
                 Padding(
@@ -332,13 +397,12 @@ class _CheckTabState extends ConsumerState<_CheckTab> {
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
                 ),
-              if (site != null && !site.hasGeofence) InfoCard(text: t.attendanceNoGeofence, error: true),
+              if (site != null && !site.hasGeofence && !site.unrestricted)
+                InfoCard(text: t.attendanceNoGeofence, error: true),
               const SizedBox(height: 12),
               OutlinedButton.icon(
                 key: const Key('attendance-detect'),
-                onPressed: !_busy && enabled && !privacyBlocked && list.any((s) => s.hasGeofence)
-                    ? () => _detect(list)
-                    : null,
+                onPressed: !_busy && enabled && !privacyBlocked && detectable ? () => _detect(list) : null,
                 icon: const Icon(Icons.travel_explore),
                 label: Text(t.attendanceDetect),
               ),
@@ -359,7 +423,7 @@ class _CheckTabState extends ConsumerState<_CheckTab> {
                   child: FilledButton.icon(
                     key: Key('attendance-${kind.name}'),
                     style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(56)),
-                    onPressed: ready ? () => _record(kind, site) : null,
+                    onPressed: ready ? () => _record(kind, site, list) : null,
                     icon: Icon(kind == AttendanceKind.checkIn ? Icons.login : Icons.logout),
                     label: Text(kind == AttendanceKind.checkIn ? t.attendanceCheckIn : t.attendanceCheckOut),
                   ),
@@ -368,7 +432,7 @@ class _CheckTabState extends ConsumerState<_CheckTab> {
             if (_notice != null) InfoCard(key: const Key('attendance-notice'), text: _notice!, error: _noticeIsError),
             const Divider(height: 32),
             Text(t.attendanceHistory, style: Theme.of(context).textTheme.titleMedium),
-            _History(sites: {for (final s in list) s.key: s.label}),
+            _History(sites: {for (final s in list) s.key: siteDisplayLabel(t, s)}),
           ],
         );
       },
@@ -433,9 +497,11 @@ class _History extends ConsumerWidget {
   }
 
   static String? _siteOf(OutboxData r) {
+    final p = _payload(r);
+    // DRMS 13/10 A2: a "Di luar area" item (local-only hint) → its outside entry
+    if (p[outsideAreaHintKey] == true && r.siteId != null) return 'o${r.siteId}';
     // ADR 0023 (schema v9): a site item carries its site in the outbox column
     if (r.siteId != null) return '${SiteKind.site.prefix}${r.siteId}';
-    final p = _payload(r);
     final project = (p['project_id'] as num?)?.toInt();
     if (project != null) return 'p$project';
     final cc = (p['cost_center_id'] as num?)?.toInt();

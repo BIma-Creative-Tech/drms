@@ -9,6 +9,7 @@ import { DEFAULT_TZ } from '@/lib/time'
 import { getRequestTx } from '@/lib/tx'
 
 import type { AttendanceFact, LocationRef, TeamMember } from './aggregate'
+import { OUTSIDE_AREA_FLAG } from './area'
 import { parseSnapshot, snapshotOf, type ScheduleSnapshot } from './schedule'
 
 /**
@@ -167,6 +168,7 @@ type FactRow = {
   schedule: unknown
   flags: unknown
   offline: boolean | null
+  outside_area: boolean | null
 }
 
 async function rows<T>(req: PayloadRequest, q: SQL): Promise<T[]> {
@@ -184,7 +186,7 @@ export function factsSql(f: { from: string; to: string; employeeIds?: number[]; 
            a.cost_center_id, cc.code AS cc_code, cc.name AS cc_name,
            a.site_id, st.code AS site_code, st.name AS site_name,
            a.source, CASE WHEN ru.id IS NULL THEN NULL ELSE coalesce(ru.name, 'PM #' || ru.id) END AS recorded_by_name,
-           (c.new_time IS NOT NULL) AS corrected, a.schedule, a.flags, a.offline
+           (c.new_time IS NOT NULL) AS corrected, a.schedule, a.flags, a.offline, a.outside_area
     FROM attendances a
     LEFT JOIN LATERAL (SELECT new_time FROM attendance_corrections x WHERE x.attendance_id = a.id ORDER BY x.id DESC LIMIT 1) c ON TRUE
     LEFT JOIN projects p ON p.id = a.project_id
@@ -215,8 +217,10 @@ export async function loadFacts(req: PayloadRequest, f: { from: string; to: stri
       recordedByName: x.recorded_by_name,
       corrected: x.corrected === true,
       schedule: parseSnapshot(x.schedule),
-      flags: Array.isArray(x.flags) ? x.flags.filter((v): v is string => typeof v === 'string') : [],
+      // DRMS 13/10 A2: "Di luar area" (Non-OnSite outside every registered location) as a flag of the fact / day
+      flags: [...(Array.isArray(x.flags) ? x.flags.filter((v): v is string => typeof v === 'string') : []), ...(x.outside_area === true ? [OUTSIDE_AREA_FLAG] : [])],
       offline: x.offline === true,
+      ...(x.outside_area === true ? { outsideArea: true } : {}),
     }
   })
 }

@@ -2320,6 +2320,7 @@ export interface Attendance {
   lng: number;
   accuracyM?: number | null;
   distanceM: number;
+  outsideArea?: boolean | null;
   selfie: number | MediaSelfy;
   device?: (number | null) | Device;
   flags?:
@@ -4180,6 +4181,7 @@ export interface AttendancesSelect<T extends boolean = true> {
   lng?: T;
   accuracyM?: T;
   distanceM?: T;
+  outsideArea?: T;
   selfie?: T;
   device?: T;
   flags?: T;

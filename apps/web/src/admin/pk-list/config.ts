@@ -68,7 +68,7 @@ const EXPLICIT: Record<string, { filters?: readonly string[]; dates?: readonly s
   transfers: { filters: ['status', 'kind', 'costCenter'], dates: ['transferAt'] },
   receipts: { filters: ['status'], dates: ['receiptDate'] },
   settlements: { filters: ['status', 'settlementType'] },
-  attendances: { filters: ['kind', 'source', 'project', 'site'] },
+  attendances: { filters: ['kind', 'source', 'project', 'site', 'outsideArea'] },
   'attendance-corrections': { filters: ['employee', 'kind', 'correctedBy'], dates: ['correctedAt'] },
   notifications: { dates: ['createdAt'] },
   'audit-logs': { filters: ['action', 'docType', 'source'], dates: ['serverTime'] },

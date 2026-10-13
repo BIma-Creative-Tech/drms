@@ -42,7 +42,7 @@ export function registerAttendancePaths(registry: OpenAPIRegistry, h: Helpers): 
     method: 'get',
     path: '/attendance/locations',
     summary:
-      'DRMS 13/10 A2: eligible check-in locations of the caller (own employee per selected PT) by attendance type — OnSite: every registered location of the PT with a point (sites incl. head office, projects, cost centers; no assignment needed); Non-OnSite: head office + branch offices (sites). Coordinates and radius only (no money). The APK matches the GPS fix against this list (auto-detect) and caches it for offline check-ins; the server re-validates each check-in',
+      'DRMS 13/10 A2: registered check-in locations of the caller (own employee per selected PT): every location of the PT with a point (sites incl. head office, projects, cost centers; no assignment needed). OnSite must check in inside one; Non-OnSite has no location restriction (outside every location → "Di luar area" at employees[].referenceSite). Coordinates and radius only (no money). The APK matches the GPS fix against this list (auto-detect) and caches it for offline check-ins; the server re-validates each check-in',
     security: h.security,
     request: { headers: h.deviceHeader, query: A.AttendanceLocationsQuery },
     responses: h.res(200, 'Eligible locations', A.AttendanceLocations, [400, 401, 403, 426, 429]),
@@ -50,7 +50,7 @@ export function registerAttendancePaths(registry: OpenAPIRegistry, h: Helpers): 
   registry.registerPath({
     method: 'post',
     path: '/attendance/check-in',
-    summary: 'Owner decision 2026-10-09: web self check-in, every role. Selfie first with POST /media/selfies. Synchronous counterpart of the APK sync item attendance.check_in — same gates (company-settings.syncAttendanceEnabled, else FEATURE_DISABLED; ADR 0018 privacy ack, else PRIVACY_ACK_REQUIRED) and rejection codes (MOCK_LOCATION never applies on web; NOT_FOUND, VALIDATION, NO_GEOFENCE, NOT_ASSIGNED = location not eligible for the attendance type of the employee (DRMS 13/10 A2), OUTSIDE_GEOFENCE, MEDIA_MISSING, FORBIDDEN, ALREADY_CHECKED_IN)',
+    summary: 'Owner decision 2026-10-09: web self check-in, every role. Selfie first with POST /media/selfies. Synchronous counterpart of the APK sync item attendance.check_in — same gates (company-settings.syncAttendanceEnabled, else FEATURE_DISABLED; ADR 0018 privacy ack, else PRIVACY_ACK_REQUIRED) and rejection codes (MOCK_LOCATION never applies on web; NOT_FOUND, VALIDATION, NO_GEOFENCE, NOT_ASSIGNED = location outside the PT of the employee, OUTSIDE_GEOFENCE (OnSite only; DRMS 13/10 A2: a Non-OnSite check-in outside every registered location is recorded "Di luar area", see the result), MEDIA_MISSING, FORBIDDEN, ALREADY_CHECKED_IN)',
     security: h.security,
     request: { headers: h.deviceHeader, body: { content: { 'application/json': { schema: A.AttendanceCheckBody } } } },
     responses: h.res(201, 'Recorded', A.AttendanceCheckResult, [400, 401, 403, 404, 409, 426, 429]),

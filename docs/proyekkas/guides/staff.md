@@ -27,10 +27,11 @@ Sebelum mulai: unggah **tanda tangan** sekali di web (**Profil & tanda tangan**)
 - **Tidak ada sinyal?** Tetap absen. Tertulis "Absen tersimpan di HP (offline)…" dan otomatis terkirim saat ada
   sinyal. Jam yang dicatat = jam saat Anda absen, bukan jam kirim.
 - **"Di luar area absen"**: dekati titik lokasi. Bila Anda yakin sudah di lokasi, lapor PM/Admin (titik mungkin salah).
-- **Lokasi mana yang muncul?** Tergantung **tipe absensi** Anda (diatur Admin): **Karyawan OnSite** — semua lokasi
-  terdaftar PT (kantor, site, project, pusat biaya), tanpa perlu ditugaskan; **Karyawan Non-OnSite** — hanya kantor
-  pusat dan kantor cabang. *"Lokasi ini tidak termasuk area absen untuk karyawan Non-OnSite"* = minta Admin bila tipe
-  Anda salah. Daftar lokasi tersimpan di HP, jadi deteksi area tetap jalan tanpa sinyal.
+- **Di mana boleh absen?** Tergantung **tipe absensi** Anda (diatur Admin): **Karyawan OnSite** — di dalam salah satu
+  lokasi terdaftar PT (kantor, site, project, pusat biaya), tanpa perlu ditugaskan; di luar radius ditolak.
+  **Karyawan Non-OnSite** — di mana saja: di dalam lokasi terdaftar tercatat di lokasi itu, di luar semua lokasi
+  terdaftar pilihan **"Di luar area"** otomatis terpilih dan absen tetap tersimpan (tercatat "Di luar area" dengan
+  acuan site penempatan / kantor pusat). Daftar lokasi tersimpan di HP, jadi deteksi area tetap jalan tanpa sinyal.
 - **"Lokasi palsu (mock location) terdeteksi"**: matikan aplikasi pengubah lokasi. Absen ditolak.
 - **"Sudah absen masuk di … hari ini"**: absen masuk hanya sekali per hari per lokasi.
 - **"Titik lokasi … belum diisi Admin"**: lapor Admin. (Bila titik sudah ada tetapi radius kosong, dipakai radius

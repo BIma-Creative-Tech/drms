@@ -11,6 +11,7 @@ import 'package:proyekkas/features/attendance/data/attendance_locations_reposito
 import 'package:proyekkas/features/attendance/domain/attendance.dart';
 import 'package:proyekkas/features/auth/application/auth_controller.dart';
 import 'package:proyekkas/features/auth/domain/user_profile.dart';
+import 'package:proyekkas/features/expense/data/expense_mappers.dart' show outsideAreaHintKey, resolveMediaIds;
 import 'package:proyekkas/features/masters/data/masters_repository.dart';
 
 import '../support/harness.dart';
@@ -59,7 +60,13 @@ LocationFix _at(double lat, double lng, {double acc = 5, bool mocked = false}) =
 Map<String, dynamic> _locationsJson() => {
   'employees': [
     {'id': 12, 'company': 1, 'attendanceType': 'onsite', 'homeSiteId': 2},
-    {'id': 31, 'company': 4, 'attendanceType': 'non_onsite', 'homeSiteId': null},
+    {
+      'id': 31,
+      'company': 4,
+      'attendanceType': 'non_onsite',
+      'homeSiteId': null,
+      'referenceSite': {'id': 40, 'code': 'HO2', 'name': 'Kantor Pusat PT Dua', 'lat': -3.0, 'lng': 114.0},
+    },
   ],
   'items': [
     {
@@ -161,7 +168,7 @@ void main() {
   group('eligible locations (GET /attendance/locations)', () {
     test('parse: label, kind, head office / home flags, PT, type per PT; scoped to the selected PTs', () {
       final e = EligibleLocations.fromJson(_locationsJson());
-      expect(e.sites.map((s) => s.key), ['s2', 's1', 'p7', 's40']);
+      expect(e.sites.map((s) => s.key), ['s2', 's1', 'p7', 's40', 'o40'], reason: 'o40 = Di luar area');
       final head = e.sites[1];
       expect(head.label, 'HO — Kantor Pusat Contoh');
       expect(head.isHeadOffice, isTrue);
@@ -173,7 +180,13 @@ void main() {
       expect(e.sites.last.attendanceType, AttendanceType.nonOnsite);
       expect(e.sites.first.attendanceType, AttendanceType.onsite);
       final scoped = e.scoped(const [4]);
-      expect(scoped.sites.map((s) => s.key), ['s40']);
+      expect(scoped.sites.map((s) => s.key), ['s40', 'o40']);
+      final outside = e.sites.last;
+      expect(outside.outsideArea, isTrue);
+      expect(outside.unrestricted, isTrue);
+      expect(outside.hasGeofence, isFalse, reason: 'any position; the server decides');
+      expect(outside.label, 'HO2 — Kantor Pusat PT Dua');
+      expect(e.sites.first.unrestricted, isFalse, reason: 'OnSite PT');
       expect(scoped.types.keys, [4]);
       expect(AttendanceType.fromCode(null), AttendanceType.onsite, reason: 'default OnSite');
     });
@@ -188,17 +201,17 @@ void main() {
       expect(await repo.cached('sub-1'), isNull);
       expect(await repo.refresh('sub-1'), isTrue);
       expect(server.calls.single.$3.containsKey('x-company-ids'), isFalse, reason: 'all membership PTs');
-      expect((await repo.cached('sub-1'))!.sites, hasLength(4));
+      expect((await repo.cached('sub-1'))!.sites, hasLength(5));
 
       // server before A2: 404 → false, the cache stays
       server.routes.clear();
       expect(await repo.refresh('sub-1'), isFalse);
-      expect((await repo.cached('sub-1'))!.sites, hasLength(4));
+      expect((await repo.cached('sub-1'))!.sites, hasLength(5));
       // offline: false, the cache stays (area detection keeps working without signal)
       final offlineApi = AttendanceApi(testClient('http://127.0.0.1:9', StaticTokens()));
       final offline = AttendanceLocationsRepository(offlineApi, db);
       expect(await offline.refresh('sub-1'), isFalse);
-      expect((await offline.cached('sub-1'))!.sites.map((s) => s.key), ['s2', 's1', 'p7', 's40']);
+      expect((await offline.cached('sub-1'))!.sites.map((s) => s.key), ['s2', 's1', 'p7', 's40', 'o40']);
     });
   });
 
@@ -242,8 +255,27 @@ void main() {
       await db.kvPut(AttendanceLocationsRepository.key('st-sub'), jsonEncode(_locationsJson()));
       c.invalidate(eligibleLocationsProvider);
       final list = await c.read(attendanceSitesProvider.future);
-      expect(list.map((s) => s.key), ['s2', 's1', 'p7', 's40'], reason: 'no assignment needed (OnSite)');
+      expect(list.map((s) => s.key), ['s2', 's1', 'p7', 's40', 'o40'], reason: 'no assignment needed');
       expect(list.first.home, isTrue, reason: 'home site first');
     });
+  });
+
+  test('"Di luar area" item: local-only hint for the history, stripped before sending', () {
+    const outside = ProjectSite(
+      id: 40,
+      label: 'HO2 — Kantor Pusat PT Dua',
+      kind: SiteKind.site,
+      companyId: 4,
+      attendanceType: AttendanceType.nonOnsite,
+      outsideArea: true,
+    );
+    final p = attendancePayload(site: outside, fix: _at(-3.5, 114.0), selfieUuid: 'sel-9');
+    expect(p['site_id'], 40);
+    expect(p[outsideAreaHintKey], isTrue);
+    final sent = resolveMediaIds(p, {'sel-9': 77})!;
+    expect(sent.containsKey(outsideAreaHintKey), isFalse);
+    expect(sent['selfie_media_id'], 77);
+    final inside = attendancePayload(site: _head, fix: _at(-1.25, 116.85), selfieUuid: 's');
+    expect(inside.containsKey(outsideAreaHintKey), isFalse);
   });
 }

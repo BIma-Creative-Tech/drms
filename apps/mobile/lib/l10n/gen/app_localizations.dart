@@ -2938,8 +2938,32 @@ abstract class AppLocalizations {
   /// No description provided for @attendanceTypeNonOnsite.
   ///
   /// In id, this message translates to:
-  /// **'Karyawan Non-OnSite: absen hanya di kantor pusat dan kantor cabang.'**
+  /// **'Karyawan Non-OnSite: boleh absen di mana saja; di luar lokasi terdaftar dicatat \"Di luar area\".'**
   String get attendanceTypeNonOnsite;
+
+  /// No description provided for @attendanceOutsideArea.
+  ///
+  /// In id, this message translates to:
+  /// **'Di luar area'**
+  String get attendanceOutsideArea;
+
+  /// No description provided for @attendanceOutsideAreaHint.
+  ///
+  /// In id, this message translates to:
+  /// **'Karyawan Non-OnSite: di luar lokasi terdaftar, absen tetap bisa dan dicatat \"Di luar area\".'**
+  String get attendanceOutsideAreaHint;
+
+  /// No description provided for @attendanceDetectOutsideArea.
+  ///
+  /// In id, this message translates to:
+  /// **'Posisi Anda di luar semua lokasi terdaftar: absen dicatat \"Di luar area\" (ref. {name}).'**
+  String attendanceDetectOutsideArea(String name);
+
+  /// No description provided for @attendanceNoReference.
+  ///
+  /// In id, this message translates to:
+  /// **'Absen \"Di luar area\" belum bisa: site penempatan / kantor pusat PT belum ditetapkan Admin.'**
+  String get attendanceNoReference;
 
   /// No description provided for @distanceInside.
   ///

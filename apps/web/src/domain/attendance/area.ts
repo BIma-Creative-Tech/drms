@@ -5,9 +5,11 @@
  * the same rules in Dart (apps/mobile/lib/features/attendance/domain/attendance.dart).
  *
  * - OnSite: may check in at ANY registered location of the own PT that has a point (site — incl. the head office —,
- *   project, cost center); no team assignment / home site needed.
- * - Non-OnSite (office staff): only at the PT's sites (head office "Kantor pusat" and branch offices).
- * The server stays authoritative (record.ts): eligible kind for the type, same PT, inside the geofence.
+ *   project, cost center); no team assignment / home site needed; outside the radius → refused.
+ * - Non-OnSite (owner 2026-10-14): NO location restriction. Inside a registered location of the PT → that location;
+ *   anywhere else → recorded "Di luar area", referenced to the home site (else the PT head office) with the distance.
+ * Both: own PT only, GPS fix required and stored, mock location refused, selfie / privacy rules unchanged. The server
+ * stays authoritative (record.ts).
  */
 
 /** GPS accuracy added to the geofence radius is capped (a 2 km "accuracy" must not widen the fence). */
@@ -48,13 +50,16 @@ export function attendanceTypeOf(v: unknown): AttendanceType {
   return v === 'non_onsite' ? 'non_onsite' : DEFAULT_ATTENDANCE_TYPE
 }
 
-/** May an employee of `type` check in at a location of `kind` (same PT, with a point — checked separately)? */
-export function kindAllowedFor(type: AttendanceType, kind: LocationKind): boolean {
-  return type === 'onsite' || kind === 'site'
+/** Does the type require the fix inside the chosen location's geofence? OnSite yes; Non-OnSite no ("Di luar area"). */
+export function geofenceRequired(type: AttendanceType): boolean {
+  return type === 'onsite'
 }
 
-/** Rejection text (APK contract code `NOT_ASSIGNED`, kept for old APKs) of a location the type does not allow. */
-export const NOT_ELIGIBLE_NON_ONSITE = 'Lokasi ini tidak termasuk area absen untuk karyawan Non-OnSite (hanya kantor pusat dan kantor cabang).'
+/** Label of a Non-OnSite attendance outside every registered location (reports, recaps, APK history, web). */
+export const OUTSIDE_AREA_LABEL = 'Di luar area'
+
+/** Fact / recap flag of an outside-area attendance (`attendances.outside_area`). */
+export const OUTSIDE_AREA_FLAG = 'OUTSIDE_AREA'
 
 /** Rejection text of a location outside the employee's PT (normally caught earlier as NOT_FOUND / COMPANY_MISMATCH). */
 export const NOT_ELIGIBLE_OTHER_PT = 'Lokasi ini bukan lokasi terdaftar PT karyawan.'
@@ -89,4 +94,13 @@ const KIND_RANK: Record<LocationKind, number> = { site: 2, project: 3, cost_cent
 export function compareEligible(a: { kind: LocationKind; code: string; home?: boolean; isHeadOffice?: boolean }, b: { kind: LocationKind; code: string; home?: boolean; isHeadOffice?: boolean }): number {
   const rank = (x: typeof a) => (x.home ? 0 : x.kind === 'site' && x.isHeadOffice ? 1 : KIND_RANK[x.kind])
   return rank(a) - rank(b) || a.code.localeCompare(b.code)
+}
+
+/**
+ * Non-OnSite resolution (server and clients): the requested location when the fix lies inside it, else the nearest
+ * registered location containing the fix, else null (= "Di luar area"). `key` identifies a candidate (`kind:id`).
+ */
+export function pickContaining<T extends AreaCandidate & { key: string }>(requestedKey: string | null, candidates: readonly T[], fix: { lat: number; lng: number; accuracyM?: number | null }): AreaMatch<T> | null {
+  const d = detectArea(candidates, fix)
+  return d.inside.find((m) => m.key === requestedKey) ?? d.inside[0] ?? null
 }

@@ -68,12 +68,6 @@ async function setAttendance(enabled: boolean) {
   resetAppConfigCache()
 }
 
-/** DRMS 13/10 A2: the attendance type of a fixture employee (OnSite = default; no assignment needed). */
-async function setAttendanceType(employee: number, attendanceType: 'onsite' | 'non_onsite') {
-  const p = await getTestPayload()
-  await p.update({ collection: 'employees', id: employee, data: { attendanceType }, overrideAccess: true /* SYSTEM-WRITE: fixture */ })
-}
-
 beforeAll(async () => {
   installLocalJwks()
   w = await makeWorld('att')
@@ -135,7 +129,7 @@ describe('attendance sync (F4 slice)', () => {
     expect(out2.body.results[0]).toMatchObject({ status: 'rejected', errors: [{ code: 'ALREADY_CHECKED_OUT' }] })
   })
 
-  it('server-side rejections: mock location, outside radius, not eligible, no geofence, foreign selfie, check-out first', async () => {
+  it('server-side rejections: mock location, outside radius, no geofence, foreign selfie, check-out first', async () => {
     const s = await selfie(staffB)
     const results = (
       await sync(staffB, [
@@ -149,11 +143,6 @@ describe('attendance sync (F4 slice)', () => {
       ])
     ).body.results as Array<{ status: string; errors: Array<{ code: string; message: string }> }>
     expect(results.map((r) => r.errors[0]?.code)).toEqual(['MOCK_LOCATION', 'OUTSIDE_GEOFENCE', 'NO_GEOFENCE', 'FORBIDDEN', 'NO_CHECK_IN', 'MEDIA_MISSING', 'VALIDATION'])
-    // DRMS 13/10 A2: an unassigned project is eligible for an OnSite employee; a Non-OnSite one is refused there
-    await setAttendanceType(w.emp.b, 'non_onsite')
-    const ne = (await sync(staffB, [item('attendance.check_in', payload(s, { project_id: w.otherProject }))])).body.results as Array<{ status: string; errors: Array<{ code: string }> }>
-    await setAttendanceType(w.emp.b, 'onsite')
-    expect(ne[0]).toMatchObject({ status: 'rejected', errors: [{ code: 'NOT_ASSIGNED' }] })
     expect(results.every((r) => r.status === 'rejected')).toBe(true)
     expect(results[1]!.errors[0]!.message).toMatch(/Di luar radius project \(\d+ m dari titik, radius 100 m\)/)
     // nothing stored for B; each rejection is in the audit log (sync_offline with the error code)

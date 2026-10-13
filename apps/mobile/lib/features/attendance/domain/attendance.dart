@@ -1,7 +1,7 @@
 import 'dart:math';
 
 import '../../../core/location/location_service.dart';
-import '../../expense/data/expense_mappers.dart' show selfiePlaceholderKey;
+import '../../expense/data/expense_mappers.dart' show outsideAreaHintKey, selfiePlaceholderKey;
 import '../../masters/domain/master_item.dart';
 import '../../sync/domain/sync_models.dart';
 
@@ -43,8 +43,9 @@ enum SiteKind {
 }
 
 /// DRMS 13/10 A2: attendance type of the user's employee in a PT (`GET /attendance/locations` → `employees[]`).
-/// OnSite = any registered location of the PT with a point (no assignment); Non-OnSite = head office + branch
-/// offices (sites) only. The server applies the same rule (apps/web/src/domain/attendance/area.ts).
+/// OnSite = inside a registered location of the PT with a point (no assignment; outside the radius refused);
+/// Non-OnSite = no location restriction (inside a registered location → that one, else "Di luar area" at the home
+/// site / head office). The server applies the same rule (apps/web/src/domain/attendance/area.ts).
 enum AttendanceType {
   onsite('onsite'),
   nonOnsite('non_onsite');
@@ -71,6 +72,7 @@ class ProjectSite {
     this.team = false,
     this.isHeadOffice = false,
     this.attendanceType,
+    this.outsideArea = false,
   });
   final int id;
 
@@ -98,10 +100,17 @@ class ProjectSite {
   /// masters of a server before A2).
   final AttendanceType? attendanceType;
 
+  /// DRMS 13/10 A2: the "Di luar area" entry of a Non-OnSite employee — [id] is the reference site (home site, else the
+  /// head office), [label] its name; no geofence (any position is accepted, the server decides where it belongs).
+  final bool outsideArea;
+
+  /// Non-OnSite: any position may be recorded (no client-side geofence refusal).
+  bool get unrestricted => attendanceType == AttendanceType.nonOnsite;
+
   bool get hasGeofence => lat != null && lng != null && radiusM != null;
 
-  /// Unique across the kinds (`p7`, `c3`, `s2`) — dropdown value.
-  String get key => '${kind.prefix}$id';
+  /// Unique across the kinds (`p7`, `c3`, `s2`; "Di luar area" entry `o2`) — dropdown value.
+  String get key => outsideArea ? 'o$id' : '${kind.prefix}$id';
 
   static ProjectSite fromMaster(MasterItem m, {SiteKind kind = SiteKind.project}) {
     double? d(String k) => (m.extra[k] as num?)?.toDouble();
@@ -220,6 +229,7 @@ AreaDetection detectArea(List<ProjectSite> sites, LocationFix fix) {
 /// `SyncAttendancePayload` (openapi) with the local selfie id in [selfiePlaceholderKey]; the sync engine
 /// uploads the selfie (`POST /media/selfies`) and replaces it with `selfie_media_id` just before sending.
 /// Exactly one of `project_id` / `cost_center_id` / `site_id` (E6, ADR 0023).
+/// DRMS 13/10 A2: a "Di luar area" item carries the local-only [outsideAreaHintKey] (history label; never sent).
 Map<String, dynamic> attendancePayload({
   required ProjectSite site,
   required LocationFix fix,
@@ -232,6 +242,7 @@ Map<String, dynamic> attendancePayload({
   'is_mocked': fix.isMocked,
   'camera_lens': 'front',
   selfiePlaceholderKey: selfieUuid,
+  if (site.outsideArea) outsideAreaHintKey: true,
 };
 
 /// Camera used by the PM for an on-behalf photo (the employee may stand in front of the PM's phone).

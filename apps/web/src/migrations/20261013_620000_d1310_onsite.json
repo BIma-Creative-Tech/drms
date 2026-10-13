@@ -14426,6 +14426,13 @@
           "primaryKey": false,
           "notNull": true
         },
+        "outside_area": {
+          "name": "outside_area",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false,
+          "default": false
+        },
         "selfie_id": {
           "name": "selfie_id",
           "type": "integer",

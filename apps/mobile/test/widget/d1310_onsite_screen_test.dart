@@ -13,7 +13,8 @@ import '../support/widget_harness.dart';
 
 /// DRMS 13/10 A2: the Absen tab recognises the area — the location whose geofence contains the GPS fix is selected
 /// on open (nearest when several overlap, chips to pick another; none → manual picker with the nearest as a hint);
-/// "Pusat" badge and the attendance-type hint. The service is a fake (no I/O in the widget zone). Fictional points.
+/// "Pusat" badge and the attendance-type hint; Non-OnSite outside every registered location → "Di luar area" (no
+/// refusal). The service is a fake (no I/O in the widget zone). Fictional points.
 const _home = ProjectSite(
   id: 2,
   label: 'CAB — Kantor Cabang Contoh',
@@ -142,8 +143,61 @@ void main() {
       );
       await pump(tester, const [head]);
       expect(find.byKey(const Key('head-office-badge')), findsOneWidget);
-      expect(find.text('Karyawan Non-OnSite: absen hanya di kantor pusat dan kantor cabang.'), findsOneWidget);
+      expect(find.byKey(const Key('attendance-type-hint')), findsOneWidget);
+      expect(find.textContaining('Karyawan Non-OnSite: boleh absen di mana saja'), findsOneWidget);
       expect(find.textContaining('Kantor pusat · radius 150 m'), findsOneWidget);
+    });
+
+    group('Non-OnSite (no location restriction)', () {
+      const head = ProjectSite(
+        id: 1,
+        label: 'HO — Kantor Pusat Contoh',
+        lat: -1.25,
+        lng: 116.85,
+        radiusM: 150,
+        kind: SiteKind.site,
+        companyId: 1,
+        isHeadOffice: true,
+        attendanceType: AttendanceType.nonOnsite,
+      );
+      const outside = ProjectSite(
+        id: 2,
+        label: 'CAB — Kantor Cabang Contoh',
+        kind: SiteKind.site,
+        companyId: 1,
+        attendanceType: AttendanceType.nonOnsite,
+        outsideArea: true,
+      );
+
+      testWidgets('outside every registered location: "Di luar area" selected, check-in allowed and queued', (
+        tester,
+      ) async {
+        location.fix = _at(-1.6, 116.85);
+        await pump(tester, const [head, outside], online: false);
+        expect(find.textContaining('absen dicatat "Di luar area" (ref. CAB — Kantor Cabang Contoh)'), findsOneWidget);
+        await tester.tap(find.byKey(const Key('attendance-checkIn')));
+        await tester.pumpAndSettle();
+        expect(service.calls.single, (AttendanceKind.checkIn, 'o2'));
+      });
+
+      testWidgets('inside a registered location: recorded there, even when "Di luar area" was chosen', (tester) async {
+        location.fix = _at(-1.6, 116.85);
+        await pump(tester, const [head, outside]);
+        location.fix = _at(-1.2501, 116.85);
+        await tester.tap(find.byKey(const Key('attendance-checkIn')));
+        await tester.pumpAndSettle();
+        expect(service.calls.single, (AttendanceKind.checkIn, 's1'));
+        expect(find.textContaining('Di dalam radius lokasi'), findsOneWidget);
+      });
+
+      testWidgets('mock location is still refused', (tester) async {
+        location.fix = _at(-1.6, 116.85, mocked: true);
+        await pump(tester, const [head, outside]);
+        await tester.tap(find.byKey(const Key('attendance-checkIn')));
+        await tester.pumpAndSettle();
+        expect(service.calls, isEmpty);
+        expect(find.textContaining('Lokasi palsu (mock location) terdeteksi'), findsOneWidget);
+      });
     });
   });
 }

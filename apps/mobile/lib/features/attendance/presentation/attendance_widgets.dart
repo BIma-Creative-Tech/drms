@@ -43,6 +43,22 @@ IconData siteKindIcon(SiteKind kind) => switch (kind) {
   SiteKind.site => Icons.home_work,
 };
 
+/// Picker / history label: the location name, or — DRMS 13/10 A2 — `Di luar area (ref. HO — Kantor Pusat)`.
+String siteDisplayLabel(AppLocalizations t, ProjectSite s) =>
+    s.outsideArea ? '${t.attendanceOutsideArea} (ref. ${s.label})' : s.label;
+
+/// Day flags for display: `OUTSIDE_AREA` (DRMS 13/10 A2) as "Di luar area", other codes as sent.
+String flagsText(AppLocalizations t, List<String> flags) =>
+    [for (final f in flags) f == 'OUTSIDE_AREA' ? t.attendanceOutsideArea : f].join(', ');
+
+/// Line under the picker: kind (Site penempatan / Kantor pusat / Project …) and radius, or the "Di luar area" hint.
+String siteSubLabel(AppLocalizations t, ProjectSite site) {
+  if (site.outsideArea) return t.attendanceOutsideAreaHint;
+  final kind = site.home ? t.siteHome : (site.isHeadOffice ? t.siteHeadOffice : siteKindLabel(t, site.kind));
+  final radius = site.radiusM;
+  return radius == null ? kind : '$kind · ${t.attendanceRadius(radius.round())}';
+}
+
 /// `Project · P-01 — Gudang` / `Pusat biaya · Ops Palangka` / `Site · BPN — Cabang Balikpapan`.
 String siteLabel(AppLocalizations t, ProjectSite s) => '${siteKindLabel(t, s.kind)} · ${s.label}';
 

@@ -8496,6 +8496,10 @@
               },
               "corrected": {
                 "type": "boolean"
+              },
+              "outsideArea": {
+                "type": "boolean",
+                "description": "DRMS 13/10 A2: true = \"Di luar area\" (Non-OnSite outside every registered location; the location is the reference)."
               }
             },
             "required": [
@@ -8528,6 +8532,10 @@
               },
               "corrected": {
                 "type": "boolean"
+              },
+              "outsideArea": {
+                "type": "boolean",
+                "description": "DRMS 13/10 A2: true = \"Di luar area\" (Non-OnSite outside every registered location; the location is the reference)."
               }
             },
             "required": [
@@ -8816,7 +8824,7 @@
                     "onsite",
                     "non_onsite"
                   ],
-                  "description": "onsite = any registered location of the PT with a point; non_onsite = head office + branch offices (sites) only."
+                  "description": "onsite = inside a registered location of the PT (outside the radius refused); non_onsite = no location restriction (inside a registered location → that one, else \"Di luar area\")."
                 },
                 "homeSiteId": {
                   "type": [
@@ -8824,13 +8832,52 @@
                     "null"
                   ],
                   "exclusiveMinimum": 0
+                },
+                "referenceSite": {
+                  "type": [
+                    "object",
+                    "null"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "lat": {
+                      "type": [
+                        "number",
+                        "null"
+                      ]
+                    },
+                    "lng": {
+                      "type": [
+                        "number",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "code",
+                    "name",
+                    "lat",
+                    "lng"
+                  ],
+                  "description": "Non-OnSite only: the reference of a \"Di luar area\" check-in (home site, else the PT head office); null for OnSite or when neither is set (then an outside check-in is refused VALIDATION)."
                 }
               },
               "required": [
                 "id",
                 "company",
                 "attendanceType",
-                "homeSiteId"
+                "homeSiteId",
+                "referenceSite"
               ]
             },
             "description": "The caller's active employees in the selected PTs (one per PT)."
@@ -8918,11 +8965,44 @@
           "localDate": {
             "type": "string",
             "pattern": "^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$"
+          },
+          "location": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "project",
+                  "cost_center",
+                  "site"
+                ]
+              },
+              "id": {
+                "type": "integer",
+                "exclusiveMinimum": 0
+              }
+            },
+            "required": [
+              "type",
+              "id"
+            ],
+            "description": "Where the record belongs (DRMS 13/10 A2: a Non-OnSite check-in may be recorded at the registered location containing the fix, or at the reference site when outside)."
+          },
+          "outsideArea": {
+            "type": "boolean",
+            "description": "Non-OnSite \"Di luar area\": outside every registered location of the PT; `location` = the reference (home site, else head office; a check-out: the open check-in)."
+          },
+          "distanceM": {
+            "type": "integer",
+            "description": "Distance to the point of `location` (m)."
           }
         },
         "required": [
           "id",
-          "localDate"
+          "localDate",
+          "location",
+          "outsideArea",
+          "distanceM"
         ]
       },
       "AttendanceCheckBody": {
@@ -8941,7 +9021,7 @@
           "site_id": {
             "type": "integer",
             "exclusiveMinimum": 0,
-            "description": "ADR 0023: site (kantor pusat / kantor cabang). DRMS 13/10 A2: eligibility by the employee attendance type (OnSite: any registered location of the PT; Non-OnSite: sites only), no assignment needed."
+            "description": "ADR 0023: site (kantor pusat / kantor cabang). DRMS 13/10 A2: no assignment needed; OnSite must be inside the location; Non-OnSite has no location restriction (send the reference site when outside every registered location → \"Di luar area\")."
           },
           "lat": {
             "type": "number",
@@ -31824,7 +31904,7 @@
     },
     "/attendance/locations": {
       "get": {
-        "summary": "DRMS 13/10 A2: eligible check-in locations of the caller (own employee per selected PT) by attendance type — OnSite: every registered location of the PT with a point (sites incl. head office, projects, cost centers; no assignment needed); Non-OnSite: head office + branch offices (sites). Coordinates and radius only (no money). The APK matches the GPS fix against this list (auto-detect) and caches it for offline check-ins; the server re-validates each check-in",
+        "summary": "DRMS 13/10 A2: registered check-in locations of the caller (own employee per selected PT): every location of the PT with a point (sites incl. head office, projects, cost centers; no assignment needed). OnSite must check in inside one; Non-OnSite has no location restriction (outside every location → \"Di luar area\" at employees[].referenceSite). Coordinates and radius only (no money). The APK matches the GPS fix against this list (auto-detect) and caches it for offline check-ins; the server re-validates each check-in",
         "security": [
           {
             "bearer": []
@@ -31936,7 +32016,7 @@
     },
     "/attendance/check-in": {
       "post": {
-        "summary": "Owner decision 2026-10-09: web self check-in, every role. Selfie first with POST /media/selfies. Synchronous counterpart of the APK sync item attendance.check_in — same gates (company-settings.syncAttendanceEnabled, else FEATURE_DISABLED; ADR 0018 privacy ack, else PRIVACY_ACK_REQUIRED) and rejection codes (MOCK_LOCATION never applies on web; NOT_FOUND, VALIDATION, NO_GEOFENCE, NOT_ASSIGNED = location not eligible for the attendance type of the employee (DRMS 13/10 A2), OUTSIDE_GEOFENCE, MEDIA_MISSING, FORBIDDEN, ALREADY_CHECKED_IN)",
+        "summary": "Owner decision 2026-10-09: web self check-in, every role. Selfie first with POST /media/selfies. Synchronous counterpart of the APK sync item attendance.check_in — same gates (company-settings.syncAttendanceEnabled, else FEATURE_DISABLED; ADR 0018 privacy ack, else PRIVACY_ACK_REQUIRED) and rejection codes (MOCK_LOCATION never applies on web; NOT_FOUND, VALIDATION, NO_GEOFENCE, NOT_ASSIGNED = location outside the PT of the employee, OUTSIDE_GEOFENCE (OnSite only; DRMS 13/10 A2: a Non-OnSite check-in outside every registered location is recorded \"Di luar area\", see the result), MEDIA_MISSING, FORBIDDEN, ALREADY_CHECKED_IN)",
         "security": [
           {
             "bearer": []

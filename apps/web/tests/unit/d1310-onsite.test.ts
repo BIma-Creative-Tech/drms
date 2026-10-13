@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
+import { recapDay, type AttendanceFact } from '@/domain/attendance/aggregate'
 import {
   ATTENDANCE_TYPE_LABEL,
   ATTENDANCE_TYPES,
@@ -7,17 +8,19 @@ import {
   compareEligible,
   DEFAULT_ATTENDANCE_TYPE,
   detectArea,
+  geofenceRequired,
   haversineM,
   insideGeofence,
-  kindAllowedFor,
-  NOT_ELIGIBLE_NON_ONSITE,
+  OUTSIDE_AREA_FLAG,
+  OUTSIDE_AREA_LABEL,
+  pickContaining,
 } from '@/domain/attendance/area'
-import { isEligible } from '@/domain/attendance/eligibility'
 import * as legacy from '@/domain/sync/attendance'
 
 /**
- * DRMS 13/10 A2 (ADR 0023 amendment 2026-10-13): attendance type OnSite / Non-OnSite — the eligibility rule and the
- * automatic area detection (pure, shared by server and web client). Points are fictional.
+ * DRMS 13/10 A2 (ADR 0023 amendment 2026-10-13; Non-OnSite rule owner 2026-10-14): attendance type OnSite / Non-OnSite
+ * — the geofence rule, the Non-OnSite resolution ("Di luar area"), the automatic area detection (pure, shared by
+ * server and web client) and the recap stamp. Points are fictional.
  */
 const P = { lat: -2.21, lng: 113.91 }
 const loc = (key: string, lat: number | null, lng: number | null, radiusM: number | null) => ({ key, lat, lng, radiusM })
@@ -31,18 +34,45 @@ describe('attendance type', () => {
     for (const v of ['onsite', null, undefined, '', 'x']) expect(attendanceTypeOf(v)).toBe('onsite')
   })
 
-  it('OnSite: site, project and cost center; Non-OnSite: sites (head office + branches) only', () => {
-    expect(['site', 'project', 'cost_center'].map((k) => kindAllowedFor('onsite', k as never))).toEqual([true, true, true])
-    expect(['site', 'project', 'cost_center'].map((k) => kindAllowedFor('non_onsite', k as never))).toEqual([true, false, false])
-    expect(NOT_ELIGIBLE_NON_ONSITE).toContain('tidak termasuk area absen untuk karyawan Non-OnSite')
+  it('OnSite needs the fix inside the location; Non-OnSite has no location restriction', () => {
+    expect(geofenceRequired('onsite')).toBe(true)
+    expect(geofenceRequired('non_onsite')).toBe(false)
+    expect(OUTSIDE_AREA_LABEL).toBe('Di luar area')
   })
+})
 
-  it('server rule: same PT AND an allowed kind (another PT is never eligible, whatever the type)', () => {
-    expect(isEligible({ company: 1, type: 'onsite' }, 'project', 1)).toBe(true)
-    expect(isEligible({ company: 1, type: 'onsite' }, 'project', 2)).toBe(false)
-    expect(isEligible({ company: 1, type: 'onsite' }, 'site', undefined)).toBe(false)
-    expect(isEligible({ company: 1, type: 'non_onsite' }, 'site', 1)).toBe(true)
-    expect(isEligible({ company: 1, type: 'non_onsite' }, 'cost_center', 1)).toBe(false)
+describe('Non-OnSite resolution (pickContaining)', () => {
+  const cands = [
+    { key: 'site:1', lat: P.lat, lng: P.lng, radiusM: 100 },
+    { key: 'project:7', lat: P.lat - 0.0004, lng: P.lng, radiusM: 120 },
+  ]
+  it('the requested location when the fix is inside it, even if another one is nearer', () => {
+    expect(pickContaining('site:1', cands, { lat: P.lat - 0.0003, lng: P.lng })!.key).toBe('site:1')
+  })
+  it('else the nearest registered location containing the fix (the request named another / none)', () => {
+    expect(pickContaining('cost_center:9', cands, { lat: P.lat - 0.0003, lng: P.lng })!.key).toBe('project:7')
+    expect(pickContaining(null, cands, { lat: P.lat - 0.0001, lng: P.lng })!.key).toBe('site:1')
+  })
+  it('outside every registered location → null ("Di luar area")', () => {
+    expect(pickContaining('site:1', cands, { lat: P.lat + 0.05, lng: P.lng })).toBeNull()
+    expect(pickContaining('site:1', [], { lat: P.lat, lng: P.lng })).toBeNull()
+  })
+})
+
+describe('recap stamp "Di luar area"', () => {
+  it('the stamp and the day carry it; inside stamps stay unchanged (no extra key)', () => {
+    const base = { employeeId: 1, localDate: '2026-10-14', source: 'self' as const, recordedByName: null, corrected: false, schedule: null, offline: false }
+    const loc = { type: 'site' as const, id: 3, code: 'HO', name: 'Kantor Pusat' }
+    const facts: AttendanceFact[] = [
+      { ...base, id: 10, kind: 'check_in', time: new Date('2026-10-14T00:05:00Z'), location: loc, flags: [] },
+      { ...base, id: 11, kind: 'check_out', time: new Date('2026-10-14T09:00:00Z'), location: loc, flags: [OUTSIDE_AREA_FLAG], outsideArea: true },
+    ]
+    const d = recapDay({ date: '2026-10-14', facts, holidayName: null, fallbackSchedule: null, today: '2026-10-14', timeZone: 'Asia/Makassar' })
+    expect(d.locations).toHaveLength(1)
+    expect(d.locations[0]!.checkIn).toEqual({ id: 10, time: '2026-10-14T00:05:00.000Z', source: 'self', corrected: false })
+    expect(d.locations[0]!.checkOut).toMatchObject({ id: 11, outsideArea: true })
+    expect(d.flags).toContain(OUTSIDE_AREA_FLAG)
+    expect(d.status).toBe('selesai')
   })
 })
 

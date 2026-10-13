@@ -1606,7 +1606,24 @@ class AppLocalizationsId extends AppLocalizations {
       'Karyawan OnSite: boleh absen di semua lokasi terdaftar PT (site, kantor pusat, project, pusat biaya).';
 
   @override
-  String get attendanceTypeNonOnsite => 'Karyawan Non-OnSite: absen hanya di kantor pusat dan kantor cabang.';
+  String get attendanceTypeNonOnsite =>
+      'Karyawan Non-OnSite: boleh absen di mana saja; di luar lokasi terdaftar dicatat \"Di luar area\".';
+
+  @override
+  String get attendanceOutsideArea => 'Di luar area';
+
+  @override
+  String get attendanceOutsideAreaHint =>
+      'Karyawan Non-OnSite: di luar lokasi terdaftar, absen tetap bisa dan dicatat \"Di luar area\".';
+
+  @override
+  String attendanceDetectOutsideArea(String name) {
+    return 'Posisi Anda di luar semua lokasi terdaftar: absen dicatat \"Di luar area\" (ref. $name).';
+  }
+
+  @override
+  String get attendanceNoReference =>
+      'Absen \"Di luar area\" belum bisa: site penempatan / kantor pusat PT belum ditetapkan Admin.';
 
   @override
   String get distanceInside => 'Di dalam area absen';
