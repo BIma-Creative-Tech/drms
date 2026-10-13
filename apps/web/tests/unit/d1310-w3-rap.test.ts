@@ -8,6 +8,7 @@ import { createBody, draftAmount, draftOf, formatDecimalInput, itemUsed, parseDe
 import { itemIcon, moduleForPath, resolveModules } from '@/admin/modules/registry'
 import type { Role } from '@/access/roles'
 import { filterOverview, overviewTotals, rapOverRab, rapState, rapVsRab, type RapOverviewRow } from '@/domain/rap/overview'
+import { RAP_USED_REASON_MESSAGE, rapItemUsed } from '@/domain/rap/rules'
 
 /**
  * DRMS 13/10 Wave 3 "Proyek › RAP": pure helpers of the RAP index (domain/rap/overview.ts) and of the RAP item
@@ -157,6 +158,36 @@ describe('RAP item form (rap-item-form.ts)', () => {
     expect(rapGrandTotal(rows)).toBe(125)
     expect(rapGrandTotal([item({ value: undefined })])).toBeNull()
     expect(rapRealisedTotal(rows)).toBe(30)
+  })
+
+  it('owner 2026-10-13: a used item needs a reason for any change (every role) — same definition as the server rule', () => {
+    // the chip and the server share one definition
+    for (const over of [{}, { realisedAmount: 1 }, { realisedAmount: undefined, realised: 2 }, { received: 1 }, { used: 0.5 }]) {
+      const i = item(over)
+      expect(itemUsed(i), JSON.stringify(over)).toBe(rapItemUsed(i))
+    }
+    const usedItem = item({ realisedAmount: 600_000 })
+    // PM on an unlocked RAP (needsReason false): used → reason required, Indonesian message
+    const noReason = parseRapDraft({ ...draftOf(usedItem), volume: '13' }, { stageRequired: true, needsReason: false, used: true })
+    expect(noReason.values).toBeNull()
+    expect(noReason.errors).toEqual({ reason: RAP_USED_REASON_MESSAGE })
+    expect(RAP_USED_REASON_MESSAGE).toBe('Item RAP sudah terpakai: isi alasan perubahan (min. 3 karakter).')
+    expect(parseRapDraft({ ...draftOf(usedItem), volume: '13', reason: 'ab' }, { stageRequired: true, needsReason: false, used: true }).errors.reason).toBe(RAP_USED_REASON_MESSAGE)
+    const ok = parseRapDraft({ ...draftOf(usedItem), volume: '13', reason: 'Revisi kebutuhan' }, { stageRequired: true, needsReason: false, used: true })
+    expect(ok.errors).toEqual({})
+    expect(patchBody(usedItem, ok.values!, 'Revisi kebutuhan')).toEqual({ volume: 13, reason: 'Revisi kebutuhan' })
+    // an unused item: no reason needed
+    expect(parseRapDraft({ ...draftOf(item()), volume: '13' }, { stageRequired: true, needsReason: false, used: false }).errors).toEqual({})
+    // locked RAP keeps its own message
+    expect(parseRapDraft({ ...draftOf(usedItem), volume: '13' }, { stageRequired: true, needsReason: true, used: true }).errors.reason).toBe('RAP terkunci: isi alasan perubahan (min. 3 karakter).')
+  })
+
+  it('the server enforces it: PATCH /rap-items/{id} checks the used rule, the import commit too (field `reason`)', () => {
+    const svc = readFileSync(join(process.cwd(), 'src/domain/rap/service.ts'), 'utf8')
+    expect(svc).toMatch(/usedReasonIssue\(used, ed\.reason\)/)
+    expect(svc).toMatch(/usedReasonIssue\(d\.usedChanged\.length > 0, opts\.reason\)/)
+    // the lock rule is untouched: PM 409 RAP_LOCKED, Direktur/Admin reason
+    expect(svc).toContain("fail(409, 'RAP_LOCKED'")
   })
 })
 
