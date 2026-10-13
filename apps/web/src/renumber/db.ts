@@ -276,7 +276,7 @@ export type ApplyResult = { companies: CompanyInfo[]; plan: RenumberPlan; text: 
  */
 export async function applyRenumber(db: Db, opts: { scope: Scope; operator: string; expectSha256?: string }): Promise<ApplyResult> {
   const who = await db.query('SELECT current_user::text AS u')
-  if (!/_owner$/.test(String(who.rows[0]?.u ?? ''))) throw new RenumberRefused(`apply harus dijalankan dengan role <prefix>_owner (sekarang ${String(who.rows[0]?.u)})`, 'not_owner')
+  if (!/_owner$/.test(String(who.rows[0]?.u ?? ''))) throw new RenumberRefused(`apply harus dijalankan dengan role pemilik "*_owner" (sekarang ${String(who.rows[0]?.u)})`, 'not_owner')
   await db.query('BEGIN')
   try {
     await db.query("SET LOCAL lock_timeout = '15s'")

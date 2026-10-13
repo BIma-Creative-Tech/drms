@@ -117,7 +117,7 @@ try {
   const who = await client.query<{ u: string; d: string }>('SELECT current_user::text AS u, current_database()::text AS d')
   const { u, d } = who.rows[0]!
   console.log(`Penomoran ulang dokumen — mode ${mode}, database ${d} (role ${u}), cakupan ${opts.all ? 'semua PT' : opts.codes.join(', ')}`)
-  if (mode !== 'dry-run' && !/_owner$/.test(u)) throw new RenumberRefused(`${mode} harus dengan role <prefix>_owner (sekarang ${u})`, 'not_owner')
+  if (mode !== 'dry-run' && !/_owner$/.test(u)) throw new RenumberRefused(`${mode} harus dengan role pemilik "*_owner" (sekarang ${u})`, 'not_owner')
 
   if (mode === 'dry-run') {
     const r = await dryRun(client, scope)
