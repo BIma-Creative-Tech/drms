@@ -1,10 +1,10 @@
-# ADR 0025 — "Owner" approval level above the Direktur (role `pk-principal`)
+# ADR 0026 — "Owner" approval level above the Direktur (role `pk-principal`)
 
 - **Status:** Accepted (owner decision 2026-10-13, DRMS 13/10 Phase A1). Staging first; no production deploy without
   separate owner approval.
 - **Date:** 2026-10-13
-- **Branch:** `feat/d1310-a-owner` (from `feat/d1310-w3-dash`). If another in-flight branch also adds an ADR 0025, this
-  one is renumbered at merge (the title stays).
+- **Branch:** `feat/d1310-a-owner` (from `feat/d1310-w3-dash`). Numbered 0026 because ADR 0025 is taken by the
+  Direktur-signature change (PR #59).
 - **Amends:** [ADR 0021](0021-approval-pm-direktur.md) (the Direktur is no longer the last approver of expense
   requests) and [ADR 0024](0024-configurable-approval-rules-direktur-no-approval.md) (the zero-step rule is the
   Owner's, not the Direktur's; a Direktur's own request is approved by the Owner).
@@ -32,7 +32,7 @@ Owner, 2026-10-13: a new role **Owner**, one level above the Direktur.
 F2e delegation tier `owner`, …). Reusing "owner" for the new role would make every existing reference ambiguous, so the
 new role is **`pk-principal`**, shown as **"Owner"** (`ROLE_LABELS`, APK `Role.principal`, matrix short "Own"). Postgres
 enums extended: `enum_company_memberships_roles`, `enum_approval_rules_steps_approver_role`,
-`enum_approval_rules_acknowledge_role`, `enum_approval_rules_requester_roles` (migration `…610000_d1310_owner_role`,
+`enum_approval_rules_acknowledge_role`, `enum_approval_rules_requester_roles` (migration `…630000_d1310_owner_role`,
 own transaction).
 
 ### 2. Access = Direktur, approval = exact role (two role sets per membership)
@@ -62,7 +62,9 @@ exact-role channel for the approval engine.**
 
 - `DECISION_ROLES` = Direktur, Finance, **Owner** (stored in each new snapshot); Addendum RAB snapshots keep
   `ADDENDUM_DECISION_ROLES` = Direktur, Finance, and an addendum rule may not name the Owner (hook 400).
-- Default expense rules end with an **Owner level** (last level): "Default — PM project lalu Direktur" =
+- The **Owner level is placed Direktur → Owner → Finance**: directly after the last Direktur level; in a rule without a
+  Direktur level before the first Finance level (ADR 0013 shape "Diketahui" Direktur → Finance levels: the Owner
+  becomes level 1); otherwise at the end. Default rules: "Default — PM project lalu Direktur" =
   PM project ("Diketahui") → L1 Direktur → **L2 Owner**; "Pengajuan Direktur" (Peran pemohon = Direktur, priority 10)
   = **L1 Owner**; new **"Pengajuan Owner"** (Peran pemohon = Owner, priority 5, no level).
 - **Zero-step rule = Owner only**: `zeroStepRuleError` / `isNoApprovalRule` / DB trigger `approval_rules_zero_step`
@@ -88,12 +90,13 @@ current level), `decisionBy: owner`, KPI `teamWaiting.owner`, transfer-queue `no
 pengajuan Owner (kebijakan PT)", PDF Approval box lists every level with its role. `STATUS_LABELS.pending_approval`
 stays "Menunggu persetujuan Direktur" (level 1 of the default rule; rows without a snapshot).
 
-### 5. Data migration (`…610200_d1310_owner_role_data`, idempotent)
+### 5. Data migration (`…630200_d1310_owner_role_data`, idempotent)
 
-Appends one Owner level (last level) to every **active** expense-request rule and every ADR 0024 zero-step Direktur
-rule, skipping rules that already name the Owner and the Owner's own rules; creates "Pengajuan Owner" in every PT
-without an active one. Audited (`source: system`). Request rows are not touched. Down removes the levels it added
-(never leaving a rule without a level) and deletes / deactivates the rules it created.
+Inserts one Owner level (placement as in §3, following levels renumbered) into every **active** expense-request rule
+and every ADR 0024 zero-step Direktur rule (inactive rules and rule names unchanged), skipping rules that already name
+the Owner and the Owner's own rules; creates "Pengajuan Owner" in every PT without an active one. Audited
+(`source: system`, old levels in `old_value`). Request rows are not touched. Down removes the levels it added (never
+leaving a rule without a level), renumbers the following levels back and deletes / deactivates the rules it created.
 
 ## Consequences
 

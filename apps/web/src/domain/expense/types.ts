@@ -66,7 +66,7 @@ export const LEGACY_WAITING_LABELS = {
 } as const
 
 /**
- * ADR 0025 (owner 2026-10-13): "Menunggu persetujuan" of the Owner level (the level above the Direktur) — derived
+ * ADR 0026 (owner 2026-10-13): "Menunggu persetujuan" of the Owner level (the level above the Direktur) — derived
  * from the snapshot's current level by timeline.ts requestStatusLabel (STATUS_LABELS.pending_approval stays the
  * Direktur wording: the default rule's first approval level and the label of rows without a snapshot).
  */

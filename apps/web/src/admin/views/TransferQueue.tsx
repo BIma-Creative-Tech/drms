@@ -122,7 +122,7 @@ export async function TransferQueue(props: AdminViewServerProps) {
                 </td>
                 <td style={td} data-label="Jenis">
                   {r.statusLabel}
-                  {/* ADR 0024 / 0025: a Direktur's (legacy) / the Owner's own request reached the queue without any approval — Finance is the only check */}
+                  {/* ADR 0024 / 0026: a Direktur's (legacy) / the Owner's own request reached the queue without any approval — Finance is the only check */}
                   {r.noApproval ? (
                     <div style={{ marginTop: 2 }}>
                       <span style={badge('warn')} data-pk-queue-no-approval={r.id} title={r.noApprovalBy === 'owner' ? PRINCIPAL_NO_APPROVAL_NOTE : NO_APPROVAL_NOTE}>

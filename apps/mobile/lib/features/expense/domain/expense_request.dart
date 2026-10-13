@@ -253,11 +253,11 @@ abstract class ApprovalRuleInfo with _$ApprovalRuleInfo {
   bool get direkturViaPmSelf => selfApproval == 'direktur_via_pm_self';
 
   /// ADR 0024 (owner 2026-10-11): a Direktur's own request without any approval step — straight to the Finance
-  /// transfer queue (audited policy exception, web `direktur_no_approval`). ADR 0025 (owner 2026-10-13): since then
+  /// transfer queue (audited policy exception, web `direktur_no_approval`). ADR 0026 (owner 2026-10-13): since then
   /// only the Owner's own request (`principal_no_approval`); a Direktur's own request goes to the Owner.
   bool get noApproval => selfApproval == 'direktur_no_approval' || selfApproval == 'principal_no_approval';
 
-  /// ADR 0025: the request without approval is the Owner's own (else a Direktur's, ADR 0024).
+  /// ADR 0026: the request without approval is the Owner's own (else a Direktur's, ADR 0024).
   bool get ownerNoApproval => selfApproval == 'principal_no_approval';
 
   /// Approver role of an approval level (null = named user / unknown).

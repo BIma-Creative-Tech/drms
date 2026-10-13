@@ -8,19 +8,19 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { addDays } from '@/domain/expense/types'
 import { pmDashboard } from '@/domain/reports/dashboards'
 import { resetRateLimits } from '@/lib/rate-limit'
-import { down as dataDown, OWNER_RULE, up as dataUp } from '@/migrations/20261013_610200_d1310_owner_role_data'
+import { down as dataDown, OWNER_RULE, up as dataUp } from '@/migrations/20261013_630200_d1310_owner_role_data'
 import { buildPdfData } from '@/pdf/data'
 
 import { addMembership, companyId, getTestPayload, sqlAs } from './helpers'
-import { api, asUser, draftBody, makeFlowUser, makeWorld, png, sysCreate, upload, type FlowUser, type World } from './flow-world'
+import { ADR0013_FALLBACK_RULE, api, asUser, draftBody, makeFlowUser, makeWorld, png, sysCreate, upload, type FlowUser, type World } from './flow-world'
 
 /**
- * ADR 0025 (owner decision 2026-10-13) through the real API + DB: the Owner (`pk-principal`) one approval level above
+ * ADR 0026 (owner decision 2026-10-13) through the real API + DB: the Owner (`pk-principal`) one approval level above
  * the Direktur — Staff → PM project → Direktur → Owner → Finance transfer queue; the Owner never decides the Direktur
  * level and vice versa (stored roles); notifications reach the Owner at his level; requests already submitted keep
  * their snapshot (in-flight flow unchanged); the LPJ shortfall re-approval uses the same rule (and roles); loans and
  * Addendum RAB stay Direktur-only; the Owner sees what the Direktur sees in each PT where he is Owner (dashboard,
- * lists, cash); the data migration 20261013_610200 is idempotent and leaves request snapshots alone.
+ * lists, cash); the data migration 20261013_630200 is idempotent and leaves request snapshots alone.
  * The Owner's own request (no approval) and a Direktur's own request (→ Owner) are covered by d1010-e-approval.
  * Fictional data only. The shared test DB may hold other Owners of DRMS — assertions name this file's users.
  */
@@ -36,7 +36,7 @@ const key = () => ({ 'Idempotency-Key': randomUUID() })
 const today = () => new Date(Date.now() + 8 * 3600_000).toISOString().slice(0, 10) // Asia/Makassar
 
 beforeAll(async () => {
-  w = await makeWorld('AOW') // ADR 0013 world rules — replaced below by the ADR 0025 shape
+  w = await makeWorld('AOW') // ADR 0013 world rules — replaced below by the ADR 0026 shape
   drms = await companyId()
   await sqlAs('app', "UPDATE approval_rules SET active = false WHERE name LIKE 'AOW rule %'")
   await sysCreate('approval-rules', {
@@ -204,7 +204,7 @@ describe('2. In-flight requests keep their flow (snapshot taken at submit)', () 
       id: rule,
       data: { steps: [{ level: 1, approverRole: 'pk-owner' }, { level: 2, approverRole: 'pk-principal' }] } as never,
       overrideAccess: true, // SYSTEM-WRITE: fixture (the Admin's change)
-      context: { auditReason: 'ADR 0025 uji' },
+      context: { auditReason: 'ADR 0026 uji' },
     })
     expect((await sqlAs('app', 'SELECT approval_snapshot FROM expense_requests WHERE id = $1', [before.id])).rows[0].approval_snapshot).toEqual(snap)
     expect((await api('POST', `${E}/${before.id}/acknowledge`, w.users.otherPm, {}, key())).status).toBe(200)
@@ -319,8 +319,8 @@ async function inRolledBackTx(fn: (db: { execute: (q: unknown) => Promise<{ rows
   }
 }
 
-describe('migration 20261013_610200_d1310_owner_role_data', () => {
-  it('pre-ADR-0025 DRMS → Owner level appended, "Pengajuan Owner" created; idempotent; snapshots untouched; down reverts', async () => {
+describe('migration 20261013_630200_d1310_owner_role_data', () => {
+  it('pre-ADR-0026 DRMS → Owner level after the Direktur / before Finance, "Pengajuan Owner" created; idempotent; snapshots untouched; down reverts', async () => {
     await inRolledBackTx(async (db) => {
       const q = async (s: string) => (await db.execute(sql.raw(s))).rows
       const snapshots = async () => (await q('SELECT md5(coalesce(string_agg(approval_snapshot::text, \',\' ORDER BY id), \'\')) AS h FROM expense_requests'))[0]!.h
@@ -343,15 +343,20 @@ describe('migration 20261013_610200_d1310_owner_role_data', () => {
         [2, 'pk-principal'],
       ])
       expect(await stepsOf('Pengajuan Direktur')).toEqual([[1, 'pk-principal']])
+      // ADR 0013 shape ("Diketahui" Direktur → Finance level): the Owner goes BEFORE Finance (Direktur → Owner → Finance)
+      expect(await stepsOf(ADR0013_FALLBACK_RULE)).toEqual([
+        [1, 'pk-principal'],
+        [2, 'pk-finance'],
+      ])
       expect(await stepsOf('Contoh — di atas Rp 10 juta: PM project lalu Direktur (Q-31, nonaktif)')).toEqual([[1, 'pk-owner']]) // inactive: the Admin decides
       expect(await stepsOf(RULE)).toEqual([
         [1, 'pk-owner'],
         [2, 'pk-principal'],
-      ]) // this file's rule: its Owner level is back (appended once)
+      ]) // this file's rule: its Owner level is back (once, after the Direktur)
       expect(await ownerRules()).toEqual([expect.objectContaining({ priority: 5, ack: 'none', roles: ['pk-principal'], steps: 0 })])
       const rid = (await ownerRules())[0]!.id
       expect(await q(`SELECT action::text AS a, source::text AS s FROM audit_logs WHERE doc_type = 'approval_rule' AND doc_id = '${rid}'`)).toEqual([{ a: 'create', s: 'system' }])
-      await q('SET CONSTRAINTS ALL IMMEDIATE') // the ADR 0025 zero-step guard accepts every rule now
+      await q('SET CONSTRAINTS ALL IMMEDIATE') // the ADR 0026 zero-step guard accepts every rule now
       await q('SET CONSTRAINTS ALL DEFERRED')
 
       await dataUp({ db } as never) // idempotent
@@ -363,6 +368,7 @@ describe('migration 20261013_610200_d1310_owner_role_data', () => {
       await dataDown({ db } as never)
       expect(await stepsOf('Default — PM project lalu Direktur (semua nominal)')).toEqual([[1, 'pk-owner']])
       expect(await stepsOf('Pengajuan Direktur')).toEqual([[1, 'pk-principal']]) // never left without a level
+      expect(await stepsOf(ADR0013_FALLBACK_RULE)).toEqual([[1, 'pk-finance']]) // renumbered back
       expect(await ownerRules()).toEqual([])
     })
   })

@@ -3,14 +3,14 @@ import { type MigrateDownArgs, type MigrateUpArgs, sql } from '@payloadcms/db-po
 import { up as adr0024GuardUp } from './20261013_300000_d1010_approval_config_guard'
 
 /**
- * ADR 0025 (owner decision 2026-10-13) — DB guards of the Owner approval level. Hand-written, re-runnable, run as
- * <prefix>_owner after 20261013_610000_d1310_owner_role (the enum value must be committed before it is used here).
+ * ADR 0026 (owner decision 2026-10-13) — DB guards of the Owner approval level. Hand-written, re-runnable, run as
+ * <prefix>_owner after 20261013_630000_d1310_owner_role (the enum value must be committed before it is used here).
  * Replaces the ADR 0024 function bodies of 20261013_300000_d1010_approval_config_guard:
  *
  * 1. `approval_rules_zero_step` (same DEFERRABLE constraint triggers, new body): a rule WITHOUT approval levels must be
  *    an expense-request rule without "Diketahui" whose requester roles are EXACTLY {pk-principal} (Owner). A
- *    Direktur's own request is approved by the Owner since ADR 0025 — the ADR 0024 zero-step Direktur rules get an
- *    Owner level from the data migration 20261013_610200 (the trigger checks a rule only when it is written).
+ *    Direktur's own request is approved by the Owner since ADR 0026 — the ADR 0024 zero-step Direktur rules get an
+ *    Owner level from the data migration 20261013_630200 (the trigger checks a rule only when it is written).
  * 2. `expense_requests.g1_exception` CHECK += 'principal_no_approval'; `pk_expense_requests_g1_exception` accepts a
  *    no-approval value at the submit freeze point ONLY when `pk_no_approval_allowed_for`: the request's rule is a
  *    zero-step rule of the request's PT whose requester roles are exactly the role of the value
@@ -20,7 +20,7 @@ import { up as adr0024GuardUp } from './20261013_300000_d1010_approval_config_gu
  * 3. `expense_requests_approval_guard`: "Menunggu persetujuan" → "Disetujui" needs the final decision of the cycle —
  *    or one of the two no-approval values.
  * ADDITIVE for the previous web image: it never writes the new value and never saves a zero-step rule; the only
- * behaviour it loses is saving a NEW zero-step Direktur rule (ADR 0025 policy).
+ * behaviour it loses is saving a NEW zero-step Direktur rule (ADR 0026 policy).
  * Down: the ADR 0024 bodies are restored (re-running that migration's `up`) — refused while a request carries
  * `principal_no_approval` (that CHECK value cannot be dropped then); rows are never rewritten.
  */
@@ -56,7 +56,7 @@ export async function up({ db }: MigrateUpArgs): Promise<void> {
         RETURN NULL;
       END IF;
       IF r.doc_type IS DISTINCT FROM 'expense_request' OR r.ack IS DISTINCT FROM 'none' OR NOT pk_rule_requester_only(rid, 'pk-principal') THEN
-        RAISE EXCEPTION 'approval_rules %: a rule without approval levels is allowed only for requester role = Owner (pk-principal) on expense requests, without "Diketahui" (ADR 0024/0025)', rid
+        RAISE EXCEPTION 'approval_rules %: a rule without approval levels is allowed only for requester role = Owner (pk-principal) on expense requests, without "Diketahui" (ADR 0024/0026)', rid
           USING ERRCODE = '23514';
       END IF;
       RETURN NULL;
@@ -111,12 +111,12 @@ export async function up({ db }: MigrateUpArgs): Promise<void> {
          AND NOT (pk_expense_editable(OLD.status::text) AND NOT pk_expense_editable(NEW.status::text)) THEN
         RAISE EXCEPTION 'expense_requests %: g1_exception changes only at submit (ADR 0021)', OLD.id USING ERRCODE = '42501';
       END IF;
-      -- ADR 0024 / 0025: a no-approval value only for the requester's OWN request under the zero-step rule of his role
+      -- ADR 0024 / 0026: a no-approval value only for the requester's OWN request under the zero-step rule of his role
       IF NEW.g1_exception IN ('direktur_no_approval', 'principal_no_approval')
          AND pk_expense_editable(OLD.status::text) AND NOT pk_expense_editable(NEW.status::text)
          AND NOT pk_no_approval_allowed_for(NEW.id, NEW.company_id, NEW.created_by_id, NEW.approval_rule_id, NEW.approval_snapshot,
                                             CASE NEW.g1_exception WHEN 'principal_no_approval' THEN 'pk-principal' ELSE 'pk-owner' END, NEW.g1_exception) THEN
-        RAISE EXCEPTION 'expense_requests %: % only for the requester''s own request under the zero-step rule of his role (ADR 0024/0025)', OLD.id, NEW.g1_exception USING ERRCODE = '42501';
+        RAISE EXCEPTION 'expense_requests %: % only for the requester''s own request under the zero-step rule of his role (ADR 0024/0026)', OLD.id, NEW.g1_exception USING ERRCODE = '42501';
       END IF;
       RETURN NEW;
     END
@@ -134,7 +134,7 @@ export async function up({ db }: MigrateUpArgs): Promise<void> {
                               -- G1-2: every approval level skipped → the "Diketahui" approval is final
                               OR (a.position::text = 'diketahui' AND a.decision::text = 'acknowledged'
                                   AND coalesce(jsonb_array_length(NEW.approval_snapshot -> 'steps'), 0) = 0))) THEN
-        RAISE EXCEPTION 'expense_requests %: approved without a decision of cycle % (only direktur_no_approval / principal_no_approval, ADR 0024/0025)', OLD.id, NEW.approval_cycle USING ERRCODE = '42501';
+        RAISE EXCEPTION 'expense_requests %: approved without a decision of cycle % (only direktur_no_approval / principal_no_approval, ADR 0024/0026)', OLD.id, NEW.approval_cycle USING ERRCODE = '42501';
       END IF;
       RETURN NEW;
     END
@@ -144,9 +144,9 @@ export async function up({ db }: MigrateUpArgs): Promise<void> {
 export async function down({ db, payload, req }: MigrateDownArgs): Promise<void> {
   const r = (await db.execute(sql`SELECT count(*)::int AS n FROM expense_requests WHERE g1_exception = 'principal_no_approval'`)) as unknown as { rows: Array<{ n: number }> }
   if ((r.rows[0]?.n ?? 0) > 0) {
-    throw new Error(`20261013_610100_d1310_owner_role_guard down: ${r.rows[0]!.n} request(s) carry principal_no_approval (ADR 0025) — not reverted`)
+    throw new Error(`20261013_630100_d1310_owner_role_guard down: ${r.rows[0]!.n} request(s) carry principal_no_approval (ADR 0026) — not reverted`)
   }
-  // ADR 0024 bodies (zero-step = Direktur only, CHECK without the ADR 0025 value, approval guard) — re-runnable
+  // ADR 0024 bodies (zero-step = Direktur only, CHECK without the ADR 0026 value, approval guard) — re-runnable
   await adr0024GuardUp({ db, payload, req } as MigrateUpArgs)
   await db.execute(sql`
     DROP FUNCTION IF EXISTS pk_no_approval_allowed_for(integer, integer, integer, integer, jsonb, text, text);

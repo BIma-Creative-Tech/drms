@@ -182,7 +182,7 @@ export async function actorContext(req: PayloadRequest, doc: LoanDoc, repayments
   const borrower = await loadProject(req, relId(doc.borrowerProject)!, 'borrowerProjectId')
   // ADR 0016 §5: roles IN THE LOAN's PT
   const isDirektur = hasRole(req, 'pk-owner', company)
-  // ADR 0025: loans stay Direktur-only — the decision pool is the STORED Direktur role (the Owner sees and may cancel /
+  // ADR 0026: loans stay Direktur-only — the decision pool is the STORED Direktur role (the Owner sees and may cancel /
   // void like a Direktur, but never approves or rejects a loan)
   const decides = hasExactRole(req, 'pk-owner', company)
   const posted = (repayments ?? (repaid(doc) > 0 ? await repaymentsOf(req, doc.id) : [])).some((r) => r.status === 'posted')
@@ -207,9 +207,9 @@ async function requireAction(req: PayloadRequest, doc: LoanDoc, action: LoanActi
   if (loanAllowedActions(ctx).includes(action)) return ctx
   const decision = DECISIONS.has(action)
   if (decision) {
-    const direktur = hasExactRole(req, 'pk-owner', relId(doc.company)) // ADR 0025: the Owner does not decide loans
+    const direktur = hasExactRole(req, 'pk-owner', relId(doc.company)) // ADR 0026: the Owner does not decide loans
     const reason = !direktur
-      ? 'hanya Direktur PT yang memutuskan pinjaman antar project (ADR 0022 §4, ADR 0025)'
+      ? 'hanya Direktur PT yang memutuskan pinjaman antar project (ADR 0022 §4, ADR 0026)'
       : ctx.isCreator
         ? 'pembuat pinjaman tidak boleh memutuskan pinjamannya sendiri (G1; ada Direktur lain)'
         : 'bukan langkah keputusan'

@@ -8,14 +8,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added (DRMS — Owner approval level)
 
-- **Role "Owner" (`pk-principal`) one approval level above the Direktur** (owner decision 2026-10-13, ADR 0025):
+- **Role "Owner" (`pk-principal`) one approval level above the Direktur** (owner decision 2026-10-13, ADR 0026):
   expense requests go **Staff → PM project → Direktur → Owner → Finance (transfer queue)**. The Owner has the same view
   and permissions as the Direktur in every PT where he holds the role (effective roles: `pk-principal` implies
   `pk-owner` for every access check); the approval engine matches the **stored** role, so the Owner never decides the
   Direktur level and vice versa (distinct persons, step holders and step notifications by exact role). Assigned per PT
   in Pengguna / Akses PT (label "Owner").
-- **Rules:** every active expense rule ends with an Owner level (data migration `20261013_610200`, idempotent, audited;
-  names kept); "Pengajuan Direktur" → approved by the Owner; new **"Pengajuan Owner"** (Peran pemohon = Owner, no level,
+- **Rules:** every active expense rule gets an Owner level placed **Direktur → Owner → Finance** — directly after the
+  last Direktur level, else before the first Finance level (ADR 0013 shape: Owner becomes level 1), else at the end;
+  following levels renumbered (data migration `20261013_630200`, idempotent, audited; names kept, inactive rules
+  untouched); "Pengajuan Direktur" → approved by the Owner; new **"Pengajuan Owner"** (Peran pemohon = Owner, no level,
   priority 5): the Owner's own request goes straight to Finance (`principal_no_approval`, audited, DB-checked). Zero-step
   rules are now allowed for requester role **Owner only** (hook + DB trigger); an Owner level is never skipped silently
   (409). Addendum RAB and inter-project loans stay Direktur-only. LPJ shortfall re-approval uses the same rule (→
@@ -23,8 +25,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - **Labels (web + APK):** "Persetujuan Owner", "Menunggu persetujuan Owner", decision texts, PDF Approval box with every
   level and its role, PM KPI `teamWaiting.owner`, transfer queue `noApprovalBy`, notifications / email "Persetujuan
   Owner". APK: `Role.principal` ("Owner", Direktur home + inbox), stepper and decision sheet with the Owner level.
-- **Migrations:** `20261013_610000_d1310_owner_role` (enum values), `…610100_…_guard` (zero-step = Owner only,
-  `g1_exception` += `principal_no_approval`, approval guard), `…610200_…_data`. OpenAPI: `Role`, `OnboardingRole`,
+- **Migrations:** `20261013_630000_d1310_owner_role` (enum values), `…630100_…_guard` (zero-step = Owner only,
+  `g1_exception` += `principal_no_approval`, approval guard), `…630200_…_data`. OpenAPI: `Role`, `OnboardingRole`,
   membership batch roles, `decisionBy`, `selfApproval`, `TransferQueueItem.noApprovalBy`, PM dashboard `teamWaiting`.
 - **Deploy step:** after migrating, tick **Owner** for the Owner in every PT — until then submissions under a rule with
   an Owner level answer 409 ("Tidak ada pengguna aktif … (peran Owner)").

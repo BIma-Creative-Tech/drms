@@ -31,7 +31,7 @@ describe('ADR 0013 labels + seeded default rule', () => {
   it('pk-owner is labelled "Direktur" (G1-1: no separate role)', () => {
     expect(ROLE_LABELS['pk-owner']).toBe('Direktur')
   })
-  it('default rule (ADR 0021 supersedes the ADR 0013 default): PM project then Direktur level 1, Owner level 2 (ADR 0025), all amounts; every seeded rule is valid', () => {
+  it('default rule (ADR 0021 supersedes the ADR 0013 default): PM project then Direktur level 1, Owner level 2 (ADR 0026), all amounts; every seeded rule is valid', () => {
     const def = DEFAULT_APPROVAL_RULES[0]
     expect(def).toMatchObject({ name: 'Default — PM project lalu Direktur (semua nominal)', acknowledge: 'required', acknowledgeBy: 'scope_manager', minAmount: 0, maxAmount: null, active: true })
     expect(def.steps).toEqual([

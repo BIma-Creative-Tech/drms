@@ -1,7 +1,7 @@
 /**
  * DRMS 10/10 9c (WA-06): readable approval timeline of a request — the web counterpart of the APK
  * `turn_timeline.dart` (buildTimeline + TimelineView): Diajukan → Persetujuan PM / Diketahui →
- * Persetujuan Direktur → Persetujuan Owner (ADR 0025) / Approval → Transfer Finance, per step the role, the planned approver, the
+ * Persetujuan Direktur → Persetujuan Owner (ADR 0026) / Approval → Transfer Finance, per step the role, the planned approver, the
  * state (selesai / saat ini / menunggu / dilewati / ditolak), who acted, when and the note. Replaces
  * the raw JSON snapshot for everyone (raw JSON stays for Admin only, collapsed).
  * Pure module (unit-tested): derived from the snapshot stored at submit + the decision rows of the
@@ -92,7 +92,7 @@ export function ackPosition(s: TimelineSnapshot | null): { title: string; role: 
 export function approvalPosition(s: TimelineSnapshot | null, level: number, multi: boolean): { title: string; role: string } {
   const role = s?.steps.find((x) => x.level === level)?.approverRole ?? null
   const suffix = multi ? ` (level ${level})` : ''
-  // ADR 0025: Direktur → Owner — a role that holds ONE level is named without "(level n)"
+  // ADR 0026: Direktur → Owner — a role that holds ONE level is named without "(level n)"
   const own = role && (s?.steps.filter((x) => x.approverRole === role && x.approverUserId === null).length ?? 0) <= 1 ? '' : suffix
   if (role === DIREKTUR_ROLE) return { title: `Persetujuan Direktur${own}`, role: ROLE_LABELS[DIREKTUR_ROLE] }
   if (role === OWNER_ROLE) return { title: `Persetujuan Owner${own}`, role: ROLE_LABELS[OWNER_ROLE] }
@@ -105,7 +105,7 @@ export function g1ExceptionText(v: unknown): string | null {
   return selfApprovalNote(v)
 }
 
-/** ADR 0024 step of a request without approval (web = APK). ADR 0025: the requester role follows the exception. */
+/** ADR 0024 step of a request without approval (web = APK). ADR 0026: the requester role follows the exception. */
 export const NO_APPROVAL_STEP_TITLE = 'Persetujuan'
 export const NO_APPROVAL_STEP_ROLE = 'Direktur (pemohon)'
 export const PRINCIPAL_NO_APPROVAL_STEP_ROLE = 'Owner (pemohon)'
@@ -138,7 +138,7 @@ export function buildApprovalTimeline(d: TimelineInput): ApprovalTimelineStep[] 
     note: submitted ? creatorNote : ['belum diajukan', creatorNote].filter(Boolean).join(' · '),
   })
 
-  // ADR 0024 / 0025: a Direktur's (legacy) / the Owner's own request without approval → one "Persetujuan" step,
+  // ADR 0024 / 0026: a Direktur's (legacy) / the Owner's own request without approval → one "Persetujuan" step,
   // skipped by policy (APK turn_timeline.dart builds the same step).
   if (isNoApproval(snap)) {
     const role = noApprovalRequesterRole(snap) === OWNER_ROLE ? PRINCIPAL_NO_APPROVAL_STEP_ROLE : NO_APPROVAL_STEP_ROLE
@@ -186,7 +186,7 @@ export function buildApprovalTimeline(d: TimelineInput): ApprovalTimelineStep[] 
   if (!snap && !submitted) {
     // Draft: the rule is chosen at submit — show the usual next positions without names.
     steps.push({ key: 'approval-1', title: 'Persetujuan Direktur', role: ROLE_LABELS[DIREKTUR_ROLE], planned: null, state: 'pending', actor: null, at: null, note: 'aturan approval ditetapkan saat diajukan' })
-    // ADR 0025: the default rules end with the Owner level
+    // ADR 0026: the default rules end with the Owner level
     steps.push({ key: 'approval-2', title: 'Persetujuan Owner', role: ROLE_LABELS[OWNER_ROLE], planned: null, state: 'pending', actor: null, at: null, note: null })
   }
   for (const s of snap?.skipped ?? []) {

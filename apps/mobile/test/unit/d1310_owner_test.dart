@@ -7,7 +7,7 @@ import 'package:proyekkas/features/expense/domain/turn_timeline.dart';
 
 import '../support/fixtures.dart';
 
-/// ADR 0025 (owner decision 2026-10-13): the Owner (`pk-principal`) one approval level above the Direktur — same
+/// ADR 0026 (owner decision 2026-10-13): the Owner (`pk-principal`) one approval level above the Direktur — same
 /// stepper / labels as the web (`apps/web/src/domain/expense/approval-timeline.ts`). Fictional names only.
 Map<String, dynamic> _step(int level, String role) => {'level': level, 'approverRole': role, 'approverUserId': null};
 
@@ -39,7 +39,12 @@ void main() {
       expect(Role.fromCode('pk-principal'), Role.principal);
       expect(Role.principal.label, 'Owner');
       expect(Role.owner.label, 'Direktur');
-      final c = companyMembershipFromJson({'id': 1, 'code': 'DRMS', 'name': 'PT DRMS', 'roles': ['pk-principal']});
+      final c = companyMembershipFromJson({
+        'id': 1,
+        'code': 'DRMS',
+        'name': 'PT DRMS',
+        'roles': ['pk-principal'],
+      });
       expect(c.roles, {Role.principal, Role.owner});
       expect(c.roleLabels, 'Owner');
       expect(c.canCreateRequests, isTrue);
@@ -48,7 +53,11 @@ void main() {
     });
 
     test('home + inbox of the Owner = the Direktur ones', () {
-      final p = userProfileFromJson({'id': 5, 'email': 'owner@example.test', 'roles': ['pk-owner', 'pk-principal']});
+      final p = userProfileFromJson({
+        'id': 5,
+        'email': 'owner@example.test',
+        'roles': ['pk-owner', 'pk-principal'],
+      });
       expect(p.homeKind, HomeKind.direktur);
       expect(p.hasApprovalInbox, isTrue);
       expect(p.roleLabels, 'Owner');

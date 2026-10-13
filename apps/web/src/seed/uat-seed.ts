@@ -11,7 +11,7 @@ import { withSystemTransaction } from '@/lib/system-tx'
  *
  * Input `UAT_USERS` = JSON array of { email, name, role, keycloakSub } — EXISTING Keycloak users
  * (one Staff, one PM, up to two Finance and two Direktur = `pk-owner`, ADR 0013; optionally one Owner =
- * `pk-principal`, ADR 0025 — the last approval level of the default rule)
+ * `pk-principal`, ADR 0026 — the last approval level of the default rule)
  * (created by infra); nothing is written to Keycloak (context `skipKeycloakSync`). Every step is
  * idempotent (natural keys) and never overwrites data it did not create, except:
  * - an existing user (same keycloakSub) gets its missing UAT role added to its company #1 membership and,

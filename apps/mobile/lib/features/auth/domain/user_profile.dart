@@ -10,7 +10,7 @@ enum Role {
   finance('pk-finance'),
   owner('pk-owner'),
 
-  /// ADR 0025 (owner decision 2026-10-13): "Owner", the approval level above the Direktur (key `pk-principal`;
+  /// ADR 0026 (owner decision 2026-10-13): "Owner", the approval level above the Direktur (key `pk-principal`;
   /// `owner` above stays the Direktur). Same view and permissions as the Direktur — see [effective].
   principal('pk-principal'),
   admin('pk-admin'),
@@ -39,7 +39,7 @@ enum Role {
     return null;
   }
 
-  /// ADR 0025: roles + the roles they imply — an Owner ([principal]) has every Direktur ([owner]) view and permission
+  /// ADR 0026: roles + the roles they imply — an Owner ([principal]) has every Direktur ([owner]) view and permission
   /// (the server lists both in `/me`; older caches may hold only `pk-principal`). Deciding stays the server's.
   static Set<Role> effective(Iterable<Role> roles) => {...roles, if (roles.contains(principal)) owner};
 
@@ -292,7 +292,7 @@ abstract class UserProfile with _$UserProfile {
     return local.isEmpty ? 'Pengguna' : local;
   }
 
-  /// Direktur first, then Finance (both: approval inbox + KPI home), PM (team monitor), Staff. ADR 0025: the Owner gets
+  /// Direktur first, then Finance (both: approval inbox + KPI home), PM (team monitor), Staff. ADR 0026: the Owner gets
   /// the Direktur home (his roles carry `pk-owner`, [Role.effective]).
   HomeKind get homeKind {
     if (has(Role.owner)) return HomeKind.direktur;

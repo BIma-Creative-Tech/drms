@@ -81,7 +81,7 @@ async function activeOnly(req: PayloadRequest, userIds: Iterable<number>): Promi
 
 /** Active holders of `role` IN `companyId` (ADR 0016 §5/§7: recipients of the subject's PT only). */
 async function roleHolders(req: PayloadRequest, role: string, companyId: number): Promise<number[]> {
-  // ADR 0025: an FYI reminder addressed to the Direktur reaches the Owner too (same view as the Direktur);
+  // ADR 0026: an FYI reminder addressed to the Direktur reaches the Owner too (same view as the Direktur);
   // decision requests of an approval step never come from here (they use the step's exact role)
   const roles = role === 'pk-owner' ? ['pk-owner', 'pk-principal'] : [role]
   const r = await q<{ id: number }>(

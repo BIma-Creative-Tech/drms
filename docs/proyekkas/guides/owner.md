@@ -1,6 +1,6 @@
 # Panduan Owner
 
-Peran **Owner** (sejak 13 Okt 2026, keputusan owner, ADR 0025) adalah satu tingkat **di atas Direktur**. Owner
+Peran **Owner** (sejak 13 Okt 2026, keputusan owner, ADR 0026) adalah satu tingkat **di atas Direktur**. Owner
 **melihat dan boleh melakukan semua yang boleh Direktur** (dashboard Direktur, daftar pengajuan, kas, laporan, project,
 tutup buku) di setiap PT tempat Anda diberi peran Owner. Yang berbeda hanya **alur persetujuan pengajuan biaya**: Anda
 memberi **persetujuan terakhir** sebelum Finance mentransfer. Baca juga [Panduan Direktur](direktur.md) (semua menu

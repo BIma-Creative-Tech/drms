@@ -20,7 +20,7 @@ import { DIREKTUR_RULE } from '@/migrations/20261013_300000_d1010_approval_confi
 
 /**
  * ADR 0024 (owner decision 2026-10-11): configurable approval rules ("Peran pemohon", zero-step rule) and the
- * audited no-approval exception — pure parts. ADR 0025 (owner 2026-10-13): the zero-step rule is the OWNER's
+ * audited no-approval exception — pure parts. ADR 0026 (owner 2026-10-13): the zero-step rule is the OWNER's
  * (`pk-principal`); "Pengajuan Direktur" has the Owner level. Legacy `direktur_no_approval` snapshots keep their texts.
  */
 const rule = (over: Partial<RuleInput> = {}): RuleInput => ({
@@ -45,13 +45,13 @@ const facts = (requesterRoles?: Role[][], over: Partial<RequestFacts> = {}): Req
 const noRoles = () => undefined
 
 describe('zero-step rule guardrail (validation; the DB trigger approval_rules_zero_step says the same)', () => {
-  it('allowed only for Peran pemohon = exactly Owner (ADR 0025), expense requests, no "Diketahui"', () => {
+  it('allowed only for Peran pemohon = exactly Owner (ADR 0026), expense requests, no "Diketahui"', () => {
     expect(zeroStepRuleError(ownerRule())).toBeNull()
     expect(ruleDecisionError(ownerRule(), noRoles)).toBeNull()
     expect(ruleDecisionError(direkturRule(), noRoles)).toBeNull() // the Direktur rule with its Owner level
   })
   it.each([
-    ['Direktur (ADR 0024 shape, refused since ADR 0025)', ownerRule({ requesterRoles: ['pk-owner'] }), /hanya boleh untuk Peran pemohon = Owner/],
+    ['Direktur (ADR 0024 shape, refused since ADR 0026)', ownerRule({ requesterRoles: ['pk-owner'] }), /hanya boleh untuk Peran pemohon = Owner/],
     ['no requester role (= everybody)', ownerRule({ requesterRoles: [] }), /hanya boleh untuk Peran pemohon = Owner/],
     ['Staff', ownerRule({ requesterRoles: ['pk-staff'] }), /hanya boleh untuk Peran pemohon = Owner/],
     ['PM', ownerRule({ requesterRoles: ['pk-pm'] }), /hanya boleh untuk Peran pemohon = Owner/],
@@ -61,9 +61,9 @@ describe('zero-step rule guardrail (validation; the DB trigger approval_rules_ze
   ])('refused: %s', (_n, r, msg) => {
     expect(ruleDecisionError(r, noRoles)).toMatch(msg)
   })
-  it('Addendum RAB: never zero steps, never a requester role, never an Owner position (ADR 0025)', () => {
+  it('Addendum RAB: never zero steps, never a requester role, never an Owner position (ADR 0026)', () => {
     expect(zeroStepRuleError(ownerRule(), 'budget_addendum')).toMatch(/Addendum RAB harus punya minimal 1 level/)
-    expect(ruleDecisionError(rule({ acknowledgeBy: 'role', acknowledgeRole: 'pk-owner', steps: [{ level: 1, approverRole: 'pk-principal' }] }), noRoles, 'budget_addendum')).toMatch(/hanya untuk aturan Pengajuan biaya \(ADR 0025\)/)
+    expect(ruleDecisionError(rule({ acknowledgeBy: 'role', acknowledgeRole: 'pk-owner', steps: [{ level: 1, approverRole: 'pk-principal' }] }), noRoles, 'budget_addendum')).toMatch(/hanya untuk aturan Pengajuan biaya \(ADR 0026\)/)
     expect(ruleDecisionError(rule({ acknowledgeBy: 'role', acknowledgeRole: 'pk-owner', steps: [{ level: 1, approverRole: 'pk-finance' }], requesterRoles: ['pk-pm'] }), noRoles, 'budget_addendum')).toMatch(/Peran pemohon hanya untuk aturan Pengajuan biaya/)
   })
   it('stepsError accepts zero steps only when asked; buildSnapshot only for the Owner rule', () => {
@@ -199,7 +199,7 @@ describe('notifications of a request without approval', () => {
 })
 
 describe('Aturan approval editor: explanation + preview', () => {
-  it('Owner zero-step rule → "Contoh: pengajuan oleh Owner → langsung ke Finance"; a Direktur one is refused (ADR 0025)', () => {
+  it('Owner zero-step rule → "Contoh: pengajuan oleh Owner → langsung ke Finance"; a Direktur one is refused (ADR 0026)', () => {
     const p = rulePreview({ docType: 'expense_request', requesterRoles: ['pk-principal'], acknowledge: 'none', acknowledgeBy: 'role', acknowledgeRole: null, hasAcknowledgeUser: false, steps: [] })
     expect(p.example).toBe('Contoh: pengajuan oleh Owner → langsung ke Finance (Tanpa persetujuan — langsung ke antrian transfer Finance).')
     expect(p).toMatchObject({ noApproval: true, error: null })

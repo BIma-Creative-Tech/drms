@@ -83,12 +83,12 @@ const NO_APPROVAL_TEAM_DEFAULT = {
 }
 
 /**
- * ADR 0025: the waiting position is the Owner's (the level above the Direktur; recipients = the holders of the STORED
+ * ADR 0026: the waiting position is the Owner's (the level above the Direktur; recipients = the holders of the STORED
  * Owner role, `membersWithRole`) — named as such like the PM's.
  */
 const OWNER_STEP_DEFAULT = { title: 'Persetujuan Owner: {docNo}', body: '{docNo} menunggu persetujuan Anda sebagai Owner: {type} "{title}" {amount}.' }
 
-/** ADR 0025: the Owner's own request without approval reaches Finance (team PM informed, like ADR 0024). */
+/** ADR 0026: the Owner's own request without approval reaches Finance (team PM informed, like ADR 0024). */
 const PRINCIPAL_NO_APPROVAL_TEAM_DEFAULT = {
   title: 'Pengajuan Owner: {docNo}',
   body: '{type} "{title}" {amount} di project Anda diajukan oleh Owner — tanpa persetujuan (kebijakan PT), langsung ke antrian Finance.',

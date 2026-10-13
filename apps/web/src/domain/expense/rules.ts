@@ -34,7 +34,7 @@ export type RuleInput = {
   /**
    * ADR 0024 "Peran pemohon": the rule applies only when EVERY requester holds one of these roles in the
    * request's PT (empty / absent = any requester; STORED roles — an Owner is not a "Direktur" requester).
-   * A zero-step rule requires exactly ['pk-principal'] (ADR 0025; was ['pk-owner'] under ADR 0024).
+   * A zero-step rule requires exactly ['pk-principal'] (ADR 0026; was ['pk-owner'] under ADR 0024).
    */
   requesterRoles?: readonly Role[] | null
 }
@@ -162,7 +162,7 @@ export function stepsError(steps: RuleInput['steps'], opts: { allowEmpty?: boole
 export type AckDelegation = { to: AckDelegate; userIds: number[]; reason: string; originalUserId: number | null }
 
 export function buildSnapshot(r: RuleInput, acknowledgerUserId: number | null, delegation?: AckDelegation | null): ApprovalSnapshot {
-  // ADR 0024 / 0025: a zero-step rule is valid only as the Owner's no-approval rule (requester role = Owner only)
+  // ADR 0024 / 0026: a zero-step rule is valid only as the Owner's no-approval rule (requester role = Owner only)
   const zero = r.steps.length === 0 && r.acknowledge === 'none' && [...new Set(r.requesterRoles ?? [])].length === 1 && r.requesterRoles![0] === 'pk-principal'
   const err = stepsError(r.steps, { allowEmpty: zero })
   if (err) throw new Error(err)
@@ -248,7 +248,7 @@ export function resolveAckDelegation(input: {
 }
 
 /**
- * The deciding caller. ADR 0025: `roles` are the caller's STORED roles in the document's PT (`exactRolesIn`) —
+ * The deciding caller. ADR 0026: `roles` are the caller's STORED roles in the document's PT (`exactRolesIn`) —
  * never the effective roles: the Owner's implied Direktur access must not match a Direktur step (and vice versa).
  */
 export type Caller = { id: number; roles: readonly Role[] }

@@ -30,7 +30,7 @@ import { ackStepLabel, approvalStepLabel } from './timeline'
 
 /** ADR 0024: status text of a shortfall that needed no approval (a Direktur's own request, legacy). */
 export const SHORTFALL_NO_APPROVAL_LABEL = 'Kekurangan tanpa persetujuan — pengajuan Direktur (kebijakan PT)'
-/** ADR 0025: the same for the Owner's own request. */
+/** ADR 0026: the same for the Owner's own request. */
 export const SHORTFALL_PRINCIPAL_NO_APPROVAL_LABEL = 'Kekurangan tanpa persetujuan — pengajuan Owner (kebijakan PT)'
 
 export type ShortfallDecisionRow = {
@@ -62,7 +62,7 @@ export async function shortfallDecisions(req: PayloadRequest, settlementId: numb
 async function ctxOf(req: PayloadRequest, raw: RequestDoc, s: SettlementDoc, rows?: ShortfallDecisionRow[]): Promise<ShortfallCtx & { roles: readonly Role[] }> {
   const uid = userId(req) ?? -1
   const company = relId((raw as { company?: unknown }).company)
-  // ADR 0025: STORED roles decide (the Owner never decides a Direktur step; the same roles as the expense rule)
+  // ADR 0026: STORED roles decide (the Owner never decides a Direktur step; the same roles as the expense rule)
   const roles = company !== undefined ? exactRolesIn(req, company) : exactRolesOf(req.user)
   const involved = await involvedUserIds(req, raw)
   const cycle = s.shortfallApprovalCycle ?? 0
@@ -267,9 +267,9 @@ async function requireDecision(req: PayloadRequest, raw: RequestDoc, s: Settleme
     writeAuditDetached(req, [{ action: 'access_denied', docType: 'settlement', docId: String(s.id), docNo: s.docNo ?? undefined, field: `shortfall_${action}`, newValue: { action, status: ctx.status, roles: ctx.roles }, reason }])
   // E9 rule: authorization (403) before state (409)
   // ADR 0021: Direktur / Finance, or the PM project acknowledger of THIS shortfall approval
-  // ADR 0025: the decision roles of the expense rule (Direktur, Owner, Finance — DECISION_ROLES), stored roles only
+  // ADR 0026: the decision roles of the expense rule (Direktur, Owner, Finance — DECISION_ROLES), stored roles only
   if (ctx.lacksDecisionRole || (!ctx.isAcknowledger && !ctx.roles.some(isDecisionRole))) {
-    await audit('hanya PM project pengajuan ini, Direktur, Owner atau Finance yang memutuskan kekurangan LPJ (ADR 0013/0019/0021/0025)')
+    await audit('hanya PM project pengajuan ini, Direktur, Owner atau Finance yang memutuskan kekurangan LPJ (ADR 0013/0019/0021/0026)')
     fail(403, 'Hanya PM project dari pengajuan ini, Direktur, Owner atau Finance yang dapat menyetujui atau menolak kekurangan LPJ.')
   }
   if (ctx.selfInvolved) {
@@ -389,7 +389,7 @@ export async function shortfallSummary(req: PayloadRequest, raw: RequestDoc, s: 
     aboveTolerance: sf.aboveTolerance,
     settleAllowed: s.status === 'verified' ? sf.allowed : null,
     status,
-    // ADR 0024 / 0025: the shortfall of a Direktur's (legacy) / the Owner's own request without approval
+    // ADR 0024 / 0026: the shortfall of a Direktur's (legacy) / the Owner's own request without approval
     statusLabel:
       status === 'approved' && noApproval
         ? snapOf?.selfApproval === 'principal_no_approval'

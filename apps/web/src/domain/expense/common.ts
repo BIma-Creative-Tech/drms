@@ -155,7 +155,7 @@ export async function actorContext(req: PayloadRequest, doc: RequestDoc): Promis
   // THE DOCUMENT's PT (Finance in PT A is nobody in PT B), and "requester" = the caller's employee there.
   const company = relId((doc as { company?: unknown }).company)
   const roles = company !== undefined ? rolesIn(req, company) : userRoles(req)
-  // ADR 0025: deciding is matched on the STORED roles (the Owner's implied Direktur access never decides a Direktur step)
+  // ADR 0026: deciding is matched on the STORED roles (the Owner's implied Direktur access never decides a Direktur step)
   const decisionRoles = company !== undefined ? exactRolesIn(req, company) : exactRolesOf(req.user)
   const emp = company !== undefined ? employeeIn(req, company) : relId((req.user as { employee?: unknown } | null)?.employee)
   const cycle = doc.approvalCycle ?? 0

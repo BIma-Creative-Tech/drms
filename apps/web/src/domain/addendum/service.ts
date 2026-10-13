@@ -137,7 +137,7 @@ export async function actorContext(req: PayloadRequest, doc: AddendumDoc, rows?:
   // ADR 0016 §5: decisions are checked against the caller's roles IN THE ADDENDUM's PT (MC2 fix:
   // was the union over the selected PTs → Finance of PT A + PM of PT B could decide a PT B addendum)
   const company = relId((doc as { company?: unknown }).company)
-  // ADR 0025: STORED roles decide — the addendum stays Direktur → Finance, the Owner's implied Direktur access never decides it
+  // ADR 0026: STORED roles decide — the addendum stays Direktur → Finance, the Owner's implied Direktur access never decides it
   const roles = company !== undefined ? exactRolesIn(req, company) : exactRolesOf(req.user)
   const cycle = doc.approvalCycle ?? 0
   const decisions = (rows ?? (cycle > 0 ? await decisionsOf(req, doc.id) : [])).filter((r) => r.cycle === cycle)

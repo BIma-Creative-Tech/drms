@@ -11,7 +11,7 @@ const id = z.number().int().positive()
 /** Same set as `ROLES` (access/roles.ts) — inlined: this module is bundled without Payload. */
 export const OnboardingRole = z
   .enum(['pk-staff', 'pk-pm', 'pk-finance', 'pk-owner', 'pk-principal', 'pk-admin', 'pk-operator'])
-  .meta({ id: 'OnboardingRole', description: 'Role in ONE PT (pk-owner = Direktur, pk-principal = Owner (ADR 0025), pk-operator = Operator/Anggota).' })
+  .meta({ id: 'OnboardingRole', description: 'Role in ONE PT (pk-owner = Direktur, pk-principal = Owner (ADR 0026), pk-operator = Operator/Anggota).' })
 
 const optText = (max: number, label: string) => z.string().trim().max(max, `${label} maksimal ${max} karakter.`)
 

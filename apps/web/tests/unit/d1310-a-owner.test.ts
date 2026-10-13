@@ -41,11 +41,11 @@ import { allowedActions, type ActorContext } from '@/domain/expense/state'
 import { approvalStepLabel, decisionByOf, nextActor, OWNER_STEP_LABEL, requestStatusLabel } from '@/domain/expense/timeline'
 import { OWNER_WAITING_LABEL, STATUS_LABELS } from '@/domain/expense/types'
 import { approvalEmail, eventsFor } from '@/domain/notifications'
-import { OWNER_RULE } from '@/migrations/20261013_610200_d1310_owner_role_data'
+import { OWNER_RULE, ownerLevelPosition } from '@/migrations/20261013_630200_d1310_owner_role_data'
 import { DEFAULT_APPROVAL_RULES, OWNER_RULE_NAME } from '@/seed/data'
 
 /**
- * ADR 0025 (owner decision 2026-10-13): "Owner" (`pk-principal`) one approval level ABOVE the Direktur — pure parts:
+ * ADR 0026 (owner decision 2026-10-13): "Owner" (`pk-principal`) one approval level ABOVE the Direktur — pure parts:
  * role + effective/stored roles, rule resolution and the decision guards (exact roles), labels, the stepper with the
  * Owner level, the Owner's own request (zero-step), notifications wording. Fictional names only.
  */
@@ -128,7 +128,7 @@ describe('rule resolution + decision guards (exact roles)', () => {
     expect(ruleDecisionError(pmDirOwner(), () => undefined)).toBeNull()
     expect(ruleDecisionError(direkturRule(), () => undefined)).toBeNull()
     const addendum = pmDirOwner({ acknowledgeBy: 'role', acknowledgeRole: 'pk-owner', steps: [{ level: 1, approverRole: 'pk-principal' }] })
-    expect(ruleDecisionError(addendum, () => undefined, 'budget_addendum')).toMatch(/ADR 0025/)
+    expect(ruleDecisionError(addendum, () => undefined, 'budget_addendum')).toMatch(/ADR 0026/)
     // a named approver must hold a decision role (stored roles)
     expect(ruleDecisionError(pmDirOwner({ steps: [{ level: 1, approverUser: OWN }] }), (id) => (id === OWN ? (['pk-principal'] as Role[]) : undefined))).toBeNull()
   })
@@ -186,6 +186,16 @@ describe('rule resolution + decision guards (exact roles)', () => {
     expect(isNoApproval({ selfApproval: PRINCIPAL_NO_APPROVAL })).toBe(true)
     expect(noApprovalNote({ selfApproval: PRINCIPAL_NO_APPROVAL })).toBe(PRINCIPAL_NO_APPROVAL_NOTE)
     expect(selfApprovalNote(PRINCIPAL_NO_APPROVAL)).toBe('Tanpa persetujuan — pengajuan Owner (kebijakan PT)')
+  })
+  it('data migration placement: Direktur → Owner → Finance (after the last Direktur level, else before Finance, else last)', () => {
+    const lv = (...roles: Array<string | null>) => roles.map((role, i) => ({ level: i + 1, role }))
+    expect(ownerLevelPosition(lv('pk-owner'))).toBe(2) // PM project → Direktur → Owner
+    expect(ownerLevelPosition(lv('pk-finance'))).toBe(1) // ADR 0013: Direktur "Diketahui" → Owner → Finance
+    expect(ownerLevelPosition(lv('pk-finance', 'pk-finance'))).toBe(1)
+    expect(ownerLevelPosition(lv('pk-owner', 'pk-finance'))).toBe(2)
+    expect(ownerLevelPosition(lv('pk-owner', 'pk-owner', 'pk-finance'))).toBe(3)
+    expect(ownerLevelPosition([])).toBe(1) // ADR 0024 zero-step "Pengajuan Direktur"
+    expect(ownerLevelPosition([{ level: 1, role: null, user: 7 }])).toBe(2) // named user only → at the end
   })
   it('seed = data migration: "Pengajuan Owner" + an Owner level on every seeded expense rule; Addendum RAB untouched', () => {
     expect(OWNER_RULE).toBe(OWNER_RULE_NAME)

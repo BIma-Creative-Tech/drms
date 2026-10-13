@@ -47,7 +47,7 @@ List<TimelineStep> buildTimeline(ExpenseDetail d) {
   final submitted = d.status != RequestStatus.draft;
   final pmFlow = d.approvalRule?.pmApproval ?? false;
   // ADR 0024: a Direktur's own request without approval reads like the web: Diajukan → Persetujuan (dilewati,
-  // "Tanpa persetujuan — pengajuan Direktur (kebijakan PT)") → Transfer Finance. ADR 0025: the Owner's own request.
+  // "Tanpa persetujuan — pengajuan Direktur (kebijakan PT)") → Transfer Finance. ADR 0026: the Owner's own request.
   final noApproval = d.approvalRule?.noApproval ?? false;
   final approvalFlow = d.approvalRule?.decisionFlow ?? false;
 
@@ -292,10 +292,10 @@ const skippedNote = '(tidak berlaku — pemohon)';
 const noApprovalStepTitle = 'Persetujuan';
 const noApprovalNote = 'Tanpa persetujuan — pengajuan Direktur (kebijakan PT)';
 
-/// ADR 0025: the Owner's own request without approval (web `PRINCIPAL_NO_APPROVAL_NOTE`).
+/// ADR 0026: the Owner's own request without approval (web `PRINCIPAL_NO_APPROVAL_NOTE`).
 const ownerNoApprovalNote = 'Tanpa persetujuan — pengajuan Owner (kebijakan PT)';
 
-/// ADR 0025 (owner decision 2026-10-13): the approval level above the Direktur — role code and step title (web
+/// ADR 0026 (owner decision 2026-10-13): the approval level above the Direktur — role code and step title (web
 /// `OWNER_STEP_LABEL`).
 const ownerRoleCode = 'pk-principal';
 const ownerStepTitle = 'Persetujuan Owner';
@@ -312,7 +312,7 @@ String acknowledgeTitle(ApprovalRuleInfo? rule) {
 }
 
 /// Approval position title: Finance since ADR 0013; pre-E1 snapshots name the role of the level;
-/// ADR 0021 (PM project → Direktur): the Direktur level is "Persetujuan Direktur"; ADR 0025: the Owner level is
+/// ADR 0021 (PM project → Direktur): the Direktur level is "Persetujuan Direktur"; ADR 0026: the Owner level is
 /// "Persetujuan Owner". A role that holds a single level is named without "(level n)" (web approval-timeline.ts).
 String approvalTitle(ApprovalRuleInfo? rule, int level, {required bool multi}) {
   final base = multi ? 'Approval level $level' : 'Approval';

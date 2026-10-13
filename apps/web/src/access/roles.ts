@@ -13,7 +13,7 @@ export const ROLES = ['pk-staff', 'pk-pm', 'pk-finance', 'pk-owner', 'pk-princip
 export type Role = (typeof ROLES)[number]
 
 /**
- * ADR 0025 (owner decision 2026-10-13): the "Owner" approval level ABOVE the Direktur. Internal key
+ * ADR 0026 (owner decision 2026-10-13): the "Owner" approval level ABOVE the Direktur. Internal key
  * `pk-principal` (NOT "owner": `pk-owner` has been the Direktur since ADR 0013, also in `/dashboard/owner` and
  * the APK `Role.owner`). The Owner sees and may do everything the Direktur may (ROLE_IMPLIES); only the
  * approval flow differs: Staff → PM → Direktur → Owner → Finance transfer queue.
@@ -21,7 +21,7 @@ export type Role = (typeof ROLES)[number]
 export const PRINCIPAL_ROLE = 'pk-principal' as const satisfies Role
 
 /**
- * ADR 0025: roles that carry the ACCESS of other roles. A membership holding `pk-principal` (Owner) acts as
+ * ADR 0026: roles that carry the ACCESS of other roles. A membership holding `pk-principal` (Owner) acts as
  * `pk-owner` (Direktur) for every access / visibility check (`rolesIn`, `hasRole`, `byRole`, dashboards, …).
  * The approval engine never uses this expansion: step matching, step holders, notifications of a step and the
  * distinct-person rule read the EXACT stored roles (`exactRolesIn`, `membersWithRole`), so the Owner never
@@ -29,7 +29,7 @@ export const PRINCIPAL_ROLE = 'pk-principal' as const satisfies Role
  */
 export const ROLE_IMPLIES: Readonly<Partial<Record<Role, readonly Role[]>>> = { 'pk-principal': ['pk-owner'] }
 
-/** Stored roles (their order kept) + the roles they imply appended (ADR 0025), no duplicates. */
+/** Stored roles (their order kept) + the roles they imply appended (ADR 0026), no duplicates. */
 export function effectiveRoles(exact: readonly Role[]): Role[] {
   const out = [...new Set(exact)]
   for (const r of exact) for (const x of ROLE_IMPLIES[r] ?? []) if (!out.includes(x)) out.push(x)
@@ -41,7 +41,7 @@ export const LOGIN_ROLE = 'pk-user'
 
 /**
  * Display labels. ADR 0013 / GATE 1 G1-1 (user 2026-09-26): the role `pk-owner` is shown as
- * "Direktur" (the role id stays `pk-owner`). ADR 0025: `pk-principal` is shown as "Owner".
+ * "Direktur" (the role id stays `pk-owner`). ADR 0026: `pk-principal` is shown as "Owner".
  */
 export const ROLE_LABELS: Record<Role, string> = {
   'pk-staff': 'Staff lapangan',
@@ -66,7 +66,7 @@ export const PANEL_ROLES: readonly Role[] = ['pk-admin', 'pk-finance', 'pk-owner
 
 /**
  * One active membership of the user in an active PT. `roles` = EFFECTIVE roles (stored roles + ROLE_IMPLIES,
- * ADR 0025) — what every access check reads; `exactRoles` = the roles as stored (approval engine). Built by
+ * ADR 0026) — what every access check reads; `exactRoles` = the roles as stored (approval engine). Built by
  * `withCompanyContext` (a membership without `exactRoles` is taken as stored).
  */
 export type Membership = { company: number; roles: Role[]; exactRoles?: Role[]; employee: number | null }
@@ -99,7 +99,7 @@ export function companyContextOf(user: unknown): CompanyContext | null {
  * MC2: `employee` is ambiguous with >1 selected PT — callers must use `employeeIn(req, company)`.
  */
 export function withCompanyContext<T extends object>(user: T, stored: Membership[], selection: number[] | null, groupAdmin: boolean): T & { roles: Role[]; employee: number | null } {
-  // ADR 0025: effective roles for access, stored roles kept for the approval engine (idempotent on a context's own memberships)
+  // ADR 0026: effective roles for access, stored roles kept for the approval engine (idempotent on a context's own memberships)
   const memberships = stored.map((m) => {
     const exactRoles = [...(m.exactRoles ?? m.roles)]
     return { ...m, exactRoles, roles: effectiveRoles(exactRoles) }
@@ -133,7 +133,7 @@ export function userRoles(req: ReqLike): Role[] {
 }
 
 /**
- * ADR 0025: STORED roles of the caller IN ONE PT (no ROLE_IMPLIES expansion) — the approval engine only
+ * ADR 0026: STORED roles of the caller IN ONE PT (no ROLE_IMPLIES expansion) — the approval engine only
  * (step matching, decision roles): the Owner is not a Direktur there and vice versa. Everything else uses `rolesIn`.
  */
 export function exactRolesIn(req: ReqLike, companyId: number | null | undefined): Role[] {
@@ -142,14 +142,14 @@ export function exactRolesIn(req: ReqLike, companyId: number | null | undefined)
   return m ? [...(m.exactRoles ?? m.roles)] : []
 }
 
-/** ADR 0025: stored roles in ANY selected PT (UI labels; plain objects without a context: their `roles`). */
+/** ADR 0026: stored roles in ANY selected PT (UI labels; plain objects without a context: their `roles`). */
 export function exactRolesOf(user: unknown): Role[] {
   const c = companyContextOf(user)
   if (!c) return rolesOf(user)
   return ROLES.filter((r) => membershipsOf(user).some((m) => (m.exactRoles ?? m.roles).includes(r)))
 }
 
-/** ADR 0025: the caller holds `role` AS STORED in the PT (approval positions: Direktur-only loan / addendum decisions). */
+/** ADR 0026: the caller holds `role` AS STORED in the PT (approval positions: Direktur-only loan / addendum decisions). */
 export function hasExactRole(req: ReqLike, role: Role | readonly Role[], companyId: number | null | undefined): boolean {
   const want: readonly Role[] = typeof role === 'string' ? [role] : role
   return exactRolesIn(req, companyId).some((r) => want.includes(r))

@@ -1,6 +1,6 @@
 /**
  * ADR 0024 (owner decision 2026-10-11): explanation + preview of one `approval-rules` row for the Admin
- * form ("Contoh: pengajuan oleh Owner → langsung ke Finance" — ADR 0025: the zero-step rule is the Owner's). Pure module (unit-tested) — the rule
+ * form ("Contoh: pengajuan oleh Owner → langsung ke Finance" — ADR 0026: the zero-step rule is the Owner's). Pure module (unit-tested) — the rule
  * hook (`ruleDecisionError` / `zeroStepRuleError`) and the DB trigger stay authoritative.
  */
 import { ROLE_LABELS, isRole, type Role } from '@/access/roles'

@@ -438,7 +438,7 @@ export async function pendingApprovals(req: PayloadRequest, scope: ReportScope) 
  * now, from the request's snapshot — ADR 0021: "pm" (pending_ack, PM project → Direktur rule) then
  * "direktur" (the Direktur level); ADR 0013 snapshots: "direktur" (pending_ack, Diketahui = Direktur
  * approval) then "finance" (an approval level of another role). Legacy snapshots follow the same rule.
- * ADR 0025: "owner" = the Owner level (`pk-principal`, the level above the Direktur).
+ * ADR 0026: "owner" = the Owner level (`pk-principal`, the level above the Direktur).
  */
 export type TeamWaitingItem = { id: number; companyId: number; docNo: string | null; title: string; type: RequestType; status: RequestStatus; waitingFor: 'pm' | 'direktur' | 'owner' | 'finance'; scopeName: string; requesters: string; grandTotal: number; submittedDate: string | null; days: number | null }
 
@@ -649,9 +649,9 @@ export type RequestRow = {
   refund: number
   realized: number
   openFlags: number
-  /** ADR 0024: a Direktur's own request without approval (`g1_exception = direktur_no_approval`); ADR 0025: or the Owner's (`principal_no_approval`). */
+  /** ADR 0024: a Direktur's own request without approval (`g1_exception = direktur_no_approval`); ADR 0026: or the Owner's (`principal_no_approval`). */
   noApproval: boolean
-  /** ADR 0025: the G1 exception value (picks the "pengajuan Direktur / Owner" wording). */
+  /** ADR 0026: the G1 exception value (picks the "pengajuan Direktur / Owner" wording). */
   g1Exception: string | null
 }
 

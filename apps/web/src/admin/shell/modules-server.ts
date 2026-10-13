@@ -17,7 +17,7 @@ import { normalizeSelection, type SwitcherState } from './company-switcher'
 
 type I18nLike = Parameters<typeof getTranslation>[1]
 
-/** Moved from F2NavLinks (US-19 "badge jumlah antrian"): Direktur/Finance only (ADR 0025: the Owner too — effective
+/** Moved from F2NavLinks (US-19 "badge jumlah antrian"): Direktur/Finance only (ADR 0026: the Owner too — effective
  * roles carry pk-owner). S3e (S-07): the transfer badge counts exactly the transfer queue of the page title (TRANSFER_QUEUE_WHERE). */
 export async function loadBadges(payload: Pick<Payload, 'count'>, user: TypedUser): Promise<Partial<Record<BadgeKey, number>>> {
   const roles = rolesOf(user)
@@ -67,7 +67,7 @@ export function navUser(user: TypedUser, displayName?: string): NavUser {
     name,
     email: u.email ?? '',
     roles,
-    // ADR 0025: labels of the STORED roles ("Owner", not "Direktur · Owner" — the Direktur access is implied)
+    // ADR 0026: labels of the STORED roles ("Owner", not "Direktur · Owner" — the Direktur access is implied)
     roleLabel: exactRolesOf(user).map((r) => ROLE_LABELS[r]).join(' · ') || 'Tanpa peran',
     staffOnly: isStaffOnly(user),
     operatorOnly: isOperatorOnly(user),

@@ -38,7 +38,7 @@ import { buildSnapshot, selectRule, type ApprovalSnapshot, type RuleInput } from
  * ("Peran pemohon", matched per requester in the PT) and a Direktur's own request under a zero-step rule
  * is `direktur_no_approval` (no decision position). Snapshots taken earlier keep working unchanged at
  * decision time; a request that already carries an ADR 0021 exception (`legacy`) keeps that flow on
- * re-approval / LPJ shortfall (zero-step rules are not considered for it). ADR 0025 (owner 2026-10-13): the
+ * re-approval / LPJ shortfall (zero-step rules are not considered for it). ADR 0026 (owner 2026-10-13): the
  * zero-step rule is the Owner's ("Pengajuan Owner", `principal_no_approval`); a Direktur's own request goes
  * through the Owner level; an Owner level is never skipped silently (409 MSG_OWNER_STEP_SKIPPED). Requests
  * submitted before keep their snapshot (and so their flow) — this module only runs at submit / re-approval.
@@ -109,20 +109,20 @@ export const MSG_PROJECT_WITHOUT_PM = 'Project ini belum punya PM. Hubungi Admin
 export const MSG_COST_CENTER_WITHOUT_MANAGER = 'Pusat biaya ini belum punya manajer (penanggung jawab). Hubungi Admin untuk mengisi manajer pusat biaya.'
 export const MSG_PM_NOT_MEMBER = 'PM project bukan pengguna aktif di PT ini. Hubungi Admin untuk memperbarui PM project.'
 /**
- * ADR 0024: under the PM project → Direktur model the Direktur's approval is never skipped silently. ADR 0025: a
+ * ADR 0024: under the PM project → Direktur model the Direktur's approval is never skipped silently. ADR 0026: a
  * Direktur's own request follows the rule "Pengajuan Direktur" (approved by the Owner, then the Finance transfer
  * queue). Replaces the ADR 0021 text "Pengajuan untuk Direktur dibuat oleh PM project …" for new submissions.
  */
 export const MSG_DIREKTUR_STEP_SKIPPED =
   'Persetujuan Direktur tidak boleh terlewati: pemohon/pembuat adalah satu-satunya Direktur PT. Pengajuan Direktur memakai aturan "Pengajuan Direktur" (disetujui Owner, lalu antrian transfer Finance — kebijakan PT 2026-10-13). Hubungi Admin bila aturan itu belum ada.'
 /**
- * ADR 0025: the Owner level is never skipped silently — only the Owner's OWN request goes straight to Finance, under
+ * ADR 0026: the Owner level is never skipped silently — only the Owner's OWN request goes straight to Finance, under
  * the zero-step rule "Pengajuan Owner". Raised when the only Owner of the PT is requester / creator of a request
  * whose rule has an Owner level (e.g. the Owner files for someone else, or the rule "Pengajuan Owner" is missing).
  */
 export const MSG_OWNER_STEP_SKIPPED =
   'Persetujuan Owner tidak boleh terlewati: pemohon/pembuat adalah satu-satunya Owner PT. Pengajuan Owner sendiri dibuat dan dikirim oleh Owner dengan aturan "Pengajuan Owner" (langsung ke antrian transfer Finance, kebijakan PT 2026-10-13). Hubungi Admin bila aturan itu belum ada.'
-/** ADR 0024 / 0025: the no-approval path only for the Owner's OWN request (creator = the Owner requester). */
+/** ADR 0024 / 0026: the no-approval path only for the Owner's OWN request (creator = the Owner requester). */
 export const MSG_OWNER_OWN_REQUEST =
   'Pengajuan Owner tanpa persetujuan (langsung ke antrian transfer Finance) harus dibuat dan dikirim sendiri oleh Owner pemohon (kebijakan PT 2026-10-13). Pengguna lain tidak mengajukan atas nama Owner.'
 
@@ -182,7 +182,7 @@ export async function snapshotForRule(req: PayloadRequest, rule: RuleInput, excl
   const stepHolders: number[][] = []
   for (const s of [...rule.steps].sort((a, b) => a.level - b.level)) stepHolders.push(await holders(s.approverUser ? null : s.approverRole, s.approverUser))
 
-  // ADR 0024 / 0025: zero-step rule (requester role = Owner only, validated by ruleDecisionError above) → the
+  // ADR 0024 / 0026: zero-step rule (requester role = Owner only, validated by ruleDecisionError above) → the
   // Owner's OWN request without any decision position: every requester holds Owner in the PT (stored role) and
   // the creator is one of them. Anyone filing for the Owner → 409.
   if (rule.steps.length === 0) {
@@ -222,7 +222,7 @@ export async function snapshotForRule(req: PayloadRequest, rule: RuleInput, excl
   const { plan } = planned
   // ADR 0021 / 0024: under the PM project → Direktur model the Direktur's approval is never skipped silently.
   if (scopeManager && plan.skipped.some((x) => x.position === 'approval' && x.role === DIREKTUR_ROLE)) fail(409, MSG_DIREKTUR_STEP_SKIPPED)
-  // ADR 0025: the Owner level (approval or "Diketahui" by role) is never skipped silently — whatever the rule shape.
+  // ADR 0026: the Owner level (approval or "Diketahui" by role) is never skipped silently — whatever the rule shape.
   if (plan.skipped.some((x) => x.role === OWNER_ROLE)) fail(409, MSG_OWNER_STEP_SKIPPED)
   const optionalAckUser =
     rule.acknowledge === 'optional' && rule.acknowledgeBy === 'user' && rule.acknowledgeUser && !excluded.has(rule.acknowledgeUser) ? rule.acknowledgeUser : null
@@ -231,7 +231,7 @@ export async function snapshotForRule(req: PayloadRequest, rule: RuleInput, excl
     ...base,
     acknowledge: rule.acknowledge === 'required' && !plan.ackRequired ? 'none' : base.acknowledge,
     steps: plan.steps,
-    // ADR 0025: Addendum RAB (no scope) stays Direktur → Finance — the Owner is not a decider there
+    // ADR 0026: Addendum RAB (no scope) stays Direktur → Finance — the Owner is not a decider there
     decisionRoles: scope ? [...DECISION_ROLES] : [...ADDENDUM_DECISION_ROLES],
     skipped: plan.skipped,
     ...(selfApproval ? { selfApproval } : {}),
@@ -249,7 +249,7 @@ export async function requesterUsersAllDirektur(req: PayloadRequest, employeeIds
 
 /**
  * The accounts of the requester employees when EVERY requester has an account and every such account is active and
- * holds `role` AS STORED in the PT (ADR 0025: Owner for the no-approval rule); else null.
+ * holds `role` AS STORED in the PT (ADR 0026: Owner for the no-approval rule); else null.
  */
 export async function requesterUsersAllRole(req: PayloadRequest, employeeIds: readonly number[], companyId: number, role: Role): Promise<Set<number> | null> {
   if (employeeIds.length === 0) return null
@@ -336,7 +336,7 @@ export async function auditSkipped(req: PayloadRequest, doc: RequestDoc, snapsho
 
 /**
  * One `approval_policy_exception` audit row when the snapshot carries a G1 exception — submit /
- * re-approval: ADR 0021 (a Direktur's request filed by the PM project, legacy) or ADR 0024 / 0025
+ * re-approval: ADR 0021 (a Direktur's request filed by the PM project, legacy) or ADR 0024 / 0026
  * (`principal_no_approval`: the Owner's own request straight to the Finance transfer queue).
  */
 export async function auditSelfApproval(req: PayloadRequest, doc: RequestDoc, snapshot: ApprovalSnapshot): Promise<void> {

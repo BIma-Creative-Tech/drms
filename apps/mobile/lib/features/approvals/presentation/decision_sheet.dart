@@ -111,7 +111,7 @@ class _DecisionSheetState extends ConsumerState<DecisionSheet> {
     final level = d.currentLevel ?? 1;
     final direkturStep = pm && rule!.roleOfLevel(level) == 'pk-owner';
     final direkturFinal = direkturStep && level >= rule.lastLevel;
-    // ADR 0025: the Owner level (above the Direktur) — the last decision before the Finance transfer
+    // ADR 0026: the Owner level (above the Direktur) — the last decision before the Finance transfer
     final ownerStep = d.approvalRule?.roleOfLevel(level) == ownerRoleCode;
     final ownerFinal = ownerStep && level >= (d.approvalRule?.lastLevel ?? 0);
     var approveTitle = direkturStep ? t.decisionTitleApproveDirektur : t.decisionTitleApprove;

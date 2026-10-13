@@ -175,7 +175,7 @@ export async function transferQueue(req: PayloadRequest, f?: QueueFilter) {
       bankVerification: verification((d as { bankAccount?: unknown }).bankAccount),
       flags: await flagCounts(req, d.id),
       sla: { approvedAt, slaHours, ageHours: age?.hours ?? null, over: age?.over ?? false },
-      // ADR 0024 / 0025: a Direktur's (legacy) / the Owner's own request that reached the queue without any approval (badge)
+      // ADR 0024 / 0026: a Direktur's (legacy) / the Owner's own request that reached the queue without any approval (badge)
       noApproval: isNoApproval(d.approvalSnapshot),
       noApprovalBy: noApprovalRequesterRole(d.approvalSnapshot) === OWNER_ROLE ? ('owner' as const) : isNoApproval(d.approvalSnapshot) ? ('direktur' as const) : null,
     })

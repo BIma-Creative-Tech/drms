@@ -1,6 +1,6 @@
 # ADR 0024 — Configurable approval rules + Direktur no-approval
 
-> **Amended by [ADR 0025](0025-owner-approval-level-above-direktur.md) (owner, 2026-10-13).** The zero-step rule is now
+> **Amended by [ADR 0026](0026-owner-approval-level-above-direktur.md) (owner, 2026-10-13).** The zero-step rule is now
 > allowed only for requester role = **Owner** (`pk-principal`, rule "Pengajuan Owner", exception
 > `principal_no_approval`); a Direktur's own request ("Pengajuan Direktur") is approved by the Owner. Requests that
 > already carry `direktur_no_approval` keep their state and wording. "Peran pemohon" and everything else stand.

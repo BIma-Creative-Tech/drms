@@ -28,7 +28,7 @@ let dirReq: FlowUser
 let accDir: number
 let teamPm: FlowUser
 let accPm: number
-// ADR 0025: an Owner (pk-principal) with an employee — the level above the Direktur; his own request is the no-approval one
+// ADR 0026: an Owner (pk-principal) with an employee — the level above the Direktur; his own request is the no-approval one
 let ownerEmp: number
 let principal: FlowUser
 let accOwner: number
@@ -256,7 +256,7 @@ describe('6. A Direktur request (ADR 0024 supersedes the ADR 0021 PM-files-for-t
     expect((await sqlError('app', "UPDATE expense_requests SET g1_exception = 'direktur_via_pm' WHERE id = $1", [id]))?.message).toMatch(/g1_exception|locked/)
   })
 
-  it('ADR 0025: a Direktur request created by the Admin goes to the Owner (rule "Pengajuan Direktur": Owner level, no zero-step any more)', async () => {
+  it('ADR 0026: a Direktur request created by the Admin goes to the Owner (rule "Pengajuan Direktur": Owner level, no zero-step any more)', async () => {
     const r = await onlyActive('pk-owner', [dirReq.id], () => submitted(w.users.admin, { requesterIds: [dirEmp], bankAccountId: accDir }))
     expect(r.body).toMatchObject({ status: 'pending_approval', statusLabel: 'Menunggu persetujuan Owner', approvalRule: { name: 'Pengajuan Direktur', selfApproval: null, steps: [{ level: 1, approverRole: 'pk-principal' }] } })
     expect((await api('POST', `${E}/${r.id}/approve`, w.users.owner, {}, key())).status).toBe(403) // a Direktur never takes the Owner level
@@ -356,7 +356,7 @@ describe('9. An old (Direktur → Finance) snapshot finishes on its own rules', 
 
 describe('Admin data', () => {
   it('approval_policy_exception rows are readable in the request audit trail', async () => {
-    // ADR 0024 / 0025: the Owner's own request (no approval, rule "Pengajuan Owner") records the exception
+    // ADR 0024 / 0026: the Owner's own request (no approval, rule "Pengajuan Owner") records the exception
     const own = await submitted(principal, { requesterIds: [ownerEmp], bankAccountId: accOwner })
     expect(own.body).toMatchObject({ status: 'approved', approvalRule: { selfApproval: 'principal_no_approval' } })
     const rows = (await sqlAs('app', "SELECT doc_id FROM audit_logs WHERE action = 'approval_policy_exception' AND doc_type = 'expense_request'")).rows
@@ -393,9 +393,9 @@ describe('migration 20261010_130000_approval_pm_direktur', () => {
       const col = "SELECT count(*)::int AS n FROM information_schema.columns WHERE table_name = 'expense_requests' AND column_name = 'g1_exception'"
       const trg = "SELECT count(*)::int AS n FROM pg_trigger WHERE tgname = 'expense_requests_g1_exception'"
       const fn = "SELECT count(*)::int AS n FROM pg_proc WHERE proname = 'pk_approvals_before_insert' AND prosrc LIKE '%direktur_via_pm%'"
-      // ADR 0024 rows (direktur_no_approval) predate this check in the round trip — cleared in the rolled-back tx
+      // ADR 0024 / 0026 rows (direktur_no_approval, principal_no_approval) predate this check in the round trip — cleared in the rolled-back tx
       await db.execute(sql.raw('ALTER TABLE expense_requests DISABLE TRIGGER USER'))
-      await db.execute(sql.raw("UPDATE expense_requests SET g1_exception = NULL WHERE g1_exception = 'direktur_no_approval'"))
+      await db.execute(sql.raw("UPDATE expense_requests SET g1_exception = NULL WHERE g1_exception IN ('direktur_no_approval', 'principal_no_approval')"))
       await db.execute(sql.raw('ALTER TABLE expense_requests ENABLE TRIGGER USER'))
       await migrationUp({ db } as never)
       expect([await n(col), await n(trg), await n(fn)]).toEqual([1, 1, 1])

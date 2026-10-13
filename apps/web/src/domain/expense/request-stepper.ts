@@ -118,7 +118,7 @@ export function buildRequestStepper(d: StepperInput): RequestStepper {
       steps.push({
         key: 'shortfall',
         title: 'Persetujuan kekurangan',
-        // ADR 0019 / 0025: the deciders of the request's approval rule (PM project → Direktur → Owner; legacy Direktur → Finance)
+        // ADR 0019 / 0026: the deciders of the request's approval rule (PM project → Direktur → Owner; legacy Direktur → Finance)
         role: 'Sesuai aturan approval',
         planned: null,
         state,

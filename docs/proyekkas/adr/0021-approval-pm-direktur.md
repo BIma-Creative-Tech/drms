@@ -6,7 +6,7 @@
 > decision 5 (`direktur_via_pm` / `direktur_via_pm_self`, the PM files for the Direktur) no longer apply to new
 > submissions; requests already submitted under them keep working with their wording. The rest of this ADR stands.
 >
-> **Amended by [ADR 0025](0025-owner-approval-level-above-direktur.md) (owner, 2026-10-13).** The Direktur is no longer
+> **Amended by [ADR 0026](0026-owner-approval-level-above-direktur.md) (owner, 2026-10-13).** The Direktur is no longer
 > the last approver of expense requests: an **Owner** level (`pk-principal`) follows him — Staff → PM project →
 > Direktur → Owner → Finance transfer. Requests submitted before keep their snapshot (Direktur = last level).
 

@@ -25,7 +25,7 @@ type UserShape = {
  * (roles of the selected PTs) and for each PT in `companies[]` (roles IN that PT). Decisions
  * (approval inbox) = Direktur (pk-owner) or Finance; the PM monitors the team list; progress
  * reports are created by the PM (team projects) or the Direktur. ADR 0021: the PM approves its project's
- * requests first, so the approval inbox is offered to the PM too. ADR 0025: `roles` are EFFECTIVE roles — an
+ * requests first, so the approval inbox is offered to the PM too. ADR 0026: `roles` are EFFECTIVE roles — an
  * Owner (`pk-principal`) also holds `pk-owner` here, so every Direktur capability applies to the Owner too.
  * The server guards stay authoritative.
  */
@@ -122,8 +122,8 @@ export const meEndpoint = v1({
         employeeId: m.employee,
         employee: m.employee !== null ? (employees.get(m.employee) ?? null) : null,
         capabilities: capabilitiesOf(roles, { fieldReportsEnabled: c.fieldReportsEnabled === true }),
-        // ADR 0024 / 0025: the caller's own requests in this PT go straight to the Finance transfer queue (APK hint) —
-        // since ADR 0025 only an Owner (STORED role) under the zero-step rule "Pengajuan Owner"
+        // ADR 0024 / 0026: the caller's own requests in this PT go straight to the Finance transfer queue (APK hint) —
+        // since ADR 0026 only an Owner (STORED role) under the zero-step rule "Pengajuan Owner"
         ownRequestNoApproval: (m.exactRoles ?? m.roles).includes('pk-principal') && (await loadActiveRules(req, 'expense_request', m.company)).some(isNoApprovalRule),
         settings: {
           defaultGeofenceRadiusM: c.defaultGeofenceRadiusM,

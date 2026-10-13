@@ -19,7 +19,7 @@ export { MAX_RECEIPT_IMAGES }
 
 
 /** Latest cycle's signature rows per position (US-46: unsigned positions stay empty). */
-/** "Nama (Direktur)" — the actor of an approval level with its role (ADR 0025: several levels in one box). */
+/** "Nama (Direktur)" — the actor of an approval level with its role (ADR 0026: several levels in one box). */
 export function approverWithRole(name: string | null | undefined, role: Role | null): string {
   const n = (name ?? '').trim()
   if (!n) return ''
@@ -93,7 +93,7 @@ export async function buildPdfData(req: PayloadRequest, requestId: number, opts:
     },
     {
       label: 'Approval',
-      // ADR 0025: every approval level is listed; with several levels each name carries its role ("… (Direktur), … (Owner)")
+      // ADR 0026: every approval level is listed; with several levels each name carries its role ("… (Direktur), … (Owner)")
       names: pdfSafe(approvals.map((a) => approverWithRole(a.actorName, approvals.length > 1 ? levelRole(a.level) : null)).filter(Boolean).join(', ')),
       images: approvals.some((a) => a.decision === 'rejected') ? [] : approvalImages,
       time: formatServerTime(approvals.at(-1)?.decidedAt, tz),

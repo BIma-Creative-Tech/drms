@@ -11,9 +11,9 @@ import { companyField, companyHook } from '@/fields/company'
 import { userPicker } from '@/fields/users'
 
 const roleOptions = ROLES.map((r) => ({ label: ROLE_LABELS[r], value: r }))
-/** ADR 0024 "Peran pemohon": Direktur, Owner (ADR 0025), PM, Staff, Finance, Admin (Operator never files expense requests). */
+/** ADR 0024 "Peran pemohon": Direktur, Owner (ADR 0026), PM, Staff, Finance, Admin (Operator never files expense requests). */
 const requesterRoleOptions = REQUESTER_ROLE_OPTIONS.map((r) => ({ label: ROLE_LABELS[r], value: r }))
-/** ADR 0013: only Direktur/Finance (ADR 0025: + Owner) are offered for decision positions (the DB enum keeps every role). */
+/** ADR 0013: only Direktur/Finance (ADR 0026: + Owner) are offered for decision positions (the DB enum keeps every role). */
 const decisionRoleOptions = ({ options }: { options: Option[] }): Option[] => options.filter((o) => isDecisionRole(typeof o === 'string' ? o : o.value))
 
 /**
@@ -26,8 +26,8 @@ const decisionRoleOptions = ({ options }: { options: Option[] }): Option[] => op
  * ADR 0021: an expense-request rule may name the PM project for a required "Diketahui".
  * ADR 0024 (owner 2026-10-11): condition "Peran pemohon" (every requester holds one of the roles in the PT;
  * empty = any) and zero approval levels ("Tanpa persetujuan — langsung ke antrian transfer Finance") ONLY
- * when the requester role is exactly Owner (ADR 0025; was Direktur) — hook (400) + DB trigger `approval_rules_zero_step`.
- * ADR 0025: expense rules end with the Owner level (`pk-principal`); Addendum RAB rules never name the Owner.
+ * when the requester role is exactly Owner (ADR 0026; was Direktur) — hook (400) + DB trigger `approval_rules_zero_step`.
+ * ADR 0026: expense rules end with the Owner level (`pk-principal`); Addendum RAB rules never name the Owner.
  */
 export const ApprovalRules: CollectionConfig = withAudit(
   {
@@ -57,7 +57,7 @@ export const ApprovalRules: CollectionConfig = withAudit(
             if ((data.requestType ?? originalDoc?.requestType ?? 'any') !== 'any') throw new APIError('Aturan Addendum RAB: jenis pengajuan harus "Semua".', 400, null, true)
             if (relId(data.category !== undefined ? data.category : originalDoc?.category)) throw new APIError('Aturan Addendum RAB tidak memakai kategori biaya.', 400, null, true)
           }
-          // ADR 0024 / 0025: zero steps only for "Peran pemohon = Owner" (ruleDecisionError → zeroStepRuleError)
+          // ADR 0024 / 0026: zero steps only for "Peran pemohon = Owner" (ruleDecisionError → zeroStepRuleError)
           const requesterRoles = ((data.requesterRoles !== undefined ? data.requesterRoles : originalDoc?.requesterRoles) ?? []) as Role[]
           const err = stepsError(steps, { allowEmpty: true })
           if (err) throw new APIError(err, 400, null, true)
@@ -154,7 +154,7 @@ export const ApprovalRules: CollectionConfig = withAudit(
           (data as { docType?: string } | undefined)?.docType === 'budget_addendum' ? options.filter((o) => (typeof o === 'string' ? o : o.value) !== 'scope_manager') : options,
       },
       { name: 'acknowledgeRole', type: 'select', label: 'Peran "Diketahui Oleh"', defaultValue: 'pk-owner', options: roleOptions, filterOptions: decisionRoleOptions },
-      // QA-16: decision users of the rule's PT only (ADR 0013: Direktur / Finance; ADR 0025: + Owner), shown by name
+      // QA-16: decision users of the rule's PT only (ADR 0013: Direktur / Finance; ADR 0026: + Owner), shown by name
       { name: 'acknowledgeUser', type: 'relationship', relationTo: 'users', label: 'User "Diketahui Oleh"', ...userPicker({ roles: ['pk-owner', 'pk-principal', 'pk-finance'] }) },
       {
         name: 'signDiajukan',
@@ -187,10 +187,10 @@ export const ApprovalRules: CollectionConfig = withAudit(
         type: 'array',
         label: 'Level approval',
         labels: { singular: 'Level', plural: 'Level' },
-        // ADR 0024 / 0025: 0 rows = "Tanpa persetujuan — langsung ke antrian transfer Finance" (Peran pemohon = Owner only)
+        // ADR 0024 / 0026: 0 rows = "Tanpa persetujuan — langsung ke antrian transfer Finance" (Peran pemohon = Owner only)
         admin: {
           description:
-            'Urutan pengajuan biaya: Direktur lalu Owner (level terakhir, ADR 0025). Kosongkan HANYA untuk aturan Peran pemohon = Owner: "Tanpa persetujuan — langsung ke antrian transfer Finance".',
+            'Urutan pengajuan biaya: Direktur → Owner → Finance (level Owner sesudah Direktur, sebelum level Finance, ADR 0026). Kosongkan HANYA untuk aturan Peran pemohon = Owner: "Tanpa persetujuan — langsung ke antrian transfer Finance".',
         },
         fields: [
           { name: 'level', type: 'number', label: 'Level', required: true, min: 1 },

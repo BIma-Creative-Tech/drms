@@ -24,7 +24,7 @@ const USERS = parseUatUsers(
     { email: 'owner.uji@proyekkas.test', name: 'Direktur Uji', role: 'pk-owner', keycloakSub: randomUUID() },
     // ADR 0013: a second Finance user so "another Finance decides" / the G1-2 fallback is testable.
     { email: 'finance2.uji@proyekkas.test', name: 'Finance Uji 2', role: 'pk-finance', keycloakSub: randomUUID() },
-    // ADR 0025: the Owner — last approval level of the default rule (above the Direktur)
+    // ADR 0026: the Owner — last approval level of the default rule (above the Direktur)
     { email: 'principal.uji@proyekkas.test', name: 'Owner Uji', role: 'pk-principal', keycloakSub: randomUUID() },
   ]),
 )
@@ -120,7 +120,7 @@ describe('UAT seed', () => {
     await expect(seedUat(p, clash)).rejects.toThrow(/email already belongs to another account/)
   })
 
-  it('Staff Uji can submit a request on the UAT project; PM Uji approves (Persetujuan PM), then Direktur Uji (ADR 0021), then Owner Uji (ADR 0025); Finance Uji does not approve', async () => {
+  it('Staff Uji can submit a request on the UAT project; PM Uji approves (Persetujuan PM), then Direktur Uji (ADR 0021), then Owner Uji (ADR 0026); Finance Uji does not approve', async () => {
     const asFlow = async (email: string): Promise<FlowUser> => {
       const u = await one('users', 'email', email)
       const f = { ...(await withContext({ id: u.id as number, email, keycloakSub: '', collection: 'users' as const })), cookie: '', _strategy: 'oidcSession' } as FlowUser
@@ -175,7 +175,7 @@ describe('UAT seed', () => {
     expect((await api('POST', `${E}/${c.body.id}/approve`, finance, {})).status).toBe(403)
     const dir = await api('POST', `${E}/${c.body.id}/approve`, direktur, {})
     expect(dir.status, JSON.stringify(dir.body)).toBe(200)
-    // ADR 0025: Direktur → Owner (the Owner does not take the Direktur step and the Direktur not the Owner's)
+    // ADR 0026: Direktur → Owner (the Owner does not take the Direktur step and the Direktur not the Owner's)
     expect(dir.body).toMatchObject({ status: 'pending_approval', currentLevel: 2, statusLabel: 'Menunggu persetujuan Owner' })
     expect((await api('POST', `${E}/${c.body.id}/approve`, direktur, {})).status).toBe(403)
     const ok = await api('POST', `${E}/${c.body.id}/approve`, owner, {})

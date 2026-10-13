@@ -17,7 +17,7 @@ import { companyId, getTestPayload, sqlAs, sqlError } from './helpers'
 import { api, asUser, draftBody, makeFlowUser, makeWorld, png, sysCreate, upload, type FlowUser, type World } from './flow-world'
 
 /**
- * ADR 0024 (owner decision 2026-10-11) as amended by ADR 0025 (owner 2026-10-13) through the real API + DB:
+ * ADR 0024 (owner decision 2026-10-11) as amended by ADR 0026 (owner 2026-10-13) through the real API + DB:
  * configurable approval rules ("Peran pemohon", zero-step rule for the OWNER only — was the Direktur) and the
  * audited no-approval exception — the Owner's own request → Finance transfer queue at once (audit, timeline, PDF,
  * report, notifications); an Owner request filed by someone else is refused; a Direktur's own request now goes to
@@ -33,7 +33,7 @@ let dirEmp: number
 let dirReq: FlowUser
 let accDir: number
 let accPm: number
-// ADR 0025: the Owner (pk-principal) with an employee — his own request is the no-approval one
+// ADR 0026: the Owner (pk-principal) with an employee — his own request is the no-approval one
 let ownEmp: number
 let ownReq: FlowUser
 let accOwn: number
@@ -91,7 +91,7 @@ async function receipt(id: number, lineId: string, amount: number, user: FlowUse
   return r.body
 }
 
-describe('1. The Owner files his own request → Finance transfer queue at once (audited exception, ADR 0025)', () => {
+describe('1. The Owner files his own request → Finance transfer queue at once (audited exception, ADR 0026)', () => {
   it('Pengajuan Baru: no approval step, status "Tanpa persetujuan (Antri Transfer)", audit + timeline + queue + PDF + report + notifications', async () => {
     const { id, body } = await submitted(ownReq, ownerBody())
     expect(body).toMatchObject({
@@ -141,9 +141,9 @@ describe('1. The Owner files his own request → Finance transfer queue at once 
 
   it('/me and masters hint the APK (ownRequestNoApproval, employees.direktur)', async () => {
     const me = await api('GET', '/api/v1/me', ownReq)
-    // ADR 0025: effective roles — the Owner is listed with the Direktur role too (same view and permissions)
+    // ADR 0026: effective roles — the Owner is listed with the Direktur role too (same view and permissions)
     expect(me.body.companies.find((c: { id: number }) => c.id === drms)).toMatchObject({ ownRequestNoApproval: true, roles: ['pk-owner', 'pk-principal'], capabilities: { approvalInbox: true } })
-    // ADR 0025: a Direktur's own request goes to the Owner — no hint for the Direktur any more
+    // ADR 0026: a Direktur's own request goes to the Owner — no hint for the Direktur any more
     const dir = await api('GET', '/api/v1/me', dirReq)
     expect(dir.body.companies.find((c: { id: number }) => c.id === drms)).toMatchObject({ ownRequestNoApproval: false })
     const staff = await api('GET', '/api/v1/me', w.users.staffA)
@@ -151,12 +151,12 @@ describe('1. The Owner files his own request → Finance transfer queue at once 
     const m = await api('GET', '/api/v1/masters?types=employees', w.users.finance)
     const items = m.body.types.employees.items as Array<{ id: number; direktur: boolean }>
     expect(items.find((e) => e.id === dirEmp)?.direktur).toBe(true)
-    expect(items.find((e) => e.id === ownEmp)?.direktur).toBe(true) // ADR 0025: the Owner files his own request too
+    expect(items.find((e) => e.id === ownEmp)?.direktur).toBe(true) // ADR 0026: the Owner files his own request too
     expect(items.find((e) => e.id === w.emp.a)?.direktur).toBe(false)
   })
 })
 
-describe('2. An Owner request filed by someone else is refused; a Direktur\'s own request goes to the Owner (ADR 0025)', () => {
+describe('2. An Owner request filed by someone else is refused; a Direktur\'s own request goes to the Owner (ADR 0026)', () => {
   it('PM → 403 at the draft; Admin on behalf of the Owner → 409 at submit (stays Draft); the 2026-10-10 PM wording is gone', async () => {
     const pm = await api('POST', E, w.users.pm, ownerBody(), key())
     expect(pm.status).toBe(403)
@@ -204,7 +204,7 @@ describe('3. Staff / PM flows unchanged', () => {
   })
 })
 
-describe('4. Zero-step rules: Owner only (ADR 0025; was Direktur) — service AND DB', () => {
+describe('4. Zero-step rules: Owner only (ADR 0026; was Direktur) — service AND DB', () => {
   const zero = (requesterRoles: string[], over: Record<string, unknown> = {}) => ({
     company: drms,
     name: `EAP nol level ${requesterRoles.join('+') || 'semua'}`,
@@ -244,7 +244,7 @@ describe('4. Zero-step rules: Owner only (ADR 0025; was Direktur) — service AN
       ${role ? `INSERT INTO approval_rules_requester_roles ("order", parent_id, value) SELECT 1, id, '${role}' FROM r` : 'SELECT id FROM r'}`
     expect((await sqlError('app', ins('pk-staff'), [drms]))?.code).toBe('23514')
     expect((await sqlError('app', ins(null), [drms]))?.code).toBe('23514')
-    expect((await sqlError('app', ins('pk-owner'), [drms]))?.code).toBe('23514') // ADR 0025: no zero-step Direktur rule any more
+    expect((await sqlError('app', ins('pk-owner'), [drms]))?.code).toBe('23514') // ADR 0026: no zero-step Direktur rule any more
     expect(await sqlError('app', ins('pk-principal'), [drms])).toBeNull()
     // the seeded Owner rule cannot be widened nor lose its role
     const seeded = (await sqlAs('app', 'SELECT id FROM approval_rules WHERE company_id = $1 AND name = $2', [drms, OWNER_RULE_NAME])).rows[0].id as number
@@ -443,7 +443,7 @@ describe('migration 20261013_300000_d1010_approval_config_data', () => {
   it('seeds "Pengajuan Direktur" only in a PT that still has the default rules; idempotent; down removes it', async () => {
     await inRolledBackTx(async (db) => {
       const q = async (s: string) => (await db.execute(sql.raw(s))).rows
-      // DRMS as a fresh PT of 2026-10-11: only the seeded default active (its ADR 0025 Owner level removed), no Direktur rule yet
+      // DRMS as a fresh PT of 2026-10-11: only the seeded default active (its ADR 0026 Owner level removed), no Direktur rule yet
       await q(`UPDATE approval_rules SET active = (name = 'Default — PM project lalu Direktur (semua nominal)') WHERE company_id = ${drms} AND doc_type = 'expense_request'`)
       await q(`DELETE FROM approval_rules_steps s USING approval_rules r WHERE s._parent_id = r.id AND r.company_id = ${drms} AND r.name = 'Default — PM project lalu Direktur (semua nominal)' AND s.approver_role::text = 'pk-principal'`)
       const mine = async () => q(`SELECT r.id, r.priority::int AS priority, r.acknowledge::text AS ack, (SELECT array_agg(value::text) FROM approval_rules_requester_roles x WHERE x.parent_id = r.id) AS roles,
@@ -452,7 +452,7 @@ describe('migration 20261013_300000_d1010_approval_config_data', () => {
       expect(await mine()).toEqual([expect.objectContaining({ priority: 10, ack: 'none', roles: ['pk-owner'], steps: 0 })])
       const id = (await mine())[0]!.id as number
       expect(await q(`SELECT action::text AS a, source::text AS s FROM audit_logs WHERE doc_type = 'approval_rule' AND doc_id = '${id}'`)).toEqual([{ a: 'create', s: 'system' }])
-      // (ADR 0025: the zero-step guard of 20261013_610100 would refuse this Direktur rule at commit — the ADR 0025 data
+      // (ADR 0026: the zero-step guard of 20261013_630100 would refuse this Direktur rule at commit — the ADR 0026 data
       // migration gives it an Owner level first; covered by d1310-a-owner.int.test.ts. Rolled back here.)
       await dataUp({ db } as never) // idempotent
       expect((await mine()).length).toBe(1)
