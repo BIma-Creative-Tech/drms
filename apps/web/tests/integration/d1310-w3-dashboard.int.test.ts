@@ -40,7 +40,7 @@ async function loan(over: Record<string, unknown>): Promise<number> {
 }
 
 beforeAll(async () => {
-  w = await makeWorld('W3D')
+  w = await makeWorld('WTD') // letters only: the world's vehicle plate suffix comes from the tag
   today = (await sqlAs('app', "SELECT to_char(now() AT TIME ZONE 'Asia/Makassar', 'YYYY-MM-DD') AS d")).rows[0].d
   noRap = await sysCreate('projects', { code: `W3D-NR${Date.now() % 10000}`, name: 'W3D tanpa RAP', kind: 'umum', pm: w.users.pm.id, budget: 9_000_000, status: 'berjalan' }, { rap: false })
   // one approved loan (outstanding) + one waiting for the Direktur

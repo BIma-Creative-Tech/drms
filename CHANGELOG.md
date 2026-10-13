@@ -17,7 +17,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   where the caller is Direktur/Finance, loans = office roles their PTs / PM the team projects, RAP = the caller's
   project read scope (PM layout: team only). Visibility as on the web: Direktur all four, Finance SLA + loans, PM loans +
   its team's projects without RAP, Staff/Admin none. OpenAPI (`OwnerDashboard`, `FinanceDashboard`, `PmDashboard`)
-  updated.
+  updated. Fix: "Project ber-RAB belum punya RAP" no longer fails (400 "path cannot be queried: budget") for a caller
+  who is Staff in another selected PT — the RAB filter now runs on the budget the caller may read.
 - **APK home = web dashboard per role, in the web's order** (client: "Dashboard di APK belum ada: SLA transfer,
   Pinjaman antar project, Project ber-RAB tanpa RAP, Tren pengajuan, Saldo per akun, Kelengkapan nota/LPJ"). Direktur:
   Status pengajuan, Komposisi biaya per kategori, SLA transfer, Monitoring RAP, Pinjaman antar project, Project ber-RAB
