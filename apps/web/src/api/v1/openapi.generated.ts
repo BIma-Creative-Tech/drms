@@ -2830,7 +2830,7 @@ export const openapiDocument = {
               "null"
             ],
             "exclusiveMinimum": 0,
-            "description": "D2: IGNORED since DRMS 10/10 (Finance sets the cost center at the transfer). Still accepted so older apps keep working."
+            "description": "D2: IGNORED since DRMS 10/10 for employee payments (Finance sets the cost center at the transfer; still accepted so older apps keep working). ADR 0027: a vendor payment (payeeType vendor) WITHOUT a project names its cost center here (active, of the request PT; project OR cost center required to submit)."
           },
           "neededDate": {
             "type": [
@@ -3082,7 +3082,7 @@ export const openapiDocument = {
               "null"
             ],
             "exclusiveMinimum": 0,
-            "description": "D2: IGNORED since DRMS 10/10 (Finance sets the cost center at the transfer). Still accepted so older apps keep working."
+            "description": "D2: IGNORED since DRMS 10/10 for employee payments (Finance sets the cost center at the transfer; still accepted so older apps keep working). ADR 0027: a vendor payment (payeeType vendor) WITHOUT a project names its cost center here (active, of the request PT; project OR cost center required to submit)."
           },
           "neededDate": {
             "type": [
@@ -6806,7 +6806,7 @@ export const openapiDocument = {
               "null"
             ],
             "exclusiveMinimum": 0,
-            "description": "D2: ignored (no non-project requests; Finance sets the cost center at the transfer). Still accepted so older apps keep working."
+            "description": "D2: ignored for employee payments (Finance sets the cost center at the transfer; still accepted so older apps keep working). ADR 0027: the cost center of a vendor payment without a project."
           },
           "needed_date": {
             "type": [
