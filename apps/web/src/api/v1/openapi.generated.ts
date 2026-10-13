@@ -8795,6 +8795,120 @@ export const openapiDocument = {
           "members"
         ]
       },
+      "AttendanceLocations": {
+        "type": "object",
+        "properties": {
+          "employees": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                "company": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                "attendanceType": {
+                  "type": "string",
+                  "enum": [
+                    "onsite",
+                    "non_onsite"
+                  ],
+                  "description": "onsite = any registered location of the PT with a point; non_onsite = head office + branch offices (sites) only."
+                },
+                "homeSiteId": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "exclusiveMinimum": 0
+                }
+              },
+              "required": [
+                "id",
+                "company",
+                "attendanceType",
+                "homeSiteId"
+              ]
+            },
+            "description": "The caller's active employees in the selected PTs (one per PT)."
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "project",
+                    "cost_center",
+                    "site"
+                  ]
+                },
+                "id": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                "company": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                "employeeId": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "description": "The caller's employee in that PT."
+                },
+                "code": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "lat": {
+                  "type": "number"
+                },
+                "lng": {
+                  "type": "number"
+                },
+                "radiusM": {
+                  "type": "number",
+                  "description": "Own radius, else the PT default (the radius the server checks)."
+                },
+                "isHeadOffice": {
+                  "type": "boolean",
+                  "description": "Site flagged \"Kantor pusat\"."
+                },
+                "home": {
+                  "type": "boolean",
+                  "description": "\"Site penempatan\" of the employee."
+                }
+              },
+              "required": [
+                "kind",
+                "id",
+                "company",
+                "employeeId",
+                "code",
+                "name",
+                "lat",
+                "lng",
+                "radiusM",
+                "isHeadOffice",
+                "home"
+              ]
+            },
+            "description": "Eligible locations with a point: home site first, then head office, sites, projects, cost centers (by code). Locations without a point are never listed."
+          }
+        },
+        "required": [
+          "employees",
+          "items"
+        ]
+      },
       "AttendanceCheckResult": {
         "type": "object",
         "properties": {
@@ -8828,7 +8942,7 @@ export const openapiDocument = {
           "site_id": {
             "type": "integer",
             "exclusiveMinimum": 0,
-            "description": "ADR 0023: site (kantor cabang) — allowed at the home site or with an active site assignment."
+            "description": "ADR 0023: site (kantor pusat / kantor cabang). DRMS 13/10 A2: eligibility by the employee attendance type (OnSite: any registered location of the PT; Non-OnSite: sites only), no assignment needed."
           },
           "lat": {
             "type": "number",
@@ -16107,6 +16221,13 @@ export const openapiDocument = {
                         "null"
                       ]
                     },
+                    "attendanceType": {
+                      "type": "string",
+                      "enum": [
+                        "onsite",
+                        "non_onsite"
+                      ]
+                    },
                     "active": {
                       "type": "boolean"
                     }
@@ -16118,6 +16239,7 @@ export const openapiDocument = {
                     "nickname",
                     "position",
                     "phone",
+                    "attendanceType",
                     "active"
                   ]
                 },
@@ -16384,6 +16506,14 @@ export const openapiDocument = {
                       ],
                       "maxLength": 32
                     },
+                    "attendanceType": {
+                      "type": "string",
+                      "enum": [
+                        "onsite",
+                        "non_onsite"
+                      ],
+                      "description": "DRMS 13/10 A2 \"Tipe absensi\": onsite (default for a new employee) = any registered location of the PT; non_onsite = head office + branch offices only."
+                    },
                     "active": {
                       "type": "boolean"
                     }
@@ -16543,6 +16673,14 @@ export const openapiDocument = {
                         "null"
                       ],
                       "maxLength": 32
+                    },
+                    "attendanceType": {
+                      "type": "string",
+                      "enum": [
+                        "onsite",
+                        "non_onsite"
+                      ],
+                      "description": "DRMS 13/10 A2 \"Tipe absensi\": onsite (default for a new employee) = any registered location of the PT; non_onsite = head office + branch offices only."
                     },
                     "active": {
                       "type": "boolean"
@@ -31685,9 +31823,121 @@ export const openapiDocument = {
         }
       }
     },
+    "/attendance/locations": {
+      "get": {
+        "summary": "DRMS 13/10 A2: eligible check-in locations of the caller (own employee per selected PT) by attendance type — OnSite: every registered location of the PT with a point (sites incl. head office, projects, cost centers; no assignment needed); Non-OnSite: head office + branch offices (sites). Coordinates and radius only (no money). The APK matches the GPS fix against this list (auto-detect) and caches it for offline check-ins; the server re-validates each check-in",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9]\\d{0,8}(,[1-9]\\d{0,8})*$",
+              "description": "MC3: PT filter (comma separated ids). Only narrows the effective selection (X-Company-Ids / cookie ∩ memberships); a PT outside it → 403 COMPANY_NOT_ALLOWED."
+            },
+            "required": false,
+            "description": "MC3: PT filter (comma separated ids). Only narrows the effective selection (X-Company-Ids / cookie ∩ memberships); a PT outside it → 403 COMPANY_NOT_ALLOWED.",
+            "name": "company",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": true,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "APK version; below company minimum → 426."
+            },
+            "required": false,
+            "description": "APK version; below company minimum → 426.",
+            "name": "X-App-Version",
+            "in": "header"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Eligible locations",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttendanceLocations"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/attendance/check-in": {
       "post": {
-        "summary": "Owner decision 2026-10-09: web self check-in, every role. Selfie first with POST /media/selfies. Synchronous counterpart of the APK sync item attendance.check_in — same gates (company-settings.syncAttendanceEnabled, else FEATURE_DISABLED; ADR 0018 privacy ack, else PRIVACY_ACK_REQUIRED) and rejection codes (MOCK_LOCATION never applies on web; NOT_FOUND, VALIDATION, NO_GEOFENCE, NOT_ASSIGNED, OUTSIDE_GEOFENCE, MEDIA_MISSING, FORBIDDEN, ALREADY_CHECKED_IN)",
+        "summary": "Owner decision 2026-10-09: web self check-in, every role. Selfie first with POST /media/selfies. Synchronous counterpart of the APK sync item attendance.check_in — same gates (company-settings.syncAttendanceEnabled, else FEATURE_DISABLED; ADR 0018 privacy ack, else PRIVACY_ACK_REQUIRED) and rejection codes (MOCK_LOCATION never applies on web; NOT_FOUND, VALIDATION, NO_GEOFENCE, NOT_ASSIGNED = location not eligible for the attendance type of the employee (DRMS 13/10 A2), OUTSIDE_GEOFENCE, MEDIA_MISSING, FORBIDDEN, ALREADY_CHECKED_IN)",
         "security": [
           {
             "bearer": []

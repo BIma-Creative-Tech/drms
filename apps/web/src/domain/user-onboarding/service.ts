@@ -3,6 +3,7 @@ import { APIError, ValidationError, type CollectionSlug, type PayloadRequest, ty
 import { companyContextOf, hasRole, isGroupAdmin, isRole, relId, userId as callerId, type Role } from '@/access/roles'
 import { canUseMatrix, employeeChoices, matrixColumns, viewerOf, type MatrixCompany, type Viewer } from '@/admin/components/access/role-matrix'
 import { writeAudit } from '@/audit/writer'
+import { attendanceTypeOf, type AttendanceType } from '@/domain/attendance/area'
 import { membershipOf, membershipOfEmployee } from '@/domain/employee-user-link'
 import { CTX_KC_NEW_USER, CTX_TEMP_PASSWORD } from '@/domain/users-sync'
 import { isDbGuardError, pgCode } from '@/lib/pg-error'
@@ -52,7 +53,7 @@ export type OnboardingCompany = {
   name: string
   canManageEmployees: boolean
   membership: { id: number; roles: Role[]; active: boolean } | null
-  employee: { id: number; code: string; name: string; nickname: string | null; position: string | null; phone: string | null; active: boolean } | null
+  employee: { id: number; code: string; name: string; nickname: string | null; position: string | null; phone: string | null; attendanceType: AttendanceType; active: boolean } | null
   bankAccounts: Array<{ id: number; bank: number | null; bankName: string | null; accountNo: string; accountHolder: string; isDefault: boolean; verificationStatus: 'unverified' | 'verified'; active: boolean }>
   employeeChoices: Array<{ id: number; code: string; name: string; active: boolean }>
   assignments: Array<{ id: number; label: string; roleInProject: string; startDate: string | null; endDate: string | null }>
@@ -128,7 +129,7 @@ export async function loadUserOnboarding(req: PayloadRequest, userId: number | n
 
   const [cellsRes, employeesRes, banksRes] = await Promise.all([
     colIds.length ? req.payload.find({ collection: 'company-memberships', where: { company: { in: colIds } }, pagination: false, select: { user: true, company: true, roles: true, employee: true, active: true }, ...asCaller, overrideAccess: false }) : { docs: [] },
-    colIds.length ? req.payload.find({ collection: 'employees', where: { company: { in: colIds } }, sort: 'code', pagination: false, select: { code: true, name: true, nickname: true, position: true, phone: true, active: true, company: true }, ...asCaller, overrideAccess: false }) : { docs: [] },
+    colIds.length ? req.payload.find({ collection: 'employees', where: { company: { in: colIds } }, sort: 'code', pagination: false, select: { code: true, name: true, nickname: true, position: true, phone: true, attendanceType: true, active: true, company: true }, ...asCaller, overrideAccess: false }) : { docs: [] },
     req.payload.find({ collection: 'banks', where: { active: { not_equals: false } }, sort: 'name', pagination: false, select: { name: true }, ...asCaller, overrideAccess: false }),
   ])
   const cells = (cellsRes.docs as unknown as Row[]).map((m) => ({
@@ -147,6 +148,7 @@ export async function loadUserOnboarding(req: PayloadRequest, userId: number | n
     nickname: strOrNull(e.nickname),
     position: strOrNull(e.position),
     phone: strOrNull(e.phone),
+    attendanceType: attendanceTypeOf(e.attendanceType),
     active: e.active !== false,
   }))
   const banks = (banksRes.docs as unknown as Row[]).map((b) => ({ id: b.id as number, name: str(b.name) }))
@@ -171,7 +173,7 @@ export async function loadUserOnboarding(req: PayloadRequest, userId: number | n
         name: c.name,
         canManageEmployees: hasRole(req, 'pk-admin', c.id),
         membership: m ? { id: m.id, roles: m.roles, active: m.active } : null,
-        employee: emp ? { id: emp.id, code: emp.code, name: emp.name, nickname: emp.nickname, position: emp.position, phone: emp.phone, active: emp.active } : null,
+        employee: emp ? { id: emp.id, code: emp.code, name: emp.name, nickname: emp.nickname, position: emp.position, phone: emp.phone, attendanceType: emp.attendanceType, active: emp.active } : null,
         bankAccounts: emp
           ? (accountsRes.docs as unknown as Row[])
               .filter((a) => relId(a.employee) === emp.id)
@@ -238,7 +240,7 @@ async function at<T>(prefix: string, fn: () => Promise<T>): Promise<T> {
   }
 }
 
-const EMPLOYEE_FIELDS = ['code', 'name', 'nickname', 'position', 'phone', 'active'] as const
+const EMPLOYEE_FIELDS = ['code', 'name', 'nickname', 'position', 'phone', 'attendanceType', 'active'] as const
 const BANK_FIELDS = ['bank', 'accountNo', 'accountHolder', 'isDefault', 'verificationStatus', 'active'] as const
 
 function employeeData(e: EmployeeInput): Record<string, unknown> {

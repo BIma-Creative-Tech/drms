@@ -1,8 +1,9 @@
 'use client'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import React, { useId, useRef, useState } from 'react'
+import React, { useEffect, useId, useRef, useState } from 'react'
 
+import { detectArea } from '@/domain/attendance/area'
 import { geofenceError } from '@/domain/attendance/calendar'
 import { errorLine } from '@/lib/field-labels'
 
@@ -447,11 +448,59 @@ export function GeofenceForm({ costCenterId, name, lat, lng, radiusM, defaultRad
   )
 }
 
-/** ADR 0023: `site` = kantor cabang (assigned or the home site, `home` = "Site penempatan"). */
-export type SelfCheckLocation = { type: 'project' | 'cost_center' | 'site'; id: number; label: string; checkIn: string | null; checkOut: string | null; home?: boolean }
+/**
+ * ADR 0023: `site` = kantor pusat / kantor cabang (`home` = "Site penempatan", `headOffice` = "Kantor pusat"). DRMS
+ * 13/10 A2: the list is the caller's ELIGIBLE locations by attendance type, each with its point + effective radius
+ * (area detection from the browser GPS).
+ */
+export type SelfCheckLocation = {
+  type: 'project' | 'cost_center' | 'site'
+  id: number
+  label: string
+  checkIn: string | null
+  checkOut: string | null
+  home?: boolean
+  headOffice?: boolean
+  lat?: number
+  lng?: number
+  radiusM?: number
+}
 
 const LOC_FIELD: Record<SelfCheckLocation['type'], string> = { project: 'project_id', cost_center: 'cost_center_id', site: 'site_id' }
 const LOC_KIND: Record<SelfCheckLocation['type'], string> = { project: 'Project', cost_center: 'Pusat biaya', site: 'Site (kantor cabang)' }
+const locKeyOf = (l: Pick<SelfCheckLocation, 'type' | 'id'>) => `${l.type}:${l.id}`
+
+type AreaNote = { text: string; tone: 'ok' | 'warn'; inside: string[] }
+
+/**
+ * DRMS 13/10 A2: recognise the area from a GPS fix — one location whose geofence contains the fix → chosen; several
+ * (overlapping) → the nearest is chosen and the user may pick another of them; none → manual choice (fallback) with
+ * the nearest as a hint. Pure (exported for the unit test); the server re-checks the chosen location.
+ */
+export function areaNote(locations: readonly SelfCheckLocation[], fix: { lat: number; lng: number; accuracyM: number | null }): { pick: string | null; note: AreaNote } {
+  const d = detectArea(locations, fix)
+  const first = d.inside[0]
+  if (first && d.inside.length === 1) {
+    return { pick: locKeyOf(first), note: { tone: 'ok', inside: [locKeyOf(first)], text: `Lokasi terdeteksi otomatis: ${first.label} (${first.distanceM} m dari titik).` } }
+  }
+  if (first) {
+    return {
+      pick: locKeyOf(first),
+      note: {
+        tone: 'ok',
+        inside: d.inside.map(locKeyOf),
+        text: `Anda berada di ${d.inside.length} area absen yang bertumpuk. Dipilih yang terdekat: ${first.label} (${first.distanceM} m). Pilih lokasi lain yang ditandai bila perlu.`,
+      },
+    }
+  }
+  if (d.nearest) {
+    return {
+      pick: null,
+      note: { tone: 'warn', inside: [], text: `Posisi Anda di luar semua area absen terdaftar. Terdekat: ${d.nearest.label} (${d.nearest.distanceM} m, radius ${d.nearest.radiusM} m). Mendekatlah ke lokasi atau pilih lokasi secara manual.` },
+    }
+  }
+  return { pick: null, note: { tone: 'warn', inside: [], text: 'Belum ada lokasi absen dengan titik koordinat. Hubungi Admin.' } }
+}
 
 function getPosition(): Promise<GeolocationPosition> {
   return new Promise((resolve, reject) => {
@@ -478,6 +527,40 @@ export function SelfCheckForm({ locations, privacyBlocked }: { locations: SelfCh
   const [locKey, setLocKey] = useState(locations[0] ? `${locations[0].type}:${locations[0].id}` : '')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [area, setArea] = useState<AreaNote | null>(null)
+
+  const detect = async () => {
+    setError(null)
+    setBusy(true)
+    try {
+      const pos = await getPosition()
+      const r = areaNote(locations, { lat: pos.coords.latitude, lng: pos.coords.longitude, accuracyM: pos.coords.accuracy ?? null })
+      if (r.pick) setLocKey(r.pick)
+      setArea(r.note)
+    } catch (err) {
+      setError((err as Error).message || 'Gagal mengambil lokasi GPS.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  // DRMS 13/10 A2: detect the area on open when the browser already allows the location (no permission prompt on
+  // load; otherwise the button below asks).
+  useEffect(() => {
+    if (locations.length === 0 || privacyBlocked || typeof navigator === 'undefined' || !navigator.permissions?.query) return
+    let alive = true
+    navigator.permissions
+      .query({ name: 'geolocation' as PermissionName })
+      .then((p) => {
+        if (alive && p.state === 'granted') void detect()
+      })
+      .catch(() => undefined)
+    return () => {
+      alive = false
+    }
+    // once per page load
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
   const loc = locations.find((l) => `${l.type}:${l.id}` === locKey)
   const action: 'check_in' | 'check_out' | null = loc ? (!loc.checkIn ? 'check_in' : !loc.checkOut ? 'check_out' : null) : null
 
@@ -510,7 +593,9 @@ export function SelfCheckForm({ locations, privacyBlocked }: { locations: SelfCh
     }
   }
 
-  if (locations.length === 0) return <EmptyStateInline text="Anda belum ditugaskan ke project/pusat biaya/site manapun dan belum punya site penempatan. Hubungi Admin untuk penugasan (Team Assignment)." />
+  if (locations.length === 0) {
+    return <EmptyStateInline text="Belum ada lokasi absen untuk Anda: PT Anda belum punya lokasi terdaftar dengan titik koordinat yang sesuai tipe absensi Anda (OnSite: site/project/pusat biaya; Non-OnSite: kantor pusat/cabang). Hubungi Admin." />
+  }
   if (privacyBlocked) {
     return (
       <p className="pk-kerr" role="alert">
@@ -523,19 +608,33 @@ export function SelfCheckForm({ locations, privacyBlocked }: { locations: SelfCh
   // with today's state, one wide action button.
   return (
     <form className="pk-kform pk-selfcheck" onSubmit={submit} data-pk-form="self-check">
+      <div className="pk-sc-detect">
+        <button type="button" className="pk-kbtn" onClick={() => void detect()} disabled={busy} data-pk-action="detect-area">
+          Deteksi lokasi otomatis
+        </button>
+        {area ? (
+          <span className="note" data-tone={area.tone} role="status" data-pk-area-note>
+            {area.text}
+          </span>
+        ) : null}
+      </div>
       <fieldset className="pk-sc-locs" disabled={busy}>
         <legend>Lokasi</legend>
         {locations.map((l) => {
-          const key = `${l.type}:${l.id}`
+          const key = locKeyOf(l)
           const state = l.checkOut ? 'selesai' : l.checkIn ? 'hadir' : 'belum'
+          const inside = area?.inside.includes(key) ?? false
           return (
-            <label key={key} className="pk-sc-loc" data-state={state} data-pk-loc={key}>
+            <label key={key} className="pk-sc-loc" data-state={state} data-pk-loc={key} data-area={inside ? 'in' : undefined}>
               <input type="radio" name="self-check-loc" value={key} checked={locKey === key} onChange={() => setLocKey(key)} />
               <span className="name">
                 {l.label}
-                <span className="sub">{l.home ? 'Site penempatan' : LOC_KIND[l.type]}</span>
+                <span className="sub">{l.home ? 'Site penempatan' : l.headOffice ? 'Kantor pusat' : LOC_KIND[l.type]}</span>
               </span>
-              <span className="st">{l.checkOut ? `Selesai · pulang ${l.checkOut}` : l.checkIn ? `Masuk ${l.checkIn}` : 'Belum absen'}</span>
+              <span className="st">
+                {l.checkOut ? `Selesai · pulang ${l.checkOut}` : l.checkIn ? `Masuk ${l.checkIn}` : 'Belum absen'}
+                {inside ? <span className="area"> · Anda di area ini</span> : null}
+              </span>
             </label>
           )
         })}

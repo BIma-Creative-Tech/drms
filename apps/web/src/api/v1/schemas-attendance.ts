@@ -52,7 +52,7 @@ export const AttendanceCheckBody = z
   .object({
     project_id: id.optional().meta({ description: 'Project (exactly one of project_id / cost_center_id / site_id).' }),
     cost_center_id: id.optional().meta({ description: 'Cost center / operational location (E6, Q-40).' }),
-    site_id: id.optional().meta({ description: 'ADR 0023: site (kantor cabang) — allowed at the home site or with an active site assignment.' }),
+    site_id: id.optional().meta({ description: 'ADR 0023: site (kantor pusat / kantor cabang). DRMS 13/10 A2: eligibility by the employee attendance type (OnSite: any registered location of the PT; Non-OnSite: sites only), no assignment needed.' }),
     lat: z.number().min(-90).max(90),
     lng: z.number().min(-180).max(180),
     accuracy_m: z.number().min(0).max(10_000).nullable().optional().meta({ description: 'Browser GPS accuracy radius (m); up to 50 m is added to the geofence radius.' }),
@@ -176,3 +176,43 @@ export const AttendanceCorrection = z
     reason: z.string(),
   })
   .meta({ id: 'AttendanceCorrection' })
+
+/** DRMS 13/10 A2: GET /attendance/locations (`?company=` narrows the selection, like the masters). */
+export const AttendanceLocationsQuery = z.object({ company: companyFilterParam }).meta({ id: 'AttendanceLocationsQuery' })
+
+/**
+ * DRMS 13/10 A2 (ADR 0023 amendment 2026-10-13): the caller's eligible check-in locations — only what the APK needs to
+ * recognise the area (id, kind, name, point, radius); no money, no budgets. Cached by the APK for offline check-ins;
+ * the server re-validates every check-in (eligible for the type, same PT, inside the geofence).
+ */
+export const AttendanceLocations = z
+  .object({
+    employees: z
+      .array(
+        z.object({
+          id,
+          company: id,
+          attendanceType: z.enum(['onsite', 'non_onsite']).meta({ description: 'onsite = any registered location of the PT with a point; non_onsite = head office + branch offices (sites) only.' }),
+          homeSiteId: id.nullable(),
+        }),
+      )
+      .meta({ description: "The caller's active employees in the selected PTs (one per PT)." }),
+    items: z
+      .array(
+        z.object({
+          kind: z.enum(['project', 'cost_center', 'site']),
+          id,
+          company: id,
+          employeeId: id.meta({ description: "The caller's employee in that PT." }),
+          code: z.string(),
+          name: z.string(),
+          lat: z.number(),
+          lng: z.number(),
+          radiusM: z.number().meta({ description: 'Own radius, else the PT default (the radius the server checks).' }),
+          isHeadOffice: z.boolean().meta({ description: 'Site flagged "Kantor pusat".' }),
+          home: z.boolean().meta({ description: '"Site penempatan" of the employee.' }),
+        }),
+      )
+      .meta({ description: 'Eligible locations with a point: home site first, then head office, sites, projects, cost centers (by code). Locations without a point are never listed.' }),
+  })
+  .meta({ id: 'AttendanceLocations' })

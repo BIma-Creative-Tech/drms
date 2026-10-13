@@ -128,6 +128,12 @@ afterAll(async () => {
   await setAttendance(false)
 })
 
+/** DRMS 13/10 A2: the attendance type of a fixture employee (OnSite = default; no assignment needed). */
+async function setAttendanceType(employee: number, attendanceType: 'onsite' | 'non_onsite') {
+  const p = await getTestPayload()
+  await p.update({ collection: 'employees', id: employee, data: { attendanceType }, overrideAccess: true /* SYSTEM-WRITE: fixture */ })
+}
+
 describe('cost-center geofence (Q-40) with syncAttendanceEnabled = true', () => {
   it('check-in at an assigned cost center inside the radius is applied; project_id stays empty', async () => {
     const [r] = await sync(staffA, [item('attendance.check_in', { cost_center_id: w.costCenter, lat: OPS.lat + 0.0005, lng: OPS.lng, accuracy_m: 10, is_mocked: false, selfie_media_id: await selfie(staffA) })])
@@ -138,16 +144,20 @@ describe('cost-center geofence (Q-40) with syncAttendanceEnabled = true', () => 
     expect(dup[0]!.errors[0]!.code).toBe('ALREADY_CHECKED_IN')
   })
 
-  it('rejections carry the distance; no geofence / not assigned / both locations', async () => {
+  it('rejections carry the distance; no geofence / not eligible / both locations', async () => {
     const s = await selfie(staffA)
     const res = await sync(staffA, [
       item('attendance.check_in', { cost_center_id: w.costCenter, lat: OPS.lat + 0.01, lng: OPS.lng, accuracy_m: 5, is_mocked: false, selfie_media_id: s }),
       item('attendance.check_in', { cost_center_id: noGeoCc, lat: OPS.lat, lng: OPS.lng, is_mocked: false, selfie_media_id: s }),
-      item('attendance.check_in', { cost_center_id: unassignedCc, lat: OPS.lat, lng: OPS.lng, is_mocked: false, selfie_media_id: s }),
       item('attendance.check_in', { project_id: w.project, cost_center_id: w.costCenter, lat: OPS.lat, lng: OPS.lng, is_mocked: false, selfie_media_id: s }),
     ])
-    expect(res.map((r) => r.errors[0]?.code)).toEqual(['OUTSIDE_GEOFENCE', 'NO_GEOFENCE', 'NOT_ASSIGNED', 'VALIDATION'])
+    expect(res.map((r) => r.errors[0]?.code)).toEqual(['OUTSIDE_GEOFENCE', 'NO_GEOFENCE', 'VALIDATION'])
     expect(res[0]!.errors[0]!.message).toMatch(/Di luar radius pusat biaya \(\d+ m dari titik, radius 150 m\)/)
+    // DRMS 13/10 A2: an OnSite employee needs no assignment (d1310-onsite); a Non-OnSite one is refused at a cost center
+    await setAttendanceType(w.emp.a, 'non_onsite')
+    const [na] = await sync(staffA, [item('attendance.check_in', { cost_center_id: unassignedCc, lat: OPS.lat, lng: OPS.lng, is_mocked: false, selfie_media_id: s })])
+    await setAttendanceType(w.emp.a, 'onsite')
+    expect(na!.errors[0]!.code).toBe('NOT_ASSIGNED')
   })
 })
 
@@ -193,6 +203,8 @@ describe('diabsenkan oleh PM (US-14)', () => {
     expect(staffRes[0]!.errors[0]).toMatchObject({ code: 'FORBIDDEN' })
     const otherRes = await sync(otherPm, [item('attendance.on_behalf', ob({ employee_id: w.emp.b, selfie_media_id: sOther }))])
     expect(otherRes[0]!.errors[0]).toMatchObject({ code: 'FORBIDDEN', message: 'Hanya untuk project tim Anda.' })
+    // DRMS 13/10 A2: the location must be eligible for the EMPLOYEE's type — a Non-OnSite employee at a project → NOT_ASSIGNED
+    await setAttendanceType(w.emp.admin, 'non_onsite')
     const res = await sync(pm, [
       item('attendance.on_behalf', ob({ employee_id: w.emp.pm, selfie_media_id: sPm })),
       item('attendance.on_behalf', ob({ employee_id: w.emp.admin, selfie_media_id: sPm })),
@@ -201,6 +213,7 @@ describe('diabsenkan oleh PM (US-14)', () => {
       item('attendance.on_behalf', ob({ employee_id: w.emp.b, reason: '', selfie_media_id: sPm })),
       item('attendance.on_behalf', ob({ employee_id: w.emp.b, lat: SITE.lat + 0.01, selfie_media_id: sPm })),
     ])
+    await setAttendanceType(w.emp.admin, 'onsite')
     expect(res.map((r) => r.errors[0]?.code)).toEqual(['FORBIDDEN', 'NOT_ASSIGNED', 'FORBIDDEN', 'MOCK_LOCATION', 'VALIDATION', 'OUTSIDE_GEOFENCE'])
     expect(res.every((r) => r.status === 'rejected')).toBe(true)
     // nothing stored for B today

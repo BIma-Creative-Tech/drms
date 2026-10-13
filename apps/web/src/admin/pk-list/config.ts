@@ -60,7 +60,8 @@ export const FILTER_TARGETS: ReadonlySet<string> = new Set([
 const EXPLICIT: Record<string, { filters?: readonly string[]; dates?: readonly string[] }> = {
   'expense-requests': { filters: ['status', 'type', 'project', 'urgencyLevel', 'costCenter'], dates: ['requestDate'] },
   projects: { filters: ['status', 'kind', 'client', 'site', 'pm'], dates: ['startDate'] },
-  employees: { filters: ['homeSite', 'workSchedule', 'active'] },
+  employees: { filters: ['attendanceType', 'homeSite', 'workSchedule', 'active'] },
+  sites: { filters: ['isHeadOffice', 'costCenter', 'active'] },
   vendors: { filters: ['active'] },
   users: { filters: ['active'] },
   'cash-entries': { filters: ['direction', 'status', 'sourceType', 'cashAccount'], dates: ['entryDate'] },

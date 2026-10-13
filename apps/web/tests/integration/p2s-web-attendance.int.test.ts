@@ -75,10 +75,14 @@ describe('web self check-in/out (owner decision 2026-10-09)', () => {
     expect((again.body as { code?: string }).code).toBe('ALREADY_CHECKED_OUT')
   })
 
-  it('server rules apply: outside the radius → OUTSIDE_GEOFENCE; not assigned → NOT_ASSIGNED; two locations → 400', async () => {
+  it('server rules apply: outside the radius → OUTSIDE_GEOFENCE; not eligible → NOT_ASSIGNED; two locations → 400', async () => {
     const far = await check('in', w.users.staffB, { project_id: w.project, lat: SITE.lat + 0.05, selfie_media_id: await selfie(w.users.staffB) })
     expect((far.body as { code?: string }).code).toBe('OUTSIDE_GEOFENCE')
+    // DRMS 13/10 A2: a project is not eligible for a Non-OnSite employee (an OnSite one needs no assignment)
+    const p = await getTestPayload()
+    await p.update({ collection: 'employees', id: w.emp.b, data: { attendanceType: 'non_onsite' }, overrideAccess: true /* SYSTEM-WRITE: fixture */ })
     const other = await check('in', w.users.staffB, { project_id: w.otherProject, selfie_media_id: await selfie(w.users.staffB) })
+    await p.update({ collection: 'employees', id: w.emp.b, data: { attendanceType: 'onsite' }, overrideAccess: true /* SYSTEM-WRITE: fixture */ })
     expect(other.status).toBe(403)
     expect((other.body as { code?: string }).code).toBe('NOT_ASSIGNED')
     const both = await check('in', w.users.staffB, { project_id: w.project, cost_center_id: w.costCenter, selfie_media_id: 1 })

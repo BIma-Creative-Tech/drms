@@ -4,9 +4,10 @@ import { Readable } from 'node:stream'
 import type { PayloadRequest } from 'payload'
 import type { z } from 'zod'
 
-import { ownEmployees, relId, userId } from '@/access/roles'
+import { employeeIn, memberCompanies, ownEmployees, relId, userId } from '@/access/roles'
 import { writeAudit } from '@/audit/writer'
 import { correctAttendance } from '@/domain/attendance/corrections'
+import { eligibleLocations, employeeAttendance, type EmployeeAttendance } from '@/domain/attendance/eligibility'
 import { AttendanceReject, locationOf, recordWebAttendance, type Location } from '@/domain/attendance/record'
 import { employeeRecap, myRecap, teamTodayFor } from '@/domain/attendance/service'
 import { fileSize, mediaPath } from '@/lib/media-files'
@@ -14,7 +15,7 @@ import { withReqTransaction } from '@/lib/system-tx'
 
 import { companyQuery, singleCompanyQuery } from '../company-query'
 import { HttpError, json, v1 } from '../http'
-import { AttendanceCheckBody, AttendanceCorrectBody, AttendanceMonthQuery, AttendanceRecapQuery, TeamTodayQuery } from '../schemas-attendance'
+import { AttendanceCheckBody, AttendanceCorrectBody, AttendanceLocationsQuery, AttendanceMonthQuery, AttendanceRecapQuery, TeamTodayQuery } from '../schemas-attendance'
 
 /**
  * E6 attendance endpoints (APK + web S2). "Diabsenkan PM" is APK/sync-only (POST /sync/batch);
@@ -23,6 +24,7 @@ import { AttendanceCheckBody, AttendanceCorrectBody, AttendanceMonthQuery, Atten
  * - GET  /attendance/me?month=YYYY-MM                 US-09 own monthly recap (any role with an employee)
  * - GET  /attendance/recap?employee_id=&month=        recap of an employee: PM team / Admin, Owner, Finance
  * - GET  /attendance/team-today?date=&project_id=&cost_center_id=&site_id=   US-13 (PM team; office roles all)
+ * - GET  /attendance/locations?company=              DRMS 13/10 A2: own eligible check-in locations (APK auto-detect)
  * - POST /attendance/check-in, /attendance/check-out  self-service web absen (every role)
  * - POST /attendance/{id}/correct {new_time, reason}  US-15 T10 (PM team / Admin; never own; idempotent)
  * - GET  /attendance/{id}/selfie                      selfie of a visible attendance; audited view_sensitive
@@ -77,6 +79,39 @@ export const teamTodayEndpoint = v1({
       }),
     )
     return json(r)
+  },
+})
+
+/**
+ * DRMS 13/10 A2 (ADR 0023 amendment 2026-10-13): the caller's eligible check-in locations, per own employee in the
+ * selected PTs (`?company=` narrows; the APK asks with every membership PT and caches the list for offline use).
+ * OnSite → every registered location of the PT with a point; Non-OnSite → the PT's sites (head office + branches).
+ * Only id, kind, code, name, point, radius and the head-office / home flags — no money, no budgets. Read-only; the
+ * check-in re-validates everything (domain/attendance/record.ts).
+ */
+export const attendanceLocationsEndpoint = v1({
+  path: '/attendance/locations',
+  method: 'get',
+  rateLimit: READ_LIMIT,
+  handler: async ({ req }) => {
+    const q = AttendanceLocationsQuery.safeParse(params(req))
+    if (!q.success) throw badQuery(q.error.issues)
+    const companies = (await companyQuery(req)) ?? memberCompanies(req)
+    return json(
+      await withReqTransaction(req, async () => {
+        const employees: EmployeeAttendance[] = []
+        for (const c of companies) {
+          const id = employeeIn(req, c)
+          const emp = id === undefined ? null : await employeeAttendance(req, id)
+          if (emp && emp.company === c && emp.active) employees.push(emp)
+        }
+        const items = await eligibleLocations(req, employees)
+        return {
+          employees: employees.map((e) => ({ id: e.id, company: e.company, attendanceType: e.type, homeSiteId: e.homeSite })),
+          items: items.map((l) => ({ kind: l.kind, id: l.id, company: l.company, employeeId: l.employee, code: l.code, name: l.name, lat: l.lat, lng: l.lng, radiusM: l.radiusM, isHeadOffice: l.isHeadOffice, home: l.home })),
+        }
+      }),
+    )
   },
 })
 
@@ -211,6 +246,7 @@ export const ATTENDANCE_ENDPOINTS = [
   attendanceMeEndpoint,
   attendanceRecapEndpoint,
   teamTodayEndpoint,
+  attendanceLocationsEndpoint,
   attendanceCheckInEndpoint,
   attendanceCheckOutEndpoint,
   correctAttendanceEndpoint,

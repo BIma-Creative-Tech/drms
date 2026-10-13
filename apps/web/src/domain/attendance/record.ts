@@ -12,12 +12,18 @@ import { getRequestTx } from '@/lib/tx'
 
 import { snapshotOf, type ScheduleSnapshot } from './schedule'
 import { effectiveRadiusM } from './calendar'
+import { kindAllowedFor, NOT_ELIGIBLE_NON_ONSITE, NOT_ELIGIBLE_OTHER_PT } from './area'
+import { employeeAttendance } from './eligibility'
 import { companyOf, settings, userOfEmployee as userOfEmployeeLink } from '@/domain/companies'
 
 /**
  * E6 — the ONE write path of `attendances` (sync items attendance.check_in / check_out / on_behalf,
- * US-01/02/14, Q-40). ADR 0023: a location is a project, a cost center or a site (kantor cabang); at a site the
- * employee needs an active site assignment OR that site as home site, a PM on-behalf a team site. Server-side checks, in this order (error codes are part of the APK contract):
+ * US-01/02/14, Q-40). ADR 0023: a location is a project, a cost center or a site (kantor cabang).
+ * DRMS 13/10 A2 (ADR 0023 amendment 2026-10-13): WHERE an employee may check in follows the employee's attendance
+ * type, no team assignment needed — OnSite: any registered location of the own PT with a point; Non-OnSite: the
+ * PT's sites only (head office + branch offices). A PM on-behalf still needs the location in the PM's team.
+ * Server-side checks, in this order (error codes are part of the APK contract; `NOT_ASSIGNED` is kept as the code of
+ * "location not eligible for this employee" so released APKs keep showing the server text):
  * MOCK_LOCATION → NOT_FOUND/VALIDATION (location) → NO_GEOFENCE → NOT_ASSIGNED → OUTSIDE_GEOFENCE →
  * MEDIA_MISSING / FORBIDDEN (selfie) → ALREADY_CHECKED_IN / NO_CHECK_IN / ALREADY_CHECKED_OUT.
  * On-behalf (source `pm`) additionally: caller holds pk-pm, the location is in the caller's TEAM
@@ -88,32 +94,15 @@ export type RecordInput = {
 
 const LABEL: Record<Location['type'], string> = { project: 'project', cost_center: 'pusat biaya', site: 'site' }
 
-const ASSIGNMENT_FIELD: Record<Location['type'], string> = { project: 'project', cost_center: 'costCenter', site: 'site' }
-
 /**
- * Is `employee` assigned to the location on `localDate` (team-assignments, start/end inclusive)? ADR 0023 Q-S5: at a
- * site also when it is the employee's home site ("Site penempatan") — no daily assignment rows needed.
+ * DRMS 13/10 A2: is the location eligible for the employee's attendance type (same PT; OnSite: any kind, Non-OnSite:
+ * sites only)? Throws `NOT_ASSIGNED` (APK contract code) with the Indonesian reason otherwise. Replaces the
+ * assignment / home-site rule of ADR 0023 Q-S5 for the check-in itself (assignments keep driving the PM team views).
  */
-export async function isAssignedTo(req: PayloadRequest, employee: number, loc: Location, localDate: string): Promise<boolean> {
-  if (loc.type === 'site') {
-    const emp = (await req.payload.findByID({ collection: 'employees', id: employee, depth: 0, select: { homeSite: true } as never, overrideAccess: true /* SYSTEM-READ: home site of the attendance's employee */, req, disableErrors: true })) as {
-      homeSite?: unknown
-    } | null
-    if (relId(emp?.homeSite) === loc.id) return true
-  }
-  const res = await req.payload.find({
-    collection: 'team-assignments',
-    where: { and: [{ employee: { equals: employee } }, { [ASSIGNMENT_FIELD[loc.type]]: { equals: loc.id } }] },
-    depth: 0,
-    pagination: false,
-    overrideAccess: true, // SYSTEM-READ: assignment check of the attendance's employee
-    req,
-  })
-  return (res.docs as Array<{ startDate?: string | null; endDate?: string | null }>).some((a) => {
-    const start = a.startDate ? a.startDate.slice(0, 10) : null
-    const end = a.endDate ? a.endDate.slice(0, 10) : null
-    return (!start || start <= localDate) && (!end || end >= localDate)
-  })
+async function assertEligible(req: PayloadRequest, employee: number, loc: Location, locationCompany: number | undefined, field: string): Promise<void> {
+  const emp = await employeeAttendance(req, employee)
+  if (!emp || emp.company !== locationCompany) reject('NOT_ASSIGNED', NOT_ELIGIBLE_OTHER_PT, field)
+  if (!kindAllowedFor(emp!.type, loc.type)) reject('NOT_ASSIGNED', NOT_ELIGIBLE_NON_ONSITE, field)
 }
 
 /**
@@ -211,15 +200,7 @@ export async function recordAttendance(req: PayloadRequest, input: RecordInput):
     const team = input.location.type === 'project' ? scope.teamProjects : input.location.type === 'site' ? scope.teamSites : scope.teamCostCenters
     if (!team.includes(input.location.id)) reject('FORBIDDEN', `Hanya untuk ${LABEL[input.location.type]} tim Anda.`, locField)
   }
-  if (!(await isAssignedTo(req, input.employee, input.location, localDate))) {
-    reject(
-      'NOT_ASSIGNED',
-      input.source === 'pm'
-        ? `Karyawan ini tidak ditugaskan di ${LABEL[input.location.type]} ini pada tanggal tersebut.`
-        : `Anda tidak ditugaskan di ${LABEL[input.location.type]} ini pada tanggal tersebut.`,
-      locField,
-    )
-  }
+  await assertEligible(req, input.employee, input.location, relId((geo as { company?: unknown }).company), locField)
   const distance = Math.round(haversineM(input.lat, input.lng, geo.lat!, geo.lng!))
   if (!insideGeofence(distance, geo.radiusM!, input.accuracyM)) {
     reject('OUTSIDE_GEOFENCE', `Di luar radius ${LABEL[input.location.type]} (${distance} m dari titik, radius ${geo.radiusM} m).`, `${pre}lat`)
