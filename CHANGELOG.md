@@ -28,7 +28,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - **Migrations:** `20261013_630000_d1310_owner_role` (enum values), `…630100_…_guard` (zero-step = Owner only,
   `g1_exception` += `principal_no_approval`, approval guard), `…630200_…_data`. OpenAPI: `Role`, `OnboardingRole`,
   membership batch roles, `decisionBy`, `selfApproval`, `TransferQueueItem.noApprovalBy`, PM dashboard `teamWaiting`.
-- **Deploy step:** after migrating, tick **Owner** for the Owner in every PT — until then submissions under a rule with
+- **Owner role = group admins only** (owner decision 2026-10-14): only a group admin grants or removes `pk-principal`
+  — `company-memberships` hook (403 "Peran Owner hanya dapat diberikan atau dicabut oleh Admin grup."), so REST, the
+  Akses PT matrix and the Pengguna form are all covered; PT admins don't get the option (shown locked where held).
+- **Deploy step:** after migrating, a **group admin** ticks **Owner** for the Owner in every PT — until then submissions under a rule with
   an Owner level answer 409 ("Tidak ada pengguna aktif … (peran Owner)").
 
 ### Changed (DRMS 13/10 Wave 3 — dashboard parity APK)

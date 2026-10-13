@@ -4,10 +4,11 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import React, { useMemo, useRef, useState } from 'react'
 
-import { ROLES, ROLE_LABELS } from '@/access/roles'
+import { ROLE_LABELS, type Role } from '@/access/roles'
 import type { OnboardingDetail } from '@/domain/user-onboarding/service'
 
 import { problemText } from '../ActionButton'
+import { lockOwner, roleOptionsFor } from '../access/role-matrix'
 import { MultiSelect } from '../list/MultiSelect'
 import { activeCompanies, buildBody, draftFromDetail, mapErrors, newBank, TABS, type BodyOrder, type CompanyDraft, type Draft, type EmpDraft, type TabId } from './user-onboarding-form'
 
@@ -19,11 +20,13 @@ import { activeCompanies, buildBody, draftFromDetail, mapErrors, newBank, TABS, 
  * transaction on the server (all-or-nothing); a refused save marks the fields and opens the first tab with an error.
  * D4 layout: label left of the input (`.pk-fgrid`), stacked on phones.
  */
-type Props = { mode: 'create' | 'update'; detail: OnboardingDetail; self: boolean }
+/** `groupAdmin`: ADR 0026 — only a group admin grants or removes the Owner role (the server refuses others, 403). */
+type Props = { mode: 'create' | 'update'; detail: OnboardingDetail; self: boolean; groupAdmin: boolean }
 
-const ROLE_OPTIONS = ROLES.map((r) => ({ value: r, label: ROLE_LABELS[r] }))
+/** ADR 0026: the Owner role is offered to group admins only (shown, locked, where a PT admin finds it already held). */
+const roleOptions = (groupAdmin: boolean, held: readonly Role[]) => roleOptionsFor(groupAdmin, held).map((r) => ({ value: r, label: ROLE_LABELS[r] }))
 
-export function UserOnboardingForm({ mode, detail: initial, self }: Props) {
+export function UserOnboardingForm({ mode, detail: initial, self, groupAdmin }: Props) {
   const router = useRouter()
   const [detail, setDetail] = useState(initial)
   const [draft, setDraft] = useState<Draft>(() => draftFromDetail(initial))
@@ -227,7 +230,7 @@ export function UserOnboardingForm({ mode, detail: initial, self }: Props) {
                     <span className="pk-pt-chip">{c.shortCode}</span> {c.name}
                   </span>
                   <div className="pk-fgrid__ctl pk-fld">
-                    <MultiSelect name={`roles-${c.id}`} label={`Peran di ${c.shortCode}`} options={ROLE_OPTIONS} value={d.roles} allLabel="Pilih peran…" onChange={(roles) => patchCompany(c.id, (x) => ({ ...x, roles }))} disabled={busy} invalid={!!err(key)} testKey={`roles-${c.shortCode}`} />
+                    <MultiSelect name={`roles-${c.id}`} label={`Peran di ${c.shortCode}`} options={roleOptions(groupAdmin, d.roles as Role[])} value={d.roles} allLabel="Pilih peran…" onChange={(roles) => patchCompany(c.id, (x) => ({ ...x, roles: lockOwner(roles as Role[], x.roles as Role[], groupAdmin) }))} disabled={busy} invalid={!!err(key)} testKey={`roles-${c.shortCode}`} />
                     <span className="help">{status}</span>
                     {err(key) ? (
                       <span className="err" role="alert" data-pk-error={key}>

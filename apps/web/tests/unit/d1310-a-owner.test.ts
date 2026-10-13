@@ -15,6 +15,7 @@ import {
   withCompanyContext,
   type Role,
 } from '@/access/roles'
+import { lockOwner, roleOptionsFor } from '@/admin/components/access/role-matrix'
 import { capabilitiesOf } from '@/api/v1/endpoints/me'
 import { buildApprovalTimeline, type TimelineInput, type TimelineSnapshot } from '@/domain/expense/approval-timeline'
 import { decisionText } from '@/domain/expense/decision-texts'
@@ -114,6 +115,21 @@ describe('role "Owner" (pk-principal): same access as the Direktur, its own appr
     const owner = capabilitiesOf(effectiveRoles(['pk-principal']), { fieldReportsEnabled: true })
     expect(owner).toEqual(capabilitiesOf(['pk-owner'], { fieldReportsEnabled: true }))
     expect(owner).toMatchObject({ approvalInbox: true, progressReportCreate: true, teamMonitor: false })
+  })
+})
+
+describe('Owner role is granted / removed by a group admin only (owner decision 2026-10-14) — UI helpers', () => {
+  it('the option is offered to group admins; a PT admin sees it only where it is already held', () => {
+    expect(roleOptionsFor(true, [])).toContain('pk-principal')
+    expect(roleOptionsFor(false, ['pk-staff'])).not.toContain('pk-principal')
+    expect(roleOptionsFor(false, ['pk-principal'])).toContain('pk-principal')
+  })
+  it('a PT admin can neither tick nor untick it; a group admin can', () => {
+    expect(lockOwner(['pk-staff', 'pk-principal'], ['pk-staff'], false)).toEqual(['pk-staff'])
+    expect(lockOwner(['pk-pm'], ['pk-principal', 'pk-staff'], false)).toEqual(['pk-pm', 'pk-principal'])
+    expect(lockOwner([], ['pk-principal'], false)).toEqual(['pk-principal'])
+    expect(lockOwner(['pk-staff', 'pk-principal'], ['pk-staff'], true)).toEqual(['pk-staff', 'pk-principal'])
+    expect(lockOwner(['pk-staff'], ['pk-principal', 'pk-staff'], true)).toEqual(['pk-staff'])
   })
 })
 

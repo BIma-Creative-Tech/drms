@@ -83,6 +83,21 @@ exact-role channel for the approval engine.**
   receipts resubmit with a changed total, LPJ shortfall) take the current rule → Owner included.
 - SLA (`approvedAt`) unchanged: it starts at the final approval, now the Owner's.
 
+### 3a. Who grants the Owner role (owner decision 2026-10-14)
+
+Only a **group admin** (`users.groupAdmin`) grants or removes `pk-principal`. Enforced server-side in the
+`company-memberships` hook `ownerRoleGuard` (403 "Peran Owner hanya dapat diberikan atau dicabut oleh Admin grup."):
+a change of "holds Owner" (role ticked / unticked, membership with Owner created, emptied, deactivated or reactivated) by
+any other user is refused. Every path writes through that collection with the caller — Payload REST / Local API, the
+Akses PT matrix batch (`/api/v1/company-memberships/batch`) and the Pengguna form (`/api/v1/user-onboarding`). A PT
+admin may still change the other roles of a membership that holds Owner. UI: the matrix and the Pengguna form offer the
+Owner option to group admins only (`roleOptionsFor`); where a PT admin finds it already held it is shown but locked
+(`lockOwner`). System writes (seed, migrations, no user) are not affected.
+
+The distinct-person rule is unchanged: a person who gave the "Persetujuan PM" (or any position) of a request never
+decides another position of the same request — e.g. an account holding PM and Direktur approves as PM, then the Direktur
+level goes to another Direktur.
+
 ### 4. Labels (web + APK)
 
 "Persetujuan Owner" (step), "Menunggu persetujuan Owner" (status of the Owner level, derived from the snapshot's

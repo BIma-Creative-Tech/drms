@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation'
 import React, { useMemo, useRef, useState } from 'react'
 
-import { ROLES, ROLE_LABELS } from '@/access/roles'
+import { ROLE_LABELS, type Role } from '@/access/roles'
 
 import { problemText } from '../ActionButton'
 import { MultiSelect } from '../list/MultiSelect'
@@ -19,11 +19,13 @@ import {
   employeeChoices,
   forbiddenOps,
   isChanged,
+  lockOwner,
   newCell,
   pendingOps,
   reasonOk,
   REASON_MIN,
   ROLE_SHORT,
+  roleOptionsFor,
   setEmployee,
   setRoles,
   type CellDraft,
@@ -192,6 +194,7 @@ export function RoleMatrix({ companies, users, cells, employees, activeUserIds, 
                             choices={employeeChoices(employees, eff.values(), c.id, u.id, cell.employee)}
                             onChange={(next) => update(key, next)}
                             duplicate={cell.employee !== null && dups.includes(`${c.id}:${cell.employee}`)}
+                            groupAdmin={viewer.groupAdmin}
                           />
                         ) : (
                           <div className="pk-rmx__none">
@@ -247,7 +250,8 @@ export function RoleMatrix({ companies, users, cells, employees, activeUserIds, 
   )
 }
 
-const ROLE_OPTIONS = ROLES.map((r) => ({ value: r, label: ROLE_LABELS[r], title: ROLE_SHORT[r] }))
+/** ADR 0026: the Owner role is offered to group admins only (`roleOptionsFor`). */
+const roleOptions = (groupAdmin: boolean, held: readonly Role[]) => roleOptionsFor(groupAdmin, held).map((r) => ({ value: r, label: ROLE_LABELS[r], title: ROLE_SHORT[r] }))
 
 function Cell({
   cell,
@@ -257,6 +261,7 @@ function Cell({
   choices,
   onChange,
   duplicate,
+  groupAdmin,
 }: {
   cell: CellDraft
   user: MatrixUser
@@ -265,6 +270,7 @@ function Cell({
   choices: MatrixEmployee[]
   onChange: (c: CellDraft) => void
   duplicate: boolean
+  groupAdmin: boolean
 }) {
   const who = user.name || user.email
   const emp = choices.find((e) => e.id === cell.employee)
@@ -275,10 +281,10 @@ function Cell({
         <MultiSelect
           name={`roles-${user.id}-${company.id}`}
           label={`Peran ${who} di ${company.shortCode}`}
-          options={ROLE_OPTIONS}
+          options={roleOptions(groupAdmin, cell.roles)}
           value={cell.roles}
           allLabel="Pilih peran…"
-          onChange={(roles) => onChange(setRoles(cell, roles))}
+          onChange={(roles) => onChange(setRoles(cell, lockOwner(roles as Role[], cell.roles, groupAdmin)))}
           disabled={!editable}
           testKey={`roles-${company.shortCode}`}
         />

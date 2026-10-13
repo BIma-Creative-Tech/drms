@@ -1,4 +1,4 @@
-import { companyContextOf, ROLES, type Role } from '@/access/roles'
+import { companyContextOf, PRINCIPAL_ROLE, ROLES, type Role } from '@/access/roles'
 import { errorLine } from '@/lib/field-labels'
 
 /**
@@ -51,6 +51,21 @@ export function matrixColumns(all: readonly MatrixCompany[], v: Viewer, selectio
 
 export function sortRoles(roles: readonly Role[]): Role[] {
   return ROLES.filter((r) => roles.includes(r))
+}
+
+/**
+ * ADR 0026 (owner decision 2026-10-14): roles a viewer may pick — the Owner (`pk-principal`) only for a GROUP admin; a
+ * PT admin sees it only where it is already held (shown, but locked by `lockOwner`). The server refuses anyway (403).
+ */
+export function roleOptionsFor(groupAdmin: boolean, held: readonly Role[]): Role[] {
+  return ROLES.filter((r) => r !== PRINCIPAL_ROLE || groupAdmin || held.includes(r))
+}
+
+/** ADR 0026: a non-group-admin can neither grant nor remove the Owner — its flag in `next` follows `prev`. */
+export function lockOwner(next: readonly Role[], prev: readonly Role[], groupAdmin: boolean): Role[] {
+  if (groupAdmin) return sortRoles(next)
+  const kept = prev.includes(PRINCIPAL_ROLE) ? [PRINCIPAL_ROLE] : []
+  return sortRoles([...next.filter((r) => r !== PRINCIPAL_ROLE), ...kept])
 }
 
 /** Toggling one role in a cell; no role left = inactive, a role on an inactive cell = active again. */

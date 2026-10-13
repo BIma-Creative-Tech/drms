@@ -5,6 +5,7 @@ import { PgDialect } from 'drizzle-orm/pg-core'
 import pg from 'pg'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 
+import { MSG_OWNER_ROLE_GROUP_ADMIN } from '@/collections/CompanyMemberships'
 import { addDays } from '@/domain/expense/types'
 import { pmDashboard } from '@/domain/reports/dashboards'
 import { resetRateLimits } from '@/lib/rate-limit'
@@ -296,6 +297,80 @@ describe('5. The Owner sees what the Direktur sees, in each PT where he is Owner
     expect(pick(a.body)).toEqual(pick(b.body))
     // the PT2 Direktur is not mapped to DRMS: 403 for the header, the Owner of both PTs is
     expect((await api('GET', '/api/v1/dashboard/owner', pt2Direktur, undefined, { 'X-Company-Ids': String(drms) })).status).toBe(403)
+  })
+})
+
+describe('6. Only a group admin grants or removes the Owner role (owner decision 2026-10-14)', () => {
+  it('PT admin: REST, Akses PT matrix and Pengguna onboarding refuse adding / removing Owner (403); a group admin can', async () => {
+    const ptAdmin = await makeFlowUser(['pk-admin'], 'aow-pt-admin', null, { signature: false, groupAdmin: false })
+    const group = await makeFlowUser(['pk-admin'], 'aow-group-admin', null, { signature: false, groupAdmin: true })
+    const target = await makeFlowUser(['pk-staff'], 'aow-owner-target', null, { signature: false })
+    const p = await getTestPayload()
+    const membership = async () =>
+      (await p.find({ collection: 'company-memberships', where: { and: [{ user: { equals: target.id } }, { company: { equals: drms } }] }, limit: 1, depth: 0, overrideAccess: true /* SYSTEM-READ: assertion */ }))
+        .docs[0] as unknown as { id: number; roles: string[]; active: boolean }
+    const batch = (u: FlowUser, roles: string[]) => api('POST', '/api/v1/company-memberships/batch', u, { reason: 'uji peran Owner', items: [{ user: target.id, company: drms, roles }] }, key())
+    const onboard = (u: FlowUser, roles: string[]) => api('PATCH', `/api/v1/user-onboarding/${target.id}`, u, { companies: [{ company: drms, roles }], reason: 'uji peran Owner' })
+
+    // a PT admin cannot GRANT the Owner role — Payload REST / Local API, the matrix, the Pengguna form (update + create)
+    const id = (await membership()).id
+    await expect(
+      p.update({ collection: 'company-memberships', id, data: { roles: ['pk-principal', 'pk-staff'] } as never, user: ptAdmin as never, overrideAccess: false, depth: 0, context: { auditReason: 'uji' } }),
+    ).rejects.toMatchObject({ status: 403, message: MSG_OWNER_ROLE_GROUP_ADMIN })
+    const b1 = await batch(ptAdmin, ['pk-principal', 'pk-staff'])
+    expect(b1.status, JSON.stringify(b1.body)).toBe(403)
+    expect(JSON.stringify(b1.body)).toContain(MSG_OWNER_ROLE_GROUP_ADMIN)
+    const o1 = await onboard(ptAdmin, ['pk-principal', 'pk-staff'])
+    expect(o1.status, JSON.stringify(o1.body)).toBe(403)
+    const c1 = await api('POST', '/api/v1/user-onboarding', ptAdmin, { user: { email: `aow-owner-${randomUUID().slice(0, 6)}@example.test`, name: 'Calon Owner' }, companies: [{ company: drms, roles: ['pk-principal'] }] })
+    expect(c1.status, JSON.stringify(c1.body)).toBe(403)
+    expect((await membership()).roles).toEqual(['pk-staff'])
+
+    // a group admin grants it (matrix)
+    const g = await batch(group, ['pk-principal', 'pk-staff'])
+    expect(g.status, JSON.stringify(g.body)).toBe(200)
+    expect((await membership()).roles).toEqual(['pk-principal', 'pk-staff'])
+    // the PT admin may change the OTHER roles while the Owner stays, but cannot REMOVE it (role, empty roles, deactivation)
+    const keep = await batch(ptAdmin, ['pk-pm', 'pk-principal', 'pk-staff'])
+    expect(keep.status, JSON.stringify(keep.body)).toBe(200)
+    expect((await batch(ptAdmin, ['pk-staff'])).status).toBe(403)
+    expect((await onboard(ptAdmin, [])).status).toBe(403)
+    await expect(p.update({ collection: 'company-memberships', id, data: { active: false } as never, user: ptAdmin as never, overrideAccess: false, depth: 0, context: { auditReason: 'uji' } })).rejects.toMatchObject({ status: 403 })
+    expect((await membership()).roles).toEqual(['pk-pm', 'pk-principal', 'pk-staff'])
+    // the group admin removes it (Pengguna form)
+    const rm = await onboard(group, ['pk-staff'])
+    expect(rm.status, JSON.stringify(rm.body)).toBe(200)
+    expect((await membership()).roles).toEqual(['pk-staff'])
+  })
+})
+
+describe('7. One person, one decision: a user who approved as PM project never decides the Direktur level of that request', () => {
+  it('PM + Direktur in one account: "Persetujuan PM" given → the Direktur level is refused to him; another Direktur decides', async () => {
+    const dual = await makeFlowUser(['pk-pm', 'pk-owner'], 'aow-pm-direktur', null)
+    const project = await sysCreate('projects', { code: `AOW-P3-${Date.now() % 10000}`, name: 'AOW project PM+Direktur', pm: dual.id, budget: 20_000_000, status: 'berjalan' })
+    await sysCreate('team-assignments', { employee: w.emp.a, project, roleInProject: 'staff' })
+    await sysCreate('approval-rules', {
+      company: drms,
+      name: 'AOW rule PM+Direktur',
+      docType: 'expense_request',
+      requestType: 'any',
+      minAmount: 0,
+      priority: 10,
+      project,
+      acknowledge: 'required',
+      acknowledgeBy: 'scope_manager',
+      acknowledgeRole: null,
+      steps: [
+        { level: 1, approverRole: 'pk-owner' },
+        { level: 2, approverRole: 'pk-principal' },
+      ],
+      active: true,
+    })
+    const { id } = await submitted(w.users.staffA, draftBody(w, { projectId: project }))
+    expect((await api('POST', `${E}/${id}/acknowledge`, dual, {}, key())).status).toBe(200)
+    expect((await api('POST', `${E}/${id}/approve`, dual, {}, key())).status).toBe(403)
+    expect(await inboxItem(dual, id)).toBeUndefined()
+    expect((await api('POST', `${E}/${id}/approve`, w.users.owner, {}, key())).status).toBe(200)
   })
 })
 

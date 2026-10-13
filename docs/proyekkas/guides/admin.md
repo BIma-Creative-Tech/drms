@@ -238,6 +238,9 @@ sampai selesai).
 - Peran baru **Owner** (kode `pk-principal`; "Direktur" tetap kode `pk-owner`). Owner melihat dan boleh melakukan semua
   yang boleh Direktur (dashboard, daftar, kas, laporan) di PT tempat ia memegang peran Owner; bedanya hanya di alur
   persetujuan. Centang **Owner** untuk orangnya di **setiap PT** (Pengguna → Akses & Peran, atau matriks Akses PT).
+  **Hanya Admin grup** yang dapat memberi atau mencabut peran Owner (keputusan owner 14 Okt 2026); Admin PT tidak
+  melihat pilihan Owner (bila sudah dipegang: tampil tetapi terkunci), dan server menolak ("Peran Owner hanya dapat
+  diberikan atau dicabut oleh Admin grup."). Admin PT tetap boleh mengubah peran lain orang tersebut.
 - Alur pengajuan biaya: **Staff → PM project → Direktur → Owner → Finance (transfer)**. Migrasi menambahkan **level
   Owner tepat sesudah level Direktur** (tanpa level Direktur: sebelum level Finance pertama — aturan lama "Diketahui
   Direktur → Finance" menjadi Diketahui Direktur → level 1 Owner → level 2 Finance; tanpa keduanya: di akhir; level

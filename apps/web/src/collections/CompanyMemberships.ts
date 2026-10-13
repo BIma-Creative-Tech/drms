@@ -1,6 +1,6 @@
 import { APIError, type CollectionBeforeChangeHook, type CollectionConfig, type Where } from 'payload'
 
-import { ROLES, ROLE_LABELS, companiesWithRole, denyAll, hasRole, isGroupAdmin, relId, userId } from '@/access/roles'
+import { PRINCIPAL_ROLE, ROLES, ROLE_LABELS, companiesWithRole, denyAll, hasRole, isGroupAdmin, relId, userId } from '@/access/roles'
 import { withAudit } from '@/audit/hooks'
 
 /**
@@ -10,7 +10,9 @@ import { withAudit } from '@/audit/hooks'
  * Roles are never synced to Keycloak (Keycloak keeps identity + the coarse realm role `pk-user`).
  *
  * Access: read = own rows, Admin of that PT, group admin; create/update = Admin of the row's PT
- * (+ group admin); never deleted (deactivate instead, audited).
+ * (+ group admin); never deleted (deactivate instead, audited). ADR 0026 (owner decision 2026-10-14): the Owner role
+ * (`pk-principal`) is granted / removed by a GROUP admin only (`ownerRoleGuard`, every path: REST, Akses PT matrix
+ * batch, Pengguna onboarding — all write through this collection with the caller).
  */
 const adminOf = (req: never, company: unknown): boolean => {
   const c = relId(company)
@@ -35,6 +37,25 @@ const membershipGuard: CollectionBeforeChangeHook = async ({ data, originalDoc, 
   return data
 }
 
+/** ADR 0026: 403 text when a non-group-admin grants or removes the Owner role. */
+export const MSG_OWNER_ROLE_GROUP_ADMIN = 'Peran Owner hanya dapat diberikan atau dicabut oleh Admin grup.'
+
+/** The membership effectively holds the Owner role (active + role ticked). */
+const holdsOwner = (roles: unknown, active: unknown): boolean => active !== false && Array.isArray(roles) && roles.includes(PRINCIPAL_ROLE)
+
+/**
+ * ADR 0026 (owner decision 2026-10-14): only a group admin (`users.groupAdmin`) grants or removes the Owner role — a
+ * change of "holds Owner" (role ticked / unticked, membership with Owner created, deactivated or reactivated) by any
+ * other user is refused (403). System writes (no user, `pkSystemMembership`) are not affected.
+ */
+export const ownerRoleGuard: CollectionBeforeChangeHook = ({ data, originalDoc, operation, req }) => {
+  if (!req.user || req.context?.pkSystemMembership === true || isGroupAdmin(req)) return data
+  const before = operation === 'update' && originalDoc ? holdsOwner(originalDoc.roles, originalDoc.active) : false
+  const after = holdsOwner(data.roles !== undefined ? data.roles : originalDoc?.roles, data.active !== undefined ? data.active : (originalDoc?.active ?? true))
+  if (before !== after) throw new APIError(MSG_OWNER_ROLE_GROUP_ADMIN, 403, null, true)
+  return data
+}
+
 export const CompanyMemberships: CollectionConfig = withAudit(
   {
     slug: 'company-memberships',
@@ -56,6 +77,7 @@ export const CompanyMemberships: CollectionConfig = withAudit(
     hooks: {
       beforeChange: [
         membershipGuard,
+        ownerRoleGuard,
         // defence in depth (create access sees `data`, but repeat after hooks filled it)
         ({ data, originalDoc, req, operation }) => {
           if (!req.user || req.context?.pkSystemMembership === true) return data
