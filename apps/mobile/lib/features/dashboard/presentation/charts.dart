@@ -268,3 +268,198 @@ class _CashFlowPainter extends CustomPainter {
   @override
   bool shouldRepaint(_CashFlowPainter old) => old.rows != rows || old.selected != selected;
 }
+
+/// One row of [HBarList]: label, bar length from [value], the exact figure as [valueText] (full Rupiah or a count —
+/// DRMS 13/10 #10: cards show full values) and an optional second line.
+class HBarItem {
+  const HBarItem({required this.label, required this.value, required this.valueText, this.sub, this.muted = false});
+  final String label;
+  final int value;
+  final String valueText;
+  final String? sub;
+
+  /// "Lainnya" / exit rows: neutral bar colour.
+  final bool muted;
+}
+
+/// Horizontal bar list (web `HBarList`): label + value on one line, a bar scaled to the largest value below it.
+/// Negative values draw an empty bar (the number still states them).
+class HBarList extends StatelessWidget {
+  const HBarList({super.key, required this.items, required this.empty, this.color});
+  final List<HBarItem> items;
+  final String empty;
+  final Color? color;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    if (items.isEmpty) return Text(empty, style: theme.textTheme.bodyMedium);
+    final maxV = items.fold<int>(1, (m, i) => math.max(m, i.value));
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (final (k, i) in items.indexed)
+          Padding(
+            key: Key('hbar-$k'),
+            padding: const EdgeInsets.only(bottom: 10),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(child: Text(i.label, style: theme.textTheme.bodyMedium)),
+                    const SizedBox(width: 8),
+                    Text(i.valueText, style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600)),
+                  ],
+                ),
+                if (i.sub != null) Text(i.sub!, style: theme.textTheme.bodySmall),
+                const SizedBox(height: 4),
+                ExcludeSemantics(
+                  child: SizedBox(
+                    height: 8,
+                    width: double.infinity,
+                    child: CustomPaint(
+                      painter: _HBarPainter(
+                        i.value <= 0 ? 0 : i.value / maxV,
+                        i.muted ? theme.colorScheme.outline : (color ?? VizColors.series1),
+                        theme.colorScheme.surfaceContainerHighest,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _HBarPainter extends CustomPainter {
+  _HBarPainter(this.fraction, this.color, this.track);
+  final double fraction;
+  final Color color;
+  final Color track;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final r = Radius.circular(size.height / 2);
+    canvas.drawRRect(RRect.fromRectAndRadius(Offset.zero & size, r), Paint()..color = track);
+    final w = size.width * fraction.clamp(0, 1);
+    if (w <= 0) return;
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(Rect.fromLTWH(0, 0, math.max(w, size.height), size.height), r),
+      Paint()..color = color,
+    );
+  }
+
+  @override
+  bool shouldRepaint(_HBarPainter old) => old.fraction != fraction || old.color != color || old.track != track;
+}
+
+/// Monthly request counts as columns (web "Tren pengajuan"). Tap a month to read its values; the latest month is
+/// selected by default and [readout] states it (the readout doubles as the table view).
+class TrendBarChart extends StatefulWidget {
+  const TrendBarChart({super.key, required this.rows, required this.readout, required this.empty});
+  final List<RequestTrendPoint> rows;
+  final String Function(RequestTrendPoint) readout;
+  final String empty;
+
+  @override
+  State<TrendBarChart> createState() => _TrendBarChartState();
+}
+
+class _TrendBarChartState extends State<TrendBarChart> {
+  int? _selected;
+
+  @override
+  Widget build(BuildContext context) {
+    final rows = widget.rows;
+    final theme = Theme.of(context);
+    if (rows.isEmpty || rows.every((r) => r.count == 0)) return Text(widget.empty, style: theme.textTheme.bodyMedium);
+    final sel = (_selected ?? rows.length - 1).clamp(0, rows.length - 1);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        LayoutBuilder(
+          builder: (context, c) {
+            final slot = c.maxWidth / rows.length;
+            return GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTapDown: (d) =>
+                  setState(() => _selected = (d.localPosition.dx / slot).floor().clamp(0, rows.length - 1)),
+              child: SizedBox(
+                key: const Key('trend-chart'),
+                height: 120,
+                width: c.maxWidth,
+                child: CustomPaint(
+                  painter: _CountBarsPainter(
+                    [for (final r in rows) r.count],
+                    sel,
+                    theme.colorScheme.outlineVariant,
+                    theme.colorScheme.primary.withValues(alpha: 0.08),
+                  ),
+                ),
+              ),
+            );
+          },
+        ),
+        const SizedBox(height: 4),
+        Row(
+          children: [
+            for (final (i, p) in rows.indexed)
+              Expanded(
+                child: Text(
+                  periodShort(p.period),
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.labelSmall?.copyWith(fontWeight: i == sel ? FontWeight.bold : null),
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Semantics(
+          liveRegion: true,
+          child: Text(widget.readout(rows[sel]), key: const Key('trend-readout'), style: theme.textTheme.bodyMedium),
+        ),
+      ],
+    );
+  }
+}
+
+class _CountBarsPainter extends CustomPainter {
+  _CountBarsPainter(this.values, this.selected, this.grid, this.highlight);
+  final List<int> values;
+  final int selected;
+  final Color grid;
+  final Color highlight;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final maxV = values.fold<int>(1, math.max).toDouble();
+    final slot = size.width / values.length;
+    final bar = math.min(24.0, slot - 12).clamp(4.0, 24.0);
+    final base = size.height;
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(Rect.fromLTWH(slot * selected + 2, 0, slot - 4, size.height), const Radius.circular(6)),
+      Paint()..color = highlight,
+    );
+    canvas.drawLine(Offset(0, base - 0.5), Offset(size.width, base - 0.5), Paint()..color = grid);
+    for (final (i, v) in values.indexed) {
+      final h = (v / maxV) * (size.height - 8);
+      if (h <= 0) continue;
+      canvas.drawRRect(
+        RRect.fromRectAndCorners(
+          Rect.fromLTWH(slot * i + (slot - bar) / 2, base - h, bar, h),
+          topLeft: const Radius.circular(4),
+          topRight: const Radius.circular(4),
+        ),
+        Paint()..color = VizColors.series1,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(_CountBarsPainter old) => old.values != values || old.selected != selected;
+}

@@ -6,8 +6,13 @@ typedef Json = Map<String, dynamic>;
 
 int _i(Object? v) => v is num ? v.toInt() : 0;
 int? _iN(Object? v) => v is num ? v.toInt() : null;
+double? _dN(Object? v) => v is num ? v.toDouble() : null;
+String _s(Object? v) => v == null ? '' : '$v';
 Json _m(Object? v) => v is Map<String, dynamic> ? v : const {};
 List<Json> _l(Object? v) => v is List ? [for (final e in v) _m(e)] : const [];
+
+/// A block that an older server does not send yet reads as null (its card stays hidden).
+T? _block<T>(Object? v, T Function(Json) parse) => v is Map<String, dynamic> ? parse(v) : null;
 
 /// One month of the cash book (`cashFlow.rows[]`, K-02a/K-02b).
 class CashFlowPoint {
@@ -97,6 +102,384 @@ List<CompanySplit> _splits(Object? companies, {Object? cash, Object? counts}) {
 /// Web `share()`: percentage with one decimal, null without a whole.
 double? share(int part, int whole) => whole <= 0 ? null : (part / whole * 1000).round() / 10;
 
+/// PT short codes of a multi-PT payload (`companies[]`), empty for one PT — prefixes account rows like the web
+/// (`[CS1] Kas kecil`).
+Map<int, String> _codes(Object? companies) {
+  final cos = _l(companies);
+  if (cos.length < 2) return const {};
+  return {for (final c in cos) _i(c['id']): '${c['shortCode'] ?? c['name'] ?? '#${c['id']}'}'};
+}
+
+/// One month of `viz.requestTrend` (K-13): number of requests and Σ grand total (money roles only).
+class RequestTrendPoint {
+  const RequestTrendPoint(this.period, this.count, this.sum);
+  final String period;
+  final int count;
+  final int sum;
+}
+
+List<RequestTrendPoint> _requestTrend(Object? rows) => [
+  for (final r in _l(rows)) RequestTrendPoint(_s(r['period']), _i(r['count']), _i(r['sum'])),
+];
+
+/// One stage of `viz.pipeline` (K-13 per status folded into ordered stages; `exit` = rejected/cancelled).
+class PipelineStage {
+  const PipelineStage({required this.key, required this.label, this.count = 0, this.sum = 0});
+  final String key;
+  final String label;
+  final int count;
+  final int sum;
+
+  static PipelineStage fromJson(Json j) =>
+      PipelineStage(key: _s(j['key']), label: _s(j['label']), count: _i(j['count']), sum: _i(j['sum']));
+}
+
+class Pipeline {
+  const Pipeline({this.stages = const [], this.exit, this.total = 0});
+  final List<PipelineStage> stages;
+  final PipelineStage? exit;
+  final int total;
+
+  int count(String key) => stages.where((s) => s.key == key).fold(0, (a, s) => a + s.count);
+
+  /// Stages in web order with the exit row last.
+  List<PipelineStage> get rows => [...stages, ?exit];
+
+  static Pipeline fromJson(Object? v) {
+    final m = _m(v);
+    return Pipeline(
+      stages: [for (final s in _l(m['stages'])) PipelineStage.fromJson(s)],
+      exit: _block(m['exit'], PipelineStage.fromJson),
+      total: _i(m['total']),
+    );
+  }
+}
+
+/// `viz.categories` (K-17 Dicairkan per category, top 6 + "Lainnya").
+class CategoryShare {
+  const CategoryShare(this.label, this.total, {this.other = false});
+  final String label;
+  final int total;
+  final bool other;
+}
+
+class CategoryMix {
+  const CategoryMix({this.from = '', this.total = 0, this.items = const []});
+  final String from;
+  final int total;
+  final List<CategoryShare> items;
+
+  static CategoryMix fromJson(Object? v) {
+    final m = _m(v);
+    return CategoryMix(
+      from: _s(m['from']),
+      total: _i(m['total']),
+      items: [for (final i in _l(m['items'])) CategoryShare(_s(i['label']), _i(i['total']), other: i['other'] == true)],
+    );
+  }
+}
+
+/// "Saldo per akun" (K-01 per account; inactive accounts with balance 0 are already left out by the server).
+class AccountBalance {
+  const AccountBalance({
+    required this.id,
+    required this.name,
+    this.code,
+    this.active = true,
+    this.balance = 0,
+    this.monthIn,
+    this.monthOut,
+  });
+  final int id;
+  final String name;
+
+  /// PT short code when the payload spans several PTs.
+  final String? code;
+  final bool active;
+  final int balance;
+
+  /// Finance only: book in/out this month.
+  final int? monthIn;
+  final int? monthOut;
+
+  static List<AccountBalance> listFromJson(Object? rows, Map<int, String> codes) => [
+    for (final a in _l(rows))
+      AccountBalance(
+        id: _i(a['id']),
+        name: _s(a['name']),
+        code: codes[_iN(a['companyId'])],
+        active: a['active'] != false,
+        balance: _i(a['balance']),
+        monthIn: _iN(a['monthIn']),
+        monthOut: _iN(a['monthOut']),
+      ),
+  ]..sort((x, y) => y.balance.compareTo(x.balance));
+}
+
+/// "Kelengkapan nota/LPJ" (K-12, this month).
+class Completeness {
+  const Completeness({
+    this.ratioDone = 0,
+    this.ratioTotal = 0,
+    this.withoutLpj = 0,
+    this.overdue = 0,
+    this.reimburseToVerify = 0,
+    this.openWarnings = 0,
+  });
+  final int ratioDone;
+  final int ratioTotal;
+  final int withoutLpj;
+  final int overdue;
+  final int reimburseToVerify;
+  final int openWarnings;
+
+  static Completeness fromJson(Json m) => Completeness(
+    ratioDone: _i(m['ratioDone']),
+    ratioTotal: _i(m['ratioTotal']),
+    withoutLpj: _i(m['withoutLpj']),
+    overdue: _i(m['overdue']),
+    reimburseToVerify: _i(m['reimburseToVerify']),
+    openWarnings: _i(m['openWarnings']),
+  );
+}
+
+/// Item 11 (DRMS 10/10) "SLA transfer" (`sla`): this month's transfers within the PT's SLA since the final approval.
+class SlaSummary {
+  const SlaSummary({
+    this.count = 0,
+    this.pctWithin,
+    this.text = '—',
+    this.avgText = '—',
+    this.late = 0,
+    this.slaHours = const [],
+  });
+  final int count;
+  final double? pctWithin;
+
+  /// Server-formatted share (`92,5%`, `—`) and average duration (`1 hr 3 jam`) — same text as the web card.
+  final String text;
+  final String avgText;
+  final int late;
+  final List<int> slaHours;
+
+  static SlaSummary fromJson(Json m) => SlaSummary(
+    count: _i(m['count']),
+    pctWithin: _dN(m['pctWithin']),
+    text: m['text'] is String ? m['text'] as String : '—',
+    avgText: m['avgText'] is String ? m['avgText'] as String : '—',
+    late: _i(m['late']),
+    slaHours: [for (final h in m['slaHours'] is List ? m['slaHours'] as List : const []) _i(h)],
+  );
+}
+
+/// One project of "Pinjaman antar project" (top 5 by outstanding).
+class LoanProjectRow {
+  const LoanProjectRow({
+    required this.projectId,
+    required this.code,
+    required this.name,
+    this.outstandingBorrowed = 0,
+    this.outstandingLent = 0,
+    this.overdueBorrowed = 0,
+    this.overdueCount = 0,
+  });
+  final int projectId;
+  final String code;
+  final String name;
+  final int outstandingBorrowed;
+  final int outstandingLent;
+  final int overdueBorrowed;
+  final int overdueCount;
+}
+
+/// ADR 0022 §9 "Pinjaman antar project" (`loans`): office roles their PTs, PM the team projects.
+class LoanMonitor {
+  const LoanMonitor({
+    this.outstanding = 0,
+    this.overdue = 0,
+    this.overdueCount = 0,
+    this.pending = 0,
+    this.waitingForMe = 0,
+    this.projects = const [],
+  });
+  final int outstanding;
+  final int overdue;
+  final int overdueCount;
+  final int pending;
+  final int waitingForMe;
+  final List<LoanProjectRow> projects;
+
+  static LoanMonitor fromJson(Json m) {
+    final t = _m(m['totals']);
+    return LoanMonitor(
+      outstanding: _i(t['outstanding']),
+      overdue: _i(t['overdue']),
+      overdueCount: _i(t['overdueCount']),
+      pending: _i(t['pending']),
+      waitingForMe: _i(m['waitingForMe']),
+      projects: [
+        for (final p in _l(m['projects']))
+          LoanProjectRow(
+            projectId: _i(p['projectId']),
+            code: _s(p['code']),
+            name: _s(p['name']),
+            outstandingBorrowed: _i(p['outstandingBorrowed']),
+            outstandingLent: _i(p['outstandingLent']),
+            overdueBorrowed: _i(p['overdueBorrowed']),
+            overdueCount: _i(p['overdueCount']),
+          ),
+      ],
+    );
+  }
+}
+
+/// D4 (owner 2026-10-11) "Project ber-RAB belum punya RAP" (`rapMissing`; `team` = PM nudge).
+class RapMissingRow {
+  const RapMissingRow({required this.id, required this.code, required this.name, this.kindLabel = '', this.budget});
+  final int id;
+  final String code;
+  final String name;
+  final String kindLabel;
+  final int? budget;
+}
+
+class RapMissing {
+  const RapMissing({this.team = false, this.total = 0, this.rows = const []});
+  final bool team;
+  final int total;
+  final List<RapMissingRow> rows;
+
+  static RapMissing fromJson(Json m) => RapMissing(
+    team: m['team'] == true,
+    total: _i(m['total']),
+    rows: [
+      for (final r in _l(m['rows']))
+        RapMissingRow(
+          id: _i(r['id']),
+          code: _s(r['code']),
+          name: _s(r['name']),
+          kindLabel: _s(r['kindLabel']),
+          budget: _iN(r['budget']),
+        ),
+    ],
+  );
+}
+
+/// DRMS 10/10 "Monitoring RAP" (`rapMonitoring`): realisation vs plan per project with a RAP.
+class RapMonitorRow {
+  const RapMonitorRow({
+    required this.projectId,
+    required this.code,
+    required this.name,
+    this.planned,
+    this.realised = 0,
+    this.percent,
+    this.overBudget = false,
+    this.overBudgetItems = 0,
+  });
+  final int projectId;
+  final String code;
+  final String name;
+  final int? planned;
+  final int realised;
+  final double? percent;
+  final bool overBudget;
+  final int overBudgetItems;
+}
+
+class RapMonitor {
+  const RapMonitor({this.projects = 0, this.overProjects = 0, this.rows = const []});
+  final int projects;
+  final int overProjects;
+  final List<RapMonitorRow> rows;
+
+  static RapMonitor fromJson(Json m) => RapMonitor(
+    projects: _i(m['projects']),
+    overProjects: _i(m['overProjects']),
+    rows: [
+      for (final r in _l(m['rows']))
+        RapMonitorRow(
+          projectId: _i(r['projectId']),
+          code: _s(r['code']),
+          name: _s(r['name']),
+          planned: _iN(r['planned']),
+          realised: _i(r['realised']),
+          percent: _dN(r['percent']),
+          overBudget: r['overBudget'] == true,
+          overBudgetItems: _i(r['overBudgetItems']),
+        ),
+    ],
+  );
+}
+
+/// "Transaksi kas terbaru" (`viz.recentCash`, office roles).
+class RecentCashEntry {
+  const RecentCashEntry({
+    required this.id,
+    this.entryNo,
+    this.entryDate = '',
+    this.incoming = true,
+    this.amount = 0,
+    this.voided = false,
+    this.account = '',
+    this.label = '',
+  });
+  final int id;
+  final String? entryNo;
+  final String entryDate;
+  final bool incoming;
+  final int amount;
+  final bool voided;
+  final String account;
+  final String label;
+
+  static List<RecentCashEntry> listFromJson(Object? rows) => [
+    for (final r in _l(rows))
+      RecentCashEntry(
+        id: _i(r['id']),
+        entryNo: r['entryNo'] as String?,
+        entryDate: _s(r['entryDate']),
+        incoming: r['direction'] == 'in',
+        amount: _i(r['amount']),
+        voided: r['status'] == 'void',
+        account: _s(r['account']),
+        label: _s(r['requestDocNo'] ?? r['label']),
+      ),
+  ];
+}
+
+/// "Pusat biaya bulan ini" (K-15).
+class CostCenterMonth {
+  const CostCenterMonth(this.id, this.code, this.name, this.total);
+  final int id;
+  final String code;
+  final String name;
+  final int total;
+
+  static List<CostCenterMonth> listFromJson(Object? rows) => [
+    for (final c in _l(rows))
+      if (_i(c['total']) != 0) CostCenterMonth(_i(c['id']), _s(c['code']), _s(c['name']), _i(c['total'])),
+  ]..sort((a, b) => b.total.compareTo(a.total));
+}
+
+/// Finance "Pengajuan baru belum LPJ" (K-12a/b).
+class AdvanceWithoutLpj {
+  const AdvanceWithoutLpj({
+    required this.id,
+    this.docNo,
+    this.requesters = '',
+    this.amount = 0,
+    this.ageDays,
+    this.overdue = false,
+  });
+  final int id;
+  final String? docNo;
+  final String requesters;
+  final int amount;
+  final int? ageDays;
+  final bool overdue;
+}
+
 /// `GET /dashboard/owner` — Direktur home.
 class DirekturDashboard {
   const DirekturDashboard({
@@ -118,6 +501,17 @@ class DirekturDashboard {
     required this.cashFlow,
     required this.transferQueueCount,
     this.byCompany = const [],
+    this.pipeline = const Pipeline(),
+    this.categories = const CategoryMix(),
+    this.sla,
+    this.rapMonitor,
+    this.loans,
+    this.rapMissing,
+    this.requestTrend = const [],
+    this.accounts = const [],
+    this.completeness = const Completeness(),
+    this.recentCash = const [],
+    this.costCenters = const [],
   });
 
   final String asOf;
@@ -140,6 +534,19 @@ class DirekturDashboard {
 
   /// Per PT: cash total + waiting approvals (count/sum).
   final List<CompanySplit> byCompany;
+
+  // DRMS 13/10 Wave 3: the rest of the web "Ringkasan Direktur", in web order.
+  final Pipeline pipeline;
+  final CategoryMix categories;
+  final SlaSummary? sla;
+  final RapMonitor? rapMonitor;
+  final LoanMonitor? loans;
+  final RapMissing? rapMissing;
+  final List<RequestTrendPoint> requestTrend;
+  final List<AccountBalance> accounts;
+  final Completeness completeness;
+  final List<RecentCashEntry> recentCash;
+  final List<CostCenterMonth> costCenters;
 
   static DirekturDashboard fromJson(Json j) {
     final cash = _m(j['cash']);
@@ -165,6 +572,17 @@ class DirekturDashboard {
       cashFlow: _cashFlow(j['cashFlow']),
       transferQueueCount: _i(_m(j['transferQueue'])['count']),
       byCompany: _splits(j['companies'], cash: cash['byCompany'], counts: a['byCompany']),
+      pipeline: Pipeline.fromJson(viz['pipeline']),
+      categories: CategoryMix.fromJson(viz['categories']),
+      sla: _block(j['sla'], SlaSummary.fromJson),
+      rapMonitor: _block(j['rapMonitoring'], RapMonitor.fromJson),
+      loans: _block(j['loans'], LoanMonitor.fromJson),
+      rapMissing: _block(j['rapMissing'], RapMissing.fromJson),
+      requestTrend: _requestTrend(viz['requestTrend']),
+      accounts: AccountBalance.listFromJson(cash['accounts'], _codes(j['companies'])),
+      completeness: Completeness.fromJson(_m(j['completeness'])),
+      recentCash: RecentCashEntry.listFromJson(viz['recentCash']),
+      costCenters: CostCenterMonth.listFromJson(j['costCenters']),
     );
   }
 }
@@ -184,6 +602,16 @@ class FinanceDashboard {
     required this.balanceTrend,
     required this.cashFlow,
     this.byCompany = const [],
+    this.accounts = const [],
+    this.pipeline = const Pipeline(),
+    this.advancesWithoutLpj = const [],
+    this.lpjDueDays = 0,
+    this.recentCash = const [],
+    this.categories = const CategoryMix(),
+    this.sla,
+    this.loans,
+    this.lastClosedPeriod,
+    this.nextClosable = '',
   });
 
   final String asOf;
@@ -201,8 +629,23 @@ class FinanceDashboard {
   /// Per PT: cash total + transfer queue (count/sum).
   final List<CompanySplit> byCompany;
 
+  // DRMS 13/10 Wave 3: the rest of the web "Ringkasan Finance", in web order.
+  final List<AccountBalance> accounts;
+  final Pipeline pipeline;
+
+  /// Top 8 of `advancesWithoutLpj` (the web card shows 8).
+  final List<AdvanceWithoutLpj> advancesWithoutLpj;
+  final int lpjDueDays;
+  final List<RecentCashEntry> recentCash;
+  final CategoryMix categories;
+  final SlaSummary? sla;
+  final LoanMonitor? loans;
+  final String? lastClosedPeriod;
+  final String nextClosable;
+
   static FinanceDashboard fromJson(Json j) {
     final q = _m(j['transferQueue']);
+    final viz = _m(j['viz']);
     return FinanceDashboard(
       asOf: '${j['asOf'] ?? ''}',
       cashTotal: _i(j['cashTotal']),
@@ -213,9 +656,29 @@ class FinanceDashboard {
       reimburseToVerify: _i(_m(j['reimburseToVerify'])['count']),
       lpjToSettle: _i(_m(j['lpjToSettle'])['count']),
       advancesOverdue: _l(j['advancesWithoutLpj']).where((a) => a['overdue'] == true).length,
-      balanceTrend: _trend(_m(j['viz'])['balanceTrend'], 'balance'),
+      balanceTrend: _trend(viz['balanceTrend'], 'balance'),
       cashFlow: _cashFlow(j['cashFlow']),
       byCompany: _splits(j['companies'], cash: j['cashByCompany'], counts: q['byCompany']),
+      accounts: AccountBalance.listFromJson(j['accounts'], _codes(j['companies'])),
+      pipeline: Pipeline.fromJson(viz['pipeline']),
+      advancesWithoutLpj: [
+        for (final a in _l(j['advancesWithoutLpj']).take(8))
+          AdvanceWithoutLpj(
+            id: _i(a['id']),
+            docNo: a['docNo'] as String?,
+            requesters: _s(a['requesters']),
+            amount: _i(a['transferredTotal']),
+            ageDays: _iN(a['ageDays']),
+            overdue: a['overdue'] == true,
+          ),
+      ],
+      lpjDueDays: _i(j['lpjDueDays']),
+      recentCash: RecentCashEntry.listFromJson(viz['recentCash']),
+      categories: CategoryMix.fromJson(viz['categories']),
+      sla: _block(j['sla'], SlaSummary.fromJson),
+      loans: _block(j['loans'], LoanMonitor.fromJson),
+      lastClosedPeriod: j['lastClosedPeriod'] as String?,
+      nextClosable: _s(j['nextClosable']),
     );
   }
 }
@@ -233,6 +696,12 @@ class PmDashboard {
     required this.requestTrend,
     required this.budgetTotals,
     this.byCompany = const [],
+    this.rapMissing,
+    this.pipeline = const Pipeline(),
+    this.trend = const [],
+    this.categories = const CategoryMix(),
+    this.loans,
+    this.costCenters = const [],
   });
 
   final String asOf;
@@ -247,6 +716,16 @@ class PmDashboard {
 
   /// Per PT: team requests this month (count/sum/waiting).
   final List<CompanySplit> byCompany;
+
+  // DRMS 13/10 Wave 3: the rest of the web "Ringkasan PM", in web order.
+  final RapMissing? rapMissing;
+  final Pipeline pipeline;
+
+  /// `viz.requestTrend` with Σ grand total (the "Tren pengajuan tim" card; [requestTrend] = counts for the sparkline).
+  final List<RequestTrendPoint> trend;
+  final CategoryMix categories;
+  final LoanMonitor? loans;
+  final List<CostCenterMonth> costCenters;
 
   static PmDashboard fromJson(Json j) {
     final team = _m(j['teamMonth']);
@@ -263,6 +742,64 @@ class PmDashboard {
       requestTrend: _trend(viz['requestTrend'], 'count'),
       budgetTotals: BudgetTotals.fromJson(viz['budgetTotals']),
       byCompany: _splits(j['companies'], counts: j['teamMonthByCompany']),
+      rapMissing: _block(j['rapMissing'], RapMissing.fromJson),
+      pipeline: Pipeline.fromJson(viz['pipeline']),
+      trend: _requestTrend(viz['requestTrend']),
+      categories: CategoryMix.fromJson(viz['categories']),
+      loans: _block(j['loans'], LoanMonitor.fromJson),
+      costCenters: CostCenterMonth.listFromJson(j['costCenters']),
+    );
+  }
+}
+
+/// `GET /dashboard/me` — Staff home ("Ringkasan pengajuan saya"). Staff never sees money on the phone: only counts
+/// are parsed (no grand totals).
+class StaffDashboard {
+  const StaffDashboard({this.actions = 0, this.pipeline = const Pipeline(), this.trend = const []});
+
+  /// "Perlu tindakan saya": drafts, revisions, receipts or LPJ to send.
+  final int actions;
+  final Pipeline pipeline;
+
+  /// Requests per month (counts only).
+  final List<TrendPoint> trend;
+
+  /// "Sedang diproses" = waiting for a decision, in the transfer queue or in LPJ.
+  int get inProcess =>
+      pipeline.count('ack') + pipeline.count('approval') + pipeline.count('queue') + pipeline.count('lpj');
+  int get waitingDecision => pipeline.count('ack') + pipeline.count('approval');
+  int get done => pipeline.count('done');
+  int get exit => pipeline.exit?.count ?? 0;
+
+  static StaffDashboard fromJson(Json j) {
+    final viz = _m(j['viz']);
+    final p = Pipeline.fromJson(viz['pipeline']);
+    return StaffDashboard(
+      actions: _l(j['actions']).length,
+      // counts only: the stage sums are dropped on purpose
+      pipeline: Pipeline(
+        stages: [for (final s in p.stages) PipelineStage(key: s.key, label: s.label, count: s.count)],
+        exit: p.exit == null ? null : PipelineStage(key: p.exit!.key, label: p.exit!.label, count: p.exit!.count),
+        total: p.total,
+      ),
+      trend: _trend(viz['requestTrend'], 'count'),
+    );
+  }
+}
+
+/// `GET /dashboard/admin` — Admin home: master-data gaps (the audit log stays on the web).
+class AdminDashboard {
+  const AdminDashboard({this.usersIncomplete = 0, this.projectsWithoutPm = 0, this.costCentersWithoutManager = 0});
+  final int usersIncomplete;
+  final int projectsWithoutPm;
+  final int costCentersWithoutManager;
+
+  static AdminDashboard fromJson(Json j) {
+    final g = _m(j['gaps']);
+    return AdminDashboard(
+      usersIncomplete: _i(g['usersIncomplete']),
+      projectsWithoutPm: _i(g['projectsWithoutPm']),
+      costCentersWithoutManager: _i(g['costCentersWithoutManager']),
     );
   }
 }

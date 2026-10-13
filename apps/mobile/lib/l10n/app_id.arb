@@ -684,6 +684,361 @@
   },
   "kpiLpjNoneOverdue": "Tidak ada yang terlambat",
   "kpiTeamBudget": "Realisasi anggaran project saya",
+  "kpiMineTitle": "Pengajuan saya",
+  "kpiCountSum": "{count} · {amount}",
+  "@kpiCountSum": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "kpiPipelineTitle": "Status pengajuan",
+  "kpiPipelineSubtitle": "Posisi semua pengajuan saat ini",
+  "kpiPipelineTeamTitle": "Status pengajuan tim",
+  "kpiPipelineTeamSubtitle": "Posisi pengajuan tim saat ini",
+  "kpiPipelineMineTitle": "Status pengajuan saya",
+  "kpiPipelineMineSubtitle": "Semua pengajuan yang pernah diajukan",
+  "kpiPipelineEmpty": "Belum ada pengajuan yang diajukan.",
+  "kpiCategoriesTitle": "Komposisi biaya per kategori",
+  "kpiCategoriesSubtitle": "Dicairkan {from} – sekarang",
+  "@kpiCategoriesSubtitle": {
+    "placeholders": {
+      "from": {
+        "type": "String"
+      }
+    }
+  },
+  "kpiCategoriesSubtitleTeam": "Dicairkan 6 bulan terakhir, tim Anda",
+  "kpiCategoriesSubtitleFinance": "Dicairkan 6 bulan terakhir",
+  "kpiCategoriesEmpty": "Belum ada biaya yang dicairkan di rentang ini.",
+  "kpiSlaTitle": "SLA transfer",
+  "kpiSlaSubtitle": "Disetujui → ditransfer, bulan ini",
+  "kpiSlaSubtitleTarget": "Disetujui → ditransfer, bulan ini · target {hours} jam",
+  "@kpiSlaSubtitleTarget": {
+    "placeholders": {
+      "hours": {
+        "type": "int"
+      }
+    }
+  },
+  "kpiSlaOf": "dari {count} transfer dalam SLA",
+  "@kpiSlaOf": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "kpiSlaNone": "Belum ada transfer bulan ini.",
+  "kpiSlaAvgLate": "Rata-rata {avg} · terlambat {late}",
+  "@kpiSlaAvgLate": {
+    "placeholders": {
+      "avg": {
+        "type": "String"
+      },
+      "late": {
+        "type": "int"
+      }
+    }
+  },
+  "kpiRapMonitorTitle": "Monitoring RAP",
+  "kpiRapMonitorSubtitle": "{projects} project ber-RAP · {over} dengan item melebihi RAP",
+  "@kpiRapMonitorSubtitle": {
+    "placeholders": {
+      "projects": {
+        "type": "int"
+      },
+      "over": {
+        "type": "int"
+      }
+    }
+  },
+  "kpiRapMonitorSubtitleEmpty": "Realisasi pengajuan per item RAP",
+  "kpiRapMonitorEmpty": "Belum ada project dengan RAP.",
+  "kpiRapRealised": "Realisasi {realised} dari rencana {planned}",
+  "@kpiRapRealised": {
+    "placeholders": {
+      "realised": {
+        "type": "String"
+      },
+      "planned": {
+        "type": "String"
+      }
+    }
+  },
+  "kpiRapOverItems": "{count} item melebihi RAP",
+  "@kpiRapOverItems": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "kpiRapSafe": "Aman",
+  "kpiLoansTitle": "Pinjaman antar project",
+  "kpiLoansSubtitle": "Sisa {outstanding} · {overdue} terlambat · {pending} menunggu persetujuan",
+  "@kpiLoansSubtitle": {
+    "placeholders": {
+      "outstanding": {
+        "type": "String"
+      },
+      "overdue": {
+        "type": "int"
+      },
+      "pending": {
+        "type": "int"
+      }
+    }
+  },
+  "kpiLoansOverdueSum": "Terlambat {amount}",
+  "@kpiLoansOverdueSum": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "kpiLoansWaiting": "{count} pinjaman menunggu keputusan Anda",
+  "@kpiLoansWaiting": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "kpiLoansEmpty": "Belum ada pinjaman antar project yang disetujui.",
+  "kpiLoanRow": "Diterima (sisa) {borrowed} · Diberikan (sisa) {lent}",
+  "@kpiLoanRow": {
+    "placeholders": {
+      "borrowed": {
+        "type": "String"
+      },
+      "lent": {
+        "type": "String"
+      }
+    }
+  },
+  "kpiLoanOverdue": "{count} terlambat · {amount}",
+  "@kpiLoanOverdue": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "kpiLoanOnTime": "Tepat waktu",
+  "kpiRapMissingTitle": "Project ber-RAB belum punya RAP",
+  "kpiRapMissingTeamTitle": "Project Anda belum punya RAP",
+  "kpiRapMissingSubtitle": "{count} project · pengajuan project ini belum bisa dikirim sampai RAP diisi (minta PM mengisi)",
+  "@kpiRapMissingSubtitle": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "kpiRapMissingTeamSubtitle": "{count} project · pengajuan project ini belum bisa dikirim sampai RAP diisi",
+  "@kpiRapMissingTeamSubtitle": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "kpiRapMissingBudget": "{kind} · RAB {budget}",
+  "@kpiRapMissingBudget": {
+    "placeholders": {
+      "kind": {
+        "type": "String"
+      },
+      "budget": {
+        "type": "String"
+      }
+    }
+  },
+  "kpiRapFill": "Isi RAP",
+  "kpiTrendTitle": "Tren pengajuan",
+  "kpiTrendSubtitle": "Jumlah pengajuan per bulan (tanggal pengajuan). Ketuk bulan untuk melihat angkanya.",
+  "kpiTrendTeamTitle": "Tren pengajuan tim",
+  "kpiTrendTeamSubtitle": "Jumlah pengajuan per bulan, 6 bulan. Ketuk bulan untuk melihat angkanya.",
+  "kpiTrendMineTitle": "Pengajuan saya per bulan",
+  "kpiTrendMineSubtitle": "Jumlah pengajuan, 6 bulan, tanpa draft. Ketuk bulan untuk melihat angkanya.",
+  "kpiTrendEmpty": "Belum ada pengajuan di rentang ini.",
+  "kpiTrendReadout": "{period}: {count} pengajuan",
+  "@kpiTrendReadout": {
+    "placeholders": {
+      "period": {
+        "type": "String"
+      },
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "kpiTrendReadoutSum": "{period}: {count} pengajuan · {amount}",
+  "@kpiTrendReadoutSum": {
+    "placeholders": {
+      "period": {
+        "type": "String"
+      },
+      "count": {
+        "type": "int"
+      },
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "kpiAccountsTitle": "Saldo per akun",
+  "kpiAccountsSubtitle": "Akun nonaktif bersaldo 0 disembunyikan",
+  "kpiAccountsEmpty": "Belum ada akun kas.",
+  "kpiAccountInactive": "{name} (nonaktif)",
+  "@kpiAccountInactive": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "kpiAccountMonth": "Bulan ini masuk {cashIn} · keluar {cashOut}",
+  "@kpiAccountMonth": {
+    "placeholders": {
+      "cashIn": {
+        "type": "String"
+      },
+      "cashOut": {
+        "type": "String"
+      }
+    }
+  },
+  "kpiCompletenessTitle": "Kelengkapan nota/LPJ",
+  "kpiCompletenessRatio": "pengajuan baru bulan ini sudah LPJ",
+  "kpiCompletenessOverdue": "{count} LPJ terlambat",
+  "@kpiCompletenessOverdue": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "kpiCompletenessNoneOverdue": "Tidak ada LPJ terlambat",
+  "kpiCompletenessWithoutLpj": "{count} pengajuan baru belum LPJ",
+  "@kpiCompletenessWithoutLpj": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "kpiCompletenessReimburse": "{count} nota reimburse menunggu verifikasi",
+  "@kpiCompletenessReimburse": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "kpiCompletenessWarnings": "{count} flag peringatan terbuka",
+  "@kpiCompletenessWarnings": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "kpiRecentCashTitle": "Transaksi kas terbaru",
+  "kpiRecentCashSubtitle": "Buku kas, termasuk void & jurnal balik",
+  "kpiRecentCashEmpty": "Belum ada transaksi kas.",
+  "kpiVoid": "Void",
+  "kpiCostCentersTitle": "Pusat biaya bulan ini",
+  "kpiCostCentersTeamTitle": "Pusat biaya saya bulan ini",
+  "kpiCostCentersEmpty": "Belum ada biaya pusat biaya bulan ini.",
+  "kpiAdvancesTitle": "Pengajuan baru belum LPJ",
+  "kpiAdvancesSubtitle": "Terlambat bila lebih dari {days} hari sejak transfer pertama",
+  "@kpiAdvancesSubtitle": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      }
+    }
+  },
+  "kpiAdvancesEmpty": "Semua pengajuan baru sudah ber-LPJ.",
+  "kpiAdvanceAge": "{days} hr",
+  "@kpiAdvanceAge": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      }
+    }
+  },
+  "kpiAdvanceLate": "{days} hr terlambat",
+  "@kpiAdvanceLate": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      }
+    }
+  },
+  "kpiPeriodCloseTitle": "Tutup buku",
+  "kpiPeriodClosed": "Bulan terakhir ditutup: {period}",
+  "@kpiPeriodClosed": {
+    "placeholders": {
+      "period": {
+        "type": "String"
+      }
+    }
+  },
+  "kpiPeriodNever": "Belum pernah tutup buku.",
+  "kpiPeriodNext": "Bulan yang bisa ditutup: {period} (bulan lampau saja).",
+  "@kpiPeriodNext": {
+    "placeholders": {
+      "period": {
+        "type": "String"
+      }
+    }
+  },
+  "kpiMyActions": "Perlu tindakan saya",
+  "kpiMyActionsNone": "Tidak ada yang perlu Anda kerjakan",
+  "kpiMyActionsHint": "draft, revisi, nota atau LPJ",
+  "kpiMyProcess": "Sedang diproses",
+  "kpiMyProcessWaiting": "menunggu persetujuan {count}",
+  "@kpiMyProcessWaiting": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "kpiMyMonth": "Pengajuan {month}",
+  "@kpiMyMonth": {
+    "placeholders": {
+      "month": {
+        "type": "String"
+      }
+    }
+  },
+  "kpiMyDone": "Selesai",
+  "kpiMyExit": "{count} ditolak/dibatalkan",
+  "@kpiMyExit": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "kpiAdminUsers": "User tanpa karyawan/peran",
+  "kpiAdminProjects": "Project tanpa PM",
+  "kpiAdminCostCenters": "Pusat biaya tanpa penanggung jawab",
+  "kpiAdminComplete": "Lengkap",
+  "kpiAdminIncomplete": "Perlu dilengkapi",
+  "kpiAdminWebHint": "Lengkapi data master dan lihat audit log di web admin.",
   "routeErrorTitle": "Halaman tidak bisa dibuka",
   "routeErrorBody": "Terjadi kesalahan saat membuka halaman ini. Kembali ke beranda lalu coba lagi.",
   "routeErrorHome": "Ke beranda",

@@ -2203,6 +2203,558 @@ abstract class AppLocalizations {
   /// **'Realisasi anggaran project saya'**
   String get kpiTeamBudget;
 
+  /// No description provided for @kpiMineTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Pengajuan saya'**
+  String get kpiMineTitle;
+
+  /// No description provided for @kpiCountSum.
+  ///
+  /// In id, this message translates to:
+  /// **'{count} · {amount}'**
+  String kpiCountSum(int count, String amount);
+
+  /// No description provided for @kpiPipelineTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Status pengajuan'**
+  String get kpiPipelineTitle;
+
+  /// No description provided for @kpiPipelineSubtitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Posisi semua pengajuan saat ini'**
+  String get kpiPipelineSubtitle;
+
+  /// No description provided for @kpiPipelineTeamTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Status pengajuan tim'**
+  String get kpiPipelineTeamTitle;
+
+  /// No description provided for @kpiPipelineTeamSubtitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Posisi pengajuan tim saat ini'**
+  String get kpiPipelineTeamSubtitle;
+
+  /// No description provided for @kpiPipelineMineTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Status pengajuan saya'**
+  String get kpiPipelineMineTitle;
+
+  /// No description provided for @kpiPipelineMineSubtitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Semua pengajuan yang pernah diajukan'**
+  String get kpiPipelineMineSubtitle;
+
+  /// No description provided for @kpiPipelineEmpty.
+  ///
+  /// In id, this message translates to:
+  /// **'Belum ada pengajuan yang diajukan.'**
+  String get kpiPipelineEmpty;
+
+  /// No description provided for @kpiCategoriesTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Komposisi biaya per kategori'**
+  String get kpiCategoriesTitle;
+
+  /// No description provided for @kpiCategoriesSubtitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Dicairkan {from} – sekarang'**
+  String kpiCategoriesSubtitle(String from);
+
+  /// No description provided for @kpiCategoriesSubtitleTeam.
+  ///
+  /// In id, this message translates to:
+  /// **'Dicairkan 6 bulan terakhir, tim Anda'**
+  String get kpiCategoriesSubtitleTeam;
+
+  /// No description provided for @kpiCategoriesSubtitleFinance.
+  ///
+  /// In id, this message translates to:
+  /// **'Dicairkan 6 bulan terakhir'**
+  String get kpiCategoriesSubtitleFinance;
+
+  /// No description provided for @kpiCategoriesEmpty.
+  ///
+  /// In id, this message translates to:
+  /// **'Belum ada biaya yang dicairkan di rentang ini.'**
+  String get kpiCategoriesEmpty;
+
+  /// No description provided for @kpiSlaTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'SLA transfer'**
+  String get kpiSlaTitle;
+
+  /// No description provided for @kpiSlaSubtitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Disetujui → ditransfer, bulan ini'**
+  String get kpiSlaSubtitle;
+
+  /// No description provided for @kpiSlaSubtitleTarget.
+  ///
+  /// In id, this message translates to:
+  /// **'Disetujui → ditransfer, bulan ini · target {hours} jam'**
+  String kpiSlaSubtitleTarget(int hours);
+
+  /// No description provided for @kpiSlaOf.
+  ///
+  /// In id, this message translates to:
+  /// **'dari {count} transfer dalam SLA'**
+  String kpiSlaOf(int count);
+
+  /// No description provided for @kpiSlaNone.
+  ///
+  /// In id, this message translates to:
+  /// **'Belum ada transfer bulan ini.'**
+  String get kpiSlaNone;
+
+  /// No description provided for @kpiSlaAvgLate.
+  ///
+  /// In id, this message translates to:
+  /// **'Rata-rata {avg} · terlambat {late}'**
+  String kpiSlaAvgLate(String avg, int late);
+
+  /// No description provided for @kpiRapMonitorTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Monitoring RAP'**
+  String get kpiRapMonitorTitle;
+
+  /// No description provided for @kpiRapMonitorSubtitle.
+  ///
+  /// In id, this message translates to:
+  /// **'{projects} project ber-RAP · {over} dengan item melebihi RAP'**
+  String kpiRapMonitorSubtitle(int projects, int over);
+
+  /// No description provided for @kpiRapMonitorSubtitleEmpty.
+  ///
+  /// In id, this message translates to:
+  /// **'Realisasi pengajuan per item RAP'**
+  String get kpiRapMonitorSubtitleEmpty;
+
+  /// No description provided for @kpiRapMonitorEmpty.
+  ///
+  /// In id, this message translates to:
+  /// **'Belum ada project dengan RAP.'**
+  String get kpiRapMonitorEmpty;
+
+  /// No description provided for @kpiRapRealised.
+  ///
+  /// In id, this message translates to:
+  /// **'Realisasi {realised} dari rencana {planned}'**
+  String kpiRapRealised(String realised, String planned);
+
+  /// No description provided for @kpiRapOverItems.
+  ///
+  /// In id, this message translates to:
+  /// **'{count} item melebihi RAP'**
+  String kpiRapOverItems(int count);
+
+  /// No description provided for @kpiRapSafe.
+  ///
+  /// In id, this message translates to:
+  /// **'Aman'**
+  String get kpiRapSafe;
+
+  /// No description provided for @kpiLoansTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Pinjaman antar project'**
+  String get kpiLoansTitle;
+
+  /// No description provided for @kpiLoansSubtitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Sisa {outstanding} · {overdue} terlambat · {pending} menunggu persetujuan'**
+  String kpiLoansSubtitle(String outstanding, int overdue, int pending);
+
+  /// No description provided for @kpiLoansOverdueSum.
+  ///
+  /// In id, this message translates to:
+  /// **'Terlambat {amount}'**
+  String kpiLoansOverdueSum(String amount);
+
+  /// No description provided for @kpiLoansWaiting.
+  ///
+  /// In id, this message translates to:
+  /// **'{count} pinjaman menunggu keputusan Anda'**
+  String kpiLoansWaiting(int count);
+
+  /// No description provided for @kpiLoansEmpty.
+  ///
+  /// In id, this message translates to:
+  /// **'Belum ada pinjaman antar project yang disetujui.'**
+  String get kpiLoansEmpty;
+
+  /// No description provided for @kpiLoanRow.
+  ///
+  /// In id, this message translates to:
+  /// **'Diterima (sisa) {borrowed} · Diberikan (sisa) {lent}'**
+  String kpiLoanRow(String borrowed, String lent);
+
+  /// No description provided for @kpiLoanOverdue.
+  ///
+  /// In id, this message translates to:
+  /// **'{count} terlambat · {amount}'**
+  String kpiLoanOverdue(int count, String amount);
+
+  /// No description provided for @kpiLoanOnTime.
+  ///
+  /// In id, this message translates to:
+  /// **'Tepat waktu'**
+  String get kpiLoanOnTime;
+
+  /// No description provided for @kpiRapMissingTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Project ber-RAB belum punya RAP'**
+  String get kpiRapMissingTitle;
+
+  /// No description provided for @kpiRapMissingTeamTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Project Anda belum punya RAP'**
+  String get kpiRapMissingTeamTitle;
+
+  /// No description provided for @kpiRapMissingSubtitle.
+  ///
+  /// In id, this message translates to:
+  /// **'{count} project · pengajuan project ini belum bisa dikirim sampai RAP diisi (minta PM mengisi)'**
+  String kpiRapMissingSubtitle(int count);
+
+  /// No description provided for @kpiRapMissingTeamSubtitle.
+  ///
+  /// In id, this message translates to:
+  /// **'{count} project · pengajuan project ini belum bisa dikirim sampai RAP diisi'**
+  String kpiRapMissingTeamSubtitle(int count);
+
+  /// No description provided for @kpiRapMissingBudget.
+  ///
+  /// In id, this message translates to:
+  /// **'{kind} · RAB {budget}'**
+  String kpiRapMissingBudget(String kind, String budget);
+
+  /// No description provided for @kpiRapFill.
+  ///
+  /// In id, this message translates to:
+  /// **'Isi RAP'**
+  String get kpiRapFill;
+
+  /// No description provided for @kpiTrendTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Tren pengajuan'**
+  String get kpiTrendTitle;
+
+  /// No description provided for @kpiTrendSubtitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Jumlah pengajuan per bulan (tanggal pengajuan). Ketuk bulan untuk melihat angkanya.'**
+  String get kpiTrendSubtitle;
+
+  /// No description provided for @kpiTrendTeamTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Tren pengajuan tim'**
+  String get kpiTrendTeamTitle;
+
+  /// No description provided for @kpiTrendTeamSubtitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Jumlah pengajuan per bulan, 6 bulan. Ketuk bulan untuk melihat angkanya.'**
+  String get kpiTrendTeamSubtitle;
+
+  /// No description provided for @kpiTrendMineTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Pengajuan saya per bulan'**
+  String get kpiTrendMineTitle;
+
+  /// No description provided for @kpiTrendMineSubtitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Jumlah pengajuan, 6 bulan, tanpa draft. Ketuk bulan untuk melihat angkanya.'**
+  String get kpiTrendMineSubtitle;
+
+  /// No description provided for @kpiTrendEmpty.
+  ///
+  /// In id, this message translates to:
+  /// **'Belum ada pengajuan di rentang ini.'**
+  String get kpiTrendEmpty;
+
+  /// No description provided for @kpiTrendReadout.
+  ///
+  /// In id, this message translates to:
+  /// **'{period}: {count} pengajuan'**
+  String kpiTrendReadout(String period, int count);
+
+  /// No description provided for @kpiTrendReadoutSum.
+  ///
+  /// In id, this message translates to:
+  /// **'{period}: {count} pengajuan · {amount}'**
+  String kpiTrendReadoutSum(String period, int count, String amount);
+
+  /// No description provided for @kpiAccountsTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Saldo per akun'**
+  String get kpiAccountsTitle;
+
+  /// No description provided for @kpiAccountsSubtitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Akun nonaktif bersaldo 0 disembunyikan'**
+  String get kpiAccountsSubtitle;
+
+  /// No description provided for @kpiAccountsEmpty.
+  ///
+  /// In id, this message translates to:
+  /// **'Belum ada akun kas.'**
+  String get kpiAccountsEmpty;
+
+  /// No description provided for @kpiAccountInactive.
+  ///
+  /// In id, this message translates to:
+  /// **'{name} (nonaktif)'**
+  String kpiAccountInactive(String name);
+
+  /// No description provided for @kpiAccountMonth.
+  ///
+  /// In id, this message translates to:
+  /// **'Bulan ini masuk {cashIn} · keluar {cashOut}'**
+  String kpiAccountMonth(String cashIn, String cashOut);
+
+  /// No description provided for @kpiCompletenessTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Kelengkapan nota/LPJ'**
+  String get kpiCompletenessTitle;
+
+  /// No description provided for @kpiCompletenessRatio.
+  ///
+  /// In id, this message translates to:
+  /// **'pengajuan baru bulan ini sudah LPJ'**
+  String get kpiCompletenessRatio;
+
+  /// No description provided for @kpiCompletenessOverdue.
+  ///
+  /// In id, this message translates to:
+  /// **'{count} LPJ terlambat'**
+  String kpiCompletenessOverdue(int count);
+
+  /// No description provided for @kpiCompletenessNoneOverdue.
+  ///
+  /// In id, this message translates to:
+  /// **'Tidak ada LPJ terlambat'**
+  String get kpiCompletenessNoneOverdue;
+
+  /// No description provided for @kpiCompletenessWithoutLpj.
+  ///
+  /// In id, this message translates to:
+  /// **'{count} pengajuan baru belum LPJ'**
+  String kpiCompletenessWithoutLpj(int count);
+
+  /// No description provided for @kpiCompletenessReimburse.
+  ///
+  /// In id, this message translates to:
+  /// **'{count} nota reimburse menunggu verifikasi'**
+  String kpiCompletenessReimburse(int count);
+
+  /// No description provided for @kpiCompletenessWarnings.
+  ///
+  /// In id, this message translates to:
+  /// **'{count} flag peringatan terbuka'**
+  String kpiCompletenessWarnings(int count);
+
+  /// No description provided for @kpiRecentCashTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Transaksi kas terbaru'**
+  String get kpiRecentCashTitle;
+
+  /// No description provided for @kpiRecentCashSubtitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Buku kas, termasuk void & jurnal balik'**
+  String get kpiRecentCashSubtitle;
+
+  /// No description provided for @kpiRecentCashEmpty.
+  ///
+  /// In id, this message translates to:
+  /// **'Belum ada transaksi kas.'**
+  String get kpiRecentCashEmpty;
+
+  /// No description provided for @kpiVoid.
+  ///
+  /// In id, this message translates to:
+  /// **'Void'**
+  String get kpiVoid;
+
+  /// No description provided for @kpiCostCentersTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Pusat biaya bulan ini'**
+  String get kpiCostCentersTitle;
+
+  /// No description provided for @kpiCostCentersTeamTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Pusat biaya saya bulan ini'**
+  String get kpiCostCentersTeamTitle;
+
+  /// No description provided for @kpiCostCentersEmpty.
+  ///
+  /// In id, this message translates to:
+  /// **'Belum ada biaya pusat biaya bulan ini.'**
+  String get kpiCostCentersEmpty;
+
+  /// No description provided for @kpiAdvancesTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Pengajuan baru belum LPJ'**
+  String get kpiAdvancesTitle;
+
+  /// No description provided for @kpiAdvancesSubtitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Terlambat bila lebih dari {days} hari sejak transfer pertama'**
+  String kpiAdvancesSubtitle(int days);
+
+  /// No description provided for @kpiAdvancesEmpty.
+  ///
+  /// In id, this message translates to:
+  /// **'Semua pengajuan baru sudah ber-LPJ.'**
+  String get kpiAdvancesEmpty;
+
+  /// No description provided for @kpiAdvanceAge.
+  ///
+  /// In id, this message translates to:
+  /// **'{days} hr'**
+  String kpiAdvanceAge(int days);
+
+  /// No description provided for @kpiAdvanceLate.
+  ///
+  /// In id, this message translates to:
+  /// **'{days} hr terlambat'**
+  String kpiAdvanceLate(int days);
+
+  /// No description provided for @kpiPeriodCloseTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Tutup buku'**
+  String get kpiPeriodCloseTitle;
+
+  /// No description provided for @kpiPeriodClosed.
+  ///
+  /// In id, this message translates to:
+  /// **'Bulan terakhir ditutup: {period}'**
+  String kpiPeriodClosed(String period);
+
+  /// No description provided for @kpiPeriodNever.
+  ///
+  /// In id, this message translates to:
+  /// **'Belum pernah tutup buku.'**
+  String get kpiPeriodNever;
+
+  /// No description provided for @kpiPeriodNext.
+  ///
+  /// In id, this message translates to:
+  /// **'Bulan yang bisa ditutup: {period} (bulan lampau saja).'**
+  String kpiPeriodNext(String period);
+
+  /// No description provided for @kpiMyActions.
+  ///
+  /// In id, this message translates to:
+  /// **'Perlu tindakan saya'**
+  String get kpiMyActions;
+
+  /// No description provided for @kpiMyActionsNone.
+  ///
+  /// In id, this message translates to:
+  /// **'Tidak ada yang perlu Anda kerjakan'**
+  String get kpiMyActionsNone;
+
+  /// No description provided for @kpiMyActionsHint.
+  ///
+  /// In id, this message translates to:
+  /// **'draft, revisi, nota atau LPJ'**
+  String get kpiMyActionsHint;
+
+  /// No description provided for @kpiMyProcess.
+  ///
+  /// In id, this message translates to:
+  /// **'Sedang diproses'**
+  String get kpiMyProcess;
+
+  /// No description provided for @kpiMyProcessWaiting.
+  ///
+  /// In id, this message translates to:
+  /// **'menunggu persetujuan {count}'**
+  String kpiMyProcessWaiting(int count);
+
+  /// No description provided for @kpiMyMonth.
+  ///
+  /// In id, this message translates to:
+  /// **'Pengajuan {month}'**
+  String kpiMyMonth(String month);
+
+  /// No description provided for @kpiMyDone.
+  ///
+  /// In id, this message translates to:
+  /// **'Selesai'**
+  String get kpiMyDone;
+
+  /// No description provided for @kpiMyExit.
+  ///
+  /// In id, this message translates to:
+  /// **'{count} ditolak/dibatalkan'**
+  String kpiMyExit(int count);
+
+  /// No description provided for @kpiAdminUsers.
+  ///
+  /// In id, this message translates to:
+  /// **'User tanpa karyawan/peran'**
+  String get kpiAdminUsers;
+
+  /// No description provided for @kpiAdminProjects.
+  ///
+  /// In id, this message translates to:
+  /// **'Project tanpa PM'**
+  String get kpiAdminProjects;
+
+  /// No description provided for @kpiAdminCostCenters.
+  ///
+  /// In id, this message translates to:
+  /// **'Pusat biaya tanpa penanggung jawab'**
+  String get kpiAdminCostCenters;
+
+  /// No description provided for @kpiAdminComplete.
+  ///
+  /// In id, this message translates to:
+  /// **'Lengkap'**
+  String get kpiAdminComplete;
+
+  /// No description provided for @kpiAdminIncomplete.
+  ///
+  /// In id, this message translates to:
+  /// **'Perlu dilengkapi'**
+  String get kpiAdminIncomplete;
+
+  /// No description provided for @kpiAdminWebHint.
+  ///
+  /// In id, this message translates to:
+  /// **'Lengkapi data master dan lihat audit log di web admin.'**
+  String get kpiAdminWebHint;
+
   /// No description provided for @routeErrorTitle.
   ///
   /// In id, this message translates to:

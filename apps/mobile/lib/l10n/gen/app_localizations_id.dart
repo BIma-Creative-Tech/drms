@@ -1165,6 +1165,346 @@ class AppLocalizationsId extends AppLocalizations {
   String get kpiTeamBudget => 'Realisasi anggaran project saya';
 
   @override
+  String get kpiMineTitle => 'Pengajuan saya';
+
+  @override
+  String kpiCountSum(int count, String amount) {
+    return '$count · $amount';
+  }
+
+  @override
+  String get kpiPipelineTitle => 'Status pengajuan';
+
+  @override
+  String get kpiPipelineSubtitle => 'Posisi semua pengajuan saat ini';
+
+  @override
+  String get kpiPipelineTeamTitle => 'Status pengajuan tim';
+
+  @override
+  String get kpiPipelineTeamSubtitle => 'Posisi pengajuan tim saat ini';
+
+  @override
+  String get kpiPipelineMineTitle => 'Status pengajuan saya';
+
+  @override
+  String get kpiPipelineMineSubtitle => 'Semua pengajuan yang pernah diajukan';
+
+  @override
+  String get kpiPipelineEmpty => 'Belum ada pengajuan yang diajukan.';
+
+  @override
+  String get kpiCategoriesTitle => 'Komposisi biaya per kategori';
+
+  @override
+  String kpiCategoriesSubtitle(String from) {
+    return 'Dicairkan $from – sekarang';
+  }
+
+  @override
+  String get kpiCategoriesSubtitleTeam => 'Dicairkan 6 bulan terakhir, tim Anda';
+
+  @override
+  String get kpiCategoriesSubtitleFinance => 'Dicairkan 6 bulan terakhir';
+
+  @override
+  String get kpiCategoriesEmpty => 'Belum ada biaya yang dicairkan di rentang ini.';
+
+  @override
+  String get kpiSlaTitle => 'SLA transfer';
+
+  @override
+  String get kpiSlaSubtitle => 'Disetujui → ditransfer, bulan ini';
+
+  @override
+  String kpiSlaSubtitleTarget(int hours) {
+    return 'Disetujui → ditransfer, bulan ini · target $hours jam';
+  }
+
+  @override
+  String kpiSlaOf(int count) {
+    return 'dari $count transfer dalam SLA';
+  }
+
+  @override
+  String get kpiSlaNone => 'Belum ada transfer bulan ini.';
+
+  @override
+  String kpiSlaAvgLate(String avg, int late) {
+    return 'Rata-rata $avg · terlambat $late';
+  }
+
+  @override
+  String get kpiRapMonitorTitle => 'Monitoring RAP';
+
+  @override
+  String kpiRapMonitorSubtitle(int projects, int over) {
+    return '$projects project ber-RAP · $over dengan item melebihi RAP';
+  }
+
+  @override
+  String get kpiRapMonitorSubtitleEmpty => 'Realisasi pengajuan per item RAP';
+
+  @override
+  String get kpiRapMonitorEmpty => 'Belum ada project dengan RAP.';
+
+  @override
+  String kpiRapRealised(String realised, String planned) {
+    return 'Realisasi $realised dari rencana $planned';
+  }
+
+  @override
+  String kpiRapOverItems(int count) {
+    return '$count item melebihi RAP';
+  }
+
+  @override
+  String get kpiRapSafe => 'Aman';
+
+  @override
+  String get kpiLoansTitle => 'Pinjaman antar project';
+
+  @override
+  String kpiLoansSubtitle(String outstanding, int overdue, int pending) {
+    return 'Sisa $outstanding · $overdue terlambat · $pending menunggu persetujuan';
+  }
+
+  @override
+  String kpiLoansOverdueSum(String amount) {
+    return 'Terlambat $amount';
+  }
+
+  @override
+  String kpiLoansWaiting(int count) {
+    return '$count pinjaman menunggu keputusan Anda';
+  }
+
+  @override
+  String get kpiLoansEmpty => 'Belum ada pinjaman antar project yang disetujui.';
+
+  @override
+  String kpiLoanRow(String borrowed, String lent) {
+    return 'Diterima (sisa) $borrowed · Diberikan (sisa) $lent';
+  }
+
+  @override
+  String kpiLoanOverdue(int count, String amount) {
+    return '$count terlambat · $amount';
+  }
+
+  @override
+  String get kpiLoanOnTime => 'Tepat waktu';
+
+  @override
+  String get kpiRapMissingTitle => 'Project ber-RAB belum punya RAP';
+
+  @override
+  String get kpiRapMissingTeamTitle => 'Project Anda belum punya RAP';
+
+  @override
+  String kpiRapMissingSubtitle(int count) {
+    return '$count project · pengajuan project ini belum bisa dikirim sampai RAP diisi (minta PM mengisi)';
+  }
+
+  @override
+  String kpiRapMissingTeamSubtitle(int count) {
+    return '$count project · pengajuan project ini belum bisa dikirim sampai RAP diisi';
+  }
+
+  @override
+  String kpiRapMissingBudget(String kind, String budget) {
+    return '$kind · RAB $budget';
+  }
+
+  @override
+  String get kpiRapFill => 'Isi RAP';
+
+  @override
+  String get kpiTrendTitle => 'Tren pengajuan';
+
+  @override
+  String get kpiTrendSubtitle => 'Jumlah pengajuan per bulan (tanggal pengajuan). Ketuk bulan untuk melihat angkanya.';
+
+  @override
+  String get kpiTrendTeamTitle => 'Tren pengajuan tim';
+
+  @override
+  String get kpiTrendTeamSubtitle => 'Jumlah pengajuan per bulan, 6 bulan. Ketuk bulan untuk melihat angkanya.';
+
+  @override
+  String get kpiTrendMineTitle => 'Pengajuan saya per bulan';
+
+  @override
+  String get kpiTrendMineSubtitle => 'Jumlah pengajuan, 6 bulan, tanpa draft. Ketuk bulan untuk melihat angkanya.';
+
+  @override
+  String get kpiTrendEmpty => 'Belum ada pengajuan di rentang ini.';
+
+  @override
+  String kpiTrendReadout(String period, int count) {
+    return '$period: $count pengajuan';
+  }
+
+  @override
+  String kpiTrendReadoutSum(String period, int count, String amount) {
+    return '$period: $count pengajuan · $amount';
+  }
+
+  @override
+  String get kpiAccountsTitle => 'Saldo per akun';
+
+  @override
+  String get kpiAccountsSubtitle => 'Akun nonaktif bersaldo 0 disembunyikan';
+
+  @override
+  String get kpiAccountsEmpty => 'Belum ada akun kas.';
+
+  @override
+  String kpiAccountInactive(String name) {
+    return '$name (nonaktif)';
+  }
+
+  @override
+  String kpiAccountMonth(String cashIn, String cashOut) {
+    return 'Bulan ini masuk $cashIn · keluar $cashOut';
+  }
+
+  @override
+  String get kpiCompletenessTitle => 'Kelengkapan nota/LPJ';
+
+  @override
+  String get kpiCompletenessRatio => 'pengajuan baru bulan ini sudah LPJ';
+
+  @override
+  String kpiCompletenessOverdue(int count) {
+    return '$count LPJ terlambat';
+  }
+
+  @override
+  String get kpiCompletenessNoneOverdue => 'Tidak ada LPJ terlambat';
+
+  @override
+  String kpiCompletenessWithoutLpj(int count) {
+    return '$count pengajuan baru belum LPJ';
+  }
+
+  @override
+  String kpiCompletenessReimburse(int count) {
+    return '$count nota reimburse menunggu verifikasi';
+  }
+
+  @override
+  String kpiCompletenessWarnings(int count) {
+    return '$count flag peringatan terbuka';
+  }
+
+  @override
+  String get kpiRecentCashTitle => 'Transaksi kas terbaru';
+
+  @override
+  String get kpiRecentCashSubtitle => 'Buku kas, termasuk void & jurnal balik';
+
+  @override
+  String get kpiRecentCashEmpty => 'Belum ada transaksi kas.';
+
+  @override
+  String get kpiVoid => 'Void';
+
+  @override
+  String get kpiCostCentersTitle => 'Pusat biaya bulan ini';
+
+  @override
+  String get kpiCostCentersTeamTitle => 'Pusat biaya saya bulan ini';
+
+  @override
+  String get kpiCostCentersEmpty => 'Belum ada biaya pusat biaya bulan ini.';
+
+  @override
+  String get kpiAdvancesTitle => 'Pengajuan baru belum LPJ';
+
+  @override
+  String kpiAdvancesSubtitle(int days) {
+    return 'Terlambat bila lebih dari $days hari sejak transfer pertama';
+  }
+
+  @override
+  String get kpiAdvancesEmpty => 'Semua pengajuan baru sudah ber-LPJ.';
+
+  @override
+  String kpiAdvanceAge(int days) {
+    return '$days hr';
+  }
+
+  @override
+  String kpiAdvanceLate(int days) {
+    return '$days hr terlambat';
+  }
+
+  @override
+  String get kpiPeriodCloseTitle => 'Tutup buku';
+
+  @override
+  String kpiPeriodClosed(String period) {
+    return 'Bulan terakhir ditutup: $period';
+  }
+
+  @override
+  String get kpiPeriodNever => 'Belum pernah tutup buku.';
+
+  @override
+  String kpiPeriodNext(String period) {
+    return 'Bulan yang bisa ditutup: $period (bulan lampau saja).';
+  }
+
+  @override
+  String get kpiMyActions => 'Perlu tindakan saya';
+
+  @override
+  String get kpiMyActionsNone => 'Tidak ada yang perlu Anda kerjakan';
+
+  @override
+  String get kpiMyActionsHint => 'draft, revisi, nota atau LPJ';
+
+  @override
+  String get kpiMyProcess => 'Sedang diproses';
+
+  @override
+  String kpiMyProcessWaiting(int count) {
+    return 'menunggu persetujuan $count';
+  }
+
+  @override
+  String kpiMyMonth(String month) {
+    return 'Pengajuan $month';
+  }
+
+  @override
+  String get kpiMyDone => 'Selesai';
+
+  @override
+  String kpiMyExit(int count) {
+    return '$count ditolak/dibatalkan';
+  }
+
+  @override
+  String get kpiAdminUsers => 'User tanpa karyawan/peran';
+
+  @override
+  String get kpiAdminProjects => 'Project tanpa PM';
+
+  @override
+  String get kpiAdminCostCenters => 'Pusat biaya tanpa penanggung jawab';
+
+  @override
+  String get kpiAdminComplete => 'Lengkap';
+
+  @override
+  String get kpiAdminIncomplete => 'Perlu dilengkapi';
+
+  @override
+  String get kpiAdminWebHint => 'Lengkapi data master dan lihat audit log di web admin.';
+
+  @override
   String get routeErrorTitle => 'Halaman tidak bisa dibuka';
 
   @override
