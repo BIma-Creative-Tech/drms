@@ -16,7 +16,7 @@ import { resetRateLimits } from '@/lib/rate-limit'
 
 import { api, asUser, draftBody, sysCreate, type FlowUser } from './flow-world'
 import { makeFr1World, type Fr1World } from './fr1-world'
-import { auditRows, fixturePm, getTestPayload, installLocalJwks, updateCompany } from './helpers'
+import { auditRows, companyId, fixturePm, getTestPayload, installLocalJwks, updateCompany } from './helpers'
 
 /**
  * DRMS 13/10 Wave 3 "Proyek › RAP": the RAP index (/admin/rap) and the RAP page of one project (/admin/rap/:id)
@@ -125,7 +125,8 @@ describe('owner 2026-10-13: a used item ("Sudah terpakai") stays editable, any c
   let proj = 0
 
   it('PM: used item without reason → 400 field reason; with reason → 200 + audit row with the reason; unused item → no reason; RAP not locked', async () => {
-    proj = await sysCreate('projects', { code: `${tag}-USE`, name: `${tag} Pagar gudang`, kind: 'umum', pm: w.users.pm.id, budget: 10_000_000, status: 'berjalan' }, { rap: false })
+    // the foreign PT of this file exists by now → name the world PT explicitly
+    proj = await sysCreate('projects', { company: await companyId(), code: `${tag}-USE`, name: `${tag} Pagar gudang`, kind: 'umum', pm: w.users.pm.id, budget: 10_000_000, status: 'berjalan' }, { rap: false })
     await sysCreate('team-assignments', { employee: w.emp.a, project: proj, roleInProject: 'staff' })
     for (const [code, description] of [
       ['U.1', 'Besi beton'],
