@@ -4,7 +4,7 @@ import { renderToString } from 'react-dom/server'
 import { beforeAll, describe, expect, it, vi } from 'vitest'
 
 import { withCompanyContext, type Role } from '@/access/roles'
-import { activeHref, entityModuleMap, MODULES, moduleForPath, resolveModules, type ModuleId, type ResolvedModule } from '@/admin/modules/registry'
+import { activeHref, entityModuleMap, landingSections, MODULES, moduleForPath, resolveModules, type ModuleId, type ResolvedModule } from '@/admin/modules/registry'
 import { deriveCrumbs, routeOf, type StepLike } from '@/admin/shell/crumbs'
 import { loadBadges, loadModules, navUser } from '@/admin/shell/modules-server'
 
@@ -314,20 +314,29 @@ describe('ModuleBar (SSR with mocked pathname/theme)', () => {
     expect(html).toContain('data-pk-avatar')
   })
 
-  it('Persetujuan module: role-gated links with badges; active link aria-current', async () => {
+  it('DRMS 13/10 #9: Persetujuan module — no module menu in the bar; module name → landing page, module badge kept', async () => {
     const html = await bar('/admin/antrian-transfer', ['pk-owner'])
     expect(html).toContain('data-module="persetujuan"')
-    expect(html).toContain('href="/admin/persetujuan"')
-    expect(html).toMatch(/aria-current="page"[^>]*href="\/admin\/antrian-transfer"/)
+    expect(html).not.toContain('pk-bar__nav')
+    expect(html).not.toContain('pk-bar__link')
+    expect(html).not.toContain('data-pk-burger')
+    expect(html).not.toContain('href="/admin/persetujuan"')
+    expect(html).toMatch(/data-pk-nav-link="module-home"[^>]*href="\/admin\/modul\/persetujuan"/)
     expect(html).toContain('pk-bar__count')
+    // PT switcher slot, bell and avatar stay
+    expect(html).toContain('data-pk-nav-link="notifikasi"')
+    expect(html).toContain('data-pk-avatar')
   })
 
-  it('Keuangan: labelled sections render as dropdown triggers, the one with the active item marked', async () => {
-    const html = await bar('/admin/kas/baru', ['pk-finance'])
-    expect(html).toContain('data-module="keuangan"')
-    expect(html).toMatch(/aria-expanded="false"[^>]*data-active="true"[^>]*>.*?Kas</)
-    expect(html).toContain('>Pengajuan<')
-    expect(html).toContain('>Transfer &amp; LPJ<')
+  it('DRMS 13/10 #9: every former menu entry stays reachable as a landing tile of its module', async () => {
+    for (const roles of [['pk-owner'], ['pk-finance'], ['pk-pm'], ['pk-admin'], ['pk-staff']] as Role[][]) {
+      for (const m of await modulesFor(roles, 2)) {
+        const tiles = landingSections(m).flatMap((s) => s.tiles.map((t) => t.href))
+        const items = m.sections.flatMap((s) => s.items.map((i) => i.href))
+        if (m.landing) expect(tiles).toEqual(items)
+        else expect(m.href).toBe(items[0])
+      }
+    }
   })
 
   it('breadcrumb line: none on the launcher (no empty row), module home on entity pages and (D9) custom views', async () => {
