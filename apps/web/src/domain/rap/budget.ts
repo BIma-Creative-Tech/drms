@@ -289,14 +289,13 @@ export async function rapMissingProjects(req: PayloadRequest, opts: { teamOnly?:
     const res = await req.payload.find({
       collection: 'projects',
       where: {
-        and: [
-          { status: { not_in: ['arsip', 'selesai'] } },
-          { or: [{ budget: { greater_than: 0 } }, { kind: { equals: 'konstruksi' } }] },
-          ...(team ? [{ id: { in: team } }] : []),
-        ],
+        // no `budget` condition here: RAB is a money field (moneyRead) and a caller who is Staff in one selected PT may
+        // not query it at all ("path cannot be queried") — `rapRequiredFor` below filters on the budget the caller can
+        // read (hidden budget = none → only konstruksi projects need a RAP there)
+        and: [{ status: { not_in: ['arsip', 'selesai'] } }, ...(team ? [{ id: { in: team } }] : [])],
       },
       depth: 0,
-      limit: 500,
+      limit: 2000, // every open project (the RAB filter runs below)
       sort: 'code',
       select: { code: true, name: true, kind: true, company: true, budget: true, pm: true },
       user: req.user,

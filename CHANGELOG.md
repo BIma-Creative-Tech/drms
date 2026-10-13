@@ -6,6 +6,30 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed (DRMS 13/10 Wave 3 — dashboard parity APK)
+
+- **One source for the web dashboard and the APK home.** `GET /api/v1/dashboard/{owner,finance,pm}` now carries the
+  cards the web view used to load on its own: `sla` ("SLA transfer": this month's transfers within the PT SLA, average,
+  late), `loans` ("Pinjaman antar project": totals, top 5 projects, `waitingForMe`), `rapMonitoring` ("Monitoring RAP")
+  and `rapMissing` ("Project ber-RAB belum punya RAP"; `team` on the PM layout). Built once in
+  `domain/reports/dashboards.ts` (`slaBlock`, `loanBlock`, `rapMonitoringBlock`, `rapMissingBlock`); the web cards
+  (`dashboard-sla/-loans/-rap.tsx`) render the same payload, so web and APK cannot drift. Scopes unchanged: SLA = PTs
+  where the caller is Direktur/Finance, loans = office roles their PTs / PM the team projects, RAP = the caller's
+  project read scope (PM layout: team only). Visibility as on the web: Direktur all four, Finance SLA + loans, PM loans +
+  its team's projects without RAP, Staff/Admin none. OpenAPI (`OwnerDashboard`, `FinanceDashboard`, `PmDashboard`)
+  updated. Fix: "Project ber-RAB belum punya RAP" no longer fails (400 "path cannot be queried: budget") for a caller
+  who is Staff in another selected PT — the RAB filter now runs on the budget the caller may read.
+- **APK home = web dashboard per role, in the web's order** (client: "Dashboard di APK belum ada: SLA transfer,
+  Pinjaman antar project, Project ber-RAB tanpa RAP, Tren pengajuan, Saldo per akun, Kelengkapan nota/LPJ"). Direktur:
+  Status pengajuan, Komposisi biaya per kategori, SLA transfer, Monitoring RAP, Pinjaman antar project, Project ber-RAB
+  belum punya RAP, Tren pengajuan (tap a month), Saldo per akun, Kelengkapan nota/LPJ, Transaksi kas terbaru, Pusat
+  biaya bulan ini. Finance: Saldo per akun (masuk/keluar bulan ini), Status pengajuan, Pengajuan baru belum LPJ,
+  Transaksi kas terbaru, Komposisi biaya, SLA transfer, Pinjaman antar project, Tutup buku. PM: Project Anda belum
+  punya RAP, Status pengajuan tim, Tren pengajuan tim, Komposisi biaya, Pinjaman antar project, Pusat biaya saya. New
+  Staff summary from `/dashboard/me` (counts only — no amounts) and Admin summary from `/dashboard/admin` (master-data
+  gaps). Rows open the project's RAP / Pinjaman tab or the request. KPI cards show **full Rupiah** values (Umum #10);
+  new CustomPainter charts: request-trend columns and a horizontal bar list.
+
 ### Added (DRMS 13/10 Wave 3 — Pengguna tabbed onboarding)
 
 - **One tabbed "Pengguna" form** (`/admin/pengguna/baru`, `/admin/pengguna/<id>`; client: "Satu UI ber-tab: Detail

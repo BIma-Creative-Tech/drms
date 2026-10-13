@@ -774,13 +774,13 @@ async function Owner({ req, months, siteId }: { req: PayloadRequest; months: 6 |
         <BudgetCard id="owner-budget" projects={d.projects} warnPct={v.warnPct} span={7} i={6} progress={progressMap(k09)} />
         <CategoryCard id="owner-categories" c={v.categories} span={5} i={7} sub={`Dicairkan ${short(v.categories.from.slice(0, 7))} – sekarang`} />
 
-        <SlaTransferCard req={req} span={12} i={8} />
+        <SlaTransferCard data={d.sla} span={12} i={8} />
         {/* DRMS 10/10 point 2–4 (D4): RAP realisation per project, items over plan → the project's RAP tab */}
-        <RapMonitorCard req={req} span={12} i={8} />
+        <RapMonitorCard data={d.rapMonitoring} span={12} i={8} />
         {/* ADR 0022 §9: inter-project loans — outstanding / overdue per project, loans waiting for the Direktur */}
-        <LoanCard req={req} span={12} i={8} />
+        <LoanCard data={d.loans} span={12} i={8} />
         {/* D4 (owner 2026-10-11): projects with a RAB but no RAP yet — requests blocked until a PM fills the RAP */}
-        <RapMissingCard req={req} span={12} i={9} />
+        <RapMissingCard data={d.rapMissing} span={12} i={9} />
         <TrendCard id="owner-trend" rows={v.requestTrend} title="Tren pengajuan" sub="Jumlah pengajuan per bulan (tanggal pengajuan)" span={6} i={8} />
         <Card id="accounts" title="Saldo per akun" sub="Akun nonaktif bersaldo 0 disembunyikan" span={3} i={9}>
           <HBarList
@@ -1055,8 +1055,8 @@ async function Finance({ req, siteId }: { req: PayloadRequest; siteId?: number }
         <RecentCashCard id="finance-recent-cash" rows={v.recentCash} span={8} i={12} />
         <CategoryCard id="finance-categories" c={v.categories} span={4} i={13} sub="Dicairkan 6 bulan terakhir" />
 
-        <SlaTransferCard req={req} span={12} i={14} />
-        <LoanCard req={req} span={12} i={14} />
+        <SlaTransferCard data={d.sla} span={12} i={14} />
+        <LoanCard data={d.loans} span={12} i={14} />
         <Card id="period-close" title="Tutup buku" span={6} i={14} action={{ href: '/admin/tutup-buku', label: 'Tutup buku' }}>
           <p className="pk-kpi-x" data-pk-kpi="last-closed" style={{ fontSize: 14 }}>
             {d.lastClosedPeriod ? (
@@ -1162,7 +1162,7 @@ async function Pm({ req, siteId }: { req: PayloadRequest; siteId?: number }) {
         </KpiRow>
 
         {/* D4 (owner 2026-10-11): nudge — team projects with a RAB but no RAP (requests cannot be submitted yet) */}
-        <RapMissingCard req={req} span={12} i={4} team />
+        <RapMissingCard data={d.rapMissing} span={12} i={4} />
         <ProgressVsBudgetCard id="pm-progress" data={k09} i={4} pm  pt={pt} />
         <BudgetCard id="pm-budget" projects={d.projects} warnPct={v.warnPct} span={7} i={4} pm progress={progressMap(k09)} />
         <PipelineCard id="pm-pipeline" pipeline={v.pipeline} title="Status pengajuan tim" sub="Posisi pengajuan tim saat ini" span={5} i={5} />
@@ -1173,7 +1173,7 @@ async function Pm({ req, siteId }: { req: PayloadRequest; siteId?: number }) {
         {/* ADR 0021: the PM project approves its requests first ("Persetujuan PM") */}
         <InboxCard id="pm-inbox" items={v.inbox} count={d.waitingForMe} span={12} i={8} />
         <TeamWaitingCard id="pm-waiting" data={d.teamWaiting} span={6} i={8} />
-        <LoanCard req={req} span={6} i={8} />
+        <LoanCard data={d.loans} span={6} i={8} />
         <Card id="team-latest" title="Pengajuan tim terbaru" span={6} i={9} action={{ href: ER, label: 'Lihat semua' }}>
           <DataTable<R>
             id="team-latest"

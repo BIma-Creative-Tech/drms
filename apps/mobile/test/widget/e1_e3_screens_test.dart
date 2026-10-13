@@ -98,7 +98,7 @@ void main() {
       );
       expect(find.byKey(const Key('home-inbox')), findsOneWidget);
       expect(find.byKey(const Key('kpi-direktur')), findsOneWidget);
-      expect(find.text('Rp 152,5 jt'), findsOneWidget);
+      expect(find.text('Rp 152.500.000'), findsOneWidget, reason: 'DRMS 13/10 #10: full Rupiah on cards');
       expect(find.text('2 menunggu saya · tertua 4 hari'), findsOneWidget);
       expect(find.text('Diketahui 2 · Approval 1'), findsOneWidget);
       expect(find.text('42,5%'), findsOneWidget);
@@ -145,11 +145,11 @@ void main() {
       );
       expect(find.byKey(const Key('kpi-by-company')), findsNWidgets(3));
       expect(find.text('Per PT'), findsNWidgets(3));
-      expect(find.text('Kas Rp 100 jt'), findsOneWidget);
-      expect(find.text('2 menunggu · Rp 5 jt'), findsOneWidget);
-      expect(find.text('Kas Rp 38 jt'), findsOneWidget);
-      expect(find.text('3 antri transfer · Rp 7 jt'), findsOneWidget);
-      expect(find.text('4 pengajuan · Rp 12 jt'), findsOneWidget);
+      expect(find.text('Kas Rp 100.000.000'), findsOneWidget);
+      expect(find.text('2 menunggu · Rp 5.000.000'), findsOneWidget);
+      expect(find.text('Kas Rp 38.000.000'), findsOneWidget);
+      expect(find.text('3 antri transfer · Rp 7.000.000'), findsOneWidget);
+      expect(find.text('4 pengajuan · Rp 12.000.000'), findsOneWidget);
       expect(find.text('0 pengajuan · Rp 0'), findsOneWidget);
       expect(find.text('CS1'), findsNWidgets(3));
     });

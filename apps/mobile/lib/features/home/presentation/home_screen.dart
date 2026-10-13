@@ -153,10 +153,14 @@ class HomeScreen extends ConsumerWidget {
           onPressed: () => context.push(profile.hasOwnAttendance ? '/attendance' : '/attendance?tab=team'),
         ),
     ];
+    // DRMS 13/10 Wave 3: one summary per home, in the web's layout order (Direktur > Finance > PM > Admin > Staff);
+    // Operator/Anggota (attendance only) has none.
     final kpis = switch (kind) {
       HomeKind.direktur => const DirekturKpis(),
       HomeKind.finance => const FinanceKpis(),
       _ when profile.hasTeamMonitor => const PmTeamKpis(),
+      _ when profile.has(Role.admin) => const AdminKpis(),
+      _ when profile.has(Role.staff) => const StaffKpis(),
       _ => null,
     };
 
@@ -183,6 +187,8 @@ class HomeScreen extends ConsumerWidget {
           ref.invalidate(direkturDashboardProvider);
           ref.invalidate(financeDashboardProvider);
           ref.invalidate(pmDashboardProvider);
+          ref.invalidate(staffDashboardProvider);
+          ref.invalidate(adminDashboardProvider);
           ref.invalidate(projectProgressProvider);
           if (profile.hasFinanceMenu) ref.invalidate(transferQueueProvider);
         },
@@ -224,7 +230,11 @@ class HomeScreen extends ConsumerWidget {
             ModuleGrid(children: actions),
             if (kpis != null) ...[
               const SizedBox(height: 20),
-              _SectionTitle(kind == HomeKind.pm || kind == HomeKind.staff ? t.kpiTeamTitle : t.kpiSummaryTitle),
+              _SectionTitle(switch (kpis) {
+                PmTeamKpis() => t.kpiTeamTitle,
+                StaffKpis() => t.kpiMineTitle,
+                _ => t.kpiSummaryTitle,
+              }),
               kpis,
             ],
             // US-12 "Progress fisik vs anggaran": PM (team), Direktur and Finance (all; same card as the web

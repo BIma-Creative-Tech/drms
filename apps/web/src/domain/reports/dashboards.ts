@@ -2,7 +2,12 @@ import type { PayloadRequest } from 'payload'
 
 import { companiesWithRole, rolesIn } from '@/access/roles'
 import { companyRefs, mayReadUntaggedAudit } from '@/domain/companies'
+import { formatHours } from '@/domain/expense/sla'
 import { approvalInbox } from '@/domain/expense/queues'
+import { kindOf, PROJECT_KIND_LABELS } from '@/domain/field/rules'
+import { loanDashboard } from '@/domain/loans/report'
+import { loanInbox } from '@/domain/loans/service'
+import { rapMissingProjects, rapMonitoring } from '@/domain/rap/budget'
 
 import { auditLogPage } from './audit-log'
 import {
@@ -37,6 +42,7 @@ import {
   type ProjectBudget,
 } from './kpi'
 import { addMonths, firstDay, lastDay } from './rules'
+import { slaThisMonth } from './sla-report'
 import { narrowToSite, ownScope, roleScope, scopeCompanies, teamScope, type ReportScope } from './scope'
 import { cashBySite, scopeSiteOptions, siteSummaries } from './sites'
 import { pipelineFromStatus, topWithOther } from './viz'
@@ -152,6 +158,48 @@ async function completenessByCompany(req: PayloadRequest, scope: ReportScope, fr
   }))
 }
 
+// ---- DRMS 13/10 Wave 3 (dashboard parity APK ↔ web): the cards that used to load their own data in the admin view
+// (dashboard-sla / -loans / -rap) are computed here, ONCE, for the web view and GET /api/v1/dashboard/* alike. Each
+// keeps the scope it has on the web: NOT narrowed by the dashboard's site filter nor by the layout role.
+
+/**
+ * Item 11 (DRMS 10/10) "SLA transfer" (Direktur + Finance layouts): this month's transfers of the PTs where the caller
+ * is Owner/Finance (`slaScope`), share within the PT's SLA since the final approval — same numbers as the report.
+ */
+export async function slaBlock(req: PayloadRequest) {
+  const s = await slaThisMonth(req)
+  return { ...s, avgText: formatHours(s.avgHours) }
+}
+export type SlaBlock = Awaited<ReturnType<typeof slaBlock>>
+
+/**
+ * ADR 0022 §9 "Pinjaman antar project" (Direktur, Finance, PM layouts): totals + top 5 projects by outstanding in
+ * `loanScope` (office roles: their PTs, PM: team projects as borrower or lender); `waitingForMe` = loans waiting for
+ * the caller's decision (Direktur only, G1 rules of the inbox).
+ */
+export async function loanBlock(req: PayloadRequest) {
+  const d = await loanDashboard(req)
+  const waitingForMe = (await loanInbox(req)).items.length
+  return { totals: d.totals, projects: d.projects, waitingForMe }
+}
+export type LoanBlock = Awaited<ReturnType<typeof loanBlock>>
+
+/**
+ * D4 (owner 2026-10-11) "Project ber-RAB belum punya RAP": Direktur = every project the caller may read in the
+ * selected PTs, PM (`team`) = the PM's team projects only (nudge). Top 8 + `total`.
+ */
+export async function rapMissingBlock(req: PayloadRequest, team: boolean) {
+  const d = await rapMissingProjects(req, { teamOnly: team, limit: 8 })
+  return { team, total: d.total, rows: d.rows.map((r) => ({ ...r, kindLabel: PROJECT_KIND_LABELS[kindOf(r.kind)] })) }
+}
+export type RapMissingBlock = Awaited<ReturnType<typeof rapMissingBlock>>
+
+/** DRMS 10/10 point 2–4 "Monitoring RAP" (Direktur layout): projects with a RAP, realisation vs plan, top 8. */
+export async function rapMonitoringBlock(req: PayloadRequest) {
+  return rapMonitoring(req, { limit: 8 })
+}
+export type RapMonitoringBlock = Awaited<ReturnType<typeof rapMonitoringBlock>>
+
 /**
  * ADR 0023 §5: `siteId` = the dashboard "Site" filter (next to the PT switcher) — narrows every scope-based card to
  * that site (requests / projects through the project's site, cash through the account's site flag); the per-PT
@@ -165,7 +213,7 @@ export async function ownerDashboard(req: PayloadRequest, opts: { months?: numbe
   const pts = scopeCompanies(ALL)
   const months = opts.months === 6 ? 6 : 12
   const flowRange = { from: addMonths(ctx.month, -(months - 1)), to: ctx.month, accountId: opts.accountId }
-  const [balances, monthOps, pending, mine, lpj, flows, projects, costCenters, queue, book, disbursed, trend, statuses, categories, recent, companies] = await inSequence(
+  const [balances, monthOps, pending, mine, lpj, flows, projects, costCenters, queue, book, disbursed, trend, statuses, categories, recent, companies, sla, loans, rapMon, rapMissing] = await inSequence(
     () => cashBalances(req, ALL, ctx.today),
     () => accountMonthFlows(req, ALL, ctx.month, 'operational'),
     () => pendingApprovals(req, ALL),
@@ -182,6 +230,10 @@ export async function ownerDashboard(req: PayloadRequest, opts: { months?: numbe
     () => categoryMix(req, ALL, firstDay(flowRange.from), ctx.today),
     () => recentCashEntries(req, ALL, 8),
     () => companyRefs(req, pts),
+    () => slaBlock(req),
+    () => loanBlock(req),
+    () => rapMonitoringBlock(req),
+    () => rapMissingBlock(req, false),
   )
   const completeness = await completenessByCompany(req, ALL, firstDay(ctx.month), lastDay(ctx.month), lpj)
   const monthPt = flowsByCompany(balances.accounts, monthOps, pts)
@@ -223,6 +275,10 @@ export async function ownerDashboard(req: PayloadRequest, opts: { months?: numbe
     projects,
     costCenters: costCenters.filter((c) => c.total !== 0 || c.fromRequests !== 0 || c.manualOut !== 0 || c.manualIn !== 0),
     transferQueue: queue,
+    sla,
+    loans,
+    rapMonitoring: rapMon,
+    rapMissing,
     viz: {
       balanceTrend: book.map((f) => ({ period: f.period, balance: f.closingBalance ?? 0 })),
       disbursed: disbursed.map((d) => ({ period: d.period, net: d.net })),
@@ -244,7 +300,7 @@ export async function financeDashboard(req: PayloadRequest, opts: { siteId?: num
   const ALL = narrowToSite(BASE, opts.siteId)
   const pts = scopeCompanies(ALL)
   const from = addMonths(ctx.month, -5)
-  const [queue, lpj, balances, monthBook, flows, lastClosed, disbursed, statuses, categories, recent, queueTop, companies] = await inSequence(
+  const [queue, lpj, balances, monthBook, flows, lastClosed, disbursed, statuses, categories, recent, queueTop, companies, sla, loans] = await inSequence(
     () => transferQueueSummary(req, ALL),
     () => lpjSummary(req, ALL, firstDay(ctx.month), lastDay(ctx.month)),
     () => cashBalances(req, ALL, ctx.today),
@@ -257,6 +313,8 @@ export async function financeDashboard(req: PayloadRequest, opts: { siteId?: num
     () => recentCashEntries(req, ALL, 8),
     () => transferQueueTop(req, ALL, 6),
     () => companyRefs(req, pts),
+    () => slaBlock(req),
+    () => loanBlock(req),
   )
   const completeness = await completenessByCompany(req, ALL, firstDay(ctx.month), lastDay(ctx.month), lpj)
   const siteOpts = await scopeSiteOptions(req, BASE)
@@ -284,6 +342,8 @@ export async function financeDashboard(req: PayloadRequest, opts: { siteId?: num
     lastClosedPeriod: lastClosed.period,
     lastClosedByCompany: lastClosed.byCompany,
     nextClosable: addMonths(ctx.month, -1),
+    sla,
+    loans,
     viz: {
       balanceTrend: flows.map((f) => ({ period: f.period, balance: f.closingBalance ?? 0 })),
       disbursed: disbursed.map((d) => ({ period: d.period, net: d.net })),
@@ -302,7 +362,7 @@ export async function pmDashboard(req: PayloadRequest, opts: { siteId?: number }
   const scope = narrowToSite(BASE, opts.siteId)
   const pts = scopeCompanies(scope)
   const from = addMonths(ctx.month, -5)
-  const [mine, month, lpjRows, projects, costCenters, latest, trend, statuses, categories, waiting, companies] = await inSequence(
+  const [mine, month, lpjRows, projects, costCenters, latest, trend, statuses, categories, waiting, companies, loans, rapMissing] = await inSequence(
     () => waitingForMe(req),
     () => teamMonth(req, scope, ctx.month),
     () => advancesWithoutLpj(req, scope),
@@ -314,6 +374,8 @@ export async function pmDashboard(req: PayloadRequest, opts: { siteId?: number }
     () => categoryMix(req, scope, firstDay(from), ctx.today),
     () => teamWaiting(req, scope),
     () => companyRefs(req, pts),
+    () => loanBlock(req),
+    () => rapMissingBlock(req, true),
   )
   const monthPt = pts.length <= 1 ? pts.map((c) => ({ companyId: c, value: month })) : await perCompany(scope, (s) => teamMonth(req, s, ctx.month))
   const siteOpts = await scopeSiteOptions(req, BASE)
@@ -333,6 +395,8 @@ export async function pmDashboard(req: PayloadRequest, opts: { siteId?: number }
     projects,
     costCenters,
     latest,
+    loans,
+    rapMissing,
     attendance: { available: false as const, phase: 'F5' },
     progressReports: { available: false as const, phase: 'F5' },
     viz: {

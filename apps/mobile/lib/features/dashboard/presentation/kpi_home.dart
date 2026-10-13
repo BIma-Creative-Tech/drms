@@ -10,6 +10,7 @@ import '../../../shared/widgets/async_body.dart';
 import '../data/dashboard_api.dart';
 import '../domain/dashboard.dart';
 import 'charts.dart';
+import 'dashboard_cards.dart';
 
 final dashboardApiProvider = Provider((ref) => DashboardApi(ref.watch(apiClientProvider)));
 
@@ -20,6 +21,12 @@ final financeDashboardProvider = FutureProvider.autoDispose<FinanceDashboard>(
   (ref) => ref.watch(dashboardApiProvider).finance(),
 );
 final pmDashboardProvider = FutureProvider.autoDispose<PmDashboard>((ref) => ref.watch(dashboardApiProvider).pm());
+final staffDashboardProvider = FutureProvider.autoDispose<StaffDashboard>(
+  (ref) => ref.watch(dashboardApiProvider).me(),
+);
+final adminDashboardProvider = FutureProvider.autoDispose<AdminDashboard>(
+  (ref) => ref.watch(dashboardApiProvider).admin(),
+);
 
 /// KPI card: icon + label, big value, supporting lines and an optional sparkline. Tappable when it
 /// leads somewhere (whole card = one ≥ 48 dp target).
@@ -115,35 +122,6 @@ class KpiGrid extends StatelessWidget {
   );
 }
 
-class _SectionCard extends StatelessWidget {
-  const _SectionCard({super.key, required this.title, required this.child, this.subtitle});
-  final String title;
-  final String? subtitle;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Card(
-      elevation: 0,
-      color: theme.colorScheme.surfaceContainerLow,
-      margin: const EdgeInsets.only(bottom: 12),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(title, style: theme.textTheme.titleMedium),
-            if (subtitle != null) Text(subtitle!, style: theme.textTheme.bodySmall),
-            const SizedBox(height: 12),
-            child,
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 /// MC4: compact per-PT breakdown under the KPI totals when the dashboard covers several PTs
 /// (one line per PT: short code, main figure, secondary figure). Nothing for a single PT.
 class CompanySplitCard extends StatelessWidget {
@@ -156,7 +134,7 @@ class CompanySplitCard extends StatelessWidget {
   Widget build(BuildContext context) {
     if (rows.isEmpty) return const SizedBox.shrink();
     final theme = Theme.of(context);
-    return _SectionCard(
+    return DashSection(
       key: const Key('kpi-by-company'),
       title: AppLocalizations.of(context).kpiPerCompanyTitle,
       child: Column(
@@ -236,11 +214,8 @@ class DirekturKpis extends ConsumerWidget {
                 emphasis: true,
                 icon: Icons.account_balance_wallet,
                 label: t.kpiCashTotal,
-                value: formatRupiahShort(d.cashTotal),
-                lines: [
-                  _small(context, formatRupiah(d.cashTotal)),
-                  _small(context, t.kpiMonthInOut(formatRupiahShort(d.monthIn), formatRupiahShort(d.monthOut))),
-                ],
+                value: formatRupiah(d.cashTotal),
+                lines: [_small(context, t.kpiMonthInOut(formatRupiah(d.monthIn), formatRupiah(d.monthOut)))],
                 footer: Sparkline(values: [for (final p in d.balanceTrend) p.value], semanticsLabel: t.kpiBalanceTrend),
               ),
               KpiCard(
@@ -263,7 +238,7 @@ class DirekturKpis extends ConsumerWidget {
               KpiCard(
                 icon: Icons.send,
                 label: t.kpiDisbursedMonth,
-                value: formatRupiahShort(disb),
+                value: formatRupiah(disb),
                 lines: [_small(context, t.kpiDisbursedNet(formatRupiah(disb)))],
                 footer: Sparkline(values: [for (final p in d.disbursed) p.value], semanticsLabel: t.kpiDisbursedTrend),
               ),
@@ -272,7 +247,7 @@ class DirekturKpis extends ConsumerWidget {
                 label: t.kpiBudgetRealized,
                 value: pctText(share(bt.realized, bt.budget)),
                 lines: [
-                  _small(context, t.kpiOfBudget(formatRupiahShort(bt.realized), formatRupiahShort(bt.budget))),
+                  _small(context, t.kpiOfBudget(formatRupiah(bt.realized), formatRupiah(bt.budget))),
                   if (d.budgetOver > 0 || d.budgetWarn > 0)
                     _small(context, t.kpiBudgetAlerts(d.budgetOver, d.budgetWarn), color: context.pk.warnText),
                 ],
@@ -282,15 +257,27 @@ class DirekturKpis extends ConsumerWidget {
           ),
           CompanySplitCard(
             rows: d.byCompany,
-            primary: (r) => t.kpiSplitCash(formatRupiahShort(r.cash ?? 0)),
-            secondary: (r) => t.kpiSplitWaiting(r.count, formatRupiahShort(r.sum)),
+            primary: (r) => t.kpiSplitCash(formatRupiah(r.cash ?? 0)),
+            secondary: (r) => t.kpiSplitWaiting(r.count, formatRupiah(r.sum)),
           ),
           if (d.cashFlow.isNotEmpty)
-            _SectionCard(
+            DashSection(
               title: t.kpiCashFlowTitle,
               subtitle: t.kpiCashFlowSubtitle,
               child: CashFlowChart(rows: d.cashFlow, labelIn: t.kpiIn, labelOut: t.kpiOut),
             ),
+          // DRMS 13/10 Wave 3: the rest of the web "Ringkasan Direktur", same order as Dashboard.tsx Owner().
+          PipelineCard(pipeline: d.pipeline, title: t.kpiPipelineTitle, subtitle: t.kpiPipelineSubtitle),
+          CategoryCard(mix: d.categories, subtitle: t.kpiCategoriesSubtitle(periodShort(_month(d.categories.from)))),
+          if (d.sla case final sla?) SlaCard(sla: sla),
+          if (d.rapMonitor case final m?) RapMonitorCard(data: m),
+          if (d.loans case final l?) LoanCard(data: l),
+          if (d.rapMissing case final m?) RapMissingCard(data: m),
+          TrendCard(rows: d.requestTrend, title: t.kpiTrendTitle, subtitle: t.kpiTrendSubtitle),
+          AccountsCard(accounts: d.accounts),
+          CompletenessCard(data: d.completeness),
+          RecentCashCard(rows: d.recentCash),
+          CostCentersCard(rows: d.costCenters, title: t.kpiCostCentersTitle),
         ],
       );
     });
@@ -318,8 +305,7 @@ class FinanceKpis extends ConsumerWidget {
                 emphasis: true,
                 icon: Icons.account_balance_wallet,
                 label: t.kpiCashTotal,
-                value: formatRupiahShort(d.cashTotal),
-                lines: [_small(context, formatRupiah(d.cashTotal))],
+                value: formatRupiah(d.cashTotal),
                 footer: Sparkline(values: [for (final p in d.balanceTrend) p.value], semanticsLabel: t.kpiBalanceTrend),
               ),
               KpiCard(
@@ -355,15 +341,24 @@ class FinanceKpis extends ConsumerWidget {
           ),
           CompanySplitCard(
             rows: d.byCompany,
-            primary: (r) => t.kpiSplitCash(formatRupiahShort(r.cash ?? 0)),
-            secondary: (r) => t.kpiSplitTransfer(r.count, formatRupiahShort(r.sum)),
+            primary: (r) => t.kpiSplitCash(formatRupiah(r.cash ?? 0)),
+            secondary: (r) => t.kpiSplitTransfer(r.count, formatRupiah(r.sum)),
           ),
           if (cur != null)
-            _SectionCard(
+            DashSection(
               title: t.kpiCashFlowTitle,
               subtitle: t.kpiCashFlowSubtitleFinance,
               child: CashFlowChart(rows: d.cashFlow, labelIn: t.kpiIn, labelOut: t.kpiOut),
             ),
+          // DRMS 13/10 Wave 3: the rest of the web "Ringkasan Finance", same order as Dashboard.tsx Finance().
+          AccountsCard(accounts: d.accounts, subtitle: t.kpiAccountsSubtitle),
+          PipelineCard(pipeline: d.pipeline, title: t.kpiPipelineTitle, subtitle: t.kpiPipelineSubtitle),
+          AdvancesWithoutLpjCard(rows: d.advancesWithoutLpj, dueDays: d.lpjDueDays),
+          RecentCashCard(rows: d.recentCash),
+          CategoryCard(mix: d.categories, subtitle: t.kpiCategoriesSubtitleFinance),
+          if (d.sla case final sla?) SlaCard(sla: sla),
+          if (d.loans case final l?) LoanCard(data: l),
+          PeriodCloseCard(last: d.lastClosedPeriod, next: d.nextClosable),
           Padding(
             padding: const EdgeInsets.only(bottom: 12),
             child: Text(t.financeHint, style: Theme.of(context).textTheme.bodySmall),
@@ -417,20 +412,143 @@ class PmTeamKpis extends ConsumerWidget {
             icon: Icons.track_changes,
             label: t.kpiTeamBudget,
             value: pctText(share(bt.realized, bt.budget)),
-            lines: [_small(context, t.kpiOfBudget(formatRupiahShort(bt.realized), formatRupiahShort(bt.budget)))],
+            lines: [_small(context, t.kpiOfBudget(formatRupiah(bt.realized), formatRupiah(bt.budget)))],
             footer: Meter(value: bt.realized, max: bt.budget),
           ),
         ],
       );
-      if (d.byCompany.isEmpty) return grid;
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           grid,
           CompanySplitCard(
             rows: d.byCompany,
-            primary: (r) => t.kpiSplitTeam(r.count, formatRupiahShort(r.sum)),
+            primary: (r) => t.kpiSplitTeam(r.count, formatRupiah(r.sum)),
             secondary: (r) => t.kpiTeamWaiting(r.waiting ?? 0),
+          ),
+          // DRMS 13/10 Wave 3: the rest of the web "Ringkasan PM", same order as Dashboard.tsx Pm().
+          if (d.rapMissing case final m?) RapMissingCard(data: m),
+          PipelineCard(pipeline: d.pipeline, title: t.kpiPipelineTeamTitle, subtitle: t.kpiPipelineTeamSubtitle),
+          TrendCard(rows: d.trend, title: t.kpiTrendTeamTitle, subtitle: t.kpiTrendTeamSubtitle),
+          CategoryCard(mix: d.categories, subtitle: t.kpiCategoriesSubtitleTeam),
+          if (d.loans case final l?) LoanCard(data: l),
+          CostCentersCard(rows: d.costCenters, title: t.kpiCostCentersTeamTitle),
+        ],
+      );
+    });
+  }
+}
+
+/// `2026-04-01` → `2026-04` (category range start → month label).
+String _month(String date) => date.length >= 7 ? date.substring(0, 7) : date;
+
+/// Staff home (`/dashboard/me`, web "Ringkasan pengajuan saya"): own requests as counts only — Staff never sees
+/// money on the phone (no grand totals, no amounts).
+class StaffKpis extends ConsumerWidget {
+  const StaffKpis({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final t = AppLocalizations.of(context);
+    return _kpiAsync(ref.watch(staffDashboardProvider), () => ref.invalidate(staffDashboardProvider), (d) {
+      final cur = d.trend.isEmpty ? null : d.trend.last;
+      return Column(
+        key: const Key('kpi-staff'),
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          KpiGrid(
+            children: [
+              KpiCard(
+                key: const Key('kpi-my-actions'),
+                emphasis: true,
+                icon: Icons.inbox,
+                label: t.kpiMyActions,
+                value: formatDecimal(d.actions),
+                onTap: () => context.go('/requests'),
+                lines: [_small(context, d.actions == 0 ? t.kpiMyActionsNone : t.kpiMyActionsHint)],
+              ),
+              KpiCard(
+                key: const Key('kpi-my-process'),
+                icon: Icons.schedule,
+                label: t.kpiMyProcess,
+                value: formatDecimal(d.inProcess),
+                lines: [_small(context, t.kpiMyProcessWaiting(d.waitingDecision))],
+              ),
+              KpiCard(
+                key: const Key('kpi-my-month'),
+                icon: Icons.description,
+                label: t.kpiMyMonth(cur == null ? '' : periodShort(cur.period)),
+                value: formatDecimal(cur?.value ?? 0),
+                footer: Sparkline(values: [for (final p in d.trend) p.value], semanticsLabel: t.kpiTrendMineTitle),
+              ),
+              KpiCard(
+                key: const Key('kpi-my-done'),
+                icon: Icons.check_circle_outline,
+                label: t.kpiMyDone,
+                value: formatDecimal(d.done),
+                lines: [_small(context, t.kpiMyExit(d.exit))],
+              ),
+            ],
+          ),
+          PipelineCard(
+            pipeline: d.pipeline,
+            title: t.kpiPipelineMineTitle,
+            subtitle: t.kpiPipelineMineSubtitle,
+            money: false,
+          ),
+          TrendCard(
+            rows: [for (final p in d.trend) RequestTrendPoint(p.period, p.value, 0)],
+            title: t.kpiTrendMineTitle,
+            subtitle: t.kpiTrendMineSubtitle,
+            money: false,
+          ),
+        ],
+      );
+    });
+  }
+}
+
+/// Admin home (`/dashboard/admin`, web "Ringkasan Admin"): master-data gaps; fixing them and the audit log stay on
+/// the web admin.
+class AdminKpis extends ConsumerWidget {
+  const AdminKpis({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final t = AppLocalizations.of(context);
+    return _kpiAsync(ref.watch(adminDashboardProvider), () => ref.invalidate(adminDashboardProvider), (d) {
+      Widget gap(Key key, IconData icon, String label, int n) => KpiCard(
+        key: key,
+        icon: icon,
+        label: label,
+        value: formatDecimal(n),
+        lines: [
+          _small(
+            context,
+            n == 0 ? t.kpiAdminComplete : t.kpiAdminIncomplete,
+            color: n == 0 ? context.pk.okText : context.pk.warnText,
+          ),
+        ],
+      );
+      return Column(
+        key: const Key('kpi-admin'),
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          KpiGrid(
+            children: [
+              gap(const Key('kpi-admin-users'), Icons.people_outline, t.kpiAdminUsers, d.usersIncomplete),
+              gap(const Key('kpi-admin-projects'), Icons.track_changes, t.kpiAdminProjects, d.projectsWithoutPm),
+              gap(
+                const Key('kpi-admin-cost-centers'),
+                Icons.balance,
+                t.kpiAdminCostCenters,
+                d.costCentersWithoutManager,
+              ),
+            ],
+          ),
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Text(t.kpiAdminWebHint, style: Theme.of(context).textTheme.bodySmall),
           ),
         ],
       );
