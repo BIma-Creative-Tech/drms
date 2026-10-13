@@ -33,7 +33,7 @@ export type DecisionProps = {
   canReject: boolean
   stepLabel: string
   /** ADR 0025: the decision is signed as the PT's definitive Direktur ("Nama (Jabatan)"), else null. */
-  signAs: string | null
+  signAs?: string | null
 }
 
 export type RequestPanel = {
