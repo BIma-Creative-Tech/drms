@@ -218,7 +218,9 @@ class _DraftEditorScreenState extends ConsumerState<DraftEditorScreen> {
     if (raw == null || !mounted) return;
     setState(() => _busy = true);
     try {
-      final photo = await ref.read(photoCompressorProvider).compress(raw, receiptTargetFor(ref.read(currentProfileProvider)));
+      final photo = await ref
+          .read(photoCompressorProvider)
+          .compress(raw, receiptTargetFor(ref.read(currentProfileProvider)));
       final uuid = ref.read(draftServiceProvider).newId();
       await ref
           .read(draftRepositoryProvider)
@@ -609,63 +611,63 @@ class _DraftEditorScreenState extends ConsumerState<DraftEditorScreen> {
                   ),
                 ),
                 if (!_d.isVendor)
-                FormGridCell(
-                  label: t.fieldRequesters,
-                  stackedLabel: true,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Wrap(
-                        spacing: 6,
-                        children: [
-                          for (final id in _d.requesterIds)
-                            InputChip(
-                              label: Text(allEmployees.where((e) => e.id == id).firstOrNull?.label ?? '#$id'),
-                              onDeleted: _d.requesterIds.length > 1 ? () => _removeRequester(id) : null,
+                  FormGridCell(
+                    label: t.fieldRequesters,
+                    stackedLabel: true,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Wrap(
+                          spacing: 6,
+                          children: [
+                            for (final id in _d.requesterIds)
+                              InputChip(
+                                label: Text(allEmployees.where((e) => e.id == id).firstOrNull?.label ?? '#$id'),
+                                onDeleted: _d.requesterIds.length > 1 ? () => _removeRequester(id) : null,
+                              ),
+                            // QA-15: a Staff-only user can add only themselves (no other requesters)
+                            if (selfOnly == null || (selfOnly > 0 && !_d.requesterIds.contains(selfOnly)))
+                              ActionChip(
+                                avatar: const Icon(Icons.person_add, size: 18),
+                                label: Text(t.choose),
+                                onPressed: () => _addRequester(employees),
+                              ),
+                          ],
+                        ),
+                        if (issueFor('requesterIds') != null)
+                          Padding(
+                            key: const Key('requesters-issue'),
+                            padding: const EdgeInsets.only(top: 4),
+                            child: Text(
+                              issueFor('requesterIds')!,
+                              style: TextStyle(color: Theme.of(context).colorScheme.error),
                             ),
-                          // QA-15: a Staff-only user can add only themselves (no other requesters)
-                          if (selfOnly == null || (selfOnly > 0 && !_d.requesterIds.contains(selfOnly)))
-                            ActionChip(
-                              avatar: const Icon(Icons.person_add, size: 18),
-                              label: Text(t.choose),
-                              onPressed: () => _addRequester(employees),
-                            ),
-                        ],
-                      ),
-                      if (issueFor('requesterIds') != null)
-                        Padding(
-                          key: const Key('requesters-issue'),
-                          padding: const EdgeInsets.only(top: 4),
-                          child: Text(
-                            issueFor('requesterIds')!,
-                            style: TextStyle(color: Theme.of(context).colorScheme.error),
                           ),
-                        ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
                 if (!_d.isVendor)
-                FormGridCell(
-                  label: t.fieldBankAccount,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      MasterPickerField(
-                        label: t.fieldBankAccount,
-                        items: accounts,
-                        value: _d.bankAccountId,
-                        errorText: issueFor('bankAccountId'),
-                        onChanged: (v) => setState(() => _d = _d.copyWith(bankAccountId: v)),
-                      ),
-                      if (accounts.where((a) => a.id == _d.bankAccountId).firstOrNull case final acc?)
-                        BankAccountPreview(
-                          key: ValueKey('bank-preview-${acc.id}'),
-                          account: acc,
-                          banks: m[MasterTypes.banks] ?? const [],
+                  FormGridCell(
+                    label: t.fieldBankAccount,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        MasterPickerField(
+                          label: t.fieldBankAccount,
+                          items: accounts,
+                          value: _d.bankAccountId,
+                          errorText: issueFor('bankAccountId'),
+                          onChanged: (v) => setState(() => _d = _d.copyWith(bankAccountId: v)),
                         ),
-                    ],
+                        if (accounts.where((a) => a.id == _d.bankAccountId).firstOrNull case final acc?)
+                          BankAccountPreview(
+                            key: ValueKey('bank-preview-${acc.id}'),
+                            account: acc,
+                            banks: m[MasterTypes.banks] ?? const [],
+                          ),
+                      ],
+                    ),
                   ),
-                ),
                 // ADR 0025: vendor → its account → invoice number / date / due date / photo
                 if (_d.isVendor) ...[
                   FormGridCell(
@@ -681,7 +683,9 @@ class _DraftEditorScreenState extends ConsumerState<DraftEditorScreen> {
                         if (v == _d.vendorId) return;
                         final accs = vendorAccountsOf(m, v);
                         // the vendor's default (else only) active account is preselected
-                        final def = accs.where((a) => a.extra['isDefault'] == true).firstOrNull ?? (accs.length == 1 ? accs.single : null);
+                        final def =
+                            accs.where((a) => a.extra['isDefault'] == true).firstOrNull ??
+                            (accs.length == 1 ? accs.single : null);
                         _d = _d.copyWith(vendorId: v, vendorBankAccountId: def?.id);
                       }),
                     ),
@@ -767,7 +771,9 @@ class _DraftEditorScreenState extends ConsumerState<DraftEditorScreen> {
                               ? t.invoiceOnServer
                               : t.invoiceMissing,
                           key: const Key('draft-invoice-state'),
-                          style: issueFor('invoiceFile') == null ? null : TextStyle(color: Theme.of(context).colorScheme.error),
+                          style: issueFor('invoiceFile') == null
+                              ? null
+                              : TextStyle(color: Theme.of(context).colorScheme.error),
                         ),
                         Wrap(
                           spacing: 8,

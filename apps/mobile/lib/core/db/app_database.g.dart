@@ -137,6 +137,17 @@ class $LocalDraftsTable extends LocalDrafts
     type: DriftSqlType.int,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _vendorJsonMeta = const VerificationMeta(
+    'vendorJson',
+  );
+  @override
+  late final GeneratedColumn<String> vendorJson = GeneratedColumn<String>(
+    'vendor_json',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _serverIdMeta = const VerificationMeta(
     'serverId',
   );
@@ -244,6 +255,7 @@ class $LocalDraftsTable extends LocalDrafts
     notes,
     requesterIdsJson,
     bankAccountId,
+    vendorJson,
     serverId,
     serverRev,
     syncState,
@@ -353,6 +365,12 @@ class $LocalDraftsTable extends LocalDrafts
           data['bank_account_id']!,
           _bankAccountIdMeta,
         ),
+      );
+    }
+    if (data.containsKey('vendor_json')) {
+      context.handle(
+        _vendorJsonMeta,
+        vendorJson.isAcceptableOrUnknown(data['vendor_json']!, _vendorJsonMeta),
       );
     }
     if (data.containsKey('server_id')) {
@@ -467,6 +485,10 @@ class $LocalDraftsTable extends LocalDrafts
         DriftSqlType.int,
         data['${effectivePrefix}bank_account_id'],
       ),
+      vendorJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}vendor_json'],
+      ),
       serverId: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
         data['${effectivePrefix}server_id'],
@@ -526,6 +548,10 @@ class LocalDraft extends DataClass implements Insertable<LocalDraft> {
   final String? notes;
   final String requesterIdsJson;
   final int? bankAccountId;
+
+  /// Schema v10 (ADR 0025 "Pembayaran vendor"): payee type + vendor / vendor account / invoice of the draft as JSON
+  /// (`DraftRepository` vendorToJson); null = an employee payment (every draft before v10).
+  final String? vendorJson;
   final int? serverId;
   final int? serverRev;
 
@@ -549,6 +575,7 @@ class LocalDraft extends DataClass implements Insertable<LocalDraft> {
     this.notes,
     required this.requesterIdsJson,
     this.bankAccountId,
+    this.vendorJson,
     this.serverId,
     this.serverRev,
     required this.syncState,
@@ -586,6 +613,9 @@ class LocalDraft extends DataClass implements Insertable<LocalDraft> {
     map['requester_ids_json'] = Variable<String>(requesterIdsJson);
     if (!nullToAbsent || bankAccountId != null) {
       map['bank_account_id'] = Variable<int>(bankAccountId);
+    }
+    if (!nullToAbsent || vendorJson != null) {
+      map['vendor_json'] = Variable<String>(vendorJson);
     }
     if (!nullToAbsent || serverId != null) {
       map['server_id'] = Variable<int>(serverId);
@@ -634,6 +664,9 @@ class LocalDraft extends DataClass implements Insertable<LocalDraft> {
       bankAccountId: bankAccountId == null && nullToAbsent
           ? const Value.absent()
           : Value(bankAccountId),
+      vendorJson: vendorJson == null && nullToAbsent
+          ? const Value.absent()
+          : Value(vendorJson),
       serverId: serverId == null && nullToAbsent
           ? const Value.absent()
           : Value(serverId),
@@ -671,6 +704,7 @@ class LocalDraft extends DataClass implements Insertable<LocalDraft> {
       notes: serializer.fromJson<String?>(json['notes']),
       requesterIdsJson: serializer.fromJson<String>(json['requesterIdsJson']),
       bankAccountId: serializer.fromJson<int?>(json['bankAccountId']),
+      vendorJson: serializer.fromJson<String?>(json['vendorJson']),
       serverId: serializer.fromJson<int?>(json['serverId']),
       serverRev: serializer.fromJson<int?>(json['serverRev']),
       syncState: serializer.fromJson<String>(json['syncState']),
@@ -697,6 +731,7 @@ class LocalDraft extends DataClass implements Insertable<LocalDraft> {
       'notes': serializer.toJson<String?>(notes),
       'requesterIdsJson': serializer.toJson<String>(requesterIdsJson),
       'bankAccountId': serializer.toJson<int?>(bankAccountId),
+      'vendorJson': serializer.toJson<String?>(vendorJson),
       'serverId': serializer.toJson<int?>(serverId),
       'serverRev': serializer.toJson<int?>(serverRev),
       'syncState': serializer.toJson<String>(syncState),
@@ -721,6 +756,7 @@ class LocalDraft extends DataClass implements Insertable<LocalDraft> {
     Value<String?> notes = const Value.absent(),
     String? requesterIdsJson,
     Value<int?> bankAccountId = const Value.absent(),
+    Value<String?> vendorJson = const Value.absent(),
     Value<int?> serverId = const Value.absent(),
     Value<int?> serverRev = const Value.absent(),
     String? syncState,
@@ -746,6 +782,7 @@ class LocalDraft extends DataClass implements Insertable<LocalDraft> {
     bankAccountId: bankAccountId.present
         ? bankAccountId.value
         : this.bankAccountId,
+    vendorJson: vendorJson.present ? vendorJson.value : this.vendorJson,
     serverId: serverId.present ? serverId.value : this.serverId,
     serverRev: serverRev.present ? serverRev.value : this.serverRev,
     syncState: syncState ?? this.syncState,
@@ -783,6 +820,9 @@ class LocalDraft extends DataClass implements Insertable<LocalDraft> {
       bankAccountId: data.bankAccountId.present
           ? data.bankAccountId.value
           : this.bankAccountId,
+      vendorJson: data.vendorJson.present
+          ? data.vendorJson.value
+          : this.vendorJson,
       serverId: data.serverId.present ? data.serverId.value : this.serverId,
       serverRev: data.serverRev.present ? data.serverRev.value : this.serverRev,
       syncState: data.syncState.present ? data.syncState.value : this.syncState,
@@ -811,6 +851,7 @@ class LocalDraft extends DataClass implements Insertable<LocalDraft> {
           ..write('notes: $notes, ')
           ..write('requesterIdsJson: $requesterIdsJson, ')
           ..write('bankAccountId: $bankAccountId, ')
+          ..write('vendorJson: $vendorJson, ')
           ..write('serverId: $serverId, ')
           ..write('serverRev: $serverRev, ')
           ..write('syncState: $syncState, ')
@@ -824,7 +865,7 @@ class LocalDraft extends DataClass implements Insertable<LocalDraft> {
   }
 
   @override
-  int get hashCode => Object.hash(
+  int get hashCode => Object.hashAll([
     clientUuid,
     userSub,
     companyId,
@@ -837,6 +878,7 @@ class LocalDraft extends DataClass implements Insertable<LocalDraft> {
     notes,
     requesterIdsJson,
     bankAccountId,
+    vendorJson,
     serverId,
     serverRev,
     syncState,
@@ -845,7 +887,7 @@ class LocalDraft extends DataClass implements Insertable<LocalDraft> {
     deleted,
     createdAt,
     updatedAt,
-  );
+  ]);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -862,6 +904,7 @@ class LocalDraft extends DataClass implements Insertable<LocalDraft> {
           other.notes == this.notes &&
           other.requesterIdsJson == this.requesterIdsJson &&
           other.bankAccountId == this.bankAccountId &&
+          other.vendorJson == this.vendorJson &&
           other.serverId == this.serverId &&
           other.serverRev == this.serverRev &&
           other.syncState == this.syncState &&
@@ -885,6 +928,7 @@ class LocalDraftsCompanion extends UpdateCompanion<LocalDraft> {
   final Value<String?> notes;
   final Value<String> requesterIdsJson;
   final Value<int?> bankAccountId;
+  final Value<String?> vendorJson;
   final Value<int?> serverId;
   final Value<int?> serverRev;
   final Value<String> syncState;
@@ -907,6 +951,7 @@ class LocalDraftsCompanion extends UpdateCompanion<LocalDraft> {
     this.notes = const Value.absent(),
     this.requesterIdsJson = const Value.absent(),
     this.bankAccountId = const Value.absent(),
+    this.vendorJson = const Value.absent(),
     this.serverId = const Value.absent(),
     this.serverRev = const Value.absent(),
     this.syncState = const Value.absent(),
@@ -930,6 +975,7 @@ class LocalDraftsCompanion extends UpdateCompanion<LocalDraft> {
     this.notes = const Value.absent(),
     this.requesterIdsJson = const Value.absent(),
     this.bankAccountId = const Value.absent(),
+    this.vendorJson = const Value.absent(),
     this.serverId = const Value.absent(),
     this.serverRev = const Value.absent(),
     this.syncState = const Value.absent(),
@@ -957,6 +1003,7 @@ class LocalDraftsCompanion extends UpdateCompanion<LocalDraft> {
     Expression<String>? notes,
     Expression<String>? requesterIdsJson,
     Expression<int>? bankAccountId,
+    Expression<String>? vendorJson,
     Expression<int>? serverId,
     Expression<int>? serverRev,
     Expression<String>? syncState,
@@ -980,6 +1027,7 @@ class LocalDraftsCompanion extends UpdateCompanion<LocalDraft> {
       if (notes != null) 'notes': notes,
       if (requesterIdsJson != null) 'requester_ids_json': requesterIdsJson,
       if (bankAccountId != null) 'bank_account_id': bankAccountId,
+      if (vendorJson != null) 'vendor_json': vendorJson,
       if (serverId != null) 'server_id': serverId,
       if (serverRev != null) 'server_rev': serverRev,
       if (syncState != null) 'sync_state': syncState,
@@ -1005,6 +1053,7 @@ class LocalDraftsCompanion extends UpdateCompanion<LocalDraft> {
     Value<String?>? notes,
     Value<String>? requesterIdsJson,
     Value<int?>? bankAccountId,
+    Value<String?>? vendorJson,
     Value<int?>? serverId,
     Value<int?>? serverRev,
     Value<String>? syncState,
@@ -1028,6 +1077,7 @@ class LocalDraftsCompanion extends UpdateCompanion<LocalDraft> {
       notes: notes ?? this.notes,
       requesterIdsJson: requesterIdsJson ?? this.requesterIdsJson,
       bankAccountId: bankAccountId ?? this.bankAccountId,
+      vendorJson: vendorJson ?? this.vendorJson,
       serverId: serverId ?? this.serverId,
       serverRev: serverRev ?? this.serverRev,
       syncState: syncState ?? this.syncState,
@@ -1079,6 +1129,9 @@ class LocalDraftsCompanion extends UpdateCompanion<LocalDraft> {
     if (bankAccountId.present) {
       map['bank_account_id'] = Variable<int>(bankAccountId.value);
     }
+    if (vendorJson.present) {
+      map['vendor_json'] = Variable<String>(vendorJson.value);
+    }
     if (serverId.present) {
       map['server_id'] = Variable<int>(serverId.value);
     }
@@ -1124,6 +1177,7 @@ class LocalDraftsCompanion extends UpdateCompanion<LocalDraft> {
           ..write('notes: $notes, ')
           ..write('requesterIdsJson: $requesterIdsJson, ')
           ..write('bankAccountId: $bankAccountId, ')
+          ..write('vendorJson: $vendorJson, ')
           ..write('serverId: $serverId, ')
           ..write('serverRev: $serverRev, ')
           ..write('syncState: $syncState, ')
@@ -11870,6 +11924,7 @@ typedef $$LocalDraftsTableCreateCompanionBuilder =
       Value<String?> notes,
       Value<String> requesterIdsJson,
       Value<int?> bankAccountId,
+      Value<String?> vendorJson,
       Value<int?> serverId,
       Value<int?> serverRev,
       Value<String> syncState,
@@ -11894,6 +11949,7 @@ typedef $$LocalDraftsTableUpdateCompanionBuilder =
       Value<String?> notes,
       Value<String> requesterIdsJson,
       Value<int?> bankAccountId,
+      Value<String?> vendorJson,
       Value<int?> serverId,
       Value<int?> serverRev,
       Value<String> syncState,
@@ -12015,6 +12071,11 @@ class $$LocalDraftsTableFilterComposer
 
   ColumnFilters<int> get bankAccountId => $composableBuilder(
     column: $table.bankAccountId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get vendorJson => $composableBuilder(
+    column: $table.vendorJson,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -12178,6 +12239,11 @@ class $$LocalDraftsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get vendorJson => $composableBuilder(
+    column: $table.vendorJson,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<int> get serverId => $composableBuilder(
     column: $table.serverId,
     builder: (column) => ColumnOrderings(column),
@@ -12273,6 +12339,11 @@ class $$LocalDraftsTableAnnotationComposer
 
   GeneratedColumn<int> get bankAccountId => $composableBuilder(
     column: $table.bankAccountId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get vendorJson => $composableBuilder(
+    column: $table.vendorJson,
     builder: (column) => column,
   );
 
@@ -12393,6 +12464,7 @@ class $$LocalDraftsTableTableManager
                 Value<String?> notes = const Value.absent(),
                 Value<String> requesterIdsJson = const Value.absent(),
                 Value<int?> bankAccountId = const Value.absent(),
+                Value<String?> vendorJson = const Value.absent(),
                 Value<int?> serverId = const Value.absent(),
                 Value<int?> serverRev = const Value.absent(),
                 Value<String> syncState = const Value.absent(),
@@ -12415,6 +12487,7 @@ class $$LocalDraftsTableTableManager
                 notes: notes,
                 requesterIdsJson: requesterIdsJson,
                 bankAccountId: bankAccountId,
+                vendorJson: vendorJson,
                 serverId: serverId,
                 serverRev: serverRev,
                 syncState: syncState,
@@ -12439,6 +12512,7 @@ class $$LocalDraftsTableTableManager
                 Value<String?> notes = const Value.absent(),
                 Value<String> requesterIdsJson = const Value.absent(),
                 Value<int?> bankAccountId = const Value.absent(),
+                Value<String?> vendorJson = const Value.absent(),
                 Value<int?> serverId = const Value.absent(),
                 Value<int?> serverRev = const Value.absent(),
                 Value<String> syncState = const Value.absent(),
@@ -12461,6 +12535,7 @@ class $$LocalDraftsTableTableManager
                 notes: notes,
                 requesterIdsJson: requesterIdsJson,
                 bankAccountId: bankAccountId,
+                vendorJson: vendorJson,
                 serverId: serverId,
                 serverRev: serverRev,
                 syncState: syncState,

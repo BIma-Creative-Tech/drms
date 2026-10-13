@@ -124,19 +124,21 @@ class DraftService {
     if (!d.isVendor || d.invoiceFileId != null || local == null) return d;
     final blob = await drafts.media(local);
     if (blob == null) {
-      throw const ProblemException(status: 422, detail: 'Foto invoice tidak ditemukan di HP. Ambil ulang foto invoice.');
+      throw const ProblemException(
+        status: 422,
+        detail: 'Foto invoice tidak ditemukan di HP. Ambil ulang foto invoice.',
+      );
     }
     final known = int.tryParse(blob.serverMediaId ?? '');
-    final id =
-        known ?? await api.uploadMedia('attachments', blob.bytes, filename: '$local.jpg', mime: blob.mimeType);
+    final id = known ?? await api.uploadMedia('attachments', blob.bytes, filename: '$local.jpg', mime: blob.mimeType);
     if (known == null) await drafts.markMediaUploaded(local, serverMediaId: '$id');
     return d.copyWith(invoiceFileId: id);
   }
 
   /// "Ajukan" — online only. Creates the server draft through `/api/v1` (idempotent by clientUuid)
   /// when the offline queue has not delivered it yet, uploads the receipts, then submits.
-  Future<ExpenseDetail> submit(String sub, DraftRequest submitted, {RapCheck rap = RapCheck.strict}) async {
-    var draft = submitted;
+  Future<ExpenseDetail> submit(String sub, DraftRequest original, {RapCheck rap = RapCheck.strict}) async {
+    var draft = original;
     final issues = validateForSubmit(draft, rap: rap);
     if (issues.isNotEmpty) throw DraftValidationException(issues);
     return lock.run(() async {
@@ -198,7 +200,7 @@ class DraftService {
       );
       await drafts.setSyncState(draft.clientUuid, DraftSyncState.submitted, serverId: submitted.id, clearError: true);
       await outbox.supersede(sub, draft.clientUuid);
-      await drafts.purgeMediaOf(submitted); // incl. the local invoice photo (ADR 0025)
+      await drafts.purgeMediaOf(original); // incl. the local invoice photo (ADR 0025)
       return submitted;
     });
   }

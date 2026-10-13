@@ -5787,6 +5787,53 @@ export const openapiDocument = {
             ],
             "exclusiveMinimum": 0
           },
+          "payee_type": {
+            "type": "string",
+            "enum": [
+              "karyawan",
+              "vendor"
+            ],
+            "description": "ADR 0025."
+          },
+          "vendor_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "exclusiveMinimum": 0
+          },
+          "vendor_bank_account_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "exclusiveMinimum": 0
+          },
+          "invoice_no": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "invoice_date": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "invoice_due_date": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "invoice_file_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "exclusiveMinimum": 0
+          },
           "grand_total": {
             "type": "integer",
             "minimum": 0,
@@ -5988,6 +6035,13 @@ export const openapiDocument = {
           "notes",
           "requester_ids",
           "bank_account_id",
+          "payee_type",
+          "vendor_id",
+          "vendor_bank_account_id",
+          "invoice_no",
+          "invoice_date",
+          "invoice_due_date",
+          "invoice_file_id",
           "grand_total",
           "updated_at",
           "lines",
@@ -6806,6 +6860,59 @@ export const openapiDocument = {
               "null"
             ],
             "exclusiveMinimum": 0
+          },
+          "payee_type": {
+            "type": "string",
+            "enum": [
+              "karyawan",
+              "vendor"
+            ],
+            "description": "ADR 0025: default karyawan. vendor = vendor payment (Finance / PM only): vendor + vendor account + invoice, no employee account, no LPJ."
+          },
+          "vendor_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "exclusiveMinimum": 0
+          },
+          "vendor_bank_account_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "exclusiveMinimum": 0,
+            "description": "ADR 0025: an active account of vendor_id (masters type vendor-bank-accounts)."
+          },
+          "invoice_no": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 64,
+            "description": "ADR 0025: unique per vendor among live requests (else VALIDATION / 409 errors[invoiceNo])."
+          },
+          "invoice_date": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$"
+          },
+          "invoice_due_date": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$"
+          },
+          "invoice_file_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "exclusiveMinimum": 0,
+            "description": "ADR 0025: media-attachments id of the invoice (POST /media/attachments)."
           },
           "client_grand_total": {
             "type": [

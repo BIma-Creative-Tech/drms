@@ -21,11 +21,24 @@ Map<String, dynamic> _vendor() => {
   'payeeType': 'vendor',
   'vendor': {'id': 3, 'name': 'CV Contoh Material'},
   'vendorBankAccountId': 31,
-  'invoice': {'no': 'INV/2026/0012', 'date': '2026-10-10', 'dueDate': '2026-10-31', 'fileId': 77, 'fileName': 'invoice.jpg'},
+  'invoice': {
+    'no': 'INV/2026/0012',
+    'date': '2026-10-10',
+    'dueDate': '2026-10-31',
+    'fileId': 77,
+    'fileName': 'invoice.jpg',
+  },
   'bank': {'bankName': 'Mandiri', 'accountNo': '•••4321', 'accountHolder': 'CV Contoh Material'},
   'settlement': null,
   'transfers': [
-    {'id': 5, 'docNo': 'TRF/CS1/2610/0001', 'kind': 'advance', 'amount': 1447500, 'transferDate': '2026-10-12', 'status': 'posted'},
+    {
+      'id': 5,
+      'docNo': 'TRF/CS1/2610/0001',
+      'kind': 'advance',
+      'amount': 1447500,
+      'transferDate': '2026-10-12',
+      'status': 'posted',
+    },
   ],
 };
 
@@ -41,10 +54,22 @@ void main() {
       ],
     );
     expect(find.byKey(const Key('section-vendor')), findsOneWidget);
-    expect(find.descendant(of: find.byKey(const Key('detail-vendor')), matching: find.text('CV Contoh Material')), findsOneWidget);
-    expect(find.descendant(of: find.byKey(const Key('detail-invoice-no')), matching: find.text('INV/2026/0012')), findsOneWidget);
-    expect(find.descendant(of: find.byKey(const Key('detail-invoice-file')), matching: find.text('invoice.jpg')), findsOneWidget);
-    expect(find.descendant(of: find.byKey(const Key('section-bank')), matching: find.text('Rekening vendor')), findsOneWidget);
+    expect(
+      find.descendant(of: find.byKey(const Key('detail-vendor')), matching: find.text('CV Contoh Material')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: find.byKey(const Key('detail-invoice-no')), matching: find.text('INV/2026/0012')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: find.byKey(const Key('detail-invoice-file')), matching: find.text('invoice.jpg')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: find.byKey(const Key('section-bank')), matching: find.text('Rekening vendor')),
+      findsOneWidget,
+    );
     expect(find.text('LPJ'), findsNothing, reason: 'a vendor payment has no LPJ step');
     expect(find.textContaining('pembayaran vendor selesai saat ditransfer'), findsOneWidget);
   });

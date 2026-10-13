@@ -35,7 +35,16 @@ DraftRequest vendorDraft({String? invoiceMediaUuid = 'inv-photo-1', int? invoice
   invoiceMediaUuid: invoiceMediaUuid,
   invoiceFileId: invoiceFileId,
   lines: const [
-    DraftLine(clientUuid: 'l-1', no: 1, description: 'Semen 50 sak', qty: 50, uomId: 3, unitPrice: 70000, rapItemId: 501, categoryId: 1),
+    DraftLine(
+      clientUuid: 'l-1',
+      no: 1,
+      description: 'Semen 50 sak',
+      qty: 50,
+      uomId: 3,
+      unitPrice: 70000,
+      rapItemId: 501,
+      categoryId: 1,
+    ),
   ],
 );
 
@@ -46,11 +55,25 @@ Map<String, dynamic> vendorDetailJson({String status = 'completed'}) => {
   'payeeType': 'vendor',
   'vendor': {'id': 3, 'code': null, 'name': 'CV Contoh Material'},
   'vendorBankAccountId': 31,
-  'invoice': {'no': 'INV/2026/0012', 'date': '2026-10-10', 'dueDate': null, 'fileId': 77, 'fileName': 'invoice.jpg', 'mimeType': 'image/jpeg'},
+  'invoice': {
+    'no': 'INV/2026/0012',
+    'date': '2026-10-10',
+    'dueDate': null,
+    'fileId': 77,
+    'fileName': 'invoice.jpg',
+    'mimeType': 'image/jpeg',
+  },
   'bank': {'bankName': 'Mandiri', 'accountNo': '•••4321', 'accountHolder': 'CV Contoh Material'},
   'settlement': null,
   'transfers': [
-    {'id': 5, 'docNo': 'TRF/CS1/2610/0001', 'kind': 'advance', 'amount': 3500000, 'transferDate': '2026-10-12', 'status': 'posted'},
+    {
+      'id': 5,
+      'docNo': 'TRF/CS1/2610/0001',
+      'kind': 'advance',
+      'amount': 3500000,
+      'transferDate': '2026-10-12',
+      'status': 'posted',
+    },
   ],
 };
 
@@ -114,8 +137,15 @@ void main() {
 
   test('validation: vendor, account, invoice number / date / photo; no employee account needed', () {
     expect(validateForSubmit(vendorDraft()), isEmpty);
-    final empty = vendorDraft(invoiceMediaUuid: null).copyWith(vendorId: null, vendorBankAccountId: null, invoiceNo: ' / ', invoiceDate: null);
-    expect(validateForSubmit(empty).map((i) => i.field).toSet(), {'vendorId', 'vendorBankAccountId', 'invoiceNo', 'invoiceDate', 'invoiceFile'});
+    final empty = vendorDraft(invoiceMediaUuid: null)
+        .copyWith(vendorId: null, vendorBankAccountId: null, invoiceNo: ' / ', invoiceDate: null);
+    expect(validateForSubmit(empty).map((i) => i.field).toSet(), {
+      'vendorId',
+      'vendorBankAccountId',
+      'invoiceNo',
+      'invoiceDate',
+      'invoiceFile',
+    });
     final due = vendorDraft().copyWith(invoiceDueDate: '2026-10-01');
     expect(validateForSubmit(due).map((i) => i.field), ['invoiceDueDate']);
     expect(normalizeInvoiceNo('inv/2026-01 '), 'INV202601');
@@ -124,14 +154,24 @@ void main() {
   test('read model + stepper: vendor and invoice, no LPJ step, "Selesai" after the transfer', () {
     final d = detailFromJson(vendorDetailJson());
     expect(d.isVendor, isTrue);
-    expect((d.vendor?.name, d.invoiceNo, d.invoiceFileId, d.invoiceFileName), ('CV Contoh Material', 'INV/2026/0012', 77, 'invoice.jpg'));
+    expect(
+      (d.vendor?.name, d.invoiceNo, d.invoiceFileId, d.invoiceFileName),
+      ('CV Contoh Material', 'INV/2026/0012', 77, 'invoice.jpg'),
+    );
     final steps = buildRequestStepper(d);
     expect(steps.map((s) => s.title), isNot(contains(lpjStepTitle)));
     expect(steps.last.title, doneStepTitle);
     expect(steps.last.note, vendorDoneNote);
     final waiting = detailFromJson(vendorDetailJson(status: 'approved')..['transfers'] = const []);
     expect(currentTurn(waiting), 'Finance — transfer ke rekening vendor');
-    expect(draftFromServer(detailFromJson(vendorDetailJson(status: 'draft')), clientUuid: 'x', receiptUuid: (i) => '$i').invoiceFileId, 77);
+    expect(
+      draftFromServer(
+        detailFromJson(vendorDetailJson(status: 'draft')),
+        clientUuid: 'x',
+        receiptUuid: (i) => '$i',
+      ).invoiceFileId,
+      77,
+    );
     // an employee Pengajuan Baru keeps its LPJ step
     final emp = detailFromJson({...vendorDetailJson(status: 'transferred'), 'payeeType': 'karyawan'});
     expect(buildRequestStepper(emp).map((s) => s.title), contains(lpjStepTitle));
@@ -141,8 +181,20 @@ void main() {
   test('vendor accounts of the chosen vendor only', () {
     final masters = {
       MasterTypes.vendorBankAccounts: [
-        masterFromJson(MasterTypes.vendorBankAccounts, {'id': 31, 'vendor': 3, 'bank': 1, 'accountNo': '1234567890', 'accountHolder': 'CV Contoh Material'}),
-        masterFromJson(MasterTypes.vendorBankAccounts, {'id': 32, 'vendor': 4, 'bank': 1, 'accountNo': '9876543210', 'accountHolder': 'PT Contoh Alat'}),
+        masterFromJson(MasterTypes.vendorBankAccounts, {
+          'id': 31,
+          'vendor': 3,
+          'bank': 1,
+          'accountNo': '1234567890',
+          'accountHolder': 'CV Contoh Material',
+        }),
+        masterFromJson(MasterTypes.vendorBankAccounts, {
+          'id': 32,
+          'vendor': 4,
+          'bank': 1,
+          'accountNo': '9876543210',
+          'accountHolder': 'PT Contoh Alat',
+        }),
       ],
     };
     expect(vendorAccountsOf(masters, 3).map((a) => a.id), [31]);

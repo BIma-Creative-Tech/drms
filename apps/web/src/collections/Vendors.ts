@@ -24,13 +24,14 @@ export const Vendors: CollectionConfig = withAudit(
     },
     hooks: { beforeChange: [companyHook('vendors')] },
     fields: [
+      // PT stays a top-level field (PT column / chip / filter of the list wrappers, ADR 0016)
+      companyField(),
       {
         type: 'tabs',
         tabs: [
           {
             label: 'Vendor',
             fields: [
-              companyField(),
               { name: 'name', type: 'text', label: 'Nama', required: true, maxLength: 160 },
               { name: 'contact', type: 'text', label: 'Kontak', maxLength: 128 },
               {
