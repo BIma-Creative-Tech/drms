@@ -298,6 +298,27 @@ Hal penting per PT yang harus Anda atur sebelum go-live:
 | Pengingat & notifikasi | **Notifikasi status pengajuan → Email ke Direktur/Finance saat pengajuan menunggu keputusannya** | Default mati; nyalakan setelah alamat email pengguna benar. Batas SMTP 30 email/jam |
 | Identitas | Nama, Kode singkat, Logo, Kop PDF | Data perusahaan |
 
+#### Tab "Direktur definitif" (tanda tangan Direktur PT, ADR 0025)
+
+Untuk PT yang Direktur sahnya **tidak memakai aplikasi** dan keputusan Direktur diambil oleh pengguna lain atas
+namanya. Hanya **Admin PT itu** (dan Admin grup) yang dapat mengubah tab ini; Direktur dan Finance PT hanya melihat.
+
+1. **Pengaturan → Perusahaan (PT)** → buka PT → tab **Direktur definitif**.
+2. Isi **Nama Direktur** dan **Jabatan** (mis. Direktur Utama).
+3. **Tanda tangan**: unggah **file PNG baru** (latar transparan, maks. 800 × 300 px) — jangan memilih tanda tangan
+   profil pengguna (ditolak). File ini hanya dapat dilihat Admin, Direktur dan Finance PT ini.
+4. **Wakil penanda tangan**: pilih pengguna yang memegang peran **Direktur** di PT ini dan boleh memutuskan atas nama
+   Direktur definitif (peran Direktur diberikan dulu di Akses PT, §1). → **Simpan**.
+
+Akibatnya: bila salah satu wakil memutuskan **langkah Direktur** (Persetujuan Direktur pengajuan, Diketahui Direktur
+pada alur lama dan Addendum RAB, persetujuan kekurangan LPJ, pinjaman antar project — setuju maupun tolak), PDF
+mencetak **tanda tangan dan nama (jabatan) Direktur definitif**, dan alur persetujuan, Log perubahan / Riwayat,
+aplikasi dan laporan menampilkan nama Direktur tersebut. Siapa yang sebenarnya menekan tombol tetap tersimpan di
+database dan di **Audit Log** (kolom user id) untuk penelusuran. Wakil yang memutuskan langkah lain (mis. sebagai PM
+project atau Finance) tetap memakai tanda tangan pribadinya; Direktur lain yang bukan wakil juga. Mengubah data tab ini
+tidak mengubah dokumen yang sudah ditandatangani (nama, jabatan dan tanda tangan disimpan saat keputusan). Kosongkan
+semua isian tab ini untuk kembali ke tanda tangan pribadi.
+
 ![TODO screenshot: Perusahaan (PT) tab Absensi & retensi](img/admin-setting.png)
 
 ### 6b. Setting aplikasi — seluruh grup (Admin grup saja)

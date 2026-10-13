@@ -297,6 +297,8 @@
   "signatureClear": "Ulangi",
   "signatureEmpty": "Tanda tangan belum dibuat.",
   "signatureTooLarge": "Tanda tangan terlalu besar. Ulangi dengan goresan lebih sederhana.",
+  "direkturSignatureTitle": "Tanda tangan Direktur PT",
+  "direkturSignatureHint": "Ditandatangani dengan tanda tangan dan nama Direktur definitif PT.",
   "confirm": "Konfirmasi",
   "decisionDone": "Keputusan tersimpan.",
   "transferTitle": "Transfer dari Finance",
