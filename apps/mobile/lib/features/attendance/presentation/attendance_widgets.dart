@@ -65,6 +65,25 @@ class HomeSiteBadge extends StatelessWidget {
   }
 }
 
+/// "Pusat" badge of the PT's head office (DRMS 13/10 A2, site flagged "Kantor pusat").
+class HeadOfficeBadge extends StatelessWidget {
+  const HeadOfficeBadge({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      key: const Key('head-office-badge'),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(color: scheme.secondaryContainer, borderRadius: BorderRadius.circular(6)),
+      child: Text(
+        AppLocalizations.of(context).siteHeadOfficeBadge,
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(color: scheme.onSecondaryContainer),
+      ),
+    );
+  }
+}
+
 /// Indonesian problem text of a client-side geofence check (null = inside).
 String? siteProblem(AppLocalizations t, ProjectSite site, ({SiteCheck check, int? distanceM}) res) =>
     switch (res.check) {

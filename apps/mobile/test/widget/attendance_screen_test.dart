@@ -145,7 +145,10 @@ void main() {
   testWidgets('no assigned project', (tester) async {
     await pump(tester, sites: const []);
     expect(
-      find.text('Anda belum ditugaskan di site, project, atau pusat biaya mana pun. Hubungi PM/Admin.'),
+      find.text(
+        'Belum ada lokasi absen untuk Anda (lokasi terdaftar dengan titik sesuai tipe absensi, atau penugasan). '
+        'Hubungi PM/Admin.',
+      ),
       findsOneWidget,
     );
   });

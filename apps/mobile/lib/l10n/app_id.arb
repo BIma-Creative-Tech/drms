@@ -383,7 +383,7 @@
   "integrityWarning": "HP ini terdeteksi di-root atau berupa emulator. Aktivitas dari HP ini ditandai untuk ditinjau Admin.",
   "attendanceTitle": "Absensi",
   "attendanceDisabled": "Absensi dari aplikasi belum diaktifkan Admin (Setting perusahaan).",
-  "attendanceNoProjects": "Anda belum ditugaskan di site, project, atau pusat biaya mana pun. Hubungi PM/Admin.",
+  "attendanceNoProjects": "Belum ada lokasi absen untuk Anda (lokasi terdaftar dengan titik sesuai tipe absensi, atau penugasan). Hubungi PM/Admin.",
   "attendanceProject": "Project",
   "attendanceCheckIn": "Absen masuk",
   "attendanceCheckOut": "Absen pulang",
@@ -1074,6 +1074,43 @@
   "siteSite": "Site",
   "siteHome": "Site penempatan",
   "siteHomeBadge": "Penempatan",
+  "siteHeadOffice": "Kantor pusat",
+  "siteHeadOfficeBadge": "Pusat",
+  "attendanceDetect": "Deteksi lokasi otomatis",
+  "attendanceDetected": "Lokasi terdeteksi otomatis: {name} ({distance} m dari titik).",
+  "@attendanceDetected": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "distance": {
+        "type": "int"
+      }
+    }
+  },
+  "attendanceDetectedOverlap": "Anda berada di {count} area absen yang bertumpuk. Dipilih yang terdekat; pilih lokasi lain di bawah bila perlu.",
+  "@attendanceDetectedOverlap": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "attendanceDetectNone": "Posisi Anda di luar semua area absen terdaftar. Terdekat: {name} ({distance} m). Mendekatlah ke lokasi atau pilih lokasi secara manual.",
+  "@attendanceDetectNone": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "distance": {
+        "type": "int"
+      }
+    }
+  },
+  "attendanceDetectNoPoint": "Belum ada lokasi absen dengan titik koordinat. Hubungi Admin.",
+  "attendanceAreaChoice": "Area absen di posisi Anda",
+  "attendanceTypeOnsite": "Karyawan OnSite: boleh absen di semua lokasi terdaftar PT (site, kantor pusat, project, pusat biaya).",
+  "attendanceTypeNonOnsite": "Karyawan Non-OnSite: absen hanya di kantor pusat dan kantor cabang.",
   "distanceInside": "Di dalam area absen",
   "distanceOutside": "Di luar area absen",
   "distanceDetail": "Radius {radius} m + toleransi GPS {allowance} m (akurasi GPS ±{accuracy} m, maks. 50 m dihitung).",

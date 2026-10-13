@@ -8,6 +8,7 @@ import '../../../core/connectivity/connectivity_controller.dart';
 import '../../../core/db/app_database.dart';
 import '../../../core/format/dates.dart';
 import '../../../core/location/location_service.dart';
+import '../../../core/logging/log.dart';
 import '../../../core/media/photo_compressor.dart';
 import '../../../l10n/gen/app_localizations.dart';
 import '../../../shared/widgets/async_body.dart';
@@ -29,7 +30,10 @@ import 'team_view.dart';
 enum AttendanceTab { check, recap, team }
 
 /// E6 attendance hub. "Absen": own check-in/out at a site (ADR 0023), a project OR a cost center (US-01/02, Q-40) with
-/// geofence distance feedback — works offline; GPS + front-camera selfie are captured on the phone and
+/// geofence distance feedback. DRMS 13/10 A2: the locations are the user's eligible ones by attendance type (OnSite /
+/// Non-OnSite, cached for offline use); on open the GPS fix selects the location whose geofence contains it (nearest
+/// when several overlap → the user picks among them; none → manual picker as fallback) — works offline; GPS +
+/// front-camera selfie are captured on the phone and
 /// queued; the server decides. "Rekap": own month (US-09). "Tim": team today (US-13) with on-behalf
 /// (US-14) and corrections (US-15). Check-in / on-behalf follow `features.syncAttendance`; the recap and
 /// team views are online reads and work with the flag off.
@@ -88,6 +92,68 @@ class _CheckTabState extends ConsumerState<_CheckTab> {
   String? _notice;
   bool _noticeIsError = false;
   ({ProjectSite site, int distanceM, double accuracyM})? _distance;
+
+  /// DRMS 13/10 A2: last automatic area detection (null = not run yet) and whether it ran on open.
+  AreaDetection? _area;
+  bool _autoDetected = false;
+
+  /// DRMS 13/10 A2: GPS fix → the location whose geofence contains it (nearest when several overlap, the user may
+  /// pick another of those); none → the manual picker stays (fallback) with the nearest one as a hint. Only a hint:
+  /// the buttons re-check the selected location and the server decides.
+  Future<void> _detect(List<ProjectSite> list, {bool auto = false}) async {
+    final t = AppLocalizations.of(context);
+    setState(() {
+      _busy = true;
+      _notice = t.attendanceLocating;
+      _noticeIsError = false;
+    });
+    try {
+      final fix = await ref.read(locationServiceProvider).current();
+      if (!mounted) return;
+      if (fix.isMocked) {
+        setState(() {
+          _area = null;
+          _notice = t.attendanceMocked;
+          _noticeIsError = true;
+        });
+        return;
+      }
+      final d = detectArea(list, fix);
+      final pick = d.inside.firstOrNull;
+      final nearest = d.nearest;
+      setState(() {
+        _area = d;
+        if (pick != null) {
+          _siteKey = pick.site.key;
+          _distance = (site: pick.site, distanceM: pick.distanceM, accuracyM: fix.accuracyM);
+          _notice = d.overlap
+              ? t.attendanceDetectedOverlap(d.inside.length)
+              : t.attendanceDetected(pick.site.label, pick.distanceM);
+          _noticeIsError = false;
+        } else if (nearest != null) {
+          _distance = (site: nearest.site, distanceM: nearest.distanceM, accuracyM: fix.accuracyM);
+          _notice = t.attendanceDetectNone(nearest.site.label, nearest.distanceM);
+          _noticeIsError = true;
+        } else {
+          _notice = t.attendanceDetectNoPoint;
+          _noticeIsError = true;
+        }
+      });
+    } on LocationException catch (e) {
+      if (mounted) {
+        setState(() {
+          _notice = e.message;
+          _noticeIsError = true;
+        });
+      }
+    } on Object catch (e) {
+      // best effort (e.g. no location plugin): the manual picker stays usable
+      Log.w('attendance: area detection failed', e);
+      if (mounted) setState(() => _notice = auto ? null : const LocationException(LocationProblem.unavailable).message);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
 
   /// GPS fix + client geofence check (only enables the action; the server re-checks). Null = refused.
   Future<LocationFix?> _locate(ProjectSite site) async {
@@ -170,6 +236,16 @@ class _CheckTabState extends ConsumerState<_CheckTab> {
         final enabled = ref.watch(attendanceEnabledForProvider(site?.companyId));
         // ADR 0018: blocked until the current privacy notice is acknowledged (selfie + GPS)
         final privacyBlocked = ref.watch(attendanceBlockedByPrivacyProvider);
+        // DRMS 13/10 A2: attendance type of the PT of the selected location (eligible list only)
+        final type = site?.attendanceType;
+        // DRMS 13/10 A2: recognise the area once on open (not while blocked: no GPS before the privacy ack)
+        if (!_autoDetected && enabled && !privacyBlocked && list.any((s) => s.hasGeofence)) {
+          _autoDetected = true;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) _detect(list, auto: true);
+          });
+        }
+        final area = _area;
         final ready = enabled && !privacyBlocked && !_busy && site != null && site.hasGeofence;
         final d = _distance;
         final dist = d != null && site != null && d.site.key == site.key ? d : null;
@@ -181,9 +257,34 @@ class _CheckTabState extends ConsumerState<_CheckTab> {
             if (list.isEmpty)
               InfoCard(text: t.attendanceNoProjects, error: true)
             else ...[
+              if (area != null && area.overlap) ...[
+                Text(t.attendanceAreaChoice, style: Theme.of(context).textTheme.labelLarge),
+                const SizedBox(height: 4),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 4,
+                  children: [
+                    for (final m in area.inside)
+                      ChoiceChip(
+                        key: Key('attendance-area-${m.site.key}'),
+                        avatar: Icon(siteKindIcon(m.site.kind), size: 18),
+                        label: Text('${m.site.label} · ${m.distanceM} m'),
+                        selected: site?.key == m.site.key,
+                        onSelected: _busy
+                            ? null
+                            : (_) => setState(() {
+                                _siteKey = m.site.key;
+                                _distance = null;
+                              }),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+              ],
               DropdownButtonFormField<String>(
                 hint: Text(t.pickLocation),
-                key: const Key('attendance-project'),
+                // keyed by the selection: the auto-detected area (DRMS 13/10 A2) re-initialises the field
+                key: ValueKey('attendance-project:${site?.key}'),
                 initialValue: site?.key,
                 isExpanded: true,
                 decoration: InputDecoration(labelText: t.attendanceLocation, prefixIcon: const Icon(Icons.place)),
@@ -201,6 +302,7 @@ class _CheckTabState extends ConsumerState<_CheckTab> {
                           ],
                           Expanded(child: Text(s.label, overflow: TextOverflow.ellipsis)),
                           if (s.home) ...[const SizedBox(width: 6), const HomeSiteBadge()],
+                          if (!s.home && s.isHeadOffice) ...[const SizedBox(width: 6), const HeadOfficeBadge()],
                         ],
                       ),
                     ),
@@ -216,13 +318,31 @@ class _CheckTabState extends ConsumerState<_CheckTab> {
                 Padding(
                   padding: const EdgeInsets.only(top: 4, left: 12),
                   child: Text(
-                    '${site.home ? t.siteHome : siteKindLabel(t, site.kind)}'
+                    '${site.home ? t.siteHome : (site.isHeadOffice ? t.siteHeadOffice : siteKindLabel(t, site.kind))}'
                     '${site.radiusM == null ? '' : ' · ${t.attendanceRadius(site.radiusM!.round())}'}',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ),
+              if (type != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 2, left: 12),
+                  child: Text(
+                    type == AttendanceType.nonOnsite ? t.attendanceTypeNonOnsite : t.attendanceTypeOnsite,
+                    key: const Key('attendance-type-hint'),
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
                 ),
               if (site != null && !site.hasGeofence) InfoCard(text: t.attendanceNoGeofence, error: true),
               const SizedBox(height: 12),
+              OutlinedButton.icon(
+                key: const Key('attendance-detect'),
+                onPressed: !_busy && enabled && !privacyBlocked && list.any((s) => s.hasGeofence)
+                    ? () => _detect(list)
+                    : null,
+                icon: const Icon(Icons.travel_explore),
+                label: Text(t.attendanceDetect),
+              ),
+              const SizedBox(height: 8),
               if (dist != null) DistanceCard(site: dist.site, distanceM: dist.distanceM, accuracyM: dist.accuracyM),
               OutlinedButton.icon(
                 key: const Key('attendance-check-distance'),

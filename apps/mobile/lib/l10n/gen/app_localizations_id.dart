@@ -723,7 +723,7 @@ class AppLocalizationsId extends AppLocalizations {
 
   @override
   String get attendanceNoProjects =>
-      'Anda belum ditugaskan di site, project, atau pusat biaya mana pun. Hubungi PM/Admin.';
+      'Belum ada lokasi absen untuk Anda (lokasi terdaftar dengan titik sesuai tipe absensi, atau penugasan). Hubungi PM/Admin.';
 
   @override
   String get attendanceProject => 'Project';
@@ -1570,6 +1570,43 @@ class AppLocalizationsId extends AppLocalizations {
 
   @override
   String get siteHomeBadge => 'Penempatan';
+
+  @override
+  String get siteHeadOffice => 'Kantor pusat';
+
+  @override
+  String get siteHeadOfficeBadge => 'Pusat';
+
+  @override
+  String get attendanceDetect => 'Deteksi lokasi otomatis';
+
+  @override
+  String attendanceDetected(String name, int distance) {
+    return 'Lokasi terdeteksi otomatis: $name ($distance m dari titik).';
+  }
+
+  @override
+  String attendanceDetectedOverlap(int count) {
+    return 'Anda berada di $count area absen yang bertumpuk. Dipilih yang terdekat; pilih lokasi lain di bawah bila perlu.';
+  }
+
+  @override
+  String attendanceDetectNone(String name, int distance) {
+    return 'Posisi Anda di luar semua area absen terdaftar. Terdekat: $name ($distance m). Mendekatlah ke lokasi atau pilih lokasi secara manual.';
+  }
+
+  @override
+  String get attendanceDetectNoPoint => 'Belum ada lokasi absen dengan titik koordinat. Hubungi Admin.';
+
+  @override
+  String get attendanceAreaChoice => 'Area absen di posisi Anda';
+
+  @override
+  String get attendanceTypeOnsite =>
+      'Karyawan OnSite: boleh absen di semua lokasi terdaftar PT (site, kantor pusat, project, pusat biaya).';
+
+  @override
+  String get attendanceTypeNonOnsite => 'Karyawan Non-OnSite: absen hanya di kantor pusat dan kantor cabang.';
 
   @override
   String get distanceInside => 'Di dalam area absen';
