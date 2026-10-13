@@ -41,6 +41,10 @@ class DraftRepository {
               ..orderBy([(t) => OrderingTerm.asc(t.no)]))
             .get();
     final receipts = await (db.select(db.localReceipts)..where((t) => t.draftUuid.equals(row.clientUuid))).get();
+    return withVendorJson(_draftOf(row, lines, receipts), row.vendorJson);
+  }
+
+  DraftRequest _draftOf(LocalDraft row, List<LocalLine> lines, List<LocalReceipt> receipts) {
     return DraftRequest(
       clientUuid: row.clientUuid,
       type: RequestType.fromCode(row.type),
@@ -116,7 +120,9 @@ class DraftRepository {
             urgencyLevelId: Value(d.urgencyLevelId),
             notes: Value(d.notes),
             requesterIdsJson: Value(jsonEncode(d.requesterIds)),
-            bankAccountId: Value(d.bankAccountId),
+            bankAccountId: Value(d.isVendor ? null : d.bankAccountId),
+            // ADR 0025: vendor payment data (null = paid to an employee account)
+            vendorJson: Value(vendorToJson(d)),
             serverId: Value(d.serverId),
             serverRev: Value(d.serverRev),
             syncState: Value(d.syncState.name),
@@ -127,6 +133,11 @@ class DraftRepository {
             updatedAt: ts,
           ),
         );
+    // ADR 0025: a replaced / dropped invoice photo of this draft is removed (receipt photos: _dropOrphanMedia)
+    final oldInvoice = existing == null ? null : withVendorJson(_blank(existing), existing.vendorJson).invoiceMediaUuid;
+    if (oldInvoice != null && oldInvoice != (d.isVendor ? d.invoiceMediaUuid : null)) {
+      await (db.delete(db.mediaBlobs)..where((t) => t.clientUuid.equals(oldInvoice))).go();
+    }
     await (db.delete(db.localReceipts)..where((t) => t.draftUuid.equals(d.clientUuid))).go();
     await (db.delete(db.localLines)..where((t) => t.draftUuid.equals(d.clientUuid))).go();
     for (final l in d.lines) {
@@ -259,4 +270,45 @@ class DraftRepository {
     if (ids.isEmpty) return;
     await (db.delete(db.mediaBlobs)..where((t) => t.clientUuid.isIn(ids))).go();
   }
+
+  DraftRequest _blank(LocalDraft row) => DraftRequest(clientUuid: row.clientUuid, type: RequestType.fromCode(row.type));
+}
+
+/// ADR 0025: vendor payment fields of a draft → `local_drafts.vendor_json` (null for an employee payment).
+String? vendorToJson(DraftRequest d) => d.isVendor
+    ? jsonEncode({
+        'payeeType': d.payeeType.code,
+        'vendorId': d.vendorId,
+        'vendorBankAccountId': d.vendorBankAccountId,
+        'invoiceNo': d.invoiceNo,
+        'invoiceDate': d.invoiceDate,
+        'invoiceDueDate': d.invoiceDueDate,
+        'invoiceMediaUuid': d.invoiceMediaUuid,
+        'invoiceFileId': d.invoiceFileId,
+      })
+    : null;
+
+/// ADR 0025: `local_drafts.vendor_json` back onto [d] (null / unreadable = employee payment, as before v10).
+DraftRequest withVendorJson(DraftRequest d, String? json) {
+  if (json == null || json.isEmpty) return d;
+  final Object? decoded;
+  try {
+    decoded = jsonDecode(json);
+  } on FormatException {
+    return d;
+  }
+  if (decoded is! Map<String, dynamic>) return d;
+  final m = decoded;
+  int? n(String k) => m[k] is num ? (m[k] as num).toInt() : null;
+  String? s(String k) => m[k] is String ? m[k] as String : null;
+  return d.copyWith(
+    payeeType: PayeeType.fromCode(s('payeeType')),
+    vendorId: n('vendorId'),
+    vendorBankAccountId: n('vendorBankAccountId'),
+    invoiceNo: s('invoiceNo'),
+    invoiceDate: s('invoiceDate'),
+    invoiceDueDate: s('invoiceDueDate'),
+    invoiceMediaUuid: s('invoiceMediaUuid'),
+    invoiceFileId: n('invoiceFileId'),
+  );
 }

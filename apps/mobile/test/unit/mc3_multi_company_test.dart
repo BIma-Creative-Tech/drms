@@ -290,7 +290,7 @@ void main() {
     test('rows survive the upgrade unchanged with company_id NULL (payload, ids, status)', () async {
       final db = oldPhoneDb(2, seedV2);
       addTearDown(db.close);
-      expect(db.schemaVersion, 9); // v2 → v3 (company_id) → v4 (urgency level, 2026-10-09) → v5 (FR1 field reports) → v6 (P3) → v7 (D3) → v8 (D4) → v9 (sites)
+      expect(db.schemaVersion, 10); // v2 → v3 (company_id) → v4 (urgency level, 2026-10-09) → v5 (FR1 field reports) → v6 (P3) → v7 (D3) → v8 (D4) → v9 (sites) → v10 (vendor)
       final out = await db.select(db.outbox).get();
       expect(out.map((r) => r.opUuid), unorderedEquals(['d-1', 'r-1', 'a-1']));
       expect(out.every((r) => r.companyId == null && r.status == 'pending'), isTrue);

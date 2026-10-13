@@ -26,6 +26,12 @@ const fixtures: Record<string, Fixture> = {
   },
   clients: { create: () => ({ name: 'Klien Audit' }), update: { contact: 'Bu Audit' }, field: 'contact' },
   vendors: { create: () => ({ name: 'Vendor Audit' }), update: { npwp: '01.234.567.8-901.000' }, field: 'npwp' },
+  // ADR 0025
+  'vendor-bank-accounts': {
+    create: () => ({ vendor: ids.vendors, bank: ids.banks, accountNo: '7654321', accountHolder: 'Vendor Audit' }),
+    update: { isDefault: true },
+    field: 'isDefault',
+  },
   projects: { create: () => ({ code: 'AUD-PRJ', name: 'Project Audit', client: ids.clients, pm: admin.id }), update: { address: 'Jl. Audit 1' }, field: 'address' },
   'project-stages': { create: () => ({ project: ids.projects, name: 'Pondasi', weightPct: 30, sequence: 1 }), update: { weightPct: 40 }, field: 'weightPct' },
   'stage-templates': {

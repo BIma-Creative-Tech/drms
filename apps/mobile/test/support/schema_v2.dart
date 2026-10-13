@@ -55,7 +55,10 @@ final schemaV7 = [...schemaV6, 'ALTER TABLE "local_lines" ADD COLUMN "receipt_am
 /// v8 (DRMS 10/10 D4, mobile-v0.6.x): v7 + the RAP item per line, as drift's `addColumn` added it.
 final schemaV8 = [...schemaV7, 'ALTER TABLE "local_lines" ADD COLUMN "rap_item_id" INTEGER NULL'];
 
-/// An in-memory database that starts as schema [version] (1 … 8) with rows from [seed], then is opened by
+/// v9 (ADR 0023 sites): site of an attendance outbox item.
+final schemaV9 = [...schemaV8, 'ALTER TABLE "outbox" ADD COLUMN "site_id" INTEGER NULL'];
+
+/// An in-memory database that starts as schema [version] (1 … 9) with rows from [seed], then is opened by
 /// the current `AppDatabase` (runs the drift migration to the current schema version).
 AppDatabase oldPhoneDb(int version, void Function(CommonDatabase raw) seed) => AppDatabase(
   NativeDatabase.memory(
@@ -69,7 +72,8 @@ AppDatabase oldPhoneDb(int version, void Function(CommonDatabase raw) seed) => A
           5 => schemaV5,
           6 => schemaV6,
           7 => schemaV7,
-          _ => schemaV8,
+          8 => schemaV8,
+          _ => schemaV9,
         }) {
           raw.execute(s);
         }

@@ -393,7 +393,7 @@ export const ExpenseRequests: CollectionConfig = withAudit(
           { label: `${PAYEE_TYPE_LABELS.vendor} (${VENDOR_PAYMENT_LABEL.toLowerCase()})`, value: 'vendor' },
         ],
         filterOptions: payeeTypeOptions as never,
-        admin: { description: 'Vendor: Finance / PM membayar invoice vendor ke rekening vendor (tanpa LPJ).', components: { Field: '@/admin/components/EditableOnlyFields#PayeeTypeField' } },
+        admin: { placeholder: PLACEHOLDERS.payeeType, description: 'Vendor: Finance / PM membayar invoice vendor ke rekening vendor (tanpa LPJ).', components: { Field: '@/admin/components/EditableOnlyFields#PayeeTypeField' } },
       },
       {
         name: 'type',

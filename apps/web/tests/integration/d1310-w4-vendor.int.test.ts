@@ -219,6 +219,6 @@ describe('transfer → Selesai (no LPJ)', () => {
     const t = await ok(api('POST', `${E}/${id}/transfer`, w.users.finance, { ...body, confirmUnverifiedAccount: true }, key()), 201)
     expect(t.request.status).toBe('completed')
     const audit = await sqlAs('app', "SELECT new_value FROM audit_logs WHERE doc_type = 'transfer' AND doc_id = $1 AND action = 'bank_unverified_confirmed'", [String(t.transferId)])
-    expect(audit.rows[0].new_value).toMatchObject({ accountKind: 'vendor', verificationStatus: 'unverified' })
+    expect(audit.rows[0].new_value).toMatchObject({ v: { accountKind: 'vendor', verificationStatus: 'unverified' } })
   })
 })

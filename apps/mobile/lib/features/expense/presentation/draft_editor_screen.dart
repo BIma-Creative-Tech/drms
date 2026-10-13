@@ -7,6 +7,7 @@ import '../../../app/theme.dart';
 import '../../../core/connectivity/connectivity_controller.dart';
 import '../../../core/format/dates.dart';
 import '../../../core/format/rupiah.dart';
+import '../../auth/domain/user_profile.dart';
 import '../../../l10n/gen/app_localizations.dart';
 import '../../../shared/widgets/async_body.dart';
 import '../../../shared/widgets/form_grid.dart';
@@ -21,6 +22,7 @@ import '../domain/draft.dart';
 import '../domain/draft_validation.dart';
 import '../domain/request_status.dart';
 import 'line_editor_screen.dart';
+import 'receipt_capture.dart';
 import 'requests_screen.dart' show syncStateLabel;
 import 'widgets/master_picker.dart';
 import 'widgets/rap_item_picker.dart';
@@ -136,6 +138,8 @@ class _DraftEditorScreenState extends ConsumerState<DraftEditorScreen> {
   late DraftRequest _d = widget.initial;
   late final _title = TextEditingController(text: widget.initial.title);
   late final _notes = TextEditingController(text: widget.initial.notes ?? '');
+  // ADR 0025: invoice number of a vendor payment
+  late final _invoiceNo = TextEditingController(text: widget.initial.invoiceNo ?? '');
   bool _busy = false;
   List<DraftIssue> _issues = const [];
 
@@ -143,6 +147,7 @@ class _DraftEditorScreenState extends ConsumerState<DraftEditorScreen> {
   void dispose() {
     _title.dispose();
     _notes.dispose();
+    _invoiceNo.dispose();
     super.dispose();
   }
 
@@ -151,7 +156,80 @@ class _DraftEditorScreenState extends ConsumerState<DraftEditorScreen> {
     title: _title.text,
     notes: _notes.text.trim().isEmpty ? null : _notes.text.trim(),
     costCenterId: null,
+    invoiceNo: _d.isVendor ? (_invoiceNo.text.trim().isEmpty ? null : _invoiceNo.text.trim()) : null,
   );
+
+  /// ADR 0025 (D3): only Finance / PM of the draft's PT file a vendor payment (the server re-checks).
+  bool _mayFileVendorPayment() {
+    final roles = ref.read(currentProfileProvider)?.forCompany(_d.companyId).roles ?? const <Role>{};
+    return roles.contains(Role.finance) || roles.contains(Role.pm);
+  }
+
+  /// ADR 0025: switching the payee type — vendor = Pengajuan Baru, Pemohon = the filer, no employee account;
+  /// karyawan clears every vendor / invoice field.
+  void _setPayee(Set<PayeeType> s) {
+    final payee = s.first;
+    if (payee == _d.payeeType) return;
+    setState(() {
+      if (payee == PayeeType.vendor) {
+        final own = ref.read(currentProfileProvider)?.forCompany(_d.companyId).employee?.id;
+        _d = _d.copyWith(
+          payeeType: PayeeType.vendor,
+          type: RequestType.advance,
+          bankAccountId: null,
+          requesterIds: own == null ? _d.requesterIds : [own],
+        );
+      } else {
+        _invoiceNo.clear();
+        _d = _d.copyWith(
+          payeeType: PayeeType.karyawan,
+          vendorId: null,
+          vendorBankAccountId: null,
+          invoiceNo: null,
+          invoiceDate: null,
+          invoiceDueDate: null,
+          invoiceMediaUuid: null,
+          invoiceFileId: null,
+        );
+      }
+    });
+  }
+
+  Future<void> _pickInvoiceDate({required bool due}) async {
+    final now = DateTime.now();
+    final current = DateTime.tryParse((due ? _d.invoiceDueDate : _d.invoiceDate) ?? '');
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: current ?? now,
+      firstDate: now.subtract(const Duration(days: 730)),
+      // the invoice date is never in the future (server rule); a due date may be
+      lastDate: due ? now.add(const Duration(days: 365)) : now,
+    );
+    if (picked == null) return;
+    setState(() => _d = due ? _d.copyWith(invoiceDueDate: toYmd(picked)) : _d.copyWith(invoiceDate: toYmd(picked)));
+  }
+
+  /// ADR 0025: invoice photo (camera / gallery, compressed like a receipt photo), stored as media blob `invoice` and
+  /// uploaded to `POST /media/attachments` by the sync / at "Ajukan".
+  Future<void> _addInvoicePhoto({required bool fromCamera}) async {
+    final sub = ref.read(currentSubProvider);
+    if (sub == null) return;
+    final raw = await pickReceiptImage(context, fromCamera: fromCamera);
+    if (raw == null || !mounted) return;
+    setState(() => _busy = true);
+    try {
+      final photo = await ref.read(photoCompressorProvider).compress(raw, receiptTargetFor(ref.read(currentProfileProvider)));
+      final uuid = ref.read(draftServiceProvider).newId();
+      await ref
+          .read(draftRepositoryProvider)
+          .addMedia(sub, uuid: uuid, kind: 'invoice', bytes: photo.bytes, sha256: photo.sha256Hex);
+      if (mounted) setState(() => _d = _d.copyWith(invoiceMediaUuid: uuid, invoiceFileId: null));
+    } on Object catch (e) {
+      if (mounted) showSnack(context, errorText(e));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
 
   /// D4: RAP items belong to the project — a new project clears the RAP item of every line (after a confirm).
   Future<void> _setProject(int? id) async {
@@ -375,6 +453,9 @@ class _DraftEditorScreenState extends ConsumerState<DraftEditorScreen> {
         .where((a) => _d.requesterIds.isEmpty || _d.requesterIds.contains((a.extra['employee'] as num?)?.toInt()))
         .toList();
     final urgencies = _byRank(m[MasterTypes.urgencyLevels] ?? const <MasterItem>[]);
+    // ADR 0025: Finance / PM may switch to "Vendor"; the chosen vendor's active accounts
+    final mayVendor = _mayFileVendorPayment();
+    final vendorAccounts = vendorAccountsOf(m, _d.vendorId);
     String? issueFor(String field) => _issues.where((i) => i.field == field && i.lineNo == null).firstOrNull?.message;
     final editableType = _d.serverId == null;
     // D4: RAP items of the chosen project (labels + live remaining budget on the line cards).
@@ -434,17 +515,41 @@ class _DraftEditorScreenState extends ConsumerState<DraftEditorScreen> {
                 ),
               ),
             // DRMS 13/10 Umum #2 / D4: label left of the field, two columns on wide screens.
+            if (_d.isVendor)
+              Card(
+                key: const Key('draft-vendor-hint'),
+                color: Theme.of(context).colorScheme.secondaryContainer,
+                margin: const EdgeInsets.only(bottom: 12),
+                child: ListTile(leading: const Icon(Icons.storefront), title: Text(t.vendorPaymentHint)),
+              ),
             FormGrid(
               children: [
-                FormGridCell(
-                  label: t.fieldType,
-                  stackedLabel: true,
-                  child: SegmentedButton<RequestType>(
-                    segments: [for (final ty in RequestType.values) ButtonSegment(value: ty, label: Text(ty.label))],
-                    selected: {_d.type},
-                    onSelectionChanged: editableType ? _setType : null,
+                // ADR 0025 "Jenis penerima": only Finance / PM see "Vendor"; fixed once the server knows the draft
+                if (mayVendor || _d.isVendor)
+                  FormGridCell(
+                    label: t.fieldPayeeType,
+                    stackedLabel: true,
+                    child: SegmentedButton<PayeeType>(
+                      key: const Key('draft-payee-type'),
+                      segments: [
+                        ButtonSegment(value: PayeeType.karyawan, label: Text(t.payeeKaryawan)),
+                        ButtonSegment(value: PayeeType.vendor, label: Text(t.payeeVendor)),
+                      ],
+                      selected: {_d.payeeType},
+                      onSelectionChanged: editableType && mayVendor ? _setPayee : null,
+                    ),
                   ),
-                ),
+                // a vendor payment is always Pengajuan Baru (no "Jenis" choice)
+                if (!_d.isVendor)
+                  FormGridCell(
+                    label: t.fieldType,
+                    stackedLabel: true,
+                    child: SegmentedButton<RequestType>(
+                      segments: [for (final ty in RequestType.values) ButtonSegment(value: ty, label: Text(ty.label))],
+                      selected: {_d.type},
+                      onSelectionChanged: editableType ? _setType : null,
+                    ),
+                  ),
                 FormGridCell(
                   label: t.fieldTitle,
                   builder: (label) => TextField(
@@ -503,6 +608,7 @@ class _DraftEditorScreenState extends ConsumerState<DraftEditorScreen> {
                     onChanged: (v) => setState(() => _d = _d.copyWith(urgencyLevelId: v)),
                   ),
                 ),
+                if (!_d.isVendor)
                 FormGridCell(
                   label: t.fieldRequesters,
                   stackedLabel: true,
@@ -538,6 +644,7 @@ class _DraftEditorScreenState extends ConsumerState<DraftEditorScreen> {
                     ],
                   ),
                 ),
+                if (!_d.isVendor)
                 FormGridCell(
                   label: t.fieldBankAccount,
                   child: Column(
@@ -559,6 +666,130 @@ class _DraftEditorScreenState extends ConsumerState<DraftEditorScreen> {
                     ],
                   ),
                 ),
+                // ADR 0025: vendor → its account → invoice number / date / due date / photo
+                if (_d.isVendor) ...[
+                  FormGridCell(
+                    label: t.fieldVendor,
+                    child: MasterPickerField(
+                      key: const Key('draft-vendor'),
+                      label: t.fieldVendor,
+                      items: m[MasterTypes.vendors] ?? const [],
+                      value: _d.vendorId,
+                      allowNone: false,
+                      errorText: issueFor('vendorId'),
+                      onChanged: (v) => setState(() {
+                        if (v == _d.vendorId) return;
+                        final accs = vendorAccountsOf(m, v);
+                        // the vendor's default (else only) active account is preselected
+                        final def = accs.where((a) => a.extra['isDefault'] == true).firstOrNull ?? (accs.length == 1 ? accs.single : null);
+                        _d = _d.copyWith(vendorId: v, vendorBankAccountId: def?.id);
+                      }),
+                    ),
+                  ),
+                  FormGridCell(
+                    label: t.fieldVendorBankAccount,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        MasterPickerField(
+                          key: const Key('draft-vendor-account'),
+                          label: t.fieldVendorBankAccount,
+                          items: vendorAccounts,
+                          value: _d.vendorBankAccountId,
+                          allowNone: false,
+                          errorText: issueFor('vendorBankAccountId'),
+                          onChanged: (v) => setState(() => _d = _d.copyWith(vendorBankAccountId: v)),
+                        ),
+                        if (_d.vendorId != null && vendorAccounts.isEmpty)
+                          Padding(
+                            key: const Key('draft-vendor-no-account'),
+                            padding: const EdgeInsets.only(top: 4),
+                            child: Text(t.vendorAccountsNone, style: TextStyle(color: context.pk.warnText)),
+                          ),
+                        if (vendorAccounts.where((a) => a.id == _d.vendorBankAccountId).firstOrNull case final acc?)
+                          BankAccountPreview(
+                            key: ValueKey('vendor-bank-preview-${acc.id}'),
+                            account: acc,
+                            banks: m[MasterTypes.banks] ?? const [],
+                          ),
+                      ],
+                    ),
+                  ),
+                  FormGridCell(
+                    label: t.fieldInvoiceNo,
+                    builder: (label) => TextField(
+                      key: const Key('draft-invoice-no'),
+                      controller: _invoiceNo,
+                      maxLength: 64,
+                      decoration: InputDecoration(labelText: label, errorText: issueFor('invoiceNo')),
+                    ),
+                  ),
+                  FormGridCell(
+                    label: t.fieldInvoiceDate,
+                    builder: (label) => InkWell(
+                      key: const Key('draft-invoice-date'),
+                      onTap: () => _pickInvoiceDate(due: false),
+                      child: InputDecorator(
+                        decoration: InputDecoration(
+                          labelText: label,
+                          errorText: issueFor('invoiceDate'),
+                          suffixIcon: const Icon(Icons.calendar_today),
+                        ),
+                        child: Text(formatDateOnly(_d.invoiceDate)),
+                      ),
+                    ),
+                  ),
+                  FormGridCell(
+                    label: t.fieldInvoiceDueDate,
+                    builder: (label) => InkWell(
+                      key: const Key('draft-invoice-due-date'),
+                      onTap: () => _pickInvoiceDate(due: true),
+                      child: InputDecorator(
+                        decoration: InputDecoration(
+                          labelText: label,
+                          errorText: issueFor('invoiceDueDate'),
+                          suffixIcon: const Icon(Icons.event),
+                        ),
+                        child: Text(formatDateOnly(_d.invoiceDueDate)),
+                      ),
+                    ),
+                  ),
+                  FormGridCell(
+                    label: t.fieldInvoiceFile,
+                    stackedLabel: true,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _d.invoiceMediaUuid != null
+                              ? t.invoiceAttached
+                              : _d.invoiceFileId != null
+                              ? t.invoiceOnServer
+                              : t.invoiceMissing,
+                          key: const Key('draft-invoice-state'),
+                          style: issueFor('invoiceFile') == null ? null : TextStyle(color: Theme.of(context).colorScheme.error),
+                        ),
+                        Wrap(
+                          spacing: 8,
+                          children: [
+                            OutlinedButton.icon(
+                              key: const Key('draft-invoice-camera'),
+                              onPressed: _busy ? null : () => _addInvoicePhoto(fromCamera: true),
+                              icon: const Icon(Icons.photo_camera),
+                              label: Text(t.invoiceCamera),
+                            ),
+                            OutlinedButton.icon(
+                              key: const Key('draft-invoice-gallery'),
+                              onPressed: _busy ? null : () => _addInvoicePhoto(fromCamera: false),
+                              icon: const Icon(Icons.photo_library),
+                              label: Text(t.invoiceGallery),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
                 FormGridCell(
                   label: t.fieldNotes,
                   full: true,
@@ -710,6 +941,13 @@ class _DraftEditorScreenState extends ConsumerState<DraftEditorScreen> {
     );
   }
 }
+
+/// ADR 0025: the active accounts of vendor [vendorId] (masters `vendor-bank-accounts`; none before a vendor is chosen).
+List<MasterItem> vendorAccountsOf(Map<String, List<MasterItem>> masters, int? vendorId) => vendorId == null
+    ? const []
+    : (masters[MasterTypes.vendorBankAccounts] ?? const <MasterItem>[])
+          .where((a) => (a.extra['vendor'] as num?)?.toInt() == vendorId)
+          .toList();
 
 /// Owner decision 2026-10-09: "Tingkat urgensi" of the PT, lowest rank first.
 List<MasterItem> _byRank(List<MasterItem> items) {

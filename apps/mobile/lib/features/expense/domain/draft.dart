@@ -120,6 +120,20 @@ abstract class DraftRequest with _$DraftRequest {
     String? notes,
     @Default([]) List<int> requesterIds,
     int? bankAccountId,
+
+    /// ADR 0025 "Jenis penerima": vendor = "Pembayaran vendor" (Finance / PM only; type is always Pengajuan Baru,
+    /// no employee account, no LPJ). Stored in `local_drafts.vendor_json` (schema v10).
+    @Default(PayeeType.karyawan) PayeeType payeeType,
+    int? vendorId,
+    int? vendorBankAccountId,
+    String? invoiceNo,
+    String? invoiceDate, // YYYY-MM-DD
+    String? invoiceDueDate, // YYYY-MM-DD
+    /// Local invoice photo (`media_blobs` kind `invoice`) until it is on the server.
+    String? invoiceMediaUuid,
+
+    /// Server media id of the invoice (`media-attachments`): imported from the server or uploaded by the sync.
+    int? invoiceFileId,
     @Default([]) List<DraftLine> lines,
     int? serverId,
     int? serverRev,
@@ -133,7 +147,15 @@ abstract class DraftRequest with _$DraftRequest {
 
   int get receiptCount => lines.fold(0, (n, l) => n + l.receipts.length);
 
-  /// Local photos of this draft (server receipts of an imported draft have no local photo).
-  Iterable<String> get mediaUuids =>
-      lines.expand((l) => l.receipts).where((r) => !r.isServerReceipt).map((r) => r.mediaUuid);
+  /// ADR 0025: a vendor payment ("Pembayaran vendor").
+  bool get isVendor => payeeType == PayeeType.vendor;
+
+  /// ADR 0025: a vendor payment has an invoice file (local photo or already on the server).
+  bool get hasInvoiceFile => invoiceFileId != null || invoiceMediaUuid != null;
+
+  /// Local photos of this draft (server receipts of an imported draft have no local photo; ADR 0025: + the invoice).
+  Iterable<String> get mediaUuids => [
+    ...lines.expand((l) => l.receipts).where((r) => !r.isServerReceipt).map((r) => r.mediaUuid),
+    if (isVendor && invoiceFileId == null && invoiceMediaUuid != null) invoiceMediaUuid!,
+  ];
 }

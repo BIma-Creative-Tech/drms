@@ -118,9 +118,25 @@ class DraftService {
     });
   }
 
+  /// ADR 0025: uploads the local invoice photo of a vendor payment (once: the blob remembers its server id).
+  Future<DraftRequest> _uploadInvoice(DraftRequest d) async {
+    final local = d.invoiceMediaUuid;
+    if (!d.isVendor || d.invoiceFileId != null || local == null) return d;
+    final blob = await drafts.media(local);
+    if (blob == null) {
+      throw const ProblemException(status: 422, detail: 'Foto invoice tidak ditemukan di HP. Ambil ulang foto invoice.');
+    }
+    final known = int.tryParse(blob.serverMediaId ?? '');
+    final id =
+        known ?? await api.uploadMedia('attachments', blob.bytes, filename: '$local.jpg', mime: blob.mimeType);
+    if (known == null) await drafts.markMediaUploaded(local, serverMediaId: '$id');
+    return d.copyWith(invoiceFileId: id);
+  }
+
   /// "Ajukan" — online only. Creates the server draft through `/api/v1` (idempotent by clientUuid)
   /// when the offline queue has not delivered it yet, uploads the receipts, then submits.
-  Future<ExpenseDetail> submit(String sub, DraftRequest draft, {RapCheck rap = RapCheck.strict}) async {
+  Future<ExpenseDetail> submit(String sub, DraftRequest submitted, {RapCheck rap = RapCheck.strict}) async {
+    var draft = submitted;
     final issues = validateForSubmit(draft, rap: rap);
     if (issues.isNotEmpty) throw DraftValidationException(issues);
     return lock.run(() async {
@@ -134,6 +150,8 @@ class DraftService {
           detail: 'Perubahan draft masih menunggu sinkron. Tekan "Kirim sekarang" lalu coba Ajukan lagi.',
         );
       } else {
+        // ADR 0025: the invoice photo of a vendor payment goes up first (`POST /media/attachments`)
+        draft = await _uploadInvoice(draft);
         detail = await api.create(
           draftToCreateBody(draft),
           idempotencyKey: draft.clientUuid,
@@ -180,7 +198,7 @@ class DraftService {
       );
       await drafts.setSyncState(draft.clientUuid, DraftSyncState.submitted, serverId: submitted.id, clearError: true);
       await outbox.supersede(sub, draft.clientUuid);
-      await drafts.purgeMediaOf(draft);
+      await drafts.purgeMediaOf(submitted); // incl. the local invoice photo (ADR 0025)
       return submitted;
     });
   }

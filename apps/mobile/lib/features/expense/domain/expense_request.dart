@@ -29,6 +29,9 @@ abstract class ExpenseSummary with _$ExpenseSummary {
 
     /// MC3: PT of the request (`companyId`); null from a server before MC3.
     int? companyId,
+
+    /// ADR 0025: vendor payment (`payeeType`); karyawan from a server before Wave 4.
+    @Default(PayeeType.karyawan) PayeeType payeeType,
   }) = _ExpenseSummary;
 }
 
@@ -337,7 +340,23 @@ abstract class ExpenseDetail with _$ExpenseDetail {
 
     /// MC3: PT of the request (`companyId`).
     int? companyId,
+
+    /// ADR 0025 "Pembayaran vendor": payee type, vendor, chosen vendor account (the destination snapshot is in
+    /// `bankName` / `bankAccountNo` / `bankAccountHolder` after submit) and the invoice (the proof — no LPJ).
+    @Default(PayeeType.karyawan) PayeeType payeeType,
+    RefItem? vendor,
+    int? vendorBankAccountId,
+    String? invoiceNo,
+    String? invoiceDate,
+    String? invoiceDueDate,
+    int? invoiceFileId,
+    String? invoiceFileName,
   }) = _ExpenseDetail;
+}
+
+/// ADR 0025: a vendor payment — no receipts, no LPJ (the transfer completes it).
+extension ExpenseDetailVendor on ExpenseDetail {
+  bool get isVendor => payeeType == PayeeType.vendor;
 }
 
 /// `ApprovalInbox.items[]`.

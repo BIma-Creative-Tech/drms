@@ -1002,7 +1002,11 @@ export const openapiDocument = {
             "$ref": "#/components/schemas/RequestType"
           },
           "typeLabel": {
-            "type": "string"
+            "type": "string",
+            "description": "Pengajuan Baru / Reimburse; \"Pembayaran vendor\" for payeeType vendor (ADR 0025)."
+          },
+          "payeeType": {
+            "$ref": "#/components/schemas/PayeeType"
           },
           "status": {
             "$ref": "#/components/schemas/RequestStatus"
@@ -1082,6 +1086,7 @@ export const openapiDocument = {
           "docNo",
           "type",
           "typeLabel",
+          "payeeType",
           "status",
           "statusLabel",
           "title",
@@ -1103,6 +1108,14 @@ export const openapiDocument = {
           "reimburse"
         ],
         "description": "advance = Pengajuan Baru (label until 2026-10: Uang Muka), reimburse = Reimburse"
+      },
+      "PayeeType": {
+        "type": "string",
+        "enum": [
+          "karyawan",
+          "vendor"
+        ],
+        "description": "ADR 0025 \"Jenis penerima\": karyawan = the requester's employee account (default, every request before ADR 0025); vendor = \"Pembayaran vendor\" (Finance / PM only): vendor + vendor account + invoice, type always advance, no LPJ (transfer → completed)."
       },
       "RequestStatus": {
         "type": "string",
@@ -1140,7 +1153,11 @@ export const openapiDocument = {
             "$ref": "#/components/schemas/RequestType"
           },
           "typeLabel": {
-            "type": "string"
+            "type": "string",
+            "description": "Pengajuan Baru / Reimburse; \"Pembayaran vendor\" for payeeType vendor (ADR 0025)."
+          },
+          "payeeType": {
+            "$ref": "#/components/schemas/PayeeType"
           },
           "status": {
             "$ref": "#/components/schemas/RequestStatus"
@@ -1300,6 +1317,45 @@ export const openapiDocument = {
             ],
             "exclusiveMinimum": 0
           },
+          "vendor": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "type": "integer",
+                "exclusiveMinimum": 0
+              },
+              "code": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "name": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "id"
+            ],
+            "description": "ADR 0025: vendor of a vendor payment (null for payeeType karyawan)."
+          },
+          "vendorBankAccountId": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "exclusiveMinimum": 0,
+            "description": "ADR 0025: chosen vendor account (vendor payment); after submit the destination is `bank` (snapshot)."
+          },
+          "invoice": {
+            "$ref": "#/components/schemas/VendorInvoice"
+          },
           "bank": {
             "type": [
               "object",
@@ -1330,7 +1386,8 @@ export const openapiDocument = {
               "bankName",
               "accountNo",
               "accountHolder"
-            ]
+            ],
+            "description": "Destination snapshot taken at submit: the requester's account, or (ADR 0025) the vendor account."
           },
           "lines": {
             "type": "array",
@@ -2239,6 +2296,7 @@ export const openapiDocument = {
           "docNo",
           "type",
           "typeLabel",
+          "payeeType",
           "status",
           "statusLabel",
           "title",
@@ -2260,6 +2318,9 @@ export const openapiDocument = {
           "requesters",
           "createdBy",
           "bankAccountId",
+          "vendor",
+          "vendorBankAccountId",
+          "invoice",
           "bank",
           "lines",
           "transferredTotal",
@@ -2313,6 +2374,61 @@ export const openapiDocument = {
         "required": [
           "id"
         ]
+      },
+      "VendorInvoice": {
+        "type": [
+          "object",
+          "null"
+        ],
+        "properties": {
+          "no": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "date": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "dueDate": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "fileId": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "exclusiveMinimum": 0,
+            "description": "media-attachments id (GET /api/v1/media/attachments/{id}/file)."
+          },
+          "fileName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "mimeType": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "no",
+          "date",
+          "dueDate",
+          "fileId",
+          "fileName",
+          "mimeType"
+        ],
+        "description": "ADR 0025: the vendor invoice (the proof of a vendor payment — no LPJ). null for payeeType karyawan."
       },
       "Settlement": {
         "type": [
@@ -2786,6 +2902,62 @@ export const openapiDocument = {
             },
             "maxItems": 20
           },
+          "payeeType": {
+            "type": "string",
+            "enum": [
+              "karyawan",
+              "vendor"
+            ],
+            "description": "Default karyawan. vendor: only a Finance / PM caller of the request PT (403 otherwise); `type` is set to advance, `bankAccountId` must be empty, the requester is the caller himself."
+          },
+          "vendorId": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "exclusiveMinimum": 0,
+            "description": "ADR 0025: active vendor of the request PT (GET /masters?types=vendors). Required to submit a vendor payment."
+          },
+          "vendorBankAccountId": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "exclusiveMinimum": 0,
+            "description": "ADR 0025: active account OF THAT vendor (GET /masters?types=vendor-bank-accounts). Required to submit; snapshotted at submit = the transfer destination."
+          },
+          "invoiceNo": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 64,
+            "description": "ADR 0025: required to submit. Unique per vendor among requests that are not cancelled / rejected (compared upper case, letters + digits only) → else 409 with errors[invoiceNo]."
+          },
+          "invoiceDate": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$",
+            "description": "ADR 0025: required to submit; not in the future."
+          },
+          "invoiceDueDate": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$",
+            "description": "ADR 0025: optional; not before invoiceDate."
+          },
+          "invoiceFileId": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "exclusiveMinimum": 0,
+            "description": "ADR 0025: media-attachments id (photo / PDF, POST /media/attachments) of the invoice. Required to submit; linked to the request at submit."
+          },
           "clientUuid": {
             "type": "string",
             "format": "uuid",
@@ -2981,6 +3153,62 @@ export const openapiDocument = {
               "exclusiveMinimum": 0
             },
             "maxItems": 20
+          },
+          "payeeType": {
+            "type": "string",
+            "enum": [
+              "karyawan",
+              "vendor"
+            ],
+            "description": "Default karyawan. vendor: only a Finance / PM caller of the request PT (403 otherwise); `type` is set to advance, `bankAccountId` must be empty, the requester is the caller himself."
+          },
+          "vendorId": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "exclusiveMinimum": 0,
+            "description": "ADR 0025: active vendor of the request PT (GET /masters?types=vendors). Required to submit a vendor payment."
+          },
+          "vendorBankAccountId": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "exclusiveMinimum": 0,
+            "description": "ADR 0025: active account OF THAT vendor (GET /masters?types=vendor-bank-accounts). Required to submit; snapshotted at submit = the transfer destination."
+          },
+          "invoiceNo": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 64,
+            "description": "ADR 0025: required to submit. Unique per vendor among requests that are not cancelled / rejected (compared upper case, letters + digits only) → else 409 with errors[invoiceNo]."
+          },
+          "invoiceDate": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$",
+            "description": "ADR 0025: required to submit; not in the future."
+          },
+          "invoiceDueDate": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$",
+            "description": "ADR 0025: optional; not before invoiceDate."
+          },
+          "invoiceFileId": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "exclusiveMinimum": 0,
+            "description": "ADR 0025: media-attachments id (photo / PDF, POST /media/attachments) of the invoice. Required to submit; linked to the request at submit."
           }
         },
         "additionalProperties": false,
@@ -3454,7 +3682,11 @@ export const openapiDocument = {
             "$ref": "#/components/schemas/RequestType"
           },
           "typeLabel": {
-            "type": "string"
+            "type": "string",
+            "description": "Pengajuan Baru / Reimburse; \"Pembayaran vendor\" for payeeType vendor (ADR 0025)."
+          },
+          "payeeType": {
+            "$ref": "#/components/schemas/PayeeType"
           },
           "status": {
             "$ref": "#/components/schemas/RequestStatus"
@@ -3650,6 +3882,13 @@ export const openapiDocument = {
           "noApproval": {
             "type": "boolean",
             "description": "ADR 0024: a Direktur's own request without any approval (kebijakan PT) — show the badge \"Tanpa persetujuan (Direktur)\"; Finance's transfer checks are the only check."
+          },
+          "vendorName": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "ADR 0025: vendor of a vendor payment (the transfer completes it; destination = the vendor account in `bank`)."
           }
         },
         "required": [
@@ -3657,6 +3896,7 @@ export const openapiDocument = {
           "docNo",
           "type",
           "typeLabel",
+          "payeeType",
           "status",
           "statusLabel",
           "title",
@@ -3675,7 +3915,8 @@ export const openapiDocument = {
           "bankVerification",
           "flags",
           "sla",
-          "noApproval"
+          "noApproval",
+          "vendorName"
         ]
       },
       "LpjQueue": {
@@ -16923,10 +17164,10 @@ export const openapiDocument = {
             "schema": {
               "type": "string",
               "pattern": "^[a-z-]+(,[a-z-]+)*$",
-              "description": "Comma separated subset of: projects, project-stages, cost-centers, expense-categories, uoms, vehicles, employees, banks, bank-accounts, work-schedules, holidays, team-assignments, vendors, cash-in-sources, urgency-levels, clients, sites. Default: all."
+              "description": "Comma separated subset of: projects, project-stages, cost-centers, expense-categories, uoms, vehicles, employees, banks, bank-accounts, work-schedules, holidays, team-assignments, vendors, cash-in-sources, urgency-levels, clients, sites, vendor-bank-accounts. Default: all."
             },
             "required": false,
-            "description": "Comma separated subset of: projects, project-stages, cost-centers, expense-categories, uoms, vehicles, employees, banks, bank-accounts, work-schedules, holidays, team-assignments, vendors, cash-in-sources, urgency-levels, clients, sites. Default: all.",
+            "description": "Comma separated subset of: projects, project-stages, cost-centers, expense-categories, uoms, vehicles, employees, banks, bank-accounts, work-schedules, holidays, team-assignments, vendors, cash-in-sources, urgency-levels, clients, sites, vendor-bank-accounts. Default: all.",
             "name": "types",
             "in": "query"
           },
@@ -17437,6 +17678,20 @@ export const openapiDocument = {
             "required": false,
             "description": "advance = Pengajuan Baru (label until 2026-10: Uang Muka), reimburse = Reimburse",
             "name": "type",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "karyawan",
+                "vendor"
+              ],
+              "description": "ADR 0025: vendor = vendor payments only, karyawan = requests paid to employees."
+            },
+            "required": false,
+            "description": "ADR 0025: vendor = vendor payments only, karyawan = requests paid to employees.",
+            "name": "payeeType",
             "in": "query"
           },
           {
@@ -17981,6 +18236,17 @@ export const openapiDocument = {
             "required": false,
             "description": "Employee bank account id (picker value). Without `request`: only an account readable through the collection access.",
             "name": "account",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "description": "ADR 0025: vendor bank account id (vendor-payment picker value) instead of `account`. Draft: an account of the request PT and of its chosen vendor (or readable); submitted → the snapshot."
+            },
+            "required": false,
+            "description": "ADR 0025: vendor bank account id (vendor-payment picker value) instead of `account`. Draft: an account of the request PT and of its chosen vendor (or readable); submitted → the snapshot.",
+            "name": "vendorAccount",
             "in": "query"
           },
           {

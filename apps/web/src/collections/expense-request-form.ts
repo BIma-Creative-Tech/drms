@@ -81,6 +81,7 @@ export function draftOrSet(name: string): Condition {
  */
 export const PLACEHOLDERS = {
   type: 'Pilih jenis pengajuan…',
+  payeeType: 'Pilih jenis penerima…',
   project: 'Pilih project…',
   costCenter: 'Pilih pusat biaya…',
   urgencyLevel: 'Pilih tingkat urgensi…',

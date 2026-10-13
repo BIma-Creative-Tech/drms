@@ -158,6 +158,9 @@ const transferStepTitle = 'Transfer Finance';
 const receiptCheckStepTitle = 'Verifikasi nota Finance';
 const lpjStepTitle = 'LPJ';
 const doneStepTitle = 'Selesai';
+
+/// ADR 0025: note of the final step of a vendor payment (web `VENDOR_END_NOTE`).
+const vendorDoneNote = 'pembayaran vendor selesai saat ditransfer — invoice = bukti, tanpa LPJ';
 const rejectedStepTitle = 'Ditolak';
 const cancelledStepTitle = 'Dibatalkan';
 
@@ -180,7 +183,8 @@ List<TimelineStep> buildRequestStepper(ExpenseDetail d) {
   if (d.type == RequestType.reimburse) {
     final check = _receiptCheckStep(d, ended: ended, turn: turn);
     steps.insert(steps.indexWhere((s) => s.title == transferStepTitle), check);
-  } else {
+  } else if (!d.isVendor) {
+    // ADR 0025: a vendor payment has no LPJ — the transfer completes it.
     steps.add(_lpjStep(d, ended: ended, turn: turn));
   }
   steps.add(_finalStep(d, rejected: rejected, cancelled: cancelled, turn: turn));
@@ -241,7 +245,12 @@ TimelineStep _finalStep(ExpenseDetail d, {required bool rejected, required bool 
   if (rejected) return const TimelineStep(title: rejectedStepTitle, state: TurnState.rejected);
   if (cancelled) return TimelineStep(title: cancelledStepTitle, state: TurnState.rejected, note: d.cancelReason);
   if (d.status == RequestStatus.completed) {
-    return TimelineStep(title: doneStepTitle, state: TurnState.done, at: d.settlement?.settledAt);
+    return TimelineStep(
+      title: doneStepTitle,
+      state: TurnState.done,
+      at: d.settlement?.settledAt,
+      note: d.isVendor ? vendorDoneNote : null,
+    );
   }
   // A transferred Reimburse waits for the requester / Finance to confirm completion.
   final confirm = d.type == RequestType.reimburse && d.status == RequestStatus.transferred;
@@ -331,7 +340,12 @@ String currentTurn(ExpenseDetail d) => switch (d.status) {
     d.currentLevel ?? 1,
     multi: (d.approvalRule?.steps.length ?? 1) > 1,
   ),
-  RequestStatus.approved => d.type == RequestType.reimburse ? 'Finance — verifikasi nota' : 'Finance — antri transfer',
+  RequestStatus.approved =>
+    d.isVendor
+        ? 'Finance — transfer ke rekening vendor'
+        : d.type == RequestType.reimburse
+        ? 'Finance — verifikasi nota'
+        : 'Finance — antri transfer',
   RequestStatus.receiptRevision => 'Pemohon — perbaiki nota',
   RequestStatus.receiptsVerified => 'Finance — antri transfer',
   RequestStatus.transferred =>
