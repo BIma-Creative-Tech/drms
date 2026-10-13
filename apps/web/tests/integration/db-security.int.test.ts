@@ -58,6 +58,7 @@ describe('grants (least privilege)', () => {
     expect(r.rows.map((x) => x.table_name)).toEqual([
       'approval_rules_requester_roles', // ADR 0024: "Peran pemohon" (hasMany rewritten on update)
       'approval_rules_steps',
+      'companies_rels', // ADR 0025: representatives of the PT's definitive Direktur (hasMany rewritten on update)
       'company_memberships_roles', // MC1: per-PT roles (hasMany rewritten on update)
       'expense_categories_rels',
       // F2a: Payload rewrites these children on every parent update; locked content is protected
