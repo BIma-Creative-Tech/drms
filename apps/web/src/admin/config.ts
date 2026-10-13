@@ -122,6 +122,17 @@ export const MC2_ADMIN_VIEWS = {
 }
 
 /**
+ * DRMS 13/10 Wave 3: "Pengguna" — ONE tabbed form (account, access per PT, employee, bank accounts) for create
+ * (`/pengguna/baru`, also the menu item) and edit (`/pengguna/<id>`). Both routes render the same view (it reads the
+ * segment), so whichever matches first is right. Admin of a PT / group admin; checks inside the view +
+ * /api/v1/user-onboarding.
+ */
+export const USER_ONBOARDING_ADMIN_VIEWS = {
+  userOnboardingNew: { Component: '@/admin/views/Pengguna#PenggunaView', path: '/pengguna/baru' as const, exact: true, meta: { title: 'Pengguna baru' } },
+  userOnboarding: { Component: '@/admin/views/Pengguna#PenggunaView', path: '/pengguna/:id' as const, exact: true, meta: { title: 'Pengguna' } },
+}
+
+/**
  * FR1 (ADR 0020, plan "Web"): field reports per project kind — "Unit & kontrak" (contract list,
  * contract detail with tabs Timesheet/Rekap/Unit/Timeline, unit detail, timesheet input/detail),
  * "Laporan servis" (list/input/detail) and "Aftersales" (weekly recap, activity list/input/detail).

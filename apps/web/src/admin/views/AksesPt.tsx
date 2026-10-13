@@ -130,8 +130,9 @@ export async function AksesPtView(props: AdminViewServerProps) {
           <button type="submit" className="pk-btn">
             Terapkan
           </button>
-          <Link className="pk-btn" href="/admin/collections/users/create" data-pk-invite>
-            + Undang pengguna
+          {/* DRMS 13/10 W3: the tabbed "Pengguna" form (account + access + employee + bank accounts in one save) */}
+          <Link className="pk-btn" href="/admin/pengguna/baru" data-pk-invite>
+            + Pengguna baru
           </Link>
         </form>
         <RoleMatrix

@@ -1,4 +1,4 @@
-import { ROLES, type Role } from '@/access/roles'
+import { companyContextOf, ROLES, type Role } from '@/access/roles'
 import { errorLine } from '@/lib/field-labels'
 
 /**
@@ -30,6 +30,12 @@ export function canEditCompany(v: Viewer, company: number): boolean {
   return v.groupAdmin || v.adminOf.includes(company)
 }
 
+/** The viewer of a request user: group admin flag + the PTs where they hold `pk-admin` (any membership, not only the selection). */
+export function viewerOf(user: unknown): Viewer {
+  const ctx = companyContextOf(user)
+  return { groupAdmin: ctx?.groupAdmin === true, adminOf: (ctx?.memberships ?? []).filter((m) => m.roles.includes('pk-admin')).map((m) => m.company) }
+}
+
 /** Does the viewer see the page at all? */
 export function canUseMatrix(v: Viewer): boolean {
   return v.groupAdmin || v.adminOf.length > 0
@@ -51,6 +57,15 @@ export function sortRoles(roles: readonly Role[]): Role[] {
 export function toggleRole(cell: CellDraft, role: Role): CellDraft {
   const roles = cell.roles.includes(role) ? cell.roles.filter((r) => r !== role) : sortRoles([...cell.roles, role])
   return { ...cell, roles, active: roles.length > 0 }
+}
+
+/**
+ * DRMS 13/10 W3 ("multiple dropdown, bukan checkbox"): the roles of a cell from the checklist dropdown — same rule as
+ * toggling (no role left = inactive, a role on an inactive cell = active again), roles in ROLES order.
+ */
+export function setRoles(cell: CellDraft, roles: readonly string[]): CellDraft {
+  const next = ROLES.filter((r) => roles.includes(r))
+  return { ...cell, roles: next, active: next.length > 0 }
 }
 
 export function setEmployee(cell: CellDraft, employee: number | null): CellDraft {
