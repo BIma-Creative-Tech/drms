@@ -9,7 +9,7 @@ import { withReqTransaction } from '@/lib/system-tx'
 
 import { ActionButton } from '../components/ActionButton'
 import { ListToolbar, Pager } from '../components/list/ListToolbar'
-import { matchesQuery, paginate, parseListQuery } from '../list-query'
+import { allowedValues, idValues, matchesQuery, paginate, parseListQuery } from '../list-query'
 import { ClickableRow } from '../components/list/ClickableRow'
 import { AddendumInboxSection } from './Addendum'
 import { LoanInboxSection } from './Loans'
@@ -27,16 +27,21 @@ import { Empty, Shell, TableScroll, badge, docLink, num, rp, table, td, th } fro
  * DRMS 13/10 Persetujuan #1: no expandable "Rincian baris, nota & flag" row any more — the whole row opens the
  * request detail (lines, receipts and per-line flags in ReviewDetails there); the buttons in the row still decide.
  */
+const STEPS = ['acknowledge', 'approve'] as const
+
 export async function ApprovalInbox(props: AdminViewServerProps) {
   const req = props.initPageResult.req
   const pt = await ptView(req)
   // DRMS 10/10 D8: search / PT / jenis / langkah + pagination (URL state); the inbox is a bounded worklist
+  // DRMS 13/10 Persetujuan #2 / Umum #4: PT, jenis and langkah are multi-select (`?jenis=advance,reimburse`); PTs ⊆ selection
   const lq = parseListQuery(props.searchParams, ['pt', 'jenis', 'langkah'])
-  const ptId = pt.multi && pt.selected.includes(Number(lq.filters.pt)) ? Number(lq.filters.pt) : undefined
+  const ptIds = pt.multi ? idValues(lq, 'pt').filter((id) => pt.selected.includes(id)) : []
+  const jenis = allowedValues(lq, 'jenis', REQUEST_TYPES)
+  const langkah = allowedValues(lq, 'langkah', STEPS)
   const { all, page, budgetWarnPct } = await withReqTransaction(req, async () => {
-    const inbox = await approvalInbox(req, ptId ? { companyIds: [ptId] } : undefined)
+    const inbox = await approvalInbox(req, ptIds.length ? { companyIds: ptIds } : undefined)
     const matched = inbox.items.filter(
-      (r) => (!lq.filters.jenis || r.type === lq.filters.jenis) && (!lq.filters.langkah || r.step === lq.filters.langkah) && matchesQuery([r.docNo, r.title, r.scope, r.requesters, r.typeLabel, r.stepLabel], lq.q),
+      (r) => (!jenis.length || jenis.includes(r.type as (typeof jenis)[number])) && (!langkah.length || langkah.includes(r.step as (typeof langkah)[number])) && matchesQuery([r.docNo, r.title, r.scope, r.requesters, r.typeLabel, r.stepLabel], lq.q),
     )
     const page = paginate(matched, lq.page, lq.per)
     return { all: inbox.items.length, page, budgetWarnPct: inbox.budgetWarnPct }
@@ -48,7 +53,7 @@ export async function ApprovalInbox(props: AdminViewServerProps) {
       <p style={{ marginTop: 0 }}>
         Pengajuan yang menunggu keputusan Anda. Merah = anggaran project sesudah disetujui melebihi {pt.multi ? 'ambang PT pengajuan' : `${budgetWarnPct}%`}.{pt.multi ? ' Keputusan selalu memakai peran Anda di PT dokumen.' : ''}
       </p>
-      {all > 0 || lq.q || ptId ? (
+      {all > 0 || lq.q || ptIds.length ? (
         <ListToolbar
           id="persetujuan"
           action="/admin/persetujuan"
@@ -56,9 +61,9 @@ export async function ApprovalInbox(props: AdminViewServerProps) {
           label="Cari dan saring persetujuan"
           search={{ placeholder: 'Nomor, judul, pemohon, project…' }}
           filters={[
-            pt.multi ? { key: 'pt', label: 'PT', all: 'Semua PT', options: pt.selected.map((id) => ({ value: String(id), label: pt.ref(id)?.shortCode ?? `#${id}` })) } : null,
-            { key: 'jenis', label: 'Jenis', options: REQUEST_TYPES.map((t) => ({ value: t, label: REQUEST_TYPE_LABELS[t] })) },
-            { key: 'langkah', label: 'Langkah', options: [{ value: 'acknowledge', label: 'Persetujuan pertama (PM / Diketahui)' }, { value: 'approve', label: 'Persetujuan berikutnya' }] },
+            pt.multi ? { key: 'pt', label: 'PT', all: 'Semua PT', multi: true, options: pt.selected.map((id) => ({ value: String(id), label: pt.ref(id)?.shortCode ?? `#${id}` })) } : null,
+            { key: 'jenis', label: 'Jenis', multi: true, options: REQUEST_TYPES.map((t) => ({ value: t, label: REQUEST_TYPE_LABELS[t] })) },
+            { key: 'langkah', label: 'Langkah', multi: true, options: [{ value: 'acknowledge', label: 'Persetujuan pertama (PM / Diketahui)' }, { value: 'approve', label: 'Persetujuan berikutnya' }] },
           ]}
         />
       ) : null}

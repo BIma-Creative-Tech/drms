@@ -2486,6 +2486,190 @@ $pk-modules: dashboard, persetujuan, proyek, keuangan, absensi, laporan, penggun
   }
 }
 
+// ---- DRMS 13/10 Umum #3–#8: checklist dropdowns (MultiSelect / Kolom ▾) + the generic list view PkListView ------
+@layer payload {
+  .pk-ltb__btn--primary {
+    border-color: var(--pk-primary);
+    background: var(--pk-primary);
+    color: var(--pk-on-primary);
+
+    &:hover:not([aria-disabled='true']):not(:disabled) {
+      border-color: var(--pk-primary-hover);
+      background: var(--pk-primary-hover);
+      color: var(--pk-on-primary);
+    }
+
+    &:disabled {
+      opacity: 0.5;
+      cursor: default;
+    }
+  }
+
+  .pk-ms {
+    position: relative;
+  }
+
+  .pk-ms__btn {
+    display: inline-flex;
+    gap: 6px;
+    align-items: center;
+    justify-content: space-between;
+    min-width: 140px;
+    max-width: 240px;
+    min-height: 36px;
+    padding: 4px 8px;
+    border: 1px solid var(--pk-input);
+    border-radius: var(--style-radius-s);
+    background: var(--theme-input-bg, var(--pk-card));
+    color: var(--pk-fg);
+    font: inherit;
+    font-size: 13px;
+    font-weight: 400;
+    text-align: left;
+    cursor: pointer;
+
+    &[data-active='true'] {
+      border-color: var(--pk-primary);
+      font-weight: 600;
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--pk-ring);
+      outline-offset: 1px;
+    }
+  }
+
+  .pk-ms__value {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .pk-ms__count {
+    padding: 0 6px;
+    border-radius: 999px;
+    background: var(--pk-primary);
+    color: var(--pk-on-primary);
+    font-size: 11px;
+    font-weight: 700;
+  }
+
+  .pk-ms__caret {
+    color: var(--pk-muted-fg);
+  }
+
+  .pk-ms__panel {
+    position: absolute;
+    z-index: 26; // above the sticky module bar layer of the page content, below modals/drawers (30)
+    top: calc(100% + 4px);
+    left: 0;
+    display: grid;
+    gap: 8px;
+    width: max-content;
+    min-width: 220px;
+    max-width: min(340px, calc(100vw - 32px));
+    padding: 10px;
+    border: 1px solid var(--pk-border);
+    border-radius: var(--style-radius-m);
+    background: var(--pk-card);
+    box-shadow: var(--pk-shadow-hover, var(--pk-shadow));
+    color: var(--pk-fg);
+    font-weight: 400;
+  }
+
+  .pk-ms__panel--end {
+    right: 0;
+    left: auto;
+  }
+
+  .pk-ms__search {
+    width: 100%;
+    min-height: 34px;
+    padding: 4px 8px;
+    border: 1px solid var(--pk-input);
+    border-radius: var(--style-radius-s);
+    background: var(--theme-input-bg, var(--pk-card));
+    color: var(--pk-fg);
+    font: inherit;
+    font-size: 13px;
+  }
+
+  .pk-ms__list {
+    display: grid;
+    gap: 2px;
+    max-height: 280px;
+    margin: 0;
+    padding: 0;
+    overflow-y: auto;
+    list-style: none;
+  }
+
+  .pk-ms__opt {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    min-height: 32px;
+    padding: 2px 6px;
+    border-radius: var(--style-radius-s);
+    font-size: 13px;
+    cursor: pointer;
+
+    &:hover {
+      background: color-mix(in oklab, var(--pk-primary) 8%, transparent);
+    }
+
+    input {
+      width: 16px;
+      height: 16px;
+      margin: 0;
+      accent-color: var(--pk-primary);
+    }
+  }
+
+  .pk-ms__none,
+  .pk-ms__error {
+    margin: 0;
+    padding: 4px 6px;
+    color: var(--pk-muted-fg);
+    font-size: 12px;
+  }
+
+  .pk-ms__error {
+    color: var(--pk-tone-bad-text);
+    font-weight: 600;
+  }
+
+  .pk-ms__foot {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+  }
+
+  @media (pointer: coarse) {
+    .pk-ms__btn,
+    .pk-ms__opt {
+      min-height: 44px;
+    }
+  }
+
+  @media (max-width: 640px) {
+    .pk-ltb__field--multi .pk-ms__btn {
+      width: 100%;
+      max-width: none;
+    }
+
+    .pk-ms__panel {
+      position: fixed;
+      top: auto;
+      right: 16px;
+      bottom: 16px;
+      left: 16px;
+      width: auto;
+      max-width: none;
+    }
+  }
+}
+
 // D8: search box inside the existing .pk-filter forms (Kas, Absensi, field reports) grows first
 @layer payload {
   .pk-f3 form.pk-filter .pk-filter__search {

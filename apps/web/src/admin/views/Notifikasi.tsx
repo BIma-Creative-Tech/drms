@@ -7,7 +7,7 @@ import { DEFAULT_TZ } from '@/lib/time'
 import { ActionButton } from '../components/ActionButton'
 import { ListToolbar, Pager } from '../components/list/ListToolbar'
 import { NotificationOpen } from '../components/NotificationOpen'
-import { isFiltered, pageOfFind, parseListQuery, searchWhere } from '../list-query'
+import { allowedValues, isFiltered, pageOfFind, parseListQuery, searchWhere } from '../list-query'
 import { dateTimeId } from './progress-ui'
 import { Empty, Shell, TableScroll, badge, table, td, th } from './shared'
 
@@ -26,8 +26,9 @@ export async function NotificationsView(props: AdminViewServerProps) {
   const lq = parseListQuery(props.searchParams, ['status'])
   const own = { user: { equals: user.id } }
   const and: Where[] = [own]
-  if (lq.filters.status === 'baru') and.push({ readAt: { exists: false } })
-  if (lq.filters.status === 'dibaca') and.push({ readAt: { exists: true } })
+  // DRMS 13/10 Umum #4: multi-select — both ticked = every notification
+  const status = allowedValues(lq, 'status', ['baru', 'dibaca'] as const)
+  if (status.length === 1) and.push({ readAt: { exists: status[0] === 'dibaca' } })
   const text = searchWhere(['title', 'body', 'docNo'], lq.q)
   if (text) and.push(text)
   const res = await req.payload.find({ collection: 'notifications', where: { and }, sort: '-id', limit: lq.per, page: lq.page, depth: 0, user, overrideAccess: false, req })
@@ -46,7 +47,7 @@ export async function NotificationsView(props: AdminViewServerProps) {
         query={lq}
         label="Cari notifikasi"
         search={{ placeholder: 'Judul, isi atau nomor dokumen…' }}
-        filters={[{ key: 'status', label: 'Status', options: [{ value: 'baru', label: 'Belum dibaca' }, { value: 'dibaca', label: 'Sudah dibaca' }] }]}
+        filters={[{ key: 'status', label: 'Status', multi: true, options: [{ value: 'baru', label: 'Belum dibaca' }, { value: 'dibaca', label: 'Sudah dibaca' }] }]}
       />
       {rows.length === 0 ? (
         <Empty text={isFiltered(lq) ? 'Tidak ada notifikasi yang cocok.' : 'Belum ada notifikasi.'} />

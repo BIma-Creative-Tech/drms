@@ -9,6 +9,7 @@ import { CashEntryForm, type CashEntryFormProps } from '@/admin/components/kas/C
 import { ReasonAction } from '@/admin/components/kas/ReasonAction'
 import { KAS_STYLE } from '@/admin/components/kas/style'
 import { AutoSubmit } from '@/admin/components/list/AutoSubmit'
+import { MultiSelect } from '@/admin/components/list/MultiSelect'
 import { PAGE_SIZES } from '@/admin/list-query'
 import {
   accountFlows,
@@ -340,6 +341,14 @@ function FilterBar({ q, lk, filtered, pt, pts }: { q: BookQuery; lk: Lookups; fi
       </select>
     </label>
   )
+  // DRMS 13/10 Umum #4: akun / project / pusat biaya / arah / status are checklist dropdowns (several values each)
+  const multi = (name: string, label: string, options: Array<{ value: string; label: string }>, value: ReadonlyArray<string | number> | undefined, all: string) => (
+    <div className="pk-filter__multi">
+      <span aria-hidden="true">{label}</span>
+      <MultiSelect name={name} label={label} options={options} value={(value ?? []).map(String)} allLabel={all} />
+    </div>
+  )
+  const ids = (list: Array<{ id: number; label: string }>) => list.map((x) => ({ value: String(x.id), label: x.label }))
   return (
     <form className="pk-filter" method="get" action="/admin/kas" role="search" aria-label="Filter buku kas" data-pk-filter="kas">
       {/* DRMS 10/10 D8: search + page size (shared AutoSubmit: debounced, URL state) */}
@@ -349,29 +358,15 @@ function FilterBar({ q, lk, filtered, pt, pts }: { q: BookQuery; lk: Lookups; fi
       </label>
       {pts.length > 1 ? sel('pt', 'PT', pts.map((c) => ({ id: c, label: `${ptCode(pt, c)} — ${pt.ref(c)?.name ?? ''}` })), q.pt, 'Semua PT') : null}
       {lk.sites.length ? sel('site', 'Site', lk.sites, q.site, 'Semua site') : null}
-      {sel('akun', 'Akun', lk.accounts, q.akun, 'Semua akun')}
+      {multi('akun', 'Akun', ids(lk.accounts), q.akun, 'Semua akun')}
       <label>
         Periode
         <input type="month" name="periode" defaultValue={q.periode ?? ''} />
       </label>
-      {sel('project', 'Project', lk.projects, q.project, 'Semua project')}
-      {sel('pusat', 'Pusat biaya', lk.costCenters, q.pusat, 'Semua pusat biaya')}
-      <label>
-        Arah
-        <select name="arah" defaultValue={q.arah ?? ''}>
-          <option value="">Masuk & keluar</option>
-          <option value="masuk">Masuk</option>
-          <option value="keluar">Keluar</option>
-        </select>
-      </label>
-      <label>
-        Status
-        <select name="status" defaultValue={q.status ?? ''}>
-          <option value="">Semua</option>
-          <option value="posted">Posted</option>
-          <option value="void">Void</option>
-        </select>
-      </label>
+      {multi('project', 'Project', ids(lk.projects), q.project, 'Semua project')}
+      {multi('pusat', 'Pusat biaya', ids(lk.costCenters), q.pusat, 'Semua pusat biaya')}
+      {multi('arah', 'Arah', [{ value: 'masuk', label: 'Masuk' }, { value: 'keluar', label: 'Keluar' }], q.arah, 'Masuk & keluar')}
+      {multi('status', 'Status', [{ value: 'posted', label: 'Posted' }, { value: 'void', label: 'Void' }], q.status, 'Semua')}
       <label>
         Per halaman
         <select name="per" defaultValue={String(q.per ?? 50)} data-pk-page-size="kas">
@@ -543,6 +538,8 @@ function LedgerTable({
   return (
     <DataTable
       id="kas-book"
+      paged={false}
+      rowHref={(r) => `/admin/collections/cash-entries/${r.id}`}
       cols={canWrite ? cols : cols.filter((c) => c.key !== 'act' || rows.some((r) => r.proofId))}
       rows={rows}
       rowKey={(r) => r.id}

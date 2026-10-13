@@ -1,5 +1,8 @@
 import React from 'react'
 
+import { ClickableRow } from '@/admin/components/list/ClickableRow'
+import { PagedBody } from '@/admin/components/list/PagedBody'
+import { DEFAULT_PAGE_SIZE } from '@/admin/list-query'
 import { Icon as Glyph } from '@/admin/modules/Icon'
 import type { IconName } from '@/admin/modules/icons'
 
@@ -801,9 +804,53 @@ export function StatusPill({ tone, label }: { tone: PillTone; label: string }) {
 
 export type Col<T> = { key: string; label: string; num?: boolean; sec?: boolean; sort?: 'ascending' | 'descending'; cell: (r: T) => React.ReactNode }
 
-/** Compact card table; `sort` marks the column the rows are ordered by (aria-sort + arrow). */
-export function DataTable<T>({ id, cols, rows, rowKey, rowAttrs, caption, empty }: { id: string; cols: Col<T>[]; rows: T[]; rowKey: (r: T) => string | number; rowAttrs?: (r: T) => Record<string, string | undefined>; caption: string; empty: React.ReactNode }) {
+/**
+ * Compact card table; `sort` marks the column the rows are ordered by (aria-sort + arrow).
+ * DRMS 13/10 Umum #3 / #7: more than `pageSize` (20) rows → paged in the browser (PagedBody: tfoot pager);
+ * tables already paged in the database with the URL Pager pass `paged={false}`. `rowHref` makes every row open
+ * its record (ClickableRow: click / Enter, links and buttons inside keep their own action).
+ */
+export function DataTable<T>({
+  id,
+  cols,
+  rows,
+  rowKey,
+  rowAttrs,
+  rowHref,
+  caption,
+  empty,
+  paged = true,
+  pageSize = DEFAULT_PAGE_SIZE,
+}: {
+  id: string
+  cols: Col<T>[]
+  rows: T[]
+  rowKey: (r: T) => string | number
+  rowAttrs?: (r: T) => Record<string, string | undefined>
+  rowHref?: (r: T) => string | null | undefined
+  caption: string
+  empty: React.ReactNode
+  paged?: boolean
+  pageSize?: number
+}) {
   if (rows.length === 0) return <>{empty}</>
+  const trs = rows.map((r) => {
+    const cells = cols.map((c) => (
+      <td key={c.key} className={`${c.num ? 'n' : ''} ${c.sec ? 'sec' : ''}`}>
+        {c.cell(r)}
+      </td>
+    ))
+    const href = rowHref?.(r)
+    return href ? (
+      <ClickableRow key={rowKey(r)} href={href} {...(rowAttrs ? rowAttrs(r) : {})}>
+        {cells}
+      </ClickableRow>
+    ) : (
+      <tr key={rowKey(r)} {...(rowAttrs ? rowAttrs(r) : {})}>
+        {cells}
+      </tr>
+    )
+  })
   return (
     <div className="pk-tw">
       <table className="pk-t" data-pk-table={id}>
@@ -822,17 +869,13 @@ export function DataTable<T>({ id, cols, rows, rowKey, rowAttrs, caption, empty 
             ))}
           </tr>
         </thead>
-        <tbody>
-          {rows.map((r) => (
-            <tr key={rowKey(r)} {...(rowAttrs ? rowAttrs(r) : {})}>
-              {cols.map((c) => (
-                <td key={c.key} className={`${c.num ? 'n' : ''} ${c.sec ? 'sec' : ''}`}>
-                  {c.cell(r)}
-                </td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
+        {paged && rows.length > pageSize ? (
+          <PagedBody id={id} colSpan={cols.length} per={pageSize}>
+            {trs}
+          </PagedBody>
+        ) : (
+          <tbody>{trs}</tbody>
+        )}
       </table>
     </div>
   )

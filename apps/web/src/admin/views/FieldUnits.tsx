@@ -154,7 +154,7 @@ export async function FieldContracts(props: AdminViewServerProps) {
       <Bento label="Unit & kontrak">
         <Card id="contracts" title="Kontrak unit" sub={`${page.total} kontrak · klik Buka untuk matriks timesheet, rekap dan unit`}>
           {d.projects.length > 0 ? <ListToolbar id="unit-kontrak" action="/admin/unit-kontrak" query={lq} label="Cari kontrak" search={{ placeholder: 'Kode atau nama project…' }} /> : null}
-          <DataTable id="contracts" cols={cols} rows={rows} rowKey={(r) => r.p.id} rowAttrs={(r) => ({ 'data-pk-row': r.p.code })} caption="Kontrak unit" empty={<EmptyState text={d.projects.length ? 'Tidak ada kontrak yang cocok.' : 'Belum ada project berjenis kontrak unit dalam cakupan Anda.'} />} />
+          <DataTable id="contracts" paged={false} cols={cols} rows={rows} rowKey={(r) => r.p.id} rowAttrs={(r) => ({ 'data-pk-row': r.p.code })} caption="Kontrak unit" empty={<EmptyState text={d.projects.length ? 'Tidak ada kontrak yang cocok.' : 'Belum ada project berjenis kontrak unit dalam cakupan Anda.'} />} />
           {page.total > 0 ? <Pager id="unit-kontrak" path="/admin/unit-kontrak" sp={props.searchParams} page={page} unit="kontrak" /> : null}
         </Card>
         <Card id="units" title="Unit alat berat" sub="Status dari laporan servis terakhir · HM dari timesheet/servis">

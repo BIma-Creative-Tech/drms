@@ -13,7 +13,8 @@ import { docHref } from '../doc-links'
 import { ReasonAction } from '../components/kas/ReasonAction'
 import { KAS_STYLE } from '../components/kas/style'
 import { ListToolbar, Pager } from '../components/list/ListToolbar'
-import { matchesQuery, paginate, parseListQuery } from '../list-query'
+import { allowedValues, idValues, matchesQuery, paginate, parseListQuery } from '../list-query'
+import { ClickableRow } from '../components/list/ClickableRow'
 import { MoneyForm } from '../components/MoneyForm'
 import { ReimburseReceiptReview, loadReimburseReview } from '../components/ReimburseReceiptReview'
 import { SlaAgeBadge } from '../components/SlaAgeBadge'
@@ -30,17 +31,19 @@ export async function TransferQueue(props: AdminViewServerProps) {
   if (!allowed(req, ['pk-finance', 'pk-owner'])) return <Forbidden props={props} title="Antrian Transfer" roles={['pk-finance', 'pk-owner']} />
   const pt = await ptView(req)
   // DRMS 10/10 D8: search / PT / jenis + pagination of both tables (URL state; `hal2` = recorded transfers)
+  // DRMS 13/10 Umum #4: PT and jenis are multi-select (`?pt=1,3&jenis=advance,reimburse`); PTs ⊆ the selection
   const lq = parseListQuery(props.searchParams, ['pt', 'jenis'])
-  const ptId = pt.multi && pt.selected.includes(Number(lq.filters.pt)) ? Number(lq.filters.pt) : undefined
+  const ptIds = pt.multi ? idValues(lq, 'pt').filter((id) => pt.selected.includes(id)) : []
+  const jenis = allowedValues(lq, 'jenis', REQUEST_TYPES)
   const { all, page, items, review, done, donePage, mine } = await withReqTransaction(req, async () => {
-    const q = await transferQueue(req, ptId ? { companyIds: [ptId] } : undefined)
+    const q = await transferQueue(req, ptIds.length ? { companyIds: ptIds } : undefined)
     const page = paginate(
-      q.filter((r) => (!lq.filters.jenis || r.type === lq.filters.jenis) && matchesQuery([r.docNo, r.title, r.scope, r.statusLabel, r.bank?.bankName, r.bank?.accountHolder], lq.q)),
+      q.filter((r) => (!jenis.length || jenis.includes(r.type as (typeof jenis)[number])) && matchesQuery([r.docNo, r.title, r.scope, r.statusLabel, r.bank?.bankName, r.bank?.accountHolder], lq.q)),
       lq.page,
       lq.per,
     )
     const doneAll = (await voidableTransfers(req)).filter(
-      (t) => (!ptId || t.companyId === ptId) && (!lq.filters.jenis || t.requestType === lq.filters.jenis) && matchesQuery([t.transferNo, t.requestNo, t.requestTitle], lq.q),
+      (t) => (!ptIds.length || (t.companyId !== null && ptIds.includes(t.companyId))) && (!jenis.length || jenis.includes(t.requestType as (typeof jenis)[number])) && matchesQuery([t.transferNo, t.requestNo, t.requestTitle], lq.q),
     )
     const donePage = paginate(doneAll, parseListQuery(props.searchParams, [], { pageKey: 'hal2' }).page, lq.per)
     // MC2: every queue item carries its PT (`company`, mc2-contract §3) — it also picks the cash
@@ -71,8 +74,8 @@ export async function TransferQueue(props: AdminViewServerProps) {
         label="Cari dan saring antrian transfer"
         search={{ placeholder: 'Nomor, judul, pemilik rekening…' }}
         filters={[
-          pt.multi ? { key: 'pt', label: 'PT', all: 'Semua PT', options: pt.selected.map((id) => ({ value: String(id), label: pt.ref(id)?.shortCode ?? `#${id}` })) } : null,
-          { key: 'jenis', label: 'Jenis', options: REQUEST_TYPES.map((t) => ({ value: t, label: REQUEST_TYPE_LABELS[t] })) },
+          pt.multi ? { key: 'pt', label: 'PT', all: 'Semua PT', multi: true, options: pt.selected.map((id) => ({ value: String(id), label: pt.ref(id)?.shortCode ?? `#${id}` })) } : null,
+          { key: 'jenis', label: 'Jenis', multi: true, options: REQUEST_TYPES.map((t) => ({ value: t, label: REQUEST_TYPE_LABELS[t] })) },
         ]}
       />
       {items.length === 0 ? (
@@ -94,7 +97,8 @@ export async function TransferQueue(props: AdminViewServerProps) {
           </thead>
           {items.map((r) => (
             <tbody key={r.id} data-pk-queue-item={r.id}>
-              <tr>
+              {/* DRMS 13/10 Umum #7: the item row opens the request; the transfer form row below stays a plain row */}
+              <ClickableRow href={`/admin/collections/expense-requests/${r.id}`}>
                 {pt.multi ? (
                   <td style={td} data-label="PT">
                     <PtChip pt={pt.ref(itemCompany(r))} />
@@ -152,7 +156,7 @@ export async function TransferQueue(props: AdminViewServerProps) {
                     </div>
                   ) : null}
                 </td>
-              </tr>
+              </ClickableRow>
               {canTransfer && hasRole(req, 'pk-finance', itemCompany(r)) ? (
                 <tr>
                   <td style={td} />
@@ -206,7 +210,7 @@ export async function TransferQueue(props: AdminViewServerProps) {
             </thead>
             <tbody>
               {done.map((t) => (
-                <tr key={t.transferId} data-pk-transfer={t.transferNo}>
+                <ClickableRow key={t.transferId} href={docHref('transfer', t.transferId)!} data-pk-transfer={t.transferNo}>
                   {pt.multi ? (
                     <td style={td}>
                       <PtChip pt={pt.ref(t.companyId)} />
@@ -243,7 +247,7 @@ export async function TransferQueue(props: AdminViewServerProps) {
                       )}
                     </td>
                   ) : null}
-                </tr>
+                </ClickableRow>
               ))}
             </tbody>
           </table>
