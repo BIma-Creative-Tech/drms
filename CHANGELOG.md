@@ -42,6 +42,29 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   `Receipts.taxAmount` now show "Rp 1.250.000"; every other number column (counts, quantities, hours) shows `12.000` /
   `7,5` (coordinates stay raw).
 
+### Changed (APK, DRMS 13/10 Wave 2 — form grid and Persetujuan)
+
+- **Umum #2 / D4 — shared `FormGrid` / `FormGridCell`** (`lib/shared/widgets/form_grid.dart`): "label | input" cells,
+  label ≈35% left of the input and top-aligned from 600dp, two columns of cells from 900dp (full-width cells for notes,
+  line lists and photo pickers span both), label on top and one column on phones (< 600dp; the input keeps its own
+  floating label there). Source order = focus order. `MasterPickerField`, `RapItemPickerField` and `FieldDateField`
+  drop their own label while a cell shows it. Applied to the expense request form (Pengajuan), the line editor, the
+  Finance transfer form, "Kirim LPJ", the loan form (Pinjaman) and the service report (Laporan Servis Unit: unit and
+  work sections). Keys, validation and field order unchanged; on phones the Qty / Satuan, Tanggal / HM and Mulai /
+  Selesai pairs now stack (single column); the "Tanggal dibutuhkan" and loan dates are date inputs instead of list
+  tiles (same picker).
+- **Persetujuan #3 — one stepper on the request detail**: the overall flow and the approval steps merged into one
+  vertical stepper (Diajukan → Persetujuan PM / Diketahui → Persetujuan Direktur / Approval → Verifikasi nota Finance
+  (Reimburse) → Transfer Finance → LPJ (Pengajuan Baru) → Selesai, or Ditolak / Dibatalkan), each step with actor,
+  time, decision (Disetujui / Ditolak / Diketahui) and note; exactly one step is labelled "Tahapan saat ini". Phones:
+  after the summary; tablets (≥ 900dp): right-hand column. Built only from `GET /expense-requests/{id}` (approvals,
+  rule snapshot, transfers, settlement, status) — no API change.
+- **Persetujuan #8–#11 on the APK detail**: the PT is a badge in the header (no "PT" row); "Giliran" → "Tahapan saat
+  ini" / "Menunggu keputusan Anda" (when the server allows this user a decision); the grand total is the footer row of
+  "Rincian item" (removed from the summary); the header summary chips "Selisih nota" / "Melebihi RAP" are gone (the
+  chips stay on the lines) and a line's other flags are shown on its card ("Flag validasi" lists request-level flags
+  only). The APK had no "Keputusan siklus sebelumnya" block. The expense form shows the PT badge without "PT:".
+
 ### Changed (APK, DRMS 13/10 Wave 1 — Umum #10)
 
 - `formatDecimal` / `formatPercent` (id_ID, `core/format/rupiah.dart`) replace the `toStringAsFixed` percentages of the
