@@ -55,7 +55,10 @@ export const RapItemUpdate = z
     weightPct: rapItemFields.weightPct,
     sortOrder: rapItemFields.sortOrder,
     active: z.boolean().optional().meta({ description: 'false = deactivate (items are never deleted).' }),
-    reason: lockReason,
+    reason: reason.optional().meta({
+      description:
+        'Required (min. 3) once the RAP is locked (any daily-report realisation: Direktur/Admin only, 409 RAP_LOCKED otherwise) and — owner 2026-10-13 — for ANY change of a used item ("Sudah terpakai": expense lines from the final approval onward or daily-report quantities), every editor role (400 field `reason`). Written to the audit log.',
+    }),
   })
   .strict()
   .meta({ id: 'RapItemUpdate' })
@@ -135,7 +138,7 @@ export const Rap = z
   .meta({ id: 'Rap' })
 
 export const RapImportCommit = z
-  .object({ fileHash: z.string().regex(/^[0-9a-f]{64}$/), reason: lockReason })
+  .object({ fileHash: z.string().regex(/^[0-9a-f]{64}$/), reason: reason.optional().meta({ description: 'Required (min. 3) on a locked RAP (Direktur/Admin only) and when the file changes / deactivates a used item (preview `usedChanged`).' }) })
   .strict()
   .meta({ id: 'RapImportCommit', description: 'multipart: field "file" (.xlsx) + "_payload" (this JSON). fileHash = the preview\'s sha256 (409 FILE_CHANGED).' })
 
@@ -145,6 +148,7 @@ export const RapPreview = z
     locked: z.boolean(),
     rows: z.array(z.object({ row: z.number().int(), code: z.string(), status: z.enum(['new', 'changed', 'unchanged']), changes: z.array(z.string()) })),
     deactivated: z.array(z.object({ code: z.string(), description: z.string(), hasRealisation: z.boolean() })),
+    usedChanged: z.array(z.string()).meta({ description: 'Codes of used items ("Sudah terpakai") the file changes or deactivates — the commit then needs `reason` (400 field `reason`).' }),
     newStages: z.array(z.string()),
     issues: z.array(z.object({ row: z.number().int().optional(), column: z.string().optional(), message: z.string() })),
     counts: z.object({ new: z.number().int(), changed: z.number().int(), unchanged: z.number().int(), deactivated: z.number().int() }),

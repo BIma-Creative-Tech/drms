@@ -31,7 +31,9 @@ import {
  * to the existing endpoints POST /api/v1/projects/{id}/rap/items and PATCH /api/v1/rap-items/{id} (role, lock,
  * duplicate kode and stage re-checked by the server, audited). Items are never deleted — the dialog can deactivate
  * one (API `active: false`). A locked RAP (daily-report realisation) keeps the buttons visible but disabled for the
- * PM; the Direktur/Admin edits with a reason. Money (harga satuan, jumlah, realisasi) only when `prices`.
+ * PM; the Direktur/Admin edits with a reason. A used item ("Sudah terpakai", owner 2026-10-13) stays editable, but the
+ * dialog asks for a required "Alasan perubahan" (every role; the server enforces it and audits the reason). Money
+ * (harga satuan, jumlah, realisasi) only when `prices`.
  */
 type Opt = { id: number; label: string }
 
@@ -269,6 +271,9 @@ function RapItemDialog(props: { projectId: number; item: RapItemView | null; sta
     touch: () => setPriceTouched(true),
   }
   const amount = draftAmount(d.volume, d.unitPrice)
+  // owner 2026-10-13: changing a used item needs a reason (every role), like a locked RAP for the Direktur/Admin
+  const used = item ? itemUsed(item) : false
+  const askReason = props.needsReason || used
   const close = () => {
     ref.current?.close()
     props.onClose()
@@ -278,7 +283,7 @@ function RapItemDialog(props: { projectId: number; item: RapItemView | null; sta
     e?.preventDefault()
     if (busy) return
     setPriceTouched(true)
-    const r = parseRapDraft(d, { stageRequired: props.stageRequired, needsReason: props.needsReason })
+    const r = parseRapDraft(d, { stageRequired: props.stageRequired, needsReason: props.needsReason, used })
     if (!r.values) return setErrors(r.errors)
     const body = item ? patchBody(item, r.values, d.reason) : createBody(r.values, d.reason)
     if (!body) return close() // nothing changed
@@ -327,15 +332,13 @@ function RapItemDialog(props: { projectId: number; item: RapItemView | null; sta
       *
     </span>
   )
-  const used = item ? itemUsed(item) : false
-
   return (
     <dialog ref={ref} className="pk-dlg pk-rap-dlg" aria-labelledby={`${uid}-t`} onCancel={props.onClose} data-pk-dialog="rap-item">
       <form onSubmit={submit} noValidate>
         <h2 id={`${uid}-t`}>{item ? `Ubah item RAP ${item.code}` : 'Tambah item RAP'}</h2>
         {used ? (
           <p className="desc" role="note" data-pk-rap-item-used>
-            Item ini sudah punya realisasi. Perubahan volume / harga mengubah rencana; realisasi tetap. Item tidak dapat dihapus — nonaktifkan bila tidak dipakai lagi.
+            Item ini sudah terpakai (sudah punya realisasi): setiap perubahan wajib disertai alasan dan tercatat di audit. Perubahan volume / harga mengubah rencana; realisasi tetap. Item tidak dapat dihapus — nonaktifkan bila tidak dipakai lagi.
           </p>
         ) : null}
         {serverError ? (
@@ -426,11 +429,11 @@ function RapItemDialog(props: { projectId: number; item: RapItemView | null; sta
               <p className="help">Item RAP tidak pernah dihapus; item nonaktif tidak bisa dipilih di pengajuan baru.</p>
             </div>
           ) : null}
-          {props.needsReason ? (
+          {askReason ? (
             <div className="pk-fld">
               <label htmlFor={`${uid}-reason`}>Alasan perubahan{req}</label>
               <textarea id={`${uid}-reason`} value={d.reason} onChange={set('reason')} maxLength={1000} rows={2} data-pk-rap-field="reason" {...aria('reason')} />
-              {err('reason') ?? <p className="help">RAP terkunci karena sudah ada realisasi — alasan tercatat di audit.</p>}
+              {err('reason') ?? <p className="help">{props.needsReason ? 'RAP terkunci karena sudah ada realisasi — alasan tercatat di audit.' : 'Item sudah terpakai — alasan wajib (min. 3 karakter) dan tercatat di audit.'}</p>}
             </div>
           ) : null}
         </div>

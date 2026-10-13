@@ -93,16 +93,24 @@ void main() {
     expect(p.pipeline.total, 15);
   });
 
-  test('Staff (/dashboard/me): counts only — the stage sums are dropped', () {
+  test('Staff (/dashboard/me): own requests with their amounts (owner 2026-10-13), counts unchanged', () {
     final s = StaffDashboard.fromJson(staffW3Json());
     expect(s.actions, 1);
     expect(s.inProcess, 2 + 1 + 1 + 3);
     expect(s.waitingDecision, 3);
     expect(s.done, 7);
     expect(s.exit, 1);
-    expect(s.trend.map((p) => p.value), [4, 6]);
-    expect(s.pipeline.rows.every((r) => r.sum == 0), isTrue);
-    expect(StaffDashboard.fromJson(const {}).inProcess, 0, reason: 'tolerant parsing');
+    expect(s.trend.map((p) => (p.period, p.count, p.sum)), [('2026-08', 4, 10000000), ('2026-09', 6, 18750000)]);
+    expect((s.month!.count, s.month!.sum), (6, 18750000));
+    expect(s.pipeline.rows.map((r) => r.sum), [5000000, 2250000, 1000000, 4500000, 21000000, 800000]);
+    expect(s.latest.map((r) => (r.id, r.docNo, r.status, r.grandTotal)), [
+      (1, null, 'draft', 1447500),
+      (2, 'PB/DRMS/2609/0007', 'transferred', 2250000),
+    ]);
+    final empty = StaffDashboard.fromJson(const {});
+    expect(empty.inProcess, 0, reason: 'tolerant parsing');
+    expect(empty.month, isNull);
+    expect(empty.latest, isEmpty);
   });
 
   test('Admin (/dashboard/admin): master-data gaps', () {

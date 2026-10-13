@@ -1335,7 +1335,8 @@ class AppLocalizationsId extends AppLocalizations {
   String get kpiTrendMineTitle => 'Pengajuan saya per bulan';
 
   @override
-  String get kpiTrendMineSubtitle => 'Jumlah pengajuan, 6 bulan, tanpa draft. Ketuk bulan untuk melihat angkanya.';
+  String get kpiTrendMineSubtitle =>
+      'Jumlah dan nilai pengajuan saya, 6 bulan, tanpa draft. Ketuk bulan untuk melihat angkanya.';
 
   @override
   String get kpiTrendEmpty => 'Belum ada pengajuan di rentang ini.';
@@ -1476,6 +1477,20 @@ class AppLocalizationsId extends AppLocalizations {
   @override
   String kpiMyMonth(String month) {
     return 'Pengajuan $month';
+  }
+
+  @override
+  String get kpiMyLatestTitle => 'Pengajuan terbaru saya';
+
+  @override
+  String get kpiMyLatestSubtitle => '10 terbaru · nominal = grand total';
+
+  @override
+  String get kpiMyLatestEmpty => 'Anda belum punya pengajuan.';
+
+  @override
+  String kpiMyDraftTitle(String title) {
+    return 'Draft \"$title\"';
   }
 
   @override

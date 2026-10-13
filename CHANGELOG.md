@@ -52,9 +52,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   biaya bulan ini. Finance: Saldo per akun (masuk/keluar bulan ini), Status pengajuan, Pengajuan baru belum LPJ,
   Transaksi kas terbaru, Komposisi biaya, SLA transfer, Pinjaman antar project, Tutup buku. PM: Project Anda belum
   punya RAP, Status pengajuan tim, Tren pengajuan tim, Komposisi biaya, Pinjaman antar project, Pusat biaya saya. New
-  Staff summary from `/dashboard/me` (counts only — no amounts) and Admin summary from `/dashboard/admin` (master-data
+  Staff summary from `/dashboard/me` (own requests; amounts: see below) and Admin summary from `/dashboard/admin` (master-data
   gaps). Rows open the project's RAP / Pinjaman tab or the request. KPI cards show **full Rupiah** values (Umum #10);
   new CustomPainter charts: request-trend columns and a horizontal bar list.
+- **APK Staff home shows the amounts of the user's OWN requests** (owner 2026-10-13), the same figures as the web
+  Staff home: KPI "Pengajuan <bulan>" with its Σ, **Status pengajuan saya** with count · Σ grand total per stage,
+  new card **Pengajuan terbaru saya** (10 latest own requests: number or `Draft "judul"`, status, Nominal; tap opens
+  the request) and **Pengajuan saya per bulan** with the Σ in the readout — full Rupiah. `/dashboard/me` already
+  carried exactly these own-scoped figures (`ownScope`: `latest[].grandTotal`, `viz.pipeline` sums,
+  `viz.requestTrend` sums), so no API change. No other money on the Staff home (no project budgets, cash or other
+  people's requests); the web Staff project pages stay money-free.
 
 ### Added (DRMS 13/10 Wave 3 — Pengguna tabbed onboarding)
 
@@ -104,6 +111,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   the buttons disabled (409 `RAP_LOCKED` server-side), Direktur / Admin edit with a reason. **Upload Excel & template**
   (RapImport, template, RAP download, RAP templates) stay on the page for the RAP editors. The project's RAP tab links
   to it ("Ubah item RAP").
+- **Used RAP item: editable, reason required and audited** (owner 2026-10-13). An item that is already used — the
+  "Sudah terpakai" definition, now one pure rule `rapItemUsed` (`domain/rap/rules.ts`): expense lines charged to it
+  from the final approval onward or daily-report quantities — stays editable by the roles that may edit, but **any
+  change needs a reason** (min. 3 characters, the repo's reason rule) for **every** role, enforced server-side:
+  `PATCH /api/v1/rap-items/{id}` → 400 `VALIDATION` with field error `reason` ("Item RAP sudah terpakai: isi alasan
+  perubahan (min. 3 karakter)."); the reason goes to the audit row of the change (`auditReason`, like the locked-RAP
+  reason). The dialog shows a required **Alasan perubahan** for used items. The Excel import follows the same rule:
+  the preview lists `usedChanged` (used items the file changes or deactivates) and the commit then needs `reason`.
+  The RAP lock after daily-report realisation is unchanged (PM 409 `RAP_LOCKED`, Direktur/Admin with reason).
+  OpenAPI: `RapItemUpdate.reason` / `RapImportCommit.reason` descriptions, `RapPreview.usedChanged`. The APK does not
+  edit RAP items (no change there).
 - Shared `FORM_GRID_STYLE` (`admin/components/form-grid.ts`): the label-left grid of the Wave 2 request form for custom
   `.pk-fld` forms and dialogs.
 

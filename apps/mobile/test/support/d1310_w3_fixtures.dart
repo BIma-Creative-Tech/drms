@@ -269,7 +269,7 @@ Map<String, dynamic> pmW3Json() {
   };
 }
 
-/// `/dashboard/me`: the server sends own grand totals; the phone must not show them.
+/// `/dashboard/me`: the caller's own requests with their grand totals (owner 2026-10-13: shown like the web).
 Map<String, dynamic> staffW3Json() => {
   'companies': [
     {'id': 1, 'shortCode': 'DRMS', 'name': 'PT DRMS Contoh'},
@@ -286,7 +286,28 @@ Map<String, dynamic> staffW3Json() => {
       'ageDays': 1,
     },
   ],
-  'latest': <Object>[],
+  'latest': [
+    {
+      'id': 1,
+      'companyId': 1,
+      'docNo': null,
+      'title': 'Semen',
+      'type': 'advance',
+      'status': 'draft',
+      'grandTotal': 1447500,
+      'ageDays': 1,
+    },
+    {
+      'id': 2,
+      'companyId': 1,
+      'docNo': 'PB/DRMS/2609/0007',
+      'title': 'Besi beton',
+      'type': 'advance',
+      'status': 'transferred',
+      'grandTotal': 2250000,
+      'ageDays': 6,
+    },
+  ],
   'month': '2026-09',
   'viz': {'requestTrend': requestTrendJson, 'pipeline': pipelineJson},
 };
