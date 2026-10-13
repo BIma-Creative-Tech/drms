@@ -24,6 +24,7 @@ import { RequestTypeField as RequestTypeField_a356a4ed347478242de628aded3440b3 }
 import { RequestStatusCell as RequestStatusCell_08836769fece85e42fb05beb6c632414 } from '@/admin/components/RequestStatusCell'
 import { RequestStatusField as RequestStatusField_3f8d5a55b1fcbc79eb9e47f3583cb1ed } from '@/admin/components/RequestStatusField'
 import { RequestTitleField as RequestTitleField_a356a4ed347478242de628aded3440b3 } from '@/admin/components/EditableOnlyFields'
+import { CompanyScopedField as CompanyScopedField_17980260c895f93f0d171a2dbc0f4023 } from '@/admin/components/companies/CompanyScopedField'
 import { BankAccountPreview as BankAccountPreview_1615d70b0243139e3dffd45ad2617f07 } from '@/admin/components/BankAccountPreview'
 import { RupiahNumberField as RupiahNumberField_d552ada140febbfef2d7dea921fde6df } from '@/admin/components/RupiahNumberField'
 import { LinesTableField as LinesTableField_652f9839b87cfebdbb6f1faba6b58e18 } from '@/admin/components/lines/LinesTableField'
@@ -120,6 +121,7 @@ export const importMap = {
   "@/admin/components/RequestStatusCell#RequestStatusCell": RequestStatusCell_08836769fece85e42fb05beb6c632414,
   "@/admin/components/RequestStatusField#RequestStatusField": RequestStatusField_3f8d5a55b1fcbc79eb9e47f3583cb1ed,
   "@/admin/components/EditableOnlyFields#RequestTitleField": RequestTitleField_a356a4ed347478242de628aded3440b3,
+  "@/admin/components/companies/CompanyScopedField#CompanyScopedField": CompanyScopedField_17980260c895f93f0d171a2dbc0f4023,
   "@/admin/components/BankAccountPreview#BankAccountPreview": BankAccountPreview_1615d70b0243139e3dffd45ad2617f07,
   "@/admin/components/RupiahNumberField#RupiahNumberField": RupiahNumberField_d552ada140febbfef2d7dea921fde6df,
   "@/admin/components/lines/LinesTableField#LinesTableField": LinesTableField_652f9839b87cfebdbb6f1faba6b58e18,

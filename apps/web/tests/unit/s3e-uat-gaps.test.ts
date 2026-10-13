@@ -65,9 +65,12 @@ describe('S-04 notifications: submit / withdraw / on behalf + approval email', (
 
 describe('S-03 bank account picker (US-44)', () => {
   it('lists active accounts of the requesters, else of the creator, else nothing', () => {
-    expect(bankAccountOptions({ data: { requesters: [3, { id: 4 }] }, user: { employee: 9 } as never })).toEqual({ and: [{ employee: { in: [3, 4] } }, { active: { not_equals: false } }] })
+    expect(bankAccountOptions({ data: { company: 1, requesters: [3, { id: 4 }] }, user: { employee: 9 } as never })).toEqual({ and: [{ employee: { in: [3, 4] } }, { active: { not_equals: false } }] })
+    // list view filter (data {}): the creator's employee
     expect(bankAccountOptions({ data: {}, user: { employee: { id: 9 } } as never })).toEqual({ and: [{ employee: { in: [9] } }, { active: { not_equals: false } }] })
-    expect(bankAccountOptions({ data: { requesters: [] }, user: {} as never })).toBe(false)
+    expect(bankAccountOptions({ data: { company: 1, requesters: [] }, user: {} as never })).toBe(false)
+    // DRMS 13/10 #3: no PT on the form yet → nothing (tests/unit/d1310-w1-forms.test.ts)
+    expect(bankAccountOptions({ data: { requesters: [3] }, user: { employee: 9 } as never })).toBe(false)
   })
 })
 
