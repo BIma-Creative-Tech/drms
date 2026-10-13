@@ -1,19 +1,26 @@
 'use client'
-import { SaveButton, useFormFields } from '@payloadcms/ui'
+import { SaveButton, useDocumentInfo, useFormFields } from '@payloadcms/ui'
 import type { SaveButtonClientProps } from 'payload'
 import React from 'react'
 
-import { isContentEditable, type RequestStatus } from '@/domain/expense/types'
+import { requestEditGate } from '@/collections/expense-request-form'
+
+import { useRequestMode } from './request/mode'
 
 /**
  * Expense request "Simpan" (DRMS 10/10 integration, Lead review d): only while the content is editable
  * (new / Draft / Revisi Nota). A submitted request changes only through the workflow actions (panel,
- * decision bar) — a "Simpan" there saved nothing and misled the reader. The server stays the authority
- * (beforeChange rejects content edits of a locked request).
+ * action bar) — a "Simpan" there saved nothing and misled the reader. DRMS 13/10 Persetujuan #7: on an existing
+ * request only in edit mode ("Edit" in the action bar), next to "Batal"; a new request is always in edit mode.
+ * Payload's own submit (validation, audit reason, onSave) is kept. The server stays the authority (beforeChange
+ * rejects content edits of a locked request).
  */
 export function RequestSaveButton(props: SaveButtonClientProps) {
-  const status = useFormFields(([fields]) => fields.status?.value) as RequestStatus | null | undefined
-  if (status && !isContentEditable(status)) return null
+  const { id, hasSavePermission } = useDocumentInfo()
+  const status = useFormFields(([fields]) => fields.status?.value) as string | null | undefined
+  const mode = useRequestMode(id)
+  const gate = requestEditGate({ id, status, hasSavePermission })
+  if (gate === 'locked' || mode !== 'edit') return null
   return <SaveButton {...props} />
 }
 

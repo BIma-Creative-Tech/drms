@@ -117,19 +117,21 @@ Nota & LPJ hanya bisa dikirim saat online.
 ## 5. Di web (opsional)
 
 Menu Anda: **Daftar pengajuan**, **Rekap absensi saya**, **+ Buat pengajuan**, **Profil & tanda tangan**.
-Di web Anda juga bisa **Cetak PDF Pengajuan Biaya** (tombol di samping kanan pengajuan yang sudah bernomor) —
+Di web Anda juga bisa mencetak **PDF Pengajuan Biaya** (tombol **Cetak** di bar aksi atas pengajuan yang sudah bernomor) —
 PDF tidak tersedia di APK. Kop dan logo PDF mengikuti PT pengajuan. Di web, form **+ Buat pengajuan** punya kolom
 **PT** di atas — wajib dipilih bila pemilih PT Anda berisi lebih dari satu PT, dan tidak bisa diubah setelah dibuat.
 Di form web, baris item tampil sebagai **tabel** (No, Uraian, Kategori, Qty, Satuan, Harga satuan, Total, Nominal sesuai
 nota). **+ Tambah baris** dan **Ubah** membuka jendela isian yang sama seperti di APK; total baris dan grand total
-langsung terlihat. Tekan **Simpan** pada form untuk menyimpan draft. Setelah diajukan, bagian atas berubah menjadi
-ringkasan **Rincian pengajuan** (hanya baca).
+langsung terlihat. Tekan **Simpan** untuk menyimpan draft. Pengajuan yang sudah tersimpan selalu terbuka sebagai
+ringkasan **Rincian pengajuan** (hanya baca); untuk mengubah draft (atau baris item saat **Revisi Nota**) tekan **Edit** di
+bar aksi atas → ubah → **Simpan** (atau **Batal**). **Duplikat** membuat draft baru berisi PT, project, pemohon dan
+baris item yang sama (tanpa nomor, persetujuan, nota, lampiran) — praktis untuk pengajuan rutin.
 
 ## Pertanyaan umum
 
-- *Kenapa belum disetujui?* Lihat **Giliran** di detail pengajuan (PM project atau Direktur). Notifikasi ke HP belum
-  aktif (PM/Direktur melihatnya di aplikasi/web, dan lewat email bila diaktifkan Admin); ingatkan langsung bila
-  mendesak.
+- *Kenapa belum disetujui?* Lihat **Giliran** (APK) / **Tahapan saat ini** (web, alur di kolom kanan) di detail
+  pengajuan (PM project atau Direktur). Notifikasi ke HP belum aktif (PM/Direktur melihatnya di aplikasi/web, dan
+  lewat email bila diaktifkan Admin); ingatkan langsung bila mendesak.
 - *Nota berbeda sedikit dengan total baris?* Tidak apa-apa; sistem memberi tanda (flag) untuk diperiksa Finance.
 - *Muncul flag "Nota ganda dalam pengajuan ini"?* Foto yang sama, atau nomor nota + toko yang sama, diunggah dua kali
   di pengajuan yang sama. Hapus salah satunya bila memang dobel; bila memang satu nota untuk dua baris, biarkan —

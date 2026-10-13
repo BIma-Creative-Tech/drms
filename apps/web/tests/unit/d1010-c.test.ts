@@ -91,10 +91,10 @@ describe('point 7 + polish: project tabs, request sidebar', () => {
     expect(revisionOnly({ status: 'receipt_revision' }, {}, ctx)).toBe(true)
     const cond = (name: string) => (ExpenseRequests.fields.find((f) => 'name' in f && f.name === name) as { admin?: { condition?: (d: unknown, s: unknown, c: unknown) => boolean } }).admin?.condition
     for (const n of ['docNo', 'grandTotal', 'submittedAt', 'approvedAt']) expect(cond(n)?.({ status: 'pending_ack', [n]: 'x' }, {}, ctx), n).toBe(false)
+    // DRMS 13/10 Persetujuan #5/#7: the read-only summary (Tanggal pengajuan, Dibuat oleh) is shown on every status,
+    // Revisi Nota included — these server fields are never on the form any more
     for (const n of ['createdBy', 'requestDate']) {
-      expect(cond(n)?.({ status: 'draft', [n]: 1 }, {}, ctx), n).toBe(false)
-      expect(cond(n)?.({ status: 'approved', [n]: 1 }, {}, ctx), n).toBe(false)
-      expect(cond(n)?.({ status: 'receipt_revision', [n]: 1 }, {}, ctx), n).toBe(true)
+      for (const status of ['draft', 'approved', 'receipt_revision']) expect(cond(n)?.({ status, [n]: 1 }, {}, ctx), `${n} ${status}`).toBe(false)
     }
   })
 })

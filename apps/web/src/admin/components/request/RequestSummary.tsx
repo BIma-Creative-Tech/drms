@@ -2,6 +2,7 @@ import React from 'react'
 
 import type { detail } from '@/domain/expense/dto'
 import { maskAccountNo } from '@/domain/expense/dto'
+import { formatRupiah } from '@/lib/money'
 import { formatDateLong } from '@/pdf/format'
 
 import { BankReveal } from './BankReveal'
@@ -14,14 +15,20 @@ const named = (r: unknown): string => {
   return [o.code, o.name].filter((x) => typeof x === 'string' && x).join(' ')
 }
 
+/** Chosen account of a Draft (no submit snapshot yet) — bank-preview.ts, masked. */
+export type DraftBank = { bankName: string | null; accountHolder: string | null; accountNoMasked: string | null; canReveal: boolean }
+
 /**
  * DRMS 10/10 B-2 (item 3): read-only "Rincian pengajuan" of a submitted (locked) request — label: value on one
  * line, the APK detail order (PT, project / pusat biaya, urgensi, tanggal, pemohon, dibuat oleh, rekening,
  * keterangan, lampiran). Replaces the disabled header inputs of the Payload form (empty "Pilih project…"
  * placeholders, a "memuat…" account preview). Rows without a value are left out. Server-rendered from the
  * request DTO; the bank number is masked, the eye button reveals it only for the people the DTO allows.
+ * DRMS 13/10 Persetujuan #5/#7: shown for EVERY status (read mode of a Draft too) as a two-column grid on wide screens,
+ * with the money totals that left the sidebar (Nominal disetujui, Total ditransfer, Total nota terverifikasi LPJ); the
+ * grand total stays the footer of "Rincian item".
  */
-export function RequestSummary({ d, ptName, attachments, canRevealBank }: { d: Detail; ptName: string | null; attachments: Array<{ id: number; name: string }>; canRevealBank: boolean }) {
+export function RequestSummary({ d, ptName, attachments, canRevealBank, draftBank = null }: { d: Detail; ptName: string | null; attachments: Array<{ id: number; name: string }>; canRevealBank: boolean; draftBank?: DraftBank | null }) {
   const scope = d.project ? named(d.project) : d.costCenter ? named(d.costCenter) : ''
   const rows: Array<[string, React.ReactNode, string]> = []
   const add = (label: string, value: React.ReactNode, key: string) => {
@@ -39,19 +46,28 @@ export function RequestSummary({ d, ptName, attachments, canRevealBank }: { d: D
   add('Tanggal dibutuhkan', d.neededDate ? formatDateLong(d.neededDate) : '', 'neededDate')
   add('Pemohon', d.requesters.map((r) => (r && 'name' in r ? String(r.name ?? '') : '')).filter(Boolean).join(', '), 'requesters')
   add('Dibuat oleh', d.createdBy && 'name' in d.createdBy ? String(d.createdBy.name ?? '') : '', 'createdBy')
+  // a submitted request shows its submit snapshot; a Draft (read mode, Persetujuan #7) the chosen account
+  const bank = d.bank
+    ? { bankName: d.bank.bankName, accountHolder: d.bank.accountHolder, masked: d.bank.accountNo ? (maskAccountNo(d.bank.accountNo, false) ?? '') : null, canReveal: canRevealBank }
+    : draftBank
+      ? { bankName: draftBank.bankName, accountHolder: draftBank.accountHolder, masked: draftBank.accountNoMasked, canReveal: draftBank.canReveal }
+      : null
   add(
     'Rekening tujuan',
-    d.bank ? (
+    bank ? (
       <span style={{ display: 'inline-flex', flexWrap: 'wrap', alignItems: 'center', gap: 6 }}>
         <span>
-          {[d.bank.bankName, d.bank.accountHolder].filter(Boolean).join(' · ')}
-          {d.bank.accountNo ? ' ·' : ''}
+          {[bank.bankName, bank.accountHolder].filter(Boolean).join(' · ')}
+          {bank.masked ? ' ·' : ''}
         </span>
-        {d.bank.accountNo ? <BankReveal requestId={d.id} masked={maskAccountNo(d.bank.accountNo, false) ?? ''} canReveal={canRevealBank} /> : null}
+        {bank.masked ? <BankReveal requestId={d.id} masked={bank.masked} canReveal={bank.canReveal} /> : null}
       </span>
     ) : null,
     'bank',
   )
+  if (d.approvedAmount !== null) add('Nominal disetujui', formatRupiah(d.approvedAmount), 'approvedAmount')
+  if (d.status !== 'draft') add('Total ditransfer', formatRupiah(d.transferredTotal ?? 0), 'transferredTotal')
+  if (d.verifiedReceiptsTotal !== null) add('Total nota terverifikasi LPJ', formatRupiah(d.verifiedReceiptsTotal), 'verifiedReceiptsTotal')
   add('Keterangan', d.notes?.trim() ?? '', 'notes')
   add(
     'Lampiran',
@@ -67,11 +83,11 @@ export function RequestSummary({ d, ptName, attachments, canRevealBank }: { d: D
     'attachments',
   )
   return (
-    <section data-pk-section="summary" style={{ border: '1px solid var(--theme-elevation-150)', borderRadius: 4, padding: 12, marginBottom: 16, fontSize: 13 }}>
+    <section className="pk-er-summary" data-pk-section="summary" style={{ border: '1px solid var(--theme-elevation-150)', borderRadius: 4, padding: 12, marginBottom: 16, fontSize: 13 }}>
       <strong style={{ display: 'block', marginBottom: 8 }}>Rincian pengajuan</strong>
-      <dl style={{ margin: 0, display: 'grid', gap: 6 }}>
+      <dl className="pk-er-summary__grid" style={{ margin: 0, display: 'grid', gap: 6 }}>
         {rows.map(([label, value, key]) => (
-          <div key={key} data-pk-summary={key} style={{ display: 'flex', flexWrap: 'wrap', gap: '0 8px', alignItems: 'baseline' }}>
+          <div key={key} className={key === 'notes' || key === 'attachments' || key === 'title' ? 'is-wide' : undefined} data-pk-summary={key} style={{ display: 'flex', flexWrap: 'wrap', gap: '0 8px', alignItems: 'baseline' }}>
             <dt style={{ flex: '0 0 auto', minWidth: 132, color: 'var(--pk-muted-fg)' }}>{label}:</dt>
             <dd style={{ margin: 0, flex: '1 1 160px', minWidth: 0, overflowWrap: 'anywhere', fontWeight: 500 }}>{value}</dd>
           </div>

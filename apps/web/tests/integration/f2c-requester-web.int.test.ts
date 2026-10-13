@@ -5,6 +5,8 @@ import { renderToString } from 'react-dom/server'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 
 import { WorkflowPanel } from '@/admin/components/WorkflowPanel'
+import { actionBarProps } from '@/admin/components/request/action-bar'
+import { loadRequestPanel } from '@/admin/components/request/panel-data'
 import { addDays } from '@/domain/expense/types'
 
 import { getTestPayload } from './helpers'
@@ -44,6 +46,12 @@ async function panelHtml(user: FlowUser, id: number): Promise<string> {
   const req = await createLocalReq({ user: { ...user, collection: 'users' } as never }, p)
   const el = await WorkflowPanel({ req, id, operation: 'update' } as never)
   return el ? renderToString(el) : ''
+}
+
+/** DRMS 13/10 Persetujuan #5: the decision buttons moved to the action bar (document controls) — its server-built props. */
+async function bar(user: FlowUser, id: number) {
+  const panel = await loadRequestPanel(await getTestPayload(), { ...user, collection: 'users' } as never, id)
+  return panel ? actionBarProps(panel) : null
 }
 
 describe('F2c staff panel — access restrictions', () => {
@@ -232,8 +240,8 @@ describe('F2c workflow panel (server-rendered in the edit view)', () => {
     expect(html).toContain('Menunggu Diketahui')
     expect(html).toContain('data-pk-next-actor')
     expect(html).not.toContain('data-pk-panel="requester"')
-    // DRMS 10/10 9d: the decider whose turn it is gets Setujui / Tolak on the detail too
-    expect(html).toContain('data-pk-decision-bar')
+    // DRMS 10/10 9d: the decider whose turn it is gets Setujui / Tolak on the detail too (DRMS 13/10: in the action bar)
+    expect((await bar(w.users.owner, a.id))?.decision).not.toBeNull()
     const own = await panelHtml(w.users.staffA, a.id)
     expect(own).toContain('data-pk-action="withdraw"')
     expect(own).toContain('data-pk-action="cancel"')
