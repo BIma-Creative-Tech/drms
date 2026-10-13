@@ -6,7 +6,7 @@ import { addDays } from '@/domain/expense/types'
 import { financeDashboard, loanBlock, ownerDashboard, pmDashboard, rapMissingBlock, rapMonitoringBlock, slaBlock, staffDashboard } from '@/domain/reports/dashboards'
 import { resetRateLimits } from '@/lib/rate-limit'
 
-import { getTestPayload, sqlAs } from './helpers'
+import { fixturePm, getTestPayload, sqlAs } from './helpers'
 import { api, asUser, makeFlowUser, makeWorld, sysCreate, type FlowUser, type Res, type World } from './flow-world'
 
 /**
@@ -50,7 +50,7 @@ beforeAll(async () => {
   // a second PT with its own Direktur and a RAB project without RAP
   otherPt = await sysCreate('companies', { name: 'PT Uji Dashboard W3', shortCode: `W3${Date.now() % 1000}`, timezone: 'Asia/Makassar' })
   foreignOwner = await makeFlowUser(['pk-owner'], 'w3d-foreign-owner', null, { company: otherPt })
-  foreignNoRap = await sysCreate('projects', { company: otherPt, code: 'W3D-X1', name: 'W3D lain PT', kind: 'umum', budget: 4_000_000, status: 'berjalan' }, { rap: false })
+  foreignNoRap = await sysCreate('projects', { company: otherPt, pm: await fixturePm(otherPt), code: 'W3D-X1', name: 'W3D lain PT', kind: 'umum', budget: 4_000_000, status: 'berjalan' }, { rap: false })
 }, 600_000)
 
 beforeEach(() => resetRateLimits())
