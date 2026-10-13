@@ -6,6 +6,34 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added (DRMS 13/10 Wave 3 — Pengguna tabbed onboarding)
+
+- **One tabbed "Pengguna" form** (`/admin/pengguna/baru`, `/admin/pengguna/<id>`; client: "Satu UI ber-tab: Detail
+  Pengguna, Permissions, Detail Karyawan, Rekening Karyawan"): tabs **Detail Pengguna** (email, nama, No. HP,
+  status), **Akses & Peran** (per PT the roles as ONE checklist dropdown — "multiple dropdown, bukan checkbox"),
+  **Data Karyawan** (per PT: create, pick an unlinked employee of that PT, edit the linked one, unlink),
+  **Rekening Karyawan** (list + "+ Tambah rekening") and **Penugasan Proyek** (read-only). Label left of the input
+  (D4 grid, now shared as `.pk-fgrid`), stacked below 640 px. One **Simpan**; a refused save marks the fields and
+  opens the first tab with an error. Admin of a PT / group admin only; the PTs shown = the caller's Admin PTs within
+  the PT selection. The users list ("+ Buat baru", row click; "Aksi" column dropped there), the menu ("+ Pengguna
+  baru") and the Akses PT matrix ("+ Pengguna baru", user name) open it; others keep Payload's user form.
+- **`POST /api/v1/user-onboarding`, `PATCH|GET /api/v1/user-onboarding/{userId}`:** account + memberships +
+  employees + bank accounts in ONE DB transaction, every write through the existing collections with the caller's
+  access (same rules, hooks and audit rows as the separate pages: Admin of THAT PT, Users update access for the
+  identity, bank-account reason / verification rules, same-PT employee, one employee per account and PT). Keycloak
+  first (Users hook); on any failure the transaction rolls back and the endpoint compensates Keycloak (new user
+  deleted, enabled flag / login role reverted). Errors as problem+json with `errors[].path` = body paths
+  (`user.*`, `companies.<i>.…`, `reason`); Keycloak refusing → 502 `KEYCLOAK_FAILED`. Own account: no
+  self-deactivation, no removal of the own Admin role. OpenAPI: `UserOnboardingCreate` / `UserOnboardingUpdate` /
+  `UserOnboardingResult` / `UserOnboardingDetail`.
+- **Temporary password for new accounts:** a NEW Keycloak user created here gets a generated temporary password
+  (`reset-password`, `temporary: true` → Keycloak requires a new password at the first login, `UPDATE_PASSWORD`),
+  shown ONCE to the Admin (never stored, logged or audited — the audit row records only the fact). An existing
+  Keycloak account with the email is linked, password untouched. Keycloak admin client: `resetPassword` (same
+  signature as the APK initial-password branch). ADR 0003 "Revisi 2026-10-13".
+- **Akses PT matrix:** the role checkboxes of a cell are the same checklist dropdown (`MultiSelect` form mode:
+  applies on tick, "Kosongkan" / "Selesai", floats above the scrolling table); rules unchanged.
+
 ### Changed (DRMS 13/10 Wave 2 — generic list view, Umum #3–#8, Persetujuan #2)
 
 - **One list view for every collection** (`PkListView`, `src/admin/pk-list/`, wired centrally in `payload.config.ts`

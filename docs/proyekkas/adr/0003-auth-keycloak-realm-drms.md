@@ -1,6 +1,6 @@
 # ADR 0003 — Authentication & identity: Keycloak realm `drms`, OIDC for web and APK
 
-- **Status:** accepted (user, GATE F0 2026-09-23); revised 2026-09-23 after the F1 spike (user-approved) and the F1 foundation / staging deploy; F2c panel access recorded 2026-09-24 (see Revision history); multi-company revision proposed 2026-09-27 (ADR 0016, section "Revisi 2026-09-27")
+- **Status:** accepted (user, GATE F0 2026-09-23); revised 2026-09-23 after the F1 spike (user-approved) and the F1 foundation / staging deploy; F2c panel access recorded 2026-09-24 (see Revision history); multi-company revision proposed 2026-09-27 (ADR 0016, section "Revisi 2026-09-27"); one-transaction user onboarding + temporary password 2026-10-13 (section "Revisi 2026-10-13")
 - **Date:** 2026-09-23
 - **Author:** Analyst/Architect — Phase 0
 - **Related:** brief §2 #3; `/opt/infra/CLAUDE.md` §3.2 (login), §3.6; `/opt/infra/identity/keycloak/*`
@@ -301,6 +301,42 @@ the record of the single-company design.*
   change; the service account rights (`manage-users` + `view-users`) are unchanged.
 - **Alternatives (added):** Keycloak Organizations / group-per-PT roles — rejected, see ADR 0016 "Alternatives".
 
+## Revisi 2026-10-13 (DRMS 13/10 Wave 3 — Pengguna tabbed onboarding)
+
+*Status of this revision: design approved for DRMS 13/10 Wave 3 (Lead brief; client request "Satu UI ber-tab: Detail
+Pengguna, Permissions, Detail Karyawan, Rekening Karyawan"); staging first, no prod deploy without owner approval.
+Branch `feat/d1310-w3-users`.*
+
+- **One save for an account (§2/§5).** New endpoints `POST /api/v1/user-onboarding` (create) and
+  `PATCH /api/v1/user-onboarding/{userId}` (edit) write the account (`users`), its memberships per PT, the employee
+  per PT and the employee's bank accounts in **one DB transaction**, opened by the endpoint
+  (`api/v1/endpoints/user-onboarding.ts`). Every write goes through the existing collections with the caller's
+  access (`overrideAccess: false`) — Users create/update access, `company-memberships` (Admin of THAT PT or group
+  admin), `employees`, `employee-bank-accounts` (reason rules, verification by Admin/Finance) — so audit rows,
+  reason rules and DB guards are exactly those of the separate pages. Gate: Admin of a PT or group admin (the
+  Akses PT matrix rule); each PT of the body must be one the caller administers (403 naming the item).
+- **Keycloak first, compensation after the rollback.** The Keycloak calls still run in the Users `beforeChange`
+  hook (`domain/users-sync.ts`) and push their compensations on `req.context`. The Local API does not run the
+  collection `afterError` hook, so the endpoint calls `compensateKeycloak(req)` itself **after** the transaction
+  rolled back (`withReqTransaction`): new Keycloak user deleted, enabled flag / login role reverted — best effort,
+  logged. A Keycloak error → 502 `KEYCLOAK_FAILED` (nothing saved); Admin API not configured → 503. Unchanged
+  limitation: a name / email change already written to Keycloak is not reverted (as on the REST path).
+- **Temporary password instead of the execute-actions mail (§5, onboarding).** A NEW Keycloak user created by the
+  onboarding endpoint gets a server-generated temporary password (14 characters, crypto random, upper + lower +
+  digit) via `PUT /users/{id}/reset-password` with `temporary: true` — Keycloak then requires `UPDATE_PASSWORD` at
+  the first login (web: Keycloak's own page; APK: the in-app step of the ADR 0012 revision 2026-10-11 once that
+  branch is merged, else the web). The password is returned ONCE in the 201 response (`Cache-Control: no-store`),
+  never stored, logged or audited; the audit row `update` / `user` / field `password` records only the fact. An
+  existing Keycloak account with the same email is linked as before and its password is not touched
+  (`temporaryPassword: null`). A policy refusal (400) aborts the save (502) and the user is deleted. The Payload
+  user form (REST path) keeps the execute-actions mail. Service account rights unchanged (`manage-users` covers
+  `reset-password`).
+- **Own account.** The onboarding form refuses self-deactivation and removing one's own Admin role in a PT (lock-out
+  guard of this form only; the matrix and REST paths are unchanged).
+- **Not changed:** Users / memberships / employees / bank-account collections, their access and the Akses PT matrix
+  (its role checkboxes became the same checklist dropdown); the Payload user form stays for signature, group admin,
+  privacy acknowledgement.
+
 ## Revision history
 
 - **2026-09-23 (F0 gate):** accepted by user.
@@ -331,3 +367,6 @@ the record of the single-company design.*
 - **2026-09-26 (E9, S3 track A):** §7 decision recorded — Keycloak event log = source of truth for failed logins;
   ProyekKas writes `login_failed` only for logins refused on its side. Status stays accepted.
 - **2026-09-27 (ADR 0016, multi-company):** section "Revisi 2026-09-27 (ADR 0016)" added (proposed; takes effect with phase MC). Status stays accepted.
+- **2026-10-13 (DRMS 13/10 Wave 3):** section "Revisi 2026-10-13" added — one-transaction user onboarding endpoint,
+  Keycloak compensation after the rollback, temporary password (`reset-password`, `temporary: true`) for new accounts.
+  Status stays accepted.
