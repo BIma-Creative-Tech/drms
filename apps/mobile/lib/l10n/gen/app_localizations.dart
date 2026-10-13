@@ -532,13 +532,19 @@ abstract class AppLocalizations {
   /// No description provided for @turnLabel.
   ///
   /// In id, this message translates to:
-  /// **'Giliran'**
+  /// **'Tahapan saat ini'**
   String get turnLabel;
+
+  /// No description provided for @turnYours.
+  ///
+  /// In id, this message translates to:
+  /// **'Menunggu keputusan Anda'**
+  String get turnYours;
 
   /// No description provided for @timelineTitle.
   ///
   /// In id, this message translates to:
-  /// **'Riwayat approval'**
+  /// **'Alur pengajuan'**
   String get timelineTitle;
 
   /// No description provided for @linesTitle.
@@ -1720,7 +1726,7 @@ abstract class AppLocalizations {
   /// No description provided for @decisionForbidden.
   ///
   /// In id, this message translates to:
-  /// **'Anda tidak dapat memutuskan pengajuan ini. Hanya PM project pengajuan ini, Direktur dan Finance yang memutuskan, masing-masing hanya pada gilirannya. Data dimuat ulang.'**
+  /// **'Anda tidak dapat memutuskan pengajuan ini. Hanya PM project pengajuan ini, Direktur dan Finance yang memutuskan, masing-masing hanya pada tahapannya. Data dimuat ulang.'**
   String get decisionForbidden;
 
   /// No description provided for @decisionTitleAcknowledgeDirektur.

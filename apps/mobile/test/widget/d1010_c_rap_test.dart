@@ -243,7 +243,8 @@ void main() {
       expect(find.text('Item RAP: A.2 — Akomodasi tim'), findsOneWidget);
       expect(find.byKey(const Key('line-1-rap-over')), findsOneWidget);
       expect(find.byKey(const Key('line-2-rap-over')), findsNothing);
-      expect(find.byKey(const Key('detail-rap-over')), findsOneWidget);
+      // DRMS 13/10 Persetujuan #11: no summary in the header — the chip is on the line.
+      expect(find.byKey(const Key('detail-rap-over')), findsNothing);
       expect(find.byKey(const Key('detail-cost-center')), findsNothing);
       expect(tester.widget<Text>(find.byKey(const Key('detail-project'))).data, 'PRJ-09 Jalan Tambang Blok B');
     });

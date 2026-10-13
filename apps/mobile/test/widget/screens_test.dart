@@ -94,7 +94,7 @@ void main() {
       expect(find.text('Rp 1.447.500'), findsOneWidget);
     });
 
-    testWidgets('detail: Giliran, lines, flags and Setujui/Tolak for the approver', (tester) async {
+    testWidgets('detail: Tahapan saat ini, lines, flags and Setujui/Tolak for the approver', (tester) async {
       await pumpScreen(
         tester,
         const RequestDetailScreen(id: 42),

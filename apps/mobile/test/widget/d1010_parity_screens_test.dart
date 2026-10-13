@@ -82,7 +82,7 @@ void main() {
       expect(find.text('Rincian pengajuan'), findsOneWidget);
       expect(find.text('Pemohon'), findsOneWidget);
       expect(find.text('Rekening tujuan'), findsOneWidget);
-      expect(find.text('Riwayat approval'), findsOneWidget);
+      expect(find.text('Alur pengajuan'), findsOneWidget);
       expect(tester.widget<Text>(find.byKey(const Key('detail-company'))).data, 'CS6 — PT Contoh Enam');
       expect(tester.widget<Text>(find.byKey(const Key('detail-bank-no'))).data, '•••0123');
       expect(find.text('Atas nama'), findsOneWidget);
