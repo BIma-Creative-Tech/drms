@@ -12930,7 +12930,7 @@ export const openapiDocument = {
             "type": "string",
             "minLength": 3,
             "maxLength": 1000,
-            "description": "Required once the RAP is locked (any daily-report realisation): Direktur/Admin only (409 RAP_LOCKED otherwise)."
+            "description": "Required (min. 3) once the RAP is locked (any daily-report realisation: Direktur/Admin only, 409 RAP_LOCKED otherwise) and — owner 2026-10-13 — for ANY change of a used item (\"Sudah terpakai\": expense lines from the final approval onward or daily-report quantities), every editor role (400 field `reason`). Written to the audit log."
           }
         },
         "additionalProperties": false
@@ -13000,6 +13000,13 @@ export const openapiDocument = {
               ]
             }
           },
+          "usedChanged": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Codes of used items (\"Sudah terpakai\") the file changes or deactivates — the commit then needs `reason` (400 field `reason`)."
+          },
           "newStages": {
             "type": "array",
             "items": {
@@ -13055,6 +13062,7 @@ export const openapiDocument = {
           "locked",
           "rows",
           "deactivated",
+          "usedChanged",
           "newStages",
           "issues",
           "counts"
@@ -37189,7 +37197,7 @@ export const openapiDocument = {
     },
     "/rap-items/{id}": {
       "patch": {
-        "summary": "P3 edit / deactivate a RAP item (same roles and lock as create; kind never changes)",
+        "summary": "P3 edit / deactivate a RAP item (same roles and lock as create; kind never changes). A used item (\"Sudah terpakai\") stays editable, but any change needs `reason` (400 field reason), audited",
         "security": [
           {
             "bearer": []

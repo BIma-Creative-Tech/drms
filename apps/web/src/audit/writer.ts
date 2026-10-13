@@ -69,6 +69,10 @@ export const AUDIT_ACTIONS = [
   // (QA-04), a transfer confirmed to an employee bank account that is not verified (QA-17).
   'overdraft_confirmed',
   'bank_unverified_confirmed',
+  // DRMS 13/10 Wave 4 (ADR 0007 amendment 2026-10-13): the ONE-TIME controlled renumbering (src/renumber) — one row per
+  // renumbered document (field docNo / entryNo, old → new) and per rewritten cash-entry description; written by the
+  // renumber CLI in its own transaction, never by the app.
+  'renumbered',
 ] as const
 export type AuditAction = (typeof AUDIT_ACTIONS)[number]
 

@@ -2494,7 +2494,7 @@ abstract class AppLocalizations {
   /// No description provided for @kpiTrendMineSubtitle.
   ///
   /// In id, this message translates to:
-  /// **'Jumlah pengajuan, 6 bulan, tanpa draft. Ketuk bulan untuk melihat angkanya.'**
+  /// **'Jumlah dan nilai pengajuan saya, 6 bulan, tanpa draft. Ketuk bulan untuk melihat angkanya.'**
   String get kpiTrendMineSubtitle;
 
   /// No description provided for @kpiTrendEmpty.
@@ -2718,6 +2718,30 @@ abstract class AppLocalizations {
   /// In id, this message translates to:
   /// **'Pengajuan {month}'**
   String kpiMyMonth(String month);
+
+  /// No description provided for @kpiMyLatestTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Pengajuan terbaru saya'**
+  String get kpiMyLatestTitle;
+
+  /// No description provided for @kpiMyLatestSubtitle.
+  ///
+  /// In id, this message translates to:
+  /// **'10 terbaru · nominal = grand total'**
+  String get kpiMyLatestSubtitle;
+
+  /// No description provided for @kpiMyLatestEmpty.
+  ///
+  /// In id, this message translates to:
+  /// **'Anda belum punya pengajuan.'**
+  String get kpiMyLatestEmpty;
+
+  /// No description provided for @kpiMyDraftTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Draft \"{title}\"'**
+  String kpiMyDraftTitle(String title);
 
   /// No description provided for @kpiMyDone.
   ///

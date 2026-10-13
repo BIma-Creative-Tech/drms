@@ -14,6 +14,8 @@ type Preview = {
   locked: boolean
   rows: Array<{ row: number; code: string; status: 'new' | 'changed' | 'unchanged'; changes: string[] }>
   deactivated: Array<{ code: string; description: string; hasRealisation: boolean }>
+  /** Used items ("Sudah terpakai") the file changes or deactivates — the commit then needs a reason (owner 2026-10-13). */
+  usedChanged?: string[]
   newStages: string[]
   issues: Array<{ row?: number; column?: string; message: string }>
   counts: { new: number; changed: number; unchanged: number; deactivated: number }
@@ -53,8 +55,12 @@ export function RapImport({ projectId, needsReason, stageRequired = true }: { pr
     }
   }
 
+  const usedChanged = preview?.usedChanged ?? []
+  const askReason = needsReason || usedChanged.length > 0
+
   const doCommit = async () => {
     if (needsReason && reason.trim().length < 3) return setError('RAP terkunci: isi alasan perubahan (min. 3 karakter).')
+    if (usedChanged.length > 0 && reason.trim().length < 3) return setError(`Item sudah terpakai ikut berubah (${usedChanged.join(', ')}): isi alasan perubahan (min. 3 karakter).`)
     setError(null)
     setBusy('Menyimpan RAP…')
     try {
@@ -138,7 +144,12 @@ export function RapImport({ projectId, needsReason, stageRequired = true }: { pr
               Dinonaktifkan: {preview.deactivated.map((d) => `${d.code}${d.hasRealisation ? ' (sudah ada realisasi)' : ''}`).join(', ')}
             </p>
           ) : null}
-          {needsReason ? (
+          {usedChanged.length ? (
+            <p className="pk-note" data-pk-rap-used-changed>
+              Item sudah terpakai yang berubah / dinonaktifkan: {usedChanged.join(', ')} — alasan wajib dan tercatat di audit.
+            </p>
+          ) : null}
+          {askReason ? (
             <div className="pk-fld">
               <label htmlFor={`${uid}-reason`}>
                 Alasan perubahan<span className="req" aria-hidden>*</span>

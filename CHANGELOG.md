@@ -33,6 +33,29 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   CHECK signature source ⇔ snapshot. Migrations `20261013_910000_d1310_direktur_ttd` +
   `20261013_910100_d1310_direktur_ttd_guard` (additive).
 
+### Added (DRMS 13/10 Wave 4 — one-time document renumbering)
+
+- **One-time controlled renumbering** (client Umum #1: "Reset penomoran dari 1 dan bentuk ulang nomor yang sudah ada
+  berdasarkan tanggal dibuat. Kas Masuk belum ada kode singkat PT."; owner decision D1). CLI
+  `apps/web/src/renumber/cli.ts` (migrate image, OWNER DSN; runbook `docs/proyekkas/runbooks/penomoran-ulang.md`):
+  `--dry-run` (read-only: full old → new mapping as JSON + CSV, derived-text changes, counters, pattern fixes, plan
+  sha256) → `--apply --expect-sha256 <reviewed>` (ONE transaction, refuses a changed plan / a second run / any plan
+  error) → `--verify`. Per PT × doc type × month of the document, ordered by `created_at` (tie: id), numbered 1..n with
+  the PT's current pattern; a pattern without `{COMPANY}` (the custom KM `KM/{YY}{MM}/{seq}`) moves to the D5 default
+  `KM/{COMPANY}/{YY}{MM}/{seq}` first. Numbers copied elsewhere are rewritten in the same transaction (cash-entry
+  descriptions, notification number/title/body, duplicate-receipt flags); counters = last number + 1, so the next new
+  document continues at n + 1. NOT run on deploy — the infra Lead runs it staging → prod with the owner's go.
+- **Audit**: new action `renumbered` — one row per renumbered document (field `docNo` / `entryNo`, old → new, same
+  `tx_id`) and per rewritten cash-entry description; "Log perubahan" / "Riwayat" show **"Nomor diubah: lama → baru"**.
+  Old audit rows are not rewritten (append-only).
+- **DB (migration `20261013_610000_d1310_renumber`, changes no document)**: `document_renumber_runs` (one row per PT,
+  UNIQUE → a second run is refused; owner-only writes), `pk_renumber_bypass()` and a guard prelude in
+  `pk_protect_columns`, `pk_counter_monotonic` and the expense-request / transfer / LPJ / ledger / progress /
+  field-report / addendum / loan / receipt-flag guards: a number / derived-text change passes ONLY with the session
+  flag `pk.renumber = 'on'` AND a running run row of the current transaction AND no other column changed — every
+  ordinary write stays blocked. ADR 0007 "Amendment 2026-10-13" records the one-time exception; the never-rewrite rule
+  stays in force afterwards.
+
 ### Changed (DRMS 13/10 Wave 3 — dashboard parity APK)
 
 - **One source for the web dashboard and the APK home.** `GET /api/v1/dashboard/{owner,finance,pm}` now carries the
@@ -53,9 +76,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   biaya bulan ini. Finance: Saldo per akun (masuk/keluar bulan ini), Status pengajuan, Pengajuan baru belum LPJ,
   Transaksi kas terbaru, Komposisi biaya, SLA transfer, Pinjaman antar project, Tutup buku. PM: Project Anda belum
   punya RAP, Status pengajuan tim, Tren pengajuan tim, Komposisi biaya, Pinjaman antar project, Pusat biaya saya. New
-  Staff summary from `/dashboard/me` (counts only — no amounts) and Admin summary from `/dashboard/admin` (master-data
+  Staff summary from `/dashboard/me` (own requests; amounts: see below) and Admin summary from `/dashboard/admin` (master-data
   gaps). Rows open the project's RAP / Pinjaman tab or the request. KPI cards show **full Rupiah** values (Umum #10);
   new CustomPainter charts: request-trend columns and a horizontal bar list.
+- **APK Staff home shows the amounts of the user's OWN requests** (owner 2026-10-13), the same figures as the web
+  Staff home: KPI "Pengajuan <bulan>" with its Σ, **Status pengajuan saya** with count · Σ grand total per stage,
+  new card **Pengajuan terbaru saya** (10 latest own requests: number or `Draft "judul"`, status, Nominal; tap opens
+  the request) and **Pengajuan saya per bulan** with the Σ in the readout — full Rupiah. `/dashboard/me` already
+  carried exactly these own-scoped figures (`ownScope`: `latest[].grandTotal`, `viz.pipeline` sums,
+  `viz.requestTrend` sums), so no API change. No other money on the Staff home (no project budgets, cash or other
+  people's requests); the web Staff project pages stay money-free.
 
 ### Added (DRMS 13/10 Wave 3 — Pengguna tabbed onboarding)
 
@@ -105,6 +135,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   the buttons disabled (409 `RAP_LOCKED` server-side), Direktur / Admin edit with a reason. **Upload Excel & template**
   (RapImport, template, RAP download, RAP templates) stay on the page for the RAP editors. The project's RAP tab links
   to it ("Ubah item RAP").
+- **Used RAP item: editable, reason required and audited** (owner 2026-10-13). An item that is already used — the
+  "Sudah terpakai" definition, now one pure rule `rapItemUsed` (`domain/rap/rules.ts`): expense lines charged to it
+  from the final approval onward or daily-report quantities — stays editable by the roles that may edit, but **any
+  change needs a reason** (min. 3 characters, the repo's reason rule) for **every** role, enforced server-side:
+  `PATCH /api/v1/rap-items/{id}` → 400 `VALIDATION` with field error `reason` ("Item RAP sudah terpakai: isi alasan
+  perubahan (min. 3 karakter)."); the reason goes to the audit row of the change (`auditReason`, like the locked-RAP
+  reason). The dialog shows a required **Alasan perubahan** for used items. The Excel import follows the same rule:
+  the preview lists `usedChanged` (used items the file changes or deactivates) and the commit then needs `reason`.
+  The RAP lock after daily-report realisation is unchanged (PM 409 `RAP_LOCKED`, Direktur/Admin with reason).
+  OpenAPI: `RapItemUpdate.reason` / `RapImportCommit.reason` descriptions, `RapPreview.usedChanged`. The APK does not
+  edit RAP items (no change there).
 - Shared `FORM_GRID_STYLE` (`admin/components/form-grid.ts`): the label-left grid of the Wave 2 request form for custom
   `.pk-fld` forms and dialogs.
 

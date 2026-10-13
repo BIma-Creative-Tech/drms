@@ -2597,7 +2597,8 @@ export interface AuditLog {
     | '2fa_disabled'
     | 'privacy_ack'
     | 'overdraft_confirmed'
-    | 'bank_unverified_confirmed';
+    | 'bank_unverified_confirmed'
+    | 'renumbered';
   field?: string | null;
   lineNo?: number | null;
   oldValue?:
