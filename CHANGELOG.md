@@ -6,6 +6,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed (DRMS 13/10 Wave 2 — generic list view, Umum #3–#8, Persetujuan #2)
+
+- **One list view for every collection** (`PkListView`, `src/admin/pk-list/`, wired centrally in `payload.config.ts`
+  via `withPkListView`; media libraries keep Payload's list): title + **Buat baru** (create permission only), the same
+  filter bar as the custom views (search, **checklist dropdown** filters per collection — select values, booleans,
+  relationships to master data, PT when 2+ PTs are selected — date ranges on the key date), **Kolom ▾** (checkbox
+  list, saved per user and collection in Payload's `collection-<slug>` preference), sortable headers, the shared pager
+  (20/50/100), **every row opens the record** (click / Enter). Payload's pill controls (Kolom / Filter / WhereBuilder),
+  the selection checkboxes and bulk edit/delete ("pilih isian untuk diedit") are gone; editing goes through the
+  document form (the **Ubah** button of the Aksi column). Rows are read with `overrideAccess: false` as the user; the
+  PT filter is intersected with the PT switcher selection (the URL can only narrow). URL state: `q`, `hal`, `per`,
+  `urut`, `f.<field>=a,b`, `f.<date>.dari/.sampai`; old `where[…]` deep links still work (dashboard KPI tiles now use
+  `f.status` / `f.requestDate`). The single-choice PT chips (`CompanyListFilter`) are replaced by the PT multi-select.
+- **Multi-select filters on the custom views** (Umum #4, Persetujuan #2): Persetujuan (PT, jenis, langkah), Antrian
+  Transfer (PT, jenis), Verifikasi LPJ (PT, tahap), Pinjaman (status, project, peran), Kas (akun, project, pusat
+  biaya, arah, status), project tabs RAP / Pengajuan, Progress and Notifikasi use the same checklist dropdown
+  (`MultiSelect`; values as `?key=a,b`). `listLoans` and the Kas book query accept several values (`in`).
+- **Clickable rows / pagination** (Umum #3, #7): Antrian Transfer (queue item + recorded transfers), Verifikasi LPJ
+  receipts, Kas book, Pinjaman and project Pengajuan rows open their record; dashboard / report tables (`DataTable`)
+  with more than 20 rows are paged in the browser (tables paged in the database keep the URL pager).
+
 ### Changed (DRMS 13/10 Wave 1 — expense-request form and approval page)
 
 - **Pengajuan #1/#2:** the PT picker of a new expense request offers only the PTs selected in the PT switcher (top

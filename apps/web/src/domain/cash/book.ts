@@ -55,20 +55,34 @@ const ptSql = (ids: number[]) =>
     : sql`FALSE`
 
 const optId = z.preprocess((v) => (v === '' || v === undefined ? undefined : v), z.coerce.number().int().positive().max(2_147_483_647).optional())
+/** DRMS 13/10 Umum #4: multi-select ids `1,3` — invalid entries dropped, none left → no filter. */
+const optIds = z.preprocess((v) => {
+  if (typeof v !== 'string') return undefined
+  const ids = [...new Set(v.split(',').map((x) => x.trim()).filter((x) => /^[1-9][0-9]{0,9}$/.test(x) && Number(x) <= 2_147_483_647).map(Number))].slice(0, 50)
+  return ids.length ? ids : undefined
+}, z.array(z.number().int().positive()).optional())
+/** Multi-select of fixed values (`masuk,keluar`); unknown values dropped. */
+const optEnums = <T extends string>(values: readonly [T, ...T[]]) =>
+  z.preprocess((v) => {
+    if (typeof v !== 'string') return undefined
+    const out = [...new Set(v.split(',').map((x) => x.trim()))].filter((x): x is T => (values as readonly string[]).includes(x))
+    return out.length ? out : undefined
+  }, z.array(z.enum(values)).optional())
 const optPeriod = z.preprocess((v) => (v === '' || v === undefined ? undefined : v), z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/).optional())
 
 /** Query string of /admin/kas (server-side Zod; invalid values are dropped, never passed on). */
 export const BookQuery = z.object({
-  akun: optId,
+  // DRMS 13/10 Umum #4: akun / project / pusat / arah / status are multi-select (`?akun=1,3`)
+  akun: optIds,
   periode: optPeriod,
-  project: optId,
-  pusat: optId,
-  arah: z.enum(['masuk', 'keluar']).optional().catch(undefined),
+  project: optIds,
+  pusat: optIds,
+  arah: optEnums(['masuk', 'keluar']),
   /** MC2: PT filter of the Kas list (a PT without Kas access simply yields no rows). */
   pt: optId,
   /** ADR 0023 (Q-S7): rows of the cash accounts flagged with this site (petty cash of a branch). */
   site: optId,
-  status: z.enum(['posted', 'void']).optional().catch(undefined),
+  status: optEnums(['posted', 'void']),
   /** DRMS 10/10 D8: free text over number + description, page size 20 / 50 / 100 (default 50). */
   q: z.preprocess((v) => (typeof v === 'string' && v.trim() !== '' ? v.trim() : undefined), z.string().max(100).optional()).catch(undefined),
   per: z.coerce.number().int().refine((n) => n === 20 || n === 50 || n === 100).optional().catch(undefined),
@@ -79,7 +93,8 @@ export type BookQuery = z.infer<typeof BookQuery>
 export function parseBookQuery(sp: Record<string, string | string[] | undefined> | undefined): BookQuery {
   const flat: Record<string, string> = {}
   for (const [k, v] of Object.entries(sp ?? {})) {
-    const s = Array.isArray(v) ? v[0] : v
+    // a repeated param (plain GET form multi-select) = one comma-joined value
+    const s = Array.isArray(v) ? v.join(',') : v
     if (typeof s === 'string') flat[k] = s
   }
   const out: Record<string, unknown> = {}
@@ -93,12 +108,12 @@ export function parseBookQuery(sp: Record<string, string | string[] | undefined>
 
 export function bookWhere(q: BookQuery): Where | undefined {
   const and: Where[] = []
-  if (q.akun) and.push({ cashAccount: { equals: q.akun } })
+  if (q.akun?.length) and.push({ cashAccount: { in: q.akun } })
   if (q.periode) and.push({ period: { equals: q.periode } })
-  if (q.project) and.push({ project: { equals: q.project } })
-  if (q.pusat) and.push({ costCenter: { equals: q.pusat } })
-  if (q.arah) and.push({ direction: { equals: q.arah === 'masuk' ? 'in' : 'out' } })
-  if (q.status) and.push({ status: { equals: q.status } })
+  if (q.project?.length) and.push({ project: { in: q.project } })
+  if (q.pusat?.length) and.push({ costCenter: { in: q.pusat } })
+  if (q.arah?.length === 1) and.push({ direction: { equals: q.arah[0] === 'masuk' ? 'in' : 'out' } }) // both = no filter
+  if (q.status?.length) and.push({ status: { in: q.status } })
   if (q.pt) and.push({ company: { equals: q.pt } })
   if (q.site) and.push({ 'cashAccount.site': { equals: q.site } })
   if (q.q) for (const t of q.q.split(/\s+/).filter(Boolean).slice(0, 5)) and.push({ or: [{ entryNo: { like: t } }, { description: { like: t } }] })

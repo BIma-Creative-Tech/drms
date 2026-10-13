@@ -79,7 +79,8 @@ const LABEL: Record<Layout, string> = { owner: 'Direktur', finance: 'Finance', p
 const ER = '/admin/collections/expense-requests'
 const where = (q: Record<string, string>) => new URLSearchParams(q).toString()
 const rekapKasMonth = (period: string) => `/admin/laporan/rekap-kas?${where({ dari: period, sampai: period })}`
-const statusList = (statuses: readonly string[]) => `${ER}?${where({ 'where[status][in]': statuses.join(',') })}`
+// DRMS 13/10 Umum #4: the list's own multi-select filters (PkListView) — the ticks show in its filter bar
+const statusList = (statuses: readonly string[]) => `${ER}?${where({ 'f.status': statuses.join(',') })}`
 const reqHref = (id: number) => `${ER}/${id}`
 const WAITING = ['pending_ack', 'pending_approval']
 const SR: React.CSSProperties = { position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)' }
@@ -1133,7 +1134,7 @@ async function Pm({ req, siteId }: { req: PayloadRequest; siteId?: number }) {
             value={formatNumber(d.teamMonth.count)}
             title={`${formatNumber(d.teamMonth.count)} pengajuan, ${rp(d.teamMonth.sum)}`}
             kpi="k13-month"
-            href={`${ER}?${where({ 'where[requestDate][greater_than_equal]': monthStart, 'where[requestDate][less_than_equal]': lastDay(d.month) })}`}
+            href={`${ER}?${where({ 'f.requestDate.dari': monthStart, 'f.requestDate.sampai': lastDay(d.month) })}`}
             more="Lihat pengajuan"
             i={1}
           >

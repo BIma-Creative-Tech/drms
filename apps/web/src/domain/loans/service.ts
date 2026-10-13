@@ -709,9 +709,10 @@ export async function loanDetail(req: PayloadRequest, doc: LoanDoc) {
 export type LoanDetail = Awaited<ReturnType<typeof loanDetail>>
 
 export type LoanFilter = {
-  projectId?: number
+  /** One project or several (DRMS 13/10 Umum #4: multi-select filter of the web list). */
+  projectId?: number | readonly number[]
   role?: 'borrower' | 'lender'
-  status?: LoanStatus
+  status?: LoanStatus | readonly LoanStatus[]
   overdue?: boolean
   q?: string
   page: number
@@ -724,12 +725,14 @@ export async function listLoans(req: PayloadRequest, f: LoanFilter) {
   const empty = { items: [] as LoanSummary[], page: 1, totalPages: 0, totalDocs: 0, limit: f.limit }
   if (!mayReadLoans(req)) return empty
   const and: Where[] = []
-  if (f.projectId !== undefined) {
-    if (f.role === 'borrower') and.push({ borrowerProject: { equals: f.projectId } })
-    else if (f.role === 'lender') and.push({ lenderProject: { equals: f.projectId } })
-    else and.push({ or: [{ borrowerProject: { equals: f.projectId } }, { lenderProject: { equals: f.projectId } }] })
+  const projects = f.projectId === undefined ? [] : typeof f.projectId === 'number' ? [f.projectId] : [...f.projectId]
+  if (projects.length) {
+    if (f.role === 'borrower') and.push({ borrowerProject: { in: projects } })
+    else if (f.role === 'lender') and.push({ lenderProject: { in: projects } })
+    else and.push({ or: [{ borrowerProject: { in: projects } }, { lenderProject: { in: projects } }] })
   }
-  if (f.status) and.push({ status: { equals: f.status } })
+  const statuses = f.status === undefined ? [] : typeof f.status === 'string' ? [f.status] : [...f.status]
+  if (statuses.length) and.push({ status: { in: statuses } })
   if (f.companyIds?.length) and.push({ company: { in: [...f.companyIds] } })
   if (f.overdue) {
     // derived: due date before today (per PT business date; the PT of the context — exact per row below)

@@ -7,7 +7,7 @@ import { RapImport } from '@/admin/components/field/RapImport'
 import { RapTemplateActions } from '@/admin/components/field/RapTemplateActions'
 import { KAS_STYLE } from '@/admin/components/kas/style'
 import { ListToolbar, Pager } from '@/admin/components/list/ListToolbar'
-import { matchesQuery, pageOfFind, paginate, parseListQuery, searchWhere } from '@/admin/list-query'
+import { allowedValues, filterValues, matchesQuery, pageOfFind, paginate, parseListQuery, searchWhere } from '@/admin/list-query'
 import { listItem } from '@/domain/expense/dto'
 import type { RequestDoc } from '@/domain/expense/common'
 import { BUDGET_COMMITTED, REQUEST_TYPE_LABELS, REQUEST_TYPES, type RequestStatus } from '@/domain/expense/types'
@@ -75,12 +75,16 @@ export async function ProjectRapTab(props: DocumentViewServerProps) {
   const prices = rap.budget !== null
   const stageOf = (i: Item) => (i.stage ? `${i.stage.name} · ` : '')
   const sp = props.searchParams as Record<string, string | string[] | undefined> | undefined
+  // DRMS 13/10 Umum #4: tahapan / status are multi-select (an item matches ANY ticked status)
   const lq = parseListQuery(sp, ['tahap', 'status'])
+  const tahap = filterValues(lq, 'tahap')
+  const statuses = allowedValues(lq, 'status', ['melebihi', 'aktif', 'nonaktif'] as const)
+  const statusOk = (i: Item) => statuses.length === 0 || statuses.some((st) => (st === 'melebihi' ? i.overBudget === true : st === 'nonaktif' ? !i.active : i.active))
   const filtered = rap.items.filter(
     (i) =>
-      (i.active || (i.realisedAmount ?? 0) > 0 || !!lq.filters.status) &&
-      (!lq.filters.tahap || String(i.stage?.id ?? '') === lq.filters.tahap) &&
-      (lq.filters.status === 'melebihi' ? i.overBudget === true : lq.filters.status === 'nonaktif' ? !i.active : lq.filters.status === 'aktif' ? i.active : true) &&
+      (i.active || (i.realisedAmount ?? 0) > 0 || statuses.length > 0) &&
+      (tahap.length === 0 || tahap.includes(String(i.stage?.id ?? ''))) &&
+      statusOk(i) &&
       matchesQuery([i.code, i.description, i.stage?.name ?? ''], lq.q),
   )
   const page = paginate(filtered, lq.page, lq.per)
@@ -191,10 +195,11 @@ export async function ProjectRapTab(props: DocumentViewServerProps) {
               label="Cari dan saring item RAP"
               search={{ placeholder: 'Kode, uraian, tahapan…' }}
               filters={[
-                { key: 'tahap', label: 'Tahapan', options: rap.stages.map((s) => ({ value: String(s.id), label: s.name })) },
+                { key: 'tahap', label: 'Tahapan', multi: true, options: rap.stages.map((s) => ({ value: String(s.id), label: s.name })) },
                 {
                   key: 'status',
                   label: 'Status',
+                  multi: true,
                   options: [
                     ...(prices ? [{ value: 'melebihi', label: 'Melebihi RAP' }] : []),
                     { value: 'aktif', label: 'Aktif' },
@@ -204,7 +209,7 @@ export async function ProjectRapTab(props: DocumentViewServerProps) {
               ]}
             />
             <div className="pk-lwide">
-              <DataTable id="project-rap-items" caption="Item RAP" rows={page.items} rowKey={(i) => i.id} rowAttrs={(i) => ({ 'data-pk-rap-item': i.code, 'data-pk-over': i.overBudget ? '1' : undefined })} cols={cols} empty={<EmptyState text={rap.items.length === 0 ? 'RAP project ini masih kosong.' : 'Tidak ada item yang cocok dengan pencarian / filter.'} />} />
+              <DataTable id="project-rap-items" paged={false} caption="Item RAP" rows={page.items} rowKey={(i) => i.id} rowAttrs={(i) => ({ 'data-pk-rap-item': i.code, 'data-pk-over': i.overBudget ? '1' : undefined })} cols={cols} empty={<EmptyState text={rap.items.length === 0 ? 'RAP project ini masih kosong.' : 'Tidak ada item yang cocok dengan pencarian / filter.'} />} />
             </div>
             <div className="pk-lcards" data-pk-rap-cards>
               {page.items.length === 0 ? <EmptyState text={rap.items.length === 0 ? 'RAP project ini masih kosong.' : 'Tidak ada item yang cocok.'} /> : null}
@@ -303,9 +308,11 @@ export async function ProjectRequestsTab(props: DocumentViewServerProps) {
   const lq = parseListQuery(sp, ['status', 'jenis'])
   const path = `/admin/collections/projects/${id}/pengajuan`
   const and: Where[] = [{ project: { equals: id } }]
-  const group = STATUS_GROUPS[lq.filters.status ?? '']
-  if (group) and.push({ status: { in: [...group.statuses] } })
-  if (lq.filters.jenis === 'advance' || lq.filters.jenis === 'reimburse') and.push({ type: { equals: lq.filters.jenis } })
+  // DRMS 13/10 Umum #4: status groups / jenis are multi-select (`?status=menunggu,selesai&jenis=advance`)
+  const groups = filterValues(lq, 'status').flatMap((g) => (STATUS_GROUPS[g] ? [...STATUS_GROUPS[g].statuses] : []))
+  if (groups.length) and.push({ status: { in: [...new Set(groups)] } })
+  const jenis = allowedValues(lq, 'jenis', REQUEST_TYPES)
+  if (jenis.length) and.push({ type: { in: jenis } })
   const text = searchWhere(['docNo', 'title'], lq.q)
   if (text) and.push(text)
   // owner 2026-10-11: a Staff (no other role in the project's PT) sees only their OWN requests of the project here
@@ -353,12 +360,12 @@ export async function ProjectRequestsTab(props: DocumentViewServerProps) {
           label="Cari dan saring pengajuan project"
           search={{ placeholder: 'Nomor atau judul…' }}
           filters={[
-            { key: 'status', label: 'Status', options: Object.entries(STATUS_GROUPS).map(([value, g]) => ({ value, label: g.label })) },
-            { key: 'jenis', label: 'Jenis', options: REQUEST_TYPES.map((t) => ({ value: t, label: REQUEST_TYPE_LABELS[t] })) },
+            { key: 'status', label: 'Status', multi: true, options: Object.entries(STATUS_GROUPS).map(([value, g]) => ({ value, label: g.label })) },
+            { key: 'jenis', label: 'Jenis', multi: true, options: REQUEST_TYPES.map((t) => ({ value: t, label: REQUEST_TYPE_LABELS[t] })) },
           ]}
         />
         <div className="pk-lwide">
-          <DataTable id="project-requests" caption="Pengajuan project" rows={page.items} rowKey={(r) => r.id} rowAttrs={(r) => ({ 'data-pk-request': String(r.id) })} cols={cols} empty={<EmptyState text={res === null ? 'Project tidak ditemukan atau tidak dapat Anda buka.' : 'Belum ada pengajuan yang cocok.'} />} />
+          <DataTable id="project-requests" paged={false} rowHref={(r) => `/admin/collections/expense-requests/${r.id}`} caption="Pengajuan project" rows={page.items} rowKey={(r) => r.id} rowAttrs={(r) => ({ 'data-pk-request': String(r.id) })} cols={cols} empty={<EmptyState text={res === null ? 'Project tidak ditemukan atau tidak dapat Anda buka.' : 'Belum ada pengajuan yang cocok.'} />} />
         </div>
         <div className="pk-lcards" data-pk-request-cards>
           {page.items.length === 0 ? <EmptyState text="Belum ada pengajuan yang cocok." /> : null}

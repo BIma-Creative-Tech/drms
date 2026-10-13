@@ -30,6 +30,11 @@ export const F3_STYLE = `
 .pk-f3 form.pk-filter label { display: flex; flex-direction: column; font-size: 12px; gap: 2px; }
 .pk-f3 form.pk-filter input, .pk-f3 form.pk-filter select { font-size: 13px; padding: 4px 6px; min-width: 140px; background: var(--theme-input-bg, var(--theme-elevation-0)); color: var(--theme-text); border: 1px solid var(--pk-input); border-radius: var(--style-radius-s); }
 .pk-f3 form.pk-filter select[multiple] { min-height: 90px; }
+/* DRMS 13/10 Umum #4: checklist dropdowns (MultiSelect) inside .pk-filter — undo the column label / 140px input rules */
+.pk-f3 form.pk-filter .pk-filter__multi { display: flex; flex-direction: column; font-size: 12px; gap: 2px; }
+.pk-f3 form.pk-filter label.pk-ms__opt { flex-direction: row; align-items: center; gap: 8px; font-size: 13px; }
+.pk-f3 form.pk-filter .pk-ms__opt input { min-width: 0; width: 16px; height: 16px; padding: 0; }
+.pk-f3 form.pk-filter .pk-ms__search { min-width: 0; width: 100%; }
 .pk-f3 .pk-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 0 0 12px; font-size: 13px; }
 /* one button system: same box as .pk-kbtn (components/kas/style.ts) — 38 px, 32 px .sm, 44 px on touch */
 .pk-f3 .pk-btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 38px; padding: 0 14px; border-radius: var(--style-radius-m); border: 1px solid color-mix(in oklab, var(--pk-muted-fg) 60%, var(--pk-input)); text-decoration: none; background: var(--pk-card); color: var(--theme-text); font: inherit; font-size: 13px; font-weight: 600; line-height: 1.2; white-space: nowrap; cursor: pointer; }

@@ -22,12 +22,49 @@ export function spValue(sp: SP, key: string): string {
   return typeof v === 'string' ? v.trim() : ''
 }
 
+/** Max values of one multi-select filter / chars of one value (URL length + query size guard). */
+export const MAX_FILTER_VALUES = 50
+const MAX_VALUE_LEN = 100
+
+/**
+ * DRMS 13/10 Umum #4: every value of a (multi-select) filter param — `?jenis=a,b` (checklist dropdown) and the
+ * repeated form `?jenis=a&jenis=b` (plain GET form) both give ['a', 'b']; trimmed, de-duplicated, capped.
+ */
+export function spValues(sp: SP, key: string): string[] {
+  const raw = sp?.[key]
+  const parts = (Array.isArray(raw) ? raw : raw === undefined ? [] : [raw]).flatMap((v) => (typeof v === 'string' ? v.split(',') : []))
+  const out: string[] = []
+  for (const p of parts) {
+    const v = p.trim().slice(0, MAX_VALUE_LEN)
+    if (v !== '' && !out.includes(v)) out.push(v)
+    if (out.length >= MAX_FILTER_VALUES) break
+  }
+  return out
+}
+
 export type ListQuery = {
   q: string
   page: number
   per: PageSize
-  /** Only the declared filter keys, values as given ('' = not set). */
+  /** Only the declared filter keys; multi-select values comma-joined ('' = not set) — split with filterValues. */
   filters: Record<string, string>
+}
+
+/** The values of one filter of a parsed query (DRMS 13/10 Umum #4: filters are multi-select). */
+export function filterValues(q: Pick<ListQuery, 'filters'>, key: string): string[] {
+  return spValues(q.filters, key)
+}
+
+/** filterValues restricted to `allowed` (unknown values from the URL are dropped). */
+export function allowedValues<T extends string>(q: Pick<ListQuery, 'filters'>, key: string, allowed: readonly T[]): T[] {
+  return filterValues(q, key).filter((v): v is T => (allowed as readonly string[]).includes(v))
+}
+
+/** Positive integer ids of a filter (e.g. PT / project ids); anything else is dropped. */
+export function idValues(q: Pick<ListQuery, 'filters'>, key: string): number[] {
+  return filterValues(q, key)
+    .filter((v) => /^[1-9][0-9]{0,9}$/.test(v))
+    .map(Number)
 }
 
 /** Parses `q` / `hal` / `per` + the declared filter keys; bad values fall back to the defaults. */
@@ -38,7 +75,7 @@ export function parseListQuery(sp: SP, filterKeys: readonly string[] = [], opts:
   const perRaw = Number(spValue(sp, 'per'))
   const per = (PAGE_SIZES as readonly number[]).includes(perRaw) ? (perRaw as PageSize) : DEFAULT_PAGE_SIZE
   const filters: Record<string, string> = {}
-  for (const k of filterKeys) filters[k] = spValue(sp, k).slice(0, 100)
+  for (const k of filterKeys) filters[k] = spValues(sp, k).join(',')
   return { q, page, per, filters }
 }
 
@@ -79,7 +116,8 @@ export function listHref(path: string, sp: SP, patch: Record<string, string | nu
   const pageKey = opts.pageKey ?? 'hal'
   const params = new URLSearchParams()
   for (const [k, raw] of Object.entries(sp ?? {})) {
-    const v = Array.isArray(raw) ? raw[0] : raw
+    // a repeated param (multi-select of a plain GET form) is kept as one comma-joined value
+    const v = Array.isArray(raw) ? raw.filter((x) => typeof x === 'string' && x !== '').join(',') : raw
     if (typeof v === 'string' && v !== '') params.set(k, v)
   }
   const touchesOther = Object.keys(patch).some((k) => k !== pageKey)
