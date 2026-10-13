@@ -1,4 +1,4 @@
-import { APIError, type CollectionAfterChangeHook, type Condition, type CollectionBeforeChangeHook, type CollectionConfig, type FilterOptionsProps, type PayloadRequest, type Where } from 'payload'
+import { APIError, type CollectionAfterChangeHook, type CollectionBeforeChangeHook, type CollectionConfig, type FilterOptionsProps, type PayloadRequest, type Where } from 'payload'
 
 import { RIWAYAT_TAB } from '@/admin/config'
 
@@ -20,7 +20,7 @@ import { notifyCreated, notifyTransition } from '@/domain/notifications'
 import { companyField, companyHook, formCompany, isListFilter, pickerSameCompany } from '@/fields/company'
 import { validationError } from '@/lib/validation'
 
-import { draftOnly, editableInput, isDraftForm, linesCondition, linesEditable, PLACEHOLDERS, revisionOnly, shownInHeader, submittedOnly, whenSet } from './expense-request-form'
+import { draftOnly, editableInput, linesCondition, linesEditable, notOnRequestPage, PLACEHOLDERS, revisionOnly, shownInHeader, whenSet } from './expense-request-form'
 import { businessDateField } from './fields-f2'
 import { USER_NAME_VIEW } from '@/fields/users'
 
@@ -45,12 +45,6 @@ import { USER_NAME_VIEW } from '@/fields/users'
 
 const system = { create: fieldNever, update: fieldNever }
 
-/** Phase C polish: a server field kept in the sidebar only in "Revisi Nota" (and only with a value). */
-const revisionAndSet = (name: string): Condition => (d, s, c) => revisionOnly(d, s, c) && whenSet(name)(d, s, c)
-
-/** Roles that may read `approval-rules` (collection read access) — the field is shown only to them. */
-// Phase C polish: in the sidebar for Finance / Admin only (the Direktur and PM read the approval timeline)
-const canSeeApprovalRules: Condition = (_data, _sibling, { user }) => rolesOf(user).some((r) => r === 'pk-admin' || r === 'pk-finance')
 const ro = { readOnly: true }
 const RUPIAH_FIELD = '@/admin/components/RupiahNumberField#RupiahNumberField'
 /** DRMS 13/10 Pengajuan #3/#5: a picker that stays disabled ("Pilih PT terlebih dahulu") until the form has a PT. */
@@ -293,9 +287,16 @@ export const ExpenseRequests: CollectionConfig = withAudit(
       group: 'Keuangan',
       defaultColumns: ['docNo', 'type', 'title', 'urgencyLevel', 'status', 'grandTotal', 'createdBy', 'updatedAt'],
       listSearchableFields: ['docNo', 'title'],
-      // Lead review (d): "Simpan" only while the content is editable (new / Draft / Revisi Nota).
-      components: { views: { edit: RIWAYAT_TAB }, edit: { SaveButton: '@/admin/components/RequestSaveButton#RequestSaveButton' } },
+      // Lead review (d): "Simpan" only while the content is editable (new / Draft / Revisi Nota); DRMS 13/10 Persetujuan #5/#7/#12:
+      // the action bar (decisions, Cetak, Duplikat, Edit/Batal) in the document controls row before "Simpan".
+      components: {
+        views: { edit: RIWAYAT_TAB },
+        edit: { SaveButton: '@/admin/components/RequestSaveButton#RequestSaveButton', beforeDocumentControls: ['@/admin/components/request/RequestActionBar#RequestActionBar'] },
+      },
     },
+    // DRMS 13/10 Persetujuan #12: Payload's duplicate copies every column (status, number, snapshot, totals, unique clientUuid,
+    // attachments …) — off (menu item + REST route); "Duplikat" = POST /api/v1/expense-requests/:id/duplicate (domain/expense/duplicate.ts).
+    disableDuplicate: true,
     access: {
       read: requestReadAccess,
       // Q-09 default: Staff/PM for themselves, Admin and Finance also on behalf of requesters. ADR 0024 (owner
@@ -315,8 +316,9 @@ export const ExpenseRequests: CollectionConfig = withAudit(
       { name: 'docNo', type: 'text', label: 'Nomor', index: true, access: system, admin: { ...ro, position: 'sidebar', condition: shownInHeader } },
       // F2c: status timeline + next actor for everyone, requester actions for creator/requesters.
       { name: 'workflowPanel', type: 'ui', label: 'Status & aksi', admin: { components: { Field: '@/admin/components/WorkflowPanel#WorkflowPanel' } } },
-      // M16 / US-46: "Cetak PDF" (audited API download); UI only, no column.
-      { name: 'pdfLinks', type: 'ui', label: 'PDF', admin: { position: 'sidebar', components: { Field: '@/admin/components/PdfLinks#PdfLinks' } } },
+      // DRMS 13/10 Persetujuan #3/#5: right column = the request stepper (replaces "Cetak PDF" — now "Cetak" in the action bar —,
+      // "Total ditransfer" — now in the summary — and "Aturan approval" — named in the stepper for Finance / Admin).
+      { name: 'requestStepper', type: 'ui', label: 'Alur pengajuan', admin: { position: 'sidebar', components: { Field: '@/admin/components/request/StepperField#StepperField' } } },
       {
         name: 'type',
         type: 'select',
@@ -434,19 +436,21 @@ export const ExpenseRequests: CollectionConfig = withAudit(
         ],
       },
       // DRMS 13/10 Persetujuan #10: no separate "Total (pratinjau)" box — the grand total is the footer row of the lines table
-      // Phase C polish: Grand total is in the panel header; Tanggal / Dibuat oleh in the locked "Rincian pengajuan" — so
-      // the sidebar keeps those two only in "Revisi Nota" (editable: no summary there) and never on a Draft
-      businessDateField('requestDate', 'Tanggal pengajuan (server)', { access: system, admin: { ...ro, position: 'sidebar', condition: revisionAndSet('requestDate') } }),
-      { name: 'createdBy', type: 'relationship', relationTo: 'users', label: 'Dibuat oleh', index: true, access: system, admin: { ...ro, position: 'sidebar', condition: revisionAndSet('createdBy'), components: USER_NAME_VIEW } },
+      // Phase C polish: Grand total is the "Rincian item" footer; Tanggal / Dibuat oleh in the read-only "Rincian pengajuan".
+      // DRMS 13/10 Persetujuan #5: the summary is shown on every status (read mode), so none of these server fields is on
+      // the form any more — the money totals are summary rows, the approval rule is named in the stepper (Finance / Admin;
+      // F2e UAT: a relationship input for users without approval-rules read access fired a 403 on every view).
+      businessDateField('requestDate', 'Tanggal pengajuan (server)', { access: system, admin: { ...ro, position: 'sidebar', condition: notOnRequestPage } }),
+      { name: 'createdBy', type: 'relationship', relationTo: 'users', label: 'Dibuat oleh', index: true, access: system, admin: { ...ro, position: 'sidebar', condition: notOnRequestPage, components: USER_NAME_VIEW } },
       { ...rupiahField('grandTotal', 'Grand total (Rp)'), access: system, admin: { ...ro, ...rupiahView, position: 'sidebar', condition: shownInHeader } },
-      { ...rupiahField('approvedAmount', 'Nominal disetujui (Rp)'), access: system, admin: { ...ro, ...rupiahView, position: 'sidebar', condition: (d, s, c) => submittedOnly(d, s, c) && whenSet('approvedAmount')(d, s, c) } },
-      { ...rupiahField('transferredTotal', 'Total ditransfer (Rp)'), access: system, admin: { ...ro, ...rupiahView, position: 'sidebar', condition: submittedOnly } },
-      { ...rupiahField('verifiedReceiptsTotal', 'Total nota terverifikasi LPJ (Rp)'), access: system, admin: { ...ro, ...rupiahView, position: 'sidebar', condition: (d, s, c) => submittedOnly(d, s, c) && whenSet('verifiedReceiptsTotal')(d, s, c) } },
-      // F2e UAT: office-only fields are not rendered for users who cannot read their target
-      // (staff/PM → the relationship input fired POST /api/approval-rules → 403 on every view).
-      { name: 'approvalRule', type: 'relationship', relationTo: 'approval-rules', label: 'Aturan approval', access: system, admin: { ...ro, position: 'sidebar', condition: (data, sibling, ctx) => submittedOnly(data, sibling, ctx) && canSeeApprovalRules(data, sibling, ctx) } },
-      // DRMS 10/10 9c (WA-06): readable timeline in the workflow panel; raw JSON only for Admin, folded.
-      { name: 'approvalSnapshot', type: 'json', label: 'Snapshot aturan approval', access: system, admin: { readOnly: true, components: { Field: '@/components/ReadOnlyJson#CollapsedReadOnlyJson' }, condition: (data, _s, { user }) => !isDraftForm(data) && rolesOf(user).includes('pk-admin') } },
+      { ...rupiahField('approvedAmount', 'Nominal disetujui (Rp)'), access: system, admin: { ...ro, ...rupiahView, position: 'sidebar', condition: notOnRequestPage } },
+      { ...rupiahField('transferredTotal', 'Total ditransfer (Rp)'), access: system, admin: { ...ro, ...rupiahView, position: 'sidebar', condition: notOnRequestPage } },
+      { ...rupiahField('verifiedReceiptsTotal', 'Total nota terverifikasi LPJ (Rp)'), access: system, admin: { ...ro, ...rupiahView, position: 'sidebar', condition: notOnRequestPage } },
+      { name: 'approvalRule', type: 'relationship', relationTo: 'approval-rules', label: 'Aturan approval', access: system, admin: { ...ro, position: 'sidebar', condition: notOnRequestPage } },
+      // DRMS 10/10 9c (WA-06): readable timeline instead of the raw JSON. DRMS 13/10 Persetujuan #6: not on the page at all
+      // (also not for Admin) — the stepper shows the positions, "Log perubahan" / "Riwayat" the changes.
+      // (the read-only JSON component stays declared: config guard — no json field may fall back to the Monaco editor)
+      { name: 'approvalSnapshot', type: 'json', label: 'Snapshot aturan approval', access: system, admin: { readOnly: true, hidden: true, components: { Field: '@/components/ReadOnlyJson#ReadOnlyJson' } } },
       {
         // ADR 0021 (owner 2026-10-10): narrow G1 exception, set by the service at submit only (DB trigger
         // expense_requests_g1_exception: value 'direktur_via_pm' | 'direktur_via_pm_self' or null, changes only at the freeze point).

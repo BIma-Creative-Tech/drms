@@ -1,29 +1,19 @@
 import type { UIFieldServerProps } from 'payload'
 import React from 'react'
 
-import { hasRole, ownEmployees, relId } from '@/access/roles'
-import { companyById } from '@/domain/companies'
-import { buildApprovalTimeline, g1ExceptionText } from '@/domain/expense/approval-timeline'
-import { displayName, ids, loadVisible, today } from '@/domain/expense/common'
 import { isContentEditable } from '@/domain/expense/types'
-import { detail } from '@/domain/expense/dto'
-import { isDecisionSnapshot } from '@/domain/expense/decision'
-import { decisionText } from '@/domain/expense/decision-texts'
-import { lastLevel, type ApprovalSnapshot } from '@/domain/expense/rules'
-import { ackStepLabel, approvalStepLabel, decisionByOf, nextActor, timeline } from '@/domain/expense/timeline'
 import { formatRupiah } from '@/lib/money'
-import { withSystemTransaction } from '@/lib/system-tx'
+import { formatServerTime } from '@/pdf/format'
 
-import { ApprovalTimeline } from './ApprovalTimeline'
-import { DecisionBar } from './DecisionBar'
 import { ReasonAction } from './kas/ReasonAction'
 import { KAS_STYLE } from './kas/style'
 import { Act, RequesterActions, type RequesterActionsProps } from './RequesterActions'
 import { ReviewDetails } from './ReviewDetails'
+import { ChangeLog } from './request/ChangeLog'
+import { loadRequestPanel } from './request/panel-data'
+import { RequestStepper } from './request/RequestStepper'
 import { RequestSummary } from './request/RequestSummary'
 import { LpjPhotoGrid } from './lpj/LpjPhotoGrid'
-
-type Detail = Awaited<ReturnType<typeof detail>>
 
 // Local copies of views/shared helpers: that module pulls the admin DefaultTemplate (not needed
 // in a field component, and keeps this component renderable in integration tests).
@@ -42,12 +32,16 @@ const badge = (tone: 'ok' | 'warn' | 'bad'): React.CSSProperties => ({
 const REQUESTER_ACTIONS = ['submit', 'withdraw', 'cancel', 'resubmit', 'add_receipt', 'receipts_resubmit', 'receipts_complete', 'lpj_submit', 'complete'] as const
 
 /**
- * ui field at the top of the expense-request edit view (F2c items 3 + 5): status timeline with the
- * NEXT expected actor for everyone who can read the request, and — for its creator/requesters only
- * — the requester actions the state machine allows now (`allowedActions` of the domain DTO, the
- * same guard the service enforces). Actions call the existing /api/v1 endpoints (guards, audit,
- * idempotency, notifications unchanged). Read in a fresh req + transaction (SYSTEM tx pattern of
- * the work views) as the logged-in user; visibility = collection read access (loadVisible).
+ * ui field at the top of the expense-request edit view (F2c items 3 + 5) = the MAIN COLUMN of the request page
+ * (DRMS 13/10 Persetujuan #3/#5–#7): header (number · type, PT badge, status, "Tahapan saat ini"), the read-only
+ * "Rincian pengajuan" summary (every status — the page opens in read mode, "Edit" in the action bar switches the
+ * Payload inputs on), the stepper again for the stacked layout (≤ 1024 px; on desktop it is the right column,
+ * StepperField), "Rincian item" with receipts and flags, transfers, LPJ, the requester actions (creator /
+ * requesters: `allowedActions` of the domain DTO, the same guard the service enforces) and "Log perubahan".
+ * Decisions, "Cetak" and "Duplikat" are in the action bar (RequestActionBar). Sections marked `data-pk-read` belong
+ * to read mode (custom.scss hides them while the form is edited). Actions call the existing /api/v1 endpoints
+ * (guards, audit, idempotency, notifications unchanged). Data: panel-data.ts (fresh req + transaction as the
+ * logged-in user; visibility = collection read access), read once per render for the three page parts.
  */
 export async function WorkflowPanel(props: UIFieldServerProps) {
   const { req, id } = props
@@ -60,131 +54,36 @@ export async function WorkflowPanel(props: UIFieldServerProps) {
       </div>
     )
   }
-  let data: {
-    d: Detail
-    snap: ApprovalSnapshot | null
-    names: Record<number, string>
-    hasSignature: boolean
-    todayDate: string
-    tz: string
-    office: boolean
-    ptName: string | null
-    attachments: Array<{ id: number; name: string }>
-  } | null = null
-  try {
-    data = await withSystemTransaction(req.payload, req.user, async (r) => {
-      const doc = await loadVisible(r, docId)
-      const d = await detail(r, docId)
-      const snap = (doc.approvalSnapshot ?? null) as ApprovalSnapshot | null
-      const names: Record<number, string> = {}
-      const userIds = [snap?.acknowledgerUserId, ...(snap?.steps ?? []).map((s) => s.approverUserId)].filter((x): x is number => typeof x === 'number')
-      for (const u of new Set(userIds)) names[u] = await displayName(r, u)
-      const me = await r.payload.findByID({ collection: 'users', id: req.user!.id as number, depth: 0, overrideAccess: true /* SYSTEM-READ: own profile signature flag */, req: r })
-      const company = relId((doc as { company?: unknown }).company)
-      const pt = company !== undefined ? await companyById(r, company) : null
-      const tz = pt?.timezone ?? 'Asia/Makassar'
-      // B-2 item 3: "Lampiran" of the read-only summary (file names; the files open through the authorized media endpoint)
-      const attIds = ids((doc as { attachments?: unknown[] | null }).attachments ?? null)
-      const attachments = attIds.length
-        ? (
-            await r.payload.find({ collection: 'media-attachments', where: { id: { in: attIds } }, depth: 0, pagination: false, select: { filename: true }, overrideAccess: true /* SYSTEM-READ: names of a visible request's attachments */, req: r })
-          ).docs.map((m) => ({ id: m.id as number, name: String((m as { filename?: string }).filename ?? `Lampiran #${String(m.id)}`) }))
-        : []
-      // KK (cash entries) are readable by Finance/Direktur/Admin of the PT only → link them only for those
-      const office = hasRole(r, ['pk-finance', 'pk-owner', 'pk-admin'], company)
-      return { d, snap, names, hasSignature: relId(me.signature) !== undefined, todayDate: await today(r, company), tz, office, ptName: pt ? [pt.shortCode, pt.name].filter(Boolean).join(' · ') : null, attachments }
-    })
-  } catch (err) {
-    // Not visible (404) → the document view itself already denies; anything else is logged.
-    const status = (err as { status?: number }).status
-    if (status !== 404) req.payload.logger.error({ msg: 'workflow panel failed', id: docId, err: (err as Error).message })
-    return null
-  }
-  const { d, snap, names, hasSignature, todayDate, tz, office, ptName, attachments } = data
-  const steps = timeline(d.type, d.status, { skipAck: snap?.acknowledge === 'none', snapshot: snap, currentLevel: d.currentLevel ?? null })
-  const next = nextActor({
-    type: d.type,
-    status: d.status,
-    currentLevel: d.currentLevel,
-    snapshot: snap,
-    requesters: d.requesters.map((r) => (r && 'name' in r ? String(r.name ?? '') : '')).filter(Boolean).join(', '),
-    names,
-  })
+  const data = await loadRequestPanel(req.payload, req.user, docId)
+  // Not visible (404) → the document view itself already denies; anything else is logged by the loader.
+  if (!data) return null
+  const { d, hasSignature, todayDate, tz, office, own, ptName, pt, attachments, stepper } = data
+  const next = d.nextActor
   // Requester panel only for the request's creator / requesters (office actions such as a Finance
   // cancel after approval stay in the work views).
-  const own = isOwn(d, req.user)
   const acts = (own ? d.allowedActions.filter((a) => (REQUESTER_ACTIONS as readonly string[]).includes(a)) : []) as RequesterActionsProps['actions']
   const box: React.CSSProperties = { border: '1px solid var(--theme-elevation-150)', borderRadius: 4, padding: 12, marginBottom: 16, fontSize: 13 }
-  // DRMS 10/10 9c: readable approval timeline (APK turn_timeline.dart) instead of the raw snapshot.
-  const approvalSteps = buildApprovalTimeline({
-    type: d.type,
-    status: d.status,
-    approvalCycle: d.approvalCycle,
-    currentLevel: d.currentLevel,
-    submittedAt: d.submittedAt,
-    snapshot: snap,
-    approvals: d.approvals,
-    transfers: d.transfers,
-    requesters: d.requesters.map((r) => (r && 'name' in r ? String(r.name ?? '') : '')).filter(Boolean).join(', '),
-    createdBy: d.createdBy && 'name' in d.createdBy ? String(d.createdBy.name ?? '') : null,
-    names,
-  })
-  // DRMS 13/10 Persetujuan #4: no "Keputusan siklus sebelumnya" list — earlier cycles stay in the "Riwayat" tab (audit log)
-  // DRMS 10/10 9d: decision bar when the server allows a decision now (same texts as the inbox).
-  const decideStep = d.allowedActions.includes('approve') ? 'approve' : d.allowedActions.includes('acknowledge') ? 'acknowledge' : null
-  const canReject = d.allowedActions.includes('reject')
-  const level = d.currentLevel ?? 1
-  const decision = decideStep
-    ? decisionText({
-        step: decideStep,
-        docNo: d.docNo,
-        grandTotal: d.grandTotal,
-        decisionFlow: isDecisionSnapshot(snap),
-        decisionBy: decisionByOf(snap, decideStep, decideStep === 'acknowledge' ? 0 : level),
-        finalStep: snap ? (decideStep === 'acknowledge' ? lastLevel(snap) === 0 : level >= lastLevel(snap)) : false,
-      })
-    : null
-  const decideLabel = decideStep === 'approve' || (!decideStep && d.status === 'pending_approval') ? approvalStepLabel(snap, level) : ackStepLabel(snap)
+  // DRMS 13/10 Persetujuan #4: no "Keputusan siklus sebelumnya" list — earlier cycles stay in "Log perubahan" / "Riwayat"
   return (
-    <div className="field-type" data-pk-panel="workflow">
-      <section style={box}>
+    <div className="field-type pk-er-panel" data-pk-panel="workflow">
+      <section style={box} data-pk-section="header">
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
           <strong style={{ fontSize: 15 }}>
             {d.docNo ?? `Draft #${d.id}`} · {d.typeLabel}
           </strong>
-          <span style={badge(d.status === 'rejected' || d.status === 'cancelled' ? 'bad' : d.status === 'completed' ? 'ok' : 'warn')}>{d.statusLabel}</span>
-          {/* DRMS 13/10 Persetujuan #10: the grand total is the footer row of "Rincian item" (ReviewDetails / LinesTableField) */}
-          {d.approvedAmount !== null || d.transferredTotal ? (
-            <span>
-              {[d.approvedAmount !== null ? `Disetujui ${rp(d.approvedAmount)}` : null, d.transferredTotal ? `Ditransfer ${rp(d.transferredTotal)}` : null].filter(Boolean).join(' · ')}
+          {/* DRMS 13/10 Persetujuan #8: the PT as a small badge (custom.scss .pk-pt-badge), no "PT:" label */}
+          {pt ? (
+            <span className="pk-pt-badge" title={pt.name ?? undefined} data-pk-company-inline={pt.shortCode}>
+              <span className="pk-pt-chip">{pt.shortCode}</span>
+              {pt.name ? <span className="pk-pt-badge__name">{pt.name}</span> : null}
             </span>
           ) : null}
+          <span style={badge(d.status === 'rejected' || d.status === 'cancelled' ? 'bad' : d.status === 'completed' ? 'ok' : 'warn')}>{d.statusLabel}</span>
+          {/* DRMS 13/10 Persetujuan #10: the grand total is the footer row of "Rincian item"; #5: the other totals are in the summary */}
         </div>
-        <ol style={{ display: 'flex', flexWrap: 'wrap', gap: 4, listStyle: 'none', padding: 0, margin: '10px 0' }} aria-label="Timeline status">
-          {steps.map((s, i) => (
-            <li key={`${s.status}-${i}`} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-              <span
-                style={{
-                  padding: '2px 8px',
-                  borderRadius: 10,
-                  fontSize: 12,
-                  fontWeight: s.state === 'current' ? 700 : 400,
-                  background: s.state === 'current' ? 'var(--pk-primary)' : s.state === 'done' ? 'var(--theme-elevation-150)' : 'transparent',
-                  color: s.state === 'current' ? 'var(--pk-on-primary)' : s.state === 'todo' ? 'var(--theme-elevation-500)' : 'inherit',
-                  border: s.state === 'todo' ? '1px dashed var(--theme-elevation-300)' : '1px solid transparent',
-                }}
-                aria-current={s.state === 'current' ? 'step' : undefined}
-              >
-                {s.state === 'done' ? '✓ ' : ''}
-                {s.label}
-              </span>
-              {i < steps.length - 1 ? <span aria-hidden>›</span> : null}
-            </li>
-          ))}
-        </ol>
         {d.resubmitOf ? (
           // F2e: the previous request by NUMBER + title (UAT: "Pengajuan ulang dari" showed only a title).
-          <div data-pk-resubmit-of={d.resubmitOf.id} style={{ marginBottom: 6 }}>
+          <div data-pk-resubmit-of={d.resubmitOf.id} style={{ marginTop: 6 }}>
             Pengajuan ulang dari{' '}
             <a href={`/admin/collections/expense-requests/${d.resubmitOf.id}`}>
               <strong>{d.resubmitOf.docNo ?? `#${d.resubmitOf.id}`}</strong>
@@ -194,39 +93,12 @@ export async function WorkflowPanel(props: UIFieldServerProps) {
         ) : null}
         {next ? (
           // DRMS 13/10 Persetujuan #9: "Tahapan saat ini" instead of "Giliran"
-          <div data-pk-next-actor>
+          <div data-pk-next-actor style={{ marginTop: 6 }}>
             Tahapan saat ini: <strong>{next.who}</strong> — {next.what}.
           </div>
         ) : (
-          <div>Tidak ada aksi lanjutan (status akhir).</div>
+          <div style={{ marginTop: 6 }}>Tidak ada aksi lanjutan (status akhir).</div>
         )}
-        {d.type === 'reimburse' && d.allowedActions.includes('verify_receipts') ? (
-          // F2d: Finance verifies Reimburse receipts in the Antrian Transfer view (US-39).
-          <div style={{ marginTop: 6 }}>
-            <a href={`/admin/antrian-transfer#reimburse-${d.id}`} data-pk-link="receipt-review">
-              Verifikasi nota Reimburse (Antrian Transfer) →
-            </a>
-          </div>
-        ) : null}
-        {d.allowedActions.includes('transfer_void') ? (
-          // E2 (US-24, T8): Finance voids a recorded transfer from the request detail (reason dialog).
-          <div style={{ marginTop: 8, display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }} data-pk-transfer-void>
-            <style>{KAS_STYLE}</style>
-            {d.transfers
-              .filter((t) => t.status === 'posted' && (t.kind === 'advance' || t.kind === 'reimburse'))
-              .map((t) => (
-                <ReasonAction
-                  key={t.id}
-                  url={`/api/v1/expense-requests/${d.id}/transfers/${t.id}/void`}
-                  label={`Void transfer ${t.docNo}`}
-                  title={`Void transfer ${t.docNo}?`}
-                  description={`KK transfer ${rp(t.amount)} dibalik dengan jurnal balik, transfer ditandai Void, dan pengajuan kembali ke ${d.type === 'advance' ? 'Disetujui (Antri Transfer)' : 'Nota Terverifikasi (Antri Transfer)'}.`}
-                  confirmLabel="Void transfer"
-                  testId={`void-transfer-${t.id}`}
-                />
-              ))}
-          </div>
-        ) : null}
         {!own && d.allowedActions.includes('complete') ? (
           // QA-19: the turn text names "Pemohon atau Finance" — Finance confirms the Reimburse "selesai" here
           // (state.ts: complete = own || Finance); the requester gets the same button in its panel below.
@@ -254,17 +126,30 @@ export async function WorkflowPanel(props: UIFieldServerProps) {
         ) : null}
         {d.rejectReason ? <div style={{ marginTop: 6, color: 'var(--theme-error-500)' }}>Alasan ditolak: {d.rejectReason}</div> : null}
         {d.cancelReason ? <div style={{ marginTop: 6 }}>Alasan batal: {d.cancelReason}</div> : null}
-        {d.status !== 'draft' ? (
-          <div style={{ marginTop: 12, paddingTop: 10, borderTop: '1px solid var(--theme-elevation-100)' }}>
-            <ApprovalTimeline steps={approvalSteps} tz={tz} note={g1ExceptionText(snap?.selfApproval)} />
-          </div>
-        ) : null}
-        {d.transfers.length > 0 ? (
-          // DRMS 10/10 12b: transfer (TRF) and its cash-out (KK) numbers link to their detail.
-          <ul style={{ margin: '8px 0 0', paddingLeft: 18, fontSize: 12 }} data-pk-transfers>
+      </section>
+      <div data-pk-read>
+        {/* B-2 item 3 / Persetujuan #7: read-only summary on every status (the read mode of a Draft too) */}
+        <RequestSummary d={d} ptName={ptName} attachments={attachments} canRevealBank={own || office} draftBank={data.draftBank} />
+      </div>
+      {/* Persetujuan #3 + layout: the stepper after the summary in the stacked layout (desktop: right column) */}
+      <div data-pk-read className="pk-er-stepper-inline">
+        <RequestStepper stepper={stepper} tz={tz} variant="inline" note={data.stepperNote} ruleName={data.ruleName} />
+      </div>
+      {d.lines.length > 0 || !isContentEditable(d.status) ? (
+        // S3e (US-26/US-59, S-05): lines, receipts and per-line flags. DRMS 10/10 9a: ONE lines table
+        // for everyone incl. the requester; Persetujuan #7: the Draft's read mode too (edit mode: LinesTableField).
+        <section style={box} id="review" data-pk-section="review" data-pk-read>
+          <ReviewDetails d={d} title="Rincian item" />
+        </section>
+      ) : null}
+      {d.transfers.length > 0 ? (
+        // DRMS 10/10 12b: transfer (TRF) and its cash-out (KK) numbers link to their detail.
+        <section style={box} data-pk-section="transfers" data-pk-read>
+          <strong>Transfer</strong>
+          <ul style={{ margin: '6px 0 0', paddingLeft: 18, fontSize: 12 }} data-pk-transfers>
             {d.transfers.map((t) => (
               <li key={t.id}>
-                Transfer <a href={`/admin/collections/transfers/${t.id}`}>{t.docNo}</a> · {t.transferDate} · {rp(t.amount)}
+                <a href={`/admin/collections/transfers/${t.id}`}>{t.docNo}</a> · {t.transferDate} · {rp(t.amount)}
                 {t.costCenter ? ` · ${[t.costCenter.code, t.costCenter.name].filter(Boolean).join(' ')}` : ''}
                 {t.status !== 'posted' ? ` · ${t.status === 'void' ? 'Void' : t.status}` : ''}
                 {t.cashEntryId && office ? (
@@ -285,22 +170,30 @@ export async function WorkflowPanel(props: UIFieldServerProps) {
               </li>
             ))}
           </ul>
-        ) : null}
-      </section>
-      {!isContentEditable(d.status) ? (
-        // B-2 item 3: header of a locked request as a read-only summary (the header inputs are hidden then)
-        <RequestSummary d={d} ptName={ptName} attachments={attachments} canRevealBank={own || office} />
-      ) : null}
-      {d.status !== 'draft' ? (
-        // S3e (US-26/US-59, S-05): lines, receipts and per-line flags. DRMS 10/10 9a: ONE lines table
-        // for everyone incl. the requester; the Payload line cards are hidden after submit.
-        <section style={box} id="review" data-pk-section="review">
-          <ReviewDetails d={d} title="Rincian item" />
+          {d.allowedActions.includes('transfer_void') ? (
+            // E2 (US-24, T8): Finance voids a recorded transfer from the request detail (reason dialog).
+            <div style={{ marginTop: 8, display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }} data-pk-transfer-void>
+              <style>{KAS_STYLE}</style>
+              {d.transfers
+                .filter((t) => t.status === 'posted' && (t.kind === 'advance' || t.kind === 'reimburse'))
+                .map((t) => (
+                  <ReasonAction
+                    key={t.id}
+                    url={`/api/v1/expense-requests/${d.id}/transfers/${t.id}/void`}
+                    label={`Void transfer ${t.docNo}`}
+                    title={`Void transfer ${t.docNo}?`}
+                    description={`KK transfer ${rp(t.amount)} dibalik dengan jurnal balik, transfer ditandai Void, dan pengajuan kembali ke ${d.type === 'advance' ? 'Disetujui (Antri Transfer)' : 'Nota Terverifikasi (Antri Transfer)'}.`}
+                    confirmLabel="Void transfer"
+                    testId={`void-transfer-${t.id}`}
+                  />
+                ))}
+            </div>
+          ) : null}
         </section>
       ) : null}
       {!own && d.settlement ? (
         // point 13: the LPJ (incl. its photos) for office readers of the request; the requester sees it in its panel
-        <section style={box} data-pk-section="lpj">
+        <section style={box} data-pk-section="lpj" data-pk-read>
           <strong>
             LPJ{' '}
             {d.settlement.docNo ? <a href={`/admin/collections/settlements/${d.settlement.id}`}>{d.settlement.docNo}</a> : null}
@@ -310,38 +203,37 @@ export async function WorkflowPanel(props: UIFieldServerProps) {
           <LpjPhotoGrid ids={d.settlement.photos} group={`lpj-photos-${d.id}`} label="Foto LPJ" />
         </section>
       ) : null}
-      {decideStep || canReject ? <DecisionBar id={d.id} step={decideStep} label={decision?.label ?? 'Setujui'} confirm={decision?.confirm ?? ''} canReject={canReject} stepLabel={decideLabel} /> : null}
       {own ? (
-        <RequesterActions
-          id={d.id}
-          type={d.type}
-          status={d.status}
-          actions={acts}
-          profileHref={`/admin/collections/users/${req.user.id}`}
-          hasSignature={hasSignature}
-          today={todayDate}
-          lines={d.lines.map((l) => ({ id: l.id, no: l.no, description: l.description ?? '', total: l.total, incomplete: isContentEditable(d.status) && l.unitPrice === null }))}
-          receipts={d.receipts.map((r) => ({
-            ...r,
-            flags: d.flags.filter((f) => f.receiptId === r.id).map((f) => ({ id: f.id, label: f.kindLabel, level: f.level, message: f.message, status: f.status })),
-          }))}
-          requestFlags={d.flags.filter((f) => f.receiptId === null).map((f) => ({ id: f.id, label: f.kindLabel, level: f.level, message: f.message, status: f.status, lineNo: f.lineNo }))}
-          settlement={
-            d.settlement
-              ? { docNo: d.settlement.docNo, statusLabel: d.settlement.statusLabel, usageNotes: d.settlement.usageNotes, financeNotes: d.settlement.financeNotes, receiptsTotal: d.settlement.receiptsTotal, difference: d.settlement.difference, submitCount: d.settlement.submitCount, photos: d.settlement.photos }
-              : null
-          }
-        />
+        // Persetujuan #7: requester actions (Kirim pengajuan, nota, LPJ …) belong to read mode — save the edit first
+        <div data-pk-read data-pk-requester-actions>
+          <RequesterActions
+            id={d.id}
+            type={d.type}
+            status={d.status}
+            actions={acts}
+            profileHref={`/admin/collections/users/${req.user.id}`}
+            hasSignature={hasSignature}
+            today={todayDate}
+            lines={d.lines.map((l) => ({ id: l.id, no: l.no, description: l.description ?? '', total: l.total, incomplete: isContentEditable(d.status) && l.unitPrice === null }))}
+            receipts={d.receipts.map((r) => ({
+              ...r,
+              flags: d.flags.filter((f) => f.receiptId === r.id).map((f) => ({ id: f.id, label: f.kindLabel, level: f.level, message: f.message, status: f.status })),
+            }))}
+            requestFlags={d.flags.filter((f) => f.receiptId === null).map((f) => ({ id: f.id, label: f.kindLabel, level: f.level, message: f.message, status: f.status, lineNo: f.lineNo }))}
+            settlement={
+              d.settlement
+                ? { docNo: d.settlement.docNo, statusLabel: d.settlement.statusLabel, usageNotes: d.settlement.usageNotes, financeNotes: d.settlement.financeNotes, receiptsTotal: d.settlement.receiptsTotal, difference: d.settlement.difference, submitCount: d.settlement.submitCount, photos: d.settlement.photos }
+                : null
+            }
+          />
+        </div>
       ) : null}
+      {/* Persetujuan #6/#13: change log (who / when / what) with the created / last-changed times */}
+      <div data-pk-read>
+        <ChangeLog entries={data.history} created={data.createdAt ? formatServerTime(data.createdAt, tz) : null} updated={data.updatedAt ? formatServerTime(data.updatedAt, tz) : null} />
+      </div>
     </div>
   )
-}
-
-function isOwn(d: Detail, user: { id?: unknown }): boolean {
-  if (d.createdById === user.id) return true
-  // ADR 0016: one employee per PT membership — any of them counts (each belongs to one PT).
-  const emps = ownEmployees({ user } as never)
-  return d.requesters.some((r) => r?.id !== undefined && emps.includes(r.id))
 }
 
 export default WorkflowPanel
