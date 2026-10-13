@@ -587,9 +587,9 @@ export function buildOpenApiDocument(version: string) {
       request: { headers: deviceHeader, ...(['owner', 'finance', 'pm'].includes(name) ? { query: R.DashboardQuery } : {}) },
       responses: res(200, 'Dashboard', schema, [400, 401, 403, 426, 429]),
     })
-  dash('owner', 'Owner home: cash (K-01, K-02b), budgets (K-07/K-08), completeness (K-12), approvals (K-10), cost centers (K-15), transfer queue (K-11)', R.OwnerDashboard)
-  dash('finance', 'Finance home: work queues (K-11, K-12c/d/e), balances per account (K-01), advances without LPJ (K-12a/b), cash flow (K-02a)', R.FinanceDashboard)
-  dash('pm', 'PM home (team scope): waiting for my "Diketahui", team month (K-13), LPJ (K-12a/b), project budgets (K-08), cost centers (K-15); attendance/progress = F5', R.PmDashboard)
+  dash('owner', 'Owner home: cash (K-01, K-02b), budgets (K-07/K-08), completeness (K-12), approvals (K-10), cost centers (K-15), transfer queue (K-11), SLA transfer, inter-project loans, RAP monitoring, projects with a RAB but no RAP', R.OwnerDashboard)
+  dash('finance', 'Finance home: work queues (K-11, K-12c/d/e), balances per account (K-01), advances without LPJ (K-12a/b), cash flow (K-02a), SLA transfer, inter-project loans', R.FinanceDashboard)
+  dash('pm', 'PM home (team scope): waiting for my "Diketahui", team month (K-13), LPJ (K-12a/b), project budgets (K-08), cost centers (K-15), inter-project loans (team), team projects with a RAB but no RAP; attendance/progress = F5', R.PmDashboard)
   dash('admin', 'Admin home: master-data gaps and latest audit rows', R.AdminDashboard)
   dash('me', 'Own requests: "Perlu tindakan saya" and latest (any role)', R.StaffDashboard)
   registry.registerPath({

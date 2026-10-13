@@ -138,6 +138,83 @@ const SiteSummary = SiteCash.extend({
   disbursedMonth: rp.meta({ description: 'K-05 net disbursed this month for the site\'s projects.' }),
 })
 
+// ---- DRMS 13/10 Wave 3: cards shared by the web dashboard and the APK home (dashboards.ts slaBlock / loanBlock /
+// rapMissingBlock / rapMonitoringBlock). Scopes as on the web: NOT narrowed by `?site=` nor by the layout role.
+const SlaBlock = z
+  .object({
+    month: z.string(),
+    count: z.number().int().meta({ description: 'Transfers this month (PT zone) measured from the final approval' }),
+    pctWithin: z.number().nullable().meta({ description: 'Share within the PT transfer SLA, 1 decimal; null = no transfer' }),
+    avgHours: z.number().nullable(),
+    avgText: z.string().meta({ description: 'Average duration as shown on the web ("5 jam", "1 hr 3 jam", "—")' }),
+    late: z.number().int(),
+    slaHours: z.array(z.number()).meta({ description: 'Distinct SLA targets (hours) of the PTs involved' }),
+    text: z.string().meta({ description: 'pctWithin as text ("92,5%", "—")' }),
+  })
+  .meta({ description: 'Item 11 (DRMS 10/10) "SLA transfer": PTs where the caller is Owner/Finance; same numbers as the SLA transfer report.' })
+const LoanProjectRow = z.object({
+  projectId: z.number().int(),
+  companyId: ptId,
+  code: z.string(),
+  name: z.string(),
+  borrowed: rp,
+  lent: rp,
+  outstandingBorrowed: rp,
+  outstandingLent: rp,
+  overdueBorrowed: rp,
+  overdueCount: z.number().int(),
+})
+const LoanBlock = z
+  .object({
+    totals: z.object({
+      count: z.number().int(),
+      amount: rp,
+      repaid: rp,
+      outstanding: rp,
+      overdue: rp,
+      overdueCount: z.number().int(),
+      pending: z.number().int().meta({ description: 'Loans waiting for the Direktur' }),
+      byCompany: z.array(z.object({ companyId: ptId, count: z.number().int(), amount: rp, repaid: rp, outstanding: rp })),
+    }),
+    projects: z.array(LoanProjectRow).meta({ description: 'Top 5 projects by outstanding (borrowed + lent)' }),
+    waitingForMe: z.number().int().meta({ description: 'Loans waiting for the caller\'s decision (Direktur; 0 otherwise)' }),
+  })
+  .meta({ description: 'ADR 0022 §9 "Pinjaman antar project": loanScope (office roles: their PTs, PM: team projects as borrower or lender).' })
+const RapMissingBlock = z
+  .object({
+    team: z.boolean().meta({ description: 'true = PM layout (the PM\'s team projects only)' }),
+    total: z.number().int(),
+    rows: z.array(
+      z.object({ id: z.number().int(), companyId: ptId, code: z.string(), name: z.string(), kind: z.string(), kindLabel: z.string(), budget: rp.nullable(), pm: z.number().int().nullable() }),
+    ),
+  })
+  .meta({ description: 'D4 (owner 2026-10-11): projects with a RAB (or konstruksi) WITHOUT a RAP — their requests cannot be submitted. Top 8 + total.' })
+const RapMonitoringBlock = z
+  .object({
+    projects: z.number().int(),
+    overProjects: z.number().int(),
+    rows: z.array(
+      z.object({
+        projectId: z.number().int(),
+        companyId: ptId,
+        code: z.string(),
+        name: z.string(),
+        status: z.string().nullable(),
+        planned: rp.nullable(),
+        realised: rp,
+        transferred: rp,
+        verified: rp,
+        remaining: rp.nullable(),
+        percent: z.number().nullable().meta({ description: 'realised / planned × 100, 2 decimals' }),
+        overBudget: z.boolean(),
+        items: z.number().int(),
+        activeItems: z.number().int(),
+        overBudgetItems: z.number().int(),
+      }),
+    ),
+  })
+  .meta({ description: 'DRMS 10/10 "Monitoring RAP": projects with a RAP the caller may read, realisation vs plan (top 8).' })
+
 const BudgetCounts = { running: z.number().int(), over: z.number().int(), warn: z.number().int(), ok: z.number().int(), none: z.number().int() }
 
 export const OwnerDashboard = z.object({
@@ -178,6 +255,10 @@ export const OwnerDashboard = z.object({
   projects: z.array(ProjectBudget),
   costCenters: z.array(CostCenterMonth),
   transferQueue: TransferQueueSummary,
+  sla: SlaBlock,
+  loans: LoanBlock,
+  rapMonitoring: RapMonitoringBlock,
+  rapMissing: RapMissingBlock,
   viz: z.object({
     balanceTrend: z.array(BalancePoint),
     disbursed: z.array(DisbursedPoint),
@@ -211,6 +292,8 @@ export const FinanceDashboard = z.object({
   lastClosedPeriod: z.string().nullable().meta({ description: 'MC2: the OLDEST of the PTs\' latest closed periods (null when one PT never closed).' }),
   lastClosedByCompany: z.array(z.object({ companyId: ptId, period: z.string().nullable() })),
   nextClosable: z.string(),
+  sla: SlaBlock,
+  loans: LoanBlock,
   viz: z.object({
     balanceTrend: z.array(BalancePoint),
     disbursed: z.array(DisbursedPoint),
@@ -270,6 +353,8 @@ export const PmDashboard = z.object({
   projects: z.array(ProjectBudget),
   costCenters: z.array(CostCenterMonth),
   latest: z.array(RequestRow),
+  loans: LoanBlock,
+  rapMissing: RapMissingBlock,
   attendance: z.object({ available: z.literal(false), phase: z.string() }),
   progressReports: z.object({ available: z.literal(false), phase: z.string() }),
   viz: z.object({

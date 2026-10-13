@@ -25062,7 +25062,7 @@ export const openapiDocument = {
     },
     "/dashboard/owner": {
       "get": {
-        "summary": "Owner home: cash (K-01, K-02b), budgets (K-07/K-08), completeness (K-12), approvals (K-10), cost centers (K-15), transfer queue (K-11)",
+        "summary": "Owner home: cash (K-01, K-02b), budgets (K-07/K-08), completeness (K-12), approvals (K-10), cost centers (K-15), transfer queue (K-11), SLA transfer, inter-project loans, RAP monitoring, projects with a RAB but no RAP",
         "security": [
           {
             "bearer": []
@@ -25863,6 +25863,381 @@ export const openapiDocument = {
                         "byCompany"
                       ]
                     },
+                    "sla": {
+                      "type": "object",
+                      "properties": {
+                        "month": {
+                          "type": "string"
+                        },
+                        "count": {
+                          "type": "integer",
+                          "description": "Transfers this month (PT zone) measured from the final approval"
+                        },
+                        "pctWithin": {
+                          "type": [
+                            "number",
+                            "null"
+                          ],
+                          "description": "Share within the PT transfer SLA, 1 decimal; null = no transfer"
+                        },
+                        "avgHours": {
+                          "type": [
+                            "number",
+                            "null"
+                          ]
+                        },
+                        "avgText": {
+                          "type": "string",
+                          "description": "Average duration as shown on the web (\"5 jam\", \"1 hr 3 jam\", \"—\")"
+                        },
+                        "late": {
+                          "type": "integer"
+                        },
+                        "slaHours": {
+                          "type": "array",
+                          "items": {
+                            "type": "number"
+                          },
+                          "description": "Distinct SLA targets (hours) of the PTs involved"
+                        },
+                        "text": {
+                          "type": "string",
+                          "description": "pctWithin as text (\"92,5%\", \"—\")"
+                        }
+                      },
+                      "required": [
+                        "month",
+                        "count",
+                        "pctWithin",
+                        "avgHours",
+                        "avgText",
+                        "late",
+                        "slaHours",
+                        "text"
+                      ],
+                      "description": "Item 11 (DRMS 10/10) \"SLA transfer\": PTs where the caller is Owner/Finance; same numbers as the SLA transfer report."
+                    },
+                    "loans": {
+                      "type": "object",
+                      "properties": {
+                        "totals": {
+                          "type": "object",
+                          "properties": {
+                            "count": {
+                              "type": "integer"
+                            },
+                            "amount": {
+                              "type": "integer",
+                              "description": "Rupiah (integer)"
+                            },
+                            "repaid": {
+                              "type": "integer",
+                              "description": "Rupiah (integer)"
+                            },
+                            "outstanding": {
+                              "type": "integer",
+                              "description": "Rupiah (integer)"
+                            },
+                            "overdue": {
+                              "type": "integer",
+                              "description": "Rupiah (integer)"
+                            },
+                            "overdueCount": {
+                              "type": "integer"
+                            },
+                            "pending": {
+                              "type": "integer",
+                              "description": "Loans waiting for the Direktur"
+                            },
+                            "byCompany": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "companyId": {
+                                    "type": "integer",
+                                    "description": "PT (companies id); label from `companies[]` / GET /me companies[]."
+                                  },
+                                  "count": {
+                                    "type": "integer"
+                                  },
+                                  "amount": {
+                                    "type": "integer",
+                                    "description": "Rupiah (integer)"
+                                  },
+                                  "repaid": {
+                                    "type": "integer",
+                                    "description": "Rupiah (integer)"
+                                  },
+                                  "outstanding": {
+                                    "type": "integer",
+                                    "description": "Rupiah (integer)"
+                                  }
+                                },
+                                "required": [
+                                  "companyId",
+                                  "count",
+                                  "amount",
+                                  "repaid",
+                                  "outstanding"
+                                ]
+                              }
+                            }
+                          },
+                          "required": [
+                            "count",
+                            "amount",
+                            "repaid",
+                            "outstanding",
+                            "overdue",
+                            "overdueCount",
+                            "pending",
+                            "byCompany"
+                          ]
+                        },
+                        "projects": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "projectId": {
+                                "type": "integer"
+                              },
+                              "companyId": {
+                                "type": "integer",
+                                "description": "PT (companies id); label from `companies[]` / GET /me companies[]."
+                              },
+                              "code": {
+                                "type": "string"
+                              },
+                              "name": {
+                                "type": "string"
+                              },
+                              "borrowed": {
+                                "type": "integer",
+                                "description": "Rupiah (integer)"
+                              },
+                              "lent": {
+                                "type": "integer",
+                                "description": "Rupiah (integer)"
+                              },
+                              "outstandingBorrowed": {
+                                "type": "integer",
+                                "description": "Rupiah (integer)"
+                              },
+                              "outstandingLent": {
+                                "type": "integer",
+                                "description": "Rupiah (integer)"
+                              },
+                              "overdueBorrowed": {
+                                "type": "integer",
+                                "description": "Rupiah (integer)"
+                              },
+                              "overdueCount": {
+                                "type": "integer"
+                              }
+                            },
+                            "required": [
+                              "projectId",
+                              "companyId",
+                              "code",
+                              "name",
+                              "borrowed",
+                              "lent",
+                              "outstandingBorrowed",
+                              "outstandingLent",
+                              "overdueBorrowed",
+                              "overdueCount"
+                            ]
+                          },
+                          "description": "Top 5 projects by outstanding (borrowed + lent)"
+                        },
+                        "waitingForMe": {
+                          "type": "integer",
+                          "description": "Loans waiting for the caller's decision (Direktur; 0 otherwise)"
+                        }
+                      },
+                      "required": [
+                        "totals",
+                        "projects",
+                        "waitingForMe"
+                      ],
+                      "description": "ADR 0022 §9 \"Pinjaman antar project\": loanScope (office roles: their PTs, PM: team projects as borrower or lender)."
+                    },
+                    "rapMonitoring": {
+                      "type": "object",
+                      "properties": {
+                        "projects": {
+                          "type": "integer"
+                        },
+                        "overProjects": {
+                          "type": "integer"
+                        },
+                        "rows": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "projectId": {
+                                "type": "integer"
+                              },
+                              "companyId": {
+                                "type": "integer",
+                                "description": "PT (companies id); label from `companies[]` / GET /me companies[]."
+                              },
+                              "code": {
+                                "type": "string"
+                              },
+                              "name": {
+                                "type": "string"
+                              },
+                              "status": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "planned": {
+                                "type": [
+                                  "integer",
+                                  "null"
+                                ],
+                                "description": "Rupiah (integer)"
+                              },
+                              "realised": {
+                                "type": "integer",
+                                "description": "Rupiah (integer)"
+                              },
+                              "transferred": {
+                                "type": "integer",
+                                "description": "Rupiah (integer)"
+                              },
+                              "verified": {
+                                "type": "integer",
+                                "description": "Rupiah (integer)"
+                              },
+                              "remaining": {
+                                "type": [
+                                  "integer",
+                                  "null"
+                                ],
+                                "description": "Rupiah (integer)"
+                              },
+                              "percent": {
+                                "type": [
+                                  "number",
+                                  "null"
+                                ],
+                                "description": "realised / planned × 100, 2 decimals"
+                              },
+                              "overBudget": {
+                                "type": "boolean"
+                              },
+                              "items": {
+                                "type": "integer"
+                              },
+                              "activeItems": {
+                                "type": "integer"
+                              },
+                              "overBudgetItems": {
+                                "type": "integer"
+                              }
+                            },
+                            "required": [
+                              "projectId",
+                              "companyId",
+                              "code",
+                              "name",
+                              "status",
+                              "planned",
+                              "realised",
+                              "transferred",
+                              "verified",
+                              "remaining",
+                              "percent",
+                              "overBudget",
+                              "items",
+                              "activeItems",
+                              "overBudgetItems"
+                            ]
+                          }
+                        }
+                      },
+                      "required": [
+                        "projects",
+                        "overProjects",
+                        "rows"
+                      ],
+                      "description": "DRMS 10/10 \"Monitoring RAP\": projects with a RAP the caller may read, realisation vs plan (top 8)."
+                    },
+                    "rapMissing": {
+                      "type": "object",
+                      "properties": {
+                        "team": {
+                          "type": "boolean",
+                          "description": "true = PM layout (the PM's team projects only)"
+                        },
+                        "total": {
+                          "type": "integer"
+                        },
+                        "rows": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "integer"
+                              },
+                              "companyId": {
+                                "type": "integer",
+                                "description": "PT (companies id); label from `companies[]` / GET /me companies[]."
+                              },
+                              "code": {
+                                "type": "string"
+                              },
+                              "name": {
+                                "type": "string"
+                              },
+                              "kind": {
+                                "type": "string"
+                              },
+                              "kindLabel": {
+                                "type": "string"
+                              },
+                              "budget": {
+                                "type": [
+                                  "integer",
+                                  "null"
+                                ],
+                                "description": "Rupiah (integer)"
+                              },
+                              "pm": {
+                                "type": [
+                                  "integer",
+                                  "null"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "companyId",
+                              "code",
+                              "name",
+                              "kind",
+                              "kindLabel",
+                              "budget",
+                              "pm"
+                            ]
+                          }
+                        }
+                      },
+                      "required": [
+                        "team",
+                        "total",
+                        "rows"
+                      ],
+                      "description": "D4 (owner 2026-10-11): projects with a RAB (or konstruksi) WITHOUT a RAP — their requests cannot be submitted. Top 8 + total."
+                    },
                     "viz": {
                       "type": "object",
                       "properties": {
@@ -26336,6 +26711,10 @@ export const openapiDocument = {
                     "projects",
                     "costCenters",
                     "transferQueue",
+                    "sla",
+                    "loans",
+                    "rapMonitoring",
+                    "rapMissing",
                     "viz"
                   ]
                 }
@@ -26397,7 +26776,7 @@ export const openapiDocument = {
     },
     "/dashboard/finance": {
       "get": {
-        "summary": "Finance home: work queues (K-11, K-12c/d/e), balances per account (K-01), advances without LPJ (K-12a/b), cash flow (K-02a)",
+        "summary": "Finance home: work queues (K-11, K-12c/d/e), balances per account (K-01), advances without LPJ (K-12a/b), cash flow (K-02a), SLA transfer, inter-project loans",
         "security": [
           {
             "bearer": []
@@ -26919,6 +27298,207 @@ export const openapiDocument = {
                     "nextClosable": {
                       "type": "string"
                     },
+                    "sla": {
+                      "type": "object",
+                      "properties": {
+                        "month": {
+                          "type": "string"
+                        },
+                        "count": {
+                          "type": "integer",
+                          "description": "Transfers this month (PT zone) measured from the final approval"
+                        },
+                        "pctWithin": {
+                          "type": [
+                            "number",
+                            "null"
+                          ],
+                          "description": "Share within the PT transfer SLA, 1 decimal; null = no transfer"
+                        },
+                        "avgHours": {
+                          "type": [
+                            "number",
+                            "null"
+                          ]
+                        },
+                        "avgText": {
+                          "type": "string",
+                          "description": "Average duration as shown on the web (\"5 jam\", \"1 hr 3 jam\", \"—\")"
+                        },
+                        "late": {
+                          "type": "integer"
+                        },
+                        "slaHours": {
+                          "type": "array",
+                          "items": {
+                            "type": "number"
+                          },
+                          "description": "Distinct SLA targets (hours) of the PTs involved"
+                        },
+                        "text": {
+                          "type": "string",
+                          "description": "pctWithin as text (\"92,5%\", \"—\")"
+                        }
+                      },
+                      "required": [
+                        "month",
+                        "count",
+                        "pctWithin",
+                        "avgHours",
+                        "avgText",
+                        "late",
+                        "slaHours",
+                        "text"
+                      ],
+                      "description": "Item 11 (DRMS 10/10) \"SLA transfer\": PTs where the caller is Owner/Finance; same numbers as the SLA transfer report."
+                    },
+                    "loans": {
+                      "type": "object",
+                      "properties": {
+                        "totals": {
+                          "type": "object",
+                          "properties": {
+                            "count": {
+                              "type": "integer"
+                            },
+                            "amount": {
+                              "type": "integer",
+                              "description": "Rupiah (integer)"
+                            },
+                            "repaid": {
+                              "type": "integer",
+                              "description": "Rupiah (integer)"
+                            },
+                            "outstanding": {
+                              "type": "integer",
+                              "description": "Rupiah (integer)"
+                            },
+                            "overdue": {
+                              "type": "integer",
+                              "description": "Rupiah (integer)"
+                            },
+                            "overdueCount": {
+                              "type": "integer"
+                            },
+                            "pending": {
+                              "type": "integer",
+                              "description": "Loans waiting for the Direktur"
+                            },
+                            "byCompany": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "companyId": {
+                                    "type": "integer",
+                                    "description": "PT (companies id); label from `companies[]` / GET /me companies[]."
+                                  },
+                                  "count": {
+                                    "type": "integer"
+                                  },
+                                  "amount": {
+                                    "type": "integer",
+                                    "description": "Rupiah (integer)"
+                                  },
+                                  "repaid": {
+                                    "type": "integer",
+                                    "description": "Rupiah (integer)"
+                                  },
+                                  "outstanding": {
+                                    "type": "integer",
+                                    "description": "Rupiah (integer)"
+                                  }
+                                },
+                                "required": [
+                                  "companyId",
+                                  "count",
+                                  "amount",
+                                  "repaid",
+                                  "outstanding"
+                                ]
+                              }
+                            }
+                          },
+                          "required": [
+                            "count",
+                            "amount",
+                            "repaid",
+                            "outstanding",
+                            "overdue",
+                            "overdueCount",
+                            "pending",
+                            "byCompany"
+                          ]
+                        },
+                        "projects": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "projectId": {
+                                "type": "integer"
+                              },
+                              "companyId": {
+                                "type": "integer",
+                                "description": "PT (companies id); label from `companies[]` / GET /me companies[]."
+                              },
+                              "code": {
+                                "type": "string"
+                              },
+                              "name": {
+                                "type": "string"
+                              },
+                              "borrowed": {
+                                "type": "integer",
+                                "description": "Rupiah (integer)"
+                              },
+                              "lent": {
+                                "type": "integer",
+                                "description": "Rupiah (integer)"
+                              },
+                              "outstandingBorrowed": {
+                                "type": "integer",
+                                "description": "Rupiah (integer)"
+                              },
+                              "outstandingLent": {
+                                "type": "integer",
+                                "description": "Rupiah (integer)"
+                              },
+                              "overdueBorrowed": {
+                                "type": "integer",
+                                "description": "Rupiah (integer)"
+                              },
+                              "overdueCount": {
+                                "type": "integer"
+                              }
+                            },
+                            "required": [
+                              "projectId",
+                              "companyId",
+                              "code",
+                              "name",
+                              "borrowed",
+                              "lent",
+                              "outstandingBorrowed",
+                              "outstandingLent",
+                              "overdueBorrowed",
+                              "overdueCount"
+                            ]
+                          },
+                          "description": "Top 5 projects by outstanding (borrowed + lent)"
+                        },
+                        "waitingForMe": {
+                          "type": "integer",
+                          "description": "Loans waiting for the caller's decision (Direktur; 0 otherwise)"
+                        }
+                      },
+                      "required": [
+                        "totals",
+                        "projects",
+                        "waitingForMe"
+                      ],
+                      "description": "ADR 0022 §9 \"Pinjaman antar project\": loanScope (office roles: their PTs, PM: team projects as borrower or lender)."
+                    },
                     "viz": {
                       "type": "object",
                       "properties": {
@@ -27280,6 +27860,8 @@ export const openapiDocument = {
                     "lastClosedPeriod",
                     "lastClosedByCompany",
                     "nextClosable",
+                    "sla",
+                    "loans",
                     "viz"
                   ]
                 }
@@ -27341,7 +27923,7 @@ export const openapiDocument = {
     },
     "/dashboard/pm": {
       "get": {
-        "summary": "PM home (team scope): waiting for my \"Diketahui\", team month (K-13), LPJ (K-12a/b), project budgets (K-08), cost centers (K-15); attendance/progress = F5",
+        "summary": "PM home (team scope): waiting for my \"Diketahui\", team month (K-13), LPJ (K-12a/b), project budgets (K-08), cost centers (K-15), inter-project loans (team), team projects with a RAB but no RAP; attendance/progress = F5",
         "security": [
           {
             "bearer": []
@@ -27884,6 +28466,221 @@ export const openapiDocument = {
                         ]
                       }
                     },
+                    "loans": {
+                      "type": "object",
+                      "properties": {
+                        "totals": {
+                          "type": "object",
+                          "properties": {
+                            "count": {
+                              "type": "integer"
+                            },
+                            "amount": {
+                              "type": "integer",
+                              "description": "Rupiah (integer)"
+                            },
+                            "repaid": {
+                              "type": "integer",
+                              "description": "Rupiah (integer)"
+                            },
+                            "outstanding": {
+                              "type": "integer",
+                              "description": "Rupiah (integer)"
+                            },
+                            "overdue": {
+                              "type": "integer",
+                              "description": "Rupiah (integer)"
+                            },
+                            "overdueCount": {
+                              "type": "integer"
+                            },
+                            "pending": {
+                              "type": "integer",
+                              "description": "Loans waiting for the Direktur"
+                            },
+                            "byCompany": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "companyId": {
+                                    "type": "integer",
+                                    "description": "PT (companies id); label from `companies[]` / GET /me companies[]."
+                                  },
+                                  "count": {
+                                    "type": "integer"
+                                  },
+                                  "amount": {
+                                    "type": "integer",
+                                    "description": "Rupiah (integer)"
+                                  },
+                                  "repaid": {
+                                    "type": "integer",
+                                    "description": "Rupiah (integer)"
+                                  },
+                                  "outstanding": {
+                                    "type": "integer",
+                                    "description": "Rupiah (integer)"
+                                  }
+                                },
+                                "required": [
+                                  "companyId",
+                                  "count",
+                                  "amount",
+                                  "repaid",
+                                  "outstanding"
+                                ]
+                              }
+                            }
+                          },
+                          "required": [
+                            "count",
+                            "amount",
+                            "repaid",
+                            "outstanding",
+                            "overdue",
+                            "overdueCount",
+                            "pending",
+                            "byCompany"
+                          ]
+                        },
+                        "projects": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "projectId": {
+                                "type": "integer"
+                              },
+                              "companyId": {
+                                "type": "integer",
+                                "description": "PT (companies id); label from `companies[]` / GET /me companies[]."
+                              },
+                              "code": {
+                                "type": "string"
+                              },
+                              "name": {
+                                "type": "string"
+                              },
+                              "borrowed": {
+                                "type": "integer",
+                                "description": "Rupiah (integer)"
+                              },
+                              "lent": {
+                                "type": "integer",
+                                "description": "Rupiah (integer)"
+                              },
+                              "outstandingBorrowed": {
+                                "type": "integer",
+                                "description": "Rupiah (integer)"
+                              },
+                              "outstandingLent": {
+                                "type": "integer",
+                                "description": "Rupiah (integer)"
+                              },
+                              "overdueBorrowed": {
+                                "type": "integer",
+                                "description": "Rupiah (integer)"
+                              },
+                              "overdueCount": {
+                                "type": "integer"
+                              }
+                            },
+                            "required": [
+                              "projectId",
+                              "companyId",
+                              "code",
+                              "name",
+                              "borrowed",
+                              "lent",
+                              "outstandingBorrowed",
+                              "outstandingLent",
+                              "overdueBorrowed",
+                              "overdueCount"
+                            ]
+                          },
+                          "description": "Top 5 projects by outstanding (borrowed + lent)"
+                        },
+                        "waitingForMe": {
+                          "type": "integer",
+                          "description": "Loans waiting for the caller's decision (Direktur; 0 otherwise)"
+                        }
+                      },
+                      "required": [
+                        "totals",
+                        "projects",
+                        "waitingForMe"
+                      ],
+                      "description": "ADR 0022 §9 \"Pinjaman antar project\": loanScope (office roles: their PTs, PM: team projects as borrower or lender)."
+                    },
+                    "rapMissing": {
+                      "type": "object",
+                      "properties": {
+                        "team": {
+                          "type": "boolean",
+                          "description": "true = PM layout (the PM's team projects only)"
+                        },
+                        "total": {
+                          "type": "integer"
+                        },
+                        "rows": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "integer"
+                              },
+                              "companyId": {
+                                "type": "integer",
+                                "description": "PT (companies id); label from `companies[]` / GET /me companies[]."
+                              },
+                              "code": {
+                                "type": "string"
+                              },
+                              "name": {
+                                "type": "string"
+                              },
+                              "kind": {
+                                "type": "string"
+                              },
+                              "kindLabel": {
+                                "type": "string"
+                              },
+                              "budget": {
+                                "type": [
+                                  "integer",
+                                  "null"
+                                ],
+                                "description": "Rupiah (integer)"
+                              },
+                              "pm": {
+                                "type": [
+                                  "integer",
+                                  "null"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "companyId",
+                              "code",
+                              "name",
+                              "kind",
+                              "kindLabel",
+                              "budget",
+                              "pm"
+                            ]
+                          }
+                        }
+                      },
+                      "required": [
+                        "team",
+                        "total",
+                        "rows"
+                      ],
+                      "description": "D4 (owner 2026-10-11): projects with a RAB (or konstruksi) WITHOUT a RAP — their requests cannot be submitted. Top 8 + total."
+                    },
                     "attendance": {
                       "type": "object",
                       "properties": {
@@ -28276,6 +29073,8 @@ export const openapiDocument = {
                     "projects",
                     "costCenters",
                     "latest",
+                    "loans",
+                    "rapMissing",
                     "attendance",
                     "progressReports",
                     "viz"

@@ -1,10 +1,7 @@
-import type { PayloadRequest } from 'payload'
 import React from 'react'
 
-import { PROJECT_KIND_LABELS, kindOf } from '@/domain/field/rules'
-import { rapMissingProjects, rapMonitoring } from '@/domain/rap/budget'
+import type { RapMissingBlock, RapMonitoringBlock } from '@/domain/reports/dashboards'
 import { formatNumber } from '@/lib/money'
-import { withSystemTransaction } from '@/lib/system-tx'
 
 import { Card, DataTable, EmptyState, Meter, StatusPill, rp } from './viz'
 
@@ -13,11 +10,10 @@ const pct = (v: number | null) => (v === null ? '—' : `${formatNumber(v, 1)}%`
 /**
  * DRMS 10/10 point 2–4 (D4): "Monitoring RAP" on the Direktur dashboard — projects with a RAP, realisation (Σ approved
  * request lines charged to the RAP items) vs plan, items over plan; each row opens the project's RAP tab.
- * Data: domain/rap/budget.ts rapMonitoring (caller's project read scope, selected PTs).
+ * Data: the dashboard payload's `rapMonitoring` block (domain/rap/budget.ts rapMonitoring: caller's project read scope,
+ * selected PTs — same rows as the APK home).
  */
-export async function RapMonitorCard({ req, i, span = 12 }: { req: PayloadRequest; i: number; span?: 6 | 7 | 8 | 12 }) {
-  // own req + transaction: the dashboard cards render concurrently (a shared req transaction would be committed under us)
-  const d = await withSystemTransaction(req.payload, req.user, (r) => rapMonitoring(r, { limit: 8 }))
+export function RapMonitorCard({ data: d, i, span = 12 }: { data: RapMonitoringBlock; i: number; span?: 6 | 7 | 8 | 12 }) {
   return (
     <Card
       id="rap-monitor"
@@ -69,10 +65,11 @@ export async function RapMonitorCard({ req, i, span = 12 }: { req: PayloadReques
  * DRMS 10/10 D4 (owner 2026-10-11 "RAP wajib untuk semua proyek yang punya RAB"): projects with a RAB (or konstruksi)
  * WITHOUT a RAP — their requests cannot be submitted. Direktur dashboard: every readable project of the selected PTs
  * (the owner has the PMs fill them); PM dashboard (`team`): the PM's team projects only (nudge). Renders nothing when
- * every such project has a RAP. Each row opens the project's RAP tab (template / Excel import).
+ * every such project has a RAP. Each row opens the project's RAP tab (template / Excel import). Data: the dashboard
+ * payload's `rapMissing` block (`team` = PM layout).
  */
-export async function RapMissingCard({ req, i, span = 12, team = false }: { req: PayloadRequest; i: number; span?: 6 | 7 | 8 | 12; team?: boolean }) {
-  const d = await withSystemTransaction(req.payload, req.user, (r) => rapMissingProjects(r, { teamOnly: team, limit: 8 }))
+export function RapMissingCard({ data: d, i, span = 12 }: { data: RapMissingBlock; i: number; span?: 6 | 7 | 8 | 12 }) {
+  const team = d.team
   if (d.total === 0) return null
   return (
     <Card
@@ -99,7 +96,7 @@ export async function RapMissingCard({ req, i, span = 12, team = false }: { req:
               </a>
             ),
           },
-          { key: 'k', label: 'Jenis', sec: true, cell: (r) => PROJECT_KIND_LABELS[kindOf(r.kind)] },
+          { key: 'k', label: 'Jenis', sec: true, cell: (r) => r.kindLabel },
           { key: 'b', label: 'RAB', num: true, sec: true, cell: (r) => (r.budget === null ? '—' : <span title={rp(r.budget)}>{rp(r.budget)}</span>) },
           { key: 's', label: 'Status', cell: () => <StatusPill tone="warn" label="Isi RAP" /> },
         ]}
