@@ -106,7 +106,9 @@ void main() {
   group('image viewer (12c / WA-11)', () {
     testWidgets('receipt thumbnail opens the fullscreen viewer; swipe to the next receipt', (tester) async {
       await _pumpDetail(tester, _twoReceipts());
-      await tester.scrollUntilVisible(find.byKey(const Key('receipt-thumb-901')), 200);
+      // DRMS 13/10: on a tablet the stepper has its own column — scroll the main list.
+      final main = find.descendant(of: find.byKey(const Key('detail-main')), matching: find.byType(Scrollable));
+      await tester.scrollUntilVisible(find.byKey(const Key('receipt-thumb-901')), 200, scrollable: main.first);
       await tester.tap(find.byKey(const Key('receipt-thumb-901')));
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('photo-viewer')), findsOneWidget);
