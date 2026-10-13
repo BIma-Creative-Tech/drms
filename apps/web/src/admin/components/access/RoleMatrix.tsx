@@ -6,6 +6,7 @@ import React, { useMemo, useRef, useState } from 'react'
 import { ROLES, ROLE_LABELS } from '@/access/roles'
 
 import { problemText } from '../ActionButton'
+import { MultiSelect } from '../list/MultiSelect'
 import { newIdemKey } from '../kas/client'
 import {
   batchBody,
@@ -24,7 +25,7 @@ import {
   REASON_MIN,
   ROLE_SHORT,
   setEmployee,
-  toggleRole,
+  setRoles,
   type CellDraft,
   type MatrixCell,
   type MatrixCompany,
@@ -153,7 +154,7 @@ export function RoleMatrix({ companies, users, cells, employees, activeUserIds, 
       ) : null}
 
       {users.length === 0 ? (
-        <p className="pk-empty">Belum ada pengguna. Tambah dengan + Undang pengguna.</p>
+        <p className="pk-empty">Belum ada pengguna. Tambah dengan + Pengguna baru.</p>
       ) : (
         <div className="pk-scroll pk-rmx__scroll">
           <table className="pk-table pk-rmx__table">
@@ -173,7 +174,7 @@ export function RoleMatrix({ companies, users, cells, employees, activeUserIds, 
               {users.map((u) => (
                 <tr key={u.id} data-pk-user-row={u.id}>
                   <th scope="row" className="pk-rmx__user">
-                    <a href={`/admin/collections/users/${u.id}`}>{u.name || u.email}</a>
+                    <a href={`/admin/pengguna/${u.id}`}>{u.name || u.email}</a>
                     <span className="pk-rmx__email">{u.email}</span>
                   </th>
                   {cols.map((c) => {
@@ -246,6 +247,8 @@ export function RoleMatrix({ companies, users, cells, employees, activeUserIds, 
   )
 }
 
+const ROLE_OPTIONS = ROLES.map((r) => ({ value: r, label: ROLE_LABELS[r], title: ROLE_SHORT[r] }))
+
 function Cell({
   cell,
   user,
@@ -267,13 +270,18 @@ function Cell({
   const emp = choices.find((e) => e.id === cell.employee)
   return (
     <div className="pk-rmx__cell" data-inactive={!cell.active || undefined}>
-      <div className="pk-rmx__roles" role="group" aria-label={`Peran ${who} di ${company.shortCode}`}>
-        {ROLES.map((r) => (
-          <label key={r} className="pk-rmx__role" title={ROLE_LABELS[r]} data-on={cell.roles.includes(r) || undefined}>
-            <input type="checkbox" checked={cell.roles.includes(r)} disabled={!editable} onChange={() => onChange(toggleRole(cell, r))} aria-label={`${ROLE_LABELS[r]} di ${company.shortCode}`} data-pk-role={r} />
-            <span aria-hidden="true">{ROLE_SHORT[r]}</span>
-          </label>
-        ))}
+      {/* DRMS 13/10 W3: the roles of the cell as ONE checklist dropdown (was a row of checkboxes) */}
+      <div className="pk-rmx__roles" data-pk-roles={`${user.id}:${company.shortCode}`}>
+        <MultiSelect
+          name={`roles-${user.id}-${company.id}`}
+          label={`Peran ${who} di ${company.shortCode}`}
+          options={ROLE_OPTIONS}
+          value={cell.roles}
+          allLabel="Pilih peran…"
+          onChange={(roles) => onChange(setRoles(cell, roles))}
+          disabled={!editable}
+          testKey={`roles-${company.shortCode}`}
+        />
       </div>
       <div className="pk-rmx__emp">
         <label>

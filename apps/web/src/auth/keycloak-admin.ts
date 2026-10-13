@@ -34,6 +34,14 @@ export interface KeycloakAdmin {
    * created). Never secretData/credentialData. Needs realm-management `view-users`.
    */
   listUserCredentials(id: string): Promise<OtpCredential[]>
+  /**
+   * `PUT /users/{id}/reset-password`. `temporary: true` (DRMS 13/10 W3 onboarding, ADR 0003 revision 2026-10-13) makes
+   * Keycloak add the `UPDATE_PASSWORD` required action — the user must choose a new password at the first login;
+   * `temporary: false` also removes it (Keycloak `UserResource.resetPassword`). A password-policy violation (400) throws
+   * {@link KeycloakPasswordPolicyError} with the policy message key only — never the password. Same signature as the
+   * APK initial-password branch (ADR 0012 revision 2026-10-11).
+   */
+  resetPassword(id: string, value: string, temporary: boolean): Promise<void>
 }
 
 /** Metadata of one OTP authenticator of a user (Keycloak CredentialRepresentation, type `otp`). */
@@ -45,6 +53,20 @@ export class KeycloakAdminError extends Error {
     readonly status: number,
   ) {
     super(message)
+  }
+}
+
+/**
+ * Keycloak refused a new password because of the realm password policy (reset-password → 400). `policy` is the
+ * message key (e.g. `invalidPasswordMinLengthMessage`), `param` the first number of Keycloak's English
+ * description (e.g. the minimum length) when there is one. Never carries the password.
+ */
+export class KeycloakPasswordPolicyError extends KeycloakAdminError {
+  constructor(
+    readonly policy: string,
+    readonly param: number | null,
+  ) {
+    super(`keycloak password policy: ${policy}`, 400)
   }
 }
 
@@ -189,7 +211,22 @@ export function createHttpKeycloakAdmin(cfg: {
       const list = (await (await call('GET', `/users/${uid(id)}/credentials`)).json()) as Array<Record<string, unknown>>
       return toOtpCredentials(list)
     },
+    async resetPassword(id, value, temporary) {
+      const res = await call('PUT', `/users/${uid(id)}/reset-password`, { type: 'password', value, temporary }, [400])
+      if (res.status === 400) throw passwordPolicyError(await res.json().catch(() => null))
+    },
   }
+}
+
+/**
+ * Keycloak 26.7 answers a policy violation of reset-password with 400 `{ error: <message key>, error_description:
+ * <English text> }`. Only a key-shaped `error` is kept; anything else becomes `unknown`.
+ */
+export function passwordPolicyError(body: unknown): KeycloakPasswordPolicyError {
+  const b = body && typeof body === 'object' ? (body as Record<string, unknown>) : {}
+  const key = typeof b.error === 'string' && /^[A-Za-z]{1,80}$/.test(b.error) ? b.error : 'unknown'
+  const num = typeof b.error_description === 'string' ? /\b(\d{1,4})\b/.exec(b.error_description)?.[1] : undefined
+  return new KeycloakPasswordPolicyError(key, num === undefined ? null : Number(num))
 }
 
 /** Keeps only OTP credentials and only their metadata (the representation also carries credentialData). */

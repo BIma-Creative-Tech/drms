@@ -18,8 +18,12 @@ import { getEnv } from '@/lib/env'
  * failure aborts the save. If the DB write fails afterwards, the REST `afterError` hook compensates
  * (created KC user deleted, role mapping / enabled flag reverted) — best effort, logged.
  *
- * Context flag (system tooling only, never from HTTP input):
+ * Context flags (server code only, never from HTTP input):
  * - `skipKeycloakSync`: bootstrap/seed of an EXISTING Keycloak user (keycloakSub given).
+ * - `pkTemporaryPassword` (DRMS 13/10 W3 onboarding, ADR 0003 revision 2026-10-13): a NEWLY created Keycloak user gets
+ *   this password as TEMPORARY (Keycloak adds `UPDATE_PASSWORD`) instead of the execute-actions mail; a linked
+ *   existing Keycloak user keeps its password. The hook reports `pkKcNewUser` (the new Keycloak id) in the context.
+ *   Compensation is the same `deleteUser` (the password goes with the user).
  */
 type UserData = {
   email?: string
@@ -34,6 +38,10 @@ type Compensation =
   | { kind: 'enabled'; kcId: string; enabled: boolean }
 
 const CTX_COMP = 'pkKcCompensate'
+/** Context: temporary password for a NEW Keycloak user (server code only). */
+export const CTX_TEMP_PASSWORD = 'pkTemporaryPassword'
+/** Context (set by the hook): Keycloak id of a user this request CREATED in Keycloak. */
+export const CTX_KC_NEW_USER = 'pkKcNewUser'
 
 function mobileClientId(): string {
   try {
@@ -92,7 +100,12 @@ export const keycloakSyncBeforeChange: CollectionBeforeChangeHook = async ({ dat
     const added = await grantLoginRole(req, kc, kcId)
     if (existing && added.length > 0) pushComp(req, { kind: 'roles', kcId, added, removed: [] })
     d.keycloakSub = kcId
-    if (!existing) {
+    const temporary = context?.[CTX_TEMP_PASSWORD]
+    if (!existing && typeof temporary === 'string' && temporary !== '') {
+      // fatal on failure (policy / Keycloak down): the save aborts, the compensation deletes the new user
+      await kc.resetPassword(kcId, temporary, true)
+      req.context[CTX_KC_NEW_USER] = kcId
+    } else if (!existing) {
       // Onboarding mail needs realm SMTP (not configured yet, runbook §Catatan) → non-fatal.
       try {
         await kc.executeActionsEmail(kcId, ['UPDATE_PASSWORD'])
@@ -159,7 +172,11 @@ export const deactivationAfterChange: CollectionAfterChangeHook = async ({ doc, 
   return doc
 }
 
-/** REST error path only (payload utilities/routeError.js): undo Keycloak writes of a failed save. */
+/**
+ * Undo Keycloak writes of a failed save: REST error path (payload utilities/routeError.js → `afterError`) and the
+ * user-onboarding endpoint (Local API writes in one transaction — `afterError` does not run there, the endpoint calls
+ * this after the rollback).
+ */
 export async function compensateKeycloak(req: PayloadRequest): Promise<void> {
   const list = (req.context?.[CTX_COMP] ?? []) as Compensation[]
   if (list.length === 0) return

@@ -75,18 +75,64 @@ dibuka menampilkan satu pesan yang sama: **"Anda tidak memiliki akses ke halaman
 
 ## 1. Pengguna, karyawan dan akses PT
 
-Urutan: **Karyawan** → **Pengguna** → **akses PT** (peran + karyawan per PT).
+**Satu form ber-tab (DRMS 13/10, mulai versi berikutnya):** akun login, akses per PT, data karyawan dan rekening
+karyawan diisi di **satu halaman** dan disimpan **sekaligus** — tidak perlu lagi membuka Karyawan → Rekening →
+Pengguna → Akses PT satu per satu.
+
+1. **Pengguna & Akses → Pengguna** → **+ Buat baru** (atau menu **+ Pengguna baru**, atau tombol **+ Pengguna baru**
+   di matriks Akses PT). Klik satu baris di daftar Pengguna = membuka form yang sama untuk mengubah.
+2. Isi tab demi tab (label di kiri, isian di kanan; di HP label di atas):
+   - **Detail Pengguna:** **Email** (untuk login), **Nama**, **No. HP**, **Status** (Aktif/Nonaktif). Satu orang =
+     satu akun, walau bekerja di beberapa PT.
+   - **Akses & Peran:** satu baris per PT yang Anda kelola → pilih peran dari **dropdown pilihan ganda** (Staff, PM,
+     Finance, Direktur, Admin, Operator/Anggota; boleh lebih dari satu) → **Selesai**. Mengosongkan semua peran di
+     satu PT = akses di PT itu dinonaktifkan (riwayat tetap).
+   - **Data Karyawan:** per PT yang punya peran → **Buat data karyawan baru** (Kode, Nama lengkap, Nama panggilan,
+     Jabatan, No. HP, Status), **Pilih karyawan yang sudah ada** (hanya karyawan PT itu yang belum terhubung ke akun
+     lain), atau **Tanpa data karyawan**. Karyawan yang sudah terhubung bisa diubah langsung, atau **Lepas tautan**
+     (data karyawannya tetap ada). Jadwal kerja, site penempatan dan foto wajah: tautan **Buka data karyawan
+     lengkap ↗**.
+   - **Rekening Karyawan:** per PT yang punya data karyawan → **+ Tambah rekening** (Bank, Nomor rekening — hanya
+     angka, Atas nama, Status verifikasi, Rekening default, Status). Rekening tidak pernah dihapus — nonaktifkan.
+   - **Penugasan Proyek:** daftar penugasan tim karyawan itu (hanya-baca); tambah/ubah di **Proyek → Penugasan tim**.
+3. **Simpan** (satu tombol, di bawah). Semua tab disimpan **bersama atau tidak sama sekali**. Bila ada yang salah,
+   tidak ada yang tersimpan: tab yang bermasalah diberi titik merah, isian yang salah ditandai beserta pesannya.
+4. **Akun baru:** setelah Simpan tampil **kata sandi sementara** (hanya sekali — salin dan berikan langsung ke
+   pengguna, jangan lewat grup chat). Saat login pertama pengguna **wajib mengganti** kata sandinya. Bila email itu
+   sudah punya akun di sistem login, akun itu ditautkan dan kata sandinya **tidak** diubah (pesan "sudah ada …
+   ditautkan").
+5. **Mengubah pengguna:** isi **Alasan perubahan** (bawah) bila menonaktifkan akun/karyawan/rekening atau mengubah
+   nomor rekening, nama pemilik atau bank — tanpa alasan, simpan ditolak dengan pesan di isian Alasan. Semua perubahan
+   tercatat di **Audit Log** seperti dari halaman masing-masing.
+
+Aturan yang tetap berlaku (sama seperti halaman lama):
+
+- Hanya **Admin PT** (PT tempat ia Admin) dan **Admin grup** yang bisa membuka form ini. Form hanya menampilkan PT
+  yang Anda kelola **dalam pilihan PT** saat ini (pemilih PT di kanan atas).
+- Akun yang **juga terdaftar di PT lain** yang bukan wewenang Anda: email, nama, No. HP dan status hanya-baca (pesan
+  di tab Detail Pengguna) — peran di PT Anda tetap bisa diubah. Admin grup bisa mengubah semuanya.
+- Admin grup tanpa peran Admin di suatu PT hanya mengatur **peran** di PT itu; data karyawan dan rekening PT itu
+  diubah oleh Admin PT tersebut.
+- **Akun sendiri:** Anda tidak bisa menonaktifkan akun Anda sendiri atau mencabut peran Admin Anda sendiri di form
+  ini (minta Admin lain).
+- Pesan **"Satu karyawan hanya boleh terhubung ke satu akun per PT …"** = karyawan itu sudah dipakai akun lain.
+- **Form akun (tanda tangan, Admin grup) ↗** di kepala halaman membuka form lama pengguna (tanda tangan, Admin grup,
+  ID Keycloak, pemberitahuan privasi).
+
+![TODO screenshot: form Pengguna ber-tab (Detail Pengguna · Akses & Peran · Data Karyawan · Rekening Karyawan)](img/admin-pengguna-tab.png)
+
+Halaman lama **tetap bisa dipakai** (mis. untuk banyak pengguna sekaligus):
 
 1. **Karyawan:** **Pengguna & Akses → Karyawan** → buat baru → pilih **PT** (paling atas; wajib bila Anda mencentang
    lebih dari satu PT) → isi data. **1 data karyawan = 1 PT**; orang yang bekerja di 2 PT punya 2 data karyawan. PT
    karyawan tidak bisa diubah setelah dibuat. Lalu isi **Rekening karyawan** (untuk transfer).
-2. **Pengguna (akun login):** **Pengguna & Akses → Pengguna** → buat baru (atau tombol **+ Undang pengguna** di
-   matriks akses) → **Email**, **Nama**, **No. HP**, **Aktif** → Simpan. Akun login dibuat otomatis di sistem login
-   DRMS. Satu orang = satu akun, walau bekerja di beberapa PT.
+2. **Pengguna (akun login):** form lama lewat **Form akun ↗** (lihat di atas) → **Email**, **Nama**, **No. HP**,
+   **Aktif** → Simpan. Akun login dibuat otomatis di sistem login DRMS (tautan atur kata sandi lewat email).
 3. **Akses PT:** **Pengguna & Akses → Akses PT (matriks)** (halaman **Pengguna & akses PT**, `/admin/akses-pt`):
    baris = pengguna, kolom = PT.
-   - Sel **bukan anggota** → **+ Tambah** → centang peran di PT itu (**Staff**, **PM**, **Fin**, **Dir**, **Adm**;
-     boleh lebih dari satu) → pilih **Karyawan** PT itu (tanda ↗ membuka data karyawannya).
+   - Sel **bukan anggota** → **+ Tambah** → pilih peran di PT itu dari **dropdown pilihan ganda** (**Staff**, **PM**,
+     **Finance**, **Direktur**, **Admin**, **Operator/Anggota**; boleh lebih dari satu) → pilih **Karyawan** PT itu
+     (tanda ↗ membuka data karyawannya). Nama pengguna di kolom kiri membuka form ber-tab.
    - Ubah beberapa sel sekaligus bila perlu → isi **Alasan (wajib)** (mis. "mutasi tugas ke CS1") → **Simpan**.
      Semua perubahan disimpan bersama atau tidak sama sekali; sel yang bermasalah ditandai merah.
    - Mengosongkan semua peran di satu PT = akses di PT itu dinonaktifkan (riwayat tetap).
@@ -99,10 +145,10 @@ Urutan: **Karyawan** → **Pengguna** → **akses PT** (peran + karyawan per PT)
 
 ![TODO screenshot: matriks Pengguna & akses PT dengan dua kolom PT](img/admin-akses-pt.png)
 
-- **Karyawan keluar:** buka **Pengguna** → hilangkan centang **Aktif** + alasan. Sesi web, HP, dan login langsung
-  dicabut (di semua PT). Langkah lengkap & pemeriksaan (Direktur/Finance/PM pengganti):
-  [runbook cabut perangkat](../runbooks/cabut-perangkat.md) §B. Keluar dari **satu PT saja**: kosongkan perannya di
-  kolom PT itu di matriks.
+- **Karyawan keluar:** buka **Pengguna** (klik barisnya) → tab **Detail Pengguna** → **Status = Nonaktif** + **Alasan
+  perubahan** → **Simpan**. Sesi web, HP, dan login langsung dicabut (di semua PT). Langkah lengkap & pemeriksaan
+  (Direktur/Finance/PM pengganti): [runbook cabut perangkat](../runbooks/cabut-perangkat.md) §B. Keluar dari **satu PT
+  saja**: kosongkan perannya di PT itu (tab **Akses & Peran**, atau kolom PT itu di matriks).
 - Pastikan **setiap PT** selalu punya **minimal satu Direktur dan satu Finance aktif** selain pemohon, agar pengajuan
   bisa diputuskan.
 - **Data akses PT** (`Pengguna & Akses → Data akses PT`) = daftar mentah isi matriks, untuk pencarian/pemeriksaan.

@@ -17,6 +17,28 @@
 // Admin loader overlay + dots (src/admin/loading, Uiverse.io MIT — notice in the partial).
 @use '../../admin/loading/loading-dots';
 
+// D4 (owner decision, DRMS 13/10 W2): Odoo-style form grid — two columns of cells, the label LEFT of the input
+// (~35 %). Shared by the expense-request form (Payload fields) and the custom forms (`.pk-fgrid`, W3 Pengguna).
+@mixin pk-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 24px;
+  align-items: start;
+}
+
+@mixin pk-label-left-cell {
+  display: grid;
+  grid-template-columns: minmax(0, 35%) minmax(0, 1fr);
+  column-gap: 12px;
+  align-items: start;
+}
+
+@mixin pk-label-left-label {
+  margin: 0;
+  padding-top: 10px;
+  line-height: 1.3;
+}
+
 @layer payload {
   // ---------------------------------------------------------------------------------------------
   // Tokens → Payload variables
@@ -1603,43 +1625,6 @@ $pk-modules: dashboard, persetujuan, proyek, keuangan, absensi, laporan, penggun
     gap: 4px;
   }
 
-  .pk-rmx__role {
-    display: inline-flex;
-    gap: 4px;
-    align-items: center;
-    min-height: 30px;
-    padding: 0 8px 0 6px;
-    border: 1px solid var(--pk-border);
-    border-radius: 8px;
-    background: var(--pk-card);
-    font-size: 12px;
-    font-weight: 600;
-    cursor: pointer;
-
-    input {
-      width: 15px;
-      height: 15px;
-      margin: 0;
-      accent-color: var(--pk-primary);
-    }
-
-    &[data-on] {
-      border-color: color-mix(in oklab, var(--pk-primary) 55%, var(--pk-border));
-      background: color-mix(in oklab, var(--pk-primary) 12%, var(--pk-card));
-      color: var(--pk-primary);
-    }
-
-    &:has(input:disabled) {
-      cursor: not-allowed;
-      opacity: 0.6;
-    }
-
-    &:has(input:focus-visible) {
-      outline: 2px solid var(--pk-primary);
-      outline-offset: 1px;
-    }
-  }
-
   .pk-rmx__emp {
     display: flex;
     gap: 6px;
@@ -2538,10 +2523,7 @@ $pk-modules: dashboard, persetujuan, proyek, keuangan, absensi, laporan, penggun
   // Below 640 px the label goes back on top (Payload's default).
   @media (min-width: 641px) {
     .collection-edit--expense-requests:is([data-pk-mode='edit'], :not(.collection-edit--is-editing)) .document-fields__fields {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      column-gap: 24px;
-      align-items: start;
+      @include pk-form-grid;
 
       > * {
         grid-column: 1 / -1;
@@ -2553,10 +2535,7 @@ $pk-modules: dashboard, persetujuan, proyek, keuangan, absensi, laporan, penggun
 
       > :is(.field-type.text, .field-type.select, .field-type.relationship, .field-type.number, .field-type.date-time-field),
       > [data-pk-needs-company] > .field-type {
-        display: grid;
-        grid-template-columns: minmax(0, 35%) minmax(0, 1fr);
-        column-gap: 12px;
-        align-items: start;
+        @include pk-label-left-cell;
 
         > * {
           grid-column: 2;
@@ -2564,14 +2543,52 @@ $pk-modules: dashboard, persetujuan, proyek, keuangan, absensi, laporan, penggun
         }
 
         > .field-label {
+          @include pk-label-left-label;
           grid-row: 1 / span 4;
           grid-column: 1;
-          margin: 0;
-          padding-top: 10px;
-          line-height: 1.3;
         }
       }
     }
+
+    // the same grid for custom client forms (W3 Pengguna): .pk-fgrid > .pk-fgrid__row (label + control)
+    .pk-fgrid {
+      @include pk-form-grid;
+    }
+
+    .pk-fgrid__row {
+      @include pk-label-left-cell;
+
+      > .pk-fgrid__label {
+        @include pk-label-left-label;
+      }
+    }
+  }
+
+  .pk-fgrid {
+    display: grid;
+    row-gap: 14px;
+
+    > .pk-fgrid__wide {
+      grid-column: 1 / -1;
+    }
+  }
+
+  .pk-fgrid__row {
+    display: grid;
+    row-gap: 6px;
+    min-width: 0;
+
+    > .pk-fgrid__ctl {
+      display: grid;
+      gap: 4px;
+      min-width: 0;
+    }
+  }
+
+  .pk-fgrid__label {
+    color: var(--pk-fg);
+    font-size: 13px;
+    font-weight: 600;
   }
 
   // One field rhythm for main column, rows and sidebar: 20 px between fields (16 px on phones),
@@ -3215,5 +3232,200 @@ $pk-modules: dashboard, persetujuan, proyek, keuangan, absensi, laporan, penggun
       display: grid;
       gap: 10px;
     }
+  }
+}
+
+// ---- DRMS 13/10 W3: "Pengguna" tabbed form (/admin/pengguna/baru, /admin/pengguna/<id>) -------------------------------
+@layer payload {
+  .pk-uo {
+    display: grid;
+    gap: 16px;
+    max-width: 1100px;
+  }
+
+  .pk-uo__tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    border-bottom: 1px solid var(--pk-border);
+  }
+
+  .pk-uo__tab {
+    position: relative;
+    display: inline-flex;
+    gap: 6px;
+    align-items: center;
+    min-height: 40px;
+    margin-bottom: -1px;
+    padding: 0 14px;
+    border: 1px solid transparent;
+    border-radius: var(--style-radius-m) var(--style-radius-m) 0 0;
+    background: transparent;
+    color: var(--pk-muted-fg);
+    font: inherit;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+
+    &:hover {
+      color: var(--pk-fg);
+    }
+
+    &[aria-selected='true'] {
+      border-color: var(--pk-border);
+      border-bottom-color: var(--pk-card);
+      background: var(--pk-card);
+      color: var(--pk-primary);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--pk-ring);
+      outline-offset: 1px;
+    }
+
+    &[data-error] {
+      color: var(--pk-tone-bad-text);
+    }
+  }
+
+  .pk-uo__dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 999px;
+    background: var(--pk-tone-bad);
+  }
+
+  .pk-uo__panel {
+    display: grid;
+    gap: 16px;
+    padding: 4px 0;
+
+    &[hidden] {
+      display: none;
+    }
+  }
+
+  .pk-uo__lead {
+    margin: 0;
+    color: var(--pk-muted-fg);
+    font-size: 13px;
+  }
+
+  .pk-uo__req {
+    color: var(--pk-tone-bad-text);
+  }
+
+  .pk-uo__group {
+    display: grid;
+    gap: 12px;
+    min-width: 0;
+    margin: 0;
+    padding: 14px 16px;
+    border: 1px solid var(--pk-border);
+    border-radius: var(--style-radius-l);
+    background: var(--pk-card);
+
+    > legend {
+      padding: 0 6px;
+      font-weight: 700;
+    }
+  }
+
+  .pk-uo__bank {
+    display: grid;
+    gap: 10px;
+    padding: 12px 0;
+    border-top: 1px dashed var(--pk-border);
+
+    &:first-of-type {
+      border-top: 0;
+    }
+  }
+
+  .pk-uo__bank-title {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+    margin: 0;
+    font-weight: 700;
+  }
+
+  .pk-uo__more {
+    margin: 0;
+    font-size: 13px;
+  }
+
+  .pk-uo__list {
+    margin: 0;
+    padding-left: 18px;
+    line-height: 1.7;
+  }
+
+  .pk-uo__pw code {
+    padding: 4px 10px;
+    border: 1px solid var(--pk-border);
+    border-radius: var(--style-radius-s);
+    background: var(--pk-bg);
+    font-size: 18px;
+    letter-spacing: 0.06em;
+  }
+
+  .pk-uo__bar {
+    position: sticky;
+    z-index: 5;
+    bottom: 0;
+    display: grid;
+    gap: 10px;
+    padding: 12px 16px;
+    border: 1px solid var(--pk-border);
+    border-radius: var(--style-radius-l);
+    background: var(--pk-card);
+    box-shadow: var(--pk-shadow);
+  }
+
+  .pk-uo__reason {
+    max-width: 560px;
+  }
+
+  .pk-uo__hint {
+    color: var(--pk-muted-fg);
+    font-size: 13px;
+  }
+
+  .pk-uo__msg {
+    font-weight: 600;
+  }
+
+  .pk-uo__msg--ok {
+    color: var(--pk-tone-ok-text);
+  }
+
+  .pk-uo__msg--bad {
+    color: var(--pk-tone-bad-text);
+  }
+
+  .pk-uo .pk-ms__btn {
+    width: 100%;
+    max-width: 420px;
+    min-height: 40px;
+  }
+
+  @media (max-width: 640px) {
+    .pk-uo__tab {
+      flex: 1 1 auto;
+      padding: 0 10px;
+      font-size: 13px;
+    }
+
+    .pk-uo__group {
+      padding: 12px;
+    }
+  }
+}
+
+@layer payload {
+  .pk-ms__btn[data-invalid] {
+    border-color: var(--pk-tone-bad);
   }
 }
