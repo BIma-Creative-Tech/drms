@@ -10,11 +10,12 @@ import { withReqTransaction } from '@/lib/system-tx'
 import { docHref } from '../doc-links'
 import { ActionButton } from '../components/ActionButton'
 import { KAS_STYLE } from '../components/kas/style'
+import { ClickableRow } from '../components/list/ClickableRow'
 import { ListToolbar, Pager } from '../components/list/ListToolbar'
 import { MoneyForm } from '../components/MoneyForm'
 import { ShortfallPanel } from '../components/ShortfallPanel'
 import { LpjPhotoGrid } from '../components/lpj/LpjPhotoGrid'
-import { pageOfFind, parseListQuery, searchWhere } from '../list-query'
+import { allowedValues, idValues, pageOfFind, parseListQuery, searchWhere } from '../list-query'
 import { accountsOf, PtChip, PtScopeNote, ptView } from './pt'
 import { Empty, Forbidden, Shell, TableScroll, allowed, badge, docLink, num, rp, table, td, th } from './shared'
 
@@ -32,15 +33,17 @@ export async function LpjVerification(props: AdminViewServerProps) {
   const finance = allowed(req, ['pk-finance'])
   const pt = await ptView(req)
   // DRMS 10/10 D8: search (nomor / judul) + PT / tahap filters, paged in the database (URL state)
+  // DRMS 13/10 Umum #4: PT and tahap are multi-select (`?pt=1,3`); PTs ⊆ the switcher selection
   const lq = parseListQuery(props.searchParams, ['pt', 'tahap'])
-  const ptId = pt.multi && pt.selected.includes(Number(lq.filters.pt)) ? Number(lq.filters.pt) : undefined
-  const statuses = lq.filters.tahap === 'lpj_submitted' || lq.filters.tahap === 'lpj_verified' ? [lq.filters.tahap] : ['lpj_submitted', 'lpj_verified']
+  const ptIds = pt.multi ? idValues(lq, 'pt').filter((id) => pt.selected.includes(id)) : []
+  const tahap = allowedValues(lq, 'tahap', ['lpj_submitted', 'lpj_verified'] as const)
+  const statuses: string[] = tahap.length ? tahap : ['lpj_submitted', 'lpj_verified']
   const text = searchWhere(['docNo', 'title'], lq.q)
   const { submitted, verified, accounts, companyOf, page } = await withReqTransaction(req, async () => {
     const res = await req.payload.find({
       collection: 'expense-requests',
       // MC2: PTs where the caller is Finance / Direktur only (mc2-contract §3)
-      where: officeQueueWhere(req, { and: [{ type: { equals: 'advance' } }, { status: { in: statuses } }, ...(text ? [text as never] : [])] }, ptId ? { companyIds: [ptId] } : undefined),
+      where: officeQueueWhere(req, { and: [{ type: { equals: 'advance' } }, { status: { in: statuses } }, ...(text ? [text as never] : [])] }, ptIds.length ? { companyIds: ptIds } : undefined),
       sort: 'updatedAt',
       limit: lq.per,
       page: lq.page,
@@ -73,8 +76,8 @@ export async function LpjVerification(props: AdminViewServerProps) {
         label="Cari dan saring LPJ"
         search={{ placeholder: 'Nomor atau judul pengajuan…' }}
         filters={[
-          pt.multi ? { key: 'pt', label: 'PT', all: 'Semua PT', options: pt.selected.map((id) => ({ value: String(id), label: pt.ref(id)?.shortCode ?? `#${id}` })) } : null,
-          { key: 'tahap', label: 'Tahap', options: [{ value: 'lpj_submitted', label: 'LPJ diajukan' }, { value: 'lpj_verified', label: 'Menunggu penyelesaian selisih' }] },
+          pt.multi ? { key: 'pt', label: 'PT', all: 'Semua PT', multi: true, options: pt.selected.map((id) => ({ value: String(id), label: pt.ref(id)?.shortCode ?? `#${id}` })) } : null,
+          { key: 'tahap', label: 'Tahap', multi: true, options: [{ value: 'lpj_submitted', label: 'LPJ diajukan' }, { value: 'lpj_verified', label: 'Menunggu penyelesaian selisih' }] },
         ]}
       />
       <h2>LPJ diajukan ({submitted.length})</h2>
@@ -133,7 +136,8 @@ export async function LpjVerification(props: AdminViewServerProps) {
                 {d.receipts
                   .filter((r) => r.status !== 'removed')
                   .map((r) => (
-                    <tr key={r.id}>
+                    // DRMS 13/10 Umum #7: the row opens the receipt; photo link and Valid/Tolak keep their own action
+                    <ClickableRow key={r.id} href={`/admin/collections/receipts/${r.id}`}>
                       <td style={td}>
                         {r.imageId ? (
                           <a href={`/api/v1/media/receipts/${r.imageId}/file`} target="_blank" rel="noopener noreferrer" data-pk-lightbox={`lpj-${d.id}`} data-pk-lightbox-title={`Nota ${r.receiptNo ?? r.id} · ${rp(r.amount)}`}>
@@ -162,7 +166,7 @@ export async function LpjVerification(props: AdminViewServerProps) {
                           </>
                         ) : null}
                       </td>
-                    </tr>
+                    </ClickableRow>
                   ))}
               </tbody>
             </table>

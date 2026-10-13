@@ -145,19 +145,15 @@ describe('office-only fields hidden from staff (no 403 queries from the admin fo
   const visible = (f: F, roles: string[], data: unknown = {}) => f.admin?.condition?.(data, {}, { user: { id: 1, roles } }) ?? true
   const submitted = { status: 'pending_ack' }
 
-  it('"Aturan approval" + snapshot only for roles that can read approval rules; vendor master not for staff', () => {
+  it('"Aturan approval" + snapshot never rendered as form fields (no approval-rules query); vendor master not for staff', () => {
     const rule = field('expense-requests', 'approvalRule')
-    expect(visible(rule, ['pk-staff'], submitted)).toBe(false)
-    expect(visible(rule, ['pk-pm'], submitted)).toBe(false)
-    // DRMS 10/10 Phase C polish: in the sidebar for Finance / Admin only (the Direktur reads the approval timeline)
-    for (const r of ['pk-finance', 'pk-admin']) expect(visible(rule, [r], submitted), `approvalRule ${r}`).toBe(true)
-    expect(visible(rule, ['pk-owner'], submitted)).toBe(false)
-    // DRMS 10/10 9c: the raw snapshot JSON only for Admin (everyone else reads the approval timeline)
-    const snap = field('expense-requests', 'approvalSnapshot')
-    for (const r of ['pk-staff', 'pk-pm', 'pk-finance', 'pk-owner']) expect(visible(snap, [r], submitted), `approvalSnapshot ${r}`).toBe(false)
-    expect(visible(snap, ['pk-admin'], submitted)).toBe(true)
-    // DRMS 10/10 8i: neither on create / draft
-    for (const f of [rule, snap]) expect(visible(f, ['pk-admin'], { status: 'draft' })).toBe(false)
+    // DRMS 13/10 Persetujuan #5: no sidebar field for anyone — the stepper names the rule for Finance / Admin
+    for (const r of ['pk-staff', 'pk-pm', 'pk-finance', 'pk-admin', 'pk-owner']) {
+      expect(visible(rule, [r], submitted), `approvalRule ${r}`).toBe(false)
+      expect(visible(rule, [r], { status: 'draft' }), `approvalRule draft ${r}`).toBe(false)
+    }
+    // DRMS 13/10 Persetujuan #6: the raw snapshot JSON is not on the page at all (stepper + "Log perubahan")
+    expect((field('expense-requests', 'approvalSnapshot').admin as { hidden?: boolean } | undefined)?.hidden).toBe(true)
     expect(visible(field('receipts', 'vendor'), ['pk-staff'])).toBe(false)
     expect(visible(field('receipts', 'vendor'), ['pk-finance'])).toBe(true)
     expect(field('expense-requests', 'resubmitOf').admin?.components?.Field).toBe('@/admin/components/ResubmitOfField#ResubmitOfField')

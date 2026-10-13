@@ -43,6 +43,10 @@ const LABELS: Record<string, string> = {
   uomId: 'Satuan',
   uom: 'Satuan',
   qty: 'Jumlah',
+  // DRMS 13/10 Persetujuan #6: line fields of the request audit ("Log perubahan": lines.total, lines.rapItem)
+  total: 'Total',
+  rapItem: 'Item RAP',
+  rapItemId: 'Item RAP',
   unitPrice: 'Harga satuan',
   receiptAmount: 'Nominal sesuai nota',
   proofId: 'Bukti',

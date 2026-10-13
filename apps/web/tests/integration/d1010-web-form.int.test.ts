@@ -5,6 +5,8 @@ import { renderToString } from 'react-dom/server'
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { WorkflowPanel } from '@/admin/components/WorkflowPanel'
+import { actionBarProps } from '@/admin/components/request/action-bar'
+import { loadRequestPanel } from '@/admin/components/request/panel-data'
 import { resetRateLimits } from '@/lib/rate-limit'
 
 import { getTestPayload } from './helpers'
@@ -54,6 +56,12 @@ async function panelHtml(user: FlowUser, id: number): Promise<string> {
   const req = await createLocalReq({ user: { ...user, collection: 'users' } as never }, p)
   const el = await WorkflowPanel({ req, id, operation: 'update' } as never)
   return el ? renderToString(el) : ''
+}
+
+/** DRMS 13/10 Persetujuan #5: the decision buttons moved to the action bar (document controls) — its server-built props. */
+async function bar(user: FlowUser, id: number) {
+  const panel = await loadRequestPanel(await getTestPayload(), { ...user, collection: 'users' } as never, id)
+  return panel ? actionBarProps(panel) : null
 }
 
 const accNo = async (id: number) => (await (await getTestPayload()).findByID({ collection: 'employee-bank-accounts', id, depth: 0, overrideAccess: true /* SYSTEM-READ: fixture */ })).accountNo as string
@@ -116,24 +124,22 @@ describe('9a/9c/9d workflow panel', () => {
     expect(pm).toContain('data-pk-approval-timeline')
     expect(pm).toContain('Persetujuan PM<')
     expect(pm).toMatch(/data-pk-step="diketahui" data-pk-step-state="current"/)
-    expect(pm).toContain('data-pk-decision-bar')
-    expect(pm).toContain('data-pk-action="acknowledge"')
-    expect(pm).toContain('data-pk-action="reject"')
+    expect((await bar(w.users.pm, id))?.decision).toMatchObject({ step: 'acknowledge', canReject: true, stepLabel: 'Persetujuan PM' })
     expect(pm).not.toContain('direktur_via_pm')
 
     const own = await panelHtml(w.users.staffA, id)
     expect(own).toContain('Rincian pengajuan')
     expect(own).toContain('data-pk-section="review"')
-    expect(own).not.toContain('data-pk-decision-bar')
+    expect((await bar(w.users.staffA, id))?.decision).toBeNull()
     // the Direktur's turn has not come yet
-    expect(await panelHtml(w.users.owner, id)).not.toContain('data-pk-decision-bar')
+    expect((await bar(w.users.owner, id))?.decision).toBeNull()
 
     expect((await api('POST', `${E}/${id}/acknowledge`, w.users.pm, {}, key())).status).toBe(200)
     const dir = await panelHtml(w.users.owner, id)
     expect(dir).toMatch(/data-pk-step="diketahui" data-pk-step-state="done"/)
     expect(dir).toMatch(/data-pk-step="approval-1" data-pk-step-state="current"/)
-    expect(dir).toContain('data-pk-action="approve"')
+    expect((await bar(w.users.owner, id))?.decision).toMatchObject({ step: 'approve', canReject: true })
     expect(dir).toContain('Persetujuan Direktur')
-    expect(await panelHtml(w.users.pm, id)).not.toContain('data-pk-decision-bar')
+    expect((await bar(w.users.pm, id))?.decision).toBeNull()
   })
 })

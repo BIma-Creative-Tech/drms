@@ -40,16 +40,22 @@ describe('E2 menu: Kas + Tutup buku only for Finance and Direktur (pk-owner)', (
 
 describe('E2 book query (server-side Zod)', () => {
   it('parses valid filters', () => {
-    expect(parseBookQuery({ akun: '3', periode: '2026-08', project: '7', pusat: '', arah: 'keluar', status: 'void', hal: '2' })).toEqual({ akun: 3, periode: '2026-08', project: 7, arah: 'keluar', status: 'void', hal: 2 })
+    expect(parseBookQuery({ akun: '3', periode: '2026-08', project: '7', pusat: '', arah: 'keluar', status: 'void', hal: '2' })).toEqual({ akun: [3], periode: '2026-08', project: [7], arah: ['keluar'], status: ['void'], hal: 2 })
+  })
+  it('DRMS 13/10 Umum #4: akun / project / pusat / arah / status are multi-select (comma or repeated param)', () => {
+    expect(parseBookQuery({ akun: '3,5,3', project: ['7', '9'], arah: 'masuk,keluar', status: 'posted,void,deleted' })).toEqual({ akun: [3, 5], project: [7, 9], arah: ['masuk', 'keluar'], status: ['posted', 'void'], hal: 1 })
+    expect(parseBookQuery({ akun: '3,x;DROP,0' })).toEqual({ akun: [3], hal: 1 })
   })
   it('drops invalid values one by one (never passed on)', () => {
     expect(parseBookQuery({ akun: '3; DROP', periode: '2026-8', project: '-1', arah: 'semua', status: 'deleted', hal: '0' })).toEqual({ hal: 1 })
-    expect(parseBookQuery({ akun: ['4', '5'] })).toEqual({ akun: 4, hal: 1 })
+    expect(parseBookQuery({ akun: ['4', '5'] })).toEqual({ akun: [4, 5], hal: 1 })
     expect(parseBookQuery(undefined)).toEqual({ hal: 1 })
   })
   it('builds the where', () => {
     expect(bookWhere({ hal: 1 })).toBeUndefined()
-    expect(bookWhere({ hal: 1, akun: 2, arah: 'masuk', status: 'posted' })).toEqual({ and: [{ cashAccount: { equals: 2 } }, { direction: { equals: 'in' } }, { status: { equals: 'posted' } }] })
+    expect(bookWhere({ hal: 1, akun: [2], arah: ['masuk'], status: ['posted'] })).toEqual({ and: [{ cashAccount: { in: [2] } }, { direction: { equals: 'in' } }, { status: { in: ['posted'] } }] })
+    // both directions = no direction filter; several accounts / projects / cost centers = `in`
+    expect(bookWhere({ hal: 1, akun: [2, 4], project: [7], pusat: [1, 2], arah: ['masuk', 'keluar'] })).toEqual({ and: [{ cashAccount: { in: [2, 4] } }, { project: { in: [7] } }, { costCenter: { in: [1, 2] } }] })
   })
 })
 

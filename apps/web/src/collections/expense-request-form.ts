@@ -77,3 +77,20 @@ export const PLACEHOLDERS = {
   rapItem: 'Pilih item RAP…',
   company: 'Pilih PT…',
 } as const
+
+/**
+ * DRMS 13/10 Persetujuan #5/#6: request-page values that moved off the form — the totals into the read-only summary,
+ * the approval rule into the stepper, timestamps into "Log perubahan". The fields stay in the document, API and PDF.
+ */
+export const notOnRequestPage: Condition = () => false
+
+/**
+ * DRMS 13/10 Persetujuan #7: the request page opens READ-ONLY (summary + lines table); "Edit" switches the Payload
+ * form on. A new document (no id) is always in edit mode. "Edit" only when Payload grants the update (collection
+ * access: own Draft / Revisi Nota, domain/expense/access.ts requestUpdateAccess → `hasSavePermission`) AND the status
+ * is content-editable — UI only, the collection hook rejects any other write.
+ */
+export function requestEditGate(p: { id?: unknown; status?: string | null; hasSavePermission?: boolean }): 'create' | 'editable' | 'locked' {
+  if (p.id === undefined || p.id === null || p.id === '') return 'create'
+  return p.hasSavePermission === true && (p.status === 'draft' || p.status === 'receipt_revision') ? 'editable' : 'locked'
+}

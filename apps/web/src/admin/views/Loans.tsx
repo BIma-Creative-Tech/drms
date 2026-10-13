@@ -11,7 +11,7 @@ import { KAS_STYLE } from '@/admin/components/kas/style'
 import { ListToolbar, Pager } from '@/admin/components/list/ListToolbar'
 import { LoanForm } from '@/admin/components/loans/LoanForm'
 import { RepaymentAction } from '@/admin/components/loans/RepaymentAction'
-import { pageOfFind, parseListQuery } from '@/admin/list-query'
+import { allowedValues, idValues, pageOfFind, parseListQuery, type ListQuery } from '@/admin/list-query'
 import { settings, today } from '@/domain/expense/common'
 import { loanScope, loanTotals, projectLoanFigures } from '@/domain/loans/report'
 import { LOAN_STATUS_LABELS, LOAN_STATUSES, OVERDUE_LABEL, type LoanStatus } from '@/domain/loans/rules'
@@ -133,8 +133,14 @@ function LoanCards({ items, focus, empty }: { items: LoanSummary[]; focus?: numb
   )
 }
 
-const STATUS_FILTER = { key: 'status', label: 'Status', options: LOAN_STATUSES.map((s) => ({ value: s, label: LOAN_STATUS_LABELS[s] })) }
-const OVERDUE_FILTER = { key: 'terlambat', label: 'Terlambat', all: 'Semua', options: [{ value: 'ya', label: 'Terlambat saja' }] }
+const STATUS_FILTER = { key: 'status', label: 'Status', multi: true, options: LOAN_STATUSES.map((s) => ({ value: s, label: LOAN_STATUS_LABELS[s] })) }
+
+/** "Peran project": both ticked (or none) = either side. */
+function loanRole(lq: ListQuery): 'borrower' | 'lender' | undefined {
+  const r = allowedValues(lq, 'peran', ['borrower', 'lender'] as const)
+  return r.length === 1 ? r[0] : undefined
+}
+const OVERDUE_FILTER = { key: 'terlambat', label: 'Terlambat', all: 'Semua', multi: true, options: [{ value: 'ya', label: 'Terlambat saja' }] }
 
 async function tzOf(req: PayloadRequest): Promise<string> {
   return (await settings(req)).timezone || process.env.TZ || DEFAULT_TZ
@@ -146,10 +152,11 @@ export async function LoanList(props: AdminViewServerProps) {
   const req = props.initPageResult.req
   if (!hasRoleAny(req, ...READERS)) return <NoAccess props={props} />
   const sp = props.searchParams as Record<string, string | string[] | undefined> | undefined
+  // DRMS 13/10 Umum #4: status / project / peran are multi-select (`?status=approved,repaying&project=3,7`)
   const lq = parseListQuery(sp, ['status', 'project', 'peran', 'terlambat'])
-  const status = (LOAN_STATUSES as readonly string[]).includes(lq.filters.status ?? '') ? (lq.filters.status as LoanStatus) : undefined
-  const projectId = /^\d{1,10}$/.test(lq.filters.project ?? '') ? Number(lq.filters.project) : undefined
-  const role = lq.filters.peran === 'borrower' || lq.filters.peran === 'lender' ? lq.filters.peran : undefined
+  const status = allowedValues(lq, 'status', LOAN_STATUSES)
+  const projectId = idValues(lq, 'project')
+  const role = loanRole(lq)
   const d = await withReqTransaction(req, async () => {
     const page = await listLoans(req, { projectId, role, status, overdue: lq.filters.terlambat === 'ya', q: lq.q, page: lq.page, limit: lq.per })
     const totals = await loanTotals(req, await loanScope(req))
@@ -160,7 +167,7 @@ export async function LoanList(props: AdminViewServerProps) {
   })
   const pt = await ptView(req)
   const page = pageOfFind({ docs: d.page.items, page: d.page.page, totalDocs: d.page.totalDocs, totalPages: d.page.totalPages, limit: d.page.limit })
-  const filtered = Boolean(status || projectId || role || lq.q || lq.filters.terlambat)
+  const filtered = Boolean(status.length || projectId.length || role || lq.q || lq.filters.terlambat)
   const empty = filtered ? 'Tidak ada pinjaman untuk filter ini.' : 'Belum ada pinjaman antar project.'
   return (
     <Frame props={props} name="pinjaman">
@@ -205,13 +212,13 @@ export async function LoanList(props: AdminViewServerProps) {
             search={{ placeholder: 'Nomor atau alasan…' }}
             filters={[
               STATUS_FILTER,
-              { key: 'project', label: 'Project', options: d.projects.map((p) => ({ value: String(p.id), label: `${p.code} ${p.name}` })) },
-              { key: 'peran', label: 'Peran project', options: [{ value: 'borrower', label: 'Peminjam' }, { value: 'lender', label: 'Pemberi' }] },
+              { key: 'project', label: 'Project', multi: true, options: d.projects.map((p) => ({ value: String(p.id), label: `${p.code} ${p.name}` })) },
+              { key: 'peran', label: 'Peran project', multi: true, options: [{ value: 'borrower', label: 'Peminjam' }, { value: 'lender', label: 'Pemberi' }] },
               OVERDUE_FILTER,
             ]}
           />
           <div className="pk-lwide">
-            <DataTable id="loans" cols={loanCols(pt)} rows={page.items} rowKey={(l) => l.id} rowAttrs={(l) => ({ 'data-pk-row': l.docNo ?? String(l.id), 'data-pk-status': l.status })} caption="Pinjaman antar project" empty={<EmptyState text={empty} action={d.canCreate ? { href: '/admin/pinjaman/baru', label: '+ Ajukan pinjaman' } : undefined} />} />
+            <DataTable id="loans" paged={false} rowHref={(l) => loanHref(l.id)} cols={loanCols(pt)} rows={page.items} rowKey={(l) => l.id} rowAttrs={(l) => ({ 'data-pk-row': l.docNo ?? String(l.id), 'data-pk-status': l.status })} caption="Pinjaman antar project" empty={<EmptyState text={empty} action={d.canCreate ? { href: '/admin/pinjaman/baru', label: '+ Ajukan pinjaman' } : undefined} />} />
           </div>
           <LoanCards items={page.items} empty={empty} />
           <Pager id="pinjaman" path="/admin/pinjaman" sp={sp} page={page} unit="pinjaman" />
@@ -534,8 +541,8 @@ export async function ProjectLoansTab(props: DocumentViewServerProps) {
       ? await withReqTransaction(req, async () => {
           const p = (await req.payload.findByID({ collection: 'projects', id, depth: 0, user: req.user, overrideAccess: false /* caller's read scope */, req }).catch(() => null)) as { pm?: unknown; company?: unknown } | null
           if (!p) return null
-          const status = (LOAN_STATUSES as readonly string[]).includes(lq.filters.status ?? '') ? (lq.filters.status as LoanStatus) : undefined
-          const role = lq.filters.peran === 'borrower' || lq.filters.peran === 'lender' ? lq.filters.peran : undefined
+          const status = allowedValues(lq, 'status', LOAN_STATUSES)
+          const role = loanRole(lq)
           const page = await listLoans(req, { projectId: id, role, status, overdue: lq.filters.terlambat === 'ya', q: lq.q, page: lq.page, limit: lq.per })
           const fig = (await projectLoanFigures(req, await loanScope(req), { projectId: id }))[0] ?? null
           return { page, fig, canCreate: relId(p.pm) === userId(req) && hasRoleAny(req, 'pk-pm') }
@@ -576,10 +583,10 @@ export async function ProjectLoansTab(props: DocumentViewServerProps) {
                   query={lq}
                   label="Cari dan saring pinjaman project"
                   search={{ placeholder: 'Nomor atau alasan…' }}
-                  filters={[STATUS_FILTER, { key: 'peran', label: 'Peran', options: [{ value: 'borrower', label: 'Pinjaman diterima' }, { value: 'lender', label: 'Pinjaman diberikan' }] }, OVERDUE_FILTER]}
+                  filters={[STATUS_FILTER, { key: 'peran', label: 'Peran', multi: true, options: [{ value: 'borrower', label: 'Pinjaman diterima' }, { value: 'lender', label: 'Pinjaman diberikan' }] }, OVERDUE_FILTER]}
                 />
                 <div className="pk-lwide">
-                  <DataTable id="project-loans" cols={loanCols(pt, id)} rows={d.page.items} rowKey={(l) => l.id} rowAttrs={(l) => ({ 'data-pk-loan-row': String(l.id) })} caption="Pinjaman project" empty={<EmptyState text="Belum ada pinjaman antar project." />} />
+                  <DataTable id="project-loans" paged={false} rowHref={(l) => loanHref(l.id)} cols={loanCols(pt, id)} rows={d.page.items} rowKey={(l) => l.id} rowAttrs={(l) => ({ 'data-pk-loan-row': String(l.id) })} caption="Pinjaman project" empty={<EmptyState text="Belum ada pinjaman antar project." />} />
                 </div>
                 <LoanCards items={d.page.items} focus={id} empty="Belum ada pinjaman antar project." />
                 <Pager id="project-loans" path={path} sp={sp} page={pageOfFind({ docs: d.page.items, page: d.page.page, totalDocs: d.page.totalDocs, totalPages: d.page.totalPages, limit: d.page.limit })} unit="pinjaman" />
