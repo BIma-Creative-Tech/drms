@@ -12,6 +12,7 @@ import '../../../l10n/gen/app_localizations.dart';
 import '../../../shared/widgets/async_body.dart';
 import '../../../shared/widgets/online_only_button.dart';
 import '../../expense/domain/expense_request.dart';
+import '../../expense/domain/turn_timeline.dart' show ownerApproveTitle, ownerRoleCode;
 import '../data/approvals_api.dart';
 
 /// Signature PNG limit (requirements §9: ≤ 800×300 px, ≤ 50 KB).
@@ -110,6 +111,11 @@ class _DecisionSheetState extends ConsumerState<DecisionSheet> {
     final level = d.currentLevel ?? 1;
     final direkturStep = pm && rule!.roleOfLevel(level) == 'pk-owner';
     final direkturFinal = direkturStep && level >= rule.lastLevel;
+    // ADR 0025: the Owner level (above the Direktur) — the last decision before the Finance transfer
+    final ownerStep = d.approvalRule?.roleOfLevel(level) == ownerRoleCode;
+    final ownerFinal = ownerStep && level >= (d.approvalRule?.lastLevel ?? 0);
+    var approveTitle = direkturStep ? t.decisionTitleApproveDirektur : t.decisionTitleApprove;
+    if (ownerStep) approveTitle = ownerApproveTitle;
     final title = switch (widget.decision) {
       Decision.acknowledge =>
         pm
@@ -117,7 +123,7 @@ class _DecisionSheetState extends ConsumerState<DecisionSheet> {
             : direktur
             ? t.decisionTitleAcknowledgeDirektur
             : t.decisionTitleAcknowledge,
-      Decision.approve => direkturStep ? t.decisionTitleApproveDirektur : t.decisionTitleApprove,
+      Decision.approve => approveTitle,
       Decision.reject => t.decisionTitleReject,
     };
     return Padding(
@@ -143,6 +149,11 @@ class _DecisionSheetState extends ConsumerState<DecisionSheet> {
               Padding(
                 padding: const EdgeInsets.only(top: 8),
                 child: Text(t.decisionHintDirekturFinal, key: const Key('decision-hint-direktur-final')),
+              ),
+            if (widget.decision == Decision.approve && ownerFinal)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Text(t.decisionHintDirekturFinal, key: const Key('decision-hint-owner-final')),
               ),
             const SizedBox(height: 12),
             if (widget.decision == Decision.reject)
