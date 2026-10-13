@@ -8,6 +8,7 @@ import { bankPreview } from '@/domain/expense/bank-preview'
 import { displayName, ids, loadVisible, today } from '@/domain/expense/common'
 import { isDecisionSnapshot } from '@/domain/expense/decision'
 import { decisionText } from '@/domain/expense/decision-texts'
+import { direkturLabel } from '@/domain/direktur-rules'
 import { detail } from '@/domain/expense/dto'
 import { buildRequestStepper, type RequestStepper } from '@/domain/expense/request-stepper'
 import { lastLevel, type ApprovalSnapshot } from '@/domain/expense/rules'
@@ -25,7 +26,15 @@ const CREATE_ROLES: readonly Role[] = ['pk-staff', 'pk-pm', 'pk-admin', 'pk-fina
 /** Roles that read approval rules (collection access) — the stepper names the rule for them (Persetujuan #5). */
 const RULE_READERS: readonly Role[] = ['pk-admin', 'pk-finance']
 
-export type DecisionProps = { step: 'acknowledge' | 'approve' | null; label: string; confirm: string; canReject: boolean; stepLabel: string }
+export type DecisionProps = {
+  step: 'acknowledge' | 'approve' | null
+  label: string
+  confirm: string
+  canReject: boolean
+  stepLabel: string
+  /** ADR 0025: the decision is signed as the PT's definitive Direktur ("Nama (Jabatan)"), else null. */
+  signAs: string | null
+}
 
 export type RequestPanel = {
   d: Detail
@@ -126,7 +135,7 @@ async function load(payload: Payload, user: NonNullable<PayloadRequest['user']>,
 }
 
 /** DRMS 10/10 9d: decision when the server allows one now (same texts as the inbox and the APK decision sheet). */
-export function decisionOf(d: Pick<Detail, 'allowedActions' | 'currentLevel' | 'status' | 'docNo' | 'grandTotal'>, snap: ApprovalSnapshot | null): DecisionProps | null {
+export function decisionOf(d: Pick<Detail, 'allowedActions' | 'currentLevel' | 'status' | 'docNo' | 'grandTotal'> & { direkturSignature?: Detail['direkturSignature'] }, snap: ApprovalSnapshot | null): DecisionProps | null {
   const step = d.allowedActions.includes('approve') ? 'approve' : d.allowedActions.includes('acknowledge') ? 'acknowledge' : null
   const canReject = d.allowedActions.includes('reject')
   if (!step && !canReject) return null
@@ -142,7 +151,9 @@ export function decisionOf(d: Pick<Detail, 'allowedActions' | 'currentLevel' | '
       })
     : null
   const stepLabel = step === 'approve' || (!step && d.status === 'pending_approval') ? approvalStepLabel(snap, level) : ackStepLabel(snap)
-  return { step, label: text?.label ?? 'Setujui', confirm: text?.confirm ?? '', canReject, stepLabel }
+  const signAs = d.direkturSignature ? direkturLabel(d.direkturSignature.name, d.direkturSignature.title) : null
+  const confirm = [text?.confirm ?? '', signAs ? `Ditandatangani dengan tanda tangan Direktur PT: ${signAs}.` : ''].filter(Boolean).join(' ')
+  return { step, label: text?.label ?? 'Setujui', confirm, canReject, stepLabel, signAs }
 }
 
 function isOwn(d: Detail, user: { id?: unknown }): boolean {

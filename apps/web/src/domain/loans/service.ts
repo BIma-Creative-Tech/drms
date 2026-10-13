@@ -4,7 +4,8 @@ import { APIError, type PayloadRequest, type Where } from 'payload'
 import { hasRole, hasRoleAny, mappedCompanies, relId, userId, userRoles } from '@/access/roles'
 import { writeAudit, writeAuditDetached } from '@/audit/writer'
 import { contextCompanyId, displayNames, membersWithRole } from '@/domain/companies'
-import { displayName, resolveSignature, today, type Signature } from '@/domain/expense/common'
+import { signDecision, signerColumns, type DecisionSigner } from '@/domain/direktur-signature'
+import { today } from '@/domain/expense/common'
 import { notificationTemplate, pushEnabled } from '@/domain/notifications'
 import { parseBusinessDate } from '@/domain/numbering'
 import { allocateDocNo } from '@/domain/numbering-db'
@@ -463,7 +464,7 @@ export async function cancelLoan(req: PayloadRequest, id: number, reason: string
 
 type SignOpts = { signatureMediaId?: number | null }
 
-async function insertDecision(req: PayloadRequest, doc: LoanDoc, decision: 'approved' | 'rejected', reason: string | null, signature: Signature | null): Promise<void> {
+async function insertDecision(req: PayloadRequest, doc: LoanDoc, decision: 'approved' | 'rejected', reason: string | null, signer: DecisionSigner): Promise<void> {
   const caller = userId(req)!
   const meta = requestMeta(req)
   await req.payload.create({
@@ -475,13 +476,10 @@ async function insertDecision(req: PayloadRequest, doc: LoanDoc, decision: 'appr
       position: 'approval',
       level: 1,
       actor: caller,
-      actorName: await displayName(req, caller),
       onBehalf: false,
       decision,
       reason,
-      signature: signature?.mediaId ?? null,
-      signatureSha256: signature?.sha256 ?? null,
-      signatureSource: signature ? signature.source : 'none',
+      ...signerColumns(signer), // ADR 0025: signature + display name (the PT's definitive Direktur when represented)
       deviceId: meta.deviceId ?? null,
       source: meta.source,
     } as never,
@@ -496,7 +494,7 @@ async function insertDecision(req: PayloadRequest, doc: LoanDoc, decision: 'appr
       docId: String(doc.id),
       docNo: doc.docNo ?? undefined,
       field: 'approval',
-      newValue: { decision, amount: amountOf(doc), g1Exception: doc.g1Exception ?? null, selfDecision: caller === relId(doc.createdBy), signatureSource: signature?.source ?? 'none' },
+      newValue: { decision, amount: amountOf(doc), g1Exception: doc.g1Exception ?? null, selfDecision: caller === relId(doc.createdBy), signatureSource: signer.signature?.source ?? 'none' },
       reason: reason ?? undefined,
     },
   ])
@@ -509,7 +507,8 @@ async function decide(req: PayloadRequest, id: number, decision: 'approved' | 'r
   const lender = await loadProject(req, relId(doc.lenderProject)!, 'lenderProjectId')
   const borrower = await loadProject(req, relId(doc.borrowerProject)!, 'borrowerProjectId')
   if (decision === 'approved' && (lender.status === 'arsip' || borrower.status === 'arsip')) fail(409, 'STATE_CONFLICT', 'Project sudah diarsipkan; pinjaman tidak dapat disetujui.')
-  const sig = await resolveSignature(req, userId(req)!, opts.signatureMediaId)
+  // ADR 0025: the loan decision IS the Direktur step — a designated representative signs as the PT's definitive Direktur
+  const sig = await signDecision(req, { companyId: relId(doc.company), callerId: userId(req)!, direkturStep: true, capturedId: opts.signatureMediaId, required: false })
   await insertDecision(req, doc, decision, reason, sig)
   const now = new Date().toISOString()
   const updated =
@@ -601,10 +600,29 @@ export async function voidRepayment(req: PayloadRequest, id: number, repaymentId
 
 // ---------------------------------------------------------------- read models
 
-type Names = { projects: Map<number, ProjectRow>; users: Map<number, string> }
+/** `representedDecider`: loan id → name of the PT's definitive Direktur when a representative decided it (ADR 0025). */
+type Names = { projects: Map<number, ProjectRow>; users: Map<number, string>; representedDecider: Map<number, string> }
 
 async function names(req: PayloadRequest, docs: readonly LoanDoc[], extraUsers: number[] = []): Promise<Names> {
-  const out: Names = { projects: new Map(), users: new Map() }
+  const out: Names = { projects: new Map(), users: new Map(), representedDecider: new Map() }
+  const decided = docs.filter((d) => relId(d.decidedBy) !== undefined).map((d) => d.id)
+  if (decided.length) {
+    // ADR 0025: "Diputuskan oleh" shows the definitive Direktur, never the representative (rows keep the real user)
+    const r = await req.payload.find({
+      collection: 'approvals',
+      where: { and: [{ loan: { in: decided } }, { signatureSource: { equals: 'company' } }] },
+      depth: 0,
+      pagination: false,
+      sort: 'id',
+      select: { loan: true, actorName: true },
+      overrideAccess: true, // SYSTEM-READ: decision rows of readable loans
+      req,
+    })
+    for (const a of r.docs as unknown as Array<{ loan?: unknown; actorName?: string | null }>) {
+      const loan = relId(a.loan)
+      if (loan !== undefined && a.actorName) out.representedDecider.set(loan, a.actorName)
+    }
+  }
   const pIds = [...new Set(docs.flatMap((d) => [relId(d.lenderProject), relId(d.borrowerProject)]).filter((x): x is number => x !== undefined))]
   if (pIds.length) {
     const r = await req.payload.find({ collection: 'projects', where: { id: { in: pIds } }, depth: 0, pagination: false, select: { code: true, name: true, status: true, pm: true, company: true }, overrideAccess: true /* SYSTEM-READ: names of projects of readable loans */, req })
@@ -655,7 +673,7 @@ function summary(d: LoanDoc, n: Names, todayStr: string) {
     createdBy: { id: uid, name: n.users.get(uid) ?? null },
     submittedAt: d.submittedAt ?? null,
     decidedAt: d.decidedAt ?? null,
-    decidedBy: decider === undefined ? null : { id: decider, name: n.users.get(decider) ?? null },
+    decidedBy: decider === undefined ? null : { id: decider, name: n.representedDecider.get(d.id) ?? n.users.get(decider) ?? null },
     rejectReason: d.rejectReason ?? null,
     cancelReason: d.cancelReason ?? null,
     source: d.source ?? null,

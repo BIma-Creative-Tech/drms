@@ -7,6 +7,7 @@ import type { CollectionSlug, PayloadRequest } from 'payload'
 import { loadMemberships } from '@/access/company-context'
 import { relId, userId, withCompanyContext } from '@/access/roles'
 import { writeAudit, writeAuditDetached } from '@/audit/writer'
+import { COMPANY_SIGNATURE_SOURCE } from '@/domain/direktur-rules'
 import { auditPrivacyDenied, PRIVACY_ACK_REQUIRED, PRIVACY_ACK_REQUIRED_DETAIL, PRIVACY_CHECKED_KEY, privacyAckCheck } from '@/legal/privacy-enforcement'
 import { getEnv } from '@/lib/env'
 import { ImageQueueFullError, withImageSlot } from '@/lib/image-queue'
@@ -152,7 +153,8 @@ function shouldAuditView(key: string, now = Date.now()): boolean {
 async function signatureOnVisibleRequest(req: PayloadRequest, mediaId: number): Promise<boolean> {
   const rows = await req.payload.find({
     collection: 'approvals',
-    where: { signature: { equals: mediaId } },
+    // ADR 0025: a PT's definitive Direktur signature is never opened through a request (office roles of the PT only)
+    where: { and: [{ signature: { equals: mediaId } }, { or: [{ signatureSource: { exists: false } }, { signatureSource: { not_equals: COMPANY_SIGNATURE_SOURCE } }] }] },
     depth: 0,
     pagination: false,
     select: { request: true },

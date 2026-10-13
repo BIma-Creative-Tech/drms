@@ -80,7 +80,8 @@ export async function historyRows(req: PayloadRequest, targets: Array<{ docType:
     statusTo: (a.statusTo as string) ?? null,
     reason: (a.reason as string) ?? null,
     userId: (a.userId as number) ?? null,
-    userName: typeof a.userId === 'number' ? (names.get(a.userId) ?? null) : null,
+    // ADR 0025: a decision of a designated representative shows the PT's definitive Direktur (the row keeps the real user id)
+    userName: (a as { actorDisplayName?: string | null }).actorDisplayName || (typeof a.userId === 'number' ? (names.get(a.userId) ?? null) : null),
     userRoles: (a.userRoles as string) ?? null,
     source: (a.source as string) ?? null,
     appVersion: (a.appVersion as string) ?? null,
