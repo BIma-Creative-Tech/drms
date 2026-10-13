@@ -142,8 +142,7 @@ class _InfoTab extends ConsumerWidget {
               if (d.client != null) _row(context, t.projectClient, d.client!.name ?? '-'),
               if (d.startDate != null || d.targetDate != null)
                 _row(context, t.projectPeriod, '${formatDateOnly(d.startDate)} – ${formatDateOnly(d.targetDate)}'),
-              if (p.progressPct != null)
-                _row(context, t.projectProgress, formatPercent(p.progressPct!)),
+              if (p.progressPct != null) _row(context, t.projectProgress, formatPercent(p.progressPct!)),
               if (d.address != null && d.address!.trim().isNotEmpty) _row(context, t.projectAddress, d.address!),
               const SizedBox(height: 16),
               Card(
