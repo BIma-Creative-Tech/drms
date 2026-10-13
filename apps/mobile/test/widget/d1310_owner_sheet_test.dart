@@ -10,20 +10,21 @@ import '../support/widget_harness.dart';
 
 /// ADR 0025 (owner decision 2026-10-13): decision sheet of a PM project → Direktur → Owner request. The Direktur
 /// level is no longer final (no "diteruskan ke Finance" hint); the Owner level is ("Setujui sebagai Owner").
-Map<String, dynamic> _ownerRule() => {
-  ...pmRuleJson(),
-  'decisionRoles': ['pk-owner', 'pk-finance', 'pk-principal'],
-  'steps': [
-    {'level': 1, 'approverRole': 'pk-owner', 'approverUserId': null},
-    {'level': 2, 'approverRole': 'pk-principal', 'approverUserId': null},
-  ],
-};
+Map<String, dynamic> _step(int level, String role) => {'level': level, 'approverRole': role, 'approverUserId': null};
 
-ExpenseDetail _detail(int level) => detailFromJson({
-  ...pmDetailJson(status: 'pending_approval', allowed: const ['approve', 'reject']),
-  'currentLevel': level,
-  'approvalRule': _ownerRule(),
-});
+Map<String, dynamic> _ownerRule() {
+  final rule = pmRuleJson();
+  rule['decisionRoles'] = ['pk-owner', 'pk-finance', 'pk-principal'];
+  rule['steps'] = [_step(1, 'pk-owner'), _step(2, 'pk-principal')];
+  return rule;
+}
+
+ExpenseDetail _detail(int level) {
+  final json = pmDetailJson(status: 'pending_approval', allowed: const ['approve', 'reject']);
+  json['currentLevel'] = level;
+  json['approvalRule'] = _ownerRule();
+  return detailFromJson(json);
+}
 
 void main() {
   testWidgets('Direktur level of an Owner flow: Direktur wording, not the final step', (tester) async {

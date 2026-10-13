@@ -9,14 +9,14 @@ import '../support/fixtures.dart';
 
 /// ADR 0025 (owner decision 2026-10-13): the Owner (`pk-principal`) one approval level above the Direktur — same
 /// stepper / labels as the web (`apps/web/src/domain/expense/approval-timeline.ts`). Fictional names only.
-Map<String, dynamic> _ownerRule() => {
-  ...pmRuleJson(),
-  'decisionRoles': ['pk-owner', 'pk-finance', 'pk-principal'],
-  'steps': [
-    {'level': 1, 'approverRole': 'pk-owner', 'approverUserId': null},
-    {'level': 2, 'approverRole': 'pk-principal', 'approverUserId': null},
-  ],
-};
+Map<String, dynamic> _step(int level, String role) => {'level': level, 'approverRole': role, 'approverUserId': null};
+
+Map<String, dynamic> _ownerRule() {
+  final rule = pmRuleJson();
+  rule['decisionRoles'] = ['pk-owner', 'pk-finance', 'pk-principal'];
+  rule['steps'] = [_step(1, 'pk-owner'), _step(2, 'pk-principal')];
+  return rule;
+}
 
 final List<Map<String, dynamic>> _approvals = [
   {'id': 1, 'cycle': 1, 'position': 'diajukan', 'level': 0, 'actorName': 'Budi', 'decision': 'signed'},
@@ -25,12 +25,13 @@ final List<Map<String, dynamic>> _approvals = [
   {'id': 4, 'cycle': 1, 'position': 'approval', 'level': 1, 'actorName': 'Dedi', 'decision': 'approved'},
 ];
 
-ExpenseDetail _waitingForOwner() => detailFromJson({
-  ...pmDetailJson(status: 'pending_approval', allowed: const ['approve', 'reject'], approvals: _approvals),
-  'currentLevel': 2,
-  'statusLabel': ownerWaitingLabel,
-  'approvalRule': _ownerRule(),
-});
+ExpenseDetail _waitingForOwner() {
+  final json = pmDetailJson(status: 'pending_approval', allowed: const ['approve', 'reject'], approvals: _approvals);
+  json['currentLevel'] = 2;
+  json['statusLabel'] = ownerWaitingLabel;
+  json['approvalRule'] = _ownerRule();
+  return detailFromJson(json);
+}
 
 void main() {
   group('role Owner (pk-principal)', () {
