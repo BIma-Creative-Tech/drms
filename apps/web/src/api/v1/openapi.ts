@@ -9,6 +9,7 @@ import { registerFieldPaths } from './openapi-field'
 import { registerLoanPaths } from './openapi-loans'
 import { registerProjectPaths } from './openapi-projects'
 import { registerShortfallPaths } from './openapi-shortfall'
+import { registerUserOnboardingPaths } from './openapi-users'
 import { Device, DeviceRegister, DeviceRevoke, Health, Masters, MastersQuery, Me, Problem, Ready, TestEmailQueued } from './schemas'
 import * as F from './schemas-flow'
 import { PrivacyAck, PrivacyAckBody, PrivacyNotice } from './schemas-privacy'
@@ -635,6 +636,8 @@ export function buildOpenApiDocument(version: string) {
   registerProjectPaths(registry, { security, deviceHeader, res })
   // ---- ADR 0022: inter-project loans (Pinjaman antar project) ----------------------------------
   registerLoanPaths(registry, { security, deviceHeader, idem, res })
+  // ---- DRMS 13/10 W3: "Pengguna" tabbed onboarding (ADR 0003 revision 2026-10-13) ----------------
+  registerUserOnboardingPaths(registry, { security, res })
 
   return new OpenApiGeneratorV31(registry.definitions).generateDocument({
     openapi: '3.1.0',
