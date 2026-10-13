@@ -7,6 +7,8 @@
  * ADR 0022 §5 option B): no cash entry is ever written for a loan or a repayment.
  */
 
+import { formatRupiah } from '@/lib/money'
+
 export const LOAN_STATUSES = ['draft', 'pending_approval', 'approved', 'partially_repaid', 'repaid', 'rejected', 'cancelled'] as const
 export type LoanStatus = (typeof LOAN_STATUSES)[number]
 
@@ -105,7 +107,7 @@ export function repaymentInputErrors(input: { amount?: unknown; repayDate?: unkn
   const errors: FieldError[] = []
   const a = input.amount
   if (typeof a !== 'number' || !Number.isSafeInteger(a) || a <= 0) errors.push({ path: 'amount', message: 'Nominal pengembalian wajib diisi (bilangan bulat Rupiah > 0).' })
-  else if (a > loan.outstanding) errors.push({ path: 'amount', message: `Nominal pengembalian melebihi sisa pinjaman (${loan.outstanding.toLocaleString('id-ID')}).` })
+  else if (a > loan.outstanding) errors.push({ path: 'amount', message: `Nominal pengembalian melebihi sisa pinjaman (${formatRupiah(loan.outstanding)}).` })
   const d = input.repayDate
   if (!isDate(d)) errors.push({ path: 'repayDate', message: 'Tanggal pengembalian wajib diisi (YYYY-MM-DD).' })
   else if (d < loan.loanDate) errors.push({ path: 'repayDate', message: 'Tanggal pengembalian tidak boleh sebelum tanggal pinjaman.' })

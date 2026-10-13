@@ -190,7 +190,7 @@ class ProjectCard extends StatelessWidget {
                   children: [
                     Expanded(child: Text(t.projectRapUsed, style: theme.textTheme.labelMedium)),
                     Text(
-                      '${pct.toStringAsFixed(0)}%',
+                      formatPercent(pct, digits: 0),
                       style: theme.textTheme.labelMedium?.copyWith(
                         fontWeight: FontWeight.w700,
                         color: over ? context.pk.badText : null,

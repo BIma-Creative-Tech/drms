@@ -25,7 +25,7 @@ import { Frame } from './frame'
 import { NoAccess } from './NoAccess'
 import { Alert, dateId, dateTimeId } from './progress-ui'
 import { PtChip, ptView, type PtView } from './pt'
-import { Bento, Card, DashHead, DataTable, EmptyState, KpiRow, KpiTile, Meter, rp, rpShort, StatusPill, VIZ_STYLE, type Col } from './viz'
+import { Bento, Card, DashHead, DataTable, EmptyState, KpiRow, KpiTile, Meter, rp, StatusPill, VIZ_STYLE, type Col } from './viz'
 
 /**
  * ADR 0022 web: "Pinjaman antar project" — list (D8: search, filters, numbered pages, cards ≤ 640 px), new Draft
@@ -187,13 +187,13 @@ export async function LoanList(props: AdminViewServerProps) {
           <KpiTile id="loan-pending" icon="clock" label="Menunggu persetujuan" value={String(d.totals.pending)} kpi="loan-pending" href={`/admin/pinjaman?status=pending_approval`} more="Lihat" i={0}>
             <p className="pk-kpi-x">{d.inbox === 0 ? 'Tidak ada yang menunggu Anda ✓' : `${d.inbox} menunggu keputusan Anda`}</p>
           </KpiTile>
-          <KpiTile id="loan-outstanding" icon="wallet" label="Sisa pinjaman" value={rpShort(d.totals.outstanding)} title={rp(d.totals.outstanding)} kpi="loan-outstanding" i={1}>
+          <KpiTile id="loan-outstanding" icon="wallet" label="Sisa pinjaman" value={rp(d.totals.outstanding)} title={rp(d.totals.outstanding)} kpi="loan-outstanding" i={1}>
             <p className="pk-kpi-x">
-              Disetujui <b>{rpShort(d.totals.amount)}</b> · kembali {rpShort(d.totals.repaid)}
+              Disetujui <b>{rp(d.totals.amount)}</b> · kembali {rp(d.totals.repaid)}
             </p>
           </KpiTile>
           <KpiTile id="loan-overdue" icon="clock" label={OVERDUE_LABEL} value={String(d.totals.overdueCount)} kpi="loan-overdue" href="/admin/pinjaman?terlambat=ya" more="Lihat" i={2}>
-            <p className="pk-kpi-x">{d.totals.overdueCount === 0 ? 'Tidak ada yang terlambat ✓' : <>Sisa terlambat <b>{rpShort(d.totals.overdue)}</b></>}</p>
+            <p className="pk-kpi-x">{d.totals.overdueCount === 0 ? 'Tidak ada yang terlambat ✓' : <>Sisa terlambat <b>{rp(d.totals.overdue)}</b></>}</p>
           </KpiTile>
         </KpiRow>
         <Card id="loans" title="Daftar pinjaman" sub="Terbaru dulu · nomor dapat diklik">
@@ -416,18 +416,17 @@ export async function LoanDetail(props: AdminViewServerProps) {
 
       <Bento label="Pinjaman antar project">
         <KpiRow cols={4}>
-          <KpiTile id="l-amount" icon="wallet" label="Nilai pinjaman" value={rpShort(l.amount)} title={rp(l.amount)} kpi="loan-amount" i={0}>
-            <p className="pk-kpi-x">{rp(l.amount)}</p>
+          <KpiTile id="l-amount" icon="wallet" label="Nilai pinjaman" value={rp(l.amount)} title={rp(l.amount)} kpi="loan-amount" i={0}>
             <p className="pk-kpi-x">
               <StatusCell l={l} />
             </p>
           </KpiTile>
-          <KpiTile id="l-repaid" icon="check" label="Sudah kembali" value={active ? rpShort(l.repaidTotal) : '—'} title={rp(l.repaidTotal)} kpi="loan-repaid" i={1}>
+          <KpiTile id="l-repaid" icon="check" label="Sudah kembali" value={active ? rp(l.repaidTotal) : '—'} title={rp(l.repaidTotal)} kpi="loan-repaid" i={1}>
             {active ? <Meter value={l.repaidTotal} max={Math.max(1, l.amount)} tone={l.status === 'repaid' ? 'ok' : l.overdue ? 'over' : 'warn'} /> : null}
             <p className="pk-kpi-x">{active ? `${l.repayments.filter((r) => r.status === 'posted').length} pengembalian` : 'Dicatat setelah disetujui'}</p>
           </KpiTile>
-          <KpiTile id="l-outstanding" icon="target" label="Sisa pinjaman" value={active ? rpShort(l.outstanding) : '—'} title={rp(l.outstanding)} kpi="loan-outstanding" i={2}>
-            <p className="pk-kpi-x">{active ? rp(l.outstanding) : pending ? 'Diajukan, belum disetujui' : 'Tidak ada'}</p>
+          <KpiTile id="l-outstanding" icon="target" label="Sisa pinjaman" value={active ? rp(l.outstanding) : '—'} title={rp(l.outstanding)} kpi="loan-outstanding" i={2}>
+            <p className="pk-kpi-x">{active ? `dari ${rp(l.amount)}` : pending ? 'Diajukan, belum disetujui' : 'Tidak ada'}</p>
           </KpiTile>
           <KpiTile id="l-due" icon="doc" label="Jatuh tempo" value={dateId(l.dueDate)} kpi="loan-due" i={3}>
             <p className="pk-kpi-x">Tanggal pinjaman {dateId(l.loanDate)}</p>
@@ -555,14 +554,14 @@ export async function ProjectLoansTab(props: DocumentViewServerProps) {
           ) : (
             <>
               <KpiRow cols={3}>
-                <KpiTile id="pl-borrowed" icon="down" label="Pinjaman diterima (sisa)" value={rpShort(d.fig?.outstandingBorrowed ?? 0)} title={rp(d.fig?.outstandingBorrowed ?? 0)} kpi="project-loan-borrowed" i={0}>
+                <KpiTile id="pl-borrowed" icon="down" label="Pinjaman diterima (sisa)" value={rp(d.fig?.outstandingBorrowed ?? 0)} title={rp(d.fig?.outstandingBorrowed ?? 0)} kpi="project-loan-borrowed" i={0}>
                   <p className="pk-kpi-x">Disetujui {rp(d.fig?.borrowed ?? 0)}</p>
                 </KpiTile>
-                <KpiTile id="pl-lent" icon="up" label="Pinjaman diberikan (sisa)" value={rpShort(d.fig?.outstandingLent ?? 0)} title={rp(d.fig?.outstandingLent ?? 0)} kpi="project-loan-lent" i={1}>
+                <KpiTile id="pl-lent" icon="up" label="Pinjaman diberikan (sisa)" value={rp(d.fig?.outstandingLent ?? 0)} title={rp(d.fig?.outstandingLent ?? 0)} kpi="project-loan-lent" i={1}>
                   <p className="pk-kpi-x">Disetujui {rp(d.fig?.lent ?? 0)}</p>
                 </KpiTile>
                 <KpiTile id="pl-overdue" icon="clock" label={OVERDUE_LABEL} value={String(d.fig?.overdueCount ?? 0)} kpi="project-loan-overdue" i={2}>
-                  <p className="pk-kpi-x">{(d.fig?.overdueBorrowed ?? 0) > 0 ? <>Sisa diterima terlambat <b>{rpShort(d.fig!.overdueBorrowed)}</b></> : 'Tidak ada yang terlambat ✓'}</p>
+                  <p className="pk-kpi-x">{(d.fig?.overdueBorrowed ?? 0) > 0 ? <>Sisa diterima terlambat <b>{rp(d.fig!.overdueBorrowed)}</b></> : 'Tidak ada yang terlambat ✓'}</p>
                 </KpiTile>
               </KpiRow>
               <Card

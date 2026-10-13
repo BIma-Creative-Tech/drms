@@ -2,6 +2,7 @@ import type { CollectionConfig } from 'payload'
 
 import { denyAll } from '@/access/roles'
 import { byVisibleRequest, denyDeleteLogged } from '@/domain/expense/access'
+import { RUPIAH_MARK } from '@/fields/common'
 import { companyField, companyHook } from '@/fields/company'
 
 const ro = { readOnly: true }
@@ -24,7 +25,8 @@ export const ExpenseLineSnapshots: CollectionConfig = {
     { name: 'request', type: 'relationship', relationTo: 'expense-requests', required: true, index: true, admin: ro },
     { name: 'cycle', type: 'number', required: true, admin: ro },
     { name: 'reason', type: 'select', required: true, options: ['submit', 'approve', 'receipts_resubmit'].map((v) => ({ label: v, value: v })), admin: ro },
-    { name: 'grandTotal', type: 'number', required: true, admin: ro },
+    // DRMS 13/10 #10: Rupiah marker → "Rp 1.250.000" in the list (display only, same column)
+    { name: 'grandTotal', type: 'number', label: 'Grand total (Rp)', required: true, custom: { ...RUPIAH_MARK }, admin: ro },
     { name: 'contentHash', type: 'text', admin: ro },
     { name: 'data', type: 'json', required: true, admin: jsonView },
     { name: 'takenAt', type: 'date', admin: { ...ro, date: { pickerAppearance: 'dayAndTime' } } },

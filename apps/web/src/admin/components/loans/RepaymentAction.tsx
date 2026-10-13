@@ -2,6 +2,8 @@
 import { useRouter } from 'next/navigation'
 import React, { useId, useRef, useState } from 'react'
 
+import { formatRupiah } from '@/lib/money'
+
 import { DateInput } from '../DateInput'
 import { RupiahInput, useRupiah } from '../RupiahInput'
 import { fieldErrors, newIdemKey, sendJson } from '../kas/client'
@@ -41,7 +43,7 @@ export function RepaymentAction({ loanId, outstanding, loanDate, today }: { loan
     const v = amount.parsed.value ?? 0
     if (amount.parsed.error) e.amount = amount.parsed.error
     else if (!(v > 0)) e.amount = 'Nominal pengembalian wajib diisi (> 0).'
-    else if (v > outstanding) e.amount = `Nominal melebihi sisa pinjaman (Rp ${new Intl.NumberFormat('id-ID').format(outstanding)}).`
+    else if (v > outstanding) e.amount = `Nominal melebihi sisa pinjaman (${formatRupiah(outstanding)}).`
     if (!date) e.repayDate = 'Tanggal pengembalian wajib diisi.'
     else if (date < loanDate) e.repayDate = 'Tanggal pengembalian tidak boleh sebelum tanggal pinjaman.'
     else if (date > today) e.repayDate = 'Tanggal pengembalian tidak boleh di masa depan.'
@@ -72,7 +74,7 @@ export function RepaymentAction({ loanId, outstanding, loanDate, today }: { loan
       <dialog ref={ref} className="pk-dlg" aria-labelledby={`${uid}-t`} onCancel={(e) => busy && e.preventDefault()}>
         <div role="form" aria-labelledby={`${uid}-t`}>
           <h2 id={`${uid}-t`}>Catat pengembalian</h2>
-          <div className="desc">Sisa pinjaman Rp {new Intl.NumberFormat('id-ID').format(outstanding)}. Tanpa persetujuan Direktur; Direktur dan PM pemberi diberi tahu. Salah catat dibatalkan (void) dengan alasan.</div>
+          <div className="desc">Sisa pinjaman {formatRupiah(outstanding)}. Tanpa persetujuan Direktur; Direktur dan PM pemberi diberi tahu. Salah catat dibatalkan (void) dengan alasan.</div>
           <div className="pk-fld">
             <label htmlFor={`${uid}-a`}>
               Nominal

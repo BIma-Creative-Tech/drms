@@ -143,7 +143,7 @@ class _InfoTab extends ConsumerWidget {
               if (d.startDate != null || d.targetDate != null)
                 _row(context, t.projectPeriod, '${formatDateOnly(d.startDate)} – ${formatDateOnly(d.targetDate)}'),
               if (p.progressPct != null)
-                _row(context, t.projectProgress, '${p.progressPct!.toStringAsFixed(1).replaceAll('.', ',')}%'),
+                _row(context, t.projectProgress, formatPercent(p.progressPct!)),
               if (d.address != null && d.address!.trim().isNotEmpty) _row(context, t.projectAddress, d.address!),
               const SizedBox(height: 16),
               Card(
@@ -185,7 +185,7 @@ class _InfoTab extends ConsumerWidget {
                               ),
                               const SizedBox(width: 8),
                               Text(
-                                '${rap.percent!.toStringAsFixed(0)}%',
+                                formatPercent(rap.percent!, digits: 0),
                                 style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w700),
                               ),
                             ],
@@ -363,7 +363,7 @@ class RapItemCard extends StatelessWidget {
                   Expanded(child: RapProgressBar(item: i)),
                   const SizedBox(width: 8),
                   Text(
-                    i.percent == null ? '-' : '${i.percent!.toStringAsFixed(0)}%',
+                    i.percent == null ? '-' : formatPercent(i.percent!, digits: 0),
                     style: theme.textTheme.labelMedium?.copyWith(
                       fontWeight: FontWeight.w700,
                       color: over ? context.pk.badText : null,

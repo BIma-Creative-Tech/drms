@@ -6,6 +6,7 @@ import '../../../app/providers.dart';
 import '../../../core/connectivity/connectivity_controller.dart';
 import '../../../core/db/app_database.dart';
 import '../../../core/format/dates.dart';
+import '../../../core/format/rupiah.dart';
 import '../../../l10n/gen/app_localizations.dart';
 import '../../../shared/widgets/async_body.dart';
 import '../../auth/application/auth_controller.dart';
@@ -58,7 +59,7 @@ class QueueScreen extends ConsumerWidget {
         onRetry: () => ref.invalidate(_queueRowsProvider),
         data: (data) {
           final (items, bytes) = data;
-          final mb = (bytes / (1024 * 1024)).toStringAsFixed(1);
+          final mb = formatDecimal(bytes / (1024 * 1024));
           return ListView(
             padding: const EdgeInsets.all(16),
             children: [

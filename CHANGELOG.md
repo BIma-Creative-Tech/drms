@@ -6,6 +6,29 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed (DRMS 13/10 Wave 1 — Umum #9 / #10)
+
+- **Top bar without the module menu** (Umum #9, owner decision D2): the links / ▾ dropdowns of the current module and the
+  ☰ sheet on mobile are gone from the bar. Launcher, module name, PT switcher, bell, avatar menu and breadcrumbs stay.
+  The module name (and the breadcrumb home) opens the module landing page, whose tiles are exactly the former menu
+  entries (same visibility rules, badges kept; single-item modules link straight to their page) — no page became
+  unreachable. The module's pending-count badge (transfers / LPJ) now sits next to the module name.
+- **One number format everywhere** (Umum #10, id-ID: thousands `.`, decimals `,`): new `formatNumber` next to
+  `formatRupiah` (`src/lib/money.ts`), reused by the dashboard, custom views, list cells and messages (no more ad-hoc
+  `Intl` / `toLocaleString`). KPI tiles show the **full Rupiah value** (`Rp 12.500.000`, size follows the tile width)
+  instead of `Rp 12,5 jt`; tables and text too (Dashboard, Kas, Pinjaman, Addendum, Aftersales, RAP/loan cards). The
+  compact form stays only on chart axes and bar labels (exact value in the tooltip and number table). Counts use
+  thousands separators.
+- **Payload lists:** Rupiah fields are recognised by a marker set by `rupiahField()` (server-only `custom`, no schema
+  change) instead of the "(Rp)" label — `ApprovalRules.maxAmount`, `ExpenseLineSnapshots.grandTotal` and
+  `Receipts.taxAmount` now show "Rp 1.250.000"; every other number column (counts, quantities, hours) shows `12.000` /
+  `7,5` (coordinates stay raw).
+
+### Changed (APK, DRMS 13/10 Wave 1 — Umum #10)
+
+- `formatDecimal` / `formatPercent` (id_ID, `core/format/rupiah.dart`) replace the `toStringAsFixed` percentages of the
+  project detail (progress, RAP summary and items), project list and RAP item picker, and the queue size in MB.
+
 ## [0.9.1] - 2026-10-12
 
 **0.9.0 plus the "Lampiran umum" fix** found on production 2026-10-12 (PB 230/PB-DRMS). Production goes 0.6.4 → 0.9.1:

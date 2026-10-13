@@ -12,6 +12,23 @@ String formatRupiah(int amount) {
 /// Line quantity without a trailing ".0", decimal comma (`2`, `24,8`).
 String formatQty(double q) => q.toString().replaceAll(RegExp(r'\.0$'), '').replaceAll('.', ',');
 
+final Map<int, NumberFormat> _decimals = {};
+
+/// DRMS 13/10 #10: number with id_ID separators — thousands `.`, decimal `,`, at most [digits] decimals
+/// without trailing zeros (`1.031,5`, `12`). Web twin: `formatNumber` (apps/web/src/lib/money.ts).
+String formatDecimal(num value, {int digits = 1}) {
+  final f = _decimals.putIfAbsent(
+    digits,
+    () => NumberFormat.decimalPattern('id_ID')
+      ..minimumFractionDigits = 0
+      ..maximumFractionDigits = digits,
+  );
+  return f.format(value);
+}
+
+/// DRMS 13/10 #10: percentage with id_ID separators (`12,5%`, `98%`), at most [digits] decimals.
+String formatPercent(num value, {int digits = 1}) => '${formatDecimal(value, digits: digits)}%';
+
 /// Parses user input such as `1.447.500`, `Rp 1.447.500` or `1447500` into integer rupiah.
 /// Returns null for empty/invalid input or fractions (rupiah has no decimals in ProyekKas).
 int? parseRupiah(String input) {
