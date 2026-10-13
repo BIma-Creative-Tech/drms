@@ -247,6 +247,7 @@ export function buildOpenApiDocument(version: string) {
   post('/expense-requests/{id}/withdraw', 'Withdraw to Draft before any decision (reason)', F.ReasonBody, ['id'], detailOk())
   post('/expense-requests/{id}/cancel', 'Cancel (reason)', F.ReasonBody, ['id'], detailOk())
   post('/expense-requests/{id}/resubmit', 'Clone a rejected request into a new Draft (US-06)', F.EmptyBody, ['id'], res(201, 'New draft', F.ExpenseRequestDetail, [401, 403, 404, 409, 422, 426, 429]))
+  post('/expense-requests/{id}/duplicate', 'Duplikat: a clean new Draft from a readable request (same PT, project, lines, requesters; no number, approvals, transfers, receipts, flags) — DRMS 13/10 Persetujuan #12', F.EmptyBody, ['id'], res(201, 'New draft', F.ExpenseRequestDetail, [401, 403, 404, 409, 422, 426, 429]))
   post('/expense-requests/{id}/acknowledge', '"Diketahui Oleh" = Direktur approval (US-42, ADR 0013); PM/Staff/Admin → 403 (audited)', F.SignBody, ['id'], detailOk())
   post('/expense-requests/{id}/approve', 'Approve the current level — Finance by default (G1/G2, ADR 0013; budget % before → after); PM/Staff/Admin → 403 (audited)', F.SignBody, ['id'], detailOk())
   post('/expense-requests/{id}/reject', 'Reject (reason) at "Diketahui" (Direktur) or an approval level (Finance); PM/Staff/Admin → 403 (audited)', F.RejectBody, ['id'], detailOk())

@@ -18100,6 +18100,146 @@
         }
       }
     },
+    "/expense-requests/{id}/duplicate": {
+      "post": {
+        "summary": "Duplikat: a clean new Draft from a readable request (same PT, project, lines, requesters; no number, approvals, transfers, receipts, flags) — DRMS 13/10 Persetujuan #12",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d+$"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": false,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422."
+            },
+            "required": false,
+            "description": "Required from the APK; a retry with the same key and body returns the stored response (header Idempotent-Replayed: true); another body → 422.",
+            "name": "Idempotency-Key",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmptyBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "New draft",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExpenseRequestDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/expense-requests/{id}/acknowledge": {
       "post": {
         "summary": "\"Diketahui Oleh\" = Direktur approval (US-42, ADR 0013); PM/Staff/Admin → 403 (audited)",
