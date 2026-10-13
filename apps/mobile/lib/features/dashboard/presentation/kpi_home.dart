@@ -442,8 +442,8 @@ class PmTeamKpis extends ConsumerWidget {
 /// `2026-04-01` → `2026-04` (category range start → month label).
 String _month(String date) => date.length >= 7 ? date.substring(0, 7) : date;
 
-/// Staff home (`/dashboard/me`, web "Ringkasan pengajuan saya"): own requests as counts only — Staff never sees
-/// money on the phone (no grand totals, no amounts).
+/// Staff home (`/dashboard/me`, web "Ringkasan pengajuan saya"): the caller's OWN requests with their amounts, the
+/// same figures as the web Staff home (owner 2026-10-13) — no project budgets, cash or other people's requests.
 class StaffKpis extends ConsumerWidget {
   const StaffKpis({super.key});
 
@@ -451,7 +451,7 @@ class StaffKpis extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final t = AppLocalizations.of(context);
     return _kpiAsync(ref.watch(staffDashboardProvider), () => ref.invalidate(staffDashboardProvider), (d) {
-      final cur = d.trend.isEmpty ? null : d.trend.last;
+      final cur = d.month;
       return Column(
         key: const Key('kpi-staff'),
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -478,8 +478,9 @@ class StaffKpis extends ConsumerWidget {
                 key: const Key('kpi-my-month'),
                 icon: Icons.description,
                 label: t.kpiMyMonth(cur == null ? '' : periodShort(cur.period)),
-                value: formatDecimal(cur?.value ?? 0),
-                footer: Sparkline(values: [for (final p in d.trend) p.value], semanticsLabel: t.kpiTrendMineTitle),
+                value: formatDecimal(cur?.count ?? 0),
+                lines: [_small(context, formatRupiah(cur?.sum ?? 0), key: const Key('kpi-my-month-sum'))],
+                footer: Sparkline(values: [for (final p in d.trend) p.count], semanticsLabel: t.kpiTrendMineTitle),
               ),
               KpiCard(
                 key: const Key('kpi-my-done'),
@@ -490,18 +491,10 @@ class StaffKpis extends ConsumerWidget {
               ),
             ],
           ),
-          PipelineCard(
-            pipeline: d.pipeline,
-            title: t.kpiPipelineMineTitle,
-            subtitle: t.kpiPipelineMineSubtitle,
-            money: false,
-          ),
-          TrendCard(
-            rows: [for (final p in d.trend) RequestTrendPoint(p.period, p.value, 0)],
-            title: t.kpiTrendMineTitle,
-            subtitle: t.kpiTrendMineSubtitle,
-            money: false,
-          ),
+          // web order (Dashboard.tsx Staff()): status → "Pengajuan saya" → per month
+          PipelineCard(pipeline: d.pipeline, title: t.kpiPipelineMineTitle, subtitle: t.kpiPipelineMineSubtitle),
+          MyRequestsCard(rows: d.latest),
+          TrendCard(rows: d.trend, title: t.kpiTrendMineTitle, subtitle: t.kpiTrendMineSubtitle),
         ],
       );
     });

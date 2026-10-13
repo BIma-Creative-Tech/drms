@@ -752,17 +752,63 @@ class PmDashboard {
   }
 }
 
-/// `GET /dashboard/me` — Staff home ("Ringkasan pengajuan saya"). Staff never sees money on the phone: only counts
-/// are parsed (no grand totals).
+/// One own request of the Staff home (`latest[]`, web "Pengajuan saya": number, status, Nominal).
+class OwnRequest {
+  const OwnRequest({
+    required this.id,
+    this.docNo,
+    this.title = '',
+    this.type = '',
+    this.status = '',
+    this.grandTotal = 0,
+  });
+  final int id;
+
+  /// null for a draft (web: `Draft "title"`).
+  final String? docNo;
+  final String title;
+
+  /// `advance` / `reimburse` and the status code (labels: `statusLabelFallback`).
+  final String type;
+  final String status;
+  final int grandTotal;
+
+  static List<OwnRequest> listFromJson(Object? rows) => [
+    for (final r in _l(rows))
+      OwnRequest(
+        id: _i(r['id']),
+        docNo: r['docNo'] is String ? r['docNo'] as String : null,
+        title: _s(r['title']),
+        type: _s(r['type']),
+        status: _s(r['status']),
+        grandTotal: _i(r['grandTotal']),
+      ),
+  ];
+}
+
+/// `GET /dashboard/me` — Staff home ("Ringkasan pengajuan saya"). The server scopes every block to the caller's OWN
+/// requests (`ownScope`). Owner decision 2026-10-13: the phone shows the amounts of those own requests like the web
+/// Staff home (month Σ, stage Σ, Σ per month, Nominal of the latest requests) — and no other money (no project
+/// budgets, no cash, no other people's requests: `/dashboard/me` carries none).
 class StaffDashboard {
-  const StaffDashboard({this.actions = 0, this.pipeline = const Pipeline(), this.trend = const []});
+  const StaffDashboard({
+    this.actions = 0,
+    this.pipeline = const Pipeline(),
+    this.trend = const [],
+    this.latest = const [],
+  });
 
   /// "Perlu tindakan saya": drafts, revisions, receipts or LPJ to send.
   final int actions;
+
+  /// Own requests per stage: count and Σ grand total.
   final Pipeline pipeline;
 
-  /// Requests per month (counts only).
-  final List<TrendPoint> trend;
+  /// Own requests per month (6 months, no drafts): count and Σ grand total.
+  final List<RequestTrendPoint> trend;
+
+  /// "Pengajuan saya": the 10 latest own requests with their grand total.
+  final List<OwnRequest> latest;
 
   /// "Sedang diproses" = waiting for a decision, in the transfer queue or in LPJ.
   int get inProcess =>
@@ -771,18 +817,16 @@ class StaffDashboard {
   int get done => pipeline.count('done');
   int get exit => pipeline.exit?.count ?? 0;
 
+  /// The current month of [trend] (web KPI "Pengajuan `bulan`"), null without data.
+  RequestTrendPoint? get month => trend.isEmpty ? null : trend.last;
+
   static StaffDashboard fromJson(Json j) {
     final viz = _m(j['viz']);
-    final p = Pipeline.fromJson(viz['pipeline']);
     return StaffDashboard(
       actions: _l(j['actions']).length,
-      // counts only: the stage sums are dropped on purpose
-      pipeline: Pipeline(
-        stages: [for (final s in p.stages) PipelineStage(key: s.key, label: s.label, count: s.count)],
-        exit: p.exit == null ? null : PipelineStage(key: p.exit!.key, label: p.exit!.label, count: p.exit!.count),
-        total: p.total,
-      ),
-      trend: _trend(viz['requestTrend'], 'count'),
+      pipeline: Pipeline.fromJson(viz['pipeline']),
+      trend: _requestTrend(viz['requestTrend']),
+      latest: OwnRequest.listFromJson(j['latest']),
     );
   }
 }

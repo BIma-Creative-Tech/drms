@@ -55,7 +55,7 @@ export function registerDailyPaths(registry: OpenAPIRegistry, h: Helpers): void 
   registry.registerPath({
     method: 'patch',
     path: '/rap-items/{id}',
-    summary: 'P3 edit / deactivate a RAP item (same roles and lock as create; kind never changes)',
+    summary: 'P3 edit / deactivate a RAP item (same roles and lock as create; kind never changes). A used item ("Sudah terpakai") stays editable, but any change needs `reason` (400 field reason), audited',
     security: h.security,
     request: { headers: h.idem, params: idParam, body: json(D.RapItemUpdate) },
     responses: h.res(200, 'RAP item', D.RapItem, write),
