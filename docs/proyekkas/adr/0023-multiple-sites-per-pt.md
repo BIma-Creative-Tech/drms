@@ -203,3 +203,76 @@ use: keep the data, stop using it (sites can be deactivated).
 
 All answered on 2026-10-11 (section "Decisions"): Q-S1 = site is a branch office (cabang), one site handles several
 projects, a project belongs to at most one site; Q-S2…Q-S7 = the proposed defaults. No open questions.
+
+## Amendment 2026-10-13 — attendance type OnSite / Non-OnSite and the head office (DRMS 13/10 A2)
+
+- **Status:** accepted (owner 2026-10-13, DRMS 13/10 Phase A2). Supersedes the check-in part of §3 and Q-S5 ("home
+  site **or** team assignment") for own check-ins; everything else of this ADR stands.
+- **Branch:** `feat/d1310-a-onsite` (from `feat/d1310-w3-dash`).
+
+### Owner requirement
+
+> Karyawan OnSite boleh absen di semua lokasi terdaftar PT-nya (site, project, pusat biaya) — tidak perlu dimapping,
+> selama site teregister. Karyawan Non-OnSite (staf kantor) hanya di kantor pusat dan kantor cabang. Aplikasi
+> mengenali area secara otomatis.
+
+### Decision
+
+1. **`employees.attendanceType`** ("Tipe absensi", select, required): `onsite` = **Karyawan OnSite**, `non_onsite` =
+   **Karyawan Non-OnSite**. Edited on the employee form and on the Pengguna form (tab Data Karyawan,
+   `POST/PATCH /api/v1/user-onboarding` `employee.attendanceType`); list filter on Karyawan.
+   **Default and backfill = `onsite`.** Rationale: OnSite allows a superset of what the assignment rule allowed (every
+   assigned project / cost center / site and the home site are registered locations of the own PT), so after the
+   migration no check-in that worked before is refused; the Admin then switches office staff to Non-OnSite. (Default
+   `non_onsite` would have broken every project check-in of field staff on the day of the deploy.)
+2. **`sites.isHeadOffice`** ("Kantor pusat", checkbox, default false) — the PT's head office is a registered site.
+   **At most one per PT**: field error in the collection hook ("PT ini sudah punya kantor pusat …") and a partial
+   unique index `sites_one_head_office_per_company (company_id) WHERE is_head_office` in the DB. Moving the flag =
+   clear it on the old site first. List filter + column on Site.
+3. **Eligibility (server, `domain/attendance/area.ts` + `record.ts`)** — replaces the assignment / home-site check:
+   - the location must belong to the **employee's PT** (as before: another PT's location → `NOT_FOUND`; a mismatch
+     that slips through → `NOT_ASSIGNED`; DB `pk_same_company` unchanged);
+   - **OnSite:** any active location of the PT **with a point** — site (head office included), project (not
+     archived), cost center (active); **no team assignment and no home site needed**;
+   - **Non-OnSite:** sites only (head office + branch offices); a project / cost center → `NOT_ASSIGNED` "Lokasi ini
+     tidak termasuk area absen untuk karyawan Non-OnSite (hanya kantor pusat dan kantor cabang)." — also when the
+     employee has a team assignment there;
+   - a location without a point is never eligible (`NO_GEOFENCE`, unchanged); outside the radius → `OUTSIDE_GEOFENCE`
+     (same haversine + GPS allowance ≤ 50 m).
+   Check order unchanged: MOCK_LOCATION → NOT_FOUND/VALIDATION → NO_GEOFENCE → NOT_ASSIGNED → OUTSIDE_GEOFENCE → …
+   The code `NOT_ASSIGNED` is **kept** (it now means "not eligible for the employee's type") so released APKs keep
+   showing the server text. PM on-behalf: the PM's team-scope check stays; the employee's eligibility follows the
+   employee's type. Team assignments keep driving the PM views (Tim hari ini, on-behalf candidates).
+4. **`GET /api/v1/attendance/locations`** (route class `selection`): the caller's own employee per selected PT
+   (`?company=` narrows, 403 `COMPANY_NOT_ALLOWED` outside) → `{ employees: [{id, company, attendanceType,
+   homeSiteId}], items: [{kind, id, company, employeeId, code, name, lat, lng, radiusM, isHeadOffice, home}] }` —
+   only eligible locations with a point, `radiusM` = own radius else the PT default, ordered home site, head office,
+   sites, projects, cost centers. **No money, no budgets** (the Staff masters filter of projects / cost centers is not
+   widened). OpenAPI `AttendanceLocations`.
+5. **Automatic area detection** (APK `detectArea`, web `areaNote`, same rule as the server): the location whose
+   geofence contains the fix is selected; several (overlapping) → the nearest is selected and the user picks among
+   them (chips "Area absen di posisi Anda"); none → manual picker (fallback) with the nearest as a hint. The APK runs it
+   when the Absen tab opens (not while the privacy notice blocks GPS) and on "Deteksi lokasi otomatis"; the web form
+   runs it on open when the browser already allows the location, else on the button.
+6. **Offline:** the APK caches the list per user (`attendance-locations:<sub>` in the encrypted DB), refreshed with
+   the masters and at most every 15 min after a sync run; check-ins stay queueable offline and the server
+   re-validates each at sync. A server before A2 (404) → the APK keeps the assignment-based masters list.
+7. Migrations `20261013_620000_d1310_onsite` (enum + `employees.attendance_type NOT NULL DEFAULT 'onsite'`,
+   `sites.is_head_office DEFAULT false`, snapshot `.json`) and `20261013_620100_d1310_onsite_guard` (unique index).
+   Additive; `down()` drops them (pre-production).
+
+### Consequences
+
+- Positive: no daily Team Assignment rows for field staff to check in; office staff are confined to offices; the
+  phone picks the right location by itself.
+- Negative / watch: an OnSite employee can check in at every project of the PT with a point (by design — the selfie,
+  GPS, geofence and the reports remain the control); the APK list is as fresh as the last sync (≤ 15 min online).
+- Deploy: Admin flags the head office of each PT (with its point) and sets office staff to Non-OnSite; until then
+  everyone is OnSite.
+
+### Open questions (owner)
+
+- Non-OnSite = **every** site of the PT (head office + all branches), not only the own home site + head office — as
+  read from "hanya di kantor pusat dan kantor cabang". Narrow to "home site + head office" if intended.
+- Should a Non-OnSite employee still be allowed at a project when explicitly assigned (team assignment)? Today: no.
+- Employee import workbook: no `Tipe absensi` column yet (new employees default to OnSite).

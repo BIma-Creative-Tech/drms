@@ -13,8 +13,12 @@ Sebelum mulai: unggah **tanda tangan** sekali di web (**Profil & tanda tangan**)
    menampilkan *"Absensi (selfie dan lokasi) belum bisa dipakai…"* dan tombol absen mati — ketuk **Baca pemberitahuan
    privasi**. Tanpa sinyal: konfirmasi dikirim otomatis saat online; tunggu sampai terkirim.
 1. Datang ke lokasi project atau kantor/pusat biaya. Nyalakan **GPS**.
-2. Beranda → **Absensi** → tab **Absen** → pilih lokasi (ikon gedung = pusat biaya).
-3. Tekan **Cek jarak ke lokasi**. Harus tertulis **"Di dalam area absen"**.
+2. Beranda → **Absensi** → tab **Absen**. Aplikasi **mengenali area otomatis**: lokasi tempat Anda berdiri langsung
+   terpilih (*"Lokasi terdeteksi otomatis: …"*). Bila beberapa area bertumpuk, pilih salah satu di **Area absen di
+   posisi Anda**. Bila tertulis *"Posisi Anda di luar semua area absen terdaftar"*, dekati lokasi atau pilih lokasi
+   secara manual (ikon gedung = pusat biaya; label **Pusat** = kantor pusat, **Penempatan** = site penempatan Anda).
+   Tombol **Deteksi lokasi otomatis** mengulang pencarian.
+3. Tekan **Cek jarak ke lokasi** bila perlu. Harus tertulis **"Di dalam area absen"**.
 4. Tekan **Absen masuk** → ambil **selfie** dengan kamera depan (galeri tidak bisa dipakai).
 5. Pulang: ulangi dan tekan **Absen pulang**.
 
@@ -23,6 +27,10 @@ Sebelum mulai: unggah **tanda tangan** sekali di web (**Profil & tanda tangan**)
 - **Tidak ada sinyal?** Tetap absen. Tertulis "Absen tersimpan di HP (offline)…" dan otomatis terkirim saat ada
   sinyal. Jam yang dicatat = jam saat Anda absen, bukan jam kirim.
 - **"Di luar area absen"**: dekati titik lokasi. Bila Anda yakin sudah di lokasi, lapor PM/Admin (titik mungkin salah).
+- **Lokasi mana yang muncul?** Tergantung **tipe absensi** Anda (diatur Admin): **Karyawan OnSite** — semua lokasi
+  terdaftar PT (kantor, site, project, pusat biaya), tanpa perlu ditugaskan; **Karyawan Non-OnSite** — hanya kantor
+  pusat dan kantor cabang. *"Lokasi ini tidak termasuk area absen untuk karyawan Non-OnSite"* = minta Admin bila tipe
+  Anda salah. Daftar lokasi tersimpan di HP, jadi deteksi area tetap jalan tanpa sinyal.
 - **"Lokasi palsu (mock location) terdeteksi"**: matikan aplikasi pengubah lokasi. Absen ditolak.
 - **"Sudah absen masuk di … hari ini"**: absen masuk hanya sekali per hari per lokasi.
 - **"Titik lokasi … belum diisi Admin"**: lapor Admin. (Bila titik sudah ada tetapi radius kosong, dipakai radius

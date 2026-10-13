@@ -318,6 +318,20 @@ Hal penting per PT yang harus Anda atur sebelum go-live:
   Jadwal kerja default diatur per PT (**Perusahaan (PT) → Operasional → Jadwal kerja default**).
 - Titik & radius **project** diisi di **Proyek → Project**. Lokasi tanpa titik tidak bisa dipakai absen; titik tanpa
   radius memakai **Radius geofence default** PT itu. Server menambah toleransi akurasi GPS HP (maks. 50 m) ke radius.
+- **Tipe absensi karyawan** (DRMS 13/10 A2): di **Karyawan** (atau **Pengguna → tab Data Karyawan**) isi **Tipe
+  absensi**:
+  - **Karyawan OnSite** (default semua karyawan): boleh absen di **semua lokasi terdaftar PT** yang punya titik —
+    kantor pusat, kantor cabang (site), project, pusat biaya — **tanpa penugasan** (Team Assignment tidak perlu).
+  - **Karyawan Non-OnSite** (staf kantor): hanya boleh absen di **kantor pusat dan kantor cabang** (site). Absen di
+    project/pusat biaya ditolak: *"Lokasi ini tidak termasuk area absen untuk karyawan Non-OnSite…"*.
+  - Daftar Karyawan bisa difilter per **Tipe absensi**.
+- **Kantor pusat:** di **Master Data → Site** centang **Kantor pusat** pada site kantor pusat PT (maksimal **1 per
+  PT**; untuk memindahkan, hapus centang di site lama dulu) dan isi **titik + radius**. Tanpa titik, karyawan
+  Non-OnSite tidak punya tempat absen di kantor pusat.
+- APK dan web **mengenali area otomatis**: lokasi yang geofence-nya memuat posisi GPS karyawan langsung terpilih;
+  bila beberapa area bertumpuk, karyawan memilih salah satu; di luar semua area, karyawan memilih manual (server
+  tetap menolak bila di luar radius). Lokasi baru/titik baru terbaca di APK setelah sinkron berikutnya (maks. ±15
+  menit saat online).
 - Bila lebih dari satu PT tampil, halaman absensi punya pilihan **PT** (mis. **Semua PT (DRMS, CS1)**) dan nama lokasi
   diberi awalan `[KODE PT]`.
 - **Laporan → Laporan Absensi**: Admin bisa melihat dan mengunduh (CSV/Excel) untuk semua karyawan PT tempat ia Admin.
