@@ -254,7 +254,13 @@ export async function ProjectRapTab(props: DocumentViewServerProps) {
         </>
       )}
       {rap.canEdit ? (
-        <Card id="project-rap-manage" title="Kelola RAP" sub={rap.drivesProgress ? 'Konstruksi: tahapan wajib; pekerjaan menggerakkan progress tahapan' : 'Rencana biaya project: tahapan opsional, progress tetap manual'}>
+        <Card
+          id="project-rap-manage"
+          title="Kelola RAP"
+          sub={rap.drivesProgress ? 'Konstruksi: tahapan wajib; pekerjaan menggerakkan progress tahapan' : 'Rencana biaya project: tahapan opsional, progress tetap manual'}
+          // DRMS 13/10 Wave 3: item-by-item form (tambah / ubah) on Proyek › RAP
+          action={{ href: `/admin/rap/${id}`, label: 'Ubah item RAP' }}
+        >
           <div className="pk-kact" style={{ marginBottom: 12 }}>
             {rap.items.length ? (
               <a className="pk-kbtn" href={`/api/v1/projects/${id}/rap.xlsx`} data-pk-link="rap-download">

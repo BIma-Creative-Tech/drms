@@ -122,6 +122,17 @@ export const MC2_ADMIN_VIEWS = {
 }
 
 /**
+ * DRMS 13/10 Wave 3: "Pengguna" — ONE tabbed form (account, access per PT, employee, bank accounts) for create
+ * (`/pengguna/baru`, also the menu item) and edit (`/pengguna/<id>`). Both routes render the same view (it reads the
+ * segment), so whichever matches first is right. Admin of a PT / group admin; checks inside the view +
+ * /api/v1/user-onboarding.
+ */
+export const USER_ONBOARDING_ADMIN_VIEWS = {
+  userOnboardingNew: { Component: '@/admin/views/Pengguna#PenggunaView', path: '/pengguna/baru' as const, exact: true, meta: { title: 'Pengguna baru' } },
+  userOnboarding: { Component: '@/admin/views/Pengguna#PenggunaView', path: '/pengguna/:id' as const, exact: true, meta: { title: 'Pengguna' } },
+}
+
+/**
  * FR1 (ADR 0020, plan "Web"): field reports per project kind — "Unit & kontrak" (contract list,
  * contract detail with tabs Timesheet/Rekap/Unit/Timeline, unit detail, timesheet input/detail),
  * "Laporan servis" (list/input/detail) and "Aftersales" (weekly recap, activity list/input/detail).
@@ -165,4 +176,14 @@ export const LOAN_ADMIN_VIEWS = {
   loanList: { Component: '@/admin/views/Loans#LoanList', path: '/pinjaman' as const, exact: true, meta: { title: 'Pinjaman antar project' } },
   loanNew: { Component: '@/admin/views/Loans#LoanNew', path: '/pinjaman/baru' as const, exact: true, meta: { title: 'Ajukan pinjaman antar project' } },
   loanDetail: { Component: '@/admin/views/Loans#LoanDetail', path: '/pinjaman/detail/:id' as const, exact: true, meta: { title: 'Pinjaman antar project' } },
+}
+
+/**
+ * DRMS 13/10 Wave 3 — "Proyek › RAP" (own sub-menu under Proyek): RAP index of the visible projects and the RAP form +
+ * Excel upload of one project. Both exact (`/rap` would prefix-match `/rap/<id>`). Role / project checks inside the
+ * views; every write goes through /api/v1 (projects/{id}/rap/items, rap-items/{id}, rap import / templates).
+ */
+export const RAP_ADMIN_VIEWS = {
+  rapIndex: { Component: '@/admin/views/Rap#RapIndex', path: '/rap' as const, exact: true, meta: { title: 'RAP proyek' } },
+  rapProject: { Component: '@/admin/views/Rap#RapProject', path: '/rap/:id' as const, exact: true, meta: { title: 'RAP project' } },
 }

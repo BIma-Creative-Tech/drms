@@ -22,9 +22,10 @@ export async function getTestPayload(): Promise<Payload> {
 
 // ---- fake Keycloak Admin API (records calls) --------------------------------------------------
 export type KcCall = { op: string; args: unknown[] }
-export function installFakeKeycloak(): { calls: KcCall[]; users: Map<string, { email: string; enabled: boolean; roles: Set<string> }> } {
+export type FakeKcUser = { email: string; enabled: boolean; roles: Set<string>; password?: { value: string; temporary: boolean } }
+export function installFakeKeycloak(): { calls: KcCall[]; users: Map<string, FakeKcUser> } {
   const calls: KcCall[] = []
-  const users = new Map<string, { email: string; enabled: boolean; roles: Set<string> }>()
+  const users = new Map<string, FakeKcUser>()
   const rec = (op: string, ...args: unknown[]) => void calls.push({ op, args })
   const fake: KeycloakAdmin = {
     async findUserByEmail(email) {
@@ -76,6 +77,11 @@ export function installFakeKeycloak(): { calls: KcCall[]; users: Map<string, { e
     async listUserCredentials(id) {
       rec('listUserCredentials', id)
       return []
+    },
+    async resetPassword(id, value, temporary) {
+      rec('resetPassword', id, temporary) // never the value
+      const u = users.get(id)
+      if (u) u.password = { value, temporary }
     },
   }
   setKeycloakAdmin(fake)

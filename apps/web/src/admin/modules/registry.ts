@@ -55,6 +55,8 @@ export type ModuleItem =
       staffLabel?: string
       /** FR1: shown only when a selected PT has this feature on (companies.fieldReportsEnabled). */
       feature?: FeatureKey
+      /** Path prefix that belongs to the module when wider than `view` (e.g. `/pengguna` for /pengguna/<id>). */
+      prefix?: string
     }
 
 export type ModuleSection = { label?: string; items: readonly ModuleItem[] }
@@ -119,6 +121,16 @@ export const MODULES: readonly ModuleDef[] = [
     sections: [
       // Grouped so the whole menu fits one bar row at 1440px (7 flat entries + 2 dropdowns did not).
       { items: [{ collection: 'projects' }, { collection: 'budget-lines' }] },
+      // DRMS 13/10 Wave 3: "Proyek › RAP" — own sub-menu (RAP index + form + Excel upload per project); the raw
+      // collection lists of the RAP live here too (were under "Laporan lapangan")
+      {
+        label: 'RAP',
+        items: [
+          { view: '/rap', label: 'RAP proyek', roles: OFFICE_PM_ADMIN, navKey: 'rap' },
+          { collection: 'rap-items', label: 'Data item RAP' },
+          { collection: 'rap-templates' },
+        ],
+      },
       { label: 'Tahapan', items: [{ collection: 'project-stages' }, { collection: 'stage-templates' }] },
       { label: 'Data pendukung', items: [{ collection: 'clients' }, { collection: 'cost-centers' }, { collection: 'team-assignments' }] },
       {
@@ -143,12 +155,10 @@ export const MODULES: readonly ModuleDef[] = [
           { collection: 'unit-timesheets', label: 'Data timesheet unit' },
           { collection: 'aftersales-activities', label: 'Data aktivitas aftersales' },
           { collection: 'contract-units' },
-          // P3 konstruksi: Laporan Harian + RAP
+          // P3 konstruksi: Laporan Harian (RAP: own section above)
           { view: '/laporan-harian', label: 'Laporan harian', roles: FIELD_ALL, feature: 'fieldReports', navKey: 'laporan-harian' },
           { collection: 'daily-reports', label: 'Data laporan harian' },
           { collection: 'daily-report-lines', label: 'Data baris laporan harian' },
-          { collection: 'rap-items', label: 'Data item RAP' },
-          { collection: 'rap-templates' },
           { collection: 'resource-types' },
         ],
       },
@@ -230,6 +240,8 @@ export const MODULES: readonly ModuleDef[] = [
         items: [
           // MC2-4: role matrix user × PT (Admin of a PT / group admin; the view re-checks)
           { view: '/akses-pt', label: 'Akses PT (matriks)', roles: ['pk-admin'], navKey: 'akses-pt' },
+          // DRMS 13/10 W3: one tabbed form (account + access + employee + bank accounts); /pengguna/<id> = edit
+          { view: '/pengguna/baru', label: '+ Pengguna baru', roles: ['pk-admin'], navKey: 'pengguna-baru', prefix: '/pengguna' },
           // own profile = avatar menu "Profil & tanda tangan" (profileHref)
           { collection: 'users', personal: true },
           { collection: 'company-memberships', label: 'Data akses PT' },
@@ -348,7 +360,7 @@ export function entityModuleMap(modules: readonly ModuleDef[] = MODULES): { coll
 function viewPrefixes(modules: readonly ModuleDef[]): Array<[string, ModuleId]> {
   const out: Array<[string, ModuleId]> = []
   for (const m of modules) {
-    for (const it of allItems(m)) if ('view' in it && !it.view.startsWith('/collections/') && !it.view.startsWith('/globals/')) out.push([it.view, m.id])
+    for (const it of allItems(m)) if ('view' in it && !it.view.startsWith('/collections/') && !it.view.startsWith('/globals/')) out.push([it.prefix ?? it.view, m.id])
   }
   return out.sort((a, b) => b[0].length - a[0].length)
 }
@@ -495,6 +507,7 @@ export const ITEM_ICONS: Readonly<Record<string, IconName>> = {
   '/collections/clients': 'users',
   '/collections/cost-centers': 'tWallet3',
   '/collections/team-assignments': 'tPeople',
+  '/rap': 'tReceiptItem',
   '/progress': 'tStatusUp',
   '/progress/laporan': 'tChart',
   '/collections/progress-reports': 'tChartSquare',

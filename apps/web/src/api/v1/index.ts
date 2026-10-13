@@ -24,6 +24,7 @@ import { REPORT_ENDPOINTS } from './endpoints/reports'
 import { SHORTFALL_ENDPOINTS } from './endpoints/shortfall'
 import { appConfigEndpoint } from './endpoints/app'
 import { syncBatchEndpoint } from './endpoints/sync'
+import { USER_ONBOARDING_ENDPOINTS } from './endpoints/user-onboarding'
 
 /** Root custom endpoints served at /api/v1/* (architecture §6.1/§6.3). */
 export const v1Endpoints: Endpoint[] = [
@@ -73,4 +74,6 @@ export const v1Endpoints: Endpoint[] = [
   ...PROJECT_ENDPOINTS,
   // ADR 0022: inter-project loans (PM submits, Direktur decides, repayments) — web + APK
   ...LOAN_ENDPOINTS,
+  // DRMS 13/10 W3: "Pengguna" tabbed onboarding — account + access per PT + employee + bank accounts in ONE save
+  ...USER_ONBOARDING_ENDPOINTS,
 ]

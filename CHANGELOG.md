@@ -30,6 +30,57 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   gaps). Rows open the project's RAP / Pinjaman tab or the request. KPI cards show **full Rupiah** values (Umum #10);
   new CustomPainter charts: request-trend columns and a horizontal bar list.
 
+### Added (DRMS 13/10 Wave 3 — Pengguna tabbed onboarding)
+
+- **One tabbed "Pengguna" form** (`/admin/pengguna/baru`, `/admin/pengguna/<id>`; client: "Satu UI ber-tab: Detail
+  Pengguna, Permissions, Detail Karyawan, Rekening Karyawan"): tabs **Detail Pengguna** (email, nama, No. HP,
+  status), **Akses & Peran** (per PT the roles as ONE checklist dropdown — "multiple dropdown, bukan checkbox"),
+  **Data Karyawan** (per PT: create, pick an unlinked employee of that PT, edit the linked one, unlink),
+  **Rekening Karyawan** (list + "+ Tambah rekening") and **Penugasan Proyek** (read-only). Label left of the input
+  (D4 grid, now shared as `.pk-fgrid`), stacked below 640 px. One **Simpan**; a refused save marks the fields and
+  opens the first tab with an error. Admin of a PT / group admin only; the PTs shown = the caller's Admin PTs within
+  the PT selection. The users list ("+ Buat baru", row click; "Aksi" column dropped there), the menu ("+ Pengguna
+  baru") and the Akses PT matrix ("+ Pengguna baru", user name) open it; others keep Payload's user form.
+- **`POST /api/v1/user-onboarding`, `PATCH|GET /api/v1/user-onboarding/{userId}`:** account + memberships +
+  employees + bank accounts in ONE DB transaction, every write through the existing collections with the caller's
+  access (same rules, hooks and audit rows as the separate pages: Admin of THAT PT, Users update access for the
+  identity, bank-account reason / verification rules, same-PT employee, one employee per account and PT). Keycloak
+  first (Users hook); on any failure the transaction rolls back and the endpoint compensates Keycloak (new user
+  deleted, enabled flag / login role reverted). Errors as problem+json with `errors[].path` = body paths
+  (`user.*`, `companies.<i>.…`, `reason`); Keycloak refusing → 502 `KEYCLOAK_FAILED`. Own account: no
+  self-deactivation, no removal of the own Admin role. OpenAPI: `UserOnboardingCreate` / `UserOnboardingUpdate` /
+  `UserOnboardingResult` / `UserOnboardingDetail`.
+- **Temporary password for new accounts:** a NEW Keycloak user created here gets a generated temporary password
+  (`reset-password`, `temporary: true` → Keycloak requires a new password at the first login, `UPDATE_PASSWORD`),
+  shown ONCE to the Admin (never stored, logged or audited — the audit row records only the fact). An existing
+  Keycloak account with the email is linked, password untouched. Keycloak admin client: `resetPassword` (same
+  signature as the APK initial-password branch). ADR 0003 "Revisi 2026-10-13".
+- **Akses PT matrix:** the role checkboxes of a cell are the same checklist dropdown (`MultiSelect` form mode:
+  applies on tick, "Kosongkan" / "Selesai", floats above the scrolling table); rules unchanged.
+
+### Added (DRMS 13/10 Wave 3 — Proyek › RAP)
+
+- **Own sub-menu "Proyek › RAP"** (client: "Form RAP + upload, submenu sendiri di bawah Proyek"): section **RAP** in the
+  Proyek module (launcher / landing tiles) with **RAP proyek** (`/admin/rap`) for Direktur, Admin, Finance and PM; the
+  raw lists **Data item RAP** and **RAP templates** moved there from "Laporan lapangan". The Staff menu is unchanged
+  (project list only); Staff may still open the pages read-only, without money, like the project's RAP tab.
+- **RAP index** `/admin/rap`: every project the caller may read with its RAP state (**Ada · n item**, **Belum ada
+  (wajib)** for projects with a RAB or konstruksi, **Belum ada**), Wave 2 toolbar (search, multi-select PT / status
+  project / RAP, archived only on request), numbered pages, clickable rows and a **totals row** at the bottom (projects,
+  items, Σ RAP, Σ RAB over every filtered row). **Total RAP** (Σ volume × harga satuan of the active items) only for the
+  RAP price roles of the project (Direktur / Admin / Finance of the PT, PM of the project team), **RAB** only where the
+  RAB field is readable, **RAP / RAB** % with a "Melebihi RAB" warning; Staff sees no money column at all.
+- **RAP page per project** `/admin/rap/:id`: items table (kode, uraian, jenis, tahapan, volume; harga satuan / jumlah /
+  realisasi for the price roles) with a **Grand total** row, **+ Tambah item** and **Ubah** in one dialog (label left of
+  the input, D4; same limits as the API; jumlah computed live), deactivation instead of delete (items are never
+  deleted), a "Sudah terpakai" chip on items with realisation. It calls the existing `POST /api/v1/projects/{id}/rap/items`
+  and `PATCH /api/v1/rap-items/{id}` (no API change). Lock unchanged: once a daily report realised anything the PM sees
+  the buttons disabled (409 `RAP_LOCKED` server-side), Direktur / Admin edit with a reason. **Upload Excel & template**
+  (RapImport, template, RAP download, RAP templates) stay on the page for the RAP editors. The project's RAP tab links
+  to it ("Ubah item RAP").
+- Shared `FORM_GRID_STYLE` (`admin/components/form-grid.ts`): the label-left grid of the Wave 2 request form for custom
+  `.pk-fld` forms and dialogs.
+
 ### Changed (DRMS 13/10 Wave 2 — generic list view, Umum #3–#8, Persetujuan #2)
 
 - **One list view for every collection** (`PkListView`, `src/admin/pk-list/`, wired centrally in `payload.config.ts`

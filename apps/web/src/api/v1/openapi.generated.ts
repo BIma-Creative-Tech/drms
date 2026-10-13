@@ -15946,6 +15946,670 @@ export const openapiDocument = {
           "amount"
         ],
         "additionalProperties": false
+      },
+      "UserOnboardingResult": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "integer",
+            "exclusiveMinimum": 0
+          },
+          "created": {
+            "type": "boolean"
+          },
+          "temporaryPassword": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Create only, shown ONCE: temporary password of a NEW Keycloak user (Keycloak requires a new password at the first login, UPDATE_PASSWORD). null when an existing Keycloak account with that email was linked (its password is unchanged) and on edit. Never stored or logged."
+          },
+          "linkedExistingAccount": {
+            "type": "boolean"
+          },
+          "detail": {
+            "$ref": "#/components/schemas/UserOnboardingDetail"
+          }
+        },
+        "required": [
+          "userId",
+          "created",
+          "temporaryPassword",
+          "linkedExistingAccount",
+          "detail"
+        ]
+      },
+      "UserOnboardingDetail": {
+        "type": "object",
+        "properties": {
+          "user": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "type": "integer",
+                "exclusiveMinimum": 0
+              },
+              "email": {
+                "type": "string"
+              },
+              "name": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "phone": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "active": {
+                "type": "boolean"
+              },
+              "groupAdmin": {
+                "type": "boolean"
+              },
+              "identityEditable": {
+                "type": "boolean",
+                "description": "false: the account also belongs to a PT the caller does not administer (or is a group admin) — identity read-only (Users update access)."
+              }
+            },
+            "required": [
+              "id",
+              "email",
+              "name",
+              "phone",
+              "active",
+              "groupAdmin",
+              "identityEditable"
+            ]
+          },
+          "companies": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                "shortCode": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "canManageEmployees": {
+                  "type": "boolean",
+                  "description": "Admin role IN this PT (employee + bank-account writes); a group admin without it edits access only."
+                },
+                "membership": {
+                  "type": [
+                    "object",
+                    "null"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0
+                    },
+                    "roles": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/OnboardingRole"
+                      }
+                    },
+                    "active": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "roles",
+                    "active"
+                  ]
+                },
+                "employee": {
+                  "type": [
+                    "object",
+                    "null"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "nickname": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "position": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "phone": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "active": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "code",
+                    "name",
+                    "nickname",
+                    "position",
+                    "phone",
+                    "active"
+                  ]
+                },
+                "bankAccounts": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0
+                      },
+                      "bank": {
+                        "type": [
+                          "integer",
+                          "null"
+                        ],
+                        "exclusiveMinimum": 0
+                      },
+                      "bankName": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "accountNo": {
+                        "type": "string"
+                      },
+                      "accountHolder": {
+                        "type": "string"
+                      },
+                      "isDefault": {
+                        "type": "boolean"
+                      },
+                      "verificationStatus": {
+                        "type": "string",
+                        "enum": [
+                          "unverified",
+                          "verified"
+                        ]
+                      },
+                      "active": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "bank",
+                      "bankName",
+                      "accountNo",
+                      "accountHolder",
+                      "isDefault",
+                      "verificationStatus",
+                      "active"
+                    ]
+                  }
+                },
+                "employeeChoices": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0
+                      },
+                      "code": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "active": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "code",
+                      "name",
+                      "active"
+                    ]
+                  },
+                  "description": "Employees of this PT not linked to another account (the linked one included)."
+                },
+                "assignments": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0
+                      },
+                      "label": {
+                        "type": "string"
+                      },
+                      "roleInProject": {
+                        "type": "string"
+                      },
+                      "startDate": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "endDate": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "label",
+                      "roleInProject",
+                      "startDate",
+                      "endDate"
+                    ]
+                  },
+                  "description": "Team assignments of the linked employee (read-only here)."
+                }
+              },
+              "required": [
+                "id",
+                "shortCode",
+                "name",
+                "canManageEmployees",
+                "membership",
+                "employee",
+                "bankAccounts",
+                "employeeChoices",
+                "assignments"
+              ]
+            }
+          },
+          "banks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                "name": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "name"
+              ]
+            }
+          }
+        },
+        "required": [
+          "user",
+          "companies",
+          "banks"
+        ]
+      },
+      "OnboardingRole": {
+        "type": "string",
+        "enum": [
+          "pk-staff",
+          "pk-pm",
+          "pk-finance",
+          "pk-owner",
+          "pk-admin",
+          "pk-operator"
+        ],
+        "description": "Role in ONE PT (pk-owner = Direktur, pk-operator = Operator/Anggota)."
+      },
+      "UserOnboardingCreate": {
+        "type": "object",
+        "properties": {
+          "user": {
+            "type": "object",
+            "properties": {
+              "email": {
+                "type": "string",
+                "maxLength": 254,
+                "format": "email"
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              },
+              "phone": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "maxLength": 32
+              },
+              "active": {
+                "type": "boolean",
+                "description": "Default true. false = account disabled in Keycloak, sessions + devices revoked (edit: reason required)."
+              }
+            },
+            "required": [
+              "email",
+              "name"
+            ],
+            "additionalProperties": false
+          },
+          "companies": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "company": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                "roles": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/OnboardingRole"
+                  },
+                  "maxItems": 6,
+                  "description": "Roles in this PT. Empty on an existing membership = membership inactive (history kept); a PT without membership needs ≥ 1 role."
+                },
+                "employee": {
+                  "type": [
+                    "object",
+                    "null"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "description": "Existing employee of THIS PT: linked to the account (must not be linked to another account) and the given fields are updated. Omitted = a NEW employee of this PT (code + name required)."
+                    },
+                    "code": {
+                      "type": "string",
+                      "maxLength": 32
+                    },
+                    "name": {
+                      "type": "string",
+                      "maxLength": 128
+                    },
+                    "nickname": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "maxLength": 64
+                    },
+                    "position": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "maxLength": 128
+                    },
+                    "phone": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "maxLength": 32
+                    },
+                    "active": {
+                      "type": "boolean"
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "null = unlink the employee of this PT (the employee record stays). Omitted = unchanged."
+                },
+                "bankAccounts": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "description": "Existing account of this PT's employee (update). Omitted = new account (bank, accountNo, accountHolder required)."
+                      },
+                      "bank": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0
+                      },
+                      "accountNo": {
+                        "type": "string",
+                        "maxLength": 40,
+                        "description": "Digits only after removing spaces, dots and dashes (5–34)."
+                      },
+                      "accountHolder": {
+                        "type": "string",
+                        "maxLength": 128
+                      },
+                      "isDefault": {
+                        "type": "boolean"
+                      },
+                      "verificationStatus": {
+                        "type": "string",
+                        "enum": [
+                          "unverified",
+                          "verified"
+                        ],
+                        "description": "Admin / Finance only (collection field access)."
+                      },
+                      "active": {
+                        "type": "boolean"
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "maxItems": 20,
+                  "description": "Bank accounts of THIS PT's employee (rows omitted = unchanged; never deleted — deactivate instead)."
+                }
+              },
+              "required": [
+                "company",
+                "roles"
+              ],
+              "additionalProperties": false
+            },
+            "minItems": 1,
+            "maxItems": 50
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 1000,
+            "description": "Change reason for the audit rows. Required (≥ 3 characters) whenever a collection rule asks for it: deactivating the account / an employee / a bank account, changing a bank account's number, holder or bank."
+          }
+        },
+        "required": [
+          "user",
+          "companies"
+        ],
+        "additionalProperties": false
+      },
+      "UserOnboardingUpdate": {
+        "type": "object",
+        "properties": {
+          "user": {
+            "type": "object",
+            "properties": {
+              "email": {
+                "type": "string",
+                "maxLength": 254,
+                "format": "email"
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              },
+              "phone": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "maxLength": 32
+              },
+              "active": {
+                "type": "boolean",
+                "description": "Default true. false = account disabled in Keycloak, sessions + devices revoked (edit: reason required)."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Only the identity fields to change (Keycloak-first)."
+          },
+          "companies": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "company": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                "roles": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/OnboardingRole"
+                  },
+                  "maxItems": 6,
+                  "description": "Roles in this PT. Empty on an existing membership = membership inactive (history kept); a PT without membership needs ≥ 1 role."
+                },
+                "employee": {
+                  "type": [
+                    "object",
+                    "null"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "description": "Existing employee of THIS PT: linked to the account (must not be linked to another account) and the given fields are updated. Omitted = a NEW employee of this PT (code + name required)."
+                    },
+                    "code": {
+                      "type": "string",
+                      "maxLength": 32
+                    },
+                    "name": {
+                      "type": "string",
+                      "maxLength": 128
+                    },
+                    "nickname": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "maxLength": 64
+                    },
+                    "position": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "maxLength": 128
+                    },
+                    "phone": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "maxLength": 32
+                    },
+                    "active": {
+                      "type": "boolean"
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "null = unlink the employee of this PT (the employee record stays). Omitted = unchanged."
+                },
+                "bankAccounts": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "description": "Existing account of this PT's employee (update). Omitted = new account (bank, accountNo, accountHolder required)."
+                      },
+                      "bank": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0
+                      },
+                      "accountNo": {
+                        "type": "string",
+                        "maxLength": 40,
+                        "description": "Digits only after removing spaces, dots and dashes (5–34)."
+                      },
+                      "accountHolder": {
+                        "type": "string",
+                        "maxLength": 128
+                      },
+                      "isDefault": {
+                        "type": "boolean"
+                      },
+                      "verificationStatus": {
+                        "type": "string",
+                        "enum": [
+                          "unverified",
+                          "verified"
+                        ],
+                        "description": "Admin / Finance only (collection field access)."
+                      },
+                      "active": {
+                        "type": "boolean"
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "maxItems": 20,
+                  "description": "Bank accounts of THIS PT's employee (rows omitted = unchanged; never deleted — deactivate instead)."
+                }
+              },
+              "required": [
+                "company",
+                "roles"
+              ],
+              "additionalProperties": false
+            },
+            "maxItems": 50
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 1000,
+            "description": "Change reason for the audit rows. Required (≥ 3 characters) whenever a collection rule asks for it: deactivating the account / an employee / a bank account, changing a bank account's number, holder or bank."
+          }
+        },
+        "additionalProperties": false
       }
     },
     "parameters": {
@@ -40093,6 +40757,329 @@ export const openapiDocument = {
             }
           },
           "429": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/user-onboarding": {
+      "post": {
+        "summary": "Create an account with its access per PT, employee per PT and bank accounts in ONE transaction (Admin of every PT named / group admin). Keycloak first: a NEW Keycloak user gets a temporary password (UPDATE_PASSWORD at the first login), returned once; an existing Keycloak account with the email is linked. Any failure rolls the DB back and compensates Keycloak (new user deleted); Keycloak refusing / unreachable → 502 KEYCLOAK_FAILED, not configured → 503. Errors name the field: errors[].path = user.* / companies.<i>.* / reason",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserOnboardingCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserOnboardingResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/user-onboarding/{userId}": {
+      "get": {
+        "summary": "Form data of one account: identity (+ whether the caller may change it), per PT of the caller (Admin PTs ∩ PT selection) the membership, linked employee, its bank accounts, selectable employees and team assignments; active banks",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d+$"
+            },
+            "required": true,
+            "name": "userId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Detail",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserOnboardingDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "summary": "Edit in ONE transaction: changed identity fields (Keycloak-first; accounts only in the caller's Admin PTs), roles per PT (empty = membership inactive), employee per PT (link / create / update / unlink), bank accounts (create / update, never deleted). Collection rules apply unchanged (reason on deactivation and bank-account changes, verification by Admin/Finance). Own account: no self-deactivation, no removal of the own Admin role",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d+$"
+            },
+            "required": true,
+            "name": "userId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserOnboardingUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Saved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserOnboardingResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
             "description": "Problem",
             "content": {
               "application/problem+json": {

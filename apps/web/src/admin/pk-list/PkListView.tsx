@@ -14,6 +14,7 @@ import { ROW_ACTIONS_FIELD } from '@/admin/row-actions'
 
 import { ColumnPicker } from './ColumnPicker'
 import { loadPkList } from './data'
+import { customEditOf } from './edit-view'
 import { COMPANY_PARAM, dateParams, filterParam, nextSort, pkFiltered, SORT_PARAM, toolbarQuery } from './query'
 
 type I18nLike = Parameters<typeof getTranslation>[1]
@@ -57,6 +58,10 @@ export async function PkListView(props: ListViewServerProps) {
   const data = await loadPkList({ payload, user, collection: collectionConfig, searchParams, columnsPref: listPreferences?.columns, fieldPermissions })
   const { cfg, query, page, docs } = data
   const plural = label(collectionConfig.labels?.plural, i18n, slug)
+  // DRMS 13/10 W3: users → the tabbed "Pengguna" view for Admins (create + row), see edit-view.ts
+  const custom = customEditOf(slug, user, adminRoute)
+  const createHref = custom ? (props.hasCreatePermission ? custom.createHref : undefined) : props.hasCreatePermission ? props.newDocumentURL : undefined
+  const rowHref = (id: unknown) => (custom ? custom.rowHref(String(id)) : `${base}/${encodeURIComponent(String(id))}`)
 
   // Payload's cell pipeline for exactly the visible columns (no selection column)
   const clientConfig = getClientConfig({ config: payload.config, i18n, importMap: payload.importMap, user: user ?? true })
@@ -76,7 +81,7 @@ export async function PkListView(props: ListViewServerProps) {
     viewType: 'list',
   })
   const byAccessor = new Map(columnState.map((c) => [c.accessor, c]))
-  const shown = data.columns.map((a) => byAccessor.get(a)).filter((c): c is NonNullable<typeof c> => !!c && c.active)
+  const shown = data.columns.map((a) => byAccessor.get(a)).filter((c): c is NonNullable<typeof c> => !!c && c.active && !(custom && c.accessor === ROW_ACTIONS_FIELD))
   const sortable = new Set(cfg.columns.filter((c) => c.sortable).map((c) => c.name))
   const colLabel = (name: string, field?: unknown) =>
     name === 'id' ? 'ID' : name === ROW_ACTIONS_FIELD ? 'Aksi' : label((field as { label?: unknown } | undefined)?.label ?? cfg.columns.find((c) => c.name === name)?.label, i18n, name)
@@ -109,8 +114,8 @@ export async function PkListView(props: ListViewServerProps) {
       <Gutter className="pk-plist__wrap">
         <header className="pk-plist__head">
           <h1 className="pk-plist__title">{plural}</h1>
-          {props.hasCreatePermission && props.newDocumentURL ? (
-            <Link href={props.newDocumentURL} prefetch={false} className="pk-ltb__btn pk-ltb__btn--primary" data-pk-create={slug}>
+          {createHref ? (
+            <Link href={createHref} prefetch={false} className="pk-ltb__btn pk-ltb__btn--primary" data-pk-create={slug}>
               + Buat baru
             </Link>
           ) : null}
@@ -146,8 +151,8 @@ export async function PkListView(props: ListViewServerProps) {
         {docs.length === 0 ? (
           <div className="pk-plist__empty" data-pk-empty={slug}>
             <p>{filtered ? 'Tidak ada data yang cocok dengan pencarian / filter.' : `Belum ada data ${plural.toLocaleLowerCase('id')}.`}</p>
-            {!filtered && props.hasCreatePermission && props.newDocumentURL ? (
-              <Link href={props.newDocumentURL} prefetch={false} className="pk-ltb__btn pk-ltb__btn--primary">
+            {!filtered && createHref ? (
+              <Link href={createHref} prefetch={false} className="pk-ltb__btn pk-ltb__btn--primary">
                 + Buat baru
               </Link>
             ) : null}
@@ -182,7 +187,7 @@ export async function PkListView(props: ListViewServerProps) {
                   </thead>
                   <tbody>
                     {docs.map((doc, i) => (
-                      <ClickableRow key={String(doc.id)} href={`${base}/${encodeURIComponent(String(doc.id))}`} data-id={String(doc.id)} className={`row-${i + 1}`}>
+                      <ClickableRow key={String(doc.id)} href={rowHref(doc.id)} data-id={String(doc.id)} className={`row-${i + 1}`}>
                         {shown.map((c) => (
                           <td key={c.accessor} className={`cell-${c.accessor}`}>
                             {c.renderedCells[i]}
