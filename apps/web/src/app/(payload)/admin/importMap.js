@@ -11,6 +11,7 @@ import { ActiveCell as ActiveCell_5b572f69f0b2c658d322ad3e65563a49 } from '@/adm
 import { MemberCountCell as MemberCountCell_0560bc1409d80e4fbd9f8971b0f4bccb } from '@/admin/components/companies/MemberCountCell'
 import { CompanyCell as CompanyCell_a3ad1a52c7c805d12e2b4c793adf9c6d } from '@/admin/components/companies/CompanyCell'
 import { CompanyListFilter as CompanyListFilter_b31d22e0603f5879a90d350d8ff6b31b } from '@/admin/components/companies/CompanyListFilter'
+import { PkListView as PkListView_ff264d598d1662a7ac6f3895692319e4 } from '@/admin/pk-list/PkListView'
 import { CompanyField as CompanyField_d907892a7d1864bfc60310041555d48d } from '@/admin/components/companies/CompanyField'
 import { ProjectDetailLink as ProjectDetailLink_50199ae12722a75ff9856fb84c25b621 } from '@/admin/components/ProjectDetailLink'
 import { ProjectRapTab as ProjectRapTab_477bcbaacaa37a019b46a0d40f873f32 } from '@/admin/views/ProjectTabs'
@@ -108,6 +109,7 @@ export const importMap = {
   "@/admin/components/companies/MemberCountCell#MemberCountCell": MemberCountCell_0560bc1409d80e4fbd9f8971b0f4bccb,
   "@/admin/components/companies/CompanyCell#CompanyCell": CompanyCell_a3ad1a52c7c805d12e2b4c793adf9c6d,
   "@/admin/components/companies/CompanyListFilter#CompanyListFilter": CompanyListFilter_b31d22e0603f5879a90d350d8ff6b31b,
+  "@/admin/pk-list/PkListView#PkListView": PkListView_ff264d598d1662a7ac6f3895692319e4,
   "@/admin/components/companies/CompanyField#CompanyField": CompanyField_d907892a7d1864bfc60310041555d48d,
   "@/admin/components/ProjectDetailLink#ProjectDetailLink": ProjectDetailLink_50199ae12722a75ff9856fb84c25b621,
   "@/admin/views/ProjectTabs#ProjectRapTab": ProjectRapTab_477bcbaacaa37a019b46a0d40f873f32,
