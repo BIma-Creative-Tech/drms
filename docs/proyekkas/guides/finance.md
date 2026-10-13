@@ -41,10 +41,10 @@ Direktur yang dibuat Admin/Finance atas namanya ditolak saat dikirim — minta D
 **Direktur** menyetujui dulu ("Diketahui"), baru pengajuan masuk ke Anda untuk **Approval**.
 
 - **Web:** **Persetujuan** → periksa Jenis, Grand total, **Dampak anggaran** (merah = anggaran project sesudah
-  disetujui > 85%), **Flag** → buka **Rincian baris, nota & flag** di bawah baris pengajuan (tiap baris item dengan
-  foto nota — klik untuk ukuran penuh —, total nota & selisih per baris, flag per baris) → **Setujui** atau
-  **Tolak** (alasan wajib, minimal 3 huruf; alasan yang terlalu pendek langsung ditolak dengan pesan "Alasan wajib
-  diisi, minimal 3 karakter."). Rincian yang sama ada di halaman detail pengajuan.
+  disetujui > 85%), **Flag** → **Setujui** / **Tolak** langsung di baris, atau klik baris untuk membuka halaman
+  detail (tiap baris item dengan foto nota — klik untuk ukuran penuh —, total nota & selisih per baris, flag per
+  baris; **Setujui** / **Tolak** di bar aksi atas) — **Tolak**: alasan wajib, minimal 3 huruf (alasan yang terlalu
+  pendek langsung ditolak dengan pesan "Alasan wajib diisi, minimal 3 karakter.").
 - Angka **Flag** = flag **terbuka** (peringatan + info). Angka inilah yang tersimpan bersama keputusan Anda; flag
   yang sudah "diperiksa" tidak dihitung.
 - **APK:** **Menunggu Persetujuan** → buka → **Setujui** → pilih **Pakai tanda tangan profil** atau **Tanda tangan
@@ -94,7 +94,7 @@ tanggalnya menentukan periode (tutup buku) — **No. referensi bank**, **Bukti**
 - Salah catat? **Void transfer** (di bagian "Transfer tercatat — dapat dibatalkan" atau di detail pengajuan) + alasan:
   KK dibalik, pengajuan kembali ke antrian.
 - Reimburse **Ditransfer**: bila pemohon sudah menerima dana tetapi belum menekan **Konfirmasi selesai**, Anda bisa
-  menekannya di detail pengajuan (di bawah "Giliran: Pemohon … atau Finance"). Tanpa itu pengajuan ditutup otomatis
+  menekannya di detail pengajuan (di bawah "Tahapan saat ini: Pemohon … atau Finance"). Tanpa itu pengajuan ditutup otomatis
   setelah batas hari di Setting perusahaan.
 
 ## 4. LPJ Pengajuan Baru

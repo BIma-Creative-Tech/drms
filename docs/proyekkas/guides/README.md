@@ -90,7 +90,14 @@ saat pengajuan menunggu keputusannya (bila dinyalakan Admin).
 **Jangan keluar (logout) atau hapus aplikasi** selama masih ada data *Menunggu*.
 
 **Riwayat:** setiap pengajuan punya tab **Riwayat** (web) / ikon jam (APK): siapa mengubah apa, kapan, dari
-perangkat apa.
+perangkat apa. Di web, bagian **Log perubahan** di bawah halaman pengajuan (klik untuk membuka) memuat ringkasan yang
+sama beserta waktu dibuat dan terakhir diubah.
+
+**Halaman pengajuan (web):** kiri — nomor, badge PT, status, **Rincian pengajuan**, **Rincian item** (baris, nota,
+flag) dan **Log perubahan**; kanan — **Alur pengajuan** (Diajukan → PM → Direktur → Transfer → LPJ → Selesai; yang
+sedang berjalan bertanda **Tahapan saat ini**). Di HP alurnya tampil setelah ringkasan. Tombol ada di bar aksi atas:
+**Setujui** / **Tolak** (bila giliran Anda), **Cetak**, **Duplikat**, **Edit** → **Simpan** / **Batal** (hanya Draft
+atau Revisi Nota milik Anda).
 
 **HP hilang atau ganti HP:** segera lapor Admin agar perangkat dicabut.
 
