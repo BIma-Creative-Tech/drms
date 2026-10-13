@@ -4,6 +4,7 @@ import React from 'react'
 
 import { loadVisible } from '@/domain/expense/common'
 import { historyRows, requestHistory, type HistoryRow } from '@/domain/history'
+import { actorText, ACTION_LABELS, DOC_LABELS, showValue as show } from '@/domain/history-format'
 import { formatServerTime } from '@/pdf/format'
 import { DEFAULT_TZ } from '@/lib/time'
 import { withReqTransaction } from '@/lib/system-tx'
@@ -12,38 +13,6 @@ import { docHref } from '../doc-links'
 
 import { Empty, TableScroll, table, td, th } from './shared'
 import { settings as companySettings } from '@/domain/companies'
-
-const ACTION_LABELS: Record<string, string> = {
-  create: 'dibuat',
-  update: 'diubah',
-  status_change: 'status',
-  void: 'void',
-  sign: 'tanda tangan',
-  acknowledge: 'disetujui (Diketahui)', // ADR 0021: PM project; ADR 0013: Direktur (pre-E1 rows: PM "Diketahui")
-  approve: 'disetujui',
-  approval_policy_exception: 'pengecualian G1 (pengajuan Direktur via PM)',
-  reject: 'ditolak',
-  verify: 'diverifikasi',
-  number_issued: 'nomor terbit',
-  flag_raised: 'flag muncul',
-  flag_reviewed: 'flag diperiksa',
-  export: 'PDF/ekspor',
-  print: 'cetak',
-  view_sensitive: 'dilihat (sensitif)',
-  delete_attempt: 'percobaan hapus',
-  acknowledge_delegated: 'Diketahui dilimpahkan',
-  access_denied: 'aksi ditolak (hak akses)',
-  approval_skipped: 'posisi dilewati (tidak berlaku — pemohon)',
-  privacy_ack: 'pemberitahuan privasi dibaca',
-}
-
-const DOC_LABELS: Record<string, string> = { expense_request: 'Pengajuan', receipt: 'Nota', transfer: 'Transfer', settlement: 'LPJ', cash_entry: 'Kas' }
-
-function show(v: unknown): string {
-  if (v === null || v === undefined) return '—'
-  const s = typeof v === 'string' ? v : JSON.stringify(v)
-  return s.length > 160 ? `${s.slice(0, 157)}…` : s
-}
 
 /**
  * "Riwayat" document tab (US-35, requirements §8 "Tampilan log", architecture §8): who (user +
@@ -100,7 +69,7 @@ export async function RiwayatView(props: DocumentViewServerProps) {
                 <tr key={r.id}>
                   <td style={{ ...td, whiteSpace: 'nowrap' }}>{formatServerTime(r.serverTime, tz)}</td>
                   <td style={td}>
-                    {r.userName ?? (r.source === 'job' ? 'sistem (job)' : r.userId ? `user#${r.userId}` : 'sistem')}
+                    {actorText(r)}
                     {r.userRoles ? <div style={{ fontSize: 11 }}>{r.userRoles}</div> : null}
                   </td>
                   <td style={td}>
