@@ -97,7 +97,7 @@ tanggalnya menentukan periode (tutup buku) — **No. referensi bank**, **Bukti**
   menekannya di detail pengajuan (di bawah "Tahapan saat ini: Pemohon … atau Finance"). Tanpa itu pengajuan ditutup otomatis
   setelah batas hari di Setting perusahaan.
 
-## 3a. Pembayaran vendor (DRMS 13/10, ADR 0025)
+## 3a. Pembayaran vendor (DRMS 13/10, ADR 0027)
 
 Membayar **invoice vendor** langsung ke **rekening vendor** — tanpa nota per baris, tanpa LPJ dan tanpa selisih;
 invoice adalah buktinya.

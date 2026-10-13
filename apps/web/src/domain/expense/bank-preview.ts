@@ -63,7 +63,7 @@ function out(source: BankPreview['source'], acc: { bankName: string | null; acco
 
 export async function bankPreview(req: PayloadRequest, input: { requestId?: number; accountId?: number; vendorAccountId?: number; reveal: boolean }): Promise<BankPreview> {
   const { requestId, accountId, reveal } = input
-  // ADR 0025: a vendor account (vendor payment) — readable through the collection access (Admin / Finance / Direktur / PM of its PT)
+  // ADR 0027: a vendor account (vendor payment) — readable through the collection access (Admin / Finance / Direktur / PM of its PT)
   if (input.vendorAccountId !== undefined) return vendorPreview(req, { requestId, accountId: input.vendorAccountId, reveal })
   if (requestId === undefined) {
     if (accountId === undefined) fail(400, 'Pilih rekening.')
@@ -81,7 +81,7 @@ export async function bankPreview(req: PayloadRequest, input: { requestId?: numb
     if (!s?.accountNo) fail(404, 'Rekening tujuan belum tercatat.')
     return out('snapshot', { bankName: s.bankName ?? null, accountNo: s.accountNo, accountHolder: s.accountHolder }, full, reveal)
   }
-  // ADR 0025: a vendor-payment Draft shows its saved vendor account
+  // ADR 0027: a vendor-payment Draft shows its saved vendor account
   if (payeeOf(doc.payeeType) === 'vendor') {
     const saved = relId(doc.vendorBankAccount)
     if (saved === undefined) fail(404, 'Belum ada rekening vendor.')
@@ -98,7 +98,7 @@ export async function bankPreview(req: PayloadRequest, input: { requestId?: numb
 }
 
 /**
- * ADR 0025: preview of a vendor account. With a request (visible to the caller): a Draft's account must be of the
+ * ADR 0027: preview of a vendor account. With a request (visible to the caller): a Draft's account must be of the
  * request's PT and of its chosen vendor — or the saved one; after submit the snapshot. Without a request (new form):
  * an account the caller may read (collection access). The full number for the request's own people / office roles,
  * and for readers of the account (vendor accounts are business data, readable in full by their collection readers).

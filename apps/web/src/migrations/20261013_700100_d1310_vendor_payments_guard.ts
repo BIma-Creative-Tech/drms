@@ -1,8 +1,8 @@
 import { type MigrateDownArgs, type MigrateUpArgs, sql } from '@payloadcms/db-postgres'
 
 /**
- * ADR 0025 (DRMS 13/10 Wave 4) "Pembayaran vendor" — DB guards, hand-written, run as <prefix>_owner after
- * 20261014_100000_d1310_vendor_payments.
+ * ADR 0027 (DRMS 13/10 Wave 4) "Pembayaran vendor" — DB guards, hand-written, run as <prefix>_owner after
+ * 20261013_700000_d1310_vendor_payments.
  *
  * 1. `vendor_bank_accounts` = per-PT master derived from the vendor (as employee_bank_accounts): company filled from
  *    the vendor on a raw insert (`_00_company`), NOT NULL, immutable with the uuid, same PT as its vendor
@@ -60,12 +60,12 @@ export async function up({ db }: MigrateUpArgs): Promise<void> {
     BEGIN
       IF NEW.payee_type::text <> 'vendor' THEN RETURN NEW; END IF;
       IF NEW.status::text IN ('receipt_revision', 'receipts_verified', 'transferred', 'receipts_complete', 'lpj_submitted', 'lpj_revision', 'lpj_verified') THEN
-        RAISE EXCEPTION 'expense_requests %: a vendor payment has no receipt / LPJ status (%) (ADR 0025)', NEW.id, NEW.status USING ERRCODE = '23514';
+        RAISE EXCEPTION 'expense_requests %: a vendor payment has no receipt / LPJ status (%) (ADR 0027)', NEW.id, NEW.status USING ERRCODE = '23514';
       END IF;
       IF NEW.vendor_bank_account_id IS NOT NULL
          AND (TG_OP = 'INSERT' OR NEW.vendor_bank_account_id IS DISTINCT FROM OLD.vendor_bank_account_id OR NEW.vendor_id IS DISTINCT FROM OLD.vendor_id)
          AND NOT EXISTS (SELECT 1 FROM vendor_bank_accounts a WHERE a.id = NEW.vendor_bank_account_id AND a.vendor_id IS NOT DISTINCT FROM NEW.vendor_id) THEN
-        RAISE EXCEPTION 'expense_requests %: vendor account % is not an account of vendor % (ADR 0025)', NEW.id, NEW.vendor_bank_account_id, NEW.vendor_id USING ERRCODE = '23514';
+        RAISE EXCEPTION 'expense_requests %: vendor account % is not an account of vendor % (ADR 0027)', NEW.id, NEW.vendor_bank_account_id, NEW.vendor_id USING ERRCODE = '23514';
       END IF;
       RETURN NEW;
     END
@@ -83,7 +83,7 @@ export async function up({ db }: MigrateUpArgs): Promise<void> {
     CREATE OR REPLACE FUNCTION pk_settlement_not_vendor() RETURNS trigger LANGUAGE plpgsql AS $fn$
     BEGIN
       IF EXISTS (SELECT 1 FROM expense_requests e WHERE e.id = NEW.request_id AND e.payee_type::text = 'vendor') THEN
-        RAISE EXCEPTION 'settlements: request % is a vendor payment — no LPJ (ADR 0025)', NEW.request_id USING ERRCODE = '23514';
+        RAISE EXCEPTION 'settlements: request % is a vendor payment — no LPJ (ADR 0027)', NEW.request_id USING ERRCODE = '23514';
       END IF;
       RETURN NEW;
     END

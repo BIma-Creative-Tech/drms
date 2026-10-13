@@ -31,7 +31,7 @@ export function listItem(doc: RequestDoc & { project?: unknown; costCenter?: unk
     id: doc.id,
     docNo: doc.docNo ?? null,
     type: doc.type,
-    // ADR 0025: "Pembayaran vendor" for a vendor payment, else Pengajuan Baru / Reimburse
+    // ADR 0027: "Pembayaran vendor" for a vendor payment, else Pengajuan Baru / Reimburse
     typeLabel: requestKindLabel(doc.type, doc.payeeType),
     payeeType: payeeOf(doc.payeeType),
     status: doc.status,
@@ -130,7 +130,7 @@ export async function detail(req: PayloadRequest, id: number) {
   }
   const snap = (doc.approvalSnapshot ?? null) as ApprovalSnapshot | null
   const vendorPay = payeeOf(doc.payeeType) === 'vendor'
-  // ADR 0025: a vendor payment has no LPJ
+  // ADR 0027: a vendor payment has no LPJ
   const lpj = doc.type === 'advance' && !vendorPay ? await settlementOfRequest(req, id) : null
   // QA-06 / ADR 0019: shortfall vs approved + tolerance and its re-approval (office roles only)
   // ADR 0021: also the PM project acknowledger of the shortfall approval (it decides "Persetujuan PM")
@@ -159,7 +159,7 @@ export async function detail(req: PayloadRequest, id: number) {
     requesters: (doc.requesters ?? []).map((r) => ref(r, (d) => ({ code: d.code, name: d.name }))),
     createdBy: ref(doc.createdBy, (d) => ({ name: (d.name as string) || (d.email as string) })),
     bankAccountId: relId(doc.bankAccount) ?? null,
-    // ADR 0025: vendor payment — vendor, its account (the destination; snapshot in `bank` after submit) and the invoice
+    // ADR 0027: vendor payment — vendor, its account (the destination; snapshot in `bank` after submit) and the invoice
     vendor: vendorPay ? ref(doc.vendor, (d) => ({ name: d.name, code: null })) : null,
     vendorBankAccountId: vendorPay ? (relId(doc.vendorBankAccount) ?? null) : null,
     invoice: vendorPay

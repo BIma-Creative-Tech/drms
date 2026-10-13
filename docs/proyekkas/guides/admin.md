@@ -250,7 +250,7 @@ sampai selesai).
 Pengajuan yang sudah diajukan sebelum langkah ini tetap diputuskan Direktur lalu Finance (snapshot lama). Direktur cuti:
 buat/ubah aturan sementara dengan level 1 = Direktur pengganti (user bernama), lalu kembalikan.
 
-### 4b. Pembayaran vendor (DRMS 13/10, ADR 0025)
+### 4b. Pembayaran vendor (DRMS 13/10, ADR 0027)
 
 - Aturan approval punya syarat baru **Jenis penerima** (*Semua* / *Karyawan* / *Vendor*). Semua aturan lama =
   *Semua* (tidak berubah).

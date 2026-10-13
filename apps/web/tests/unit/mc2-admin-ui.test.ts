@@ -35,7 +35,7 @@ const WITH_COMPANY = [
   'project-loans', 'project-loan-repayments',
   // ADR 0023 sites (kantor cabang)
   'sites',
-  // ADR 0025 rekening vendor
+  // ADR 0027 rekening vendor
   'vendor-bank-accounts',
 ].sort()
 

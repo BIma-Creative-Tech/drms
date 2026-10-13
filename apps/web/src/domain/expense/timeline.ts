@@ -16,7 +16,7 @@ export const STATUS_PATH: Record<RequestType, RequestStatus[]> = {
   reimburse: ['draft', 'pending_ack', 'pending_approval', 'approved', 'receipts_verified', 'transferred', 'completed'],
 }
 
-/** ADR 0025: a vendor payment's happy path — the transfer completes it (no LPJ). */
+/** ADR 0027: a vendor payment's happy path — the transfer completes it (no LPJ). */
 export const VENDOR_STATUS_PATH: RequestStatus[] = ['draft', 'pending_ack', 'pending_approval', 'approved', 'completed']
 
 /** Where a side status sits on the happy path (for "done" marking). */
@@ -110,7 +110,7 @@ const roleLabel = (r: Role | null | undefined) => (r ? ROLE_LABELS[r] : 'approve
  */
 export function nextActor(input: {
   type: RequestType
-  /** ADR 0025: vendor payment texts (Finance pays the vendor; nothing after the transfer). */
+  /** ADR 0027: vendor payment texts (Finance pays the vendor; nothing after the transfer). */
   payeeType?: PayeeType | null
   status: RequestStatus
   currentLevel: number | null

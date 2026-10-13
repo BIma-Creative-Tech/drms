@@ -317,7 +317,7 @@ String rejectionMessage(List<SyncError> errors, {String? type}) {
 String mediaUploadPath(String localKind) => switch (localKind) {
   'selfie' => 'selfies',
   'progress' || 'field' => 'progress-photos',
-  // ADR 0025: the invoice of a vendor payment is a general attachment (photo; PDF from the web)
+  // ADR 0027: the invoice of a vendor payment is a general attachment (photo; PDF from the web)
   'invoice' => 'attachments',
   _ => 'receipts',
 };

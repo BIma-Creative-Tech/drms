@@ -103,14 +103,14 @@ export const SyncDraftUpsertPayload = z
     notes: z.string().max(2000).nullable().optional(),
     requester_ids: z.array(id).max(20).optional(),
     bank_account_id: id.nullable().optional(),
-    // ADR 0025 "Pembayaran vendor" (Finance / PM only; kind is set to advance by the server)
-    payee_type: z.enum(['karyawan', 'vendor']).optional().meta({ description: 'ADR 0025: default karyawan. vendor = vendor payment (Finance / PM only): vendor + vendor account + invoice, no employee account, no LPJ.' }),
+    // ADR 0027 "Pembayaran vendor" (Finance / PM only; kind is set to advance by the server)
+    payee_type: z.enum(['karyawan', 'vendor']).optional().meta({ description: 'ADR 0027: default karyawan. vendor = vendor payment (Finance / PM only): vendor + vendor account + invoice, no employee account, no LPJ.' }),
     vendor_id: id.nullable().optional(),
-    vendor_bank_account_id: id.nullable().optional().meta({ description: 'ADR 0025: an active account of vendor_id (masters type vendor-bank-accounts).' }),
-    invoice_no: z.string().trim().max(64).nullable().optional().meta({ description: 'ADR 0025: unique per vendor among live requests (else VALIDATION / 409 errors[invoiceNo]).' }),
+    vendor_bank_account_id: id.nullable().optional().meta({ description: 'ADR 0027: an active account of vendor_id (masters type vendor-bank-accounts).' }),
+    invoice_no: z.string().trim().max(64).nullable().optional().meta({ description: 'ADR 0027: unique per vendor among live requests (else VALIDATION / 409 errors[invoiceNo]).' }),
     invoice_date: businessDate.nullable().optional(),
     invoice_due_date: businessDate.nullable().optional(),
-    invoice_file_id: id.nullable().optional().meta({ description: 'ADR 0025: media-attachments id of the invoice (POST /media/attachments).' }),
+    invoice_file_id: id.nullable().optional().meta({ description: 'ADR 0027: media-attachments id of the invoice (POST /media/attachments).' }),
     client_grand_total: rupiah.nullable().optional().meta({ description: 'Advisory; mismatch with the server total → flag CLIENT_TOTAL_MISMATCH.' }),
     lines: z.array(SyncLineInput).max(200).optional().meta({ description: 'Replaces ALL lines when present.' }),
   })
@@ -431,7 +431,7 @@ export const SyncDraftCopy = z
     notes: z.string().nullable(),
     requester_ids: z.array(id),
     bank_account_id: id.nullable(),
-    payee_type: z.enum(['karyawan', 'vendor']).meta({ description: 'ADR 0025.' }),
+    payee_type: z.enum(['karyawan', 'vendor']).meta({ description: 'ADR 0027.' }),
     vendor_id: id.nullable(),
     vendor_bank_account_id: id.nullable(),
     invoice_no: z.string().nullable(),

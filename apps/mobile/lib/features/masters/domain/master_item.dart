@@ -32,8 +32,8 @@ abstract final class MasterTypes {
   /// Owner decision 2026-10-09: "Tingkat urgensi" of an expense draft (server ≥ 0.7 knows this type).
   static const urgencyLevels = 'urgency-levels';
 
-  /// ADR 0025 "Pembayaran vendor": vendors of the PT and their accounts (Finance / PM / Direktur / Admin read them;
-  /// Staff get none). `vendor-bank-accounts` needs a server with ADR 0025 (an older one answers 400 for the type) —
+  /// ADR 0027 "Pembayaran vendor": vendors of the PT and their accounts (Finance / PM / Direktur / Admin read them;
+  /// Staff get none). `vendor-bank-accounts` needs a server with ADR 0027 (an older one answers 400 for the type) —
   /// the APK with this change is released after that server.
   static const vendors = 'vendors';
   static const vendorBankAccounts = 'vendor-bank-accounts';

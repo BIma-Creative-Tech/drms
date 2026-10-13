@@ -54,7 +54,7 @@ const ALLOWED: Record<string, string> = {
   // QA-MC4-13 (scan of domain/expense|progress|addendum): rows bound to one checked document
   'domain/expense/common.ts#lockRequest': 'row lock (FOR UPDATE) of ONE request id; visibility is checked right after (loadVisible)',
   'domain/expense/common.ts#projectCommitted': 'requests of ONE project id (the request being decided; same PT by the DB trigger)',
-  // ADR 0025: duplicate invoice check
+  // ADR 0027: duplicate invoice check
   'domain/expense/drafts.ts#assertInvoiceUnused': 'requests of ONE vendor id (validated before: active vendor of the request PT; vendor_id is same-PT by DB trigger)',
   'domain/expense/receipts.ts#duplicateHits': 'receipts of ONE request; PT = the request PT or a PT the uploader is mapped to (QA-MC4-06, scope rule)',
   'domain/expense/snapshot.ts#writeSnapshot': 'content hash of ONE request id (the document being snapshotted)',

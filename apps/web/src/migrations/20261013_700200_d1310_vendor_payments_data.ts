@@ -1,8 +1,8 @@
 import { type MigrateDownArgs, type MigrateUpArgs, sql } from '@payloadcms/db-postgres'
 
 /**
- * ADR 0025 (DRMS 13/10 Wave 4, decision D3), DATA ONLY, hand-written, idempotent, run as <prefix>_owner after
- * 20261014_100100_d1310_vendor_payments_guard: per PT the approval rule "Pembayaran vendor oleh Finance — Direktur"
+ * ADR 0027 (DRMS 13/10 Wave 4, decision D3), DATA ONLY, hand-written, idempotent, run as <prefix>_owner after
+ * 20261013_700100_d1310_vendor_payments_guard: per PT the approval rule "Pembayaran vendor oleh Finance — Direktur"
  * (Jenis penerima = Vendor, Peran pemohon = Finance, no "Diketahui", one level Direktur, priority 20) — a vendor
  * payment filed by Finance goes to the Direktur only. Skipped in a PT that already has an active rule with Jenis
  * penerima = Vendor (none before this migration; idempotent re-run). PM vendor payments need no rule: the PT's default
@@ -11,10 +11,10 @@ import { type MigrateDownArgs, type MigrateUpArgs, sql } from '@payloadcms/db-po
  * Down: the rules this migration created (by its audit rows) are deleted when no request references them, else
  * deactivated.
  */
-const NAME = '20261014_100200_d1310_vendor_payments_data'
+const NAME = '20261013_700200_d1310_vendor_payments_data'
 /** Name of the seeded rule (seed/data.ts VENDOR_FINANCE_RULE_NAME, frozen copy). */
 export const VENDOR_FINANCE_RULE = 'Pembayaran vendor oleh Finance — Direktur'
-const REASON = `ADR 0025 (DRMS 13/10 D3): pembayaran vendor oleh Finance langsung ke persetujuan Direktur (migrasi ${NAME})`
+const REASON = `ADR 0027 (DRMS 13/10 D3): pembayaran vendor oleh Finance langsung ke persetujuan Direktur (migrasi ${NAME})`
 
 export async function up({ db, payload }: MigrateUpArgs): Promise<void> {
   await db.execute(sql`
@@ -50,7 +50,7 @@ export async function up({ db, payload }: MigrateUpArgs): Promise<void> {
     SELECT coalesce(array_agg(ins.company_id ORDER BY ins.company_id), '{}') AS companies, (SELECT count(*) FROM roles)::int AS roles,
            (SELECT count(*) FROM steps)::int AS steps, (SELECT count(*) FROM logged)::int AS logged
       FROM ins`)) as unknown as { rows: Array<{ companies: number[]; roles: number; steps: number; logged: number }> }
-  payload?.logger?.info?.({ msg: `${NAME}: rule "${VENDOR_FINANCE_RULE}" per PT (ADR 0025)`, ...r.rows[0] })
+  payload?.logger?.info?.({ msg: `${NAME}: rule "${VENDOR_FINANCE_RULE}" per PT (ADR 0027)`, ...r.rows[0] })
 }
 
 export async function down({ db, payload }: MigrateDownArgs): Promise<void> {

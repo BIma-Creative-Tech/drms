@@ -138,7 +138,7 @@ class _DraftEditorScreenState extends ConsumerState<DraftEditorScreen> {
   late DraftRequest _d = widget.initial;
   late final _title = TextEditingController(text: widget.initial.title);
   late final _notes = TextEditingController(text: widget.initial.notes ?? '');
-  // ADR 0025: invoice number of a vendor payment
+  // ADR 0027: invoice number of a vendor payment
   late final _invoiceNo = TextEditingController(text: widget.initial.invoiceNo ?? '');
   bool _busy = false;
   List<DraftIssue> _issues = const [];
@@ -159,13 +159,13 @@ class _DraftEditorScreenState extends ConsumerState<DraftEditorScreen> {
     invoiceNo: _d.isVendor ? (_invoiceNo.text.trim().isEmpty ? null : _invoiceNo.text.trim()) : null,
   );
 
-  /// ADR 0025 (D3): only Finance / PM of the draft's PT file a vendor payment (the server re-checks).
+  /// ADR 0027 (D3): only Finance / PM of the draft's PT file a vendor payment (the server re-checks).
   bool _mayFileVendorPayment() {
     final roles = ref.read(currentProfileProvider)?.forCompany(_d.companyId).roles ?? const <Role>{};
     return roles.contains(Role.finance) || roles.contains(Role.pm);
   }
 
-  /// ADR 0025: switching the payee type — vendor = Pengajuan Baru, Pemohon = the filer, no employee account;
+  /// ADR 0027: switching the payee type — vendor = Pengajuan Baru, Pemohon = the filer, no employee account;
   /// karyawan clears every vendor / invoice field.
   void _setPayee(Set<PayeeType> s) {
     final payee = s.first;
@@ -209,7 +209,7 @@ class _DraftEditorScreenState extends ConsumerState<DraftEditorScreen> {
     setState(() => _d = due ? _d.copyWith(invoiceDueDate: toYmd(picked)) : _d.copyWith(invoiceDate: toYmd(picked)));
   }
 
-  /// ADR 0025: invoice photo (camera / gallery, compressed like a receipt photo), stored as media blob `invoice` and
+  /// ADR 0027: invoice photo (camera / gallery, compressed like a receipt photo), stored as media blob `invoice` and
   /// uploaded to `POST /media/attachments` by the sync / at "Ajukan".
   Future<void> _addInvoicePhoto({required bool fromCamera}) async {
     final sub = ref.read(currentSubProvider);
@@ -455,7 +455,7 @@ class _DraftEditorScreenState extends ConsumerState<DraftEditorScreen> {
         .where((a) => _d.requesterIds.isEmpty || _d.requesterIds.contains((a.extra['employee'] as num?)?.toInt()))
         .toList();
     final urgencies = _byRank(m[MasterTypes.urgencyLevels] ?? const <MasterItem>[]);
-    // ADR 0025: Finance / PM may switch to "Vendor"; the chosen vendor's active accounts
+    // ADR 0027: Finance / PM may switch to "Vendor"; the chosen vendor's active accounts
     final mayVendor = _mayFileVendorPayment();
     final vendorAccounts = vendorAccountsOf(m, _d.vendorId);
     String? issueFor(String field) => _issues.where((i) => i.field == field && i.lineNo == null).firstOrNull?.message;
@@ -526,7 +526,7 @@ class _DraftEditorScreenState extends ConsumerState<DraftEditorScreen> {
               ),
             FormGrid(
               children: [
-                // ADR 0025 "Jenis penerima": only Finance / PM see "Vendor"; fixed once the server knows the draft
+                // ADR 0027 "Jenis penerima": only Finance / PM see "Vendor"; fixed once the server knows the draft
                 if (mayVendor || _d.isVendor)
                   FormGridCell(
                     label: t.fieldPayeeType,
@@ -668,7 +668,7 @@ class _DraftEditorScreenState extends ConsumerState<DraftEditorScreen> {
                       ],
                     ),
                   ),
-                // ADR 0025: vendor → its account → invoice number / date / due date / photo
+                // ADR 0027: vendor → its account → invoice number / date / due date / photo
                 if (_d.isVendor) ...[
                   FormGridCell(
                     label: t.fieldVendor,
@@ -948,7 +948,7 @@ class _DraftEditorScreenState extends ConsumerState<DraftEditorScreen> {
   }
 }
 
-/// ADR 0025: the active accounts of vendor [vendorId] (masters `vendor-bank-accounts`; none before a vendor is chosen).
+/// ADR 0027: the active accounts of vendor [vendorId] (masters `vendor-bank-accounts`; none before a vendor is chosen).
 List<MasterItem> vendorAccountsOf(Map<String, List<MasterItem>> masters, int? vendorId) => vendorId == null
     ? const []
     : (masters[MasterTypes.vendorBankAccounts] ?? const <MasterItem>[])

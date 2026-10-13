@@ -30,7 +30,7 @@ const MAP: Record<MasterType, { collection: CollectionSlug; fields: string[] }> 
   'team-assignments': { collection: 'team-assignments', fields: ['employee', 'project', 'costCenter', 'site', 'roleInProject', 'startDate', 'endDate'] },
   // MC3-1: receipt vendor picker (vendor_id) and Kas "sumber kas masuk" — per PT, read access of the collection
   vendors: { collection: 'vendors', fields: ['name', 'contact', 'active'] },
-  // ADR 0025: vendor payment — the chosen vendor's accounts (collection access: Admin / Finance / Direktur / PM)
+  // ADR 0027: vendor payment — the chosen vendor's accounts (collection access: Admin / Finance / Direktur / PM)
   'vendor-bank-accounts': { collection: 'vendor-bank-accounts', fields: ['vendor', 'bank', 'accountNo', 'accountHolder', 'isDefault', 'verificationStatus', 'active'] },
   'cash-in-sources': { collection: 'cash-in-sources', fields: ['code', 'name', 'active'] },
   'urgency-levels': { collection: 'urgency-levels', fields: ['code', 'name', 'rank', 'active'] },

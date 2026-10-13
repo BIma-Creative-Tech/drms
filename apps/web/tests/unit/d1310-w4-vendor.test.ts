@@ -21,7 +21,7 @@ import { normalizeInvoiceNo, payeeOf, requestKindLabel, VENDOR_FORBIDDEN_STATUSE
 import { DEFAULT_APPROVAL_RULES, VENDOR_FINANCE_RULE_NAME } from '@/seed/data'
 
 /**
- * DRMS 13/10 Wave 4a (ADR 0025) "Pembayaran vendor": payee type vocabulary, state machine (no LPJ path), rule engine
+ * DRMS 13/10 Wave 4a (ADR 0027) "Pembayaran vendor": payee type vocabulary, state machine (no LPJ path), rule engine
  * condition "Jenis penerima", stepper / timeline, duplicate-invoice key, form conditions, list filter, config. Pure;
  * fictional data only.
  */
@@ -46,7 +46,7 @@ const ctx = (over: Partial<ActorContext> = {}): ActorContext => ({
   ...over,
 })
 
-describe('ADR 0025 vocabulary', () => {
+describe('ADR 0027 vocabulary', () => {
   it('payee type defaults to karyawan; kind label "Pembayaran vendor"', () => {
     expect(payeeOf(undefined)).toBe('karyawan')
     expect(payeeOf(null)).toBe('karyawan')
@@ -72,7 +72,7 @@ describe('ADR 0025 vocabulary', () => {
   })
 })
 
-describe('ADR 0025 state machine: transfer completes a vendor payment, no LPJ path', () => {
+describe('ADR 0027 state machine: transfer completes a vendor payment, no LPJ path', () => {
   it('transfer: vendor approved → completed; karyawan approved → transferred', () => {
     expect(targets('advance', 'approved', 'transfer', 'vendor')).toEqual(['completed'])
     expect(targets('advance', 'approved', 'transfer', 'karyawan')).toEqual(['transferred'])
@@ -99,7 +99,7 @@ describe('ADR 0025 state machine: transfer completes a vendor payment, no LPJ pa
   })
 })
 
-describe('ADR 0025 rule engine: "Jenis penerima" condition', () => {
+describe('ADR 0027 rule engine: "Jenis penerima" condition', () => {
   const base: RuleInput = { id: 1, name: 'Default', docType: 'expense_request', requestType: 'any', minAmount: 0, maxAmount: null, priority: 100, acknowledge: 'required', acknowledgeBy: 'scope_manager', steps: [{ level: 1, approverRole: 'pk-owner' }] }
   const vendorFinance: RuleInput = { ...base, id: 2, name: VENDOR_FINANCE_RULE_NAME, priority: 20, payeeType: 'vendor', requesterRoles: ['pk-finance'], acknowledge: 'none', acknowledgeBy: 'role' }
   const facts = (payeeType: 'karyawan' | 'vendor', roles: Role[][]) => ({ type: 'advance' as const, grandTotal: 5_000_000, categoryIds: [], projectId: 3, payeeType, requesterRoles: roles })
@@ -158,7 +158,7 @@ const input = (over: Partial<StepperInput> = {}): StepperInput => ({
 })
 const states = (i: StepperInput) => buildRequestStepper(i).steps.map((s) => `${s.key}:${s.state}`)
 
-describe('ADR 0025 stepper / timeline: no LPJ step for a vendor payment', () => {
+describe('ADR 0027 stepper / timeline: no LPJ step for a vendor payment', () => {
   it('PM filer: PM step skipped → Direktur → Transfer → Selesai (no "Nota & LPJ", no "Penyelesaian LPJ")', () => {
     expect(states(input())).toEqual(['diajukan:done', 'diketahui:skipped', 'approval-1:current', 'transfer:pending', 'end:pending'])
     const done = buildRequestStepper(
@@ -184,7 +184,7 @@ describe('ADR 0025 stepper / timeline: no LPJ step for a vendor payment', () => 
   })
 })
 
-describe('ADR 0025 drafts: vendor columns', () => {
+describe('ADR 0027 drafts: vendor columns', () => {
   const doc = { id: 5, type: 'advance', status: 'rejected', title: 'Semen', payeeType: 'vendor', vendor: 3, vendorBankAccount: { id: 9 }, invoiceNo: 'INV-1', invoiceDate: '2026-10-01', invoiceDueDate: null, invoiceFile: 11, requesters: [2], lines: [] } as unknown as RequestDoc
 
   it('vendorOfDoc / vendorData round trip; karyawan clears every vendor column', () => {
@@ -203,7 +203,7 @@ describe('ADR 0025 drafts: vendor columns', () => {
   })
 })
 
-describe('ADR 0025 web form, preview, list, menu', () => {
+describe('ADR 0027 web form, preview, list, menu', () => {
   it('conditions: vendor inputs only for a vendor payment, the employee account / Pemohon picker only for karyawan', () => {
     const yes = () => true
     expect(isVendorForm({ payeeType: 'vendor' })).toBe(true)
@@ -243,12 +243,12 @@ describe('ADR 0025 web form, preview, list, menu', () => {
 
   it('migrations: schema + guard + data, the duplicate-invoice index and the no-LPJ guard (pinned)', () => {
     const dir = join(__dirname, '../../src/migrations')
-    const guard = readFileSync(join(dir, '20261014_100100_d1310_vendor_payments_guard.ts'), 'utf8')
+    const guard = readFileSync(join(dir, '20261013_700100_d1310_vendor_payments_guard.ts'), 'utf8')
     expect(guard).toContain('CREATE UNIQUE INDEX expense_requests_vendor_invoice_uq ON expense_requests (vendor_id, pk_invoice_key(invoice_no))')
     expect(guard).toContain("status NOT IN ('cancelled', 'rejected')")
     expect(guard).toContain('settlements_no_vendor_payment')
     const index = readFileSync(join(dir, 'index.ts'), 'utf8')
-    expect(index.indexOf('20261014_100000_d1310_vendor_payments')).toBeLessThan(index.indexOf('20261014_100100_d1310_vendor_payments_guard'))
-    expect(index.indexOf('20261014_100100_d1310_vendor_payments_guard')).toBeLessThan(index.indexOf('20261014_100200_d1310_vendor_payments_data'))
+    expect(index.indexOf('20261013_700000_d1310_vendor_payments')).toBeLessThan(index.indexOf('20261013_700100_d1310_vendor_payments_guard'))
+    expect(index.indexOf('20261013_700100_d1310_vendor_payments_guard')).toBeLessThan(index.indexOf('20261013_700200_d1310_vendor_payments_data'))
   })
 })

@@ -286,7 +286,7 @@ as String?,
 mixin _$ExpenseSummary {
 
  int get id; String? get docNo; RequestType get type; String get typeLabel; RequestStatus get status; String get statusLabel; String get title; int get grandTotal; int? get approvedAmount; String? get requestDate; String? get neededDate; String? get updatedAt; int get openWarningFlags;/// MC3: PT of the request (`companyId`); null from a server before MC3.
- int? get companyId;/// ADR 0025: vendor payment (`payeeType`); karyawan from a server before Wave 4.
+ int? get companyId;/// ADR 0027: vendor payment (`payeeType`); karyawan from a server before Wave 4.
  PayeeType get payeeType;
 /// Create a copy of ExpenseSummary
 /// with the given fields replaced by the non-null parameter values.
@@ -516,7 +516,7 @@ class _ExpenseSummary implements ExpenseSummary {
 @override@JsonKey() final  int openWarningFlags;
 /// MC3: PT of the request (`companyId`); null from a server before MC3.
 @override final  int? companyId;
-/// ADR 0025: vendor payment (`payeeType`); karyawan from a server before Wave 4.
+/// ADR 0027: vendor payment (`payeeType`); karyawan from a server before Wave 4.
 @override@JsonKey() final  PayeeType payeeType;
 
 /// Create a copy of ExpenseSummary
@@ -3604,7 +3604,7 @@ mixin _$ExpenseDetail {
 
  int get id; String? get docNo; String? get clientUuid; RequestType get type; String get typeLabel; RequestStatus get status; String get statusLabel; String get title; int get grandTotal; int? get approvedAmount; String? get requestDate; String? get neededDate; String? get notes; RefItem? get project; RefItem? get costCenter; List<RefItem> get requesters; String? get createdByName; String? get bankName; String? get bankAccountNo; String? get bankAccountHolder; List<ExpenseLine> get lines; List<ReceiptInfo> get receipts; List<ApprovalEntry> get approvals; ApprovalRuleInfo? get approvalRule; int get approvalCycle; int? get currentLevel; List<FlagInfo> get flags; BudgetImpact get budget; List<TransferInfo> get transfers; int get transferredTotal; SettlementInfo? get settlement; Set<String> get allowedActions; String? get rejectReason; String? get cancelReason; String? get submittedAt; String? get updatedAt; int? get rev; int? get resubmitOfId; int? get createdById;/// Owner decision 2026-10-09: "Tingkat urgensi" (replaces the activity period).
  RefItem? get urgencyLevel; int? get bankAccountId;/// MC3: PT of the request (`companyId`).
- int? get companyId;/// ADR 0025 "Pembayaran vendor": payee type, vendor, chosen vendor account (the destination snapshot is in
+ int? get companyId;/// ADR 0027 "Pembayaran vendor": payee type, vendor, chosen vendor account (the destination snapshot is in
 /// `bankName` / `bankAccountNo` / `bankAccountHolder` after submit) and the invoice (the proof — no LPJ).
  PayeeType get payeeType; RefItem? get vendor; int? get vendorBankAccountId; String? get invoiceNo; String? get invoiceDate; String? get invoiceDueDate; int? get invoiceFileId; String? get invoiceFileName;
 /// Create a copy of ExpenseDetail
@@ -4022,7 +4022,7 @@ class _ExpenseDetail implements ExpenseDetail {
 @override final  int? bankAccountId;
 /// MC3: PT of the request (`companyId`).
 @override final  int? companyId;
-/// ADR 0025 "Pembayaran vendor": payee type, vendor, chosen vendor account (the destination snapshot is in
+/// ADR 0027 "Pembayaran vendor": payee type, vendor, chosen vendor account (the destination snapshot is in
 /// `bankName` / `bankAccountNo` / `bankAccountHolder` after submit) and the invoice (the proof — no LPJ).
 @override@JsonKey() final  PayeeType payeeType;
 @override final  RefItem? vendor;

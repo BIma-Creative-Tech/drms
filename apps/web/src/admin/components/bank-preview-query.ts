@@ -7,7 +7,7 @@ export function previewQuery(input: { requestId: number | null; accountId: numbe
     // draft / new form: the picker value (an emptied picker shows "none", not the saved account)
     if (input.accountId === null) return null
     if (input.requestId !== null) q.set('request', String(input.requestId))
-    // ADR 0025: a vendor payment's picker is the vendor account
+    // ADR 0027: a vendor payment's picker is the vendor account
     q.set(input.vendor ? 'vendorAccount' : 'account', String(input.accountId))
   } else {
     // after submit: the snapshot taken at submit

@@ -624,7 +624,7 @@ mixin _$DraftRequest {
  int? get projectId;/// D2: no longer chosen by the requester (Finance sets the cost center at transfer). Kept only for drafts
 /// written before D2; never sent to the server any more.
  int? get costCenterId; String? get neededDate;/// Owner decision 2026-10-09: "Tingkat urgensi" (`urgency-levels` master of the draft's PT).
- int? get urgencyLevelId; String? get notes; List<int> get requesterIds; int? get bankAccountId;/// ADR 0025 "Jenis penerima": vendor = "Pembayaran vendor" (Finance / PM only; type is always Pengajuan Baru,
+ int? get urgencyLevelId; String? get notes; List<int> get requesterIds; int? get bankAccountId;/// ADR 0027 "Jenis penerima": vendor = "Pembayaran vendor" (Finance / PM only; type is always Pengajuan Baru,
 /// no employee account, no LPJ). Stored in `local_drafts.vendor_json` (schema v10).
  PayeeType get payeeType; int? get vendorId; int? get vendorBankAccountId; String? get invoiceNo; String? get invoiceDate; String? get invoiceDueDate;/// Local invoice photo (`media_blobs` kind `invoice`) until it is on the server.
  String? get invoiceMediaUuid;/// Server media id of the invoice (`media-attachments`): imported from the server or uploaded by the sync.
@@ -875,7 +875,7 @@ class _DraftRequest extends DraftRequest {
 }
 
 @override final  int? bankAccountId;
-/// ADR 0025 "Jenis penerima": vendor = "Pembayaran vendor" (Finance / PM only; type is always Pengajuan Baru,
+/// ADR 0027 "Jenis penerima": vendor = "Pembayaran vendor" (Finance / PM only; type is always Pengajuan Baru,
 /// no employee account, no LPJ). Stored in `local_drafts.vendor_json` (schema v10).
 @override@JsonKey() final  PayeeType payeeType;
 @override final  int? vendorId;

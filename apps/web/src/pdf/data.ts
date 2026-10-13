@@ -133,7 +133,7 @@ export async function buildPdfData(req: PayloadRequest, requestId: number, opts:
   // "Lampiran umum": images share the receipts' image budget (ADR 0008 §2); PDFs are listed by name
   let imageBudget = Math.max(0, MAX_RECEIPT_IMAGES - Math.min(receiptRows.length, MAX_RECEIPT_IMAGES))
   const attachments: PdfAttachment[] = []
-  // ADR 0025: the vendor invoice (the proof of a vendor payment) is the first attachment page
+  // ADR 0027: the vendor invoice (the proof of a vendor payment) is the first attachment page
   const vendorPay = payeeOf(doc.payeeType) === 'vendor'
   const invoiceId = vendorPay ? relId(doc.invoiceFile) : undefined
   const attachmentIds = [...(invoiceId !== undefined ? [invoiceId] : []), ...(doc.attachments ?? []).map((a) => relId(a)).filter((x): x is number => x !== undefined && x !== invoiceId)]
@@ -194,7 +194,7 @@ export async function buildPdfData(req: PayloadRequest, requestId: number, opts:
           accountNo: pdfSafe(doc.bankSnapshot.accountNo),
         }
       : null,
-    // ADR 0025: vendor + invoice of a vendor payment (printed with the transfer info)
+    // ADR 0027: vendor + invoice of a vendor payment (printed with the transfer info)
     vendorInvoice: vendorPay
       ? {
           vendor: pdfSafe(doc.vendor && typeof doc.vendor === 'object' ? String((doc.vendor as { name?: string }).name ?? '') : ''),

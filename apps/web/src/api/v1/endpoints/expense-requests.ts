@@ -110,7 +110,7 @@ export const listRequestsEndpoint = v1({
     if (scope === 'inbox') and.push({ status: { in: ['pending_ack', 'pending_approval'] } })
     if (status) and.push({ status: { in: status.split(',') } })
     if (type) and.push({ type: { equals: type } })
-    // ADR 0025: vendor payments only (or only requests paid to employees)
+    // ADR 0027: vendor payments only (or only requests paid to employees)
     if (payeeType) and.push({ payeeType: { equals: payeeType } })
     // DRMS 10/10 (project "Pengajuan" tab, APK project screen): one project + search in nomor / judul
     if (project) and.push({ project: { equals: project } })

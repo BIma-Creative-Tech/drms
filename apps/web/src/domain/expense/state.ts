@@ -37,7 +37,7 @@ export const ACTIONS = [
 ] as const
 export type Action = (typeof ACTIONS)[number]
 
-/** `payees` absent = every payee type (ADR 0025: rows limited to `karyawan` are the LPJ path a vendor payment never takes). */
+/** `payees` absent = every payee type (ADR 0027: rows limited to `karyawan` are the LPJ path a vendor payment never takes). */
 type Row = { from: RequestStatus[]; action: Action; to: RequestStatus[]; types?: RequestType[]; payees?: PayeeType[] }
 
 /**
@@ -57,7 +57,7 @@ export const TRANSITIONS: readonly Row[] = [
   { types: ['advance'], from: ['approved'], action: 'cancel', to: ['cancelled'] },
   { types: ['advance'], payees: ['karyawan'], from: ['approved'], action: 'transfer', to: ['transferred'] },
   { types: ['advance'], payees: ['karyawan'], from: ['transferred'], action: 'transfer_void', to: ['approved'] },
-  // ADR 0025 "Pembayaran vendor" (always advance): the invoice is the proof — the transfer completes the request (no
+  // ADR 0027 "Pembayaran vendor" (always advance): the invoice is the proof — the transfer completes the request (no
   // receipts / LPJ / settlement); a void of that transfer re-opens it in the transfer queue.
   { types: ['advance'], payees: ['vendor'], from: ['approved'], action: 'transfer', to: ['completed'] },
   { types: ['advance'], payees: ['vendor'], from: ['completed'], action: 'transfer_void', to: ['approved'] },
@@ -113,7 +113,7 @@ export function assertTransition(type: RequestType, from: RequestStatus, action:
 /** Facts about the caller and the document that the actor guards need (computed by the service). */
 export type ActorContext = {
   type: RequestType
-  /** ADR 0025: `vendor` = vendor payment (no LPJ path). Absent = karyawan. */
+  /** ADR 0027: `vendor` = vendor payment (no LPJ path). Absent = karyawan. */
   payeeType?: PayeeType
   status: RequestStatus
   roles: readonly Role[]

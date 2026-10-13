@@ -28,7 +28,7 @@ const decisionRoleOptions = ({ options }: { options: Option[] }): Option[] => op
  * ADR 0024 (owner 2026-10-11): condition "Peran pemohon" (every requester holds one of the roles in the PT;
  * empty = any) and zero approval levels ("Tanpa persetujuan — langsung ke antrian transfer Finance") ONLY
  * when the requester role is exactly Direktur — hook (400) + DB trigger `approval_rules_zero_step`.
- * ADR 0025: condition "Jenis penerima" (Semua / Karyawan / Vendor) — expense-request rules only.
+ * ADR 0027: condition "Jenis penerima" (Semua / Karyawan / Vendor) — expense-request rules only.
  */
 export const ApprovalRules: CollectionConfig = withAudit(
   {
@@ -57,7 +57,7 @@ export const ApprovalRules: CollectionConfig = withAudit(
             // E5: addenda have no request type / expense category — such a rule would never match.
             if ((data.requestType ?? originalDoc?.requestType ?? 'any') !== 'any') throw new APIError('Aturan Addendum RAB: jenis pengajuan harus "Semua".', 400, null, true)
             if (relId(data.category !== undefined ? data.category : originalDoc?.category)) throw new APIError('Aturan Addendum RAB tidak memakai kategori biaya.', 400, null, true)
-            // ADR 0025: an addendum has no payee — such a rule would never match
+            // ADR 0027: an addendum has no payee — such a rule would never match
             if ((data.payeeType ?? originalDoc?.payeeType ?? 'any') !== 'any') throw new APIError('Aturan Addendum RAB: jenis penerima harus "Semua".', 400, null, true)
           }
           // ADR 0024: zero steps only for "Peran pemohon = Direktur" (ruleDecisionError → zeroStepRuleError)
@@ -128,7 +128,7 @@ export const ApprovalRules: CollectionConfig = withAudit(
         admin: { description: 'Aturan berlaku bila SETIAP pemohon memegang salah satu peran ini di PT pengajuan. Kosong = semua pemohon.' },
       },
       {
-        // ADR 0025 (DRMS 13/10 Wave 4): rule selection by "Jenis penerima" — e.g. vendor payments filed by Finance → Direktur
+        // ADR 0027 (DRMS 13/10 Wave 4): rule selection by "Jenis penerima" — e.g. vendor payments filed by Finance → Direktur
         name: 'payeeType',
         type: 'select',
         label: 'Jenis penerima',

@@ -46,17 +46,17 @@ export const shownInHeader: Condition = () => false
 /** "Alasan perubahan" (audit reason of a save): only in "Revisi Nota" — the Draft needs none (Phase C polish). */
 export const revisionOnly: Condition = (data) => (data as FormData)?.status === 'receipt_revision'
 
-/** ADR 0025: the form is a vendor payment ("Jenis penerima" = Vendor). */
+/** ADR 0027: the form is a vendor payment ("Jenis penerima" = Vendor). */
 export function isVendorForm(data: FormData): boolean {
   return data?.payeeType === 'vendor'
 }
 
-/** ADR 0025: `cond` AND a vendor payment (vendor, rekening vendor, invoice inputs). */
+/** ADR 0027: `cond` AND a vendor payment (vendor, rekening vendor, invoice inputs). */
 export function vendorPayee(cond: Condition): Condition {
   return (data, sibling, ctx) => isVendorForm(data as FormData) && cond(data, sibling, ctx)
 }
 
-/** ADR 0025: `cond` AND paid to an employee (Pemohon picker, rekening karyawan). */
+/** ADR 0027: `cond` AND paid to an employee (Pemohon picker, rekening karyawan). */
 export function employeePayee(cond: Condition): Condition {
   return (data, sibling, ctx) => !isVendorForm(data as FormData) && cond(data, sibling, ctx)
 }

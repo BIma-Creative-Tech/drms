@@ -193,7 +193,7 @@ class _DetailBody extends ConsumerWidget {
       section(t.sectionRequester, key: const Key('section-requester')),
       row(t.requesters, d.requesters.map((r) => r.name ?? '-').join(', ')),
       if (d.createdByName != null) row(t.createdBy, d.createdByName!),
-      // ADR 0025: a vendor payment — vendor + invoice (the proof; no receipts / LPJ), paid to the vendor account
+      // ADR 0027: a vendor payment — vendor + invoice (the proof; no receipts / LPJ), paid to the vendor account
       if (d.isVendor) ...[
         section(t.sectionVendorPayment, key: const Key('section-vendor')),
         row(t.fieldVendor, d.vendor?.name ?? '-', key: const Key('detail-vendor')),

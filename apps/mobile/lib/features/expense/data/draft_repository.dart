@@ -121,7 +121,7 @@ class DraftRepository {
             notes: Value(d.notes),
             requesterIdsJson: Value(jsonEncode(d.requesterIds)),
             bankAccountId: Value(d.isVendor ? null : d.bankAccountId),
-            // ADR 0025: vendor payment data (null = paid to an employee account)
+            // ADR 0027: vendor payment data (null = paid to an employee account)
             vendorJson: Value(vendorToJson(d)),
             serverId: Value(d.serverId),
             serverRev: Value(d.serverRev),
@@ -133,7 +133,7 @@ class DraftRepository {
             updatedAt: ts,
           ),
         );
-    // ADR 0025: a replaced / dropped invoice photo of this draft is removed (receipt photos: _dropOrphanMedia)
+    // ADR 0027: a replaced / dropped invoice photo of this draft is removed (receipt photos: _dropOrphanMedia)
     final oldInvoice = existing == null ? null : withVendorJson(_blank(existing), existing.vendorJson).invoiceMediaUuid;
     if (oldInvoice != null && oldInvoice != (d.isVendor ? d.invoiceMediaUuid : null)) {
       await (db.delete(db.mediaBlobs)..where((t) => t.clientUuid.equals(oldInvoice))).go();
@@ -274,7 +274,7 @@ class DraftRepository {
   DraftRequest _blank(LocalDraft row) => DraftRequest(clientUuid: row.clientUuid, type: RequestType.fromCode(row.type));
 }
 
-/// ADR 0025: vendor payment fields of a draft → `local_drafts.vendor_json` (null for an employee payment).
+/// ADR 0027: vendor payment fields of a draft → `local_drafts.vendor_json` (null for an employee payment).
 String? vendorToJson(DraftRequest d) => d.isVendor
     ? jsonEncode({
         'payeeType': d.payeeType.code,
@@ -288,7 +288,7 @@ String? vendorToJson(DraftRequest d) => d.isVendor
       })
     : null;
 
-/// ADR 0025: `local_drafts.vendor_json` back onto [d] (null / unreadable = employee payment, as before v10).
+/// ADR 0027: `local_drafts.vendor_json` back onto [d] (null / unreadable = employee payment, as before v10).
 DraftRequest withVendorJson(DraftRequest d, String? json) {
   if (json == null || json.isEmpty) return d;
   final Object? decoded;

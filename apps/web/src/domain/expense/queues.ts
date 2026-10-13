@@ -100,7 +100,7 @@ const base = (d: Populated, refs: Map<number, CompanyRef>) => ({
   docNo: d.docNo ?? null,
   type: d.type,
   typeLabel: requestKindLabel(d.type, d.payeeType),
-  // ADR 0025: vendor payment (+ the vendor's name for the queues)
+  // ADR 0027: vendor payment (+ the vendor's name for the queues)
   payeeType: payeeOf(d.payeeType),
   vendorName: payeeOf(d.payeeType) === 'vendor' && d.vendor && typeof d.vendor === 'object' ? (d.vendor.name ?? null) : null,
   status: d.status,
@@ -176,7 +176,7 @@ export async function transferQueue(req: PayloadRequest, f?: QueueFilter) {
       // D2: cost center proposed to Finance (the project's default, else a legacy request's own); null = Finance picks
       costCenter: await suggestedCostCenter(req, { project: p?.id ?? d.project, costCenter: d.costCenter && typeof d.costCenter === 'object' ? d.costCenter.id : d.costCenter }),
       bank: d.bankSnapshot ?? null,
-      // ADR 0025: a vendor payment's destination is the vendor account (same confirmation rule)
+      // ADR 0027: a vendor payment's destination is the vendor account (same confirmation rule)
       bankVerification: verification(payeeOf(d.payeeType) === 'vendor' ? (d as { vendorBankAccount?: unknown }).vendorBankAccount : (d as { bankAccount?: unknown }).bankAccount),
       flags: await flagCounts(req, d.id),
       sla: { approvedAt, slaHours, ageHours: age?.hours ?? null, over: age?.over ?? false },

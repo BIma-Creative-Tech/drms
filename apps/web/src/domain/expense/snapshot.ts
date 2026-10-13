@@ -52,7 +52,7 @@ export async function selectAndSnapshot(req: PayloadRequest, doc: RequestDoc, op
     projectId,
     costCenterId,
     requesterRoles: await requesterRolesIn(req, requesterEmployeeIds, companyId),
-    payeeType: payeeOf(doc.payeeType), // ADR 0025
+    payeeType: payeeOf(doc.payeeType), // ADR 0027
   })
   if (!rule) fail(409, 'Tidak ada aturan approval yang berlaku untuk pengajuan ini. Hubungi Admin.')
 

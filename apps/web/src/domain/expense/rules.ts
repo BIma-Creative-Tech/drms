@@ -37,7 +37,7 @@ export type RuleInput = {
    */
   requesterRoles?: readonly Role[] | null
   /**
-   * ADR 0025 "Jenis penerima": the rule applies only to requests paid to that payee type (`any` / absent = every
+   * ADR 0027 "Jenis penerima": the rule applies only to requests paid to that payee type (`any` / absent = every
    * request). E.g. "Pembayaran vendor oleh Finance → Direktur" (payee vendor + Peran pemohon Finance).
    */
   payeeType?: 'any' | PayeeType | null
@@ -57,7 +57,7 @@ export type RequestFacts = {
    * without an active account has []). Absent → rules with a requester-role condition never match.
    */
   requesterRoles?: ReadonlyArray<readonly Role[]>
-  /** ADR 0025: payee type of the request (absent = karyawan; addenda: rules with a payee condition never match). */
+  /** ADR 0027: payee type of the request (absent = karyawan; addenda: rules with a payee condition never match). */
   payeeType?: PayeeType | null
 }
 
@@ -117,7 +117,7 @@ function specificity(r: RuleInput): number {
   return (r.category ? 1 : 0) + (r.project ? 1 : 0) + (r.costCenter ? 1 : 0) + (r.requestType !== 'any' ? 1 : 0) + ((r.requesterRoles?.length ?? 0) > 0 ? 1 : 0) + (payeeCondition(r) ? 1 : 0)
 }
 
-/** ADR 0025: the rule's payee-type condition (null = any payee). */
+/** ADR 0027: the rule's payee-type condition (null = any payee). */
 export function payeeCondition(r: Pick<RuleInput, 'payeeType'>): PayeeType | null {
   return r.payeeType === 'karyawan' || r.payeeType === 'vendor' ? r.payeeType : null
 }

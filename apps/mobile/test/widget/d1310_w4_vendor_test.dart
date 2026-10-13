@@ -11,7 +11,7 @@ import 'package:proyekkas/features/expense/presentation/widgets/receipt_thumb.da
 import '../support/fixtures.dart';
 import '../support/widget_harness.dart';
 
-/// DRMS 13/10 Wave 4a (ADR 0025): the request detail of a vendor payment — vendor + invoice section, the destination
+/// DRMS 13/10 Wave 4a (ADR 0027): the request detail of a vendor payment — vendor + invoice section, the destination
 /// = the vendor account, a stepper without the LPJ step. Fictional data.
 Map<String, dynamic> _vendor() => {
   ...detailJson(status: 'completed', allowed: const []),
@@ -54,18 +54,10 @@ void main() {
       ],
     );
     expect(find.byKey(const Key('section-vendor')), findsOneWidget);
-    expect(
-      find.descendant(of: find.byKey(const Key('detail-vendor')), matching: find.text('CV Contoh Material')),
-      findsOneWidget,
-    );
-    expect(
-      find.descendant(of: find.byKey(const Key('detail-invoice-no')), matching: find.text('INV/2026/0012')),
-      findsOneWidget,
-    );
-    expect(
-      find.descendant(of: find.byKey(const Key('detail-invoice-file')), matching: find.text('invoice.jpg')),
-      findsOneWidget,
-    );
+    String? text(String key) => tester.widget<Text>(find.byKey(Key(key))).data;
+    expect(text('detail-vendor'), 'CV Contoh Material');
+    expect(text('detail-invoice-no'), 'INV/2026/0012');
+    expect(text('detail-invoice-file'), 'invoice.jpg');
     expect(
       find.descendant(of: find.byKey(const Key('section-bank')), matching: find.text('Rekening vendor')),
       findsOneWidget,

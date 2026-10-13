@@ -96,7 +96,7 @@ export const requesterOptions = ({ data, user }: Pick<FilterOptionsProps, 'data'
 }
 
 /**
- * ADR 0025: "Jenis penerima" options of the form — `vendor` only for Finance / PM of the form's PT (D3; the server
+ * ADR 0027: "Jenis penerima" options of the form — `vendor` only for Finance / PM of the form's PT (D3; the server
  * re-checks: drafts.ts vendorErrors). A stored value stays selectable (a locked request is never re-validated here).
  */
 export const payeeTypeOptions = ({ options, data, req }: { options: Array<string | { label: unknown; value: string }>; data?: unknown; req: PayloadRequest }) => {
@@ -106,14 +106,14 @@ export const payeeTypeOptions = ({ options, data, req }: { options: Array<string
   return may || stored === 'vendor' ? options : options.filter((o) => (typeof o === 'string' ? o : o.value) !== 'vendor')
 }
 
-/** ADR 0025: vendor picker — ACTIVE vendors of the form's PT (locked until the PT is known; list filter: every readable vendor). */
+/** ADR 0027: vendor picker — ACTIVE vendors of the form's PT (locked until the PT is known; list filter: every readable vendor). */
 export const vendorOptions = ({ data, user }: Pick<FilterOptionsProps, 'data' | 'user'>): boolean | Where => {
   if (isListFilter(data)) return true
   const company = formCompany(data, user, REQUEST_CREATE_ROLES)
   return company === undefined ? false : { and: [{ company: { equals: company } }, { active: { not_equals: false } }] }
 }
 
-/** ADR 0025: vendor account picker — active accounts OF THE CHOSEN vendor (nothing before a vendor is chosen). */
+/** ADR 0027: vendor account picker — active accounts OF THE CHOSEN vendor (nothing before a vendor is chosen). */
 export const vendorAccountOptions = ({ data }: Pick<FilterOptionsProps, 'data'>): boolean | Where => {
   if (isListFilter(data)) return true
   const v = relId((data as { vendor?: unknown } | undefined)?.vendor)
@@ -186,7 +186,7 @@ const beforeChange: CollectionBeforeChangeHook = async ({ data, originalDoc, ope
     }
   }
 
-  // ADR 0025: payee type coercion on every content write of a Draft — vendor = Pengajuan Baru without an employee account;
+  // ADR 0027: payee type coercion on every content write of a Draft — vendor = Pengajuan Baru without an employee account;
   // karyawan = no vendor / invoice data (a switch back never leaves stale vendor columns, DB CHECK expense_requests_payee).
   const payee = payeeOf(d.payeeType !== undefined ? d.payeeType : prev.payeeType)
   if (!transition && (operation === 'create' || prev.status === 'draft')) {
@@ -255,7 +255,7 @@ const beforeChange: CollectionBeforeChangeHook = async ({ data, originalDoc, ope
           lines: fromDocLines({ lines } as unknown as RequestDoc),
           neededDate: pick<string | null>('neededDate'),
           urgencyLevelId: relId(pick('urgencyLevel')) ?? null,
-          // ADR 0025
+          // ADR 0027
           payeeType: payee,
           vendorId: relId(pick('vendor')) ?? null,
           vendorBankAccountId: relId(pick('vendorBankAccount')) ?? null,
@@ -274,7 +274,7 @@ const beforeChange: CollectionBeforeChangeHook = async ({ data, originalDoc, ope
       )
     } catch (err) {
       const e = err as APIError & { data?: { errors?: Array<{ path: string; message: string }> } }
-      // 400 field errors, and ADR 0025's 409 duplicate invoice (field `invoiceNo`) → marked on the form inputs
+      // 400 field errors, and ADR 0027's 409 duplicate invoice (field `invoiceNo`) → marked on the form inputs
       const list = e instanceof APIError && (e.status === 400 || e.status === 409) ? e.data?.errors : undefined
       if (!list?.length) throw err
       // API field names → form field paths so the admin form marks the right inputs.
@@ -379,7 +379,7 @@ export const ExpenseRequests: CollectionConfig = withAudit(
       // "Total ditransfer" — now in the summary — and "Aturan approval" — named in the stepper for Finance / Admin).
       { name: 'requestStepper', type: 'ui', label: 'Alur pengajuan', admin: { position: 'sidebar', components: { Field: '@/admin/components/request/StepperField#StepperField' } } },
       {
-        // ADR 0025 (DRMS 13/10 Wave 4) "Jenis penerima": karyawan (default, as before) or vendor = "Pembayaran vendor"
+        // ADR 0027 (DRMS 13/10 Wave 4) "Jenis penerima": karyawan (default, as before) or vendor = "Pembayaran vendor"
         // (Finance / PM only, vendor + rekening vendor + invoice, no LPJ). Required → no admin.condition (schema drift);
         // the wrapper renders it only while the content is editable.
         name: 'payeeType',
@@ -404,7 +404,7 @@ export const ExpenseRequests: CollectionConfig = withAudit(
           { label: REQUEST_TYPE_LABELS.advance, value: 'advance' },
           { label: REQUEST_TYPE_LABELS.reimburse, value: 'reimburse' },
         ],
-        // ADR 0025: a vendor payment is always "Pengajuan Baru" — set by the hook, so the (hidden) input may stay empty
+        // ADR 0027: a vendor payment is always "Pengajuan Baru" — set by the hook, so the (hidden) input may stay empty
         validate: (value: unknown, options: { siblingData?: unknown }) => (payeeOf((options.siblingData as { payeeType?: unknown } | undefined)?.payeeType) === 'vendor' ? true : selectValidation(value as never, options as never)),
         // B-2 item 3: required → no admin.condition (schema drift); the wrapper renders nothing on a locked request
         admin: { placeholder: PLACEHOLDERS.type, components: { Field: '@/admin/components/EditableOnlyFields#RequestTypeField' } },
@@ -444,7 +444,7 @@ export const ExpenseRequests: CollectionConfig = withAudit(
       { name: 'urgencyLevel', type: 'relationship', relationTo: 'urgency-levels', label: 'Tingkat urgensi', index: true, ...pickerSameCompany({ createRoles: REQUEST_CREATE_ROLES }), admin: { placeholder: PLACEHOLDERS.urgencyLevel, condition: editableInput('urgencyLevel'), components: { Field: COMPANY_SCOPED_FIELD } } },
       // QA-15: Staff-only users pick only themselves (requesterOptions); the server re-checks (validateContent).
       // WA-09: "Pemohon" as in the APK (the PDF signature box keeps "Diajukan Oleh").
-      // ADR 0025: a vendor payment's Pemohon is its filer (server default) — no picker
+      // ADR 0027: a vendor payment's Pemohon is its filer (server default) — no picker
       { name: 'requesters', type: 'relationship', relationTo: 'employees', hasMany: true, label: 'Pemohon', admin: { isSortable: true, placeholder: PLACEHOLDERS.requesters, condition: employeePayee(editableInput()), components: { Field: COMPANY_SCOPED_FIELD } }, ...pickerSameCompany(), filterOptions: requesterOptions },
       {
         name: 'bankAccount',
@@ -461,7 +461,7 @@ export const ExpenseRequests: CollectionConfig = withAudit(
         // DRMS 10/10 8e: the picker only while Draft; afterwards the preview below shows the submit snapshot.
         admin: { description: 'Hanya rekening milik pemohon. Kosongkan untuk memakai rekening default pemohon pertama.', placeholder: PLACEHOLDERS.bankAccount, condition: employeePayee(draftOnly), components: { Field: COMPANY_SCOPED_FIELD } },
       },
-      // ADR 0025 "Pembayaran vendor": vendor + its account (Draft only, then the snapshot) + invoice (the proof)
+      // ADR 0027 "Pembayaran vendor": vendor + its account (Draft only, then the snapshot) + invoice (the proof)
       { name: 'vendor', type: 'relationship', relationTo: 'vendors', label: 'Vendor', index: true, ...pickerSameCompany(), filterOptions: vendorOptions, admin: { placeholder: PLACEHOLDERS.vendor, condition: vendorPayee(editableInput('vendor')), components: { Field: COMPANY_SCOPED_FIELD } } },
       {
         name: 'vendorBankAccount',

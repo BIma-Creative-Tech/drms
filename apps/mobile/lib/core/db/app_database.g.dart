@@ -549,7 +549,7 @@ class LocalDraft extends DataClass implements Insertable<LocalDraft> {
   final String requesterIdsJson;
   final int? bankAccountId;
 
-  /// Schema v10 (ADR 0025 "Pembayaran vendor"): payee type + vendor / vendor account / invoice of the draft as JSON
+  /// Schema v10 (ADR 0027 "Pembayaran vendor"): payee type + vendor / vendor account / invoice of the draft as JSON
   /// (`DraftRepository` vendorToJson); null = an employee payment (every draft before v10).
   final String? vendorJson;
   final int? serverId;

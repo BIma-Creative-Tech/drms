@@ -136,7 +136,7 @@ describe('expense request form conditions + placeholders (8d, 8i, 9a)', () => {
   it('every editable select / relationship of the request form has its own placeholder (no "Pilih nilai")', () => {
     const editable = fields().filter((f) => (f.type === 'select' || f.type === 'relationship') && !f.admin?.hidden && !(f.admin as { readOnly?: boolean } | undefined)?.readOnly && f.name !== 'company')
     // D2: the requester no longer picks a cost center (read-only legacy field); D4: the line's RAP item
-    // ADR 0025: Jenis penerima, Vendor, Rekening vendor
+    // ADR 0027: Jenis penerima, Vendor, Rekening vendor
     expect(editable.map((f) => f.name).sort()).toEqual(['bankAccount', 'category', 'payeeType', 'project', 'rapItem', 'requesters', 'type', 'uom', 'urgencyLevel', 'vehicle', 'vendor', 'vendorBankAccount'])
     for (const f of editable) expect(f.admin?.placeholder, f.name).toBe(PLACEHOLDERS[f.name as keyof typeof PLACEHOLDERS])
     expect((config.i18n.translations as { id?: { general?: { selectValue?: string } } }).id?.general?.selectValue).toBe('Pilih…')

@@ -236,7 +236,7 @@ export async function draftCopy(req: PayloadRequest, id: number): Promise<SyncDr
     notes: doc.notes ?? null,
     requester_ids: ids(doc.requesters),
     bank_account_id: relId(doc.bankAccount) ?? null,
-    // ADR 0025
+    // ADR 0027
     payee_type: payeeOf(doc.payeeType),
     vendor_id: relId(doc.vendor) ?? null,
     vendor_bank_account_id: relId(doc.vendorBankAccount) ?? null,
@@ -331,7 +331,7 @@ function toDraftInput(p: SyncDraftUpsert): DraftInput {
   if (p.notes !== undefined) input.notes = p.notes
   if (p.requester_ids !== undefined) input.requesterIds = p.requester_ids
   if (p.bank_account_id !== undefined) input.bankAccountId = p.bank_account_id
-  // ADR 0025 vendor payment
+  // ADR 0027 vendor payment
   if (p.payee_type !== undefined) input.payeeType = p.payee_type
   if (p.vendor_id !== undefined) input.vendorId = p.vendor_id
   if (p.vendor_bank_account_id !== undefined) input.vendorBankAccountId = p.vendor_bank_account_id

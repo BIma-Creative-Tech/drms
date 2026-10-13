@@ -19,7 +19,7 @@ import { payeeOf, type RequestType } from './types'
  * (evidence of the source request), "Nominal sesuai nota" per line (belongs to a receipt), the needed date (the
  * new need gets its own) and a legacy cost center (D2: the requester picks a project). The copy is validated like
  * any new draft (createDraft → validateContent) and audited on the new draft (`create`, field `duplicated_from`).
- * ADR 0025: a vendor payment keeps its vendor and vendor account; the invoice (number, dates, file) is NOT copied — one
+ * ADR 0027: a vendor payment keeps its vendor and vendor account; the invoice (number, dates, file) is NOT copied — one
  * invoice is paid once (the duplicate-invoice rule would refuse it anyway); the new draft needs its own invoice.
  */
 export function duplicateDraftInput(src: RequestDoc): DraftInput & { type: RequestType; title: string } {
@@ -47,7 +47,7 @@ export async function duplicateAsDraft(req: PayloadRequest, id: number): Promise
   const src = await loadRaw(req, id)
   const input = duplicateDraftInput(src)
   if (input.vendorBankAccountId) {
-    // ADR 0025: an account that is no longer usable (inactive) is dropped — the filer picks one before submit
+    // ADR 0027: an account that is no longer usable (inactive) is dropped — the filer picks one before submit
     const acc = await req.payload.findByID({ collection: 'vendor-bank-accounts', id: input.vendorBankAccountId, depth: 0, overrideAccess: true /* SYSTEM-READ: is the copied vendor account still usable */, req }).catch(() => null)
     if (!acc || acc.active === false || relId(acc.vendor) !== input.vendorId) input.vendorBankAccountId = null
   }

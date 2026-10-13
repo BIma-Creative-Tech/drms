@@ -10,7 +10,7 @@ import { companyId, getTestPayload, sqlAs, sqlError } from './helpers'
 import { api, makeFlowUser, makeWorld, png, sysCreate, upload, type FlowUser, type World } from './flow-world'
 
 /**
- * DRMS 13/10 Wave 4a (ADR 0025) "Pembayaran vendor" through the real API + DB guards:
+ * DRMS 13/10 Wave 4a (ADR 0027) "Pembayaran vendor" through the real API + DB guards:
  * - vendor accounts (`vendor-bank-accounts`): PT from the vendor, Staff cannot read, masters type for the APK;
  * - who files: Finance and PM only (Staff 403); Pemohon = the filer; type forced to Pengajuan Baru;
  * - approval through the generic engine: Finance → seeded rule "Pembayaran vendor oleh Finance — Direktur";

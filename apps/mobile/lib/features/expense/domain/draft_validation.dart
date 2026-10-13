@@ -99,7 +99,8 @@ List<DraftIssue> validateForSubmit(DraftRequest d, {int? selfOnlyEmployee, RapCh
     } else if ((l.computedTotal ?? 0) <= 0) {
       issues.add(DraftIssue('total', 'Total harus lebih dari 0.', lineNo: l.no));
     }
-    if (d.type == RequestType.reimburse && l.receipts.isEmpty) {
+    // a vendor payment is always Pengajuan Baru (no receipts before the transfer, ADR 0027)
+    if (d.type == RequestType.reimburse && !d.isVendor && l.receipts.isEmpty) {
       issues.add(DraftIssue('receipts', 'Reimburse wajib melampirkan minimal 1 nota.', lineNo: l.no));
     }
     for (final r in l.receipts) {
@@ -114,7 +115,7 @@ List<DraftIssue> validateForSubmit(DraftRequest d, {int? selfOnlyEmployee, RapCh
   return issues;
 }
 
-/// ADR 0025 "Pembayaran vendor": vendor, vendor account, invoice number / date / photo before "Ajukan" (same rules as
+/// ADR 0027 "Pembayaran vendor": vendor, vendor account, invoice number / date / photo before "Ajukan" (same rules as
 /// the server; the server also refuses a duplicate invoice of the same vendor).
 List<DraftIssue> vendorIssues(DraftRequest d) => [
   if (d.vendorId == null) const DraftIssue('vendorId', 'Vendor wajib dipilih.'),
@@ -129,7 +130,7 @@ List<DraftIssue> vendorIssues(DraftRequest d) => [
   if (!d.hasInvoiceFile) const DraftIssue('invoiceFile', 'Foto invoice wajib dilampirkan.'),
 ];
 
-/// ADR 0025: invoice key of the duplicate check (web `normalizeInvoiceNo`): letters + digits, upper case.
+/// ADR 0027: invoice key of the duplicate check (web `normalizeInvoiceNo`): letters + digits, upper case.
 String normalizeInvoiceNo(String? v) => (v ?? '').replaceAll(RegExp('[^A-Za-z0-9]'), '').toUpperCase();
 
 /// Renumbers lines 1..n after add/remove (the "No" column is automatic, US-37).

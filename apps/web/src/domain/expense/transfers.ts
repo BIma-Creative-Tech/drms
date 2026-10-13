@@ -38,7 +38,7 @@ export type TransferInput = {
   confirmUnverifiedAccount?: boolean
 }
 
-/** Verification state of the destination bank account of a request (QA-17; ADR 0025: a vendor account for a vendor payment). */
+/** Verification state of the destination bank account of a request (QA-17; ADR 0027: a vendor account for a vendor payment). */
 export type DestinationCheck = { bankAccountId: number | null; verificationStatus: 'verified' | 'unverified'; accountKind?: 'employee' | 'vendor' }
 
 /**
@@ -53,7 +53,7 @@ export async function checkDestination(
   doc: { bankAccount?: unknown; payeeType?: unknown; vendorBankAccount?: unknown; bankSnapshot?: { bankName?: string | null; accountNo?: string | null; accountHolder?: string | null } | null },
   confirmed: boolean,
 ): Promise<DestinationCheck> {
-  // ADR 0025: a vendor payment's destination is the vendor account (same confirmation rule as an employee account)
+  // ADR 0027: a vendor payment's destination is the vendor account (same confirmation rule as an employee account)
   const vendor = payeeOf(doc.payeeType) === 'vendor'
   const bankAccountId = relId(vendor ? doc.vendorBankAccount : doc.bankAccount) ?? null
   const acct = bankAccountId
@@ -168,7 +168,7 @@ type TransferDoc = { id: number; docNo: string; request: unknown; amount: number
 
 /**
  * POST /expense-requests/{id}/transfer (US-20, T3): Pengajuan Baru "Disetujui (Antri Transfer)" or
- * Reimburse "Nota Terverifikasi (Antri Transfer)". ADR 0025: a vendor payment → "Selesai" at once (no LPJ); the
+ * Reimburse "Nota Terverifikasi (Antri Transfer)". ADR 0027: a vendor payment → "Selesai" at once (no LPJ); the
  * destination snapshot is the vendor account taken at submit. Amount copied from `approvedAmount` (G3, also
  * DB-checked on insert), destination = the request's bank snapshot (read-only), source account +
  * bank reference + proof required. Auto-posts ONE KK cash-out linked to request and transfer
@@ -247,7 +247,7 @@ export async function recordTransfer(req: PayloadRequest, id: number, input: Tra
     overrideAccess: true, // SYSTEM-WRITE: link the KK entry (DB: cash_entry_id set once)
     req,
   })
-  // ADR 0025: a vendor payment is done with the transfer (the invoice is the proof — no receipts, LPJ or settlement)
+  // ADR 0027: a vendor payment is done with the transfer (the invoice is the proof — no receipts, LPJ or settlement)
   const vendor = payeeOf(doc.payeeType) === 'vendor'
   const updated = await updateRequest(
     req,

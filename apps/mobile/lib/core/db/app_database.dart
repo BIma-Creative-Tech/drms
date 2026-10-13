@@ -30,7 +30,7 @@ class LocalDrafts extends Table {
   TextColumn get requesterIdsJson => text().withDefault(const Constant('[]'))();
   IntColumn get bankAccountId => integer().nullable()();
 
-  /// Schema v10 (ADR 0025 "Pembayaran vendor"): payee type + vendor / vendor account / invoice of the draft as JSON
+  /// Schema v10 (ADR 0027 "Pembayaran vendor"): payee type + vendor / vendor account / invoice of the draft as JSON
   /// (`DraftRepository` vendorToJson); null = an employee payment (every draft before v10).
   TextColumn get vendorJson => text().nullable()();
   IntColumn get serverId => integer().nullable()();
@@ -457,7 +457,7 @@ class AppDatabase extends _$AppDatabase {
       // v9 (ADR 0023 sites): site of an attendance outbox item, nullable. Queued rows keep NULL (they were queued for a
       // project or a cost center — an APK before v9 had no site locations).
       if (from < 9) await m.addColumn(outbox, outbox.siteId);
-      // v10 (ADR 0025 "Pembayaran vendor"): vendor data of a draft (JSON), nullable. Existing drafts keep NULL = paid
+      // v10 (ADR 0027 "Pembayaran vendor"): vendor data of a draft (JSON), nullable. Existing drafts keep NULL = paid
       // to an employee account, exactly as before.
       if (from < 10) await m.addColumn(localDrafts, localDrafts.vendorJson);
     },

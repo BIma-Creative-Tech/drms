@@ -293,7 +293,7 @@ ExpenseDetail detailFromJson(Json j) {
     createdById: _intN(j['createdById']),
     urgencyLevel: refFromJson(j['urgencyLevel']),
     bankAccountId: _intN(j['bankAccountId']),
-    // ADR 0025 (absent on servers before Wave 4 → an employee payment)
+    // ADR 0027 (absent on servers before Wave 4 → an employee payment)
     payeeType: PayeeType.fromCode(_strN(j['payeeType'])),
     vendor: refFromJson(j['vendor']),
     vendorBankAccountId: _intN(j['vendorBankAccountId']),
@@ -380,7 +380,7 @@ InboxItem inboxItemFromJson(Json j) {
   );
 }
 
-/// ADR 0025: vendor fields of the create body (`invoiceFileId` = the uploaded invoice; DraftService uploads it first).
+/// ADR 0027: vendor fields of the create body (`invoiceFileId` = the uploaded invoice; DraftService uploads it first).
 Json _vendorCreateFields(DraftRequest d) => d.isVendor
     ? {
         'payeeType': PayeeType.vendor.code,
@@ -397,7 +397,7 @@ String? _trimmed(String? v) => (v == null || v.trim().isEmpty) ? null : v.trim()
 
 /// Local draft → `POST /api/v1/expense-requests` body (openapi `ExpenseRequestCreate`).
 Json draftToCreateBody(DraftRequest d) => {
-  // ADR 0025: a vendor payment is always Pengajuan Baru (the server sets it too)
+  // ADR 0027: a vendor payment is always Pengajuan Baru (the server sets it too)
   'type': d.isVendor ? RequestType.advance.code : d.type.code,
   'title': d.title.trim(),
   // D2: project only — the requester no longer sends a cost center (Finance sets it at transfer).
@@ -445,7 +445,7 @@ Json draftToSyncPayload(DraftRequest d, {bool includeDraftId = false}) => {
   'notes': (d.notes == null || d.notes!.trim().isEmpty) ? null : d.notes!.trim(),
   'requester_ids': d.requesterIds,
   'bank_account_id': d.isVendor ? null : d.bankAccountId,
-  // ADR 0025: vendor payment only (an employee draft stays byte-compatible with servers before Wave 4; the payee
+  // ADR 0027: vendor payment only (an employee draft stays byte-compatible with servers before Wave 4; the payee
   // type of a draft the server knows is fixed in the editor)
   if (d.isVendor) ...{
     'payee_type': PayeeType.vendor.code,
@@ -515,7 +515,7 @@ DraftRequest draftFromServer(
   notes: d.notes,
   requesterIds: [for (final r in d.requesters) r.id],
   bankAccountId: d.bankAccountId,
-  // ADR 0025: vendor payment — the invoice stays on the server (its media id)
+  // ADR 0027: vendor payment — the invoice stays on the server (its media id)
   payeeType: d.payeeType,
   vendorId: d.vendor?.id,
   vendorBankAccountId: d.vendorBankAccountId,
@@ -571,13 +571,13 @@ const progressPhotosPlaceholderKey = 'pk_photo_uuids';
 /// Local-only key of a `unit_timesheet.upsert` item (FR1): the HM meter photo, replaced by `hm_photo_media_id`.
 const hmPhotoPlaceholderKey = 'pk_hm_photo_uuid';
 
-/// ADR 0025: local-only key of a vendor-payment draft item: the invoice photo, replaced by `invoice_file_id`.
+/// ADR 0027: local-only key of a vendor-payment draft item: the invoice photo, replaced by `invoice_file_id`.
 const invoicePlaceholderKey = 'pk_invoice_uuid';
 
 /// Replaces [mediaPlaceholderKey] by `media_id` using [mediaIds] (local uuid → server id).
 /// Returns null when a photo has no server id yet.
 Json? resolveMediaIds(Json payload, Map<String, int> mediaIds) {
-  // ADR 0025: the invoice photo of a vendor-payment draft (then the draft's receipts as usual).
+  // ADR 0027: the invoice photo of a vendor-payment draft (then the draft's receipts as usual).
   if (payload.containsKey(invoicePlaceholderKey)) {
     final out = Map<String, dynamic>.of(payload);
     final local = out.remove(invoicePlaceholderKey);

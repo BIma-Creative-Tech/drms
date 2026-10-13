@@ -35,7 +35,7 @@ export function RequestSummary({ d, ptName, attachments, canRevealBank, draftBan
     if (value !== null && value !== undefined && value !== '') rows.push([label, value, key])
   }
   add('Jenis', d.typeLabel, 'type')
-  // ADR 0025: vendor payment — the payee is the vendor (Pemohon = the Finance / PM filer)
+  // ADR 0027: vendor payment — the payee is the vendor (Pemohon = the Finance / PM filer)
   const vendorPay = d.payeeType === 'vendor'
   if (vendorPay) add('Jenis penerima', 'Vendor', 'payeeType')
   add('Judul', d.title, 'title')

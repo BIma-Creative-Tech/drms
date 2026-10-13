@@ -101,7 +101,7 @@ export async function claimMedia(
  * already linked to ANOTHER expense request (copied by "Ajukan ulang", US-06) keeps that link.
  */
 export async function claimAttachments(req: PayloadRequest, doc: RequestDoc, involved: ReadonlySet<number>): Promise<void> {
-  // ADR 0025: the invoice file of a vendor payment is linked the same way (readable by everyone who reads the request)
+  // ADR 0027: the invoice file of a vendor payment is linked the same way (readable by everyone who reads the request)
   const invoice = relId(doc.invoiceFile)
   for (const mediaId of [...new Set([...ids(doc.attachments), ...(invoice !== undefined ? [invoice] : [])])]) {
     const m = (await req.payload

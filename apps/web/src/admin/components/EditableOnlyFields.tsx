@@ -17,7 +17,7 @@ const useEditable = () => {
   return linesEditable({ status })
 }
 
-/** ADR 0025: a vendor payment is always "Pengajuan Baru" (set by the server) — no "Jenis" input then. */
+/** ADR 0027: a vendor payment is always "Pengajuan Baru" (set by the server) — no "Jenis" input then. */
 const useVendor = () => useFormFields(([f]) => f.payeeType?.value === 'vendor')
 
 export const RequestTypeField: SelectFieldClientComponent = (props) => {
@@ -26,7 +26,7 @@ export const RequestTypeField: SelectFieldClientComponent = (props) => {
   return editable && !vendor ? <SelectField {...props} /> : null
 }
 
-/** ADR 0025 "Jenis penerima": only while the request is a Draft (it never changes afterwards). */
+/** ADR 0027 "Jenis penerima": only while the request is a Draft (it never changes afterwards). */
 export const PayeeTypeField: SelectFieldClientComponent = (props) => {
   const status = useFormFields(([f]) => (typeof f.status?.value === 'string' ? f.status.value : null))
   return status === null || status === 'draft' ? <SelectField {...props} /> : null

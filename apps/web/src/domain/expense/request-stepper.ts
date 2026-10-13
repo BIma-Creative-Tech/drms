@@ -5,7 +5,7 @@
  * [Reimburse: Verifikasi nota] → Transfer → [Pengajuan Baru: Nota & LPJ → Persetujuan kekurangan → Penyelesaian
  * LPJ] → Selesai / Ditolak / Dibatalkan. Per step: who acted, when, the decision and the note; the step that waits
  * now is `current` ("Tahapan saat ini"), a step sent back to the requester is `revision` (Revisi Nota, LPJ Revisi,
- * a withdrawn request back in Draft). ADR 0025: a vendor payment ("Pembayaran vendor") has no LPJ steps — Transfer → Selesai.
+ * a withdrawn request back in Draft). ADR 0027: a vendor payment ("Pembayaran vendor") has no LPJ steps — Transfer → Selesai.
  * Pure module (unit-tested, API-reusable — the APK detail can render the same list later): derived from the
  * request status, the approval snapshot stored at submit, the decision rows of the CURRENT cycle, the transfers
  * and the LPJ — no new columns, it never decides anything (the domain service does).
@@ -46,7 +46,7 @@ export type StepperSettlement = {
 }
 
 export type StepperInput = TimelineInput & {
-  /** ADR 0025: `vendor` = vendor payment (no "Nota & LPJ" / "Penyelesaian LPJ"); absent = karyawan. */
+  /** ADR 0027: `vendor` = vendor payment (no "Nota & LPJ" / "Penyelesaian LPJ"); absent = karyawan. */
   payeeType?: PayeeType | null
   settlement?: StepperSettlement | null
   rejectReason?: string | null
@@ -68,7 +68,7 @@ const LPJ_RUNNING: readonly RequestStatus[] = ['transferred', 'receipts_complete
 /** Note of the "Diajukan" step of a withdrawn request (Draft again after a submit). */
 export const WITHDRAWN_NOTE = 'ditarik kembali ke Draft — perbaiki lalu Kirim pengajuan lagi'
 
-/** ADR 0025: note of the final step of a vendor payment. */
+/** ADR 0027: note of the final step of a vendor payment. */
 export const VENDOR_END_NOTE = 'pembayaran vendor selesai saat ditransfer — invoice = bukti, tanpa LPJ'
 
 export const isCurrentStep = (s: Pick<StepperStep, 'state'>) => s.state === 'current' || s.state === 'revision'
@@ -97,7 +97,7 @@ export function buildRequestStepper(d: StepperInput): RequestStepper {
 
   const vendor = payeeOf(d.payeeType) === 'vendor'
   // Pengajuan Baru: receipts + LPJ by the requester, verification + settlement by Finance (§5.1, ADR 0019).
-  // ADR 0025: not for a vendor payment — the vendor's invoice is the proof, the transfer completes it.
+  // ADR 0027: not for a vendor payment — the vendor's invoice is the proof, the transfer completes it.
   if (d.type === 'advance' && !vendor) {
     const lpj = d.settlement ?? null
     const lpjState: StepperState =

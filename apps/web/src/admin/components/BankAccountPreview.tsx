@@ -27,7 +27,7 @@ const EYE_OFF = 'M3 3l18 18M10.6 5.1A10.9 10.9 0 0 1 12 5c6.4 0 10 7 10 7a17.6 1
 export function BankAccountPreview() {
   const { id } = useDocumentInfo()
   const requestId = typeof id === 'number' ? id : typeof id === 'string' && /^\d+$/.test(id) ? Number(id) : null
-  // ADR 0025: a vendor payment previews the chosen vendor account
+  // ADR 0027: a vendor payment previews the chosen vendor account
   const vendor = useFormFields(([f]) => f.payeeType?.value === 'vendor')
   const employeeAccount = useFormFields(([f]) => relValue(f.bankAccount?.value))
   const vendorAccount = useFormFields(([f]) => relValue(f.vendorBankAccount?.value))

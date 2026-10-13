@@ -6,11 +6,11 @@ import { reasonOnChange, reasonOnDeactivate, withAudit } from '@/audit/hooks'
 import { activeField, uuidField } from '@/fields/common'
 import { companyField, companyHook, pickerSameCompany } from '@/fields/company'
 
-/** ADR 0025: account number as stored (spaces, dots and dashes removed) — same rule as the employee accounts. */
+/** ADR 0027: account number as stored (spaces, dots and dashes removed) — same rule as the employee accounts. */
 export const normalizeAccountNo = (v: unknown): unknown => (typeof v === 'string' ? v.replace(/[\s.-]/g, '') : v)
 
 /**
- * ADR 0025 (DRMS 13/10 Wave 4) "Rekening vendor": destination of a vendor payment ("Pembayaran vendor"), mirror of
+ * ADR 0027 (DRMS 13/10 Wave 4) "Rekening vendor": destination of a vendor payment ("Pembayaran vendor"), mirror of
  * `employee-bank-accounts` — vendor, bank (the shared bank master), account number, holder ("Atas nama"), default
  * flag, verification status (Admin / Finance only), active. PT derived from the vendor (company hook + DB trigger),
  * no delete (deactivate with a reason), a reason on every change of the account data, audited.

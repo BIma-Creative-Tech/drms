@@ -1,4 +1,4 @@
-# ADR 0025 — Pembayaran vendor (vendor payments)
+# ADR 0027 — Pembayaran vendor (vendor payments)
 
 - **Status:** Proposed → implemented on `feat/d1310-w4-vendor` (DRMS 13/10 Wave 4a). Decisions D3 approved by the
   owner; the points marked **(to confirm)** are proposals of this ADR that the client confirms at UAT. Staging first;
@@ -51,7 +51,7 @@ payments therefore stay on the generic rule engine, nothing names a step.
 4. **Approval** — the generic engine (`rules.ts`, `snapshot.ts`) with one new rule condition **"Jenis penerima"**
    (`approval_rules.payee_type`: `any` (default, every existing rule) | `karyawan` | `vendor`; counts as one more
    specificity like "Peran pemohon"; addendum rules: `any` only — hook + DB CHECK). Seeded per PT (data migration
-   `20261014_100200_d1310_vendor_payments_data`, `seed/data.ts`, copied to new PTs) the rule
+   `20261013_700200_d1310_vendor_payments_data`, `seed/data.ts`, copied to new PTs) the rule
    **"Pembayaran vendor oleh Finance — Direktur"**: Jenis penerima = Vendor, Peran pemohon = Finance, no "Diketahui",
    one level Direktur, priority 20. Result:
    - **filed by Finance** → that rule → **Direktur only**;
@@ -110,8 +110,8 @@ payments therefore stay on the generic rule engine, nothing names a step.
 
 ## Rollout
 
-1. Merge → staging; migrations `20261014_100000_d1310_vendor_payments` (schema, additive),
-   `…_100100_…_guard`, `…_100200_…_data` (rule per PT).
+1. Merge → staging; migrations `20261013_700000_d1310_vendor_payments` (schema, additive),
+   `…_700100_…_guard`, `…_700200_…_data` (rule per PT).
 2. Finance / Admin: add vendor accounts (Master Data → Vendor → tab Rekening), verify them.
 3. UAT: Finance files a vendor payment → Direktur approves → transfer (unverified account confirmation) → Selesai;
    PM files → (PM step skipped) Direktur → transfer; duplicate invoice → 409; APK PM flow.

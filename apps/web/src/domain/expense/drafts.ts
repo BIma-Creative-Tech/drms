@@ -46,7 +46,7 @@ export type DraftInput = {
   lines?: LineInputApi[]
   attachmentIds?: number[]
   clientUuid?: string
-  /** ADR 0025 "Jenis penerima" (default karyawan). `vendor` = Pembayaran vendor (Finance / PM only; type is set to advance). */
+  /** ADR 0027 "Jenis penerima" (default karyawan). `vendor` = Pembayaran vendor (Finance / PM only; type is set to advance). */
   payeeType?: PayeeType
   vendorId?: number | null
   vendorBankAccountId?: number | null
@@ -57,12 +57,12 @@ export type DraftInput = {
   invoiceFileId?: number | null
 }
 
-/** ADR 0025 (D3): roles that may file a vendor payment, IN the request's PT. */
+/** ADR 0027 (D3): roles that may file a vendor payment, IN the request's PT. */
 export const VENDOR_PAYMENT_ROLES: readonly Role[] = ['pk-finance', 'pk-pm']
 
 export const VENDOR_PAYMENT_ROLE_MESSAGE = 'Pembayaran vendor hanya dapat diajukan oleh Finance atau PM di PT ini.'
 
-/** Vendor fields of a draft (ADR 0025) — the part of `validateContent`'s input that only a vendor payment uses. */
+/** Vendor fields of a draft (ADR 0027) — the part of `validateContent`'s input that only a vendor payment uses. */
 export type VendorContent = {
   payeeType?: PayeeType | null
   vendorId?: number | null
@@ -167,7 +167,7 @@ export async function validateContent(
     callerSetsRequesters?: boolean
     /** D2: a legacy cost-center request submitted before (withdrawn / back to Draft) may be sent again without a project. */
     legacyCostCenter?: boolean
-    /** ADR 0025: the request itself (excluded from the duplicate-invoice check); absent on create. */
+    /** ADR 0027: the request itself (excluded from the duplicate-invoice check); absent on create. */
     requestId?: number
   },
 ): Promise<void> {
@@ -233,7 +233,7 @@ export async function validateContent(
   }
 
   const vendor = payeeOf(c.payeeType) === 'vendor'
-  // ADR 0025: a vendor payment pays the vendor's account — the requester's account plays no part
+  // ADR 0027: a vendor payment pays the vendor's account — the requester's account plays no part
   if (vendor) {
     if (c.bankAccountId) errors.push({ path: 'bankAccountId', message: 'Pembayaran vendor memakai rekening vendor, bukan rekening karyawan.' })
     errors.push(...(await vendorErrors(req, c, { ...opts, company: ownPt, requesters: uniq })))
@@ -281,12 +281,12 @@ export async function validateContent(
   })
   errors.push(...(await rapLineErrors(req, c.projectId ?? null, c.lines, opts.forSubmit)))
   if (errors.length > 0) fail(400, 'Data pengajuan tidak valid.', errors)
-  // ADR 0025: the same invoice of the same vendor on another live request → 409 (DB: expense_requests_vendor_invoice_uq)
+  // ADR 0027: the same invoice of the same vendor on another live request → 409 (DB: expense_requests_vendor_invoice_uq)
   if (vendor && c.vendorId && normalizeInvoiceNo(c.invoiceNo)) await assertInvoiceUnused(req, c.vendorId, c.invoiceNo!, opts.requestId)
 }
 
 /**
- * ADR 0025 (D3): vendor-payment rules of a draft / submit — filer = Finance or PM of the request's PT, the requester is
+ * ADR 0027 (D3): vendor-payment rules of a draft / submit — filer = Finance or PM of the request's PT, the requester is
  * the filer himself, an active vendor of the PT and an active account OF THAT vendor, invoice number / date / file
  * (required to send), due date not before the invoice date.
  */
@@ -300,7 +300,7 @@ async function vendorErrors(
   if (opts.company !== undefined) {
     const { roles, employee } = await rolesOfUserIn(req, opts.creatorId, opts.company)
     if (!roles.some((r) => VENDOR_PAYMENT_ROLES.includes(r))) fail(403, VENDOR_PAYMENT_ROLE_MESSAGE)
-    // the filer is the applicant: "Pemohon" = exactly his own employee in the PT (routing by his role, ADR 0025)
+    // the filer is the applicant: "Pemohon" = exactly his own employee in the PT (routing by his role, ADR 0027)
     if (opts.requesters.length > 0 && (employee === undefined || opts.requesters.length !== 1 || opts.requesters[0] !== employee)) {
       errors.push({ path: 'requesterIds', message: 'Pembayaran vendor: pemohon adalah pembuat pengajuan sendiri (Finance / PM).' })
     }
@@ -345,13 +345,13 @@ async function vendorErrors(
   return errors
 }
 
-/** Message of a duplicate invoice (ADR 0025): the other request by number (or id) and its status. */
+/** Message of a duplicate invoice (ADR 0027): the other request by number (or id) and its status. */
 export function duplicateInvoiceMessage(invoiceNo: string, other: { id: number; docNo: string | null; status: RequestStatus }): string {
   return `Invoice ${invoiceNo.trim()} dari vendor ini sudah dipakai di pengajuan ${other.docNo ?? `#${other.id} (draft)`} — status ${STATUS_LABELS[other.status]}. Satu invoice hanya boleh dibayar sekali; batalkan pengajuan lama atau periksa nomor invoice.`
 }
 
 /**
- * ADR 0025 duplicate-invoice rule: same vendor + same normalized invoice number on a request that is not cancelled /
+ * ADR 0027 duplicate-invoice rule: same vendor + same normalized invoice number on a request that is not cancelled /
  * rejected (Draft included) → 409 with a field error on `invoiceNo`. The DB unique index
  * `expense_requests_vendor_invoice_uq` (same key, `pk_invoice_key`) is the final guard against a race.
  */
@@ -439,7 +439,7 @@ async function assertStaffSelfOnly(req: PayloadRequest, requesters: number[], co
   if (caller !== undefined && caller !== opts.creatorId && opts.callerSetsRequesters) await check(caller)
 }
 
-/** ADR 0025: the vendor fields of a stored request in API shape. */
+/** ADR 0027: the vendor fields of a stored request in API shape. */
 export function vendorOfDoc(doc: RequestDoc): Required<VendorContent> {
   return {
     payeeType: payeeOf(doc.payeeType),
@@ -452,7 +452,7 @@ export function vendorOfDoc(doc: RequestDoc): Required<VendorContent> {
   }
 }
 
-/** ADR 0025: validateContent's vendor part of an API input (karyawan: nothing but the payee type). */
+/** ADR 0027: validateContent's vendor part of an API input (karyawan: nothing but the payee type). */
 function vendorInput(input: VendorContent, vendor: boolean): VendorContent {
   if (!vendor) return { payeeType: 'karyawan' }
   return {
@@ -466,7 +466,7 @@ function vendorInput(input: VendorContent, vendor: boolean): VendorContent {
   }
 }
 
-/** ADR 0025: the vendor columns written for a draft (karyawan → all empty, so a payee switch never leaves stale data). */
+/** ADR 0027: the vendor columns written for a draft (karyawan → all empty, so a payee switch never leaves stale data). */
 export function vendorData(input: VendorContent, vendor: boolean): Record<string, unknown> {
   return {
     payeeType: vendor ? 'vendor' : 'karyawan',
@@ -545,7 +545,7 @@ export async function createDraft(req: PayloadRequest, input: DraftInput & { typ
   const requesterIds = input.requesterIds && input.requesterIds.length > 0 ? input.requesterIds : emp !== undefined ? [emp] : []
   const lines = input.lines ?? []
   const vendor = payeeOf(input.payeeType) === 'vendor'
-  // ADR 0025: a vendor payment is always a Pengajuan Baru (type advance), without an employee account
+  // ADR 0027: a vendor payment is always a Pengajuan Baru (type advance), without an employee account
   const type: RequestType = vendor ? 'advance' : input.type
   await validateContent(req, { ...input, type, costCenterId: null, requesterIds, lines, ...vendorInput(input, vendor) }, { forSubmit: false, creatorId: uid })
   const doc = await validated(req, () => req.payload.create({
@@ -588,7 +588,7 @@ export async function updateDraft(req: PayloadRequest, id: number, input: DraftI
   const projectId = input.projectId !== undefined ? input.projectId : (relId(doc.project) ?? null)
   // D4: lines without `rapItemId` (old clients) keep the stored RAP item of the same line id
   const lines = input.lines !== undefined ? keepRapItems(input.lines, fromDocLines(doc)) : undefined
-  // ADR 0025: the payee type of a Draft may change (vendor ⇄ karyawan); vendor → type advance, no employee account
+  // ADR 0027: the payee type of a Draft may change (vendor ⇄ karyawan); vendor → type advance, no employee account
   const payee = payeeOf(input.payeeType ?? doc.payeeType)
   const vendor = payee === 'vendor'
   if (doc.status === 'receipt_revision' && input.payeeType !== undefined && payeeOf(input.payeeType) !== payeeOf(doc.payeeType)) fail(409, 'Saat Revisi Nota jenis penerima tidak dapat diubah.')
@@ -620,7 +620,7 @@ export async function updateDraft(req: PayloadRequest, id: number, input: DraftI
   const data: Record<string, unknown> = {}
   if (input.type !== undefined) data.type = input.type
   if (doc.status === 'draft' && (input.payeeType !== undefined || vendor)) {
-    // ADR 0025: payee type + vendor fields (karyawan clears them; vendor clears the employee account)
+    // ADR 0027: payee type + vendor fields (karyawan clears them; vendor clears the employee account)
     Object.assign(data, vendorData(vendor ? { ...input, ...vendorNow } : {}, vendor), { type: current.type })
     if (vendor) data.bankAccount = null
   }
@@ -668,7 +668,7 @@ export async function resubmitAsDraft(req: PayloadRequest, id: number): Promise<
       notes: src.notes ?? null,
       requesters: ids(src.requesters),
       bankAccount: relId(src.bankAccount) ?? null,
-      // ADR 0025: a rejected vendor payment comes back with its vendor + invoice (the rejected one no longer counts as a duplicate)
+      // ADR 0027: a rejected vendor payment comes back with its vendor + invoice (the rejected one no longer counts as a duplicate)
       ...vendorData(vendorOfDoc(src), payeeOf(src.payeeType) === 'vendor'),
       lines: toDocLines(fromDocLines(src).map(({ id: _id, ...l }) => l)),
       attachments: ids(src.attachments),

@@ -9,7 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### Added (DRMS 13/10 Wave 4 — pembayaran vendor)
 
 - **Pembayaran vendor** (client: "kelola vendor dan rekening vendor; finance memilih vendor dan upload invoice"),
-  [ADR 0025](docs/proyekkas/adr/0025-vendor-payments.md). New per-PT master **Rekening vendor**
+  [ADR 0027](docs/proyekkas/adr/0027-vendor-payments.md). New per-PT master **Rekening vendor**
   (`vendor-bank-accounts`: vendor, bank, number, holder, default, verification by Admin / Finance, reason on change,
   audited, no delete) and a **Rekening** tab on the vendor form. Expense requests get **Jenis penerima**
   (`payeeType`: `karyawan` default — unchanged — / `vendor`): vendor, vendor account (of that vendor, same PT), invoice
@@ -26,7 +26,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   as first Lampiran, transfer-queue badge, list filter "Jenis penerima". API / OpenAPI: `payeeType`, `vendorId`,
   `vendorBankAccountId`, `invoice*` on drafts, list filter `payeeType`, detail `vendor` / `invoice`, transfer queue
   `vendorName`, masters type `vendor-bank-accounts`, bank preview `vendorAccount`. Migrations
-  `20261014_100000_d1310_vendor_payments` (+ `_guard`, `_data`). Guides: finance, pm, admin.
+  `20261013_700000_d1310_vendor_payments` (+ `_guard`, `_data`). Guides: finance, pm, admin.
 
 ### Changed (DRMS 13/10 Wave 3 — dashboard parity APK)
 

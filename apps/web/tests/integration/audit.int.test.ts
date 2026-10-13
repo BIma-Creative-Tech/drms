@@ -26,7 +26,7 @@ const fixtures: Record<string, Fixture> = {
   },
   clients: { create: () => ({ name: 'Klien Audit' }), update: { contact: 'Bu Audit' }, field: 'contact' },
   vendors: { create: () => ({ name: 'Vendor Audit' }), update: { npwp: '01.234.567.8-901.000' }, field: 'npwp' },
-  // ADR 0025
+  // ADR 0027
   'vendor-bank-accounts': {
     create: () => ({ vendor: ids.vendors, bank: ids.banks, accountNo: '7654321', accountHolder: 'Vendor Audit' }),
     update: { isDefault: true },

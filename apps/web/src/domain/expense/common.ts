@@ -37,9 +37,9 @@ export type RequestDoc = {
   id: number
   docNo?: string | null
   type: RequestType
-  /** ADR 0025 "Jenis penerima" (absent on rows read before the column existed = karyawan). */
+  /** ADR 0027 "Jenis penerima" (absent on rows read before the column existed = karyawan). */
   payeeType?: PayeeType | null
-  /** ADR 0025 vendor payment: vendor + its bank account (destination) + invoice (the proof). */
+  /** ADR 0027 vendor payment: vendor + its bank account (destination) + invoice (the proof). */
   vendor?: unknown
   vendorBankAccount?: unknown
   invoiceNo?: string | null

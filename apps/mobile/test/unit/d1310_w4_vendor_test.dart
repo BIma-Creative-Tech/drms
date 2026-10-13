@@ -13,7 +13,7 @@ import 'package:proyekkas/features/sync/domain/sync_models.dart';
 import '../support/fixtures.dart';
 import '../support/schema_v2.dart';
 
-/// DRMS 13/10 Wave 4a (ADR 0025) "Pembayaran vendor" on the APK: draft model + drift v10 (`vendor_json`), create /
+/// DRMS 13/10 Wave 4a (ADR 0027) "Pembayaran vendor" on the APK: draft model + drift v10 (`vendor_json`), create /
 /// sync payloads (invoice photo placeholder → `invoice_file_id`), validation, read model, stepper without LPJ.
 /// Fictional data (example names, made-up numbers).
 const sub = 'kc-sub-v10';

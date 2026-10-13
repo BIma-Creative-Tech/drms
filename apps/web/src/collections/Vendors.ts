@@ -8,7 +8,7 @@ import { companyField, companyHook } from '@/fields/company'
 
 /**
  * Vendor (opsional; duplikat nota). Admin/Finance C/R/U, Owner R/U, PM R.
- * ADR 0025 (DRMS 13/10 Wave 4): tab "Rekening" lists the vendor's bank accounts (`vendor-bank-accounts`, join — no
+ * ADR 0027 (DRMS 13/10 Wave 4): tab "Rekening" lists the vendor's bank accounts (`vendor-bank-accounts`, join — no
  * column) — the destination of a vendor payment ("Pembayaran vendor"). Unnamed tabs: no schema change.
  */
 export const Vendors: CollectionConfig = withAudit(

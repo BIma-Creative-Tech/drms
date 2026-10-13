@@ -156,7 +156,7 @@ export const MASTER_TYPES = [
   'clients',
   // ADR 0023: sites (kantor cabang) — attendance locations + per-caller `home` / `assigned` / `team`
   'sites',
-  // ADR 0025: vendor accounts — destination picker of a vendor payment (Finance / PM / Direktur / Admin read; Staff: none)
+  // ADR 0027: vendor accounts — destination picker of a vendor payment (Finance / PM / Direktur / Admin read; Staff: none)
   'vendor-bank-accounts',
 ] as const
 export type MasterType = (typeof MASTER_TYPES)[number]

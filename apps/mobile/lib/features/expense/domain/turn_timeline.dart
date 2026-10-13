@@ -159,7 +159,7 @@ const receiptCheckStepTitle = 'Verifikasi nota Finance';
 const lpjStepTitle = 'LPJ';
 const doneStepTitle = 'Selesai';
 
-/// ADR 0025: note of the final step of a vendor payment (web `VENDOR_END_NOTE`).
+/// ADR 0027: note of the final step of a vendor payment (web `VENDOR_END_NOTE`).
 const vendorDoneNote = 'pembayaran vendor selesai saat ditransfer — invoice = bukti, tanpa LPJ';
 const rejectedStepTitle = 'Ditolak';
 const cancelledStepTitle = 'Dibatalkan';
@@ -184,7 +184,7 @@ List<TimelineStep> buildRequestStepper(ExpenseDetail d) {
     final check = _receiptCheckStep(d, ended: ended, turn: turn);
     steps.insert(steps.indexWhere((s) => s.title == transferStepTitle), check);
   } else if (!d.isVendor) {
-    // ADR 0025: a vendor payment has no LPJ — the transfer completes it.
+    // ADR 0027: a vendor payment has no LPJ — the transfer completes it.
     steps.add(_lpjStep(d, ended: ended, turn: turn));
   }
   steps.add(_finalStep(d, rejected: rejected, cancelled: cancelled, turn: turn));

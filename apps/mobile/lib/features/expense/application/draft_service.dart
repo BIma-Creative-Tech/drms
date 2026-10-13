@@ -118,7 +118,7 @@ class DraftService {
     });
   }
 
-  /// ADR 0025: uploads the local invoice photo of a vendor payment (once: the blob remembers its server id).
+  /// ADR 0027: uploads the local invoice photo of a vendor payment (once: the blob remembers its server id).
   Future<DraftRequest> _uploadInvoice(DraftRequest d) async {
     final local = d.invoiceMediaUuid;
     if (!d.isVendor || d.invoiceFileId != null || local == null) return d;
@@ -152,7 +152,7 @@ class DraftService {
           detail: 'Perubahan draft masih menunggu sinkron. Tekan "Kirim sekarang" lalu coba Ajukan lagi.',
         );
       } else {
-        // ADR 0025: the invoice photo of a vendor payment goes up first (`POST /media/attachments`)
+        // ADR 0027: the invoice photo of a vendor payment goes up first (`POST /media/attachments`)
         draft = await _uploadInvoice(draft);
         detail = await api.create(
           draftToCreateBody(draft),
@@ -200,7 +200,7 @@ class DraftService {
       );
       await drafts.setSyncState(draft.clientUuid, DraftSyncState.submitted, serverId: submitted.id, clearError: true);
       await outbox.supersede(sub, draft.clientUuid);
-      await drafts.purgeMediaOf(original); // incl. the local invoice photo (ADR 0025)
+      await drafts.purgeMediaOf(original); // incl. the local invoice photo (ADR 0027)
       return submitted;
     });
   }

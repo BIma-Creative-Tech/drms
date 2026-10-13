@@ -100,7 +100,7 @@ export const MASTER_COLLECTIONS = [
   Banks,
   Clients,
   Vendors,
-  // ADR 0025: rekening vendor (destination of a vendor payment)
+  // ADR 0027: rekening vendor (destination of a vendor payment)
   VendorBankAccounts,
   Projects,
   ProjectStages,

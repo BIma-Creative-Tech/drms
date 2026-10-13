@@ -54,7 +54,7 @@ export type PdfData = {
   /** ADR 0021: policy note printed under the signatures (e.g. a Direktur's request filed by the PM). */
   policyNote?: string
   transfer: { bankName: string; accountHolder: string; accountNo: string } | null
-  /** ADR 0025: vendor payment — vendor + invoice (no LPJ; the invoice is the proof, attached as the first Lampiran). */
+  /** ADR 0027: vendor payment — vendor + invoice (no LPJ; the invoice is the proof, attached as the first Lampiran). */
   vendorInvoice?: { vendor: string; invoiceNo: string; invoiceDate: string; dueDate: string } | null
   receipts: PdfReceipt[]
   attachments: PdfAttachment[]
