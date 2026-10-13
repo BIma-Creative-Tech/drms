@@ -166,3 +166,13 @@ export const LOAN_ADMIN_VIEWS = {
   loanNew: { Component: '@/admin/views/Loans#LoanNew', path: '/pinjaman/baru' as const, exact: true, meta: { title: 'Ajukan pinjaman antar project' } },
   loanDetail: { Component: '@/admin/views/Loans#LoanDetail', path: '/pinjaman/detail/:id' as const, exact: true, meta: { title: 'Pinjaman antar project' } },
 }
+
+/**
+ * DRMS 13/10 Wave 3 — "Proyek › RAP" (own sub-menu under Proyek): RAP index of the visible projects and the RAP form +
+ * Excel upload of one project. Both exact (`/rap` would prefix-match `/rap/<id>`). Role / project checks inside the
+ * views; every write goes through /api/v1 (projects/{id}/rap/items, rap-items/{id}, rap import / templates).
+ */
+export const RAP_ADMIN_VIEWS = {
+  rapIndex: { Component: '@/admin/views/Rap#RapIndex', path: '/rap' as const, exact: true, meta: { title: 'RAP proyek' } },
+  rapProject: { Component: '@/admin/views/Rap#RapProject', path: '/rap/:id' as const, exact: true, meta: { title: 'RAP project' } },
+}

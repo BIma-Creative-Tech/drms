@@ -6,6 +6,29 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added (DRMS 13/10 Wave 3 — Proyek › RAP)
+
+- **Own sub-menu "Proyek › RAP"** (client: "Form RAP + upload, submenu sendiri di bawah Proyek"): section **RAP** in the
+  Proyek module (launcher / landing tiles) with **RAP proyek** (`/admin/rap`) for Direktur, Admin, Finance and PM; the
+  raw lists **Data item RAP** and **RAP templates** moved there from "Laporan lapangan". The Staff menu is unchanged
+  (project list only); Staff may still open the pages read-only, without money, like the project's RAP tab.
+- **RAP index** `/admin/rap`: every project the caller may read with its RAP state (**Ada · n item**, **Belum ada
+  (wajib)** for projects with a RAB or konstruksi, **Belum ada**), Wave 2 toolbar (search, multi-select PT / status
+  project / RAP, archived only on request), numbered pages, clickable rows and a **totals row** at the bottom (projects,
+  items, Σ RAP, Σ RAB over every filtered row). **Total RAP** (Σ volume × harga satuan of the active items) only for the
+  RAP price roles of the project (Direktur / Admin / Finance of the PT, PM of the project team), **RAB** only where the
+  RAB field is readable, **RAP / RAB** % with a "Melebihi RAB" warning; Staff sees no money column at all.
+- **RAP page per project** `/admin/rap/:id`: items table (kode, uraian, jenis, tahapan, volume; harga satuan / jumlah /
+  realisasi for the price roles) with a **Grand total** row, **+ Tambah item** and **Ubah** in one dialog (label left of
+  the input, D4; same limits as the API; jumlah computed live), deactivation instead of delete (items are never
+  deleted), a "Sudah terpakai" chip on items with realisation. It calls the existing `POST /api/v1/projects/{id}/rap/items`
+  and `PATCH /api/v1/rap-items/{id}` (no API change). Lock unchanged: once a daily report realised anything the PM sees
+  the buttons disabled (409 `RAP_LOCKED` server-side), Direktur / Admin edit with a reason. **Upload Excel & template**
+  (RapImport, template, RAP download, RAP templates) stay on the page for the RAP editors. The project's RAP tab links
+  to it ("Ubah item RAP").
+- Shared `FORM_GRID_STYLE` (`admin/components/form-grid.ts`): the label-left grid of the Wave 2 request form for custom
+  `.pk-fld` forms and dialogs.
+
 ### Changed (DRMS 13/10 Wave 2 — generic list view, Umum #3–#8, Persetujuan #2)
 
 - **One list view for every collection** (`PkListView`, `src/admin/pk-list/`, wired centrally in `payload.config.ts`

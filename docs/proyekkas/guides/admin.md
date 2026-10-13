@@ -302,7 +302,8 @@ RAB, Kendaraan, Penugasan, AkunKas), dan sheet **AksesPT** untuk akses satu peng
 
 File impor tidak memuat RAP. Setiap project ber-RAB wajib punya RAP sebelum pengajuannya bisa dikirim (keputusan
 pemilik 11 Okt 2026): laporan impor memberi **PERINGATAN** per project ber-RAB yang belum punya RAP. Setelah impor,
-PM / Direktur mengisi RAP di tab **RAP** project (template atau impor Excel RAP).
+PM / Direktur mengisi RAP di menu **Proyek → RAP proyek** (form per item, template atau upload Excel RAP; saring
+**RAP: Belum ada (wajib)**) atau di tab **RAP** project.
 
 ## 11. Audit Log
 

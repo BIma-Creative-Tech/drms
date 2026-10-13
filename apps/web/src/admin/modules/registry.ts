@@ -119,6 +119,16 @@ export const MODULES: readonly ModuleDef[] = [
     sections: [
       // Grouped so the whole menu fits one bar row at 1440px (7 flat entries + 2 dropdowns did not).
       { items: [{ collection: 'projects' }, { collection: 'budget-lines' }] },
+      // DRMS 13/10 Wave 3: "Proyek › RAP" — own sub-menu (RAP index + form + Excel upload per project); the raw
+      // collection lists of the RAP live here too (were under "Laporan lapangan")
+      {
+        label: 'RAP',
+        items: [
+          { view: '/rap', label: 'RAP proyek', roles: OFFICE_PM_ADMIN, navKey: 'rap' },
+          { collection: 'rap-items', label: 'Data item RAP' },
+          { collection: 'rap-templates' },
+        ],
+      },
       { label: 'Tahapan', items: [{ collection: 'project-stages' }, { collection: 'stage-templates' }] },
       { label: 'Data pendukung', items: [{ collection: 'clients' }, { collection: 'cost-centers' }, { collection: 'team-assignments' }] },
       {
@@ -143,12 +153,10 @@ export const MODULES: readonly ModuleDef[] = [
           { collection: 'unit-timesheets', label: 'Data timesheet unit' },
           { collection: 'aftersales-activities', label: 'Data aktivitas aftersales' },
           { collection: 'contract-units' },
-          // P3 konstruksi: Laporan Harian + RAP
+          // P3 konstruksi: Laporan Harian (RAP: own section above)
           { view: '/laporan-harian', label: 'Laporan harian', roles: FIELD_ALL, feature: 'fieldReports', navKey: 'laporan-harian' },
           { collection: 'daily-reports', label: 'Data laporan harian' },
           { collection: 'daily-report-lines', label: 'Data baris laporan harian' },
-          { collection: 'rap-items', label: 'Data item RAP' },
-          { collection: 'rap-templates' },
           { collection: 'resource-types' },
         ],
       },
@@ -495,6 +503,7 @@ export const ITEM_ICONS: Readonly<Record<string, IconName>> = {
   '/collections/clients': 'users',
   '/collections/cost-centers': 'tWallet3',
   '/collections/team-assignments': 'tPeople',
+  '/rap': 'tReceiptItem',
   '/progress': 'tStatusUp',
   '/progress/laporan': 'tChart',
   '/collections/progress-reports': 'tChartSquare',

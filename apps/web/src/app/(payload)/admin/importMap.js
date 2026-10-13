@@ -92,6 +92,8 @@ import { ModuleLanding as ModuleLanding_72aa9cb004784b713db133bbda520731 } from 
 import { LoanList as LoanList_e5d452935824a68d96fdc373e55d7f95 } from '@/admin/views/Loans'
 import { LoanNew as LoanNew_e5d452935824a68d96fdc373e55d7f95 } from '@/admin/views/Loans'
 import { LoanDetail as LoanDetail_e5d452935824a68d96fdc373e55d7f95 } from '@/admin/views/Loans'
+import { RapIndex as RapIndex_773cef30cdd6663e7e587999e07fc5eb } from '@/admin/views/Rap'
+import { RapProject as RapProject_773cef30cdd6663e7e587999e07fc5eb } from '@/admin/views/Rap'
 import { CollectionCards as CollectionCards_f9c02e79a4aed9a3924487c0cd4cafb1 } from '@payloadcms/next/rsc'
 
 /** @type import('payload').ImportMap */
@@ -190,5 +192,7 @@ export const importMap = {
   "@/admin/views/Loans#LoanList": LoanList_e5d452935824a68d96fdc373e55d7f95,
   "@/admin/views/Loans#LoanNew": LoanNew_e5d452935824a68d96fdc373e55d7f95,
   "@/admin/views/Loans#LoanDetail": LoanDetail_e5d452935824a68d96fdc373e55d7f95,
+  "@/admin/views/Rap#RapIndex": RapIndex_773cef30cdd6663e7e587999e07fc5eb,
+  "@/admin/views/Rap#RapProject": RapProject_773cef30cdd6663e7e587999e07fc5eb,
   "@payloadcms/next/rsc#CollectionCards": CollectionCards_f9c02e79a4aed9a3924487c0cd4cafb1
 }
