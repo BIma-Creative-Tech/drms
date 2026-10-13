@@ -69,7 +69,7 @@ html[data-theme='dark'] .pk-f3 {
 .pk-f3 .pk-kpi-l { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: var(--pk-muted-fg); margin: 0; }
 .pk-f3 .pk-kpi-l .ic { width: 28px; height: 28px; border-radius: 8px; display: inline-grid; place-items: center; background: color-mix(in oklab, var(--pk-primary) 12%, transparent); color: var(--pk-primary); flex: none; }
 .pk-f3 .pk-kpi-l .ic svg { width: 16px; height: 16px; }
-/* DRMS 13/10 #10: tiles show the full Rupiah value — the size follows the tile width (container query units) so "Rp 1.234.567.890" stays on one line */
+/* DRMS 13/10 #10: tiles show the full Rupiah value — the size follows the tile width (container query units) so a full billion-rupiah amount stays on one line (no amount example here: this CSS is inlined in pages Staff can open) */
 .pk-f3 .pk-kpi { container-type: inline-size; }
 .pk-f3 .pk-kpi-v { font-family: var(--pk-font-heading); font-size: clamp(16px, 10cqi, 26px); font-weight: 700; letter-spacing: -0.02em; line-height: 1.15; margin: 6px 0 0; color: var(--pk-fg); overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
 .pk-f3 .pk-kpi.hero .pk-kpi-v { font-size: clamp(20px, 10cqi, 48px); }
