@@ -108,10 +108,17 @@ Sejak 11 Okt 2026 (keputusan pemilik): **setiap project yang punya RAB wajib pun
 Selama RAP kosong, pengajuan project itu **tidak bisa dikirim** (pemohon melihat "Project belum punya RAP — hubungi
 PM"). Dashboard PM menampilkan kartu **"Project Anda belum punya RAP"** berisi project tim yang perlu diisi.
 
-1. Buka project → tab **RAP** → kartu **Kelola RAP**.
-2. Isi RAP dengan salah satu cara: **Pakai template** (template RAP PT ini untuk jenis project yang sama), atau
-   **Template Excel kosong** → isi kode, uraian, jenis (pekerjaan/material), satuan, volume, harga satuan → **Pratinjau**
-   → **Simpan RAP**.
+1. Buka menu **Proyek → RAP proyek** (sejak 13 Okt 2026): daftar project dengan status RAP (**Ada · n item** /
+   **Belum ada (wajib)**), Total RAP vs RAB, saring PT / status / RAP. Klik baris project. (Dari project: tab **RAP** →
+   **Ubah item RAP**.)
+2. Isi RAP dengan salah satu cara:
+   - **Per item:** **+ Tambah item** → isi kode, uraian, jenis (pekerjaan/material), tahapan, satuan, volume, harga
+     satuan (jumlah dihitung otomatis) → **Tambah item**. Ubah item lewat tombol **Ubah**; item tidak pernah dihapus —
+     set **Status: Nonaktif** bila tidak dipakai lagi. Baris **Grand total** di bawah tabel = jumlah item aktif.
+   - **Pakai template** (template RAP PT ini untuk jenis project yang sama), atau **Template Excel kosong** → isi kode,
+     uraian, jenis, satuan, volume, harga satuan → kartu **Upload Excel & template** → **Pratinjau** → **Simpan RAP**.
+   Setelah ada realisasi laporan harian, RAP terkunci: tombol tampil abu-abu untuk PM; perubahan hanya oleh
+   Direktur/Admin dengan alasan.
 3. Kolom **tahapan**: wajib untuk project konstruksi; jenis lain (umum, trading, kontrak unit, aftersales) boleh
    kosong — bila diisi harus tahapan yang sudah ada. RAP project non-konstruksi tidak mengubah progress tahapan.
 4. RAP yang sudah rapi bisa disimpan sebagai template (**Simpan template**) untuk project berikutnya yang sejenis.
