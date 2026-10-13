@@ -109,11 +109,11 @@ const strOrNull = (v: unknown): string | null => (typeof v === 'string' && v !==
 export async function loadUserOnboarding(req: PayloadRequest, userId: number | null): Promise<OnboardingDetail> {
   const companies = await onboardingCompanies(req)
   const colIds = companies.map((c) => c.id)
-  const asCaller = { user: req.user, overrideAccess: false, req, depth: 0 } as const
+  const asCaller = { user: req.user, req, depth: 0 } as const
 
   let user: OnboardingDetail['user'] = null
   if (userId !== null) {
-    const u = (await req.payload.findByID({ collection: 'users', id: userId, ...asCaller, disableErrors: true })) as Row | null
+    const u = (await req.payload.findByID({ collection: 'users', id: userId, ...asCaller, overrideAccess: false, disableErrors: true })) as Row | null
     if (!u) throw new OnboardingError(404, 'Pengguna tidak ditemukan atau bukan pengguna PT Anda.')
     user = {
       id: userId,
@@ -127,9 +127,9 @@ export async function loadUserOnboarding(req: PayloadRequest, userId: number | n
   }
 
   const [cellsRes, employeesRes, banksRes] = await Promise.all([
-    colIds.length ? req.payload.find({ collection: 'company-memberships', where: { company: { in: colIds } }, pagination: false, select: { user: true, company: true, roles: true, employee: true, active: true }, ...asCaller }) : { docs: [] },
-    colIds.length ? req.payload.find({ collection: 'employees', where: { company: { in: colIds } }, sort: 'code', pagination: false, select: { code: true, name: true, nickname: true, position: true, phone: true, active: true, company: true }, ...asCaller }) : { docs: [] },
-    req.payload.find({ collection: 'banks', where: { active: { not_equals: false } }, sort: 'name', pagination: false, select: { name: true }, ...asCaller }),
+    colIds.length ? req.payload.find({ collection: 'company-memberships', where: { company: { in: colIds } }, pagination: false, select: { user: true, company: true, roles: true, employee: true, active: true }, ...asCaller, overrideAccess: false }) : { docs: [] },
+    colIds.length ? req.payload.find({ collection: 'employees', where: { company: { in: colIds } }, sort: 'code', pagination: false, select: { code: true, name: true, nickname: true, position: true, phone: true, active: true, company: true }, ...asCaller, overrideAccess: false }) : { docs: [] },
+    req.payload.find({ collection: 'banks', where: { active: { not_equals: false } }, sort: 'name', pagination: false, select: { name: true }, ...asCaller, overrideAccess: false }),
   ])
   const cells = (cellsRes.docs as unknown as Row[]).map((m) => ({
     id: m.id as number,
@@ -155,8 +155,8 @@ export async function loadUserOnboarding(req: PayloadRequest, userId: number | n
   const mine = cells.filter((c) => userId !== null && c.user === userId)
   const linked = mine.map((c) => c.employee).filter((e): e is number => e !== null)
   const [accountsRes, assignRes] = await Promise.all([
-    linked.length ? req.payload.find({ collection: 'employee-bank-accounts', where: { employee: { in: linked } }, sort: 'id', pagination: false, select: { employee: true, bank: true, accountNo: true, accountHolder: true, isDefault: true, verificationStatus: true, active: true }, ...asCaller }) : { docs: [] },
-    linked.length ? req.payload.find({ collection: 'team-assignments', where: { employee: { in: linked } }, sort: '-startDate', pagination: false, ...asCaller, depth: 1 }) : { docs: [] },
+    linked.length ? req.payload.find({ collection: 'employee-bank-accounts', where: { employee: { in: linked } }, sort: 'id', pagination: false, select: { employee: true, bank: true, accountNo: true, accountHolder: true, isDefault: true, verificationStatus: true, active: true }, ...asCaller, overrideAccess: false }) : { docs: [] },
+    linked.length ? req.payload.find({ collection: 'team-assignments', where: { employee: { in: linked } }, sort: '-startDate', pagination: false, ...asCaller, overrideAccess: false, depth: 1 }) : { docs: [] },
   ])
 
   return {
@@ -286,7 +286,7 @@ export async function saveUserOnboarding(req: PayloadRequest, input: OnboardingI
   if (errors.length) throw new OnboardingError(400, errors.map((e) => e.message).filter((m, i, a) => a.indexOf(m) === i).slice(0, 3).join(' '), errors)
 
   if (input.reason && input.reason.trim()) req.context.auditReason = input.reason.trim()
-  const asCaller = { depth: 0, user: req.user, overrideAccess: false, req } as const
+  const asCaller = { depth: 0, user: req.user, req } as const
 
   // 1. the account (Keycloak-first inside the Users hooks)
   let uid: number
@@ -298,7 +298,7 @@ export async function saveUserOnboarding(req: PayloadRequest, input: OnboardingI
     req.context[CTX_TEMP_PASSWORD] = password
     try {
       const doc = await at('user', () =>
-        req.payload.create({ collection: 'users', data: { email: u.email!, name: u.name ?? null, phone: u.phone ?? null, active: u.active !== false } as never, ...asCaller }),
+        req.payload.create({ collection: 'users', data: { email: u.email!, name: u.name ?? null, phone: u.phone ?? null, active: u.active !== false } as never, ...asCaller, overrideAccess: false }),
       )
       uid = doc.id as number
       const fresh = typeof req.context[CTX_KC_NEW_USER] === 'string' && req.context[CTX_KC_NEW_USER] === (doc as { keycloakSub?: unknown }).keycloakSub
@@ -314,9 +314,9 @@ export async function saveUserOnboarding(req: PayloadRequest, input: OnboardingI
   } else {
     uid = userId
     if (input.user) {
-      const current = (await req.payload.findByID({ collection: 'users', id: uid, ...asCaller })) as unknown as Row
+      const current = (await req.payload.findByID({ collection: 'users', id: uid, ...asCaller, overrideAccess: false })) as unknown as Row
       const patch = changedFields({ ...current, email: str(current.email).toLowerCase() }, { ...input.user, ...(input.user.email ? { email: input.user.email.trim().toLowerCase() } : {}) }, ['email', 'name', 'phone', 'active'])
-      if (Object.keys(patch).length) await at('user', () => req.payload.update({ collection: 'users', id: uid, data: patch as never, ...asCaller }))
+      if (Object.keys(patch).length) await at('user', () => req.payload.update({ collection: 'users', id: uid, data: patch as never, ...asCaller, overrideAccess: false }))
     }
   }
 
@@ -328,7 +328,7 @@ export async function saveUserOnboarding(req: PayloadRequest, input: OnboardingI
 
 async function savePt(req: PayloadRequest, uid: number, c: CompanyInput, i: number, stored: StoredCompany): Promise<void> {
   const prefix = `companies.${i}`
-  const asCaller = { depth: 0, user: req.user, overrideAccess: false, req } as const
+  const asCaller = { depth: 0, user: req.user, req } as const
 
   // employee of this PT after the save: undefined = unchanged, null = none
   let employee: number | null | undefined
@@ -336,11 +336,11 @@ async function savePt(req: PayloadRequest, uid: number, c: CompanyInput, i: numb
   if (e === null) employee = null
   else if (e !== undefined) {
     if (e.id === undefined) {
-      const doc = await at(`${prefix}.employee`, () => req.payload.create({ collection: 'employees', data: { ...employeeData(e), company: c.company } as never, ...asCaller }))
+      const doc = await at(`${prefix}.employee`, () => req.payload.create({ collection: 'employees', data: { ...employeeData(e), company: c.company } as never, ...asCaller, overrideAccess: false }))
       employee = doc.id as number
     } else {
       const id = e.id
-      const current = (await at(`${prefix}.employee`, () => req.payload.findByID({ collection: 'employees', id, ...asCaller }))) as unknown as Row
+      const current = (await at(`${prefix}.employee`, () => req.payload.findByID({ collection: 'employees', id, ...asCaller, overrideAccess: false }))) as unknown as Row
       if (relId(current.company) !== c.company) throw new OnboardingError(400, 'Karyawan harus dari PT yang sama.', [{ path: `${prefix}.employee`, message: 'Karyawan harus dari PT yang sama.' }])
       if (id !== stored.employee) {
         const other = await membershipOfEmployee(req, id)
@@ -350,7 +350,7 @@ async function savePt(req: PayloadRequest, uid: number, c: CompanyInput, i: numb
         }
       }
       const patch = changedFields(current, employeeData(e), EMPLOYEE_FIELDS)
-      if (Object.keys(patch).length) await at(`${prefix}.employee`, () => req.payload.update({ collection: 'employees', id, data: patch as never, ...asCaller }))
+      if (Object.keys(patch).length) await at(`${prefix}.employee`, () => req.payload.update({ collection: 'employees', id, data: patch as never, ...asCaller, overrideAccess: false }))
       employee = id
     }
   }
@@ -359,9 +359,9 @@ async function savePt(req: PayloadRequest, uid: number, c: CompanyInput, i: numb
   if (change) {
     if (stored.membership) {
       const id = stored.membership.id
-      await at(`${prefix}.roles`, () => req.payload.update({ collection: 'company-memberships', id, data: change as never, ...asCaller }))
+      await at(`${prefix}.roles`, () => req.payload.update({ collection: 'company-memberships', id, data: change as never, ...asCaller, overrideAccess: false }))
     } else {
-      await at(`${prefix}.roles`, () => req.payload.create({ collection: 'company-memberships', data: { ...change, user: uid, company: c.company, employee: employee ?? null } as never, ...asCaller }))
+      await at(`${prefix}.roles`, () => req.payload.create({ collection: 'company-memberships', data: { ...change, user: uid, company: c.company, employee: employee ?? null } as never, ...asCaller, overrideAccess: false }))
     }
   }
 
@@ -370,13 +370,13 @@ async function savePt(req: PayloadRequest, uid: number, c: CompanyInput, i: numb
     const bat = `${prefix}.bankAccounts.${j}`
     if (owner === null) throw new OnboardingError(400, 'Rekening butuh data karyawan.', [{ path: bat, message: 'Rekening butuh data karyawan.' }])
     if (b.id === undefined) {
-      await at(bat, () => req.payload.create({ collection: 'employee-bank-accounts', data: { ...bankData(b), employee: owner } as never, ...asCaller }))
+      await at(bat, () => req.payload.create({ collection: 'employee-bank-accounts', data: { ...bankData(b), employee: owner } as never, ...asCaller, overrideAccess: false }))
       continue
     }
     const id = b.id
-    const current = (await at(bat, () => req.payload.findByID({ collection: 'employee-bank-accounts' as CollectionSlug, id, ...asCaller }))) as unknown as Row
+    const current = (await at(bat, () => req.payload.findByID({ collection: 'employee-bank-accounts' as CollectionSlug, id, ...asCaller, overrideAccess: false }))) as unknown as Row
     if (relId(current.employee) !== owner) throw new OnboardingError(400, 'Rekening ini bukan milik karyawan PT ini.', [{ path: bat, message: 'Rekening ini bukan milik karyawan PT ini.' }])
     const patch = changedFields({ ...current, bank: relId(current.bank) ?? null }, bankData(b), BANK_FIELDS)
-    if (Object.keys(patch).length) await at(bat, () => req.payload.update({ collection: 'employee-bank-accounts', id, data: patch as never, ...asCaller }))
+    if (Object.keys(patch).length) await at(bat, () => req.payload.update({ collection: 'employee-bank-accounts', id, data: patch as never, ...asCaller, overrideAccess: false }))
   }
 }

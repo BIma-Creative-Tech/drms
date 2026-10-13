@@ -450,6 +450,11 @@ const ROUTE_CLASSES: Record<string, RouteClass> = {
   'POST /project-loans/:id/repayments': 'document',
   'POST /project-loans/:id/repayments/:rid/void': 'document',
   'POST /project-loans': 'named-pt',
+  // DRMS 13/10 W3 "Pengguna" onboarding: every PT of the body is checked (Admin of THAT PT / group admin); the account
+  // is read with the caller's Users access; the form lists the caller's Admin PTs ∩ selection
+  'POST /user-onboarding': 'named-pt',
+  'PATCH /user-onboarding/:userId': 'named-pt',
+  'GET /user-onboarding/:userId': 'document',
 }
 
 describe('MC3 — route classes sampled across PTs', () => {
