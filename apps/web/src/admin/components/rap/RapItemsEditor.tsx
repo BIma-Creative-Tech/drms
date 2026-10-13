@@ -7,7 +7,6 @@ import { groupRupiah, isImmediateRupiahError, parseRupiah } from '@/lib/rupiah-i
 
 import { problemText } from '../ActionButton'
 import { FORM_GRID_STYLE } from '../form-grid'
-import { KAS_STYLE } from '../kas/style'
 import { RupiahInput, type RupiahField } from '../RupiahInput'
 import {
   createBody,
@@ -74,9 +73,7 @@ export function RapItemsEditor({ projectId, items, stages, uoms, prices, mode, s
 
   return (
     <div className="pk-rap-items" data-pk-rap-editor={mode}>
-      <style href="pk-kas-style" precedence="default">
-        {KAS_STYLE}
-      </style>
+      {/* KAS_STYLE (buttons, fields, dialog) comes with the page frame (views/frame.tsx) */}
       <style>{FORM_GRID_STYLE}</style>
       <style>{STYLE}</style>
       <div className="pk-rap-head">

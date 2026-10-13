@@ -32,7 +32,7 @@ let stage = 0
 let foreignPt = 0
 let foreignProject = 0
 const item: Record<string, number> = {}
-const tag = `w3r${randomUUID().slice(0, 5)}`
+const tag = `rap${randomUUID().slice(0, 5)}` // starts with 2 letters: the world vehicle plate takes them
 const MONEY = /Rp\s?\d/
 
 type Props = AdminViewServerProps

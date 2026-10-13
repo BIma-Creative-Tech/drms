@@ -106,8 +106,8 @@ describe('registry guard: every entity maps to exactly one module', () => {
   })
 
   it('every custom view item points at a registered admin view path', async () => {
-    const { E2_ADMIN_VIEWS, E6_ADMIN_VIEWS, F2_ADMIN_VIEWS, F3_ADMIN_VIEWS, FR1_ADMIN_VIEWS, LOAN_ADMIN_VIEWS, MC2_ADMIN_VIEWS, S2A_ADMIN_VIEWS, S3E_ADMIN_VIEWS } = await import('@/admin/config')
-    const paths = new Set(Object.values({ ...F2_ADMIN_VIEWS, ...F3_ADMIN_VIEWS, ...E2_ADMIN_VIEWS, ...E6_ADMIN_VIEWS, ...S2A_ADMIN_VIEWS, ...S3E_ADMIN_VIEWS, ...MC2_ADMIN_VIEWS, ...FR1_ADMIN_VIEWS, ...LOAN_ADMIN_VIEWS }).map((v) => ('path' in v ? v.path : '')))
+    const { E2_ADMIN_VIEWS, E6_ADMIN_VIEWS, F2_ADMIN_VIEWS, F3_ADMIN_VIEWS, FR1_ADMIN_VIEWS, LOAN_ADMIN_VIEWS, MC2_ADMIN_VIEWS, RAP_ADMIN_VIEWS, S2A_ADMIN_VIEWS, S3E_ADMIN_VIEWS } = await import('@/admin/config')
+    const paths = new Set(Object.values({ ...F2_ADMIN_VIEWS, ...F3_ADMIN_VIEWS, ...E2_ADMIN_VIEWS, ...E6_ADMIN_VIEWS, ...S2A_ADMIN_VIEWS, ...S3E_ADMIN_VIEWS, ...MC2_ADMIN_VIEWS, ...FR1_ADMIN_VIEWS, ...LOAN_ADMIN_VIEWS, ...RAP_ADMIN_VIEWS }).map((v) => ('path' in v ? v.path : '')))
     for (const m of MODULES)
       for (const s of m.sections)
         for (const i of s.items) if ('view' in i && !i.view.startsWith('/collections/')) expect(paths, `${m.id}: ${i.view}`).toContain(i.view)
