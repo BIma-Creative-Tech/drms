@@ -347,7 +347,8 @@ describe('6. Only a group admin grants or removes the Owner role (owner decision
 describe('7. One person, one decision: a user who approved as PM project never decides the Direktur level of that request', () => {
   it('PM + Direktur in one account: "Persetujuan PM" given → the Direktur level is refused to him; another Direktur decides', async () => {
     const dual = await makeFlowUser(['pk-pm', 'pk-owner'], 'aow-pm-direktur', null)
-    const project = await sysCreate('projects', { code: `AOW-P3-${Date.now() % 10000}`, name: 'AOW project PM+Direktur', pm: dual.id, budget: 20_000_000, status: 'berjalan' })
+    // this file's second PT is active by now → name the world PT explicitly
+    const project = await sysCreate('projects', { company: drms, code: `AOW-P3-${Date.now() % 10000}`, name: 'AOW project PM+Direktur', pm: dual.id, budget: 20_000_000, status: 'berjalan' })
     await sysCreate('team-assignments', { employee: w.emp.a, project, roleInProject: 'staff' })
     await sysCreate('approval-rules', {
       company: drms,
