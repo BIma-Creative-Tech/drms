@@ -132,9 +132,9 @@ void main() {
       overrides: [requestDetailProvider(42).overrideWith((ref) async => detailFromJson(json))],
     );
 
-    testWidgets('receiptAmount ≠ total → line chip + header chip; nota amount shown', (tester) async {
+    testWidgets('receiptAmount ≠ total → line chip only (no header chip); nota amount shown', (tester) async {
       await pump(tester, detailJson());
-      expect(find.byKey(const Key('detail-receipt-mismatch')), findsOneWidget);
+      expect(find.byKey(const Key('detail-receipt-mismatch')), findsNothing);
       expect(find.byKey(const Key('line-2-receipt-mismatch')), findsOneWidget);
       expect(find.byKey(const Key('line-1-receipt-mismatch')), findsNothing);
       expect(_text(tester, 'line-2-receipt-amount'), 'Nominal sesuai nota: Rp 676.876');

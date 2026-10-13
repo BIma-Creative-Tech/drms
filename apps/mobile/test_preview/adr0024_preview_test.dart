@@ -29,7 +29,7 @@ import 'package:proyekkas/features/expense/domain/request_status.dart';
 import 'package:proyekkas/features/expense/presentation/draft_editor_screen.dart';
 import 'package:proyekkas/features/expense/presentation/request_detail_screen.dart';
 import 'package:proyekkas/features/expense/presentation/widgets/receipt_thumb.dart';
-import 'package:proyekkas/features/expense/presentation/widgets/timeline_view.dart';
+import 'package:proyekkas/features/expense/presentation/widgets/request_stepper.dart';
 import 'package:proyekkas/features/finance/application/finance_providers.dart';
 import 'package:proyekkas/features/finance/domain/transfer_queue.dart';
 import 'package:proyekkas/features/finance/presentation/finance_screen.dart';
@@ -201,7 +201,7 @@ void main() {
         receiptThumbProvider(901).overrideWith((ref) => Future.error(const NetworkException())),
       ],
       (t) async {
-        final timeline = find.byType(TimelineView);
+        final timeline = find.byType(RequestStepper);
         await t.scrollUntilVisible(timeline, 300, scrollable: find.byType(Scrollable).first);
         await Scrollable.ensureVisible(t.element(timeline), alignment: 0.3);
       },

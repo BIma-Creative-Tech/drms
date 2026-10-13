@@ -7,6 +7,7 @@ import '../../../app/providers.dart';
 import '../../../core/media/photo_compressor.dart';
 import '../../../l10n/gen/app_localizations.dart';
 import '../../../shared/widgets/async_body.dart';
+import '../../../shared/widgets/form_grid.dart';
 import '../../../shared/widgets/photo_viewer.dart';
 import '../../auth/application/auth_controller.dart';
 import '../domain/expense_request.dart';
@@ -151,85 +152,103 @@ class _LpjSubmitScreenState extends ConsumerState<LpjSubmitScreen> {
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            TextField(
-              key: const Key('lpj-usage-notes'),
-              controller: _notes,
-              minLines: 2,
-              maxLines: 5,
-              maxLength: 2000,
-              decoration: InputDecoration(
-                labelText: t.lpjUsageNotes,
-                helperText: t.lpjUsageNotesHint,
-                helperMaxLines: 2,
-                errorText: _error,
-              ),
-            ),
-            const SizedBox(height: 16),
-            Row(
+            // DRMS 13/10 Umum #2 / D4: label left of the field on wide screens; notes and photos are full width.
+            FormGrid(
+              rowGap: 16,
               children: [
-                Expanded(child: Text(t.lpjPhotos, style: theme.textTheme.titleMedium)),
-                Text(t.lpjPhotosCount(_count, maxLpjPhotos), key: const Key('lpj-photo-count')),
-              ],
-            ),
-            Text(t.lpjPhotosHint(maxLpjPhotos), style: theme.textTheme.bodySmall),
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 14,
-              runSpacing: 14,
-              children: [
-                for (final (i, id) in _kept.indexed)
-                  removable(
-                    ReceiptThumb(key: Key('lpj-photo-server-$id'), imageId: id, caption: t.lpjPhotoCaption(i + 1)),
-                    () => setState(() => _kept.remove(id)),
-                    Key('lpj-photo-remove-server-$id'),
-                  ),
-                for (final (i, b) in _new.indexed)
-                  removable(
-                    SizedBox.square(
-                      dimension: 64,
-                      child: Material(
-                        borderRadius: BorderRadius.circular(6),
-                        clipBehavior: Clip.antiAlias,
-                        child: InkWell(
-                          key: Key('lpj-photo-new-$i'),
-                          onTap: () => showPhotoViewer(context, viewer, initialIndex: _kept.length + i),
-                          child: Image.memory(b, fit: BoxFit.cover, gaplessPlayback: true),
-                        ),
-                      ),
+                FormGridCell(
+                  label: t.lpjUsageNotes,
+                  full: true,
+                  builder: (label) => TextField(
+                    key: const Key('lpj-usage-notes'),
+                    controller: _notes,
+                    minLines: 2,
+                    maxLines: 5,
+                    maxLength: 2000,
+                    decoration: InputDecoration(
+                      labelText: label,
+                      helperText: t.lpjUsageNotesHint,
+                      helperMaxLines: 2,
+                      errorText: _error,
                     ),
-                    () => setState(() => _new.removeAt(i)),
-                    Key('lpj-photo-remove-new-$i'),
-                  ),
-              ],
-            ),
-            if (_busy) Padding(padding: const EdgeInsets.all(8), child: Text(t.photoCompressing)),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    key: const Key('lpj-photo-camera'),
-                    onPressed: full ? null : () => _add(fromCamera: true),
-                    icon: const Icon(Icons.photo_camera),
-                    label: Text(t.lpjPhotoCamera),
                   ),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: OutlinedButton.icon(
-                    key: const Key('lpj-photo-gallery'),
-                    onPressed: full ? null : () => _add(fromCamera: false),
-                    icon: const Icon(Icons.photo_library),
-                    label: Text(t.addReceiptGallery),
+                FormGridCell(
+                  label: t.lpjPhotos,
+                  full: true,
+                  stackedLabel: true,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(t.lpjPhotosCount(_count, maxLpjPhotos), key: const Key('lpj-photo-count')),
+                      Text(t.lpjPhotosHint(maxLpjPhotos), style: theme.textTheme.bodySmall),
+                      const SizedBox(height: 12),
+                      Wrap(
+                        spacing: 14,
+                        runSpacing: 14,
+                        children: [
+                          for (final (i, id) in _kept.indexed)
+                            removable(
+                              ReceiptThumb(
+                                key: Key('lpj-photo-server-$id'),
+                                imageId: id,
+                                caption: t.lpjPhotoCaption(i + 1),
+                              ),
+                              () => setState(() => _kept.remove(id)),
+                              Key('lpj-photo-remove-server-$id'),
+                            ),
+                          for (final (i, b) in _new.indexed)
+                            removable(
+                              SizedBox.square(
+                                dimension: 64,
+                                child: Material(
+                                  borderRadius: BorderRadius.circular(6),
+                                  clipBehavior: Clip.antiAlias,
+                                  child: InkWell(
+                                    key: Key('lpj-photo-new-$i'),
+                                    onTap: () => showPhotoViewer(context, viewer, initialIndex: _kept.length + i),
+                                    child: Image.memory(b, fit: BoxFit.cover, gaplessPlayback: true),
+                                  ),
+                                ),
+                              ),
+                              () => setState(() => _new.removeAt(i)),
+                              Key('lpj-photo-remove-new-$i'),
+                            ),
+                        ],
+                      ),
+                      if (_busy) Padding(padding: const EdgeInsets.all(8), child: Text(t.photoCompressing)),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              key: const Key('lpj-photo-camera'),
+                              onPressed: full ? null : () => _add(fromCamera: true),
+                              icon: const Icon(Icons.photo_camera),
+                              label: Text(t.lpjPhotoCamera),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              key: const Key('lpj-photo-gallery'),
+                              onPressed: full ? null : () => _add(fromCamera: false),
+                              icon: const Icon(Icons.photo_library),
+                              label: Text(t.addReceiptGallery),
+                            ),
+                          ),
+                        ],
+                      ),
+                      if (full)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: Text(t.lpjPhotosFull(maxLpjPhotos), key: const Key('lpj-photos-full')),
+                        ),
+                    ],
                   ),
                 ),
               ],
             ),
-            if (full)
-              Padding(
-                padding: const EdgeInsets.only(top: 8),
-                child: Text(t.lpjPhotosFull(maxLpjPhotos), key: const Key('lpj-photos-full')),
-              ),
             const SizedBox(height: 24),
             FilledButton.icon(
               key: const Key('lpj-send'),

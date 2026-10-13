@@ -49,7 +49,7 @@ void main() {
     final last = buildTimeline(d).last;
     expect(last.state, TurnState.rejected);
     expect(last.note, 'Nota kurang');
-    expect(currentTurn(d), contains('tidak ada giliran'));
+    expect(currentTurn(d), contains('tidak ada tahapan aktif'));
   });
 
   test('draft: requester has the turn', () {

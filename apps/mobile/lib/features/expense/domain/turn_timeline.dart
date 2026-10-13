@@ -4,16 +4,32 @@ import 'request_status.dart';
 enum TurnState { done, current, pending, rejected, skipped }
 
 class TimelineStep {
-  const TimelineStep({required this.title, required this.state, this.actor, this.at, this.note});
+  const TimelineStep({required this.title, required this.state, this.actor, this.at, this.note, this.decision});
   final String title;
   final TurnState state;
   final String? actor;
   final String? at;
   final String? note;
+
+  /// DRMS 13/10 Persetujuan #3: decision of an approval step ("Disetujui" / "Ditolak" / "Diketahui").
+  final String? decision;
+
+  TimelineStep withState(TurnState state) {
+    return TimelineStep(title: title, state: state, actor: actor, at: at, note: note, decision: decision);
+  }
 }
 
+/// Decision label of a signature (web wording); null for a plain signature (Diajukan / Dibuat).
+/// [approvalFlow]: since ADR 0013 the "Diketahui" position is an approval (Direktur, or the PM under ADR 0021).
+String? decisionLabel(ApprovalEntry a, {required bool approvalFlow}) => switch (a.decision) {
+  'approved' => 'Disetujui',
+  'rejected' => 'Ditolak',
+  'acknowledged' => approvalFlow ? 'Disetujui' : 'Diketahui',
+  _ => null,
+};
+
 /// Signature positions of the current approval cycle, in form order (Diajukan → Dibuat → Diketahui →
-/// Approval 1..n), with who acted and whose turn it is ("Giliran", US-05).
+/// Approval 1..n), with who acted and which step is current ("Tahapan saat ini", US-05).
 /// ADR 0021 snapshots (PM project → Direktur) read exactly like the web ApprovalTimeline
 /// (`apps/web/src/domain/expense/approval-timeline.ts`): Diajukan → Persetujuan PM → Persetujuan Direktur →
 /// Transfer Finance. Older snapshots keep their wording (Diajukan Oleh / Dibuat Oleh / Diketahui / Approval).
@@ -33,6 +49,7 @@ List<TimelineStep> buildTimeline(ExpenseDetail d) {
   // ADR 0024: a Direktur's own request without approval reads like the web: Diajukan → Persetujuan (dilewati,
   // "Tanpa persetujuan — pengajuan Direktur (kebijakan PT)") → Transfer Finance.
   final noApproval = d.approvalRule?.noApproval ?? false;
+  final approvalFlow = d.approvalRule?.decisionFlow ?? false;
 
   if (pmFlow || noApproval) {
     // web: one "Diajukan" step; the creator is named in the note when it is someone else
@@ -64,7 +81,7 @@ List<TimelineStep> buildTimeline(ExpenseDetail d) {
 
   if (noApproval) {
     steps.add(const TimelineStep(title: noApprovalStepTitle, state: TurnState.skipped, note: noApprovalNote));
-    steps.add(_transferStep(d, submitted: submitted, rejected: false));
+    steps.add(transferStep(d, submitted: submitted, rejected: false));
     return steps;
   }
 
@@ -85,6 +102,7 @@ List<TimelineStep> buildTimeline(ExpenseDetail d) {
           actor: actorOf(a),
           at: a.decidedAt,
           note: a.reason ?? delegated,
+          decision: decisionLabel(a, approvalFlow: approvalFlow),
         ),
       );
     } else {
@@ -110,6 +128,7 @@ List<TimelineStep> buildTimeline(ExpenseDetail d) {
           actor: actorOf(a),
           at: a.decidedAt,
           note: a.reason,
+          decision: decisionLabel(a, approvalFlow: approvalFlow),
         ),
       );
     } else {
@@ -129,21 +148,117 @@ List<TimelineStep> buildTimeline(ExpenseDetail d) {
   }
   if (pmFlow) {
     final rejected = steps.any((s) => s.state == TurnState.rejected);
-    steps.add(_transferStep(d, submitted: submitted, rejected: rejected));
+    steps.add(transferStep(d, submitted: submitted, rejected: rejected));
   }
   return steps;
 }
 
+/// Step titles after the approvals (DRMS 13/10 Persetujuan #3, same wording as the web stepper).
+const transferStepTitle = 'Transfer Finance';
+const receiptCheckStepTitle = 'Verifikasi nota Finance';
+const lpjStepTitle = 'LPJ';
+const doneStepTitle = 'Selesai';
+const rejectedStepTitle = 'Ditolak';
+const cancelledStepTitle = 'Dibatalkan';
+
+/// DRMS 13/10 Persetujuan #3: ONE vertical stepper of the whole request — the approval steps of [buildTimeline]
+/// (Diajukan → Persetujuan PM / Diketahui → Persetujuan Direktur / Approval, each with actor, time, decision and
+/// note), then "Verifikasi nota Finance" (Reimburse), "Transfer Finance", "LPJ" (Pengajuan Baru) and "Selesai" —
+/// or "Ditolak" / "Dibatalkan". While someone has to act, that step is [TurnState.current] ("Tahapan saat ini").
+/// Only data of `GET /expense-requests/{id}` (approvals, rule snapshot, transfers, settlement, status).
+List<TimelineStep> buildRequestStepper(ExpenseDetail d) {
+  final steps = buildTimeline(d);
+  final rejected = d.status == RequestStatus.rejected;
+  final cancelled = d.status == RequestStatus.cancelled;
+  final ended = rejected || cancelled;
+  final turn = currentTurn(d);
+  if (!steps.any((s) => s.title == transferStepTitle)) {
+    final decidedNo = steps.any((s) => s.state == TurnState.rejected);
+    steps.add(transferStep(d, submitted: d.status != RequestStatus.draft, rejected: rejected || decidedNo));
+  }
+  // Finance checks the receipts of a Reimburse before its transfer.
+  if (d.type == RequestType.reimburse) {
+    final check = _receiptCheckStep(d, ended: ended, turn: turn);
+    steps.insert(steps.indexWhere((s) => s.title == transferStepTitle), check);
+  } else {
+    steps.add(_lpjStep(d, ended: ended, turn: turn));
+  }
+  steps.add(_finalStep(d, rejected: rejected, cancelled: cancelled, turn: turn));
+  // One "Tahapan saat ini": a later step marked current (Dibuat Oleh of a legacy draft) waits for it.
+  final current = steps.indexWhere((s) => s.state == TurnState.current);
+  for (var i = current + 1; current >= 0 && i < steps.length; i++) {
+    if (steps[i].state == TurnState.current) steps[i] = steps[i].withState(TurnState.pending);
+  }
+  return steps;
+}
+
+/// Statuses of a Reimburse whose receipts Finance has verified.
+const _receiptsChecked = {RequestStatus.receiptsVerified, RequestStatus.transferred, RequestStatus.completed};
+
+TimelineStep _receiptCheckStep(ExpenseDetail d, {required bool ended, required String turn}) {
+  final s = d.status;
+  if (s == RequestStatus.approved || s == RequestStatus.receiptRevision) {
+    return TimelineStep(title: receiptCheckStepTitle, state: TurnState.current, note: turn);
+  }
+  final checked = _receiptsChecked.contains(s);
+  if (checked || d.transfers.any((t) => !t.isVoid)) {
+    return const TimelineStep(title: receiptCheckStepTitle, state: TurnState.done);
+  }
+  return TimelineStep(title: receiptCheckStepTitle, state: ended ? TurnState.skipped : TurnState.pending);
+}
+
+/// Statuses of a Pengajuan Baru between its transfer and the end of its LPJ.
+const _lpjPhase = {
+  RequestStatus.transferred,
+  RequestStatus.receiptRevision,
+  RequestStatus.receiptsComplete,
+  RequestStatus.lpjSubmitted,
+  RequestStatus.lpjRevision,
+  RequestStatus.lpjVerified,
+};
+
+TimelineStep _lpjStep(ExpenseDetail d, {required bool ended, required String turn}) {
+  // The LPJ status itself is in the LPJ section; the step names the document and who acts.
+  final lpj = d.settlement;
+  final docNo = lpj?.docNo;
+  if (d.status == RequestStatus.completed || lpj?.status == 'settled') {
+    final at = lpj?.settledAt ?? lpj?.verifiedAt;
+    return TimelineStep(title: lpjStepTitle, state: TurnState.done, at: at, note: docNo);
+  }
+  if (_lpjPhase.contains(d.status)) {
+    return TimelineStep(
+      title: lpjStepTitle,
+      state: TurnState.current,
+      at: lpj?.submittedAt,
+      note: [?docNo, turn].join(' · '),
+    );
+  }
+  return TimelineStep(title: lpjStepTitle, state: ended ? TurnState.skipped : TurnState.pending);
+}
+
+TimelineStep _finalStep(ExpenseDetail d, {required bool rejected, required bool cancelled, required String turn}) {
+  // The reason is on the rejecting step (and in "Alasan ditolak").
+  if (rejected) return const TimelineStep(title: rejectedStepTitle, state: TurnState.rejected);
+  if (cancelled) return TimelineStep(title: cancelledStepTitle, state: TurnState.rejected, note: d.cancelReason);
+  if (d.status == RequestStatus.completed) {
+    return TimelineStep(title: doneStepTitle, state: TurnState.done, at: d.settlement?.settledAt);
+  }
+  // A transferred Reimburse waits for the requester / Finance to confirm completion.
+  final confirm = d.type == RequestType.reimburse && d.status == RequestStatus.transferred;
+  if (confirm) return TimelineStep(title: doneStepTitle, state: TurnState.current, note: turn);
+  return const TimelineStep(title: doneStepTitle, state: TurnState.pending);
+}
+
 /// ADR 0021 last step "Transfer Finance" (web approval-timeline.ts step 4): done with the posted
 /// Pengajuan Baru / Reimburse transfers, current while the request waits in the transfer queue.
-TimelineStep _transferStep(ExpenseDetail d, {required bool submitted, required bool rejected}) {
+TimelineStep transferStep(ExpenseDetail d, {required bool submitted, required bool rejected}) {
   bool main(TransferInfo t) => t.kind == 'advance' || t.kind == 'reimburse';
   final posted = d.transfers.where((t) => main(t) && !t.isVoid).toList();
   final voided = d.transfers.where((t) => main(t) && t.isVoid).toList();
   final voidNote = voided.isEmpty ? null : 'void: ${voided.map((t) => t.docNo ?? '-').join(', ')}';
   if (posted.isNotEmpty) {
     return TimelineStep(
-      title: 'Transfer Finance',
+      title: transferStepTitle,
       state: TurnState.done,
       at: posted.last.transferDate,
       note: [posted.map((t) => t.docNo ?? '-').join(', '), ?voidNote].join(' · '),
@@ -159,7 +274,7 @@ TimelineStep _transferStep(ExpenseDetail d, {required bool submitted, required b
       ? 'setelah nota diverifikasi Finance'
       : voidNote;
   return TimelineStep(
-    title: 'Transfer Finance',
+    title: transferStepTitle,
     state: !submitted
         ? TurnState.pending
         : queue
@@ -202,7 +317,7 @@ String approvalTitle(ApprovalRuleInfo? rule, int level, {required bool multi}) {
   return label == null ? base : '$base ($label)';
 }
 
-/// One-line "Giliran" text: who has to act next.
+/// One-line "Tahapan saat ini" text: who has to act next.
 String currentTurn(ExpenseDetail d) => switch (d.status) {
   RequestStatus.draft => 'Pemohon — belum diajukan',
   RequestStatus.pendingAck =>
@@ -225,6 +340,6 @@ String currentTurn(ExpenseDetail d) => switch (d.status) {
   RequestStatus.lpjSubmitted => 'Finance — verifikasi LPJ',
   RequestStatus.lpjRevision => 'Pemohon — revisi LPJ',
   RequestStatus.lpjVerified => 'Finance — penyelesaian selisih',
-  RequestStatus.completed || RequestStatus.rejected || RequestStatus.cancelled => 'Selesai — tidak ada giliran',
+  RequestStatus.completed || RequestStatus.rejected || RequestStatus.cancelled => 'Selesai — tidak ada tahapan aktif',
   RequestStatus.unknown => '-',
 };

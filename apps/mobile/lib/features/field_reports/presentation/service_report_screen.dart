@@ -7,6 +7,7 @@ import '../../../core/connectivity/connectivity_controller.dart';
 import '../../../core/media/photo_compressor.dart';
 import '../../../l10n/gen/app_localizations.dart';
 import '../../../shared/widgets/async_body.dart';
+import '../../../shared/widgets/form_grid.dart';
 import '../../auth/application/auth_controller.dart';
 import '../../expense/data/draft_repository.dart';
 import '../../sync/application/sync_coordinator.dart';
@@ -407,10 +408,11 @@ class _ServiceReportScreenState extends ConsumerState<ServiceReportScreen> {
               if (_projectId != null && unitsAsync?.hasValue == true && units.isEmpty)
                 FieldNote(text: t.fieldNoUnits, warn: true),
               const SizedBox(height: 12),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              // DRMS 13/10 Umum #2 / D4: label left of the field, two columns on wide screens.
+              FormGrid(
                 children: [
-                  Expanded(
+                  FormGridCell(
+                    label: t.fieldDate,
                     child: FieldDateField(
                       key: const Key('service-date'),
                       value: _date,
@@ -420,16 +422,16 @@ class _ServiceReportScreenState extends ConsumerState<ServiceReportScreen> {
                       onChanged: _locked || _busy ? null : (v) => _set(() => _date = v, 'date'),
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: TextField(
+                  FormGridCell(
+                    label: t.fieldHmAtService,
+                    builder: (label) => TextField(
                       key: const Key('service-hm'),
                       controller: _hm,
                       keyboardType: const TextInputType.numberWithOptions(decimal: true),
                       inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]'))],
                       style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
                       decoration: InputDecoration(
-                        labelText: t.fieldHmAtService,
+                        labelText: label,
                         errorText: _errors['hourMeter'] ?? (hmBelow ? t.fieldHmBelow(fmtNum(floor)) : null),
                         errorMaxLines: 3,
                         helperText: floor == null ? null : t.fieldHmLast(fmtNum(floor)),
@@ -437,15 +439,14 @@ class _ServiceReportScreenState extends ConsumerState<ServiceReportScreen> {
                       onChanged: (_) => _set(() {}, 'hourMeter'),
                     ),
                   ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(child: _timeField(t, _start, t.fieldStart, 'startTime', const Key('service-start'))),
-                  const SizedBox(width: 8),
-                  Expanded(child: _timeField(t, _end, t.fieldEnd, 'endTime', const Key('service-end'))),
+                  FormGridCell(
+                    label: t.fieldStart,
+                    builder: (l) => _timeField(_start, t.fieldStart, l, 'startTime', const Key('service-start')),
+                  ),
+                  FormGridCell(
+                    label: t.fieldEnd,
+                    builder: (l) => _timeField(_end, t.fieldEnd, l, 'endTime', const Key('service-end')),
+                  ),
                 ],
               ),
             ],
@@ -453,44 +454,67 @@ class _ServiceReportScreenState extends ConsumerState<ServiceReportScreen> {
           FieldSection(
             title: t.fieldWork,
             children: [
-              Text(t.fieldServiceType, style: theme.textTheme.labelMedium),
-              const SizedBox(height: 6),
-              ChoiceGrid<ServiceType>(
-                keyPrefix: 'service-type',
-                options: ServiceType.values,
-                selected: _serviceType,
-                label: (v) => v.label,
-                code: (v) => v.code,
-                onSelected: _busy ? null : (v) => _set(() => _serviceType = v, 'serviceType'),
-              ),
-              if (_errors['serviceType'] != null) FieldNote(text: _errors['serviceType']!, error: true),
-              const SizedBox(height: 12),
-              TextField(
-                key: const Key('service-complaint'),
-                controller: _complaint,
-                minLines: 2,
-                maxLines: 4,
-                maxLength: 2000,
-                textCapitalization: TextCapitalization.sentences,
-                decoration: InputDecoration(labelText: t.fieldComplaint, errorText: _errors['complaint']),
-                onChanged: (_) => _changed(),
-              ),
-              TextField(
-                key: const Key('service-action'),
-                controller: _action,
-                minLines: 3,
-                maxLines: 6,
-                maxLength: 4000,
-                textCapitalization: TextCapitalization.sentences,
-                decoration: InputDecoration(labelText: t.fieldAction, errorText: _errors['action']),
-                onChanged: (_) => _set(() {}, 'action'),
-              ),
-              TextField(
-                key: const Key('service-helpers'),
-                controller: _helpers,
-                maxLength: 200,
-                decoration: InputDecoration(labelText: t.fieldHelpers, errorText: _errors['helpers']),
-                onChanged: (_) => _changed(),
+              // D4: label left of the field on wide screens; the long texts span the whole width.
+              FormGrid(
+                children: [
+                  FormGridCell(
+                    label: t.fieldServiceType,
+                    full: true,
+                    stackedLabel: true,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        ChoiceGrid<ServiceType>(
+                          keyPrefix: 'service-type',
+                          options: ServiceType.values,
+                          selected: _serviceType,
+                          label: (v) => v.label,
+                          code: (v) => v.code,
+                          onSelected: _busy ? null : (v) => _set(() => _serviceType = v, 'serviceType'),
+                        ),
+                        if (_errors['serviceType'] != null) FieldNote(text: _errors['serviceType']!, error: true),
+                      ],
+                    ),
+                  ),
+                  FormGridCell(
+                    label: t.fieldComplaint,
+                    full: true,
+                    builder: (label) => TextField(
+                      key: const Key('service-complaint'),
+                      controller: _complaint,
+                      minLines: 2,
+                      maxLines: 4,
+                      maxLength: 2000,
+                      textCapitalization: TextCapitalization.sentences,
+                      decoration: InputDecoration(labelText: label, errorText: _errors['complaint']),
+                      onChanged: (_) => _changed(),
+                    ),
+                  ),
+                  FormGridCell(
+                    label: t.fieldAction,
+                    full: true,
+                    builder: (label) => TextField(
+                      key: const Key('service-action'),
+                      controller: _action,
+                      minLines: 3,
+                      maxLines: 6,
+                      maxLength: 4000,
+                      textCapitalization: TextCapitalization.sentences,
+                      decoration: InputDecoration(labelText: label, errorText: _errors['action']),
+                      onChanged: (_) => _set(() {}, 'action'),
+                    ),
+                  ),
+                  FormGridCell(
+                    label: t.fieldHelpers,
+                    builder: (label) => TextField(
+                      key: const Key('service-helpers'),
+                      controller: _helpers,
+                      maxLength: 200,
+                      decoration: InputDecoration(labelText: label, errorText: _errors['helpers']),
+                      onChanged: (_) => _changed(),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -596,13 +620,14 @@ class _ServiceReportScreenState extends ConsumerState<ServiceReportScreen> {
     );
   }
 
-  Widget _timeField(AppLocalizations t, TextEditingController c, String label, String errorKey, Key key) => TextField(
+  /// [inputLabel]: the label inside the input (null while a FormGridCell shows [label] left of it).
+  Widget _timeField(TextEditingController c, String label, String? inputLabel, String errorKey, Key key) => TextField(
     key: key,
     controller: c,
     keyboardType: TextInputType.datetime,
     inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9:]')), LengthLimitingTextInputFormatter(5)],
     decoration: InputDecoration(
-      labelText: label,
+      labelText: inputLabel,
       hintText: '08:30',
       errorText: _errors[errorKey],
       suffixIcon: IconButton(
