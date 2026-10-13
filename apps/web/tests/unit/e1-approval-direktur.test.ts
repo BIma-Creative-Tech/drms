@@ -31,17 +31,20 @@ describe('ADR 0013 labels + seeded default rule', () => {
   it('pk-owner is labelled "Direktur" (G1-1: no separate role)', () => {
     expect(ROLE_LABELS['pk-owner']).toBe('Direktur')
   })
-  it('default rule (ADR 0021 supersedes the ADR 0013 default): PM project then Direktur level 1, all amounts; every seeded rule is valid', () => {
+  it('default rule (ADR 0021 supersedes the ADR 0013 default): PM project then Direktur level 1, Owner level 2 (ADR 0025), all amounts; every seeded rule is valid', () => {
     const def = DEFAULT_APPROVAL_RULES[0]
     expect(def).toMatchObject({ name: 'Default — PM project lalu Direktur (semua nominal)', acknowledge: 'required', acknowledgeBy: 'scope_manager', minAmount: 0, maxAmount: null, active: true })
-    expect(def.steps).toEqual([{ level: 1, approverRole: 'pk-owner' }])
+    expect(def.steps).toEqual([
+      { level: 1, approverRole: 'pk-owner' },
+      { level: 2, approverRole: 'pk-principal' },
+    ])
     for (const r of DEFAULT_APPROVAL_RULES) expect(ruleDecisionError({ ...r, steps: [...r.steps] }, rolesOf, r.docType)).toBeNull()
   })
 })
 
 describe('rule validation (AC-5): Staff/PM roles never decide, Direktur not optional; ADR 0021 scope_manager only for expense requests', () => {
   it.each([
-    ['acknowledgeRole = pk-pm', rule({ acknowledgeRole: 'pk-pm' }), /Peran "Diketahui Oleh" harus Direktur atau Finance/],
+    ['acknowledgeRole = pk-pm', rule({ acknowledgeRole: 'pk-pm' }), /Peran "Diketahui Oleh" harus Direktur, Owner atau Finance/],
     ['acknowledgeRole = pk-staff', rule({ acknowledgeRole: 'pk-staff' }), /Peran "Diketahui Oleh"/],
     ['approverRole = pk-pm', rule({ steps: [{ level: 1, approverRole: 'pk-pm' }] }), /Peran approver level 1/],
     ['approverRole = pk-admin', rule({ steps: [{ level: 1, approverRole: 'pk-admin' }] }), /Peran approver level 1/],

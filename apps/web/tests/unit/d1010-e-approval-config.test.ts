@@ -19,8 +19,9 @@ import { DEFAULT_APPROVAL_RULES, DIREKTUR_RULE_NAME } from '@/seed/data'
 import { DIREKTUR_RULE } from '@/migrations/20261013_300000_d1010_approval_config_data'
 
 /**
- * ADR 0024 (owner decision 2026-10-11): configurable approval rules ("Peran pemohon", zero-step rule for
- * the Direktur only) and the audited Direktur no-approval exception — pure parts.
+ * ADR 0024 (owner decision 2026-10-11): configurable approval rules ("Peran pemohon", zero-step rule) and the
+ * audited no-approval exception — pure parts. ADR 0025 (owner 2026-10-13): the zero-step rule is the OWNER's
+ * (`pk-principal`); "Pengajuan Direktur" has the Owner level. Legacy `direktur_no_approval` snapshots keep their texts.
  */
 const rule = (over: Partial<RuleInput> = {}): RuleInput => ({
   id: 1,
@@ -37,34 +38,40 @@ const rule = (over: Partial<RuleInput> = {}): RuleInput => ({
   ...over,
 })
 const direkturRule = (over: Partial<RuleInput> = {}): RuleInput =>
-  rule({ id: 2, name: 'Pengajuan Direktur', priority: 10, requesterRoles: ['pk-owner'], acknowledge: 'none', acknowledgeBy: 'role', steps: [], ...over })
+  rule({ id: 2, name: 'Pengajuan Direktur', priority: 10, requesterRoles: ['pk-owner'], acknowledge: 'none', acknowledgeBy: 'role', steps: [{ level: 1, approverRole: 'pk-principal' }], ...over })
+const ownerRule = (over: Partial<RuleInput> = {}): RuleInput =>
+  rule({ id: 3, name: 'Pengajuan Owner', priority: 5, requesterRoles: ['pk-principal'], acknowledge: 'none', acknowledgeBy: 'role', steps: [], ...over })
 const facts = (requesterRoles?: Role[][], over: Partial<RequestFacts> = {}): RequestFacts => ({ type: 'advance', grandTotal: 1_000_000, categoryIds: [], projectId: 5, requesterRoles, ...over })
 const noRoles = () => undefined
 
 describe('zero-step rule guardrail (validation; the DB trigger approval_rules_zero_step says the same)', () => {
-  it('allowed only for Peran pemohon = exactly Direktur, expense requests, no "Diketahui"', () => {
-    expect(zeroStepRuleError(direkturRule())).toBeNull()
-    expect(ruleDecisionError(direkturRule(), noRoles)).toBeNull()
+  it('allowed only for Peran pemohon = exactly Owner (ADR 0025), expense requests, no "Diketahui"', () => {
+    expect(zeroStepRuleError(ownerRule())).toBeNull()
+    expect(ruleDecisionError(ownerRule(), noRoles)).toBeNull()
+    expect(ruleDecisionError(direkturRule(), noRoles)).toBeNull() // the Direktur rule with its Owner level
   })
   it.each([
-    ['no requester role (= everybody)', direkturRule({ requesterRoles: [] }), /hanya boleh untuk Peran pemohon = Direktur/],
-    ['Staff', direkturRule({ requesterRoles: ['pk-staff'] }), /hanya boleh untuk Peran pemohon = Direktur/],
-    ['PM', direkturRule({ requesterRoles: ['pk-pm'] }), /hanya boleh untuk Peran pemohon = Direktur/],
-    ['Finance', direkturRule({ requesterRoles: ['pk-finance'] }), /hanya boleh untuk Peran pemohon = Direktur/],
-    ['Direktur + Staff', direkturRule({ requesterRoles: ['pk-owner', 'pk-staff'] }), /hanya boleh untuk Peran pemohon = Direktur/],
-    ['with "Diketahui"', direkturRule({ acknowledge: 'required', acknowledgeBy: 'role', acknowledgeRole: 'pk-owner' }), /tidak memakai "Diketahui Oleh"/],
+    ['Direktur (ADR 0024 shape, refused since ADR 0025)', ownerRule({ requesterRoles: ['pk-owner'] }), /hanya boleh untuk Peran pemohon = Owner/],
+    ['no requester role (= everybody)', ownerRule({ requesterRoles: [] }), /hanya boleh untuk Peran pemohon = Owner/],
+    ['Staff', ownerRule({ requesterRoles: ['pk-staff'] }), /hanya boleh untuk Peran pemohon = Owner/],
+    ['PM', ownerRule({ requesterRoles: ['pk-pm'] }), /hanya boleh untuk Peran pemohon = Owner/],
+    ['Finance', ownerRule({ requesterRoles: ['pk-finance'] }), /hanya boleh untuk Peran pemohon = Owner/],
+    ['Owner + Staff', ownerRule({ requesterRoles: ['pk-principal', 'pk-staff'] }), /hanya boleh untuk Peran pemohon = Owner/],
+    ['with "Diketahui"', ownerRule({ acknowledge: 'required', acknowledgeBy: 'role', acknowledgeRole: 'pk-owner' }), /tidak memakai "Diketahui Oleh"/],
   ])('refused: %s', (_n, r, msg) => {
     expect(ruleDecisionError(r, noRoles)).toMatch(msg)
   })
-  it('Addendum RAB: never zero steps, never a requester role', () => {
-    expect(zeroStepRuleError(direkturRule(), 'budget_addendum')).toMatch(/Addendum RAB harus punya minimal 1 level/)
+  it('Addendum RAB: never zero steps, never a requester role, never an Owner position (ADR 0025)', () => {
+    expect(zeroStepRuleError(ownerRule(), 'budget_addendum')).toMatch(/Addendum RAB harus punya minimal 1 level/)
+    expect(ruleDecisionError(rule({ acknowledgeBy: 'role', acknowledgeRole: 'pk-owner', steps: [{ level: 1, approverRole: 'pk-principal' }] }), noRoles, 'budget_addendum')).toMatch(/hanya untuk aturan Pengajuan biaya \(ADR 0025\)/)
     expect(ruleDecisionError(rule({ acknowledgeBy: 'role', acknowledgeRole: 'pk-owner', steps: [{ level: 1, approverRole: 'pk-finance' }], requesterRoles: ['pk-pm'] }), noRoles, 'budget_addendum')).toMatch(/Peran pemohon hanya untuk aturan Pengajuan biaya/)
   })
-  it('stepsError accepts zero steps only when asked; buildSnapshot only for the Direktur rule', () => {
+  it('stepsError accepts zero steps only when asked; buildSnapshot only for the Owner rule', () => {
     expect(stepsError([])).toMatch(/minimal 1 level/)
     expect(stepsError([], { allowEmpty: true })).toBeNull()
-    expect(buildSnapshot(direkturRule(), null).steps).toEqual([])
-    expect(() => buildSnapshot(direkturRule({ requesterRoles: ['pk-staff'] }), null)).toThrow(/minimal 1 level/)
+    expect(buildSnapshot(ownerRule(), null).steps).toEqual([])
+    expect(() => buildSnapshot(ownerRule({ requesterRoles: ['pk-staff'] }), null)).toThrow(/minimal 1 level/)
+    expect(() => buildSnapshot(ownerRule({ requesterRoles: ['pk-owner'] }), null)).toThrow(/minimal 1 level/)
   })
   it('a rule with levels may carry any requester roles (normal approval)', () => {
     expect(ruleDecisionError(rule({ requesterRoles: ['pk-staff', 'pk-pm'] }), noRoles)).toBeNull()
@@ -96,10 +103,17 @@ describe('rule selection with "Peran pemohon" + priority', () => {
   it('an inactive Direktur rule is never chosen', () => {
     expect(selectRule([rule(), direkturRule({ active: false })], facts([['pk-owner']]))?.name).toBe(rule().name)
   })
-  it('seed + data migration: one "Pengajuan Direktur" rule, valid, before the default', () => {
+  it('Owner requester → "Pengajuan Owner" (priority 5); the Owner is not a "Direktur" requester (stored roles)', () => {
+    const all = [rule(), direkturRule(), ownerRule()]
+    expect(selectRule(all, facts([['pk-principal']]))?.name).toBe('Pengajuan Owner')
+    expect(selectRule(all, facts([['pk-owner']]))?.name).toBe('Pengajuan Direktur')
+    expect(selectRule(all, facts([['pk-principal'], ['pk-staff']]))?.name).toBe(rule().name)
+  })
+  it('seed + data migration: "Pengajuan Direktur" with the Owner level, "Pengajuan Owner" zero-step, all valid', () => {
     expect(DIREKTUR_RULE_NAME).toBe(DIREKTUR_RULE)
     const d = DEFAULT_APPROVAL_RULES.find((r) => r.name === DIREKTUR_RULE_NAME)!
-    expect(d).toMatchObject({ docType: 'expense_request', priority: 10, requesterRoles: ['pk-owner'], acknowledge: 'none', steps: [], active: true })
+    expect(d).toMatchObject({ docType: 'expense_request', priority: 10, requesterRoles: ['pk-owner'], acknowledge: 'none', steps: [{ level: 1, approverRole: 'pk-principal' }], active: true })
+    expect(DEFAULT_APPROVAL_RULES.find((r) => r.name === 'Pengajuan Owner')).toMatchObject({ priority: 5, requesterRoles: ['pk-principal'], acknowledge: 'none', steps: [], active: true })
     for (const r of DEFAULT_APPROVAL_RULES) {
       const shape = { ...r, steps: [...r.steps], requesterRoles: 'requesterRoles' in r ? [...r.requesterRoles] : [] } as unknown as RuleInput
       expect(ruleDecisionError(shape, noRoles, r.docType)).toBeNull()
@@ -185,10 +199,12 @@ describe('notifications of a request without approval', () => {
 })
 
 describe('Aturan approval editor: explanation + preview', () => {
-  it('Direktur zero-step rule → "Contoh: pengajuan oleh Direktur → langsung ke Finance"', () => {
-    const p = rulePreview({ docType: 'expense_request', requesterRoles: ['pk-owner'], acknowledge: 'none', acknowledgeBy: 'role', acknowledgeRole: null, hasAcknowledgeUser: false, steps: [] })
-    expect(p.example).toBe('Contoh: pengajuan oleh Direktur → langsung ke Finance (Tanpa persetujuan — langsung ke antrian transfer Finance).')
+  it('Owner zero-step rule → "Contoh: pengajuan oleh Owner → langsung ke Finance"; a Direktur one is refused (ADR 0025)', () => {
+    const p = rulePreview({ docType: 'expense_request', requesterRoles: ['pk-principal'], acknowledge: 'none', acknowledgeBy: 'role', acknowledgeRole: null, hasAcknowledgeUser: false, steps: [] })
+    expect(p.example).toBe('Contoh: pengajuan oleh Owner → langsung ke Finance (Tanpa persetujuan — langsung ke antrian transfer Finance).')
     expect(p).toMatchObject({ noApproval: true, error: null })
+    const d = rulePreview({ docType: 'expense_request', requesterRoles: ['pk-owner'], acknowledge: 'none', acknowledgeBy: 'role', acknowledgeRole: null, hasAcknowledgeUser: false, steps: [] })
+    expect(d.error).toMatch(/Peran pemohon = Owner/)
   })
   it('zero steps for Staff → the same refusal as the server', () => {
     const p = rulePreview({ docType: 'expense_request', requesterRoles: ['pk-staff'], acknowledge: 'none', acknowledgeBy: 'role', acknowledgeRole: null, hasAcknowledgeUser: false, steps: [] })

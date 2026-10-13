@@ -78,7 +78,7 @@ describe('approval timeline (9c, mirrors APK turn_timeline.dart)', () => {
 
   it('draft: requester has the turn, the rest waits (rule chosen at submit); creator ≠ requester noted', () => {
     const steps = buildApprovalTimeline(base({ status: 'draft', snapshot: null, approvals: [], submittedAt: null, createdBy: 'Admin Kantor' }))
-    expect(steps.map((s) => s.state)).toEqual(['current', 'pending', 'pending', 'pending'])
+    expect(steps.map((s) => s.state)).toEqual(['current', 'pending', 'pending', 'pending', 'pending']) // ADR 0025: … Direktur → Owner → Transfer
     expect(steps[0]!.note).toBe('belum diajukan · dibuat oleh Admin Kantor')
   })
 

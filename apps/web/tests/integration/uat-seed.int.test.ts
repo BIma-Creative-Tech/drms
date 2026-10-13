@@ -24,6 +24,8 @@ const USERS = parseUatUsers(
     { email: 'owner.uji@proyekkas.test', name: 'Direktur Uji', role: 'pk-owner', keycloakSub: randomUUID() },
     // ADR 0013: a second Finance user so "another Finance decides" / the G1-2 fallback is testable.
     { email: 'finance2.uji@proyekkas.test', name: 'Finance Uji 2', role: 'pk-finance', keycloakSub: randomUUID() },
+    // ADR 0025: the Owner — last approval level of the default rule (above the Direktur)
+    { email: 'principal.uji@proyekkas.test', name: 'Owner Uji', role: 'pk-principal', keycloakSub: randomUUID() },
   ]),
 )
 
@@ -69,8 +71,8 @@ describe('UAT seed', () => {
     await setManager(realManager)
     const r = await seedUat(p, USERS)
     expect(r).toMatchObject({
-      employees: { created: 5, linked: 0, skipped: 0 },
-      users: { created: 5, linked: 0, skipped: 0 },
+      employees: { created: 6, linked: 0, skipped: 0 },
+      users: { created: 6, linked: 0, skipped: 0 },
       'cost-centers.manager': { created: 0, linked: 0, skipped: 1 },
       'employee-bank-accounts': { created: 1, linked: 0, skipped: 0 },
       projects: { created: 1, linked: 0, skipped: 0 },
@@ -88,7 +90,7 @@ describe('UAT seed', () => {
     expect(m).toHaveLength(1)
     expect(m[0]).toMatchObject({ company: await companyId(), roles: ['pk-staff'], employee: staffEmp.id, active: true })
     expect(staffEmp.name).toBe('Staff Uji')
-    for (const code of ['UJI-PM', 'UJI-FIN', 'UJI-OWN', 'UJI-FIN-2']) expect(await one('employees', 'code', code)).toBeDefined()
+    for (const code of ['UJI-PM', 'UJI-FIN', 'UJI-OWN', 'UJI-FIN-2', 'UJI-OWNER']) expect(await one('employees', 'code', code)).toBeDefined()
     expect(await one('projects', 'code', 'UJI-PRJ')).toMatchObject({ name: 'Proyek Uji', pm: pm.id, budget: 50_000_000, status: 'berjalan' })
     const mandiri = await one('banks', 'code', 'MANDIRI')
     expect(await one('employee-bank-accounts', 'accountNo', '9990001112223')).toMatchObject({ employee: staffEmp.id, bank: mandiri.id, accountHolder: 'Staff Uji', isDefault: true })
@@ -109,7 +111,7 @@ describe('UAT seed', () => {
     const third = await seedUat(p, USERS)
     expect(sum(third, 'created')).toBe(0)
     expect(sum(third, 'linked')).toBe(0)
-    expect(sum(third, 'skipped')).toBe(5 + 5 + 1 + 1 + 1 + 3)
+    expect(sum(third, 'skipped')).toBe(6 + 6 + 1 + 1 + 1 + 3)
   })
 
   it('rejects inconsistent input against the DB (same email, other Keycloak id) without writing', async () => {
@@ -118,7 +120,7 @@ describe('UAT seed', () => {
     await expect(seedUat(p, clash)).rejects.toThrow(/email already belongs to another account/)
   })
 
-  it('Staff Uji can submit a request on the UAT project; PM Uji approves (Persetujuan PM), then Direktur Uji (ADR 0021); Finance Uji does not approve', async () => {
+  it('Staff Uji can submit a request on the UAT project; PM Uji approves (Persetujuan PM), then Direktur Uji (ADR 0021), then Owner Uji (ADR 0025); Finance Uji does not approve', async () => {
     const asFlow = async (email: string): Promise<FlowUser> => {
       const u = await one('users', 'email', email)
       const f = { ...(await withContext({ id: u.id as number, email, keycloakSub: '', collection: 'users' as const })), cookie: '', _strategy: 'oidcSession' } as FlowUser
@@ -132,6 +134,7 @@ describe('UAT seed', () => {
     const pm = await asFlow('pm.uji@proyekkas.test')
     const direktur = await asFlow('owner.uji@proyekkas.test')
     const finance = await asFlow('finance.uji@proyekkas.test')
+    const owner = await asFlow('principal.uji@proyekkas.test')
     const account = await one('employee-bank-accounts', 'accountNo', '9990001112223')
     const ksm = await one('expense-categories', 'code', 'KSM')
     const E = '/api/v1/expense-requests'
@@ -170,7 +173,12 @@ describe('UAT seed', () => {
     expect(ack.status, JSON.stringify(ack.body)).toBe(200)
     expect(ack.body).toMatchObject({ status: 'pending_approval', statusLabel: 'Menunggu persetujuan Direktur' })
     expect((await api('POST', `${E}/${c.body.id}/approve`, finance, {})).status).toBe(403)
-    const ok = await api('POST', `${E}/${c.body.id}/approve`, direktur, {})
+    const dir = await api('POST', `${E}/${c.body.id}/approve`, direktur, {})
+    expect(dir.status, JSON.stringify(dir.body)).toBe(200)
+    // ADR 0025: Direktur → Owner (the Owner does not take the Direktur step and the Direktur not the Owner's)
+    expect(dir.body).toMatchObject({ status: 'pending_approval', currentLevel: 2, statusLabel: 'Menunggu persetujuan Owner' })
+    expect((await api('POST', `${E}/${c.body.id}/approve`, direktur, {})).status).toBe(403)
+    const ok = await api('POST', `${E}/${c.body.id}/approve`, owner, {})
     expect(ok.status, JSON.stringify(ok.body)).toBe(200)
     expect(ok.body.status).toBe('approved')
   })
