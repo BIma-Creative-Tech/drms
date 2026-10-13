@@ -11,18 +11,20 @@ vi.mock('next/navigation', () => ({ useRouter: () => ({ push: () => undefined, r
 
 import { RapIndex, RapProject } from '@/admin/views/Rap'
 import { loadRapOverview } from '@/domain/rap/overview-load'
+import { RAP_USED_REASON_MESSAGE } from '@/domain/rap/rules'
 import { resetRateLimits } from '@/lib/rate-limit'
 
-import { api, asUser, sysCreate, type FlowUser } from './flow-world'
+import { api, asUser, draftBody, sysCreate, type FlowUser } from './flow-world'
 import { makeFr1World, type Fr1World } from './fr1-world'
-import { fixturePm, getTestPayload, installLocalJwks, updateCompany } from './helpers'
+import { auditRows, companyId, fixturePm, getTestPayload, installLocalJwks, updateCompany } from './helpers'
 
 /**
  * DRMS 13/10 Wave 3 "Proyek › RAP": the RAP index (/admin/rap) and the RAP page of one project (/admin/rap/:id)
  * rendered server-side with real data and the caller's access, and the existing RAP item endpoints the page's form
  * uses (POST /projects/{id}/rap/items, PATCH /rap-items/{id}): who may write, Staff without money (no "Rp" + digit
  * anywhere on the page), the lock after daily-report realisation (PM: disabled buttons + 409 RAP_LOCKED, Direktur:
- * reason), PT scope (a project of a PT the caller is not a member of is never listed / opened / written).
+ * reason), PT scope (a project of a PT the caller is not a member of is never listed / opened / written), and the
+ * owner rule of 2026-10-13: a used item ("Sudah terpakai") stays editable, but any change needs an audited reason.
  * Payload's DefaultTemplate / Gutter are stubbed. Fictional data only.
  */
 let w: Fr1World
@@ -114,6 +116,63 @@ describe('form endpoints (the page dialog): who may write', () => {
     expect(off.status).toBe(200)
     expect(off.body.active).toBe(false)
     expect((await editItem(w.users.owner, item['A.2']!, { active: true })).body.active).toBe(true)
+  })
+})
+
+describe('owner 2026-10-13: a used item ("Sudah terpakai") stays editable, any change needs a reason', () => {
+  const E = '/api/v1/expense-requests'
+  const used: Record<string, number> = {}
+  let proj = 0
+
+  it('PM: used item without reason → 400 field reason; with reason → 200 + audit row with the reason; unused item → no reason; RAP not locked', async () => {
+    // the foreign PT of this file exists by now → name the world PT explicitly
+    proj = await sysCreate('projects', { company: await companyId(), code: `${tag}-USE`, name: `${tag} Pagar gudang`, kind: 'umum', pm: w.users.pm.id, budget: 10_000_000, status: 'berjalan' }, { rap: false })
+    await sysCreate('team-assignments', { employee: w.emp.a, project: proj, roleInProject: 'staff' })
+    for (const [code, description] of [
+      ['U.1', 'Besi beton'],
+      ['U.2', 'Cat pagar'],
+    ] as const) {
+      const r = await addItem(w.users.pm, proj, { code, description, kind: 'material', uomId: w.uom.l, volume: 10, unitPrice: 100_000 })
+      expect(r.status, JSON.stringify(r.body)).toBe(201)
+      used[code] = r.body.id
+    }
+    // a request charged to U.1 reaches the final approval (Direktur "Diketahui" → Finance): realisation without a daily report
+    const d = await api('POST', E, w.users.staffA, draftBody(w, { projectId: proj, lines: [{ description: 'Besi beton 10 mm', qty: 2, uomId: w.uom.l, unitPrice: 100_000, categoryId: w.cat.mat, rapItemId: used['U.1'] }] }))
+    expect(d.status, JSON.stringify(d.body)).toBe(201)
+    expect((await api('POST', `${E}/${d.body.id}/submit`, w.users.staffA, {})).status).toBe(200)
+    expect((await api('POST', `${E}/${d.body.id}/acknowledge`, w.users.owner, {})).status).toBe(200)
+    const ap = await api('POST', `${E}/${d.body.id}/approve`, w.users.finance, {})
+    expect(ap.status, JSON.stringify(ap.body)).toBe(200)
+    const rap = (await api('GET', `/api/v1/projects/${proj}/rap`, w.users.pm)).body
+    expect(rap).toMatchObject({ locked: false, canEdit: true, needsReason: false })
+    expect(rap.items.find((i: { code: string }) => i.code === 'U.1')).toMatchObject({ realisedAmount: 200_000 })
+
+    // the page: editor mode unchanged ("edit"), the chip on U.1 only
+    const html = await page(w.users.pm, proj)
+    expect(html).toContain('data-pk-rap-editor="edit"')
+    expect(html).toMatch(/data-pk-rap-item="U.1"[^>]*data-pk-used="1"/)
+    expect(html).not.toMatch(/data-pk-rap-item="U.2"[^>]*data-pk-used="1"/)
+
+    // PM without reason → 400, field error `reason` (Indonesian); a too-short reason → 400 too
+    const no = await editItem(w.users.pm, used['U.1']!, { volume: 12 })
+    expect(no.status).toBe(400)
+    expect(no.body.errors).toEqual([{ path: 'reason', message: RAP_USED_REASON_MESSAGE }])
+    expect((await editItem(w.users.pm, used['U.1']!, { volume: 12, reason: 'ab' })).status).toBe(400)
+    // every role: the Direktur too (RAP not locked), deactivation counts as a change
+    const dir = await editItem(w.users.owner, used['U.1']!, { active: false })
+    expect(dir.status).toBe(400)
+    expect(dir.body.errors).toEqual([expect.objectContaining({ path: 'reason' })])
+
+    const ok = await editItem(w.users.pm, used['U.1']!, { volume: 12, reason: 'Tambah kebutuhan pagar sisi timur' })
+    expect(ok.status, JSON.stringify(ok.body)).toBe(200)
+    expect(ok.body.volume).toBe(12)
+    const audit = (await auditRows('rap_item', used['U.1']!)).filter((a) => a.field === 'volume')
+    expect(audit.at(-1)).toMatchObject({ reason: 'Tambah kebutuhan pagar sisi timur', new_value: { v: 12 } })
+
+    // an unused item: no reason needed
+    const free = await editItem(w.users.pm, used['U.2']!, { volume: 11 })
+    expect(free.status, JSON.stringify(free.body)).toBe(200)
+    expect(free.body.volume).toBe(11)
   })
 })
 

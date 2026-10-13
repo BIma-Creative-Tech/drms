@@ -53,6 +53,22 @@ export function rapRequiredFor(p: { kind: string | null | undefined; budget: num
 /** Message for the requester (server, web and APK use this exact text). */
 export const RAP_MISSING_MESSAGE = 'Project belum punya RAP — hubungi PM'
 
+/** Minimum length of a change reason (the repo's audit reason rule, `reason` in the /api/v1 schemas). */
+export const RAP_REASON_MIN = 3
+
+/**
+ * "Sudah terpakai" (DRMS 13/10, owner 2026-10-13): the item already carries realisation — expense lines charged to
+ * it from the final approval onward (`realisedAmount`, D4) or daily-report quantities (realised / received / used).
+ * The web chip and the server rule use this one definition. A used item stays editable by the editor roles, but
+ * every change needs a reason (audited); the RAP lock after daily-report realisation (`isRapLocked`) is unchanged.
+ */
+export function rapItemUsed(i: { realisedAmount?: number | null; realised: number; received: number; used: number }): boolean {
+  return (i.realisedAmount ?? 0) > 0 || i.realised > 0 || i.received > 0 || i.used > 0
+}
+
+/** Field error `reason` when a used item is changed without one (server, web dialog, import). */
+export const RAP_USED_REASON_MESSAGE = `Item RAP sudah terpakai: isi alasan perubahan (min. ${RAP_REASON_MIN} karakter).`
+
 /**
  * Only konstruksi RAPs drive the stage progress (work volume of the daily reports, P3) and need a stage per item.
  * Other kinds (ADR 0020 amendment 2026-10-11): the RAP is a cost plan only — stage optional (an existing stage as a

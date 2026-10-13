@@ -5,6 +5,7 @@
  * Rupiah ≥ 0 (empty = unpriced), bobot 0–100 with ≤ 2 decimals, tahapan required for konstruksi. The server stays the
  * judge (role, lock, duplicate kode, stage of the project) — these checks only spare a round trip.
  */
+import { RAP_REASON_MIN, RAP_USED_REASON_MESSAGE, rapItemUsed } from '@/domain/rap/rules'
 import { groupRupiah, parseRupiah } from '@/lib/rupiah-input'
 
 export type RapKindValue = 'pekerjaan' | 'material'
@@ -95,8 +96,11 @@ export function draftOf(item: RapItemView | null, defaults: { kind?: RapKindValu
 
 const id = (v: string): number | null => (/^\d{1,10}$/.test(v.trim()) ? Number(v.trim()) : null)
 
-/** Dialog → values + errors (Indonesian messages next to the inputs). */
-export function parseRapDraft(d: RapItemDraft, opts: { stageRequired: boolean; needsReason: boolean }): { values: RapItemValues | null; errors: RapItemDraftErrors } {
+/**
+ * Dialog → values + errors (Indonesian messages next to the inputs). Reason required when the RAP is locked
+ * (`needsReason`, Direktur/Admin) or the edited item is already used (`used`, owner 2026-10-13: every role).
+ */
+export function parseRapDraft(d: RapItemDraft, opts: { stageRequired: boolean; needsReason: boolean; used?: boolean }): { values: RapItemValues | null; errors: RapItemDraftErrors } {
   const errors: RapItemDraftErrors = {}
   const code = d.code.trim()
   if (!code) errors.code = 'Kode wajib diisi.'
@@ -117,7 +121,8 @@ export function parseRapDraft(d: RapItemDraft, opts: { stageRequired: boolean; n
   if (price.error) errors.unitPrice = price.error
   const weight = parseDecimal(d.weightPct)
   if (weight !== null && (Number.isNaN(weight) || weight < 0 || weight > 100 || !dec2(weight))) errors.weightPct = 'Bobot 0–100, maks. 2 desimal.'
-  if (opts.needsReason && d.reason.trim().length < 3) errors.reason = 'RAP terkunci: isi alasan perubahan (min. 3 karakter).'
+  if (opts.needsReason && d.reason.trim().length < RAP_REASON_MIN) errors.reason = `RAP terkunci: isi alasan perubahan (min. ${RAP_REASON_MIN} karakter).`
+  else if (opts.used && d.reason.trim().length < RAP_REASON_MIN) errors.reason = RAP_USED_REASON_MESSAGE
   else if (d.reason.trim().length > 1000) errors.reason = 'Alasan maksimal 1000 karakter.'
   if (Object.keys(errors).length > 0) return { values: null, errors }
   return { values: { code, description, kind: kind!, stageId, uomId: uomId!, volume: volume!, unitPrice: price.value, weightPct: weight, active: d.active !== 'tidak' }, errors }
@@ -147,8 +152,8 @@ export function patchBody(item: RapItemView, v: RapItemValues, reason = ''): Rec
   return Object.keys(out).length === 0 ? null : { ...out, ...reasonOf(reason) }
 }
 
-/** The item already carries realisation (expense lines charged to it, or daily-report quantities). */
-export const itemUsed = (i: Pick<RapItemView, 'realisedAmount' | 'realised' | 'received' | 'used'>): boolean => (i.realisedAmount ?? 0) > 0 || i.realised > 0 || i.received > 0 || i.used > 0
+/** "Sudah terpakai": the item already carries realisation — the server rule's definition (domain/rap/rules `rapItemUsed`). */
+export const itemUsed = (i: Pick<RapItemView, 'realisedAmount' | 'realised' | 'received' | 'used'>): boolean => rapItemUsed(i)
 
 /** Grand total (footer) of the shown rows: Σ planned value of the ACTIVE priced items; null when none is priced. */
 export function rapGrandTotal(items: ReadonlyArray<Pick<RapItemView, 'value' | 'active'>>): number | null {
