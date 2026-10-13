@@ -12,7 +12,8 @@ import '../support/widget_harness.dart';
 
 /// DRMS 13/10 Wave 3 — "Dashboard di APK belum ada: SLA transfer, Pinjaman antar project, Project ber-RAB tanpa RAP,
 /// Tren pengajuan, Saldo per akun, Kelengkapan nota/LPJ. Samakan dengan web.": every role home shows the web cards of
-/// its layout, full Rupiah on cards (#10), and Staff sees no money at all.
+/// its layout, full Rupiah on cards (#10). Staff (owner 2026-10-13): the amounts of its OWN requests like the web Staff
+/// home, and no other money (no project budgets, no cash, no other people's requests).
 AuthSignedIn signedIn(Set<Role> roles) => AuthSignedIn(profile: profile(roles), sub: 's');
 
 final _compact = RegExp(r'Rp [\d,]+ (jt|rb|M)\b');
@@ -126,25 +127,75 @@ void main() {
     expect(tester.widget<Text>(find.byKey(const Key('trend-readout'))).data, contains('Rp 18.750.000'));
   });
 
-  testWidgets('Staff home: own request counts from /dashboard/me, never a Rupiah amount', (tester) async {
+  testWidgets('Staff home: own requests with their amounts in full Rupiah — no project / cash money', (tester) async {
     await pumpScreen(
       tester,
       const HomeScreen(),
       auth: signedIn({Role.staff}),
       overrides: [staffDashboardProvider.overrideWith((ref) async => StaffDashboard.fromJson(staffW3Json()))],
     );
+    // every Rupiah figure on the Staff home is one of the caller's own request amounts (/dashboard/me)
+    const own = {
+      'Rp 18.750.000', // September Σ (KPI + trend)
+      'Rp 10.000.000', // August Σ (trend)
+      'Rp 5.000.000', 'Rp 2.250.000', 'Rp 1.000.000', 'Rp 4.500.000', 'Rp 21.000.000', 'Rp 800.000', // stages
+      'Rp 1.447.500', // own draft (latest)
+    };
+    final amount = RegExp(r'Rp\s?[\d.]+');
+    void onlyOwnMoney(String where) {
+      for (final t in tester.widgetList<Text>(find.textContaining(_money, skipOffstage: false))) {
+        for (final m in amount.allMatches(t.data ?? '')) {
+          expect(own, contains(m.group(0)), reason: '$where: "${t.data}" is not an own request amount');
+        }
+      }
+      expect(find.textContaining(_compact, skipOffstage: false), findsNothing, reason: 'DRMS 13/10 #10: full Rupiah');
+      for (final k in [
+        'dash-sla',
+        'dash-loans',
+        'dash-rap-missing',
+        'dash-rap-monitor',
+        'dash-accounts',
+        'dash-recent-cash',
+        'dash-categories',
+        'dash-cost-centers',
+        'dash-completeness',
+        'kpi-by-company',
+      ]) {
+        expect(find.byKey(Key(k), skipOffstage: false), findsNothing, reason: '$where: $k');
+      }
+    }
+
     expect(find.text('Pengajuan saya'), findsOneWidget, reason: 'section title');
     expect(find.byKey(const Key('kpi-staff')), findsOneWidget);
     expect(find.byKey(const Key('kpi-my-actions')), findsOneWidget);
     expect(find.text('Sedang diproses'), findsOneWidget);
     expect(find.text('menunggu persetujuan 3'), findsOneWidget);
     expect(find.text('1 ditolak/dibatalkan'), findsOneWidget);
+    // KPI "Pengajuan Sep": count + Σ of the own requests this month (web: count, then the Rupiah line)
+    expect(tester.widget<Text>(find.byKey(const Key('kpi-my-month-sum'))).data, 'Rp 18.750.000');
+    onlyOwnMoney('KPIs');
+
+    await tester.scrollUntilVisible(find.byKey(const Key('dash-pipeline')), 300);
+    expect(find.text('2 · Rp 5.000.000'), findsOneWidget, reason: 'stage: count · Σ grand total of own requests');
+    onlyOwnMoney('pipeline');
+
+    await tester.scrollUntilVisible(find.byKey(const Key('dash-my-request-2')), 300);
+    expect(find.text('Pengajuan terbaru saya'), findsOneWidget);
+    expect(find.text('Draft "Semen"'), findsOneWidget);
+    expect(find.text('PB/DRMS/2609/0007'), findsOneWidget);
+    expect(find.text('Besi beton · Ditransfer'), findsOneWidget);
+    expect(
+      find.descendant(of: find.byKey(const Key('dash-my-request-2')), matching: find.text('Rp 2.250.000')),
+      findsOneWidget,
+    );
+    onlyOwnMoney('latest');
+
     await tester.scrollUntilVisible(find.byKey(const Key('trend-readout')), 300);
-    expect(tester.widget<Text>(find.byKey(const Key('trend-readout'))).data, 'September 2026: 6 pengajuan');
-    expect(find.textContaining(_money), findsNothing, reason: 'Staff never sees money');
-    for (final k in ['dash-sla', 'dash-loans', 'dash-rap-missing', 'dash-accounts']) {
-      expect(find.byKey(Key(k), skipOffstage: false), findsNothing, reason: k);
-    }
+    expect(
+      tester.widget<Text>(find.byKey(const Key('trend-readout'))).data,
+      'September 2026: 6 pengajuan · Rp 18.750.000',
+    );
+    onlyOwnMoney('trend');
   });
 
   testWidgets('Admin home: master-data gaps from /dashboard/admin', (tester) async {

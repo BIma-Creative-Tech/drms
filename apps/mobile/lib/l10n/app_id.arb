@@ -869,7 +869,7 @@
   "kpiTrendTeamTitle": "Tren pengajuan tim",
   "kpiTrendTeamSubtitle": "Jumlah pengajuan per bulan, 6 bulan. Ketuk bulan untuk melihat angkanya.",
   "kpiTrendMineTitle": "Pengajuan saya per bulan",
-  "kpiTrendMineSubtitle": "Jumlah pengajuan, 6 bulan, tanpa draft. Ketuk bulan untuk melihat angkanya.",
+  "kpiTrendMineSubtitle": "Jumlah dan nilai pengajuan saya, 6 bulan, tanpa draft. Ketuk bulan untuk melihat angkanya.",
   "kpiTrendEmpty": "Belum ada pengajuan di rentang ini.",
   "kpiTrendReadout": "{period}: {count} pengajuan",
   "@kpiTrendReadout": {
@@ -1020,6 +1020,17 @@
   "@kpiMyMonth": {
     "placeholders": {
       "month": {
+        "type": "String"
+      }
+    }
+  },
+  "kpiMyLatestTitle": "Pengajuan terbaru saya",
+  "kpiMyLatestSubtitle": "10 terbaru · nominal = grand total",
+  "kpiMyLatestEmpty": "Anda belum punya pengajuan.",
+  "kpiMyDraftTitle": "Draft \"{title}\"",
+  "@kpiMyDraftTitle": {
+    "placeholders": {
+      "title": {
         "type": "String"
       }
     }
