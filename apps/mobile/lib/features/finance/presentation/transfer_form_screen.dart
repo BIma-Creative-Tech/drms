@@ -14,6 +14,7 @@ import '../../../core/media/photo_compressor.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../l10n/gen/app_localizations.dart';
 import '../../../shared/widgets/async_body.dart';
+import '../../../shared/widgets/form_grid.dart';
 import '../../../shared/widgets/online_only_button.dart';
 import '../../../shared/widgets/photo_viewer.dart';
 import '../../approvals/application/inbox_providers.dart';
@@ -116,6 +117,14 @@ class _TransferFormScreenState extends ConsumerState<TransferFormScreen> {
     );
     if (time == null) return;
     setState(() => _at = DateTime(date.year, date.month, date.day, time.hour, time.minute));
+  }
+
+  /// "22 Sep 2026 14.05 WITA" of the picked transfer time.
+  String _atText(String zone) {
+    final at = _at!;
+    final hh = at.hour.toString().padLeft(2, '0');
+    final mm = at.minute.toString().padLeft(2, '0');
+    return '${formatDateOnly(toYmd(at))} $hh.$mm $zone';
   }
 
   Future<void> _addProof({required bool fromCamera}) async {
@@ -221,6 +230,19 @@ class _TransferFormScreenState extends ConsumerState<TransferFormScreen> {
     final accountList = accounts.value ?? const <CashAccountOption>[];
     if (_cashAccountId == null && accountList.isNotEmpty) _cashAccountId = accountList.first.id;
     final zone = zoneAbbrev(ref.watch(accountProfileProvider)?.forCompany(it.companyId).timezone);
+    final accountItems = [
+      for (final a in accountList)
+        MasterItem(a.id, a.balance == null ? a.name : '${a.name} · ${formatRupiah(a.balance!)}'),
+    ];
+    final centerList = centers.value ?? const <CostCenterOption>[];
+    final suggested = it.costCenter;
+    final centerItems = [
+      for (final c in centerList) MasterItem(c.id, c.label),
+      // the suggestion may be missing from the list (deactivated): keep it visible
+      if (suggested != null && !centerList.any((c) => c.id == suggested.id))
+        MasterItem(suggested.id, '${suggested.code ?? ''} ${suggested.name ?? ''}'.trim()),
+    ];
+    Widget loadError(Object error) => Text(errorText(error), style: TextStyle(color: theme.colorScheme.error));
     return Scaffold(
       appBar: AppBar(title: Text(t.transferRecord)),
       body: AbsorbPointer(
@@ -274,128 +296,91 @@ class _TransferFormScreenState extends ConsumerState<TransferFormScreen> {
               ),
             ),
             const SizedBox(height: 16),
-            // 1. Akun kas
-            switch (accounts) {
-              AsyncError(:final error) => Text(errorText(error), style: TextStyle(color: theme.colorScheme.error)),
-              _ => MasterPickerField(
-                key: const Key('transfer-cash-account'),
-                label: t.cashAccountLabel,
-                items: [
-                  for (final a in accountList)
-                    MasterItem(a.id, a.balance == null ? a.name : '${a.name} · ${formatRupiah(a.balance!)}'),
-                ],
-                value: _cashAccountId,
-                allowNone: false,
-                errorText: issues['cashAccountId'],
-                onChanged: (v) => setState(() => _cashAccountId = v),
-              ),
-            },
-            const SizedBox(height: 12),
-            // 2. Tanggal & jam transfer (item 11 / D11)
-            InkWell(
-              key: const Key('transfer-at'),
-              onTap: _pickAt,
-              child: InputDecorator(
-                decoration: InputDecoration(
-                  labelText: t.transferAtLabel,
-                  helperText: t.transferAtHelp,
-                  errorText: issues['transferAt'],
-                  suffixIcon: const Icon(Icons.event),
+            // DRMS 13/10 Umum #2 / D4: label left of the field, two columns on wide screens (web field order).
+            FormGrid(
+              children: [
+                // 1. Akun kas
+                FormGridCell(
+                  label: t.cashAccountLabel,
+                  child: switch (accounts) {
+                    AsyncError(:final error) => loadError(error),
+                    _ => MasterPickerField(
+                      key: const Key('transfer-cash-account'),
+                      label: t.cashAccountLabel,
+                      items: accountItems,
+                      value: _cashAccountId,
+                      allowNone: false,
+                      errorText: issues['cashAccountId'],
+                      onChanged: (v) => setState(() => _cashAccountId = v),
+                    ),
+                  },
                 ),
-                child: Text(
-                  _at == null
-                      ? t.transferAtHint
-                      : '${formatDateOnly(toYmd(_at!))} ${_at!.hour.toString().padLeft(2, '0')}.${_at!.minute.toString().padLeft(2, '0')} $zone',
-                  key: const Key('transfer-at-value'),
-                  style: _at == null ? theme.textTheme.bodyLarge?.copyWith(color: theme.hintColor) : null,
-                ),
-              ),
-            ),
-            const SizedBox(height: 12),
-            // 3. Pusat biaya (D2)
-            switch (centers) {
-              AsyncError(:final error) => Text(errorText(error), style: TextStyle(color: theme.colorScheme.error)),
-              _ => MasterPickerField(
-                key: const Key('transfer-cost-center'),
-                label: t.fieldCostCenter,
-                hint: t.costCenterPickHint,
-                items: [
-                  for (final c in centers.value ?? const <CostCenterOption>[]) MasterItem(c.id, c.label),
-                  // the suggestion may be missing from the list (deactivated): keep it visible
-                  if (it.costCenter != null && !(centers.value ?? const []).any((c) => c.id == it.costCenter!.id))
-                    MasterItem(it.costCenter!.id, '${it.costCenter!.code ?? ''} ${it.costCenter!.name ?? ''}'.trim()),
-                ],
-                value: _costCenterId,
-                allowNone: false,
-                errorText: issues['costCenterId'],
-                helperText: it.costCenter != null ? t.costCenterSuggested : t.costCenterNoDefault,
-                onChanged: (v) => setState(() => _costCenterId = v),
-              ),
-            },
-            const SizedBox(height: 12),
-            // 4. No. referensi bank
-            TextField(
-              key: const Key('transfer-bank-ref'),
-              controller: _bankRef,
-              maxLength: 64,
-              decoration: InputDecoration(
-                labelText: t.bankRefLabel,
-                hintText: t.bankRefHint,
-                errorText: issues['bankRef'],
-              ),
-              onChanged: (_) => _tried ? setState(() {}) : null,
-            ),
-            const SizedBox(height: 4),
-            // 5. Bukti
-            Text(t.transferProofLabel, style: theme.textTheme.titleSmall),
-            const SizedBox(height: 6),
-            if (_proof != null)
-              Align(
-                alignment: Alignment.centerLeft,
-                child: SizedBox.square(
-                  dimension: 96,
-                  child: Material(
-                    borderRadius: BorderRadius.circular(8),
-                    clipBehavior: Clip.antiAlias,
-                    child: InkWell(
-                      key: const Key('transfer-proof-thumb'),
-                      onTap: () => showPhotoViewer(context, [
-                        ViewerPhoto(
-                          caption: t.transferProofLabel,
-                          builder: (_) => Image.memory(_proof!, fit: BoxFit.contain),
-                        ),
-                      ]),
-                      child: Image.memory(_proof!, fit: BoxFit.cover),
+                // 2. Tanggal & jam transfer (item 11 / D11)
+                FormGridCell(
+                  label: t.transferAtLabel,
+                  builder: (label) => InkWell(
+                    key: const Key('transfer-at'),
+                    onTap: _pickAt,
+                    child: InputDecorator(
+                      decoration: InputDecoration(
+                        labelText: label,
+                        helperText: t.transferAtHelp,
+                        errorText: issues['transferAt'],
+                        suffixIcon: const Icon(Icons.event),
+                      ),
+                      child: Text(
+                        _at == null ? t.transferAtHint : _atText(zone),
+                        key: const Key('transfer-at-value'),
+                        style: _at == null ? theme.textTheme.bodyLarge?.copyWith(color: theme.hintColor) : null,
+                      ),
                     ),
                   ),
                 ),
-              ),
-            if (issues['proof'] != null) Text(issues['proof']!, style: TextStyle(color: theme.colorScheme.error)),
-            const SizedBox(height: 6),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    key: const Key('transfer-proof-camera'),
-                    onPressed: () => _addProof(fromCamera: true),
-                    icon: const Icon(Icons.photo_camera),
-                    label: Text(_proof == null ? t.proofCamera : t.proofRetake),
+                // 3. Pusat biaya (D2)
+                FormGridCell(
+                  label: t.fieldCostCenter,
+                  child: switch (centers) {
+                    AsyncError(:final error) => loadError(error),
+                    _ => MasterPickerField(
+                      key: const Key('transfer-cost-center'),
+                      label: t.fieldCostCenter,
+                      hint: t.costCenterPickHint,
+                      items: centerItems,
+                      value: _costCenterId,
+                      allowNone: false,
+                      errorText: issues['costCenterId'],
+                      helperText: it.costCenter != null ? t.costCenterSuggested : t.costCenterNoDefault,
+                      onChanged: (v) => setState(() => _costCenterId = v),
+                    ),
+                  },
+                ),
+                // 4. No. referensi bank
+                FormGridCell(
+                  label: t.bankRefLabel,
+                  builder: (label) => TextField(
+                    key: const Key('transfer-bank-ref'),
+                    controller: _bankRef,
+                    maxLength: 64,
+                    decoration: InputDecoration(
+                      labelText: label,
+                      hintText: t.bankRefHint,
+                      errorText: issues['bankRef'],
+                    ),
+                    onChanged: (_) => _tried ? setState(() {}) : null,
                   ),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: OutlinedButton.icon(
-                    key: const Key('transfer-proof-gallery'),
-                    onPressed: () => _addProof(fromCamera: false),
-                    icon: const Icon(Icons.photo_library),
-                    label: Text(t.addReceiptGallery),
+                // 5. Bukti
+                FormGridCell(
+                  label: t.transferProofLabel,
+                  full: true,
+                  stackedLabel: true,
+                  child: _ProofPicker(
+                    proof: _proof,
+                    error: issues['proof'],
+                    onAdd: (fromCamera) => _addProof(fromCamera: fromCamera),
                   ),
                 ),
               ],
-            ),
-            Padding(
-              padding: const EdgeInsets.only(top: 4),
-              child: Text(t.transferProofHelp, style: theme.textTheme.bodySmall),
             ),
             if (_error != null)
               Card(
@@ -415,6 +400,75 @@ class _TransferFormScreenState extends ConsumerState<TransferFormScreen> {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// 5. Bukti transfer: thumbnail (tap = viewer), camera / gallery, help line.
+class _ProofPicker extends StatelessWidget {
+  const _ProofPicker({required this.proof, required this.error, required this.onAdd});
+  final Uint8List? proof;
+  final String? error;
+  final void Function(bool fromCamera) onAdd;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final photo = proof;
+    final issue = error;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (photo != null)
+          Align(
+            alignment: Alignment.centerLeft,
+            child: SizedBox.square(
+              dimension: 96,
+              child: Material(
+                borderRadius: BorderRadius.circular(8),
+                clipBehavior: Clip.antiAlias,
+                child: InkWell(
+                  key: const Key('transfer-proof-thumb'),
+                  onTap: () => showPhotoViewer(context, [
+                    ViewerPhoto(
+                      caption: t.transferProofLabel,
+                      builder: (_) => Image.memory(photo, fit: BoxFit.contain),
+                    ),
+                  ]),
+                  child: Image.memory(photo, fit: BoxFit.cover),
+                ),
+              ),
+            ),
+          ),
+        if (issue != null) Text(issue, style: TextStyle(color: theme.colorScheme.error)),
+        const SizedBox(height: 6),
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton.icon(
+                key: const Key('transfer-proof-camera'),
+                onPressed: () => onAdd(true),
+                icon: const Icon(Icons.photo_camera),
+                label: Text(photo == null ? t.proofCamera : t.proofRetake),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: OutlinedButton.icon(
+                key: const Key('transfer-proof-gallery'),
+                onPressed: () => onAdd(false),
+                icon: const Icon(Icons.photo_library),
+                label: Text(t.addReceiptGallery),
+              ),
+            ),
+          ],
+        ),
+        Padding(
+          padding: const EdgeInsets.only(top: 4),
+          child: Text(t.transferProofHelp, style: theme.textTheme.bodySmall),
+        ),
+      ],
     );
   }
 }

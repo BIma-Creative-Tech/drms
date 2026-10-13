@@ -5,6 +5,7 @@ import '../../../../app/theme.dart';
 import '../../../../core/format/rupiah.dart';
 import '../../../../l10n/gen/app_localizations.dart';
 import '../../../../shared/widgets/async_body.dart' as async_body;
+import '../../../../shared/widgets/form_grid.dart';
 import '../../../projects/application/projects_providers.dart';
 import '../../../projects/domain/project.dart';
 
@@ -132,7 +133,7 @@ class RapItemPickerField extends ConsumerWidget {
                 },
           child: InputDecorator(
             decoration: InputDecoration(
-              labelText: t.fieldRapItem,
+              labelText: FormGridCell.inputLabel(context, t.fieldRapItem),
               errorText: errorText,
               helperText: helper,
               helperMaxLines: 2,

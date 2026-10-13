@@ -12,6 +12,7 @@ import '../../../core/network/api_exception.dart';
 import '../../../l10n/gen/app_localizations.dart';
 import '../../../shared/widgets/async_body.dart';
 import '../../../shared/widgets/doc_no_chip.dart';
+import '../../../shared/widgets/form_grid.dart';
 import '../../../shared/widgets/online_only_button.dart';
 import '../../../shared/widgets/pick_hint.dart';
 import '../../approvals/application/inbox_providers.dart';
@@ -268,16 +269,18 @@ class _LoanFormScreenState extends ConsumerState<LoanFormScreen> {
     final initial = widget.initial;
     final canSubmit = initial == null || initial.allowedActions.contains(LoanAction.submit);
     final options = ref.watch(loanOptionsProvider);
-    Widget dateTile(String label, String? value, {required bool due, required String errorKey}) => ListTile(
+    // D4: a date input (label left of it on wide screens) instead of a list tile; the error shows under it.
+    Widget dateField(String? label, String? value, {required bool due, required String errorKey}) => InkWell(
       key: Key(due ? 'loan-due-date' : 'loan-date'),
-      contentPadding: EdgeInsets.zero,
-      title: Text(label),
-      subtitle: Text(
-        _errors[errorKey] ?? formatDateOnly(value),
-        style: _errors[errorKey] == null ? null : TextStyle(color: theme.colorScheme.error),
-      ),
-      trailing: const Icon(Icons.calendar_today),
       onTap: _busy ? null : () => _pickDate(due: due),
+      child: InputDecorator(
+        decoration: InputDecoration(
+          labelText: label,
+          errorText: _errors[errorKey],
+          suffixIcon: const Icon(Icons.calendar_today),
+        ),
+        child: Text(formatDateOnly(value)),
+      ),
     );
     return Scaffold(
       appBar: AppBar(title: Text(initial == null ? t.loanNewTitle : t.loanEditTitle)),
@@ -309,92 +312,122 @@ class _LoanFormScreenState extends ConsumerState<LoanFormScreen> {
           return ListView(
             padding: const EdgeInsets.all(16),
             children: [
-              if (fixedBorrower)
-                InputDecorator(
-                  key: const Key('loan-borrower-fixed'),
-                  decoration: InputDecoration(labelText: t.loanBorrower, prefixIcon: const Icon(Icons.call_received)),
-                  child: Text(borrowerLabel),
-                )
-              else
-                DropdownButtonFormField<int>(
-                  key: const Key('loan-borrower'),
-                  hint: Text(pickHintFor(t, t.loanBorrower)),
-                  initialValue: _borrowerId,
-                  isExpanded: true,
-                  decoration: InputDecoration(
-                    labelText: t.loanBorrower,
-                    prefixIcon: const Icon(Icons.call_received),
-                    errorText: _errors['borrower'],
-                  ),
-                  items: [
-                    for (final b in o.borrowers)
-                      DropdownMenuItem(
-                        value: b.id,
-                        child: Text(b.label, overflow: TextOverflow.ellipsis),
+              // DRMS 13/10 Umum #2 / D4: label left of the field, two columns on wide screens.
+              FormGrid(
+                rowGap: 16,
+                children: [
+                  if (fixedBorrower)
+                    FormGridCell(
+                      label: t.loanBorrower,
+                      builder: (label) => InputDecorator(
+                        key: const Key('loan-borrower-fixed'),
+                        decoration: InputDecoration(labelText: label, prefixIcon: const Icon(Icons.call_received)),
+                        child: Text(borrowerLabel),
                       ),
-                  ],
-                  onChanged: _busy
-                      ? null
-                      : (v) => setState(() {
-                          _borrowerId = v;
-                          if (!o.lendersFor(v).any((l) => l.id == _lenderId)) _lenderId = null;
-                        }),
-                ),
-              const SizedBox(height: 16),
-              DropdownButtonFormField<int>(
-                key: ValueKey('loan-lender-$_borrowerId'),
-                hint: Text(pickHintFor(t, t.loanLender)),
-                initialValue: lenderItems.any((l) => l.id == _lenderId) ? _lenderId : null,
-                isExpanded: true,
-                decoration: InputDecoration(
-                  labelText: t.loanLender,
-                  prefixIcon: const Icon(Icons.call_made),
-                  errorText: _errors['lender'],
-                ),
-                items: [
-                  for (final l in lenderItems)
-                    DropdownMenuItem(
-                      value: l.id,
-                      child: Text(l.label, overflow: TextOverflow.ellipsis),
+                    )
+                  else
+                    FormGridCell(
+                      label: t.loanBorrower,
+                      builder: (label) => DropdownButtonFormField<int>(
+                        key: const Key('loan-borrower'),
+                        hint: Text(pickHintFor(t, t.loanBorrower)),
+                        initialValue: _borrowerId,
+                        isExpanded: true,
+                        decoration: InputDecoration(
+                          labelText: label,
+                          prefixIcon: const Icon(Icons.call_received),
+                          errorText: _errors['borrower'],
+                        ),
+                        items: [
+                          for (final b in o.borrowers)
+                            DropdownMenuItem(
+                              value: b.id,
+                              child: Text(b.label, overflow: TextOverflow.ellipsis),
+                            ),
+                        ],
+                        onChanged: _busy
+                            ? null
+                            : (v) => setState(() {
+                                _borrowerId = v;
+                                if (!o.lendersFor(v).any((l) => l.id == _lenderId)) _lenderId = null;
+                              }),
+                      ),
                     ),
-                ],
-                onChanged: _busy ? null : (v) => setState(() => _lenderId = v),
-              ),
-              const SizedBox(height: 16),
-              Text(t.loanKind, style: theme.textTheme.bodySmall),
-              const SizedBox(height: 6),
-              SegmentedButton<String>(
-                key: const Key('loan-kind'),
-                segments: [
-                  ButtonSegment(value: 'dana', label: Text(t.loanKindDana), icon: const Icon(Icons.payments_outlined)),
-                  ButtonSegment(
-                    value: 'barang',
-                    label: Text(t.loanKindBarang),
-                    icon: const Icon(Icons.inventory_2_outlined),
+                  FormGridCell(
+                    label: t.loanLender,
+                    builder: (label) => DropdownButtonFormField<int>(
+                      key: ValueKey('loan-lender-$_borrowerId'),
+                      hint: Text(pickHintFor(t, t.loanLender)),
+                      initialValue: lenderItems.any((l) => l.id == _lenderId) ? _lenderId : null,
+                      isExpanded: true,
+                      decoration: InputDecoration(
+                        labelText: label,
+                        prefixIcon: const Icon(Icons.call_made),
+                        errorText: _errors['lender'],
+                      ),
+                      items: [
+                        for (final l in lenderItems)
+                          DropdownMenuItem(
+                            value: l.id,
+                            child: Text(l.label, overflow: TextOverflow.ellipsis),
+                          ),
+                      ],
+                      onChanged: _busy ? null : (v) => setState(() => _lenderId = v),
+                    ),
+                  ),
+                  FormGridCell(
+                    label: t.loanKind,
+                    stackedLabel: true,
+                    child: SegmentedButton<String>(
+                      key: const Key('loan-kind'),
+                      segments: [
+                        ButtonSegment(
+                          value: 'dana',
+                          label: Text(t.loanKindDana),
+                          icon: const Icon(Icons.payments_outlined),
+                        ),
+                        ButtonSegment(
+                          value: 'barang',
+                          label: Text(t.loanKindBarang),
+                          icon: const Icon(Icons.inventory_2_outlined),
+                        ),
+                      ],
+                      selected: {_kind},
+                      onSelectionChanged: _busy ? null : (s) => setState(() => _kind = s.first),
+                    ),
+                  ),
+                  FormGridCell(
+                    label: t.loanAmount,
+                    builder: (label) => TextField(
+                      key: const Key('loan-amount'),
+                      controller: _amount,
+                      keyboardType: TextInputType.number,
+                      inputFormatters: const [RupiahInputFormatter()],
+                      decoration: InputDecoration(labelText: label, prefixText: 'Rp ', errorText: _errors['amount']),
+                    ),
+                  ),
+                  FormGridCell(
+                    label: t.loanReason,
+                    full: true,
+                    builder: (label) => TextField(
+                      key: const Key('loan-reason'),
+                      controller: _reason,
+                      minLines: 2,
+                      maxLines: 5,
+                      maxLength: 1000,
+                      decoration: InputDecoration(labelText: label, errorText: _errors['reason']),
+                    ),
+                  ),
+                  FormGridCell(
+                    label: t.loanDate,
+                    builder: (label) => dateField(label, _loanDate, due: false, errorKey: 'loanDate'),
+                  ),
+                  FormGridCell(
+                    label: t.loanDueDate,
+                    builder: (label) => dateField(label, _dueDate, due: true, errorKey: 'dueDate'),
                   ),
                 ],
-                selected: {_kind},
-                onSelectionChanged: _busy ? null : (s) => setState(() => _kind = s.first),
               ),
-              const SizedBox(height: 16),
-              TextField(
-                key: const Key('loan-amount'),
-                controller: _amount,
-                keyboardType: TextInputType.number,
-                inputFormatters: const [RupiahInputFormatter()],
-                decoration: InputDecoration(labelText: t.loanAmount, prefixText: 'Rp ', errorText: _errors['amount']),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                key: const Key('loan-reason'),
-                controller: _reason,
-                minLines: 2,
-                maxLines: 5,
-                maxLength: 1000,
-                decoration: InputDecoration(labelText: t.loanReason, errorText: _errors['reason']),
-              ),
-              dateTile(t.loanDate, _loanDate, due: false, errorKey: 'loanDate'),
-              dateTile(t.loanDueDate, _dueDate, due: true, errorKey: 'dueDate'),
               const SizedBox(height: 12),
               if (_error != null)
                 Padding(
