@@ -77,9 +77,9 @@ describe('F2e acknowledger delegation — LEGACY snapshots only (ADR 0013 supers
     }
     await sqlAs('app', "UPDATE expense_requests SET status = 'pending_ack', current_level = 0, approval_snapshot = $2::jsonb WHERE id = $1", [id, JSON.stringify(legacy)])
 
-    // timeline: "Giliran: Direktur — Diketahui (dilimpahkan)" (pk-owner is labelled Direktur since E1)
+    // timeline: "Tahapan saat ini: Direktur — Diketahui (dilimpahkan)" (pk-owner is labelled Direktur since E1)
     const html = await panelHtml(w.users.admin, id)
-    expect(html.replace(/<!-- -->/g, '')).toMatch(/Giliran: <strong>Direktur<\/strong> — Diketahui \(dilimpahkan\)/)
+    expect(html.replace(/<!-- -->/g, '')).toMatch(/Tahapan saat ini: <strong>Direktur<\/strong> — Diketahui \(dilimpahkan\)/)
 
     // G1: the PM (requester) may not acknowledge — 403 and an audited denied attempt
     const denied = await api('POST', `${E}/${id}/acknowledge`, w.users.pm, {}, key())

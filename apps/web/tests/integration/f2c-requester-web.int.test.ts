@@ -215,11 +215,11 @@ describe('F2c requester actions (panel request shapes)', () => {
 })
 
 describe('F2c workflow panel (server-rendered in the edit view)', () => {
-  it('own draft: timeline + "Giliran: Pemohon" + Kirim pengajuan button; other staff: nothing', async () => {
+  it('own draft: timeline + "Tahapan saat ini: Pemohon" + Kirim pengajuan button; other staff: nothing', async () => {
     const a = await draft()
     const html = await panelHtml(w.users.staffA, a.id)
     expect(html).toContain('data-pk-panel="workflow"')
-    expect(html).toContain('Giliran')
+    expect(html).toContain('Tahapan saat ini')
     expect(html).toContain('data-pk-action="submit"')
     expect(html).not.toContain('data-pk-action="withdraw"')
     expect(await panelHtml(w.users.staffB, a.id)).toBe('')

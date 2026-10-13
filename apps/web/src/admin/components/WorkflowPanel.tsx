@@ -129,7 +129,7 @@ export async function WorkflowPanel(props: UIFieldServerProps) {
     createdBy: d.createdBy && 'name' in d.createdBy ? String(d.createdBy.name ?? '') : null,
     names,
   })
-  const olderDecisions = d.approvals.filter((a) => a.cycle !== d.approvalCycle)
+  // DRMS 13/10 Persetujuan #4: no "Keputusan siklus sebelumnya" list — earlier cycles stay in the "Riwayat" tab (audit log)
   // DRMS 10/10 9d: decision bar when the server allows a decision now (same texts as the inbox).
   const decideStep = d.allowedActions.includes('approve') ? 'approve' : d.allowedActions.includes('acknowledge') ? 'acknowledge' : null
   const canReject = d.allowedActions.includes('reject')
@@ -153,11 +153,12 @@ export async function WorkflowPanel(props: UIFieldServerProps) {
             {d.docNo ?? `Draft #${d.id}`} · {d.typeLabel}
           </strong>
           <span style={badge(d.status === 'rejected' || d.status === 'cancelled' ? 'bad' : d.status === 'completed' ? 'ok' : 'warn')}>{d.statusLabel}</span>
-          <span>
-            Grand total <strong>{rp(d.grandTotal)}</strong>
-            {d.approvedAmount !== null ? <> · disetujui {rp(d.approvedAmount)}</> : null}
-            {d.transferredTotal ? <> · ditransfer {rp(d.transferredTotal)}</> : null}
-          </span>
+          {/* DRMS 13/10 Persetujuan #10: the grand total is the footer row of "Rincian item" (ReviewDetails / LinesTableField) */}
+          {d.approvedAmount !== null || d.transferredTotal ? (
+            <span>
+              {[d.approvedAmount !== null ? `Disetujui ${rp(d.approvedAmount)}` : null, d.transferredTotal ? `Ditransfer ${rp(d.transferredTotal)}` : null].filter(Boolean).join(' · ')}
+            </span>
+          ) : null}
         </div>
         <ol style={{ display: 'flex', flexWrap: 'wrap', gap: 4, listStyle: 'none', padding: 0, margin: '10px 0' }} aria-label="Timeline status">
           {steps.map((s, i) => (
@@ -192,8 +193,9 @@ export async function WorkflowPanel(props: UIFieldServerProps) {
           </div>
         ) : null}
         {next ? (
+          // DRMS 13/10 Persetujuan #9: "Tahapan saat ini" instead of "Giliran"
           <div data-pk-next-actor>
-            Giliran: <strong>{next.who}</strong> — {next.what}.
+            Tahapan saat ini: <strong>{next.who}</strong> — {next.what}.
           </div>
         ) : (
           <div>Tidak ada aksi lanjutan (status akhir).</div>
@@ -284,21 +286,6 @@ export async function WorkflowPanel(props: UIFieldServerProps) {
             ))}
           </ul>
         ) : null}
-        {olderDecisions.length > 0 ? (
-          <details style={{ marginTop: 8, fontSize: 12 }}>
-            <summary style={{ cursor: 'pointer' }}>Keputusan siklus sebelumnya ({olderDecisions.length})</summary>
-            <ul style={{ margin: '6px 0 0', paddingLeft: 18 }}>
-              {olderDecisions.map((a) => (
-                <li key={a.id}>
-                  siklus {a.cycle} · {POSITION_LABELS[a.position] ?? a.position}
-                  {a.position === 'approval' ? ` L${a.level}` : ''}: {a.actorName ?? '—'} — {DECISION_LABELS[a.decision] ?? a.decision}
-                  {a.onBehalf ? ' (diwakili)' : ''}
-                  {a.reason ? ` — ${a.reason}` : ''}
-                </li>
-              ))}
-            </ul>
-          </details>
-        ) : null}
       </section>
       {!isContentEditable(d.status) ? (
         // B-2 item 3: header of a locked request as a read-only summary (the header inputs are hidden then)
@@ -356,8 +343,5 @@ function isOwn(d: Detail, user: { id?: unknown }): boolean {
   const emps = ownEmployees({ user } as never)
   return d.requesters.some((r) => r?.id !== undefined && emps.includes(r.id))
 }
-
-const POSITION_LABELS: Record<string, string> = { diajukan: 'Pemohon', dibuat: 'Dibuat oleh', diketahui: 'Diketahui', approval: 'Approval' }
-const DECISION_LABELS: Record<string, string> = { signed: 'tanda tangan', acknowledged: 'diketahui', approved: 'disetujui', rejected: 'ditolak' }
 
 export default WorkflowPanel

@@ -28,7 +28,6 @@ import { CompanyScopedField as CompanyScopedField_17980260c895f93f0d171a2dbc0f40
 import { BankAccountPreview as BankAccountPreview_1615d70b0243139e3dffd45ad2617f07 } from '@/admin/components/BankAccountPreview'
 import { RupiahNumberField as RupiahNumberField_d552ada140febbfef2d7dea921fde6df } from '@/admin/components/RupiahNumberField'
 import { LinesTableField as LinesTableField_652f9839b87cfebdbb6f1faba6b58e18 } from '@/admin/components/lines/LinesTableField'
-import { LinesTotalPreview as LinesTotalPreview_981a7b2ac6e59231317266aea0a515ba } from '@/admin/components/LinesTotalPreview'
 import { UserNameCell as UserNameCell_5104a3a36f4740029b1c68f279f156e4 } from '@/admin/components/users/UserNameCell'
 import { UserNameField as UserNameField_578d1739bee7e5d282b9062a1999065a } from '@/admin/components/users/UserNameField'
 import { CollapsedReadOnlyJson as CollapsedReadOnlyJson_08329374a86bb7164f48836797d5c216 } from '@/components/ReadOnlyJson'
@@ -125,7 +124,6 @@ export const importMap = {
   "@/admin/components/BankAccountPreview#BankAccountPreview": BankAccountPreview_1615d70b0243139e3dffd45ad2617f07,
   "@/admin/components/RupiahNumberField#RupiahNumberField": RupiahNumberField_d552ada140febbfef2d7dea921fde6df,
   "@/admin/components/lines/LinesTableField#LinesTableField": LinesTableField_652f9839b87cfebdbb6f1faba6b58e18,
-  "@/admin/components/LinesTotalPreview#LinesTotalPreview": LinesTotalPreview_981a7b2ac6e59231317266aea0a515ba,
   "@/admin/components/users/UserNameCell#UserNameCell": UserNameCell_5104a3a36f4740029b1c68f279f156e4,
   "@/admin/components/users/UserNameField#UserNameField": UserNameField_578d1739bee7e5d282b9062a1999065a,
   "@/components/ReadOnlyJson#CollapsedReadOnlyJson": CollapsedReadOnlyJson_08329374a86bb7164f48836797d5c216,

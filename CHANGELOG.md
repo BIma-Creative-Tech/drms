@@ -6,6 +6,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed (DRMS 13/10 Wave 1 — expense-request form and approval page)
+
+- **Pengajuan #1/#2:** the PT picker of a new expense request offers only the PTs selected in the PT switcher (top
+  right) where the user may create requests. Exactly one such PT (one membership, or the switcher on one PT) → it is
+  prefilled and shown read-only as the PT badge. Server rules unchanged: the role in the chosen PT is still checked on
+  save (a PT outside the switcher selection is not rejected by the picker filter; one without the create role is).
+- **Pengajuan #3/#5:** Project, Tingkat urgensi, Pemohon and Rekening tujuan stay disabled ("Pilih PT terlebih
+  dahulu") until the PT is known, then list only that PT's rows (no more Low/Medium/High of three PTs listed three
+  times). Opt-in (`pickerSameCompany({ createRoles })`); other forms keep their pickers. List-view filters unchanged.
+- **Persetujuan #1:** the approval inbox no longer has the expandable "Rincian baris, nota & flag" row; the whole row
+  opens the request (click or Enter; the Setujui / Tolak buttons and links in the row work as before).
+- **Persetujuan #4/#9/#10/#11/#13 (request detail):** "Keputusan siklus sebelumnya" removed (earlier cycles stay in the
+  Riwayat tab); "Giliran:" → "Tahapan saat ini:", "Giliran Anda:" → "Menunggu keputusan Anda:" (timeline state
+  "Saat ini"); the grand total moved from the header to the footer row of "Rincian item" (read-only table and the
+  draft lines table, which replaces the separate "Total (pratinjau)" box); the summary line "Flag terbuka … · Nota
+  menyusul …" removed (flags stay per line); Payload's "Terakhir Diubah / Dibuat" hidden on the expense-request page.
+- **Persetujuan #8:** the PT of a document is a small badge (code + name) without the "PT:" label.
+
 ## [0.9.1] - 2026-10-12
 
 **0.9.0 plus the "Lampiran umum" fix** found on production 2026-10-12 (PB 230/PB-DRMS). Production goes 0.6.4 → 0.9.1:

@@ -19,6 +19,8 @@ type Detail = Awaited<ReturnType<typeof detail>>
  * inbox, flag review in the Finance work views).
  *
  * DRMS 10/10 B-2: at ≤ 640 px every line is an APK-style card (LineCard) instead of the wide table.
+ * DRMS 13/10 Persetujuan #10/#11: the grand total is the table's footer row (cards: a total line); no summary
+ * sentence "Flag terbuka … · Nota menyusul …" above the table — the flags stay per line (and "Flag pengajuan").
  *
  * Flag count definition (shared with the decision rows `approvals.openFlags`): flags with status
  * "Terbuka", both levels (peringatan + info); "Sudah diperiksa" and "Tidak berlaku lagi" are shown
@@ -107,20 +109,10 @@ export function ReviewDetails({ d, title = 'Rincian untuk pemeriksa' }: { d: Det
   const needsReceipts = d.type === 'reimburse' || receipts.length > 0
   const receiptTotal = receipts.filter((r) => r.status !== 'rejected').reduce((s, r) => s + r.amount, 0)
   return (
-    <div data-pk-review={d.id} style={{ fontSize: 13 }}>
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'baseline', margin: '4px 0 6px' }}>
+    // data-pk-open-flags: the open-flag count (same definition as approvals.openFlags) as a hook, no visible summary
+    <div data-pk-review={d.id} data-pk-open-flags={counts.total} style={{ fontSize: 13 }}>
+      <div style={{ margin: '4px 0 6px' }}>
         <strong>{title}</strong>
-        <span data-pk-open-flags={counts.total}>
-          Flag terbuka: {counts.total} ({counts.warning} peringatan, {counts.info} info)
-        </span>
-        {needsReceipts ? (
-          <span>
-            · Total nota {rp(receiptTotal)} dari grand total {rp(d.grandTotal)}
-            {receiptTotal !== d.grandTotal ? ` (selisih ${rp(d.grandTotal - receiptTotal)})` : ''}
-          </span>
-        ) : (
-          <span>· Nota menyusul setelah dana ditransfer (Pengajuan Baru).</span>
-        )}
       </div>
       <div className="pk-lwide" style={{ overflowX: 'auto' }}>
         <table style={{ width: '100%', minWidth: TABLE_MIN, tableLayout: 'fixed', borderCollapse: 'collapse', fontSize: 12 }} data-pk-review-table>
@@ -201,6 +193,23 @@ export function ReviewDetails({ d, title = 'Rincian untuk pemeriksa' }: { d: Det
               )
             })}
           </tbody>
+          <tfoot>
+            <tr data-pk-grand-total={d.grandTotal}>
+              <th style={{ ...cell, borderBottom: 0 }} colSpan={5} scope="row">
+                Grand total
+              </th>
+              <td style={{ ...numCell, borderBottom: 0, fontWeight: 700, fontSize: 13 }}>{rp(d.grandTotal)}</td>
+              <td style={{ ...numCell, borderBottom: 0 }} />
+              <td style={{ ...cell, borderBottom: 0, fontSize: 11 }} data-pk-receipt-total={needsReceipts ? receiptTotal : undefined}>
+                {needsReceipts ? (
+                  <>
+                    Nota {rp(receiptTotal)}
+                    {receiptTotal !== d.grandTotal ? ` · selisih ${rp(d.grandTotal - receiptTotal)}` : ' · sesuai'}
+                  </>
+                ) : null}
+              </td>
+            </tr>
+          </tfoot>
         </table>
       </div>
       <div className="pk-lcards" data-pk-review-cards>
@@ -240,6 +249,10 @@ export function ReviewDetails({ d, title = 'Rincian untuk pemeriksa' }: { d: Det
             </LineCard>
           )
         })}
+        <div data-pk-grand-total={d.grandTotal} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, padding: '8px 2px', fontWeight: 700 }}>
+          <span>Grand total</span>
+          <span style={{ fontVariantNumeric: 'tabular-nums' }}>{rp(d.grandTotal)}</span>
+        </div>
       </div>
       {requestFlags.length > 0 ? (
         <div style={{ marginTop: 6 }}>

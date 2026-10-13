@@ -2,7 +2,7 @@
  * DRMS 10/10 9c (WA-06): readable approval timeline of a request — the web counterpart of the APK
  * `turn_timeline.dart` (buildTimeline + TimelineView): Diajukan → Persetujuan PM / Diketahui →
  * Persetujuan Direktur / Approval → Transfer Finance, per step the role, the planned approver, the
- * state (selesai / giliran / menunggu / dilewati / ditolak), who acted, when and the note. Replaces
+ * state (selesai / saat ini / menunggu / dilewati / ditolak), who acted, when and the note. Replaces
  * the raw JSON snapshot for everyone (raw JSON stays for Admin only, collapsed).
  * Pure module (unit-tested): derived from the snapshot stored at submit + the decision rows of the
  * CURRENT approval cycle + the transfers — it never decides anything, the domain service does.
@@ -17,7 +17,7 @@ export type TimelineState = 'done' | 'current' | 'pending' | 'skipped' | 'reject
 
 export const TIMELINE_STATE_LABELS: Record<TimelineState, string> = {
   done: 'Selesai',
-  current: 'Giliran',
+  current: 'Saat ini', // DRMS 13/10 Persetujuan #9: no "Giliran" in the UI
   pending: 'Menunggu',
   skipped: 'Dilewati',
   rejected: 'Ditolak',

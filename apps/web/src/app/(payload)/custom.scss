@@ -2358,6 +2358,12 @@ $pk-modules: dashboard, persetujuan, proyek, keuangan, absensi, laporan, penggun
     min-height: 56px;
   }
 
+  // DRMS 13/10 Persetujuan #13: no "Terakhir Diubah / Dibuat" on the expense-request page (the request's history
+  // tab "Riwayat" carries who/when). Payload renders only these two meta items with __value-wrap (no drafts here).
+  .collection-edit--expense-requests .doc-controls__meta .doc-controls__value-wrap {
+    display: none;
+  }
+
   // One field rhythm for main column, rows and sidebar: 20 px between fields (16 px on phones),
   // descriptions 6 px under their control.
   .document-fields {

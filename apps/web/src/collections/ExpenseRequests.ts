@@ -433,7 +433,7 @@ export const ExpenseRequests: CollectionConfig = withAudit(
           { name: 'notes', type: 'text', label: 'Keterangan', maxLength: 500 },
         ],
       },
-      { name: 'linesTotalPreview', type: 'ui', label: 'Total (pratinjau)', admin: { condition: linesCondition, components: { Field: '@/admin/components/LinesTotalPreview#LinesTotalPreview' } } },
+      // DRMS 13/10 Persetujuan #10: no separate "Total (pratinjau)" box — the grand total is the footer row of the lines table
       // Phase C polish: Grand total is in the panel header; Tanggal / Dibuat oleh in the locked "Rincian pengajuan" — so
       // the sidebar keeps those two only in "Revisi Nota" (editable: no summary there) and never on a Draft
       businessDateField('requestDate', 'Tanggal pengajuan (server)', { access: system, admin: { ...ro, position: 'sidebar', condition: revisionAndSet('requestDate') } }),

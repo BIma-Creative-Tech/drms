@@ -2,7 +2,6 @@ import type { SanitizedConfig } from 'payload'
 import { beforeAll, describe, expect, it } from 'vitest'
 
 import { groupDigits, previewQuery } from '@/admin/components/bank-preview-query'
-import { sumLineTotals } from '@/admin/components/lines-total'
 import { collect, keyAction, step, swipeAction } from '@/admin/components/lightbox/gallery'
 import { docHref } from '@/admin/doc-links'
 import { draftOnly, isDraftForm, linesEditable, PLACEHOLDERS, submittedOnly, whenSet } from '@/collections/expense-request-form'
@@ -159,9 +158,9 @@ describe('expense request form conditions + placeholders (8d, 8i, 9a)', () => {
     expect(byName('requesters').label).toBe('Pemohon')
     expect(byName('lines').admin?.condition?.({ status: 'pending_approval' }, {}, {})).toBe(false)
     expect(byName('bankAccount').admin?.condition?.({ status: 'pending_ack' }, {}, {})).toBe(false)
-    // input order of the APK draft editor
+    // input order of the APK draft editor (DRMS 13/10 #10: the grand total is the lines table footer, no preview field)
     const order = (config.collections.find((c) => c.slug === 'expense-requests')!.fields as F[]).filter((f) => f.name && ['type', 'title', 'project', 'costCenter', 'neededDate', 'urgencyLevel', 'requesters', 'bankAccount', 'notes', 'attachments', 'lines', 'linesTotalPreview'].includes(f.name)).map((f) => f.name)
-    expect(order).toEqual(['type', 'title', 'project', 'costCenter', 'neededDate', 'urgencyLevel', 'requesters', 'bankAccount', 'notes', 'attachments', 'lines', 'linesTotalPreview'])
+    expect(order).toEqual(['type', 'title', 'project', 'costCenter', 'neededDate', 'urgencyLevel', 'requesters', 'bankAccount', 'notes', 'attachments', 'lines'])
   })
 
   it('no required column has admin.condition (the Postgres adapter would drop its NOT NULL → schema drift)', () => {
@@ -194,10 +193,6 @@ describe('bank preview query (8e), totals preview, doc links (12b), lightbox hel
     expect(previewQuery({ requestId: 9, accountId: 5, draft: false })).toBe('/api/v1/bank-account-preview?request=9')
     expect(previewQuery({ requestId: null, accountId: 5, draft: false })).toBeNull()
     expect(groupDigits('1234567890')).toBe('1234 5678 90')
-  })
-
-  it('sumLineTotals counts only valid integer line totals', () => {
-    expect(sumLineTotals({ 'lines.0.total': { value: 1000 }, 'lines.1.total': { value: '1,5' }, 'lines.1.qty': { value: 3 }, grandTotal: { value: 99 } })).toEqual({ total: 1000, rows: 2 })
   })
 
   it('docHref maps numbered documents to their detail', () => {
