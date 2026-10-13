@@ -339,6 +339,7 @@ const ROUTE_CLASSES: Record<string, RouteClass> = {
   'POST /expense-requests/:id/withdraw': 'document',
   'POST /expense-requests/:id/cancel': 'document',
   'POST /expense-requests/:id/resubmit': 'document',
+  'POST /expense-requests/:id/duplicate': 'document', // DRMS 13/10 Persetujuan #12: read the source + create role IN its PT
   'POST /expense-requests/:id/acknowledge': 'document',
   'POST /expense-requests/:id/approve': 'document',
   'POST /expense-requests/:id/reject': 'document',

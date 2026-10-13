@@ -3,9 +3,10 @@ import type { PayloadRequest, Where } from 'payload'
 import { hasRole, membershipsOf, ownEmployees, relId, userId, type Role } from '@/access/roles'
 import { resolveScope } from '@/access/scope'
 import { writeAudit } from '@/audit/writer'
-import { actorContext, displayName, loadVisible, type RequestDoc } from '@/domain/expense/common'
+import { actorContext, displayName, loadRaw, loadVisible, type RequestDoc } from '@/domain/expense/common'
 import { withReqTransaction } from '@/lib/system-tx'
 import { createDraft, resubmitAsDraft, updateDraft } from '@/domain/expense/drafts'
+import { duplicateAsDraft } from '@/domain/expense/duplicate'
 import { withFlagVisibility } from '@/domain/expense/flag-visibility'
 import { bankPreview } from '@/domain/expense/bank-preview'
 import { detail, listItem } from '@/domain/expense/dto'
@@ -349,6 +350,29 @@ export const cancelEndpoint = action('cancel', ReasonBody, (req, id, b) => {
   return cancel(req, id, b.reason)
 })
 export const resubmitEndpoint = action('resubmit', EmptyBody, (req, id) => resubmitAsDraft(req, id), { status: 201, returnsNewId: true })
+/**
+ * POST /expense-requests/{id}/duplicate — DRMS 13/10 Persetujuan #12 "Duplikat": a clean NEW Draft from a request the
+ * caller can read (same PT, project, lines, requesters; no number, approvals, transfers, receipts, flags,
+ * attachments — domain/expense/duplicate.ts). Permission: a create role (Q-09 / ADR 0024) IN THE SOURCE's PT; the
+ * draft is created and answered under that PT (withNamedCompany, as a create body `company`). 201 + the new draft.
+ */
+export const duplicateEndpoint = v1({
+  path: '/expense-requests/:id/duplicate',
+  method: 'post',
+  body: EmptyBody,
+  rateLimit: ACTION_LIMIT,
+  transactional: true,
+  idempotent: true,
+  handler: async ({ req, params }) => {
+    const id = idParam(params)
+    await loadVisible(req, id)
+    const company = relId(((await loadRaw(req, id)) as { company?: unknown }).company)
+    return withNamedCompany(req, company, { roles: ['pk-staff', 'pk-pm', 'pk-admin', 'pk-finance', 'pk-owner'] }, async () => {
+      const doc = await duplicateAsDraft(req, id)
+      return ok(req, doc.id, 201)
+    })
+  },
+})
 export const acknowledgeEndpoint = action('acknowledge', SignBody, (req, id, b) => acknowledge(req, id, { signatureMediaId: b.signatureMediaId }))
 export const approveEndpoint = action('approve', SignBody, (req, id, b) => approve(req, id, { signatureMediaId: b.signatureMediaId }))
 export const rejectEndpoint = action('reject', RejectBody, (req, id, b) => {
@@ -613,6 +637,7 @@ export const EXPENSE_ENDPOINTS = [
   withdrawEndpoint,
   cancelEndpoint,
   resubmitEndpoint,
+  duplicateEndpoint,
   acknowledgeEndpoint,
   approveEndpoint,
   rejectEndpoint,

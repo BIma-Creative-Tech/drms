@@ -10,6 +10,7 @@ import '../../../../app/theme.dart';
 import '../../../../core/format/dates.dart';
 import '../../../../core/logging/log.dart';
 import '../../../../l10n/gen/app_localizations.dart';
+import '../../../../shared/widgets/form_grid.dart';
 import '../../../expense/presentation/camera_capture_screen.dart';
 import '../../../progress/presentation/widgets/progress_widgets.dart' show LocalPhotoThumb;
 import '../../application/field_service.dart';
@@ -540,7 +541,7 @@ class FieldDateField extends StatelessWidget {
       onTap: onChanged == null ? null : pick,
       child: InputDecorator(
         decoration: InputDecoration(
-          labelText: label,
+          labelText: FormGridCell.inputLabel(context, label),
           errorText: errorText,
           enabled: onChanged != null,
           suffixIcon: const Icon(Icons.calendar_today),

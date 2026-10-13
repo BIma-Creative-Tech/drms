@@ -8,6 +8,7 @@ import '../../../core/format/rupiah.dart';
 import '../../../core/media/photo_compressor.dart';
 import '../../../l10n/gen/app_localizations.dart';
 import '../../../shared/widgets/async_body.dart';
+import '../../../shared/widgets/form_grid.dart';
 import '../../../shared/widgets/photo_viewer.dart';
 import '../../auth/application/auth_controller.dart';
 import '../../masters/domain/master_item.dart';
@@ -172,44 +173,53 @@ class _LineEditorScreenState extends ConsumerState<LineEditorScreen> {
                     title: Text(t.lineNeedsUnitPrice(formatRupiah(widget.line.total!))),
                   ),
                 ),
-              TextFormField(
-                key: const Key('line-description'),
-                controller: _desc,
-                maxLength: 500,
-                decoration: InputDecoration(labelText: t.fieldDescription),
-                validator: req,
-              ),
-              // D4: required RAP item of the draft's project (remaining budget shown; "Melebihi RAP" when above it).
-              RapItemPickerField(
-                projectId: widget.projectId,
-                value: _line.rapItemId,
-                lineTotal: current.computedTotal,
-                errorText: _tried && _line.rapItemId == null && _rapPickable ? t.required : null,
-                onChanged: (v) => setState(() => _line = _line.copyWith(rapItemId: v)),
-              ),
-              const SizedBox(height: 12),
-              MasterPickerField(
-                label: t.fieldCategory,
-                items: m[MasterTypes.categories] ?? const [],
-                value: _line.categoryId,
-                onChanged: (v) => setState(() => _line = _line.copyWith(categoryId: v)),
-              ),
-              const SizedBox(height: 12),
-              Row(
+              // DRMS 13/10 Umum #2 / D4: label left of the field, two columns on wide screens (same field order).
+              FormGrid(
                 children: [
-                  Expanded(
-                    child: TextFormField(
+                  FormGridCell(
+                    label: t.fieldDescription,
+                    builder: (label) => TextFormField(
+                      key: const Key('line-description'),
+                      controller: _desc,
+                      maxLength: 500,
+                      decoration: InputDecoration(labelText: label),
+                      validator: req,
+                    ),
+                  ),
+                  // D4: required RAP item of the draft's project (remaining budget; "Melebihi RAP" when above it).
+                  FormGridCell(
+                    label: t.fieldRapItem,
+                    child: RapItemPickerField(
+                      projectId: widget.projectId,
+                      value: _line.rapItemId,
+                      lineTotal: current.computedTotal,
+                      errorText: _tried && _line.rapItemId == null && _rapPickable ? t.required : null,
+                      onChanged: (v) => setState(() => _line = _line.copyWith(rapItemId: v)),
+                    ),
+                  ),
+                  FormGridCell(
+                    label: t.fieldCategory,
+                    child: MasterPickerField(
+                      label: t.fieldCategory,
+                      items: m[MasterTypes.categories] ?? const [],
+                      value: _line.categoryId,
+                      onChanged: (v) => setState(() => _line = _line.copyWith(categoryId: v)),
+                    ),
+                  ),
+                  FormGridCell(
+                    label: t.fieldQty,
+                    builder: (label) => TextFormField(
                       key: const Key('line-qty'),
                       controller: _qty,
                       keyboardType: const TextInputType.numberWithOptions(decimal: true),
                       inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]'))],
-                      decoration: InputDecoration(labelText: t.fieldQty),
+                      decoration: InputDecoration(labelText: label),
                       validator: qty,
                       onChanged: (_) => setState(() {}),
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
+                  FormGridCell(
+                    label: t.fieldUom,
                     child: MasterPickerField(
                       label: t.fieldUom,
                       items: m[MasterTypes.uoms] ?? const [],
@@ -218,76 +228,92 @@ class _LineEditorScreenState extends ConsumerState<LineEditorScreen> {
                       onChanged: (v) => setState(() => _line = _line.copyWith(uomId: v)),
                     ),
                   ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                key: const Key('line-unit-price'),
-                controller: _unit,
-                keyboardType: TextInputType.number,
-                inputFormatters: const [RupiahInputFormatter()],
-                decoration: InputDecoration(labelText: t.fieldUnitPrice, prefixText: 'Rp '),
-                validator: (v) => money(v, required: true),
-                onChanged: (_) => setState(() {}),
-              ),
-              const SizedBox(height: 12),
-              // D3: Total = Qty × Harga satuan, shown live, read-only (not an input).
-              InputDecorator(
-                decoration: InputDecoration(
-                  labelText: t.fieldTotal,
-                  helperText: t.lineTotalHelper,
-                  helperMaxLines: 2,
-                  filled: true,
-                  enabled: false,
-                ),
-                child: Text(
-                  current.computedTotal == null ? '-' : formatRupiah(current.computedTotal!),
-                  key: const Key('line-total'),
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
-                    fontFeatures: const [FontFeature.tabularFigures()],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                key: const Key('line-receipt-amount'),
-                controller: _receiptAmount,
-                keyboardType: TextInputType.number,
-                inputFormatters: const [RupiahInputFormatter()],
-                decoration: InputDecoration(
-                  labelText: t.fieldReceiptAmount,
-                  helperText: t.receiptAmountHelper,
-                  helperMaxLines: 2,
-                  prefixText: 'Rp ',
-                ),
-                validator: (v) => money(v),
-                onChanged: (_) => setState(() {}),
-              ),
-              if (current.receiptMismatch)
-                Padding(
-                  padding: const EdgeInsets.only(top: 8),
-                  child: Align(
-                    alignment: Alignment.centerLeft,
-                    child: ReceiptMismatchChip(
-                      key: const Key('line-receipt-mismatch'),
-                      receiptAmount: current.receiptAmount,
-                      total: current.computedTotal,
+                  FormGridCell(
+                    label: t.fieldUnitPrice,
+                    builder: (label) => TextFormField(
+                      key: const Key('line-unit-price'),
+                      controller: _unit,
+                      keyboardType: TextInputType.number,
+                      inputFormatters: const [RupiahInputFormatter()],
+                      decoration: InputDecoration(labelText: label, prefixText: 'Rp '),
+                      validator: (v) => money(v, required: true),
+                      onChanged: (_) => setState(() {}),
                     ),
                   ),
-                ),
-              const SizedBox(height: 12),
-              MasterPickerField(
-                label: t.fieldVehicle,
-                items: m[MasterTypes.vehicles] ?? const [],
-                value: _line.vehicleId,
-                onChanged: (v) => setState(() => _line = _line.copyWith(vehicleId: v)),
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _notes,
-                maxLength: 500,
-                decoration: InputDecoration(labelText: t.fieldLineNotes),
+                  // D3: Total = Qty × Harga satuan, shown live, read-only (not an input).
+                  FormGridCell(
+                    label: t.fieldTotal,
+                    builder: (label) => InputDecorator(
+                      decoration: InputDecoration(
+                        labelText: label,
+                        helperText: t.lineTotalHelper,
+                        helperMaxLines: 2,
+                        filled: true,
+                        enabled: false,
+                      ),
+                      child: Text(
+                        current.computedTotal == null ? '-' : formatRupiah(current.computedTotal!),
+                        key: const Key('line-total'),
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                          fontFeatures: const [FontFeature.tabularFigures()],
+                        ),
+                      ),
+                    ),
+                  ),
+                  FormGridCell(
+                    label: t.fieldReceiptAmount,
+                    builder: (label) => Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        TextFormField(
+                          key: const Key('line-receipt-amount'),
+                          controller: _receiptAmount,
+                          keyboardType: TextInputType.number,
+                          inputFormatters: const [RupiahInputFormatter()],
+                          decoration: InputDecoration(
+                            labelText: label,
+                            helperText: t.receiptAmountHelper,
+                            helperMaxLines: 2,
+                            prefixText: 'Rp ',
+                          ),
+                          validator: (v) => money(v),
+                          onChanged: (_) => setState(() {}),
+                        ),
+                        if (current.receiptMismatch)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 8),
+                            child: Align(
+                              alignment: Alignment.centerLeft,
+                              child: ReceiptMismatchChip(
+                                key: const Key('line-receipt-mismatch'),
+                                receiptAmount: current.receiptAmount,
+                                total: current.computedTotal,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  FormGridCell(
+                    label: t.fieldVehicle,
+                    child: MasterPickerField(
+                      label: t.fieldVehicle,
+                      items: m[MasterTypes.vehicles] ?? const [],
+                      value: _line.vehicleId,
+                      onChanged: (v) => setState(() => _line = _line.copyWith(vehicleId: v)),
+                    ),
+                  ),
+                  FormGridCell(
+                    label: t.fieldLineNotes,
+                    full: true,
+                    builder: (label) => TextFormField(
+                      controller: _notes,
+                      maxLength: 500,
+                      decoration: InputDecoration(labelText: label),
+                    ),
+                  ),
+                ],
               ),
               const Divider(height: 24),
               Text(t.receiptsTitle, style: Theme.of(context).textTheme.titleMedium),

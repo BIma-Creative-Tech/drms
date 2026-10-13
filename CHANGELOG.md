@@ -6,6 +6,61 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed (DRMS 13/10 Wave 2 — generic list view, Umum #3–#8, Persetujuan #2)
+
+- **One list view for every collection** (`PkListView`, `src/admin/pk-list/`, wired centrally in `payload.config.ts`
+  via `withPkListView`; media libraries keep Payload's list): title + **Buat baru** (create permission only), the same
+  filter bar as the custom views (search, **checklist dropdown** filters per collection — select values, booleans,
+  relationships to master data, PT when 2+ PTs are selected — date ranges on the key date), **Kolom ▾** (checkbox
+  list, saved per user and collection in Payload's `collection-<slug>` preference), sortable headers, the shared pager
+  (20/50/100), **every row opens the record** (click / Enter). Payload's pill controls (Kolom / Filter / WhereBuilder),
+  the selection checkboxes and bulk edit/delete ("pilih isian untuk diedit") are gone; editing goes through the
+  document form (the **Ubah** button of the Aksi column). Rows are read with `overrideAccess: false` as the user; the
+  PT filter is intersected with the PT switcher selection (the URL can only narrow). URL state: `q`, `hal`, `per`,
+  `urut`, `f.<field>=a,b`, `f.<date>.dari/.sampai`; old `where[…]` deep links still work (dashboard KPI tiles now use
+  `f.status` / `f.requestDate`). The single-choice PT chips (`CompanyListFilter`) are replaced by the PT multi-select.
+- **Multi-select filters on the custom views** (Umum #4, Persetujuan #2): Persetujuan (PT, jenis, langkah), Antrian
+  Transfer (PT, jenis), Verifikasi LPJ (PT, tahap), Pinjaman (status, project, peran), Kas (akun, project, pusat
+  biaya, arah, status), project tabs RAP / Pengajuan, Progress and Notifikasi use the same checklist dropdown
+  (`MultiSelect`; values as `?key=a,b`). `listLoans` and the Kas book query accept several values (`in`).
+- **Clickable rows / pagination** (Umum #3, #7): Antrian Transfer (queue item + recorded transfers), Verifikasi LPJ
+  receipts, Kas book, Pinjaman and project Pengajuan rows open their record; dashboard / report tables (`DataTable`)
+  with more than 20 rows are paged in the browser (tables paged in the database keep the URL pager).
+
+### Changed (DRMS 13/10 Wave 2 — expense-request (Persetujuan) detail page)
+
+- **Persetujuan #3 — one stepper:** the status chips and the "Alur persetujuan" timeline are merged into one vertical
+  stepper "Alur pengajuan" in the right column (sticky; after the summary on screens ≤ 1024 px): Diajukan → the
+  positions of the request's approval snapshot (PM, Direktur, Finance level …; skipped / no-approval positions shown as
+  such) → Verifikasi nota (Reimburse) → Transfer → Nota & LPJ → Persetujuan kekurangan (when asked) → Penyelesaian LPJ
+  (Pengajuan Baru) → Selesai, or Ditolak / Dibatalkan with the reason. Per step who, when, decision and note; the
+  waiting step is highlighted as "Tahapan saat ini", a step sent back (Revisi Nota, LPJ Revisi, a withdrawn request)
+  as "Dikembalikan". Derived from existing data only (`domain/expense/request-stepper.ts`, pure, reusable by the API).
+- **Persetujuan #5 — action bar:** the right sidebar no longer holds "Cetak PDF", "Total ditransfer" and "Aturan
+  approval". One row in the document controls holds the decision (Tolak / Setujui with "Menunggu keputusan Anda"),
+  Finance's "Catat transfer" / "Verifikasi nota" link, **Cetak** (a menu when the internal PDF copy is available),
+  **Duplikat** and **Edit** / **Batal** + **Simpan**. The fixed bottom decision bar is gone from this page. "Nominal
+  disetujui", "Total ditransfer" and "Total nota terverifikasi LPJ" are rows of the "Rincian pengajuan" summary (two
+  columns on wide screens); the approval rule's name is shown in the stepper for Finance / Admin.
+- **Persetujuan #6 — Log perubahan:** "Snapshot aturan approval" (raw JSON, Admin) removed from the page. A collapsible,
+  paged (20 rows) "Log perubahan" at the end of the main column lists the request's history (request, receipts,
+  transfers, LPJ; cash entries for the office roles): time, who, action, field old → new (status as its label), reason,
+  headed by the created / last-changed times. The "Riwayat" tab is unchanged (same labels, `domain/history-format.ts`).
+- **Persetujuan #7 — Edit → Simpan:** the page opens read-only (summary + "Rincian item"), Drafts included. **Edit**
+  (only when the request may be changed: Draft / Revisi Nota and the update access) shows the same Payload form with
+  the loaded data; **Simpan** is Payload's save (validation, "Alasan perubahan" in Revisi Nota unchanged) and returns
+  to read mode; **Batal** discards the changes. A new request opens in edit mode. Kirim pengajuan / nota / LPJ actions
+  stay in read mode.
+- **Persetujuan #12 — Duplikat:** Payload's ⋯ menu ("Buat Baru") is hidden and Payload's duplicate is off for expense
+  requests (it copied number, status, snapshot, totals and attachments). New `POST /api/v1/expense-requests/{id}/duplicate`
+  creates a clean Draft with the same PT, project, title, urgency, notes, requesters, account (if still valid) and lines —
+  no number, approvals, transfers, receipts, flags, attachments, "Nominal sesuai nota" or needed date — as the caller,
+  with the normal draft rules (read access to the source + a create role in its PT; Staff only for themselves),
+  audited on the new draft (`create`, field `duplicated_from`), then opens it.
+- **D4 (form grid, this form only):** in edit mode the expense-request inputs sit in a two-column grid with the label
+  left of the input (~35 %); long fields (Keterangan, Lampiran, Rincian item) span the row; below 640 px the label is
+  on top again. Other forms follow in a later wave.
+
 ### Changed (DRMS 13/10 Wave 1 — expense-request form and approval page)
 
 - **Pengajuan #1/#2:** the PT picker of a new expense request offers only the PTs selected in the PT switcher (top
@@ -41,6 +96,29 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   change) instead of the "(Rp)" label — `ApprovalRules.maxAmount`, `ExpenseLineSnapshots.grandTotal` and
   `Receipts.taxAmount` now show "Rp 1.250.000"; every other number column (counts, quantities, hours) shows `12.000` /
   `7,5` (coordinates stay raw).
+
+### Changed (APK, DRMS 13/10 Wave 2 — form grid and Persetujuan)
+
+- **Umum #2 / D4 — shared `FormGrid` / `FormGridCell`** (`lib/shared/widgets/form_grid.dart`): "label | input" cells,
+  label ≈35% left of the input and top-aligned from 600dp, two columns of cells from 900dp (full-width cells for notes,
+  line lists and photo pickers span both), label on top and one column on phones (< 600dp; the input keeps its own
+  floating label there). Source order = focus order. `MasterPickerField`, `RapItemPickerField` and `FieldDateField`
+  drop their own label while a cell shows it. Applied to the expense request form (Pengajuan), the line editor, the
+  Finance transfer form, "Kirim LPJ", the loan form (Pinjaman) and the service report (Laporan Servis Unit: unit and
+  work sections). Keys, validation and field order unchanged; on phones the Qty / Satuan, Tanggal / HM and Mulai /
+  Selesai pairs now stack (single column); the "Tanggal dibutuhkan" and loan dates are date inputs instead of list
+  tiles (same picker).
+- **Persetujuan #3 — one stepper on the request detail**: the overall flow and the approval steps merged into one
+  vertical stepper (Diajukan → Persetujuan PM / Diketahui → Persetujuan Direktur / Approval → Verifikasi nota Finance
+  (Reimburse) → Transfer Finance → LPJ (Pengajuan Baru) → Selesai, or Ditolak / Dibatalkan), each step with actor,
+  time, decision (Disetujui / Ditolak / Diketahui) and note; exactly one step is labelled "Tahapan saat ini". Phones:
+  after the summary; tablets (≥ 900dp): right-hand column. Built only from `GET /expense-requests/{id}` (approvals,
+  rule snapshot, transfers, settlement, status) — no API change.
+- **Persetujuan #8–#11 on the APK detail**: the PT is a badge in the header (no "PT" row); "Giliran" → "Tahapan saat
+  ini" / "Menunggu keputusan Anda" (when the server allows this user a decision); the grand total is the footer row of
+  "Rincian item" (removed from the summary); the header summary chips "Selisih nota" / "Melebihi RAP" are gone (the
+  chips stay on the lines) and a line's other flags are shown on its card ("Flag validasi" lists request-level flags
+  only). The APK had no "Keputusan siklus sebelumnya" block. The expense form shows the PT badge without "PT:".
 
 ### Changed (APK, DRMS 13/10 Wave 1 — Umum #10)
 

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../l10n/gen/app_localizations.dart';
+import '../../../../shared/widgets/form_grid.dart';
 import '../../../../shared/widgets/pick_hint.dart';
 import '../../../masters/domain/master_item.dart';
 
@@ -46,7 +47,8 @@ class MasterPickerField extends StatelessWidget {
       },
       child: InputDecorator(
         decoration: InputDecoration(
-          labelText: label,
+          // D4: no own label while a FormGridCell shows it left of the field
+          labelText: FormGridCell.inputLabel(context, label),
           errorText: errorText,
           helperText: helperText,
           helperMaxLines: 2,

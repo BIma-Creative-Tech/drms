@@ -7,7 +7,7 @@ import { resolveScope } from '@/access/scope'
 import { AutoSubmit } from '@/admin/components/list/AutoSubmit'
 import { ListToolbar, Pager } from '@/admin/components/list/ListToolbar'
 import { StageEditor } from '@/admin/components/progress/StageEditor'
-import { DEFAULT_PAGE_SIZE, matchesQuery, PAGE_SIZES, paginate, parseListQuery } from '@/admin/list-query'
+import { DEFAULT_PAGE_SIZE, filterValues, matchesQuery, PAGE_SIZES, paginate, parseListQuery } from '@/admin/list-query'
 import { listAddenda } from '@/domain/addendum/service'
 import { settings } from '@/domain/expense/common'
 import { listReports, reportDto, type ReportDto } from '@/domain/progress/dto'
@@ -72,9 +72,11 @@ export async function ProgressOverview(props: AdminViewServerProps) {
   const avg = measured.length ? measured.reduce((s, p) => s + p.progressPct, 0) / measured.length : null
   const isPm = !hasRoleAny(req, 'pk-owner', 'pk-finance')
   // DRMS 10/10 D8: search (kode / nama) + status filter + pagination of the project list (KPI tiles count all)
+  // DRMS 13/10 Umum #4: status is multi-select
   const lq = parseListQuery(props.searchParams, ['status'])
+  const tones = filterValues(lq, 'status')
   const page = paginate(
-    rows.filter((p) => (!lq.filters.status || p.tone === lq.filters.status) && matchesQuery([p.code, p.name], lq.q)),
+    rows.filter((p) => (!tones.length || tones.includes(p.tone)) && matchesQuery([p.code, p.name], lq.q)),
     lq.page,
     lq.per,
   )
@@ -126,7 +128,7 @@ export async function ProgressOverview(props: AdminViewServerProps) {
                 label="Cari dan saring project"
                 search={{ placeholder: 'Kode atau nama project…' }}
                 keep={{ arsip: archived ? 'ya' : undefined }}
-                filters={[{ key: 'status', label: 'Status', options: [{ value: 'ok', label: 'Sesuai' }, { value: 'warn', label: 'Perlu perhatian' }, { value: 'bad', label: 'Anggaran mendahului progress' }, { value: 'none', label: 'Belum dinilai' }] }]}
+                filters={[{ key: 'status', label: 'Status', multi: true, options: [{ value: 'ok', label: 'Sesuai' }, { value: 'warn', label: 'Perlu perhatian' }, { value: 'bad', label: 'Anggaran mendahului progress' }, { value: 'none', label: 'Belum dinilai' }] }]}
               />
             ) : null}
             {rows.length > 0 ? <ProgressLegend warn={d.warnGapPct} bad={d.badGapPct} /> : null}

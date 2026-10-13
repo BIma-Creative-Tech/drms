@@ -143,11 +143,12 @@ describe('expense request form conditions + placeholders (8d, 8i, 9a)', () => {
 
   it('create/draft hides system fields; dates use the picker, money the Rupiah input; APK labels', () => {
     const draft = { status: 'draft' }
-    for (const n of ['approvalRule', 'approvalSnapshot', 'submittedAt', 'resubmitOf', 'cancelReason', 'rejectReason', 'approvedAmount', 'transferredTotal', 'verifiedReceiptsTotal', 'docNo']) {
+    for (const n of ['approvalRule', 'submittedAt', 'resubmitOf', 'cancelReason', 'rejectReason', 'approvedAmount', 'transferredTotal', 'verifiedReceiptsTotal', 'docNo']) {
       const f = byName(n)
       expect(f.admin?.condition?.(draft, {}, { user: { id: 1, roles: ['pk-admin'] } }), n).toBe(false)
     }
-    for (const n of ['g1Exception', 'bankSnapshot', 'currentLevel', 'source']) expect(byName(n).admin?.hidden, n).toBe(true)
+    // DRMS 13/10 Persetujuan #6: the approval snapshot JSON is not on the page (stepper + "Log perubahan" instead)
+    for (const n of ['g1Exception', 'bankSnapshot', 'currentLevel', 'source', 'approvalSnapshot']) expect(byName(n).admin?.hidden, n).toBe(true)
     // status: no condition (schema drift, see below) — the sidebar component renders nothing on a Draft form
     expect(byName('status').admin?.condition).toBeUndefined()
     expect(byName('status').admin?.components?.Field).toBe('@/admin/components/RequestStatusField#RequestStatusField')

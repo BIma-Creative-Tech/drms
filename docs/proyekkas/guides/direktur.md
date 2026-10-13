@@ -23,8 +23,9 @@ langkah "Diketahui" (**Menunggu Diketahui (Direktur)**), lalu Finance memberi Ap
    tanda tangan profil** atau **Tanda tangan di layar** → **Konfirmasi**. Atau **Tolak** dengan alasan; pemohon dan PM
    diberi tahu.
 
-**Di web:** **Persetujuan** → buka **Rincian baris, nota & flag** di bawah pengajuan (baris item, foto nota, flag per
-baris) → **Setujui** / **Tolak** (tanda tangan profil dipakai otomatis; alasan tolak minimal 3 karakter). Pengajuan
+**Di web:** **Persetujuan** → klik baris pengajuan → halaman detail (baris item, foto nota, flag per baris; alur
+persetujuan di kolom kanan) → **Setujui** / **Tolak** di bar aksi atas (tanda tangan profil dipakai otomatis; alasan
+tolak minimal 3 karakter). Tombol yang sama juga ada langsung di baris daftar **Persetujuan**. Pengajuan
 baru juga muncul di lonceng **Notifikasi** (bar atas, kanan) dan — bila Admin menyalakan **Email ke Direktur/Finance**
 — lewat email berisi nomor pengajuan dan tautan ke Persetujuan.
 

@@ -17,7 +17,8 @@ ProyekKas bisa memuat beberapa PT dalam satu grup. Peran berlaku **per PT**:
 | **Admin grup** (centang **Admin grup (semua PT)** di data Pengguna) | Membuat dan menonaktifkan PT, mengubah **Setting aplikasi**, dan mengubah akses PT **semua** pengguna. Centang ini hanya bisa diberikan oleh Admin grup lain. |
 
 Di bar atas ada **tombol PT** (lihat [Hal umum](README.md#hal-umum-untuk-semua-peran)). Daftar data mengikuti PT yang
-dicentang; bila lebih dari satu PT tampil, daftar punya kolom dan filter **PT**.
+dicentang; bila lebih dari satu PT tampil, daftar punya kolom **PT** dan filter **PT ▾** (bisa beberapa PT sekaligus).
+Cara memakai filter, **Kolom ▾**, urutan dan halaman: [Daftar dan tabel](README.md#hal-umum-untuk-semua-peran).
 
 ### Navigasi: layar modul (gaya Odoo)
 

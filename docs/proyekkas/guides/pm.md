@@ -20,8 +20,9 @@ lagi menyetujui. Yang masuk ke Anda hanya pengajuan pada project di mana Anda te
    **Tanda tangan di layar** → **Konfirmasi**. Pengajuan diteruskan ke Direktur.
 3. Atau **Tolak** dengan alasan (minimal 3 karakter). Pemohon diberi tahu "Ditolak: …" beserta alasannya.
 
-**Di web:** **Persetujuan** → buka **Rincian baris, nota & flag** → **Setujui** (konfirmasi "Setujui … sebagai PM
-project?") / **Tolak** (alasan wajib). Tanda tangan profil dipakai otomatis — unggah dulu di **Profil & tanda
+**Di web:** **Persetujuan** → **Setujui** / **Tolak** di baris, atau klik baris → halaman detail (baris item, nota,
+flag; alur di kolom kanan) → **Setujui** (konfirmasi "Setujui … sebagai PM project?") / **Tolak** (alasan wajib) di
+bar aksi atas. Tanda tangan profil dipakai otomatis — unggah dulu di **Profil & tanda
 tangan**. Beranda PM juga punya kartu **Menunggu tindakan saya**.
 
 - **Notifikasi:** "Persetujuan PM: {nomor}" (lonceng; email bila Admin menyalakan email persetujuan). Untuk pengajuan

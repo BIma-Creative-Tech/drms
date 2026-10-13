@@ -9,6 +9,7 @@ import '../../../core/format/rupiah.dart';
 import '../../../l10n/gen/app_localizations.dart';
 import '../../../shared/widgets/async_body.dart';
 import '../../../shared/widgets/doc_no_chip.dart';
+import '../../../shared/widgets/form_grid.dart';
 import '../../approvals/application/inbox_providers.dart';
 import '../../approvals/data/approvals_api.dart';
 import '../../approvals/presentation/decision_sheet.dart';
@@ -18,15 +19,16 @@ import '../domain/expense_request.dart';
 import '../domain/turn_timeline.dart';
 import 'requester_actions.dart';
 import 'widgets/rap_item_picker.dart';
+import 'widgets/request_stepper.dart';
 import 'widgets/receipt_mismatch_chip.dart';
 import 'widgets/receipt_thumb.dart';
 import 'widgets/transfer_lpj.dart';
-import 'widgets/timeline_view.dart';
 
 String pct(double? v) => v == null ? '-' : '${v.toStringAsFixed(1).replaceAll('.', ',')}%';
 
-/// Server request detail: lines, receipts (thumbnails), flags, budget impact, "Giliran" timeline,
-/// and — when the server allows it for this user — Diketahui / Setujui / Tolak (US-26, US-42).
+/// Server request detail: lines (grand total in the footer), receipts (thumbnails), flags per line, budget impact,
+/// ONE stepper of the whole flow ("Tahapan saat ini", DRMS 13/10 Persetujuan #3) and — when the server allows it for
+/// this user — Diketahui / Setujui / Tolak (US-26, US-42).
 class RequestDetailScreen extends ConsumerWidget {
   const RequestDetailScreen({super.key, required this.id});
   final int id;
@@ -92,8 +94,8 @@ class _DetailBody extends ConsumerWidget {
     );
     String refText(RefItem r) => '${r.code ?? ''} ${r.name ?? ''}'.trim();
     final over = (d.budget.pctAfter ?? 0) > 85;
-    // d1010 (WA-08): PT inline as "shortCode — name" (the membership's name; the code alone for a PT the
-    // user is no longer a member of).
+    // d1010 (WA-08): PT as "shortCode — name" (the membership's name; the code alone for a PT the user is no longer
+    // a member of) — a badge in the header since DRMS 13/10 Persetujuan #8.
     final profile = ref.watch(accountProfileProvider);
     final pt = profile?.company(d.companyId);
     final ptText = d.companyId == null
@@ -105,131 +107,224 @@ class _DetailBody extends ConsumerWidget {
           if (r.lineId == l.id && r.status != 'removed' && r.imageId != null)
             (imageId: r.imageId!, caption: receiptCaption(t, l, r)),
     ];
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        Text(d.title, style: theme.textTheme.titleLarge),
-        const SizedBox(height: 4),
-        Wrap(
-          spacing: 8,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          children: [
-            Chip(label: Text(d.typeLabel)),
-            Chip(label: Text(d.statusLabel)),
-            if (d.docNo != null) DocNoChip(docNo: d.docNo!),
-            // D3: at least one line's "Nominal sesuai nota" differs from its total (details on the line).
-            if (d.lines.any((l) => lineReceiptMismatch(d, l)))
-              const ReceiptMismatchChip(key: Key('detail-receipt-mismatch')),
-            // D4: at least one line is above the remaining budget of its RAP item.
-            if (d.lines.any((l) => lineRapOverBudget(d, l))) const RapOverBudgetChip(key: Key('detail-rap-over')),
-          ],
+    final decides = d.allowedActions.any(_decisionActions.contains);
+    final header = <Widget>[
+      Text(d.title, style: theme.textTheme.titleLarge),
+      const SizedBox(height: 4),
+      Wrap(
+        spacing: 8,
+        runSpacing: 4,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: [
+          Chip(label: Text(d.typeLabel)),
+          Chip(label: Text(d.statusLabel)),
+          if (d.docNo != null) DocNoChip(docNo: d.docNo!),
+          // Persetujuan #8: the PT as a small badge (code + name), no "PT:" label.
+          if (ptText != null) _PtBadge(text: ptText),
+        ],
+      ),
+      // Persetujuan #9: "Tahapan saat ini" — "Menunggu keputusan Anda" when this user decides now.
+      Card(
+        key: const Key('turn-card'),
+        color: theme.colorScheme.primaryContainer,
+        child: ListTile(
+          leading: const Icon(Icons.flag_circle),
+          title: Text(decides ? t.turnYours : t.turnLabel, key: const Key('turn-title')),
+          subtitle: Text(currentTurn(d), key: const Key('turn-text')),
         ),
-        Card(
-          color: theme.colorScheme.primaryContainer,
-          child: ListTile(
-            leading: const Icon(Icons.flag_circle),
-            title: Text(t.turnLabel),
-            subtitle: Text(currentTurn(d), key: const Key('turn-text')),
-          ),
-        ),
-        // ADR 0021: narrow G1 exception, recorded on the request (audit + PDF + panel).
-        if (d.approvalRule?.direkturViaPm ?? false)
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 4),
-            child: Row(
-              children: [
-                const Icon(Icons.info_outline, size: 18),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(
-                    d.approvalRule!.direkturViaPmSelf ? t.direkturViaPmSelfNote : t.direkturViaPmNote,
-                    key: const Key('direktur-via-pm-note'),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        // ADR 0024: a Direktur's own request without approval (audited policy exception; web panel note).
-        if (d.approvalRule?.noApproval ?? false)
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 4),
-            child: Row(
-              children: [
-                const Icon(Icons.info_outline, size: 18),
-                const SizedBox(width: 6),
-                Expanded(child: Text(t.noApprovalNote, key: const Key('no-approval-note'))),
-              ],
-            ),
-          ),
-        section(t.sectionRequestDetails, key: const Key('section-details')),
-        if (ptText != null) row(t.draftCompany, ptText, key: const Key('detail-company')),
-        row(t.grandTotal, formatRupiah(d.grandTotal)),
-        if (d.approvedAmount != null) row(t.approvedAmount, formatRupiah(d.approvedAmount!)),
-        // D2: project of the request; the cost center is Finance's (set at transfer) — shown once known.
-        row(t.fieldProject, d.project == null ? '-' : refText(d.project!), key: const Key('detail-project')),
-        if (d.costCenter != null) row(t.fieldCostCenter, refText(d.costCenter!), key: const Key('detail-cost-center')),
-        if (d.urgencyLevel != null) row(t.fieldUrgency, d.urgencyLevel!.name ?? '-'),
-        if (d.requestDate != null) row(t.requestDate, formatDateOnly(d.requestDate)),
-        row(t.neededDate, formatDateOnly(d.neededDate)),
-        if (d.notes != null && d.notes!.trim().isNotEmpty) row(t.fieldNotes, d.notes!.trim()),
-        // owner 2026-10-11: the RAB % is money (the server sends basis "none" to Staff) — no row instead of "Tanpa anggaran"
-        if (d.budget.hasBudget || (pt?.seesProjectMoney ?? profile?.seesProjectMoney ?? false))
-          row(
-            t.budgetImpact,
-            d.budget.hasBudget ? t.budgetChange(pct(d.budget.pctBefore), pct(d.budget.pctAfter)) : t.budgetNone,
-          ),
-        if (over)
-          Row(
+      ),
+      // ADR 0021: narrow G1 exception, recorded on the request (audit + PDF + panel).
+      if (d.approvalRule?.direkturViaPm ?? false)
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: Row(
             children: [
-              Icon(Icons.warning_amber_rounded, size: 18, color: context.pk.badText),
+              const Icon(Icons.info_outline, size: 18),
               const SizedBox(width: 6),
               Expanded(
-                child: Text('${t.budgetImpact} > 85%', style: TextStyle(color: context.pk.badText)),
+                child: Text(
+                  d.approvalRule!.direkturViaPmSelf ? t.direkturViaPmSelfNote : t.direkturViaPmNote,
+                  key: const Key('direktur-via-pm-note'),
+                ),
               ),
             ],
           ),
-        if (d.rejectReason != null) row(t.rejectReasonLabel, d.rejectReason!),
-        section(t.sectionRequester, key: const Key('section-requester')),
-        row(t.requesters, d.requesters.map((r) => r.name ?? '-').join(', ')),
-        if (d.createdByName != null) row(t.createdBy, d.createdByName!),
-        section(t.bankAccount, key: const Key('section-bank')),
-        if (d.bankName == null && d.bankAccountNo == null && d.bankAccountHolder == null)
-          Text('-', style: theme.textTheme.bodyMedium)
-        else ...[
-          if (d.bankName != null) row(t.bankNameLabel, d.bankName!),
-          if (d.bankAccountHolder != null) row(t.bankHolderLabel, d.bankAccountHolder!),
-          // Masked by the server unless this user may see the full number (dto.ts maskAccountNo).
-          if (d.bankAccountNo != null) row(t.bankNumberLabel, d.bankAccountNo!, key: const Key('detail-bank-no')),
-        ],
-        if (TransferSection.visibleFor(d)) TransferSection(detail: d, zone: zone),
-        if (d.settlement != null) LpjSection(settlement: d.settlement!),
-        RequestLifecycleActions(detail: d),
-        RequesterActionsSection(detail: d),
-        const Divider(height: 32),
-        Text(t.timelineTitle, style: theme.textTheme.titleMedium),
-        TimelineView(steps: buildTimeline(d), zone: zone),
-        const Divider(height: 32),
-        Text(t.linesTitle, style: theme.textTheme.titleMedium),
-        for (final l in d.lines)
-          _LineCard(
-            detail: d,
-            line: l,
-            receipts: d.receipts.where((r) => r.lineId == l.id && r.status != 'removed').toList(),
-            photos: receiptPhotos,
+        ),
+      // ADR 0024: a Direktur's own request without approval (audited policy exception; web panel note).
+      if (d.approvalRule?.noApproval ?? false)
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: Row(
+            children: [
+              const Icon(Icons.info_outline, size: 18),
+              const SizedBox(width: 6),
+              Expanded(child: Text(t.noApprovalNote, key: const Key('no-approval-note'))),
+            ],
           ),
-        if (d.flags.isNotEmpty) ...[
-          const Divider(height: 32),
-          Text(t.flagsTitle, style: theme.textTheme.titleMedium),
-          for (final f in d.flags)
-            ListTile(
-              dense: true,
-              leading: Icon(Icons.flag, color: f.level == 'warning' ? context.pk.warnText : theme.colorScheme.outline),
-              title: Text(f.kindLabel),
-              subtitle: Text('${f.lineNo != null ? 'Baris ${f.lineNo}: ' : ''}${f.message}'),
+        ),
+    ];
+    final summary = <Widget>[
+      section(t.sectionRequestDetails, key: const Key('section-details')),
+      if (d.approvedAmount != null) row(t.approvedAmount, formatRupiah(d.approvedAmount!)),
+      // D2: project of the request; the cost center is Finance's (set at transfer) — shown once known.
+      row(t.fieldProject, d.project == null ? '-' : refText(d.project!), key: const Key('detail-project')),
+      if (d.costCenter != null) row(t.fieldCostCenter, refText(d.costCenter!), key: const Key('detail-cost-center')),
+      if (d.urgencyLevel != null) row(t.fieldUrgency, d.urgencyLevel!.name ?? '-'),
+      if (d.requestDate != null) row(t.requestDate, formatDateOnly(d.requestDate)),
+      row(t.neededDate, formatDateOnly(d.neededDate)),
+      if (d.notes != null && d.notes!.trim().isNotEmpty) row(t.fieldNotes, d.notes!.trim()),
+      // owner 2026-10-11: the RAB % is money (the server sends basis "none" to Staff) — no row instead of "Tanpa anggaran"
+      if (d.budget.hasBudget || (pt?.seesProjectMoney ?? profile?.seesProjectMoney ?? false))
+        row(
+          t.budgetImpact,
+          d.budget.hasBudget ? t.budgetChange(pct(d.budget.pctBefore), pct(d.budget.pctAfter)) : t.budgetNone,
+        ),
+      if (over)
+        Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, size: 18, color: context.pk.badText),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text('${t.budgetImpact} > 85%', style: TextStyle(color: context.pk.badText)),
             ),
-        ],
-        const SizedBox(height: 80),
+          ],
+        ),
+      if (d.rejectReason != null) row(t.rejectReasonLabel, d.rejectReason!),
+      section(t.sectionRequester, key: const Key('section-requester')),
+      row(t.requesters, d.requesters.map((r) => r.name ?? '-').join(', ')),
+      if (d.createdByName != null) row(t.createdBy, d.createdByName!),
+      section(t.bankAccount, key: const Key('section-bank')),
+      if (d.bankName == null && d.bankAccountNo == null && d.bankAccountHolder == null)
+        Text('-', style: theme.textTheme.bodyMedium)
+      else ...[
+        if (d.bankName != null) row(t.bankNameLabel, d.bankName!),
+        if (d.bankAccountHolder != null) row(t.bankHolderLabel, d.bankAccountHolder!),
+        // Masked by the server unless this user may see the full number (dto.ts maskAccountNo).
+        if (d.bankAccountNo != null) row(t.bankNumberLabel, d.bankAccountNo!, key: const Key('detail-bank-no')),
       ],
+    ];
+    // Persetujuan #3: one stepper (overall flow + approval steps); after the summary on phones, right column on
+    // tablets.
+    final stepper = <Widget>[
+      section(t.timelineTitle, key: const Key('section-stepper')),
+      RequestStepper(steps: buildRequestStepper(d), zone: zone),
+    ];
+    final requestFlags = d.flags.where((f) => f.lineNo == null).toList();
+    final rest = <Widget>[
+      if (TransferSection.visibleFor(d)) TransferSection(detail: d, zone: zone),
+      if (d.settlement != null) LpjSection(settlement: d.settlement!),
+      RequestLifecycleActions(detail: d),
+      RequesterActionsSection(detail: d),
+      section(t.linesTitle, key: const Key('section-lines')),
+      for (final l in d.lines)
+        _LineCard(
+          detail: d,
+          line: l,
+          receipts: d.receipts.where((r) => r.lineId == l.id && r.status != 'removed').toList(),
+          photos: receiptPhotos,
+        ),
+      // Persetujuan #10: the grand total is the footer row of "Rincian item" (not in the header).
+      _GrandTotalRow(total: d.grandTotal),
+      // Flags of a line are shown on its card; only request-level flags are listed here.
+      if (requestFlags.isNotEmpty) ...[
+        section(t.flagsTitle, key: const Key('section-flags')),
+        for (final f in requestFlags)
+          ListTile(
+            dense: true,
+            leading: Icon(Icons.flag, color: f.level == 'warning' ? context.pk.warnText : theme.colorScheme.outline),
+            title: Text(f.kindLabel),
+            subtitle: Text(f.message),
+          ),
+      ],
+      const SizedBox(height: 80),
+    ];
+    if (MediaQuery.sizeOf(context).width < FormGridLayout.twoColumnsMinWidth) {
+      return ListView(
+        key: const Key('detail-main'),
+        padding: const EdgeInsets.all(16),
+        children: [...header, ...summary, ...stepper, ...rest],
+      );
+    }
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          child: ListView(
+            key: const Key('detail-main'),
+            padding: const EdgeInsets.all(16),
+            children: [...header, ...summary, ...rest],
+          ),
+        ),
+        SizedBox(
+          width: 360,
+          child: ListView(
+            key: const Key('detail-side'),
+            padding: const EdgeInsets.fromLTRB(0, 16, 16, 80),
+            children: [
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: stepper),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Decisions on a request ("Menunggu keputusan Anda" while the server allows one of them to this user).
+const _decisionActions = {'acknowledge', 'approve', 'reject'};
+
+/// Persetujuan #8: PT of the request as a small badge.
+class _PtBadge extends StatelessWidget {
+  const _PtBadge({required this.text});
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final style = theme.textTheme.labelMedium?.copyWith(color: scheme.primary, fontWeight: FontWeight.w700);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: scheme.primary.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(text, key: const Key('detail-company'), style: style),
+    );
+  }
+}
+
+/// Persetujuan #10: "Grand total" as the footer row of the line items.
+class _GrandTotalRow extends StatelessWidget {
+  const _GrandTotalRow({required this.total});
+  final int total;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final style = theme.textTheme.titleMedium?.copyWith(
+      fontWeight: FontWeight.w700,
+      fontFeatures: const [FontFeature.tabularFigures()],
+    );
+    return Container(
+      key: const Key('lines-footer'),
+      margin: const EdgeInsets.only(top: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      decoration: BoxDecoration(
+        border: Border(top: BorderSide(color: theme.colorScheme.outlineVariant, width: 2)),
+      ),
+      child: Row(
+        children: [
+          Expanded(child: Text(t.grandTotal, style: theme.textTheme.titleSmall)),
+          Text(formatRupiah(total), key: const Key('lines-grand-total'), style: style),
+        ],
+      ),
     );
   }
 }
@@ -247,6 +342,9 @@ String receiptCaption(AppLocalizations t, ExpenseLine l, ReceiptInfo r) => [
   if (r.receiptNo != null) 'No. ${r.receiptNo}',
   formatRupiah(r.amount),
 ].where((e) => e.isNotEmpty).join(' · ');
+
+/// Flags already shown as chips on the line (D3 "Selisih nota", D4 "Melebihi RAP").
+const _chipFlags = {receiptAmountMismatchFlag, rapOverBudgetFlag};
 
 class _LineCard extends ConsumerWidget {
   const _LineCard({required this.detail, required this.line, required this.receipts, required this.photos});
@@ -267,6 +365,10 @@ class _LineCard extends ConsumerWidget {
     final qtyPrice = [?qtyUom, if (price != null) formatRupiah(price)].join(' × ');
     final meta = [if (qtyPrice.isNotEmpty) qtyPrice, ?line.category?.name, ?line.vehiclePlate].join(' · ');
     final mismatch = lineReceiptMismatch(detail, line);
+    // Persetujuan #11: the flags of this line, on the line (no summary sentence); "Selisih nota" and "Melebihi RAP"
+    // have their chips.
+    final flags = detail.flags.where((f) => f.lineNo == line.no && !_chipFlags.contains(f.kind)).toList();
+    Color flagColor(FlagInfo f) => f.level == 'warning' ? context.pk.warnText : Theme.of(context).colorScheme.outline;
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(12),
@@ -319,6 +421,27 @@ class _LineCard extends ConsumerWidget {
                 t.lineNeedsUnitPriceShort,
                 key: Key('line-${line.no}-needs-unit-price'),
                 style: TextStyle(color: context.pk.warnText, fontWeight: FontWeight.w600),
+              ),
+            for (final f in flags)
+              Padding(
+                key: Key('line-${line.no}-flag-${f.id}'),
+                padding: const EdgeInsets.only(top: 4),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(Icons.flag, size: 16, color: flagColor(f)),
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(f.kindLabel, style: const TextStyle(fontWeight: FontWeight.w600)),
+                          Text(f.message, style: Theme.of(context).textTheme.bodySmall),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
             if (line.notes != null) Text(line.notes!, style: Theme.of(context).textTheme.bodySmall),
             if (receipts.isNotEmpty) const SizedBox(height: 8),

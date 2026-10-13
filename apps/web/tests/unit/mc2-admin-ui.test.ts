@@ -4,6 +4,7 @@ import { beforeAll, describe, expect, it } from 'vitest'
 import { withCompanyContext } from '@/access/roles'
 import { COMPANY_CELL, COMPANY_LIST_FILTER, companyFieldOf, withCompanyListUi } from '@/admin/company-list'
 import { activeCompanyFilter, companyFilterHref, hasOtherFilter } from '@/admin/components/companies/list-filter'
+import { PK_LIST_VIEW } from '@/admin/pk-list/wire'
 import { COMPANY_SETTING_FIELDS, COMPANY_SETTING_TABS, companySettingKey } from '@/collections/Companies'
 import { pickerSameCompany, requireCompanyWhenAmbiguous, sameCompanyOptions } from '@/fields/company'
 
@@ -37,14 +38,17 @@ const WITH_COMPANY = [
 ].sort()
 
 describe('PT column + PT filter on list views', () => {
-  it('every collection with a company column gets the PT chip cell, company first in defaultColumns, the PT filter', () => {
+  it('every collection with a company column gets the PT chip cell, company first in defaultColumns, the PT filter (PkListView)', () => {
     const got = config.collections.filter((c) => companyFieldOf(c as unknown as CollectionConfig)).map((c) => c.slug).sort()
     expect(got).toEqual(WITH_COMPANY)
     for (const c of config.collections.filter((x) => WITH_COMPANY.includes(x.slug))) {
       const f = companyFieldOf(c as unknown as CollectionConfig) as { admin?: { components?: { Cell?: unknown } } }
       expect(f.admin?.components?.Cell, c.slug).toBe(COMPANY_CELL)
       expect(c.admin.defaultColumns?.[0] === 'company' || c.admin.defaultColumns?.includes('company'), c.slug).toBe(true)
-      expect([c.admin.components?.beforeListTable].flat(), c.slug).toContain(COMPANY_LIST_FILTER)
+      // DRMS 13/10 Umum #4: the generic list view (PkListView) replaces the single-choice PT chips with the PT
+      // multi-select of its filter bar → the chips are dropped from beforeListTable there
+      expect(c.admin.components?.views?.list?.Component, c.slug).toBe(PK_LIST_VIEW)
+      expect([c.admin.components?.beforeListTable].flat(), c.slug).not.toContain(COMPANY_LIST_FILTER)
     }
   })
 

@@ -9,6 +9,7 @@ import '../../../core/format/dates.dart';
 import '../../../core/format/rupiah.dart';
 import '../../../l10n/gen/app_localizations.dart';
 import '../../../shared/widgets/async_body.dart';
+import '../../../shared/widgets/form_grid.dart';
 import '../../../shared/widgets/online_only_button.dart';
 import '../../auth/application/auth_controller.dart';
 import '../../masters/domain/master_item.dart';
@@ -305,6 +306,48 @@ class _DraftEditorScreenState extends ConsumerState<DraftEditorScreen> {
     if (mounted) context.pop();
   }
 
+  void _setType(Set<RequestType> s) => setState(() => _d = _d.copyWith(type: s.first));
+
+  Future<void> _pickNeededDate() async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: DateTime.tryParse(_d.neededDate ?? '') ?? now,
+      firstDate: now.subtract(const Duration(days: 60)),
+      lastDate: now.add(const Duration(days: 365)),
+    );
+    if (picked != null) setState(() => _d = _d.copyWith(neededDate: toYmd(picked)));
+  }
+
+  void _removeRequester(int id) {
+    setState(() => _d = _d.copyWith(requesterIds: [..._d.requesterIds]..remove(id)));
+  }
+
+  Future<void> _addRequester(List<MasterItem> employees) async {
+    final t = AppLocalizations.of(context);
+    int? chosen;
+    await showDialog<void>(
+      context: context,
+      builder: (c) => AlertDialog(
+        content: MasterPickerField(
+          label: t.fieldRequesters,
+          hint: t.pickEmployee,
+          items: employees,
+          value: null,
+          allowNone: false,
+          onChanged: (v) {
+            chosen = v;
+            Navigator.pop(c);
+          },
+        ),
+      ),
+    );
+    final id = chosen;
+    if (id != null && !_d.requesterIds.contains(id)) {
+      setState(() => _d = _d.copyWith(requesterIds: [..._d.requesterIds, id]));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
@@ -331,6 +374,7 @@ class _DraftEditorScreenState extends ConsumerState<DraftEditorScreen> {
     final accounts = (m[MasterTypes.bankAccounts] ?? const [])
         .where((a) => _d.requesterIds.isEmpty || _d.requesterIds.contains((a.extra['employee'] as num?)?.toInt()))
         .toList();
+    final urgencies = _byRank(m[MasterTypes.urgencyLevels] ?? const <MasterItem>[]);
     String? issueFor(String field) => _issues.where((i) => i.field == field && i.lineNo == null).firstOrNull?.message;
     final editableType = _d.serverId == null;
     // D4: RAP items of the chosen project (labels + live remaining budget on the line cards).
@@ -360,13 +404,13 @@ class _DraftEditorScreenState extends ConsumerState<DraftEditorScreen> {
                 padding: const EdgeInsets.only(bottom: 8),
                 child: Text('${syncStateLabel(t, _d.syncState)}${_d.lastError != null ? '\n${_d.lastError}' : ''}'),
               ),
-            // MC3: the PT of this draft (fixed; the pickers below list that PT's data only).
+            // MC3: the PT of this draft (fixed; the pickers below list that PT's data only). Persetujuan #8: a badge
+            // (code + name), no "PT:" label.
             if ((ref.watch(accountProfileProvider)?.isMultiCompany ?? false) && _d.companyId != null)
               Padding(
                 padding: const EdgeInsets.only(bottom: 12),
                 child: Row(
                   children: [
-                    Text('${t.draftCompany}: ', style: Theme.of(context).textTheme.labelLarge),
                     CompanyChip(key: const Key('draft-company'), companyId: _d.companyId, always: true),
                     const SizedBox(width: 8),
                     Expanded(
@@ -389,153 +433,144 @@ class _DraftEditorScreenState extends ConsumerState<DraftEditorScreen> {
                   subtitle: Text(t.draftDirekturNoApprovalHint),
                 ),
               ),
-            Text(t.fieldType),
-            const SizedBox(height: 4),
-            SegmentedButton<RequestType>(
-              segments: [for (final ty in RequestType.values) ButtonSegment(value: ty, label: Text(ty.label))],
-              selected: {_d.type},
-              onSelectionChanged: editableType ? (s) => setState(() => _d = _d.copyWith(type: s.first)) : null,
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              key: const Key('draft-title'),
-              controller: _title,
-              maxLength: 200,
-              decoration: InputDecoration(labelText: t.fieldTitle, errorText: issueFor('title')),
-            ),
-            // D2 (DRMS 10/10): project required, no cost center choice (Finance sets it at transfer).
-            MasterPickerField(
-              key: const Key('draft-project'),
-              label: t.fieldProject,
-              items: m[MasterTypes.projects] ?? const [],
-              value: _d.projectId,
-              allowNone: false,
-              errorText: issueFor('projectId'),
-              onChanged: _setProject,
-            ),
-            // D4 (owner 2026-10-11): project with a RAB but no RAP → submit refused; same text as the web form
-            if (rap != null && rap.missing)
-              Card(
-                key: const Key('draft-rap-missing'),
-                margin: const EdgeInsets.only(top: 4),
-                color: Theme.of(context).colorScheme.errorContainer,
-                child: ListTile(
-                  leading: Icon(Icons.block, color: Theme.of(context).colorScheme.onErrorContainer),
-                  title: Text(
-                    t.rapMissingBlock,
-                    style: TextStyle(
-                      fontWeight: FontWeight.w600,
-                      color: Theme.of(context).colorScheme.onErrorContainer,
-                    ),
-                  ),
-                  subtitle: Text(
-                    t.rapMissingBlockDetail,
-                    style: TextStyle(color: Theme.of(context).colorScheme.onErrorContainer),
+            // DRMS 13/10 Umum #2 / D4: label left of the field, two columns on wide screens.
+            FormGrid(
+              children: [
+                FormGridCell(
+                  label: t.fieldType,
+                  stackedLabel: true,
+                  child: SegmentedButton<RequestType>(
+                    segments: [for (final ty in RequestType.values) ButtonSegment(value: ty, label: Text(ty.label))],
+                    selected: {_d.type},
+                    onSelectionChanged: editableType ? _setType : null,
                   ),
                 ),
-              ),
-            if (_d.projectId == null && widget.initial.costCenterId != null)
-              Padding(
-                key: const Key('draft-cost-center-legacy'),
-                padding: const EdgeInsets.only(top: 4),
-                child: Text(t.draftCostCenterLegacy, style: TextStyle(color: context.pk.warnText)),
-              ),
-            const SizedBox(height: 12),
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              title: Text(t.fieldNeededDate),
-              subtitle: Text(formatDateOnly(_d.neededDate)),
-              trailing: const Icon(Icons.calendar_today),
-              onTap: () async {
-                final now = DateTime.now();
-                final picked = await showDatePicker(
-                  context: context,
-                  initialDate: DateTime.tryParse(_d.neededDate ?? '') ?? now,
-                  firstDate: now.subtract(const Duration(days: 60)),
-                  lastDate: now.add(const Duration(days: 365)),
-                );
-                if (picked != null) setState(() => _d = _d.copyWith(neededDate: toYmd(picked)));
-              },
-            ),
-            // Owner decision 2026-10-09: "Tingkat urgensi" (per-PT master, lowest rank first)
-            MasterPickerField(
-              key: const Key('draft-urgency'),
-              label: t.fieldUrgency,
-              items: [...(m[MasterTypes.urgencyLevels] ?? const <MasterItem>[])]
-                ..sort((a, b) => ((a.extra['rank'] as num?) ?? 0).compareTo((b.extra['rank'] as num?) ?? 0)),
-              value: _d.urgencyLevelId,
-              errorText: issueFor('urgencyLevelId'),
-              onChanged: (v) => setState(() => _d = _d.copyWith(urgencyLevelId: v)),
-            ),
-            const SizedBox(height: 12),
-            Text(t.fieldRequesters),
-            Wrap(
-              spacing: 6,
-              children: [
-                for (final id in _d.requesterIds)
-                  InputChip(
-                    label: Text(allEmployees.where((e) => e.id == id).firstOrNull?.label ?? '#$id'),
-                    onDeleted: _d.requesterIds.length > 1
-                        ? () => setState(() => _d = _d.copyWith(requesterIds: [..._d.requesterIds]..remove(id)))
-                        : null,
+                FormGridCell(
+                  label: t.fieldTitle,
+                  builder: (label) => TextField(
+                    key: const Key('draft-title'),
+                    controller: _title,
+                    maxLength: 200,
+                    decoration: InputDecoration(labelText: label, errorText: issueFor('title')),
                   ),
-                // QA-15: a Staff-only user can add only themselves (no other requesters)
-                if (selfOnly == null || (selfOnly > 0 && !_d.requesterIds.contains(selfOnly)))
-                  ActionChip(
-                    avatar: const Icon(Icons.person_add, size: 18),
-                    label: Text(t.choose),
-                    onPressed: () async {
-                      int? chosen;
-                      await showDialog<void>(
-                        context: context,
-                        builder: (c) => AlertDialog(
-                          content: MasterPickerField(
-                            label: t.fieldRequesters,
-                            hint: t.pickEmployee,
-                            items: employees,
-                            value: null,
-                            allowNone: false,
-                            onChanged: (v) {
-                              chosen = v;
-                              Navigator.pop(c);
-                            },
+                ),
+                // D2 (DRMS 10/10): project required, no cost center choice (Finance sets it at transfer).
+                FormGridCell(
+                  label: t.fieldProject,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      MasterPickerField(
+                        key: const Key('draft-project'),
+                        label: t.fieldProject,
+                        items: m[MasterTypes.projects] ?? const [],
+                        value: _d.projectId,
+                        allowNone: false,
+                        errorText: issueFor('projectId'),
+                        onChanged: _setProject,
+                      ),
+                      // D4 (owner 2026-10-11): project with a RAB but no RAP → submit refused; same text as the web
+                      if (rap != null && rap.missing) const _RapMissingCard(),
+                      if (_d.projectId == null && widget.initial.costCenterId != null)
+                        Padding(
+                          key: const Key('draft-cost-center-legacy'),
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Text(t.draftCostCenterLegacy, style: TextStyle(color: context.pk.warnText)),
+                        ),
+                    ],
+                  ),
+                ),
+                FormGridCell(
+                  label: t.fieldNeededDate,
+                  builder: (label) => InkWell(
+                    key: const Key('draft-needed-date'),
+                    onTap: _pickNeededDate,
+                    child: InputDecorator(
+                      decoration: InputDecoration(labelText: label, suffixIcon: const Icon(Icons.calendar_today)),
+                      child: Text(formatDateOnly(_d.neededDate)),
+                    ),
+                  ),
+                ),
+                // Owner decision 2026-10-09: "Tingkat urgensi" (per-PT master, lowest rank first)
+                FormGridCell(
+                  label: t.fieldUrgency,
+                  child: MasterPickerField(
+                    key: const Key('draft-urgency'),
+                    label: t.fieldUrgency,
+                    items: urgencies,
+                    value: _d.urgencyLevelId,
+                    errorText: issueFor('urgencyLevelId'),
+                    onChanged: (v) => setState(() => _d = _d.copyWith(urgencyLevelId: v)),
+                  ),
+                ),
+                FormGridCell(
+                  label: t.fieldRequesters,
+                  stackedLabel: true,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Wrap(
+                        spacing: 6,
+                        children: [
+                          for (final id in _d.requesterIds)
+                            InputChip(
+                              label: Text(allEmployees.where((e) => e.id == id).firstOrNull?.label ?? '#$id'),
+                              onDeleted: _d.requesterIds.length > 1 ? () => _removeRequester(id) : null,
+                            ),
+                          // QA-15: a Staff-only user can add only themselves (no other requesters)
+                          if (selfOnly == null || (selfOnly > 0 && !_d.requesterIds.contains(selfOnly)))
+                            ActionChip(
+                              avatar: const Icon(Icons.person_add, size: 18),
+                              label: Text(t.choose),
+                              onPressed: () => _addRequester(employees),
+                            ),
+                        ],
+                      ),
+                      if (issueFor('requesterIds') != null)
+                        Padding(
+                          key: const Key('requesters-issue'),
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Text(
+                            issueFor('requesterIds')!,
+                            style: TextStyle(color: Theme.of(context).colorScheme.error),
                           ),
                         ),
-                      );
-                      if (chosen != null && !_d.requesterIds.contains(chosen)) {
-                        setState(() => _d = _d.copyWith(requesterIds: [..._d.requesterIds, chosen!]));
-                      }
-                    },
+                    ],
                   ),
+                ),
+                FormGridCell(
+                  label: t.fieldBankAccount,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      MasterPickerField(
+                        label: t.fieldBankAccount,
+                        items: accounts,
+                        value: _d.bankAccountId,
+                        errorText: issueFor('bankAccountId'),
+                        onChanged: (v) => setState(() => _d = _d.copyWith(bankAccountId: v)),
+                      ),
+                      if (accounts.where((a) => a.id == _d.bankAccountId).firstOrNull case final acc?)
+                        BankAccountPreview(
+                          key: ValueKey('bank-preview-${acc.id}'),
+                          account: acc,
+                          banks: m[MasterTypes.banks] ?? const [],
+                        ),
+                    ],
+                  ),
+                ),
+                FormGridCell(
+                  label: t.fieldNotes,
+                  full: true,
+                  builder: (label) => TextField(
+                    controller: _notes,
+                    maxLength: 2000,
+                    maxLines: 3,
+                    minLines: 1,
+                    decoration: InputDecoration(labelText: label),
+                  ),
+                ),
               ],
-            ),
-            if (issueFor('requesterIds') != null)
-              Padding(
-                key: const Key('requesters-issue'),
-                padding: const EdgeInsets.only(top: 4),
-                child: Text(issueFor('requesterIds')!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
-              ),
-            const SizedBox(height: 12),
-            MasterPickerField(
-              label: t.fieldBankAccount,
-              items: accounts,
-              value: _d.bankAccountId,
-              errorText: issueFor('bankAccountId'),
-              onChanged: (v) => setState(() => _d = _d.copyWith(bankAccountId: v)),
-            ),
-            if (accounts.where((a) => a.id == _d.bankAccountId).firstOrNull case final acc?)
-              BankAccountPreview(
-                key: ValueKey('bank-preview-${acc.id}'),
-                account: acc,
-                banks: m[MasterTypes.banks] ?? const [],
-              ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _notes,
-              maxLength: 2000,
-              maxLines: 3,
-              minLines: 1,
-              decoration: InputDecoration(labelText: t.fieldNotes),
             ),
             const Divider(height: 24),
             Row(
@@ -671,6 +706,36 @@ class _DraftEditorScreenState extends ConsumerState<DraftEditorScreen> {
             const SizedBox(height: 32),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Owner decision 2026-10-09: "Tingkat urgensi" of the PT, lowest rank first.
+List<MasterItem> _byRank(List<MasterItem> items) {
+  num rank(MasterItem i) => (i.extra['rank'] as num?) ?? 0;
+  return [...items]..sort((a, b) => rank(a).compareTo(rank(b)));
+}
+
+/// D4 (owner 2026-10-11): a project with a RAB but no RAP → submit refused; same text as the web form.
+class _RapMissingCard extends StatelessWidget {
+  const _RapMissingCard();
+
+  @override
+  Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
+    final scheme = Theme.of(context).colorScheme;
+    return Card(
+      key: const Key('draft-rap-missing'),
+      margin: const EdgeInsets.only(top: 4),
+      color: scheme.errorContainer,
+      child: ListTile(
+        leading: Icon(Icons.block, color: scheme.onErrorContainer),
+        title: Text(
+          t.rapMissingBlock,
+          style: TextStyle(fontWeight: FontWeight.w600, color: scheme.onErrorContainer),
+        ),
+        subtitle: Text(t.rapMissingBlockDetail, style: TextStyle(color: scheme.onErrorContainer)),
       ),
     );
   }

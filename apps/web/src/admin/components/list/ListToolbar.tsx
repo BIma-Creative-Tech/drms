@@ -1,9 +1,10 @@
 import Link from 'next/link'
 import React from 'react'
 
-import { isFiltered, listHref, PAGE_SIZES, type ListQuery, type PageOf } from '@/admin/list-query'
+import { filterValues, isFiltered, listHref, PAGE_SIZES, type ListQuery, type PageOf } from '@/admin/list-query'
 
 import { AutoSubmit } from './AutoSubmit'
+import { MultiSelect } from './MultiSelect'
 import { DateInput } from '../DateInput'
 
 /**
@@ -11,8 +12,11 @@ import { DateInput } from '../DateInput'
  * date range and page size, as a GET form (URL = state; AutoSubmit applies it without a reload). Server
  * component; values come from the parsed ListQuery. `keep` = params of the view that the toolbar does
  * not own (e.g. a tab) and must survive a search.
+ * DRMS 13/10 Umum #4 / Persetujuan #2: a filter with `multi` is a checklist dropdown (MultiSelect, `?key=a,b`);
+ * the view reads it with filterValues(). `extra` = more controls at the end of the bar (PkListView: "Kolom ▾").
  */
-export type ToolbarFilter = { key: string; label: string; options: ReadonlyArray<{ value: string; label: string }>; all?: string }
+export type ToolbarFilter = { key: string; label: string; options: ReadonlyArray<{ value: string; label: string; title?: string }>; all?: string; multi?: boolean }
+export type ToolbarDates = { from: string; to: string; fromLabel?: string; toLabel?: string }
 
 type Props = {
   id: string
@@ -21,14 +25,21 @@ type Props = {
   label: string
   search?: { placeholder: string }
   filters?: ReadonlyArray<ToolbarFilter | null | false>
-  dates?: { from: string; to: string; fromLabel?: string; toLabel?: string }
+  dates?: ToolbarDates | ReadonlyArray<ToolbarDates>
   keep?: Record<string, string | undefined>
   pageSize?: boolean
+  extra?: React.ReactNode
+  /** Reset target (default: the action with only `keep`). */
+  resetHref?: string
+  /** Force the Reset link (e.g. a filter the toolbar does not render is active). */
+  filteredHint?: boolean
 }
 
-export function ListToolbar({ id, action, query, label, search, filters, dates, keep, pageSize = true }: Props) {
-  const fs = (filters ?? []).filter((f): f is ToolbarFilter => !!f && f.options.length > 0)
-  const filtered = isFiltered(query) || (dates ? !!(query.filters[dates.from] || query.filters[dates.to]) : false)
+export function ListToolbar({ id, action, query, label, search, filters, dates, keep, pageSize = true, extra, resetHref, filteredHint }: Props) {
+  // a multi filter with a value from the URL stays visible even if its option list came back empty
+  const fs = (filters ?? []).filter((f): f is ToolbarFilter => !!f && (f.options.length > 0 || (!!f.multi && filterValues(query, f.key).length > 0)))
+  const ranges: ReadonlyArray<ToolbarDates> = dates ? ('from' in dates ? [dates as ToolbarDates] : (dates as ReadonlyArray<ToolbarDates>)) : []
+  const filtered = !!filteredHint || isFiltered(query) || ranges.some((d) => !!(query.filters[d.from] || query.filters[d.to]))
   return (
     <form className="pk-ltb" method="get" action={action} role="search" aria-label={label} data-pk-toolbar={id}>
       {Object.entries(keep ?? {}).map(([k, v]) => (v ? <input key={k} type="hidden" name={k} value={v} /> : null))}
@@ -38,31 +49,38 @@ export function ListToolbar({ id, action, query, label, search, filters, dates, 
           <input type="search" name="q" defaultValue={query.q} placeholder={search.placeholder} maxLength={100} autoComplete="off" data-pk-search={id} />
         </label>
       ) : null}
-      {fs.map((f) => (
-        <label key={f.key} className="pk-ltb__field">
-          <span>{f.label}</span>
-          <select name={f.key} defaultValue={query.filters[f.key] ?? ''} data-pk-filter-key={f.key}>
-            <option value="">{f.all ?? 'Semua'}</option>
-            {f.options.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </select>
-        </label>
+      {fs.map((f) =>
+        f.multi ? (
+          <div key={f.key} className="pk-ltb__field pk-ltb__field--multi">
+            <span aria-hidden="true">{f.label}</span>
+            <MultiSelect name={f.key} label={f.label} options={f.options} value={filterValues(query, f.key)} allLabel={f.all ?? 'Semua'} />
+          </div>
+        ) : (
+          <label key={f.key} className="pk-ltb__field">
+            <span>{f.label}</span>
+            <select name={f.key} defaultValue={query.filters[f.key] ?? ''} data-pk-filter-key={f.key}>
+              <option value="">{f.all ?? 'Semua'}</option>
+              {f.options.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        ),
+      )}
+      {ranges.map((d) => (
+        <React.Fragment key={d.from}>
+          <label className="pk-ltb__field">
+            <span>{d.fromLabel ?? 'Dari'}</span>
+            <DateInput type="date" name={d.from} defaultValue={query.filters[d.from] ?? ''} />
+          </label>
+          <label className="pk-ltb__field">
+            <span>{d.toLabel ?? 'Sampai'}</span>
+            <DateInput type="date" name={d.to} defaultValue={query.filters[d.to] ?? ''} />
+          </label>
+        </React.Fragment>
       ))}
-      {dates ? (
-        <>
-          <label className="pk-ltb__field">
-            <span>{dates.fromLabel ?? 'Dari'}</span>
-            <DateInput type="date" name={dates.from} defaultValue={query.filters[dates.from] ?? ''} />
-          </label>
-          <label className="pk-ltb__field">
-            <span>{dates.toLabel ?? 'Sampai'}</span>
-            <DateInput type="date" name={dates.to} defaultValue={query.filters[dates.to] ?? ''} />
-          </label>
-        </>
-      ) : null}
       {pageSize ? (
         <label className="pk-ltb__field pk-ltb__per">
           <span>Per halaman</span>
@@ -80,10 +98,11 @@ export function ListToolbar({ id, action, query, label, search, filters, dates, 
           Terapkan
         </button>
         {filtered ? (
-          <Link className="pk-ltb__btn pk-ltb__btn--ghost" href={listHref(action, keep ?? {}, {})} prefetch={false} data-pk-reset={id}>
+          <Link className="pk-ltb__btn pk-ltb__btn--ghost" href={resetHref ?? listHref(action, keep ?? {}, {})} prefetch={false} data-pk-reset={id}>
             Reset
           </Link>
         ) : null}
+        {extra}
       </div>
       <AutoSubmit />
     </form>

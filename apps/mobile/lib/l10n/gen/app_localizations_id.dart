@@ -248,10 +248,13 @@ class AppLocalizationsId extends AppLocalizations {
   String get detailTitle => 'Detail Pengajuan';
 
   @override
-  String get turnLabel => 'Giliran';
+  String get turnLabel => 'Tahapan saat ini';
 
   @override
-  String get timelineTitle => 'Riwayat approval';
+  String get turnYours => 'Menunggu keputusan Anda';
+
+  @override
+  String get timelineTitle => 'Alur pengajuan';
 
   @override
   String get linesTitle => 'Rincian item';
@@ -885,7 +888,7 @@ class AppLocalizationsId extends AppLocalizations {
 
   @override
   String get decisionForbidden =>
-      'Anda tidak dapat memutuskan pengajuan ini. Hanya PM project pengajuan ini, Direktur dan Finance yang memutuskan, masing-masing hanya pada gilirannya. Data dimuat ulang.';
+      'Anda tidak dapat memutuskan pengajuan ini. Hanya PM project pengajuan ini, Direktur dan Finance yang memutuskan, masing-masing hanya pada tahapannya. Data dimuat ulang.';
 
   @override
   String get decisionTitleAcknowledgeDirektur => 'Setujui sebagai Direktur (Diketahui)';
