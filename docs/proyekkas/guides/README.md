@@ -65,6 +65,22 @@ aplikasi** dan tidak bisa dipakai sampai diperbarui.
   sebelum PT dipilih.
 - Bila lebih dari satu PT tampil, daftar dan antrian memberi **tanda kode PT** (mis. `DRMS`, `CS1`) pada setiap baris.
 
+**Daftar dan tabel (web):** semua daftar data (Pengajuan, Project, Pengguna, Karyawan, Vendor, master lain) dan
+halaman kerja (Persetujuan, Antrian Transfer, Verifikasi LPJ, Kas, Pinjaman) memakai bar filter yang sama:
+- **Cari** (ketik, daftar menyaring sendiri), lalu filter **dropdown berceklis** per kriteria — mis. **Status ▾** →
+  centang **Diajukan** dan **Disetujui** → **Terapkan**. Tombol menampilkan pilihan Anda (**Semua**, satu nama, atau
+  **2 dipilih**); **Semua** di dalam dropdown menghapus centang kriteria itu, **Reset** menghapus semua filter.
+  Rentang tanggal (**… dari / sampai**) ada pada daftar yang punya tanggal utama (mis. tanggal pengajuan).
+- **PT ▾** muncul bila lebih dari satu PT dicentang di tombol PT; filter ini hanya bisa mempersempit, tidak menambah
+  PT di luar pilihan tombol PT.
+- **Kolom ▾** (daftar data): centang kolom yang ingin ditampilkan → **Terapkan**; pilihan disimpan per pengguna
+  dan per daftar (ikut ke perangkat lain). **Default** mengembalikan kolom bawaan. Klik judul kolom untuk mengurutkan
+  (▲/▼).
+- **Klik baris** (atau Enter) membuka detail; tombol di kolom **Aksi** (**Ubah**, **Buka**, **Lihat**) tetap bekerja.
+  Data diubah lewat formulir dokumen (tombol **Ubah**), tidak ada lagi centang baris / ubah massal.
+- Di bawah tabel: **1–20 dari 57 data · Halaman 1 dari 3** dengan **‹ Sebelumnya / Berikutnya ›**; jumlah baris per
+  halaman 20/50/100 lewat **Per halaman**. Tabel ringkasan di dashboard/laporan yang panjang juga dibagi per 20 baris.
+
 **Keamanan akun — 2FA (pilihan):** Anda boleh menambah kode 6 digit dari aplikasi autentikator di HP (mis. Google
 Authenticator, Microsoft Authenticator, FreeOTP) supaya kata sandi yang bocor saja tidak cukup untuk masuk.
 - **Menyalakan (web):** menu akun (lingkaran inisial) → **Keamanan akun** → **Aktifkan 2FA** → login ulang → pindai
