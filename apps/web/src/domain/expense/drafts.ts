@@ -178,8 +178,12 @@ export async function validateContent(
   const scope = () => resolveScope(req, company ?? null)
 
   if (c.projectId && c.costCenterId) errors.push({ path: 'projectId', message: 'Pilih project ATAU pusat biaya, tidak keduanya.' })
-  // D2 (owner 2026-10-11): no non-project requests — the project is mandatory to send (legacy cost-center rows aside)
-  if (opts.forSubmit && !c.projectId && !(opts.legacyCostCenter && c.costCenterId)) errors.push({ path: 'projectId', message: 'Project wajib diisi (pengajuan tanpa project tidak dapat dikirim).' })
+  // D2 (owner 2026-10-11): no non-project requests — the project is mandatory to send (legacy cost-center rows aside).
+  // ADR 0027 (client 2026-10-14): a vendor payment may name a cost center instead (e.g. office bills).
+  const vendorPay = payeeOf(c.payeeType) === 'vendor'
+  if (opts.forSubmit && !c.projectId && !(c.costCenterId && (opts.legacyCostCenter || vendorPay))) {
+    errors.push({ path: 'projectId', message: vendorPay ? 'Pilih project atau pusat biaya (pembayaran vendor).' : 'Project wajib diisi (pengajuan tanpa project tidak dapat dikirim).' })
+  }
   if (opts.forSubmit && !(c.title ?? '').trim()) errors.push({ path: 'title', message: 'Judul wajib diisi.' })
   if (c.neededDate && !isBusinessDate(c.neededDate)) errors.push({ path: 'neededDate', message: 'Tanggal harus YYYY-MM-DD.' })
 
@@ -539,20 +543,23 @@ export async function createDraft(req: PayloadRequest, input: DraftInput & { typ
       return { doc: existing, created: false }
     }
   }
-  // D2: a cost center sent by an old client is ignored (the requester no longer picks one)
-  const company = await draftCompany(req, { projectId: input.projectId })
+  // D2: a cost center sent by an old client is ignored (the requester no longer picks one) — ADR 0027: except on a
+  // vendor payment without a project
+  const vendorCc = payeeOf(input.payeeType) === 'vendor' && !input.projectId ? (input.costCenterId ?? null) : null
+  const company = await draftCompany(req, { projectId: input.projectId, costCenterId: vendorCc })
   const emp = company !== undefined ? employeeIn(req, company) : relId((req.user as { employee?: unknown } | null)?.employee)
   const requesterIds = input.requesterIds && input.requesterIds.length > 0 ? input.requesterIds : emp !== undefined ? [emp] : []
   const lines = input.lines ?? []
   const vendor = payeeOf(input.payeeType) === 'vendor'
   // ADR 0027: a vendor payment is always a Pengajuan Baru (type advance), without an employee account
   const type: RequestType = vendor ? 'advance' : input.type
-  await validateContent(req, { ...input, type, costCenterId: null, requesterIds, lines, ...vendorInput(input, vendor) }, { forSubmit: false, creatorId: uid })
+  await validateContent(req, { ...input, type, costCenterId: vendorCc, requesterIds, lines, ...vendorInput(input, vendor) }, { forSubmit: false, creatorId: uid })
   const doc = await validated(req, () => req.payload.create({
     collection: 'expense-requests',
     data: {
       type,
       ...vendorData(input, vendor),
+      ...(vendorCc ? { costCenter: vendorCc } : {}),
       title: input.title.trim(),
       project: input.projectId ?? null,
       neededDate: input.neededDate ?? null,
@@ -609,7 +616,8 @@ export async function updateDraft(req: PayloadRequest, id: number, input: DraftI
     type: vendor ? ('advance' as const) : ((input.type ?? doc.type) as RequestType),
     title: input.title ?? doc.title,
     projectId,
-    costCenterId: projectId ? null : (relId(doc.costCenter) ?? null),
+    // ADR 0027: a vendor payment without a project may change its cost center
+    costCenterId: projectId ? null : vendor && input.costCenterId !== undefined ? input.costCenterId : (relId(doc.costCenter) ?? null),
     requesterIds: input.requesterIds ?? ids(doc.requesters),
     bankAccountId: vendor ? null : input.bankAccountId !== undefined ? input.bankAccountId : (relId(doc.bankAccount) ?? null),
     lines: lines ?? fromDocLines(doc),
@@ -619,6 +627,7 @@ export async function updateDraft(req: PayloadRequest, id: number, input: DraftI
   await validateContent(req, current, { forSubmit: false, creatorId: relId(doc.createdBy) ?? -1, requestId: id, callerSetsRequesters: input.requesterIds !== undefined && input.requesterIds.join(',') !== ids(doc.requesters).join(',') })
   const data: Record<string, unknown> = {}
   if (input.type !== undefined) data.type = input.type
+  if (doc.status === 'draft' && vendor && input.costCenterId !== undefined) data.costCenter = projectId ? null : input.costCenterId
   if (doc.status === 'draft' && (input.payeeType !== undefined || vendor)) {
     // ADR 0027: payee type + vendor fields (karyawan clears them; vendor clears the employee account)
     Object.assign(data, vendorData(vendor ? { ...input, ...vendorNow } : {}, vendor), { type: current.type })
@@ -669,7 +678,9 @@ export async function resubmitAsDraft(req: PayloadRequest, id: number): Promise<
       requesters: ids(src.requesters),
       bankAccount: relId(src.bankAccount) ?? null,
       // ADR 0027: a rejected vendor payment comes back with its vendor + invoice (the rejected one no longer counts as a duplicate)
+      // and — without a project — its cost center
       ...vendorData(vendorOfDoc(src), payeeOf(src.payeeType) === 'vendor'),
+      ...(payeeOf(src.payeeType) === 'vendor' && !relId(src.project) && relId(src.costCenter) ? { costCenter: relId(src.costCenter) } : {}),
       lines: toDocLines(fromDocLines(src).map(({ id: _id, ...l }) => l)),
       attachments: ids(src.attachments),
     } as never,

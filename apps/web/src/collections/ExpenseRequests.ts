@@ -96,6 +96,15 @@ export const requesterOptions = ({ data, user }: Pick<FilterOptionsProps, 'data'
 }
 
 /**
+ * ADR 0027 (client 2026-10-14): the requester's cost center is writable only on a vendor payment (a vendor payment
+ * without a project names its cost center); employee requests keep D2 (no cost center, Finance sets it at the transfer).
+ */
+export const vendorCostCenterAccess = ({ data, siblingData, doc }: { data?: unknown; siblingData?: unknown; doc?: unknown }): boolean => {
+  const payee = (data as { payeeType?: unknown } | undefined)?.payeeType ?? (siblingData as { payeeType?: unknown } | undefined)?.payeeType ?? (doc as { payeeType?: unknown } | undefined)?.payeeType
+  return payeeOf(payee) === 'vendor'
+}
+
+/**
  * ADR 0027: "Jenis penerima" options of the form — `vendor` only for Finance / PM of the form's PT (D3; the server
  * re-checks: drafts.ts vendorErrors). A stored value stays selectable (a locked request is never re-validated here).
  */
@@ -196,6 +205,8 @@ const beforeChange: CollectionBeforeChangeHook = async ({ data, originalDoc, ope
       d.bankAccount = null
     } else {
       for (const k of ['vendor', 'vendorBankAccount', 'invoiceNo', 'invoiceDate', 'invoiceDueDate', 'invoiceFile']) d[k] = null
+      // a vendor draft switched back to an employee payment drops its cost center (D2: employee requests have none)
+      if (payeeOf(prev.payeeType) === 'vendor') d.costCenter = null
     }
   }
 
@@ -428,15 +439,23 @@ export const ExpenseRequests: CollectionConfig = withAudit(
       // D2 (DRMS 10/10, owner 2026-10-11): no non-project requests — the requester never sets a cost center (create /
       // update access false → a value sent by an old client is ignored); Finance sets it on the transfer
       // (transfers.costCenter). Legacy requests keep theirs (shown read-only, never on a new form).
+      // ADR 0027 (client 2026-10-14): a VENDOR payment may name a cost center instead of a project (e.g. office bills) —
+      // writable only for the vendor payee (field access), the DB rule expense_requests_project_rules agrees.
       {
         name: 'costCenter',
         type: 'relationship',
         relationTo: 'cost-centers',
-        label: 'Pusat biaya (lama)',
+        label: 'Pusat biaya',
         index: true,
-        access: { create: fieldNever, update: fieldNever },
-        ...pickerSameCompany(),
-        admin: { ...ro, description: 'Pengajuan lama tanpa project. Pengajuan baru: pusat biaya diisi Finance saat transfer.', condition: (d, s, c) => linesEditable(d as Parameters<typeof linesEditable>[0]) && whenSet('costCenter')(d, s, c) },
+        access: { create: vendorCostCenterAccess, update: vendorCostCenterAccess },
+        ...pickerSameCompany({ createRoles: REQUEST_CREATE_ROLES }),
+        admin: {
+          placeholder: PLACEHOLDERS.costCenter,
+          description: 'Pembayaran vendor tanpa project: pilih pusat biaya (mis. tagihan kantor). Pengajuan lama tanpa project menampilkan pusat biayanya di sini.',
+          condition: (d, s, c) =>
+            (vendorPayee(editableInput())(d, s, c) && !whenSet('project')(d, s, c)) || (linesEditable(d as Parameters<typeof linesEditable>[0]) && whenSet('costCenter')(d, s, c)),
+          components: { Field: COMPANY_SCOPED_FIELD },
+        },
       },
       businessDateField('neededDate', 'Tanggal dibutuhkan', { admin: { condition: editableInput() } }),
       // Owner decision 2026-10-09: replaces "Periode kegiatan" (periodFrom/periodTo, Q-04).

@@ -106,7 +106,8 @@ invoice adalah buktinya.
    atas nama, *Rekening default*). Atau Master Data → **Rekening vendor**. Periksa nomor dan nama pemilik lalu ubah
    **Status verifikasi** menjadi *Terverifikasi* (hanya Finance / Admin). Mengubah nomor / nama / bank wajib dengan
    alasan (tercatat di audit).
-2. **Buat pengajuan:** Keuangan → Pengajuan biaya → Buat baru → **Jenis penerima: Vendor**. Pilih project, **Vendor**,
+2. **Buat pengajuan:** Keuangan → Pengajuan biaya → Buat baru → **Jenis penerima: Vendor**. Pilih project — atau,
+   tanpa project (mis. tagihan kantor), **Pusat biaya** —, **Vendor**,
    **Rekening vendor** (hanya rekening aktif vendor itu), isi **Nomor invoice**, **Tanggal invoice**, *Jatuh tempo*
    (opsional) dan unggah **File invoice** (foto / PDF). Isi baris item seperti biasa (item RAP per baris). Pemohon =
    Anda sendiri; jenis otomatis *Pengajuan Baru*. **Kirim pengajuan**.

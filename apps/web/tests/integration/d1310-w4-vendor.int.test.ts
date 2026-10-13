@@ -222,3 +222,38 @@ describe('transfer → Selesai (no LPJ)', () => {
     expect(audit.rows[0].new_value).toMatchObject({ v: { accountKind: 'vendor', verificationStatus: 'unverified' } })
   })
 })
+
+describe('client 2026-10-14: a vendor payment on a cost center (no project)', () => {
+  it('Finance files on a cost center → Finance vendor rule (Direktur) → transfer books that cost center → Selesai', async () => {
+    const cc = await sysCreate('cost-centers', { code: 'VND-KTR', name: 'VND Kantor', manager: pmV.id })
+    const body = await vendorBody(financeV, { projectId: null, costCenterId: cc })
+    const d = await ok(api('POST', E, financeV, body, key()), 201)
+    expect(d).toMatchObject({ projectId: null, costCenterId: cc, payeeType: 'vendor' })
+    // both is refused; an employee request still ignores a cost center (D2)
+    const both = await api('POST', E, financeV, await vendorBody(financeV, { costCenterId: cc }), key())
+    expect([201, 400]).toContain(both.status)
+    if (both.status === 201) expect(both.body).toMatchObject({ projectId: projectV, costCenterId: null })
+    const emp = await ok(api('POST', E, w.users.staffA, { type: 'advance', title: 'Biaya kantor', projectId: w.project, costCenterId: cc, requesterIds: [w.emp.a], bankAccountId: w.accA, lines: [] }, key()), 201)
+    expect(emp.costCenterId).toBeNull()
+    expect((await sqlError('app', 'UPDATE expense_requests SET cost_center_id = $1 WHERE id = $2', [cc, emp.id]))?.code).toBe('23514')
+
+    const s = await ok(api('POST', `${E}/${d.id}/submit`, financeV, {}, key()))
+    expect(s.status).toBe('pending_approval')
+    expect(s.approvalRule.name).toBe(VENDOR_FINANCE_RULE_NAME)
+    const a = await ok(api('POST', `${E}/${d.id}/approve`, w.users.owner, {}, key()))
+    expect(a.status).toBe('approved')
+    const q = await ok(api('GET', '/api/v1/transfer-queue', w.users.finance))
+    expect(q.items.find((i: { id: number }) => i.id === d.id)?.costCenter?.id).toBe(cc)
+    const proof = (await ok(upload('/api/v1/media/transfer-proofs', w.users.finance, await png()), 201)).id as number
+    const t = await ok(api('POST', `${E}/${d.id}/transfer`, w.users.finance, { cashAccountId: w.cashAccount, bankRef: `VNDCC-${d.id}`, proofMediaId: proof }, key()), 201)
+    expect(t.request.status).toBe('completed')
+    expect((await sqlAs('app', 'SELECT cost_center_id FROM transfers WHERE id = $1', [t.transferId])).rows[0].cost_center_id).toBe(cc)
+  })
+
+  it('a vendor payment with neither project nor cost center cannot be sent', async () => {
+    const d = await ok(api('POST', E, financeV, await vendorBody(financeV, { projectId: null }), key()), 201)
+    const sent = await api('POST', `${E}/${d.id}/submit`, financeV, {}, key())
+    expect(sent.status).toBe(400)
+    expect(sent.body.errors.map((e: { path: string }) => e.path)).toContain('projectId')
+  })
+})

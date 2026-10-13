@@ -61,10 +61,12 @@ enum RapCheck {
 /// Everything required before "Ajukan" (online submit).
 List<DraftIssue> validateForSubmit(DraftRequest d, {int? selfOnlyEmployee, RapCheck rap = RapCheck.strict}) {
   final issues = <DraftIssue>[...validateForSave(d), ...requesterIssues(d, selfOnlyEmployee: selfOnlyEmployee)];
-  // D2: project required (no non-project requests; Finance sets the cost center at transfer).
-  if (d.projectId == null) {
-    issues.add(const DraftIssue('projectId', 'Project wajib dipilih.'));
-  } else if (rap == RapCheck.missing) {
+  // D2: project required (no non-project requests; Finance sets the cost center at transfer). ADR 0027 (client
+  // 2026-10-14): a vendor payment may name a cost center instead (e.g. office bills).
+  if (d.projectId == null && !(d.isVendor && d.costCenterId != null)) {
+    final message = d.isVendor ? 'Pilih project atau pusat biaya (pembayaran vendor).' : 'Project wajib dipilih.';
+    issues.add(DraftIssue('projectId', message));
+  } else if (d.projectId != null && rap == RapCheck.missing) {
     issues.add(const DraftIssue('projectId', rapMissingMessage));
   }
   if (d.isVendor) {

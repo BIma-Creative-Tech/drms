@@ -9,6 +9,7 @@ import { previewQuery } from '@/admin/components/bank-preview-query'
 import { itemIcon, resolveModules } from '@/admin/modules/registry'
 import { buildPkListConfig } from '@/admin/pk-list/config'
 import { employeePayee, isVendorForm, vendorPayee } from '@/collections/expense-request-form'
+import { vendorCostCenterAccess } from '@/collections/ExpenseRequests'
 import type { TimelineSnapshot } from '@/domain/expense/approval-timeline'
 import type { RequestDoc } from '@/domain/expense/common'
 import { duplicateInvoiceMessage, vendorData, vendorOfDoc } from '@/domain/expense/drafts'
@@ -194,6 +195,16 @@ describe('ADR 0027 drafts: vendor columns', () => {
     expect(vendorData({ invoiceNo: '   ' }, true).invoiceNo).toBeNull()
   })
 
+  it('client 2026-10-14: the cost center is writable only on a vendor payment (employee requests keep D2)', () => {
+    expect(vendorCostCenterAccess({ data: { payeeType: 'vendor' } })).toBe(true)
+    expect(vendorCostCenterAccess({ data: {}, doc: { payeeType: 'vendor' } })).toBe(true)
+    expect(vendorCostCenterAccess({ data: { payeeType: 'karyawan' } })).toBe(false)
+    expect(vendorCostCenterAccess({})).toBe(false)
+    // "Duplikat" of a vendor payment on a cost center keeps the cost center
+    expect(duplicateDraftInput({ ...doc, project: null, costCenter: 8 } as unknown as RequestDoc)).toMatchObject({ projectId: null, costCenterId: 8 })
+    expect(duplicateDraftInput({ ...doc, project: 4, costCenter: null } as unknown as RequestDoc)).not.toHaveProperty('costCenterId')
+  })
+
   it('"Duplikat" keeps vendor + account but never the invoice (one invoice is paid once)', () => {
     const d = duplicateDraftInput(doc)
     expect(d).toMatchObject({ payeeType: 'vendor', vendorId: 3, vendorBankAccountId: 9 })
@@ -247,6 +258,7 @@ describe('ADR 0027 web form, preview, list, menu', () => {
     expect(guard).toContain('CREATE UNIQUE INDEX expense_requests_vendor_invoice_uq ON expense_requests (vendor_id, pk_invoice_key(invoice_no))')
     expect(guard).toContain("status NOT IN ('cancelled', 'rejected')")
     expect(guard).toContain('settlements_no_vendor_payment')
+    expect(guard).toContain("NOT (NEW.payee_type::text = 'vendor' AND NEW.project_id IS NULL)")
     const index = readFileSync(join(dir, 'index.ts'), 'utf8')
     expect(index.indexOf('20261013_700000_d1310_vendor_payments')).toBeLessThan(index.indexOf('20261013_700100_d1310_vendor_payments_guard'))
     expect(index.indexOf('20261013_700100_d1310_vendor_payments_guard')).toBeLessThan(index.indexOf('20261013_700200_d1310_vendor_payments_data'))

@@ -101,7 +101,7 @@ export const LineInput = z
 const draftFields = {
   title: z.string().trim().min(1).max(200),
   projectId: id.nullable().optional().meta({ description: 'D2 (DRMS 10/10): required to submit (no non-project requests).' }),
-  costCenterId: id.nullable().optional().meta({ description: 'D2: IGNORED since DRMS 10/10 (Finance sets the cost center at the transfer). Still accepted so older apps keep working.' }),
+  costCenterId: id.nullable().optional().meta({ description: 'D2: IGNORED since DRMS 10/10 for employee payments (Finance sets the cost center at the transfer; still accepted so older apps keep working). ADR 0027: a vendor payment (payeeType vendor) WITHOUT a project names its cost center here (active, of the request PT; project OR cost center required to submit).' }),
   neededDate: businessDate.nullable().optional(),
   urgencyLevelId: id.nullable().optional().meta({ description: 'urgency-levels id of the request PT ("Tingkat urgensi", owner decision 2026-10-09).' }),
   periodFrom: businessDate.nullable().optional().meta({ description: 'Ignored since 2026-10-09: "Periode kegiatan" was replaced by the urgency level. Still accepted so older apps keep working.' }),

@@ -3807,4 +3807,7 @@ class AppLocalizationsId extends AppLocalizations {
 
   @override
   String get vendorAccountsNone => 'Vendor ini belum punya rekening aktif — minta Finance / Admin menambahkannya.';
+
+  @override
+  String get vendorCostCenterHint => 'Tanpa project: pilih pusat biaya (mis. tagihan kantor).';
 }

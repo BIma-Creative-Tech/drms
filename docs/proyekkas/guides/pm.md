@@ -65,6 +65,7 @@ PM boleh mengajukan **pembayaran invoice vendor** untuk project-nya (selain PM, 
   diverifikasi oleh Finance / Admin), isi nomor, tanggal dan jatuh tempo invoice, foto / PDF invoice, baris item →
   **Kirim**. Draft boleh disimpan offline seperti pengajuan lain.
 - **Web:** Pengajuan biaya → Buat baru → *Jenis penerima* **Vendor** (field yang sama).
+- Tanpa project (mis. tagihan kantor): kosongkan project lalu pilih **Pusat biaya** yang Anda pegang.
 - Pemohon = Anda sendiri. Karena Anda PM project-nya, langkah **Persetujuan PM** dilewati → langsung **Direktur** →
   Finance mentransfer ke rekening vendor → **Selesai**. Tidak ada nota per baris maupun LPJ: invoice adalah buktinya.
 - Satu invoice hanya bisa diajukan sekali per vendor (selama pengajuan lama belum dibatalkan / ditolak).

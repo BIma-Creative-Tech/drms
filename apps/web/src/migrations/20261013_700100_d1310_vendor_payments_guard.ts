@@ -19,6 +19,8 @@ import { type MigrateDownArgs, type MigrateUpArgs, sql } from '@payloadcms/db-po
  *      normalizeInvoiceNo). Drafts count: a second draft with the same invoice is refused.
  * 3. `settlements`: no LPJ for a vendor payment (`settlements_no_vendor_payment`).
  * 4. `approval_rules.payee_type` is an expense-request condition only (addendum rules: 'any').
+ * 5. `pk_expense_requests_project_rules` (D2): a vendor payment may carry a cost center instead of a project (client
+ *    answer 2026-10-14, office bills) — set while Draft, sent with project OR cost center; employee requests unchanged.
  * Existing rows: every request is `karyawan` without vendor data and every rule `any` → all checks hold (validated).
  */
 export async function up({ db }: MigrateUpArgs): Promise<void> {
@@ -90,6 +92,32 @@ export async function up({ db }: MigrateUpArgs): Promise<void> {
     $fn$;
     CREATE TRIGGER settlements_no_vendor_payment BEFORE INSERT ON settlements FOR EACH ROW EXECUTE FUNCTION pk_settlement_not_vendor();
 
+    -- 5. D2 project rule (20261012_400100_d1010_rap_guard) widened, client answer 2026-10-14: a VENDOR payment may be
+    --    filed and sent with a cost center instead of a project; employee requests keep D2 unchanged.
+    CREATE OR REPLACE FUNCTION pk_expense_requests_project_rules() RETURNS trigger LANGUAGE plpgsql AS $fn$
+    BEGIN
+      IF TG_OP = 'INSERT' THEN
+        -- Payload writes an update of a row with hasMany children as INSERT … ON CONFLICT (id) DO UPDATE: the INSERT
+        -- step of an EXISTING row is passed through (the UPDATE branch below then checks the change)
+        IF EXISTS (SELECT 1 FROM expense_requests WHERE id = NEW.id) THEN RETURN NEW; END IF;
+        -- ADR 0027: a vendor payment without a project names its cost center
+        IF NEW.cost_center_id IS NOT NULL AND NOT (NEW.payee_type::text = 'vendor' AND NEW.project_id IS NULL) THEN
+          RAISE EXCEPTION 'expense_requests: new requests have no cost center — Finance sets it on the transfer (D2)' USING ERRCODE = '23514';
+        END IF;
+        RETURN NEW;
+      END IF;
+      IF NEW.cost_center_id IS NOT NULL AND NEW.cost_center_id IS DISTINCT FROM OLD.cost_center_id
+         AND NOT (NEW.payee_type::text = 'vendor' AND OLD.status = 'draft' AND NEW.project_id IS NULL) THEN
+        RAISE EXCEPTION 'expense_requests %: the cost center of a request cannot be set or changed (D2)', OLD.id USING ERRCODE = '23514';
+      END IF;
+      IF OLD.status = 'draft' AND NEW.status NOT IN ('draft', 'cancelled') AND NEW.project_id IS NULL
+         AND NOT (NEW.cost_center_id IS NOT NULL AND (coalesce(OLD.approval_cycle, 0) > 0 OR NEW.payee_type::text = 'vendor')) THEN
+        RAISE EXCEPTION 'expense_requests %: a request is sent with a project (D2)', OLD.id USING ERRCODE = '23514';
+      END IF;
+      RETURN NEW;
+    END
+    $fn$;
+
     -- 4. payee condition only on expense-request rules
     ALTER TABLE approval_rules ADD CONSTRAINT approval_rules_payee_type CHECK (doc_type = 'expense_request' OR payee_type = 'any');
 
@@ -104,6 +132,28 @@ export async function up({ db }: MigrateUpArgs): Promise<void> {
 
 export async function down({ db }: MigrateDownArgs): Promise<void> {
   await db.execute(sql`
+    -- D2 body of 20261012_400100_d1010_rap_guard
+    CREATE OR REPLACE FUNCTION pk_expense_requests_project_rules() RETURNS trigger LANGUAGE plpgsql AS $fn$
+    BEGIN
+      IF TG_OP = 'INSERT' THEN
+        -- Payload writes an update of a row with hasMany children as INSERT … ON CONFLICT (id) DO UPDATE: the INSERT
+        -- step of an EXISTING row is passed through (the UPDATE branch below then checks the change)
+        IF EXISTS (SELECT 1 FROM expense_requests WHERE id = NEW.id) THEN RETURN NEW; END IF;
+        IF NEW.cost_center_id IS NOT NULL THEN
+          RAISE EXCEPTION 'expense_requests: new requests have no cost center — Finance sets it on the transfer (D2)' USING ERRCODE = '23514';
+        END IF;
+        RETURN NEW;
+      END IF;
+      IF NEW.cost_center_id IS NOT NULL AND NEW.cost_center_id IS DISTINCT FROM OLD.cost_center_id THEN
+        RAISE EXCEPTION 'expense_requests %: the cost center of a request cannot be set or changed (D2)', OLD.id USING ERRCODE = '23514';
+      END IF;
+      IF OLD.status = 'draft' AND NEW.status NOT IN ('draft', 'cancelled') AND NEW.project_id IS NULL
+         AND NOT (NEW.cost_center_id IS NOT NULL AND coalesce(OLD.approval_cycle, 0) > 0) THEN
+        RAISE EXCEPTION 'expense_requests %: a request is sent with a project (D2)', OLD.id USING ERRCODE = '23514';
+      END IF;
+      RETURN NEW;
+    END
+    $fn$;
     ALTER TABLE approval_rules DROP CONSTRAINT IF EXISTS approval_rules_payee_type;
     DROP TRIGGER IF EXISTS settlements_no_vendor_payment ON settlements;
     DROP FUNCTION IF EXISTS pk_settlement_not_vendor();

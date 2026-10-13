@@ -178,6 +178,20 @@ void main() {
     expect(summaryFromJson({...vendorDetailJson(), 'payeeType': 'vendor'}).payeeType, PayeeType.vendor);
   });
 
+  test('client 2026-10-14: a vendor payment on a cost center (no project) is sendable; employee drafts keep D2', () {
+    final onCc = vendorDraft().copyWith(projectId: null, costCenterId: 7, lines: const []);
+    expect(validateForSubmit(onCc).map((i) => i.field), isNot(contains('projectId')));
+    expect(draftToSyncPayload(onCc)['cost_center_id'], 7);
+    expect(draftToCreateBody(onCc)['costCenterId'], 7);
+    final neither = onCc.copyWith(costCenterId: null);
+    expect(validateForSubmit(neither).map((i) => i.field), contains('projectId'));
+    final withProject = vendorDraft().copyWith(costCenterId: 7);
+    expect(draftToSyncPayload(withProject).containsKey('cost_center_id'), isFalse, reason: 'project wins');
+    final emp = onCc.copyWith(payeeType: PayeeType.karyawan);
+    expect(draftToSyncPayload(emp).containsKey('cost_center_id'), isFalse);
+    expect(validateForSubmit(emp).map((i) => i.field), contains('projectId'));
+  });
+
   test('vendor accounts of the chosen vendor only', () {
     final masters = {
       MasterTypes.vendorBankAccounts: [

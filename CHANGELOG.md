@@ -14,7 +14,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   audited, no delete) and a **Rekening** tab on the vendor form. Expense requests get **Jenis penerima**
   (`payeeType`: `karyawan` default — unchanged — / `vendor`): vendor, vendor account (of that vendor, same PT), invoice
   number / date / due date / file (required to submit). Vendor payments are filed by **Finance or PM only** (Staff 403),
-  always type Pengajuan Baru, Pemohon = the filer.
+  always type Pengajuan Baru, Pemohon = the filer. **Project or cost center** (client 2026-10-14): without a project a
+  vendor payment names a cost center (pusat biaya, e.g. office bills) — vendor payee only; employee requests keep D2
+  (DB rule `pk_expense_requests_project_rules` widened for the vendor payee only).
 - **Approval through the generic rule engine**: new rule condition "Jenis penerima"; seeded per PT "Pembayaran vendor
   oleh Finance — Direktur" (Finance → Direktur only); a PM's vendor payment takes the default rule with the PM step
   skipped. **Duplicate invoice** (same vendor + normalized number on a request not cancelled / rejected) → 409 field

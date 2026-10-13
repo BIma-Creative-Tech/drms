@@ -400,8 +400,10 @@ Json draftToCreateBody(DraftRequest d) => {
   // ADR 0027: a vendor payment is always Pengajuan Baru (the server sets it too)
   'type': d.isVendor ? RequestType.advance.code : d.type.code,
   'title': d.title.trim(),
-  // D2: project only — the requester no longer sends a cost center (Finance sets it at transfer).
+  // D2: project only — the requester no longer sends a cost center (Finance sets it at transfer). ADR 0027: a vendor
+  // payment without a project sends its cost center.
   'projectId': d.projectId,
+  if (d.isVendor && d.projectId == null && d.costCenterId != null) 'costCenterId': d.costCenterId,
   'neededDate': d.neededDate,
   'urgencyLevelId': d.urgencyLevelId,
   'notes': (d.notes == null || d.notes!.trim().isEmpty) ? null : d.notes!.trim(),
@@ -440,6 +442,7 @@ Json draftToSyncPayload(DraftRequest d, {bool includeDraftId = false}) => {
   'kind': d.isVendor ? RequestType.advance.code : d.type.code,
   'title': d.title.trim(),
   'project_id': d.projectId,
+  if (d.isVendor && d.projectId == null && d.costCenterId != null) 'cost_center_id': d.costCenterId,
   'needed_date': d.neededDate,
   'urgency_level_id': d.urgencyLevelId,
   'notes': (d.notes == null || d.notes!.trim().isEmpty) ? null : d.notes!.trim(),

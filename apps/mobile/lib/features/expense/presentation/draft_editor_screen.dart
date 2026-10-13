@@ -155,7 +155,8 @@ class _DraftEditorScreenState extends ConsumerState<DraftEditorScreen> {
   DraftRequest _collect() => _d.copyWith(
     title: _title.text,
     notes: _notes.text.trim().isEmpty ? null : _notes.text.trim(),
-    costCenterId: null,
+    // ADR 0027 (client 2026-10-14): only a vendor payment without a project keeps a cost center
+    costCenterId: _d.isVendor && _d.projectId == null ? _d.costCenterId : null,
     invoiceNo: _d.isVendor ? (_invoiceNo.text.trim().isEmpty ? null : _invoiceNo.text.trim()) : null,
   );
 
@@ -572,13 +573,25 @@ class _DraftEditorScreenState extends ConsumerState<DraftEditorScreen> {
                         label: t.fieldProject,
                         items: m[MasterTypes.projects] ?? const [],
                         value: _d.projectId,
-                        allowNone: false,
+                        // ADR 0027: a vendor payment may go without a project (then a cost center)
+                        allowNone: _d.isVendor,
                         errorText: issueFor('projectId'),
                         onChanged: _setProject,
                       ),
+                      if (_d.isVendor && _d.projectId == null) ...[
+                        const SizedBox(height: 8),
+                        MasterPickerField(
+                          key: const Key('draft-cost-center'),
+                          label: t.fieldCostCenter,
+                          hint: t.vendorCostCenterHint,
+                          items: m[MasterTypes.costCenters] ?? const [],
+                          value: _d.costCenterId,
+                          onChanged: (v) => setState(() => _d = _d.copyWith(costCenterId: v)),
+                        ),
+                      ],
                       // D4 (owner 2026-10-11): project with a RAB but no RAP → submit refused; same text as the web
                       if (rap != null && rap.missing) const _RapMissingCard(),
-                      if (_d.projectId == null && widget.initial.costCenterId != null)
+                      if (!_d.isVendor && _d.projectId == null && widget.initial.costCenterId != null)
                         Padding(
                           key: const Key('draft-cost-center-legacy'),
                           padding: const EdgeInsets.only(top: 4),

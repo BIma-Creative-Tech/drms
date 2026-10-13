@@ -1,8 +1,8 @@
 # ADR 0027 — Pembayaran vendor (vendor payments)
 
-- **Status:** Proposed → implemented on `feat/d1310-w4-vendor` (DRMS 13/10 Wave 4a). Decisions D3 approved by the
-  owner; the points marked **(to confirm)** are proposals of this ADR that the client confirms at UAT. Staging first;
-  no production deploy without separate owner approval.
+- **Status:** Accepted — implemented on `feat/d1310-w4-vendor` (DRMS 13/10 Wave 4a). Decisions D3 approved by the
+  owner; the open points were answered by the client on 2026-10-14 (see "Client answers"). Staging first; no
+  production deploy without separate owner approval.
 - **Date:** 2026-10-14
 - **Author:** nextjs developer (branch `feat/d1310-w4-vendor`, from `feat/d1310-w3-dash`)
 - **Related:** ADR 0005 (cash ledger), ADR 0006 (audit), ADR 0007 (numbering), ADR 0008 (PDF), ADR 0010 (APK offline),
@@ -40,14 +40,18 @@ payments therefore stay on the generic rule engine, nothing names a step.
      account, invoice number, date and file are **required to submit**. The employee account (`bankAccount`) stays
      empty; the requester picker is hidden: **Pemohon = the filer himself** (his own employee in the PT), so the
      approval routing follows the filer's role;
-   - the **project is required** to submit, like every new request since D2 (a legacy cost-center draft keeps its cost
-     center); Finance sets the cost center at the transfer as usual. **(to confirm: no vendor payment without a
-     project — a general/office vendor bill must be filed on a project or later on a cost center when that comes
-     back)**.
+   - **project OR cost center** (client answer 2026-10-14): a vendor payment is filed on a project, or — without a
+     project, e.g. office bills — on a **cost center (pusat biaya)**. Employee requests keep D2 unchanged (project
+     required; the requester never sets a cost center; Finance sets it at the transfer), so this is a vendor-payee
+     exception: the `costCenter` field is writable only for the vendor payee (field access), "Pilih project atau pusat
+     biaya" at submit, and the DB rule `pk_expense_requests_project_rules` (D2) is widened for `payee_type = vendor`
+     only (guard migration). Project wins when both are given. A PM files only on his own projects / cost centers
+     (existing scope check G10); approval routing of a cost-center vendor payment is the normal rule engine (Finance
+     rule → Direktur; a PM's → the default rule, "Diketahui" by the cost center's manager, skipped when that is the
+     PM himself). At the transfer Finance's cost center defaults to the request's own one.
 3. **Who may file (D3)** — the creator must hold **Finance or PM in the request's PT** (403 "Pembayaran vendor hanya
    dapat diajukan oleh Finance atau PM di PT ini."). Staff, Admin and Direktur cannot file vendor payments; the form only
-   offers "Vendor" to Finance / PM (UI hint, the server is the authority). **(to confirm: Admin / Direktur do not file
-   vendor payments)**.
+   offers "Vendor" to Finance / PM (UI hint, the server is the authority). Confirmed by the client 2026-10-14.
 4. **Approval** — the generic engine (`rules.ts`, `snapshot.ts`) with one new rule condition **"Jenis penerima"**
    (`approval_rules.payee_type`: `any` (default, every existing rule) | `karyawan` | `vendor`; counts as one more
    specificity like "Peran pemohon"; addendum rules: `any` only — hook + DB CHECK). Seeded per PT (data migration
@@ -98,15 +102,14 @@ payments therefore stay on the generic rule engine, nothing names a step.
   the transfer (no open LPJ). Reports can filter on `payee_type` later if the client wants a separate column.
 - Vendors without accounts cannot be paid: Finance / Admin add the account (tab Rekening) first.
 
-## Open questions for the client
+## Client answers (2026-10-14)
 
-1. Vendor payment without a project (office / general bills)? Today: project required (D2).
-2. Is the invoice **due date** required? Today: optional.
-3. Should Admin or Direktur also be able to file vendor payments? Today: Finance and PM only.
-4. Partial payments of one invoice (term payments)? Today: one invoice = one request (the duplicate rule refuses a
-   second request with the same invoice number while the first is not cancelled / rejected).
-5. Should the vendor payment rule for Finance have an amount band (e.g. above a threshold also the Owner)? The upcoming
-   Owner level will be added to the rules.
+1. Vendor payment without a project: **yes, on a cost center** (pusat biaya), e.g. office bills — decision 2 above.
+2. Invoice **due date**: stays **optional**.
+3. Who files: **Finance and PM only** (no Admin / Direktur).
+4. Partial / term payments of one invoice: **no** — one invoice = one request (duplicate rule unchanged).
+5. Amount band on the Finance vendor rule: **no**. The upcoming Owner level is a separate change (after PR #62) on the
+   generic rule engine.
 
 ## Rollout
 

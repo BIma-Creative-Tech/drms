@@ -32,7 +32,15 @@ export function duplicateDraftInput(src: RequestDoc): DraftInput & { type: Reque
     requesterIds: ids(src.requesters),
     bankAccountId: relId(src.bankAccount) ?? null,
     lines: fromDocLines(src).map(({ id: _id, receiptAmount: _receipt, ...l }): LineInputApi => ({ ...l, receiptAmount: null })),
-    ...(payeeOf(src.payeeType) === 'vendor' ? { payeeType: 'vendor' as const, vendorId: relId(src.vendor) ?? null, vendorBankAccountId: relId(src.vendorBankAccount) ?? null } : {}),
+    ...(payeeOf(src.payeeType) === 'vendor'
+      ? {
+          payeeType: 'vendor' as const,
+          vendorId: relId(src.vendor) ?? null,
+          vendorBankAccountId: relId(src.vendorBankAccount) ?? null,
+          // ADR 0027: a vendor payment on a cost center (no project) keeps it
+          ...(!relId(src.project) && relId(src.costCenter) ? { costCenterId: relId(src.costCenter)! } : {}),
+        }
+      : {}),
   }
 }
 

@@ -95,7 +95,7 @@ export const SyncDraftUpsertPayload = z
     kind: z.enum(['advance', 'reimburse']).optional().meta({ description: 'Required for a new draft. advance = Pengajuan Baru.' }),
     title: z.string().trim().min(1).max(200).optional().meta({ description: 'Required for a new draft.' }),
     project_id: id.nullable().optional(),
-    cost_center_id: id.nullable().optional().meta({ description: 'D2: ignored (no non-project requests; Finance sets the cost center at the transfer). Still accepted so older apps keep working.' }),
+    cost_center_id: id.nullable().optional().meta({ description: 'D2: ignored for employee payments (Finance sets the cost center at the transfer; still accepted so older apps keep working). ADR 0027: the cost center of a vendor payment without a project.' }),
     needed_date: businessDate.nullable().optional(),
     urgency_level_id: id.nullable().optional().meta({ description: 'urgency-levels id of the request PT (owner decision 2026-10-09).' }),
     period_from: businessDate.nullable().optional().meta({ description: 'Ignored since 2026-10-09: "Periode kegiatan" was replaced by the urgency level. Still accepted so older apps keep working.' }),

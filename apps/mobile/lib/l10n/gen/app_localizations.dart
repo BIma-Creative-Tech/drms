@@ -6804,6 +6804,12 @@ abstract class AppLocalizations {
   /// In id, this message translates to:
   /// **'Vendor ini belum punya rekening aktif — minta Finance / Admin menambahkannya.'**
   String get vendorAccountsNone;
+
+  /// No description provided for @vendorCostCenterHint.
+  ///
+  /// In id, this message translates to:
+  /// **'Tanpa project: pilih pusat biaya (mis. tagihan kantor).'**
+  String get vendorCostCenterHint;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {
