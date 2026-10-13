@@ -5,7 +5,7 @@ import { companiesWithRole, relId, type Role } from '@/access/roles'
 import { companyRefs, type CompanyRef } from '@/domain/companies'
 
 import { actorContext, ids, projectCommitted, settings, type RequestDoc } from './common'
-import { isDecisionSnapshot, isNoApproval } from './decision'
+import { isDecisionSnapshot, isNoApproval, noApprovalRequesterRole, OWNER_ROLE } from './decision'
 import { DEFAULT_TRANSFER_SLA_HOURS, queueAge } from './sla'
 import { suggestedCostCenter } from './transfers'
 import { withFlagVisibility } from './flag-visibility'
@@ -175,8 +175,9 @@ export async function transferQueue(req: PayloadRequest, f?: QueueFilter) {
       bankVerification: verification((d as { bankAccount?: unknown }).bankAccount),
       flags: await flagCounts(req, d.id),
       sla: { approvedAt, slaHours, ageHours: age?.hours ?? null, over: age?.over ?? false },
-      // ADR 0024: a Direktur's own request that reached the queue without any approval (badge)
+      // ADR 0024 / 0025: a Direktur's (legacy) / the Owner's own request that reached the queue without any approval (badge)
       noApproval: isNoApproval(d.approvalSnapshot),
+      noApprovalBy: noApprovalRequesterRole(d.approvalSnapshot) === OWNER_ROLE ? ('owner' as const) : isNoApproval(d.approvalSnapshot) ? ('direktur' as const) : null,
     })
   }
   // needed date ascending, requests without a date last

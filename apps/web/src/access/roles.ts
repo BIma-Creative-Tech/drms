@@ -9,21 +9,46 @@ import type { Access, PayloadRequest } from 'payload'
  * intentionally absent from `anyMember` (access/policies.ts) and from every per-collection role map
  * that exposes business data — new code must not add it there without a specific reason.
  */
-export const ROLES = ['pk-staff', 'pk-pm', 'pk-finance', 'pk-owner', 'pk-admin', 'pk-operator'] as const
+export const ROLES = ['pk-staff', 'pk-pm', 'pk-finance', 'pk-owner', 'pk-principal', 'pk-admin', 'pk-operator'] as const
 export type Role = (typeof ROLES)[number]
+
+/**
+ * ADR 0025 (owner decision 2026-10-13): the "Owner" approval level ABOVE the Direktur. Internal key
+ * `pk-principal` (NOT "owner": `pk-owner` has been the Direktur since ADR 0013, also in `/dashboard/owner` and
+ * the APK `Role.owner`). The Owner sees and may do everything the Direktur may (ROLE_IMPLIES); only the
+ * approval flow differs: Staff → PM → Direktur → Owner → Finance transfer queue.
+ */
+export const PRINCIPAL_ROLE = 'pk-principal' as const satisfies Role
+
+/**
+ * ADR 0025: roles that carry the ACCESS of other roles. A membership holding `pk-principal` (Owner) acts as
+ * `pk-owner` (Direktur) for every access / visibility check (`rolesIn`, `hasRole`, `byRole`, dashboards, …).
+ * The approval engine never uses this expansion: step matching, step holders, notifications of a step and the
+ * distinct-person rule read the EXACT stored roles (`exactRolesIn`, `membersWithRole`), so the Owner never
+ * decides the Direktur level and the Direktur never decides the Owner level.
+ */
+export const ROLE_IMPLIES: Readonly<Partial<Record<Role, readonly Role[]>>> = { 'pk-principal': ['pk-owner'] }
+
+/** Stored roles (their order kept) + the roles they imply appended (ADR 0025), no duplicates. */
+export function effectiveRoles(exact: readonly Role[]): Role[] {
+  const out = [...new Set(exact)]
+  for (const r of exact) for (const x of ROLE_IMPLIES[r] ?? []) if (!out.includes(x)) out.push(x)
+  return out
+}
 
 /** Keycloak realm role "may log in to ProyekKas" (ADR 0016 §2). */
 export const LOGIN_ROLE = 'pk-user'
 
 /**
  * Display labels. ADR 0013 / GATE 1 G1-1 (user 2026-09-26): the role `pk-owner` is shown as
- * "Direktur" (the role id stays `pk-owner`).
+ * "Direktur" (the role id stays `pk-owner`). ADR 0025: `pk-principal` is shown as "Owner".
  */
 export const ROLE_LABELS: Record<Role, string> = {
   'pk-staff': 'Staff lapangan',
   'pk-pm': 'Project Manager',
   'pk-finance': 'Finance',
   'pk-owner': 'Direktur',
+  'pk-principal': 'Owner',
   'pk-admin': 'Admin',
   'pk-operator': 'Operator/Anggota',
 }
@@ -35,12 +60,16 @@ export const ROLE_LABELS: Record<Role, string> = {
  * an even narrower panel (attendance only). What a restricted role SEES is narrowed by
  * `src/access/panel-visibility.ts`; what it may READ/WRITE is still decided by access functions.
  */
-export const PANEL_ROLES: readonly Role[] = ['pk-admin', 'pk-finance', 'pk-owner', 'pk-pm', 'pk-staff', 'pk-operator']
+export const PANEL_ROLES: readonly Role[] = ['pk-admin', 'pk-finance', 'pk-owner', 'pk-principal', 'pk-pm', 'pk-staff', 'pk-operator']
 
 // ---- company context (ADR 0016 §5) --------------------------------------------------------------
 
-/** One active membership of the user in an active PT. */
-export type Membership = { company: number; roles: Role[]; employee: number | null }
+/**
+ * One active membership of the user in an active PT. `roles` = EFFECTIVE roles (stored roles + ROLE_IMPLIES,
+ * ADR 0025) — what every access check reads; `exactRoles` = the roles as stored (approval engine). Built by
+ * `withCompanyContext` (a membership without `exactRoles` is taken as stored).
+ */
+export type Membership = { company: number; roles: Role[]; exactRoles?: Role[]; employee: number | null }
 
 /**
  * Per-request access context, attached to `req.user` by the auth strategies (and by
@@ -69,7 +98,12 @@ export function companyContextOf(user: unknown): CompanyContext | null {
  * stored value) and `employee` (employee of the first selected membership that has one).
  * MC2: `employee` is ambiguous with >1 selected PT — callers must use `employeeIn(req, company)`.
  */
-export function withCompanyContext<T extends object>(user: T, memberships: Membership[], selection: number[] | null, groupAdmin: boolean): T & { roles: Role[]; employee: number | null } {
+export function withCompanyContext<T extends object>(user: T, stored: Membership[], selection: number[] | null, groupAdmin: boolean): T & { roles: Role[]; employee: number | null } {
+  // ADR 0025: effective roles for access, stored roles kept for the approval engine (idempotent on a context's own memberships)
+  const memberships = stored.map((m) => {
+    const exactRoles = [...(m.exactRoles ?? m.roles)]
+    return { ...m, exactRoles, roles: effectiveRoles(exactRoles) }
+  })
   const ids = memberships.map((m) => m.company)
   const selected = selection === null ? ids : ids.filter((id) => selection.includes(id))
   const sel = memberships.filter((m) => selected.includes(m.company))
@@ -96,6 +130,29 @@ export function rolesOf(user: unknown): Role[] {
 
 export function userRoles(req: ReqLike): Role[] {
   return rolesOf(req.user)
+}
+
+/**
+ * ADR 0025: STORED roles of the caller IN ONE PT (no ROLE_IMPLIES expansion) — the approval engine only
+ * (step matching, decision roles): the Owner is not a Direktur there and vice versa. Everything else uses `rolesIn`.
+ */
+export function exactRolesIn(req: ReqLike, companyId: number | null | undefined): Role[] {
+  if (typeof companyId !== 'number') return []
+  const m = companyContextOf(req.user)?.memberships.find((x) => x.company === companyId)
+  return m ? [...(m.exactRoles ?? m.roles)] : []
+}
+
+/** ADR 0025: stored roles in ANY selected PT (UI labels; plain objects without a context: their `roles`). */
+export function exactRolesOf(user: unknown): Role[] {
+  const c = companyContextOf(user)
+  if (!c) return rolesOf(user)
+  return ROLES.filter((r) => membershipsOf(user).some((m) => (m.exactRoles ?? m.roles).includes(r)))
+}
+
+/** ADR 0025: the caller holds `role` AS STORED in the PT (approval positions: Direktur-only loan / addendum decisions). */
+export function hasExactRole(req: ReqLike, role: Role | readonly Role[], companyId: number | null | undefined): boolean {
+  const want: readonly Role[] = typeof role === 'string' ? [role] : role
+  return exactRolesIn(req, companyId).some((r) => want.includes(r))
 }
 
 /** Does the caller hold exactly `role` and no other panel role in the selected PTs? */

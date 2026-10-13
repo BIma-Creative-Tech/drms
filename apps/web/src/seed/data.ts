@@ -101,18 +101,23 @@ export const EMPLOYEE_BANK_ACCOUNTS = [
  * existing databases keep their rules — the Admin changes them in the UI (ADR 0021 rollout; the ADR 0013
  * names "Default — Direktur lalu Finance (semua nominal)" / "Contoh — di atas Rp 10 juta: Direktur lalu
  * Finance" came from the data migration `20260926_*_e1_approval_direktur_finance`). ADR 0024 (owner 2026-10-11):
- * + "Pengajuan Direktur" (Peran pemohon = Direktur, no approval level → straight to Finance, priority 10).
+ * + "Pengajuan Direktur" (Peran pemohon = Direktur, priority 10). ADR 0025 (owner 2026-10-13): every expense rule
+ * ends with the Owner level (`pk-principal`, above the Direktur): Staff → PM project → Direktur → Owner → Finance
+ * transfer; "Pengajuan Direktur" → Owner; "Pengajuan Owner" (Peran pemohon = Owner, no approval level → straight to
+ * Finance, priority 5). Existing databases get the same shape from the data migration 20261013_610200 (names kept).
  */
 /** Name of the seeded default addendum rule (shared with the E5 migration). */
 export const ADDENDUM_DEFAULT_RULE_NAME = 'Default Addendum RAB — Direktur lalu Finance'
 
-/** ADR 0024: name of the seeded no-approval rule for a Direktur's own requests (also migration 20261013_300000_d1010_approval_config_data). */
+/** ADR 0024: name of the seeded rule for a Direktur's own requests (also migration 20261013_300000_d1010_approval_config_data). */
 export const DIREKTUR_RULE_NAME = 'Pengajuan Direktur'
+/** ADR 0025: name of the seeded no-approval rule for the Owner's own requests (also migration 20261013_610200_d1310_owner_role_data). */
+export const OWNER_RULE_NAME = 'Pengajuan Owner'
 
 export const DEFAULT_APPROVAL_RULES = [
   {
     // ADR 0021 (owner decision 2026-10-10): Staff → PM project ("Diketahui" = Persetujuan PM) → Direktur;
-    // Finance only transfers (no approval level).
+    // ADR 0025 (owner 2026-10-13): → Owner (last level); Finance only transfers (no approval level).
     name: 'Default — PM project lalu Direktur (semua nominal)',
     docType: 'expense_request',
     requestType: 'any',
@@ -124,12 +129,33 @@ export const DEFAULT_APPROVAL_RULES = [
     acknowledgeRole: null,
     signDiajukan: 'required',
     signDibuat: 'required',
-    steps: [{ level: 1, approverRole: 'pk-owner' }],
+    steps: [
+      { level: 1, approverRole: 'pk-owner' },
+      { level: 2, approverRole: 'pk-principal' },
+    ],
     active: true,
   },
   {
-    // ADR 0024 (owner decision 2026-10-11): a Direktur's OWN request → no approval step, straight to the
-    // Finance transfer queue (audited exception `direktur_no_approval`). Evaluated before the default (10 < 100).
+    // ADR 0025 (owner decision 2026-10-13): the Owner's OWN request → no approval step, straight to the Finance
+    // transfer queue (audited exception `principal_no_approval`). Evaluated first (5).
+    name: OWNER_RULE_NAME,
+    docType: 'expense_request',
+    requestType: 'any',
+    minAmount: 0,
+    maxAmount: null,
+    priority: 5,
+    requesterRoles: ['pk-principal'],
+    acknowledge: 'none',
+    acknowledgeBy: 'role',
+    acknowledgeRole: null,
+    signDiajukan: 'required',
+    signDibuat: 'required',
+    steps: [],
+    active: true,
+  },
+  {
+    // ADR 0024 (owner decision 2026-10-11): a Direktur's OWN request, no PM step. ADR 0025: approved by the Owner
+    // (was: no approval, `direktur_no_approval`), then the Finance transfer queue. Evaluated before the default (10 < 100).
     name: DIREKTUR_RULE_NAME,
     docType: 'expense_request',
     requestType: 'any',
@@ -142,7 +168,7 @@ export const DEFAULT_APPROVAL_RULES = [
     acknowledgeRole: null,
     signDiajukan: 'required',
     signDibuat: 'required',
-    steps: [],
+    steps: [{ level: 1, approverRole: 'pk-principal' }],
     active: true,
   },
   {
@@ -157,7 +183,10 @@ export const DEFAULT_APPROVAL_RULES = [
     acknowledgeRole: null,
     signDiajukan: 'required',
     signDibuat: 'required',
-    steps: [{ level: 1, approverRole: 'pk-owner' }],
+    steps: [
+      { level: 1, approverRole: 'pk-owner' },
+      { level: 2, approverRole: 'pk-principal' },
+    ],
     active: false,
   },
   // E5 (T12, US-30): Addendum RAB through the same engine — Direktur ("Diketahui" = approval) then

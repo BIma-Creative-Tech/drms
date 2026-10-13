@@ -1,7 +1,7 @@
 import { sql } from '@payloadcms/db-postgres'
 import { APIError, type PayloadRequest, type Where } from 'payload'
 
-import { hasRole, hasRoleAny, mappedCompanies, relId, userId, userRoles } from '@/access/roles'
+import { hasExactRole, hasRole, hasRoleAny, mappedCompanies, relId, userId, userRoles } from '@/access/roles'
 import { writeAudit, writeAuditDetached } from '@/audit/writer'
 import { contextCompanyId, displayNames, membersWithRole } from '@/domain/companies'
 import { displayName, resolveSignature, today, type Signature } from '@/domain/expense/common'
@@ -182,6 +182,9 @@ export async function actorContext(req: PayloadRequest, doc: LoanDoc, repayments
   const borrower = await loadProject(req, relId(doc.borrowerProject)!, 'borrowerProjectId')
   // ADR 0016 §5: roles IN THE LOAN's PT
   const isDirektur = hasRole(req, 'pk-owner', company)
+  // ADR 0025: loans stay Direktur-only — the decision pool is the STORED Direktur role (the Owner sees and may cancel /
+  // void like a Direktur, but never approves or rejects a loan)
+  const decides = hasExactRole(req, 'pk-owner', company)
   const posted = (repayments ?? (repaid(doc) > 0 ? await repaymentsOf(req, doc.id) : [])).some((r) => r.status === 'posted')
   return {
     status: doc.status,
@@ -189,7 +192,7 @@ export async function actorContext(req: PayloadRequest, doc: LoanDoc, repayments
     isBorrowerPm: await isBorrowerPm(req, borrower, company),
     isDirektur,
     isFinance: hasRole(req, 'pk-finance', company),
-    mayDecide: mayDecide({ callerId: uid, creatorId: relId(doc.createdBy) ?? -2, callerIsDirektur: isDirektur, g1Exception: doc.g1Exception ?? null }),
+    mayDecide: mayDecide({ callerId: uid, creatorId: relId(doc.createdBy) ?? -2, callerIsDirektur: decides, g1Exception: doc.g1Exception ?? null }),
     hasRepayment: posted || repaid(doc) > 0,
   }
 }
@@ -204,13 +207,14 @@ async function requireAction(req: PayloadRequest, doc: LoanDoc, action: LoanActi
   if (loanAllowedActions(ctx).includes(action)) return ctx
   const decision = DECISIONS.has(action)
   if (decision) {
-    const reason = !ctx.isDirektur
-      ? 'hanya Direktur PT yang memutuskan pinjaman antar project (ADR 0022 §4)'
+    const direktur = hasExactRole(req, 'pk-owner', relId(doc.company)) // ADR 0025: the Owner does not decide loans
+    const reason = !direktur
+      ? 'hanya Direktur PT yang memutuskan pinjaman antar project (ADR 0022 §4, ADR 0025)'
       : ctx.isCreator
         ? 'pembuat pinjaman tidak boleh memutuskan pinjamannya sendiri (G1; ada Direktur lain)'
         : 'bukan langkah keputusan'
     await writeAuditDetached(req, [{ action: 'access_denied', docType: 'project_loan', docId: String(doc.id), docNo: doc.docNo ?? undefined, field: action, newValue: { action, status: doc.status, roles: userRoles(req) }, reason }])
-    if (!ctx.isDirektur) fail(403, 'FORBIDDEN', 'Hanya Direktur yang dapat menyetujui atau menolak pinjaman antar project.')
+    if (!direktur) fail(403, 'FORBIDDEN', 'Hanya Direktur yang dapat menyetujui atau menolak pinjaman antar project.')
     if (ctx.isCreator && !ctx.mayDecide) fail(403, 'FORBIDDEN', 'Pembuat pinjaman tidak dapat memutuskan pinjamannya sendiri. Direktur lain yang memutuskan.')
     if (doc.status !== 'pending_approval') fail(409, 'STATE_CONFLICT', `Aksi tidak dapat dilakukan pada status pinjaman saat ini (${LOAN_STATUS_LABELS[doc.status]}).`)
     return fail(403, 'FORBIDDEN', 'Anda tidak berhak memutuskan pinjaman ini.')
@@ -764,7 +768,7 @@ export async function loanInbox(req: PayloadRequest, f: { companyIds?: readonly 
   const res = await req.payload.find({ collection: 'project-loans', where, sort: 'submittedAt', limit: 200, depth: 0, user: req.user, overrideAccess: false, req })
   const docs = res.docs as unknown as LoanDoc[]
   const uid = userId(req) ?? -1
-  const mine = docs.filter((d) => mayDecide({ callerId: uid, creatorId: relId(d.createdBy) ?? -2, callerIsDirektur: hasRole(req, 'pk-owner', relId(d.company)), g1Exception: d.g1Exception ?? null }))
+  const mine = docs.filter((d) => mayDecide({ callerId: uid, creatorId: relId(d.createdBy) ?? -2, callerIsDirektur: hasExactRole(req, 'pk-owner', relId(d.company)), g1Exception: d.g1Exception ?? null }))
   const n = await names(req, mine)
   const todayStr = await today(req)
   return { items: mine.map((d) => summary(d, n, todayStr)) }

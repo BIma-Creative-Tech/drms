@@ -569,7 +569,7 @@ function TeamWaitingCard({ id, data, span, i }: { id: string; data: TeamWaiting;
       ),
     },
     { key: 'scope', label: 'Project / pusat biaya', sec: true, cell: (r) => r.scopeName || '—' },
-    { key: 'who', label: 'Menunggu', cell: (r) => <StatusPill tone={r.days !== null && r.days > 3 ? 'warn' : 'wait'} label={r.waitingFor === 'pm' ? 'PM project' : r.waitingFor === 'direktur' ? 'Direktur' : 'Finance'} /> },
+    { key: 'who', label: 'Menunggu', cell: (r) => <StatusPill tone={r.days !== null && r.days > 3 ? 'warn' : 'wait'} label={r.waitingFor === 'pm' ? 'PM project' : r.waitingFor === 'direktur' ? 'Direktur' : r.waitingFor === 'owner' ? 'Owner' : 'Finance'} /> },
     { key: 'age', label: 'Lama', num: true, cell: (r) => (r.days === null ? '—' : <span title={r.submittedDate ?? ''}>{r.days} hari</span>) },
     { key: 'amt', label: 'Grand total', num: true, cell: (r) => rp(r.grandTotal) },
   ]
@@ -1116,14 +1116,14 @@ async function Pm({ req, siteId }: { req: PayloadRequest; siteId?: number }) {
             icon="inbox"
             label="Pengajuan tim menunggu keputusan"
             value={formatNumber(d.teamWaiting.count)}
-            title={`${formatNumber(d.teamWaiting.count)} pengajuan tim menunggu PM/Direktur/Finance`}
+            title={`${formatNumber(d.teamWaiting.count)} pengajuan tim menunggu PM/Direktur/Owner/Finance`}
             kpi="k10-team"
             href={statusList(WAITING)}
             more="Lihat pengajuan"
             i={0}
           >
             <p className="pk-kpi-x">
-              PM <b>{formatNumber(d.teamWaiting.pm)}</b> · Direktur <b>{formatNumber(d.teamWaiting.direktur)}</b> · Finance <b>{formatNumber(d.teamWaiting.finance)}</b>
+              PM <b>{formatNumber(d.teamWaiting.pm)}</b> · Direktur <b>{formatNumber(d.teamWaiting.direktur)}</b> · Owner <b>{formatNumber(d.teamWaiting.owner)}</b> · Finance <b>{formatNumber(d.teamWaiting.finance)}</b>
             </p>
             <p className="pk-kpi-x">{d.teamWaiting.oldestDays !== null ? `tertua ${d.teamWaiting.oldestDays} hari` : 'Tidak ada yang menunggu ✓'}</p>
           </KpiTile>

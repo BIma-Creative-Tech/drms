@@ -35,7 +35,7 @@ export const ShortfallApproval = z
     settleAllowed: z.boolean().nullable().meta({ description: 'LPJ verified: may the shortfall be paid now (within tolerance or approved)? null when not verified.' }),
     status: z.enum(SHORTFALL_APPROVAL_STATUSES).nullable(),
     statusLabel: z.string().nullable(),
-    noApproval: z.boolean().meta({ description: 'ADR 0024: the shortfall of a Direktur\'s own request was approved without a decision (kebijakan PT; audited).' }),
+    noApproval: z.boolean().meta({ description: 'ADR 0024 / 0025: the shortfall of a Direktur\'s (older requests) or the Owner\'s own request was approved without a decision (kebijakan PT; audited; statusLabel names which).' }),
     amount: rupiah.nullable().meta({ description: 'Total transfer the (last) re-approval is about.' }),
     cycle: z.number().int(),
     level: z.number().int().nullable(),

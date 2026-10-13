@@ -9,7 +9,9 @@ import { z } from 'zod'
 const id = z.number().int().positive()
 
 /** Same set as `ROLES` (access/roles.ts) — inlined: this module is bundled without Payload. */
-export const OnboardingRole = z.enum(['pk-staff', 'pk-pm', 'pk-finance', 'pk-owner', 'pk-admin', 'pk-operator']).meta({ id: 'OnboardingRole', description: 'Role in ONE PT (pk-owner = Direktur, pk-operator = Operator/Anggota).' })
+export const OnboardingRole = z
+  .enum(['pk-staff', 'pk-pm', 'pk-finance', 'pk-owner', 'pk-principal', 'pk-admin', 'pk-operator'])
+  .meta({ id: 'OnboardingRole', description: 'Role in ONE PT (pk-owner = Direktur, pk-principal = Owner (ADR 0025), pk-operator = Operator/Anggota).' })
 
 const optText = (max: number, label: string) => z.string().trim().max(max, `${label} maksimal ${max} karakter.`)
 
@@ -49,7 +51,7 @@ export const OnboardingBankAccountInput = z
 export const OnboardingCompanyInput = z
   .object({
     company: id,
-    roles: z.array(OnboardingRole).max(6).meta({ description: 'Roles in this PT. Empty on an existing membership = membership inactive (history kept); a PT without membership needs ≥ 1 role.' }),
+    roles: z.array(OnboardingRole).max(7).meta({ description: 'Roles in this PT. Empty on an existing membership = membership inactive (history kept); a PT without membership needs ≥ 1 role.' }),
     employee: OnboardingEmployeeInput.nullable().optional().meta({ description: 'null = unlink the employee of this PT (the employee record stays). Omitted = unchanged.' }),
     bankAccounts: z.array(OnboardingBankAccountInput).max(20).optional().meta({ description: 'Bank accounts of THIS PT\'s employee (rows omitted = unchanged; never deleted — deactivate instead).' }),
   })

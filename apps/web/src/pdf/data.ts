@@ -1,6 +1,6 @@
 import type { PayloadRequest } from 'payload'
 
-import { relId } from '@/access/roles'
+import { relId, ROLE_LABELS, type Role } from '@/access/roles'
 import { approvalsOf, settings, type ApprovalRow, type RequestDoc } from '@/domain/expense/common'
 import { displayNames } from '@/domain/companies'
 import { isNoApproval, NO_APPROVAL_PDF_LABEL, selfApprovalNote, SKIPPED_LABEL } from '@/domain/expense/decision'
@@ -19,6 +19,13 @@ export { MAX_RECEIPT_IMAGES }
 
 
 /** Latest cycle's signature rows per position (US-46: unsigned positions stay empty). */
+/** "Nama (Direktur)" — the actor of an approval level with its role (ADR 0025: several levels in one box). */
+export function approverWithRole(name: string | null | undefined, role: Role | null): string {
+  const n = (name ?? '').trim()
+  if (!n) return ''
+  return role ? `${n} (${ROLE_LABELS[role]})` : n
+}
+
 function latestCycle(rows: ApprovalRow[]): ApprovalRow[] {
   const max = rows.reduce((m, r) => Math.max(m, r.cycle), 0)
   return rows.filter((r) => r.cycle === max)
@@ -60,6 +67,7 @@ export async function buildPdfData(req: PayloadRequest, requestId: number, opts:
   const skippedAck = skipped.some((x) => x.position === 'diketahui')
   const skippedApproval = skipped.some((x) => x.position === 'approval') && (doc.approvalSnapshot?.steps.length ?? 0) === 0
   const noApproval = isNoApproval(doc.approvalSnapshot)
+  const levelRole = (level: number): Role | null => doc.approvalSnapshot?.steps.find((x) => x.level === level && x.approverUserId === null)?.approverRole ?? null
   const approvalImages: PdfImage[] = []
   for (const a of approvals.slice(-2)) approvalImages.push(...(await sig(a)))
 
@@ -85,7 +93,8 @@ export async function buildPdfData(req: PayloadRequest, requestId: number, opts:
     },
     {
       label: 'Approval',
-      names: pdfSafe(approvals.map((a) => a.actorName ?? '').filter(Boolean).join(', ')),
+      // ADR 0025: every approval level is listed; with several levels each name carries its role ("… (Direktur), … (Owner)")
+      names: pdfSafe(approvals.map((a) => approverWithRole(a.actorName, approvals.length > 1 ? levelRole(a.level) : null)).filter(Boolean).join(', ')),
       images: approvals.some((a) => a.decision === 'rejected') ? [] : approvalImages,
       time: formatServerTime(approvals.at(-1)?.decidedAt, tz),
       note: approvals.some((a) => a.decision === 'rejected')

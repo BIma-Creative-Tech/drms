@@ -107,7 +107,7 @@
             "properties": {
               "approvalInbox": {
                 "type": "boolean",
-                "description": "ADR 0013/0021: holds pk-owner (label \"Direktur\"), pk-finance or pk-pm (Persetujuan PM) → show the approval inbox."
+                "description": "ADR 0013/0021/0025: holds pk-owner (label \"Direktur\"), pk-principal (label \"Owner\"), pk-finance or pk-pm (Persetujuan PM) → show the approval inbox."
               },
               "teamMonitor": {
                 "type": "boolean",
@@ -347,8 +347,10 @@
           "pk-pm",
           "pk-finance",
           "pk-owner",
+          "pk-principal",
           "pk-admin"
-        ]
+        ],
+        "description": "pk-owner = \"Direktur\"; pk-principal = \"Owner\" (ADR 0025: the approval level above the Direktur). Effective roles: an Owner is also listed with pk-owner (same view and permissions as the Direktur); only the approval flow differs."
       },
       "ImageTargets": {
         "type": "object",
@@ -403,7 +405,7 @@
             "items": {
               "$ref": "#/components/schemas/Role"
             },
-            "description": "Roles IN this PT (company_memberships)."
+            "description": "Roles IN this PT (company_memberships), effective: an Owner (pk-principal) is listed with pk-owner too (ADR 0025)."
           },
           "employeeId": {
             "type": [
@@ -420,7 +422,7 @@
           },
           "ownRequestNoApproval": {
             "type": "boolean",
-            "description": "ADR 0024: the caller is Direktur in this PT and the PT has an active rule \"Pengajuan Direktur\" (Peran pemohon = Direktur, no approval level) — the APK shows \"Pengajuan Anda langsung ke antrian transfer Finance\" on the request form. Hint only; the rule is chosen at submit."
+            "description": "ADR 0024 / 0025: the caller is Owner (pk-principal) in this PT and the PT has an active rule \"Pengajuan Owner\" (Peran pemohon = Owner, no approval level) — the APK shows \"Pengajuan Anda langsung ke antrian transfer Finance\" on the request form. Since ADR 0025 a Direktur's own request is approved by the Owner (false for a Direktur). Hint only; the rule is chosen at submit."
           },
           "settings": {
             "type": "object",
@@ -528,7 +530,7 @@
         "properties": {
           "approvalInbox": {
             "type": "boolean",
-            "description": "ADR 0013/0021: holds pk-owner (label \"Direktur\"), pk-finance or pk-pm (Persetujuan PM) → show the approval inbox."
+            "description": "ADR 0013/0021/0025: holds pk-owner (label \"Direktur\"), pk-principal (label \"Owner\"), pk-finance or pk-pm (Persetujuan PM) → show the approval inbox."
           },
           "teamMonitor": {
             "type": "boolean",
@@ -775,7 +777,7 @@
       "MasterItem": {
         "type": "object",
         "additionalProperties": {},
-        "description": "Whitelisted fields per type (id, updatedAt, active, …) plus MC3 `company` (PT id; null for shared masters) and `shared` (true for banks, uoms, holidays). ADR 0024: `employees` items carry `direktur` (bool: the account holds Direktur in that PT — not offered as requester to others)."
+        "description": "Whitelisted fields per type (id, updatedAt, active, …) plus MC3 `company` (PT id; null for shared masters) and `shared` (true for banks, uoms, holidays). ADR 0024: `employees` items carry `direktur` (bool: the account holds Direktur — or, ADR 0025, Owner — in that PT; not offered as requester to others)."
       },
       "Device": {
         "type": "object",
@@ -1620,9 +1622,10 @@
                   "direktur_via_pm",
                   "direktur_via_pm_self",
                   "direktur_no_approval",
+                  "principal_no_approval",
                   null
                 ],
-                "description": "G1 exception of the snapshot. ADR 0024 (owner 2026-10-11): direktur_no_approval = a Direktur's OWN request under a zero-step rule — no approval step at all, straight to the Finance transfer queue; show the step \"Persetujuan\" (skipped) with the note \"Tanpa persetujuan — pengajuan Direktur (kebijakan PT)\" and status \"Tanpa persetujuan (Antri Transfer)\". Legacy ADR 0021 (no longer set for new requests): a Direktur's request filed by the PM project (PM approves, then a Direktur). direktur_via_pm = another Direktur decides the Direktur step; direktur_via_pm_self = the requester Direktur may approve (only Direktur of the PT, owner 2026-10-11). Show the note \"Pengajuan Direktur — diajukan oleh PM …\"."
+                "description": "G1 exception of the snapshot. ADR 0025 (owner 2026-10-13): principal_no_approval = the Owner's OWN request under the zero-step rule \"Pengajuan Owner\" — no approval step, straight to the Finance transfer queue; show the step \"Persetujuan\" (skipped) with the note \"Tanpa persetujuan — pengajuan Owner (kebijakan PT)\". Since ADR 0025 a Direktur's own request is approved by the Owner (direktur_no_approval stays on older requests). ADR 0024 (owner 2026-10-11): direktur_no_approval = a Direktur's OWN request under a zero-step rule — no approval step at all, straight to the Finance transfer queue; show the step \"Persetujuan\" (skipped) with the note \"Tanpa persetujuan — pengajuan Direktur (kebijakan PT)\" and status \"Tanpa persetujuan (Antri Transfer)\". Legacy ADR 0021 (no longer set for new requests): a Direktur's request filed by the PM project (PM approves, then a Direktur). direktur_via_pm = another Direktur decides the Direktur step; direktur_via_pm_self = the requester Direktur may approve (only Direktur of the PT, owner 2026-10-11). Show the note \"Pengajuan Direktur — diajukan oleh PM …\"."
               },
               "steps": {
                 "type": "array",
@@ -2510,7 +2513,7 @@
               },
               "noApproval": {
                 "type": "boolean",
-                "description": "ADR 0024: the shortfall of a Direktur's own request was approved without a decision (kebijakan PT; audited)."
+                "description": "ADR 0024 / 0025: the shortfall of a Direktur's (older requests) or the Owner's own request was approved without a decision (kebijakan PT; audited; statusLabel names which)."
               },
               "amount": {
                 "type": [
@@ -3648,7 +3651,19 @@
           },
           "noApproval": {
             "type": "boolean",
-            "description": "ADR 0024: a Direktur's own request without any approval (kebijakan PT) — show the badge \"Tanpa persetujuan (Direktur)\"; Finance's transfer checks are the only check."
+            "description": "ADR 0024: a Direktur's own request without any approval (kebijakan PT) — show the badge \"Tanpa persetujuan (Direktur)\"; Finance's transfer checks are the only check. ADR 0025: also the Owner's own request (see noApprovalBy)."
+          },
+          "noApprovalBy": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "direktur",
+              "owner",
+              null
+            ],
+            "description": "ADR 0025: whose own request went without approval — \"owner\" (rule \"Pengajuan Owner\") or \"direktur\" (ADR 0024, older requests); null when noApproval is false. Badge \"Tanpa persetujuan (Owner|Direktur)\"."
           }
         },
         "required": [
@@ -3674,7 +3689,8 @@
           "bankVerification",
           "flags",
           "sla",
-          "noApproval"
+          "noApproval",
+          "noApprovalBy"
         ]
       },
       "LpjQueue": {
@@ -4380,10 +4396,11 @@
                       "pk-pm",
                       "pk-finance",
                       "pk-owner",
+                      "pk-principal",
                       "pk-admin"
                     ]
                   },
-                  "maxItems": 5
+                  "maxItems": 6
                 },
                 "employee": {
                   "type": [
@@ -4934,10 +4951,11 @@
                   "enum": [
                     "pm",
                     "direktur",
+                    "owner",
                     "finance",
                     "other"
                   ],
-                  "description": "ADR 0021: who decides this step (APK decision sheet texts): pm = PM project, direktur, finance, other (named user / legacy)."
+                  "description": "ADR 0021: who decides this step (APK decision sheet texts): pm = PM project, direktur, owner (ADR 0025: the Owner level above the Direktur), finance, other (named user / legacy)."
                 },
                 "finalStep": {
                   "type": "boolean",
@@ -16287,10 +16305,11 @@
           "pk-pm",
           "pk-finance",
           "pk-owner",
+          "pk-principal",
           "pk-admin",
           "pk-operator"
         ],
-        "description": "Role in ONE PT (pk-owner = Direktur, pk-operator = Operator/Anggota)."
+        "description": "Role in ONE PT (pk-owner = Direktur, pk-principal = Owner (ADR 0025), pk-operator = Operator/Anggota)."
       },
       "UserOnboardingCreate": {
         "type": "object",
@@ -16340,7 +16359,7 @@
                   "items": {
                     "$ref": "#/components/schemas/OnboardingRole"
                   },
-                  "maxItems": 6,
+                  "maxItems": 7,
                   "description": "Roles in this PT. Empty on an existing membership = membership inactive (history kept); a PT without membership needs ≥ 1 role."
                 },
                 "employee": {
@@ -16500,7 +16519,7 @@
                   "items": {
                     "$ref": "#/components/schemas/OnboardingRole"
                   },
-                  "maxItems": 6,
+                  "maxItems": 7,
                   "description": "Roles in this PT. Empty on an existing membership = membership inactive (history kept); a PT without membership needs ≥ 1 role."
                 },
                 "employee": {
@@ -28735,6 +28754,10 @@
                         "direktur": {
                           "type": "integer"
                         },
+                        "owner": {
+                          "type": "integer",
+                          "description": "ADR 0025: waiting at the Owner level."
+                        },
                         "finance": {
                           "type": "integer"
                         },
@@ -28780,8 +28803,10 @@
                                 "enum": [
                                   "pm",
                                   "direktur",
+                                  "owner",
                                   "finance"
-                                ]
+                                ],
+                                "description": "Who decides now: pm (PM project), direktur, owner (ADR 0025: the Owner level above the Direktur), finance."
                               },
                               "scopeName": {
                                 "type": "string"
@@ -28827,6 +28852,7 @@
                         "count",
                         "pm",
                         "direktur",
+                        "owner",
                         "finance",
                         "oldestDays",
                         "items"

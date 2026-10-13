@@ -329,7 +329,7 @@ const TeamWaitingItem = z.object({
   title: z.string(),
   type: z.enum(['advance', 'reimburse']),
   status: z.string(),
-  waitingFor: z.enum(['pm', 'direktur', 'finance']),
+  waitingFor: z.enum(['pm', 'direktur', 'owner', 'finance']).meta({ description: 'Who decides now: pm (PM project), direktur, owner (ADR 0025: the Owner level above the Direktur), finance.' }),
   scopeName: z.string(),
   requesters: z.string(),
   grandTotal: rp,
@@ -345,7 +345,7 @@ export const PmDashboard = z.object({
   hasScope: z.boolean(),
   waitingForMe: z.number().int().meta({ description: 'ADR 0021: requests waiting for the PM\'s own "Persetujuan PM" (PM project → Direktur rule); 0 on Direktur → Finance requests (ADR 0013).' }),
   teamWaiting: z
-    .object({ count: z.number().int(), pm: z.number().int(), direktur: z.number().int(), finance: z.number().int(), oldestDays: z.number().int().nullable(), items: z.array(TeamWaitingItem) })
+    .object({ count: z.number().int(), pm: z.number().int(), direktur: z.number().int(), owner: z.number().int().meta({ description: 'ADR 0025: waiting at the Owner level.' }), finance: z.number().int(), oldestDays: z.number().int().nullable(), items: z.array(TeamWaitingItem) })
     .meta({ description: 'S3e (US-17): team requests waiting for the PM project (ADR 0021), the Direktur or Finance, oldest first (max 8 items).' }),
   teamMonth: z.object({ count: z.number().int(), sum: rp, waiting: z.number().int() }),
   teamMonthByCompany: z.array(z.object({ companyId: ptId, count: z.number().int(), sum: rp, waiting: z.number().int() })),

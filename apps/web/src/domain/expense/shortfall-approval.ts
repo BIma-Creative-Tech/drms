@@ -1,6 +1,6 @@
 import type { PayloadRequest, Where } from 'payload'
 
-import { companiesWithRole, relId, ROLES, rolesIn, userId, userRoles, type Role } from '@/access/roles'
+import { companiesWithRole, exactRolesIn, exactRolesOf, relId, ROLES, userId, type Role } from '@/access/roles'
 import { writeAudit, writeAuditDetached } from '@/audit/writer'
 import { membersWithRole, usersOfEmployees } from '@/domain/companies'
 import { notificationTemplate, pushEnabled } from '@/domain/notifications'
@@ -8,7 +8,7 @@ import { formatRupiah } from '@/lib/money'
 import { requestMeta } from '@/lib/request-meta'
 
 import { actorContext, displayName, fail, ids, loadRaw, loadVisible, requireActionAudited, resolveSignature, selfApprovalAllowed, type RequestDoc, type Signature } from './common'
-import { DIREKTUR_VIA_PM_SELF, isNoApproval, isSelfApproval, lacksDecisionRole, NO_APPROVAL_NOTE } from './decision'
+import { DIREKTUR_VIA_PM_SELF, isDecisionRole, isNoApproval, isSelfApproval, lacksDecisionRole, noApprovalNote } from './decision'
 import { requireSettlement, settlementOfRequest, shortfallStateOf, updateSettlement, type SettlementDoc } from './lpj'
 import { lastLevel, matchesAcknowledger, matchesStep, type ApprovalSnapshot } from './rules'
 import { SHORTFALL_APPROVAL_LABELS, shortfallAllowedActions, type ShortfallAction, type ShortfallApprovalStatus, type ShortfallCtx } from './settlement-rules'
@@ -28,8 +28,10 @@ import { ackStepLabel, approvalStepLabel } from './timeline'
  * pending_approval and is not changed (ADR 0019 §APK). Every write in the caller's transaction.
  */
 
-/** ADR 0024: status text of a shortfall that needed no approval (a Direktur's own request). */
+/** ADR 0024: status text of a shortfall that needed no approval (a Direktur's own request, legacy). */
 export const SHORTFALL_NO_APPROVAL_LABEL = 'Kekurangan tanpa persetujuan — pengajuan Direktur (kebijakan PT)'
+/** ADR 0025: the same for the Owner's own request. */
+export const SHORTFALL_PRINCIPAL_NO_APPROVAL_LABEL = 'Kekurangan tanpa persetujuan — pengajuan Owner (kebijakan PT)'
 
 export type ShortfallDecisionRow = {
   id: number
@@ -60,7 +62,8 @@ export async function shortfallDecisions(req: PayloadRequest, settlementId: numb
 async function ctxOf(req: PayloadRequest, raw: RequestDoc, s: SettlementDoc, rows?: ShortfallDecisionRow[]): Promise<ShortfallCtx & { roles: readonly Role[] }> {
   const uid = userId(req) ?? -1
   const company = relId((raw as { company?: unknown }).company)
-  const roles = company !== undefined ? rolesIn(req, company) : userRoles(req)
+  // ADR 0025: STORED roles decide (the Owner never decides a Direktur step; the same roles as the expense rule)
+  const roles = company !== undefined ? exactRolesIn(req, company) : exactRolesOf(req.user)
   const involved = await involvedUserIds(req, raw)
   const cycle = s.shortfallApprovalCycle ?? 0
   const decisions = (rows ?? (cycle > 0 ? await shortfallDecisions(req, s.id) : [])).filter((r) => r.cycle === cycle)
@@ -240,7 +243,7 @@ export async function requestShortfallApproval(req: PayloadRequest, id: number, 
         docNo: s.docNo ?? undefined,
         field: 'shortfallApproval',
         newValue: { exception: snapshot.selfApproval, rule: snapshot.ruleId, ruleName: snapshot.ruleName, cycle, amount: sf.totalAfter, requestId: raw.id },
-        reason: NO_APPROVAL_NOTE,
+        reason: noApprovalNote(snapshot) ?? undefined,
       },
     ])
     return finalize(req, raw, updated)
@@ -264,9 +267,10 @@ async function requireDecision(req: PayloadRequest, raw: RequestDoc, s: Settleme
     writeAuditDetached(req, [{ action: 'access_denied', docType: 'settlement', docId: String(s.id), docNo: s.docNo ?? undefined, field: `shortfall_${action}`, newValue: { action, status: ctx.status, roles: ctx.roles }, reason }])
   // E9 rule: authorization (403) before state (409)
   // ADR 0021: Direktur / Finance, or the PM project acknowledger of THIS shortfall approval
-  if (ctx.lacksDecisionRole || (!ctx.isAcknowledger && !ctx.roles.some((r) => r === 'pk-owner' || r === 'pk-finance'))) {
-    await audit('hanya PM project pengajuan ini, Direktur atau Finance yang memutuskan kekurangan LPJ (ADR 0013/0019/0021)')
-    fail(403, 'Hanya PM project dari pengajuan ini, Direktur atau Finance yang dapat menyetujui atau menolak kekurangan LPJ.')
+  // ADR 0025: the decision roles of the expense rule (Direktur, Owner, Finance — DECISION_ROLES), stored roles only
+  if (ctx.lacksDecisionRole || (!ctx.isAcknowledger && !ctx.roles.some(isDecisionRole))) {
+    await audit('hanya PM project pengajuan ini, Direktur, Owner atau Finance yang memutuskan kekurangan LPJ (ADR 0013/0019/0021/0025)')
+    fail(403, 'Hanya PM project dari pengajuan ini, Direktur, Owner atau Finance yang dapat menyetujui atau menolak kekurangan LPJ.')
   }
   if (ctx.selfInvolved) {
     await audit('pemohon/pembuat tidak boleh memutuskan kekurangan pengajuannya sendiri (G1)')
@@ -375,7 +379,8 @@ export async function shortfallSummary(req: PayloadRequest, raw: RequestDoc, s: 
   const rows = (s.shortfallApprovalCycle ?? 0) > 0 ? await shortfallDecisions(req, s.id) : []
   const ctx = await ctxOf(req, raw, s, rows)
   const status = s.shortfallApprovalStatus ?? null
-  const noApproval = isNoApproval(s.shortfallApprovalSnapshot as ApprovalSnapshot | null)
+  const snapOf = s.shortfallApprovalSnapshot as ApprovalSnapshot | null
+  const noApproval = isNoApproval(snapOf)
   return {
     approvedAmount: sf.approvedAmount,
     tolerancePct: sf.tolerancePct,
@@ -384,8 +389,15 @@ export async function shortfallSummary(req: PayloadRequest, raw: RequestDoc, s: 
     aboveTolerance: sf.aboveTolerance,
     settleAllowed: s.status === 'verified' ? sf.allowed : null,
     status,
-    // ADR 0024: the shortfall of a Direktur's own request without approval
-    statusLabel: status === 'approved' && noApproval ? SHORTFALL_NO_APPROVAL_LABEL : status ? SHORTFALL_APPROVAL_LABELS[status] : null,
+    // ADR 0024 / 0025: the shortfall of a Direktur's (legacy) / the Owner's own request without approval
+    statusLabel:
+      status === 'approved' && noApproval
+        ? snapOf?.selfApproval === 'principal_no_approval'
+          ? SHORTFALL_PRINCIPAL_NO_APPROVAL_LABEL
+          : SHORTFALL_NO_APPROVAL_LABEL
+        : status
+          ? SHORTFALL_APPROVAL_LABELS[status]
+          : null,
     noApproval,
     amount: s.shortfallApprovalAmount ?? null,
     cycle: s.shortfallApprovalCycle ?? 0,

@@ -3,7 +3,7 @@ import type { PayloadRequest } from 'payload'
 
 import type { Role } from '@/access/roles'
 import { docLink } from '@/admin/doc-links'
-import { NO_APPROVAL_NOTE } from '@/domain/expense/decision'
+import { NO_APPROVAL_NOTE, noApprovalNote } from '@/domain/expense/decision'
 import { NO_APPROVAL_STATUS_LABELS, REQUEST_STATUSES, REQUEST_TYPE_LABELS, REQUEST_TYPES, statusLabel, type RequestStatus, type RequestType } from '@/domain/expense/types'
 
 import { absensiReport } from './attendance-report'
@@ -738,7 +738,7 @@ const rekapPengajuan: ReportDef = {
             lingkup: x.scopeName,
             pemohon: x.requesters,
             status: x.noApproval && x.status === 'approved' ? NO_APPROVAL_STATUS_LABELS[x.type] : statusLabel(x.type, x.status),
-            persetujuan: x.noApproval ? NO_APPROVAL_NOTE : '',
+            persetujuan: x.noApproval ? (noApprovalNote({ selfApproval: x.g1Exception }) ?? NO_APPROVAL_NOTE) : '',
             grandTotal: x.grandTotal,
             disetujui: x.approvedAmount,
             dicairkan: x.disbursed,

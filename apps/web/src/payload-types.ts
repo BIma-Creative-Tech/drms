@@ -528,7 +528,7 @@ export interface CompanyMembership {
   user: number | User;
   company: number | Company;
   employee?: (number | null) | Employee;
-  roles?: ('pk-staff' | 'pk-pm' | 'pk-finance' | 'pk-owner' | 'pk-admin' | 'pk-operator')[] | null;
+  roles?: ('pk-staff' | 'pk-pm' | 'pk-finance' | 'pk-owner' | 'pk-principal' | 'pk-admin' | 'pk-operator')[] | null;
   active?: boolean | null;
   /**
    * Wajib saat menonaktifkan data atau mengubah data yang dilindungi. Dicatat di audit log.
@@ -1074,14 +1074,14 @@ export interface ApprovalRule {
   /**
    * Aturan berlaku bila SETIAP pemohon memegang salah satu peran ini di PT pengajuan. Kosong = semua pemohon.
    */
-  requesterRoles?: ('pk-owner' | 'pk-pm' | 'pk-staff' | 'pk-finance' | 'pk-admin')[] | null;
+  requesterRoles?: ('pk-owner' | 'pk-principal' | 'pk-pm' | 'pk-staff' | 'pk-finance' | 'pk-admin')[] | null;
   /**
    * Angka kecil dievaluasi lebih dulu (aturan "Pengajuan Direktur" = 10, default = 100).
    */
   priority?: number | null;
   acknowledge: 'required' | 'optional' | 'none';
   acknowledgeBy: 'scope_manager' | 'role' | 'user';
-  acknowledgeRole?: ('pk-staff' | 'pk-pm' | 'pk-finance' | 'pk-owner' | 'pk-admin' | 'pk-operator') | null;
+  acknowledgeRole?: ('pk-staff' | 'pk-pm' | 'pk-finance' | 'pk-owner' | 'pk-principal' | 'pk-admin' | 'pk-operator') | null;
   acknowledgeUser?: (number | null) | User;
   signDiajukan: 'required' | 'optional' | 'none';
   signDibuat: 'required' | 'optional' | 'none';
@@ -1091,7 +1091,7 @@ export interface ApprovalRule {
   steps?:
     | {
         level: number;
-        approverRole?: ('pk-staff' | 'pk-pm' | 'pk-finance' | 'pk-owner' | 'pk-admin' | 'pk-operator') | null;
+        approverRole?: ('pk-staff' | 'pk-pm' | 'pk-finance' | 'pk-owner' | 'pk-principal' | 'pk-admin' | 'pk-operator') | null;
         approverUser?: (number | null) | User;
         id?: string | null;
       }[]

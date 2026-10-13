@@ -4,7 +4,7 @@ import { relId, userId, type Role } from '@/access/roles'
 import { formatRupiah } from '@/lib/money'
 import { DEFAULT_TZ, startOfLocalDay } from '@/lib/time'
 
-import { isNoApproval } from './expense/decision'
+import { isNoApproval, noApprovalRequesterRole, OWNER_ROLE } from './expense/decision'
 import type { ApprovalSnapshot } from './expense/rules'
 import { requestStatusLabel } from './expense/timeline'
 import { REQUEST_TYPE_LABELS, type RequestStatus, type RequestType } from './expense/types'
@@ -80,6 +80,28 @@ const PM_ACK_DEFAULT = { title: 'Persetujuan PM: {docNo}', body: '{docNo} menung
 const NO_APPROVAL_TEAM_DEFAULT = {
   title: 'Pengajuan Direktur: {docNo}',
   body: '{type} "{title}" {amount} di project Anda diajukan oleh Direktur — tanpa persetujuan (kebijakan PT), langsung ke antrian Finance.',
+}
+
+/**
+ * ADR 0025: the waiting position is the Owner's (the level above the Direktur; recipients = the holders of the STORED
+ * Owner role, `membersWithRole`) — named as such like the PM's.
+ */
+const OWNER_STEP_DEFAULT = { title: 'Persetujuan Owner: {docNo}', body: '{docNo} menunggu persetujuan Anda sebagai Owner: {type} "{title}" {amount}.' }
+
+/** ADR 0025: the Owner's own request without approval reaches Finance (team PM informed, like ADR 0024). */
+const PRINCIPAL_NO_APPROVAL_TEAM_DEFAULT = {
+  title: 'Pengajuan Owner: {docNo}',
+  body: '{type} "{title}" {amount} di project Anda diajukan oleh Owner — tanpa persetujuan (kebijakan PT), langsung ke antrian Finance.',
+}
+
+/** The waiting position (current level, or "Diketahui" by role) is the Owner's. */
+function ownerTurn(doc: Doc, event: NotifyEvent): boolean {
+  const snap = doc.approvalSnapshot
+  if (!snap) return false
+  if (event === 'expense.pending_ack') return snap.acknowledgeBy === 'role' && snap.acknowledgeRole === OWNER_ROLE
+  if (event !== 'expense.pending_approval') return false
+  const step = snap.steps.find((s) => s.level === (doc.currentLevel ?? 1))
+  return !!step && step.approverUserId === null && step.approverRole === OWNER_ROLE
 }
 
 /** The waiting "Diketahui" is the PM project's (ADR 0021 snapshot). */
@@ -347,7 +369,13 @@ export async function notifySettings(req: PayloadRequest, companyId?: number | n
  */
 export function approvalEmail(doc: Doc, event: NotifyEvent, appUrl: string | undefined): { subject: string; text: string } {
   const no = doc.docNo ?? `#${doc.id}`
-  const step = event === 'expense.pending_ack' ? (pmAck(doc) ? 'persetujuan Anda sebagai PM project' : 'persetujuan Anda sebagai Direktur (Diketahui)') : 'approval Anda'
+  const step = ownerTurn(doc, event)
+    ? 'persetujuan Anda sebagai Owner'
+    : event === 'expense.pending_ack'
+      ? pmAck(doc)
+        ? 'persetujuan Anda sebagai PM project'
+        : 'persetujuan Anda sebagai Direktur (Diketahui)'
+      : 'approval Anda'
   const base = appUrl ? `${appUrl.replace(/\/$/, '')}/admin/persetujuan` : null
   return {
     subject: `RR Teams — Menunggu keputusan Anda: ${no}`.slice(0, 200),
@@ -389,9 +417,13 @@ async function deliver(req: PayloadRequest, doc: Doc, events: Array<{ event: Not
     const t =
       e.event === 'expense.pending_ack' && pmAck(doc)
         ? PM_ACK_DEFAULT
-        : e.event === 'expense.team_submitted' && isNoApproval(doc.approvalSnapshot)
-          ? NO_APPROVAL_TEAM_DEFAULT
-          : await template(req, e.event)
+        : ownerTurn(doc, e.event)
+          ? OWNER_STEP_DEFAULT
+          : e.event === 'expense.team_submitted' && isNoApproval(doc.approvalSnapshot)
+            ? noApprovalRequesterRole(doc.approvalSnapshot) === OWNER_ROLE
+              ? PRINCIPAL_NO_APPROVAL_TEAM_DEFAULT
+              : NO_APPROVAL_TEAM_DEFAULT
+            : await template(req, e.event)
     for (const uid of to) {
       if (uid === actor || done.has(`${e.event}:${uid}`)) continue
       done.add(`${e.event}:${uid}`)

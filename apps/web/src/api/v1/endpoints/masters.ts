@@ -84,7 +84,8 @@ async function loadType(req: PayloadRequest, type: MasterType, companies: number
     }
     if (type === 'employees' && items.length > 0) {
       // ADR 0024: `direktur` = the employee's account holds Direktur in the employee's PT — the APK does not
-      // offer such an employee as requester to anyone else (a Direktur files his own request; server: 403 / 409)
+      // offer such an employee as requester to anyone else (a Direktur files his own request; server: 403 / 409).
+      // ADR 0025: also an Owner (pk-principal) — the Owner's own request is the no-approval one (filed by himself).
       const dir = await direkturEmployees(req, items.map((i) => i.id as number))
       items = items.map((i) => ({ ...i, direktur: dir.has(i.id as number) }))
     }
@@ -102,11 +103,11 @@ async function loadType(req: PayloadRequest, type: MasterType, companies: number
   }
 }
 
-/** Employees whose active account holds Direktur (pk-owner) through an active membership (ADR 0024). */
+/** Employees whose active account holds Direktur (pk-owner) or Owner (pk-principal, ADR 0025) through an active membership (ADR 0024). */
 async function direkturEmployees(req: PayloadRequest, employeeIds: number[]): Promise<Set<number>> {
   const res = await req.payload.find({
     collection: 'company-memberships',
-    where: { and: [{ employee: { in: employeeIds } }, { roles: { in: ['pk-owner'] } }, { active: { equals: true } }] },
+    where: { and: [{ employee: { in: employeeIds } }, { roles: { in: ['pk-owner', 'pk-principal'] } }, { active: { equals: true } }] },
     depth: 0,
     pagination: false,
     select: { employee: true, user: true },

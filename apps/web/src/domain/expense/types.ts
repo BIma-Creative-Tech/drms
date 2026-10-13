@@ -66,6 +66,13 @@ export const LEGACY_WAITING_LABELS = {
 } as const
 
 /**
+ * ADR 0025 (owner 2026-10-13): "Menunggu persetujuan" of the Owner level (the level above the Direktur) — derived
+ * from the snapshot's current level by timeline.ts requestStatusLabel (STATUS_LABELS.pending_approval stays the
+ * Direktur wording: the default rule's first approval level and the label of rows without a snapshot).
+ */
+export const OWNER_WAITING_LABEL = 'Menunggu persetujuan Owner'
+
+/**
  * ADR 0024: "Disetujui" of a Direktur's own request without approval (snapshot `direktur_no_approval`) —
  * nobody approved it, it went straight to Finance. Web + API + APK (request_status.dart) use these texts.
  */

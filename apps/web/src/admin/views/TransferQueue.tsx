@@ -3,7 +3,7 @@ import React from 'react'
 
 import { hasRole, relId } from '@/access/roles'
 import { voidableTransfers } from '@/domain/cash/book'
-import { NO_APPROVAL_NOTE } from '@/domain/expense/decision'
+import { NO_APPROVAL_NOTE, PRINCIPAL_NO_APPROVAL_NOTE } from '@/domain/expense/decision'
 import { transferQueue } from '@/domain/expense/queues'
 import { approvedByCaller } from '@/domain/expense/transfers'
 import { REQUEST_TYPE_LABELS, REQUEST_TYPES } from '@/domain/expense/types'
@@ -122,11 +122,11 @@ export async function TransferQueue(props: AdminViewServerProps) {
                 </td>
                 <td style={td} data-label="Jenis">
                   {r.statusLabel}
-                  {/* ADR 0024: a Direktur's own request reached the queue without any approval — Finance is the only check */}
+                  {/* ADR 0024 / 0025: a Direktur's (legacy) / the Owner's own request reached the queue without any approval — Finance is the only check */}
                   {r.noApproval ? (
                     <div style={{ marginTop: 2 }}>
-                      <span style={badge('warn')} data-pk-queue-no-approval={r.id} title={NO_APPROVAL_NOTE}>
-                        Tanpa persetujuan (Direktur)
+                      <span style={badge('warn')} data-pk-queue-no-approval={r.id} title={r.noApprovalBy === 'owner' ? PRINCIPAL_NO_APPROVAL_NOTE : NO_APPROVAL_NOTE}>
+                        Tanpa persetujuan ({r.noApprovalBy === 'owner' ? 'Owner' : 'Direktur'})
                       </span>
                     </div>
                   ) : null}

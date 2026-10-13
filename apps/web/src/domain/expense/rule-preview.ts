@@ -1,11 +1,11 @@
 /**
  * ADR 0024 (owner decision 2026-10-11): explanation + preview of one `approval-rules` row for the Admin
- * form ("Contoh: pengajuan oleh Direktur → langsung ke Finance"). Pure module (unit-tested) — the rule
+ * form ("Contoh: pengajuan oleh Owner → langsung ke Finance" — ADR 0025: the zero-step rule is the Owner's). Pure module (unit-tested) — the rule
  * hook (`ruleDecisionError` / `zeroStepRuleError`) and the DB trigger stay authoritative.
  */
 import { ROLE_LABELS, isRole, type Role } from '@/access/roles'
 
-import { DIREKTUR_ROLE, NO_APPROVAL_RULE_LABEL, SCOPE_MANAGER_LABEL, zeroStepRuleError } from './decision'
+import { DIREKTUR_ROLE, NO_APPROVAL_RULE_LABEL, OWNER_ROLE, SCOPE_MANAGER_LABEL, zeroStepRuleError } from './decision'
 import type { AckBy, AckMode } from './rules'
 
 export type RulePreviewInput = {
@@ -62,8 +62,8 @@ export function rulePreview(input: RulePreviewInput): RulePreview {
   }
   for (const s of steps) flow.push(`Level ${s.level ?? '?'}: ${s.hasUser ? 'user tertentu' : roleLabel(s.approverRole)}`)
   if (finance) flow.push(finance)
-  const directorSelf = roles.length === 1 && roles[0] === DIREKTUR_ROLE
-  const example = `Contoh: pengajuan oleh ${who} → ${flow.join(' → ')}.${directorSelf ? ' (Direktur tidak pernah memutuskan pengajuannya sendiri — G1.)' : ''}`
+  const selfRole = roles.length === 1 && (roles[0] === DIREKTUR_ROLE || roles[0] === OWNER_ROLE) ? roles[0] : null
+  const example = `Contoh: pengajuan oleh ${who} → ${flow.join(' → ')}.${selfRole ? ` (${ROLE_LABELS[selfRole]} tidak pernah memutuskan pengajuannya sendiri — G1.)` : ''}`
   return { example, flow, noApproval: false, error }
 }
 

@@ -1,7 +1,7 @@
 import { sql } from '@payloadcms/db-postgres'
 import { APIError, type PayloadRequest, type Where } from 'payload'
 
-import { companiesWithRole, hasRoleAny, mappedCompanies, relId, rolesIn, userId, userRoles, type Role } from '@/access/roles'
+import { companiesWithRole, exactRolesIn, exactRolesOf, hasRoleAny, mappedCompanies, relId, userId, userRoles, type Role } from '@/access/roles'
 import { resolveScope } from '@/access/scope'
 import { writeAudit, writeAuditDetached } from '@/audit/writer'
 import { displayName, projectCommitted, resolveSignature, today, type Signature } from '@/domain/expense/common'
@@ -137,7 +137,8 @@ export async function actorContext(req: PayloadRequest, doc: AddendumDoc, rows?:
   // ADR 0016 §5: decisions are checked against the caller's roles IN THE ADDENDUM's PT (MC2 fix:
   // was the union over the selected PTs → Finance of PT A + PM of PT B could decide a PT B addendum)
   const company = relId((doc as { company?: unknown }).company)
-  const roles = company !== undefined ? rolesIn(req, company) : userRoles(req)
+  // ADR 0025: STORED roles decide — the addendum stays Direktur → Finance, the Owner's implied Direktur access never decides it
+  const roles = company !== undefined ? exactRolesIn(req, company) : exactRolesOf(req.user)
   const cycle = doc.approvalCycle ?? 0
   const decisions = (rows ?? (cycle > 0 ? await decisionsOf(req, doc.id) : [])).filter((r) => r.cycle === cycle)
   const snap = doc.approvalSnapshot ?? null
