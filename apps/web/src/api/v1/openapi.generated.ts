@@ -133,6 +133,10 @@ export const openapiDocument = {
               "dailyReportCreate": {
                 "type": "boolean",
                 "description": "P3: same rule → Laporan harian on projects of kind konstruksi."
+              },
+              "intercompanyPayment": {
+                "type": "boolean",
+                "description": "ADR 0028: may file a \"PT grup\" payment (Pembayaran antar-PT) — holds Finance, PM or Direktur (pk-owner) AS STORED (the server's filer rule). Unlike the effective `roles`, false for an Owner (pk-principal) without one of those roles. Absent on servers before this field (APK fallback: the payee directory)."
               }
             },
             "required": [
@@ -142,7 +146,8 @@ export const openapiDocument = {
               "serviceReportCreate",
               "unitTimesheetCreate",
               "aftersalesActivityCreate",
-              "dailyReportCreate"
+              "dailyReportCreate",
+              "intercompanyPayment"
             ],
             "description": "DEPRECATED (MC3): derived from the top-level `roles` (union over the selected PTs). Use companies[].capabilities."
           },
