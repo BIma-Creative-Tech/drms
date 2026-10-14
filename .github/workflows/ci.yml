@@ -45,6 +45,18 @@ jobs:
           cache: ${{ runner.environment == 'github-hosted' && 'npm' || '' }}
           package-manager-cache: ${{ runner.environment == 'github-hosted' }}
       - run: npm ci --no-audit --no-fund
+      # TEMP (feat/d1310-b-intercompany-apk, removed in the next commit): regenerate the OpenAPI contract on the runner
+      # (the host may not run node) and hand it back as an artifact.
+      - name: TEMP regenerate OpenAPI
+        run: |
+          npm run gen:openapi -w apps/web
+          git diff > "$RUNNER_TEMP/openapi.patch"
+          git diff --stat
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: openapi-patch
+          path: ${{ runner.temp }}/openapi.patch
+          retention-days: 1
       - run: npm run lint
       - run: npm run typecheck
       # E9: unit tests with the coverage gate (thresholds in apps/web/vitest.config.ts)
