@@ -206,7 +206,40 @@ class _DetailBody extends ConsumerWidget {
           key: const Key('detail-invoice-file'),
         ),
       ],
-      section(d.isVendor ? t.fieldVendorBankAccount : t.bankAccount, key: const Key('section-bank')),
+      // ADR 0028: a PT grup payment — the receiving PT + its document (tagihan / memo), paid to its designated receiving
+      // account; after the transfer the receiving PT's Kas Masuk number
+      if (d.isPtGrup) ...[
+        section(t.sectionIntercompanyPayment, key: const Key('section-intercompany')),
+        row(
+          t.fieldPayeeCompany,
+          d.payeeCompany == null
+              ? '-'
+              : [?d.payeeCompany!.code, ?d.payeeCompany!.name].where((e) => e.isNotEmpty).join(' — '),
+          key: const Key('detail-payee-company'),
+        ),
+        row(t.fieldDocumentNo, d.invoiceNo ?? '-', key: const Key('detail-invoice-no')),
+        row(t.fieldDocumentDate, formatDateOnly(d.invoiceDate)),
+        if (d.invoiceDueDate != null) row(t.fieldInvoiceDueDate, formatDateOnly(d.invoiceDueDate)),
+        row(
+          t.fieldDocumentFile,
+          d.invoiceFileName ?? (d.invoiceFileId == null ? '-' : '#${d.invoiceFileId}'),
+          key: const Key('detail-invoice-file'),
+        ),
+        if (d.intercompany case final km?)
+          row(
+            t.intercompanyEntryLabel(km.companyCode ?? d.payeeCompany?.code ?? '-'),
+            km.voided ? t.intercompanyEntryVoided(km.targetEntryNo) : km.targetEntryNo,
+            key: const Key('detail-intercompany-entry'),
+          ),
+      ],
+      section(
+        d.isVendor
+            ? t.fieldVendorBankAccount
+            : d.isPtGrup
+            ? t.intercompanyReceivingAccount
+            : t.bankAccount,
+        key: const Key('section-bank'),
+      ),
       if (d.bankName == null && d.bankAccountNo == null && d.bankAccountHolder == null)
         Text('-', style: theme.textTheme.bodyMedium)
       else ...[

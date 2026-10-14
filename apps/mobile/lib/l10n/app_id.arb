@@ -2728,5 +2728,77 @@
   "vendorPaymentHint": "Pembayaran vendor: Finance mentransfer ke rekening vendor; invoice = bukti — tanpa nota per baris dan tanpa LPJ.",
   "sectionVendorPayment": "Pembayaran vendor",
   "vendorAccountsNone": "Vendor ini belum punya rekening aktif — minta Finance / Admin menambahkannya.",
-  "vendorCostCenterHint": "Tanpa project: pilih pusat biaya (mis. tagihan kantor)."
+  "vendorCostCenterHint": "Tanpa project: pilih pusat biaya (mis. tagihan kantor).",
+  "payeePtGrup": "PT grup",
+  "fieldPayeeCompany": "PT penerima",
+  "payeeCompanyPickHint": "Pilih PT penerima",
+  "intercompanyPaymentHint": "Pembayaran antar-PT: Finance mentransfer ke rekening penerimaan antar-PT milik PT penerima; kas masuk di PT itu tercatat otomatis. Dokumen PT penerima (tagihan / memo) = bukti — tanpa nota per baris dan tanpa LPJ.",
+  "intercompanyPayeesNone": "Belum ada PT lain yang menetapkan rekening penerimaan antar-PT — minta Finance / Admin PT penerima menandainya.",
+  "intercompanyPayeeGone": "PT ini tidak ada lagi di daftar penerima antar-PT (mis. rekening penerimaannya dicabut). Pilih ulang PT penerima.",
+  "intercompanyReceivingAccount": "Rekening penerimaan antar-PT",
+  "fieldDocumentNo": "Nomor dokumen",
+  "fieldDocumentDate": "Tanggal dokumen",
+  "fieldDocumentFile": "Foto dokumen",
+  "documentNoHelp": "Tagihan / memo dari PT penerima",
+  "documentAttached": "Foto dokumen terlampir",
+  "documentOnServer": "Dokumen tersimpan di server",
+  "documentMissing": "Belum ada foto dokumen",
+  "sectionIntercompanyPayment": "Pembayaran antar-PT",
+  "intercompanyEntryLabel": "Kas masuk di PT {pt}",
+  "@intercompanyEntryLabel": {
+    "placeholders": {
+      "pt": {
+        "type": "String"
+      }
+    }
+  },
+  "intercompanyEntryVoided": "{no} (dibatalkan — jurnal balik tercatat)",
+  "@intercompanyEntryVoided": {
+    "placeholders": {
+      "no": {
+        "type": "String"
+      }
+    }
+  },
+  "intercompanyBadge": "Antar PT: {pt}",
+  "@intercompanyBadge": {
+    "placeholders": {
+      "pt": {
+        "type": "String"
+      }
+    }
+  },
+  "transferIntercompanyNote": "Antar PT: kas masuk di PT {pt} tercatat otomatis dengan tanggal transfer ini.",
+  "@transferIntercompanyNote": {
+    "placeholders": {
+      "pt": {
+        "type": "String"
+      }
+    }
+  },
+  "transferRecordedIntercompany": "Transfer {trf} tercatat. Kas masuk {km} dibuat di PT {pt}.",
+  "@transferRecordedIntercompany": {
+    "placeholders": {
+      "trf": {
+        "type": "String"
+      },
+      "km": {
+        "type": "String"
+      },
+      "pt": {
+        "type": "String"
+      }
+    }
+  },
+  "kpiCashFlowAntarPt": "Termasuk Antar PT: masuk {masuk} · keluar {keluar}",
+  "@kpiCashFlowAntarPt": {
+    "placeholders": {
+      "masuk": {
+        "type": "String"
+      },
+      "keluar": {
+        "type": "String"
+      }
+    }
+  }
 }

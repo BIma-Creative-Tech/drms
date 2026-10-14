@@ -7,6 +7,7 @@ import '../../../app/theme.dart';
 import '../../../core/connectivity/connectivity_controller.dart';
 import '../../../core/format/dates.dart';
 import '../../../core/format/rupiah.dart';
+import '../../../core/network/api_exception.dart';
 import '../../auth/domain/user_profile.dart';
 import '../../../l10n/gen/app_localizations.dart';
 import '../../../shared/widgets/async_body.dart';
@@ -20,6 +21,7 @@ import '../application/draft_service.dart';
 import '../application/expense_providers.dart';
 import '../domain/draft.dart';
 import '../domain/draft_validation.dart';
+import '../domain/intercompany.dart';
 import '../domain/request_status.dart';
 import 'line_editor_screen.dart';
 import 'receipt_capture.dart';
@@ -138,7 +140,7 @@ class _DraftEditorScreenState extends ConsumerState<DraftEditorScreen> {
   late DraftRequest _d = widget.initial;
   late final _title = TextEditingController(text: widget.initial.title);
   late final _notes = TextEditingController(text: widget.initial.notes ?? '');
-  // ADR 0027: invoice number of a vendor payment
+  // ADR 0027 / 0028: invoice number of a vendor payment / document number of a PT grup payment
   late final _invoiceNo = TextEditingController(text: widget.initial.invoiceNo ?? '');
   bool _busy = false;
   List<DraftIssue> _issues = const [];
@@ -155,9 +157,9 @@ class _DraftEditorScreenState extends ConsumerState<DraftEditorScreen> {
   DraftRequest _collect() => _d.copyWith(
     title: _title.text,
     notes: _notes.text.trim().isEmpty ? null : _notes.text.trim(),
-    // ADR 0027 (client 2026-10-14): only a vendor payment without a project keeps a cost center
-    costCenterId: _d.isVendor && _d.projectId == null ? _d.costCenterId : null,
-    invoiceNo: _d.isVendor ? (_invoiceNo.text.trim().isEmpty ? null : _invoiceNo.text.trim()) : null,
+    // ADR 0027 (client 2026-10-14) / 0028: only a vendor / PT grup payment without a project keeps a cost center
+    costCenterId: _d.isDirectPayment && _d.projectId == null ? _d.costCenterId : null,
+    invoiceNo: _d.isDirectPayment ? (_invoiceNo.text.trim().isEmpty ? null : _invoiceNo.text.trim()) : null,
   );
 
   /// ADR 0027 (D3): only Finance / PM of the draft's PT file a vendor payment (the server re-checks).
@@ -166,32 +168,42 @@ class _DraftEditorScreenState extends ConsumerState<DraftEditorScreen> {
     return roles.contains(Role.finance) || roles.contains(Role.pm);
   }
 
-  /// ADR 0027: switching the payee type — vendor = Pengajuan Baru, Pemohon = the filer, no employee account;
-  /// karyawan clears every vendor / invoice field.
+  /// ADR 0028 (owner decision 2026-10-14): Finance, PM or Direktur of the draft's PT file a PT grup payment — an
+  /// Owner-only user does not (see [mayFileIntercompanyPayment]; the server re-checks on the stored roles).
+  bool _mayFileIntercompanyPayment() {
+    final roles = ref.read(currentProfileProvider)?.forCompany(_d.companyId).roles ?? const <Role>{};
+    final listed = (widget.masters[MasterTypes.intercompanyPayees] ?? const <MasterItem>[]).isNotEmpty;
+    return mayFileIntercompanyPayment(roles, directoryListed: listed);
+  }
+
+  /// ADR 0027 / 0028: switching the payee type — vendor / PT grup = Pengajuan Baru, Pemohon = the filer, no employee
+  /// account; every switch clears the other payee's fields and the invoice / document (a vendor invoice is not the
+  /// receiving PT's document).
   void _setPayee(Set<PayeeType> s) {
     final payee = s.first;
     if (payee == _d.payeeType) return;
     setState(() {
-      if (payee == PayeeType.vendor) {
+      _invoiceNo.clear();
+      final cleared = _d.copyWith(
+        payeeType: payee,
+        vendorId: null,
+        vendorBankAccountId: null,
+        payeeCompanyId: null,
+        invoiceNo: null,
+        invoiceDate: null,
+        invoiceDueDate: null,
+        invoiceMediaUuid: null,
+        invoiceFileId: null,
+      );
+      if (payee.isDirect) {
         final own = ref.read(currentProfileProvider)?.forCompany(_d.companyId).employee?.id;
-        _d = _d.copyWith(
-          payeeType: PayeeType.vendor,
+        _d = cleared.copyWith(
           type: RequestType.advance,
           bankAccountId: null,
           requesterIds: own == null ? _d.requesterIds : [own],
         );
       } else {
-        _invoiceNo.clear();
-        _d = _d.copyWith(
-          payeeType: PayeeType.karyawan,
-          vendorId: null,
-          vendorBankAccountId: null,
-          invoiceNo: null,
-          invoiceDate: null,
-          invoiceDueDate: null,
-          invoiceMediaUuid: null,
-          invoiceFileId: null,
-        );
+        _d = cleared;
       }
     });
   }
@@ -210,8 +222,8 @@ class _DraftEditorScreenState extends ConsumerState<DraftEditorScreen> {
     setState(() => _d = due ? _d.copyWith(invoiceDueDate: toYmd(picked)) : _d.copyWith(invoiceDate: toYmd(picked)));
   }
 
-  /// ADR 0027: invoice photo (camera / gallery, compressed like a receipt photo), stored as media blob `invoice` and
-  /// uploaded to `POST /media/attachments` by the sync / at "Ajukan".
+  /// ADR 0027 / 0028: invoice / document photo (camera / gallery, compressed like a receipt photo), stored as media
+  /// blob `invoice` and uploaded to `POST /media/attachments` by the sync / at "Ajukan".
   Future<void> _addInvoicePhoto({required bool fromCamera}) async {
     final sub = ref.read(currentSubProvider);
     if (sub == null) return;
@@ -361,12 +373,30 @@ class _DraftEditorScreenState extends ConsumerState<DraftEditorScreen> {
       context.pushReplacement('/requests/${detail.id}');
     } on DraftValidationException catch (e) {
       setState(() => _issues = e.issues);
+    } on ProblemException catch (e) {
+      // ADR 0027 / 0028: field refusals of the payee (duplicate invoice / document 409, no receiving account 400)
+      // are shown under their field as well
+      final fields = [
+        for (final f in e.errors)
+          if (_payeeIssueField(f.path) case final field?) DraftIssue(field, f.message),
+      ];
+      if (mounted && fields.isNotEmpty) setState(() => _issues = fields);
+      if (mounted) showSnack(context, intercompanyAwareError(e, errorText));
     } on Object catch (e) {
       if (mounted) showSnack(context, errorText(e));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
   }
+
+  /// Server field path → editor field of the payee block (null = shown in the snack only).
+  static String? _payeeIssueField(String path) => switch (path.split('.').last) {
+    'invoiceNo' || 'invoice_no' => 'invoiceNo',
+    'invoiceDate' || 'invoice_date' => 'invoiceDate',
+    'invoiceFileId' || 'invoice_file_id' => 'invoiceFile',
+    'payeeCompanyId' || 'payee_company_id' => 'payeeCompanyId',
+    _ => null,
+  };
 
   Future<void> _delete() async {
     final t = AppLocalizations.of(context);
@@ -456,8 +486,28 @@ class _DraftEditorScreenState extends ConsumerState<DraftEditorScreen> {
         .where((a) => _d.requesterIds.isEmpty || _d.requesterIds.contains((a.extra['employee'] as num?)?.toInt()))
         .toList();
     final urgencies = _byRank(m[MasterTypes.urgencyLevels] ?? const <MasterItem>[]);
-    // ADR 0027: Finance / PM may switch to "Vendor"; the chosen vendor's active accounts
+    // ADR 0027: Finance / PM may switch to "Vendor"; the chosen vendor's active accounts. ADR 0028: Finance / PM /
+    // Direktur may switch to "PT grup".
     final mayVendor = _mayFileVendorPayment();
+    final mayIntercompany = _mayFileIntercompanyPayment();
+    // ADR 0028: the receiving PT's document uses the vendor invoice fields under its own names
+    final doc = _d.isPtGrup
+        ? (
+            no: t.fieldDocumentNo,
+            date: t.fieldDocumentDate,
+            file: t.fieldDocumentFile,
+            attached: t.documentAttached,
+            onServer: t.documentOnServer,
+            missing: t.documentMissing,
+          )
+        : (
+            no: t.fieldInvoiceNo,
+            date: t.fieldInvoiceDate,
+            file: t.fieldInvoiceFile,
+            attached: t.invoiceAttached,
+            onServer: t.invoiceOnServer,
+            missing: t.invoiceMissing,
+          );
     final vendorAccounts = vendorAccountsOf(m, _d.vendorId);
     String? issueFor(String field) => _issues.where((i) => i.field == field && i.lineNo == null).firstOrNull?.message;
     final editableType = _d.serverId == null;
@@ -525,10 +575,18 @@ class _DraftEditorScreenState extends ConsumerState<DraftEditorScreen> {
                 margin: const EdgeInsets.only(bottom: 12),
                 child: ListTile(leading: const Icon(Icons.storefront), title: Text(t.vendorPaymentHint)),
               ),
+            if (_d.isPtGrup)
+              Card(
+                key: const Key('draft-intercompany-hint'),
+                color: Theme.of(context).colorScheme.secondaryContainer,
+                margin: const EdgeInsets.only(bottom: 12),
+                child: ListTile(leading: const Icon(Icons.business), title: Text(t.intercompanyPaymentHint)),
+              ),
             FormGrid(
               children: [
-                // ADR 0027 "Jenis penerima": only Finance / PM see "Vendor"; fixed once the server knows the draft
-                if (mayVendor || _d.isVendor)
+                // ADR 0027 "Jenis penerima": only Finance / PM see "Vendor", ADR 0028: Finance / PM / Direktur see
+                // "PT grup"; fixed once the server knows the draft
+                if (mayVendor || mayIntercompany || _d.isDirectPayment)
                   FormGridCell(
                     label: t.fieldPayeeType,
                     stackedLabel: true,
@@ -536,14 +594,19 @@ class _DraftEditorScreenState extends ConsumerState<DraftEditorScreen> {
                       key: const Key('draft-payee-type'),
                       segments: [
                         ButtonSegment(value: PayeeType.karyawan, label: Text(t.payeeKaryawan)),
-                        ButtonSegment(value: PayeeType.vendor, label: Text(t.payeeVendor)),
+                        if (mayVendor || _d.isVendor) ButtonSegment(value: PayeeType.vendor, label: Text(t.payeeVendor)),
+                        if (mayIntercompany || _d.isPtGrup)
+                          ButtonSegment(
+                            value: PayeeType.ptGrup,
+                            label: Text(t.payeePtGrup, key: const Key('draft-payee-pt-grup')),
+                          ),
                       ],
                       selected: {_d.payeeType},
-                      onSelectionChanged: editableType && mayVendor ? _setPayee : null,
+                      onSelectionChanged: editableType && (mayVendor || mayIntercompany) ? _setPayee : null,
                     ),
                   ),
-                // a vendor payment is always Pengajuan Baru (no "Jenis" choice)
-                if (!_d.isVendor)
+                // a vendor / PT grup payment is always Pengajuan Baru (no "Jenis" choice)
+                if (!_d.isDirectPayment)
                   FormGridCell(
                     label: t.fieldType,
                     stackedLabel: true,
@@ -573,12 +636,12 @@ class _DraftEditorScreenState extends ConsumerState<DraftEditorScreen> {
                         label: t.fieldProject,
                         items: m[MasterTypes.projects] ?? const [],
                         value: _d.projectId,
-                        // ADR 0027: a vendor payment may go without a project (then a cost center)
-                        allowNone: _d.isVendor,
+                        // ADR 0027 / 0028: a vendor / PT grup payment may go without a project (then a cost center)
+                        allowNone: _d.isDirectPayment,
                         errorText: issueFor('projectId'),
                         onChanged: _setProject,
                       ),
-                      if (_d.isVendor && _d.projectId == null) ...[
+                      if (_d.isDirectPayment && _d.projectId == null) ...[
                         const SizedBox(height: 8),
                         MasterPickerField(
                           key: const Key('draft-cost-center'),
@@ -591,7 +654,7 @@ class _DraftEditorScreenState extends ConsumerState<DraftEditorScreen> {
                       ],
                       // D4 (owner 2026-10-11): project with a RAB but no RAP → submit refused; same text as the web
                       if (rap != null && rap.missing) const _RapMissingCard(),
-                      if (!_d.isVendor && _d.projectId == null && widget.initial.costCenterId != null)
+                      if (!_d.isDirectPayment && _d.projectId == null && widget.initial.costCenterId != null)
                         Padding(
                           key: const Key('draft-cost-center-legacy'),
                           padding: const EdgeInsets.only(top: 4),
@@ -623,7 +686,7 @@ class _DraftEditorScreenState extends ConsumerState<DraftEditorScreen> {
                     onChanged: (v) => setState(() => _d = _d.copyWith(urgencyLevelId: v)),
                   ),
                 ),
-                if (!_d.isVendor)
+                if (!_d.isDirectPayment)
                   FormGridCell(
                     label: t.fieldRequesters,
                     stackedLabel: true,
@@ -659,7 +722,7 @@ class _DraftEditorScreenState extends ConsumerState<DraftEditorScreen> {
                       ],
                     ),
                   ),
-                if (!_d.isVendor)
+                if (!_d.isDirectPayment)
                   FormGridCell(
                     label: t.fieldBankAccount,
                     child: Column(
@@ -681,7 +744,7 @@ class _DraftEditorScreenState extends ConsumerState<DraftEditorScreen> {
                       ],
                     ),
                   ),
-                // ADR 0027: vendor → its account → invoice number / date / due date / photo
+                // ADR 0027: vendor → its account (then the invoice fields below)
                 if (_d.isVendor) ...[
                   FormGridCell(
                     label: t.fieldVendor,
@@ -732,17 +795,35 @@ class _DraftEditorScreenState extends ConsumerState<DraftEditorScreen> {
                       ],
                     ),
                   ),
+                ],
+                // ADR 0028: the receiving PT (payee directory) → its designated receiving account (masked)
+                if (_d.isPtGrup)
                   FormGridCell(
-                    label: t.fieldInvoiceNo,
+                    label: t.fieldPayeeCompany,
+                    child: PayeeCompanyField(
+                      companyId: _d.companyId,
+                      value: _d.payeeCompanyId,
+                      errorText: issueFor('payeeCompanyId'),
+                      onChanged: (v) => setState(() => _d = _d.copyWith(payeeCompanyId: v)),
+                    ),
+                  ),
+                // ADR 0027 / 0028: invoice of the vendor / document of the receiving PT — number / date / due date / photo
+                if (_d.isDirectPayment) ...[
+                  FormGridCell(
+                    label: doc.no,
                     builder: (label) => TextField(
                       key: const Key('draft-invoice-no'),
                       controller: _invoiceNo,
                       maxLength: 64,
-                      decoration: InputDecoration(labelText: label, errorText: issueFor('invoiceNo')),
+                      decoration: InputDecoration(
+                        labelText: label,
+                        errorText: issueFor('invoiceNo'),
+                        helperText: _d.isPtGrup ? t.documentNoHelp : null,
+                      ),
                     ),
                   ),
                   FormGridCell(
-                    label: t.fieldInvoiceDate,
+                    label: doc.date,
                     builder: (label) => InkWell(
                       key: const Key('draft-invoice-date'),
                       onTap: () => _pickInvoiceDate(due: false),
@@ -772,17 +853,17 @@ class _DraftEditorScreenState extends ConsumerState<DraftEditorScreen> {
                     ),
                   ),
                   FormGridCell(
-                    label: t.fieldInvoiceFile,
+                    label: doc.file,
                     stackedLabel: true,
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
                           _d.invoiceMediaUuid != null
-                              ? t.invoiceAttached
+                              ? doc.attached
                               : _d.invoiceFileId != null
-                              ? t.invoiceOnServer
-                              : t.invoiceMissing,
+                              ? doc.onServer
+                              : doc.missing,
                           key: const Key('draft-invoice-state'),
                           style: issueFor('invoiceFile') == null
                               ? null
@@ -1055,6 +1136,92 @@ class _BankAccountPreviewState extends State<BankAccountPreview> {
                 onPressed: () => setState(() => _show = !_show),
               )
             : null,
+      ),
+    );
+  }
+}
+
+/// ADR 0028 "PT penerima" of a PT grup payment: the payee directory of the draft's PT (online
+/// `GET /intercompany/payees`, offline the cached masters `intercompany-payees`) and the chosen PT's designated receiving
+/// account, masked (the full number is only in the submit snapshot).
+class PayeeCompanyField extends ConsumerWidget {
+  const PayeeCompanyField({
+    super.key,
+    required this.companyId,
+    required this.value,
+    required this.onChanged,
+    this.errorText,
+  });
+
+  /// The PAYING PT (the draft's PT).
+  final int? companyId;
+  final int? value;
+  final ValueChanged<int?> onChanged;
+  final String? errorText;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final t = AppLocalizations.of(context);
+    final payees = ref.watch(intercompanyPayeesProvider(companyId));
+    final list = payees.value ?? const <IntercompanyPayee>[];
+    final chosen = list.where((p) => p.companyId == value).firstOrNull;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        MasterPickerField(
+          key: const Key('draft-payee-company'),
+          label: t.fieldPayeeCompany,
+          hint: t.payeeCompanyPickHint,
+          items: [for (final p in list) MasterItem(p.companyId, p.label)],
+          value: value,
+          allowNone: false,
+          errorText: errorText,
+          onChanged: onChanged,
+        ),
+        if (payees.isLoading && list.isEmpty) const LinearProgressIndicator(),
+        if (!payees.isLoading && list.isEmpty)
+          Padding(
+            key: const Key('draft-payee-company-none'),
+            padding: const EdgeInsets.only(top: 4),
+            child: Text(t.intercompanyPayeesNone, style: TextStyle(color: context.pk.warnText)),
+          ),
+        if (chosen != null) IntercompanyAccountPreview(key: ValueKey('ic-preview-${chosen.companyId}'), payee: chosen),
+        if (value != null && chosen == null && !payees.isLoading)
+          Padding(
+            key: const Key('draft-payee-company-gone'),
+            padding: const EdgeInsets.only(top: 4),
+            child: Text(t.intercompanyPayeeGone, style: TextStyle(color: context.pk.warnText)),
+          ),
+      ],
+    );
+  }
+}
+
+/// ADR 0028: the receiving PT's designated account as bank · holder · masked number (no eye toggle: the directory never
+/// carries the full number).
+class IntercompanyAccountPreview extends StatelessWidget {
+  const IntercompanyAccountPreview({super.key, required this.payee});
+  final IntercompanyPayee payee;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    return Card(
+      key: const Key('ic-account-preview'),
+      margin: const EdgeInsets.only(top: 8),
+      color: theme.colorScheme.surfaceContainerLow,
+      child: ListTile(
+        leading: const Icon(Icons.account_balance),
+        title: Text(payee.accountTitle.isEmpty ? payee.label : payee.accountTitle, key: const Key('ic-account-title')),
+        subtitle: Text(
+          [
+            if (payee.accountNoMasked.isNotEmpty) payee.accountNoMasked,
+            t.intercompanyReceivingAccount,
+          ].join(' · '),
+          key: const Key('ic-account-number'),
+          style: theme.textTheme.bodyMedium?.copyWith(fontFeatures: const [FontFeature.tabularFigures()]),
+        ),
       ),
     );
   }

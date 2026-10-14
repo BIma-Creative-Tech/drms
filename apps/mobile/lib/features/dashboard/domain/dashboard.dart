@@ -16,10 +16,17 @@ T? _block<T>(Object? v, T Function(Json) parse) => v is Map<String, dynamic> ? p
 
 /// One month of the cash book (`cashFlow.rows[]`, K-02a/K-02b).
 class CashFlowPoint {
-  const CashFlowPoint(this.period, this.masuk, this.keluar);
+  const CashFlowPoint(this.period, this.masuk, this.keluar, {this.masukAntarPt = 0, this.keluarAntarPt = 0});
   final String period; // YYYY-MM
   final int masuk;
   final int keluar;
+
+  /// ADR 0028 (owner decision 3, "count and label"): the part of [masuk] / [keluar] that are payments between PTs of
+  /// the group ("Antar PT"); 0 from a server before ADR 0028.
+  final int masukAntarPt;
+  final int keluarAntarPt;
+
+  bool get hasAntarPt => masukAntarPt != 0 || keluarAntarPt != 0;
 }
 
 /// One month of a single series (saldo akhir bulan, pencairan bersih, jumlah pengajuan).
@@ -30,7 +37,14 @@ class TrendPoint {
 }
 
 List<CashFlowPoint> _cashFlow(Object? block) => [
-  for (final r in _l(_m(block)['rows'])) CashFlowPoint('${r['period'] ?? ''}', _i(r['masuk']), _i(r['keluar'])),
+  for (final r in _l(_m(block)['rows']))
+    CashFlowPoint(
+      '${r['period'] ?? ''}',
+      _i(r['masuk']),
+      _i(r['keluar']),
+      masukAntarPt: _i(r['masukAntarPt']),
+      keluarAntarPt: _i(r['keluarAntarPt']),
+    ),
 ];
 
 List<TrendPoint> _trend(Object? rows, String key) => [
@@ -412,6 +426,59 @@ class RapMonitor {
   );
 }
 
+/// Web `SOURCE` labels of `cash_entries.source_type` (Dashboard / Kas "Sumber"; ADR 0028 adds "Antar PT").
+const cashSourceLabels = {
+  'transfer': 'Transfer',
+  'settlement_refund': 'Pengembalian LPJ',
+  'manual': 'Manual',
+  'reversal': 'Jurnal balik',
+  'opening': 'Saldo awal',
+  'intercompany': 'Antar PT',
+};
+
+/// ADR 0028 cash-entry `intercompany` counterpart (the other leg of a payment between PTs): numbers and PT only.
+class CashCounterpart {
+  const CashCounterpart({
+    required this.incoming,
+    this.companyCode,
+    this.sourceDocNo,
+    this.transferDocNo,
+    this.entryNo = '',
+    this.voided = false,
+  });
+
+  /// true = this entry is the Kas Masuk of the receiving PT ("Dari PT …"), false = the paying PT's KK ("Ke PT …").
+  final bool incoming;
+  final String? companyCode;
+  final String? sourceDocNo;
+  final String? transferDocNo;
+  final String entryNo;
+  final bool voided;
+
+  static CashCounterpart? fromJson(Object? v) {
+    if (v is! Map<String, dynamic>) return null;
+    String? s(Object? x) => x == null || '$x'.isEmpty ? null : '$x';
+    return CashCounterpart(
+      incoming: v['direction'] == 'in',
+      companyCode: s(_m(v['counterpartCompany'])['shortCode']),
+      sourceDocNo: s(v['sourceDocNo']),
+      transferDocNo: s(v['transferDocNo']),
+      entryNo: _s(v['counterpartEntryNo']),
+      voided: v['status'] == 'void',
+    );
+  }
+
+  /// Web Kas row: "Dari PT DRMS · PB/… · TRF/… · KK/…" (Kas Masuk of the receiving PT) or "Ke PT LAS · KM/LAS/…" (KK of
+  /// the paying PT); "(dibatalkan)" after a void.
+  String get text {
+    final pt = companyCode ?? 'lain';
+    final parts = incoming
+        ? ['Dari PT $pt', ?sourceDocNo, ?transferDocNo, if (entryNo.isNotEmpty) entryNo]
+        : ['Ke PT $pt', if (entryNo.isNotEmpty) entryNo];
+    return '${parts.join(' · ')}${voided ? ' (dibatalkan)' : ''}';
+  }
+}
+
 /// "Transaksi kas terbaru" (`viz.recentCash`, office roles).
 class RecentCashEntry {
   const RecentCashEntry({
@@ -423,6 +490,8 @@ class RecentCashEntry {
     this.voided = false,
     this.account = '',
     this.label = '',
+    this.sourceType = '',
+    this.counterpart,
   });
   final int id;
   final String? entryNo;
@@ -432,6 +501,17 @@ class RecentCashEntry {
   final bool voided;
   final String account;
   final String label;
+
+  /// `cash_entries.source_type` (`transfer`, `manual`, …, ADR 0028 `intercompany`); '' from an older server.
+  final String sourceType;
+
+  /// ADR 0028: the other leg of a payment between PTs, when the server sends it (`intercompany`).
+  final CashCounterpart? counterpart;
+
+  /// "Sumber" label (web `SOURCE`): "Antar PT" for the Kas Masuk of a payment from another PT.
+  String get sourceLabel => cashSourceLabels[sourceType] ?? sourceType;
+
+  bool get isIntercompany => sourceType == 'intercompany' || counterpart != null;
 
   static List<RecentCashEntry> listFromJson(Object? rows) => [
     for (final r in _l(rows))
@@ -444,6 +524,8 @@ class RecentCashEntry {
         voided: r['status'] == 'void',
         account: _s(r['account']),
         label: _s(r['requestDocNo'] ?? r['label']),
+        sourceType: _s(r['sourceType']),
+        counterpart: CashCounterpart.fromJson(r['intercompany']),
       ),
   ];
 }

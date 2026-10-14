@@ -135,10 +135,20 @@ class Meter extends StatelessWidget {
 /// Monthly cash in vs out as paired columns (one axis, rupiah). Tap a month to read its values; the
 /// latest month is selected by default. Legend always visible; the readout doubles as the table view.
 class CashFlowChart extends StatefulWidget {
-  const CashFlowChart({super.key, required this.rows, required this.labelIn, required this.labelOut});
+  const CashFlowChart({
+    super.key,
+    required this.rows,
+    required this.labelIn,
+    required this.labelOut,
+    this.intercompanyNote,
+  });
   final List<CashFlowPoint> rows;
   final String labelIn;
   final String labelOut;
+
+  /// ADR 0028 (owner decision 3): line under the readout naming the "Antar PT" part of the selected month (masuk,
+  /// keluar as rupiah text); shown only when that month has any.
+  final String Function(String masuk, String keluar)? intercompanyNote;
 
   @override
   State<CashFlowChart> createState() => _CashFlowChartState();
@@ -220,6 +230,12 @@ class _CashFlowChartState extends State<CashFlowChart> {
             style: theme.textTheme.bodyMedium,
           ),
         ),
+        if (widget.intercompanyNote case final note? when r.hasAntarPt)
+          Text(
+            note(formatRupiah(r.masukAntarPt), formatRupiah(r.keluarAntarPt)),
+            key: const Key('cashflow-antar-pt'),
+            style: theme.textTheme.bodySmall,
+          ),
       ],
     );
   }

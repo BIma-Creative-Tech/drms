@@ -56,6 +56,9 @@ class TransferQueueItem {
     this.receiptMismatch = 0,
     this.sla = const TransferSla(),
     this.noApproval = false,
+    this.payeeType = PayeeType.karyawan,
+    this.payeeCompany,
+    this.payeeCompanyName,
   });
 
   final int id;
@@ -89,6 +92,18 @@ class TransferQueueItem {
   /// ADR 0024: a Direktur's own request without any approval (kebijakan PT) — Finance is the only check.
   final bool noApproval;
 
+  /// ADR 0027 / 0028: payee type; for a PT grup payment the receiving PT (`payeeCompany {id, shortCode → code, name}`,
+  /// badge "Antar PT: <PT>") — the transfer also posts that PT's Kas Masuk.
+  final PayeeType payeeType;
+  final RefItem? payeeCompany;
+  final String? payeeCompanyName;
+
+  bool get isPtGrup => payeeType == PayeeType.ptGrup;
+
+  /// Short code of the receiving PT of a PT grup payment ("LAS"), else null.
+  String? get payeeCompanyCode =>
+      isPtGrup ? (payeeCompany?.code ?? payeeCompany?.name ?? payeeCompanyName ?? '-') : null;
+
   /// What Finance transfers: the approved amount (server-set, G3).
   int get amount => approvedAmount ?? grandTotal;
 
@@ -103,6 +118,8 @@ class TransferQueueItem {
     statusLabel,
     bankName,
     bankAccountHolder,
+    payeeCompany?.code,
+    payeeCompanyName,
   ].whereType<String>().join(' ');
 }
 
@@ -140,6 +157,9 @@ TransferQueueItem transferQueueItemFromJson(Map<String, dynamic> j) {
       over: sla?['over'] == true,
     ),
     noApproval: j['noApproval'] == true,
+    payeeType: s.payeeType,
+    payeeCompany: companyRefFromJson(j['payeeCompany']),
+    payeeCompanyName: _strN(j['payeeCompanyName']) ?? _strN(_map(j['payeeCompany'])?['name']),
   );
 }
 

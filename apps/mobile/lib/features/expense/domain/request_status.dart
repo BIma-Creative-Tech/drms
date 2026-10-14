@@ -12,19 +12,35 @@ enum RequestType {
 
 /// ADR 0027 (DRMS 13/10 Wave 4) "Jenis penerima": `karyawan` (default, the requester's account) or `vendor` =
 /// "Pembayaran vendor" (Finance / PM only: vendor + vendor account + invoice, always Pengajuan Baru, no LPJ).
+/// ADR 0028 (DRMS 13/10 Phase B): `pt_grup` = "Pembayaran antar-PT" (Finance / PM / Direktur of the paying PT: another
+/// PT of the group, paid to its designated receiving account + the receiving PT's document; always Pengajuan Baru, no
+/// LPJ; the transfer also posts a Kas Masuk in the receiving PT).
 enum PayeeType {
   karyawan('karyawan', 'Karyawan'),
-  vendor('vendor', 'Vendor');
+  vendor('vendor', 'Vendor'),
+  ptGrup('pt_grup', 'PT grup');
 
   const PayeeType(this.code, this.label);
   final String code;
   final String label;
 
-  static PayeeType fromCode(String? c) => c == 'vendor' ? vendor : karyawan;
+  /// Unknown / missing codes read as `karyawan` (servers before Wave 4).
+  static PayeeType fromCode(String? c) => switch (c) {
+    'vendor' => vendor,
+    'pt_grup' => ptGrup,
+    _ => karyawan,
+  };
+
+  /// ADR 0027 / 0028: paid straight to a vendor or another PT — always Pengajuan Baru, Pemohon = the filer, no employee
+  /// account, project OR cost center, the invoice / document is the proof, no receipts and no LPJ.
+  bool get isDirect => this != karyawan;
 }
 
 /// ADR 0027: kind label of a vendor payment (server `typeLabel`; fallback).
 const vendorPaymentLabel = 'Pembayaran vendor';
+
+/// ADR 0028: kind label of a PT grup payment (server `typeLabel`; fallback).
+const intercompanyPaymentLabel = 'Pembayaran antar-PT';
 
 /// Status codes of openapi `RequestStatus`; labels are a fallback — the server's `statusLabel` wins.
 /// Same wording as the web (`apps/web/src/domain/expense/types.ts` STATUS_LABELS, ADR 0021).

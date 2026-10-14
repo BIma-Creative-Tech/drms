@@ -25,6 +25,26 @@ RefItem? refFromJson(Object? v) {
   return RefItem(id: _int(m['id']), code: _strN(m['code']), name: _strN(m['name']));
 }
 
+/// A PT reference `{id, shortCode, name}` (ADR 0028 `payeeCompany`, `targetCompany`) — the short code as [RefItem.code].
+RefItem? companyRefFromJson(Object? v) {
+  final m = _map(v);
+  if (m == null || _intN(m['id']) == null) return null;
+  return RefItem(id: _int(m['id']), code: _strN(m['shortCode'] ?? m['code']), name: _strN(m['name']));
+}
+
+/// ADR 0028 `intercompany {status, targetEntryNo, targetCompany, transferId}` (null before the transfer / otherwise).
+RequestIntercompany? requestIntercompanyFromJson(Object? v) {
+  final m = _map(v);
+  final no = _strN(m?['targetEntryNo']);
+  if (m == null || no == null || no.isEmpty) return null;
+  return RequestIntercompany(
+    targetEntryNo: no,
+    voided: m['status'] == 'void',
+    targetCompany: companyRefFromJson(m['targetCompany']),
+    transferId: _intN(m['transferId']),
+  );
+}
+
 BudgetImpact budgetFromJson(Object? v) {
   final m = _map(v);
   if (m == null) return const BudgetImpact(basis: 'none');
@@ -312,6 +332,9 @@ ExpenseDetail detailFromJson(Json j) {
     invoiceDueDate: _strN(invoice?['dueDate']),
     invoiceFileId: _intN(invoice?['fileId']),
     invoiceFileName: _strN(invoice?['fileName']),
+    // ADR 0028 (absent on servers before Phase B)
+    payeeCompany: companyRefFromJson(j['payeeCompany']),
+    intercompany: requestIntercompanyFromJson(j['intercompany']),
   );
 }
 
@@ -390,35 +413,46 @@ InboxItem inboxItemFromJson(Json j) {
   );
 }
 
-/// ADR 0027: vendor fields of the create body (`invoiceFileId` = the uploaded invoice; DraftService uploads it first).
-Json _vendorCreateFields(DraftRequest d) => d.isVendor
-    ? {
-        'payeeType': PayeeType.vendor.code,
-        'vendorId': d.vendorId,
-        'vendorBankAccountId': d.vendorBankAccountId,
-        'invoiceNo': _trimmed(d.invoiceNo),
-        'invoiceDate': d.invoiceDate,
-        'invoiceDueDate': d.invoiceDueDate,
-        'invoiceFileId': d.invoiceFileId,
-      }
-    : const {};
+/// ADR 0027 / 0028: payee fields of the create body (`invoiceFileId` = the uploaded invoice / document; DraftService
+/// uploads it first).
+Json _vendorCreateFields(DraftRequest d) => switch (d.payeeType) {
+  PayeeType.karyawan => const {},
+  PayeeType.vendor => {
+    'payeeType': PayeeType.vendor.code,
+    'vendorId': d.vendorId,
+    'vendorBankAccountId': d.vendorBankAccountId,
+    ..._invoiceCreateFields(d),
+  },
+  PayeeType.ptGrup => {
+    'payeeType': PayeeType.ptGrup.code,
+    'payeeCompanyId': d.payeeCompanyId,
+    ..._invoiceCreateFields(d),
+  },
+};
+
+Json _invoiceCreateFields(DraftRequest d) => {
+  'invoiceNo': _trimmed(d.invoiceNo),
+  'invoiceDate': d.invoiceDate,
+  'invoiceDueDate': d.invoiceDueDate,
+  'invoiceFileId': d.invoiceFileId,
+};
 
 String? _trimmed(String? v) => (v == null || v.trim().isEmpty) ? null : v.trim();
 
 /// Local draft → `POST /api/v1/expense-requests` body (openapi `ExpenseRequestCreate`).
 Json draftToCreateBody(DraftRequest d) => {
-  // ADR 0027: a vendor payment is always Pengajuan Baru (the server sets it too)
-  'type': d.isVendor ? RequestType.advance.code : d.type.code,
+  // ADR 0027 / 0028: a vendor / PT grup payment is always Pengajuan Baru (the server sets it too)
+  'type': d.isDirectPayment ? RequestType.advance.code : d.type.code,
   'title': d.title.trim(),
-  // D2: project only — the requester no longer sends a cost center (Finance sets it at transfer). ADR 0027: a vendor
-  // payment without a project sends its cost center.
+  // D2: project only — the requester no longer sends a cost center (Finance sets it at transfer). ADR 0027 / 0028: a
+  // vendor / PT grup payment without a project sends its cost center.
   'projectId': d.projectId,
-  if (d.isVendor && d.projectId == null && d.costCenterId != null) 'costCenterId': d.costCenterId,
+  if (d.isDirectPayment && d.projectId == null && d.costCenterId != null) 'costCenterId': d.costCenterId,
   'neededDate': d.neededDate,
   'urgencyLevelId': d.urgencyLevelId,
   'notes': (d.notes == null || d.notes!.trim().isEmpty) ? null : d.notes!.trim(),
   if (d.requesterIds.isNotEmpty) 'requesterIds': d.requesterIds,
-  'bankAccountId': d.isVendor ? null : d.bankAccountId,
+  'bankAccountId': d.isDirectPayment ? null : d.bankAccountId,
   ..._vendorCreateFields(d),
   'lines': [for (final l in d.lines) lineToInput(l)],
   'clientUuid': d.clientUuid,
@@ -449,26 +483,27 @@ Json draftToSyncPayload(DraftRequest d, {bool includeDraftId = false}) => {
   // A draft imported from the server (withdrawn / "Ajukan ulang" clone, E3-d) may have been created on
   // the web without this phone's id: the server id then identifies it (SyncDraftUpsertPayload.request_id).
   if (d.serverId != null) 'request_id': d.serverId,
-  'kind': d.isVendor ? RequestType.advance.code : d.type.code,
+  'kind': d.isDirectPayment ? RequestType.advance.code : d.type.code,
   'title': d.title.trim(),
   'project_id': d.projectId,
-  if (d.isVendor && d.projectId == null && d.costCenterId != null) 'cost_center_id': d.costCenterId,
+  if (d.isDirectPayment && d.projectId == null && d.costCenterId != null) 'cost_center_id': d.costCenterId,
   'needed_date': d.neededDate,
   'urgency_level_id': d.urgencyLevelId,
   'notes': (d.notes == null || d.notes!.trim().isEmpty) ? null : d.notes!.trim(),
   'requester_ids': d.requesterIds,
-  'bank_account_id': d.isVendor ? null : d.bankAccountId,
-  // ADR 0027: vendor payment only (an employee draft stays byte-compatible with servers before Wave 4; the payee
-  // type of a draft the server knows is fixed in the editor)
-  if (d.isVendor) ...{
-    'payee_type': PayeeType.vendor.code,
-    'vendor_id': d.vendorId,
-    'vendor_bank_account_id': d.vendorBankAccountId,
+  'bank_account_id': d.isDirectPayment ? null : d.bankAccountId,
+  // ADR 0027 / 0028: vendor / PT grup payment only (an employee draft stays byte-compatible with servers before Wave 4;
+  // the payee type of a draft the server knows is fixed in the editor)
+  if (d.isDirectPayment) ...{
+    'payee_type': d.payeeType.code,
+    if (d.isVendor) ...{'vendor_id': d.vendorId, 'vendor_bank_account_id': d.vendorBankAccountId},
+    if (d.isPtGrup) 'payee_company_id': d.payeeCompanyId,
     'invoice_no': _trimmed(d.invoiceNo),
     'invoice_date': d.invoiceDate,
     'invoice_due_date': d.invoiceDueDate,
     if (d.invoiceFileId != null) 'invoice_file_id': d.invoiceFileId,
-    // local invoice photo: uploaded by the sync engine (POST /media/attachments), replaced by `invoice_file_id`
+    // local invoice / document photo: uploaded by the sync engine (POST /media/attachments), replaced by
+    // `invoice_file_id`
     if (d.invoiceFileId == null && d.invoiceMediaUuid != null) invoicePlaceholderKey: d.invoiceMediaUuid,
   },
   'client_grand_total': d.previewGrandTotal,
@@ -528,10 +563,11 @@ DraftRequest draftFromServer(
   notes: d.notes,
   requesterIds: [for (final r in d.requesters) r.id],
   bankAccountId: d.bankAccountId,
-  // ADR 0027: vendor payment — the invoice stays on the server (its media id)
+  // ADR 0027 / 0028: vendor / PT grup payment — the invoice / document stays on the server (its media id)
   payeeType: d.payeeType,
   vendorId: d.vendor?.id,
   vendorBankAccountId: d.vendorBankAccountId,
+  payeeCompanyId: d.payeeCompany?.id,
   invoiceNo: d.invoiceNo,
   invoiceDate: d.invoiceDate,
   invoiceDueDate: d.invoiceDueDate,
@@ -587,7 +623,8 @@ const progressPhotosPlaceholderKey = 'pk_photo_uuids';
 /// Local-only key of a `unit_timesheet.upsert` item (FR1): the HM meter photo, replaced by `hm_photo_media_id`.
 const hmPhotoPlaceholderKey = 'pk_hm_photo_uuid';
 
-/// ADR 0027: local-only key of a vendor-payment draft item: the invoice photo, replaced by `invoice_file_id`.
+/// ADR 0027 / 0028: local-only key of a vendor / PT grup payment draft item: the invoice / document photo, replaced by
+/// `invoice_file_id`.
 const invoicePlaceholderKey = 'pk_invoice_uuid';
 
 /// Replaces [mediaPlaceholderKey] by `media_id` using [mediaIds] (local uuid → server id).

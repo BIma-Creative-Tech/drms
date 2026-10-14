@@ -391,6 +391,19 @@ keep the renumber prelude where it exists (integration test `d1310-w4-renumber` 
 - **Kas page** names the designated receiving account per shown PT ("belum ditetapkan" otherwise).
 - **Not done in this change** (follow-up): the APK (enum, editor, detail, queue badge — the API contract is ready).
 
+## As implemented (APK, `feat/d1310-b-intercompany-apk`)
+
+- `PayeeType.ptGrup` (`pt_grup`); the editor offers it to Finance / PM / Direktur of the draft's PT. `/me` carries
+  EFFECTIVE roles (an Owner also holds `pk-owner`), so for an Owner the APK offers "PT grup" only when the server lists
+  him the payee directory (masters `intercompany-payees`, filtered on the stored roles); the server's 403 stays the
+  authority.
+- No drift schema bump: `payeeCompanyId` lives in the existing payee JSON `local_drafts.vendor_json` (schema 10).
+- PT penerima picker: `GET /intercompany/payees` online, masters `intercompany-payees` offline; masked account preview;
+  document number / date / photo required (the vendor invoice fields under document labels).
+- Detail section "Pembayaran antar-PT" + "Kas masuk di PT …" (`intercompany.targetEntryNo`), stepper without LPJ,
+  transfer-queue badge "Antar PT: <PT>", transfer success / 409 messages, "Antar PT" in "Transaksi kas terbaru" and the
+  cash-flow readout (`masukAntarPt` / `keluarAntarPt`).
+
 Decided by the owner already (not asked again): payee type "PT grup", rule-engine approval with Owner, system KM on
 B's designated account, void cascades, closed period in B refuses, no LPJ.
 

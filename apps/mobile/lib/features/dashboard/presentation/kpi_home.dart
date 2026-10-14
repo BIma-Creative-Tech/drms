@@ -264,7 +264,12 @@ class DirekturKpis extends ConsumerWidget {
             DashSection(
               title: t.kpiCashFlowTitle,
               subtitle: t.kpiCashFlowSubtitle,
-              child: CashFlowChart(rows: d.cashFlow, labelIn: t.kpiIn, labelOut: t.kpiOut),
+              child: CashFlowChart(
+                rows: d.cashFlow,
+                labelIn: t.kpiIn,
+                labelOut: t.kpiOut,
+                intercompanyNote: t.kpiCashFlowAntarPt,
+              ),
             ),
           // DRMS 13/10 Wave 3: the rest of the web "Ringkasan Direktur", same order as Dashboard.tsx Owner().
           PipelineCard(pipeline: d.pipeline, title: t.kpiPipelineTitle, subtitle: t.kpiPipelineSubtitle),
@@ -348,7 +353,12 @@ class FinanceKpis extends ConsumerWidget {
             DashSection(
               title: t.kpiCashFlowTitle,
               subtitle: t.kpiCashFlowSubtitleFinance,
-              child: CashFlowChart(rows: d.cashFlow, labelIn: t.kpiIn, labelOut: t.kpiOut),
+              child: CashFlowChart(
+                rows: d.cashFlow,
+                labelIn: t.kpiIn,
+                labelOut: t.kpiOut,
+                intercompanyNote: t.kpiCashFlowAntarPt,
+              ),
             ),
           // DRMS 13/10 Wave 3: the rest of the web "Ringkasan Finance", same order as Dashboard.tsx Finance().
           AccountsCard(accounts: d.accounts, subtitle: t.kpiAccountsSubtitle),
