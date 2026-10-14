@@ -11,7 +11,7 @@ import '../../auth/application/auth_controller.dart';
 import '../../auth/domain/user_profile.dart';
 import '../application/attendance_providers.dart';
 import '../domain/attendance_recap.dart';
-import 'attendance_widgets.dart' show siteKindIcon;
+import 'attendance_widgets.dart' show flagsText, siteKindIcon;
 
 /// Visual of a day status: colour + icon + short text (never colour alone).
 ({Color color, IconData icon, String label}) dayStatusVisual(
@@ -361,12 +361,12 @@ class DayDetailSheet extends StatelessWidget {
               Text(t.recapEarlyBy(d.earlyLeaveMinutes), style: TextStyle(color: context.pk.warnText)),
             if (d.onBehalf) Text(t.recapOnBehalf(d.onBehalfBy.join(', '))),
             if (d.corrected) Text(t.recapCorrected),
-            if (d.flags.isNotEmpty) Text(t.recapFlags(d.flags.join(', ')), style: theme.textTheme.bodySmall),
+            if (d.flags.isNotEmpty) Text(t.recapFlags(flagsText(t, d.flags)), style: theme.textTheme.bodySmall),
             for (final l in d.locations)
               ListTile(
                 contentPadding: EdgeInsets.zero,
-                leading: Icon(siteKindIcon(l.location.kind)),
-                title: Text(l.location.label),
+                leading: Icon(l.outsideArea ? Icons.explore : siteKindIcon(l.location.kind)),
+                title: Text(l.outsideArea ? '${t.attendanceOutsideArea} (ref. ${l.location.label})' : l.location.label),
                 subtitle: Text(
                   '${t.attendanceCheckIn}: ${localHm(l.checkIn?.time, zone)} · ${t.attendanceCheckOut}: ${localHm(l.checkOut?.time, zone)}',
                 ),

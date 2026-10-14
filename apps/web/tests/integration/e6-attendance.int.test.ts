@@ -25,7 +25,6 @@ let otherPm: Mobile
 const SITE = { lat: -2.21, lng: 113.91 }
 const OPS = { lat: -2.5, lng: 114.2 }
 let noGeoCc: number
-let unassignedCc: number
 let schedule: number
 const TZ = 'Asia/Makassar'
 const MONTH = '2026-08' // fully in the past (fixture rows below)
@@ -96,7 +95,6 @@ beforeAll(async () => {
   await p.update({ collection: 'projects', id: w.otherProject, data: { lat: SITE.lat, lng: SITE.lng, radiusM: 100 }, overrideAccess: true /* SYSTEM-WRITE: fixture geofence */ })
   await p.update({ collection: 'cost-centers', id: w.costCenter, data: { lat: OPS.lat, lng: OPS.lng, radiusM: 150 }, overrideAccess: true /* SYSTEM-WRITE: fixture geofence (Q-40) */ })
   noGeoCc = await sysCreate('cost-centers', { code: 'e6-CCNG', name: 'e6 Ops tanpa titik', manager: w.users.pm.id })
-  unassignedCc = await sysCreate('cost-centers', { code: 'e6-CCUA', name: 'e6 Ops lain', manager: w.users.pm.id, lat: OPS.lat, lng: OPS.lng, radiusM: 150 })
   await sysCreate('team-assignments', { employee: w.emp.a, costCenter: noGeoCc, roleInProject: 'staff' })
   await sysCreate('team-assignments', { employee: w.emp.noAccount, project: w.project, roleInProject: 'staff' })
   // Q-30 schedule for staff B (fixture month) — own schedule, the company default stays empty.
@@ -138,15 +136,15 @@ describe('cost-center geofence (Q-40) with syncAttendanceEnabled = true', () => 
     expect(dup[0]!.errors[0]!.code).toBe('ALREADY_CHECKED_IN')
   })
 
-  it('rejections carry the distance; no geofence / not assigned / both locations', async () => {
+  // DRMS 13/10 A2: no assignment is needed any more (OnSite: any registered location of the PT) — onsite-attendance
+  it('rejections carry the distance; no geofence / both locations', async () => {
     const s = await selfie(staffA)
     const res = await sync(staffA, [
       item('attendance.check_in', { cost_center_id: w.costCenter, lat: OPS.lat + 0.01, lng: OPS.lng, accuracy_m: 5, is_mocked: false, selfie_media_id: s }),
       item('attendance.check_in', { cost_center_id: noGeoCc, lat: OPS.lat, lng: OPS.lng, is_mocked: false, selfie_media_id: s }),
-      item('attendance.check_in', { cost_center_id: unassignedCc, lat: OPS.lat, lng: OPS.lng, is_mocked: false, selfie_media_id: s }),
       item('attendance.check_in', { project_id: w.project, cost_center_id: w.costCenter, lat: OPS.lat, lng: OPS.lng, is_mocked: false, selfie_media_id: s }),
     ])
-    expect(res.map((r) => r.errors[0]?.code)).toEqual(['OUTSIDE_GEOFENCE', 'NO_GEOFENCE', 'NOT_ASSIGNED', 'VALIDATION'])
+    expect(res.map((r) => r.errors[0]?.code)).toEqual(['OUTSIDE_GEOFENCE', 'NO_GEOFENCE', 'VALIDATION'])
     expect(res[0]!.errors[0]!.message).toMatch(/Di luar radius pusat biaya \(\d+ m dari titik, radius 150 m\)/)
   })
 })
@@ -186,22 +184,22 @@ describe('diabsenkan oleh PM (US-14)', () => {
     expect(out!.status).toBe('applied')
   })
 
-  it('authz negatives: staff, PM of another team, own attendance, unassigned employee, foreign selfie, mock, missing reason', async () => {
+  it('authz negatives: staff, PM of another team, own attendance, foreign selfie, mock, missing reason', async () => {
     const sPm = await selfie(pm)
     const sOther = await selfie(otherPm)
     const staffRes = await sync(staffA, [item('attendance.on_behalf', ob({ employee_id: w.emp.b, selfie_media_id: await selfie(staffA) }))])
     expect(staffRes[0]!.errors[0]).toMatchObject({ code: 'FORBIDDEN' })
     const otherRes = await sync(otherPm, [item('attendance.on_behalf', ob({ employee_id: w.emp.b, selfie_media_id: sOther }))])
     expect(otherRes[0]!.errors[0]).toMatchObject({ code: 'FORBIDDEN', message: 'Hanya untuk project tim Anda.' })
+    // DRMS 13/10 A2: an unassigned employee of the PT is no longer refused (no assignment needed) — onsite-attendance
     const res = await sync(pm, [
       item('attendance.on_behalf', ob({ employee_id: w.emp.pm, selfie_media_id: sPm })),
-      item('attendance.on_behalf', ob({ employee_id: w.emp.admin, selfie_media_id: sPm })),
       item('attendance.on_behalf', ob({ employee_id: w.emp.b, selfie_media_id: await selfie(staffA) })),
       item('attendance.on_behalf', ob({ employee_id: w.emp.b, is_mocked: true, selfie_media_id: sPm })),
       item('attendance.on_behalf', ob({ employee_id: w.emp.b, reason: '', selfie_media_id: sPm })),
       item('attendance.on_behalf', ob({ employee_id: w.emp.b, lat: SITE.lat + 0.01, selfie_media_id: sPm })),
     ])
-    expect(res.map((r) => r.errors[0]?.code)).toEqual(['FORBIDDEN', 'NOT_ASSIGNED', 'FORBIDDEN', 'MOCK_LOCATION', 'VALIDATION', 'OUTSIDE_GEOFENCE'])
+    expect(res.map((r) => r.errors[0]?.code)).toEqual(['FORBIDDEN', 'FORBIDDEN', 'MOCK_LOCATION', 'VALIDATION', 'OUTSIDE_GEOFENCE'])
     expect(res.every((r) => r.status === 'rejected')).toBe(true)
     // nothing stored for B today
     const n = await sqlAs('app', "SELECT count(*)::int AS n FROM attendances WHERE employee_id = $1 AND source = 'pm'", [w.emp.b])

@@ -327,6 +327,8 @@ const ROUTE_CLASSES: Record<string, RouteClass> = {
   'GET /reports/:code/:format': 'selection',
   'GET /attendance/recap': 'document',
   'GET /attendance/team-today': 'selection',
+  // DRMS 13/10 A2: own eligible check-in locations (own employee per selected PT; `?company=` narrows)
+  'GET /attendance/locations': 'selection',
   'GET /projects/progress': 'selection',
   'GET /progress-reports': 'selection',
   'GET /budget-addenda': 'selection',

@@ -22,14 +22,19 @@ export type AttendanceFact = {
   schedule: ScheduleSnapshot | null
   flags: string[]
   offline: boolean
+  /** DRMS 13/10 A2: "Di luar area" — Non-OnSite outside every registered location; `location` = the reference. */
+  outsideArea?: boolean
 }
 
 export type DayStatus = 'selesai' | 'hadir' | 'belum_absen' | 'tidak_hadir' | 'libur' | 'tanpa_jadwal'
 
+/** `outsideArea` (DRMS 13/10 A2, only when true): this check-in / check-out was "Di luar area". */
+export type LocationStamp = { id: number; time: string; source: 'self' | 'pm'; corrected: boolean; outsideArea?: boolean }
+
 export type LocationDay = {
   location: LocationRef
-  checkIn: { id: number; time: string; source: 'self' | 'pm'; corrected: boolean } | null
-  checkOut: { id: number; time: string; source: 'self' | 'pm'; corrected: boolean } | null
+  checkIn: LocationStamp | null
+  checkOut: LocationStamp | null
 }
 
 export type DayRecap = {
@@ -76,7 +81,7 @@ function locationDays(facts: AttendanceFact[]): LocationDay[] {
   for (const f of [...facts].sort((a, b) => a.time.getTime() - b.time.getTime())) {
     const k = locKey(f.location)
     const cur = by.get(k) ?? { location: f.location, checkIn: null, checkOut: null }
-    const v = { id: f.id, time: f.time.toISOString(), source: f.source, corrected: f.corrected }
+    const v: LocationStamp = { id: f.id, time: f.time.toISOString(), source: f.source, corrected: f.corrected, ...(f.outsideArea ? { outsideArea: true } : {}) }
     if (f.kind === 'check_in' && !cur.checkIn) cur.checkIn = v
     if (f.kind === 'check_out' && !cur.checkOut) cur.checkOut = v
     by.set(k, cur)

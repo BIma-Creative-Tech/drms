@@ -35,7 +35,7 @@ const MAP: Record<MasterType, { collection: CollectionSlug; fields: string[] }> 
   // FR1: customers (collection access: office roles + PM; Staff only when assigned to an aftersales project of the PT)
   clients: { collection: 'clients', fields: ['name', 'contact', 'phone', 'active'] },
   // ADR 0023: kantor cabang (every member of the PT reads them) + per-caller flags home / assigned / team (siteFlagsFor)
-  sites: { collection: 'sites', fields: ['code', 'name', 'address', 'lat', 'lng', 'radiusM', 'costCenter', 'defaultWorkSchedule', 'active'] },
+  sites: { collection: 'sites', fields: ['code', 'name', 'isHeadOffice', 'address', 'lat', 'lng', 'radiusM', 'costCenter', 'defaultWorkSchedule', 'active'] },
 }
 
 const SHARED: ReadonlySet<MasterType> = new Set(SHARED_MASTER_TYPES)

@@ -79,6 +79,23 @@ class SyncCoordinator extends Notifier<SyncStatus> {
         if (ok && ref.mounted) ref.read(mastersRevisionProvider.notifier).bump();
       }, onError: (Object e) => Log.w('masters: refresh failed', e)),
     );
+    _refreshAttendanceLocations(sub, force: true);
+  }
+
+  DateTime? _locationsAt;
+
+  /// DRMS 13/10 A2: the eligible check-in locations (offline cache of the area detection), with the masters and at
+  /// most every 15 minutes after a sync run (a new site / project of the PT appears without a new login).
+  void _refreshAttendanceLocations(String sub, {bool force = false}) {
+    final now = DateTime.now();
+    final last = _locationsAt;
+    if (!force && last != null && now.difference(last) < const Duration(minutes: 15)) return;
+    _locationsAt = now;
+    unawaited(
+      ref.read(attendanceLocationsRepositoryProvider).refresh(sub).then<void>((ok) {
+        if (ok && ref.mounted) ref.read(mastersRevisionProvider.notifier).bump();
+      }, onError: (Object e) => Log.w('attendance-locations: refresh failed', e)),
+    );
   }
 
   void _scheduleBackground() {
@@ -110,6 +127,8 @@ class SyncCoordinator extends Notifier<SyncStatus> {
       // ADR 0018: attendance refused PRIVACY_ACK_REQUIRED → reload /me (privacy gate: notice screen, attendance lock).
       if (r.privacyAckRequired) unawaited(ref.read(authControllerProvider.notifier).refreshProfile());
       if (r.outcome == SyncRunOutcome.offline || r.deferred > 0) _scheduleBackground();
+      const noRefresh = {SyncRunOutcome.offline, SyncRunOutcome.serverUnsupported, SyncRunOutcome.notLoggedIn};
+      if (!noRefresh.contains(r.outcome)) _refreshAttendanceLocations(sub);
       return r;
     } on Object catch (e) {
       Log.w('sync: run failed', e);

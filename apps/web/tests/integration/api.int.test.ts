@@ -33,7 +33,7 @@ beforeAll(async () => {
   const p = await getTestPayload()
   kcCalls = installFakeKeycloak().calls
   await installLocalJwks()
-  const emp = await p.create({ collection: 'employees', data: { code: 'API-EMP', name: 'Api Staff' }, overrideAccess: true /* SYSTEM-WRITE: fixture */ })
+  const emp = await p.create({ collection: 'employees', data: { code: 'API-EMP', name: 'Api Staff', attendanceType: 'onsite' }, overrideAccess: true /* SYSTEM-WRITE: fixture */ })
   staff = await makeUser(['pk-staff'], { employee: emp.id, label: 'api-staff' })
   admin = await makeUser(['pk-admin'], { label: 'api-admin' })
   await p.create({ collection: 'uoms', data: { code: 'API-L', name: 'liter' }, overrideAccess: true /* SYSTEM-WRITE: fixture */ })

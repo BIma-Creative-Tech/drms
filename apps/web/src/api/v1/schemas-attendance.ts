@@ -52,7 +52,7 @@ export const AttendanceCheckBody = z
   .object({
     project_id: id.optional().meta({ description: 'Project (exactly one of project_id / cost_center_id / site_id).' }),
     cost_center_id: id.optional().meta({ description: 'Cost center / operational location (E6, Q-40).' }),
-    site_id: id.optional().meta({ description: 'ADR 0023: site (kantor cabang) — allowed at the home site or with an active site assignment.' }),
+    site_id: id.optional().meta({ description: 'ADR 0023: site (kantor pusat / kantor cabang). DRMS 13/10 A2: no assignment needed; OnSite must be inside the location; Non-OnSite has no location restriction (send the reference site when outside every registered location → "Di luar area").' }),
     lat: z.number().min(-90).max(90),
     lng: z.number().min(-180).max(180),
     accuracy_m: z.number().min(0).max(10_000).nullable().optional().meta({ description: 'Browser GPS accuracy radius (m); up to 50 m is added to the geofence radius.' }),
@@ -62,13 +62,23 @@ export const AttendanceCheckBody = z
   .refine(oneLocation, oneLocationError)
   .meta({ id: 'AttendanceCheckBody' })
 
-export const AttendanceCheckResult = z.object({ id, localDate: businessDate }).meta({ id: 'AttendanceCheckResult' })
+export const AttendanceCheckResult = z
+  .object({
+    id,
+    localDate: businessDate,
+    location: z.object({ type: z.enum(['project', 'cost_center', 'site']), id }).meta({ description: 'Where the record belongs (DRMS 13/10 A2: a Non-OnSite check-in may be recorded at the registered location containing the fix, or at the reference site when outside).' }),
+    outsideArea: z.boolean().meta({ description: 'Non-OnSite "Di luar area": outside every registered location of the PT; `location` = the reference (home site, else head office; a check-out: the open check-in).' }),
+    distanceM: z.number().int().meta({ description: 'Distance to the point of `location` (m).' }),
+  })
+  .meta({ id: 'AttendanceCheckResult' })
 
 const LocationRef = z
   .object({ type: z.enum(['project', 'cost_center', 'site']), id, code: z.string(), name: z.string() })
   .meta({ id: 'AttendanceLocationRef' })
 
-const Stamp = z.object({ id, time: iso, source: z.enum(['self', 'pm']), corrected: z.boolean() }).nullable()
+const Stamp = z
+  .object({ id, time: iso, source: z.enum(['self', 'pm']), corrected: z.boolean(), outsideArea: z.boolean().optional().meta({ description: 'DRMS 13/10 A2: true = "Di luar area" (Non-OnSite outside every registered location; the location is the reference).' }) })
+  .nullable()
 
 const LocationDay = z.object({ location: LocationRef, checkIn: Stamp, checkOut: Stamp }).meta({ id: 'AttendanceLocationDay' })
 
@@ -176,3 +186,47 @@ export const AttendanceCorrection = z
     reason: z.string(),
   })
   .meta({ id: 'AttendanceCorrection' })
+
+/** DRMS 13/10 A2: GET /attendance/locations (`?company=` narrows the selection, like the masters). */
+export const AttendanceLocationsQuery = z.object({ company: companyFilterParam }).meta({ id: 'AttendanceLocationsQuery' })
+
+/**
+ * DRMS 13/10 A2 (ADR 0023 amendment 2026-10-13): the caller's eligible check-in locations — only what the APK needs to
+ * recognise the area (id, kind, name, point, radius); no money, no budgets. Cached by the APK for offline check-ins;
+ * the server re-validates every check-in (eligible for the type, same PT, inside the geofence).
+ */
+export const AttendanceLocations = z
+  .object({
+    employees: z
+      .array(
+        z.object({
+          id,
+          company: id,
+          attendanceType: z.enum(['onsite', 'non_onsite']).meta({ description: 'onsite = inside a registered location of the PT (outside the radius refused); non_onsite = no location restriction (inside a registered location → that one, else "Di luar area").' }),
+          homeSiteId: id.nullable(),
+          referenceSite: z
+            .object({ id, code: z.string(), name: z.string(), lat: z.number().nullable(), lng: z.number().nullable() })
+            .nullable()
+            .meta({ description: 'Non-OnSite only: the reference of a "Di luar area" check-in (home site, else the PT head office); null for OnSite or when neither is set (then an outside check-in is refused VALIDATION).' }),
+        }),
+      )
+      .meta({ description: "The caller's active employees in the selected PTs (one per PT)." }),
+    items: z
+      .array(
+        z.object({
+          kind: z.enum(['project', 'cost_center', 'site']),
+          id,
+          company: id,
+          employeeId: id.meta({ description: "The caller's employee in that PT." }),
+          code: z.string(),
+          name: z.string(),
+          lat: z.number(),
+          lng: z.number(),
+          radiusM: z.number().meta({ description: 'Own radius, else the PT default (the radius the server checks).' }),
+          isHeadOffice: z.boolean().meta({ description: 'Site flagged "Kantor pusat".' }),
+          home: z.boolean().meta({ description: '"Site penempatan" of the employee.' }),
+        }),
+      )
+      .meta({ description: 'Eligible locations with a point: home site first, then head office, sites, projects, cost centers (by code). Locations without a point are never listed.' }),
+  })
+  .meta({ id: 'AttendanceLocations' })

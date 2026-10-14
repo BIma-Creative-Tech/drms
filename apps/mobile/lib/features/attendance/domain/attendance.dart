@@ -1,7 +1,7 @@
 import 'dart:math';
 
 import '../../../core/location/location_service.dart';
-import '../../expense/data/expense_mappers.dart' show selfiePlaceholderKey;
+import '../../expense/data/expense_mappers.dart' show outsideAreaHintKey, selfiePlaceholderKey;
 import '../../masters/domain/master_item.dart';
 import '../../sync/domain/sync_models.dart';
 
@@ -42,8 +42,22 @@ enum SiteKind {
   };
 }
 
-/// Geofence of an assigned location from the cached masters (`projects` / `cost-centers` / `sites`: lat, lng,
-/// radiusM).
+/// DRMS 13/10 A2: attendance type of the user's employee in a PT (`GET /attendance/locations` → `employees[]`).
+/// OnSite = inside a registered location of the PT with a point (no assignment; outside the radius refused);
+/// Non-OnSite = no location restriction (inside a registered location → that one, else "Di luar area" at the home
+/// site / head office). The server applies the same rule (apps/web/src/domain/attendance/area.ts).
+enum AttendanceType {
+  onsite('onsite'),
+  nonOnsite('non_onsite');
+
+  const AttendanceType(this.code);
+  final String code;
+
+  static AttendanceType fromCode(String? c) => c == 'non_onsite' ? nonOnsite : onsite;
+}
+
+/// Geofence of a check-in location: from `GET /attendance/locations` (DRMS 13/10 A2, eligible by attendance type) or,
+/// with a server before A2, from the cached masters (`projects` / `cost-centers` / `sites`: lat, lng, radiusM).
 class ProjectSite {
   const ProjectSite({
     required this.id,
@@ -56,6 +70,9 @@ class ProjectSite {
     this.home = false,
     this.assigned = false,
     this.team = false,
+    this.isHeadOffice = false,
+    this.attendanceType,
+    this.outsideArea = false,
   });
   final int id;
 
@@ -76,10 +93,24 @@ class ProjectSite {
   /// ADR 0023 (sites only): the user may record "diabsenkan PM" here (PM assigned to the site / PM of a project of it).
   final bool team;
 
+  /// DRMS 13/10 A2 (sites only): the PT's head office ("Kantor pusat").
+  final bool isHeadOffice;
+
+  /// DRMS 13/10 A2: attendance type of the user's employee in this location's PT (eligible list only; null = from the
+  /// masters of a server before A2).
+  final AttendanceType? attendanceType;
+
+  /// DRMS 13/10 A2: the "Di luar area" entry of a Non-OnSite employee — [id] is the reference site (home site, else the
+  /// head office), [label] its name; no geofence (any position is accepted, the server decides where it belongs).
+  final bool outsideArea;
+
+  /// Non-OnSite: any position may be recorded (no client-side geofence refusal).
+  bool get unrestricted => attendanceType == AttendanceType.nonOnsite;
+
   bool get hasGeofence => lat != null && lng != null && radiusM != null;
 
-  /// Unique across the kinds (`p7`, `c3`, `s2`) — dropdown value.
-  String get key => '${kind.prefix}$id';
+  /// Unique across the kinds (`p7`, `c3`, `s2`; "Di luar area" entry `o2`) — dropdown value.
+  String get key => outsideArea ? 'o$id' : '${kind.prefix}$id';
 
   static ProjectSite fromMaster(MasterItem m, {SiteKind kind = SiteKind.project}) {
     double? d(String k) => (m.extra[k] as num?)?.toDouble();
@@ -94,6 +125,29 @@ class ProjectSite {
       home: m.extra['home'] == true,
       assigned: m.extra['assigned'] == true,
       team: m.extra['team'] == true,
+      isHeadOffice: m.extra['isHeadOffice'] == true,
+    );
+  }
+
+  /// One item of `GET /attendance/locations` (`AttendanceLocations.items[]`): always with a point and the radius the
+  /// server checks (own radius, else the PT default).
+  static ProjectSite fromEligible(Map<String, dynamic> j, {AttendanceType? type}) {
+    String s(String k) => j[k] == null ? '' : '${j[k]}';
+    final code = s('code');
+    final name = s('name');
+    final id = (j['id'] as num?)?.toInt() ?? 0;
+    final label = code.isNotEmpty ? '$code — $name' : name;
+    return ProjectSite(
+      id: id,
+      label: label.isEmpty ? '#$id' : label,
+      lat: (j['lat'] as num?)?.toDouble(),
+      lng: (j['lng'] as num?)?.toDouble(),
+      radiusM: (j['radiusM'] as num?)?.toDouble(),
+      kind: SiteKind.fromCode(j['kind'] as String?),
+      companyId: (j['company'] as num?)?.toInt(),
+      home: j['home'] == true,
+      isHeadOffice: j['isHeadOffice'] == true,
+      attendanceType: type,
     );
   }
 }
@@ -113,6 +167,57 @@ double haversineM(double lat1, double lng1, double lat2, double lng2) {
 
 enum SiteCheck { ok, outside, noGeofence, mocked }
 
+/// A location whose distance to the fix was measured.
+class AreaMatch {
+  const AreaMatch(this.site, this.distance);
+  final ProjectSite site;
+
+  /// Metres (unrounded; [distanceM] for display).
+  final double distance;
+  int get distanceM => distance.round();
+}
+
+/// DRMS 13/10 A2: result of matching a GPS fix against the eligible locations.
+class AreaDetection {
+  const AreaDetection({this.inside = const [], this.nearest});
+
+  /// Locations whose geofence contains the fix, nearest first (ties keep the list order: home site first).
+  final List<AreaMatch> inside;
+
+  /// Nearest location with a point (inside or not); null when none has a point.
+  final AreaMatch? nearest;
+
+  /// Exactly one area → selected automatically.
+  bool get single => inside.length == 1;
+
+  /// Overlapping geofences → the nearest is proposed and the user picks among [inside].
+  bool get overlap => inside.length > 1;
+}
+
+/// Automatic area detection (DRMS 13/10 A2): the location whose geofence contains the fix (nearest when several
+/// overlap); none → manual choice (fallback) with [AreaDetection.nearest] as a hint. Same distance and accuracy
+/// allowance as [checkSite] and the server; a mocked fix detects nothing (refused anyway).
+AreaDetection detectArea(List<ProjectSite> sites, LocationFix fix) {
+  if (fix.isMocked) return const AreaDetection();
+  final allowance = min(max(fix.accuracyM, 0.0), accuracyAllowanceCapM);
+  final measured = <(int, AreaMatch)>[
+    for (final (i, s) in sites.indexed)
+      if (s.hasGeofence) (i, AreaMatch(s, haversineM(fix.lat, fix.lng, s.lat!, s.lng!))),
+  ];
+  // List.sort is not stable: the list index breaks ties
+  measured.sort((a, b) {
+    final d = a.$2.distance.compareTo(b.$2.distance);
+    return d != 0 ? d : a.$1.compareTo(b.$1);
+  });
+  return AreaDetection(
+    inside: [
+      for (final (_, m) in measured)
+        if (m.distance <= m.site.radiusM! + allowance) m,
+    ],
+    nearest: measured.isEmpty ? null : measured.first.$2,
+  );
+}
+
 ({SiteCheck check, int? distanceM}) checkSite(ProjectSite site, LocationFix fix) {
   if (fix.isMocked) return (check: SiteCheck.mocked, distanceM: null);
   if (!site.hasGeofence) return (check: SiteCheck.noGeofence, distanceM: null);
@@ -124,6 +229,7 @@ enum SiteCheck { ok, outside, noGeofence, mocked }
 /// `SyncAttendancePayload` (openapi) with the local selfie id in [selfiePlaceholderKey]; the sync engine
 /// uploads the selfie (`POST /media/selfies`) and replaces it with `selfie_media_id` just before sending.
 /// Exactly one of `project_id` / `cost_center_id` / `site_id` (E6, ADR 0023).
+/// DRMS 13/10 A2: a "Di luar area" item carries the local-only [outsideAreaHintKey] (history label; never sent).
 Map<String, dynamic> attendancePayload({
   required ProjectSite site,
   required LocationFix fix,
@@ -136,6 +242,7 @@ Map<String, dynamic> attendancePayload({
   'is_mocked': fix.isMocked,
   'camera_lens': 'front',
   selfiePlaceholderKey: selfieUuid,
+  if (site.outsideArea) outsideAreaHintKey: true,
 };
 
 /// Camera used by the PM for an on-behalf photo (the employee may stand in front of the PM's phone).

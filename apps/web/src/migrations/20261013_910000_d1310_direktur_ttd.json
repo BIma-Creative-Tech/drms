@@ -1182,6 +1182,14 @@
           "primaryKey": false,
           "notNull": false
         },
+        "attendance_type": {
+          "name": "attendance_type",
+          "type": "enum_employees_attendance_type",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'onsite'"
+        },
         "face_ref_photo_id": {
           "name": "face_ref_photo_id",
           "type": "integer",
@@ -6167,6 +6175,13 @@
           "type": "varchar",
           "primaryKey": false,
           "notNull": true
+        },
+        "is_head_office": {
+          "name": "is_head_office",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false,
+          "default": false
         },
         "address": {
           "name": "address",
@@ -14599,6 +14614,13 @@
           "type": "numeric",
           "primaryKey": false,
           "notNull": true
+        },
+        "outside_area": {
+          "name": "outside_area",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false,
+          "default": false
         },
         "selfie_id": {
           "name": "selfie_id",
@@ -23739,7 +23761,8 @@
         "2fa_disabled",
         "privacy_ack",
         "overdraft_confirmed",
-        "bank_unverified_confirmed"
+        "bank_unverified_confirmed",
+        "renumbered"
       ]
     },
     "public.enum_audit_logs_source": {
@@ -23786,6 +23809,14 @@
         "dailyReminders",
         "mediaOrphanCleanup",
         "stampSelfie"
+      ]
+    },
+    "public.enum_employees_attendance_type": {
+      "name": "enum_employees_attendance_type",
+      "schema": "public",
+      "values": [
+        "onsite",
+        "non_onsite"
       ]
     }
   },

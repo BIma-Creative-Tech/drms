@@ -181,13 +181,13 @@ describe('attendance at a site (ADR 0023 §3)', () => {
     expect(noPoint!.errors[0]!.code).toBe('NO_GEOFENCE')
   })
 
-  it('site assignment (no home site) allows the check-in; neither home site nor assignment → NOT_ASSIGNED', async () => {
+  it('site assignment (no home site) allows the check-in; DRMS 13/10 A2: any registered site of the PT, no assignment', async () => {
     const [r] = await sync(staffB, [item('attendance.check_in', { site_id: siteA, ...at(BRANCH), selfie_media_id: await selfie(staffB) })])
     expect(r, JSON.stringify(r)).toMatchObject({ status: 'applied' })
     const p = await getTestPayload()
     const other = await sysCreate('sites', { code: 'sit-SMD', name: 'sit Cabang Samarinda', lat: BRANCH.lat, lng: BRANCH.lng, radiusM: 100 })
-    const [no] = await sync(staffA, [item('attendance.check_in', { site_id: other, ...at(BRANCH), selfie_media_id: await selfie(staffA) })])
-    expect(no!.errors[0]!.code).toBe('NOT_ASSIGNED')
+    const [any] = await sync(staffA, [item('attendance.check_in', { site_id: other, ...at(BRANCH), selfie_media_id: await selfie(staffA) })])
+    expect(any, JSON.stringify(any)).toMatchObject({ status: 'applied' })
     await p.update({ collection: 'sites', id: other, data: { active: false, changeReason: 'uji nonaktif' } as never, overrideAccess: true })
     const [inactive] = await sync(staffA, [item('attendance.check_in', { site_id: other, ...at(BRANCH), selfie_media_id: await selfie(staffA) })])
     expect(inactive!.errors[0]!.code).toBe('VALIDATION')

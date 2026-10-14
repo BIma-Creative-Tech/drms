@@ -129,13 +129,12 @@ describe('attendance sync (F4 slice)', () => {
     expect(out2.body.results[0]).toMatchObject({ status: 'rejected', errors: [{ code: 'ALREADY_CHECKED_OUT' }] })
   })
 
-  it('server-side rejections: mock location, outside radius, not assigned, no geofence, foreign selfie, check-out first', async () => {
+  it('server-side rejections: mock location, outside radius, no geofence, foreign selfie, check-out first', async () => {
     const s = await selfie(staffB)
     const results = (
       await sync(staffB, [
         item('attendance.check_in', payload(s, { is_mocked: true })),
         item('attendance.check_in', payload(s, { lat: SITE.lat + 0.01, accuracy_m: 2000 })),
-        item('attendance.check_in', payload(s, { project_id: w.otherProject })),
         item('attendance.check_in', payload(s, { project_id: noGeoProject })),
         item('attendance.check_in', payload(await selfie(staffA))),
         item('attendance.check_out', payload(s)),
@@ -143,7 +142,7 @@ describe('attendance sync (F4 slice)', () => {
         item('attendance.check_in', { ...payload(s), lat: 'x' }),
       ])
     ).body.results as Array<{ status: string; errors: Array<{ code: string; message: string }> }>
-    expect(results.map((r) => r.errors[0]?.code)).toEqual(['MOCK_LOCATION', 'OUTSIDE_GEOFENCE', 'NOT_ASSIGNED', 'NO_GEOFENCE', 'FORBIDDEN', 'NO_CHECK_IN', 'MEDIA_MISSING', 'VALIDATION'])
+    expect(results.map((r) => r.errors[0]?.code)).toEqual(['MOCK_LOCATION', 'OUTSIDE_GEOFENCE', 'NO_GEOFENCE', 'FORBIDDEN', 'NO_CHECK_IN', 'MEDIA_MISSING', 'VALIDATION'])
     expect(results.every((r) => r.status === 'rejected')).toBe(true)
     expect(results[1]!.errors[0]!.message).toMatch(/Di luar radius project \(\d+ m dari titik, radius 100 m\)/)
     // nothing stored for B; each rejection is in the audit log (sync_offline with the error code)

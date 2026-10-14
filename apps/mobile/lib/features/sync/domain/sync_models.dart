@@ -300,7 +300,7 @@ String rejectionMessage(List<SyncError> errors, {String? type}) {
     'FORBIDDEN' => 'Anda tidak berhak mengubah draft ini.',
     'NOT_FOUND' => 'Draft tidak ditemukan di server.',
     'CLIENT_UUID_CONFLICT' => 'ID data bentrok dengan data lain. Buat draft baru.',
-    'NOT_ASSIGNED' => 'Anda tidak ditugaskan di project/pusat biaya ini.',
+    'NOT_ASSIGNED' => 'Lokasi ini tidak termasuk area absen Anda.',
     'FEATURE_DISABLED' => 'Sinkronisasi offline sedang dinonaktifkan. Kirim saat online.',
     'OUTSIDE_GEOFENCE' || 'NO_GEOFENCE' || 'ALREADY_CHECKED_IN' || 'NO_CHECK_IN' || 'ALREADY_CHECKED_OUT' => null,
     'WEIGHTS_INCOMPLETE' => 'Bobot tahapan project belum 100%. Minta Direktur/PM melengkapi tahapan.',

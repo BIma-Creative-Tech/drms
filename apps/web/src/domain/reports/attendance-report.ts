@@ -2,6 +2,7 @@ import { sql } from '@payloadcms/db-postgres'
 import type { PayloadRequest } from 'payload'
 
 import { recapRange, type DayRecap, type RecapSummary } from '@/domain/attendance/aggregate'
+import { OUTSIDE_AREA_FLAG, OUTSIDE_AREA_LABEL } from '@/domain/attendance/area'
 import { attScopeOf, currentSchedules, loadFacts, loadHolidays, narrowAttScope, teamMembers, type AttScope } from '@/domain/attendance/queries'
 
 import { reportContext, rows } from './kpi'
@@ -140,7 +141,10 @@ export const absensiReport: ReportDef = {
               tanggal: d.date,
               karyawan: `${e.name} (${e.code})`,
               status: STATUS_LABEL[d.status] ?? d.status,
-              lokasi: d.locations.map((l) => `${l.location.code} ${l.location.name}`).join('; '),
+              // DRMS 13/10 A2: "Di luar area" (Non-OnSite) — the location is the reference (home site / head office)
+              lokasi: d.locations
+                .map((l) => (l.checkIn?.outsideArea || l.checkOut?.outsideArea ? `${OUTSIDE_AREA_LABEL} (ref. ${l.location.code} ${l.location.name})` : `${l.location.code} ${l.location.name}`))
+                .join('; '),
               masuk: d.checkInLocal,
               pulang: d.checkOutLocal,
               durasi: d.workMinutes,
@@ -150,6 +154,7 @@ export const absensiReport: ReportDef = {
                 d.holidayName ? `Hari libur: ${d.holidayName}` : d.kind === 'off' && d.checkIn ? 'Hari non-kerja' : '',
                 d.onBehalf ? `Diabsenkan PM${d.onBehalfBy.length ? ` (${d.onBehalfBy.join(', ')})` : ''}` : '',
                 d.corrected ? 'Dikoreksi' : '',
+                d.flags.includes(OUTSIDE_AREA_FLAG) ? OUTSIDE_AREA_LABEL : '',
               ]
                 .filter(Boolean)
                 .join('; '),

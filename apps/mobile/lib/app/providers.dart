@@ -24,6 +24,7 @@ import '../features/expense/data/draft_repository.dart';
 import '../features/expense/data/expense_api.dart';
 import '../features/masters/data/masters_repository.dart';
 import '../features/attendance/data/attendance_api.dart';
+import '../features/attendance/data/attendance_locations_repository.dart';
 import '../features/notifications/data/push_service.dart';
 import '../features/field_reports/data/field_repository.dart';
 import '../features/progress/data/progress_api.dart';
@@ -110,6 +111,11 @@ final progressRepositoryProvider = Provider((ref) => ProgressRepository(ref.watc
 final fieldRepositoryProvider = Provider((ref) => FieldRepository(ref.watch(databaseProvider)));
 final progressApiProvider = Provider((ref) => ProgressApi(ref.watch(apiClientProvider)));
 final attendanceApiProvider = Provider((ref) => AttendanceApi(ref.watch(apiClientProvider)));
+
+/// DRMS 13/10 A2: `GET /attendance/locations` client + offline cache (refreshed by the sync coordinator).
+final attendanceLocationsRepositoryProvider = Provider(
+  (ref) => AttendanceLocationsRepository(ref.watch(attendanceApiProvider), ref.watch(databaseProvider)),
+);
 final outboxRepositoryProvider = Provider((ref) => OutboxRepository(ref.watch(databaseProvider)));
 
 /// Bumped after every masters refresh: the cached-masters providers re-read the encrypted cache.

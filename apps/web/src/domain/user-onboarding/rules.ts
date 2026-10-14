@@ -10,7 +10,7 @@ import { randomInt } from 'node:crypto'
 
 export type FieldError = { path: string; message: string }
 
-export type EmployeeInput = { id?: number; code?: string; name?: string; nickname?: string | null; position?: string | null; phone?: string | null; active?: boolean }
+export type EmployeeInput = { id?: number; code?: string; name?: string; nickname?: string | null; position?: string | null; phone?: string | null; attendanceType?: 'onsite' | 'non_onsite'; active?: boolean }
 export type BankAccountInput = { id?: number; bank?: number; accountNo?: string; accountHolder?: string; isDefault?: boolean; verificationStatus?: 'unverified' | 'verified'; active?: boolean }
 export type CompanyInput = { company: number; roles: string[]; employee?: EmployeeInput | null; bankAccounts?: BankAccountInput[] }
 export type UserInput = { email?: string; name?: string; phone?: string | null; active?: boolean }

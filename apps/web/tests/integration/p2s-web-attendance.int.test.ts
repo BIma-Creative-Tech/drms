@@ -75,12 +75,10 @@ describe('web self check-in/out (owner decision 2026-10-09)', () => {
     expect((again.body as { code?: string }).code).toBe('ALREADY_CHECKED_OUT')
   })
 
-  it('server rules apply: outside the radius → OUTSIDE_GEOFENCE; not assigned → NOT_ASSIGNED; two locations → 400', async () => {
+  // DRMS 13/10 A2: no assignment needed any more (an unassigned project of the PT is allowed) — onsite-attendance
+  it('server rules apply: outside the radius → OUTSIDE_GEOFENCE; two locations → 400', async () => {
     const far = await check('in', w.users.staffB, { project_id: w.project, lat: SITE.lat + 0.05, selfie_media_id: await selfie(w.users.staffB) })
     expect((far.body as { code?: string }).code).toBe('OUTSIDE_GEOFENCE')
-    const other = await check('in', w.users.staffB, { project_id: w.otherProject, selfie_media_id: await selfie(w.users.staffB) })
-    expect(other.status).toBe(403)
-    expect((other.body as { code?: string }).code).toBe('NOT_ASSIGNED')
     const both = await check('in', w.users.staffB, { project_id: w.project, cost_center_id: w.costCenter, selfie_media_id: 1 })
     expect(both.status).toBe(400)
   })
