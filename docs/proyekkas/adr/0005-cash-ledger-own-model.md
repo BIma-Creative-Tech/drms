@@ -198,6 +198,16 @@ None.
 - **§7 Balances** are computed per account (unchanged) and aggregated per PT; a consolidated balance is the sum of
   per-PT balances (IDR only), always shown with its per-PT breakdown.
 - Transfers between PTs (inter-company loans) are **out of scope**: record a manual KK in PT A and a manual KM in PT B.
+  *Superseded for payments with payee "PT grup" by the amendment 2026-10-14 below (ADR 0028).*
+
+## Amendment 2026-10-14 (ADR 0028)
+
+*Replaces the last bullet of "Revisi 2026-09-27 (ADR 0016)".* Payments between PTs of the group made through an
+expense request with payee **PT grup** are posted automatically: the transfer's KK in the paying PT and a KM
+(`source_type = intercompany`, system cash-in source `ANTAR-PT`) on the receiving PT's designated account, paired in
+`intercompany_links` (ADR 0028). The KM follows every ledger rule of this ADR (per-PT numbering, period lock of the
+receiving PT — a closed period refuses the transfer —, immutability); it is voided only through the transfer void,
+which posts its reversal. Other inter-PT movements (loans until Phase C) stay manual KK + KM.
 
 ## Revision history
 
@@ -221,3 +231,4 @@ None.
   no cash entry before the opening date; cut-over closes the month before go-live. Verified against branch
   `feat/s3b-e11-data-import`. Status stays accepted.
 - **2026-09-27 (ADR 0016, multi-company):** section "Revisi 2026-09-27 (ADR 0016)" added (proposed; takes effect with phase MC). Status stays accepted.
+- **2026-10-14 (ADR 0028):** amendment — automatic KM in the receiving PT for payments with payee "PT grup".

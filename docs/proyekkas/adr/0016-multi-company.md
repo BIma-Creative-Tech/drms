@@ -424,8 +424,23 @@ Migration `20261002_080000_mc4_scope_rule`.
 | 11 | `?pt=` and display names (QA-MC4-14) | a report `pt` outside the selection → 403 `COMPANY_NOT_ALLOWED` (`/api/v1/reports`, same as `?company=`); the panel views (Laporan, Audit Log, Kas, Catat kas, Tutup buku, Absensi, Rekap) show a denial. `displayNames` and the audit-log name SQL fall back only to employees of the document's PT / PTs the viewer is mapped to / PTs shown, else the account name. `employees.faceRefPhoto` must be a selfie of the employee's PT (`ownerCompany`) or the caller's own unlinked upload | a foreign PT was narrowed silently; a name fallback showed an employee of an unmapped PT |
 | 12 | Historic audit rows (UAT MC4-04, case AUD-02, branch `fix/mc4-audit-backfill`) | Migration `20261003_090000_mc4_audit_company_backfill` sets `audit_logs.company_id` of every untagged row whose doc type is per-PT, from that document's PT. The docType → table map is a frozen copy of `PER_PT_DOC_TYPES` (`audit/writer.ts`; a unit test keeps them equal): the 15 doc types of QA-MC4-03 plus the per-PT masters / configuration (budget line, client, vendor, stage template, category, cash-in source, cash account, work schedule, approval rule, vehicle, cost center, document sequence, membership), `company` (the PT itself) and the five owner-linked media (`owner_company_id`). Child documents (receipts, transfers, settlements, cash entries) have their own doc types; approval decisions, flags and line snapshots are written under the request / addendum. Rows without `doc_id` (old `number_issued` rows of transfers, reports, cash entries) get the PT of the one document with that number; a number held in two PTs stays NULL. Never tagged: rows whose document is gone, non-numeric ids, app-wide doc types, and cross-PT duplicate flags (`newValue.relatedCompanyId`, NULL on purpose, note 2). The writer derives the PT for the same map, so no new untagged per-PT rows appear (the import cut-over `document_sequence` row and media rows were untagged before). Append-only: as the table owner, inside the migration transaction, only `audit_logs_no_update` is disabled for the UPDATEs (ADR 0006 §6, the MC1 backfill pattern; no session setting is honoured by `pk_reject_mutation`); `audit_logs_company_protect` stays on; one `schema_maintenance` row records the counts. No hash chain exists (ADR 0006 §5 deferred) and the daily anchor logs only count + max id, so no digest covers `company_id`. Down = no-op | the scope rule makes the read scope the mapped PTs, so a historic row must carry its PT: untagged rows are readable only by group admins and the Admin / Direktur of every PT, which hid the older DRMS audit trail from a Direktur DRMS without a role in the second PT. ("Riwayat" was not affected: it reads the rows of a document the caller may read without the audit row rule) |
 
+## Amendment 2026-10-14 (ADR 0028)
+
+- **§4 classification:** new class **"Group link (two PTs)"**: `intercompany_links` carries `source_company_id` and
+  `target_company_id`; each of its references is checked against the company of its own side (`pk_ic_link_sides`),
+  not against one `company_id`. It is the **only** table that may relate rows of two PTs; per-PT tables keep the
+  `pk_same_company` rule without exception. `expense_requests.payee_company_id` references the app-wide `companies`
+  master and is therefore not a cross-PT reference (CHECK: ≠ own PT).
+- **§5 mutations:** a mutation authorised in PT A may write into PT B only through a named system function of the
+  intercompany module (posting / reversing the paired KM, `domain/intercompany/service.ts`), never with the caller's
+  role in B; it is audited in both PTs. Users of A see of B only the PT name, the designated receiving account (masked
+  in the payee directory) and counterpart document numbers.
+- **Requirements v1.2 §"Di luar cakupan" "Transaksi antar-PT"**: superseded for payee "PT grup" (ADR 0028).
+
 ## Revision history
 
+- **2026-10-14 (ADR 0028):** amendment — class "Group link (two PTs)" (`intercompany_links`), system write into the
+  receiving PT for payments with payee "PT grup".
 - **2026-10-03 (UAT MC4-04):** scope-rule note 12 (backfill of the PT tag of historic audit rows).
 - **2026-10-02 (QA open items):** scope-rule notes 9–11 (QA-MC4-09, QA-MC4-14).
 - **2026-10-02 (scope rule):** implementation notes "Scope rule (owner decision 2026-10-02)" (1–8).

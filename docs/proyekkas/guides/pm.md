@@ -70,6 +70,13 @@ PM boleh mengajukan **pembayaran invoice vendor** untuk project-nya (selain PM, 
   Finance mentransfer ke rekening vendor → **Selesai**. Tidak ada nota per baris maupun LPJ: invoice adalah buktinya.
 - Satu invoice hanya bisa diajukan sekali per vendor (selama pengajuan lama belum dibatalkan / ditolak).
 
+## 1c. Pembayaran antar-PT (web, DRMS 13/10 Phase B)
+
+PM boleh mengajukan **pembayaran ke PT lain di grup** (mis. jasa PT LAS untuk project Anda): Pengajuan biaya → Buat baru
+→ **Jenis penerima: PT grup** → **PT penerima** → isi nomor, tanggal dan file tagihan / memo dari PT penerima (wajib) →
+baris item → **Kirim**. Langkah Persetujuan PM dilewati (Anda PM project-nya) → Direktur → Owner → Finance mentransfer;
+kas masuk di PT penerima tercatat otomatis, pengajuan **Selesai** (tanpa LPJ). APK: menyusul di rilis APK berikutnya.
+
 ## 2. Laporan progress harian (APK)
 
 1. Beranda → **Laporan progress** → tab **Laporan** → **Laporan baru**.

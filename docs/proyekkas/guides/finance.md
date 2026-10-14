@@ -121,6 +121,36 @@ invoice adalah buktinya.
    diabaikan) pada pengajuan lain yang belum *Dibatalkan* / *Ditolak* → pesan "Invoice … sudah dipakai di pengajuan …".
    Batalkan pengajuan lama bila memang salah input. *Duplikat* menyalin vendor + rekening, tetapi tidak invoice-nya.
 
+## 3b. Pembayaran antar-PT (DRMS 13/10 Phase B, ADR 0028)
+
+Membayar **PT lain di grup** (mis. DRMS membayar jasa LAS). Kas keluar dicatat di PT Anda; **kas masuk di PT
+penerima tercatat otomatis** saat Anda mencatat transfer — Finance PT penerima tidak perlu mengetik apa pun.
+
+1. **Rekening penerimaan antar-PT dulu** (sekali per PT, oleh Finance / Admin / Direktur PT penerima): Master Data →
+   **Akun kas/bank** → buka rekening **bank** yang aktif (bank, nomor, atas nama terisi) → centang **Rekening penerimaan
+   antar-PT** → isi alasan → Simpan. Satu rekening per PT. Tanpa rekening ini PT itu tidak muncul sebagai PT penerima.
+2. **Buat pengajuan** (Finance, PM atau Direktur PT pembayar): Pengajuan biaya → Buat baru → **Jenis penerima: PT grup**
+   → **PT penerima** (daftar PT lain yang sudah menetapkan rekening; nomor rekening tersamar) → project atau pusat
+   biaya → **Nomor**, **Tanggal** dan **File** tagihan / memo dari PT penerima (**wajib**) → baris item → **Kirim
+   pengajuan**. Pemohon = Anda sendiri; jenis otomatis *Pengajuan Baru*. Nomor dokumen yang sama dari PT penerima yang
+   sama pada pengajuan lain yang belum dibatalkan / ditolak ditolak ("Dokumen … sudah dipakai …").
+3. **Persetujuan:** yang Anda ajukan → **Direktur** → **Owner** (aturan "Pembayaran antar-PT oleh Finance — Direktur
+   lalu Owner"). Diajukan PM: langkah PM dilewati → Direktur → Owner. Diajukan Direktur: aturan "Pengajuan Direktur" →
+   Owner. Hanya pejabat PT pembayar yang memutuskan.
+4. **Transfer:** di **Antrian Transfer** dengan label *Antar PT: <kode PT>*; rekening tujuan = rekening penerimaan
+   antar-PT yang tercatat saat diajukan (tidak perlu konfirmasi verifikasi). Setelah transfer dicatat: KK di PT Anda,
+   **KM "Antar PT"** di PT penerima (nomor KM PT itu tampil di detail pengajuan dan di PDF), pengajuan **Selesai**.
+   - *"Periode … PT LAS sudah ditutup"*: tanggal transfer jatuh di bulan yang sudah tutup buku di PT penerima. Pakai
+     tanggal di periode terbuka, atau minta Direktur PT itu membuka kembali periodenya.
+   - *"Rekening penerimaan PT … berubah sejak pengajuan"*: tarik pengajuan (atau batalkan dan ajukan ulang) agar
+     rekening baru tercatat.
+5. **Void:** salah transfer → **Void transfer** di detail pengajuan (alasan): KK Anda dan KM di PT penerima dibalik
+   (jurnal balik), pengajuan kembali ke Antrian Transfer, Finance PT Anda mendapat notifikasi antrian. KM antar-PT tidak
+   bisa di-void dari buku kas PT penerima.
+6. **Kas / laporan:** di Kas baris antar-PT menampilkan lawannya ("Ke PT LAS · KM/LAS/…" atau "Dari PT DRMS · PB/… ·
+   TRF/… · KK/…"); filter **Sumber: Antar PT**. Rekap Kas memisahkan "Transfer antar PT (keluar)" dan "Antar PT
+   (masuk)"; filter **Antar PT: Tanpa antar-PT** untuk laporan gabungan beberapa PT.
+
 ## 4. LPJ Pengajuan Baru
 
 **Verifikasi LPJ** → **LPJ diajukan**:

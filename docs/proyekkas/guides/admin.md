@@ -282,6 +282,20 @@ buat/ubah aturan sementara dengan level 1 = Direktur pengganti (user bernama), l
 - Pembayaran vendor hanya bisa diajukan Finance atau PM. Admin / Direktur / Staff tidak.
 - Menonaktifkan aturan vendor (dengan alasan) → pembayaran vendor oleh Finance mengikuti aturan default.
 
+### 4c. Pembayaran antar-PT (DRMS 13/10 Phase B, ADR 0028)
+
+- **Jenis penerima** aturan approval punya nilai baru *PT grup*. Setiap PT mendapat aturan **"Pembayaran antar-PT oleh
+  Finance — Direktur lalu Owner"** (Jenis penerima *PT grup*, Peran pemohon *Finance*, Diketahui *Tidak dipakai*,
+  level 1 *Direktur*, level 2 *Owner*, prioritas 20) dan sumber kas masuk sistem **Antar PT** (kode `ANTAR-PT`) —
+  jangan dihapus / dinonaktifkan (kas masuk otomatis memakainya).
+- Pembayaran antar-PT hanya bisa diajukan Finance, PM atau Direktur PT pembayar. Admin / Staff / Owner (tanpa salah satu
+  peran itu) tidak.
+- **Master Data → Akun kas/bank → Rekening penerimaan antar-PT**: centang di satu rekening bank aktif per PT (bank,
+  nomor, atas nama wajib terisi; alasan wajib). Kolom daftar menampilkan *Penerimaan antar-PT*. Menonaktifkan rekening
+  itu melepas tandanya — PT itu tidak lagi bisa dipilih sebagai PT penerima sampai rekening lain ditandai.
+- Notifikasi PT penerima: event `cash.intercompany_received` / `cash.intercompany_reversed` (teks dapat diubah di
+  Template notifikasi; placeholder `{entryNo}` `{source}` `{amount}` `{account}` `{reversalNo}`).
+
 ## 5. Penomoran dokumen
 
 **Pengaturan → Penomoran dokumen**: pola nomor **per PT** dan per jenis dokumen (PB pengajuan, TRF, LPJ, KM, KK, LP,
