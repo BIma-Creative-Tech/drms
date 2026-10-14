@@ -252,7 +252,7 @@ export const transferQueueEndpoint = v1({
     return json({
       items: items.map((i) => {
         const x = extra.get(i.id)
-        return { ...i, project: x?.project ?? null, costCenter: x?.costCenter ?? null, bank: x?.bank ?? null, bankVerification: x?.bankVerification ?? 'unverified', flags: x?.flags ?? { warning: 0, info: 0, receiptMismatch: 0 }, sla: x?.sla ?? { approvedAt: null, slaHours: 24, ageHours: null, over: false }, noApproval: x?.noApproval ?? false, noApprovalBy: x?.noApprovalBy ?? null, vendorName: x?.vendorName ?? null }
+        return { ...i, project: x?.project ?? null, costCenter: x?.costCenter ?? null, bank: x?.bank ?? null, bankVerification: x?.bankVerification ?? 'unverified', flags: x?.flags ?? { warning: 0, info: 0, receiptMismatch: 0 }, sla: x?.sla ?? { approvedAt: null, slaHours: 24, ageHours: null, over: false }, noApproval: x?.noApproval ?? false, noApprovalBy: x?.noApprovalBy ?? null, vendorName: x?.vendorName ?? null, payeeCompany: x?.payeeCompany ?? null, payeeCompanyName: x?.payeeCompanyName ?? null }
       }),
       nextCursor: null,
     })
