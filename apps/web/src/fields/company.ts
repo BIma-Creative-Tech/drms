@@ -45,6 +45,13 @@ export function companyField(opts: { derived?: boolean; createRoles?: readonly R
       return ids.length === 0 ? false : { id: { in: ids } }
     }
     field.validate = (value, options) => relationshipValidation(value, { ...options, filterOptions: undefined })
+    // Exactly one creatable PT → it is the default, so the create form's INITIAL state already holds it. A purely
+    // client-side prefill (CompanyPrefill's effect) was overwritten on mount: Payload's Form replaces its state with
+    // `initialState` in a parent effect that runs after the child's, leaving the per-PT pickers locked.
+    field.defaultValue = ({ user }: { user?: unknown }) => {
+      const ids = creatableCompanies(user, roles)
+      return ids.length === 1 ? ids[0] : undefined
+    }
     field.custom = { ...field.custom, pkCreateRoles: roles }
   }
   return field

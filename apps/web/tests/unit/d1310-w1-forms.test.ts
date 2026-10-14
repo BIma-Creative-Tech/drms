@@ -58,10 +58,22 @@ describe('Pengajuan #1/#2: PT picker = PT switcher selection ∩ create roles', 
     expect(await f.validate(1, { req, relationTo: 'companies', data: FORM, filterOptions: f.filterOptions })).toBe(true)
   })
 
+  it('expense-requests.company: the only creatable PT is the default (initial form state, not a client effect)', () => {
+    const f = config.collections.find((c) => c.slug === 'expense-requests')!.fields.find((x) => 'name' in x && x.name === 'company') as {
+      defaultValue: (a: { user?: unknown }) => unknown
+    }
+    expect(f.defaultValue({ user: user([2, 3]) })).toBe(2) // one creatable PT → prefilled
+    expect(f.defaultValue({ user: user([1]) })).toBe(1)
+    expect(f.defaultValue({ user: user(null) })).toBeUndefined() // two PTs: must choose
+    expect(f.defaultValue({ user: user([3]) })).toBeUndefined() // no create role
+    expect(f.defaultValue({ user: undefined })).toBeUndefined() // system write: company hook decides
+  })
+
   it('other forms keep the plain picker (opt-in only)', () => {
     const plain = companyField() as { filterOptions?: unknown; custom?: unknown }
     expect(plain.filterOptions).toBeUndefined()
     expect(plain.custom).toBeUndefined()
+    expect((plain as { defaultValue?: unknown }).defaultValue).toBeUndefined()
     expect(companyField({ derived: true, createRoles: REQUEST_CREATE_ROLES }).filterOptions).toBeUndefined()
   })
 })
