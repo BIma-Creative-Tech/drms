@@ -118,15 +118,18 @@ class DraftService {
     });
   }
 
-  /// ADR 0027: uploads the local invoice photo of a vendor payment (once: the blob remembers its server id).
+  /// ADR 0027 / 0028: uploads the local invoice / document photo of a vendor / PT grup payment (once: the blob
+  /// remembers its server id).
   Future<DraftRequest> _uploadInvoice(DraftRequest d) async {
     final local = d.invoiceMediaUuid;
-    if (!d.isVendor || d.invoiceFileId != null || local == null) return d;
+    if (!d.isDirectPayment || d.invoiceFileId != null || local == null) return d;
     final blob = await drafts.media(local);
     if (blob == null) {
-      throw const ProblemException(
+      throw ProblemException(
         status: 422,
-        detail: 'Foto invoice tidak ditemukan di HP. Ambil ulang foto invoice.',
+        detail: d.isPtGrup
+            ? 'Foto dokumen PT penerima tidak ditemukan di HP. Ambil ulang foto dokumen.'
+            : 'Foto invoice tidak ditemukan di HP. Ambil ulang foto invoice.',
       );
     }
     final known = int.tryParse(blob.serverMediaId ?? '');
@@ -152,7 +155,7 @@ class DraftService {
           detail: 'Perubahan draft masih menunggu sinkron. Tekan "Kirim sekarang" lalu coba Ajukan lagi.',
         );
       } else {
-        // ADR 0027: the invoice photo of a vendor payment goes up first (`POST /media/attachments`)
+        // ADR 0027 / 0028: the invoice / document photo goes up first (`POST /media/attachments`)
         draft = await _uploadInvoice(draft);
         detail = await api.create(
           draftToCreateBody(draft),
@@ -200,7 +203,7 @@ class DraftService {
       );
       await drafts.setSyncState(draft.clientUuid, DraftSyncState.submitted, serverId: submitted.id, clearError: true);
       await outbox.supersede(sub, draft.clientUuid);
-      await drafts.purgeMediaOf(original); // incl. the local invoice photo (ADR 0027)
+      await drafts.purgeMediaOf(original); // incl. the local invoice / document photo (ADR 0027 / 0028)
       return submitted;
     });
   }

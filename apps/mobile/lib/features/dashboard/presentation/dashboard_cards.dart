@@ -507,6 +507,13 @@ class RecentCashCard extends StatelessWidget {
                         context,
                         [formatDateOnly(r.entryDate), r.label, r.account].where((x) => x.isNotEmpty).join(' · '),
                       ),
+                      // ADR 0028: "Antar PT" (+ the other leg "Dari PT … · KK/…" / "Ke PT … · KM/…" when sent)
+                      if (r.isIntercompany)
+                        _line(
+                          context,
+                          [cashSourceLabels['intercompany']!, ?r.counterpart?.text].join(' · '),
+                          key: Key('dash-cash-${r.id}-ic'),
+                        ),
                       if (r.voided) _line(context, t.kpiVoid, color: pk.badText),
                     ],
                     trailing: Text(

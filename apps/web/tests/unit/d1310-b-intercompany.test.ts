@@ -4,12 +4,13 @@ import { join } from 'node:path'
 import type { SanitizedConfig } from 'payload'
 import { beforeAll, describe, expect, it } from 'vitest'
 
-import type { Role } from '@/access/roles'
+import { rolesIn, rolesOf, withCompanyContext, type Role } from '@/access/roles'
 import { previewQuery } from '@/admin/components/bank-preview-query'
 import { intercompanyOptionLabel, payeesQuery } from '@/admin/components/intercompany-payee'
 import { ExpenseRequestCreate, IntercompanyPayeesQuery, PayeeTypeEnum, CashSourceTypeEnum } from '@/api/v1/schemas-flow'
 import { SyncDraftUpsertPayload } from '@/api/v1/schemas-sync'
-import { MASTER_TYPES } from '@/api/v1/schemas'
+import { Capabilities, MASTER_TYPES } from '@/api/v1/schemas'
+import { capabilitiesOf, meCapabilities } from '@/api/v1/endpoints/me'
 import { directPayee, employeePayee, intercompanyPayee, isIntercompanyForm, vendorPayee } from '@/collections/expense-request-form'
 import { vendorCostCenterAccess } from '@/collections/ExpenseRequests'
 import { bookWhere, canEdit, canVoid, parseBookQuery, voidHint } from '@/domain/cash/book'
@@ -331,5 +332,40 @@ describe('ADR 0028 config + migrations', () => {
     expect(snapshot.enums['public.enum_cash_entries_source_type']!.values).toContain('intercompany')
     expect(snapshot.tables['public.expense_requests']!.columns).toHaveProperty('payee_company_id')
     expect(snapshot.tables['public.cash_accounts']!.columns).toHaveProperty('intercompany_receiving')
+  })
+})
+
+describe('GET /me capability intercompanyPayment (gap: /me lists EFFECTIVE roles; the filer rule reads the STORED ones)', () => {
+  const user = withCompanyContext(
+    { id: 7 },
+    [
+      { company: 1, roles: ['pk-principal'], employee: null }, // Owner only — effective roles also list pk-owner
+      { company: 2, roles: ['pk-principal', 'pk-owner'], employee: null }, // Owner who is also Direktur
+      { company: 3, roles: ['pk-finance'], employee: null },
+      { company: 4, roles: ['pk-pm', 'pk-staff'], employee: null },
+      { company: 5, roles: ['pk-staff', 'pk-admin'], employee: null },
+      { company: 6, roles: ['pk-owner'], employee: null },
+    ],
+    null,
+    false,
+  )
+  const req = { user } as never
+  const cap = (company: number) => meCapabilities(req, rolesIn(req, company), { company })
+
+  it('per PT: Finance / PM / Direktur (stored) → true; Owner-only → false although his effective roles hold pk-owner', () => {
+    expect(rolesIn(req, 1)).toContain('pk-owner')
+    expect(cap(1)).toEqual({ ...capabilitiesOf(rolesIn(req, 1)), intercompanyPayment: false })
+    expect(cap(1).approvalInbox).toBe(true) // every other Direktur hint stays
+    expect([2, 3, 4, 6].map((c) => cap(c).intercompanyPayment)).toEqual([true, true, true, true])
+    expect(cap(5).intercompanyPayment).toBe(false) // Staff + Admin
+    expect(cap(99).intercompanyPayment).toBe(false) // not a membership
+  })
+
+  it('top level (deprecated, union over the selected PTs) and the contract field', () => {
+    expect(meCapabilities(req, rolesOf(user)).intercompanyPayment).toBe(true)
+    const ownerOnly = withCompanyContext({ id: 8 }, [{ company: 1, roles: ['pk-principal'], employee: null }], null, false)
+    expect(meCapabilities({ user: ownerOnly } as never, rolesOf(ownerOnly)).intercompanyPayment).toBe(false)
+    expect(Capabilities.safeParse(cap(3)).success).toBe(true)
+    expect(Capabilities.safeParse(capabilitiesOf(['pk-finance'])).success).toBe(false) // required in the contract
   })
 })

@@ -4,6 +4,7 @@ import 'package:dio/dio.dart';
 
 import '../../../core/network/api_client.dart';
 import '../domain/expense_request.dart';
+import '../domain/intercompany.dart';
 import 'expense_mappers.dart';
 
 /// Requester transitions after approval (state table `apps/web/src/domain/expense/state.ts`).
@@ -164,6 +165,21 @@ class ExpenseApi {
     (data) => [
       for (final i in ((data as Map<String, dynamic>)['items'] as List<dynamic>? ?? const []))
         historyFromJson(i as Map<String, dynamic>),
+    ],
+  );
+
+  /// ADR 0028: payee directory of a PT grup payment of PT [companyId] (`GET /intercompany/payees?company=`): the other
+  /// PTs of the group with a designated receiving account (masked number). Finance / PM / Direktur of that PT only
+  /// (403 otherwise). Sent for that PT (`X-Company-Ids`), like the draft itself.
+  Future<List<IntercompanyPayee>> intercompanyPayees(int companyId) => client.run(
+    (d) => d.get<dynamic>(
+      '/intercompany/payees',
+      queryParameters: {'company': companyId},
+      options: ApiClient.forCompany(companyId),
+    ),
+    (data) => [
+      for (final i in ((data as Map<String, dynamic>)['items'] as List<dynamic>? ?? const []))
+        if (i is Map<String, dynamic>) ?IntercompanyPayee.fromApiJson(i),
     ],
   );
 

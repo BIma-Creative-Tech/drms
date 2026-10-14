@@ -4,6 +4,7 @@ import type { PayloadRequest } from 'payload'
 import { BUDGET_COMMITTED, type RequestStatus, type RequestType } from '@/domain/expense/types'
 import { settings, today } from '@/domain/expense/common'
 import { flagVisibleSql } from '@/domain/expense/flag-visibility'
+import { counterpartsOf, type EntryCounterpart } from '@/domain/intercompany/service'
 import { DEFAULT_TZ } from '@/lib/time'
 import { getRequestTx } from '@/lib/tx'
 
@@ -1068,6 +1069,12 @@ export type RecentCashEntry = {
   label: string
   requestId: number | null
   requestDocNo: string | null
+  /**
+   * ADR 0028: the other leg of an intercompany payment — the same object as the cash-entry API / Buku Kas
+   * (`counterpartsOf`; reversal rows carry their original's). Non-null also marks the paying PT's KK, whose
+   * `sourceType` stays `transfer`; null for every other entry.
+   */
+  intercompany: EntryCounterpart | null
 }
 
 /**
@@ -1080,7 +1087,7 @@ export async function recentCashEntries(req: PayloadRequest, scope: ReportScope,
     req,
     sql`SELECT ce.id, ce.company_id, ce.entry_no, ce.entry_date, ce.direction::text AS direction, ce.amount::text AS amount, ce.status::text AS status,
           ce.source_type::text AS source_type, a.name AS account,
-          coalesce(nullif(ce.description, ''), c.name, s.name, '') AS label, er.id AS rid, er.doc_no
+          coalesce(nullif(ce.description, ''), c.name, s.name, '') AS label, er.id AS rid, er.doc_no, ce.reversal_of_id
         FROM cash_entries ce
         JOIN cash_accounts a ON a.id = ce.cash_account_id
         LEFT JOIN expense_categories c ON c.id = ce.category_id
@@ -1089,6 +1096,8 @@ export async function recentCashEntries(req: PayloadRequest, scope: ReportScope,
         WHERE ${ledgerScopeSql(scope)}
         ORDER BY ce.entry_date DESC, ce.id DESC LIMIT ${Math.max(1, Math.min(50, Math.floor(limit)))}`,
   )
+  // ADR 0028: counterparts of the rows and of the originals of reversal rows — one query (same helper as /cash-entries)
+  const ic = await counterpartsOf(req, r.flatMap((x) => [num(x.id), numOrNull(x.reversal_of_id)]).filter((x): x is number => x !== null))
   return r.map((x) => ({
     id: num(x.id),
     companyId: num(x.company_id),
@@ -1102,6 +1111,7 @@ export async function recentCashEntries(req: PayloadRequest, scope: ReportScope,
     label: String(x.label),
     requestId: numOrNull(x.rid),
     requestDocNo: (x.doc_no as string | null) ?? null,
+    intercompany: ic.get(num(x.id)) ?? ic.get(numOrNull(x.reversal_of_id) ?? -1) ?? null,
   }))
 }
 

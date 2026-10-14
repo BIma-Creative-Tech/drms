@@ -120,8 +120,8 @@ class DraftRepository {
             urgencyLevelId: Value(d.urgencyLevelId),
             notes: Value(d.notes),
             requesterIdsJson: Value(jsonEncode(d.requesterIds)),
-            bankAccountId: Value(d.isVendor ? null : d.bankAccountId),
-            // ADR 0027: vendor payment data (null = paid to an employee account)
+            bankAccountId: Value(d.isDirectPayment ? null : d.bankAccountId),
+            // ADR 0027 / 0028: vendor / PT grup payment data (null = paid to an employee account)
             vendorJson: Value(vendorToJson(d)),
             serverId: Value(d.serverId),
             serverRev: Value(d.serverRev),
@@ -133,9 +133,10 @@ class DraftRepository {
             updatedAt: ts,
           ),
         );
-    // ADR 0027: a replaced / dropped invoice photo of this draft is removed (receipt photos: _dropOrphanMedia)
+    // ADR 0027 / 0028: a replaced / dropped invoice / document photo of this draft is removed (receipt photos:
+    // _dropOrphanMedia)
     final oldInvoice = existing == null ? null : withVendorJson(_blank(existing), existing.vendorJson).invoiceMediaUuid;
-    if (oldInvoice != null && oldInvoice != (d.isVendor ? d.invoiceMediaUuid : null)) {
+    if (oldInvoice != null && oldInvoice != (d.isDirectPayment ? d.invoiceMediaUuid : null)) {
       await (db.delete(db.mediaBlobs)..where((t) => t.clientUuid.equals(oldInvoice))).go();
     }
     await (db.delete(db.localReceipts)..where((t) => t.draftUuid.equals(d.clientUuid))).go();
@@ -274,12 +275,15 @@ class DraftRepository {
   DraftRequest _blank(LocalDraft row) => DraftRequest(clientUuid: row.clientUuid, type: RequestType.fromCode(row.type));
 }
 
-/// ADR 0027: vendor payment fields of a draft → `local_drafts.vendor_json` (null for an employee payment).
-String? vendorToJson(DraftRequest d) => d.isVendor
+/// ADR 0027 / 0028: payee fields of a vendor / PT grup payment → `local_drafts.vendor_json` (null for an employee
+/// payment). ADR 0028 adds `payeeCompanyId` to the same JSON — no drift schema change: the column already holds the
+/// payee type, and a draft without the key reads as before.
+String? vendorToJson(DraftRequest d) => d.isDirectPayment
     ? jsonEncode({
         'payeeType': d.payeeType.code,
         'vendorId': d.vendorId,
         'vendorBankAccountId': d.vendorBankAccountId,
+        if (d.isPtGrup) 'payeeCompanyId': d.payeeCompanyId,
         'invoiceNo': d.invoiceNo,
         'invoiceDate': d.invoiceDate,
         'invoiceDueDate': d.invoiceDueDate,
@@ -288,7 +292,7 @@ String? vendorToJson(DraftRequest d) => d.isVendor
       })
     : null;
 
-/// ADR 0027: `local_drafts.vendor_json` back onto [d] (null / unreadable = employee payment, as before v10).
+/// ADR 0027 / 0028: `local_drafts.vendor_json` back onto [d] (null / unreadable = employee payment, as before v10).
 DraftRequest withVendorJson(DraftRequest d, String? json) {
   if (json == null || json.isEmpty) return d;
   final Object? decoded;
@@ -305,6 +309,7 @@ DraftRequest withVendorJson(DraftRequest d, String? json) {
     payeeType: PayeeType.fromCode(s('payeeType')),
     vendorId: n('vendorId'),
     vendorBankAccountId: n('vendorBankAccountId'),
+    payeeCompanyId: n('payeeCompanyId'),
     invoiceNo: s('invoiceNo'),
     invoiceDate: s('invoiceDate'),
     invoiceDueDate: s('invoiceDueDate'),

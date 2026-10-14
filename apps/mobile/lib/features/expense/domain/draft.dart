@@ -122,10 +122,17 @@ abstract class DraftRequest with _$DraftRequest {
     int? bankAccountId,
 
     /// ADR 0027 "Jenis penerima": vendor = "Pembayaran vendor" (Finance / PM only; type is always Pengajuan Baru,
-    /// no employee account, no LPJ). Stored in `local_drafts.vendor_json` (schema v10).
+    /// no employee account, no LPJ). ADR 0028: ptGrup = "Pembayaran antar-PT" (Finance / PM / Direktur; same shape,
+    /// the receiving PT instead of vendor + account). Stored in `local_drafts.vendor_json` (schema v10, the payee JSON).
     @Default(PayeeType.karyawan) PayeeType payeeType,
     int? vendorId,
     int? vendorBankAccountId,
+
+    /// ADR 0028: the receiving PT (`payeeCompanyId`, payee directory / masters `intercompany-payees`).
+    int? payeeCompanyId,
+
+    /// Invoice of a vendor payment (ADR 0027) / the receiving PT's document — tagihan / memo — of a PT grup payment
+    /// (ADR 0028, owner 2026-10-14: number, date and file required; due date optional).
     String? invoiceNo,
     String? invoiceDate, // YYYY-MM-DD
     String? invoiceDueDate, // YYYY-MM-DD
@@ -150,12 +157,20 @@ abstract class DraftRequest with _$DraftRequest {
   /// ADR 0027: a vendor payment ("Pembayaran vendor").
   bool get isVendor => payeeType == PayeeType.vendor;
 
-  /// ADR 0027: a vendor payment has an invoice file (local photo or already on the server).
+  /// ADR 0028: a payment to another PT of the group ("Pembayaran antar-PT").
+  bool get isPtGrup => payeeType == PayeeType.ptGrup;
+
+  /// ADR 0027 / 0028: vendor or PT grup — Pengajuan Baru, Pemohon = the filer, no employee account, project or cost
+  /// center, invoice / document as the proof, no receipts and no LPJ.
+  bool get isDirectPayment => payeeType.isDirect;
+
+  /// ADR 0027 / 0028: the invoice / document file is attached (local photo or already on the server).
   bool get hasInvoiceFile => invoiceFileId != null || invoiceMediaUuid != null;
 
-  /// Local photos of this draft (server receipts of an imported draft have no local photo; ADR 0027: + the invoice).
+  /// Local photos of this draft (server receipts of an imported draft have no local photo; ADR 0027 / 0028: + the
+  /// invoice / document photo).
   Iterable<String> get mediaUuids => [
     ...lines.expand((l) => l.receipts).where((r) => !r.isServerReceipt).map((r) => r.mediaUuid),
-    if (isVendor && invoiceFileId == null && invoiceMediaUuid != null) invoiceMediaUuid!,
+    if (isDirectPayment && invoiceFileId == null && invoiceMediaUuid != null) invoiceMediaUuid!,
   ];
 }

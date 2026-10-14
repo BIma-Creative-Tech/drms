@@ -625,8 +625,12 @@ mixin _$DraftRequest {
 /// written before D2; never sent to the server any more.
  int? get costCenterId; String? get neededDate;/// Owner decision 2026-10-09: "Tingkat urgensi" (`urgency-levels` master of the draft's PT).
  int? get urgencyLevelId; String? get notes; List<int> get requesterIds; int? get bankAccountId;/// ADR 0027 "Jenis penerima": vendor = "Pembayaran vendor" (Finance / PM only; type is always Pengajuan Baru,
-/// no employee account, no LPJ). Stored in `local_drafts.vendor_json` (schema v10).
- PayeeType get payeeType; int? get vendorId; int? get vendorBankAccountId; String? get invoiceNo; String? get invoiceDate; String? get invoiceDueDate;/// Local invoice photo (`media_blobs` kind `invoice`) until it is on the server.
+/// no employee account, no LPJ). ADR 0028: ptGrup = "Pembayaran antar-PT" (Finance / PM / Direktur; same shape,
+/// the receiving PT instead of vendor + account). Stored in `local_drafts.vendor_json` (schema v10, the payee JSON).
+ PayeeType get payeeType; int? get vendorId; int? get vendorBankAccountId;/// ADR 0028: the receiving PT (`payeeCompanyId`, payee directory / masters `intercompany-payees`).
+ int? get payeeCompanyId;/// Invoice of a vendor payment (ADR 0027) / the receiving PT's document — tagihan / memo — of a PT grup payment
+/// (ADR 0028, owner 2026-10-14: number, date and file required; due date optional).
+ String? get invoiceNo; String? get invoiceDate; String? get invoiceDueDate;/// Local invoice photo (`media_blobs` kind `invoice`) until it is on the server.
  String? get invoiceMediaUuid;/// Server media id of the invoice (`media-attachments`): imported from the server or uploaded by the sync.
  int? get invoiceFileId; List<DraftLine> get lines; int? get serverId; int? get serverRev; DraftSyncState get syncState; String? get lastError; DateTime? get updatedAt;
 /// Create a copy of DraftRequest
@@ -640,20 +644,20 @@ $DraftRequestCopyWith<DraftRequest> get copyWith => _$DraftRequestCopyWithImpl<D
 @override
 bool operator ==(Object other) {
   final _this = this as DraftRequest;
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is DraftRequest&&(identical(other.clientUuid, _this.clientUuid) || other.clientUuid == _this.clientUuid)&&(identical(other.type, _this.type) || other.type == _this.type)&&(identical(other.companyId, _this.companyId) || other.companyId == _this.companyId)&&(identical(other.title, _this.title) || other.title == _this.title)&&(identical(other.projectId, _this.projectId) || other.projectId == _this.projectId)&&(identical(other.costCenterId, _this.costCenterId) || other.costCenterId == _this.costCenterId)&&(identical(other.neededDate, _this.neededDate) || other.neededDate == _this.neededDate)&&(identical(other.urgencyLevelId, _this.urgencyLevelId) || other.urgencyLevelId == _this.urgencyLevelId)&&(identical(other.notes, _this.notes) || other.notes == _this.notes)&&const DeepCollectionEquality().equals(other.requesterIds, _this.requesterIds)&&(identical(other.bankAccountId, _this.bankAccountId) || other.bankAccountId == _this.bankAccountId)&&(identical(other.payeeType, _this.payeeType) || other.payeeType == _this.payeeType)&&(identical(other.vendorId, _this.vendorId) || other.vendorId == _this.vendorId)&&(identical(other.vendorBankAccountId, _this.vendorBankAccountId) || other.vendorBankAccountId == _this.vendorBankAccountId)&&(identical(other.invoiceNo, _this.invoiceNo) || other.invoiceNo == _this.invoiceNo)&&(identical(other.invoiceDate, _this.invoiceDate) || other.invoiceDate == _this.invoiceDate)&&(identical(other.invoiceDueDate, _this.invoiceDueDate) || other.invoiceDueDate == _this.invoiceDueDate)&&(identical(other.invoiceMediaUuid, _this.invoiceMediaUuid) || other.invoiceMediaUuid == _this.invoiceMediaUuid)&&(identical(other.invoiceFileId, _this.invoiceFileId) || other.invoiceFileId == _this.invoiceFileId)&&const DeepCollectionEquality().equals(other.lines, _this.lines)&&(identical(other.serverId, _this.serverId) || other.serverId == _this.serverId)&&(identical(other.serverRev, _this.serverRev) || other.serverRev == _this.serverRev)&&(identical(other.syncState, _this.syncState) || other.syncState == _this.syncState)&&(identical(other.lastError, _this.lastError) || other.lastError == _this.lastError)&&(identical(other.updatedAt, _this.updatedAt) || other.updatedAt == _this.updatedAt));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is DraftRequest&&(identical(other.clientUuid, _this.clientUuid) || other.clientUuid == _this.clientUuid)&&(identical(other.type, _this.type) || other.type == _this.type)&&(identical(other.companyId, _this.companyId) || other.companyId == _this.companyId)&&(identical(other.title, _this.title) || other.title == _this.title)&&(identical(other.projectId, _this.projectId) || other.projectId == _this.projectId)&&(identical(other.costCenterId, _this.costCenterId) || other.costCenterId == _this.costCenterId)&&(identical(other.neededDate, _this.neededDate) || other.neededDate == _this.neededDate)&&(identical(other.urgencyLevelId, _this.urgencyLevelId) || other.urgencyLevelId == _this.urgencyLevelId)&&(identical(other.notes, _this.notes) || other.notes == _this.notes)&&const DeepCollectionEquality().equals(other.requesterIds, _this.requesterIds)&&(identical(other.bankAccountId, _this.bankAccountId) || other.bankAccountId == _this.bankAccountId)&&(identical(other.payeeType, _this.payeeType) || other.payeeType == _this.payeeType)&&(identical(other.vendorId, _this.vendorId) || other.vendorId == _this.vendorId)&&(identical(other.vendorBankAccountId, _this.vendorBankAccountId) || other.vendorBankAccountId == _this.vendorBankAccountId)&&(identical(other.payeeCompanyId, _this.payeeCompanyId) || other.payeeCompanyId == _this.payeeCompanyId)&&(identical(other.invoiceNo, _this.invoiceNo) || other.invoiceNo == _this.invoiceNo)&&(identical(other.invoiceDate, _this.invoiceDate) || other.invoiceDate == _this.invoiceDate)&&(identical(other.invoiceDueDate, _this.invoiceDueDate) || other.invoiceDueDate == _this.invoiceDueDate)&&(identical(other.invoiceMediaUuid, _this.invoiceMediaUuid) || other.invoiceMediaUuid == _this.invoiceMediaUuid)&&(identical(other.invoiceFileId, _this.invoiceFileId) || other.invoiceFileId == _this.invoiceFileId)&&const DeepCollectionEquality().equals(other.lines, _this.lines)&&(identical(other.serverId, _this.serverId) || other.serverId == _this.serverId)&&(identical(other.serverRev, _this.serverRev) || other.serverRev == _this.serverRev)&&(identical(other.syncState, _this.syncState) || other.syncState == _this.syncState)&&(identical(other.lastError, _this.lastError) || other.lastError == _this.lastError)&&(identical(other.updatedAt, _this.updatedAt) || other.updatedAt == _this.updatedAt));
 }
 
 
 @override
 int get hashCode {
   final _this = this as DraftRequest;
-  return Object.hashAll([runtimeType,_this.clientUuid,_this.type,_this.companyId,_this.title,_this.projectId,_this.costCenterId,_this.neededDate,_this.urgencyLevelId,_this.notes,const DeepCollectionEquality().hash(_this.requesterIds),_this.bankAccountId,_this.payeeType,_this.vendorId,_this.vendorBankAccountId,_this.invoiceNo,_this.invoiceDate,_this.invoiceDueDate,_this.invoiceMediaUuid,_this.invoiceFileId,const DeepCollectionEquality().hash(_this.lines),_this.serverId,_this.serverRev,_this.syncState,_this.lastError,_this.updatedAt]);
+  return Object.hashAll([runtimeType,_this.clientUuid,_this.type,_this.companyId,_this.title,_this.projectId,_this.costCenterId,_this.neededDate,_this.urgencyLevelId,_this.notes,const DeepCollectionEquality().hash(_this.requesterIds),_this.bankAccountId,_this.payeeType,_this.vendorId,_this.vendorBankAccountId,_this.payeeCompanyId,_this.invoiceNo,_this.invoiceDate,_this.invoiceDueDate,_this.invoiceMediaUuid,_this.invoiceFileId,const DeepCollectionEquality().hash(_this.lines),_this.serverId,_this.serverRev,_this.syncState,_this.lastError,_this.updatedAt]);
 }
 
 @override
 String toString() {
   final _this = this as DraftRequest;
-  return 'DraftRequest(clientUuid: ${_this.clientUuid}, type: ${_this.type}, companyId: ${_this.companyId}, title: ${_this.title}, projectId: ${_this.projectId}, costCenterId: ${_this.costCenterId}, neededDate: ${_this.neededDate}, urgencyLevelId: ${_this.urgencyLevelId}, notes: ${_this.notes}, requesterIds: ${_this.requesterIds}, bankAccountId: ${_this.bankAccountId}, payeeType: ${_this.payeeType}, vendorId: ${_this.vendorId}, vendorBankAccountId: ${_this.vendorBankAccountId}, invoiceNo: ${_this.invoiceNo}, invoiceDate: ${_this.invoiceDate}, invoiceDueDate: ${_this.invoiceDueDate}, invoiceMediaUuid: ${_this.invoiceMediaUuid}, invoiceFileId: ${_this.invoiceFileId}, lines: ${_this.lines}, serverId: ${_this.serverId}, serverRev: ${_this.serverRev}, syncState: ${_this.syncState}, lastError: ${_this.lastError}, updatedAt: ${_this.updatedAt})';
+  return 'DraftRequest(clientUuid: ${_this.clientUuid}, type: ${_this.type}, companyId: ${_this.companyId}, title: ${_this.title}, projectId: ${_this.projectId}, costCenterId: ${_this.costCenterId}, neededDate: ${_this.neededDate}, urgencyLevelId: ${_this.urgencyLevelId}, notes: ${_this.notes}, requesterIds: ${_this.requesterIds}, bankAccountId: ${_this.bankAccountId}, payeeType: ${_this.payeeType}, vendorId: ${_this.vendorId}, vendorBankAccountId: ${_this.vendorBankAccountId}, payeeCompanyId: ${_this.payeeCompanyId}, invoiceNo: ${_this.invoiceNo}, invoiceDate: ${_this.invoiceDate}, invoiceDueDate: ${_this.invoiceDueDate}, invoiceMediaUuid: ${_this.invoiceMediaUuid}, invoiceFileId: ${_this.invoiceFileId}, lines: ${_this.lines}, serverId: ${_this.serverId}, serverRev: ${_this.serverRev}, syncState: ${_this.syncState}, lastError: ${_this.lastError}, updatedAt: ${_this.updatedAt})';
 }
 
 
@@ -664,7 +668,7 @@ abstract mixin class $DraftRequestCopyWith<$Res>  {
   factory $DraftRequestCopyWith(DraftRequest value, $Res Function(DraftRequest) _then) = _$DraftRequestCopyWithImpl;
 @useResult
 $Res call({
- String clientUuid, RequestType type, int? companyId, String title, int? projectId, int? costCenterId, String? neededDate, int? urgencyLevelId, String? notes, List<int> requesterIds, int? bankAccountId, PayeeType payeeType, int? vendorId, int? vendorBankAccountId, String? invoiceNo, String? invoiceDate, String? invoiceDueDate, String? invoiceMediaUuid, int? invoiceFileId, List<DraftLine> lines, int? serverId, int? serverRev, DraftSyncState syncState, String? lastError, DateTime? updatedAt
+ String clientUuid, RequestType type, int? companyId, String title, int? projectId, int? costCenterId, String? neededDate, int? urgencyLevelId, String? notes, List<int> requesterIds, int? bankAccountId, PayeeType payeeType, int? vendorId, int? vendorBankAccountId, int? payeeCompanyId, String? invoiceNo, String? invoiceDate, String? invoiceDueDate, String? invoiceMediaUuid, int? invoiceFileId, List<DraftLine> lines, int? serverId, int? serverRev, DraftSyncState syncState, String? lastError, DateTime? updatedAt
 });
 
 
@@ -681,7 +685,7 @@ class _$DraftRequestCopyWithImpl<$Res>
 
 /// Create a copy of DraftRequest
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? clientUuid = null,Object? type = null,Object? companyId = freezed,Object? title = null,Object? projectId = freezed,Object? costCenterId = freezed,Object? neededDate = freezed,Object? urgencyLevelId = freezed,Object? notes = freezed,Object? requesterIds = null,Object? bankAccountId = freezed,Object? payeeType = null,Object? vendorId = freezed,Object? vendorBankAccountId = freezed,Object? invoiceNo = freezed,Object? invoiceDate = freezed,Object? invoiceDueDate = freezed,Object? invoiceMediaUuid = freezed,Object? invoiceFileId = freezed,Object? lines = null,Object? serverId = freezed,Object? serverRev = freezed,Object? syncState = null,Object? lastError = freezed,Object? updatedAt = freezed,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? clientUuid = null,Object? type = null,Object? companyId = freezed,Object? title = null,Object? projectId = freezed,Object? costCenterId = freezed,Object? neededDate = freezed,Object? urgencyLevelId = freezed,Object? notes = freezed,Object? requesterIds = null,Object? bankAccountId = freezed,Object? payeeType = null,Object? vendorId = freezed,Object? vendorBankAccountId = freezed,Object? payeeCompanyId = freezed,Object? invoiceNo = freezed,Object? invoiceDate = freezed,Object? invoiceDueDate = freezed,Object? invoiceMediaUuid = freezed,Object? invoiceFileId = freezed,Object? lines = null,Object? serverId = freezed,Object? serverRev = freezed,Object? syncState = null,Object? lastError = freezed,Object? updatedAt = freezed,}) {
   return _then(DraftRequest(
 clientUuid: null == clientUuid ? _self.clientUuid : clientUuid // ignore: cast_nullable_to_non_nullable
 as String,type: null == type ? _self.type : type // ignore: cast_nullable_to_non_nullable
@@ -697,6 +701,7 @@ as List<int>,bankAccountId: freezed == bankAccountId ? _self.bankAccountId : ban
 as int?,payeeType: null == payeeType ? _self.payeeType : payeeType // ignore: cast_nullable_to_non_nullable
 as PayeeType,vendorId: freezed == vendorId ? _self.vendorId : vendorId // ignore: cast_nullable_to_non_nullable
 as int?,vendorBankAccountId: freezed == vendorBankAccountId ? _self.vendorBankAccountId : vendorBankAccountId // ignore: cast_nullable_to_non_nullable
+as int?,payeeCompanyId: freezed == payeeCompanyId ? _self.payeeCompanyId : payeeCompanyId // ignore: cast_nullable_to_non_nullable
 as int?,invoiceNo: freezed == invoiceNo ? _self.invoiceNo : invoiceNo // ignore: cast_nullable_to_non_nullable
 as String?,invoiceDate: freezed == invoiceDate ? _self.invoiceDate : invoiceDate // ignore: cast_nullable_to_non_nullable
 as String?,invoiceDueDate: freezed == invoiceDueDate ? _self.invoiceDueDate : invoiceDueDate // ignore: cast_nullable_to_non_nullable
@@ -793,10 +798,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String clientUuid,  RequestType type,  int? companyId,  String title,  int? projectId,  int? costCenterId,  String? neededDate,  int? urgencyLevelId,  String? notes,  List<int> requesterIds,  int? bankAccountId,  PayeeType payeeType,  int? vendorId,  int? vendorBankAccountId,  String? invoiceNo,  String? invoiceDate,  String? invoiceDueDate,  String? invoiceMediaUuid,  int? invoiceFileId,  List<DraftLine> lines,  int? serverId,  int? serverRev,  DraftSyncState syncState,  String? lastError,  DateTime? updatedAt)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String clientUuid,  RequestType type,  int? companyId,  String title,  int? projectId,  int? costCenterId,  String? neededDate,  int? urgencyLevelId,  String? notes,  List<int> requesterIds,  int? bankAccountId,  PayeeType payeeType,  int? vendorId,  int? vendorBankAccountId,  int? payeeCompanyId,  String? invoiceNo,  String? invoiceDate,  String? invoiceDueDate,  String? invoiceMediaUuid,  int? invoiceFileId,  List<DraftLine> lines,  int? serverId,  int? serverRev,  DraftSyncState syncState,  String? lastError,  DateTime? updatedAt)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _DraftRequest() when $default != null:
-return $default(_that.clientUuid,_that.type,_that.companyId,_that.title,_that.projectId,_that.costCenterId,_that.neededDate,_that.urgencyLevelId,_that.notes,_that.requesterIds,_that.bankAccountId,_that.payeeType,_that.vendorId,_that.vendorBankAccountId,_that.invoiceNo,_that.invoiceDate,_that.invoiceDueDate,_that.invoiceMediaUuid,_that.invoiceFileId,_that.lines,_that.serverId,_that.serverRev,_that.syncState,_that.lastError,_that.updatedAt);case _:
+return $default(_that.clientUuid,_that.type,_that.companyId,_that.title,_that.projectId,_that.costCenterId,_that.neededDate,_that.urgencyLevelId,_that.notes,_that.requesterIds,_that.bankAccountId,_that.payeeType,_that.vendorId,_that.vendorBankAccountId,_that.payeeCompanyId,_that.invoiceNo,_that.invoiceDate,_that.invoiceDueDate,_that.invoiceMediaUuid,_that.invoiceFileId,_that.lines,_that.serverId,_that.serverRev,_that.syncState,_that.lastError,_that.updatedAt);case _:
   return orElse();
 
 }
@@ -814,10 +819,10 @@ return $default(_that.clientUuid,_that.type,_that.companyId,_that.title,_that.pr
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String clientUuid,  RequestType type,  int? companyId,  String title,  int? projectId,  int? costCenterId,  String? neededDate,  int? urgencyLevelId,  String? notes,  List<int> requesterIds,  int? bankAccountId,  PayeeType payeeType,  int? vendorId,  int? vendorBankAccountId,  String? invoiceNo,  String? invoiceDate,  String? invoiceDueDate,  String? invoiceMediaUuid,  int? invoiceFileId,  List<DraftLine> lines,  int? serverId,  int? serverRev,  DraftSyncState syncState,  String? lastError,  DateTime? updatedAt)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String clientUuid,  RequestType type,  int? companyId,  String title,  int? projectId,  int? costCenterId,  String? neededDate,  int? urgencyLevelId,  String? notes,  List<int> requesterIds,  int? bankAccountId,  PayeeType payeeType,  int? vendorId,  int? vendorBankAccountId,  int? payeeCompanyId,  String? invoiceNo,  String? invoiceDate,  String? invoiceDueDate,  String? invoiceMediaUuid,  int? invoiceFileId,  List<DraftLine> lines,  int? serverId,  int? serverRev,  DraftSyncState syncState,  String? lastError,  DateTime? updatedAt)  $default,) {final _that = this;
 switch (_that) {
 case _DraftRequest():
-return $default(_that.clientUuid,_that.type,_that.companyId,_that.title,_that.projectId,_that.costCenterId,_that.neededDate,_that.urgencyLevelId,_that.notes,_that.requesterIds,_that.bankAccountId,_that.payeeType,_that.vendorId,_that.vendorBankAccountId,_that.invoiceNo,_that.invoiceDate,_that.invoiceDueDate,_that.invoiceMediaUuid,_that.invoiceFileId,_that.lines,_that.serverId,_that.serverRev,_that.syncState,_that.lastError,_that.updatedAt);case _:
+return $default(_that.clientUuid,_that.type,_that.companyId,_that.title,_that.projectId,_that.costCenterId,_that.neededDate,_that.urgencyLevelId,_that.notes,_that.requesterIds,_that.bankAccountId,_that.payeeType,_that.vendorId,_that.vendorBankAccountId,_that.payeeCompanyId,_that.invoiceNo,_that.invoiceDate,_that.invoiceDueDate,_that.invoiceMediaUuid,_that.invoiceFileId,_that.lines,_that.serverId,_that.serverRev,_that.syncState,_that.lastError,_that.updatedAt);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -834,10 +839,10 @@ return $default(_that.clientUuid,_that.type,_that.companyId,_that.title,_that.pr
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String clientUuid,  RequestType type,  int? companyId,  String title,  int? projectId,  int? costCenterId,  String? neededDate,  int? urgencyLevelId,  String? notes,  List<int> requesterIds,  int? bankAccountId,  PayeeType payeeType,  int? vendorId,  int? vendorBankAccountId,  String? invoiceNo,  String? invoiceDate,  String? invoiceDueDate,  String? invoiceMediaUuid,  int? invoiceFileId,  List<DraftLine> lines,  int? serverId,  int? serverRev,  DraftSyncState syncState,  String? lastError,  DateTime? updatedAt)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String clientUuid,  RequestType type,  int? companyId,  String title,  int? projectId,  int? costCenterId,  String? neededDate,  int? urgencyLevelId,  String? notes,  List<int> requesterIds,  int? bankAccountId,  PayeeType payeeType,  int? vendorId,  int? vendorBankAccountId,  int? payeeCompanyId,  String? invoiceNo,  String? invoiceDate,  String? invoiceDueDate,  String? invoiceMediaUuid,  int? invoiceFileId,  List<DraftLine> lines,  int? serverId,  int? serverRev,  DraftSyncState syncState,  String? lastError,  DateTime? updatedAt)?  $default,) {final _that = this;
 switch (_that) {
 case _DraftRequest() when $default != null:
-return $default(_that.clientUuid,_that.type,_that.companyId,_that.title,_that.projectId,_that.costCenterId,_that.neededDate,_that.urgencyLevelId,_that.notes,_that.requesterIds,_that.bankAccountId,_that.payeeType,_that.vendorId,_that.vendorBankAccountId,_that.invoiceNo,_that.invoiceDate,_that.invoiceDueDate,_that.invoiceMediaUuid,_that.invoiceFileId,_that.lines,_that.serverId,_that.serverRev,_that.syncState,_that.lastError,_that.updatedAt);case _:
+return $default(_that.clientUuid,_that.type,_that.companyId,_that.title,_that.projectId,_that.costCenterId,_that.neededDate,_that.urgencyLevelId,_that.notes,_that.requesterIds,_that.bankAccountId,_that.payeeType,_that.vendorId,_that.vendorBankAccountId,_that.payeeCompanyId,_that.invoiceNo,_that.invoiceDate,_that.invoiceDueDate,_that.invoiceMediaUuid,_that.invoiceFileId,_that.lines,_that.serverId,_that.serverRev,_that.syncState,_that.lastError,_that.updatedAt);case _:
   return null;
 
 }
@@ -849,7 +854,7 @@ return $default(_that.clientUuid,_that.type,_that.companyId,_that.title,_that.pr
 
 
 class _DraftRequest extends DraftRequest {
-  const _DraftRequest({required this.clientUuid, required this.type, this.companyId, this.title = '', this.projectId, this.costCenterId, this.neededDate, this.urgencyLevelId, this.notes,  List<int> requesterIds = const [], this.bankAccountId, this.payeeType = PayeeType.karyawan, this.vendorId, this.vendorBankAccountId, this.invoiceNo, this.invoiceDate, this.invoiceDueDate, this.invoiceMediaUuid, this.invoiceFileId,  List<DraftLine> lines = const [], this.serverId, this.serverRev, this.syncState = DraftSyncState.local, this.lastError, this.updatedAt}): _requesterIds = requesterIds,_lines = lines,super._();
+  const _DraftRequest({required this.clientUuid, required this.type, this.companyId, this.title = '', this.projectId, this.costCenterId, this.neededDate, this.urgencyLevelId, this.notes,  List<int> requesterIds = const [], this.bankAccountId, this.payeeType = PayeeType.karyawan, this.vendorId, this.vendorBankAccountId, this.payeeCompanyId, this.invoiceNo, this.invoiceDate, this.invoiceDueDate, this.invoiceMediaUuid, this.invoiceFileId,  List<DraftLine> lines = const [], this.serverId, this.serverRev, this.syncState = DraftSyncState.local, this.lastError, this.updatedAt}): _requesterIds = requesterIds,_lines = lines,super._();
   
 
 @override final  String clientUuid;
@@ -876,10 +881,15 @@ class _DraftRequest extends DraftRequest {
 
 @override final  int? bankAccountId;
 /// ADR 0027 "Jenis penerima": vendor = "Pembayaran vendor" (Finance / PM only; type is always Pengajuan Baru,
-/// no employee account, no LPJ). Stored in `local_drafts.vendor_json` (schema v10).
+/// no employee account, no LPJ). ADR 0028: ptGrup = "Pembayaran antar-PT" (Finance / PM / Direktur; same shape,
+/// the receiving PT instead of vendor + account). Stored in `local_drafts.vendor_json` (schema v10, the payee JSON).
 @override@JsonKey() final  PayeeType payeeType;
 @override final  int? vendorId;
 @override final  int? vendorBankAccountId;
+/// ADR 0028: the receiving PT (`payeeCompanyId`, payee directory / masters `intercompany-payees`).
+@override final  int? payeeCompanyId;
+/// Invoice of a vendor payment (ADR 0027) / the receiving PT's document — tagihan / memo — of a PT grup payment
+/// (ADR 0028, owner 2026-10-14: number, date and file required; due date optional).
 @override final  String? invoiceNo;
 @override final  String? invoiceDate;
 @override final  String? invoiceDueDate;
@@ -910,18 +920,18 @@ _$DraftRequestCopyWith<_DraftRequest> get copyWith => __$DraftRequestCopyWithImp
 
 @override
 bool operator ==(Object other) {
-    return identical(this, other) || (other.runtimeType == runtimeType&&other is _DraftRequest&&(identical(other.clientUuid, clientUuid) || other.clientUuid == clientUuid)&&(identical(other.type, type) || other.type == type)&&(identical(other.companyId, companyId) || other.companyId == companyId)&&(identical(other.title, title) || other.title == title)&&(identical(other.projectId, projectId) || other.projectId == projectId)&&(identical(other.costCenterId, costCenterId) || other.costCenterId == costCenterId)&&(identical(other.neededDate, neededDate) || other.neededDate == neededDate)&&(identical(other.urgencyLevelId, urgencyLevelId) || other.urgencyLevelId == urgencyLevelId)&&(identical(other.notes, notes) || other.notes == notes)&&const DeepCollectionEquality().equals(other.requesterIds, _requesterIds)&&(identical(other.bankAccountId, bankAccountId) || other.bankAccountId == bankAccountId)&&(identical(other.payeeType, payeeType) || other.payeeType == payeeType)&&(identical(other.vendorId, vendorId) || other.vendorId == vendorId)&&(identical(other.vendorBankAccountId, vendorBankAccountId) || other.vendorBankAccountId == vendorBankAccountId)&&(identical(other.invoiceNo, invoiceNo) || other.invoiceNo == invoiceNo)&&(identical(other.invoiceDate, invoiceDate) || other.invoiceDate == invoiceDate)&&(identical(other.invoiceDueDate, invoiceDueDate) || other.invoiceDueDate == invoiceDueDate)&&(identical(other.invoiceMediaUuid, invoiceMediaUuid) || other.invoiceMediaUuid == invoiceMediaUuid)&&(identical(other.invoiceFileId, invoiceFileId) || other.invoiceFileId == invoiceFileId)&&const DeepCollectionEquality().equals(other.lines, _lines)&&(identical(other.serverId, serverId) || other.serverId == serverId)&&(identical(other.serverRev, serverRev) || other.serverRev == serverRev)&&(identical(other.syncState, syncState) || other.syncState == syncState)&&(identical(other.lastError, lastError) || other.lastError == lastError)&&(identical(other.updatedAt, updatedAt) || other.updatedAt == updatedAt));
+    return identical(this, other) || (other.runtimeType == runtimeType&&other is _DraftRequest&&(identical(other.clientUuid, clientUuid) || other.clientUuid == clientUuid)&&(identical(other.type, type) || other.type == type)&&(identical(other.companyId, companyId) || other.companyId == companyId)&&(identical(other.title, title) || other.title == title)&&(identical(other.projectId, projectId) || other.projectId == projectId)&&(identical(other.costCenterId, costCenterId) || other.costCenterId == costCenterId)&&(identical(other.neededDate, neededDate) || other.neededDate == neededDate)&&(identical(other.urgencyLevelId, urgencyLevelId) || other.urgencyLevelId == urgencyLevelId)&&(identical(other.notes, notes) || other.notes == notes)&&const DeepCollectionEquality().equals(other.requesterIds, _requesterIds)&&(identical(other.bankAccountId, bankAccountId) || other.bankAccountId == bankAccountId)&&(identical(other.payeeType, payeeType) || other.payeeType == payeeType)&&(identical(other.vendorId, vendorId) || other.vendorId == vendorId)&&(identical(other.vendorBankAccountId, vendorBankAccountId) || other.vendorBankAccountId == vendorBankAccountId)&&(identical(other.payeeCompanyId, payeeCompanyId) || other.payeeCompanyId == payeeCompanyId)&&(identical(other.invoiceNo, invoiceNo) || other.invoiceNo == invoiceNo)&&(identical(other.invoiceDate, invoiceDate) || other.invoiceDate == invoiceDate)&&(identical(other.invoiceDueDate, invoiceDueDate) || other.invoiceDueDate == invoiceDueDate)&&(identical(other.invoiceMediaUuid, invoiceMediaUuid) || other.invoiceMediaUuid == invoiceMediaUuid)&&(identical(other.invoiceFileId, invoiceFileId) || other.invoiceFileId == invoiceFileId)&&const DeepCollectionEquality().equals(other.lines, _lines)&&(identical(other.serverId, serverId) || other.serverId == serverId)&&(identical(other.serverRev, serverRev) || other.serverRev == serverRev)&&(identical(other.syncState, syncState) || other.syncState == syncState)&&(identical(other.lastError, lastError) || other.lastError == lastError)&&(identical(other.updatedAt, updatedAt) || other.updatedAt == updatedAt));
 }
 
 
 @override
 int get hashCode {
-    return Object.hashAll([runtimeType,clientUuid,type,companyId,title,projectId,costCenterId,neededDate,urgencyLevelId,notes,const DeepCollectionEquality().hash(_requesterIds),bankAccountId,payeeType,vendorId,vendorBankAccountId,invoiceNo,invoiceDate,invoiceDueDate,invoiceMediaUuid,invoiceFileId,const DeepCollectionEquality().hash(_lines),serverId,serverRev,syncState,lastError,updatedAt]);
+    return Object.hashAll([runtimeType,clientUuid,type,companyId,title,projectId,costCenterId,neededDate,urgencyLevelId,notes,const DeepCollectionEquality().hash(_requesterIds),bankAccountId,payeeType,vendorId,vendorBankAccountId,payeeCompanyId,invoiceNo,invoiceDate,invoiceDueDate,invoiceMediaUuid,invoiceFileId,const DeepCollectionEquality().hash(_lines),serverId,serverRev,syncState,lastError,updatedAt]);
 }
 
 @override
 String toString() {
-    return 'DraftRequest(clientUuid: $clientUuid, type: $type, companyId: $companyId, title: $title, projectId: $projectId, costCenterId: $costCenterId, neededDate: $neededDate, urgencyLevelId: $urgencyLevelId, notes: $notes, requesterIds: $requesterIds, bankAccountId: $bankAccountId, payeeType: $payeeType, vendorId: $vendorId, vendorBankAccountId: $vendorBankAccountId, invoiceNo: $invoiceNo, invoiceDate: $invoiceDate, invoiceDueDate: $invoiceDueDate, invoiceMediaUuid: $invoiceMediaUuid, invoiceFileId: $invoiceFileId, lines: $lines, serverId: $serverId, serverRev: $serverRev, syncState: $syncState, lastError: $lastError, updatedAt: $updatedAt)';
+    return 'DraftRequest(clientUuid: $clientUuid, type: $type, companyId: $companyId, title: $title, projectId: $projectId, costCenterId: $costCenterId, neededDate: $neededDate, urgencyLevelId: $urgencyLevelId, notes: $notes, requesterIds: $requesterIds, bankAccountId: $bankAccountId, payeeType: $payeeType, vendorId: $vendorId, vendorBankAccountId: $vendorBankAccountId, payeeCompanyId: $payeeCompanyId, invoiceNo: $invoiceNo, invoiceDate: $invoiceDate, invoiceDueDate: $invoiceDueDate, invoiceMediaUuid: $invoiceMediaUuid, invoiceFileId: $invoiceFileId, lines: $lines, serverId: $serverId, serverRev: $serverRev, syncState: $syncState, lastError: $lastError, updatedAt: $updatedAt)';
 }
 
 
@@ -932,7 +942,7 @@ abstract mixin class _$DraftRequestCopyWith<$Res> implements $DraftRequestCopyWi
   factory _$DraftRequestCopyWith(_DraftRequest value, $Res Function(_DraftRequest) _then) = __$DraftRequestCopyWithImpl;
 @override @useResult
 $Res call({
- String clientUuid, RequestType type, int? companyId, String title, int? projectId, int? costCenterId, String? neededDate, int? urgencyLevelId, String? notes, List<int> requesterIds, int? bankAccountId, PayeeType payeeType, int? vendorId, int? vendorBankAccountId, String? invoiceNo, String? invoiceDate, String? invoiceDueDate, String? invoiceMediaUuid, int? invoiceFileId, List<DraftLine> lines, int? serverId, int? serverRev, DraftSyncState syncState, String? lastError, DateTime? updatedAt
+ String clientUuid, RequestType type, int? companyId, String title, int? projectId, int? costCenterId, String? neededDate, int? urgencyLevelId, String? notes, List<int> requesterIds, int? bankAccountId, PayeeType payeeType, int? vendorId, int? vendorBankAccountId, int? payeeCompanyId, String? invoiceNo, String? invoiceDate, String? invoiceDueDate, String? invoiceMediaUuid, int? invoiceFileId, List<DraftLine> lines, int? serverId, int? serverRev, DraftSyncState syncState, String? lastError, DateTime? updatedAt
 });
 
 
@@ -949,7 +959,7 @@ class __$DraftRequestCopyWithImpl<$Res>
 
 /// Create a copy of DraftRequest
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? clientUuid = null,Object? type = null,Object? companyId = freezed,Object? title = null,Object? projectId = freezed,Object? costCenterId = freezed,Object? neededDate = freezed,Object? urgencyLevelId = freezed,Object? notes = freezed,Object? requesterIds = null,Object? bankAccountId = freezed,Object? payeeType = null,Object? vendorId = freezed,Object? vendorBankAccountId = freezed,Object? invoiceNo = freezed,Object? invoiceDate = freezed,Object? invoiceDueDate = freezed,Object? invoiceMediaUuid = freezed,Object? invoiceFileId = freezed,Object? lines = null,Object? serverId = freezed,Object? serverRev = freezed,Object? syncState = null,Object? lastError = freezed,Object? updatedAt = freezed,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? clientUuid = null,Object? type = null,Object? companyId = freezed,Object? title = null,Object? projectId = freezed,Object? costCenterId = freezed,Object? neededDate = freezed,Object? urgencyLevelId = freezed,Object? notes = freezed,Object? requesterIds = null,Object? bankAccountId = freezed,Object? payeeType = null,Object? vendorId = freezed,Object? vendorBankAccountId = freezed,Object? payeeCompanyId = freezed,Object? invoiceNo = freezed,Object? invoiceDate = freezed,Object? invoiceDueDate = freezed,Object? invoiceMediaUuid = freezed,Object? invoiceFileId = freezed,Object? lines = null,Object? serverId = freezed,Object? serverRev = freezed,Object? syncState = null,Object? lastError = freezed,Object? updatedAt = freezed,}) {
   return _then(_DraftRequest(
 clientUuid: null == clientUuid ? _self.clientUuid : clientUuid // ignore: cast_nullable_to_non_nullable
 as String,type: null == type ? _self.type : type // ignore: cast_nullable_to_non_nullable
@@ -965,6 +975,7 @@ as List<int>,bankAccountId: freezed == bankAccountId ? _self.bankAccountId : ban
 as int?,payeeType: null == payeeType ? _self.payeeType : payeeType // ignore: cast_nullable_to_non_nullable
 as PayeeType,vendorId: freezed == vendorId ? _self.vendorId : vendorId // ignore: cast_nullable_to_non_nullable
 as int?,vendorBankAccountId: freezed == vendorBankAccountId ? _self.vendorBankAccountId : vendorBankAccountId // ignore: cast_nullable_to_non_nullable
+as int?,payeeCompanyId: freezed == payeeCompanyId ? _self.payeeCompanyId : payeeCompanyId // ignore: cast_nullable_to_non_nullable
 as int?,invoiceNo: freezed == invoiceNo ? _self.invoiceNo : invoiceNo // ignore: cast_nullable_to_non_nullable
 as String?,invoiceDate: freezed == invoiceDate ? _self.invoiceDate : invoiceDate // ignore: cast_nullable_to_non_nullable
 as String?,invoiceDueDate: freezed == invoiceDueDate ? _self.invoiceDueDate : invoiceDueDate // ignore: cast_nullable_to_non_nullable

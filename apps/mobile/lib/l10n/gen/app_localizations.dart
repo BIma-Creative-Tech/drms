@@ -6930,6 +6930,144 @@ abstract class AppLocalizations {
   /// In id, this message translates to:
   /// **'Tanpa project: pilih pusat biaya (mis. tagihan kantor).'**
   String get vendorCostCenterHint;
+
+  /// No description provided for @payeePtGrup.
+  ///
+  /// In id, this message translates to:
+  /// **'PT grup'**
+  String get payeePtGrup;
+
+  /// No description provided for @fieldPayeeCompany.
+  ///
+  /// In id, this message translates to:
+  /// **'PT penerima'**
+  String get fieldPayeeCompany;
+
+  /// No description provided for @payeeCompanyPickHint.
+  ///
+  /// In id, this message translates to:
+  /// **'Pilih PT penerima'**
+  String get payeeCompanyPickHint;
+
+  /// No description provided for @intercompanyPaymentHint.
+  ///
+  /// In id, this message translates to:
+  /// **'Pembayaran antar-PT: Finance mentransfer ke rekening penerimaan antar-PT milik PT penerima; kas masuk di PT itu tercatat otomatis. Dokumen PT penerima (tagihan / memo) = bukti — tanpa nota per baris dan tanpa LPJ.'**
+  String get intercompanyPaymentHint;
+
+  /// No description provided for @intercompanyPayeesNone.
+  ///
+  /// In id, this message translates to:
+  /// **'Belum ada PT lain yang menetapkan rekening penerimaan antar-PT — minta Finance / Admin PT penerima menandainya.'**
+  String get intercompanyPayeesNone;
+
+  /// No description provided for @intercompanyPayeeGone.
+  ///
+  /// In id, this message translates to:
+  /// **'PT ini tidak ada lagi di daftar penerima antar-PT (mis. rekening penerimaannya dicabut). Pilih ulang PT penerima.'**
+  String get intercompanyPayeeGone;
+
+  /// No description provided for @intercompanyReceivingAccount.
+  ///
+  /// In id, this message translates to:
+  /// **'Rekening penerimaan antar-PT'**
+  String get intercompanyReceivingAccount;
+
+  /// No description provided for @fieldDocumentNo.
+  ///
+  /// In id, this message translates to:
+  /// **'Nomor dokumen'**
+  String get fieldDocumentNo;
+
+  /// No description provided for @fieldDocumentDate.
+  ///
+  /// In id, this message translates to:
+  /// **'Tanggal dokumen'**
+  String get fieldDocumentDate;
+
+  /// No description provided for @fieldDocumentFile.
+  ///
+  /// In id, this message translates to:
+  /// **'Foto dokumen'**
+  String get fieldDocumentFile;
+
+  /// No description provided for @documentNoHelp.
+  ///
+  /// In id, this message translates to:
+  /// **'Tagihan / memo dari PT penerima'**
+  String get documentNoHelp;
+
+  /// No description provided for @documentAttached.
+  ///
+  /// In id, this message translates to:
+  /// **'Foto dokumen terlampir'**
+  String get documentAttached;
+
+  /// No description provided for @documentOnServer.
+  ///
+  /// In id, this message translates to:
+  /// **'Dokumen tersimpan di server'**
+  String get documentOnServer;
+
+  /// No description provided for @documentMissing.
+  ///
+  /// In id, this message translates to:
+  /// **'Belum ada foto dokumen'**
+  String get documentMissing;
+
+  /// No description provided for @sectionIntercompanyPayment.
+  ///
+  /// In id, this message translates to:
+  /// **'Pembayaran antar-PT'**
+  String get sectionIntercompanyPayment;
+
+  /// No description provided for @intercompanyEntryLabel.
+  ///
+  /// In id, this message translates to:
+  /// **'Kas masuk di PT {pt}'**
+  String intercompanyEntryLabel(String pt);
+
+  /// No description provided for @intercompanyEntryVoided.
+  ///
+  /// In id, this message translates to:
+  /// **'{no} (dibatalkan — jurnal balik tercatat)'**
+  String intercompanyEntryVoided(String no);
+
+  /// No description provided for @intercompanyBadge.
+  ///
+  /// In id, this message translates to:
+  /// **'Antar PT: {pt}'**
+  String intercompanyBadge(String pt);
+
+  /// No description provided for @transferIntercompanyNote.
+  ///
+  /// In id, this message translates to:
+  /// **'Antar PT: kas masuk di PT {pt} tercatat otomatis dengan tanggal transfer ini.'**
+  String transferIntercompanyNote(String pt);
+
+  /// No description provided for @transferRecordedIntercompany.
+  ///
+  /// In id, this message translates to:
+  /// **'Transfer {trf} tercatat. Kas masuk {km} dibuat di PT {pt}.'**
+  String transferRecordedIntercompany(String trf, String km, String pt);
+
+  /// No description provided for @kpiCashFlowAntarPt.
+  ///
+  /// In id, this message translates to:
+  /// **'Termasuk Antar PT: masuk {masuk} · keluar {keluar}'**
+  String kpiCashFlowAntarPt(String masuk, String keluar);
+
+  /// ADR 0028: chip on the Direktur cash-flow card that leaves both legs of payments between PTs out (web: Tampilkan tanpa antar-PT).
+  ///
+  /// In id, this message translates to:
+  /// **'Tanpa antar-PT'**
+  String get kpiCashFlowWithoutAntarPt;
+
+  /// No description provided for @kpiCashFlowAntarPtExcluded.
+  ///
+  /// In id, this message translates to:
+  /// **'Tanpa antar-PT: masuk {masuk} · keluar {keluar} tidak dihitung'**
+  String kpiCashFlowAntarPtExcluded(String masuk, String keluar);
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

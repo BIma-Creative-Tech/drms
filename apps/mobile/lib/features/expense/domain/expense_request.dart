@@ -356,14 +356,49 @@ abstract class ExpenseDetail with _$ExpenseDetail {
     int? invoiceFileId,
     String? invoiceFileName,
 
+    /// ADR 0028 "Pembayaran antar-PT": the receiving PT (`payeeCompany {id, shortCode → code, name}`; the destination
+    /// snapshot = its designated receiving account) and, after the transfer, its Kas Masuk (`intercompany`).
+    RefItem? payeeCompany,
+    RequestIntercompany? intercompany,
+
     /// ADR 0025: the caller's next decision is signed as the PT's definitive Direktur (`direkturSignature`).
     DirekturSignature? direkturSignature,
   }) = _ExpenseDetail;
 }
 
-/// ADR 0027: a vendor payment — no receipts, no LPJ (the transfer completes it).
+/// ADR 0027: a vendor payment — no receipts, no LPJ (the transfer completes it). ADR 0028: a PT grup payment the same
+/// way (the transfer also posts the receiving PT's Kas Masuk).
 extension ExpenseDetailVendor on ExpenseDetail {
   bool get isVendor => payeeType == PayeeType.vendor;
+  bool get isPtGrup => payeeType == PayeeType.ptGrup;
+  bool get isDirectPayment => payeeType.isDirect;
+}
+
+/// ADR 0028 `ExpenseRequestDetail.intercompany`: the receiving PT's Kas Masuk of the (latest) transfer of a PT grup
+/// payment — numbers and PT only (the entry belongs to that PT). [voided]: the transfer was voided (reversal posted in
+/// the receiving PT).
+class RequestIntercompany {
+  const RequestIntercompany({required this.targetEntryNo, this.voided = false, this.targetCompany, this.transferId});
+  final String targetEntryNo;
+  final bool voided;
+
+  /// `targetCompany {id, shortCode → code, name}`.
+  final RefItem? targetCompany;
+  final int? transferId;
+
+  /// Short code of the receiving PT ("LAS"), else null.
+  String? get companyCode => targetCompany?.code ?? targetCompany?.name;
+
+  @override
+  bool operator ==(Object other) =>
+      other is RequestIntercompany &&
+      other.targetEntryNo == targetEntryNo &&
+      other.voided == voided &&
+      other.targetCompany == targetCompany &&
+      other.transferId == transferId;
+
+  @override
+  int get hashCode => Object.hash(targetEntryNo, voided, targetCompany, transferId);
 }
 
 /// ADR 0025 `ExpenseRequestDetail.direkturSignature`: the caller is a designated representative deciding a Direktur
