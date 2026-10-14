@@ -12,9 +12,9 @@ import { companyField, companyHook } from '@/fields/company'
 import { userPicker } from '@/fields/users'
 
 const roleOptions = ROLES.map((r) => ({ label: ROLE_LABELS[r], value: r }))
-/** ADR 0024 "Peran pemohon": Direktur, PM, Staff, Finance, Admin (Operator never files expense requests). */
+/** ADR 0024 "Peran pemohon": Direktur, Owner (ADR 0026), PM, Staff, Finance, Admin (Operator never files expense requests). */
 const requesterRoleOptions = REQUESTER_ROLE_OPTIONS.map((r) => ({ label: ROLE_LABELS[r], value: r }))
-/** ADR 0013: only Direktur/Finance are offered for decision positions (the DB enum keeps every role). */
+/** ADR 0013: only Direktur/Finance (ADR 0026: + Owner) are offered for decision positions (the DB enum keeps every role). */
 const decisionRoleOptions = ({ options }: { options: Option[] }): Option[] => options.filter((o) => isDecisionRole(typeof o === 'string' ? o : o.value))
 
 /**
@@ -27,7 +27,8 @@ const decisionRoleOptions = ({ options }: { options: Option[] }): Option[] => op
  * ADR 0021: an expense-request rule may name the PM project for a required "Diketahui".
  * ADR 0024 (owner 2026-10-11): condition "Peran pemohon" (every requester holds one of the roles in the PT;
  * empty = any) and zero approval levels ("Tanpa persetujuan — langsung ke antrian transfer Finance") ONLY
- * when the requester role is exactly Direktur — hook (400) + DB trigger `approval_rules_zero_step`.
+ * when the requester role is exactly Owner (ADR 0026; was Direktur) — hook (400) + DB trigger `approval_rules_zero_step`.
+ * ADR 0026: expense rules end with the Owner level (`pk-principal`); Addendum RAB rules never name the Owner.
  * ADR 0027: condition "Jenis penerima" (Semua / Karyawan / Vendor) — expense-request rules only.
  */
 export const ApprovalRules: CollectionConfig = withAudit(
@@ -60,7 +61,7 @@ export const ApprovalRules: CollectionConfig = withAudit(
             // ADR 0027: an addendum has no payee — such a rule would never match
             if ((data.payeeType ?? originalDoc?.payeeType ?? 'any') !== 'any') throw new APIError('Aturan Addendum RAB: jenis penerima harus "Semua".', 400, null, true)
           }
-          // ADR 0024: zero steps only for "Peran pemohon = Direktur" (ruleDecisionError → zeroStepRuleError)
+          // ADR 0024 / 0026: zero steps only for "Peran pemohon = Owner" (ruleDecisionError → zeroStepRuleError)
           const requesterRoles = ((data.requesterRoles !== undefined ? data.requesterRoles : originalDoc?.requesterRoles) ?? []) as Role[]
           const err = stepsError(steps, { allowEmpty: true })
           if (err) throw new APIError(err, 400, null, true)
@@ -141,11 +142,11 @@ export const ApprovalRules: CollectionConfig = withAudit(
         ],
         admin: { description: 'Aturan hanya untuk pengajuan dengan jenis penerima ini (Semua = tanpa syarat).' },
       },
-      { name: 'priority', type: 'number', label: 'Prioritas', defaultValue: 100, min: 0, admin: { description: 'Angka kecil dievaluasi lebih dulu (aturan "Pengajuan Direktur" = 10, default = 100).' } },
+      { name: 'priority', type: 'number', label: 'Prioritas', defaultValue: 100, min: 0, admin: { description: 'Angka kecil dievaluasi lebih dulu (aturan "Pengajuan Owner" = 5, "Pengajuan Direktur" = 10, default = 100).' } },
       {
         name: 'acknowledge',
         type: 'select',
-        label: 'Diketahui Oleh (persetujuan pertama: PM project atau Direktur)',
+        label: 'Diketahui Oleh (persetujuan pertama: PM project, Direktur atau Owner)',
         required: true,
         defaultValue: 'required',
         options: [
@@ -171,8 +172,8 @@ export const ApprovalRules: CollectionConfig = withAudit(
           (data as { docType?: string } | undefined)?.docType === 'budget_addendum' ? options.filter((o) => (typeof o === 'string' ? o : o.value) !== 'scope_manager') : options,
       },
       { name: 'acknowledgeRole', type: 'select', label: 'Peran "Diketahui Oleh"', defaultValue: 'pk-owner', options: roleOptions, filterOptions: decisionRoleOptions },
-      // QA-16: decision users of the rule's PT only (ADR 0013: Direktur / Finance), shown by name
-      { name: 'acknowledgeUser', type: 'relationship', relationTo: 'users', label: 'User "Diketahui Oleh"', ...userPicker({ roles: ['pk-owner', 'pk-finance'] }) },
+      // QA-16: decision users of the rule's PT only (ADR 0013: Direktur / Finance; ADR 0026: + Owner), shown by name
+      { name: 'acknowledgeUser', type: 'relationship', relationTo: 'users', label: 'User "Diketahui Oleh"', ...userPicker({ roles: ['pk-owner', 'pk-principal', 'pk-finance'] }) },
       {
         name: 'signDiajukan',
         type: 'select',
@@ -204,12 +205,15 @@ export const ApprovalRules: CollectionConfig = withAudit(
         type: 'array',
         label: 'Level approval',
         labels: { singular: 'Level', plural: 'Level' },
-        // ADR 0024: 0 rows = "Tanpa persetujuan — langsung ke antrian transfer Finance" (Peran pemohon = Direktur only)
-        admin: { description: 'Kosongkan HANYA untuk aturan Peran pemohon = Direktur: "Tanpa persetujuan — langsung ke antrian transfer Finance".' },
+        // ADR 0024 / 0026: 0 rows = "Tanpa persetujuan — langsung ke antrian transfer Finance" (Peran pemohon = Owner only)
+        admin: {
+          description:
+            'Urutan pengajuan biaya: Direktur → Owner → Finance (level Owner sesudah Direktur, sebelum level Finance, ADR 0026). Kosongkan HANYA untuk aturan Peran pemohon = Owner: "Tanpa persetujuan — langsung ke antrian transfer Finance".',
+        },
         fields: [
           { name: 'level', type: 'number', label: 'Level', required: true, min: 1 },
           { name: 'approverRole', type: 'select', label: 'Peran approver', options: roleOptions, filterOptions: decisionRoleOptions },
-          { name: 'approverUser', type: 'relationship', relationTo: 'users', label: 'Approver (user tertentu)', ...userPicker({ roles: ['pk-owner', 'pk-finance'] }) },
+          { name: 'approverUser', type: 'relationship', relationTo: 'users', label: 'Approver (user tertentu)', ...userPicker({ roles: ['pk-owner', 'pk-principal', 'pk-finance'] }) },
         ],
       },
       activeField(),

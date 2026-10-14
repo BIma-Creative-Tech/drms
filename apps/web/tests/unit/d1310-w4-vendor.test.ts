@@ -125,10 +125,10 @@ describe('ADR 0027 rule engine: "Jenis penerima" condition', () => {
     expect(selectRule([base, { ...vendorFinance, priority: 100, requesterRoles: [] }], facts('vendor', [['pk-pm']]))?.id).toBe(2)
   })
 
-  it('seed: the Finance vendor rule is a default (Jenis penerima vendor, Peran pemohon Finance, Direktur level, no Diketahui)', () => {
+  it('seed: the Finance vendor rule is a default (Jenis penerima vendor, Peran pemohon Finance, Direktur then Owner, no Diketahui)', () => {
     const r = DEFAULT_APPROVAL_RULES.find((x) => x.name === VENDOR_FINANCE_RULE_NAME) as unknown as RuleInput
     expect(r).toMatchObject({ docType: 'expense_request', payeeType: 'vendor', requesterRoles: ['pk-finance'], acknowledge: 'none', priority: 20 })
-    expect(r.steps).toEqual([{ level: 1, approverRole: 'pk-owner' }])
+    expect(r.steps).toEqual([{ level: 1, approverRole: 'pk-owner' }, { level: 2, approverRole: 'pk-principal' }])
   })
 })
 

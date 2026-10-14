@@ -376,6 +376,8 @@ describe('MC4 extra — per-PT dashboard fields (APK) and thresholds without com
 
   it('approval inbox: items carry their PT warn %; top-level = lowest selected PT; K-09 rows carry their PT thresholds', async () => {
     await updateCompany({ budgetWarnPct: 70, progressBadGapPct: 5 }, 'CS8')
+    // ADR 0026: the seeded default rule of B ends Direktur → Owner — B needs an Owner to accept the submit
+    await makeFlowUser(['pk-principal'], 'mc4-principal-b', null, { company: B })
     // one request of B waiting for the Direktur of B (ownerBC)
     const d = await ok(call('POST', E, tri, { type: 'advance', title: 'MC4 inbox B', projectId: X.projectB, requesterIds: [X.empTriB], bankAccountId: X.accTriB, neededDate: '2026-10-30', lines: [{ description: 'Semen', total: 50_000, categoryId: X.catB }] }, key()), 201)
     await ok(call('POST', `${E}/${d.id}/submit`, tri, {}, key()))

@@ -10,7 +10,8 @@ import { withSystemTransaction } from '@/lib/system-tx'
  * (src/seed/seed.ts must have run: bank MANDIRI + cost center OPS-PB are required).
  *
  * Input `UAT_USERS` = JSON array of { email, name, role, keycloakSub } — EXISTING Keycloak users
- * (one Staff, one PM, up to two Finance and two Direktur = `pk-owner`, ADR 0013)
+ * (one Staff, one PM, up to two Finance and two Direktur = `pk-owner`, ADR 0013; optionally one Owner =
+ * `pk-principal`, ADR 0026 — the last approval level of the default rule)
  * (created by infra); nothing is written to Keycloak (context `skipKeycloakSync`). Every step is
  * idempotent (natural keys) and never overwrites data it did not create, except:
  * - an existing user (same keycloakSub) gets its missing UAT role added to its company #1 membership and,
@@ -18,7 +19,7 @@ import { withSystemTransaction } from '@/lib/system-tx'
  * - cost center OPS-PB gets manager = PM user ONLY when it has no manager yet.
  * All writes: Local API as the system actor (audit source=system), one transaction per step.
  */
-export const UAT_ROLES = ['pk-staff', 'pk-pm', 'pk-finance', 'pk-owner'] as const satisfies readonly Role[]
+export const UAT_ROLES = ['pk-staff', 'pk-pm', 'pk-finance', 'pk-owner', 'pk-principal'] as const satisfies readonly Role[]
 export type UatRole = (typeof UAT_ROLES)[number]
 
 export const UAT_EMPLOYEE_CODE: Record<UatRole, string> = {
@@ -26,10 +27,11 @@ export const UAT_EMPLOYEE_CODE: Record<UatRole, string> = {
   'pk-pm': 'UJI-PM',
   'pk-finance': 'UJI-FIN',
   'pk-owner': 'UJI-OWN',
+  'pk-principal': 'UJI-OWNER',
 }
 
 /** How many UAT users per role (ADR 0013: a second Direktur / Finance tests the G1-2 fallback). */
-export const UAT_ROLE_MAX: Record<UatRole, number> = { 'pk-staff': 1, 'pk-pm': 1, 'pk-finance': 2, 'pk-owner': 2 }
+export const UAT_ROLE_MAX: Record<UatRole, number> = { 'pk-staff': 1, 'pk-pm': 1, 'pk-finance': 2, 'pk-owner': 2, 'pk-principal': 1 }
 const UAT_MAX_USERS = Object.values(UAT_ROLE_MAX).reduce((a, b) => a + b, 0)
 
 /** Employee code of the n-th (1-based) UAT user of `role`: UJI-FIN, UJI-FIN-2, … */

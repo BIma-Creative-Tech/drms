@@ -10,7 +10,7 @@ import {
   isDirekturStep,
   representationApplies,
 } from '@/domain/direktur-rules'
-import { printedName } from '@/pdf/data'
+import { approvalPrintedName, printedName } from '@/pdf/data'
 
 /**
  * ADR 0025 (DRMS 13/10 A3): per-PT definitive Direktur signature — resolution rules (pure). The DB-bound part
@@ -96,5 +96,23 @@ describe('ADR 0025 PT configuration', () => {
     )
     expect(printedName({ actorName: 'Budi Wakil', signatureSource: 'profile', representedDirektur: null })).toBe('Budi Wakil')
     expect(printedName(undefined)).toBe('')
+  })
+})
+
+describe('ADR 0025 × ADR 0026 (Owner level)', () => {
+  const pmDirekturOwner = { ...pmToDirektur, steps: [{ level: 1, approverRole: 'pk-owner', approverUserId: null }, { level: 2, approverRole: 'pk-principal', approverUserId: null }] }
+
+  it('the Owner level is never a Direktur step (signed personally, never with the PT signature)', () => {
+    expect(isDirekturApprovalStep(pmDirekturOwner, 1)).toBe(true)
+    expect(isDirekturApprovalStep(pmDirekturOwner, 2)).toBe(false)
+    expect(isDirekturStep(pmDirekturOwner, 'approval', 2)).toBe(false)
+  })
+
+  it('PDF Approval box: the definitive Direktur keeps "Nama (Jabatan)", the Owner level carries its role', () => {
+    const company = { actorName: 'Direktur Contoh', signatureSource: COMPANY_SIGNATURE_SOURCE, representedDirektur: { name: 'Direktur Contoh', title: 'Direktur Utama' } }
+    expect(approvalPrintedName(company, 'pk-owner')).toBe('Direktur Contoh (Direktur Utama)')
+    expect(approvalPrintedName({ ...company, representedDirektur: { name: 'Direktur Contoh', title: null } }, 'pk-owner')).toBe('Direktur Contoh (Direktur)')
+    expect(approvalPrintedName({ actorName: 'Olivia Owner', signatureSource: 'profile', representedDirektur: null }, 'pk-principal')).toBe('Olivia Owner (Owner)')
+    expect(approvalPrintedName({ actorName: 'Budi', signatureSource: 'profile', representedDirektur: null }, null)).toBe('Budi')
   })
 })

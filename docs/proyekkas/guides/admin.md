@@ -233,6 +233,28 @@ sampai selesai).
   itu sendiri; PM/Admin/Finance atas namanya ditolak.
 - Setiap perubahan aturan wajib alasan dan tercatat di Audit Log; hanya berlaku untuk pengajuan baru.
 
+**Sejak 13 Okt 2026 (keputusan owner, ADR 0026): level Owner di atas Direktur.**
+
+- Peran baru **Owner** (kode `pk-principal`; "Direktur" tetap kode `pk-owner`). Owner melihat dan boleh melakukan semua
+  yang boleh Direktur (dashboard, daftar, kas, laporan) di PT tempat ia memegang peran Owner; bedanya hanya di alur
+  persetujuan. Centang **Owner** untuk orangnya di **setiap PT** (Pengguna → Akses & Peran, atau matriks Akses PT).
+  **Hanya Admin grup** yang dapat memberi atau mencabut peran Owner (keputusan owner 14 Okt 2026); Admin PT tidak
+  melihat pilihan Owner (bila sudah dipegang: tampil tetapi terkunci), dan server menolak ("Peran Owner hanya dapat
+  diberikan atau dicabut oleh Admin grup."). Admin PT tetap boleh mengubah peran lain orang tersebut.
+- Alur pengajuan biaya: **Staff → PM project → Direktur → Owner → Finance (transfer)**. Migrasi menambahkan **level
+  Owner tepat sesudah level Direktur** (tanpa level Direktur: sebelum level Finance pertama — aturan lama "Diketahui
+  Direktur → Finance" menjadi Diketahui Direktur → level 1 Owner → level 2 Finance; tanpa keduanya: di akhir; level
+  berikutnya dinomori ulang) pada setiap aturan pengajuan biaya yang aktif (nama aturan tidak diubah) dan pada "Pengajuan
+  Direktur", serta membuat aturan **"Pengajuan Owner"** (Peran pemohon = Owner, tanpa level, Prioritas 5) di setiap PT.
+  Aturan tidak aktif lain tidak diubah — tambahkan level Owner sendiri bila diaktifkan lagi.
+- **Tanpa level approval** sekarang hanya boleh untuk Peran pemohon = **Owner saja** (bukan Direktur lagi). Pengajuan
+  Owner sendiri langsung ke antrian transfer Finance ("Tanpa persetujuan — pengajuan Owner (kebijakan PT)", tercatat).
+- Level Owner **tidak pernah dilewati diam-diam**: bila satu-satunya Owner PT adalah pemohon/pembuat pengajuan dengan
+  level Owner (mis. Owner membuat pengajuan untuk orang lain), pengiriman ditolak dengan pesan. Bila belum ada Owner
+  aktif di PT, pengiriman ditolak "Tidak ada pengguna aktif untuk posisi Approval level n (peran Owner)".
+- **Addendum RAB** dan **pinjaman antar project** tetap hanya Direktur; aturan Addendum RAB tidak boleh berisi Owner.
+- Pengajuan yang sudah diajukan sebelum perubahan tetap memakai snapshot lama (Direktur = keputusan terakhir).
+
 ### 4a. Mengubah aturan setelah deploy (sekali, setiap PT: DRMS, LAS, TBK, CS1)
 
 1. Pilih PT di tombol PT bar atas. Periksa **Proyek → Project**: setiap project aktif punya **Project Manager**; dan
@@ -254,9 +276,9 @@ buat/ubah aturan sementara dengan level 1 = Direktur pengganti (user bernama), l
 
 - Aturan approval punya syarat baru **Jenis penerima** (*Semua* / *Karyawan* / *Vendor*). Semua aturan lama =
   *Semua* (tidak berubah).
-- Setiap PT mendapat aturan **"Pembayaran vendor oleh Finance — Direktur"** (Jenis penerima *Vendor*, Peran pemohon
-  *Finance*, Diketahui *Tidak dipakai*, level 1 *Direktur*, prioritas 20). Pembayaran vendor oleh PM memakai aturan
-  default PT (PM project → Direktur; langkah PM dilewati karena ia PM project-nya).
+- Setiap PT mendapat aturan **"Pembayaran vendor oleh Finance — Direktur lalu Owner"** (Jenis penerima *Vendor*, Peran
+  pemohon *Finance*, Diketahui *Tidak dipakai*, level 1 *Direktur*, level 2 *Owner*, prioritas 20). Pembayaran vendor oleh
+  PM memakai aturan default PT (PM project → Direktur → Owner; langkah PM dilewati karena ia PM project-nya).
 - Pembayaran vendor hanya bisa diajukan Finance atau PM. Admin / Direktur / Staff tidak.
 - Menonaktifkan aturan vendor (dengan alasan) → pembayaran vendor oleh Finance mengikuti aturan default.
 
@@ -349,6 +371,25 @@ semua isian tab ini untuk kembali ke tanda tangan pribadi.
   Jadwal kerja default diatur per PT (**Perusahaan (PT) → Operasional → Jadwal kerja default**).
 - Titik & radius **project** diisi di **Proyek → Project**. Lokasi tanpa titik tidak bisa dipakai absen; titik tanpa
   radius memakai **Radius geofence default** PT itu. Server menambah toleransi akurasi GPS HP (maks. 50 m) ke radius.
+- **Tipe absensi karyawan** (DRMS 13/10 A2): di **Karyawan** (atau **Pengguna → tab Data Karyawan**) isi **Tipe
+  absensi**:
+  - **Karyawan OnSite** (default semua karyawan): boleh absen di **semua lokasi terdaftar PT** yang punya titik —
+    kantor pusat, kantor cabang (site), project, pusat biaya — **tanpa penugasan** (Team Assignment tidak perlu).
+  - **Karyawan Non-OnSite** (staf kantor): **tidak dibatasi lokasi** — boleh absen di site mana pun dan juga di luar
+    lokasi terdaftar (tanpa cek radius, tanpa penugasan). Bila posisinya di dalam lokasi terdaftar, absen dicatat di
+    lokasi itu; bila tidak, dicatat **"Di luar area"** dengan acuan **site penempatan** karyawan (bila kosong:
+    **kantor pusat**) dan jaraknya. Absen pulang menutup absen masuk hari itu. GPS tetap wajib, lokasi palsu tetap
+    ditolak. Tanpa site penempatan dan tanpa kantor pusat, absen di luar area ditolak — isi salah satunya.
+  - **"Di luar area"** terlihat di Rekap absensi (tanda **Di luar area**), di **Laporan Absensi** (kolom Lokasi
+    *Di luar area (ref. …)* dan Keterangan) dan di daftar **Absensi** (kolom/filter **Di luar area**).
+  - Daftar Karyawan bisa difilter per **Tipe absensi**.
+- **Kantor pusat:** di **Master Data → Site** centang **Kantor pusat** pada site kantor pusat PT (maksimal **1 per
+  PT**; untuk memindahkan, hapus centang di site lama dulu) dan isi **titik + radius**. Kantor pusat menjadi acuan
+  "Di luar area" untuk karyawan Non-OnSite yang belum punya site penempatan.
+- APK dan web **mengenali area otomatis**: lokasi yang geofence-nya memuat posisi GPS karyawan langsung terpilih;
+  bila beberapa area bertumpuk, karyawan memilih salah satu; di luar semua area, karyawan OnSite memilih manual
+  (server tetap menolak bila di luar radius), karyawan Non-OnSite otomatis memakai pilihan **"Di luar area"**. Lokasi baru/titik baru terbaca di APK setelah sinkron berikutnya (maks. ±15
+  menit saat online).
 - Bila lebih dari satu PT tampil, halaman absensi punya pilihan **PT** (mis. **Semua PT (DRMS, CS1)**) dan nama lokasi
   diberi awalan `[KODE PT]`.
 - **Laporan → Laporan Absensi**: Admin bisa melihat dan mengunduh (CSV/Excel) untuk semua karyawan PT tempat ia Admin.

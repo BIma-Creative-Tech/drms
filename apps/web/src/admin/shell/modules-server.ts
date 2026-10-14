@@ -1,7 +1,7 @@
 import { getTranslation } from '@payloadcms/translations'
 import type { Payload, SanitizedPermissions, TypedUser, VisibleEntities } from 'payload'
 
-import { companyContextOf, isOperatorOnly, isStaffOnly, membershipsOf, ROLE_LABELS, rolesOf, type Role } from '@/access/roles'
+import { companyContextOf, exactRolesOf, isOperatorOnly, isStaffOnly, membershipsOf, ROLE_LABELS, rolesOf, type Role } from '@/access/roles'
 import { resolveModules, type BadgeKey, type FeatureKey, type ResolvedModule } from '@/admin/modules/registry'
 import { TRANSFER_QUEUE_WHERE } from '@/domain/expense/types'
 import { pickDisplayName, resolveDisplayName } from '@/domain/user-display-name'
@@ -17,8 +17,8 @@ import { normalizeSelection, type SwitcherState } from './company-switcher'
 
 type I18nLike = Parameters<typeof getTranslation>[1]
 
-/** Moved from F2NavLinks (US-19 "badge jumlah antrian"): Direktur/Finance only. S3e (S-07): the
- * transfer badge counts exactly the transfer queue of the page title (TRANSFER_QUEUE_WHERE). */
+/** Moved from F2NavLinks (US-19 "badge jumlah antrian"): Direktur/Finance only (ADR 0026: the Owner too — effective
+ * roles carry pk-owner). S3e (S-07): the transfer badge counts exactly the transfer queue of the page title (TRANSFER_QUEUE_WHERE). */
 export async function loadBadges(payload: Pick<Payload, 'count'>, user: TypedUser): Promise<Partial<Record<BadgeKey, number>>> {
   const roles = rolesOf(user)
   if (!roles.includes('pk-finance') && !roles.includes('pk-owner')) return {}
@@ -67,7 +67,8 @@ export function navUser(user: TypedUser, displayName?: string): NavUser {
     name,
     email: u.email ?? '',
     roles,
-    roleLabel: roles.map((r) => ROLE_LABELS[r]).join(' · ') || 'Tanpa peran',
+    // ADR 0026: labels of the STORED roles ("Owner", not "Direktur · Owner" — the Direktur access is implied)
+    roleLabel: exactRolesOf(user).map((r) => ROLE_LABELS[r]).join(' · ') || 'Tanpa peran',
     staffOnly: isStaffOnly(user),
     operatorOnly: isOperatorOnly(user),
     initials,
@@ -163,7 +164,7 @@ export async function loadSwitcher(payload: Pick<Payload, 'find'>, user: TypedUs
     // labels only — fall back to ids
   }
   const options = ctx.memberships
-    .map((m) => ({ id: m.company, shortCode: names.get(m.company)?.shortCode ?? `#${m.company}`, name: names.get(m.company)?.name ?? '', roles: m.roles.map((r) => ROLE_LABELS[r]) }))
+    .map((m) => ({ id: m.company, shortCode: names.get(m.company)?.shortCode ?? `#${m.company}`, name: names.get(m.company)?.name ?? '', roles: (m.exactRoles ?? m.roles).map((r) => ROLE_LABELS[r]) }))
     .sort((a, b) => a.shortCode.localeCompare(b.shortCode) || a.id - b.id)
   return { options, selected: normalizeSelection(options, ctx.selected) }
 }

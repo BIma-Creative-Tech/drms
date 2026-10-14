@@ -108,7 +108,7 @@ export const openapiDocument = {
             "properties": {
               "approvalInbox": {
                 "type": "boolean",
-                "description": "ADR 0013/0021: holds pk-owner (label \"Direktur\"), pk-finance or pk-pm (Persetujuan PM) → show the approval inbox."
+                "description": "ADR 0013/0021/0026: holds pk-owner (label \"Direktur\"), pk-principal (label \"Owner\"), pk-finance or pk-pm (Persetujuan PM) → show the approval inbox."
               },
               "teamMonitor": {
                 "type": "boolean",
@@ -348,8 +348,10 @@ export const openapiDocument = {
           "pk-pm",
           "pk-finance",
           "pk-owner",
+          "pk-principal",
           "pk-admin"
-        ]
+        ],
+        "description": "pk-owner = \"Direktur\"; pk-principal = \"Owner\" (ADR 0026: the approval level above the Direktur). Effective roles: an Owner is also listed with pk-owner (same view and permissions as the Direktur); only the approval flow differs."
       },
       "ImageTargets": {
         "type": "object",
@@ -404,7 +406,7 @@ export const openapiDocument = {
             "items": {
               "$ref": "#/components/schemas/Role"
             },
-            "description": "Roles IN this PT (company_memberships)."
+            "description": "Roles IN this PT (company_memberships), effective: an Owner (pk-principal) is listed with pk-owner too (ADR 0026)."
           },
           "employeeId": {
             "type": [
@@ -421,7 +423,7 @@ export const openapiDocument = {
           },
           "ownRequestNoApproval": {
             "type": "boolean",
-            "description": "ADR 0024: the caller is Direktur in this PT and the PT has an active rule \"Pengajuan Direktur\" (Peran pemohon = Direktur, no approval level) — the APK shows \"Pengajuan Anda langsung ke antrian transfer Finance\" on the request form. Hint only; the rule is chosen at submit."
+            "description": "ADR 0024 / 0026: the caller is Owner (pk-principal) in this PT and the PT has an active rule \"Pengajuan Owner\" (Peran pemohon = Owner, no approval level) — the APK shows \"Pengajuan Anda langsung ke antrian transfer Finance\" on the request form. Since ADR 0026 a Direktur's own request is approved by the Owner (false for a Direktur). Hint only; the rule is chosen at submit."
           },
           "settings": {
             "type": "object",
@@ -529,7 +531,7 @@ export const openapiDocument = {
         "properties": {
           "approvalInbox": {
             "type": "boolean",
-            "description": "ADR 0013/0021: holds pk-owner (label \"Direktur\"), pk-finance or pk-pm (Persetujuan PM) → show the approval inbox."
+            "description": "ADR 0013/0021/0026: holds pk-owner (label \"Direktur\"), pk-principal (label \"Owner\"), pk-finance or pk-pm (Persetujuan PM) → show the approval inbox."
           },
           "teamMonitor": {
             "type": "boolean",
@@ -776,7 +778,7 @@ export const openapiDocument = {
       "MasterItem": {
         "type": "object",
         "additionalProperties": {},
-        "description": "Whitelisted fields per type (id, updatedAt, active, …) plus MC3 `company` (PT id; null for shared masters) and `shared` (true for banks, uoms, holidays). ADR 0024: `employees` items carry `direktur` (bool: the account holds Direktur in that PT — not offered as requester to others)."
+        "description": "Whitelisted fields per type (id, updatedAt, active, …) plus MC3 `company` (PT id; null for shared masters) and `shared` (true for banks, uoms, holidays). ADR 0024: `employees` items carry `direktur` (bool: the account holds Direktur — or, ADR 0026, Owner — in that PT; not offered as requester to others)."
       },
       "Device": {
         "type": "object",
@@ -1678,9 +1680,10 @@ export const openapiDocument = {
                   "direktur_via_pm",
                   "direktur_via_pm_self",
                   "direktur_no_approval",
+                  "principal_no_approval",
                   null
                 ],
-                "description": "G1 exception of the snapshot. ADR 0024 (owner 2026-10-11): direktur_no_approval = a Direktur's OWN request under a zero-step rule — no approval step at all, straight to the Finance transfer queue; show the step \"Persetujuan\" (skipped) with the note \"Tanpa persetujuan — pengajuan Direktur (kebijakan PT)\" and status \"Tanpa persetujuan (Antri Transfer)\". Legacy ADR 0021 (no longer set for new requests): a Direktur's request filed by the PM project (PM approves, then a Direktur). direktur_via_pm = another Direktur decides the Direktur step; direktur_via_pm_self = the requester Direktur may approve (only Direktur of the PT, owner 2026-10-11). Show the note \"Pengajuan Direktur — diajukan oleh PM …\"."
+                "description": "G1 exception of the snapshot. ADR 0026 (owner 2026-10-13): principal_no_approval = the Owner's OWN request under the zero-step rule \"Pengajuan Owner\" — no approval step, straight to the Finance transfer queue; show the step \"Persetujuan\" (skipped) with the note \"Tanpa persetujuan — pengajuan Owner (kebijakan PT)\". Since ADR 0026 a Direktur's own request is approved by the Owner (direktur_no_approval stays on older requests). ADR 0024 (owner 2026-10-11): direktur_no_approval = a Direktur's OWN request under a zero-step rule — no approval step at all, straight to the Finance transfer queue; show the step \"Persetujuan\" (skipped) with the note \"Tanpa persetujuan — pengajuan Direktur (kebijakan PT)\" and status \"Tanpa persetujuan (Antri Transfer)\". Legacy ADR 0021 (no longer set for new requests): a Direktur's request filed by the PM project (PM approves, then a Direktur). direktur_via_pm = another Direktur decides the Direktur step; direktur_via_pm_self = the requester Direktur may approve (only Direktur of the PT, owner 2026-10-11). Show the note \"Pengajuan Direktur — diajukan oleh PM …\"."
               },
               "steps": {
                 "type": "array",
@@ -2656,7 +2659,7 @@ export const openapiDocument = {
               },
               "noApproval": {
                 "type": "boolean",
-                "description": "ADR 0024: the shortfall of a Direktur's own request was approved without a decision (kebijakan PT; audited)."
+                "description": "ADR 0024 / 0026: the shortfall of a Direktur's (older requests) or the Owner's own request was approved without a decision (kebijakan PT; audited; statusLabel names which)."
               },
               "amount": {
                 "type": [
@@ -3910,7 +3913,19 @@ export const openapiDocument = {
           },
           "noApproval": {
             "type": "boolean",
-            "description": "ADR 0024: a Direktur's own request without any approval (kebijakan PT) — show the badge \"Tanpa persetujuan (Direktur)\"; Finance's transfer checks are the only check."
+            "description": "ADR 0024: a Direktur's own request without any approval (kebijakan PT) — show the badge \"Tanpa persetujuan (Direktur)\"; Finance's transfer checks are the only check. ADR 0026: also the Owner's own request (see noApprovalBy)."
+          },
+          "noApprovalBy": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "direktur",
+              "owner",
+              null
+            ],
+            "description": "ADR 0026: whose own request went without approval — \"owner\" (rule \"Pengajuan Owner\") or \"direktur\" (ADR 0024, older requests); null when noApproval is false. Badge \"Tanpa persetujuan (Owner|Direktur)\"."
           },
           "vendorName": {
             "type": [
@@ -3945,6 +3960,7 @@ export const openapiDocument = {
           "flags",
           "sla",
           "noApproval",
+          "noApprovalBy",
           "vendorName"
         ]
       },
@@ -4651,10 +4667,11 @@ export const openapiDocument = {
                       "pk-pm",
                       "pk-finance",
                       "pk-owner",
+                      "pk-principal",
                       "pk-admin"
                     ]
                   },
-                  "maxItems": 5
+                  "maxItems": 6
                 },
                 "employee": {
                   "type": [
@@ -5205,10 +5222,11 @@ export const openapiDocument = {
                   "enum": [
                     "pm",
                     "direktur",
+                    "owner",
                     "finance",
                     "other"
                   ],
-                  "description": "ADR 0021: who decides this step (APK decision sheet texts): pm = PM project, direktur, finance, other (named user / legacy)."
+                  "description": "ADR 0021: who decides this step (APK decision sheet texts): pm = PM project, direktur, owner (ADR 0026: the Owner level above the Direktur), finance, other (named user / legacy)."
                 },
                 "finalStep": {
                   "type": "boolean",
@@ -8874,6 +8892,10 @@ export const openapiDocument = {
               },
               "corrected": {
                 "type": "boolean"
+              },
+              "outsideArea": {
+                "type": "boolean",
+                "description": "DRMS 13/10 A2: true = \"Di luar area\" (Non-OnSite outside every registered location; the location is the reference)."
               }
             },
             "required": [
@@ -8906,6 +8928,10 @@ export const openapiDocument = {
               },
               "corrected": {
                 "type": "boolean"
+              },
+              "outsideArea": {
+                "type": "boolean",
+                "description": "DRMS 13/10 A2: true = \"Di luar area\" (Non-OnSite outside every registered location; the location is the reference)."
               }
             },
             "required": [
@@ -9172,6 +9198,159 @@ export const openapiDocument = {
           "members"
         ]
       },
+      "AttendanceLocations": {
+        "type": "object",
+        "properties": {
+          "employees": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                "company": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                "attendanceType": {
+                  "type": "string",
+                  "enum": [
+                    "onsite",
+                    "non_onsite"
+                  ],
+                  "description": "onsite = inside a registered location of the PT (outside the radius refused); non_onsite = no location restriction (inside a registered location → that one, else \"Di luar area\")."
+                },
+                "homeSiteId": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "exclusiveMinimum": 0
+                },
+                "referenceSite": {
+                  "type": [
+                    "object",
+                    "null"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "lat": {
+                      "type": [
+                        "number",
+                        "null"
+                      ]
+                    },
+                    "lng": {
+                      "type": [
+                        "number",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "code",
+                    "name",
+                    "lat",
+                    "lng"
+                  ],
+                  "description": "Non-OnSite only: the reference of a \"Di luar area\" check-in (home site, else the PT head office); null for OnSite or when neither is set (then an outside check-in is refused VALIDATION)."
+                }
+              },
+              "required": [
+                "id",
+                "company",
+                "attendanceType",
+                "homeSiteId",
+                "referenceSite"
+              ]
+            },
+            "description": "The caller's active employees in the selected PTs (one per PT)."
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "project",
+                    "cost_center",
+                    "site"
+                  ]
+                },
+                "id": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                "company": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                "employeeId": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "description": "The caller's employee in that PT."
+                },
+                "code": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "lat": {
+                  "type": "number"
+                },
+                "lng": {
+                  "type": "number"
+                },
+                "radiusM": {
+                  "type": "number",
+                  "description": "Own radius, else the PT default (the radius the server checks)."
+                },
+                "isHeadOffice": {
+                  "type": "boolean",
+                  "description": "Site flagged \"Kantor pusat\"."
+                },
+                "home": {
+                  "type": "boolean",
+                  "description": "\"Site penempatan\" of the employee."
+                }
+              },
+              "required": [
+                "kind",
+                "id",
+                "company",
+                "employeeId",
+                "code",
+                "name",
+                "lat",
+                "lng",
+                "radiusM",
+                "isHeadOffice",
+                "home"
+              ]
+            },
+            "description": "Eligible locations with a point: home site first, then head office, sites, projects, cost centers (by code). Locations without a point are never listed."
+          }
+        },
+        "required": [
+          "employees",
+          "items"
+        ]
+      },
       "AttendanceCheckResult": {
         "type": "object",
         "properties": {
@@ -9182,11 +9361,44 @@ export const openapiDocument = {
           "localDate": {
             "type": "string",
             "pattern": "^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$"
+          },
+          "location": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "project",
+                  "cost_center",
+                  "site"
+                ]
+              },
+              "id": {
+                "type": "integer",
+                "exclusiveMinimum": 0
+              }
+            },
+            "required": [
+              "type",
+              "id"
+            ],
+            "description": "Where the record belongs (DRMS 13/10 A2: a Non-OnSite check-in may be recorded at the registered location containing the fix, or at the reference site when outside)."
+          },
+          "outsideArea": {
+            "type": "boolean",
+            "description": "Non-OnSite \"Di luar area\": outside every registered location of the PT; `location` = the reference (home site, else head office; a check-out: the open check-in)."
+          },
+          "distanceM": {
+            "type": "integer",
+            "description": "Distance to the point of `location` (m)."
           }
         },
         "required": [
           "id",
-          "localDate"
+          "localDate",
+          "location",
+          "outsideArea",
+          "distanceM"
         ]
       },
       "AttendanceCheckBody": {
@@ -9205,7 +9417,7 @@ export const openapiDocument = {
           "site_id": {
             "type": "integer",
             "exclusiveMinimum": 0,
-            "description": "ADR 0023: site (kantor cabang) — allowed at the home site or with an active site assignment."
+            "description": "ADR 0023: site (kantor pusat / kantor cabang). DRMS 13/10 A2: no assignment needed; OnSite must be inside the location; Non-OnSite has no location restriction (send the reference site when outside every registered location → \"Di luar area\")."
           },
           "lat": {
             "type": "number",
@@ -16492,6 +16704,13 @@ export const openapiDocument = {
                         "null"
                       ]
                     },
+                    "attendanceType": {
+                      "type": "string",
+                      "enum": [
+                        "onsite",
+                        "non_onsite"
+                      ]
+                    },
                     "active": {
                       "type": "boolean"
                     }
@@ -16503,6 +16722,7 @@ export const openapiDocument = {
                     "nickname",
                     "position",
                     "phone",
+                    "attendanceType",
                     "active"
                   ]
                 },
@@ -16673,10 +16893,11 @@ export const openapiDocument = {
           "pk-pm",
           "pk-finance",
           "pk-owner",
+          "pk-principal",
           "pk-admin",
           "pk-operator"
         ],
-        "description": "Role in ONE PT (pk-owner = Direktur, pk-operator = Operator/Anggota)."
+        "description": "Role in ONE PT (pk-owner = Direktur, pk-principal = Owner (ADR 0026), pk-operator = Operator/Anggota)."
       },
       "UserOnboardingCreate": {
         "type": "object",
@@ -16726,7 +16947,7 @@ export const openapiDocument = {
                   "items": {
                     "$ref": "#/components/schemas/OnboardingRole"
                   },
-                  "maxItems": 6,
+                  "maxItems": 7,
                   "description": "Roles in this PT. Empty on an existing membership = membership inactive (history kept); a PT without membership needs ≥ 1 role."
                 },
                 "employee": {
@@ -16768,6 +16989,14 @@ export const openapiDocument = {
                         "null"
                       ],
                       "maxLength": 32
+                    },
+                    "attendanceType": {
+                      "type": "string",
+                      "enum": [
+                        "onsite",
+                        "non_onsite"
+                      ],
+                      "description": "DRMS 13/10 A2 \"Tipe absensi\": onsite (default for a new employee) = any registered location of the PT; non_onsite = head office + branch offices only."
                     },
                     "active": {
                       "type": "boolean"
@@ -16886,7 +17115,7 @@ export const openapiDocument = {
                   "items": {
                     "$ref": "#/components/schemas/OnboardingRole"
                   },
-                  "maxItems": 6,
+                  "maxItems": 7,
                   "description": "Roles in this PT. Empty on an existing membership = membership inactive (history kept); a PT without membership needs ≥ 1 role."
                 },
                 "employee": {
@@ -16928,6 +17157,14 @@ export const openapiDocument = {
                         "null"
                       ],
                       "maxLength": 32
+                    },
+                    "attendanceType": {
+                      "type": "string",
+                      "enum": [
+                        "onsite",
+                        "non_onsite"
+                      ],
+                      "description": "DRMS 13/10 A2 \"Tipe absensi\": onsite (default for a new employee) = any registered location of the PT; non_onsite = head office + branch offices only."
                     },
                     "active": {
                       "type": "boolean"
@@ -29146,6 +29383,10 @@ export const openapiDocument = {
                         "direktur": {
                           "type": "integer"
                         },
+                        "owner": {
+                          "type": "integer",
+                          "description": "ADR 0026: waiting at the Owner level."
+                        },
                         "finance": {
                           "type": "integer"
                         },
@@ -29191,8 +29432,10 @@ export const openapiDocument = {
                                 "enum": [
                                   "pm",
                                   "direktur",
+                                  "owner",
                                   "finance"
-                                ]
+                                ],
+                                "description": "Who decides now: pm (PM project), direktur, owner (ADR 0026: the Owner level above the Direktur), finance."
                               },
                               "scopeName": {
                                 "type": "string"
@@ -29238,6 +29481,7 @@ export const openapiDocument = {
                         "count",
                         "pm",
                         "direktur",
+                        "owner",
                         "finance",
                         "oldestDays",
                         "items"
@@ -32095,9 +32339,121 @@ export const openapiDocument = {
         }
       }
     },
+    "/attendance/locations": {
+      "get": {
+        "summary": "DRMS 13/10 A2: registered check-in locations of the caller (own employee per selected PT): every location of the PT with a point (sites incl. head office, projects, cost centers; no assignment needed). OnSite must check in inside one; Non-OnSite has no location restriction (outside every location → \"Di luar area\" at employees[].referenceSite). Coordinates and radius only (no money). The APK matches the GPS fix against this list (auto-detect) and caches it for offline check-ins; the server re-validates each check-in",
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9]\\d{0,8}(,[1-9]\\d{0,8})*$",
+              "description": "MC3: PT filter (comma separated ids). Only narrows the effective selection (X-Company-Ids / cookie ∩ memberships); a PT outside it → 403 COMPANY_NOT_ALLOWED."
+            },
+            "required": false,
+            "description": "MC3: PT filter (comma separated ids). Only narrows the effective selection (X-Company-Ids / cookie ∩ memberships); a PT outside it → 403 COMPANY_NOT_ALLOWED.",
+            "name": "company",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Registered install id (APK)."
+            },
+            "required": true,
+            "description": "Registered install id (APK).",
+            "name": "X-Device-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "APK version; below company minimum → 426."
+            },
+            "required": false,
+            "description": "APK version; below company minimum → 426.",
+            "name": "X-App-Version",
+            "in": "header"
+          },
+          {
+            "$ref": "#/components/parameters/CompanyIds"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Eligible locations",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttendanceLocations"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/attendance/check-in": {
       "post": {
-        "summary": "Owner decision 2026-10-09: web self check-in, every role. Selfie first with POST /media/selfies. Synchronous counterpart of the APK sync item attendance.check_in — same gates (company-settings.syncAttendanceEnabled, else FEATURE_DISABLED; ADR 0018 privacy ack, else PRIVACY_ACK_REQUIRED) and rejection codes (MOCK_LOCATION never applies on web; NOT_FOUND, VALIDATION, NO_GEOFENCE, NOT_ASSIGNED, OUTSIDE_GEOFENCE, MEDIA_MISSING, FORBIDDEN, ALREADY_CHECKED_IN)",
+        "summary": "Owner decision 2026-10-09: web self check-in, every role. Selfie first with POST /media/selfies. Synchronous counterpart of the APK sync item attendance.check_in — same gates (company-settings.syncAttendanceEnabled, else FEATURE_DISABLED; ADR 0018 privacy ack, else PRIVACY_ACK_REQUIRED) and rejection codes (MOCK_LOCATION never applies on web; NOT_FOUND, VALIDATION, NO_GEOFENCE, NOT_ASSIGNED = location outside the PT of the employee, OUTSIDE_GEOFENCE (OnSite only; DRMS 13/10 A2: a Non-OnSite check-in outside every registered location is recorded \"Di luar area\", see the result), MEDIA_MISSING, FORBIDDEN, ALREADY_CHECKED_IN)",
         "security": [
           {
             "bearer": []

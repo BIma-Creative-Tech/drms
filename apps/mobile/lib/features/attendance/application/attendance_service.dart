@@ -21,6 +21,7 @@ import '../../privacy/application/privacy_providers.dart';
 import '../../privacy/domain/privacy.dart';
 import '../../sync/data/outbox_repository.dart';
 import '../../sync/domain/sync_models.dart';
+import '../data/attendance_locations_repository.dart';
 import '../domain/attendance.dart';
 
 /// Queues own check-in/out: selfie compressed on the device (720 px, ≤ 150 KB, EXIF dropped) and kept
@@ -173,11 +174,35 @@ final _masterSitesProvider = FutureProvider<List<ProjectSite>>((ref) async {
   ];
 });
 
-/// Locations of the user (masters are access-filtered server-side: Staff = assigned, PM = team), with
-/// their geofence: ADR 0023 sites where the user may check in (home site = "Site penempatan" first, then the
-/// sites of a team assignment), projects (archived hidden) and cost centers ("pusat biaya", E6 Q-40). The first
-/// entry is the default of the picker, so a stationed employee starts at the home site.
+/// DRMS 13/10 A2: the cached eligible locations of the switcher scope (works offline); null = nothing received yet
+/// (first start offline, or a server before A2) → the picker falls back to [_assignedLocationsProvider].
+final eligibleLocationsProvider = FutureProvider<EligibleLocations?>((ref) async {
+  final sub = ref.watch(currentSubProvider);
+  if (sub == null) return null;
+  ref.watch(mastersRevisionProvider);
+  final cached = await AttendanceLocationsRepository.readCached(ref.watch(databaseProvider), sub);
+  if (cached == null) return null;
+  final profile = ref.watch(currentProfileProvider);
+  final scope = profile == null || profile.companies.isEmpty ? null : profile.scopedCompanies.map((c) => c.id);
+  return cached.scoped(scope);
+});
+
+/// Own check-in locations with their geofence. DRMS 13/10 A2: the server's eligible list by attendance type
+/// (OnSite: every registered location of the PT with a point; Non-OnSite: head office + branch offices), home site
+/// first, then the head office — no assignment needed. Without that list (server before A2 / never online) the
+/// assignment-based masters list ([_assignedLocationsProvider]). The first entry is the default of the picker; the
+/// screen then selects the location whose geofence contains the GPS fix (auto-detect).
 final attendanceSitesProvider = FutureProvider<List<ProjectSite>>((ref) async {
+  final eligible = await ref.watch(eligibleLocationsProvider.future);
+  if (eligible != null) return eligible.sites;
+  return ref.watch(_assignedLocationsProvider.future);
+});
+
+/// Locations of the user from the masters (access-filtered server-side: Staff = assigned, PM = team), with
+/// their geofence: ADR 0023 sites where the user may check in (home site = "Site penempatan" first, then the
+/// sites of a team assignment), projects (archived hidden) and cost centers ("pusat biaya", E6 Q-40). Own picker
+/// with a server before DRMS 13/10 A2, and the team locations of "diabsenkan PM" (always).
+final _assignedLocationsProvider = FutureProvider<List<ProjectSite>>((ref) async {
   final sub = ref.watch(currentSubProvider);
   if (sub == null) return const [];
   ref.watch(mastersRevisionProvider);
@@ -220,7 +245,7 @@ final onBehalfCandidatesProvider = FutureProvider<List<OnBehalfCandidate>>((ref)
   bool pmIn(ProjectSite s) =>
       profile == null || profile.companies.isEmpty || profile.forCompany(s.companyId).canAttendOnBehalf;
   final sites = [
-    for (final s in await ref.watch(attendanceSitesProvider.future))
+    for (final s in await ref.watch(_assignedLocationsProvider.future))
       if (s.kind != SiteKind.site && pmIn(s)) s,
     for (final s in await ref.watch(_masterSitesProvider.future))
       if (s.team && pmIn(s)) s,

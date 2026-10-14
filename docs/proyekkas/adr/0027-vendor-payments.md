@@ -56,10 +56,10 @@ payments therefore stay on the generic rule engine, nothing names a step.
    (`approval_rules.payee_type`: `any` (default, every existing rule) | `karyawan` | `vendor`; counts as one more
    specificity like "Peran pemohon"; addendum rules: `any` only — hook + DB CHECK). Seeded per PT (data migration
    `20261013_700200_d1310_vendor_payments_data`, `seed/data.ts`, copied to new PTs) the rule
-   **"Pembayaran vendor oleh Finance — Direktur"**: Jenis penerima = Vendor, Peran pemohon = Finance, no "Diketahui",
-   one level Direktur, priority 20. Result:
-   - **filed by Finance** → that rule → **Direktur only**;
-   - **filed by a PM** → the PT's default rule (PM project → Direktur); the PM step is skipped and recorded because the
+   **"Pembayaran vendor oleh Finance — Direktur lalu Owner"**: Jenis penerima = Vendor, Peran pemohon = Finance, no
+   "Diketahui", levels Direktur then Owner (ADR 0026, `pk-principal`), priority 20. Result:
+   - **filed by Finance** → that rule → **Direktur → Owner**;
+   - **filed by a PM** → the PT's default rule (PM project → Direktur → Owner); the PM step is skipped and recorded because the
      filer is the project's PM (ADR 0013 G1-2, unchanged). A PM filing on a project whose PM is someone else gets that
      PM's approval first (same as any request).
    Admins can change / add rules in the UI as for any request (e.g. an amount band for vendor payments). The upcoming
@@ -121,7 +121,7 @@ payments therefore stay on the generic rule engine, nothing names a step.
 
 ## Rollback
 
-- Data: deactivate the rule "Pembayaran vendor oleh Finance — Direktur" (vendor payments then follow the default rule).
+- Data: deactivate the rule "Pembayaran vendor oleh Finance — Direktur lalu Owner" (vendor payments then follow the default rule).
 - Code: `git revert`; the data migration's down deletes / deactivates its rules; the guard migration's down drops the
   triggers / checks / index; the schema down drops the columns and the table (vendor payments are lost — restore the
   pre-deploy dump instead when any exist).

@@ -18,8 +18,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   vendor payment names a cost center (pusat biaya, e.g. office bills) — vendor payee only; employee requests keep D2
   (DB rule `pk_expense_requests_project_rules` widened for the vendor payee only).
 - **Approval through the generic rule engine**: new rule condition "Jenis penerima"; seeded per PT "Pembayaran vendor
-  oleh Finance — Direktur" (Finance → Direktur only); a PM's vendor payment takes the default rule with the PM step
-  skipped. **Duplicate invoice** (same vendor + normalized number on a request not cancelled / rejected) → 409 field
+  oleh Finance — Direktur lalu Owner" (Finance → Direktur → Owner, ADR 0026); a PM's vendor payment takes the default
+  rule (PM project → Direktur → Owner) with the PM step skipped. **Duplicate invoice** (same vendor + normalized number on a request not cancelled / rejected) → 409 field
   error, DB unique index.
 - **Transfer = snapshot of the vendor account**, unverified account → same confirmation as employee accounts; the
   transfer **completes** the vendor payment (no receipts / LPJ / selisih; void → back to the queue). DB guards: payee
@@ -29,6 +29,63 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   `vendorBankAccountId`, `invoice*` on drafts, list filter `payeeType`, detail `vendor` / `invoice`, transfer queue
   `vendorName`, masters type `vendor-bank-accounts`, bank preview `vendorAccount`. Migrations
   `20261013_700000_d1310_vendor_payments` (+ `_guard`, `_data`). Guides: finance, pm, admin.
+
+### Added (DRMS — Owner approval level)
+
+- **Role "Owner" (`pk-principal`) one approval level above the Direktur** (owner decision 2026-10-13, ADR 0026):
+  expense requests go **Staff → PM project → Direktur → Owner → Finance (transfer queue)**. The Owner has the same view
+  and permissions as the Direktur in every PT where he holds the role (effective roles: `pk-principal` implies
+  `pk-owner` for every access check); the approval engine matches the **stored** role, so the Owner never decides the
+  Direktur level and vice versa (distinct persons, step holders and step notifications by exact role). Assigned per PT
+  in Pengguna / Akses PT (label "Owner").
+- **Rules:** every active expense rule gets an Owner level placed **Direktur → Owner → Finance** — directly after the
+  last Direktur level, else before the first Finance level (ADR 0013 shape: Owner becomes level 1), else at the end;
+  following levels renumbered (data migration `20261013_630200`, idempotent, audited; names kept, inactive rules
+  untouched); "Pengajuan Direktur" → approved by the Owner; new **"Pengajuan Owner"** (Peran pemohon = Owner, no level,
+  priority 5): the Owner's own request goes straight to Finance (`principal_no_approval`, audited, DB-checked). Zero-step
+  rules are now allowed for requester role **Owner only** (hook + DB trigger); an Owner level is never skipped silently
+  (409). Addendum RAB and inter-project loans stay Direktur-only. LPJ shortfall re-approval uses the same rule (→
+  Owner). Requests submitted before keep their snapshot (Direktur = last level). SLA still starts at the final approval.
+- **Labels (web + APK):** "Persetujuan Owner", "Menunggu persetujuan Owner", decision texts, PDF Approval box with every
+  level and its role, PM KPI `teamWaiting.owner`, transfer queue `noApprovalBy`, notifications / email "Persetujuan
+  Owner". APK: `Role.principal` ("Owner", Direktur home + inbox), stepper and decision sheet with the Owner level.
+- **Migrations:** `20261013_630000_d1310_owner_role` (enum values), `…630100_…_guard` (zero-step = Owner only,
+  `g1_exception` += `principal_no_approval`, approval guard), `…630200_…_data`. OpenAPI: `Role`, `OnboardingRole`,
+  membership batch roles, `decisionBy`, `selfApproval`, `TransferQueueItem.noApprovalBy`, PM dashboard `teamWaiting`.
+- **Owner role = group admins only** (owner decision 2026-10-14): only a group admin grants or removes `pk-principal`
+  — `company-memberships` hook (403 "Peran Owner hanya dapat diberikan atau dicabut oleh Admin grup."), so REST, the
+  Akses PT matrix and the Pengguna form are all covered; PT admins don't get the option (shown locked where held).
+- **With ADR 0025 (definitive Direktur per PT):** the Owner level is never a Direktur step — the Owner always signs with
+  his own profile / drawn signature, never the PT's Direktur signature; the PDF Approval box prints a representative's
+  decision as "Nama (Jabatan)" of the definitive Direktur and the other levels with their role ("… (Owner)").
+- **Deploy step:** after migrating, a **group admin** ticks **Owner** for the Owner in every PT — until then submissions under a rule with
+  an Owner level answer 409 ("Tidak ada pengguna aktif … (peran Owner)").
+
+### Added (DRMS — tipe absensi OnSite / Non-OnSite)
+
+- **Tipe absensi per karyawan** (ADR 0023 amendment 2026-10-13, owner DRMS 13/10 A2): `employees.attendanceType`
+  **Karyawan OnSite** / **Karyawan Non-OnSite** on the Karyawan form, the Pengguna form (tab Data Karyawan,
+  `user-onboarding` `employee.attendanceType`) and as a list filter. **OnSite** may check in at every registered
+  location of its PT that has a point (sites incl. the head office, projects, cost centers) **without a team
+  assignment** (outside the radius refused); **Non-OnSite** (office staff, owner 2026-10-14) has **no location
+  restriction**: inside a registered location → recorded there, else recorded **"Di luar area"** referenced to the
+  home site (else the head office) with the distance (`attendances.outside_area`); a check-out closes the day's open
+  check-in. GPS, mock refusal, selfie and privacy rules unchanged; own PT only. Existing and new employees default to
+  **OnSite** (nothing that worked before is refused).
+- **"Di luar area" everywhere it is read**: recap / API stamps `outsideArea` + day flag `OUTSIDE_AREA`, Laporan
+  Absensi (Lokasi `Di luar area (ref. …)`, Keterangan), web recap chip, Absensi list column / filter, APK recap and
+  history; web check-in result `{location, outsideArea, distanceM}`.
+- **"Kantor pusat" on sites** (`sites.isHeadOffice`, at most one per PT: field error + DB unique index), list
+  column / filter, `isHeadOffice` in the `sites` masters.
+- **`GET /api/v1/attendance/locations`**: the registered check-in locations of the caller's PT(s) (id, kind, code,
+  name, point, effective radius, head office / home flags) per own employee in the selected PTs, plus the "Di luar
+  area" `referenceSite` of a Non-OnSite employee — no money / budgets. OpenAPI `AttendanceLocations`.
+- **Automatic area detection** — APK: the Absen tab selects the location whose geofence contains the GPS fix (nearest
+  when several overlap, chips to pick another; none → OnSite: manual picker with the nearest as a hint, Non-OnSite:
+  the "Di luar area" entry), button "Deteksi lokasi otomatis", "Pusat" badge, type hint; the list is cached for
+  offline check-ins (server re-validates at sync). Web "Absensi · Absen": same list, detection and "Di luar area".
+- Migrations `20261013_620000_d1310_onsite`, `20261013_620100_d1310_onsite_guard`. **Deploy:** Admin flags the head
+  office of each PT (with point + radius) and sets office staff to Non-OnSite.
 
 ### Added (DRMS — tanda tangan Direktur definitif per PT)
 

@@ -8,6 +8,7 @@ import { activeField, codeField, odooRefField, uuidField } from '@/fields/common
 
 import { companyField, companyHook, pickerSameCompany, requireCompanyWhenAmbiguous, siteOptions } from '@/fields/company'
 import { validationError } from '@/lib/validation'
+import { ATTENDANCE_TYPE_LABEL, ATTENDANCE_TYPES, DEFAULT_ATTENDANCE_TYPE } from '@/domain/attendance/area'
 import { adminCreatePrefill, applyUserAccount, readUserAccount, USER_ACCOUNT, userAccountOptions, userAccountReadAccess, validateUserAccount } from '@/domain/employee-user-link'
 
 /**
@@ -45,7 +46,7 @@ export const Employees: CollectionConfig = withAudit(
   {
     slug: 'employees',
     labels: { singular: 'Karyawan', plural: 'Karyawan' },
-    admin: { useAsTitle: 'name', group: 'Pengguna & Akses', defaultColumns: ['code', 'name', 'position', 'homeSite', 'active'], listSearchableFields: ['code', 'name', 'nickname'] },
+    admin: { useAsTitle: 'name', group: 'Pengguna & Akses', defaultColumns: ['code', 'name', 'position', 'attendanceType', 'homeSite', 'active'], listSearchableFields: ['code', 'name', 'nickname'] },
     access: {
       read: anyMember,
       create: rolesAllowed('pk-admin'),
@@ -135,6 +136,21 @@ export const Employees: CollectionConfig = withAudit(
         ...pickerSameCompany(),
         filterOptions: siteOptions,
         admin: { placeholder: 'Pilih site…', description: 'Kantor cabang tempat karyawan ditempatkan (opsional): boleh absen di site ini tanpa penugasan tim.' },
+      },
+      // DRMS 13/10 A2 (ADR 0023 amendment 2026-10-13): where the employee may check in — OnSite: any registered location
+      // of the PT with a point (site, project, cost center; no assignment needed); Non-OnSite: head office + branch
+      // offices (sites) only. Default OnSite (= no check-in that worked before is refused). Rule: domain/attendance/area.ts.
+      {
+        name: 'attendanceType',
+        type: 'select',
+        label: 'Tipe absensi',
+        required: true,
+        defaultValue: DEFAULT_ATTENDANCE_TYPE,
+        options: ATTENDANCE_TYPES.map((value) => ({ value, label: ATTENDANCE_TYPE_LABEL[value] })),
+        admin: {
+          description:
+            'Karyawan OnSite: boleh absen di semua lokasi terdaftar PT yang punya titik (site, kantor pusat, project, pusat biaya) tanpa penugasan. Karyawan Non-OnSite (staf kantor): hanya di kantor pusat dan kantor cabang (site).',
+        },
       },
       { name: 'faceRefPhoto', type: 'upload', relationTo: 'media-selfies', label: 'Foto wajah referensi' },
       odooRefField('odooEmployeeRef', 'Ref. karyawan Odoo'),

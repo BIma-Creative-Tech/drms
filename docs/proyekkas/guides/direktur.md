@@ -1,16 +1,19 @@
 # Panduan Direktur
 
-Sebagai Direktur Anda: **menyetujui pengajuan setelah PM project** (sejak 10 Okt 2026, ADR 0021; persetujuan Anda
-yang terakhir — sesudahnya Finance hanya mentransfer),
+Sebagai Direktur Anda: **menyetujui pengajuan setelah PM project** (sejak 10 Okt 2026, ADR 0021; sejak 13 Okt 2026,
+ADR 0026, sesudah Anda masih ada **Persetujuan Owner** — lihat [Panduan Owner](owner.md) — baru Finance mentransfer),
 menyetujui **addendum RAB**, mengelola **project dan tahapan**, **membuka kembali tutup buku**, dan memantau
 **dashboard** serta **laporan progress**. Direktur tidak membuat pengajuan dan tidak mencatat kas. Baca juga
 [Hal umum](README.md#hal-umum-untuk-semua-peran).
 
 ## 1. Menyetujui pengajuan (Persetujuan Direktur)
 
-Alur pengajuan baru: **Staff → PM project → Anda → Finance mentransfer**. Setelah PM project menyetujui, pengajuan
-menunggu Anda (**Menunggu persetujuan Direktur**) dan Anda diberi tahu. Persetujuan Anda adalah keputusan terakhir:
-Pengajuan Baru masuk Antrian Transfer, Reimburse ke verifikasi nota Finance lalu transfer. Finance tidak lagi menyetujui.
+Alur pengajuan baru (sejak 13 Okt 2026, ADR 0026): **Staff → PM project → Anda → Owner → Finance mentransfer**.
+Setelah PM project menyetujui, pengajuan menunggu Anda (**Menunggu persetujuan Direktur**) dan Anda diberi tahu.
+Setelah Anda menyetujui, pengajuan menunggu **Owner** (**Menunggu persetujuan Owner**); keputusan Owner yang terakhir:
+Pengajuan Baru masuk Antrian Transfer, Reimburse ke verifikasi nota Finance lalu transfer. Finance tidak menyetujui.
+Anda tidak bisa memutuskan langkah Owner, dan Owner tidak bisa memutuskan langkah Anda. Pengajuan yang sudah diajukan
+**sebelum** 13 Okt 2026 tetap selesai dengan persetujuan Anda sebagai keputusan terakhir.
 
 Pengajuan yang diajukan **sebelum** Admin mengubah aturan approval tetap memakai alur lama: Anda menyetujui pada
 langkah "Diketahui" (**Menunggu Diketahui (Direktur)**), lalu Finance memberi Approval.
@@ -35,7 +38,10 @@ baru juga muncul di lonceng **Notifikasi** (bar atas, kanan) dan — bila Admin 
   satu PT tampil (tombol PT di bar atas web / di Beranda APK), setiap baris diberi kode PT (web: kolom **PT** +
   tulisan **Menampilkan PT: …**). Keputusan selalu memakai peran Anda **di PT pengajuan**, dan warna merah Dampak
   anggaran memakai ambang PT itu.
-- **Pengajuan Anda sendiri** (sejak 11 Okt 2026, keputusan owner, ADR 0024): buat dan kirim sendiri (web atau APK,
+- **Pengajuan Anda sendiri — sejak 13 Okt 2026 (ADR 0026):** dengan aturan **"Pengajuan Direktur"** pengajuan Anda
+  **disetujui Owner** (**Menunggu persetujuan Owner**), lalu masuk antrian transfer Finance — tidak ada PM. Teks di
+  bawah ini berlaku untuk pengajuan Anda yang dikirim 11–12 Okt 2026.
+- **Pengajuan Anda sendiri** (11 Okt 2026, keputusan owner, ADR 0024): buat dan kirim sendiri (web atau APK,
   Anda sebagai pemohon). Dengan aturan **"Pengajuan Direktur"** pengajuan **langsung ke antrian transfer Finance tanpa
   persetujuan** — tidak ada PM, tidak ada Direktur lain. Status: **Tanpa persetujuan (Antri Transfer)** (Reimburse:
   **Tanpa persetujuan (Verifikasi Nota)**); di alur persetujuan, panel, PDF dan laporan Rekap Pengajuan tercatat
@@ -70,7 +76,7 @@ Bila nota LPJ Pengajuan Baru membuat total transfer melebihi nominal yang Anda s
 **persetujuan kekurangan** dengan alasan; Anda mendapat notifikasi dan keputusan ada di **web → Persetujuan →
 Kekurangan LPJ di atas nominal disetujui** (nominal disetujui, kekurangan, total transfer baru, batas tanpa
 persetujuan, alasan Finance) → **Setujui** atau **Tolak** (alasan wajib). Alurnya sama seperti pengajuan: PM project
-menyetujui dulu, lalu Anda; setelah Anda, kekurangan dapat ditransfer Finance. (Alur mengikuti aturan approval yang
+menyetujui dulu, lalu Anda, lalu Owner (ADR 0026); setelah itu kekurangan dapat ditransfer Finance. (Alur mengikuti aturan approval yang
 berlaku saat Finance mengajukan persetujuan kekurangan.) Belum tersedia di APK — notifikasi di HP membuka detail pengajuan, keputusannya di web.
 Toleransi diubah oleh Admin/Direktur di data PT (Pengaturan operasional).
 

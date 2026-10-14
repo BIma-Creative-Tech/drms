@@ -111,8 +111,8 @@ invoice adalah buktinya.
    **Rekening vendor** (hanya rekening aktif vendor itu), isi **Nomor invoice**, **Tanggal invoice**, *Jatuh tempo*
    (opsional) dan unggah **File invoice** (foto / PDF). Isi baris item seperti biasa (item RAP per baris). Pemohon =
    Anda sendiri; jenis otomatis *Pengajuan Baru*. **Kirim pengajuan**.
-3. **Persetujuan:** pembayaran vendor yang Anda ajukan langsung ke **Direktur** (aturan "Pembayaran vendor oleh
-   Finance — Direktur"). Yang diajukan PM: langkah PM dilewati (ia PM project-nya) → Direktur.
+3. **Persetujuan:** pembayaran vendor yang Anda ajukan langsung ke **Direktur**, lalu **Owner** (aturan "Pembayaran
+   vendor oleh Finance — Direktur lalu Owner"). Yang diajukan PM: langkah PM dilewati (ia PM project-nya) → Direktur → Owner.
 4. **Transfer:** muncul di **Antrian Transfer** dengan label *Pembayaran vendor: <nama vendor>*; rekening tujuan =
    rekening vendor yang tercatat saat diajukan. Rekening yang belum diverifikasi meminta konfirmasi seperti rekening
    karyawan. Setelah transfer dicatat, pengajuan langsung **Selesai** (tidak ada LPJ). Salah transfer → **Void

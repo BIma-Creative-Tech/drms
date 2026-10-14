@@ -13,7 +13,7 @@ export type DecisionTextInput = {
   grandTotal: number
   /** ADR 0013+ snapshot (decision roles recorded): "Diketahui" is an approval. */
   decisionFlow: boolean
-  decisionBy: 'pm' | 'direktur' | 'finance' | 'other'
+  decisionBy: 'pm' | 'direktur' | 'owner' | 'finance' | 'other'
   /** Approving this step is the last decision (→ Finance transfer). */
   finalStep: boolean
 }
@@ -31,5 +31,9 @@ export function decisionText(i: DecisionTextInput): { label: string; confirm: st
     return { label: 'Diketahui', confirm: `Tandai ${no} sudah diketahui?` }
   }
   if (i.decisionBy === 'direktur' && i.finalStep) return { label: 'Setujui', confirm: `Setujui ${no} sebesar ${amount} sebagai Direktur? Pengajuan diteruskan ke Finance untuk transfer.` }
+  // ADR 0026: Direktur → Owner → Finance (the next level is the Owner's under the default rules)
+  if (i.decisionBy === 'direktur') return { label: 'Setujui', confirm: `Setujui ${no} sebesar ${amount} sebagai Direktur? Pengajuan diteruskan ke level persetujuan berikutnya.` }
+  if (i.decisionBy === 'owner' && i.finalStep) return { label: 'Setujui', confirm: `Setujui ${no} sebesar ${amount} sebagai Owner? Pengajuan diteruskan ke Finance untuk transfer.` }
+  if (i.decisionBy === 'owner') return { label: 'Setujui', confirm: `Setujui ${no} sebesar ${amount} sebagai Owner?` }
   return { label: 'Setujui', confirm: `Setujui ${no} sebesar ${amount}?` }
 }

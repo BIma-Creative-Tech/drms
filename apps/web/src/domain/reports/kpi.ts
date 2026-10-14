@@ -438,13 +438,17 @@ export async function pendingApprovals(req: PayloadRequest, scope: ReportScope) 
  * now, from the request's snapshot — ADR 0021: "pm" (pending_ack, PM project → Direktur rule) then
  * "direktur" (the Direktur level); ADR 0013 snapshots: "direktur" (pending_ack, Diketahui = Direktur
  * approval) then "finance" (an approval level of another role). Legacy snapshots follow the same rule.
+ * ADR 0026: "owner" = the Owner level (`pk-principal`, the level above the Direktur).
  */
-export type TeamWaitingItem = { id: number; companyId: number; docNo: string | null; title: string; type: RequestType; status: RequestStatus; waitingFor: 'pm' | 'direktur' | 'finance'; scopeName: string; requesters: string; grandTotal: number; submittedDate: string | null; days: number | null }
+export type TeamWaitingItem = { id: number; companyId: number; docNo: string | null; title: string; type: RequestType; status: RequestStatus; waitingFor: 'pm' | 'direktur' | 'owner' | 'finance'; scopeName: string; requesters: string; grandTotal: number; submittedDate: string | null; days: number | null }
 
 /** SQL: who decides the waiting step of `er` (see TeamWaitingItem.waitingFor). */
-const WAITING_FOR = sql`CASE WHEN er.status = 'pending_ack' THEN (CASE WHEN er.approval_snapshot->>'acknowledgeBy' = 'scope_manager' THEN 'pm' ELSE 'direktur' END)
-  WHEN (SELECT s->>'approverRole' FROM jsonb_array_elements(coalesce(er.approval_snapshot->'steps', '[]'::jsonb)) s
-        WHERE (s->>'level')::int = coalesce(er.current_level, 1) AND coalesce(s->>'approverUserId', '') = '' LIMIT 1) = 'pk-owner' THEN 'direktur'
+const LEVEL_ROLE = sql`(SELECT s->>'approverRole' FROM jsonb_array_elements(coalesce(er.approval_snapshot->'steps', '[]'::jsonb)) s
+        WHERE (s->>'level')::int = coalesce(er.current_level, 1) AND coalesce(s->>'approverUserId', '') = '' LIMIT 1)`
+const WAITING_FOR = sql`CASE WHEN er.status = 'pending_ack' THEN (CASE WHEN er.approval_snapshot->>'acknowledgeBy' = 'scope_manager' THEN 'pm'
+    WHEN er.approval_snapshot->>'acknowledgeRole' = 'pk-principal' THEN 'owner' ELSE 'direktur' END)
+  WHEN ${LEVEL_ROLE} = 'pk-owner' THEN 'direktur'
+  WHEN ${LEVEL_ROLE} = 'pk-principal' THEN 'owner'
   ELSE 'finance' END`
 
 export async function teamWaiting(req: PayloadRequest, scope: ReportScope, top = 8) {
@@ -476,7 +480,7 @@ export async function teamWaiting(req: PayloadRequest, scope: ReportScope, top =
       title: String(x.title),
       type: x.type as RequestType,
       status: x.status as RequestStatus,
-      waitingFor: x.wf === 'pm' ? 'pm' : x.wf === 'direktur' ? 'direktur' : 'finance',
+      waitingFor: x.wf === 'pm' ? 'pm' : x.wf === 'direktur' ? 'direktur' : x.wf === 'owner' ? 'owner' : 'finance',
       scopeName: String(x.scope_name),
       requesters: String(x.requesters),
       grandTotal: num(x.gt),
@@ -484,7 +488,7 @@ export async function teamWaiting(req: PayloadRequest, scope: ReportScope, top =
       days: submitted ? daysBetween(submitted, ctx.today) : null,
     }
   })
-  return { count: n('pm') + n('direktur') + n('finance'), pm: n('pm'), direktur: n('direktur'), finance: n('finance'), oldestDays: oldest ? daysBetween(oldest, ctx.today) : null, items }
+  return { count: n('pm') + n('direktur') + n('owner') + n('finance'), pm: n('pm'), direktur: n('direktur'), owner: n('owner'), finance: n('finance'), oldestDays: oldest ? daysBetween(oldest, ctx.today) : null, items }
 }
 
 // ================================================================ K-11 transfer queue
@@ -535,7 +539,7 @@ export async function advancesWithoutLpj(req: PayloadRequest, scope: ReportScope
           coalesce((SELECT string_agg(e.name, ', ' ORDER BY rr."order") FROM expense_requests_rels rr JOIN employees e ON e.id = rr.employees_id
                     WHERE rr.parent_id = er.id AND rr.path = 'requesters'), '') AS requesters,
           coalesce(p.code || ' ' || p.name, cc.code || ' ' || cc.name, '') AS scope_name,
-          coalesce(er.g1_exception = 'direktur_no_approval', false) AS no_approval
+          coalesce(er.g1_exception IN ('direktur_no_approval', 'principal_no_approval'), false) AS no_approval, er.g1_exception AS g1_exception
         FROM expense_requests er
         LEFT JOIN projects p ON p.id = er.project_id LEFT JOIN cost_centers cc ON cc.id = er.cost_center_id
         WHERE er.type = 'advance' AND er.status::text IN (${textList(ADVANCE_WITHOUT_LPJ)}) AND ${requestScopeSql(scope)}
@@ -645,8 +649,10 @@ export type RequestRow = {
   refund: number
   realized: number
   openFlags: number
-  /** ADR 0024: a Direktur's own request without approval (`g1_exception = direktur_no_approval`). */
+  /** ADR 0024: a Direktur's own request without approval (`g1_exception = direktur_no_approval`); ADR 0026: or the Owner's (`principal_no_approval`). */
   noApproval: boolean
+  /** ADR 0026: the G1 exception value (picks the "pengajuan Direktur / Owner" wording). */
+  g1Exception: string | null
 }
 
 /** K-13 rows (keyset by id descending; `after` = last id of the previous page). */
@@ -660,7 +666,7 @@ export async function requestRows(req: PayloadRequest, scope: ReportScope, f: Re
           coalesce((SELECT string_agg(e.name, ', ' ORDER BY rr."order") FROM expense_requests_rels rr JOIN employees e ON e.id = rr.employees_id
                     WHERE rr.parent_id = er.id AND rr.path = 'requesters'), '') AS requesters,
           coalesce(p.code || ' ' || p.name, cc.code || ' ' || cc.name, '') AS scope_name,
-          coalesce(er.g1_exception = 'direktur_no_approval', false) AS no_approval
+          coalesce(er.g1_exception IN ('direktur_no_approval', 'principal_no_approval'), false) AS no_approval, er.g1_exception AS g1_exception
         FROM expense_requests er
         LEFT JOIN projects p ON p.id = er.project_id LEFT JOIN cost_centers cc ON cc.id = er.cost_center_id
         WHERE ${requestScopeSql(scope)} AND ${requestFilterSql(f)} ${page.after ? sql`AND er.id < ${page.after}` : sql``}
@@ -683,6 +689,7 @@ export async function requestRows(req: PayloadRequest, scope: ReportScope, f: Re
     realized: num(x.rl),
     openFlags: num(x.flags),
     noApproval: x.no_approval === true,
+    g1Exception: (x.g1_exception as string | null) ?? null,
   }))
 }
 
@@ -1088,7 +1095,7 @@ export async function transferQueueTop(req: PayloadRequest, scope: ReportScope, 
     sql`SELECT er.id, er.company_id, er.doc_no, er.title, er.type::text AS type, er.status::text AS status, er.needed_date,
           coalesce(er.approved_amount, er.grand_total, 0)::text AS amount,
           coalesce(p.code || ' ' || p.name, cc.code || ' ' || cc.name, '') AS scope_name,
-          coalesce(er.g1_exception = 'direktur_no_approval', false) AS no_approval
+          coalesce(er.g1_exception IN ('direktur_no_approval', 'principal_no_approval'), false) AS no_approval, er.g1_exception AS g1_exception
         FROM expense_requests er
         LEFT JOIN projects p ON p.id = er.project_id LEFT JOIN cost_centers cc ON cc.id = er.cost_center_id
         WHERE ((er.type = 'advance' AND er.status = 'approved') OR (er.type = 'reimburse' AND er.status = 'receipts_verified')) AND ${companyScopeSql(sql`er.company_id`, pts)}

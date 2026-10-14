@@ -1182,6 +1182,14 @@
           "primaryKey": false,
           "notNull": false
         },
+        "attendance_type": {
+          "name": "attendance_type",
+          "type": "enum_employees_attendance_type",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'onsite'"
+        },
         "face_ref_photo_id": {
           "name": "face_ref_photo_id",
           "type": "integer",
@@ -6175,6 +6183,13 @@
           "type": "varchar",
           "primaryKey": false,
           "notNull": true
+        },
+        "is_head_office": {
+          "name": "is_head_office",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false,
+          "default": false
         },
         "address": {
           "name": "address",
@@ -14766,6 +14781,13 @@
           "primaryKey": false,
           "notNull": true
         },
+        "outside_area": {
+          "name": "outside_area",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false,
+          "default": false
+        },
         "selfie_id": {
           "name": "selfie_id",
           "type": "integer",
@@ -23355,6 +23377,7 @@
         "pk-pm",
         "pk-finance",
         "pk-owner",
+        "pk-principal",
         "pk-admin",
         "pk-operator"
       ]
@@ -23419,6 +23442,7 @@
       "schema": "public",
       "values": [
         "pk-owner",
+        "pk-principal",
         "pk-pm",
         "pk-staff",
         "pk-finance",
@@ -23433,6 +23457,7 @@
         "pk-pm",
         "pk-finance",
         "pk-owner",
+        "pk-principal",
         "pk-admin",
         "pk-operator"
       ]
@@ -23480,6 +23505,7 @@
         "pk-pm",
         "pk-finance",
         "pk-owner",
+        "pk-principal",
         "pk-admin",
         "pk-operator"
       ]
@@ -24255,6 +24281,14 @@
       "values": [
         "karyawan",
         "vendor"
+      ]
+    },
+    "public.enum_employees_attendance_type": {
+      "name": "enum_employees_attendance_type",
+      "schema": "public",
+      "values": [
+        "onsite",
+        "non_onsite"
       ]
     }
   },

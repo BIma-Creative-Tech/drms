@@ -8,6 +8,7 @@ Panduan singkat per peran untuk karyawan PT DRMS (dan PT lain dalam grup yang me
 | Project Manager (PM) | [pm.md](pm.md) | APK + web |
 | Finance | [finance.md](finance.md) | Web (+ APK untuk persetujuan cepat) |
 | Direktur | [direktur.md](direktur.md) | APK + web |
+| Owner (di atas Direktur, ADR 0026) | [owner.md](owner.md) | APK + web |
 | Admin | [admin.md](admin.md) | Web |
 
 Satu orang bisa punya lebih dari satu peran; baca semua panduan yang sesuai.

@@ -12,13 +12,20 @@ import { getRequestTx } from '@/lib/tx'
 
 import { snapshotOf, type ScheduleSnapshot } from './schedule'
 import { effectiveRadiusM } from './calendar'
+import { geofenceRequired, NOT_ELIGIBLE_OTHER_PT, OUTSIDE_AREA_LABEL, pickContaining } from './area'
+import { eligibleLocations, employeeAttendance, referenceSite, type EmployeeAttendance } from './eligibility'
 import { companyOf, settings, userOfEmployee as userOfEmployeeLink } from '@/domain/companies'
 
 /**
  * E6 — the ONE write path of `attendances` (sync items attendance.check_in / check_out / on_behalf,
- * US-01/02/14, Q-40). ADR 0023: a location is a project, a cost center or a site (kantor cabang); at a site the
- * employee needs an active site assignment OR that site as home site, a PM on-behalf a team site. Server-side checks, in this order (error codes are part of the APK contract):
- * MOCK_LOCATION → NOT_FOUND/VALIDATION (location) → NO_GEOFENCE → NOT_ASSIGNED → OUTSIDE_GEOFENCE →
+ * US-01/02/14, Q-40). ADR 0023: a location is a project, a cost center or a site (kantor cabang).
+ * DRMS 13/10 A2 (ADR 0023 amendment 2026-10-13, Non-OnSite rule owner 2026-10-14): WHERE an employee may check in
+ * follows the employee's attendance type, no team assignment needed — OnSite: inside any registered location of the
+ * own PT with a point; Non-OnSite: no location restriction (`resolveNonOnsite`: the location containing the fix, else
+ * "Di luar area" referenced to the home site / head office, `attendances.outside_area`). A PM on-behalf still needs
+ * the requested location in the PM's team. Server-side checks, in this order (error codes are part of the APK
+ * contract; `NOT_ASSIGNED` = a location outside the employee's PT):
+ * MOCK_LOCATION → NOT_FOUND/VALIDATION (location) → NO_GEOFENCE (OnSite) → NOT_ASSIGNED → OUTSIDE_GEOFENCE (OnSite) →
  * MEDIA_MISSING / FORBIDDEN (selfie) → ALREADY_CHECKED_IN / NO_CHECK_IN / ALREADY_CHECKED_OUT.
  * On-behalf (source `pm`) additionally: caller holds pk-pm, the location is in the caller's TEAM
  * scope, the employee is not the caller, reason mandatory (schema) — the selfie and GPS come from
@@ -88,34 +95,6 @@ export type RecordInput = {
 
 const LABEL: Record<Location['type'], string> = { project: 'project', cost_center: 'pusat biaya', site: 'site' }
 
-const ASSIGNMENT_FIELD: Record<Location['type'], string> = { project: 'project', cost_center: 'costCenter', site: 'site' }
-
-/**
- * Is `employee` assigned to the location on `localDate` (team-assignments, start/end inclusive)? ADR 0023 Q-S5: at a
- * site also when it is the employee's home site ("Site penempatan") — no daily assignment rows needed.
- */
-export async function isAssignedTo(req: PayloadRequest, employee: number, loc: Location, localDate: string): Promise<boolean> {
-  if (loc.type === 'site') {
-    const emp = (await req.payload.findByID({ collection: 'employees', id: employee, depth: 0, select: { homeSite: true } as never, overrideAccess: true /* SYSTEM-READ: home site of the attendance's employee */, req, disableErrors: true })) as {
-      homeSite?: unknown
-    } | null
-    if (relId(emp?.homeSite) === loc.id) return true
-  }
-  const res = await req.payload.find({
-    collection: 'team-assignments',
-    where: { and: [{ employee: { equals: employee } }, { [ASSIGNMENT_FIELD[loc.type]]: { equals: loc.id } }] },
-    depth: 0,
-    pagination: false,
-    overrideAccess: true, // SYSTEM-READ: assignment check of the attendance's employee
-    req,
-  })
-  return (res.docs as Array<{ startDate?: string | null; endDate?: string | null }>).some((a) => {
-    const start = a.startDate ? a.startDate.slice(0, 10) : null
-    const end = a.endDate ? a.endDate.slice(0, 10) : null
-    return (!start || start <= localDate) && (!end || end >= localDate)
-  })
-}
-
 /**
  * Current schedule of an employee: own work schedule, else the default schedule of the employee's home site (ADR 0023
  * §3: a branch office can have its own office hours), else the company default, else null.
@@ -148,7 +127,8 @@ export async function userOfEmployee(req: PayloadRequest, employee: number): Pro
   return userOfEmployeeLink(req, employee)
 }
 
-async function loadLocation(req: PayloadRequest, loc: Location, field: string): Promise<GeoDoc> {
+/** The location document (NOT_FOUND for a missing / unmapped PT's one, VALIDATION when archived / inactive). */
+async function loadLocationDoc(req: PayloadRequest, loc: Location, field: string): Promise<GeoDoc> {
   const doc = (await req.payload.findByID({
     collection: LOCATION_COLLECTION[loc.type],
     id: loc.id,
@@ -165,6 +145,11 @@ async function loadLocation(req: PayloadRequest, loc: Location, field: string): 
   if (loc.type === 'project' && doc.status === 'arsip') reject('VALIDATION', 'Project sudah diarsipkan.', field)
   if (loc.type === 'cost_center' && doc.active === false) reject('VALIDATION', 'Pusat biaya sudah dinonaktifkan.', field)
   if (loc.type === 'site' && doc.active === false) reject('VALIDATION', 'Site sudah dinonaktifkan.', field)
+  return doc
+}
+
+/** The geofence of a location document: NO_GEOFENCE without a point; empty radius → the PT default. */
+async function withGeofence(req: PayloadRequest, doc: GeoDoc, loc: Location, field: string): Promise<GeoDoc> {
   if (typeof doc.lat !== 'number' || typeof doc.lng !== 'number') {
     reject('NO_GEOFENCE', `Titik lokasi ${LABEL[loc.type]} belum diisi Admin. Absensi belum bisa dipakai di ${LABEL[loc.type]} ini.`, field)
   }
@@ -193,37 +178,102 @@ export async function dayRowsAt(req: PayloadRequest, employee: number, loc: Loca
   return r.rows
 }
 
+/**
+ * DRMS 13/10 A2: the location of the employee's open check-in (no check-out yet) on `localDate`, latest first; null
+ * when none. PT-bound (`company_id`).
+ */
+async function openCheckIn(req: PayloadRequest, company: number, employee: number, localDate: string): Promise<Location | null> {
+  const tx = await getRequestTx(req)
+  const r = (await tx.execute(sql`
+    SELECT a.project_id, a.cost_center_id, CASE WHEN a.project_id IS NULL AND a.cost_center_id IS NULL THEN a.site_id END AS site_id
+    FROM attendances a
+    WHERE a.company_id = ${company} AND a.employee_id = ${employee} AND a.local_date = ${localDate}
+    GROUP BY 1, 2, 3
+    HAVING bool_or(a.kind = 'check_in') AND NOT bool_or(a.kind = 'check_out')
+    ORDER BY max(a.attendance_time) DESC
+    LIMIT 1`)) as unknown as { rows: Array<{ project_id: number | null; cost_center_id: number | null; site_id: number | null }> }
+  const x = r.rows[0]
+  if (!x) return null
+  return x.project_id !== null ? { type: 'project', id: Number(x.project_id) } : x.cost_center_id !== null ? { type: 'cost_center', id: Number(x.cost_center_id) } : { type: 'site', id: Number(x.site_id) }
+}
+
+type Resolved = { location: Location; distance: number; outsideArea: boolean; flags: string[] }
+
+const measure = (input: Pick<RecordInput, 'lat' | 'lng'>, doc: { lat?: number | null; lng?: number | null }) =>
+  typeof doc.lat === 'number' && typeof doc.lng === 'number' ? Math.round(haversineM(input.lat, input.lng, doc.lat, doc.lng)) : null
+
+/**
+ * Non-OnSite (owner 2026-10-14): no location restriction; WHERE the record belongs:
+ * - check-out with an open check-in today → that location (it closes the day's pair); `outsideArea` when the fix is
+ *   not inside it;
+ * - else the requested location when the fix is inside it, else the nearest registered location of the PT containing
+ *   the fix;
+ * - else "Di luar area": the home site (else the PT head office), `outsideArea`, distance to its point (0 + flag
+ *   NO_REFERENCE_POINT when it has none). Neither home site nor head office → VALIDATION (the Admin must set one).
+ */
+async function resolveNonOnsite(req: PayloadRequest, emp: EmployeeAttendance, input: RecordInput, localDate: string, field: string): Promise<Resolved> {
+  const fix = { lat: input.lat, lng: input.lng, accuracyM: input.accuracyM }
+  const candidates = (await eligibleLocations(req, [emp])).map((l) => ({ ...l, key: `${l.kind}:${l.id}` }))
+  if (input.kind === 'check_out') {
+    const open = await openCheckIn(req, emp.company, emp.id, localDate)
+    if (open) {
+      const key = `${open.type}:${open.id}`
+      const c = candidates.find((x) => x.key === key)
+      const inside = c ? pickContaining(key, [c], fix) : null
+      if (inside) return { location: open, distance: inside.distanceM, outsideArea: false, flags: [] }
+      const doc = await loadLocationDoc(req, open, field)
+      const d = measure(input, doc)
+      return { location: open, distance: d ?? 0, outsideArea: true, flags: d === null ? ['NO_REFERENCE_POINT'] : [] }
+    }
+  }
+  const hit = pickContaining(`${input.location.type}:${input.location.id}`, candidates, fix)
+  if (hit) return { location: { type: hit.kind, id: hit.id }, distance: hit.distanceM, outsideArea: false, flags: [] }
+  const ref = await referenceSite(req, emp)
+  if (!ref) {
+    return reject('VALIDATION', `Absen "${OUTSIDE_AREA_LABEL}" belum bisa dicatat: site penempatan karyawan / kantor pusat PT belum ditetapkan Admin.`, field)
+  }
+  const d = measure(input, ref)
+  return { location: { type: 'site', id: ref.id }, distance: d ?? 0, outsideArea: true, flags: d === null ? ['NO_REFERENCE_POINT'] : [] }
+}
+
+export type RecordResult = { id: number; localDate: string; location: Location; outsideArea: boolean; distanceM: number }
+
 /** Records one attendance after every server-side check. Returns the new row id. */
-export async function recordAttendance(req: PayloadRequest, input: RecordInput): Promise<{ id: number; localDate: string }> {
+export async function recordAttendance(req: PayloadRequest, input: RecordInput): Promise<RecordResult> {
   const pre = input.fieldPrefix ?? 'payload.'
   const locField = `${pre}${LOCATION_FIELD[input.location.type]}`
   // ADR 0010 decision 8 / US-01 "Mock location ditolak" (Q-43 proposal: fake GPS always blocked).
   if (input.isMocked) reject('MOCK_LOCATION', 'Lokasi palsu (mock location) terdeteksi. Absensi ditolak.', `${pre}is_mocked`)
-  const geo = await loadLocation(req, input.location, locField)
+  const doc = await loadLocationDoc(req, input.location, locField)
+  const company = relId((doc as { company?: unknown }).company)
+  const emp = await employeeAttendance(req, input.employee)
+  const onsite = !emp || geofenceRequired(emp.type)
+  // OnSite: the requested location needs a point (Non-OnSite: no location restriction)
+  const geo = onsite ? await withGeofence(req, doc, input.location, locField) : doc
   const localDate = localDateString(input.time, input.timeZone)
   if (input.source === 'pm') {
     // US-14: only for the PM's own team locations (the team scope of the CALLER).
     // ADR 0016 §5: PM role + team scope IN THE LOCATION's PT
-    const company = relId((geo as { company?: unknown }).company)
     if (!hasRole(req, 'pk-pm', company)) reject('FORBIDDEN', `Hanya untuk ${LABEL[input.location.type]} tim Anda.`, locField)
     const scope = await resolveScope(req, company ?? null)
     // ADR 0023 Q-S5: at a site = a PM assigned (role PM) to the site or the PM of a project of that site
     const team = input.location.type === 'project' ? scope.teamProjects : input.location.type === 'site' ? scope.teamSites : scope.teamCostCenters
     if (!team.includes(input.location.id)) reject('FORBIDDEN', `Hanya untuk ${LABEL[input.location.type]} tim Anda.`, locField)
   }
-  if (!(await isAssignedTo(req, input.employee, input.location, localDate))) {
-    reject(
-      'NOT_ASSIGNED',
-      input.source === 'pm'
-        ? `Karyawan ini tidak ditugaskan di ${LABEL[input.location.type]} ini pada tanggal tersebut.`
-        : `Anda tidak ditugaskan di ${LABEL[input.location.type]} ini pada tanggal tersebut.`,
-      locField,
-    )
+  // DRMS 13/10 A2: own PT only (normally caught earlier as NOT_FOUND / COMPANY_MISMATCH; the DB trigger too)
+  if (!emp || emp.company !== company) reject('NOT_ASSIGNED', NOT_ELIGIBLE_OTHER_PT, locField)
+  let resolved: Resolved
+  if (onsite) {
+    const d = Math.round(haversineM(input.lat, input.lng, geo.lat!, geo.lng!))
+    if (!insideGeofence(d, geo.radiusM!, input.accuracyM)) {
+      reject('OUTSIDE_GEOFENCE', `Di luar radius ${LABEL[input.location.type]} (${d} m dari titik, radius ${geo.radiusM} m).`, `${pre}lat`)
+    }
+    resolved = { location: input.location, distance: d, outsideArea: false, flags: [] }
+  } else {
+    resolved = await resolveNonOnsite(req, emp!, input, localDate, locField)
   }
-  const distance = Math.round(haversineM(input.lat, input.lng, geo.lat!, geo.lng!))
-  if (!insideGeofence(distance, geo.radiusM!, input.accuracyM)) {
-    reject('OUTSIDE_GEOFENCE', `Di luar radius ${LABEL[input.location.type]} (${distance} m dari titik, radius ${geo.radiusM} m).`, `${pre}lat`)
-  }
+  const location = resolved.location
+  const distance = resolved.distance
   const selfie = (await req.payload.findByID({ collection: 'media-selfies', id: input.selfieId, depth: 0, overrideAccess: true /* SYSTEM-READ: existence + uploader */, req, disableErrors: true })) as {
     uploadedBy?: unknown
   } | null
@@ -232,10 +282,10 @@ export async function recordAttendance(req: PayloadRequest, input: RecordInput):
 
   // One check-in and one check-out per employee/location/local date (serialised per day).
   const tx = await getRequestTx(req)
-  await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${`att:${input.employee}:${input.location.type}:${input.location.id}:${localDate}`}, 0))`)
-  const today = await dayRowsAt(req, input.employee, input.location, localDate)
+  await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${`att:${input.employee}:${location.type}:${location.id}:${localDate}`}, 0))`)
+  const today = await dayRowsAt(req, input.employee, location, localDate)
   const checkIn = today.find((r) => r.kind === 'check_in')
-  const where = LABEL[input.location.type]
+  const where = LABEL[location.type]
   if (input.kind === 'check_in' && checkIn) reject('ALREADY_CHECKED_IN', `Sudah absen masuk di ${where} ini hari ini.`)
   if (input.kind === 'check_out') {
     if (!checkIn) reject('NO_CHECK_IN', `Belum ada absen masuk hari ini di ${where} ini.`)
@@ -249,10 +299,12 @@ export async function recordAttendance(req: PayloadRequest, input: RecordInput):
       employee: input.employee,
       user: input.user,
       kind: input.kind,
-      project: input.location.type === 'project' ? input.location.id : null,
-      costCenter: input.location.type === 'cost_center' ? input.location.id : null,
+      project: location.type === 'project' ? location.id : null,
+      costCenter: location.type === 'cost_center' ? location.id : null,
       // ADR 0023: the DB (pk_attendance_site) fills the project's site for a project check-in; NULL for a cost center
-      site: input.location.type === 'site' ? input.location.id : null,
+      site: location.type === 'site' ? location.id : null,
+      // DRMS 13/10 A2: Non-OnSite outside every registered location ("Di luar area", reference = `location`)
+      outsideArea: resolved.outsideArea,
       source: input.source,
       recordedBy: input.recordedBy,
       onBehalfReason: input.onBehalfReason,
@@ -269,7 +321,7 @@ export async function recordAttendance(req: PayloadRequest, input: RecordInput):
       distanceM: distance,
       selfie: input.selfieId,
       device: input.device,
-      flags: input.flags,
+      flags: [...input.flags, ...resolved.flags],
       schedule,
       clientUuid: input.clientUuid,
     },
@@ -279,7 +331,7 @@ export async function recordAttendance(req: PayloadRequest, input: RecordInput):
   })
   // D7: timestamp band burnt into the selfie by the worker (same transaction → no job for a rolled-back row)
   await req.payload.jobs.queue({ task: 'stampSelfie', input: { attendanceId: created.id as number }, req })
-  return { id: created.id as number, localDate }
+  return { id: created.id as number, localDate, location, outsideArea: resolved.outsideArea, distanceM: distance }
 }
 
 export type WebCheckInput = { location: Location; lat: number; lng: number; accuracyM: number | null; selfieId: number }
@@ -293,7 +345,7 @@ export type WebCheckInput = { location: Location; lat: number; lng: number; accu
  * generated here, one-shot), no mocked-location signal (browser geolocation has none to report),
  * no "diabsenkan PM" (web self-service only; PM on-behalf stays an APK/sync feature).
  */
-export async function recordWebAttendance(req: PayloadRequest, kind: AttendanceKind, input: WebCheckInput): Promise<{ id: number; localDate: string }> {
+export async function recordWebAttendance(req: PayloadRequest, kind: AttendanceKind, input: WebCheckInput): Promise<RecordResult> {
   const uid = userId(req)
   if (uid === undefined) reject('VALIDATION', 'Tidak terautentikasi.')
   // ADR 0016 D1: the caller's employee IN THE LOCATION's PT (one employee per PT); an unmapped/missing

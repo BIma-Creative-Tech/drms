@@ -2,7 +2,7 @@ import type { PayloadRequest } from 'payload'
 
 import { companyContextOf, membershipsOf, relId, userRoles, type Membership, type Role } from '@/access/roles'
 import { appSettings, companyById, settings } from '@/domain/companies'
-import { DIREKTUR_ROLE } from '@/domain/expense/decision'
+import { isNoApprovalRule } from '@/domain/expense/decision'
 import { loadActiveRules } from '@/domain/expense/snapshot'
 import { resolveDisplayName } from '@/domain/user-display-name'
 import { privacyStatusOf } from '@/legal/privacy-notice'
@@ -25,7 +25,9 @@ type UserShape = {
  * (roles of the selected PTs) and for each PT in `companies[]` (roles IN that PT). Decisions
  * (approval inbox) = Direktur (pk-owner) or Finance; the PM monitors the team list; progress
  * reports are created by the PM (team projects) or the Direktur. ADR 0021: the PM approves its project's
- * requests first, so the approval inbox is offered to the PM too. The server guards stay authoritative.
+ * requests first, so the approval inbox is offered to the PM too. ADR 0026: `roles` are EFFECTIVE roles — an
+ * Owner (`pk-principal`) also holds `pk-owner` here, so every Direktur capability applies to the Owner too.
+ * The server guards stay authoritative.
  */
 export function capabilitiesOf(roles: readonly Role[], opts: { fieldReportsEnabled?: boolean } = {}) {
   // FR1 (ADR 0020 §2): Staff (assigned projects), PM (team) and Direktur report in the field when the
@@ -120,8 +122,9 @@ export const meEndpoint = v1({
         employeeId: m.employee,
         employee: m.employee !== null ? (employees.get(m.employee) ?? null) : null,
         capabilities: capabilitiesOf(roles, { fieldReportsEnabled: c.fieldReportsEnabled === true }),
-        // ADR 0024: the Direktur's own requests in this PT go straight to the Finance transfer queue (APK hint)
-        ownRequestNoApproval: roles.includes(DIREKTUR_ROLE) && (await loadActiveRules(req, 'expense_request', m.company)).some((r) => r.steps.length === 0 && r.requesterRoles?.length === 1 && r.requesterRoles[0] === DIREKTUR_ROLE),
+        // ADR 0024 / 0026: the caller's own requests in this PT go straight to the Finance transfer queue (APK hint) —
+        // since ADR 0026 only an Owner (STORED role) under the zero-step rule "Pengajuan Owner"
+        ownRequestNoApproval: (m.exactRoles ?? m.roles).includes('pk-principal') && (await loadActiveRules(req, 'expense_request', m.company)).some(isNoApprovalRule),
         settings: {
           defaultGeofenceRadiusM: c.defaultGeofenceRadiusM,
           receiptRoundingTolerance: c.receiptRoundingTolerance,

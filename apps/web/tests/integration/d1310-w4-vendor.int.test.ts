@@ -13,7 +13,8 @@ import { api, makeFlowUser, makeWorld, png, sysCreate, upload, type FlowUser, ty
  * DRMS 13/10 Wave 4a (ADR 0027) "Pembayaran vendor" through the real API + DB guards:
  * - vendor accounts (`vendor-bank-accounts`): PT from the vendor, Staff cannot read, masters type for the APK;
  * - who files: Finance and PM only (Staff 403); Pemohon = the filer; type forced to Pengajuan Baru;
- * - approval through the generic engine: Finance → seeded rule "Pembayaran vendor oleh Finance — Direktur";
+ * - approval through the generic engine: Finance → seeded rule "Pembayaran vendor oleh Finance — Direktur lalu Owner"
+ *   (ADR 0026: Direktur, then the Owner level);
  *   PM → the project's PM → Direktur rule with the PM step skipped (G1-2);
  * - duplicate invoice (same vendor, normalized number, request not cancelled / rejected) → 409 field error; DB index;
  * - transfer = snapshot of the vendor account, unverified account → confirmation, then Selesai at once (no LPJ);
@@ -26,6 +27,7 @@ let w: World
 let pt: number
 let financeV: FlowUser
 let pmV: FlowUser
+let principalV: FlowUser
 let projectV: number
 let vendor: number
 let otherVendor: number
@@ -47,6 +49,8 @@ beforeAll(async () => {
   pt = await companyId()
   const empFin = await sysCreate('employees', { code: 'VND-FIN', name: 'VND Finance' })
   financeV = await makeFlowUser(['pk-finance'], 'vnd-finance', empFin)
+  const empOwn = await sysCreate('employees', { code: 'VND-OWN', name: 'VND Owner' })
+  principalV = await makeFlowUser(['pk-principal'], 'vnd-principal', empOwn) // ADR 0026 Owner level of the Finance vendor rule
   pmV = w.users.pm // employee emp.pm, PM of the vendor project below
   // own project (no world rule): ADR 0021 shape PM project → Direktur, priority 50 (the seeded vendor rule = 20)
   projectV = await sysCreate('projects', { code: 'VND-PV', name: 'VND Proyek Vendor', pm: pmV.id, budget: 0, status: 'berjalan', costCenter: w.projectCostCenter })
@@ -139,11 +143,11 @@ describe('who may file a vendor payment (D3)', () => {
 })
 
 describe('approval routing through the generic rule engine', () => {
-  it('Finance files → "Pembayaran vendor oleh Finance — Direktur" (Direktur only)', async () => {
+  it('Finance files → "Pembayaran vendor oleh Finance — Direktur lalu Owner" (Direktur, then Owner)', async () => {
     const d = await ok(api('POST', E, financeV, await vendorBody(financeV), key()), 201)
     const s = await ok(api('POST', `${E}/${d.id}/submit`, financeV, {}, key()))
     expect(s.status).toBe('pending_approval')
-    expect(s.approvalRule).toMatchObject({ name: VENDOR_FINANCE_RULE_NAME, acknowledge: 'none', steps: [{ level: 1, approverRole: 'pk-owner', approverUserId: null }] })
+    expect(s.approvalRule).toMatchObject({ name: VENDOR_FINANCE_RULE_NAME, acknowledge: 'none', steps: [{ level: 1, approverRole: 'pk-owner', approverUserId: null }, { level: 2, approverRole: 'pk-principal', approverUserId: null }] })
     // the snapshot = the vendor account
     expect(s.bank).toMatchObject({ accountHolder: 'CV Contoh Material' })
   })
@@ -186,7 +190,9 @@ describe('transfer → Selesai (no LPJ)', () => {
     const d = await ok(api('POST', E, financeV, await vendorBody(financeV, over), key()), 201)
     await ok(api('POST', `${E}/${d.id}/submit`, financeV, {}, key()))
     const a = await ok(api('POST', `${E}/${d.id}/approve`, w.users.owner, {}, key()))
-    expect(a.status).toBe('approved')
+    expect(a.status).toBe('pending_approval') // ADR 0026: the Owner level follows the Direktur
+    const o = await ok(api('POST', `${E}/${d.id}/approve`, principalV, {}, key()))
+    expect(o.status).toBe('approved')
     return d.id as number
   }
 
@@ -241,7 +247,9 @@ describe('client 2026-10-14: a vendor payment on a cost center (no project)', ()
     expect(s.status).toBe('pending_approval')
     expect(s.approvalRule.name).toBe(VENDOR_FINANCE_RULE_NAME)
     const a = await ok(api('POST', `${E}/${d.id}/approve`, w.users.owner, {}, key()))
-    expect(a.status).toBe('approved')
+    expect(a.status).toBe('pending_approval') // ADR 0026: the Owner level follows the Direktur
+    const o = await ok(api('POST', `${E}/${d.id}/approve`, principalV, {}, key()))
+    expect(o.status).toBe('approved')
     const q = await ok(api('GET', '/api/v1/transfer-queue', w.users.finance))
     expect(q.items.find((i: { id: number }) => i.id === d.id)?.costCenter?.id).toBe(cc)
     const proof = (await ok(upload('/api/v1/media/transfer-proofs', w.users.finance, await png()), 201)).id as number

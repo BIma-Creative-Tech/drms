@@ -93,7 +93,7 @@ describe('Pengajuan Baru (advance) — happy path', () => {
       acknowledgeBy: 'role',
       acknowledgeRole: 'pk-owner',
       acknowledgerUserId: null,
-      decisionRoles: ['pk-owner', 'pk-finance'],
+      decisionRoles: ['pk-owner', 'pk-finance', 'pk-principal'],
       skipped: [],
       steps: [{ level: 1, approverRole: 'pk-finance' }],
     })

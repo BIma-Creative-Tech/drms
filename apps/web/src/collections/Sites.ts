@@ -1,11 +1,41 @@
-import type { CollectionConfig, Where } from 'payload'
+import type { CollectionBeforeChangeHook, CollectionConfig, Where } from 'payload'
 
-import { denyAll } from '@/access/roles'
+import { denyAll, relId } from '@/access/roles'
 import { byRole, rolesAllowed } from '@/access/policies'
 import { reasonOnDeactivate, withAudit } from '@/audit/hooks'
 import { siteFromCostCenterDefault } from '@/domain/sites'
 import { activeField, codeField, uuidField } from '@/fields/common'
 import { companyField, companyHook, pickerSameCompany, sameCompanyOptions } from '@/fields/company'
+import { validationError } from '@/lib/validation'
+
+/**
+ * DRMS 13/10 A2: at most ONE head office ("Kantor pusat") per PT — a field error here, the partial unique index
+ * `sites_one_head_office_per_company` (migration 20261013_620100_d1310_onsite_guard) in the DB.
+ */
+const oneHeadOfficePerPt: CollectionBeforeChangeHook = async ({ data, originalDoc, req }) => {
+  const d = data as { isHeadOffice?: boolean | null; company?: unknown }
+  const prev = originalDoc as { id?: number; isHeadOffice?: boolean | null; company?: unknown } | undefined
+  const flagged = d.isHeadOffice ?? prev?.isHeadOffice
+  if (flagged !== true) return data
+  const company = relId(d.company) ?? relId(prev?.company)
+  if (company === undefined) return data
+  const res = await req.payload.find({
+    collection: 'sites',
+    where: { and: [{ company: { equals: company } }, { isHeadOffice: { equals: true } }, ...(prev?.id !== undefined ? [{ id: { not_equals: prev.id } }] : [])] },
+    depth: 0,
+    limit: 1,
+    select: { code: true, name: true } as never,
+    overrideAccess: true, // SYSTEM-READ: the head office of the same PT (the caller edits a site of that PT)
+    req,
+  })
+  const other = res.docs[0] as { code?: string; name?: string } | undefined
+  if (other) {
+    throw validationError(req, { collection: 'sites' }, [
+      { path: 'isHeadOffice', message: `PT ini sudah punya kantor pusat: ${other.code ?? ''} ${other.name ?? ''}. Hapus tanda kantor pusat di site itu dulu (1 kantor pusat per PT).`.replace(/\s+/g, ' ') },
+    ])
+  }
+  return data
+}
 
 /**
  * ADR 0023 (owner 2026-10-11): Site = kantor cabang of the PT (same legal entity, same numbering, approvals
@@ -14,6 +44,8 @@ import { companyField, companyHook, pickerSameCompany, sameCompanyOptions } from
  * Optional geofence (same fields as projects / cost centers; empty radius → PT default), default work schedule
  * (schedule resolution employee → home site → PT) and default cost center (operational, transfer default of the
  * site's projects without their own). No delete: deactivate (history keeps it).
+ * DRMS 13/10 A2 (ADR 0023 amendment 2026-10-13): `isHeadOffice` "Kantor pusat" marks the PT's head office (at most
+ * one per PT); Non-OnSite employees check in at the head office and the branch offices only.
  * "Buat site dari pusat biaya" (Q-S2): /admin/collections/sites/create?costCenter=<id> pre-fills PT, kode, nama,
  * titik and pusat biaya from that cost center (domain/sites.ts siteFromCostCenterDefault).
  */
@@ -24,8 +56,9 @@ export const Sites: CollectionConfig = withAudit(
     admin: {
       useAsTitle: 'name',
       group: 'Master Data',
-      defaultColumns: ['code', 'name', 'address', 'costCenter', 'active'],
-      description: 'Kantor cabang PT (mis. Cabang Balikpapan). Satu site menangani beberapa project; absensi kantor cabang memakai titik + radius site.',
+      defaultColumns: ['code', 'name', 'isHeadOffice', 'address', 'costCenter', 'active'],
+      description:
+        'Kantor pusat dan kantor cabang PT (mis. Cabang Balikpapan). Satu site menangani beberapa project; absensi di kantor memakai titik + radius site. Tandai satu site sebagai Kantor pusat.',
     },
     access: {
       read: byRole({ 'pk-admin': true, 'pk-owner': true, 'pk-finance': true, 'pk-pm': true, 'pk-staff': true, 'pk-operator': true }),
@@ -41,12 +74,23 @@ export const Sites: CollectionConfig = withAudit(
             { field: 'costCenter', collection: 'cost-centers' },
           ],
         }),
+        oneHeadOfficePerPt,
       ],
     },
     fields: [
       { ...companyField(), defaultValue: siteFromCostCenterDefault('company') },
       { ...codeField('Kode', 32, { perCompany: true }), defaultValue: siteFromCostCenterDefault('code') },
       { name: 'name', type: 'text', label: 'Nama site', required: true, maxLength: 128, defaultValue: siteFromCostCenterDefault('name') },
+      {
+        name: 'isHeadOffice',
+        type: 'checkbox',
+        label: 'Kantor pusat',
+        defaultValue: false,
+        admin: {
+          description:
+            'Centang untuk kantor pusat PT (maksimal 1 per PT). Karyawan Non-OnSite hanya boleh absen di kantor pusat dan kantor cabang; isi titik + radius agar absensi bisa dipakai.',
+        },
+      },
       { name: 'address', type: 'textarea', label: 'Alamat', maxLength: 500 },
       {
         type: 'row',

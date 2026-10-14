@@ -27,7 +27,9 @@ export const Ready = z
   })
   .meta({ id: 'Ready' })
 
-export const RoleEnum = z.enum(['pk-staff', 'pk-pm', 'pk-finance', 'pk-owner', 'pk-admin']).meta({ id: 'Role' })
+export const RoleEnum = z
+  .enum(['pk-staff', 'pk-pm', 'pk-finance', 'pk-owner', 'pk-principal', 'pk-admin'])
+  .meta({ id: 'Role', description: 'pk-owner = "Direktur"; pk-principal = "Owner" (ADR 0026: the approval level above the Direktur). Effective roles: an Owner is also listed with pk-owner (same view and permissions as the Direktur); only the approval flow differs.' })
 
 export const ImageTargets = z
   .object({
@@ -41,7 +43,7 @@ export const ImageTargets = z
 
 export const Capabilities = z
   .object({
-    approvalInbox: z.boolean().meta({ description: 'ADR 0013/0021: holds pk-owner (label "Direktur"), pk-finance or pk-pm (Persetujuan PM) → show the approval inbox.' }),
+    approvalInbox: z.boolean().meta({ description: 'ADR 0013/0021/0026: holds pk-owner (label "Direktur"), pk-principal (label "Owner"), pk-finance or pk-pm (Persetujuan PM) → show the approval inbox.' }),
     teamMonitor: z.boolean().meta({ description: 'Holds pk-pm → team list/dashboard (monitoring only, no decisions).' }),
     progressReportCreate: z.boolean().meta({ description: 'E4: holds pk-pm (team projects), pk-owner or pk-admin (all) → may create progress reports.' }),
     serviceReportCreate: z.boolean().meta({ description: 'FR1 (ADR 0020): field reports on for the PT (companies.fieldReportsEnabled) and holds pk-staff (assigned projects), pk-pm (team) or pk-owner → may create service reports on projects of kind kontrak_unit / aftersales.' }),
@@ -71,13 +73,13 @@ export const MeCompany = z
     name: z.string(),
     timezone: z.string().meta({ description: 'IANA; this release: equals the server TZ for every PT (ADR 0016 §9).' }),
     selected: z.boolean().meta({ description: 'In the effective selection of THIS request (X-Company-Ids / cookie ∩ memberships; default all).' }),
-    roles: z.array(RoleEnum).meta({ description: 'Roles IN this PT (company_memberships).' }),
+    roles: z.array(RoleEnum).meta({ description: 'Roles IN this PT (company_memberships), effective: an Owner (pk-principal) is listed with pk-owner too (ADR 0026).' }),
     employeeId: z.number().int().nullable().meta({ description: 'Employee record of the caller in this PT (ADR 0016 D1: one per PT).' }),
     employee: EmployeeRef.nullable(),
     capabilities: Capabilities,
     ownRequestNoApproval: z.boolean().meta({
       description:
-        'ADR 0024: the caller is Direktur in this PT and the PT has an active rule "Pengajuan Direktur" (Peran pemohon = Direktur, no approval level) — the APK shows "Pengajuan Anda langsung ke antrian transfer Finance" on the request form. Hint only; the rule is chosen at submit.',
+        'ADR 0024 / 0026: the caller is Owner (pk-principal) in this PT and the PT has an active rule "Pengajuan Owner" (Peran pemohon = Owner, no approval level) — the APK shows "Pengajuan Anda langsung ke antrian transfer Finance" on the request form. Since ADR 0026 a Direktur\'s own request is approved by the Owner (false for a Direktur). Hint only; the rule is chosen at submit.',
     }),
     settings: z
       .object({
@@ -201,7 +203,7 @@ export const MastersQuery = z
 
 const MasterItem = z
   .record(z.string(), z.unknown())
-  .meta({ id: 'MasterItem', description: 'Whitelisted fields per type (id, updatedAt, active, …) plus MC3 `company` (PT id; null for shared masters) and `shared` (true for banks, uoms, holidays). ADR 0024: `employees` items carry `direktur` (bool: the account holds Direktur in that PT — not offered as requester to others).' })
+  .meta({ id: 'MasterItem', description: 'Whitelisted fields per type (id, updatedAt, active, …) plus MC3 `company` (PT id; null for shared masters) and `shared` (true for banks, uoms, holidays). ADR 0024: `employees` items carry `direktur` (bool: the account holds Direktur — or, ADR 0026, Owner — in that PT; not offered as requester to others).' })
 
 export const Masters = z
   .object({

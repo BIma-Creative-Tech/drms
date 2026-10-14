@@ -28,6 +28,13 @@ class AttendanceApi {
     (data) => AttendanceRecap.fromJson(data as Map<String, dynamic>),
   );
 
+  /// DRMS 13/10 A2: eligible check-in locations of the user by attendance type (`AttendanceLocations`), for EVERY
+  /// membership PT (not only the switcher selection): the list is cached for offline check-ins of any PT.
+  Future<Map<String, dynamic>> locations() => client.run(
+    (d) => d.get<dynamic>('/attendance/locations', options: ApiClient.allCompanies()),
+    (data) => data as Map<String, dynamic>,
+  );
+
   /// US-13 team presence for a date (default today, company TZ).
   Future<TeamToday> teamToday({String? date}) => client.run(
     (d) => d.get<dynamic>('/attendance/team-today', queryParameters: {'date': ?date}),

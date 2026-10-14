@@ -6,9 +6,9 @@
  */
 import { ROLE_LABELS, type Role } from '@/access/roles'
 
-import { DIREKTUR_ROLE, isDecisionSnapshot, isNoApproval } from './decision'
+import { DIREKTUR_ROLE, isDecisionSnapshot, isNoApproval, OWNER_ROLE } from './decision'
 import { ACK_DELEGATE_ROLE, type ApprovalSnapshot } from './rules'
-import { LEGACY_WAITING_LABELS, NO_APPROVAL_STATUS_LABELS, payeeOf, statusLabel, type PayeeType, type RequestStatus, type RequestType } from './types'
+import { LEGACY_WAITING_LABELS, NO_APPROVAL_STATUS_LABELS, OWNER_WAITING_LABEL, payeeOf, statusLabel, type PayeeType, type RequestStatus, type RequestType } from './types'
 
 /** Happy-path order per type (branches — rejected/cancelled/revisions — are shown as the current step). */
 export const STATUS_PATH: Record<RequestType, RequestStatus[]> = {
@@ -58,36 +58,55 @@ export function isPmFlow(snap: Pick<ApprovalSnapshot, 'acknowledgeBy' | 'decisio
   return !!snap && snap.acknowledgeBy === 'scope_manager' && isDecisionSnapshot(snap)
 }
 
+/** Approval step of `level` decided by `role` (no named user). */
+function roleStep(snap: LabelSnapshot | null | undefined, level: number, role: Role): boolean {
+  const step = snap?.steps.find((s) => s.level === level)
+  return !!step && step.approverUserId === null && step.approverRole === role
+}
+
 /** Approval step of `level` decided by the Direktur role (ADR 0021 step 2). */
 function direkturStep(snap: LabelSnapshot | null | undefined, level: number): boolean {
-  const step = snap?.steps.find((s) => s.level === level)
-  return !!step && step.approverUserId === null && step.approverRole === DIREKTUR_ROLE
+  return roleStep(snap, level, DIREKTUR_ROLE)
+}
+
+/** ADR 0026: approval step of `level` decided by the Owner role (the level above the Direktur). */
+export function ownerStep(snap: LabelSnapshot | null | undefined, level: number): boolean {
+  return roleStep(snap, level, OWNER_ROLE)
 }
 
 /** Label of the "Diketahui" step (inbox, panel): ADR 0021 "Persetujuan PM", ADR 0013 "Persetujuan Direktur (Diketahui)". */
 export function ackStepLabel(snap: LabelSnapshot | null | undefined): string {
   if (isPmFlow(snap)) return 'Persetujuan PM'
+  if (snap?.acknowledgeBy === 'role' && snap.acknowledgeRole === OWNER_ROLE) return 'Persetujuan Owner (Diketahui)'
   return isDecisionSnapshot(snap) ? 'Persetujuan Direktur (Diketahui)' : 'Diketahui Oleh'
 }
 
-/** Label of approval level `level` (ADR 0021: the Direktur step → "Persetujuan Direktur"). */
+/** ADR 0026: title of the Owner level (web inbox, panel, stepper, APK). */
+export const OWNER_STEP_LABEL = 'Persetujuan Owner'
+
+/** Label of approval level `level` (ADR 0021: the Direktur step → "Persetujuan Direktur"; ADR 0026: "Persetujuan Owner"). */
 export function approvalStepLabel(snap: LabelSnapshot | null | undefined, level: number): string {
-  return direkturStep(snap, level) ? 'Persetujuan Direktur' : `Approval level ${level}`
+  return direkturStep(snap, level) ? 'Persetujuan Direktur' : ownerStep(snap, level) ? OWNER_STEP_LABEL : `Approval level ${level}`
 }
 
-/** Who decides the step (APK decision sheet texts): ADR 0021 PM / Direktur, ADR 0013 Direktur / Finance. */
-export function decisionByOf(snap: LabelSnapshot | null | undefined, step: 'acknowledge' | 'approve', level: number): 'pm' | 'direktur' | 'finance' | 'other' {
-  if (step === 'acknowledge') return isPmFlow(snap) ? 'pm' : snap?.acknowledgeBy === 'role' && snap.acknowledgeRole === DIREKTUR_ROLE ? 'direktur' : snap?.acknowledgeBy === 'role' && snap.acknowledgeRole === 'pk-finance' ? 'finance' : 'other'
+export type DecisionBy = 'pm' | 'direktur' | 'owner' | 'finance' | 'other'
+
+const decisionByRole = (r: Role | null | undefined): DecisionBy => (r === DIREKTUR_ROLE ? 'direktur' : r === OWNER_ROLE ? 'owner' : r === 'pk-finance' ? 'finance' : 'other')
+
+/** Who decides the step (APK decision sheet texts): ADR 0021 PM / Direktur, ADR 0013 Direktur / Finance, ADR 0026 Owner. */
+export function decisionByOf(snap: LabelSnapshot | null | undefined, step: 'acknowledge' | 'approve', level: number): DecisionBy {
+  if (step === 'acknowledge') return isPmFlow(snap) ? 'pm' : snap?.acknowledgeBy === 'role' ? decisionByRole(snap.acknowledgeRole) : 'other'
   const s = snap?.steps.find((x) => x.level === level)
   if (!s || s.approverUserId !== null) return 'other'
-  return s.approverRole === DIREKTUR_ROLE ? 'direktur' : s.approverRole === 'pk-finance' ? 'finance' : 'other'
+  return decisionByRole(s.approverRole)
 }
 
 /**
  * Status label of a request for its snapshot. ADR 0021 (PM project → Direktur) = STATUS_LABELS
  * ("Menunggu persetujuan PM" / "Menunggu persetujuan Direktur"); older snapshots keep their wording
  * (LEGACY_WAITING_LABELS: "Menunggu Diketahui (Direktur)", "Menunggu Diketahui", "Menunggu Approval").
- * ADR 0024: "Disetujui" of a `direktur_no_approval` snapshot → NO_APPROVAL_STATUS_LABELS.
+ * ADR 0024: "Disetujui" of a `direktur_no_approval` snapshot → NO_APPROVAL_STATUS_LABELS (ADR 0026: also
+ * `principal_no_approval`). ADR 0026: "Menunggu persetujuan" of an Owner level → OWNER_WAITING_LABEL.
  * No snapshot (list rows without it, reminders) = `statusLabel`. One source: domain/expense/types.ts.
  */
 export function requestStatusLabel(type: RequestType, status: RequestStatus, snap: LabelSnapshot | null | undefined, currentLevel: number | null | undefined): string {
@@ -96,6 +115,8 @@ export function requestStatusLabel(type: RequestType, status: RequestStatus, sna
   if (status === 'pending_ack' && snap && !isPmFlow(snap)) {
     return isDecisionSnapshot(snap) && snap.acknowledgeBy === 'role' && snap.acknowledgeRole === DIREKTUR_ROLE ? LEGACY_WAITING_LABELS.ackDirektur : LEGACY_WAITING_LABELS.ack
   }
+  // ADR 0026: the Owner level reads "Menunggu persetujuan Owner" whatever the rule shape
+  if (status === 'pending_approval' && snap && ownerStep(snap, currentLevel || 1)) return OWNER_WAITING_LABEL
   if (status === 'pending_approval' && snap && !(isPmFlow(snap) && direkturStep(snap, currentLevel || 1))) return LEGACY_WAITING_LABELS.approval
   return statusLabel(type, status)
 }
@@ -145,6 +166,8 @@ export function nextActor(input: {
     case 'pending_approval': {
       const step = snapshot?.steps.find((s) => s.level === (input.currentLevel ?? 1))
       const who = step ? (user(step.approverUserId) ?? roleLabel(step.approverRole)) : 'Approver'
+      // ADR 0026: the Owner level is named as such ("Owner — Persetujuan Owner")
+      if (step && step.approverUserId === null && step.approverRole === OWNER_ROLE) return { who: `${who} — ${OWNER_STEP_LABEL}`, what: 'setujui atau tolak (keputusan terakhir sebelum transfer Finance)' }
       return { who: `${who} — approval level ${input.currentLevel ?? 1}`, what: 'setujui atau tolak' }
     }
     case 'approved':

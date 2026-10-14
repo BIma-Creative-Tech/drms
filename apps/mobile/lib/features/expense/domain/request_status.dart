@@ -66,6 +66,13 @@ const noApprovalStatusLabels = {
   RequestType.reimburse: 'Tanpa persetujuan (Verifikasi Nota)',
 };
 
-/// Fallback status label when the server's `statusLabel` is missing (the server label wins).
-String statusLabelFallback(RequestType type, RequestStatus status, {bool noApproval = false}) =>
-    noApproval && status == RequestStatus.approved ? noApprovalStatusLabels[type]! : status.label;
+/// ADR 0026: "Menunggu persetujuan" of the Owner level (web `OWNER_WAITING_LABEL`).
+const ownerWaitingLabel = 'Menunggu persetujuan Owner';
+
+/// Fallback status label when the server's `statusLabel` is missing (the server label wins). [ownerLevel]: the current
+/// approval level is the Owner's (ADR 0026).
+String statusLabelFallback(RequestType type, RequestStatus status, {bool noApproval = false, bool ownerLevel = false}) {
+  if (noApproval && status == RequestStatus.approved) return noApprovalStatusLabels[type]!;
+  if (ownerLevel && status == RequestStatus.pendingApproval) return ownerWaitingLabel;
+  return status.label;
+}

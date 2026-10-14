@@ -81,11 +81,14 @@ async function activeOnly(req: PayloadRequest, userIds: Iterable<number>): Promi
 
 /** Active holders of `role` IN `companyId` (ADR 0016 §5/§7: recipients of the subject's PT only). */
 async function roleHolders(req: PayloadRequest, role: string, companyId: number): Promise<number[]> {
+  // ADR 0026: an FYI reminder addressed to the Direktur reaches the Owner too (same view as the Direktur);
+  // decision requests of an approval step never come from here (they use the step's exact role)
+  const roles = role === 'pk-owner' ? ['pk-owner', 'pk-principal'] : [role]
   const r = await q<{ id: number }>(
     req,
     sql`SELECT DISTINCT u.id FROM users u JOIN company_memberships m ON m.user_id = u.id AND coalesce(m.active, true) AND m.company_id = ${companyId}
           JOIN company_memberships_roles mr ON mr.parent_id = m.id
-         WHERE mr.value::text = ${role} AND coalesce(u.active, true) ORDER BY u.id`,
+         WHERE mr.value::text IN (${sql.join(roles.map((x) => sql`${x}`), sql`, `)}) AND coalesce(u.active, true) ORDER BY u.id`,
   )
   return r.map((x) => Number(x.id))
 }
