@@ -161,8 +161,12 @@ describe('1. Staff → PM project → Direktur → Owner → approved → Financ
     const d = (await api('GET', `${E}/${id}`, w.users.finance)).body
     const pdf = await asUser(w.users.finance, (req) => buildPdfData(req, id, { internal: false, printedBy: 'test' }))
     const box = pdf.signatures.find((s) => s.label === 'Approval')!
-    expect(box.names).toContain('(Direktur)')
-    expect(box.names).toContain('(Owner)')
+    // Owner 2026-10-14: document signatures stop at the Direktur — the Owner level is never printed
+    const levelActor = (level: number) => (d.approvals as Array<{ position: string; level: number; actorName: string }>).find((a) => a.position === 'approval' && a.level === level)!.actorName
+    expect(box.names).toBe(levelActor(1)) // the Direktur only, one printed level → no role suffix
+    expect(box.names).not.toContain(levelActor(2))
+    expect(box.names).not.toContain('(Owner)')
+    expect(box.note).toBeUndefined()
     expect(d.status).toBe('approved')
     const t = await api('POST', `${E}/${id}/transfer`, w.users.finance, { cashAccountId: w.cashAccount, bankRef: `AOW-${id}`, proofMediaId: await proof() }, key())
     expect(t.status, JSON.stringify(t.body)).toBe(201)
@@ -175,6 +179,11 @@ describe('1. Staff → PM project → Direktur → Owner → approved → Financ
     const r = await api('POST', `${E}/${id}/reject`, principal, { reason: 'anggaran ditunda' }, key())
     expect(r.status, JSON.stringify(r.body)).toBe(200)
     expect(r.body.status).toBe('rejected')
+    // the Owner's rejection is not printed as a signature, but the box still says DITOLAK
+    const box = (await asUser(w.users.finance, (req) => buildPdfData(req, id, { internal: false, printedBy: 'test' }))).signatures.find((s) => s.label === 'Approval')!
+    expect(box.note).toBe('DITOLAK')
+    expect(box.images).toEqual([])
+    expect(box.names).not.toContain('(Owner)')
   })
 })
 
