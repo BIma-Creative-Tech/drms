@@ -102,7 +102,8 @@ class _DecisionSheetState extends ConsumerState<DecisionSheet> {
       // Finance decide, each on their own step; also a request that moved on meanwhile). Show a clear
       // reason; the caller reloads the detail and the inbox.
       // ADR 0029: 409 FUND_INSUFFICIENT — the PT's available funds dropped since the detail was loaded (race).
-      if (mounted) setState(() => _error = fundProblemMessage(e) ?? (e.status == 403 ? t.decisionForbidden : errorText(e)));
+      if (mounted)
+        setState(() => _error = fundProblemMessage(e) ?? (e.status == 403 ? t.decisionForbidden : errorText(e)));
     } on Object catch (e) {
       if (mounted) setState(() => _error = errorText(e));
     } finally {

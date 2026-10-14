@@ -135,9 +135,15 @@ void main() {
         'Dana PT tidak cukup: tersedia Rp 1.000.000, dibutuhkan Rp 1.447.500, kurang Rp 447.500. Tolak, atau '
         'perintahkan pinjaman antar-PT.',
       );
-      expect(fundProblemMessage(e, draft: true), endsWith('Pengajuan tetap Draft — perintahkan pinjaman antar-PT, lalu kirim lagi.'));
+      expect(
+        fundProblemMessage(e, draft: true),
+        endsWith('Pengajuan tetap Draft — perintahkan pinjaman antar-PT, lalu kirim lagi.'),
+      );
       final bare = ProblemException.fromJson(409, {'code': 'FUND_INSUFFICIENT'});
-      expect(fundProblemMessage(bare), 'Dana PT tidak cukup untuk langkah ini. Tolak, atau perintahkan pinjaman antar-PT.');
+      expect(
+        fundProblemMessage(bare),
+        'Dana PT tidak cukup untuk langkah ini. Tolak, atau perintahkan pinjaman antar-PT.',
+      );
     });
 
     test('other problems: null (the usual message)', () {
@@ -178,9 +184,14 @@ void main() {
         expect(m, isNotNull, reason: code);
         expect(m, isNot(contains('Conflict')), reason: code);
       }
-      expect(msg({'code': 'INTERCOMPANY_PERIOD_CLOSED', 'lockDate': '2026-10-31'}), contains('tutup buku s/d 2026-10-31'));
-      expect(msg({'code': 'LOAN_REPAYMENT_EXCEEDS_OUTSTANDING', 'amount': 600000, 'outstanding': 500000}),
-          'Pengembalian Rp 600.000 melebihi sisa pinjaman Rp 500.000.');
+      expect(
+        msg({'code': 'INTERCOMPANY_PERIOD_CLOSED', 'lockDate': '2026-10-31'}),
+        contains('tutup buku s/d 2026-10-31'),
+      );
+      expect(
+        msg({'code': 'LOAN_REPAYMENT_EXCEEDS_OUTSTANDING', 'amount': 600000, 'outstanding': 500000}),
+        'Pengembalian Rp 600.000 melebihi sisa pinjaman Rp 500.000.',
+      );
       expect(msg({'title': 'Forbidden'}, 403), isNull);
       expect(icLoanAwareError(const NetworkException(), (e) => 'fallback'), 'fallback');
     });
@@ -201,7 +212,10 @@ void main() {
       expect(l.requests.single.label, 'PB/DRMS/2610/0012');
       expect(l.requests.single.statusLabel, 'Menunggu Approval Owner');
       final mv = l.disbursement!;
-      expect([mv.label, mv.kkNo, mv.kmNo, mv.toAccountNoMasked], ['Pencairan', 'KK/LAS/2610/0004', 'KM/DRMS/2610/0011', '••••0123']);
+      expect(
+        [mv.label, mv.kkNo, mv.kmNo, mv.toAccountNoMasked],
+        ['Pencairan', 'KK/LAS/2610/0004', 'KM/DRMS/2610/0011', '••••0123'],
+      );
       expect(l.allowedActions, {IcLoanAction.voidDisbursement});
       expect(l.canDisburse, isNull, reason: 'queue field');
     });
@@ -209,7 +223,11 @@ void main() {
     test('a void movement is not the disbursement; unknown actions are ignored', () {
       final j = icLoanDetailJson(status: 'instructed');
       j['movements'] = [
-        {...(icLoanDetailJson(status: 'disbursed')['movements'] as List).single as Map<String, dynamic>, 'status': 'void', 'voidReason': 'salah rekening'},
+        {
+          ...(icLoanDetailJson(status: 'disbursed')['movements'] as List).single as Map<String, dynamic>,
+          'status': 'void',
+          'voidReason': 'salah rekening',
+        },
       ];
       j['allowedActions'] = ['disburse', 'teleport'];
       final l = IcLoan.fromJson(j);
@@ -251,8 +269,19 @@ void main() {
     const las = IcLenderOption(company: IcCompanyRef(id: 2, shortCode: 'LAS'), available: 300000);
 
     test('checks: lender, amount (> 0, ≤ the lender\'s funds), due date ≥ today, reason, borrower account', () {
-      Map<String, String> v({int? lender = 2, int? amount = 200000, String? due = '2026-11-13', String reason = 'Dana proyek'}) =>
-          validateIcLoanInstruction(lenderId: lender, amount: amount, dueDate: due, reason: reason, today: '2026-10-14', lender: las);
+      Map<String, String> v({
+        int? lender = 2,
+        int? amount = 200000,
+        String? due = '2026-11-13',
+        String reason = 'Dana proyek',
+      }) => validateIcLoanInstruction(
+        lenderId: lender,
+        amount: amount,
+        dueDate: due,
+        reason: reason,
+        today: '2026-10-14',
+        lender: las,
+      );
       expect(v(), isEmpty);
       expect(v(lender: null).keys, ['lender']);
       expect(v(amount: 500000)['lender'], contains('Rp 300.000'));
@@ -262,13 +291,27 @@ void main() {
       expect(v(due: '2026-10-13')['dueDate'], 'Jatuh tempo tidak boleh sebelum tanggal perintah.');
       expect(v(reason: ' a ')['reason'], 'Alasan wajib diisi, minimal 3 karakter.');
       expect(
-        validateIcLoanInstruction(lenderId: 2, amount: 1, dueDate: '2026-11-13', reason: 'abc', today: '2026-10-14', borrowerHasReceivingAccount: false).keys,
+        validateIcLoanInstruction(
+          lenderId: 2,
+          amount: 1,
+          dueDate: '2026-11-13',
+          reason: 'abc',
+          today: '2026-10-14',
+          borrowerHasReceivingAccount: false,
+        ).keys,
         ['borrower'],
       );
     });
 
     test('body: exactly the fields of IntercompanyLoanCreate, reason trimmed, requests unique', () {
-      final b = icLoanCreateBody(borrowerCompanyId: 1, lenderCompanyId: 2, amount: 447500, dueDate: '2026-11-13', reason: ' Dana proyek ', requestIds: const [42, 42, 43]);
+      final b = icLoanCreateBody(
+        borrowerCompanyId: 1,
+        lenderCompanyId: 2,
+        amount: 447500,
+        dueDate: '2026-11-13',
+        reason: ' Dana proyek ',
+        requestIds: const [42, 42, 43],
+      );
       expect(b, {
         'borrowerCompanyId': 1,
         'lenderCompanyId': 2,
@@ -277,15 +320,38 @@ void main() {
         'reason': 'Dana proyek',
         'requestIds': [42, 43],
       });
-      expect(icLoanCreateBody(borrowerCompanyId: 1, lenderCompanyId: 2, amount: 1, dueDate: '2026-11-13', reason: 'abc').containsKey('requestIds'), isFalse);
+      expect(
+        icLoanCreateBody(
+          borrowerCompanyId: 1,
+          lenderCompanyId: 2,
+          amount: 1,
+          dueDate: '2026-11-13',
+          reason: 'abc',
+        ).containsKey('requestIds'),
+        isFalse,
+      );
     });
   });
 
   group('disbursement form (the transfer form without a cost center)', () {
     test('body of IntercompanyLoanDisburse: no amount, no cost center; confirmOverdraft only when confirmed', () {
-      final b = icLoanDisburseBody(cashAccountId: 3, transferAt: transferAtString(DateTime(2026, 10, 14, 9, 5), const Duration(hours: 8)), bankRef: ' REF-9 ', proofMediaId: 9001);
+      final b = icLoanDisburseBody(
+        cashAccountId: 3,
+        transferAt: transferAtString(DateTime(2026, 10, 14, 9, 5), const Duration(hours: 8)),
+        bankRef: ' REF-9 ',
+        proofMediaId: 9001,
+      );
       expect(b, {'cashAccountId': 3, 'transferAt': '2026-10-14T09:05+08:00', 'bankRef': 'REF-9', 'proofMediaId': 9001});
-      expect(icLoanDisburseBody(cashAccountId: 3, transferAt: 'x', bankRef: 'r', proofMediaId: 1, confirmOverdraft: true)['confirmOverdraft'], isTrue);
+      expect(
+        icLoanDisburseBody(
+          cashAccountId: 3,
+          transferAt: 'x',
+          bankRef: 'r',
+          proofMediaId: 1,
+          confirmOverdraft: true,
+        )['confirmOverdraft'],
+        isTrue,
+      );
     });
 
     test('checks: no cost center asked', () {
@@ -304,7 +370,14 @@ void main() {
     });
 
     test('cash accounts carry the site flag (only accounts without a site pay a loan)', () {
-      final a = cashAccountFromJson({'cashAccountId': 4, 'companyId': 2, 'siteId': 7, 'name': 'Kas Kecil Site', 'active': true, 'balance': 100});
+      final a = cashAccountFromJson({
+        'cashAccountId': 4,
+        'companyId': 2,
+        'siteId': 7,
+        'name': 'Kas Kecil Site',
+        'active': true,
+        'balance': 100,
+      });
       expect(a.siteId, 7);
       expect(cashAccountFromJson({'cashAccountId': 3, 'name': 'Bank', 'siteId': null}).siteId, isNull);
     });
@@ -319,7 +392,8 @@ void main() {
         if (p.endsWith('/intercompany-loans/queue')) return (200, icLoanQueueJson());
         if (p.endsWith('/intercompany-loans/lenders')) return (200, icLenderOptionsJson());
         if (p.endsWith('/disburse')) return (200, icLoanDetailJson(status: 'disbursed'));
-        if (p.endsWith('/intercompany-loans') && c.method == 'POST') return (201, icLoanDetailJson(status: 'instructed'));
+        if (p.endsWith('/intercompany-loans') && c.method == 'POST')
+          return (201, icLoanDetailJson(status: 'instructed'));
         if (RegExp(r'/intercompany-loans/\d+$').hasMatch(p)) return (200, icLoanDetailJson(status: 'instructed'));
         return (404, {'title': 'Not Found'});
       });
@@ -346,10 +420,15 @@ void main() {
     });
 
     test('a refusal arrives as ProblemException with the code and figures', () async {
-      adapter.respond = (_) => (409, {'title': 'Conflict', 'code': 'LOAN_LENDER_INSUFFICIENT', 'available': 1, 'needed': 2, 'gap': 1});
+      adapter.respond = (_) =>
+          (409, {'title': 'Conflict', 'code': 'LOAN_LENDER_INSUFFICIENT', 'available': 1, 'needed': 2, 'gap': 1});
       await expectLater(
         api.instruct(const {}, idempotencyKey: 'k'),
-        throwsA(isA<ProblemException>().having((e) => e.code, 'code', 'LOAN_LENDER_INSUFFICIENT').having((e) => e.body['gap'], 'gap', 1)),
+        throwsA(
+          isA<ProblemException>()
+              .having((e) => e.code, 'code', 'LOAN_LENDER_INSUFFICIENT')
+              .having((e) => e.body['gap'], 'gap', 1),
+        ),
       );
     });
   });
@@ -371,8 +450,20 @@ void main() {
   });
 
   test('statuses and labels follow the web vocabulary', () {
-    expect(IcLoanStatus.values.map((s) => s.code), ['instructed', 'disbursed', 'partially_repaid', 'repaid', 'cancelled']);
-    expect(IcLoanStatus.values.map((s) => s.label), ['Menunggu pencairan', 'Dicairkan', 'Sebagian dikembalikan', 'Lunas', 'Dibatalkan']);
+    expect(IcLoanStatus.values.map((s) => s.code), [
+      'instructed',
+      'disbursed',
+      'partially_repaid',
+      'repaid',
+      'cancelled',
+    ]);
+    expect(IcLoanStatus.values.map((s) => s.label), [
+      'Menunggu pencairan',
+      'Dicairkan',
+      'Sebagian dikembalikan',
+      'Lunas',
+      'Dibatalkan',
+    ]);
     expect(IcLoanStatus.fromCode('repaid').active, isTrue);
     expect(IcLoanStatus.fromCode('cancelled').active, isFalse);
     expect(formatRupiah(447500), 'Rp 447.500');

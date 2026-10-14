@@ -17,11 +17,7 @@ String icLoanInstructPath(ExpenseDetail d) {
   final borrower = f?.companyId ?? d.companyId;
   return Uri(
     path: '/intercompany-loans/new',
-    queryParameters: {
-      'borrower': '$borrower',
-      'requests': '${d.id}',
-      if (f != null && f.gap > 0) 'amount': '${f.gap}',
-    },
+    queryParameters: {'borrower': '$borrower', 'requests': '${d.id}', if (f != null && f.gap > 0) 'amount': '${f.gap}'},
   ).toString();
 }
 
@@ -55,13 +51,18 @@ class FundCheckPanel extends StatelessWidget {
         children: [
           SizedBox(
             width: 130,
-            child: Text(label, style: strong ? theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700) : null),
+            child: Text(
+              label,
+              style: strong ? theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700) : null,
+            ),
           ),
           Expanded(child: value),
         ],
       ),
     );
-    final site = f.excludedSiteCount > 0 ? ' — ${t.fundSiteExcluded(f.excludedSiteCount, formatRupiah(f.excludedSiteBalance))}' : '';
+    final site = f.excludedSiteCount > 0
+        ? ' — ${t.fundSiteExcluded(f.excludedSiteCount, formatRupiah(f.excludedSiteBalance))}'
+        : '';
     final blocked = f.blockedReason;
     final draft = detail.status == RequestStatus.draft;
     return Card(

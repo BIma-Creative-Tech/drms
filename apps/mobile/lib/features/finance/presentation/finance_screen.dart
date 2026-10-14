@@ -184,9 +184,8 @@ class _TransferQueueViewState extends ConsumerState<TransferQueueView> {
                   padding: const EdgeInsets.fromLTRB(12, 4, 12, 24),
                   // ADR 0029: index 0 = "Pencairan pinjaman antar-PT" (Finance of a lender PT; hidden when empty)
                   itemCount: shown.length + 2,
-                  itemBuilder: (_, j) => j == 0
-                      ? const IcLoanQueueSection()
-                      : _queueRow(j - 1, shown, items.length, more),
+                  itemBuilder: (_, j) =>
+                      j == 0 ? const IcLoanQueueSection() : _queueRow(j - 1, shown, items.length, more),
                 );
               },
             ),
@@ -199,20 +198,20 @@ class _TransferQueueViewState extends ConsumerState<TransferQueueView> {
   Widget _queueRow(int i, List<TransferQueueItem> shown, int total, bool more) {
     final t = AppLocalizations.of(context);
     return i == shown.length
-                      ? more
-                            ? LoadMoreTrigger(
-                                key: ValueKey('more-${shown.length}'),
-                                onLoad: () => setState(() => _shown += _pageSize),
-                              )
-                            : Padding(
-                                padding: const EdgeInsets.all(12),
-                                child: Text(
-                                  t.listShownOf(shown.length, total),
-                                  textAlign: TextAlign.center,
-                                  style: Theme.of(context).textTheme.bodySmall,
-                                ),
-                              )
-                      : TransferQueueCard(item: shown[i]);
+        ? more
+              ? LoadMoreTrigger(
+                  key: ValueKey('more-${shown.length}'),
+                  onLoad: () => setState(() => _shown += _pageSize),
+                )
+              : Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Text(
+                    t.listShownOf(shown.length, total),
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                )
+        : TransferQueueCard(item: shown[i]);
   }
 }
 

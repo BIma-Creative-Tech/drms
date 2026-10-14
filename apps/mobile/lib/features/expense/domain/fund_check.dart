@@ -117,7 +117,8 @@ abstract class FundCheck with _$FundCheck {
   String get code => companyCode ?? '#$companyId';
 
   /// Text of the disabled "Setujui": the server's `blockedText`, else the same sentence built locally.
-  String? get blockedReason => !blocked ? null : (blockedText?.trim().isNotEmpty == true ? blockedText : fundBlockedText(gap));
+  String? get blockedReason =>
+      !blocked ? null : (blockedText?.trim().isNotEmpty == true ? blockedText : fundBlockedText(gap));
 }
 
 /// Web `blockedDecisionText` (`domain/fundcheck/rules.ts`).

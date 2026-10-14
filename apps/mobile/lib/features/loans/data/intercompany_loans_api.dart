@@ -35,10 +35,8 @@ class IntercompanyLoansApi {
       client.run((d) => d.get<dynamic>('/intercompany-loans/$id', options: ApiClient.allCompanies()), _one);
 
   /// `POST /intercompany-loans` ([icLoanCreateBody]) → the new loan (201, `PJA/{LENDER}/…`).
-  Future<IcLoan> instruct(Map<String, dynamic> body, {required String idempotencyKey}) => client.run(
-    (d) => d.post<dynamic>('/intercompany-loans', data: body, options: _idem(idempotencyKey)),
-    _one,
-  );
+  Future<IcLoan> instruct(Map<String, dynamic> body, {required String idempotencyKey}) =>
+      client.run((d) => d.post<dynamic>('/intercompany-loans', data: body, options: _idem(idempotencyKey)), _one);
 
   /// `POST /intercompany-loans/{id}/disburse` ([icLoanDisburseBody]) → the loan, now "Dicairkan". A 409
   /// `CASH_OVERDRAFT_CONFIRM_REQUIRED` asks for a confirmation (`confirmOverdraft`).

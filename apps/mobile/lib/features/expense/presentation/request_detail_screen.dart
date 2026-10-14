@@ -595,31 +595,35 @@ class _DecisionBar extends ConsumerWidget {
                 ),
               ),
             Row(
-          children: [
-            if (canReject)
-              Expanded(
-                child: OutlinedButton.icon(
-                  key: const Key('action-reject'),
-                  onPressed: () => open(Decision.reject),
-                  icon: const Icon(Icons.close),
-                  label: Text(t.actionReject),
-                ),
-              ),
-            if (canReject) const SizedBox(width: 12),
-            if (canAck || canApprove)
-              Expanded(
-                child: FilledButton.icon(
-                  key: Key(canApprove ? 'action-approve' : 'action-acknowledge'),
-                  onPressed: blocked != null ? null : () => open(canApprove ? Decision.approve : Decision.acknowledge),
-                  icon: const Icon(Icons.check),
-                  label: Text(
-                    canApprove
-                        ? t.actionApprove
-                        : (pm ? t.actionAcknowledgePm : (direktur ? t.actionAcknowledgeDirektur : t.actionAcknowledge)),
+              children: [
+                if (canReject)
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      key: const Key('action-reject'),
+                      onPressed: () => open(Decision.reject),
+                      icon: const Icon(Icons.close),
+                      label: Text(t.actionReject),
+                    ),
                   ),
-                ),
-              ),
-          ],
+                if (canReject) const SizedBox(width: 12),
+                if (canAck || canApprove)
+                  Expanded(
+                    child: FilledButton.icon(
+                      key: Key(canApprove ? 'action-approve' : 'action-acknowledge'),
+                      onPressed: blocked != null
+                          ? null
+                          : () => open(canApprove ? Decision.approve : Decision.acknowledge),
+                      icon: const Icon(Icons.check),
+                      label: Text(
+                        canApprove
+                            ? t.actionApprove
+                            : (pm
+                                  ? t.actionAcknowledgePm
+                                  : (direktur ? t.actionAcknowledgeDirektur : t.actionAcknowledge)),
+                      ),
+                    ),
+                  ),
+              ],
             ),
           ],
         ),

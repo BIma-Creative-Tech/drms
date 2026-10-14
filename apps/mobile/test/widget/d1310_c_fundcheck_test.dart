@@ -42,7 +42,10 @@ AuthSignedIn _owner() => AuthSignedIn(profile: profile(Role.effective({Role.prin
 
 AuthSignedIn _financeWith({bool disburse = true}) {
   final p = profile(const {Role.finance});
-  return AuthSignedIn(profile: p.copyWith(capabilities: p.capabilities.copyWith(disburseIntercompanyLoan: disburse)), sub: 's');
+  return AuthSignedIn(
+    profile: p.copyWith(capabilities: p.capabilities.copyWith(disburseIntercompanyLoan: disburse)),
+    sub: 's',
+  );
 }
 
 Finder _button(String key) => find.descendant(of: find.byKey(Key(key)), matching: find.bySubtype<ButtonStyleButton>());
@@ -118,7 +121,10 @@ void main() {
       );
       expect(find.byKey(const Key('fund-check')), findsOneWidget);
       expect(_text(tester, 'fund-title'), 'Ketersediaan dana PT DRMS');
-      expect(_text(tester, 'fund-balance'), 'Rp 5.000.000 (2 akun, tanpa akun site — 1 akun site Rp 750.000 tidak dihitung)');
+      expect(
+        _text(tester, 'fund-balance'),
+        'Rp 5.000.000 (2 akun, tanpa akun site — 1 akun site Rp 750.000 tidak dihitung)',
+      );
       expect(_text(tester, 'fund-commitments'), '− Rp 4.000.000');
       expect(_text(tester, 'fund-available'), 'Rp 1.000.000');
       expect(_text(tester, 'fund-needed'), 'Rp 1.447.500');
@@ -215,7 +221,9 @@ void main() {
       final d = detailFromJson(fundDetailJson());
       await pumpScreen(
         tester,
-        Scaffold(body: DecisionSheet(detail: d, decision: Decision.approve)),
+        Scaffold(
+          body: DecisionSheet(detail: d, decision: Decision.approve),
+        ),
         auth: _owner(),
       );
       expect(find.byKey(const Key('fund-check')), findsOneWidget);
@@ -246,7 +254,9 @@ void main() {
       );
       await pumpScreen(
         tester,
-        Scaffold(body: DecisionSheet(detail: d, decision: Decision.approve)),
+        Scaffold(
+          body: DecisionSheet(detail: d, decision: Decision.approve),
+        ),
         auth: _owner(),
         overrides: [approvalsApiProvider.overrideWithValue(api)],
       );
@@ -330,8 +340,13 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(_button('icloan-submit'));
       await tester.pumpAndSettle();
-      expect(find.text('PT LAS meminjamkan Rp 447.500 ke PT DRMS. Nilai dicadangkan di PT pemberi sampai Finance-nya '
-          'mencairkan.'), findsOneWidget);
+      expect(
+        find.text(
+          'PT LAS meminjamkan Rp 447.500 ke PT DRMS. Nilai dicadangkan di PT pemberi sampai Finance-nya '
+          'mencairkan.',
+        ),
+        findsOneWidget,
+      );
       await tester.tap(find.byKey(const Key('icloan-confirm')));
       await tester.pumpAndSettle();
       expect(api.instructed, hasLength(1));
@@ -391,7 +406,9 @@ void main() {
   });
 
   group('loan detail (read-only)', () {
-    testWidgets('disbursed: figures, linked request, movement with KK / KM, web-only hint, no APK action', (tester) async {
+    testWidgets('disbursed: figures, linked request, movement with KK / KM, web-only hint, no APK action', (
+      tester,
+    ) async {
       await pumpScreen(
         tester,
         const IcLoanDetailScreen(id: 77),
@@ -477,7 +494,11 @@ void main() {
         tester,
         IcLoanDisburseScreen(
           loan: loan,
-          destination: const IcLoanDestination(bankName: 'Mandiri', accountNoMasked: '••••0123', accountHolder: 'PT Contoh Dirgantara'),
+          destination: const IcLoanDestination(
+            bankName: 'Mandiri',
+            accountNoMasked: '••••0123',
+            accountHolder: 'PT Contoh Dirgantara',
+          ),
         ),
         auth: _financeWith(),
         overrides: [
@@ -536,7 +557,9 @@ void main() {
       expect(loans.disbursed.last.key, isNot(loans.disbursed.first.key), reason: 'another body, another key');
       expect(finance.uploads, 1, reason: 'the proof is uploaded once');
       expect(
-        find.text('Pencairan PJA/LAS/2610/0002 tercatat: KK/LAS/2610/0004 di PT pemberi, KM/DRMS/2610/0011 di PT peminjam.'),
+        find.text(
+          'Pencairan PJA/LAS/2610/0002 tercatat: KK/LAS/2610/0004 di PT pemberi, KM/DRMS/2610/0011 di PT peminjam.',
+        ),
         findsOneWidget,
       );
     });

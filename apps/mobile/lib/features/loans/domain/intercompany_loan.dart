@@ -454,7 +454,8 @@ Map<String, String> validateIcLoanInstruction({
   if (lenderId == null)
     'lender': 'Pilih PT pemberi.'
   else if (lender != null && amount != null && amount > 0 && !lender.sufficientFor(amount))
-    'lender': 'Dana tersedia PT ${lender.company.shortCode} ${formatRupiah(lender.available)} — kurang untuk pinjaman ini.',
+    'lender':
+        'Dana tersedia PT ${lender.company.shortCode} ${formatRupiah(lender.available)} — kurang untuk pinjaman ini.',
   if (amount == null || amount <= 0)
     'amount': 'Nilai harus lebih dari 0.'
   else if (amount > maxIcLoanAmount)
@@ -483,7 +484,10 @@ Map<String, dynamic> icLoanCreateBody({
   'amount': amount,
   'dueDate': dueDate,
   'reason': reason.trim(),
-  if (requestIds.isNotEmpty) 'requestIds': [...{...requestIds}],
+  if (requestIds.isNotEmpty)
+    'requestIds': [
+      ...{...requestIds},
+    ],
 };
 
 /// Body of `POST /intercompany-loans/{id}/disburse` (openapi `IntercompanyLoanDisburse`): the amount is never sent (one

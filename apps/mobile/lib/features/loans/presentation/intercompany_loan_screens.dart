@@ -379,8 +379,7 @@ class _IcLoanInstructScreenState extends ConsumerState<IcLoanInstructScreen> {
                 '${t.fundNeeded} ${formatRupiah(w.needed)}${w.gap > 0 ? ' · ${t.fundGap(formatRupiah(w.gap))}' : ''}',
               ),
             ),
-        if (_errors['requests'] != null)
-          Text(_errors['requests']!, style: TextStyle(color: theme.colorScheme.error)),
+        if (_errors['requests'] != null) Text(_errors['requests']!, style: TextStyle(color: theme.colorScheme.error)),
         if (_error != null)
           Card(
             key: const Key('icloan-error'),
@@ -428,10 +427,7 @@ class _IcLoanInstructScreenState extends ConsumerState<IcLoanInstructScreen> {
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              t.icLoanAvailable(formatRupiah(l.available)),
-              key: Key('icloan-lender-${l.company.id}-available'),
-            ),
+            Text(t.icLoanAvailable(formatRupiah(l.available)), key: Key('icloan-lender-${l.company.id}-available')),
             if (!enough)
               Text(
                 t.icLoanLenderShort,
@@ -511,7 +507,9 @@ class _IcLoanBody extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SizedBox(width: 140, child: Text(k, style: theme.textTheme.bodySmall)),
-          Expanded(child: Text(v, key: key, style: style)),
+          Expanded(
+            child: Text(v, key: key, style: style),
+          ),
         ],
       ),
     );
@@ -527,7 +525,9 @@ class _IcLoanBody extends ConsumerWidget {
         children: [
           Icon(Icons.info_outline, size: 18, color: color ?? theme.colorScheme.primary),
           const SizedBox(width: 6),
-          Expanded(child: Text(text, style: theme.textTheme.bodySmall?.copyWith(color: color))),
+          Expanded(
+            child: Text(text, style: theme.textTheme.bodySmall?.copyWith(color: color)),
+          ),
         ],
       ),
     );
@@ -562,7 +562,11 @@ class _IcLoanBody extends ConsumerWidget {
           ],
         ),
         const SizedBox(height: 8),
-        Text(t.icLoanFlow(l.lenderCode, l.borrowerCode), key: const Key('icloan-flow'), style: theme.textTheme.titleMedium),
+        Text(
+          t.icLoanFlow(l.lenderCode, l.borrowerCode),
+          key: const Key('icloan-flow'),
+          style: theme.textTheme.titleMedium,
+        ),
         const SizedBox(height: 8),
         row(t.icLoanLender, l.lender?.label ?? '-', key: const Key('icloan-lender-value')),
         row(t.icLoanBorrower, l.borrower?.label ?? '-', key: const Key('icloan-borrower-value')),
@@ -577,7 +581,11 @@ class _IcLoanBody extends ConsumerWidget {
           ),
         ],
         row(t.icLoanInstructionDate, formatDateOnly(l.instructionDate)),
-        row(t.icLoanDueDate, '${formatDateOnly(l.dueDate)} · ${t.icLoanNoInterest}', key: const Key('icloan-due-value')),
+        row(
+          t.icLoanDueDate,
+          '${formatDateOnly(l.dueDate)} · ${t.icLoanNoInterest}',
+          key: const Key('icloan-due-value'),
+        ),
         if (l.createdByName != null) row(t.icLoanCreatedBy, l.createdByName!),
         section(t.icLoanReason),
         Text(l.reason, key: const Key('icloan-reason-value')),
@@ -586,9 +594,17 @@ class _IcLoanBody extends ConsumerWidget {
           note(l.droppedRequestNote!, key: const Key('icloan-dropped-request'), color: context.pk.warnText),
         if (l.disburseBlockedByG1) note(t.icLoanG1Blocked, key: const Key('icloan-g1'), color: context.pk.warnText),
         if (!l.lenderHasReceivingAccount && l.status.active)
-          note(t.icLoanNoLenderAccount(l.lenderCode), key: const Key('icloan-lender-no-account'), color: context.pk.warnText),
+          note(
+            t.icLoanNoLenderAccount(l.lenderCode),
+            key: const Key('icloan-lender-no-account'),
+            color: context.pk.warnText,
+          ),
         if (l.cancelReason != null)
-          note(t.icLoanCancelledBecause(l.cancelReason!), key: const Key('icloan-cancelled'), color: context.pk.badText),
+          note(
+            t.icLoanCancelledBecause(l.cancelReason!),
+            key: const Key('icloan-cancelled'),
+            color: context.pk.badText,
+          ),
         if (l.requests.isNotEmpty) ...[
           section(t.icLoanRequests),
           for (final r in l.requests)
@@ -647,19 +663,23 @@ class _MovementTile extends StatelessWidget {
                 ),
               ],
             ),
-            Text(
-              [when, ?m.executedByName].join(' · '),
-              style: theme.textTheme.bodySmall?.merge(strike),
-            ),
+            Text([when, ?m.executedByName].join(' · '), style: theme.textTheme.bodySmall?.merge(strike)),
             if (entries.isNotEmpty)
-              Text(entries, key: Key('icloan-movement-${m.id}-entries'), style: theme.textTheme.bodySmall?.merge(strike)),
-            if (m.fromAccountName != null || m.toAccountNoMasked != null)
               Text(
-                [?m.fromAccountName, if (m.toAccountNoMasked != null) '→ ${m.toAccountName ?? ''} ${m.toAccountNoMasked}'.trim()]
-                    .join(' '),
+                entries,
+                key: Key('icloan-movement-${m.id}-entries'),
                 style: theme.textTheme.bodySmall?.merge(strike),
               ),
-            if (m.bankRef != null) Text('${t.bankRefLabel}: ${m.bankRef}', style: theme.textTheme.bodySmall?.merge(strike)),
+            if (m.fromAccountName != null || m.toAccountNoMasked != null)
+              Text(
+                [
+                  ?m.fromAccountName,
+                  if (m.toAccountNoMasked != null) '→ ${m.toAccountName ?? ''} ${m.toAccountNoMasked}'.trim(),
+                ].join(' '),
+                style: theme.textTheme.bodySmall?.merge(strike),
+              ),
+            if (m.bankRef != null)
+              Text('${t.bankRefLabel}: ${m.bankRef}', style: theme.textTheme.bodySmall?.merge(strike)),
             if (!m.posted)
               Text(
                 m.voidReason == null ? t.icLoanMovementVoid : t.icLoanMovementVoidReason(m.voidReason!),
@@ -888,7 +908,10 @@ class _IcLoanDisburseScreenState extends ConsumerState<IcLoanDisburseScreen> {
                     ),
                     Text(t.icLoanDisburseHelp, style: theme.textTheme.bodySmall),
                     const Divider(height: 20),
-                    Text('${loan.docNo} · ${t.loanDueOn(formatDateOnly(loan.dueDate))}', style: theme.textTheme.bodyMedium),
+                    Text(
+                      '${loan.docNo} · ${t.loanDueOn(formatDateOnly(loan.dueDate))}',
+                      style: theme.textTheme.bodyMedium,
+                    ),
                     if (destination != null)
                       Text(
                         '${t.bankDestination}: ${destination.text}',
@@ -911,7 +934,10 @@ class _IcLoanDisburseScreenState extends ConsumerState<IcLoanDisburseScreen> {
                 FormGridCell(
                   label: t.cashAccountLabel,
                   child: switch (accounts) {
-                    AsyncError(:final error) => Text(errorText(error), style: TextStyle(color: theme.colorScheme.error)),
+                    AsyncError(:final error) => Text(
+                      errorText(error),
+                      style: TextStyle(color: theme.colorScheme.error),
+                    ),
                     AsyncData() when pool.isEmpty => Text(
                       t.icLoanNoAccounts,
                       key: const Key('icloan-no-accounts'),
@@ -960,7 +986,11 @@ class _IcLoanDisburseScreenState extends ConsumerState<IcLoanDisburseScreen> {
                     key: const Key('transfer-bank-ref'),
                     controller: _bankRef,
                     maxLength: 64,
-                    decoration: InputDecoration(labelText: label, hintText: t.bankRefHint, errorText: issues['bankRef']),
+                    decoration: InputDecoration(
+                      labelText: label,
+                      hintText: t.bankRefHint,
+                      errorText: issues['bankRef'],
+                    ),
                     onChanged: (_) => _tried ? setState(() {}) : null,
                   ),
                 ),
@@ -1088,7 +1118,9 @@ class IcLoanQueueCard extends ConsumerWidget {
               Text(
                 l.destination == null ? t.icLoanDestinationNone : '${t.bankDestination}: ${l.destination!.text}',
                 key: Key('icloan-q-${l.id}-destination'),
-                style: theme.textTheme.bodySmall?.copyWith(color: l.destination == null ? theme.colorScheme.error : null),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: l.destination == null ? theme.colorScheme.error : null,
+                ),
               ),
               if (l.g1Note != null)
                 Padding(
