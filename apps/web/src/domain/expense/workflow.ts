@@ -29,6 +29,8 @@ import {
 import { fromDocLines, validateContent, vendorOfDoc } from './drafts'
 import { payeeOf } from './types'
 import { designatedAccount } from '@/domain/intercompany/service'
+import { checkFundsForApproval } from '@/domain/fundcheck/service'
+import type { FundFigures } from '@/domain/fundcheck/rules'
 import { approveWithoutDecision, assertEveryLineHasReceipt, claimAttachments, recomputeFlags, syncProjectRapFlags, syncRapFlags } from './receipts'
 import { isNoApproval } from './decision'
 import { ACK_DELEGATE_ROLE, budgetImpact, lastLevel, type AckDelegate, type ApprovalSnapshot } from './rules'
@@ -57,6 +59,8 @@ async function insertApproval(
     openFlags?: number
     /** F2e: "Diketahui" given by a delegated Owner/Admin (recorded in the audit row). */
     delegation?: { to: AckDelegate; reason: string | null } | null
+    /** ADR 0029: the PT's available funds at a checked final decision (evidence on the decision row). */
+    fund?: FundFigures | null
   },
 ) {
   const meta = requestMeta(req)
@@ -76,6 +80,7 @@ async function insertApproval(
       budgetPctBefore: row.budget?.before ?? null,
       budgetPctAfter: row.budget?.after ?? null,
       openFlags: row.openFlags ?? null,
+      ...(row.fund ? { fundBalance: row.fund.balance, fundCommitments: row.fund.commitments, fundAvailable: row.fund.available } : {}),
       ...(row.signer
         ? signerColumns(row.signer)
         : {
@@ -302,6 +307,9 @@ export async function acknowledge(req: PayloadRequest, id: number, opts: SignOpt
   const doc = await loadRaw(req, id)
   const caller = userId(req)!
   const snap = doc.approvalSnapshot ?? null
+  // ADR 0029 §1: a "Diketahui" that is the final decision (no approval level left, G1-2) makes the request "Disetujui" —
+  // the fund check runs here (switch on: 409 FUND_INSUFFICIENT when the PT is short; nothing is written)
+  const fund = doc.status === 'pending_ack' && snap && lastLevel(snap) === 0 ? await checkFundsForApproval(req, doc, 'acknowledge') : null
   // ADR 0025: a designated representative deciding the Direktur "Diketahui" signs as the PT's definitive Direktur
   const signer = await signDecision(req, { companyId: companyOfDoc(doc), callerId: caller, direkturStep: isDirekturAckStep(snap), capturedId: opts.signatureMediaId, required: true })
   await syncRapFlags(req, id) // D4: "Melebihi RAP" as of this decision (counted in openFlags)
@@ -315,6 +323,7 @@ export async function acknowledge(req: PayloadRequest, id: number, opts: SignOpt
     signer,
     budget: await budgetFor(req, doc),
     openFlags: await openFlagCount(req, id),
+    fund,
   })
   if (doc.status !== 'pending_ack') return doc
   const next = await updateRequest(req, id, { status: 'pending_approval', currentLevel: 1 })
@@ -342,6 +351,10 @@ export async function approve(req: PayloadRequest, id: number, opts: SignOpts = 
   const doc = await loadRaw(req, id)
   const caller = userId(req)!
   const level = doc.currentLevel ?? 1
+  const snap = doc.approvalSnapshot as ApprovalSnapshot
+  // ADR 0029 §1: the decision that makes the request "Disetujui" (normally the Owner level; a rule without an Owner level:
+  // its last level, whoever decides it) — hard block when the PT's available funds are short (switch on), before any write
+  const fund = level >= lastLevel(snap) ? await checkFundsForApproval(req, doc, 'approve') : null
   // ADR 0025: the Direktur level decided by a designated representative → the PT's definitive Direktur signature
   const signer = await signDecision(req, { companyId: companyOfDoc(doc), callerId: caller, direkturStep: isDirekturApprovalStep(doc.approvalSnapshot, level), capturedId: opts.signatureMediaId, required: true })
   await syncRapFlags(req, id) // D4: "Melebihi RAP" as of this decision (counted in openFlags)
@@ -354,8 +367,8 @@ export async function approve(req: PayloadRequest, id: number, opts: SignOpts = 
     signer,
     budget: await budgetFor(req, doc),
     openFlags: await openFlagCount(req, id),
+    fund,
   })
-  const snap = doc.approvalSnapshot as ApprovalSnapshot
   if (level < lastLevel(snap)) return updateRequest(req, id, { currentLevel: level + 1 })
   // item 11: approvedAt = start of the transfer SLA (DB: set only on pending_approval → approved)
   const updated = await updateRequest(req, id, { status: 'approved', approvedAmount: doc.grandTotal ?? 0, approvedAt: new Date().toISOString() })

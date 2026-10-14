@@ -12,6 +12,8 @@ import { notificationTemplate, pushEnabled } from '@/domain/notifications'
 import { formatRupiah } from '@/lib/money'
 import { getRequestTx } from '@/lib/tx'
 
+import { legOf } from './loan-rules'
+
 /**
  * ADR 0028 (DRMS 13/10 Phase B) "Transfer antar-PT": an expense request of PT A with payee type `pt_grup` pays PT B of
  * the group. When Finance of A records the transfer (KK in A), this module posts the Kas Masuk in B on B's designated
@@ -197,22 +199,37 @@ export async function prepareReceipt(
   const targetId = relId(doc.payeeCompany)
   const sourceId = relId(doc.company)
   if (targetId === undefined || sourceId === undefined) fail(409, 'PT penerima belum tersimpan pada pengajuan.')
-  const [target, source] = [await companyRef(req, targetId!), await companyRef(req, sourceId!)]
-  const t = (await req.payload.findByID({ collection: 'companies', id: targetId!, depth: 0, select: { active: true }, overrideAccess: true /* SYSTEM-READ: payee PT active */, req, disableErrors: true })) as { active?: boolean | null } | null
+  return prepareReceiver(req, { targetId: targetId!, sourceId: sourceId!, date: transferDate, expectedAccountNo: doc.bankSnapshot?.accountNo ?? '' })
+}
+
+/**
+ * ADR 0029 §3.5 step 4 — the generic receiving-side checks of an intercompany movement (PT grup payment: `prepareReceipt`;
+ * inter-PT loan disbursement / repayment): the receiving PT active, its designated account active (and, for a payment,
+ * still the snapshot's number), the date after its lock date (409 INTERCOMPANY_PERIOD_CLOSED, same text) and not before
+ * the account's opening-balance date. Everything BEFORE anything of the movement is written.
+ */
+export async function prepareReceiver(
+  req: PayloadRequest,
+  input: { targetId: number; sourceId: number; date: string; expectedAccountNo?: string; noun?: string; status?: number },
+): Promise<PreparedReceipt> {
+  const { targetId, sourceId, date: transferDate } = input
+  const noun = input.noun ?? 'Transfer antar-PT'
+  const [target, source] = [await companyRef(req, targetId), await companyRef(req, sourceId)]
+  const t = (await req.payload.findByID({ collection: 'companies', id: targetId, depth: 0, select: { active: true }, overrideAccess: true /* SYSTEM-READ: receiving PT active */, req, disableErrors: true })) as { active?: boolean | null } | null
   if (!target || !source || !t || t.active === false) fail(409, 'PT penerima tidak ditemukan atau nonaktif.')
   const code = target!.shortCode
-  const account = await designatedAccount(req, targetId!)
-  if (!account) failCoded(409, INTERCOMPANY_NO_ACCOUNT, `PT ${code} belum menetapkan rekening penerimaan antar-PT.`, { payeeCompanyId: targetId! })
-  if (account!.accountNo !== (doc.bankSnapshot?.accountNo ?? '')) {
-    failCoded(409, INTERCOMPANY_ACCOUNT_CHANGED, `Rekening penerimaan PT ${code} berubah sejak pengajuan. Tarik dan ajukan ulang pengajuan ini.`, { payeeCompanyId: targetId! })
+  const account = await designatedAccount(req, targetId)
+  if (!account) failCoded(input.status ?? 409, INTERCOMPANY_NO_ACCOUNT, `PT ${code} belum menetapkan rekening penerimaan antar-PT.`, { payeeCompanyId: targetId })
+  if (input.expectedAccountNo !== undefined && account!.accountNo !== input.expectedAccountNo) {
+    failCoded(409, INTERCOMPANY_ACCOUNT_CHANGED, `Rekening penerimaan PT ${code} berubah sejak pengajuan. Tarik dan ajukan ulang pengajuan ini.`, { payeeCompanyId: targetId })
   }
-  const lock = await currentLockDate(req, targetId!)
+  const lock = await currentLockDate(req, targetId)
   if (lock && transferDate <= lock) {
     failCoded(
       409,
       INTERCOMPANY_PERIOD_CLOSED,
-      `Periode ${transferDate.slice(0, 7)} PT ${code} sudah ditutup (tutup buku s/d ${lock}). Transfer antar-PT tidak dapat dicatat pada tanggal ini — minta Direktur PT ${code} membuka kembali periode itu, atau catat transfer dengan tanggal di periode terbuka.`,
-      { payeeCompanyId: targetId!, lockDate: lock },
+      `Periode ${transferDate.slice(0, 7)} PT ${code} sudah ditutup (tutup buku s/d ${lock}). ${noun} tidak dapat dicatat pada tanggal ini — minta Direktur PT ${code} membuka kembali periode itu, atau catat transfer dengan tanggal di periode terbuka.`,
+      { payeeCompanyId: targetId, lockDate: lock },
     )
   }
   if (account!.openingBalanceDate && transferDate < account!.openingBalanceDate) {
@@ -223,7 +240,7 @@ export async function prepareReceipt(
 }
 
 /** The receiving PT's system cash-in source "Antar PT" (created when missing — e.g. a PT older than the data migration). */
-async function cashInSource(req: PayloadRequest, companyId: number): Promise<number> {
+export async function cashInSource(req: PayloadRequest, companyId: number): Promise<number> {
   const found = await req.payload.find({
     collection: 'cash-in-sources',
     where: { and: [{ company: { equals: companyId } }, { code: { equals: INTERCOMPANY_CASH_IN_SOURCE.code } }] },
@@ -246,7 +263,7 @@ async function cashInSource(req: PayloadRequest, companyId: number): Promise<num
 }
 
 /** Runs `fn` with the audit source `system` and `reason` (rows of the receiving PT), restoring the request's own after. */
-async function asSystem<T>(req: PayloadRequest, reason: string, fn: () => Promise<T>): Promise<T> {
+export async function asSystem<T>(req: PayloadRequest, reason: string, fn: () => Promise<T>): Promise<T> {
   const before = { source: req.context.auditSource, reason: req.context.auditReason }
   req.context.auditSource = 'system'
   req.context.auditReason = reason
@@ -400,9 +417,13 @@ export async function intercompanyOfRequest(req: PayloadRequest, requestId: numb
 export type EntryCounterpart = {
   /** `in` = this entry is the KM of the receiving PT; `out` = the KK of the paying PT. */
   direction: 'in' | 'out'
+  /** ADR 0029: the document behind the pair — a PT grup payment (expense request) or an inter-PT loan (PJA). */
+  sourceDocType: 'expense_request' | 'intercompany_loan'
+  /** ADR 0029: the loan movement's leg ("Pinjaman antar-PT diberikan" …); null for a PT grup payment. */
+  loanLeg: 'given' | 'received' | 'repaid_in' | 'repaid_out' | null
   status: 'posted' | 'void'
   counterpartCompany: CompanyRef | null
-  /** The paying PT's request and transfer numbers. */
+  /** The paying PT's request and transfer numbers (ADR 0029: the loan's PJA number and id). */
   sourceDocNo: string | null
   sourceDocId: number
   transferDocNo: string | null
@@ -428,24 +449,33 @@ export async function counterpartsOf(req: PayloadRequest, entryIds: readonly num
     sql`, `,
   )
   const r = (await tx.execute(sql`
-    SELECT l.id, l.status, l.source_company_id, l.target_company_id, l.source_doc_id, l.source_cash_entry_id, l.target_cash_entry_id,
-           kk.entry_no AS kk_no, km.entry_no AS km_no, er.doc_no AS request_no, t.doc_no AS transfer_no
+    SELECT l.id, l.status, l.source_company_id, l.target_company_id, l.source_doc_type, l.source_doc_id, l.source_cash_entry_id, l.target_cash_entry_id,
+           kk.entry_no AS kk_no, km.entry_no AS km_no, er.doc_no AS request_no, t.doc_no AS transfer_no, ln.id AS loan_id, ln.doc_no AS loan_no
       FROM intercompany_links l
       JOIN cash_entries kk ON kk.id = l.source_cash_entry_id
       JOIN cash_entries km ON km.id = l.target_cash_entry_id
       LEFT JOIN expense_requests er ON l.source_doc_type = 'expense_request' AND er.id = l.source_doc_id
       LEFT JOIN transfers t ON t.id = l.source_transfer_id
+      LEFT JOIN intercompany_loan_transfers mv ON l.source_doc_type IN ('intercompany_loan_disbursement', 'intercompany_loan_repayment') AND mv.id = l.source_doc_id
+      LEFT JOIN intercompany_loans ln ON ln.id = mv.loan_id
      WHERE l.source_cash_entry_id IN (${list}) OR l.target_cash_entry_id IN (${list})`)) as unknown as {
-    rows: Array<{ id: number; status: 'posted' | 'void'; source_company_id: number; target_company_id: number; source_doc_id: number; source_cash_entry_id: number; target_cash_entry_id: number; kk_no: string; km_no: string; request_no: string | null; transfer_no: string | null }>
+    rows: Array<{ id: number; status: 'posted' | 'void'; source_company_id: number; target_company_id: number; source_doc_type: string; source_doc_id: number; source_cash_entry_id: number; target_cash_entry_id: number; kk_no: string; km_no: string; request_no: string | null; transfer_no: string | null; loan_id: number | null; loan_no: string | null }>
   }
   if (r.rows.length === 0) return out
   const refs = new Map((await companyRefs(req, r.rows.flatMap((x) => [Number(x.source_company_id), Number(x.target_company_id)]))).map((c) => [c.id, c]))
   for (const x of r.rows) {
     const A = Number(x.source_company_id)
     const B = Number(x.target_company_id)
-    const base = { status: x.status, sourceDocNo: x.request_no, sourceDocId: Number(x.source_doc_id), transferDocNo: x.transfer_no, canOpenSourceDoc: hasRole(req, ['pk-finance', 'pk-owner', 'pk-admin'], A) }
-    out.set(Number(x.source_cash_entry_id), { ...base, direction: 'out', counterpartCompany: refs.get(B) ?? null, counterpartEntryNo: x.km_no, counterpartEntryId: Number(x.target_cash_entry_id), canOpenCounterpart: hasRole(req, ['pk-finance', 'pk-owner', 'pk-admin'], B) })
-    out.set(Number(x.target_cash_entry_id), { ...base, direction: 'in', counterpartCompany: refs.get(A) ?? null, counterpartEntryNo: x.kk_no, counterpartEntryId: Number(x.source_cash_entry_id), canOpenCounterpart: hasRole(req, ['pk-finance', 'pk-owner', 'pk-admin'], A) })
+    const office = (c: number) => hasRole(req, ['pk-finance', 'pk-owner', 'pk-admin'], c)
+    // ADR 0029: a loan movement — the document is the PJA (it belongs to both PTs: opened by an office role of either)
+    const loan = x.loan_id !== null && x.loan_id !== undefined
+    const docType = x.source_doc_type as 'expense_request' | 'intercompany_loan_disbursement' | 'intercompany_loan_repayment'
+    const base = loan
+      ? { status: x.status, sourceDocType: 'intercompany_loan' as const, sourceDocNo: x.loan_no, sourceDocId: Number(x.loan_id), transferDocNo: null, canOpenSourceDoc: office(A) || office(B) }
+      : { status: x.status, sourceDocType: 'expense_request' as const, sourceDocNo: x.request_no, sourceDocId: Number(x.source_doc_id), transferDocNo: x.transfer_no, canOpenSourceDoc: office(A) }
+    const leg = (side: 'source' | 'target') => (loan ? legOf(docType as 'intercompany_loan_disbursement' | 'intercompany_loan_repayment', side) : null)
+    out.set(Number(x.source_cash_entry_id), { ...base, loanLeg: leg('source'), direction: 'out', counterpartCompany: refs.get(B) ?? null, counterpartEntryNo: x.km_no, counterpartEntryId: Number(x.target_cash_entry_id), canOpenCounterpart: office(B) })
+    out.set(Number(x.target_cash_entry_id), { ...base, loanLeg: leg('target'), direction: 'in', counterpartCompany: refs.get(A) ?? null, counterpartEntryNo: x.kk_no, counterpartEntryId: Number(x.source_cash_entry_id), canOpenCounterpart: office(A) })
   }
   return out
 }

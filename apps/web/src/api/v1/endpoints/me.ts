@@ -1,6 +1,6 @@
 import type { PayloadRequest } from 'payload'
 
-import { companyContextOf, membershipsOf, relId, userRoles, type Membership, type Role } from '@/access/roles'
+import { companyContextOf, exactRolesIn, exactRolesOf, membershipsOf, relId, userRoles, type Membership, type Role } from '@/access/roles'
 import { appSettings, companyById, settings } from '@/domain/companies'
 import { isNoApprovalRule } from '@/domain/expense/decision'
 import { mayFileIntercompany } from '@/domain/expense/drafts'
@@ -57,9 +57,17 @@ export function capabilitiesOf(roles: readonly Role[], opts: { fieldReportsEnabl
 export function meCapabilities(
   req: Parameters<typeof mayFileIntercompany>[0],
   roles: readonly Role[],
-  opts: { fieldReportsEnabled?: boolean; company?: number } = {},
+  opts: { fieldReportsEnabled?: boolean; company?: number; fundCheckEnabled?: boolean } = {},
 ) {
-  return { ...capabilitiesOf(roles, { fieldReportsEnabled: opts.fieldReportsEnabled }), intercompanyPayment: mayFileIntercompany(req, opts.company) }
+  // ADR 0029: the Owner (STORED pk-principal) instructs inter-PT loans; Finance executes the disbursement (lender PT)
+  const stored = opts.company !== undefined ? exactRolesIn(req, opts.company) : exactRolesOf(req.user)
+  return {
+    ...capabilitiesOf(roles, { fieldReportsEnabled: opts.fieldReportsEnabled }),
+    intercompanyPayment: mayFileIntercompany(req, opts.company),
+    instructIntercompanyLoan: stored.includes('pk-principal'),
+    disburseIntercompanyLoan: stored.includes('pk-finance'),
+    fundCheckEnabled: opts.fundCheckEnabled === true,
+  }
 }
 
 /**
@@ -137,7 +145,7 @@ export const meEndpoint = v1({
         roles,
         employeeId: m.employee,
         employee: m.employee !== null ? (employees.get(m.employee) ?? null) : null,
-        capabilities: meCapabilities(req, roles, { fieldReportsEnabled: c.fieldReportsEnabled === true, company: m.company }),
+        capabilities: meCapabilities(req, roles, { fieldReportsEnabled: c.fieldReportsEnabled === true, company: m.company, fundCheckEnabled: (c as { fundCheckEnabled?: boolean | null }).fundCheckEnabled === true }),
         // ADR 0024 / 0026: the caller's own requests in this PT go straight to the Finance transfer queue (APK hint) —
         // since ADR 0026 only an Owner (STORED role) under the zero-step rule "Pengajuan Owner"
         ownRequestNoApproval: (m.exactRoles ?? m.roles).includes('pk-principal') && (await loadActiveRules(req, 'expense_request', m.company)).some(isNoApprovalRule),
@@ -176,7 +184,7 @@ export const meEndpoint = v1({
       // local part → "Pengguna", domain/user-display-name.ts). Additive; `name` keeps the stored account name.
       displayName: await resolveDisplayName(req.payload, req.user),
       roles,
-      capabilities: meCapabilities(req, roles, { fieldReportsEnabled: companies.some((c) => c.selected && c.settings.fieldReportsEnabled) }),
+      capabilities: meCapabilities(req, roles, { fieldReportsEnabled: companies.some((c) => c.selected && c.settings.fieldReportsEnabled), fundCheckEnabled: companies.some((c) => c.selected && c.capabilities.fundCheckEnabled) }),
       employee: legacyEmployeeId !== null ? (employees.get(legacyEmployeeId) ?? null) : null,
       authMethod: u._strategy ?? 'oidcSession',
       device: u._pkDevice ?? null,

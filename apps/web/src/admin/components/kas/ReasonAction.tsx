@@ -32,17 +32,23 @@ export type ReasonActionProps = {
   testId?: string
   /** Navigate here after success instead of refreshing the current view. */
   redirectTo?: string
+  /**
+   * ADR 0029: an explicit confirmation checkbox sent as `{ [field]: true }` when ticked (e.g. `confirmBorrowerShortfall`
+   * of a loan disbursement void — the server answers 409 with the figures while it is missing).
+   */
+  confirm?: { field: string; label: string }
 }
 
 const MIN = 3
 
-export function ReasonAction({ url, label, title, description, confirmLabel, fieldLabel = 'Alasan', field = 'reason', body, required = true, variant = 'danger', size = 'sm', testId, redirectTo }: ReasonActionProps) {
+export function ReasonAction({ url, label, title, description, confirmLabel, fieldLabel = 'Alasan', field = 'reason', body, required = true, variant = 'danger', size = 'sm', testId, redirectTo, confirm }: ReasonActionProps) {
   const router = useRouter()
   const ref = useRef<HTMLDialogElement>(null)
   const key = useRef<string | undefined>(undefined)
   const [value, setValue] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [confirmed, setConfirmed] = useState(false)
   const uid = useId()
   const open = () => {
     setError(null)
@@ -63,6 +69,7 @@ export function ReasonAction({ url, label, title, description, confirmLabel, fie
     try {
       const payload: Record<string, unknown> = { ...(body ?? {}) }
       if (v) payload[field] = v
+      if (confirm && confirmed) payload[confirm.field] = true
       const r = await sendJson('POST', url, payload, key.current)
       if (!r.ok) {
         setError(r.error)
@@ -121,6 +128,20 @@ export function ReasonAction({ url, label, title, description, confirmLabel, fie
               <p className="help">Tercatat di audit log. Minimal {MIN} karakter.</p>
             ) : null}
           </div>
+          {confirm ? (
+            <label className="pk-fld" style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+              <input
+                type="checkbox"
+                checked={confirmed}
+                onChange={(e) => {
+                  setConfirmed(e.target.checked)
+                  key.current = newIdemKey() // other body → other key
+                }}
+                data-pk-confirm-field={confirm.field}
+              />
+              <span>{confirm.label}</span>
+            </label>
+          ) : null}
           <div className="foot">
             <button type="button" className="pk-kbtn" onClick={close} disabled={busy}>
               Batal

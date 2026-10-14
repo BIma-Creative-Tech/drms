@@ -11,6 +11,7 @@ import { rekapAftersales, rekapTimesheetKontrak } from './field-reports'
 import { projectProgressVsBudget } from './progress'
 import { slaTransferReport } from './sla-report'
 import { pinjamanReport } from '@/domain/loans/report'
+import { pinjamanAntarPtReport } from '@/domain/intercompany/loan-report'
 import { auditLogCount, auditLogPage, AUDIT_PAGE, AUDIT_SOURCES, parseAuditFilter, type AuditFilter } from './audit-log'
 import {
   cashBalances,
@@ -313,6 +314,11 @@ const rekapKas: ReportDef = {
       // ADR 0028
       intercompany: 'Antar PT (masuk)',
       intercompany_transfer: 'Transfer antar PT (keluar)',
+      // ADR 0029 §3.9: inter-PT loans (piutang / hutang antar-PT)
+      icloan_given: 'Pinjaman antar-PT diberikan (piutang)',
+      icloan_received: 'Pinjaman antar-PT diterima (hutang)',
+      icloan_repaid_in: 'Pengembalian pinjaman antar-PT diterima',
+      icloan_repaid_out: 'Pembayaran hutang antar-PT',
     }
     return {
       main,
@@ -1180,7 +1186,7 @@ function withCompanies(def: ReportDef): ReportDef {
   }
 }
 
-export const REPORTS: ReportDef[] = [rekapKas, bukuKas, pengeluaranKategori, anggaranProject, rekapPengajuan, kelengkapan, slaTransferReport, biayaKendaraan, absensiReport, rekapTimesheetKontrak, rekapAftersales, pinjamanReport].map(withCompanies)
+export const REPORTS: ReportDef[] = [rekapKas, bukuKas, pengeluaranKategori, anggaranProject, rekapPengajuan, kelengkapan, slaTransferReport, biayaKendaraan, absensiReport, rekapTimesheetKontrak, rekapAftersales, pinjamanReport, pinjamanAntarPtReport].map(withCompanies)
 export const AUDIT_REPORT = withCompanies(auditLog)
 export const ALL_REPORTS: ReportDef[] = [...REPORTS, AUDIT_REPORT]
 export const REPORT_CODES = ALL_REPORTS.map((r) => r.code)

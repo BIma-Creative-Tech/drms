@@ -135,11 +135,13 @@ export function canVoid(e: Pick<CashEntryDoc, 'sourceType' | 'status'>): boolean
 }
 
 /** Why a row has no Void button (shown as a hint). */
-export function voidHint(e: Pick<CashEntryDoc, 'sourceType' | 'status'>): string | null {
+export function voidHint(e: Pick<CashEntryDoc, 'sourceType' | 'status'>, ic?: { sourceDocType?: string } | null): string | null {
   if (e.status === 'void') return null
   if (e.sourceType === 'transfer') return 'Batalkan lewat transfer pengajuan'
   if (e.sourceType === 'reversal') return 'Jurnal balik tidak dapat di-void'
   if (e.sourceType === 'settlement_refund') return 'Bagian dari LPJ'
+  // ADR 0029: a leg of an inter-PT loan — voided through the loan (PJA) by Finance of the paying PT
+  if (e.sourceType === 'intercompany' && ic?.sourceDocType === 'intercompany_loan') return 'Di-void lewat pinjaman antar-PT (PJA) oleh Finance PT pembayar'
   // ADR 0028: the receiving PT's automatic KM — voided only by the paying PT's transfer void
   if (e.sourceType === 'intercompany') return 'Di-void lewat pembatalan transfer di PT pengirim'
   return null

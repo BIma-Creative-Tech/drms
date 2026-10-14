@@ -193,6 +193,16 @@ const LoanBlock = z
     waitingForMe: z.number().int().meta({ description: 'Loans waiting for the caller\'s decision (Direktur; 0 otherwise)' }),
   })
   .meta({ description: 'ADR 0022 §9 "Pinjaman antar project": loanScope (office roles: their PTs, PM: team projects as borrower or lender).' })
+const IntercompanyBlock = z
+  .object({
+    funds: z
+      .array(z.object({ companyId: ptId, balance: z.number().int(), commitments: z.number().int(), available: z.number().int(), fundCheckEnabled: z.boolean() }))
+      .meta({ description: 'ADR 0029 §1 "Dana tersedia" per PT of the scope (active accounts without a site − commitments).' }),
+    positions: z
+      .array(z.object({ companyId: ptId, receivable: z.number().int(), payable: z.number().int(), overdue: z.number().int(), instructed: z.number().int() }))
+      .meta({ description: 'ADR 0029 §3.9 "Hutang / piutang antar-PT": outstanding per PT as lender (piutang) / borrower (hutang); instructed = reserved, not yet disbursed.' }),
+  })
+  .meta({ description: 'ADR 0029: inter-PT funds and loans (Owner / Direktur layout).' })
 const RapMissingBlock = z
   .object({
     team: z.boolean().meta({ description: 'true = PM layout (the PM\'s team projects only)' }),
@@ -270,6 +280,7 @@ export const OwnerDashboard = z.object({
   transferQueue: TransferQueueSummary,
   sla: SlaBlock,
   loans: LoanBlock,
+  intercompany: IntercompanyBlock,
   rapMonitoring: RapMonitoringBlock,
   rapMissing: RapMissingBlock,
   viz: z.object({

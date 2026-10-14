@@ -10,6 +10,7 @@ import { KAS_STYLE } from './kas/style'
 import { Act, RequesterActions, type RequesterActionsProps } from './RequesterActions'
 import { ReviewDetails } from './ReviewDetails'
 import { ChangeLog } from './request/ChangeLog'
+import { FundPanel } from './request/FundPanel'
 import { loadRequestPanel } from './request/panel-data'
 import { RequestStepper } from './request/RequestStepper'
 import { RequestSummary } from './request/RequestSummary'
@@ -127,6 +128,10 @@ export async function WorkflowPanel(props: UIFieldServerProps) {
         {d.rejectReason ? <div style={{ marginTop: 6, color: 'var(--theme-error-500)' }}>Alasan ditolak: {d.rejectReason}</div> : null}
         {d.cancelReason ? <div style={{ marginTop: 6 }}>Alasan batal: {d.cancelReason}</div> : null}
       </section>
+      {/* ADR 0029 §2: "Ketersediaan dana PT" (Kas roles of the PT; waiting request or the Owner's own Draft) */}
+      <div data-pk-read>
+        <FundPanel d={d} />
+      </div>
       <div data-pk-read>
         {/* B-2 item 3 / Persetujuan #7: read-only summary on every status (the read mode of a Draft too) */}
         <RequestSummary d={d} ptName={ptName} attachments={attachments} canRevealBank={own || office} draftBank={data.draftBank} />

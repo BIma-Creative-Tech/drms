@@ -54,6 +54,16 @@ export const Capabilities = z
       description:
         'ADR 0028: may file a "PT grup" payment (Pembayaran antar-PT) — holds Finance, PM or Direktur (pk-owner) AS STORED (the server\'s filer rule). Unlike the effective `roles`, false for an Owner (pk-principal) without one of those roles. Absent on servers before this field (APK fallback: the payee directory).',
     }),
+    instructIntercompanyLoan: z.boolean().meta({
+      description:
+        'ADR 0029: Owner (pk-principal AS STORED) — may instruct a "Pinjaman antar-PT" (POST /intercompany-loans; the lender list GET /intercompany-loans/lenders) and sees `instruct_loan` on a short request. The server re-checks the Owner role in BOTH PTs.',
+    }),
+    disburseIntercompanyLoan: z.boolean().meta({
+      description: 'ADR 0029: Finance (stored) — the "Pencairan pinjaman antar-PT" queue (GET /intercompany-loans/queue) and the disbursement of loans whose LENDER is this PT (never one the caller instructed, G1).',
+    }),
+    fundCheckEnabled: z.boolean().meta({
+      description: 'ADR 0029: companies.fundCheckEnabled of this PT (top level: any selected PT) — the final approval / the Owner\'s own submit is refused (409 FUND_INSUFFICIENT) when the PT\'s available funds are short. Off = the fund panel is information only.',
+    }),
   })
   .meta({ id: 'Capabilities', description: 'UI hints for the APK (E1); the server guards stay authoritative.' })
 

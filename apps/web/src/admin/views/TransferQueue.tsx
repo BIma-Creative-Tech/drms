@@ -19,6 +19,7 @@ import { MoneyForm } from '../components/MoneyForm'
 import { ReimburseReceiptReview, loadReimburseReview } from '../components/ReimburseReceiptReview'
 import { SlaAgeBadge } from '../components/SlaAgeBadge'
 import { accountsOf, itemCompany, PtChip, PtScopeNote, ptView } from './pt'
+import { IcLoanQueueSection } from './IntercompanyLoans'
 import { Empty, Forbidden, Shell, TableScroll, allowed, badge, docLink, num, rp, table, td, th } from './shared'
 
 /**
@@ -201,6 +202,8 @@ export async function TransferQueue(props: AdminViewServerProps) {
       )}
       {items.length > 0 ? <Pager id="antrian-transfer" path="/admin/antrian-transfer" sp={props.searchParams} page={page} unit="pengajuan" /> : null}
       <style>{KAS_STYLE}</style>
+      {/* ADR 0029 §3.5: "Pencairan pinjaman antar-PT" — instructed loans whose lender is a PT where the caller is Finance */}
+      <IcLoanQueueSection req={req} />
       {/* E2 (US-24, T8): recorded transfers that can still be voided (request "Sudah Ditransfer"). */}
       <h2 id="transfer-tercatat" style={{ marginTop: 32 }}>
         Transfer tercatat — dapat dibatalkan ({donePage.total})

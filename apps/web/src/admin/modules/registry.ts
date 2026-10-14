@@ -198,6 +198,8 @@ export const MODULES: readonly ModuleDef[] = [
         label: 'Pinjaman',
         items: [
           { view: '/pinjaman', label: 'Pinjaman antar project', roles: OFFICE_PM_ADMIN, navKey: 'pinjaman' },
+          // ADR 0029: inter-PT loans (Owner instructs, Finance of the lender disburses, Finance of the borrower repays)
+          { view: '/pinjaman-antar-pt', label: 'Pinjaman antar-PT', roles: ['pk-owner', 'pk-finance', 'pk-admin'], navKey: 'pinjaman-antar-pt' },
           { collection: 'project-loans', label: 'Data pinjaman' },
           { collection: 'project-loan-repayments', label: 'Data pengembalian pinjaman' },
         ],
@@ -544,6 +546,7 @@ export const ITEM_ICONS: Readonly<Record<string, IconName>> = {
   '/tutup-buku': 'tLock',
   '/collections/period-closings': 'tArchiveTick',
   '/pinjaman': 'tMoneyChange',
+  '/pinjaman-antar-pt': 'tCardSend',
   '/collections/project-loans': 'tArchiveBook',
   '/collections/project-loan-repayments': 'tMoneyRecive',
   // Absensi

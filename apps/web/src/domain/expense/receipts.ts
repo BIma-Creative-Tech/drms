@@ -6,6 +6,7 @@ import { writeAudit } from '@/audit/writer'
 import { ORPHAN_MARK } from '@/domain/media-orphans'
 import { rapOverBudgetLines } from '@/domain/rap/budget'
 import { getRequestTx } from '@/lib/tx'
+import { checkFundsForApproval } from '@/domain/fundcheck/service'
 
 import { actorContext, fail, ids, loadRaw, loadVisible, requireAction, requireActionAudited, settings, today, updateRequest, type RequestDoc } from './common'
 import { mayViewFlag, withFlagVisibility } from './flag-visibility'
@@ -399,6 +400,9 @@ export async function resubmitReceipts(req: PayloadRequest, requestId: number) {
  */
 export async function approveWithoutDecision(req: PayloadRequest, doc: RequestDoc): Promise<RequestDoc> {
   if (doc.status !== 'pending_approval' || !isNoApproval(doc.approvalSnapshot)) return doc
+  // ADR 0029 §1 (owner 2026-10-15): the Owner's own request is checked HERE (submit / receipt resubmit) — short funds
+  // (switch on) → 409 FUND_INSUFFICIENT, the whole submit rolls back and the request stays Draft
+  await checkFundsForApproval(req, doc, doc.approvalCycle && doc.approvalCycle > 1 ? 'receipts_resubmit' : 'submit')
   const approved = await updateRequest(req, doc.id, { status: 'approved', approvedAmount: doc.grandTotal ?? 0, approvedAt: new Date().toISOString() })
   await writeSnapshot(req, approved, 'approve')
   await syncProjectRapFlags(req, doc.id)

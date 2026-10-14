@@ -95,6 +95,9 @@ import { ModuleLanding as ModuleLanding_72aa9cb004784b713db133bbda520731 } from 
 import { LoanList as LoanList_e5d452935824a68d96fdc373e55d7f95 } from '@/admin/views/Loans'
 import { LoanNew as LoanNew_e5d452935824a68d96fdc373e55d7f95 } from '@/admin/views/Loans'
 import { LoanDetail as LoanDetail_e5d452935824a68d96fdc373e55d7f95 } from '@/admin/views/Loans'
+import { IcLoanList as IcLoanList_b223b638967a0af97c0e72d82469d43e } from '@/admin/views/IntercompanyLoans'
+import { IcLoanNew as IcLoanNew_b223b638967a0af97c0e72d82469d43e } from '@/admin/views/IntercompanyLoans'
+import { IcLoanDetail as IcLoanDetail_b223b638967a0af97c0e72d82469d43e } from '@/admin/views/IntercompanyLoans'
 import { PenggunaView as PenggunaView_fad9889f096e54cb6a767f508ef49231 } from '@/admin/views/Pengguna'
 import { RapIndex as RapIndex_773cef30cdd6663e7e587999e07fc5eb } from '@/admin/views/Rap'
 import { RapProject as RapProject_773cef30cdd6663e7e587999e07fc5eb } from '@/admin/views/Rap'
@@ -199,6 +202,9 @@ export const importMap = {
   "@/admin/views/Loans#LoanList": LoanList_e5d452935824a68d96fdc373e55d7f95,
   "@/admin/views/Loans#LoanNew": LoanNew_e5d452935824a68d96fdc373e55d7f95,
   "@/admin/views/Loans#LoanDetail": LoanDetail_e5d452935824a68d96fdc373e55d7f95,
+  "@/admin/views/IntercompanyLoans#IcLoanList": IcLoanList_b223b638967a0af97c0e72d82469d43e,
+  "@/admin/views/IntercompanyLoans#IcLoanNew": IcLoanNew_b223b638967a0af97c0e72d82469d43e,
+  "@/admin/views/IntercompanyLoans#IcLoanDetail": IcLoanDetail_b223b638967a0af97c0e72d82469d43e,
   "@/admin/views/Pengguna#PenggunaView": PenggunaView_fad9889f096e54cb6a767f508ef49231,
   "@/admin/views/Rap#RapIndex": RapIndex_773cef30cdd6663e7e587999e07fc5eb,
   "@/admin/views/Rap#RapProject": RapProject_773cef30cdd6663e7e587999e07fc5eb,

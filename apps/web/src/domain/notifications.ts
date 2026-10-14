@@ -470,6 +470,9 @@ export function notificationHref(docType: string | null | undefined, docId: stri
       return `/admin/addendum/detail/${docId}`
     case 'project_loan':
       return `/admin/pinjaman/detail/${docId}`
+    // ADR 0029: inter-PT loan (PJA) — its detail is readable by the office roles of either PT
+    case 'intercompany_loan':
+      return `/admin/pinjaman-antar-pt/detail/${docId}`
     // ADR 0028: the receiving PT's automatic Kas Masuk (Finance / Direktur of that PT read cash entries)
     case 'cash_entry':
       return `/admin/collections/cash-entries/${docId}`
