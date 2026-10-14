@@ -125,7 +125,7 @@ describe('owner 2026-10-13: a used item ("Sudah terpakai") stays editable, any c
   let proj = 0
 
   it('PM: used item without reason → 400 field reason; with reason → 200 + audit row with the reason; unused item → no reason; RAP not locked', async () => {
-    // PT explicit: this file adds a second active PT (foreignPt) before this test
+    // the foreign PT of this file exists by now → name the world PT explicitly
     proj = await sysCreate('projects', { company: await companyId(), code: `${tag}-USE`, name: `${tag} Pagar gudang`, kind: 'umum', pm: w.users.pm.id, budget: 10_000_000, status: 'berjalan' }, { rap: false })
     await sysCreate('team-assignments', { employee: w.emp.a, project: proj, roleInProject: 'staff' })
     for (const [code, description] of [
