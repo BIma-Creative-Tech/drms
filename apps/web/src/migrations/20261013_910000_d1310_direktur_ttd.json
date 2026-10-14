@@ -23761,7 +23761,8 @@
         "2fa_disabled",
         "privacy_ack",
         "overdraft_confirmed",
-        "bank_unverified_confirmed"
+        "bank_unverified_confirmed",
+        "renumbered"
       ]
     },
     "public.enum_audit_logs_source": {
