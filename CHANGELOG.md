@@ -31,8 +31,61 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - **Owner role = group admins only** (owner decision 2026-10-14): only a group admin grants or removes `pk-principal`
   — `company-memberships` hook (403 "Peran Owner hanya dapat diberikan atau dicabut oleh Admin grup."), so REST, the
   Akses PT matrix and the Pengguna form are all covered; PT admins don't get the option (shown locked where held).
+- **With ADR 0025 (definitive Direktur per PT):** the Owner level is never a Direktur step — the Owner always signs with
+  his own profile / drawn signature, never the PT's Direktur signature; the PDF Approval box prints a representative's
+  decision as "Nama (Jabatan)" of the definitive Direktur and the other levels with their role ("… (Owner)").
 - **Deploy step:** after migrating, a **group admin** ticks **Owner** for the Owner in every PT — until then submissions under a rule with
   an Owner level answer 409 ("Tidak ada pengguna aktif … (peran Owner)").
+
+### Added (DRMS — tanda tangan Direktur definitif per PT)
+
+- **Per-PT definitive Direktur** (ADR 0025, owner requirement DRMS 13/10 A3). Perusahaan (PT) → new tab **"Direktur
+  definitif"**: name, title (jabatan), signature PNG and the designated representatives ("wakil penanda tangan" —
+  users with the Direktur role in that PT). Changed by the Admin of the PT / group admins only; read by the PT's
+  Admin / Direktur / Finance. A configuration is complete (name + signature) or empty; the signature must be a new
+  upload (never a user's profile signature); representatives must hold the Direktur role in the PT.
+- **Representative signs as the PT's Direktur on the Direktur step.** When a representative decides a Direktur step
+  (ADR 0021 Persetujuan Direktur, ADR 0013 / Addendum "Diketahui" by the Direktur role or delegated to the Direktur
+  tier, LPJ shortfall re-approval, inter-project loan decision — approve and reject) the approval row stores the PT's
+  signature (`signatureSource = company`), `actorName` = the definitive Direktur and a name/title snapshot
+  (`representedDirektur`); `actor` stays the real user (G1, one position per person, forensics). A drawn signature
+  sent by the representative is ignored. PTs without the configuration, non-representative Direktur and every
+  non-Direktur step (PM, Finance, named user, Diajukan / Dibuat) are unchanged.
+- **Display:** PDF "Pengajuan Biaya" prints the PT Direktur's signature and "Nama (Jabatan)" with no "via app" note;
+  approval timeline / stepper, decision lists, API `approvals[].actorName`, loans `decidedBy`, Log perubahan / Riwayat
+  (`GET …/history` → APK) and the audit-log report show the definitive Direktur (`audit_logs.actor_display_name`;
+  `user_id` stays the real user). `GET /expense-requests/{id}` gains `direkturSignature {name, title, signatureId}`
+  (OpenAPI updated); the APK decision sheet then shows "Tanda tangan Direktur PT" read-only, the web decision bar names
+  it. The admin "Approval & tanda tangan" form hides the user of company-signed rows.
+- **Security:** the PT signature file is readable only by the office roles of that PT (owner link `company_direktur`,
+  immutable), never through the "uploads of members" rule nor the request-signature fallback of
+  `GET /api/v1/media/signatures/{id}/file` (Staff / PM: 404). DB guard: company-signed approval rows only from a
+  designated representative holding the Direktur role in the row's PT, with the PT's current signature / name / title;
+  CHECK signature source ⇔ snapshot. Migrations `20261013_910000_d1310_direktur_ttd` +
+  `20261013_910100_d1310_direktur_ttd_guard` (additive).
+
+### Added (DRMS 13/10 Wave 4 — one-time document renumbering)
+
+- **One-time controlled renumbering** (client Umum #1: "Reset penomoran dari 1 dan bentuk ulang nomor yang sudah ada
+  berdasarkan tanggal dibuat. Kas Masuk belum ada kode singkat PT."; owner decision D1). CLI
+  `apps/web/src/renumber/cli.ts` (migrate image, OWNER DSN; runbook `docs/proyekkas/runbooks/penomoran-ulang.md`):
+  `--dry-run` (read-only: full old → new mapping as JSON + CSV, derived-text changes, counters, pattern fixes, plan
+  sha256) → `--apply --expect-sha256 <reviewed>` (ONE transaction, refuses a changed plan / a second run / any plan
+  error) → `--verify`. Per PT × doc type × month of the document, ordered by `created_at` (tie: id), numbered 1..n with
+  the PT's current pattern; a pattern without `{COMPANY}` (the custom KM `KM/{YY}{MM}/{seq}`) moves to the D5 default
+  `KM/{COMPANY}/{YY}{MM}/{seq}` first. Numbers copied elsewhere are rewritten in the same transaction (cash-entry
+  descriptions, notification number/title/body, duplicate-receipt flags); counters = last number + 1, so the next new
+  document continues at n + 1. NOT run on deploy — the infra Lead runs it staging → prod with the owner's go.
+- **Audit**: new action `renumbered` — one row per renumbered document (field `docNo` / `entryNo`, old → new, same
+  `tx_id`) and per rewritten cash-entry description; "Log perubahan" / "Riwayat" show **"Nomor diubah: lama → baru"**.
+  Old audit rows are not rewritten (append-only).
+- **DB (migration `20261013_610000_d1310_renumber`, changes no document)**: `document_renumber_runs` (one row per PT,
+  UNIQUE → a second run is refused; owner-only writes), `pk_renumber_bypass()` and a guard prelude in
+  `pk_protect_columns`, `pk_counter_monotonic` and the expense-request / transfer / LPJ / ledger / progress /
+  field-report / addendum / loan / receipt-flag guards: a number / derived-text change passes ONLY with the session
+  flag `pk.renumber = 'on'` AND a running run row of the current transaction AND no other column changed — every
+  ordinary write stays blocked. ADR 0007 "Amendment 2026-10-13" records the one-time exception; the never-rewrite rule
+  stays in force afterwards.
 
 ### Changed (DRMS 13/10 Wave 3 — dashboard parity APK)
 

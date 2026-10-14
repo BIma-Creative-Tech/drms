@@ -4,7 +4,8 @@ import { APIError, type PayloadRequest, type Where } from 'payload'
 import { companiesWithRole, exactRolesIn, exactRolesOf, hasRoleAny, mappedCompanies, relId, userId, userRoles, type Role } from '@/access/roles'
 import { resolveScope } from '@/access/scope'
 import { writeAudit, writeAuditDetached } from '@/audit/writer'
-import { displayName, projectCommitted, resolveSignature, today, type Signature } from '@/domain/expense/common'
+import { isDirekturStep, signDecision, signerColumns, type DecisionSigner } from '@/domain/direktur-signature'
+import { displayName, projectCommitted, today } from '@/domain/expense/common'
 import { lacksDecisionRole } from '@/domain/expense/decision'
 import { lastLevel, matchesAcknowledger, matchesStep, selectRule, type ApprovalSnapshot } from '@/domain/expense/rules'
 import { loadActiveRules, snapshotForRule } from '@/domain/expense/snapshot'
@@ -415,7 +416,7 @@ type SignOpts = { signatureMediaId?: number | null }
 async function insertDecision(
   req: PayloadRequest,
   doc: AddendumDoc,
-  row: { position: 'diketahui' | 'approval'; level: number; decision: 'acknowledged' | 'approved' | 'rejected'; reason?: string | null; signature: Signature | null; impact: { pctBefore: number | null; pctAfter: number | null } },
+  row: { position: 'diketahui' | 'approval'; level: number; decision: 'acknowledged' | 'approved' | 'rejected'; reason?: string | null; signer: DecisionSigner; impact: { pctBefore: number | null; pctAfter: number | null } },
 ): Promise<void> {
   const caller = userId(req)!
   const meta = requestMeta(req)
@@ -428,15 +429,12 @@ async function insertDecision(
       position: row.position,
       level: row.level,
       actor: caller,
-      actorName: await displayName(req, caller),
       onBehalf: false,
       decision: row.decision,
       reason: row.reason ?? null,
       budgetPctBefore: row.impact.pctBefore,
       budgetPctAfter: row.impact.pctAfter,
-      signature: row.signature?.mediaId ?? null,
-      signatureSha256: row.signature?.sha256 ?? null,
-      signatureSource: row.signature ? row.signature.source : 'none',
+      ...signerColumns(row.signer), // ADR 0025: signature + display name (the PT's definitive Direktur when represented)
       deviceId: meta.deviceId ?? null,
       source: meta.source,
     } as never,
@@ -452,10 +450,21 @@ async function insertDecision(
       docId: String(doc.id),
       docNo: doc.docNo ?? undefined,
       field: row.position,
-      newValue: { level: row.level, decision: row.decision, addition: doc.addition, budgetPctBefore: row.impact.pctBefore, budgetPctAfter: row.impact.pctAfter, signatureSource: row.signature?.source ?? 'none' },
+      newValue: { level: row.level, decision: row.decision, addition: doc.addition, budgetPctBefore: row.impact.pctBefore, budgetPctAfter: row.impact.pctAfter, signatureSource: row.signer.signature?.source ?? 'none' },
       reason: row.reason ?? undefined,
     },
   ])
+}
+
+/** ADR 0025: the Direktur "Diketahui" of an addendum decided by a designated representative → the PT's definitive Direktur signature. */
+function addendumSigner(req: PayloadRequest, doc: AddendumDoc, position: 'diketahui' | 'approval', level: number, opts: SignOpts): Promise<DecisionSigner> {
+  return signDecision(req, {
+    companyId: relId((doc as { company?: unknown }).company),
+    callerId: userId(req)!,
+    direkturStep: isDirekturStep(doc.approvalSnapshot, position, level),
+    capturedId: opts.signatureMediaId,
+    required: false,
+  })
 }
 
 /**
@@ -496,8 +505,8 @@ export async function acknowledgeAddendum(req: PayloadRequest, id: number, opts:
   await requireAction(req, visible, 'acknowledge')
   const doc = await loadRawAddendum(req, id)
   const project = await loadProject(req, relId(doc.project)!)
-  const sig = await resolveSignature(req, userId(req)!, opts.signatureMediaId)
-  await insertDecision(req, doc, { position: 'diketahui', level: 0, decision: 'acknowledged', signature: sig, impact: await budgetImpact(req, project, doc.addition) })
+  const sig = await addendumSigner(req, doc, 'diketahui', 0, opts)
+  await insertDecision(req, doc, { position: 'diketahui', level: 0, decision: 'acknowledged', signer: sig, impact: await budgetImpact(req, project, doc.addition) })
   const snap = doc.approvalSnapshot!
   if (lastLevel(snap) === 0) return finalize(req, doc, project) // only approval level skipped (G1-2)
   const next = await updateAddendum(req, id, { status: 'pending_approval', currentLevel: 1 })
@@ -512,8 +521,8 @@ export async function approveAddendum(req: PayloadRequest, id: number, opts: Sig
   const doc = await loadRawAddendum(req, id)
   const project = await loadProject(req, relId(doc.project)!)
   const level = doc.currentLevel ?? 1
-  const sig = await resolveSignature(req, userId(req)!, opts.signatureMediaId)
-  await insertDecision(req, doc, { position: 'approval', level, decision: 'approved', signature: sig, impact: await budgetImpact(req, project, doc.addition) })
+  const sig = await addendumSigner(req, doc, 'approval', level, opts)
+  await insertDecision(req, doc, { position: 'approval', level, decision: 'approved', signer: sig, impact: await budgetImpact(req, project, doc.addition) })
   if (level < lastLevel(doc.approvalSnapshot!)) {
     const next = await updateAddendum(req, id, { currentLevel: level + 1 })
     await notifyStep(req, next, project)
@@ -528,9 +537,9 @@ export async function rejectAddendum(req: PayloadRequest, id: number, reason: st
   await requireAction(req, visible, 'reject')
   const doc = await loadRawAddendum(req, id)
   const project = await loadProject(req, relId(doc.project)!)
-  const sig = await resolveSignature(req, userId(req)!, opts.signatureMediaId)
   const ack = doc.status === 'pending_ack'
-  await insertDecision(req, doc, { position: ack ? 'diketahui' : 'approval', level: ack ? 0 : (doc.currentLevel ?? 1), decision: 'rejected', reason: reason.trim(), signature: sig, impact: await budgetImpact(req, project, doc.addition) })
+  const sig = await addendumSigner(req, doc, ack ? 'diketahui' : 'approval', ack ? 0 : (doc.currentLevel ?? 1), opts)
+  await insertDecision(req, doc, { position: ack ? 'diketahui' : 'approval', level: ack ? 0 : (doc.currentLevel ?? 1), decision: 'rejected', reason: reason.trim(), signer: sig, impact: await budgetImpact(req, project, doc.addition) })
   const rejected = await updateAddendum(req, id, { status: 'rejected', rejectReason: reason.trim(), decidedAt: new Date().toISOString(), currentLevel: null }, reason.trim())
   const creator = relId(doc.createdBy)
   await notify(req, rejected, 'addendum.rejected', creator ? [creator] : [], project)

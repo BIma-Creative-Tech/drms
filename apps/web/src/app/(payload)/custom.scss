@@ -2550,6 +2550,23 @@ $pk-modules: dashboard, persetujuan, proyek, keuangan, absensi, laporan, penggun
       }
     }
 
+    // ADR 0025 (Perusahaan → tab "Direktur definitif"): single Payload fields with `admin.className: 'pk-ll'` get
+    // the same label-left cell (one column — the tab has four fields)
+    .field-type.pk-ll {
+      @include pk-label-left-cell;
+
+      > * {
+        grid-column: 2;
+        min-width: 0;
+      }
+
+      > .field-label {
+        @include pk-label-left-label;
+        grid-row: 1 / span 4;
+        grid-column: 1;
+      }
+    }
+
     // the same grid for custom client forms (W3 Pengguna): .pk-fgrid > .pk-fgrid__row (label + control)
     .pk-fgrid {
       @include pk-form-grid;

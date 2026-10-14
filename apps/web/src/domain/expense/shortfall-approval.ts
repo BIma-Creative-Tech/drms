@@ -7,7 +7,9 @@ import { notificationTemplate, pushEnabled } from '@/domain/notifications'
 import { formatRupiah } from '@/lib/money'
 import { requestMeta } from '@/lib/request-meta'
 
-import { actorContext, displayName, fail, ids, loadRaw, loadVisible, requireActionAudited, resolveSignature, selfApprovalAllowed, type RequestDoc, type Signature } from './common'
+import { isDirekturStep, signDecision, signerColumns, type DecisionSigner } from '@/domain/direktur-signature'
+
+import { actorContext, fail, ids, loadRaw, loadVisible, requireActionAudited, selfApprovalAllowed, type RequestDoc } from './common'
 import { DIREKTUR_VIA_PM_SELF, isDecisionRole, isNoApproval, isSelfApproval, lacksDecisionRole, noApprovalNote } from './decision'
 import { requireSettlement, settlementOfRequest, shortfallStateOf, updateSettlement, type SettlementDoc } from './lpj'
 import { lastLevel, matchesAcknowledger, matchesStep, type ApprovalSnapshot } from './rules'
@@ -282,7 +284,7 @@ async function requireDecision(req: PayloadRequest, raw: RequestDoc, s: Settleme
   fail(403, 'Anda bukan pemutus pada langkah persetujuan kekurangan ini.')
 }
 
-async function insertDecision(req: PayloadRequest, s: SettlementDoc, row: { position: 'diketahui' | 'approval'; level: number; decision: 'acknowledged' | 'approved' | 'rejected'; reason?: string | null; signature: Signature | null }): Promise<void> {
+async function insertDecision(req: PayloadRequest, s: SettlementDoc, row: { position: 'diketahui' | 'approval'; level: number; decision: 'acknowledged' | 'approved' | 'rejected'; reason?: string | null; signer: DecisionSigner }): Promise<void> {
   const caller = userId(req)!
   const meta = requestMeta(req)
   await req.payload.create({
@@ -294,13 +296,10 @@ async function insertDecision(req: PayloadRequest, s: SettlementDoc, row: { posi
       position: row.position,
       level: row.level,
       actor: caller,
-      actorName: await displayName(req, caller),
       onBehalf: false,
       decision: row.decision,
       reason: row.reason ?? null,
-      signature: row.signature?.mediaId ?? null,
-      signatureSha256: row.signature?.sha256 ?? null,
-      signatureSource: row.signature ? row.signature.source : 'none',
+      ...signerColumns(row.signer), // ADR 0025: signature + display name (the PT's definitive Direktur when represented)
       deviceId: meta.deviceId ?? null,
       source: meta.source,
     } as never,
@@ -316,7 +315,7 @@ async function insertDecision(req: PayloadRequest, s: SettlementDoc, row: { posi
       docId: String(s.id),
       docNo: s.docNo ?? undefined,
       field: `shortfall_${row.position}`,
-      newValue: { level: row.level, decision: row.decision, cycle: s.shortfallApprovalCycle ?? 1, amount: s.shortfallApprovalAmount ?? null, signatureSource: row.signature?.source ?? 'none' },
+      newValue: { level: row.level, decision: row.decision, cycle: s.shortfallApprovalCycle ?? 1, amount: s.shortfallApprovalAmount ?? null, signatureSource: row.signer.signature?.source ?? 'none' },
       reason: row.reason ?? undefined,
     },
   ])
@@ -334,28 +333,36 @@ export async function decideShortfall(req: PayloadRequest, id: number, action: S
   if (!s || s.status !== 'verified') fail(409, 'Tidak ada LPJ terverifikasi yang menunggu persetujuan kekurangan.')
   await requireDecision(req, raw, s!, action)
   const caller = userId(req)!
-  const sig = await resolveSignature(req, caller, opts.signatureMediaId)
-  if (!sig && action !== 'reject') fail(409, 'Tanda tangan wajib: unggah tanda tangan di profil atau kirim signatureMediaId (US-43).')
   const snap = s!.shortfallApprovalSnapshot as ApprovalSnapshot
+  // ADR 0025: the Direktur step decided by a designated representative → the PT's definitive Direktur signature
+  const position = action === 'acknowledge' || (action === 'reject' && s!.shortfallApprovalStatus === 'pending_ack') ? 'diketahui' : 'approval'
+  const sig = await signDecision(req, {
+    companyId: relId((raw as { company?: unknown }).company),
+    callerId: caller,
+    direkturStep: isDirekturStep(snap, position, position === 'diketahui' ? 0 : (s!.shortfallApprovalLevel ?? 1)),
+    capturedId: opts.signatureMediaId,
+    required: action !== 'reject',
+    missingMessage: 'Tanda tangan wajib: unggah tanda tangan di profil atau kirim signatureMediaId (US-43).',
+  })
   if (action === 'reject') {
     const reason = (opts.reason ?? '').trim()
     if (reason.length < 3) fail(400, 'Alasan penolakan wajib diisi (minimal 3 karakter).', [{ path: 'reason', message: 'Wajib.' }])
     const ack = s!.shortfallApprovalStatus === 'pending_ack'
-    await insertDecision(req, s!, { position: ack ? 'diketahui' : 'approval', level: ack ? 0 : (s!.shortfallApprovalLevel ?? 1), decision: 'rejected', reason, signature: sig })
+    await insertDecision(req, s!, { position: ack ? 'diketahui' : 'approval', level: ack ? 0 : (s!.shortfallApprovalLevel ?? 1), decision: 'rejected', reason, signer: sig })
     const rejected = await updateSettlement(req, s!.id, { shortfallApprovalStatus: 'rejected', shortfallApprovalLevel: null, shortfallRejectReason: reason }, reason)
     delete req.context.auditReason
     await notify(req, raw, rejected, 'expense.shortfall_rejected', await financeOf(req, raw))
     return rejected
   }
   if (action === 'acknowledge') {
-    await insertDecision(req, s!, { position: 'diketahui', level: 0, decision: 'acknowledged', signature: sig })
+    await insertDecision(req, s!, { position: 'diketahui', level: 0, decision: 'acknowledged', signer: sig })
     if (lastLevel(snap) === 0) return finalize(req, raw, s!) // only approval level skipped (G1-2)
     const next = await updateSettlement(req, s!.id, { shortfallApprovalStatus: 'pending_approval', shortfallApprovalLevel: 1 })
     await notifyStep(req, raw, next)
     return next
   }
   const level = s!.shortfallApprovalLevel ?? 1
-  await insertDecision(req, s!, { position: 'approval', level, decision: 'approved', signature: sig })
+  await insertDecision(req, s!, { position: 'approval', level, decision: 'approved', signer: sig })
   if (level < lastLevel(snap)) {
     const next = await updateSettlement(req, s!.id, { shortfallApprovalLevel: level + 1 })
     await notifyStep(req, raw, next)

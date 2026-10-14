@@ -336,7 +336,10 @@ export const ExpenseRequestDetail = ExpenseRequestListItem.extend({
       openFlags: z.number().int().nullable(),
       signatureId: id.nullable(),
       signatureSha256: z.string().nullable(),
-      signatureSource: z.string().nullable(),
+      signatureSource: z
+        .string()
+        .nullable()
+        .meta({ description: 'profile | captured | none | company (ADR 0025: signed with the PT\'s definitive Direktur signature by a designated representative; actorName = that Direktur).' }),
     }),
   ),
   receipts: z.array(
@@ -420,6 +423,13 @@ export const ExpenseRequestDetail = ExpenseRequestListItem.extend({
     .meta({ description: 'US-26 preview (committed % before → after); cost centers: "none" (Q-24). Owner 2026-10-11: "none" + nulls for callers without a money role in the PT (Staff) — the % with the total would reveal the RAB.' }),
   openWarningFlags: z.number().int(),
   allowedActions: z.array(ActionEnum).meta({ description: 'UI hint; the server re-checks every action.' }),
+  direkturSignature: z
+    .object({ name: z.string(), title: z.string().nullable(), signatureId: id })
+    .nullable()
+    .meta({
+      description:
+        'ADR 0025: non-null when the decision the caller may take now is a Direktur step of a PT with a definitive Direktur and the caller is one of its designated representatives. The decision is then signed with the PT\'s Direktur signature (signatureId, media-signatures; readable by the office roles of the PT) and shown under `name` — show it read-only ("Tanda tangan Direktur PT") instead of asking for a signature; a sent signatureMediaId is ignored. The server decides again at the decision.',
+    }),
   resubmitOfId: id.nullable(),
   resubmitOf: z.object({ id, docNo: z.string().nullable(), title: z.string() }).nullable(),
   submittedAt: z.string().nullable(),

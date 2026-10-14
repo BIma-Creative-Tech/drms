@@ -1,6 +1,6 @@
 # ADR 0007 — Document numbering (configurable per document type, client format by default)
 
-- **Status:** accepted (user, GATE F0 2026-09-23); revised 2026-09-23 after the F1 spike (user-approved) the F1 foundation and F2a (see Revision history); multi-company revision proposed 2026-09-27 (ADR 0016, section "Revisi 2026-09-27")
+- **Status:** accepted (user, GATE F0 2026-09-23); revised 2026-09-23 after the F1 spike (user-approved) the F1 foundation and F2a (see Revision history); multi-company revision proposed 2026-09-27 (ADR 0016, section "Revisi 2026-09-27"); **amended 2026-10-13: one-time controlled renumbering** (section "Amendment 2026-10-13")
 - **Date:** 2026-09-23
 - **Author:** Analyst/Architect — Phase 0
 - **Related:** requirements v1.0 §1 finding #8, §6 (company settings "format penomoran"), §7 (T1 `PG/YYMM/####`,
@@ -172,6 +172,84 @@ This closes Q-54 (cross-PT repetition of `TRF/2609/0001`) by configuration, as f
   BEFORE taking a counter value.
 - APK: no number parsing (numbers are opaque strings; test fixtures keep the historical paper number).
 
+## Amendment 2026-10-13 (DRMS 13/10 Umum #1 — one-time controlled renumbering)
+
+*Status of this amendment: accepted (owner decision D1, DRMS 13/10 review, 2026-10-13). It is a **one-time exception**
+to "issued numbers are never rewritten" (§6, §7, Security implications, Rollback); that rule stays in force for every
+other change, before and after the run.*
+
+**Context.** Client (Umum #1): "Reset penomoran dari 1 dan bentuk ulang nomor yang sudah ada berdasarkan tanggal
+dibuat. Kas Masuk belum ada kode singkat PT." Since D5 + the PB monthly reset (Revisi 2026-10-12) every NEW number has
+the shape `<DOC>/{COMPANY}/{YY}{MM}/{seq}`, monthly from 1 per PT — but documents issued before keep their old numbers
+(paper series `229/PB-…`, `PB/<PT>/2610/0238` from the `never` counter, `KM/2610/0001` without the PT code where an
+Admin had customised the KM pattern, which D5 deliberately left alone). Mixed shapes in one month are what the client
+objects to. The DB was built to make that impossible: `pk_protect_columns('doc_no', …)`, the immutability guards of the
+posted ledger / transfers / settled LPJ / final addenda and loans, monotonic counters, and copies of the number in
+notifications, receipt flags and cash-entry descriptions.
+
+**Decision.** Renumber **once**, as a controlled operation outside the deploy:
+
+1. **What.** Every issued number of our own documents — `expense_requests`, `transfers`, `settlements`, `cash_entries`
+   (`entry_no`, KM/KK by direction), `progress_reports`, `budget_addenda`, `service_reports`, `daily_reports`,
+   `project_loans` — of the PTs in scope, cancelled / void / reversal documents included, closed periods included
+   (amounts, dates and accounts never change; only the label). Not renumbered: drafts (no number) and
+   `aftersales_activities.doc_no` (the client's external Q/PO/SJ/INV number).
+2. **How a number is formed.** Group = PT × sequence doc type × period of the document; the period comes from the SAME
+   date the allocator uses (§2: request / transfer / entry / report / loan date; LPJ and addendum are numbered "today"
+   at submit → the time of their first `number_issued` audit row, else the submit time), in the sequence timezone.
+   Inside a group: order by `created_at`, tie-break id → `startAt`, `startAt + 1`, … (1 for every default sequence).
+   Format = the CURRENT pattern of the doc type in that PT. A pattern without `{COMPANY}` (e.g. a customised
+   `KM/{YY}{MM}/{seq}`) is first moved to the D5 default of its type (`KM/{COMPANY}/{YY}{MM}/{seq}`, 4 digits,
+   monthly, start 1; audited `update` field `pattern`). Patterns with `{COMPANY}` an Admin chose are kept (reset policy
+   / start ≠ monthly / 1 are reported as warnings in the dry-run).
+3. **Where the number is copied** (rewritten in the same transaction, one-pass whole-token replacement per PT, so a swap
+   A↔B is safe and `29/PB-…` never matches inside `229/PB-…`): `cash_entries.description` ("Transfer TRF/… — PB/…",
+   "Pengembalian LPJ …", "Transfer kekurangan LPJ …", "Jurnal balik KM/…: …" — manual descriptions quoting a number
+   too); `notifications.doc_no` / `title` / `body`; `receipt_flags.message` / `detail.otherDocNo` (duplicate-receipt
+   flag about another request). An old string that two documents of one PT share is never replaced in text (dry-run
+   warning). **Not rewritten:** `audit_logs` (Class A, append-only — ADR 0006; older rows keep the number they were
+   written with, the new `renumbered` row links old → new), free text typed by users (notes, reasons), and PDFs /
+   printouts already handed out (PDFs are rendered on demand, so a new download shows the new number). Payload rows'
+   `updated_at` moves, so the APK re-syncs the new numbers.
+4. **Counters.** For every group the counter `(company_id, doc_type, period_key)` = last assigned number + 1 (may go
+   DOWN: gaps of the old series are closed); a policy-shaped counter of a period without documents → `startAt`; other
+   keys (legacy `ALL` of the old `never` PB series) are left alone. The next new document gets n + 1.
+5. **Audit.** One `audit_logs` row per renumbered document: action **`renumbered`** (new enum value), field `docNo` /
+   `entryNo`, old → new, source `system`, the PT, the SAME `tx_id` as the change (one event id per run); one row
+   per rewritten cash-entry description (field `description`). The "Log perubahan" / "Riwayat" show it as
+   "Nomor diubah: lama → baru". Per PT one row in `document_renumber_runs` (operator, plan sha256, counts, counters,
+   pattern fixes).
+6. **Mechanism — the guards stay on.** Migration `20261013_610000_d1310_renumber` (a normal migration; it changes no
+   document) adds `pk_renumber_bypass(table, old, new)`, TRUE only when ALL of: the session flag
+   `SET LOCAL pk.renumber = 'on'`; a `running` row in `document_renumber_runs` for the **current txid** (only the owner
+   can insert it: INSERT/UPDATE revoked from the app role; one row per PT ever, UNIQUE); and the row change touches
+   nothing but the renumbered columns of that table (`doc_no` · `entry_no` + `description` · notification `doc_no` /
+   `title` / `body` · receipt-flag `message` / `detail` · counter `next_value`, plus `updated_at`). The guards
+   (`pk_protect_columns`, `pk_counter_monotonic`, the expense-request / transfer / LPJ / ledger / progress / field-report /
+   addendum / loan / receipt-flag guards and the deferred freeze checks) get a 3-line prelude after their top-level
+   `BEGIN` that returns early only in that case; it is inserted into the current function definitions, so every
+   guard body is unchanged. Without flag + run, or for any other column, every ordinary write is blocked exactly as
+   before (integration test `d1310-w4-renumber`, also checked by the CLI's `--verify`).
+7. **Delivery.** NOT a deploy migration: CLI `apps/web/src/renumber/cli.ts` run by the infra Lead in the migrate image
+   with the owner DSN — `--dry-run` (read-only transaction; full old → new mapping as JSON + CSV, derived-text
+   changes, counters, pattern fixes, plan sha256) → review → `--apply --expect-sha256 <reviewed>` (ONE transaction:
+   tables locked SHARE ROW EXCLUSIVE — reads go on, writes wait; refuses when the plan differs from the reviewed one,
+   when a PT in scope was already renumbered, or on any plan error; deferred checks fired and duplicates per
+   PT × table checked before COMMIT; any error → ROLLBACK, nothing changed) → `--verify`. Runbook
+   `../runbooks/penomoran-ulang.md` (backup → staging dry-run → review → staging apply → verify → prod by the infra
+   Lead only with the owner's go).
+8. **Afterwards.** The rule "issued numbers are never rewritten" applies again without exception. A second run for a
+   PT is refused by the database (`document_renumber_runs` UNIQUE per PT); a PT created later never needs it (its
+   numbers are born in the D5 shape). Any future renumbering needs a new ADR decision.
+
+**Consequences.** Numbers on paper / PDFs printed before the run no longer match the system — the dry-run CSV
+(old → new) is kept with the run as the conversion list for auditors and the client. The audit trail stays complete:
+old rows keep the old number, the `renumbered` row (same txid) links it to the new one. External systems that stored
+our numbers (none integrated yet; ADR 0009 Odoo mirror not live) would need the mapping too.
+
+**Rollback.** Restore the pre-run dump (taken by the runbook right before `--apply`). There is no "un-renumber": the
+migration's `down` refuses once a run exists.
+
 ## Revision history
 
 - **2026-09-23 (F0 gate):** accepted by user.
@@ -192,3 +270,4 @@ This closes Q-54 (cross-PT repetition of `TRF/2609/0001`) by configuration, as f
   unchanged (warning). Runbook `runbooks/import-data-golive.md`. Status stays accepted.
 - **2026-09-27 (ADR 0016, multi-company):** section "Revisi 2026-09-27 (ADR 0016)" added (proposed; takes effect with phase MC). Status stays accepted.
 - **2026-10-12 (D5, DRMS 10/10):** section "Revisi 2026-10-12 (D5)" added — all defaults carry `{COMPANY}`; migration of untouched default patterns; reset policies unchanged. Status stays accepted.
+- **2026-10-13 (DRMS 13/10 Umum #1, owner decision D1):** "Amendment 2026-10-13" added — one-time controlled renumbering (migration `20261013_610000_d1310_renumber`: session flag + owner run row; CLI `src/renumber/cli.ts`; runbook `runbooks/penomoran-ulang.md`). The never-rewrite rule stays in force afterwards. Status stays accepted.
