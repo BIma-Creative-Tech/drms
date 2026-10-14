@@ -314,6 +314,8 @@ const ROUTE_CLASSES: Record<string, RouteClass> = {
   'GET /transfer-queue': 'selection',
   'GET /approvals/inbox': 'selection',
   'GET /lpj-queue': 'selection',
+  // ADR 0028: payee directory — the paying PT is named by ?company= and Finance / PM / Direktur is checked IN that PT
+  'GET /intercompany/payees': 'named-pt',
   'GET /lpj-shortfall-approvals/inbox': 'selection',
   'GET /cash-entries': 'selection',
   'GET /cash-accounts/balances': 'selection',

@@ -59,7 +59,10 @@ export function RequestSummary({ d, ptName, attachments, canRevealBank, draftBan
       ? { bankName: draftBank.bankName, accountHolder: draftBank.accountHolder, masked: draftBank.accountNoMasked, canReveal: draftBank.canReveal }
       : null
   if (vendorPay) add('Vendor', d.vendor && 'name' in d.vendor ? String(d.vendor.name ?? '') : '', 'vendor')
-  if (icPay) add('PT penerima', d.payeeCompany ? [d.payeeCompany.shortCode, d.payeeCompany.name].filter(Boolean).join(' — ') : '', 'payeeCompany')
+  if (icPay) {
+    const pc = d.payeeCompany as { shortCode?: unknown; name?: unknown } | null
+    add('PT penerima', pc ? [pc.shortCode, pc.name].filter((x) => typeof x === 'string' && x).join(' — ') : '', 'payeeCompany')
+  }
   add(
     vendorPay ? 'Rekening vendor' : icPay ? 'Rekening penerimaan antar-PT' : 'Rekening tujuan',
     bank ? (

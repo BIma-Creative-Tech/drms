@@ -411,8 +411,11 @@ describe('QA-11 — "Pengembalian LPJ" (LPJ) per PT, pre-check before the upload
     for (const id of [await mk('C', true), await mk('B', false)]) {
       const r = await sqlAs('app', "SELECT name, active FROM cash_in_sources WHERE company_id = $1 AND code = 'LPJ'", [id])
       expect(r.rows, String(id)).toEqual([{ name: 'Pengembalian LPJ', active: true }])
+      // ADR 0028: + the system source "Antar PT" (ANTAR-PT) — one audited create per system source
+      const ic = await sqlAs('app', "SELECT name, active FROM cash_in_sources WHERE company_id = $1 AND code = 'ANTAR-PT'", [id])
+      expect(ic.rows, String(id)).toEqual([{ name: 'Antar PT', active: true }])
       const a = await sqlAs('app', "SELECT count(DISTINCT doc_id)::int AS n FROM audit_logs WHERE doc_type = 'cash_in_source' AND action = 'create' AND company_id = $1", [id])
-      expect(Number(a.rows[0]?.n)).toBe(1)
+      expect(Number(a.rows[0]?.n)).toBe(2)
     }
   })
 
