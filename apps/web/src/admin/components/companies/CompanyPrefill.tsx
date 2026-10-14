@@ -8,6 +8,7 @@ import { CompanyBadge } from './CompanyBadge'
  * DRMS 13/10 Pengajuan #1/#2: the create form's PT when exactly one PT is possible (one membership with the
  * create role, or the PT switcher on one PT) — set once into the form state (without marking the form as
  * modified: no "unsaved changes" prompt for a value the user did not type) and shown read-only as the PT badge.
+ * The value normally arrives already in the initial form state (companyField `defaultValue`); this effect is a fallback.
  */
 export function CompanyPrefill({ path, id, shortCode, name }: { path: string; id: number; shortCode: string; name: string | null }) {
   const { value, setValue } = useField<number | { id: number } | null>({ path })
