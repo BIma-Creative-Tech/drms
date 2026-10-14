@@ -58,6 +58,10 @@ export const RENUMBER_NEUTRAL_FUNCTIONS = [
   // ADR 0027 (20261013_700100, vendor payments): its status check covers statuses a vendor row never reaches and its
   // vendor-account check runs only when vendor / account change → a number-only change passes
   'pk_expense_vendor_guard',
+  // ADR 0028 (20261014_100200, intercompany): deferred link consistency — fired only when `status` changes
+  // (`UPDATE OF status` + WHEN) on cash_entries / transfers; the KM link check runs on INSERT only
+  'pk_ic_consistency',
+  'pk_ic_entry_linked',
 ] as const
 
 const PRELUDE = `
