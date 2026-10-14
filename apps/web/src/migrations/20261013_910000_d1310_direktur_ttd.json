@@ -4784,6 +4784,14 @@
           "primaryKey": false,
           "notNull": false
         },
+        "payee_type": {
+          "name": "payee_type",
+          "type": "enum_approval_rules_payee_type",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'any'"
+        },
         "priority": {
           "name": "priority",
           "type": "numeric",
@@ -6855,6 +6863,14 @@
           "primaryKey": false,
           "notNull": false
         },
+        "payee_type": {
+          "name": "payee_type",
+          "type": "enum_expense_requests_payee_type",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'karyawan'"
+        },
         "type": {
           "name": "type",
           "type": "enum_expense_requests_type",
@@ -6902,6 +6918,42 @@
         },
         "bank_account_id": {
           "name": "bank_account_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "vendor_id": {
+          "name": "vendor_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "vendor_bank_account_id": {
+          "name": "vendor_bank_account_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "invoice_no": {
+          "name": "invoice_no",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "invoice_date": {
+          "name": "invoice_date",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "invoice_due_date": {
+          "name": "invoice_due_date",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "invoice_file_id": {
+          "name": "invoice_file_id",
           "type": "integer",
           "primaryKey": false,
           "notNull": false
@@ -7105,6 +7157,21 @@
           "method": "btree",
           "with": {}
         },
+        "expense_requests_payee_type_idx": {
+          "name": "expense_requests_payee_type_idx",
+          "columns": [
+            {
+              "expression": "payee_type",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
         "expense_requests_status_idx": {
           "name": "expense_requests_status_idx",
           "columns": [
@@ -7170,6 +7237,66 @@
           "columns": [
             {
               "expression": "bank_account_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "expense_requests_vendor_idx": {
+          "name": "expense_requests_vendor_idx",
+          "columns": [
+            {
+              "expression": "vendor_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "expense_requests_vendor_bank_account_idx": {
+          "name": "expense_requests_vendor_bank_account_idx",
+          "columns": [
+            {
+              "expression": "vendor_bank_account_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "expense_requests_invoice_no_idx": {
+          "name": "expense_requests_invoice_no_idx",
+          "columns": [
+            {
+              "expression": "invoice_no",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "expense_requests_invoice_file_idx": {
+          "name": "expense_requests_invoice_file_idx",
+          "columns": [
+            {
+              "expression": "invoice_file_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -7360,6 +7487,45 @@
           "tableTo": "employee_bank_accounts",
           "columnsFrom": [
             "bank_account_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "expense_requests_vendor_id_vendors_id_fk": {
+          "name": "expense_requests_vendor_id_vendors_id_fk",
+          "tableFrom": "expense_requests",
+          "tableTo": "vendors",
+          "columnsFrom": [
+            "vendor_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "expense_requests_vendor_bank_account_id_vendor_bank_accounts_id_fk": {
+          "name": "expense_requests_vendor_bank_account_id_vendor_bank_accounts_id_fk",
+          "tableFrom": "expense_requests",
+          "tableTo": "vendor_bank_accounts",
+          "columnsFrom": [
+            "vendor_bank_account_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "expense_requests_invoice_file_id_media_attachments_id_fk": {
+          "name": "expense_requests_invoice_file_id_media_attachments_id_fk",
+          "tableFrom": "expense_requests",
+          "tableTo": "media_attachments",
+          "columnsFrom": [
+            "invoice_file_id"
           ],
           "columnsTo": [
             "id"
@@ -20496,6 +20662,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "vendor_bank_accounts_id": {
+          "name": "vendor_bank_accounts_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
         "projects_id": {
           "name": "projects_id",
           "type": "integer",
@@ -20941,6 +21113,21 @@
           "columns": [
             {
               "expression": "vendors_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "payload_locked_documents_rels_vendor_bank_accounts_id_idx": {
+          "name": "payload_locked_documents_rels_vendor_bank_accounts_id_idx",
+          "columns": [
+            {
+              "expression": "vendor_bank_accounts_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -21783,6 +21970,19 @@
           "tableTo": "vendors",
           "columnsFrom": [
             "vendors_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "payload_locked_documents_rels_vendor_bank_accounts_fk": {
+          "name": "payload_locked_documents_rels_vendor_bank_accounts_fk",
+          "tableFrom": "payload_locked_documents_rels",
+          "tableTo": "vendor_bank_accounts",
+          "columnsFrom": [
+            "vendor_bank_accounts_id"
           ],
           "columnsTo": [
             "id"
@@ -22901,6 +23101,249 @@
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
+    },
+    "public.vendor_bank_accounts": {
+      "name": "vendor_bank_accounts",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "company_id": {
+          "name": "company_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "vendor_id": {
+          "name": "vendor_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "bank_id": {
+          "name": "bank_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "account_no": {
+          "name": "account_no",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "account_holder": {
+          "name": "account_holder",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "label": {
+          "name": "label",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "is_default": {
+          "name": "is_default",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false,
+          "default": false
+        },
+        "verification_status": {
+          "name": "verification_status",
+          "type": "enum_vendor_bank_accounts_verification_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'unverified'"
+        },
+        "active": {
+          "name": "active",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false,
+          "default": true
+        },
+        "uuid": {
+          "name": "uuid",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp(3) with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp(3) with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "vendor_bank_accounts_company_idx": {
+          "name": "vendor_bank_accounts_company_idx",
+          "columns": [
+            {
+              "expression": "company_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "vendor_bank_accounts_vendor_idx": {
+          "name": "vendor_bank_accounts_vendor_idx",
+          "columns": [
+            {
+              "expression": "vendor_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "vendor_bank_accounts_bank_idx": {
+          "name": "vendor_bank_accounts_bank_idx",
+          "columns": [
+            {
+              "expression": "bank_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "vendor_bank_accounts_active_idx": {
+          "name": "vendor_bank_accounts_active_idx",
+          "columns": [
+            {
+              "expression": "active",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "vendor_bank_accounts_uuid_idx": {
+          "name": "vendor_bank_accounts_uuid_idx",
+          "columns": [
+            {
+              "expression": "uuid",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "vendor_bank_accounts_updated_at_idx": {
+          "name": "vendor_bank_accounts_updated_at_idx",
+          "columns": [
+            {
+              "expression": "updated_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "vendor_bank_accounts_created_at_idx": {
+          "name": "vendor_bank_accounts_created_at_idx",
+          "columns": [
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "vendor_bank_accounts_company_id_companies_id_fk": {
+          "name": "vendor_bank_accounts_company_id_companies_id_fk",
+          "tableFrom": "vendor_bank_accounts",
+          "tableTo": "companies",
+          "columnsFrom": [
+            "company_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "vendor_bank_accounts_vendor_id_vendors_id_fk": {
+          "name": "vendor_bank_accounts_vendor_id_vendors_id_fk",
+          "tableFrom": "vendor_bank_accounts",
+          "tableTo": "vendors",
+          "columnsFrom": [
+            "vendor_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "vendor_bank_accounts_bank_id_banks_id_fk": {
+          "name": "vendor_bank_accounts_bank_id_banks_id_fk",
+          "tableFrom": "vendor_bank_accounts",
+          "tableTo": "banks",
+          "columnsFrom": [
+            "bank_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
     }
   },
   "enums": {
@@ -23739,7 +24182,8 @@
         "2fa_disabled",
         "privacy_ack",
         "overdraft_confirmed",
-        "bank_unverified_confirmed"
+        "bank_unverified_confirmed",
+        "renumbered"
       ]
     },
     "public.enum_audit_logs_source": {
@@ -23786,6 +24230,31 @@
         "dailyReminders",
         "mediaOrphanCleanup",
         "stampSelfie"
+      ]
+    },
+    "public.enum_vendor_bank_accounts_verification_status": {
+      "name": "enum_vendor_bank_accounts_verification_status",
+      "schema": "public",
+      "values": [
+        "unverified",
+        "verified"
+      ]
+    },
+    "public.enum_approval_rules_payee_type": {
+      "name": "enum_approval_rules_payee_type",
+      "schema": "public",
+      "values": [
+        "any",
+        "karyawan",
+        "vendor"
+      ]
+    },
+    "public.enum_expense_requests_payee_type": {
+      "name": "enum_expense_requests_payee_type",
+      "schema": "public",
+      "values": [
+        "karyawan",
+        "vendor"
       ]
     }
   },
